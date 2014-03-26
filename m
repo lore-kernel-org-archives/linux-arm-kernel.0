@@ -1,359 +1,196 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Mar 2014 16:39:25 +0000
-Subject: [PATCH 11/15] mtd: st_spi_fsm: Update the JEDEC probe to handle
- extended READIDs
+Date: Wed, 26 Mar 2014 16:39:21 +0000
+Subject: [PATCH 07/15] mtd: st_spi_fsm: Extend fsm_clear_fifo to handle
+ unwanted bytes
 In-Reply-To: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
 References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395851969-13520-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395851969-13520-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Angus Clark <angus.clark@st.com>
 
-The previous code was based on 3-byte JEDEC IDs, with a possible 2-byte
-extension.  However, devices are now emerging that return 6 or more bytes of
-READID data and the additional bytes are required to differentiate between
-variants or generations of similar devices.
+Under certain conditions, the SPI-FSM Controller can be left in a state where
+the data FIFO is not entirely empty.  This can lead to problems where subsequent
+data transfers appear to have been shifted by a number of unidentified bytes.
 
-This patch refactors the device table and JEDEC probe code to handle arbitrary
-length READIDs, with the standard JEDEC definition now becoming a special case.
-Functionally, there should be no change in behaviour.  A subsequent patch will
-update the table with extended READIDs where applicable.
+One simple example would be an errant FSM sequence which loaded more data to the
+FIFO than was read by the host.  Another more interesting case results from an
+obscure artefact in the FSM Controller.  When switching from data transfers in
+x4 or x2 mode to data transfers in x1 mode, extraneous bytes will appear in the
+FIFO, unless the previous data transfer was a multiple of 32 cycles (i.e. 8
+bytes for x2, and 16 bytes for x4).  This applies equally whether FSM is being
+operated directly by a S/W driver, or by the SPI boot-controller in FSM-Boot
+mode.  Furthermore, data in the FIFO not only survive a transition between
+FSM-Boot and FSM, but also a S/W reset of IP block [1].
+
+By taking certain precautions, it is possible to prevent the driver from causing
+this type of problem (e.g. ensuring that the host and programmed sequence
+agree on the transfer size, and restricting transfer sizes to multiples of
+32-cycles [2]).  However, at the point the driver is loaded, no assumptions can be
+made regarding the state of the FIFO.  Even if previous S/W drivers have behaved
+correctly, it is impossible to control the number of transactions serviced by
+the controller operating in FSM-Boot.
+
+To address this problem, we ensure the FIFO is cleared during initialisation,
+before performing any FSM operations.  Previously, the fsm_clear_fifo() code was
+capable of detecting and clearing any unwanted 32-bit words from the FIFO.  This
+patch extends the capability to handle an arbitrary number of bytes present in
+the FIFO [3].  Now that the issue is better understood, we also remove the calls
+to fsm_clear_fifo() following the fsm_read() and fsm_write() operations.
+
+The process of actually clearing the FIFO deserves a mention.  While the FIFO
+may contain any number of bytes, the SPI_FAST_SEQ_STA register only reports the
+number of complete 32-bit words present.  Furthermore, data can only be drained
+from the FIFO by reading complete 32-bit words.  With this in mind, a two stage
+process is used to the clear the FIFO:
+
+    1. Read any complete 32-bit words from the FIFO, as reported by the
+           SPI_FAST_SEQ_STA register.
+
+    2. Mop up any remaining bytes.  At this point, it is not known if there
+           are 0, 1, 2, or 3 bytes in the FIFO.  To handle all cases, a dummy
+           FSM sequence is used to load one byte at a time, until a complete
+           32-bit word is formed; at most, 4 bytes will need to be loaded.
+
+[1] Although this issue has existed since early versions of the SPI-FSM
+    controller, its full extent only emerged recently as a consequence of the
+    targetpacks starting to use FSM-Boot(x4) as the default configuration.
+
+[2] The requirement to restrict transfers to multiples of 32 cycles was found
+    empirically back when DUAL and QUAD mode support was added.  The current
+    analysis now gives a satisfactory explanation for this requirement.
+
+[3] Theoretically, it is possible for the FIFO to contain an arbitrary number of
+    bits.  However, since there are no known use-cases that leave incomplete
+    bytes in the FIFO, only words and bytes are considered here.
 
 Signed-off-by: Angus Clark <angus.clark@st.com>
-Signed-off-by: Carmelo Amoroso <carmelo.amoroso@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 207 +++++++++++++++++++++++----------------
- 1 file changed, 120 insertions(+), 87 deletions(-)
+ drivers/mtd/devices/st_spi_fsm.c | 96 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 80 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 99b3435..ced7dca 100644
+index 8c56b94..9df59e7 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -20,6 +20,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/sched.h>
-+#include <linux/sort.h>
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/of.h>
-@@ -256,6 +257,11 @@
- #define FLASH_STATUS_BP2       0x10
- #define FLASH_STATUS_SRWP0     0x80
- #define FLASH_STATUS_TIMEOUT   0xff
-+
-+/* Maximum READID length */
-+#define MAX_READID_LEN         6
-+#define MAX_READID_LEN_ALIGNED ALIGN(MAX_READID_LEN, 4)
-+
- /* S25FL Error Flags */
- #define S25FL_STATUS_E_ERR     0x20
- #define S25FL_STATUS_P_ERR     0x40
-@@ -340,13 +346,9 @@ struct seq_rw_config {
- /* SPI Flash Device Table */
- struct flash_info {
- 	char            *name;
--	/*
--	 * JEDEC id zero means "no ID" (most older chips); otherwise it has
--	 * a high byte of zero plus three data bytes: the manufacturer id,
--	 * then a two byte device id.
--	 */
--	u32             jedec_id;
--	u16             ext_id;
-+	/* READID data, as returned by 'FLASH_CMD_RDID' (0x9f). */
-+	u8              readid[MAX_READID_LEN];
-+	int             readid_len;
- 	/*
- 	 * The size listed here is what works with FLASH_CMD_SE, which isn't
- 	 * necessarily called a "sector" by the vendor.
-@@ -362,6 +364,38 @@ struct flash_info {
- 	int             (*config)(struct stfsm *);
+@@ -698,6 +698,23 @@ static struct stfsm_seq stfsm_seq_write_status = {
+ 		    SEQ_CFG_STARTSEQ),
  };
  
-+/* Device with standard 3-byte JEDEC ID */
-+#define JEDEC_INFO(_name, _jedec_id, _sector_size, _n_sectors,	\
-+		   _flags, _max_freq, _config)			\
-+	{							\
-+		.name = (_name),				\
-+		.readid[0] = ((_jedec_id) >> 16 & 0xff),	\
-+		.readid[1] = ((_jedec_id) >>  8 & 0xff),	\
-+		.readid[2] = ((_jedec_id) >>  0 & 0xff),	\
-+		.readid_len = 3,				\
-+		.sector_size = (_sector_size),			\
-+		.n_sectors = (_n_sectors),			\
-+		.flags = (_flags),				\
-+		.max_freq = (_max_freq),			\
-+		.config = (_config)				\
-+	}
++/* Dummy sequence to read one byte of data from flash into the FIFO */
++static const struct stfsm_seq stfsm_seq_load_fifo_byte = {
++	.data_size = TRANSFER_SIZE(1),
++	.seq_opc[0] = (SEQ_OPC_PADS_1 |
++		       SEQ_OPC_CYCLES(8) |
++		       SEQ_OPC_OPCODE(FLASH_CMD_RDID)),
++	.seq = {
++		STFSM_INST_CMD1,
++		STFSM_INST_DATA_READ,
++		STFSM_INST_STOP,
++	},
++	.seq_cfg = (SEQ_CFG_PADS_1 |
++		    SEQ_CFG_READNOTWRITE |
++		    SEQ_CFG_CSDEASSERT |
++		    SEQ_CFG_STARTSEQ),
++};
 +
-+/* Device with arbitrary-length READID */
-+#define RDID(...) __VA_ARGS__  /* Dummy macro to protect array argument. */
-+#define RDID_INFO(_name, _readid, _readid_len, _sector_size,	\
-+		  _n_sectors, _flags, _max_freq, _config)	\
-+	{							\
-+		.name = (_name),				\
-+		.readid = _readid,				\
-+		.readid_len = _readid_len,			\
-+		.flags = (_flags),				\
-+		.sector_size = (_sector_size),			\
-+		.n_sectors = (_n_sectors),			\
-+		.flags = (_flags),				\
-+		.max_freq = (_max_freq),			\
-+		.config = (_config)				\
-+	}
-+
- static int stfsm_n25q_config(struct stfsm *fsm);
- static int stfsm_mx25_config(struct stfsm *fsm);
- static int stfsm_s25fl_config(struct stfsm *fsm);
-@@ -374,19 +408,19 @@ static struct flash_info flash_types[] = {
- 	 * (eg faster operating frequency)
- 	 */
- #define M25P_FLAG (FLASH_FLAG_READ_WRITE | FLASH_FLAG_READ_FAST)
--	{ "m25p40",  0x202013, 0,  64 * 1024,   8, M25P_FLAG, 25, NULL },
--	{ "m25p80",  0x202014, 0,  64 * 1024,  16, M25P_FLAG, 25, NULL },
--	{ "m25p16",  0x202015, 0,  64 * 1024,  32, M25P_FLAG, 25, NULL },
--	{ "m25p32",  0x202016, 0,  64 * 1024,  64, M25P_FLAG, 50, NULL },
--	{ "m25p64",  0x202017, 0,  64 * 1024, 128, M25P_FLAG, 50, NULL },
--	{ "m25p128", 0x202018, 0, 256 * 1024,  64, M25P_FLAG, 50, NULL },
-+	JEDEC_INFO("m25p40",  0x202013,  64 * 1024,   8, M25P_FLAG, 25, NULL),
-+	JEDEC_INFO("m25p80",  0x202014,  64 * 1024,  16, M25P_FLAG, 25, NULL),
-+	JEDEC_INFO("m25p16",  0x202015,  64 * 1024,  32, M25P_FLAG, 25, NULL),
-+	JEDEC_INFO("m25p32",  0x202016,  64 * 1024,  64, M25P_FLAG, 50, NULL),
-+	JEDEC_INFO("m25p64",  0x202017,  64 * 1024, 128, M25P_FLAG, 50, NULL),
-+	JEDEC_INFO("m25p128", 0x202018, 256 * 1024,  64, M25P_FLAG, 50, NULL),
- 
- #define M25PX_FLAG (FLASH_FLAG_READ_WRITE      |	\
- 		    FLASH_FLAG_READ_FAST        |	\
- 		    FLASH_FLAG_READ_1_1_2       |	\
- 		    FLASH_FLAG_WRITE_1_1_2)
--	{ "m25px32", 0x207116, 0,  64 * 1024,  64, M25PX_FLAG, 75, NULL },
--	{ "m25px64", 0x207117, 0,  64 * 1024, 128, M25PX_FLAG, 75, NULL },
-+	JEDEC_INFO("m25px32", 0x207116,  64 * 1024,  64, M25PX_FLAG, 75, NULL),
-+	JEDEC_INFO("m25px64", 0x207117,  64 * 1024, 128, M25PX_FLAG, 75, NULL),
- 
- 	/* Macronix MX25xxx
- 	 *     - Support for 'FLASH_FLAG_WRITE_1_4_4' is omitted for devices
-@@ -399,15 +433,12 @@ static struct flash_info flash_types[] = {
- 		   FLASH_FLAG_READ_1_1_4        |	\
- 		   FLASH_FLAG_SE_4K             |	\
- 		   FLASH_FLAG_SE_32K)
--	{ "mx25l3255e",  0xc29e16, 0, 64 * 1024, 64,
--	  (MX25_FLAG | FLASH_FLAG_WRITE_1_4_4), 86,
--	  stfsm_mx25_config},
--	{ "mx25l25635e", 0xc22019, 0, 64*1024, 512,
--	  (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
--	  stfsm_mx25_config },
--	{ "mx25l25655e", 0xc22619, 0, 64*1024, 512,
--	  (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
--	  stfsm_mx25_config},
-+	JEDEC_INFO("mx25l3255e",  0xc29e16, 64 * 1024, 64,
-+		   (MX25_FLAG | FLASH_FLAG_WRITE_1_4_4), 86, stfsm_mx25_config),
-+	JEDEC_INFO("mx25l25635e", 0xc22019, 64 * 1024, 512,
-+		   (MX25_FLAG | FLASH_FLAG_RESET), 70, stfsm_mx25_config),
-+	JEDEC_INFO("mx25l25655e", 0xc22619, 64 * 1024, 512,
-+		   (MX25_FLAG | FLASH_FLAG_RESET), 70, stfsm_mx25_config),
- 
- 	/* Micron N25Qxxx */
- #define N25Q_FLAG (FLASH_FLAG_READ_WRITE       |	\
-@@ -420,8 +451,8 @@ static struct flash_info flash_types[] = {
- 		   FLASH_FLAG_WRITE_1_2_2       |	\
- 		   FLASH_FLAG_WRITE_1_1_4       |	\
- 		   FLASH_FLAG_WRITE_1_4_4)
--	{ "n25q128", 0x20ba18, 0, 64 * 1024,  256, N25Q_FLAG, 108,
--	  stfsm_n25q_config },
-+	JEDEC_INFO("n25q128", 0x20ba18, 64 * 1024,  256,
-+		   N25Q_FLAG, 108, stfsm_n25q_config),
- 
-        /* Micron N25Q256/N25Q512/N25Q00A (32-bit ADDR devices)
-         *
-@@ -439,12 +470,12 @@ static struct flash_info flash_types[] = {
- 				FLASH_FLAG_32BIT_ADDR  |	\
- 				FLASH_FLAG_RESET)      &	\
- 			       ~FLASH_FLAG_WRITE_1_4_4)
--	{ "n25q256", 0x20ba19,      0, 64 * 1024,   512,
--	  N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config},
--	{ "n25q512", 0x20ba20, 0x1000, 64 * 1024,  1024,
--	  N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config},
--	{ "n25q00a", 0x20ba21, 0x1000, 64 * 1024,  2048,
--	  N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config},
-+	JEDEC_INFO("n25q256", 0x20ba19, 64 * 1024,   512,
-+		   N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config),
-+	RDID_INFO("n25q512", RDID({0x20, 0xba, 0x20, 0x10, 0x00}), 5, 64 * 1024,
-+		  1024, N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config),
-+	RDID_INFO("n25q00a", RDID({0x20, 0xba, 0x21, 0x10, 0x00}), 5, 64 * 1024,
-+		  2048, N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config),
- 
- 	/*
- 	 * Spansion S25FLxxxP
-@@ -457,12 +488,12 @@ static struct flash_info flash_types[] = {
- 			FLASH_FLAG_READ_1_4_4   |	\
- 			FLASH_FLAG_WRITE_1_1_4  |	\
- 			FLASH_FLAG_READ_FAST)
--	{ "s25fl032p",  0x010215, 0x4d00,  64 * 1024,  64, S25FLXXXP_FLAG, 80,
--	  stfsm_s25fl_config},
--	{ "s25fl129p0", 0x012018, 0x4d00, 256 * 1024,  64, S25FLXXXP_FLAG, 80,
--	  stfsm_s25fl_config },
--	{ "s25fl129p1", 0x012018, 0x4d01,  64 * 1024, 256, S25FLXXXP_FLAG, 80,
--	  stfsm_s25fl_config },
-+	RDID_INFO("s25fl032p", RDID({0x01, 0x02, 0x15, 0x4d, 0x00}), 5,
-+		  64 * 1024,  64, S25FLXXXP_FLAG, 80, stfsm_s25fl_config),
-+	RDID_INFO("s25fl129p0", RDID({0x01, 0x20, 0x18, 0x4d, 0x00}), 5,
-+		  256 * 1024,  64, S25FLXXXP_FLAG, 80, stfsm_s25fl_config),
-+	RDID_INFO("s25fl129p1", RDID({0x01, 0x20, 0x18, 0x4d, 0x01}), 5,
-+		  64 * 1024, 256, S25FLXXXP_FLAG, 80, stfsm_s25fl_config),
- 
- 	/*
- 	 * Spansion S25FLxxxS
-@@ -476,25 +507,24 @@ static struct flash_info flash_types[] = {
- #define S25FLXXXS_FLAG (S25FLXXXP_FLAG         |	\
- 			FLASH_FLAG_RESET        |	\
- 			FLASH_FLAG_DYB_LOCKING)
--	{ "s25fl128s0", 0x012018, 0x0300,  256 * 1024, 64, S25FLXXXS_FLAG, 80,
--	  stfsm_s25fl_config },
--	{ "s25fl128s1", 0x012018, 0x0301,  64 * 1024, 256, S25FLXXXS_FLAG, 80,
--	  stfsm_s25fl_config },
--	{ "s25fl256s0", 0x010219, 0x4d00, 256 * 1024, 128,
--	  S25FLXXXS_FLAG | FLASH_FLAG_32BIT_ADDR, 80, stfsm_s25fl_config },
--	{ "s25fl256s1", 0x010219, 0x4d01,  64 * 1024, 512,
--	  S25FLXXXS_FLAG | FLASH_FLAG_32BIT_ADDR, 80, stfsm_s25fl_config },
--
--	/* Winbond -- w25x "blocks" are 64K, "sectors" are 4KiB */
-+	RDID_INFO("s25fl128s0", RDID({0x01, 0x20, 0x18, 0x03, 0x00}), 5,
-+		  256 * 1024, 64, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
-+	RDID_INFO("s25fl128s1", RDID({0x01, 0x20, 0x18, 0x03, 0x01}), 5,
-+		  64 * 1024, 256, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
-+	RDID_INFO("s25fl256s0", RDID({0x01, 0x02, 0x19, 0x4d, 0x00}), 5,
-+		  256 * 1024, 128, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
-+	RDID_INFO("s25fl256s1", RDID({0x01, 0x02, 0x19, 0x4d, 0x01}), 5,
-+		  64 * 1024, 512, S25FLXXXS_FLAG, 80, stfsm_s25fl_config),
-+
- #define W25X_FLAG (FLASH_FLAG_READ_WRITE       |	\
- 		   FLASH_FLAG_READ_FAST         |	\
- 		   FLASH_FLAG_READ_1_1_2        |	\
- 		   FLASH_FLAG_WRITE_1_1_2)
--	{ "w25x40",  0xef3013, 0,  64 * 1024,   8, W25X_FLAG, 75, NULL },
--	{ "w25x80",  0xef3014, 0,  64 * 1024,  16, W25X_FLAG, 75, NULL },
--	{ "w25x16",  0xef3015, 0,  64 * 1024,  32, W25X_FLAG, 75, NULL },
--	{ "w25x32",  0xef3016, 0,  64 * 1024,  64, W25X_FLAG, 75, NULL },
--	{ "w25x64",  0xef3017, 0,  64 * 1024, 128, W25X_FLAG, 75, NULL },
-+	JEDEC_INFO("w25x40", 0xef3013, 64 * 1024,   8, W25X_FLAG, 75, NULL),
-+	JEDEC_INFO("w25x80", 0xef3014, 64 * 1024,  16, W25X_FLAG, 75, NULL),
-+	JEDEC_INFO("w25x16", 0xef3015, 64 * 1024,  32, W25X_FLAG, 75, NULL),
-+	JEDEC_INFO("w25x32", 0xef3016, 64 * 1024,  64, W25X_FLAG, 75, NULL),
-+	JEDEC_INFO("w25x64", 0xef3017, 64 * 1024, 128, W25X_FLAG, 75, NULL),
- 
- 	/* Winbond -- w25q "blocks" are 64K, "sectors" are 4KiB */
- #define W25Q_FLAG (FLASH_FLAG_READ_WRITE       |	\
-@@ -504,17 +534,16 @@ static struct flash_info flash_types[] = {
- 		   FLASH_FLAG_READ_1_1_4        |	\
- 		   FLASH_FLAG_READ_1_4_4        |	\
- 		   FLASH_FLAG_WRITE_1_1_4)
--	{ "w25q80",  0xef4014, 0,  64 * 1024,  16, W25Q_FLAG, 80,
--	  stfsm_w25q_config },
--	{ "w25q16",  0xef4015, 0,  64 * 1024,  32, W25Q_FLAG, 80,
--	  stfsm_w25q_config },
--	{ "w25q32",  0xef4016, 0,  64 * 1024,  64, W25Q_FLAG, 80,
--	  stfsm_w25q_config },
--	{ "w25q64",  0xef4017, 0,  64 * 1024, 128, W25Q_FLAG, 80,
--	  stfsm_w25q_config },
--
--	/* Sentinel */
--	{ NULL, 0x000000, 0, 0, 0, 0, 0, NULL },
-+	JEDEC_INFO("w25q80", 0xef4014, 64 * 1024,  16,
-+		   W25Q_FLAG, 80, stfsm_w25q_config),
-+	JEDEC_INFO("w25q16", 0xef4015, 64 * 1024,  32,
-+		   W25Q_FLAG, 80, stfsm_w25q_config),
-+	JEDEC_INFO("w25q32", 0xef4016, 64 * 1024,  64,
-+		   W25Q_FLAG, 80, stfsm_w25q_config),
-+	JEDEC_INFO("w25q64", 0xef4017, 64 * 1024, 128,
-+		   W25Q_FLAG, 80, stfsm_w25q_config),
-+
-+	{ },
- };
- 
- /*
-@@ -645,7 +674,7 @@ static struct seq_rw_config stfsm_s25fl_write4_configs[] = {
- #define W25Q_STATUS_QE			(0x1 << 1)
- 
- static struct stfsm_seq stfsm_seq_read_jedec = {
--	.data_size = TRANSFER_SIZE(8),
-+	.data_size = TRANSFER_SIZE(MAX_READID_LEN_ALIGNED),
- 	.seq_opc[0] = (SEQ_OPC_PADS_1 |
- 		       SEQ_OPC_CYCLES(8) |
- 		       SEQ_OPC_OPCODE(FLASH_CMD_RDID)),
-@@ -1963,45 +1992,49 @@ out1:
- static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+ static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
  {
- 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
--	uint32_t tmp[2];
-+	uint32_t tmp[MAX_READID_LEN_ALIGNED / 4];
- 
- 	stfsm_load_seq(fsm, seq);
- 
--	stfsm_read_fifo(fsm, tmp, 8);
-+	stfsm_read_fifo(fsm, tmp, MAX_READID_LEN_ALIGNED);
- 
--	memcpy(jedec, tmp, 5);
-+	memcpy(jedec, tmp, MAX_READID_LEN);
- 
- 	stfsm_wait_seq(fsm);
+ 	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
+@@ -730,22 +747,6 @@ static inline uint32_t stfsm_fifo_available(struct stfsm *fsm)
+ 	return (readl(fsm->base + SPI_FAST_SEQ_STA) >> 5) & 0x7f;
  }
  
-+static int stfsm_cmp_flash_info_readid_len(const void *a, const void *b)
+-static void stfsm_clear_fifo(struct stfsm *fsm)
+-{
+-	uint32_t avail;
+-
+-	for (;;) {
+-		avail = stfsm_fifo_available(fsm);
+-		if (!avail)
+-			break;
+-
+-		while (avail) {
+-			readl(fsm->base + SPI_FAST_SEQ_DATA_REG);
+-			avail--;
+-		}
+-	}
+-}
+-
+ static inline void stfsm_load_seq(struct stfsm *fsm,
+ 				  const struct stfsm_seq *seq)
+ {
+@@ -807,6 +808,69 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
+ 	}
+ }
+ 
++/*
++ * Clear the data FIFO
++ *
++ * Typically, this is only required during driver initialisation, where no
++ * assumptions can be made regarding the state of the FIFO.
++ *
++ * The process of clearing the FIFO is complicated by fact that while it is
++ * possible for the FIFO to contain an arbitrary number of bytes [1], the
++ * SPI_FAST_SEQ_STA register only reports the number of complete 32-bit words
++ * present.  Furthermore, data can only be drained from the FIFO by reading
++ * complete 32-bit words.
++ *
++ * With this in mind, a two stage process is used to the clear the FIFO:
++ *
++ *     1. Read any complete 32-bit words from the FIFO, as reported by the
++ *        SPI_FAST_SEQ_STA register.
++ *
++ *     2. Mop up any remaining bytes.  At this point, it is not known if there
++ *        are 0, 1, 2, or 3 bytes in the FIFO.  To handle all cases, a dummy FSM
++ *        sequence is used to load one byte at a time, until a complete 32-bit
++ *        word is formed; at most, 4 bytes will need to be loaded.
++ *
++ * [1] It is theoretically possible for the FIFO to contain an arbitrary number
++ *     of bits.  However, since there are no known use-cases that leave
++ *     incomplete bytes in the FIFO, only words and bytes are considered here.
++ */
++static void stfsm_clear_fifo(struct stfsm *fsm)
 +{
-+	return ((struct flash_info *)b)->readid_len -
-+		((struct flash_info *)a)->readid_len;
++	const struct stfsm_seq *seq = &stfsm_seq_load_fifo_byte;
++	uint32_t words;
++	int i;
++
++	/* 1. Clear any 32-bit words */
++	words = stfsm_fifo_available(fsm);
++	if (words) {
++		for (i = 0; i < words; i++)
++			readl(fsm->base + SPI_FAST_SEQ_DATA_REG);
++		dev_dbg(fsm->dev, "cleared %d words from FIFO\n", words);
++	}
++
++	/*
++	 * 2. Clear any remaining bytes
++	 *    - Load the FIFO, one byte at a time, until a complete 32-bit word
++	 *      is available.
++	 */
++	for (i = 0, words = 0; i < 4 && !words; i++) {
++		stfsm_load_seq(fsm, seq);
++		stfsm_wait_seq(fsm);
++		words = stfsm_fifo_available(fsm);
++	}
++
++	/*    - A single word must be available now */
++	if (words != 1) {
++		dev_err(fsm->dev, "failed to clear bytes from the data FIFO\n");
++		return;
++	}
++
++	/*    - Read the 32-bit word */
++	readl(fsm->base + SPI_FAST_SEQ_DATA_REG);
++
++	dev_dbg(fsm->dev, "cleared %d byte(s) from the data FIFO\n", 4 - i);
 +}
 +
- static struct flash_info *stfsm_jedec_probe(struct stfsm *fsm)
+ static int stfsm_write_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
  {
--	struct flash_info	*info;
--	u16                     ext_jedec;
--	u32			jedec;
--	u8			id[5];
-+	uint8_t readid[MAX_READID_LEN];
-+	char readid_str[MAX_READID_LEN * 3 + 1];
-+	struct flash_info *info;
- 
--	stfsm_read_jedec(fsm, id);
-+	stfsm_read_jedec(fsm, readid);
- 
--	jedec     = id[0] << 16 | id[1] << 8 | id[2];
--	/*
--	 * JEDEC also defines an optional "extended device information"
--	 * string for after vendor-specific data, after the three bytes
--	 * we use here. Supporting some chips might require using it.
--	 */
--	ext_jedec = id[3] << 8  | id[4];
-+	hex_dump_to_buffer(readid, MAX_READID_LEN, 16, 1,
-+			   readid_str, sizeof(readid_str), 0);
- 
--	dev_dbg(fsm->dev, "JEDEC =  0x%08x [%02x %02x %02x %02x %02x]\n",
--		jedec, id[0], id[1], id[2], id[3], id[4]);
-+	dev_dbg(fsm->dev, "READID = %s\n", readid_str);
-+
-+	/* The 'readid' may match multiple entries in the table.  To ensure we
-+	 * retrieve the most specific match, the table is sorted in order of
-+	 * 'readid_len'.
-+	 */
-+	sort(flash_types, ARRAY_SIZE(flash_types) - 1,
-+	     sizeof(struct flash_info), stfsm_cmp_flash_info_readid_len, NULL);
- 
- 	for (info = flash_types; info->name; info++) {
--		if (info->jedec_id == jedec) {
--			if (info->ext_id && info->ext_id != ext_jedec)
--				continue;
-+		if (memcmp(info->readid, readid, info->readid_len) == 0)
- 			return info;
--		}
- 	}
--	dev_err(fsm->dev, "Unrecognized JEDEC id %06x\n", jedec);
-+
-+	dev_err(fsm->dev, "Unrecognized READID [%s]\n", readid_str);
- 
- 	return NULL;
- }
+ 	uint32_t words = size >> 2;
 -- 
 1.8.3.2
