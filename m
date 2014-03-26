@@ -1,57 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Mar 2014 00:51:15 +0000
-Subject: [PATCH] ARM: machine_power_off should not return
-In-Reply-To: <20140325224554.GC12185@arch.cereza>
-References: <1395684784-12601-1-git-send-email-sebastian.capella@linaro.org>
- <20140325224554.GC12185@arch.cereza>
-Message-ID: <20140326005115.GW7528@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 25 Mar 2014 21:01:33 -0400
+Subject: Stuck getting DTS working for a new kirkwood board
+In-Reply-To: <20140222193008.GB7862@titan.lakedaemon.net>
+References: <5306721B.7020403@sigpipe.me>
+ <20140221013407.GX7862@titan.lakedaemon.net>
+ <5307029C.20006@sigpipe.me>
+ <20140221151530.GZ7862@titan.lakedaemon.net>
+ <5307A727.9080508@sigpipe.me>
+ <20140221200855.GM7862@titan.lakedaemon.net>
+ <5308F3B4.6010409@sigpipe.me>
+ <20140222193008.GB7862@titan.lakedaemon.net>
+Message-ID: <20140326010133.GM28304@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 07:45:55PM -0300, Ezequiel Garcia wrote:
-> Let's Cc: LAKML, and To: Russell.
+On Sat, Feb 22, 2014 at 02:30:08PM -0500, Jason Cooper wrote:
+> On Sat, Feb 22, 2014 at 08:00:04PM +0100, Dashie wrote:
+> > Hi,
+> > 
+> > On 02/21/2014 09:08 PM, Jason Cooper wrote:
+> > >> Well, with kirkwood_defconfig it doesn't find the SATA PHY and panic.
+> > >> So i've used my debian config, make oldconfig, built and ... the toy is
+> > >> booting.
+> > > Yes, this is a known issue.  You worked around it by enabling generic
+> > > phy support (it's most likely in the other configs).
+> > Well, i've done some more tests and found that i've commented the
+> > sata at 80000 {} part of the DTS, but does not remember if that was after
+> > trying "debian config".
+> > 
+> > If i uncomment it, i got the kernel panic with "sata_mv f1080000.sata:
+> > unable to find phy".
+> > 
+> > About generic phy, is it CONFIG_GENERIC_PHY ? I't already to =y in my
+> > .config actually.
+> > I have CONFIG_PHY_MVEBU_SATA=y and CONFIG_SATA_MV=y too.
 > 
-> Russell, any comments on this?
-> 
-> Without this patch we got the heartbeat's reboot_notifier called twice while
-> testing the recent hibernation patches, which was unexpected and produced a
-> kernel panic: https://lkml.org/lkml/2014/3/19/363
+> Ok.  Don't worry about that for the moment.  There's a fix making it's
+> way to mainline for this issue.  Once we get everything else sorted for
+> your board, we'll have you try Linus' current master to confirm sata
+> works on your board.
 
-I don't see why we should make this change.  kernel/reboot.c handles
-this function returning, so other places should do too.
+Care to give this a try now and report back?
 
-Even on x86, this function can return:
+thx,
 
-void machine_power_off(void)
-{
-        machine_ops.power_off();
-}
-
-        .power_off = native_machine_power_off,
-
-static void native_machine_power_off(void)
-{
-        if (pm_power_off) {
-                if (!reboot_force)
-                        machine_shutdown();
-                pm_power_off();
-        }
-        /* A fallback in case there is no PM info available */
-        tboot_shutdown(TB_SHUTDOWN_HALT);
-}
-
-void tboot_shutdown(u32 shutdown_type)
-{
-        void (*shutdown)(void);
-
-        if (!tboot_enabled())
-                return;
-
-Therefore, I'd say... it's a bug in the hibernation code - or we probably
-have many buggy architectures.  I'd suggest fixing the hibernation code
-rather than stuffing some workaround like an endless loop into every
-architecture.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Jason.
