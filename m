@@ -1,192 +1,108 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Wed, 26 Mar 2014 03:08:27 +0000
-Subject: [PATCH v3 1/2] i2c: add DMA support for freescale i2c driver
-In-Reply-To: <201403230449.51515.marex@denx.de>
-References: <1394675277-24913-1-git-send-email-yao.yuan@freescale.com>
- <1394675277-24913-2-git-send-email-yao.yuan@freescale.com>
- <201403230449.51515.marex@denx.de>
-Message-ID: <1e17ce716618472f9a0146c48f20b976@BL2PR03MB338.namprd03.prod.outlook.com>
+From: Bharat.Bhushan@freescale.com (Bharat.Bhushan at freescale.com)
+Date: Wed, 26 Mar 2014 03:16:29 +0000
+Subject: [PATCH] ARM64: Kernel managed pages are only flushed
+In-Reply-To: <20140312172642.GU17083@arm.com>
+References: <1394018446-16738-1-git-send-email-Bharat.Bhushan@freescale.com>
+ <20140306065339.GA2975@localhost>
+ <b9ecee11764146c98dd41b811ebc05ae@BN1PR03MB266.namprd03.prod.outlook.com>
+ <20140312145653.GA9691@mudshark.cambridge.arm.com>
+ <20140312160340.GI17083@arm.com> <20140312172642.GU17083@arm.com>
+Message-ID: <d7741589c5ba48eaa13c9254b57dd5e2@BN1PR03MB266.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, March 23, 2014 @ 11:50:00 AM, Marek Vasut wrote:
-> On Thursday, March 13, 2014 at 02:47:56 AM, Yuan Yao wrote:
-> > Add dma support for i2c. This function depend on DMA driver.
-> > You can turn on it by write both the dmas and dma-name properties in
-> > dts node.
+
+
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Wednesday, March 12, 2014 10:57 PM
+> To: Will Deacon
+> Cc: Bhushan Bharat-R65777; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] ARM64: Kernel managed pages are only flushed
+> 
+> On Wed, Mar 12, 2014 at 04:03:40PM +0000, Catalin Marinas wrote:
+> > On Wed, Mar 12, 2014 at 02:56:53PM +0000, Will Deacon wrote:
+> > > On Wed, Mar 12, 2014 at 02:41:31PM +0000, Bharat.Bhushan at freescale.com
+> wrote:
+> > > > Did you get the chance to look into this? What is your take for
+> > > > this patch or you want to suggest some other solution?
+> > >
+> > > See my reply to Laura here:
+> > >
+> > >
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/238
+> > > 510.html
+> > >
+> > > We *really* don't want executable device mappings.
 > >
-> > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> > ---
-> >  drivers/i2c/busses/i2c-imx.c | 354
-> > +++++++++++++++++++++++++++++++++++++------ 1 file changed, 306
-> > insertions(+), 48 deletions(-)
-> 
-> Changelog is missing.
-
-Sorry for this, Maybe the changelog is in the junk box. It's named "[PATCH v3 0/2] i2c: add DMA support for freescale i2c driver". 
-
-> [...]
-> 
-> > +/* Functions for DMA support */
-> > +static int i2c_imx_dma_request(struct imx_i2c_struct *i2c_imx,
-> > +						dma_addr_t phy_addr)
-> > +{
-> > +	struct imx_i2c_dma *dma = i2c_imx->dma;
-> > +	struct dma_slave_config dma_sconfig;
-> > +	struct device *dev = &i2c_imx->adapter.dev;
-> > +	int ret;
-> > +
-> > +	dma->chan_tx = dma_request_slave_channel(dev, "tx");
-> > +	if (!dma->chan_tx) {
-> > +		dev_err(dev, "Dma tx channel request failed!\n");
-> 
-> DMA is written in all caps, it's an abbrev. for Direct Memory Access .
-> Please fix globally.
-> 
-
-Ok, I will fix it globally.
-
-> [...]
-> 
-> >  static int i2c_imx_write(struct imx_i2c_struct *i2c_imx, struct
-> > i2c_msg
-> > *msgs) {
-> 
-> [...]
-> 
-> > -	/* write data */
-> > -	for (i = 0; i < msgs->len; i++) {
-> > -		dev_dbg(&i2c_imx->adapter.dev,
-> > -			"<%s> write byte: B%d=0x%X\n",
-> > -			__func__, i, msgs->buf[i]);
-> > -		imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
-> > +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> > +		temp |= I2CR_DMAEN;
-> > +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> > +
-> > +		/* write slave address */
-> > +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> > +		result = wait_for_completion_interruptible_timeout(
-> > +					&i2c_imx->dma->cmd_complete,
-> > +					msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> > +		if (result <= 0) {
-> > +			dmaengine_terminate_all(dma->chan_using);
-> > +			if (result)
-> > +				return result;
-> > +			else
-> > +				return -ETIMEDOUT;
-> > +		}
-> > +
-> > +		/* waiting for Transfer complete. */
-> > +		while (timeout--) {
-> > +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> > +			if (temp & I2SR_ICF)
-> > +				break;
-> > +			udelay(10);
-> > +		}
-> 
-> Do you ever check if this really timed out and handle such case at all ?
-> I don't see it , but I might be wrong ...
-> 
-
-Oh, It's a bug, Thank you very much.
-
-> > +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> > +		temp &= ~I2CR_DMAEN;
-> > +		imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> > +
-> > +		/* write the last byte */
-> > +		imx_i2c_write_reg(msgs->buf[msgs->len-1],
-> > +					i2c_imx, IMX_I2C_I2DR);
-> >  		result = i2c_imx_trx_complete(i2c_imx);
-> >  		if (result)
-> >  			return result;
-> > +
-> >  		result = i2c_imx_acked(i2c_imx);
-> >  		if (result)
-> >  			return result;
-> > +	} else {
-> > +		/* write slave address */
-> > +		imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> > +		result = i2c_imx_trx_complete(i2c_imx);
-> > +		if (result)
-> > +			return result;
-> > +
-> > +		result = i2c_imx_acked(i2c_imx);
-> > +		if (result)
-> > +			return result;
-> > +
-> > +		dev_dbg(&i2c_imx->adapter.dev, "<%s> write data\n", __func__);
-> > +
-> > +		/* write data */
-> > +		for (i = 0; i < msgs->len; i++) {
-> > +			dev_dbg(&i2c_imx->adapter.dev,
-> > +				"<%s> write byte: B%d=0x%X\n",
-> > +				__func__, i, msgs->buf[i]);
-> 
-> Can you not just have a variable $dev here and avoid having such a long
-> noodle in the dev_dbg() call ?
-> 
-
-Ok, And I don't think the dev_dbg() is very helpful here now. 
-
-> > +			imx_i2c_write_reg(msgs->buf[i], i2c_imx, IMX_I2C_I2DR);
-> > +			result = i2c_imx_trx_complete(i2c_imx);
-> > +			if (result)
-> > +				return result;
-> > +			result = i2c_imx_acked(i2c_imx);
-> > +			if (result)
-> > +				return result;
-> > +		}
-> >  	}
-> >  	return 0;
-> >  }
-> [...]
-> 
-> > +		/* waiting for Transfer complete. */
-> > +		while (timeout--) {
-> > +			temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> > +			if (temp & I2SR_ICF)
-> > +				break;
-> > +			udelay(10);
-> > +		}
-> 
-> Timeout handling here as well ...
-> 
-> [...]
-> 
-> > @@ -696,6 +936,21 @@ static int i2c_imx_probe(struct platform_device
-> *pdev)
-> >  		i2c_imx->adapter.name);
-> >  	dev_info(&i2c_imx->adapter.dev, "IMX I2C adapter registered\n");
+> > /dev/mem mapping use pgprot_noncached() but I think we could
+> > generalise any of the writecombine and dmacoherent mappings to XN like
+> > in the patch
+> > below:
 > >
-> > +	/* Init DMA config if support*/
-> > +	i2c_imx->dma = devm_kzalloc(&pdev->dev, sizeof(struct imx_i2c_dma),
-> > +					GFP_KERNEL);
-> > +	if (!i2c_imx->dma) {
-> > +		dev_info(&pdev->dev,
-> > +				"can't allocate dma struct faild use dma.\n");
+> > diff --git a/arch/arm64/include/asm/pgtable.h
+> > b/arch/arm64/include/asm/pgtable.h
+> > index b524dcd17243..2d3cede62709 100644
+> > --- a/arch/arm64/include/asm/pgtable.h
+> > +++ b/arch/arm64/include/asm/pgtable.h
+> > @@ -286,11 +286,11 @@ static inline int has_transparent_hugepage(void)
+> >   * Mark the prot value as uncacheable and unbufferable.
+> >   */
+> >  #define pgprot_noncached(prot) \
+> > -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+> > +	__pgprot_modify(prot, PTE_ATTRINDX_MASK,
+> > +PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
+> >  #define pgprot_writecombine(prot) \
+> > -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC))
+> > +	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC)
+> > +| PTE_PXN | PTE_UXN)
+> >  #define pgprot_dmacoherent(prot) \
+> > -	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC))
+> > +	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC)
+> > +| PTE_PXN | PTE_UXN)
+> >  #define __HAVE_PHYS_MEM_ACCESS_PROT
+> >  struct file;
+> >  extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long
+> > pfn,
 > 
-> Or just have $dev variable and you won't have to break the line at all ...
+> And one more patch as suggested by Steve Capper. Both would be needed.
 > 
-> > +		i2c_imx->use_dma = false;
-> > +	} else if (i2c_imx_dma_request(i2c_imx, (dma_addr_t)phy_addr)) {
-> > +		dev_info(&pdev->dev,
-> > +				"can't request dma chan, faild use dma.\n");
-> > +		i2c_imx->use_dma = false;
-> > +	} else {
-> > +		i2c_imx->use_dma = true;
-> > +	}
+> -------------8<----------------------
 > 
-> Can you not just check if i2c_imx->dma is valid pointer or NULL pointer ?
-> Then you won't need a separate variable, for this purpose ... right ?
+> From 31d84855d71778e4a0f615f61ab836be3a70a58b Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Wed, 12 Mar 2014 16:28:09 +0000
+> Subject: [PATCH] arm64: Do not synchronise I and D caches for special ptes
+> 
+> Special pte mappings are not intended to be executable and do not even have an
+> associated struct page. This patch ensures that we do not call
+> __sync_icache_dcache() on such ptes.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> Reported-by: Steve Capper <Steve.Capper@arm.com>
+> ---
+>  arch/arm64/include/asm/pgtable.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 2d3cede62709..72c9ac38cdd9 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -199,7 +199,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned
+> long addr,
+>  			      pte_t *ptep, pte_t pte)
+>  {
+>  	if (pte_valid_user(pte)) {
+> -		if (pte_exec(pte))
+> +		if (!pte_special(pte) && pte_exec(pte))
+>  			__sync_icache_dcache(pte, addr);
+>  		if (pte_dirty(pte) && pte_write(pte))
+>  			pte_val(pte) &= ~PTE_RDONLY;
 
-Sorry and I think what I know is just to check whether it is NULL.
-Then for the second question, maybe there are some other ways, But I think it is more tidy and easier 
-understanding for using a separate variable, for this purpose.
+Hi Catalin,
 
-> [...]
+These patches are not yet posted if I have not missed. Also a little bit of confusion, will you be posting these patches or you want me/someone to post these couple of patches? I am assuming you will be posting these patches, if so any idea when we can see these patches?
+
+Thanks
+-Bharat
 > 
-
-Best regards,
-Yuan Yao
