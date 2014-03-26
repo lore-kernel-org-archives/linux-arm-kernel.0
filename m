@@ -1,58 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Mar 2014 16:39:17 +0000
-Subject: [PATCH 03/15] mtd: st_spi_fsm: Update Macronix 'QE' configuration
+Date: Wed, 26 Mar 2014 16:39:19 +0000
+Subject: [PATCH 05/15] mtd: st_spi_fsm: Add Spansion S25FL032P to device table
 In-Reply-To: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
 References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395851969-13520-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395851969-13520-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Angus Clark <angus.clark@st.com>
 
-Update the configuration of the Macronix 'QE' bit, such that
-we only set or clear the bit if required.
+Add Spansion S25FL032P to the list of known devices.
 
 Signed-off-by: Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+ drivers/mtd/devices/st_spi_fsm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 31bbf28..fabba2c 100644
+index d6b352e..148c86f 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -1163,12 +1163,27 @@ static int stfsm_mx25_config(struct stfsm *fsm)
- 					      CFG_ERASESEC_TOGGLE_32BIT_ADDR);
- 	}
- 
--	/* For QUAD mode, set 'QE' STATUS bit */
-+	/* Check status of 'QE' bit */
-+	stfsm_read_status(fsm, FLASH_CMD_RDSR, &sta);
- 	data_pads = ((fsm->stfsm_seq_read.seq_cfg >> 16) & 0x3) + 1;
- 	if (data_pads == 4) {
--		stfsm_read_status(fsm, FLASH_CMD_RDSR, &sta);
--		sta |= MX25_STATUS_QE;
--		stfsm_write_status(fsm, sta, 1);
-+		if (!(sta & MX25_STATUS_QE)) {
-+			/* Set 'QE' */
-+			sta |= MX25_STATUS_QE;
-+
-+			stfsm_write_status(fsm, sta, 1);
-+
-+			stfsm_wait_busy(fsm);
-+		}
-+	} else {
-+		if (sta & MX25_STATUS_QE) {
-+			/* Clear 'QE' */
-+			sta &= ~MX25_STATUS_QE;
-+
-+			stfsm_write_status(fsm, sta, 1);
-+
-+			stfsm_wait_busy(fsm);
-+		}
- 	}
- 
- 	return 0;
+@@ -413,6 +413,8 @@ static struct flash_info flash_types[] = {
+ 			FLASH_FLAG_READ_1_4_4   |	\
+ 			FLASH_FLAG_WRITE_1_1_4  |	\
+ 			FLASH_FLAG_READ_FAST)
++	{ "s25fl032p",  0x010215, 0x4d00,  64 * 1024,  64, S25FLXXXP_FLAG, 80,
++	  stfsm_s25fl_config},
+ 	{ "s25fl129p0", 0x012018, 0x4d00, 256 * 1024,  64, S25FLXXXP_FLAG, 80,
+ 	  stfsm_s25fl_config },
+ 	{ "s25fl129p1", 0x012018, 0x4d01,  64 * 1024, 256, S25FLXXXP_FLAG, 80,
 -- 
 1.8.3.2
