@@ -1,29 +1,95 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Mar 2014 11:27:17 +0100
-Subject: [PATCH 44/62] ARM: integrator: refine CPU selection
-In-Reply-To: <4776688.CZBeEWFJox@wuerfel>
-References: <1395257399-359545-1-git-send-email-arnd@arndb.de>
- <201403201148.16239.arnd@arndb.de>
- <CACRpkdYPvoobHqG4oQaJbrXDZQwYP6H9n7MSuXDt3MonNsC5jw@mail.gmail.com>
- <4776688.CZBeEWFJox@wuerfel>
-Message-ID: <CACRpkdZt_ngaYQgBnd21NWiGVk_PFOFyc5fykQk9axB5cs7p=Q@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 26 Mar 2014 11:27:35 +0100
+Subject: [PATCH] ARM: rockchip: convert smp bringup to CPU_METHOD_OF_DECLARE
+Message-ID: <1632873.urGeGsUMPH@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 12:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+With the newly introduced CPU_METHOD_OF_DECLARE is not necessary anymore
+to reference the relevant smp_ops in the board file, but instead it can
+simply be set by the enable-method property of the cpu nodes.
 
-> My point is that once the two are multiplatform, we wouldn't
-> do the CPU selection patches like this anymore. Instead, I would just do
->
-> config CPU_ARM920T
->         bool "Support ARM920T processor" if ARCH_MULTI_V4T
->         ...
->
-> config CPU_ARM926T
->         bool "Support ARM920T processor" if ARCH_MULTI_V5
->         ...
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ arch/arm/boot/dts/rk3066a.dtsi                 | 1 +
+ arch/arm/boot/dts/rk3188.dtsi                  | 1 +
+ arch/arm/mach-rockchip/core.h                  | 2 --
+ arch/arm/mach-rockchip/platsmp.c               | 3 ++-
+ arch/arm/mach-rockchip/rockchip.c              | 1 -
+ 6 files changed, 5 insertions(+), 4 deletions(-)
 
-Ah I see, that's elegant. Yes let's go for this.
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 333f4ae..2501d5d 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+ 			    "qcom,gcc-msm8660"
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
++			    "rockchip,rk3066-smp"
+ 
+ 	- cpu-release-addr
+ 		Usage: required for systems that have an "enable-method"
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 4d4dfbb..90b354d 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -24,6 +24,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "rockchip,rk3066-smp";
+ 
+ 		cpu at 0 {
+ 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index bb36596..7ad5103 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -24,6 +24,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "rockchip,rk3066-smp";
+ 
+ 		cpu at 0 {
+ 			device_type = "cpu";
+diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
+index e2e7c9d..39bca96 100644
+--- a/arch/arm/mach-rockchip/core.h
++++ b/arch/arm/mach-rockchip/core.h
+@@ -18,5 +18,3 @@ extern char rockchip_secondary_trampoline_end;
+ 
+ extern unsigned long rockchip_boot_fn;
+ extern void rockchip_secondary_startup(void);
+-
+-extern struct smp_operations rockchip_smp_ops;
+diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+index dbfa5a2..a18b7f2 100644
+--- a/arch/arm/mach-rockchip/platsmp.c
++++ b/arch/arm/mach-rockchip/platsmp.c
+@@ -178,7 +178,8 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+ 		pmu_set_power_domain(0 + i, false);
+ }
+ 
+-struct smp_operations rockchip_smp_ops __initdata = {
++static struct smp_operations rockchip_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
+ 	.smp_boot_secondary	= rockchip_boot_secondary,
+ };
++CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index d211d6f..4499b0a 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -39,7 +39,6 @@ static const char * const rockchip_board_dt_compat[] = {
+ };
+ 
+ DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+-	.smp		= smp_ops(rockchip_smp_ops),
+ 	.init_machine	= rockchip_dt_init,
+ 	.dt_compat	= rockchip_board_dt_compat,
+ MACHINE_END
+-- 
+1.9.0
