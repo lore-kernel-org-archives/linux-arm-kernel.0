@@ -1,57 +1,117 @@
-From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
-Date: Wed, 26 Mar 2014 08:50:00 +0000
-Subject: [PATCH v5 9/9] ARM: koelsch: Add HAVE_ARM_ARCH_TIMER to defconfig
-In-Reply-To: <CANqRtoRCK8rLKDuy9kuyES=Y0Ek00BVnzzTdCeTKpPjrxiP7RQ@mail.gmail.com>
-References: <1395766604-30926-1-git-send-email-phil.edworthy@renesas.com>	<1395766604-30926-10-git-send-email-phil.edworthy@renesas.com>
- <CANqRtoRCK8rLKDuy9kuyES=Y0Ek00BVnzzTdCeTKpPjrxiP7RQ@mail.gmail.com>
-Message-ID: <OFB07E7C91.23278323-ON80257CA7.00305D4A-80257CA7.00308574@eu.necel.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 26 Mar 2014 09:51:56 +0100
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <20140324095902.GB11377@localhost>
+References: <532BCFCC.4080205@freescale.com>
+ <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+ <20140324095902.GB11377@localhost>
+Message-ID: <20140326095156.3e5585b8@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+Hi,
 
-On: 26/03/2014 05:39, Magnus wrote:
-> Subject: Re: [PATCH v5 9/9] ARM: koelsch: Add HAVE_ARM_ARCH_TIMER to 
-defconfig
-> 
-> On Wed, Mar 26, 2014 at 1:56 AM, Phil Edworthy
-> <phil.edworthy@renesas.com> wrote:
-> > This is fixes a boot problem when the R-Car PCIe driver is enabled.
-> >
-> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+Huang Shijie wrote:
+> On Fri, Mar 21, 2014 at 11:50:17AM +0100, Lothar Wa?mann wrote:
+> > With a flash-based BBT there is no reason to move the Factory Bad
+> > Block Marker from the data area buffer (to where it is mapped by the
+> > GPMI NAND controller) to the OOB buffer. Thus, make this feature
+> > configurable via DT. This is required for the Ka-Ro electronics
+> > platforms.
+> > 
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 > > ---
-> >  arch/arm/configs/koelsch_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/configs/koelsch_defconfig 
-b/arch/arm/configs/koelsch_defconfig
-> > index ec14547..67666b6 100644
-> > --- a/arch/arm/configs/koelsch_defconfig
-> > +++ b/arch/arm/configs/koelsch_defconfig
-> > @@ -15,6 +15,7 @@ CONFIG_MACH_KOELSCH=y
-> >  CONFIG_CPU_BPREDICT_DISABLE=y
-> >  CONFIG_PL310_ERRATA_588369=y
-> >  CONFIG_ARM_ERRATA_754322=y
-> > +CONFIG_HAVE_ARM_ARCH_TIMER=y
+> >  Documentation/devicetree/bindings/mtd/gpmi-nand.txt |    3 +++
+> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c              |   10 +++++++---
+> >  2 files changed, 10 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+> > index 458d596..f28949a 100644
+> > --- a/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/gpmi-nand.txt
+> > @@ -25,6 +25,9 @@ Optional properties:
+> >                         discoverable or this property is not enabled,
+> >                         the software may chooses an implementation-defined
+> >                         ECC scheme.
+> > +  - fsl,no-blockmark-swap: Don't swap the bad block marker from the OOB
+> > +                       area with the byte in the data area but rely on the
+> > +                       BBT for identifying bad blocks.
 > 
-> Hi Phil,
-> 
-> Thanks for your patches! I appreciate that you send out a whole series
-> with broken out patches, that makes it easier to see what is going on.
-> 
-> However, regarding this particular patch I'm not so sure if your fix
-> is correct. The issue is most likely there, no doubt about that, but
-> this "select" does not match well with how we currently handle timers
-> for the rest of the SoCs in mach-shmobile. We for instance want to be
-> able to boot with CMT only.
-> 
-> So here's a gentle "NAK" on this particular patch. I think this shows
-> that either deferred probing or a different init ordering is needed
-> somehow.
+> Please add the following:
+>        "NOTE: This property is not supported by the imx23 and imx28"
+>
+I don't see why this should not be supported on i.MX28 (i.MX23 doesn't
+do byteswapping anyway, so this wouldn't change anything for i.MX23).
+The partitions used by Linux need not necessarily be accessible for the
+Boot ROM code (and vice versa).
 
-When reading your comments, I realised that since I changed the driver to 
-use module_platform_driver instead of subsys_initcall, we no longer need 
-this patch.
+> >  The device tree may optionally contain sub-nodes describing partitions of the
+> >  address space. See partition.txt for more detail.
+> > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > index bb77f75..98562eb 100644
+> > --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > @@ -1632,9 +1632,6 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
+> >  	struct bch_geometry *bch_geo = &this->bch_geometry;
+> >  	int ret;
+> >  
+> > -	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+> > -	this->swap_block_mark = !GPMI_IS_MX23(this);
+> > -
+> >  	/* Set up the medium geometry */
+> >  	ret = gpmi_set_geometry(this);
+> >  	if (ret)
+> > @@ -1701,6 +1698,13 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+> >  	if (of_get_nand_on_flash_bbt(this->dev->of_node))
+> >  		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+> >  
+> > +	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+> > +	if (!of_property_read_bool(this->dev->of_node, "fsl,no-blockmark-swap"))
+> > +		this->swap_block_mark = !GPMI_IS_MX23(this);
+> 
+> the code should like this:
+> ----------------------------------------------
+> 	this->swap_block_mark = !GPMI_IS_MX23(this);
+> 
+> 	if (!GPMI_IS_IMX23(this) && !GPMI_IS_MX28(this) &&
+>
+the !GPMI_IS_MX23() is redundant here as i.MX23 will always have
+swap_block_mark == false.
+I would rather add a dependency on nand-on-flash-bbt as a
+prerequisite for not checking the BB marks in each block.
 
-Thanks
-Phil
+> > +
+> > +	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
+> > +		this->swap_block_mark ? "en" : "dis");
+> > +
+> >  	/*
+> >  	 * Allocate a temporary DMA buffer for reading ID in the
+> >  	 * nand_scan_ident().
+> 
+> There are some bugs in the gpmi driver which is caused by the assumption that
+> we always enable the swapping except the imx23. 
+> 
+> So, there are some places should be changed with this patch:
+>    [1] the subpage hook,
+>         Please also change the gpmi_ecc_read_subpage() too.
+> 
+>    [2] the OOB hook,
+>    	Please also change the gpmi_ecc_read_oob(). 
+> 
+>    [3] the markbad hook,
+>    	Please also change the gpmi_block_markbad() . 
+> 
+OK, I'll check that.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
