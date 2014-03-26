@@ -1,17 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 26 Mar 2014 18:35:17 +0100
-Subject: [PATCH v2] ata: fix Marvell SATA driver dependencies
-In-Reply-To: <3641258.OaO7lhnDYy@amdc1032>
-References: <3641258.OaO7lhnDYy@amdc1032>
-Message-ID: <20140326173517.GI25349@lunn.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 26 Mar 2014 18:53:26 +0100
+Subject: [PATCH 01/15] mtd: st_spi_fsm: Add Macronix MX25L25655E device
+In-Reply-To: <1395851969-13520-2-git-send-email-lee.jones@linaro.org>
+References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
+ <1395851969-13520-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAMuHMdXgPiJSrA4Txp_OxrGx7osNsprm5a+w3Qag=Yd-_nFVBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 05:59:03PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Make sata_mv host driver depend on PCI || ARCH_KIRKWOOD || ARCH_MVEBU ||
-> ARCH_ORION5X config options as Marvell SATA support covers both Marvell
-> PCI devices and Marvell Kirkwood, Armada 370/XP and Orion5x SoCs 
+Hi Lee,
 
-I would of thought Dove and mv78xx0 would also want it.
+On Wed, Mar 26, 2014 at 5:39 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> From: Angus Clark <angus.clark@st.com>
+>
+> Add Macronix MX25L25655E to the list of known devices.
+>
+> Signed-off-by: Angus Clark <angus.clark@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mtd/devices/st_spi_fsm.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+> index bea1416..2471061 100644
+> --- a/drivers/mtd/devices/st_spi_fsm.c
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -380,6 +380,9 @@ static struct flash_info flash_types[] = {
+>         { "mx25l25635e", 0xc22019, 0, 64*1024, 512,
+>           (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
+>           stfsm_mx25_config },
+> +       { "mx25l25655e", 0xc22619, 0, 64*1024, 512,
+> +         (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
+> +         stfsm_mx25_config},
+>
+>  #define N25Q_FLAG (FLASH_FLAG_READ_WRITE       |       \
+>                    FLASH_FLAG_READ_FAST         |       \
 
-     Andrew
+How much of this table can be shared with the one in m25p80.c?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
