@@ -1,238 +1,140 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 26 Mar 2014 12:52:42 +0800
-Subject: [PATCH 3/4] arm: mmp: make SOCes with DT use new timer driver
-In-Reply-To: <1395809563-31872-1-git-send-email-chao.xie@marvell.com>
-References: <1395809563-31872-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1395809563-31872-4-git-send-email-chao.xie@marvell.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 25 Mar 2014 21:54:00 -0700
+Subject: [RFC PATCH] Remove CONFIG_DCACHE_WORD_ACCESS
+In-Reply-To: <1394570240.4840.48.camel@pasglop>
+References: <1393964591.20435.58.camel@joe-AO722>
+ <1394570240.4840.48.camel@pasglop>
+Message-ID: <1395809640.3726.7.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Xie <chao.xie@marvell.com>
+On Wed, 2014-03-12 at 07:37 +1100, Benjamin Herrenschmidt wrote:
+> On Tue, 2014-03-04 at 12:23 -0800, Joe Perches wrote:
+> > It seems to duplicate CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> > so use that instead.
+> > 
+> > This changes the !CPU_LITTLE_ENDIAN powerpc arch to use unaligned
+> > accesses in fs/dcache.c and fs/namei.c as
+> > CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS is enabled for that arch.
+> > 
+> > Remove the now unused DCACHE_WORD_ACCESS defines & uses.
+> 
+> Interesting.. we have word-at-a-time but we never enabled
+> DCACHE_WORD_ACCESS, I wonder why that is. In fact, we should
+> probably do it for LE as well for P8 if we can make a P8
+> only config option...
+> 
+> Anton, what do you reckon here ?
 
-Change the dtsi and DT support for mmp SOCes to make them
-use the new timer driver.
+Anton, do you have an opinion here?
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/boot/dts/mmp2.dtsi   | 25 ++++++++++++++++++++++---
- arch/arm/boot/dts/pxa168.dtsi | 32 ++++++++++++++++++++++----------
- arch/arm/boot/dts/pxa910.dtsi | 32 ++++++++++++++++++++++----------
- arch/arm/mach-mmp/Kconfig     |  2 ++
- arch/arm/mach-mmp/mmp-dt.c    | 11 +++++++++--
- arch/arm/mach-mmp/mmp2-dt.c   | 11 ++++++++++-
- 6 files changed, 87 insertions(+), 26 deletions(-)
-
-diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 4e8b08c..1ffd884 100644
---- a/arch/arm/boot/dts/mmp2.dtsi
-+++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -126,9 +126,28 @@
- 			ranges;
- 
- 			timer0: timer at d4014000 {
--				compatible = "mrvl,mmp-timer";
--				reg = <0xd4014000 0x100>;
--				interrupts = <13>;
-+				compatible = "marvell,mmp-timer";
-+				reg = <0xd4014000 0xc8>;
-+				marvell,timer-id = <0>;
-+				marvell,timer-fastclk-frequency = <6500000>;
-+				marvell,timer-apb-frequency = <26000000>;
-+                                status = "okay";
-+
-+				counter0 {
-+					compatible = "marvell,timer-counter-clkevt";
-+					interrupts = <13>;
-+					marvell,timer-counter-id = <0>;
-+					marvell,timer-counter-cpu = <0>;
-+					marvell,timer-counter-frequency = <32768>;
-+					marvell,timer-counter-rating = <200>;
-+                                };
-+
-+                                counter1 {
-+					compatible = "marvell,timer-counter-clksrc";
-+					marvell,timer-counter-id = <1>;
-+					marvell,timer-counter-frequency = <32768>;
-+					marvell,timer-counter-rating = <200>;
-+                                };
- 			};
- 
- 			uart1: uart at d4030000 {
-diff --git a/arch/arm/boot/dts/pxa168.dtsi b/arch/arm/boot/dts/pxa168.dtsi
-index 975dad2..abcde10 100644
---- a/arch/arm/boot/dts/pxa168.dtsi
-+++ b/arch/arm/boot/dts/pxa168.dtsi
-@@ -50,16 +50,28 @@
- 			ranges;
- 
- 			timer0: timer at d4014000 {
--				compatible = "mrvl,mmp-timer";
--				reg = <0xd4014000 0x100>;
--				interrupts = <13>;
--			};
--
--			uart1: uart at d4017000 {
--				compatible = "mrvl,mmp-uart";
--				reg = <0xd4017000 0x1000>;
--				interrupts = <27>;
--				status = "disabled";
-+				compatible = "marvell,mmp-timer";
-+				reg = <0xd4014000 0xc8>;
-+				marvell,timer-id = <0>;
-+				marvell,timer-fastclk-frequency = <3250000>;
-+				marvell,timer-apb-frequency = <26000000>;
-+                                status = "okay";
-+
-+				counter0 {
-+					compatible = "marvell,timer-counter-clkevt";
-+					interrupts = <13>;
-+					marvell,timer-counter-id = <0>;
-+					marvell,timer-counter-cpu = <0>;
-+					marvell,timer-counter-frequency = <32768>;
-+					marvell,timer-counter-rating = <200>;
-+                                };
-+
-+                                counter1 {
-+					compatible = "marvell,timer-counter-clksrc";
-+					marvell,timer-counter-id = <1>;
-+					marvell,timer-counter-frequency = <32768>;
-+					marvell,timer-counter-rating = <200>;
-+                                };
- 			};
- 
- 			uart2: uart at d4018000 {
-diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
-index 0247c62..83d5e04 100644
---- a/arch/arm/boot/dts/pxa910.dtsi
-+++ b/arch/arm/boot/dts/pxa910.dtsi
-@@ -55,16 +55,28 @@
- 			ranges;
- 
- 			timer0: timer at d4014000 {
--				compatible = "mrvl,mmp-timer";
--				reg = <0xd4014000 0x100>;
--				interrupts = <13>;
--			};
--
--			timer1: timer at d4016000 {
--				compatible = "mrvl,mmp-timer";
--				reg = <0xd4016000 0x100>;
--				interrupts = <29>;
--				status = "disabled";
-+				compatible = "marvell,mmp-timer";
-+				reg = <0xd4014000 0xc8>;
-+				marvell,timer-id = <0>;
-+				marvell,timer-fastclk-frequency = <3250000>;
-+				marvell,timer-apb-frequency = <26000000>;
-+                                status = "okay";
-+
-+				counter0 {
-+					compatible = "marvell,timer-counter-clkevt";
-+					interrupts = <13>;
-+					marvell,timer-counter-id = <0>;
-+					marvell,timer-counter-cpu = <0>;
-+					marvell,timer-counter-frequency = <32768>;
-+					marvell,timer-counter-rating = <200>;
-+                                };
-+
-+                                counter1 {
-+					compatible = "marvell,timer-counter-clksrc";
-+					marvell,timer-counter-id = <1>;
-+					marvell,timer-counter-frequency = <32768>;
-+					marvell,timer-counter-rating = <200>;
-+                                };
- 			};
- 
- 			uart1: uart at d4017000 {
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index ebdba87..8828f61 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -89,6 +89,7 @@ config MACH_MMP_DT
- 	select CPU_PXA168
- 	select CPU_PXA910
- 	select USE_OF
-+	select CLKSRC_OF
- 	select PINCTRL
- 	select PINCTRL_SINGLE
- 	help
-@@ -101,6 +102,7 @@ config MACH_MMP2_DT
- 	depends on !CPU_MOHAWK
- 	select CPU_MMP2
- 	select USE_OF
-+	select CLKSRC_OF
- 	select PINCTRL
- 	select PINCTRL_SINGLE
- 	help
-diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
-index cca529c..c729e46 100644
---- a/arch/arm/mach-mmp/mmp-dt.c
-+++ b/arch/arm/mach-mmp/mmp-dt.c
-@@ -11,13 +11,12 @@
- 
- #include <linux/irqchip.h>
- #include <linux/of_platform.h>
-+#include <linux/clocksource.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- 
- #include "common.h"
- 
--extern void __init mmp_dt_init_timer(void);
--
- static const struct of_dev_auxdata pxa168_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
- 	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
-@@ -52,6 +51,14 @@ static void __init pxa910_dt_init(void)
- 			     pxa910_auxdata_lookup, NULL);
- }
- 
-+static void __init mmp_dt_init_timer(void)
-+{
-+	/* TODO: clock framework initialization. */
-+
-+	/* Initialize timers. */
-+	clocksource_of_init();
-+}
-+
- static const char *mmp_dt_board_compat[] __initdata = {
- 	"mrvl,pxa168-aspenite",
- 	"mrvl,pxa910-dkb",
-diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
-index 023cb45..fa57341 100644
---- a/arch/arm/mach-mmp/mmp2-dt.c
-+++ b/arch/arm/mach-mmp/mmp2-dt.c
-@@ -12,6 +12,7 @@
- #include <linux/io.h>
- #include <linux/irqchip.h>
- #include <linux/of_platform.h>
-+#include <linux/clocksource.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- 
-@@ -37,6 +38,14 @@ static void __init mmp2_dt_init(void)
- 			     mmp2_auxdata_lookup, NULL);
- }
- 
-+static void __init mmp2_dt_init_timer(void)
-+{
-+	/* TODO: clock framework initialization. */
-+
-+	/* Initialize timers. */
-+	clocksource_of_init();
-+}
-+
- static const char *mmp2_dt_board_compat[] __initdata = {
- 	"mrvl,mmp2-brownstone",
- 	NULL,
-@@ -44,7 +53,7 @@ static const char *mmp2_dt_board_compat[] __initdata = {
- 
- DT_MACHINE_START(MMP2_DT, "Marvell MMP2 (Device Tree Support)")
- 	.map_io		= mmp_map_io,
--	.init_time	= mmp_dt_init_timer,
-+	.init_time	= mmp2_dt_init_timer,
- 	.init_machine	= mmp2_dt_init,
- 	.dt_compat	= mmp2_dt_board_compat,
- MACHINE_END
--- 
-1.8.3.2
+> Cheers,
+> Ben.
+> 
+> > Signed-off-by: Joe Perches <joe@perches.com>
+> > ---
+> >  arch/arm/Kconfig                      | 1 -
+> >  arch/arm/include/asm/word-at-a-time.h | 4 ++--
+> >  arch/arm64/Kconfig                    | 1 -
+> >  arch/x86/Kconfig                      | 1 -
+> >  fs/Kconfig                            | 4 ----
+> >  fs/dcache.c                           | 2 +-
+> >  fs/namei.c                            | 2 +-
+> >  7 files changed, 4 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 623a272..d5a2e60 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -12,7 +12,6 @@ config ARM
+> >  	select BUILDTIME_EXTABLE_SORT if MMU
+> >  	select CLONE_BACKWARDS
+> >  	select CPU_PM if (SUSPEND || CPU_IDLE)
+> > -	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
+> >  	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+> >  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+> >  	select GENERIC_IDLE_POLL_SETUP
+> > diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
+> > index a6d0a29..778b2ad 100644
+> > --- a/arch/arm/include/asm/word-at-a-time.h
+> > +++ b/arch/arm/include/asm/word-at-a-time.h
+> > @@ -54,7 +54,7 @@ static inline unsigned long find_zero(unsigned long mask)
+> >  #include <asm-generic/word-at-a-time.h>
+> >  #endif
+> >  
+> > -#ifdef CONFIG_DCACHE_WORD_ACCESS
+> > +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> >  
+> >  /*
+> >   * Load an unaligned word from kernel space.
+> > @@ -94,5 +94,5 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
+> >  	return ret;
+> >  }
+> >  
+> > -#endif	/* DCACHE_WORD_ACCESS */
+> > +#endif	/* HAVE_EFFICIENT_UNALIGNED_ACCESS */
+> >  #endif /* __ASM_ARM_WORD_AT_A_TIME_H */
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 764d682..2d6978c 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -13,7 +13,6 @@ config ARM64
+> >  	select CLONE_BACKWARDS
+> >  	select COMMON_CLK
+> >  	select CPU_PM if (SUSPEND || CPU_IDLE)
+> > -	select DCACHE_WORD_ACCESS
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+> >  	select GENERIC_IOMAP
+> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> > index abb261e..60cfa073 100644
+> > --- a/arch/x86/Kconfig
+> > +++ b/arch/x86/Kconfig
+> > @@ -98,7 +98,6 @@ config X86
+> >  	select CLKEVT_I8253
+> >  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+> >  	select GENERIC_IOMAP
+> > -	select DCACHE_WORD_ACCESS
+> >  	select GENERIC_SMP_IDLE_THREAD
+> >  	select ARCH_WANT_IPC_PARSE_VERSION if X86_32
+> >  	select HAVE_ARCH_SECCOMP_FILTER
+> > diff --git a/fs/Kconfig b/fs/Kconfig
+> > index 312393f..7511271 100644
+> > --- a/fs/Kconfig
+> > +++ b/fs/Kconfig
+> > @@ -4,10 +4,6 @@
+> >  
+> >  menu "File systems"
+> >  
+> > -# Use unaligned word dcache accesses
+> > -config DCACHE_WORD_ACCESS
+> > -       bool
+> > -
+> >  if BLOCK
+> >  
+> >  source "fs/ext2/Kconfig"
+> > diff --git a/fs/dcache.c b/fs/dcache.c
+> > index 265e0ce..4e3c195 100644
+> > --- a/fs/dcache.c
+> > +++ b/fs/dcache.c
+> > @@ -163,7 +163,7 @@ int proc_nr_dentry(ctl_table *table, int write, void __user *buffer,
+> >   * Compare 2 name strings, return 0 if they match, otherwise non-zero.
+> >   * The strings are both count bytes long, and count is non-zero.
+> >   */
+> > -#ifdef CONFIG_DCACHE_WORD_ACCESS
+> > +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> >  
+> >  #include <asm/word-at-a-time.h>
+> >  /*
+> > diff --git a/fs/namei.c b/fs/namei.c
+> > index 385f781..1ee33ca 100644
+> > --- a/fs/namei.c
+> > +++ b/fs/namei.c
+> > @@ -1618,7 +1618,7 @@ static inline int nested_symlink(struct path *path, struct nameidata *nd)
+> >   *   the final mask". Again, that could be replaced with a
+> >   *   efficient population count instruction or similar.
+> >   */
+> > -#ifdef CONFIG_DCACHE_WORD_ACCESS
+> > +#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+> >  
+> >  #include <asm/word-at-a-time.h>
