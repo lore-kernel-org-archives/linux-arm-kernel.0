@@ -1,43 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Mar 2014 11:40:00 -0700
-Subject: [PATCH 12/18] ARM: OMAP3: PM: remove access to PRM_VOLTCTRL
- register
-In-Reply-To: <5332891F.9070002@ti.com>
-References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
- <1393949958-816-13-git-send-email-t-kristo@ti.com>
- <20140325223612.GA26395@atomide.com> <5332891F.9070002@ti.com>
-Message-ID: <20140326183959.GA30631@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 26 Mar 2014 19:46:54 +0100
+Subject: [ARM ATTEND] Following discussions, ARM64 SoC support, DT backward
+ compat
+Message-ID: <20140326194654.72beb639@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [140326 01:04]:
-> On 03/26/2014 12:36 AM, Tony Lindgren wrote:
-> >* Tero Kristo <t-kristo@ti.com> [140304 08:23]:
-> >>There is a solitary write to this register every wakeup from off-mode,
-> >>which isn't doing anything, so remove it.
-> >
-> >Argh, this chunk of code is for sure the the thing that's blocking all
-> >the voltage scaling for idle modes that twl4030 is supposed to do!
-> >
-> >AFAIK we must have AUTO_SLEEP, AUTO_RET and AUTO_OFF bits set in
-> >PRM_VOLTCTRL for twl4030 to scale anything. They must be set if we're
-> >scaling over I2C4 or using the pins as triggers. Unless these bits
-> >are set, VC won't send any SLEEP, RET or OFF commands.
-> >
-> >Looks like we're not even set these bits anywhere like we should?
-> >
-> >I think we should enabled these bits in vc.c init, and never clear?
-> 
-> The bits should be set according to the target sleep mode I believe,
-> e.g. for retention we should set only AUTO_RET, and for off-mode
-> AUTO_OFF. You can't have AUTO_OFF enabled if you are going to
-> retention only as far as I recall, this potentially caused some
-> problems.
+Hello,
 
-OK. So it seems that the idle code needs to constantly modify this
-register based on the idle mode. Any ideas how the idle code is going
-to update this register? Register a callback using platform_data?
+I'm a regular contributor to the Marvell EBU platform, mainly regarding
+the support of the most recent processors Armada 370, Armada XP, Armada
+375 and Armada 38x.
 
-Regards,
+For this reason, I'm interested in following discussions with the other
+ARM kernel maintainers and contributors, simply to ensure I remain
+up-to-date with the latest directions in the ARM kernel world.
 
-Tony
+Also, I'm interested specifically in:
+
+ * Hearing a bit about ARM64, and how the SoC support is going to work.
+   For example how code is shared between ARM and ARM64 when you have
+   two SoCs that are similar, but one has a 32 bits ARM core and the
+   other a 64 bits ARM core. And generally the status of ARM64 support.
+
+ * Discussing practical examples of Device Tree backward compatibility,
+   and how to handle them. Discuss whether improvements to the FDT API
+   are not needed to help in coping with those backward compatibility
+   problems.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
