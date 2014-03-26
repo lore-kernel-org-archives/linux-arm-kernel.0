@@ -1,214 +1,112 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Mar 2014 16:39:24 +0000
-Subject: [PATCH 10/15] mtd: st_spi_fsm: Add support for N25Q512 and N25Q00A
- devices
+Date: Wed, 26 Mar 2014 16:39:22 +0000
+Subject: [PATCH 08/15] mtd: st_spi_fsm: Obtain and use EMI clock if provided
 In-Reply-To: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
 References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1395851969-13520-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1395851969-13520-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Angus Clark <angus.clark@st.com>
+ST's Common Clk Framework is now available. This patch ensures the FSM
+makes use of it by obtaining and enabling the EMI clock if provided. If
+system fails to provide the EMI clock FSM uses its original default
+rate.
 
-This patch adds support for the Micron N25Q512 and N25Q00A Serial Flash devices.
-Unlike previous Micron devices, it is now mandatory to check the Flags Status
-Register following a Write or Erase operation.  The N25Q512A device presents a
-further complication in that different variants of the device use different
-opcodes for the WRITE_1_4_4 operation.  Since there is no easy way to determine
-at runtime which variant is being used, FLASH_CAPS_WRITE_1_4_4 support is
-removed for N25Q512 devices, resulting in WRITE_1_1_4 being used instead.
-
-The following devices have been tested:
-
-    b2000C + N25Q512A13GSF40G
-    b2000C + N25Q00AA13GSF40G
-    b2147A + N25Q512A83GSF40X
-
-Signed-off-by: Angus Clark <angus.clark@st.com>
-Signed-off-by: Carmelo Amoroso <carmelo.amoroso@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 96 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 91 insertions(+), 5 deletions(-)
+ drivers/mtd/devices/st_spi_fsm.c | 45 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 43 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 1584783..99b3435 100644
+index 9df59e7..2443757 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -260,12 +260,25 @@
- #define S25FL_STATUS_E_ERR     0x20
- #define S25FL_STATUS_P_ERR     0x40
+@@ -23,6 +23,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/clk.h>
  
-+/* N25Q - READ/WRITE/CLEAR NON/VOLATILE STATUS/CONFIG Registers */
-+#define N25Q_CMD_RFSR          0x70
-+#define N25Q_CMD_CLFSR         0x50
- #define N25Q_CMD_WRVCR         0x81
- #define N25Q_CMD_RDVCR         0x85
- #define N25Q_CMD_RDVECR        0x65
- #define N25Q_CMD_RDNVCR        0xb5
- #define N25Q_CMD_WRNVCR        0xb1
+ #include "serial_flash_cmds.h"
  
-+/* N25Q Flags Status Register: Error Flags */
-+#define N25Q_FLAGS_ERR_ERASE   BIT(5)
-+#define N25Q_FLAGS_ERR_PROG    BIT(4)
-+#define N25Q_FLAGS_ERR_VPP     BIT(3)
-+#define N25Q_FLAGS_ERR_PROT    BIT(1)
-+#define N25Q_FLAGS_ERROR       (N25Q_FLAGS_ERR_ERASE   | \
-+                                N25Q_FLAGS_ERR_PROG    | \
-+                                N25Q_FLAGS_ERR_VPP     | \
-+                                N25Q_FLAGS_ERR_PROT)
+@@ -297,6 +298,7 @@ struct stfsm {
+ 	struct mtd_info		mtd;
+ 	struct mutex		lock;
+ 	struct flash_info       *info;
++	struct clk              *clk;
+ 
+ 	uint32_t                configuration;
+ 	uint32_t                fifo_dir_delay;
+@@ -1941,8 +1943,13 @@ static void stfsm_set_freq(struct stfsm *fsm, uint32_t spi_freq)
+ 	uint32_t emi_freq;
+ 	uint32_t clk_div;
+ 
+-	/* TODO: Make this dynamic */
+-	emi_freq = STFSM_DEFAULT_EMI_FREQ;
++	if (!fsm->clk) {
++		dev_warn(fsm->dev,
++			 "No EMI clock available. Using default 100MHz.\n");
 +
- #define FLASH_PAGESIZE         256			/* In Bytes    */
- #define FLASH_PAGESIZE_32      (FLASH_PAGESIZE / 4)	/* In uint32_t */
- #define FLASH_MAX_BUSY_WAIT    (300 * HZ)	/* Maximum 'CHIPERASE' time */
-@@ -277,6 +290,7 @@
- #define CFG_WRITE_TOGGLE_32BIT_ADDR    0x00000002
- #define CFG_ERASESEC_TOGGLE_32BIT_ADDR 0x00000008
- #define CFG_S25FL_CHECK_ERROR_FLAGS    0x00000010
-+#define CFG_N25Q_CHECK_ERROR_FLAGS     0x00000020
- 
- struct stfsm_seq {
- 	uint32_t data_size;
-@@ -395,6 +409,7 @@ static struct flash_info flash_types[] = {
- 	  (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
- 	  stfsm_mx25_config},
- 
-+	/* Micron N25Qxxx */
- #define N25Q_FLAG (FLASH_FLAG_READ_WRITE       |	\
- 		   FLASH_FLAG_READ_FAST         |	\
- 		   FLASH_FLAG_READ_1_1_2        |	\
-@@ -407,10 +422,29 @@ static struct flash_info flash_types[] = {
- 		   FLASH_FLAG_WRITE_1_4_4)
- 	{ "n25q128", 0x20ba18, 0, 64 * 1024,  256, N25Q_FLAG, 108,
- 	  stfsm_n25q_config },
--	{ "n25q256", 0x20ba19, 0, 64 * 1024,  512,
--	  N25Q_FLAG | FLASH_FLAG_32BIT_ADDR, 108, stfsm_n25q_config },
--	{ "n25q512", 0x20ba20, 0, 64 * 1024,  1024,
--	  N25Q_FLAG | FLASH_FLAG_32BIT_ADDR, 108, stfsm_n25q_config},
-+
-+       /* Micron N25Q256/N25Q512/N25Q00A (32-bit ADDR devices)
-+        *
-+        * Versions are available with or without a dedicated RESET# pin
-+        * (e.g. N25Q512A83GSF40G vs. N25Q512A13GSF40G).  To complicate matters,
-+        * the versions that include a RESET# pin (Feature Set = 8) require a
-+        * different opcode for the FLASH_CMD_WRITE_1_4_4 command.
-+        * Unfortunately it is not possible to determine easily at run-time
-+        * which version is being used.  We therefore remove support for
-+        * FLASH_FLAG_WRITE_1_4_4 (falling back to FLASH_FLAG_WRITE_1_1_4), and
-+        * defer overall support for RESET# to the board-level platform/Device
-+        * Tree property "reset-signal".
-+        */
-+#define N25Q_32BIT_ADDR_FLAG  ((N25Q_FLAG              |	\
-+				FLASH_FLAG_32BIT_ADDR  |	\
-+				FLASH_FLAG_RESET)      &	\
-+			       ~FLASH_FLAG_WRITE_1_4_4)
-+	{ "n25q256", 0x20ba19,      0, 64 * 1024,   512,
-+	  N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config},
-+	{ "n25q512", 0x20ba20, 0x1000, 64 * 1024,  1024,
-+	  N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config},
-+	{ "n25q00a", 0x20ba21, 0x1000, 64 * 1024,  2048,
-+	  N25Q_32BIT_ADDR_FLAG, 108, stfsm_n25q_config},
++		emi_freq = STFSM_DEFAULT_EMI_FREQ;
++	} else
++		emi_freq = clk_get_rate(fsm->clk);
  
  	/*
- 	 * Spansion S25FLxxxP
-@@ -888,6 +922,30 @@ static int stfsm_write_fifo(struct stfsm *fsm, uint32_t *buf, uint32_t size)
- 	return size;
+ 	 * Calculate clk_div - values between 2 and 128
+@@ -2092,6 +2099,15 @@ static int stfsm_probe(struct platform_device *pdev)
+ 		return PTR_ERR(fsm->base);
+ 	}
+ 
++	fsm->clk = devm_clk_get(&pdev->dev, "emi_clk");
++	if (IS_ERR(fsm->clk)) {
++		dev_warn(fsm->dev, "Couldn't find EMI clock.\n");
++		fsm->clk = NULL;
++	} else if (clk_prepare_enable(fsm->clk)) {
++		dev_warn(fsm->dev, "Failed to enable EMI clock.\n");
++		fsm->clk = NULL;
++	}
++
+ 	mutex_init(&fsm->lock);
+ 
+ 	ret = stfsm_init(fsm);
+@@ -2156,6 +2172,30 @@ static int stfsm_remove(struct platform_device *pdev)
+ 	return mtd_device_unregister(&fsm->mtd);
  }
  
-+static int n25q_clear_flags(struct stfsm *fsm)
++#ifdef CONFIG_PM
++static int stfsmfsm_suspend(struct device *dev)
 +{
-+	struct stfsm_seq seq = {
-+		.seq_opc[0] = (SEQ_OPC_PADS_1 |
-+			       SEQ_OPC_CYCLES(8) |
-+			       SEQ_OPC_OPCODE(N25Q_CMD_CLFSR) |
-+			       SEQ_OPC_CSDEASSERT),
-+		.seq = {
-+			STFSM_INST_CMD1,
-+			STFSM_INST_STOP,
-+		},
-+		.seq_cfg = (SEQ_CFG_PADS_1 |
-+			    SEQ_CFG_READNOTWRITE |
-+			    SEQ_CFG_CSDEASSERT |
-+			    SEQ_CFG_STARTSEQ),
-+	};
++	struct stfsm *fsm = dev_get_drvdata(dev);
 +
-+	stfsm_load_seq(fsm, &seq);
-+
-+	stfsm_wait_seq(fsm);
++	if (fsm->clk)
++		clk_disable_unprepare(fsm->clk);
 +
 +	return 0;
 +}
 +
- static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
- {
- 	struct stfsm_seq *seq = &fsm->stfsm_seq_en_32bit_addr;
-@@ -1248,10 +1306,18 @@ static int stfsm_mx25_config(struct stfsm *fsm)
- static int stfsm_n25q_config(struct stfsm *fsm)
- {
- 	uint32_t flags = fsm->info->flags;
--	uint8_t vcr;
-+	uint8_t vcr, sta;
- 	int ret = 0;
- 	bool soc_reset;
- 
-+	/*
-+	 * Check/Clear Error Flags
-+	 */
-+	fsm->configuration |= CFG_N25Q_CHECK_ERROR_FLAGS;
-+	stfsm_read_status(fsm, N25Q_CMD_RFSR, &sta, 1);
-+	if (sta & N25Q_FLAGS_ERROR)
-+		n25q_clear_flags(fsm);
++static int stfsmfsm_resume(struct device *dev)
++{
++	struct stfsm *fsm = dev_get_drvdata(dev);
 +
- 	/* Configure 'READ' sequence */
- 	if (flags & FLASH_FLAG_32BIT_ADDR)
- 		ret = stfsm_search_prepare_rw_seq(fsm, &fsm->stfsm_seq_read,
-@@ -1626,6 +1692,7 @@ static int stfsm_write(struct stfsm *fsm, const uint8_t *buf,
- 	uint32_t page_buf[FLASH_PAGESIZE_32];
- 	uint8_t *t = (uint8_t *)&tmp;
- 	const uint8_t *p;
-+	uint8_t sta;
- 	int ret;
- 	int i;
- 
-@@ -1697,6 +1764,15 @@ static int stfsm_write(struct stfsm *fsm, const uint8_t *buf,
- 	if (ret && fsm->configuration & CFG_S25FL_CHECK_ERROR_FLAGS)
- 		stfsm_s25fl_clear_status_reg(fsm);
- 
-+	/* N25Q: Check/Clear Error Flags */
-+	if (fsm->configuration & CFG_N25Q_CHECK_ERROR_FLAGS) {
-+		stfsm_read_status(fsm, N25Q_CMD_RFSR, &sta, 1);
-+		if (sta & N25Q_FLAGS_ERROR) {
-+			n25q_clear_flags(fsm);
-+			ret = -EPROTO;
-+		}
-+	}
++	if (fsm->clk)
++		clk_prepare_enable(fsm->clk);
 +
- 	/* Exit 32-bit address mode, if required */
- 	if (fsm->configuration & CFG_WRITE_TOGGLE_32BIT_ADDR)
- 		stfsm_enter_32bit_addr(fsm, 0);
-@@ -1739,6 +1815,7 @@ static int stfsm_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
- static int stfsm_erase_sector(struct stfsm *fsm, uint32_t offset)
- {
- 	struct stfsm_seq *seq = &stfsm_seq_erase_sector;
-+	uint8_t sta;
- 	int ret;
- 
- 	dev_dbg(fsm->dev, "erasing sector at 0x%08x\n", offset);
-@@ -1759,6 +1836,15 @@ static int stfsm_erase_sector(struct stfsm *fsm, uint32_t offset)
- 	if (ret && fsm->configuration & CFG_S25FL_CHECK_ERROR_FLAGS)
- 		stfsm_s25fl_clear_status_reg(fsm);
- 
-+	/* N25Q: Check/Clear Error Flags */
-+	if (fsm->configuration & CFG_N25Q_CHECK_ERROR_FLAGS) {
-+		stfsm_read_status(fsm, N25Q_CMD_RFSR, &sta, 1);
-+		if (sta & N25Q_FLAGS_ERROR) {
-+			n25q_clear_flags(fsm);
-+			ret = -EPROTO;
-+		}
-+	}
++	return 0;
++}
++#endif
 +
- 	/* Exit 32-bit address mode, if required */
- 	if (fsm->configuration & CFG_ERASESEC_TOGGLE_32BIT_ADDR)
- 		stfsm_enter_32bit_addr(fsm, 0);
++static SIMPLE_DEV_PM_OPS(stfsm_pm_ops, stfsmfsm_suspend, stfsmfsm_resume);
++
+ static struct of_device_id stfsm_match[] = {
+ 	{ .compatible = "st,spi-fsm", },
+ 	{},
+@@ -2169,6 +2209,7 @@ static struct platform_driver stfsm_driver = {
+ 		.name	= "st-spi-fsm",
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = stfsm_match,
++		.pm     = &stfsm_pm_ops,
+ 	},
+ };
+ module_platform_driver(stfsm_driver);
 -- 
 1.8.3.2
