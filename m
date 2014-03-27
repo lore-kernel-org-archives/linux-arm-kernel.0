@@ -1,47 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Mar 2014 02:37:00 +0100
-Subject: [PATCH] ARM: moxart: fix CPU selection
-Message-ID: <201403270237.00850.arnd@arndb.de>
+Date: Thu, 27 Mar 2014 02:53:24 +0100
+Subject: [PATCH] ARM: cache-tauros2: remove ARMv6 code
+In-Reply-To: <CAN1soZz6-+s4bKbCJFXQResa07Ub9s1qfRrf2nDLC8eFVQEDsg@mail.gmail.com>
+References: <1589565.fmu2VlFkhj@wuerfel>
+ <CAN1soZz6-+s4bKbCJFXQResa07Ub9s1qfRrf2nDLC8eFVQEDsg@mail.gmail.com>
+Message-ID: <201403270253.24594.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moxart uses an FA526 CPU core, which is ARMv4 based, not ARMv4T.
-Before moxart, we had no CONFIG_MULTI_V4 option, since no ARMv4 platform
-was enabled for multiplatform. This now adds the missing option, which
-will give us slightly more efficient code on pure moxart kernels,
-because we can build a pure FA526 kernel now rather than a combined
-FA526+ARM920T kernel that we used to.
+On Tuesday 18 March 2014, Haojian Zhuang wrote:
+> On Wed, Mar 12, 2014 at 2:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > When building a kernel with support for both ARMv6 and ARMv7 but
+> > no MMU, the call from tauros2_internal_init to adjust_cr causes
+> > a link error. While that could probably be resolved, we don't
+> > actually support cache-tauros2 on ARMv6 any more. All PJ4 CPU
+> > implementations support both ARMv6 and ARMv7 and we already assume
+> > that we are using them only in ARMv7 mode.
+> >
+> > Removing the ARMv6 code path reduces the code size and avoids
+> > the linker error.
+> > -
+> >  #ifdef CONFIG_CPU_32v7
+> >         /*
+> >          * Check whether this CPU has support for the v7 hierarchical
+> >
+> 
+> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-----
+I've merged it into next/soc now, since that branch originally
+introduced the bug, which now prevents 'allmodconfig' from building.
 
-I've applied this one to the next/fixes-non-critical branch
+I had to another oneline change to the patch, see below. This has
+no functional impact, but just avoids a few "unused function" warnings
+when building with both v6 and v7 enabled. Previously some of the
+functions were shared between v5 and v6 code, but the v6 version
+is removed now.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3dad961..4f85b09 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -893,6 +893,12 @@ menu "Multiple platform selection"
- 
- comment "CPU Core family selection"
- 
-+config ARCH_MULTI_V4
-+	bool "ARMv4 based platforms (FA526)"
-+	depends on !ARCH_MULTI_V6_V7
-+	select ARCH_MULTI_V4_V5
-+	select CPU_FA526
-+
- config ARCH_MULTI_V4T
- 	bool "ARMv4T based platforms (ARM720T, ARM920T, ...)"
- 	depends on !ARCH_MULTI_V6_V7
-diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
-index 3795ae2..e9b45bb 100644
---- a/arch/arm/mach-moxart/Kconfig
-+++ b/arch/arm/mach-moxart/Kconfig
-@@ -1,5 +1,5 @@
- config ARCH_MOXART
--	bool "MOXA ART SoC" if ARCH_MULTI_V4T
-+	bool "MOXA ART SoC" if ARCH_MULTI_V4
- 	select CPU_FA526
- 	select ARM_DMA_MEM_BUFFERABLE
- 	select USE_OF
+	Arnd
+
+diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+index 7964ef2..b273739 100644
+--- a/arch/arm/mm/cache-tauros2.c
++++ b/arch/arm/mm/cache-tauros2.c
+@@ -33,7 +33,7 @@
+  * outer cache operations into the kernel image if the kernel has been
+  * configured to support a pre-v7 CPU.
+  */
+-#if __LINUX_ARM_ARCH__ < 7
++#ifdef CONFIG_CPU_32v5
+ /*
+  * Low-level cache maintenance operations.
+  */
