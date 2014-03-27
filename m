@@ -1,50 +1,54 @@
-From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
-Date: Thu, 27 Mar 2014 16:55:37 +0100
-Subject: [PATCH 1/1] ARM: imx: Add DTSC02 platform (i.MX27)
-In-Reply-To: <53344680.6080800@gmail.com>
-References: <1395934153-19416-1-git-send-email-gcembed@gmail.com>
- <CAOMZO5AwfrXVoZfCKFQHBTDcUm4cfAVVX6fJabY0_S0gtbX_eQ@mail.gmail.com>
- <53344680.6080800@gmail.com>
-Message-ID: <533449F9.4090101@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 27 Mar 2014 16:58:28 +0100
+Subject: [PATCH 1/6] ARM: mvebu: introduce CPU reset code
+In-Reply-To: <20140327151945.365db704@skate>
+References: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>	<1395927485-11842-2-git-send-email-thomas.petazzoni@free-electrons.com>	<53342EF1.3020508@free-electrons.com>
+ <20140327151945.365db704@skate>
+Message-ID: <53344AA4.4040805@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio,
-On 03/27/2014 04:40 PM, Ga?tan Carlier wrote:
-> Hi Fabio,
-> On 03/27/2014 04:35 PM, Fabio Estevam wrote:
->> Hi Ga?tan,
->>
->> On Thu, Mar 27, 2014 at 12:29 PM, Ga?tan Carlier <gcembed@gmail.com>
->> wrote:
->>>
->>> Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
->>> ---
->>>   arch/arm/mach-imx/Kconfig       |   17 ++
->>>   arch/arm/mach-imx/Makefile      |    1 +
->>>   arch/arm/mach-imx/mach-dtsc02.c |  416
->>> +++++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 434 insertions(+), 0 deletions(-)
->>>   create mode 100644 arch/arm/mach-imx/mach-dtsc02.c
->>
->> My understanding is that new board files are not allowed for ARM.
->>
->> Have you considered creating a device tree implementation instead?
->>
->>  From a quick look, all the devices you are registering are currently
->> supported on device tree.
-> Later, I will add emma-pp, emma-prp, sound which is actually not working
-> (error related to DMA coherent in ssi driver), coda. I will check how
-> device tree works.
-I am using Redboot (ecos 20090512), I supposed that is not directly 
-compatible and I have to append DTS blob to zImage as specified in 
-slides petazzoni-device-tree-dummies.pdf ?
->>
->> Regards,
->>
->> Fabio Estevam
->>
-> Thanks.
-> Ga?tan Carlier.
-Thank you for help help,
-Ga?tan Carlier.
+On 27/03/2014 15:19, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Thu, 27 Mar 2014 15:00:17 +0100, Gregory CLEMENT wrote:
+> 
+>>> +static struct of_device_id of_cpu_reset_table[] = {
+>>> +	{.compatible = "marvell,armada-370-cpu-reset", .data = (void*) ARMADA_370_MAX_CPUS },
+>> What about removing the previous line. As explained in patch 5, the CPU
+>> reset driver is not really needed as Armada 370 is single core and the
+>> only use of the CPU reset driver is to boot secondary processors. So by
+>> removing this line we can keep the marvell,armada-370-cpu-reset node in
+>> the device tree without doing useless initialization.
+> 
+> I found it weird to have a compatible string marked as supported in the
+> DT binding document, but not actually supported by the kernel. I know
+> it's possible, but I found it odd, especially considering the fact that
+> mapping these registers, even if unused, isn't costing much.
+> 
+> I don't have a strong opinion on this, so if others voice in this way,
+> I'll change it.
+
+Me neither I don't have a strong opinion on ths, so with our without this line,
+you can add my:
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+and also:
+
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+by the way
+
+
+
+> 
+> Thomas
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
