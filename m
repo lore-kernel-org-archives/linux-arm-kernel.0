@@ -1,48 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Mar 2014 08:20:47 +0000
-Subject: [PATCH 01/15] mtd: st_spi_fsm: Add Macronix MX25L25655E device
-In-Reply-To: <CAMuHMdXgPiJSrA4Txp_OxrGx7osNsprm5a+w3Qag=Yd-_nFVBw@mail.gmail.com>
-References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
- <1395851969-13520-2-git-send-email-lee.jones@linaro.org>
- <CAMuHMdXgPiJSrA4Txp_OxrGx7osNsprm5a+w3Qag=Yd-_nFVBw@mail.gmail.com>
-Message-ID: <20140327082047.GB26627@lee--X1>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 27 Mar 2014 09:29:53 +0100
+Subject: [PATCH resend] clk: axi-clkgen: Add support for v2
+In-Reply-To: <20140327023817.5762.48198@quantum>
+References: <1392629513-6114-1-git-send-email-lars@metafoo.de>
+ <20140227010421.12081.82707@quantum> <530ED945.2050907@metafoo.de>
+ <20140327023817.5762.48198@quantum>
+Message-ID: <5333E181.60607@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On 03/27/2014 03:38 AM, Mike Turquette wrote:
+> Quoting Lars-Peter Clausen (2014-02-26 22:20:53)
+>> On 02/27/2014 02:04 AM, Mike Turquette wrote:
+>>> Quoting Lars-Peter Clausen (2014-02-17 01:31:53)
+>>>> This patch adds support for the new v2 version of the axi-clkgen core.
+>>>> Unfortunately the method of accessing the registers is quite different on v2,
+>>>> while the content still stays largely the same. So the patch adds a small
+>>>> abstraction layer which implements the specific read and write functions for v1
+>>>> and v2 in callback functions.
+>>>
+>>> Hi,
+>>>
+>>> This patch almost doubles the size of clk-axi-clkgen.c. Should it be a
+>>> separate clock driver? I guess that depends on the relationship between
+>>> "v1" and "v2". Are both of those versions of the clkgen core going into
+>>> production?
+>>
+>> Hi,
+>>
+>> The only thing that is different between the two versions is how the PLL
+>> registers are accessed. The content that is written to those register is a
+>> 100% identical. So splitting it up into two drivers makes no sense, since
+>> you'd have to copy&paste all the application logic. Both versions of the
+>> core can be found in the wild.
+>
+> Hi Lars,
+>
+> I took this into clk-next some time ago but never replied to this thread
+> letting you know. Better late than never :-)
 
-> > From: Angus Clark <angus.clark@st.com>
-> >
-> > Add Macronix MX25L25655E to the list of known devices.
-> >
-> > Signed-off-by: Angus Clark <angus.clark@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/mtd/devices/st_spi_fsm.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-> > index bea1416..2471061 100644
-> > --- a/drivers/mtd/devices/st_spi_fsm.c
-> > +++ b/drivers/mtd/devices/st_spi_fsm.c
-> > @@ -380,6 +380,9 @@ static struct flash_info flash_types[] = {
-> >         { "mx25l25635e", 0xc22019, 0, 64*1024, 512,
-> >           (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
-> >           stfsm_mx25_config },
-> > +       { "mx25l25655e", 0xc22619, 0, 64*1024, 512,
-> > +         (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
-> > +         stfsm_mx25_config},
-> >
-> >  #define N25Q_FLAG (FLASH_FLAG_READ_WRITE       |       \
-> >                    FLASH_FLAG_READ_FAST         |       \
-> 
-> How much of this table can be shared with the one in m25p80.c?
+Yep, already saw it showing up in clk-next a while ago, thanks.
 
-I have a long term plan to merge the two. Just waiting for the SPI NOR
-Framework to land before I do so.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+- Lars
