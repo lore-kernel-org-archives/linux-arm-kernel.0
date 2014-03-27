@@ -1,270 +1,81 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 27 Mar 2014 13:16:19 +0100
-Subject: [PATCH RFC v3 2/2] clk: Add handling of clk parent and rate assigned
- from DT
-In-Reply-To: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
-References: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1395922579-28547-3-git-send-email-s.nawrocki@samsung.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 27 Mar 2014 13:21:09 +0100
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <20140327095956.GA29623@localhost>
+References: <532BCFCC.4080205@freescale.com>
+ <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+ <20140324095902.GB11377@localhost>
+ <20140326095156.3e5585b8@ipc1.ka-ro>
+ <5332AEE7.2040402@freescale.com>
+ <20140326125502.0e8d0657@ipc1.ka-ro>
+ <20140327095956.GA29623@localhost>
+Message-ID: <20140327132109.06258526@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function adds a helper function to configure clock parents and rates
-as specified in clock-parents, clock-rates DT properties for a consumer
-device and a call to it before driver is bound to a device.
+Hi,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
-Changes since v2:
- - edited in clock-bindings.txt, added note about 'assigned-clocks'
-   subnode which may be used to specify "global" clocks configuration
-   at a clock provider node,
- - moved of_clk_device_setup() function declaration from clk-provider.h
-   to clk-conf.h so required function stubs are available when
-   CONFIG_COMMON_CLK is not enabled,
+Huang Shijie wrote:
+> > > Please see "Figure 12-13" in the 12.12.1.12:
+> > >    "In order to preserve the BI (bad block information), flash updater 
+> > > or gang programmer
+> > > applications need to swap Bad Block Information (BI) data to byte 0 of 
+> > > metadata area for
+> > > every page before programming NAND Flash. ROM when loading firmware, 
+> > > copies back
+> > > the value at metadata[0] to BI offset in page data. The following figure 
+> > > shows how the
+> > > factory bad block marker is preserved."
+> > > 
+> > The inspection of the BB markers is only a fallback for the case that
+> > there is no DBBT. From the same chapter that you quoted above:
+> > | ROM uses DBBT to skip any bad block that falls within firmware data
+> > | on NAND Flash device.
+> > | If the address of DBBT Search Area in FCB is 0, ROM will rely on
+> > | factory marked bad block markers to find out if a block is good or bad.
+> > 
+> > Thus, even the boot ROM of i.MX28 can well live without blockmark
+> > swapping.
+> 
+> Assume that there is a NAND block "A",  and the A consist of 256 pages.
+> the uboot is burned to the "A", can occupy 6 pages:
+> 
+>   -----------------------------------------------------------------------------
+>  | page 0 |  page 1 | page 2 | page 3 | page 4 | page 5 | ... | ... | page 255 |
+>   -----------------------------------------------------------------------------
+>  
+>   \-------------------------------------- ------------------------------------/
+>                                          V  
+>                                         "A"					 
+> 
+> The DBBT is used to track if "A" is bad or not.
+> Assume we know that "A" is a good block, ROM then need to read out the uboot.
+> When the ROM needs to read out the 6 pages one by one. And each time the ROM read
+> the page, it should do the swapping for this page.
+> 
+> In this case, the ROM will do the swapping six times.
+> 
+> Please read the sector again, you will see the "every page" in it:
+> --------------------------------------------------------------------
+>    "In order to preserve the BI (bad block information), flash updater 
+> or gang programmer applications need to swap Bad Block Information (BI) data to byte 0 of 
+> metadata area for every page before programming NAND Flash. ROM when loading firmware, 
+> copies back
+> --------------------------------------------------------------------
+>
+I can assure you that the >100.000 i.MX28 based modules, that we sold
+up to now boot from NAND just fine without any block mark swapping in
+the U-Boot pages.
 
-Changes since v1:
- - the helper function to parse and set assigned clock parents and
-   rates made public so it is available to clock providers to call
-   directly;
- - dropped the platform bus notification and call of_clk_device_setup()
-   is is now called from the driver core, rather than from the
-   notification callback;
- - s/of_clk_get_list_entry/of_clk_get_by_property.
----
- .../devicetree/bindings/clock/clock-bindings.txt   |   26 ++++++
- drivers/base/dd.c                                  |    7 ++
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-conf.c                             |   87 ++++++++++++++++++++
- drivers/clk/clk.c                                  |   10 ++-
- include/linux/clk/clk-conf.h                       |   19 +++++
- 6 files changed, 149 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/clk-conf.c
- create mode 100644 include/linux/clk/clk-conf.h
 
-diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-index 7c52c29..b452f80 100644
---- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-+++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-@@ -115,3 +115,29 @@ clock signal, and a UART.
-   ("pll" and "pll-switched").
- * The UART has its baud clock connected the external oscillator and its
-   register clock connected to the PLL clock (the "pll-switched" signal)
-+
-+==Assigned clock parents and rates==
-+
-+Some platforms require static initial configuration of parts of the clocks
-+controller. Such a configuration can be specified in a clock consumer node
-+through clock-parents and clock-rates DT properties. The former should contain
-+a list of parent clocks in form of phandle and clock specifier pairs, the
-+latter the list of assigned clock frequency values (one cell each).
-+
-+    uart at a000 {
-+        compatible = "fsl,imx-uart";
-+        reg = <0xa000 0x1000>;
-+        ...
-+        clocks = <&clkcon 0>, <&clkcon 3>;
-+        clock-names = "baud", "mux";
-+
-+        clock-parents = <0>, <&pll 1>;
-+        clock-rates = <460800>;
-+    };
-+
-+In this example the pll is set as parent of "mux" clock and frequency of "baud"
-+clock is specified as 460800 Hz.
-+
-+For clocks which are not directly connected to any consumer device similarly
-+clocks, clock-parents and/or clock-rates properties should be specified in
-+assigned-clocks subnode of a clock controller DT node.
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 0605176..4c633e7 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -25,6 +25,7 @@
- #include <linux/async.h>
- #include <linux/pm_runtime.h>
- #include <linux/pinctrl/devinfo.h>
-+#include <linux/clk/clk-conf.h>
- 
- #include "base.h"
- #include "power/power.h"
-@@ -278,6 +279,12 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 	if (ret)
- 		goto probe_failed;
- 
-+	if (dev->of_node) {
-+		ret = of_clk_device_init(dev->of_node);
-+		if (ret)
-+			goto probe_failed;
-+	}
-+
- 	if (driver_sysfs_add(dev)) {
- 		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
- 			__func__, dev_name(dev));
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index a367a98..c720e4b 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
-+obj-$(CONFIG_COMMON_CLK)	+= clk-conf.o
- 
- # hardware specific clock types
- # please keep this section sorted lexicographically by file/directory path name
-diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-new file mode 100644
-index 0000000..a2e992e
---- /dev/null
-+++ b/drivers/clk/clk-conf.c
-@@ -0,0 +1,87 @@
-+/*
-+ * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-+ * Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/device.h>
-+#include <linux/of.h>
-+#include <linux/printk.h>
-+
-+/**
-+ * of_clk_device_init() - parse and set clk configuration assigned to a device
-+ * @node: device node to apply the configuration for
-+ *
-+ * This function parses 'clock-parents' and 'clock-rates' properties and sets
-+ * any specified clock parents and rates.
-+ */
-+int of_clk_device_init(struct device_node *node)
-+{
-+	struct property	*prop;
-+	const __be32 *cur;
-+	int rc, index, num_parents;
-+	struct clk *clk, *pclk;
-+	u32 rate;
-+
-+	num_parents = of_count_phandle_with_args(node, "clock-parents",
-+						 "#clock-cells");
-+	if (num_parents == -EINVAL)
-+		pr_err("clk: Invalid value of clock-parents property at %s\n",
-+		       node->full_name);
-+
-+	for (index = 0; index < num_parents; index++) {
-+		pclk = of_clk_get_by_property(node, "clock-parents", index);
-+		if (IS_ERR(pclk)) {
-+			/* skip empty (null) phandles */
-+			if (PTR_ERR(pclk) == -ENOENT)
-+				continue;
-+
-+			pr_warn("clk: couldn't get parent clock %d for %s\n",
-+				index, node->full_name);
-+			return PTR_ERR(pclk);
-+		}
-+
-+		clk = of_clk_get(node, index);
-+		if (IS_ERR(clk)) {
-+			pr_warn("clk: couldn't get clock %d for %s\n",
-+				index, node->full_name);
-+			return PTR_ERR(clk);
-+		}
-+
-+		rc = clk_set_parent(clk, pclk);
-+		if (rc < 0)
-+			pr_err("clk: failed to reparent %s to %s: %d\n",
-+			       __clk_get_name(clk), __clk_get_name(pclk), rc);
-+		else
-+			pr_debug("clk: set %s as parent of %s\n",
-+				 __clk_get_name(pclk), __clk_get_name(clk));
-+	}
-+
-+	index = 0;
-+	of_property_for_each_u32(node, "clock-rates", prop, cur, rate) {
-+		if (rate) {
-+			clk = of_clk_get(node, index);
-+			if (IS_ERR(clk)) {
-+				pr_warn("clk: couldn't get clock %d for %s\n",
-+					index, node->full_name);
-+				return PTR_ERR(clk);
-+			}
-+
-+			rc = clk_set_rate(clk, rate);
-+			if (rc < 0)
-+				pr_err("clk: couldn't set %s clock rate: %d\n",
-+				       __clk_get_name(clk), rc);
-+			else
-+				pr_debug("clk: set rate of clock %s to %lu\n",
-+					 __clk_get_name(clk), clk_get_rate(clk));
-+		}
-+		index++;
-+	}
-+
-+	return 0;
-+}
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 29dc1e7..240d776 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -10,6 +10,7 @@
-  */
- 
- #include <linux/clk-private.h>
-+#include <linux/clk/clk-conf.h>
- #include <linux/module.h>
- #include <linux/mutex.h>
- #include <linux/spinlock.h>
-@@ -2604,7 +2605,15 @@ void __init of_clk_init(const struct of_device_id *matches)
- 		list_for_each_entry_safe(clk_provider, next,
- 					&clk_provider_list, node) {
- 			if (force || parent_ready(clk_provider->np)) {
-+
- 				clk_provider->clk_init_cb(clk_provider->np);
-+
-+				/* Set any assigned clock parents and rates */
-+				np = of_get_child_by_name(clk_provider->np,
-+							  "assigned-clocks");
-+				if (np)
-+					of_clk_device_init(np);
-+
- 				list_del(&clk_provider->node);
- 				kfree(clk_provider);
- 				is_init_done = true;
-@@ -2619,7 +2628,6 @@ void __init of_clk_init(const struct of_device_id *matches)
- 		 */
- 		if (!is_init_done)
- 			force = true;
--
- 	}
- }
- #endif
-diff --git a/include/linux/clk/clk-conf.h b/include/linux/clk/clk-conf.h
-new file mode 100644
-index 0000000..f06b1c2
---- /dev/null
-+++ b/include/linux/clk/clk-conf.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-+ * Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+struct device_node;
-+
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int of_clk_device_init(struct device_node *node);
-+#else
-+int of_clk_device_init(struct device_node *node)
-+{
-+	return 0;
-+}
-+#endif
+Lothar Wa?mann
 -- 
-1.7.9.5
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
