@@ -1,32 +1,38 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 27 Mar 2014 13:46:17 +0100
-Subject: [PATCH v3] ata: fix Marvell SATA driver dependencies
-In-Reply-To: <20140327123823.GM25349@lunn.ch>
-References: <1668037.2oe7J2B7N4@amdc1032> <20140327123823.GM25349@lunn.ch>
-Message-ID: <53341D99.6070703@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 27 Mar 2014 13:50:46 +0100
+Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <20140327113633.GA13469@katana>
+References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+ <13047887.EV24E0bQlt@avalon> <20140327113633.GA13469@katana>
+Message-ID: <6464541.xxTtlZAQTW@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2014 01:38 PM, Andrew Lunn wrote:
-> On Thu, Mar 27, 2014 at 01:23:39PM +0100, Bartlomiej Zolnierkiewicz wrote:
->> Make sata_mv host driver depend on PCI || ARCH_DOVE || ARCH_KIRKWOOD ||
->> ARCH_MV78XX0 || ARCH_MVEBU || ARCH_ORION5X config options as Marvell
->> SATA support covers both Marvell PCI devices and Marvell Dove, Kirkwood,
->> MV78xx0, Armada 370/XP and Orion5x SoCs (for non-PCI devices the driver
->> to work requires suitable device tree node to be defined).
->
-> Good old fashioned platform driver will also work. In fact, 95% of Orion5x
-> and mv78xx0 devices don't have DT yet.
->
-> You might also be able to simplify it to
->
-> PCI || PLAT_ORION || COMPILE_TEST
->
-> But i suggest you build test to make sure.
+On Thursday 27 March 2014 12:36:33 Wolfram Sang wrote:
+> > > > > > Indeed, I got it wrong. We can leave it as-is then.
+> > > > > 
+> > > > > Great. So I guess, this series can be applied now?
+> > > > 
+> > > > There's just the issue of serial port aliases left. I've started a
+> > > > discussion about that on the DT mailing list (you've been CC'ed).
+> > > 
+> > > So, how to proceed with this series?
+> > 
+> > Could you please ping the DT maintainers to revive the discussion ?
+> 
+> I don't think I am the right person to ping, because I don't know what
+> you are precisely looking for from them.
 
-Please, don't do it. We are in the progress of getting rid of
-PLAT_ORION. v3 is just fine, or keep at least ARCH_MVEBU:
+I've pinged them.
 
-PCI || PLAT_ORION || ARCH_MVEBU || COMPILE_TEST
+-- 
+Regards,
 
-Sebastian
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140327/e5edb19e/attachment.sig>
