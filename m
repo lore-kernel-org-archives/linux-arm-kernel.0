@@ -1,94 +1,98 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Mar 2014 10:28:35 +0000
-Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
-In-Reply-To: <20140326072805.GB31517@norris-Latitude-E6410>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <20140325125050.GB665@arch.cereza> <20140325131139.GB24823@lee--X1>
- <20140325220045.GA12185@arch.cereza>
- <20140326072805.GB31517@norris-Latitude-E6410>
-Message-ID: <20140327102835.GA17779@lee--X1>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 27 Mar 2014 11:39:29 +0100
+Subject: [PATCHv3] net: mvneta: use devm_ioremap_resource() instead of
+ of_iomap()
+Message-ID: <1395916769-20475-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > After taking a quick glance at the whole driver I noticed you have something
-> > strange going on. AFAIK, the typical NAND driver probe() should be one of
-> > these two:
-> > 
-> > * Call nand_scan() which calls nand_scan_ident() + nand_scan_tail().
-> > 
-> > * Call nand_scan_ident() to identify the NAND device geometry, do some
-> >   driver specific initialization, fill some hooks, and finally call
-> >   nand_scan_tail() to complete the initialization.
-> > 
-> > You driver call nand_scan_ident() and then does some bad block scan, and
-> > fills some callbacks on its own, but never calls nand_scan_tail().
-> > 
-> > The call to nand_scan_tail() would remove the need to export those NAND
-> > core functions, and remove the need to scan and print the bad blocks.
-> > I don't know if you have a real reason for not doing it this way, or
-> > maybe it's the way this driver was originally written.
-> > 
-> > Care to review this and re-spin the driver? You'll have a more nicer
-> > driver, and more framework-compliant.
-> 
-> A hearty +1 to this. You are avoiding much of the core of the NAND
-> framework by avoiding the nand_chip callbacks and nand_scan_tail(), and
-> by reimplementing the BBT. I will have to NAK to some of the patches
-> that EXPORT the nand_base private core (e.g., nand_get_device()), and I
-> will most likely NAK the custom BBT implementation (please improve
-> nand_bbt.c as needed).
+The mvneta driver currently uses of_iomap(), which has two drawbacks:
+it doesn't request the resource, and it isn't devm-style so some error
+handling is needed.
 
-This is a good catch. I will attempt to reimplement the driver's
-initialisation steps to utilise more of the core infrastructure in an
-attempt to mitigate the requirement for exportation of private
-routines.
+This commit switches to use devm_ioremap_resource() instead, which
+automatically requests the resource (so the I/O registers region shows
+up properly in /proc/iomem), and also is devm-style, which allows to
+get rid of some error handling to unmap the I/O registers region.
 
-The BBT requirements are somewhere more complex. To provide you with
-the complete picture, a little knowledge of driver history is
-required. When it was initially created the MTD core only supported
-OOB BBTs, but the ST BCH Controller doesn't support OOB access, so
-Angus wrote his on In-Band (IB) implementation. Unfortunately the IB
-support which _is_ now present in the kernel doesn't match the
-internal implementation. Normally this wouldn't be an issue in itself,
-but ST's boot-stack and tooling (Primary Bootloader, U-Boot, various
-Programmers, etc) are aware of the internal IB BTT and utilise it
-in varying ways. Shifting over to the Mainline version in
-one-foul-swoop _will_ cause lots of pain and will probably result in
-the disownership of driver we're trying to Mainline today. Naturally
-I'm keen to avoid this.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes since v2:
 
-> > Also, if you plan to target v3.16 on this, I'd suggest that you pick
-> > some pack of features and submit those first, reducing the amount of code
-> > to be reviewed. For instance, you may choose to leave some of the ECC bits
-> > aside for now.
-> > 
-> > It's just a suggestion to get at least some of the code merged quicker,
-> > don't take me too seriously on this.
-> 
-> That's a possible approach if it still leaves your driver functional.
-> But I wouldn't trim the driver too much just for sake of reviewing.
-> 
-> BTW, why do you call this driver stm_nand_bch? BCH is a particular type
-> of ECC algorithm, not unique at all to ST's hardware. Can you drop the
-> _bch and make it just stm_nand?
+ - Properly take into account the fact that devm_ioremap_resource()
+   returns a PTR_ERR type of pointer, so IS_ERR must be used to test
+   the return value.
 
->From my knowledge (Angus feel free to jump in anywhere you like), ST
-have 4 NAND drivers. This is just one of them. The others are EMI,
-Flex and Advanced Flex (AFM). This particular controller is described
-as the BCH throughout ST's documentation. Much of this documentation is
-available freely online [1].
+Changes since v1:
 
-> Also, you might want to change the
-> namespacing on some of your functions; for instance, I don't think you
-> can own the name bch_write(). Possibly prefix things with stm_* or
-> stm_nand_* where reasonable.
+ - Remove error handling of platform_get_resource(), since
+   devm_ioremap_resource already checks if the resource is NULL, and
+   properly returns an error in this case. Reported by Ezequiel Garcia.
 
-Yes, absolutely.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-[1] http://www.stlinux.com/howto/NAND
-
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index f418f4f..e251ec7 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -22,6 +22,7 @@
+ #include <linux/interrupt.h>
+ #include <net/ip.h>
+ #include <net/ipv6.h>
++#include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_mdio.h>
+@@ -2774,6 +2775,7 @@ static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
+ static int mvneta_probe(struct platform_device *pdev)
+ {
+ 	const struct mbus_dram_target_info *dram_target_info;
++	struct resource *res;
+ 	struct device_node *dn = pdev->dev.of_node;
+ 	struct device_node *phy_node;
+ 	u32 phy_addr;
+@@ -2838,9 +2840,10 @@ static int mvneta_probe(struct platform_device *pdev)
+ 
+ 	clk_prepare_enable(pp->clk);
+ 
+-	pp->base = of_iomap(dn, 0);
+-	if (pp->base == NULL) {
+-		err = -ENOMEM;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	pp->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(pp->base)) {
++		err = PTR_ERR(pp->base);
+ 		goto err_clk;
+ 	}
+ 
+@@ -2848,7 +2851,7 @@ static int mvneta_probe(struct platform_device *pdev)
+ 	pp->stats = alloc_percpu(struct mvneta_pcpu_stats);
+ 	if (!pp->stats) {
+ 		err = -ENOMEM;
+-		goto err_unmap;
++		goto err_clk;
+ 	}
+ 
+ 	for_each_possible_cpu(cpu) {
+@@ -2913,8 +2916,6 @@ err_deinit:
+ 	mvneta_deinit(pp);
+ err_free_stats:
+ 	free_percpu(pp->stats);
+-err_unmap:
+-	iounmap(pp->base);
+ err_clk:
+ 	clk_disable_unprepare(pp->clk);
+ err_free_irq:
+@@ -2934,7 +2935,6 @@ static int mvneta_remove(struct platform_device *pdev)
+ 	mvneta_deinit(pp);
+ 	clk_disable_unprepare(pp->clk);
+ 	free_percpu(pp->stats);
+-	iounmap(pp->base);
+ 	irq_dispose_mapping(dev->irq);
+ 	free_netdev(dev);
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.2
