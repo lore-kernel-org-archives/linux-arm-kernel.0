@@ -1,289 +1,42 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu, 27 Mar 2014 22:29:22 +0100
-Subject: [PATCH v3 08/10] ARM: sun7i/sun4i: dt: Add AXP209 support to various
- boards
+Date: Thu, 27 Mar 2014 22:29:23 +0100
+Subject: [PATCH v3 09/10] ARM: sunxi: Add AXP20x support in defconfig
 In-Reply-To: <1395955764-18103-1-git-send-email-carlo@caione.org>
 References: <1395955764-18103-1-git-send-email-carlo@caione.org>
-Message-ID: <1395955764-18103-9-git-send-email-carlo@caione.org>
+Message-ID: <1395955764-18103-10-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts           | 13 +++++++++++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 13 +++++++++++++
- arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 19 +++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 13 +++++++++++++
- arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 19 +++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 19 +++++++++++++++++++
- arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 13 +++++++++++++
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 14 ++++++++++++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 15 +++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 14 ++++++++++++++
- 10 files changed, 152 insertions(+)
+ arch/arm/configs/sunxi_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index fa746aea..cf18c4d 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -88,6 +88,19 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 4684cbe..52d21bb 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -80,6 +80,19 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index d7c17e4..3960d67 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -82,6 +82,25 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
-+		};
- 	};
- 
- 	reg_emac_3v3: emac-3v3 {
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-index fe9272e..c797f5c 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet97fv2.dts
-@@ -34,6 +34,19 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
- 		};
- 
- 		usbphy: phy at 01c13400 {
-diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-index dd84a9e..c61902d 100644
---- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
-@@ -47,6 +47,25 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
-+		};
- 	};
- 
- 	reg_usb1_vbus: usb1-vbus {
-diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-index 66cf0c7..7e862d6 100644
---- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-@@ -81,6 +81,25 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
-+		};
- 	};
- 
- 	leds {
-diff --git a/arch/arm/boot/dts/sun4i-a10-pcduino.dts b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-index 255b47e..8ad0a86 100644
---- a/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-pcduino.dts
-@@ -66,6 +66,19 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupts = <0>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 68de89f..c5c91b8 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -66,6 +66,20 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index cb25d3c..a42f5bc 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -73,6 +73,21 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
-+
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index eeadf76..63171c4 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -95,6 +95,20 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&i2c0_pins_a>;
- 			status = "okay";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			axp: axp20x at 34 {
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				compatible = "x-powers,axp209";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+
-+				/include/ "x-powers-axp209.dtsi"
-+			};
- 		};
- 
- 		i2c1: i2c at 01c2b000 {
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index b5df4a5..6e305da 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -40,6 +40,8 @@ CONFIG_SUN4I_EMAC=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ # CONFIG_NET_VENDOR_WIZNET is not set
+ # CONFIG_WLAN is not set
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_AXP20X_PEK=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=8
+@@ -55,6 +57,7 @@ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
++CONFIG_MFD_AXP20X=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+@@ -69,3 +72,4 @@ CONFIG_NFS_FS=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NLS=y
+ CONFIG_PRINTK_TIME=y
++CONFIG_REGULATOR_AXP20X=y
 -- 
 1.8.3.2
