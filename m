@@ -1,48 +1,32 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 26 Mar 2014 22:45:09 -0500
-Subject: [PATCH net-next 0/3] net: stmmac: Add glue layer for socfpga platform
-Message-ID: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 26 Mar 2014 21:37:08 -0700
+Subject: [PATCH 0/3] clk: mmp: bug fix for clk-frac
+In-Reply-To: <1390445262-27486-1-git-send-email-chao.xie@marvell.com>
+References: <1390445262-27486-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <20140327043708.5762.44142@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+Quoting Chao Xie (2014-01-22 18:47:39)
+> From: Chao Xie <chao.xie@marvell.com>
+> 
+> When use the clk-frac type of mmp, some bugs are found.
+> The following 3 patches are bug fix for clk-frac
 
-Hi David,
+Taken into clk-next!
 
-I'm re-submitting the patch series to add the socfpga glue layer for the
-stmmac ethernet driver. My original patch did not build for kernel module,
-and I apologize for not testing against that.
+Regards,
+Mike
 
-This patch is also better aligned with the other stmmac glue
-layers(sti and sunxi).
-
-I'd like to take the "net: stmmac: Add SOCFPGA glue driver" patch into your
-tree and the other 2 dts patches through the arm-soc tree.
-
-Thanks,
-
-
-Dinh Nguyen (3):
-  net: stmmac: Add SOCFPGA glue driver
-  dts: socfpga: Add DTS entry for adding the stmmac glue layer for
-    stmmac.
-  dts: stmmac: Document the clocks property in the stmmac base document
-
- .../devicetree/bindings/net/socfpga-dwmac.txt      |   27 ++++
- Documentation/devicetree/bindings/net/stmmac.txt   |    6 +
- arch/arm/boot/dts/socfpga.dtsi                     |    2 +
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   21 ++++
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   14 +++
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |   17 +++
- arch/arm/boot/dts/socfpga_vt.dts                   |    5 +
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |   10 ++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
- .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |  130 ++++++++++++++++++++
- drivers/net/ethernet/stmicro/stmmac/stmmac.h       |    3 +
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    3 +
- 12 files changed, 239 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/socfpga-dwmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
-
--- 
-1.7.9.5
+> 
+> Chao Xie (3):
+>   clk: mmp: fix wrong mask when calculate denominator
+>   clk: mmp: fix the wrong calculation formula
+>   clk: mmp: try to use closer one when do round rate
+> 
+>  drivers/clk/mmp/clk-frac.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
+> 
+> -- 
+> 1.8.3.2
+> 
