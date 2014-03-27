@@ -1,33 +1,79 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 27 Mar 2014 12:36:33 +0100
-Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
-In-Reply-To: <13047887.EV24E0bQlt@avalon>
-References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
- <1452941.Qc8gHZ8xpL@avalon> <20140327064643.GA2687@katana>
- <13047887.EV24E0bQlt@avalon>
-Message-ID: <20140327113633.GA13469@katana>
+From: Phil.Edworthy@renesas.com (Phil.Edworthy at renesas.com)
+Date: Thu, 27 Mar 2014 11:40:24 +0000
+Subject: [PATCH v6 05/10] dt-bindings: pci: rcar pcie device tree bindings
+In-Reply-To: <53340690.20006@cogentembedded.com>
+References: <1395912416-20087-1-git-send-email-phil.edworthy@renesas.com>
+ <1395912416-20087-6-git-send-email-phil.edworthy@renesas.com>
+ <53340690.20006@cogentembedded.com>
+Message-ID: <OF9F94FEE3.D67AC138-ON80257CA8.00401203-80257CA8.00401F68@eu.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sergei,
 
-> > > > > Indeed, I got it wrong. We can leave it as-is then.
-> > > > 
-> > > > Great. So I guess, this series can be applied now?
-> > > 
-> > > There's just the issue of serial port aliases left. I've started a
-> > > discussion about that on the DT mailing list (you've been CC'ed).
-> > 
-> > So, how to proceed with this series?
+On: 27/03/2014 11:08, Sergei wrote:
+> Subject: Re: [PATCH v6 05/10] dt-bindings: pci: rcar pcie device tree 
+bindings
 > 
-> Could you please ping the DT maintainers to revive the discussion ?
+> Hello.
+> 
+> On 27-03-2014 13:26, Phil Edworthy wrote:
+> 
+> > This patch adds the bindings for the R-Car PCIe driver. The driver
+> > resides under drivers/pci/host/pcie-rcar.c
+> 
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> 
+> > v6:
+> >   - Correct DT bindings description for reg and clocks
+> 
+> > v5:
+> >   - Add PCIe bus clock reference
+> >   - Add additional interrupt bindings
+> >   - Use dma-ranges property to specify inbound memory regions
+> 
+>     Put these under --- tear line, please.
+> 
+> > ---
+> >   Documentation/devicetree/bindings/pci/rcar-pci.txt | 45 
+++++++++++++++++++++++
+> >   1 file changed, 45 insertions(+)
+> >   create mode 100644 
+Documentation/devicetree/bindings/pci/rcar-pci.txt
+> 
+> > diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt b/
+> Documentation/devicetree/bindings/pci/rcar-pci.txt
+> > new file mode 100644
+> > index 0000000..a97ebe6
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
+> > @@ -0,0 +1,45 @@
+> > +* Renesas RCar PCIe interface
+> > +
+> > +Required properties:
+> > +- compatible: should contain one of the following
+> > +   "renesas,pcie-r8a7779", "renesas,pcie-r8a7790", 
+"renesas,pcie-r8a7791"
+> > +- reg: base address and length of the pcie controller registers.
+> > +- #address-cells: set to <3>
+> > +- #size-cells: set to <2>
+> > +- device_type: set to "pci"
+> > +- ranges: ranges for the PCI memory and I/O regions.
+> > +- dma-ranges: ranges for the inbound memory regions.
+> > +- interrupts: two interrupt sources for MSI interrupts, followed by 
+interrupt
+> > +   source for hardware related interrupts (e.g. link speed change).
+> > +- #interrupt-cells: set to <1>
+> > +- interrupt-map-mask and interrupt-map: standard PCI properties
+> > +   to define the mapping of the PCIe interface to interrupt
+> > +   numbers.
+> > +- clocks: from common clock binding: phandles to PCIe controller and 
+PCIe bus
+> > +   clocks.
+> 
+>     I told it's not only phandles (e.g. &mstp3_clks) but the clock 
+specifiers.
+Ah, yes you did.
 
-I don't think I am the right person to ping, because I don't know what
-you are precisely looking for from them.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140327/3dd3add7/attachment-0001.sig>
+Thanks
+Phil
