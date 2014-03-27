@@ -1,34 +1,32 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Thu, 27 Mar 2014 20:49:59 +0100
-Subject: [PATCH v2 3/7] clk: exynos5420: Rename clock IDs
-In-Reply-To: <1395918470-16374-4-git-send-email-shaik.ameer@samsung.com>
-References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
- <1395918470-16374-4-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <20140327194959.GY3998@book.gsilab.sittig.org>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Thu, 27 Mar 2014 12:56:51 -0700
+Subject: iMX6 GPIO input
+Message-ID: <CACUGKYPMJ5Cf4D61Ta_A1t6UuGL2s18V=caPS+skP8jbqnKE8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-03-27 at 16:37 +0530, Shaik Ameer Basha wrote:
-> 
-> From: Rahul Sharma <rahul.sharma@samsung.com>
-> 
-> This patch renames the clock IDs used for the DT bindings as
-> per Exynos5420 datasheet.
-> 
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos5420.c   |  162 +++++++++++++++++---------------
->  include/dt-bindings/clock/exynos5420.h |  138 +++++++++++++--------------
->  2 files changed, 154 insertions(+), 146 deletions(-)
+Hello all,
 
-does this break bisection when you rename symbolic identifiers in
-their declaration yet don't update references at the users?
+I am using kernel 3.13 at the same time I pulled the latest for-next
+of Shawn's repo. For the testing, I un-allocated the gpio3 pin 22 by
+disabling cd-gpios = <&gpio3 22 0>;  in ushdc3 of imx6sl-evk.dts file
+in order to export it in the userspace.
 
+Then, I do the following in the userspace:
 
-virtually yours
-Gerhard Sittig
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+echo 86 > /sys/class/gpio/export
+echo in > /sys/class/gpio/gpio86/direction
+cat /sys/class/gpio/gpio86/value
+
+I got 4194304 value which is correspond to gpio3 pin 22. If the SD
+card is inserted, I got 0.
+
+Previously, the gpio should return 1 or 0 (depending how the gpio is
+configured). But, now it was returning a value based on bit
+representation of the pin.
+
+Is these a new implementation or it is a bug?
+
+Regards,
+
+john
