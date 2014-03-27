@@ -1,89 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Mar 2014 10:15:27 +0100
-Subject: [PATCH] gpio: mxs: Allow for recursive enable_irq_wake() call
-In-Reply-To: <1395628690-7225-1-git-send-email-marex@denx.de>
-References: <1395628690-7225-1-git-send-email-marex@denx.de>
-Message-ID: <CACRpkda1qnx24YdfnSwu3tJw9NiVKpKjNbibGoG5JeZ+rAFpeQ@mail.gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Thu, 27 Mar 2014 09:26:52 +0000
+Subject: [PATCH v6 06/10] ARM: shmobile: r8a7790: Add PCIe device nodes
+In-Reply-To: <1395912416-20087-1-git-send-email-phil.edworthy@renesas.com>
+References: <1395912416-20087-1-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <1395912416-20087-7-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 3:38 AM, Marek Vasut <marex@denx.de> wrote:
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 
-> The scenario here is that someone calls enable_irq_wake() from somewhere
-> in the code. This will result in the lockdep producing a backtrace as can
-> be seen below. In my case, this problem is triggered when using the wl1271
-> (TI WlCore) driver found in drivers/net/wireless/ti/ .
->
-> The problem cause is rather obvious from the backtrace, but let's outline
-> the dependency. enable_irq_wake() grabs the IRQ buslock in irq_set_irq_wake(),
-> which in turns calls mxs_gpio_set_wake_irq() . But mxs_gpio_set_wake_irq()
-> calls enable_irq_wake() again on the one-level-higher IRQ , thus it tries to
-> grab the IRQ buslock again in irq_set_irq_wake() . Because the spinlock in
-> irq_set_irq_wake()->irq_get_desc_buslock()->__irq_get_desc_lock() is not
-> marked as recursive, lockdep will spew the stuff below.
->
-> We know we can safely re-enter the lock, so use IRQ_GC_INIT_NESTED_LOCK to
-> fix the spew.
->
->  =============================================
->  [ INFO: possible recursive locking detected ]
->  3.10.33-00012-gf06b763-dirty #61 Not tainted
->  ---------------------------------------------
->  kworker/0:1/18 is trying to acquire lock:
->   (&irq_desc_lock_class){-.-...}, at: [<c00685f0>] __irq_get_desc_lock+0x48/0x88
->
->  but task is already holding lock:
->   (&irq_desc_lock_class){-.-...}, at: [<c00685f0>] __irq_get_desc_lock+0x48/0x88
->
->  other info that might help us debug this:
->   Possible unsafe locking scenario:
->
->         CPU0
->         ----
->    lock(&irq_desc_lock_class);
->    lock(&irq_desc_lock_class);
->
->   *** DEADLOCK ***
->
->   May be due to missing lock nesting notation
->
->  3 locks held by kworker/0:1/18:
->   #0:  (events){.+.+.+}, at: [<c0036308>] process_one_work+0x134/0x4a4
->   #1:  ((&fw_work->work)){+.+.+.}, at: [<c0036308>] process_one_work+0x134/0x4a4
->   #2:  (&irq_desc_lock_class){-.-...}, at: [<c00685f0>] __irq_get_desc_lock+0x48/0x88
->
->  stack backtrace:
->  CPU: 0 PID: 18 Comm: kworker/0:1 Not tainted 3.10.33-00012-gf06b763-dirty #61
->  Workqueue: events request_firmware_work_func
->  [<c0013eb4>] (unwind_backtrace+0x0/0xf0) from [<c0011c74>] (show_stack+0x10/0x14)
->  [<c0011c74>] (show_stack+0x10/0x14) from [<c005bb08>] (__lock_acquire+0x140c/0x1a64)
->  [<c005bb08>] (__lock_acquire+0x140c/0x1a64) from [<c005c6a8>] (lock_acquire+0x9c/0x104)
->  [<c005c6a8>] (lock_acquire+0x9c/0x104) from [<c051d5a4>] (_raw_spin_lock_irqsave+0x44/0x58)
->  [<c051d5a4>] (_raw_spin_lock_irqsave+0x44/0x58) from [<c00685f0>] (__irq_get_desc_lock+0x48/0x88)
->  [<c00685f0>] (__irq_get_desc_lock+0x48/0x88) from [<c0068e78>] (irq_set_irq_wake+0x20/0xf4)
->  [<c0068e78>] (irq_set_irq_wake+0x20/0xf4) from [<c027260c>] (mxs_gpio_set_wake_irq+0x1c/0x24)
->  [<c027260c>] (mxs_gpio_set_wake_irq+0x1c/0x24) from [<c0068cf4>] (set_irq_wake_real+0x30/0x44)
->  [<c0068cf4>] (set_irq_wake_real+0x30/0x44) from [<c0068ee4>] (irq_set_irq_wake+0x8c/0xf4)
->  [<c0068ee4>] (irq_set_irq_wake+0x8c/0xf4) from [<c0310748>] (wlcore_nvs_cb+0x10c/0x97c)
->  [<c0310748>] (wlcore_nvs_cb+0x10c/0x97c) from [<c02be5e8>] (request_firmware_work_func+0x38/0x58)
->  [<c02be5e8>] (request_firmware_work_func+0x38/0x58) from [<c0036394>] (process_one_work+0x1c0/0x4a4)
->  [<c0036394>] (process_one_work+0x1c0/0x4a4) from [<c0036a4c>] (worker_thread+0x138/0x394)
->  [<c0036a4c>] (worker_thread+0x138/0x394) from [<c003cb74>] (kthread+0xa4/0xb0)
->  [<c003cb74>] (kthread+0xa4/0xb0) from [<c000ee00>] (ret_from_fork+0x14/0x34)
->  wlcore: loaded
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+v6:
+ - Split device and board DT changes
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Thanks Marek, patch applied and I also added Cc: stable.
-
-I would like someone to look into converting the MXS to use the new
-gpiolib irqchip helpers merged on my devel branch so we can centralize
-and get rid of surplus redundant bug fixing everywhere around the drivers.
-
-That code does not use generic irqchip, but rather a regular irqchip+domain
-and explicitly chained interrupt handlers.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index df9ec61..dbcea57 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -821,4 +821,28 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
++
++	pcie: pcie at fe000000 {
++		compatible = "renesas,pcie-r8a7790";
++		reg = <0 0xfe000000 0 0x80000>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
++			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
++			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
++			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
++		/* Map all possible DDR as inbound ranges */
++		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
++			      0x43000000 1 0x80000000 1 0x80000000 0 0x80000000>;
++		interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH
++			      0 117 IRQ_TYPE_LEVEL_HIGH
++			      0 118 IRQ_TYPE_LEVEL_HIGH>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 0>;
++		interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7790_CLK_PCIE>, <&pcie_bus_clk>;
++		clock-names = "pcie", "pcie_bus";
++		status = "disabled";
++	};
+ };
+-- 
+1.9.0
