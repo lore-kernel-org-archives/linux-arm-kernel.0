@@ -1,35 +1,74 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Thu, 27 Mar 2014 10:30:57 -0700
-Subject: [PATCH 2/3] ARM/leds: move ARM Versatile LED driver to leds
- subsystem
-In-Reply-To: <CACRpkdZo0jpr9sCkYDbtYiK8rFrgqt36OhyMR-iLjEmAtLGnAA@mail.gmail.com>
-References: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
- <1393509500-26002-2-git-send-email-linus.walleij@linaro.org>
- <CACRpkdZo0jpr9sCkYDbtYiK8rFrgqt36OhyMR-iLjEmAtLGnAA@mail.gmail.com>
-Message-ID: <CAK5ve-KscsG7H=x2m7Aid-=PtSjqYEt6eQVfRTRGJZya_=zDZw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 27 Mar 2014 18:32:11 +0100
+Subject: [RFC PATCH 03/12] pci: host: pcie-designware: Use *base-mask* for
+ configuring the iATU
+In-Reply-To: <000001cf49b1$fcd8a810$f689f830$%han@samsung.com>
+References: <1395842272-15267-1-git-send-email-kishon@ti.com>
+ <1395842272-15267-4-git-send-email-kishon@ti.com>
+ <000001cf49b1$fcd8a810$f689f830$%han@samsung.com>
+Message-ID: <201403271832.11425.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 5:19 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Feb 27, 2014 at 2:58 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> Now that we have converted this driver to a real platform device
->> module-based thing, we move the driver down into the LEDs
->> subsystem and rename the config option to LEDS_VERSATILE.
->>
->> Cc: Bryan Wu <cooloney@gmail.com>
->> Cc: Richard Purdie <rpurdie@rpsys.net>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> Bryan: can you provide an ACK for this patch so I can funnel
->> this through the ARM SoC tree?
->
-> Ping on this.
->
+On Thursday, March 27, 2014 at 12:45:01 PM, Jingoo Han wrote:
+> On Wednesday, March 26, 2014 10:58 PM, Kishon Vijay Abraham I wrote:
+> > In DRA7, the cpu sees 32bit address, but the pcie controller can see only
+> > 28bit address. So whenever the cpu issues a read/write request, the 4
+> > most significant bits are used by L3 to determine the target controller.
+> > For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe
+> > controller but the PCIe controller will see only (0x000_0000 -
+> > 0xFFF_FFF). So for programming the outbound translation window the
+> > *base* should be programmed as 0x000_0000. Whenever we try to write to
+> > say 0x2000_0000, it will be translated to whatever we have programmed in
+> > the translation window with base as 0x000_0000.
+> > 
+> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> (+cc Pratyush Anand, Marek Vasut, Richard Zhu)
 
-Apologize for this delay, this patch email didn't show up in my inbox.
-Please go ahead with my ack
+Thanks.
 
-Acked-by: Bryan Wu <cooloney@gmail.com>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+This patch has no impact on MX6, the mask on MX6 is ~0 . A few comments below 
+...
+[...]
+
+> > diff --git a/drivers/pci/host/pcie-designware.c
+> > b/drivers/pci/host/pcie-designware.c index 17ce88f..98b661c 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -464,6 +464,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> > 
+> >  		return -EINVAL;
+> >  	
+> >  	}
+> > 
+> > +	if (of_property_read_u64(np, "base-mask", &pp->base_mask))
+> > +		pp->base_mask = ~(0x0ULL);
+
+You can just use ~0x0ULL without the () I believe.
+
+[...]
+
+> > diff --git a/drivers/pci/host/pcie-designware.h
+> > b/drivers/pci/host/pcie-designware.h index 3063b35..3fa12a6 100644
+> > --- a/drivers/pci/host/pcie-designware.h
+> > +++ b/drivers/pci/host/pcie-designware.h
+> > @@ -35,6 +35,7 @@ struct pcie_port {
+> > 
+> >  	struct device		*dev;
+> >  	u8			root_bus_nr;
+> >  	void __iomem		*dbi_base;
+> > 
+> > +	u64			base_mask;
+> > 
+> >  	u64			cfg0_base;
+> >  	void __iomem		*va_cfg0_base;
+> >  	u64			cfg1_base;
+
+This structure contains a lot of slop, check [1] please. We really should be 
+more careful about the structures. I think a separate patch to clean this up 
+would be fine though.
+
+[1] http://www.catb.org/esr/structure-packing/
