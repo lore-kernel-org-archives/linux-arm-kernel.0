@@ -1,56 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Mar 2014 14:39:51 +0100
-Subject: [PATCH] arm64: add appropriate asm/unaligned.h
-Message-ID: <1395927591-20938-1-git-send-email-ard.biesheuvel@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 27 Mar 2014 14:38:02 +0100
+Subject: [PATCH 3/6] ARM: mvebu: improve PMSU driver to request its resource
+In-Reply-To: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1395927485-11842-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic asm/unaligned.h does not allow unaligned accesses, resulting in all
-invocations of get_unaligned_xxx() and put_unaligned_xxx() to be expanded into
-byte size accesses. On arm64, this is unnecessary, so provide a more permissive
-asm/unaligned.h instead.
+Until now, the PMSU driver was using of_iomap() to map its registers,
+but of_iomap() doesn't call request_mem_region(). This commit fixes
+the memory mapping code of the PMSU to do so, which will also be
+useful for a later commit since we will need to adjust the resource
+base address and size for Device Tree backward compatibility.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/include/asm/Kbuild      |  1 -
- arch/arm64/include/asm/unaligned.h | 17 +++++++++++++++++
- 2 files changed, 17 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/unaligned.h
+ arch/arm/mach-mvebu/pmsu.c | 36 +++++++++++++++++++++++++++++++-----
+ 1 file changed, 31 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 43a2c9d2d6f4..f88986a0c1dd 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -46,7 +46,6 @@ generic-y += termios.h
- generic-y += topology.h
- generic-y += trace_clock.h
- generic-y += types.h
--generic-y += unaligned.h
- generic-y += user.h
- generic-y += vga.h
- generic-y += xor.h
-diff --git a/arch/arm64/include/asm/unaligned.h b/arch/arm64/include/asm/unaligned.h
-new file mode 100644
-index 000000000000..00c4a4e02fd1
---- /dev/null
-+++ b/arch/arm64/include/asm/unaligned.h
-@@ -0,0 +1,17 @@
-+#ifndef __ASM_UNALIGNED_H
-+#define __ASM_UNALIGNED_H
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 1807639..b337fe5 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -16,6 +16,8 @@
+  * other SOC units
+  */
+ 
++#define pr_fmt(fmt) "mvebu-pmsu: " fmt
 +
-+#include <linux/unaligned/access_ok.h>
-+#include <linux/unaligned/generic.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/of_address.h>
+@@ -63,15 +65,39 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ static int __init armada_370_xp_pmsu_init(void)
+ {
+ 	struct device_node *np;
++	struct resource res;
++	int ret = 0;
+ 
+ 	np = of_find_matching_node(NULL, of_pmsu_table);
+-	if (np) {
+-		pr_info("Initializing Power Management Service Unit\n");
+-		pmsu_mp_base = of_iomap(np, 0);
+-		of_node_put(np);
++	if (!np)
++		return 0;
 +
-+#if defined(__LITTLE_ENDIAN)
-+#define get_unaligned		__get_unaligned_le
-+#define put_unaligned		__put_unaligned_le
-+#elif defined(__BIG_ENDIAN)
-+#define get_unaligned		__get_unaligned_be
-+#define put_unaligned		__put_unaligned_be
-+#else
-+#error need to define endianess
-+#endif
++	pr_info("Initializing Power Management Service Unit\n");
 +
-+#endif /* __ASM_UNALIGNED_H */
++	if (of_address_to_resource(np, 0, &res)) {
++		pr_err("unable to get resource\n");
++		ret = -ENOENT;
++		goto out;
+ 	}
+ 
+-	return 0;
++	if (!request_mem_region(res.start, resource_size(&res),
++				np->full_name)) {
++		pr_err("unable to request region\n");
++		ret = -EBUSY;
++		goto out;
++	}
++
++	pmsu_mp_base = ioremap(res.start, resource_size(&res));
++	if (!pmsu_mp_base) {
++		pr_err("unable to map registers\n");
++		release_mem_region(res.start, resource_size(&res));
++		ret = -ENOMEM;
++		goto out;
++	}
++
++ out:
++	of_node_put(np);
++	return ret;
+ }
+ 
+ early_initcall(armada_370_xp_pmsu_init);
 -- 
 1.8.3.2
