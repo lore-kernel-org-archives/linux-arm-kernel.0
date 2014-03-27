@@ -1,184 +1,148 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 27 Mar 2014 14:38:01 +0100
-Subject: [PATCH 2/6] ARM: mvebu: start using the CPU reset driver
-In-Reply-To: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1395927485-11842-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 27 Mar 2014 14:37:59 +0100
+Subject: [PATCH 0/6] ARM: mvebu: prepare PMSU code for cpuidle and Armada
+ 375/38x SMP
+Message-ID: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit changes the PMSU driver to no longer map itself the CPU
-reset registers, and instead call into the CPU reset driver to
-deassert the secondary CPUs for SMP booting.
+Hello,
 
-In order to provide Device Tree backward compatibility, the CPU reset
-driver is extended to not only support its official compatible strings
-"marvell,armada-370-cpu-reset" and "marvell,armada-xp-cpu-reset", but
-to also look at the PMSU compatible string
-"marvell,armada-370-xp-pmsu" to find the CPU reset registers
-address. This allows old Device Tree to work correctly with newer
-kernel versions. Therefore, the CPU reset driver implements the
-following logic:
+The PMSU (Power Management Service Unit) code in
+arch/arm/mach-mvebu/pmsu.c needs several changes and improvements to
+properly support cpuidle on Armada 370/XP and SMP on Armada 375/38x.
 
- * If one of the normal compatible strings
-   "marvell,armada-<chip>-cpu-reset" is found, then we map its first
-   memory resource as the CPU reset registers.
+The problem with the current implementations are:
 
- * Otherwise, if none of the normal compatible strings have been
-   found, we look for the "marvell,armada-370-xp-pmsu" compatible
-   string, and we map the second memory as the CPU reset registers.
+ * The base address and length of the PMSU registers that we had
+   originally chosen are wrong: the base starts 0x100 too late, and
+   therefore we miss some PMSU registers that are important for the
+   cpuidle operation. In other words, the PMSU reg specification was
+   <0x22100 0x400>, but it needs to be <0x22000 0x1000>.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/cpu-reset.c | 56 ++++++++++++++++++++++++++++-------------
- arch/arm/mach-mvebu/pmsu.c      | 20 +++++++--------
- 2 files changed, 48 insertions(+), 28 deletions(-)
+   This patch set solves this by introducing a new DT binding for the
+   PMSU that assumes the reg property will be <0x22000 0x1000>. In
+   addition to this, backward compatibility with the old DT property
+   is preserved, by doing some calculation inside pmsu.c to re-adjust
+   <0x22100 0x400> to the now correct <0x22000 0x1000>. The addition
+   of the new DT binding will allow, one day, to get rid of the old
+   deprecated binding.
 
-diff --git a/arch/arm/mach-mvebu/cpu-reset.c b/arch/arm/mach-mvebu/cpu-reset.c
-index 2819887..e3821b1 100644
---- a/arch/arm/mach-mvebu/cpu-reset.c
-+++ b/arch/arm/mach-mvebu/cpu-reset.c
-@@ -46,43 +46,63 @@ int mvebu_cpu_reset_deassert(int cpu)
- 	return 0;
- }
- 
--static int __init mvebu_cpu_reset_init(void)
-+static int mvebu_cpu_reset_map(struct device_node *np, int res_idx)
- {
--	struct device_node *np;
--	const struct of_device_id *match;
- 	struct resource res;
--	int ret = 0;
- 
--	np = of_find_matching_node_and_match(NULL, of_cpu_reset_table,
--					     &match);
--	if (!np)
--		return 0;
--
--	if (of_address_to_resource(np, 0, &res)) {
-+	if (of_address_to_resource(np, res_idx, &res)) {
- 		pr_err("unable to get resource\n");
--		ret = -ENOENT;
--		goto out;
-+		return -ENOENT;
- 	}
- 
- 	if (!request_mem_region(res.start, resource_size(&res),
- 				np->full_name)) {
- 		pr_err("unable to request region\n");
--		ret = -EBUSY;
--		goto out;
-+		return -EBUSY;
- 	}
- 
- 	cpu_reset_base = ioremap(res.start, resource_size(&res));
- 	if (!cpu_reset_base) {
- 		pr_err("unable to map registers\n");
- 		release_mem_region(res.start, resource_size(&res));
--		ret = -ENOMEM;
--		goto out;
-+		return -ENOMEM;
- 	}
- 
--	ncpus = (int) match->data;
-+	return 0;
-+}
- 
--out:
-+int __init mvebu_cpu_reset_init(void)
-+{
-+	struct device_node *np;
-+	const struct of_device_id *match;
-+	int res_idx;
-+	int ret;
-+
-+	np = of_find_matching_node_and_match(NULL, of_cpu_reset_table,
-+					     &match);
-+	if (np) {
-+		res_idx = 0;
-+		ncpus = (int) match->data;
-+	} else {
-+		/*
-+		 * This code is kept for backward compatibility with
-+		 * old Device Trees.
-+		 */
-+		np = of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu");
-+		if (np) {
-+			pr_warn(FW_WARN "deprecated pmsu binding\n");
-+			res_idx = 1;
-+			ncpus = ARMADA_XP_MAX_CPUS;
-+		}
-+	}
-+
-+	/* No reset node found */
-+	if (!np)
-+		return 0;
-+
-+	ret = mvebu_cpu_reset_map(np, res_idx);
- 	of_node_put(np);
-+
- 	return ret;
- }
- 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index d71ef53..1807639 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -21,14 +21,14 @@
- #include <linux/of_address.h>
- #include <linux/io.h>
- #include <linux/smp.h>
-+#include <linux/resource.h>
- #include <asm/smp_plat.h>
-+#include "common.h"
- #include "pmsu.h"
- 
- static void __iomem *pmsu_mp_base;
--static void __iomem *pmsu_reset_base;
- 
- #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
--#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
- 
- static struct of_device_id of_pmsu_table[] = {
- 	{.compatible = "marvell,armada-370-xp-pmsu"},
-@@ -38,11 +38,11 @@ static struct of_device_id of_pmsu_table[] = {
- #ifdef CONFIG_SMP
- int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- {
--	int reg, hw_cpu;
-+	int hw_cpu, ret;
- 
--	if (!pmsu_mp_base || !pmsu_reset_base) {
-+	if (!pmsu_mp_base) {
- 		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
--		return 1;
-+		return -ENODEV;
- 	}
- 
- 	hw_cpu = cpu_logical_map(cpu_id);
-@@ -50,10 +50,11 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
- 			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
- 
--	/* Release CPU from reset by clearing reset bit*/
--	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
--	reg &= (~0x1);
--	writel(reg, pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-+	ret = mvebu_cpu_reset_deassert(hw_cpu);
-+	if (ret) {
-+		pr_warn("unable to boot CPU: %d\n", ret);
-+		return ret;
-+	}
- 
- 	return 0;
- }
-@@ -67,7 +68,6 @@ static int __init armada_370_xp_pmsu_init(void)
- 	if (np) {
- 		pr_info("Initializing Power Management Service Unit\n");
- 		pmsu_mp_base = of_iomap(np, 0);
--		pmsu_reset_base = of_iomap(np, 1);
- 		of_node_put(np);
- 	}
- 
+ * The PMSU Device Tree node was used to describe both the PMSU
+   registers themselves, but also the CPU reset registers. But this
+   was a mistake: on Armada 375, we have the same CPU reset registers
+   to start the secondary processors, but we don't have a
+   PMSU. Therefore, the PMSU should be split in two parts: one part
+   really doing the PMSU itself, and one part taking care of the CPU
+   reset registers.
+
+   This is achieved by adding a cpu-reset.c driver in
+   arch/arm/mach-mvebu/, which uses a new DT node with a compatible
+   property named "marvell,armada-<chip>-cpu-reset".
+
+   This driver is backward compatible with old DT, and therefore if no
+   "marvell,armada-<chip>-cpu-reset" compatible string is found, it
+   will look for a PMSU compatible string, and use the second reg
+   specifier of it to get the location of the CPU register registers.
+
+   Note that we have considered using the "reset framework" to support
+   this mechanism. It was working perfectly fine, except that the
+   Device Tree backward compatibility requirement makes it way too
+   complicated: when we're booted with an old Device Tree, we would
+   have to artifically create a node for the CPU reset device, and
+   then for each CPU, add a "reset" property that contains a phandle
+   to the CPU reset device node we created. While this is therorically
+   possible, the existing OF API in the kernel does not easily allow
+   the allocation of phandle numbers.
+
+   Moreover, the "reset framework" is mainly useful for device
+   drivers, so that they don't depend on a SoC-specific set of
+   functions to manage the reset line of their devices. However, in
+   our case, it's the SoC-specific SMP code that calls into
+   SoC-specific CPU reset code, so using the reset framework doesn't
+   bring a huge benefit.
+
+ * Setting the boot address of the secondary processor is not only
+   useful for SMP, but also for cpuidle, so this functionality in
+   pmsu.c is split into a separate function, so that it can be re-used
+   by the cpuidle code. It is also useful for the Armada 38x SMP,
+   which also uses the PMSU to set the secondary processor PMSU.
+
+The patch series was successfully tested by using both the old and new
+Device Trees: the backward compatibility logic has been tested.
+
+Details of the patches:
+
+ * PATCH 1 introduces the cpu-reset.c driver, with its normal DT
+   binding.
+
+ * PATCH 2 changes the pmsu.c driver to remove the CPU reset logic,
+   and rely on the cpu-reset.c driver. It also introduces the backward
+   compatibility code in the cpu-reset.c driver so that things
+   continue to work normally.
+
+ * PATCH 3 improves the pmsu.c driver to properly request its register
+   area instead of using just of_iomap().
+
+ * PATCH 4 introduces a new DT binding for the PMSU, which expects a
+   larger register area. It also adds the necessary backward
+   compatibility code to properly support the old DT binding by
+   adjusting manually the base/size of the registers within the
+   driver.
+
+ * PATCH 5 switches the Armada 370/XP device trees to use the new CPU
+   reset and PMSU bindings.
+
+ * PATCH 6 splits into a separate function the code that sets the boot
+   address of secondary CPUs.
+
+In terms of dependencies, we will have 4 interconnected patch series:
+Armada 375/38x coherency support, this PMSU rework series, the cpuidle
+series, and the Armada 375/38x SMP support. The relations are as follows
+
+  ---------------        ---------------------
+  | pmsu-rework |        | 375/38x coherency |
+  ---------------        ---------------------
+        ||   ||                 ||
+	||   \\____________     ||
+	\/                \/    \/
+  ---------------        ---------------
+  |   cpuidle   |        | 375/38x SMP |
+  ---------------        ---------------
+
+In other words: cpuidle needs pmsu-rework, and 375/38x SMP needs
+pmsu-rework and 375/38x coherency. Gregory will soon resend a new
+version of his cpuidle patch series based on top of these PMSU
+changes, and I will soon post the 375/38x SMP support.
+
+Best regards,
+
+Thomas
+
+Gregory CLEMENT (3):
+  ARM: mvebu: extend the PMSU registers
+  ARM: mvebu: switch to the new PMSU binding in Armada 370/XP Device
+    Tree
+  ARM: mvebu: use a separate function to set the boot address of CPUs
+
+Thomas Petazzoni (3):
+  ARM: mvebu: introduce CPU reset code
+  ARM: mvebu: start using the CPU reset driver
+  ARM: mvebu: improve PMSU driver to request its resource
+
+ .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |  14 ++-
+ .../devicetree/bindings/arm/armada-cpu-reset.txt   |  17 ++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |   5 +
+ arch/arm/boot/dts/armada-370.dtsi                  |   5 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   6 +-
+ arch/arm/mach-mvebu/Makefile                       |   2 +-
+ arch/arm/mach-mvebu/armada-370-xp.h                |   3 +-
+ arch/arm/mach-mvebu/common.h                       |   1 +
+ arch/arm/mach-mvebu/cpu-reset.c                    | 109 +++++++++++++++++++++
+ arch/arm/mach-mvebu/pmsu.c                         |  79 +++++++++++----
+ 10 files changed, 209 insertions(+), 32 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+ create mode 100644 arch/arm/mach-mvebu/cpu-reset.c
+
 -- 
 1.8.3.2
