@@ -1,26 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Mar 2014 02:04:42 +0100
-Subject: [PATCH RESEND for ARM-SoC 0/2] ARM: STi: NOR Flash support
-In-Reply-To: <1395401588-8825-1-git-send-email-lee.jones@linaro.org>
-References: <1395401588-8825-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <201403270204.42583.arnd@arndb.de>
+Date: Thu, 27 Mar 2014 02:08:21 +0100
+Subject: [GIT PULL] DaVinci SoC fixes for v3.15
+In-Reply-To: <532AD471.5030305@ti.com>
+References: <532AD471.5030305@ti.com>
+Message-ID: <201403270208.21854.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014, Lee Jones wrote:
-> As requested by Arnd:
+On Thursday 20 March 2014, Sekhar Nori wrote:
+> Here is a fix from Kevin over the soc pull request
+> sent earlier.
 > 
-> ARM-SoC Maintainers,
+> Thanks,
+> Sekhar
 > 
-> Please apply these two patches directly to ARM-SoC for inclusion
-> into the v3.15 merge window. All maintainer Acks are applied.
+> The following changes since commit 4b9e44f8d7c9cd166d8304b8f619741c1d59b836:
 > 
-> Kind regards,
+>   ARM: davinci: remove da8xx_omapl_defconfig (2014-03-06 19:08:30 +0530)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.15/soc-2
+> 
+> for you to fetch changes up to b737f51d423861399079a1f66647e7a416de3318:
+> 
+>   ARM: davinci: fix DT booting with default defconfig (2014-03-20 15:39:38 +0530)
+> 
+> ----------------------------------------------------------------
+> Includes a patch to enable appended
+> DTB support for DT booting on DA850
+> boards with older bootloaders.
+> 
 
-Applied to next/dt branch. I had a trivial conflict against the
-addition of the network device nodes, which I resolved on this
-branch.
-
-Thanks,
+Pulled into next/soc
 
 	Arnd
