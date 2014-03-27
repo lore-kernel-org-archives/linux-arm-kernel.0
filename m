@@ -1,38 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 27 Mar 2014 16:27:41 +0100
-Subject: [PATCH] ARM: sunxi: Select HAVE_ARM_ARCH_TIMER
-Message-ID: <1395934061-5340-1-git-send-email-maxime.ripard@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 27 Mar 2014 12:35:32 -0300
+Subject: [PATCH 1/1] ARM: imx: Add DTSC02 platform (i.MX27)
+In-Reply-To: <1395934153-19416-1-git-send-email-gcembed@gmail.com>
+References: <1395934153-19416-1-git-send-email-gcembed@gmail.com>
+Message-ID: <CAOMZO5AwfrXVoZfCKFQHBTDcUm4cfAVVX6fJabY0_S0gtbX_eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for the architected timers support to be enabled in the kernel, this
-option has to be enabled. Otherwise, the architected timers driver won't be
-compiled in, and we will not get to use them.
+Hi Ga?tan,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
+On Thu, Mar 27, 2014 at 12:29 PM, Ga?tan Carlier <gcembed@gmail.com> wrote:
+>
+> Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+> ---
+>  arch/arm/mach-imx/Kconfig       |   17 ++
+>  arch/arm/mach-imx/Makefile      |    1 +
+>  arch/arm/mach-imx/mach-dtsc02.c |  416 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 434 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/mach-dtsc02.c
 
-Hi Arnd, Kevin, Olof,
+My understanding is that new board files are not allowed for ARM.
 
-It would be great if you could apply this patch directly on top of the current
-arm-soc for-next.
+Have you considered creating a device tree implementation instead?
 
-Thanks!
+>From a quick look, all the devices you are registering are currently
+supported on device tree.
 
- arch/arm/mach-sunxi/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Regards,
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index b9d6cad8669b..931adeaf35d2 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_SUNXI
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_IRQ_CHIP
-+	select HAVE_ARM_ARCH_TIMER
- 	select HAVE_SMP
- 	select PINCTRL
- 	select PINCTRL_SUNXI
--- 
-1.9.0
+Fabio Estevam
