@@ -1,81 +1,42 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 27 Mar 2014 13:21:09 +0100
-Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <20140327095956.GA29623@localhost>
-References: <532BCFCC.4080205@freescale.com>
- <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
- <20140324095902.GB11377@localhost>
- <20140326095156.3e5585b8@ipc1.ka-ro>
- <5332AEE7.2040402@freescale.com>
- <20140326125502.0e8d0657@ipc1.ka-ro>
- <20140327095956.GA29623@localhost>
-Message-ID: <20140327132109.06258526@ipc1.ka-ro>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 27 Mar 2014 13:23:39 +0100
+Subject: [PATCH v3] ata: fix Marvell SATA driver dependencies
+Message-ID: <1668037.2oe7J2B7N4@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Make sata_mv host driver depend on PCI || ARCH_DOVE || ARCH_KIRKWOOD ||
+ARCH_MV78XX0 || ARCH_MVEBU || ARCH_ORION5X config options as Marvell
+SATA support covers both Marvell PCI devices and Marvell Dove, Kirkwood,
+MV78xx0, Armada 370/XP and Orion5x SoCs (for non-PCI devices the driver
+to work requires suitable device tree node to be defined).  Additionally
+allow the driver build if COMPILE_TEST config option is set.
 
-Huang Shijie wrote:
-> > > Please see "Figure 12-13" in the 12.12.1.12:
-> > >    "In order to preserve the BI (bad block information), flash updater 
-> > > or gang programmer
-> > > applications need to swap Bad Block Information (BI) data to byte 0 of 
-> > > metadata area for
-> > > every page before programming NAND Flash. ROM when loading firmware, 
-> > > copies back
-> > > the value at metadata[0] to BI offset in page data. The following figure 
-> > > shows how the
-> > > factory bad block marker is preserved."
-> > > 
-> > The inspection of the BB markers is only a fallback for the case that
-> > there is no DBBT. From the same chapter that you quoted above:
-> > | ROM uses DBBT to skip any bad block that falls within firmware data
-> > | on NAND Flash device.
-> > | If the address of DBBT Search Area in FCB is 0, ROM will rely on
-> > | factory marked bad block markers to find out if a block is good or bad.
-> > 
-> > Thus, even the boot ROM of i.MX28 can well live without blockmark
-> > swapping.
-> 
-> Assume that there is a NAND block "A",  and the A consist of 256 pages.
-> the uboot is burned to the "A", can occupy 6 pages:
-> 
->   -----------------------------------------------------------------------------
->  | page 0 |  page 1 | page 2 | page 3 | page 4 | page 5 | ... | ... | page 255 |
->   -----------------------------------------------------------------------------
->  
->   \-------------------------------------- ------------------------------------/
->                                          V  
->                                         "A"					 
-> 
-> The DBBT is used to track if "A" is bad or not.
-> Assume we know that "A" is a good block, ROM then need to read out the uboot.
-> When the ROM needs to read out the 6 pages one by one. And each time the ROM read
-> the page, it should do the swapping for this page.
-> 
-> In this case, the ROM will do the swapping six times.
-> 
-> Please read the sector again, you will see the "every page" in it:
-> --------------------------------------------------------------------
->    "In order to preserve the BI (bad block information), flash updater 
-> or gang programmer applications need to swap Bad Block Information (BI) data to byte 0 of 
-> metadata area for every page before programming NAND Flash. ROM when loading firmware, 
-> copies back
-> --------------------------------------------------------------------
->
-I can assure you that the >100.000 i.MX28 based modules, that we sold
-up to now boot from NAND just fine without any block mark swapping in
-the U-Boot pages.
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+v3:
+- added dependencies for Marvel Dove and MV78xx0 
+v2:
+- resynced patch with libata/for-3.15 branch (previous patch was against
+  libata/for-next branch and SATA_MV selects GENERIC_PHY in that branch)
 
+ drivers/ata/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Index: b/drivers/ata/Kconfig
+===================================================================
+--- a/drivers/ata/Kconfig	2014-03-26 17:59:35.000000000 +0100
++++ b/drivers/ata/Kconfig	2014-03-27 13:14:24.097787880 +0100
+@@ -281,6 +281,8 @@ config SATA_HIGHBANK
+ 
+ config SATA_MV
+ 	tristate "Marvell SATA support"
++	depends on PCI || ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
++		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+ 	help
+ 	  This option enables support for the Marvell Serial ATA family.
+ 	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
