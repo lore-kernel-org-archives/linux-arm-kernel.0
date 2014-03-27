@@ -1,36 +1,82 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 27 Mar 2014 15:19:45 +0100
-Subject: [PATCH 1/6] ARM: mvebu: introduce CPU reset code
-In-Reply-To: <53342EF1.3020508@free-electrons.com>
-References: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395927485-11842-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <53342EF1.3020508@free-electrons.com>
-Message-ID: <20140327151945.365db704@skate>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Thu, 27 Mar 2014 14:20:58 +0000
+Subject: [PATCH v6] can: xilinx CAN controller support
+In-Reply-To: <1395812357.3726.14.camel@joe-AO722>
+References: <5ff46a21-3047-40ff-9221-f08e476f9ce6@VA3EHSMHS030.ehs.local>
+ <1395812357.3726.14.camel@joe-AO722>
+Message-ID: <8cbdd3af-afb3-4a2d-a4b7-38ce4e34b73d@TX2EHSMHS018.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+Hi Joe perches,
 
-On Thu, 27 Mar 2014 15:00:17 +0100, Gregory CLEMENT wrote:
 
-> > +static struct of_device_id of_cpu_reset_table[] = {
-> > +	{.compatible = "marvell,armada-370-cpu-reset", .data = (void*) ARMADA_370_MAX_CPUS },
-> What about removing the previous line. As explained in patch 5, the CPU
-> reset driver is not really needed as Armada 370 is single core and the
-> only use of the CPU reset driver is to boot secondary processors. So by
-> removing this line we can keep the marvell,armada-370-cpu-reset node in
-> the device tree without doing useless initialization.
+> -----Original Message-----
+> From: Joe Perches [mailto:joe at perches.com]
+> Sent: Wednesday, March 26, 2014 11:09 AM
+> To: Appana Durga Kedareswara Rao
+> Cc: wg at grandegger.com; mkl at pengutronix.de; Michal Simek;
+> grant.likely at linaro.org; robh+dt at kernel.org; linux-can at vger.kernel.org;
+> netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org; Appana Durga
+> Kedareswara Rao
+> Subject: Re: [PATCH v6] can: xilinx CAN controller support
+>
+> On Wed, 2014-03-26 at 10:56 +0530, Kedareswara rao Appana wrote:
+> > This patch adds xilinx CAN controller support.
+> > This driver supports both ZYNQ CANPS and Soft IP AXI CAN controller.
+>
+> Just trivial notes about dmesg logging output.
+>
+> > diff --git a/drivers/net/can/xilinx_can.c
+> > b/drivers/net/can/xilinx_can.c
+> []
+> > +static int set_reset_mode(struct net_device *ndev) {
+> []
+> > +                   netdev_warn(ndev, "timedout waiting for config
+> mode\n");
+>
+> timed out
+>
+OK will do
 
-I found it weird to have a compatible string marked as supported in the
-DT binding document, but not actually supported by the kernel. I know
-it's possible, but I found it odd, especially considering the fact that
-mapping these registers, even if unused, isn't costing much.
+> > +static int xcan_set_bittiming(struct net_device *ndev) {
+> []
+> > +   if (!is_config_mode) {
+> > +           netdev_alert(ndev,
+> > +                   "BUG! Cannot set bittiming can is notin config
+> mode\n");
+>
+> "Cannot set bit timing - CAN is not in config mode\n"
+>
+> > +static int xcan_chip_start(struct net_device *ndev) {
+>
+> > +                   netdev_warn(ndev,
+> > +                           "time out waiting for correct mode\n");
+>
+> Please be consistent.  Maybe
+> "timed out waiting for correct mode\n"
+>
+Ok Will change.
 
-I don't have a strong opinion on this, so if others voice in this way,
-I'll change it.
+> > +static int xcan_open(struct net_device *ndev) {
+> > +   struct xcan_priv *priv = netdev_priv(ndev);
+> > +   int ret;
+> > +
+> > +   ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
+> > +                   ndev->name, ndev);
+> > +   if (ret < 0) {
+> > +           netdev_err(ndev, "Irq allocation for CAN failed\n");
+>
+> irq is almost always lower case.
+>
+Ok Will change.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+Kedar.
+
+>
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
