@@ -1,31 +1,68 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 27 Mar 2014 07:46:43 +0100
-Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
-In-Reply-To: <1452941.Qc8gHZ8xpL@avalon>
-References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
- <1725290.WIBK8uYmkH@avalon> <20140310072719.GB2571@katana>
- <1452941.Qc8gHZ8xpL@avalon>
-Message-ID: <20140327064643.GA2687@katana>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu, 27 Mar 2014 08:58:11 +0100
+Subject: [PATCH] clk: register fixed-clock only if #clock-cells property
+ is present
+In-Reply-To: <CAOMZO5AEry8sJW_+0aJS8ush+sYPPWk9LRU0b8RUUGa-hO_G1A@mail.gmail.com>
+References: <1395858127-18730-1-git-send-email-s.nawrocki@samsung.com>	<CAOMZO5DJPKvha7A-foktsB2dEw9xGXL_++uBXj_3ScAPTXNOkw@mail.gmail.com>	<53333145.4080903@gmail.com>
+ <CAOMZO5AEry8sJW_+0aJS8ush+sYPPWk9LRU0b8RUUGa-hO_G1A@mail.gmail.com>
+Message-ID: <5333DA13.2080505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 12:59:05PM +0100, Laurent Pinchart wrote:
-> Hi Wolfram,
-> 
-> On Monday 10 March 2014 08:27:19 Wolfram Sang wrote:
-> > > Indeed, I got it wrong. We can leave it as-is then.
-> > 
-> > Great. So I guess, this series can be applied now?
-> 
-> There's just the issue of serial port aliases left. I've started a discussion 
-> about that on the DT mailing list (you've been CC'ed).
+Le 26/03/2014 21:14, Fabio Estevam a ?crit :
+> On Wed, Mar 26, 2014 at 4:57 PM, Sylwester Nawrocki
+> <sylvester.nawrocki@gmail.com> wrote:
+>
+>> Perhaps a change as below helps ?
+>>
+>>  From 85ee85e4a92b42442354f3f2454be50c173e1c59 Mon Sep 17 00:00:00 2001
+>> From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Date: Wed, 26 Mar 2014 20:54:13 +0100
+>> Subject: [PATCH] clk: reverse default clk provider initialization order in
+>> of_clk_init()
+>>
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> ---
+>>   drivers/clk/clk.c |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index fb3c40b..d30809c 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -2608,7 +2608,7 @@ void __init of_clk_init(const struct of_device_id
+>> *matches)
+>>
+>>                  parent->clk_init_cb = match->data;
+>>                  parent->np = np;
+>> -               list_add(&parent->node, &clk_provider_list);
+>> +               list_add_tail(&parent->node, &clk_provider_list);
+>>          }
+>>
+>>          while (!list_empty(&clk_provider_list)) {
+> Thanks, Sylwester!
+>
+> This makes my imx6q-wandboard to boot again.
+>
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-So, how to proceed with this series?
+This solution solve the problem for this specific case because clks are
+declared in the correct order in imx DTs.
+But, even with your patch I think we could see similar issues by 
+reordering DT
+nodes...
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140327/7613fc1b/attachment.sig>
+The real problem here is that imx platform does not declare the CCM clocks
+dependencies upon ckil, ckih1 and osc fixed clocks within the DT [1], and
+retrieve these clocks when initializing the CCM clocks ([2] and [3]).
+
+We should try to a add these dependencies in the DT and see if it works.
+
+[1] http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx6sl.dtsi#L379
+[2] http://lxr.free-electrons.com/source/arch/arm/mach-imx/clk-imx6q.c#L151
+[3] http://lxr.free-electrons.com/source/arch/arm/mach-imx/clk.c#L30
+
+Best Regards,
+
+Boris
