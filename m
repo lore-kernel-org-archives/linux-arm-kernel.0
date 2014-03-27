@@ -1,77 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Mar 2014 14:23:41 +0100
-Subject: [PATCH] arm64: SHA-224/SHA-256 using ARMv8 Crypto Extensions
-In-Reply-To: <201403242136.20547.marex@denx.de>
-References: <1395326886-5866-1-git-send-email-ard.biesheuvel@linaro.org>
- <201403242136.20547.marex@denx.de>
-Message-ID: <CAKv+Gu9NJaq049MbT2soL=1DEUwUEvCgHo2jKLNtVW_3D6QzEA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 27 Mar 2014 14:24:39 +0100
+Subject: [PATCH v4] ata: fix Marvell SATA driver dependencies
+Message-ID: <13175343.U1fiIXSeHv@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2014 21:36, Marek Vasut <marex@denx.de> wrote:
-> On Thursday, March 20, 2014 at 03:48:06 PM, Ard Biesheuvel wrote:
->> This patch adds support for the SHA-224 and SHA-256 hash algorithms using
->> the NEON based SHA-256 instructions that were introduced in ARM v8.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->
-> [...]
->
->> + * Copyright (c) Alan Smithee.
->
-> Email contact is missing here.
->
-> [...]
->
+Make sata_mv host driver depend on PCI || ARCH_DOVE || ARCH_KIRKWOOD ||
+ARCH_MV78XX0 || ARCH_MVEBU || ARCH_ORION5X config options as Marvell
+SATA support covers both Marvell PCI devices and Marvell Dove, Kirkwood,
+MV78xx0, Armada 370/XP and Orion5x SoCs (for non-PCI devices the driver
+to work requires suitable device tree node or platform device to be
+defined).  Additionally allow the driver build if COMPILE_TEST config
+option is set.
 
-Actually, this is mostly copied from the original sha1_generic.c. In
-fact, my current v2 (which I will post shortly) has been reworked to
-such an extent that I am contemplating dropping this attribution
-altogether.
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+v4:
+- updated patch description
+v3:
+- added dependencies for Marvel Dove and MV78xx0 
+v2:
+- resynced patch with libata/for-3.15 branch (previous patch was against
+  libata/for-next branch and SATA_MV selects GENERIC_PHY in that branch)
 
->> +static int sha224_init(struct shash_desc *desc)
->> +{
->> +     struct sha256_state *sctx = shash_desc_ctx(desc);
->> +
->> +     *sctx = (struct sha256_state){
->
-> This cast is interesting, I don't quite understand it. Can you please explain
-> that to me ?
->
+ drivers/ata/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-http://gcc.gnu.org/onlinedocs/gcc/Compound-Literals.html
-
->> +             .state = {
->> +                     SHA224_H0, SHA224_H1, SHA224_H2, SHA224_H3,
->> +                     SHA224_H4, SHA224_H5, SHA224_H6, SHA224_H7,
->> +             }
->> +     };
->> +     return 0;
->> +}
->
-> [...]
->
->> +static int sha224_final(struct shash_desc *desc, u8 *out)
->> +{
->> +     struct sha256_state *sctx = shash_desc_ctx(desc);
->> +     __be32 *dst = (__be32 *)out;
->> +     int i;
->> +
->> +     sha2_final(desc);
->> +
->> +     for (i = 0; i < SHA224_DIGEST_SIZE / sizeof(*dst); i++)
->> +             dst[i] = cpu_to_be32(sctx->state[i]);
->
-> Won't this cause unaligned access if *dst is not aligned to 32 bytes ?
->
-
-arm64 does not care about that, but I agree it would be better (and
-more explicit) to use put_unaligned() here, and leave it up to the
-architecture to allow it or work around it.
-WIll update that in v2.
-
-Thanks for the review.
-
--- 
-Ard.
+Index: b/drivers/ata/Kconfig
+===================================================================
+--- a/drivers/ata/Kconfig	2014-03-26 17:59:35.000000000 +0100
++++ b/drivers/ata/Kconfig	2014-03-27 13:14:24.097787880 +0100
+@@ -281,6 +281,8 @@ config SATA_HIGHBANK
+ 
+ config SATA_MV
+ 	tristate "Marvell SATA support"
++	depends on PCI || ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
++		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+ 	help
+ 	  This option enables support for the Marvell Serial ATA family.
+ 	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
