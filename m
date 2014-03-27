@@ -1,93 +1,18 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 27 Mar 2014 16:59:15 +0100
-Subject: [PATCH 3/6] ARM: mvebu: improve PMSU driver to request its
- resource
-In-Reply-To: <1395927485-11842-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395927485-11842-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53344AD3.1010503@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 27 Mar 2014 13:31:00 -0300
+Subject: [PATCH 1/1] ARM: imx: Add DTSC02 platform (i.MX27)
+In-Reply-To: <533449F9.4090101@gmail.com>
+References: <1395934153-19416-1-git-send-email-gcembed@gmail.com>
+ <CAOMZO5AwfrXVoZfCKFQHBTDcUm4cfAVVX6fJabY0_S0gtbX_eQ@mail.gmail.com>
+ <53344680.6080800@gmail.com> <533449F9.4090101@gmail.com>
+Message-ID: <CAOMZO5Bjo4+AuFrU5tWukNbnLcWLApA+vCfphfKOCJRJrLaZ8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/2014 14:38, Thomas Petazzoni wrote:
-> Until now, the PMSU driver was using of_iomap() to map its registers,
-> but of_iomap() doesn't call request_mem_region(). This commit fixes
-> the memory mapping code of the PMSU to do so, which will also be
-> useful for a later commit since we will need to adjust the resource
-> base address and size for Device Tree backward compatibility.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Thu, Mar 27, 2014 at 12:55 PM, Ga?tan Carlier <gcembed@gmail.com> wrote:
 
+> I am using Redboot (ecos 20090512), I supposed that is not directly
+> compatible and I have to append DTS blob to zImage as specified in slides
+> petazzoni-device-tree-dummies.pdf ?
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-> ---
->  arch/arm/mach-mvebu/pmsu.c | 36 +++++++++++++++++++++++++++++++-----
->  1 file changed, 31 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 1807639..b337fe5 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -16,6 +16,8 @@
->   * other SOC units
->   */
->  
-> +#define pr_fmt(fmt) "mvebu-pmsu: " fmt
-> +
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/of_address.h>
-> @@ -63,15 +65,39 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
->  static int __init armada_370_xp_pmsu_init(void)
->  {
->  	struct device_node *np;
-> +	struct resource res;
-> +	int ret = 0;
->  
->  	np = of_find_matching_node(NULL, of_pmsu_table);
-> -	if (np) {
-> -		pr_info("Initializing Power Management Service Unit\n");
-> -		pmsu_mp_base = of_iomap(np, 0);
-> -		of_node_put(np);
-> +	if (!np)
-> +		return 0;
-> +
-> +	pr_info("Initializing Power Management Service Unit\n");
-> +
-> +	if (of_address_to_resource(np, 0, &res)) {
-> +		pr_err("unable to get resource\n");
-> +		ret = -ENOENT;
-> +		goto out;
->  	}
->  
-> -	return 0;
-> +	if (!request_mem_region(res.start, resource_size(&res),
-> +				np->full_name)) {
-> +		pr_err("unable to request region\n");
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	pmsu_mp_base = ioremap(res.start, resource_size(&res));
-> +	if (!pmsu_mp_base) {
-> +		pr_err("unable to map registers\n");
-> +		release_mem_region(res.start, resource_size(&res));
-> +		ret = -ENOMEM;
-> +		goto out;
-> +	}
-> +
-> + out:
-> +	of_node_put(np);
-> +	return ret;
->  }
->  
->  early_initcall(armada_370_xp_pmsu_init);
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yes, correct. This method works fine.
