@@ -1,285 +1,141 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 27 Mar 2014 18:19:51 +0100
-Subject: [PATCH RFC v3 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <1395922579-28547-3-git-send-email-s.nawrocki@samsung.com>
-References: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
- <1395922579-28547-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <2035207.RtdvCosQOa@amdc1032>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Thu, 27 Mar 2014 13:26:17 -0400
+Subject: [PATCH v2 1/3] PSCI: Use DT Function ID values only for old
+ versions of spec
+In-Reply-To: <CABGGisybEQC1BPE6efAP+8CW+DFiQAKB-bvJu6psY7C1E8bQtg@mail.gmail.com>
+References: <1395934715-31348-1-git-send-email-ashwin.chaugule@linaro.org>
+ <CABGGisybEQC1BPE6efAP+8CW+DFiQAKB-bvJu6psY7C1E8bQtg@mail.gmail.com>
+Message-ID: <CAJ5Y-eb2RjfVbxmTwWet8kr2Rv+VikuR93qWTp32+Ur+TCM_zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
-Hi Sylwester,
+On 27 March 2014 12:41, Rob Herring <rob.herring@linaro.org> wrote:
+> On Thu, Mar 27, 2014 at 10:38 AM, Ashwin Chaugule
+> <ashwin.chaugule@linaro.org> wrote:
+>> PSCI v0.2+ spec mandates specific values of Function IDs
+>> for ARM32 and ARM64. Use DT bindings of Function IDs only
+>> when using older versions. Use standard values otherwise.
+>
+> The subject line is a bit out of date.
 
-On Thursday, March 27, 2014 01:16:19 PM Sylwester Nawrocki wrote:
-> This function adds a helper function to configure clock parents and rates
-> as specified in clock-parents, clock-rates DT properties for a consumer
-> device and a call to it before driver is bound to a device.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
-> Changes since v2:
->  - edited in clock-bindings.txt, added note about 'assigned-clocks'
->    subnode which may be used to specify "global" clocks configuration
->    at a clock provider node,
->  - moved of_clk_device_setup() function declaration from clk-provider.h
->    to clk-conf.h so required function stubs are available when
->    CONFIG_COMMON_CLK is not enabled,
-> 
-> Changes since v1:
->  - the helper function to parse and set assigned clock parents and
->    rates made public so it is available to clock providers to call
->    directly;
->  - dropped the platform bus notification and call of_clk_device_setup()
->    is is now called from the driver core, rather than from the
->    notification callback;
->  - s/of_clk_get_list_entry/of_clk_get_by_property.
-> ---
->  .../devicetree/bindings/clock/clock-bindings.txt   |   26 ++++++
->  drivers/base/dd.c                                  |    7 ++
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/clk-conf.c                             |   87 ++++++++++++++++++++
->  drivers/clk/clk.c                                  |   10 ++-
->  include/linux/clk/clk-conf.h                       |   19 +++++
->  6 files changed, 149 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/clk-conf.c
->  create mode 100644 include/linux/clk/clk-conf.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> index 7c52c29..b452f80 100644
-> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -115,3 +115,29 @@ clock signal, and a UART.
->    ("pll" and "pll-switched").
->  * The UART has its baud clock connected the external oscillator and its
->    register clock connected to the PLL clock (the "pll-switched" signal)
-> +
-> +==Assigned clock parents and rates==
-> +
-> +Some platforms require static initial configuration of parts of the clocks
-> +controller. Such a configuration can be specified in a clock consumer node
-> +through clock-parents and clock-rates DT properties. The former should contain
-> +a list of parent clocks in form of phandle and clock specifier pairs, the
-> +latter the list of assigned clock frequency values (one cell each).
-> +
-> +    uart at a000 {
-> +        compatible = "fsl,imx-uart";
-> +        reg = <0xa000 0x1000>;
-> +        ...
-> +        clocks = <&clkcon 0>, <&clkcon 3>;
-> +        clock-names = "baud", "mux";
-> +
-> +        clock-parents = <0>, <&pll 1>;
-> +        clock-rates = <460800>;
-> +    };
-> +
-> +In this example the pll is set as parent of "mux" clock and frequency of "baud"
-> +clock is specified as 460800 Hz.
-> +
-> +For clocks which are not directly connected to any consumer device similarly
-> +clocks, clock-parents and/or clock-rates properties should be specified in
-> +assigned-clocks subnode of a clock controller DT node.
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 0605176..4c633e7 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -25,6 +25,7 @@
->  #include <linux/async.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pinctrl/devinfo.h>
-> +#include <linux/clk/clk-conf.h>
->  
->  #include "base.h"
->  #include "power/power.h"
-> @@ -278,6 +279,12 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  	if (ret)
->  		goto probe_failed;
->  
-> +	if (dev->of_node) {
-> +		ret = of_clk_device_init(dev->of_node);
-> +		if (ret)
-> +			goto probe_failed;
-> +	}
-> +
->  	if (driver_sysfs_add(dev)) {
->  		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
->  			__func__, dev_name(dev));
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index a367a98..c720e4b 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
->  obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
->  obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
->  obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
-> +obj-$(CONFIG_COMMON_CLK)	+= clk-conf.o
->  
->  # hardware specific clock types
->  # please keep this section sorted lexicographically by file/directory path name
-> diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-> new file mode 100644
-> index 0000000..a2e992e
-> --- /dev/null
-> +++ b/drivers/clk/clk-conf.c
-> @@ -0,0 +1,87 @@
-> +/*
-> + * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-> + * Sylwester Nawrocki <s.nawrocki@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/device.h>
-> +#include <linux/of.h>
-> +#include <linux/printk.h>
-> +
-> +/**
-> + * of_clk_device_init() - parse and set clk configuration assigned to a device
-> + * @node: device node to apply the configuration for
-> + *
-> + * This function parses 'clock-parents' and 'clock-rates' properties and sets
-> + * any specified clock parents and rates.
-> + */
-> +int of_clk_device_init(struct device_node *node)
-> +{
-> +	struct property	*prop;
-> +	const __be32 *cur;
-> +	int rc, index, num_parents;
-> +	struct clk *clk, *pclk;
-> +	u32 rate;
-> +
-> +	num_parents = of_count_phandle_with_args(node, "clock-parents",
-> +						 "#clock-cells");
-> +	if (num_parents == -EINVAL)
-> +		pr_err("clk: Invalid value of clock-parents property at %s\n",
-> +		       node->full_name);
-> +
-> +	for (index = 0; index < num_parents; index++) {
-> +		pclk = of_clk_get_by_property(node, "clock-parents", index);
-> +		if (IS_ERR(pclk)) {
-> +			/* skip empty (null) phandles */
-> +			if (PTR_ERR(pclk) == -ENOENT)
-> +				continue;
-> +
-> +			pr_warn("clk: couldn't get parent clock %d for %s\n",
-> +				index, node->full_name);
-> +			return PTR_ERR(pclk);
-> +		}
-> +
-> +		clk = of_clk_get(node, index);
-> +		if (IS_ERR(clk)) {
-> +			pr_warn("clk: couldn't get clock %d for %s\n",
-> +				index, node->full_name);
-> +			return PTR_ERR(clk);
-> +		}
-> +
-> +		rc = clk_set_parent(clk, pclk);
-> +		if (rc < 0)
-> +			pr_err("clk: failed to reparent %s to %s: %d\n",
-> +			       __clk_get_name(clk), __clk_get_name(pclk), rc);
-> +		else
-> +			pr_debug("clk: set %s as parent of %s\n",
-> +				 __clk_get_name(pclk), __clk_get_name(clk));
-> +	}
-> +
-> +	index = 0;
-> +	of_property_for_each_u32(node, "clock-rates", prop, cur, rate) {
-> +		if (rate) {
-> +			clk = of_clk_get(node, index);
-> +			if (IS_ERR(clk)) {
-> +				pr_warn("clk: couldn't get clock %d for %s\n",
-> +					index, node->full_name);
-> +				return PTR_ERR(clk);
-> +			}
-> +
-> +			rc = clk_set_rate(clk, rate);
-> +			if (rc < 0)
-> +				pr_err("clk: couldn't set %s clock rate: %d\n",
-> +				       __clk_get_name(clk), rc);
-> +			else
-> +				pr_debug("clk: set rate of clock %s to %lu\n",
-> +					 __clk_get_name(clk), clk_get_rate(clk));
-> +		}
-> +		index++;
-> +	}
-> +
-> +	return 0;
-> +}
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 29dc1e7..240d776 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -10,6 +10,7 @@
->   */
->  
->  #include <linux/clk-private.h>
-> +#include <linux/clk/clk-conf.h>
->  #include <linux/module.h>
->  #include <linux/mutex.h>
->  #include <linux/spinlock.h>
-> @@ -2604,7 +2605,15 @@ void __init of_clk_init(const struct of_device_id *matches)
->  		list_for_each_entry_safe(clk_provider, next,
->  					&clk_provider_list, node) {
->  			if (force || parent_ready(clk_provider->np)) {
-> +
->  				clk_provider->clk_init_cb(clk_provider->np);
-> +
-> +				/* Set any assigned clock parents and rates */
-> +				np = of_get_child_by_name(clk_provider->np,
-> +							  "assigned-clocks");
-> +				if (np)
-> +					of_clk_device_init(np);
-> +
->  				list_del(&clk_provider->node);
->  				kfree(clk_provider);
->  				is_init_done = true;
-> @@ -2619,7 +2628,6 @@ void __init of_clk_init(const struct of_device_id *matches)
->  		 */
->  		if (!is_init_done)
->  			force = true;
-> -
->  	}
->  }
->  #endif
-> diff --git a/include/linux/clk/clk-conf.h b/include/linux/clk/clk-conf.h
-> new file mode 100644
-> index 0000000..f06b1c2
-> --- /dev/null
-> +++ b/include/linux/clk/clk-conf.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-> + * Sylwester Nawrocki <s.nawrocki@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +struct device_node;
-> +
-> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-> +int of_clk_device_init(struct device_node *node);
-> +#else
-> +int of_clk_device_init(struct device_node *node)
+Yea. This patch has now become more of a PSCIv0.2 implementation.
 
-It causes build brake with s3c6400_defconfig.
+>> +       int err = 0;
+>> +       int ver = 0;
+>
+> Initialization not needed.
 
-It should be marked with 'static inline' and clk-conf.c should be build
-only for CONFIG_OF=y.
+Ok.
 
-> +{
-> +	return 0;
-> +}
-> +#endif
+>>
+>> -       np = of_find_matching_node(NULL, psci_of_match);
+>> -       if (!np)
+>> -               return;
+>> +       pr_info("probing for conduit method from DT.\n");
+>> +
+>> +       if (of_property_read_string(np, "method", &method)) {
+>> +               pr_warn("missing \"method\" property\n");
+>> +               err = -ENXIO;
+>> +               goto out_put_node;
+>> +       }
+>> +
+>> +       if (!strcmp("hvc", method)) {
+>> +               invoke_psci_fn = __invoke_psci_fn_hvc;
+>> +       } else if (!strcmp("smc", method)) {
+>> +               invoke_psci_fn = __invoke_psci_fn_smc;
+>> +       } else {
+>> +               pr_warn("invalid \"method\" property: %s\n", method);
+>> +               err = -EINVAL;
+>> +               goto out_put_node;
+>> +       }
+>
+> This should all be common setup.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+I'll roll this up into a helper.
+
+>> +
+>> +       ver = psci_get_version();
+>> +
+>> +       pr_info("PSCIv%d.%d detected in firmware.\n",
+>> +                       (ver & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT,
+>> +                       (ver & PSCI_VER_MINOR_MASK));
+>
+> If it doesn't report 0.2, then we should probably bail (possibly
+> falling back to 0.1).
+
+Hm. I'd prefer bailing out here. That would hopefully force the user
+to check the PSCI implementation.
+Theres always the option of trying out "arm, psci" later.
+
+
+>> +       ver = psci_get_version();
+>
+> This may not be safe to do on 0.1 as the call didn't exist.
+
+Ok, I will take it out from this function.
+
+>
+>> +
+>> +       pr_info("PSCIv%d.%d detected in firmware.\n",
+>> +                       (ver & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT,
+>> +                       (ver & PSCI_VER_MINOR_MASK));
+>> +
+>>         if (!of_property_read_u32(np, "cpu_suspend", &id)) {
+>>                 psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
+>>                 psci_ops.cpu_suspend = psci_cpu_suspend;
+>> @@ -204,7 +302,38 @@ void __init psci_init(void)
+>>                 psci_ops.migrate = psci_migrate;
+>>         }
+>>
+>> +       if (!of_property_read_u32(np, "affinity_info", &id)) {
+>> +               psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_ID_AFFINITY_INFO;
+>> +               psci_ops.affinity_info = psci_affinity_info;
+>> +       }
+>> +
+>> +       if (!of_property_read_u32(np, "migrate_info_type", &id)) {
+>> +               psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE]
+>> +                       = PSCI_ID_MIGRATE_INFO_TYPE;
+>> +               psci_ops.migrate_info_type = psci_migrate_info_type;
+>> +       }
+>
+> These 2 functions don't exist for 0.1.
+
+Will remove.
+
+>> +static const struct of_device_id psci_of_match[] __initconst = {
+>> +       { .compatible = "arm,psci", .data = psci_of_init},
+>> +       { .compatible = "arm,psci-0.2", .data = psci_static_init},
+>
+> "of" and "static" don't really describe the difference here. Use
+> something like psci_init_0_1 and psci_init_0_2.
+
+Ok.
+
+> Same comments apply to this file.
+>> index 0000000..b271e9a
+>> --- /dev/null
+>> +++ b/include/uapi/linux/psci.h
+>> @@ -0,0 +1,45 @@
+>> +/*
+>
+> Linaro copyright?
+>
+
+Will add.
+
+>> +#ifdef CONFIG_ARM64
+>
+> You don't need ifdefs here. The 32-bit calls are valid on arm64 as
+> that is what 32-bit guests will use. Just do something like this:
+>
+> #define PSCI_ID_VERSION                                0x84000000
+> #define PSCI_ID_CPU_SUSPEND_32                    0x84000001
+> #define PSCI_ID_CPU_SUSPEND_64                    0xc4000001
+>
+
+Ok, thats better.
+
+Cheers,
+Ashwin
