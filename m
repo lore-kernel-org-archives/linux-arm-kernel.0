@@ -1,35 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 27 Mar 2014 11:57:44 +0100
-Subject: [ARM ATTEND] Following discussions, ARM64 and big.LITTLE developments
-Message-ID: <20140327105744.GN6120@lukather>
+From: shaik.ameer@samsung.com (Shaik Ameer Basha)
+Date: Thu, 27 Mar 2014 16:37:43 +0530
+Subject: [PATCH v2 0/7] exynos5420: clock file cleanup
+Message-ID: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Many changes/fixes have been identified for clock file for exynos5420.
+These include correct parents, bit fields, new clocks etc. Existing
+files needs some correction in terms of names of the clock and
+indentation. These issues are addressed in this patch series. It also
+replaces the usage of enums with macro as clock ids.
 
-As the maintainer of the Allwinner SoCs, I'm very interested in
-following discussions with the other ARM kernel developpers to be sure
-to remain up-to-date and as efficient as possible in my role.
+This patch series is rebased on,
+git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git:samsung-next
 
-I'm also particularly interested in:
+This patch is also dependent on the following patches.
+ARM: dts: Add I2S nodes to exynos5420
+ARM: dts: add dt node for sss module for exynos5250/5420
+ARM: dts: update watchdog device nodes for exynos5250 and exynos5420
+ARM: dts: use macros in clock bindings for exynos5420
 
-  * the latest big.LITTLE developments, and what they will require
-    from the machine support to be enabled.
+Changes since v1:
+-----------------
+1] Addressed review comments from Tomasz Figa.
+    http://www.spinics.net/lists/devicetree/msg16759.html
+    http://www.spinics.net/lists/devicetree/msg16760.html
 
-  * how ARM64 is going to be merged/share some code with ARM in the
-    long-term, and what is going on in general in the ARM64 world.
+Rahul Sharma (7):
+  clk: exynos5420: Add more clock register offsets
+  clk: exynos5420: Add more clock IDs
+  clk: exynos5420: Rename clock IDs
+  clk: exynos5420: Rename clock names
+  clk: exynos5420: Add missing clocks
+  clk: exynos5420: Add more registers to restore list
+  ARM: dts: update macros in clock bindings for exynos5420
 
-Thanks!
-Maxime
+ arch/arm/boot/dts/exynos5420.dtsi      |   90 +--
+ drivers/clk/samsung/clk-exynos5420.c   | 1029 +++++++++++++++++++++-----------
+ include/dt-bindings/clock/exynos5420.h |  214 ++++---
+ 3 files changed, 871 insertions(+), 462 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140327/b5c15e6b/attachment.sig>
+1.7.9.5
