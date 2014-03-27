@@ -1,99 +1,130 @@
 From: sdu.liu@huawei.com (Liu Hua)
-Date: Thu, 27 Mar 2014 16:00:38 +0800
-Subject: [PATCH 1/3] ARM : kdump : Add LPAE support
+Date: Thu, 27 Mar 2014 16:00:40 +0800
+Subject: [PATCH 3/3] kexec : ARM : add LPAE support
 In-Reply-To: <1395907240-13308-1-git-send-email-sdu.liu@huawei.com>
 References: <1395907240-13308-1-git-send-email-sdu.liu@huawei.com>
-Message-ID: <1395907240-13308-2-git-send-email-sdu.liu@huawei.com>
+Message-ID: <1395907240-13308-4-git-send-email-sdu.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_LPAE=y, memory in 32-bit ARM systems can exceed
-4G. So if we use kdump in such systems. The capture kernel
-should parse 64-bit elf header(parse_crash_elf64_headers).
+For 32-bit ARM systems with CONFIG_ARM_LPAE=y, when kexec utility
+loads the crash kernel. 32-bit elf header is not enough if the
+physical address exceeds 4G.
 
-And this process can not pass because ARM linux does not
-supply related check function.
-
-This patch adds check functions related of elf64 header.
+This patch check whether the largest physical address of the system
+exceeds 4G. If so, kexec creates 64-bit elf header.Otherwise it
+creates 32-bit elf header.
 
 Signed-off-by: Liu Hua <sdu.liu@huawei.com>
-To: Russell King <linux@arm.linux.org.uk>
-Cc: Dan Aloni <alonid@stratoscale.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <linux-kernel@vger.kernel.org>
+To: Simon Horman <horms@verge.net.au>
+Cc: Vivek Goyal <vgoyal@redhat.com>
 Cc: <kexec@lists.infradead.org>
+Cc: <linux-kernel@vger.kernel.org>
+Cc: <linux-arm-kernel@lists.infradead.org>
 ---
- arch/arm/include/asm/elf.h |  5 ++++-
- arch/arm/kernel/elf.c      | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+), 1 deletion(-)
+ kexec/arch/arm/crashdump-arm.c | 23 ++++++++++++++++++++---
+ kexec/kexec-iomem.c            |  8 ++++----
+ kexec/kexec.h                  |  4 ++--
+ 3 files changed, 26 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index f4b46d3..6e02a6d 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -90,14 +90,17 @@ typedef struct user_fp elf_fpregset_t;
- extern char elf_platform[];
- 
- struct elf32_hdr;
-+struct elf64_hdr;
- 
- /*
-  * This is used to ensure we don't load something for the wrong architecture.
+diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
+index 0cd6935..d1133cd 100644
+--- a/kexec/arch/arm/crashdump-arm.c
++++ b/kexec/arch/arm/crashdump-arm.c
+@@ -20,6 +20,7 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
   */
- extern int elf_check_arch(const struct elf32_hdr *);
-+extern int elf_check_arch_64(const struct elf64_hdr *);
- #define elf_check_arch elf_check_arch
- 
--#define vmcore_elf64_check_arch(x) (0)
-+#define vmcore_elf64_check_arch(x) (elf_check_arch_64(x) || \
-+				vmcore_elf_check_arch_cross(x))
- 
- extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
- #define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d0d1e83..452086a 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -38,6 +38,39 @@ int elf_check_arch(const struct elf32_hdr *x)
- }
- EXPORT_SYMBOL(elf_check_arch);
- 
-+int elf_check_arch_64(const struct elf64_hdr *x)
-+{
-+	unsigned int eflags;
-+
-+	/* Make sure it's an ARM executable */
-+	if (x->e_machine != EM_ARM)
-+		return 0;
-+
-+	/* Make sure the entry address is reasonable */
-+	if (x->e_entry & 1) {
-+		if (!(elf_hwcap & HWCAP_THUMB))
-+			return 0;
-+	} else if (x->e_entry & 3)
-+		return 0;
-+
-+	eflags = x->e_flags;
-+	if ((eflags & EF_ARM_EABI_MASK) == EF_ARM_EABI_UNKNOWN) {
-+		unsigned int flt_fmt;
-+
-+		/* APCS26 is only allowed if the CPU supports it */
-+		if ((eflags & EF_ARM_APCS_26) && !(elf_hwcap & HWCAP_26BIT))
-+			return 0;
-+
-+		flt_fmt = eflags & (EF_ARM_VFP_FLOAT | EF_ARM_SOFT_FLOAT);
-+
-+		/* VFP requires the supporting code */
-+		if (flt_fmt == EF_ARM_VFP_FLOAT && !(elf_hwcap & HWCAP_VFP))
-+			return 0;
-+	}
-+	return 1;
-+}
-+EXPORT_SYMBOL(elf_check_arch_64);
-+
- void elf_set_personality(const struct elf32_hdr *x)
++#include <limits.h>
+ #include <elf.h>
+ #include <errno.h>
+ #include <stdio.h>
+@@ -75,8 +76,8 @@ unsigned long phys_offset;
+  * regions is placed in @crash_memory_nr_ranges.
+  */
+ static int crash_range_callback(void *UNUSED(data), int UNUSED(nr),
+-				char *str, unsigned long base,
+-				unsigned long length)
++				char *str, unsigned long long base,
++				unsigned long long length)
  {
- 	unsigned int eflags = x->e_flags;
+ 	struct memory_range *range;
+ 
+@@ -276,6 +277,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 	unsigned long bufsz;
+ 	void *buf;
+ 	int err;
++	int last_ranges;
+ 
+ 	/*
+ 	 * First fetch all the memory (RAM) ranges that we are going to pass to
+@@ -292,10 +294,25 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 	phys_offset = usablemem_rgns.ranges->start;
+ 	dbgprintf("phys_offset: %#lx\n", phys_offset);
+ 
+-	err = crash_create_elf32_headers(info, &elf_info,
++	last_ranges = usablemem_rgns.size - 1;
++	if (last_ranges < 0)
++		last_ranges = 0;
++
++	if (crash_memory_ranges[last_ranges].end > ULONG_MAX) {
++
++		/* for support arm LPAE and arm64 */
++		elf_info.class = ELFCLASS64;
++
++		err = crash_create_elf64_headers(info, &elf_info,
+ 					 usablemem_rgns.ranges,
+ 					 usablemem_rgns.size, &buf, &bufsz,
+ 					 ELF_CORE_HEADER_ALIGN);
++	} else {
++		err = crash_create_elf32_headers(info, &elf_info,
++					 usablemem_rgns.ranges,
++					 usablemem_rgns.size, &buf, &bufsz,
++					 ELF_CORE_HEADER_ALIGN);
++	}
+ 	if (err)
+ 		return err;
+ 
+diff --git a/kexec/kexec-iomem.c b/kexec/kexec-iomem.c
+index 0396713..485a2e8 100644
+--- a/kexec/kexec-iomem.c
++++ b/kexec/kexec-iomem.c
+@@ -26,8 +26,8 @@ int kexec_iomem_for_each_line(char *match,
+ 			      int (*callback)(void *data,
+ 					      int nr,
+ 					      char *str,
+-					      unsigned long base,
+-					      unsigned long length),
++					      unsigned long long base,
++					      unsigned long long length),
+ 			      void *data)
+ {
+ 	const char *iomem = proc_iomem();
+@@ -65,8 +65,8 @@ int kexec_iomem_for_each_line(char *match,
+ 
+ static int kexec_iomem_single_callback(void *data, int nr,
+ 				       char *UNUSED(str),
+-				       unsigned long base,
+-				       unsigned long length)
++				       unsigned long long base,
++				       unsigned long long length)
+ {
+ 	struct memory_range *range = data;
+ 
+diff --git a/kexec/kexec.h b/kexec/kexec.h
+index 2bd6e96..ecc4681 100644
+--- a/kexec/kexec.h
++++ b/kexec/kexec.h
+@@ -279,8 +279,8 @@ int kexec_iomem_for_each_line(char *match,
+ 			      int (*callback)(void *data,
+ 					      int nr,
+ 					      char *str,
+-					      unsigned long base,
+-					      unsigned long length),
++					      unsigned long long base,
++					      unsigned long long length),
+ 			      void *data);
+ int parse_iomem_single(char *str, uint64_t *start, uint64_t *end);
+ const char * proc_iomem(void);
 -- 
 1.9.0
