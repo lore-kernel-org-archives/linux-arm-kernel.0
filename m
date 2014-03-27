@@ -1,59 +1,28 @@
 From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Thu, 27 Mar 2014 09:26:51 +0000
-Subject: [PATCH v6 05/10] dt-bindings: pci: rcar pcie device tree bindings
+Date: Thu, 27 Mar 2014 09:26:54 +0000
+Subject: [PATCH v6 08/10] ARM: shmobile: r8a7791: Add PCIe device nodes
 In-Reply-To: <1395912416-20087-1-git-send-email-phil.edworthy@renesas.com>
 References: <1395912416-20087-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <1395912416-20087-6-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <1395912416-20087-9-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This patch adds the bindings for the R-Car PCIe driver. The driver
-resides under drivers/pci/host/pcie-rcar.c
 
 Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 
 v6:
- - Correct DT bindings description for reg and clocks
-
-v5:
- - Add PCIe bus clock reference
- - Add additional interrupt bindings
- - Use dma-ranges property to specify inbound memory regions
+ - Split device and board DT changes
 ---
- Documentation/devicetree/bindings/pci/rcar-pci.txt | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
+ arch/arm/boot/dts/r8a7791.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt b/Documentation/devicetree/bindings/pci/rcar-pci.txt
-new file mode 100644
-index 0000000..a97ebe6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
-@@ -0,0 +1,45 @@
-+* Renesas RCar PCIe interface
-+
-+Required properties:
-+- compatible: should contain one of the following
-+	"renesas,pcie-r8a7779", "renesas,pcie-r8a7790", "renesas,pcie-r8a7791"
-+- reg: base address and length of the pcie controller registers.
-+- #address-cells: set to <3>
-+- #size-cells: set to <2>
-+- device_type: set to "pci"
-+- ranges: ranges for the PCI memory and I/O regions.
-+- dma-ranges: ranges for the inbound memory regions.
-+- interrupts: two interrupt sources for MSI interrupts, followed by interrupt
-+	source for hardware related interrupts (e.g. link speed change).
-+- #interrupt-cells: set to <1>
-+- interrupt-map-mask and interrupt-map: standard PCI properties
-+	to define the mapping of the PCIe interface to interrupt
-+	numbers.
-+- clocks: from common clock binding: phandles to PCIe controller and PCIe bus
-+	clocks.
-+- clock-names: from common clock binding: should be "pcie" and "pcie_bus".
-+
-+Example:
-+
-+SoC specific DT Entry:
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index ccfba57..7a4be4c 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -836,4 +836,28 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
 +
 +	pcie: pcie at fe000000 {
 +		compatible = "renesas,pcie-r8a7791";
@@ -65,15 +34,19 @@ index 0000000..a97ebe6
 +			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
 +			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
 +			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
-+		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x40000000
-+			      0x42000000 2 0x00000000 2 0x00000000 0 0x40000000>;
-+		interrupts = <0 116 4 0 117 4 0 118 4>;
++		/* Map all possible DDR as inbound ranges */
++		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000
++			      0x43000000 2 0x00000000 2 0x00000000 1 0x00000000>;
++		interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH
++			      0 117 IRQ_TYPE_LEVEL_HIGH
++			      0 118 IRQ_TYPE_LEVEL_HIGH>;
 +		#interrupt-cells = <1>;
 +		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic 0 116 4>;
++		interrupt-map = <0 0 0 0 &gic 0 116 IRQ_TYPE_LEVEL_HIGH>;
 +		clocks = <&mstp3_clks R8A7791_CLK_PCIE>, <&pcie_bus_clk>;
 +		clock-names = "pcie", "pcie_bus";
 +		status = "disabled";
 +	};
+ };
 -- 
 1.9.0
