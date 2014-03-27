@@ -1,35 +1,164 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 27 Mar 2014 11:41:45 +0000
-Subject: [PATCH] arm64: Fix memory layout typo
-In-Reply-To: <1395800601-17088-1-git-send-email-zhangwm@marvell.com>
-References: <1395800601-17088-1-git-send-email-zhangwm@marvell.com>
-Message-ID: <20140327114144.GB20298@arm.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 27 Mar 2014 20:45:01 +0900
+Subject: [RFC PATCH 03/12] pci: host: pcie-designware: Use *base-mask* for
+ configuring the iATU
+In-Reply-To: <1395842272-15267-4-git-send-email-kishon@ti.com>
+References: <1395842272-15267-1-git-send-email-kishon@ti.com>
+ <1395842272-15267-4-git-send-email-kishon@ti.com>
+Message-ID: <000001cf49b1$fcd8a810$f689f830$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 02:23:21AM +0000, Neil Zhang wrote:
-> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> ---
->  Documentation/arm64/memory.txt |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Wednesday, March 26, 2014 10:58 PM, Kishon Vijay Abraham I wrote:
 > 
-> diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-> index 5e054bf..c2765e2 100644
-> --- a/Documentation/arm64/memory.txt
-> +++ b/Documentation/arm64/memory.txt
-> @@ -39,7 +39,7 @@ ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
->  
->  ffffffbffbe00000	ffffffbffbe0ffff	  64KB		PCI I/O space
->  
-> -ffffffbffbe10000	ffffffbcffffffff	  ~2MB		[guard]
-> +ffffffbffbe10000	ffffffbffbffffff	  ~2MB		[guard]
->  
->  ffffffbffc000000	ffffffbfffffffff	  64MB		modules
+> In DRA7, the cpu sees 32bit address, but the pcie controller can see only 28bit
+> address. So whenever the cpu issues a read/write request, the 4 most
+> significant bits are used by L3 to determine the target controller.
+> For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe controller but
+> the PCIe controller will see only (0x000_0000 - 0xFFF_FFF). So for programming
+> the outbound translation window the *base* should be programmed as 0x000_0000.
+> Whenever we try to write to say 0x2000_0000, it will be translated to whatever
+> we have programmed in the translation window with base as 0x000_0000.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-I fixed this in linux-next already as part of 22bd1c91fe1 (arm64: Extend
-the PCI I/O space to 16MB).
+(+cc Pratyush Anand, Marek Vasut, Richard Zhu)
 
-Thanks.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
--- 
-Catalin
+Mohit Kumar, Pratyush Anand,
+If you have other opinions, please let us know. :-)
+Thank you.
+
+Best regards,
+Jingoo Han
+
+> ---
+>  .../devicetree/bindings/pci/designware-pcie.txt    |    1 +
+>  drivers/pci/host/pcie-designware.c                 |   39 ++++++++++++++------
+>  drivers/pci/host/pcie-designware.h                 |    1 +
+>  3 files changed, 29 insertions(+), 12 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> index d6fae13..c574dd3 100644
+> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> @@ -27,6 +27,7 @@ Optional properties for fsl,imx6q-pcie
+>  - power-on-gpio: gpio pin number of power-enable signal
+>  - wake-up-gpio: gpio pin number of incoming wakeup signal
+>  - disable-gpio: gpio pin number of outgoing rfkill/endpoint disable signal
+> +- base-mask: address mask for the PCIe controller target port
+> 
+>  Example:
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 17ce88f..98b661c 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -464,6 +464,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  		return -EINVAL;
+>  	}
+> 
+> +	if (of_property_read_u64(np, "base-mask", &pp->base_mask))
+> +		pp->base_mask = ~(0x0ULL);
+> +
+>  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+>  		pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
+>  					MAX_MSI_IRQS, &msi_domain_ops,
+> @@ -503,12 +506,15 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> 
+>  static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+>  {
+> +	u64 cfg0_base;
+> +
+> +	cfg0_base = pp->cfg0_base & pp->base_mask;
+>  	/* Program viewport 0 : OUTBOUND : CFG0 */
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+>  			  PCIE_ATU_VIEWPORT);
+> -	dw_pcie_writel_rc(pp, pp->cfg0_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->cfg0_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->cfg0_base + pp->config.cfg0_size - 1,
+> +	dw_pcie_writel_rc(pp, cfg0_base, PCIE_ATU_LOWER_BASE);
+> +	dw_pcie_writel_rc(pp, (cfg0_base >> 32), PCIE_ATU_UPPER_BASE);
+> +	dw_pcie_writel_rc(pp, cfg0_base + pp->config.cfg0_size - 1,
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
+> @@ -518,14 +524,17 @@ static void dw_pcie_prog_viewport_cfg0(struct pcie_port *pp, u32 busdev)
+> 
+>  static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
+>  {
+> +	u64 cfg1_base;
+> +
+> +	cfg1_base = pp->cfg1_base & pp->base_mask;
+>  	/* Program viewport 1 : OUTBOUND : CFG1 */
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
+>  			  PCIE_ATU_VIEWPORT);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_CFG1, PCIE_ATU_CR1);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> -	dw_pcie_writel_rc(pp, pp->cfg1_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->cfg1_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->cfg1_base + pp->config.cfg1_size - 1,
+> +	dw_pcie_writel_rc(pp, cfg1_base, PCIE_ATU_LOWER_BASE);
+> +	dw_pcie_writel_rc(pp, (cfg1_base >> 32), PCIE_ATU_UPPER_BASE);
+> +	dw_pcie_writel_rc(pp, cfg1_base + pp->config.cfg1_size - 1,
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, busdev, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, 0, PCIE_ATU_UPPER_TARGET);
+> @@ -533,14 +542,17 @@ static void dw_pcie_prog_viewport_cfg1(struct pcie_port *pp, u32 busdev)
+> 
+>  static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
+>  {
+> +	u64 mem_base;
+> +
+> +	mem_base = pp->mem_base & pp->base_mask;
+>  	/* Program viewport 0 : OUTBOUND : MEM */
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX0,
+>  			  PCIE_ATU_VIEWPORT);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_MEM, PCIE_ATU_CR1);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> -	dw_pcie_writel_rc(pp, pp->mem_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->mem_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->mem_base + pp->config.mem_size - 1,
+> +	dw_pcie_writel_rc(pp, mem_base, PCIE_ATU_LOWER_BASE);
+> +	dw_pcie_writel_rc(pp, (mem_base >> 32), PCIE_ATU_UPPER_BASE);
+> +	dw_pcie_writel_rc(pp, mem_base + pp->config.mem_size - 1,
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, pp->config.mem_bus_addr, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, upper_32_bits(pp->config.mem_bus_addr),
+> @@ -549,14 +561,17 @@ static void dw_pcie_prog_viewport_mem_outbound(struct pcie_port *pp)
+> 
+>  static void dw_pcie_prog_viewport_io_outbound(struct pcie_port *pp)
+>  {
+> +	u64 io_base;
+> +
+> +	io_base = pp->io_base & pp->base_mask;
+>  	/* Program viewport 1 : OUTBOUND : IO */
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | PCIE_ATU_REGION_INDEX1,
+>  			  PCIE_ATU_VIEWPORT);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_TYPE_IO, PCIE_ATU_CR1);
+>  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> -	dw_pcie_writel_rc(pp, pp->io_base, PCIE_ATU_LOWER_BASE);
+> -	dw_pcie_writel_rc(pp, (pp->io_base >> 32), PCIE_ATU_UPPER_BASE);
+> -	dw_pcie_writel_rc(pp, pp->io_base + pp->config.io_size - 1,
+> +	dw_pcie_writel_rc(pp, io_base, PCIE_ATU_LOWER_BASE);
+> +	dw_pcie_writel_rc(pp, (io_base >> 32), PCIE_ATU_UPPER_BASE);
+> +	dw_pcie_writel_rc(pp, io_base + pp->config.io_size - 1,
+>  			  PCIE_ATU_LIMIT);
+>  	dw_pcie_writel_rc(pp, pp->config.io_bus_addr, PCIE_ATU_LOWER_TARGET);
+>  	dw_pcie_writel_rc(pp, upper_32_bits(pp->config.io_bus_addr),
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index 3063b35..3fa12a6 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -35,6 +35,7 @@ struct pcie_port {
+>  	struct device		*dev;
+>  	u8			root_bus_nr;
+>  	void __iomem		*dbi_base;
+> +	u64			base_mask;
+>  	u64			cfg0_base;
+>  	void __iomem		*va_cfg0_base;
+>  	u64			cfg1_base;
+> --
+> 1.7.9.5
