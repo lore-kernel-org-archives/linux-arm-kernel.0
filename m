@@ -1,98 +1,32 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 27 Mar 2014 10:56:02 +0530
-Subject: [RFC PATCH 02/12] pci: host: pcie-dra7xx: add support for
- pcie-dra7xx controller
-In-Reply-To: <000c01cf496e$bf2c85b0$3d859110$%han@samsung.com>
-References: <1395842272-15267-1-git-send-email-kishon@ti.com>
- <1395842272-15267-3-git-send-email-kishon@ti.com>
- <000c01cf496e$bf2c85b0$3d859110$%han@samsung.com>
-Message-ID: <5333B66A.8020804@ti.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Thu, 27 Mar 2014 11:43:02 +0530
+Subject: [PATCH V2 0/3] Add PMU and S2R support for exynos5420
+Message-ID: <1395900785-11334-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+rebased on kgene tree for-next branch
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
 
+changes since v1:
+	- Addressed comments from Tomasz figa.
+	- restructured/consolidated as per Tomasz figa's PM consolidations for exynos 
 
-On Thursday 27 March 2014 09:13 AM, Jingoo Han wrote:
-> On Wednesday, March 26, 2014 10:58 PM, Kishon Vijay Abraham I wrote:
->>
->> Added support for pcie controller in dra7xx. This driver re-uses
->> the designware core code that is already present in kernel.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> Hi Kishon,
-> Long time no see! I added trivial comments.
+Abhilash Kesavan (1):
+  ARM: dts: Add node for GPIO keys on SMDK5420
 
-yeah, these were in my TODO for a long time. Sorry for it though.
-> 
->> ---
->>  Documentation/devicetree/bindings/pci/ti-pci.txt |   35 ++
->>  drivers/pci/host/Kconfig                         |   10 +
->>  drivers/pci/host/Makefile                        |    1 +
->>  drivers/pci/host/pcie-dra7xx.c                   |  411 ++++++++++++++++++++++
-> 
-> How about using 'pci-' prefix?
-> As it was discussed earlier, 'pci-' prefix is more proper.
-> 
->>  4 files changed, 457 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/ti-pci.txt
->>  create mode 100644 drivers/pci/host/pcie-dra7xx.c
-> 
-> [.....]
-> 
->> --- /dev/null
->> +++ b/drivers/pci/host/pcie-dra7xx.c
-> 
-> [.....]
-> 
->> +#define	PCIECTRL_TI_CONF_IRQSTATUS_MAIN		0x0024
->> +#define	PCIECTRL_TI_CONF_IRQENABLE_SET_MAIN	0x0028
-> 
-> I don't think that it's good to add vendor names such as TI
-> to SFR names.
-> 
-> How about adding 'DRA7XX' or just removing 'TI'?
-> 
-> 1. PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN
+Vikas Sajjan (2):
+  ARM: EXYNOS5: Add PMU settings for exynos5420
+  ARM: EXYNOS5: Support Suspend-to-RAM on EXYNOS5420
 
-ok.
-> 
-> 2. PCIECTRL_CONF_IRQSTATUS_MAIN
-> 
-> [.....]
-> 
->> +enum dra7xx_pcie_device_type {
->> +	DRA7XX_PCIE_UNKNOWN_TYPE,
->> +	DRA7XX_PCIE_EP_TYPE,
->> +	DRA7XX_PCIE_LEG_EP_TYPE,
->> +	DRA7XX_PCIE_RC_TYPE,
->> +};
-> 
-> This driver can support only RC mode, so, these enum can be removed.
-> 
-> [.....]
-> 
->> +	of_property_read_u32(node, "ti,device-type", &device_type);
->> +	switch (device_type) {
->> +	case DRA7XX_PCIE_RC_TYPE:
->> +		dra7xx_pcie_writel(dra7xx->base,
->> +			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_RC);
->> +		break;
->> +	case DRA7XX_PCIE_EP_TYPE:
->> +		dra7xx_pcie_writel(dra7xx->base,
->> +			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_EP);
->> +		break;
->> +	case DRA7XX_PCIE_LEG_EP_TYPE:
->> +		dra7xx_pcie_writel(dra7xx->base,
->> +			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_LEG_EP);
->> +		break;
->> +	default:
->> +		dev_dbg(dev, "UNKNOWN device type %d\n", device_type);
->> +	}
-> 
-> Thus, this switch can be removed.
+ arch/arm/boot/dts/exynos5420-smdk5420.dts    |   11 +
+ arch/arm/mach-exynos/common.h                |   10 +
+ arch/arm/mach-exynos/pm.c                    |  148 +++++++++++--
+ arch/arm/mach-exynos/pmu.c                   |  307 ++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h              |  230 +++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/map-s5p.h |    2 +
+ drivers/clk/samsung/clk-exynos5420.c         |   32 +++
+ 7 files changed, 722 insertions(+), 18 deletions(-)
 
-sure.
-
-Thanks
-Kishon
+-- 
+1.7.9.5
