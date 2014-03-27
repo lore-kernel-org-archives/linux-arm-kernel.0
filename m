@@ -1,38 +1,91 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 27 Mar 2014 18:02:38 +0100
-Subject: [PATCH 1/2] ARM: sun7i/sun6i: dts: Fix IRQ number for sun6i NMI
- controller
-In-Reply-To: <1395939759-11135-1-git-send-email-carlo@caione.org>
-References: <1395939759-11135-1-git-send-email-carlo@caione.org>
-Message-ID: <1395939759-11135-2-git-send-email-carlo@caione.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 27 Mar 2014 18:14:59 +0100
+Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to kernel
+ warning
+Message-ID: <53345C93.9040005@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans de Goede <hdegoede@redhat.com>
+Hello,
 
-The IRQ line used in sun6i-a31.dtsi for the NMI controller is wrong.
-This causes a IRQ storm since the NMI controller is repeatedly fired.
-This patch fixes this problem assigning the correct IRQ number to the
-NMI controller.
+i'm using a i.MX28 custom board with two leds and Kernel 3.14-rc5.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Here is the relevant dts part:
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 3b95cb5..38d43fe 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -195,7 +195,7 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 			reg = <0x01f00c0c 0x38>;
--			interrupts = <0 0 4>;
-+			interrupts = <0 32 4>;
- 		};
- 
- 		pio: pinctrl at 01c20800 {
--- 
-1.8.4.1
+pwmleds {
+        compatible = "pwm-leds";
+        pinctrl-names = "default";
+        pinctrl-0 = <&pwm0_pins_b>; /* MX28_PAD_AUART1_RX__PWM_0 */
+       
+        led0 {
+            label = "duckbill:red";
+            pwms = <&pwm 0 7812500>;
+            max-brightness = <127>;
+            linux,default-trigger = "none";
+        };
+};
+
+gpioleds {
+        compatible = "gpio-leds";
+        pinctrl-names = "default";
+        pinctrl-0 = <&led_pins>;
+
+        led1 {
+            label = "duckbill:green";
+            gpios = <&gpio3 5 0>;
+            linux,default-trigger = "heartbeat";
+        };
+};
+
+The gpio driven led works perfect as heartbeat. But if i change the
+trigger of the pwm
+driven led from none to heartbeat, it results always in a kernel warning
+and the pwm led
+keeps on:
+
+[  248.916168] WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856
+mutex_trylock+0x184/0x1a4()
+[  248.924745] DEBUG_LOCKS_WARN_ON(in_interrupt())
+[  248.929136] Modules linked in:
+[  248.932517] CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
+[  248.938781] [<c0015420>] (unwind_backtrace) from [<c0012cb0>]
+(show_stack+0x10/0x14)
+[  248.946672] [<c0012cb0>] (show_stack) from [<c001daf8>]
+(warn_slowpath_common+0x6c/0x8c)
+[  248.954902] [<c001daf8>] (warn_slowpath_common) from [<c001dbac>]
+(warn_slowpath_fmt+0x30/0x40)
+[  248.963742] [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>]
+(mutex_trylock+0x184/0x1a4)
+[  248.972147] [<c045df74>] (mutex_trylock) from [<c0360950>]
+(clk_prepare_lock+0xc/0xec)
+[  248.980132] [<c0360950>] (clk_prepare_lock) from [<c0362020>]
+(clk_get_rate+0xc/0x68)
+[  248.988105] [<c0362020>] (clk_get_rate) from [<c028d07c>]
+(mxs_pwm_config+0x20/0x198)
+[  248.996098] [<c028d07c>] (mxs_pwm_config) from [<c028bde8>]
+(pwm_config+0x60/0x70)
+[  249.003824] [<c028bde8>] (pwm_config) from [<c034b61c>]
+(__led_pwm_set+0x1c/0x3c)
+[  249.011442] [<c034b61c>] (__led_pwm_set) from [<c034bc3c>]
+(led_heartbeat_function+0x70/0x110)
+[  249.020114] [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>]
+(call_timer_fn+0x7c/0x164)
+[  249.028856] [<c00292f0>] (call_timer_fn) from [<c00295c8>]
+(run_timer_softirq+0x1f0/0x260)
+[  249.037267] [<c00295c8>] (run_timer_softirq) from [<c002255c>]
+(__do_softirq+0xc4/0x2f0)
+[  249.045507] [<c002255c>] (__do_softirq) from [<c0022890>]
+(irq_exit+0xa4/0x10c)
+[  249.052966] [<c0022890>] (irq_exit) from [<c0010240>]
+(handle_IRQ+0x34/0x84)
+[  249.060079] [<c0010240>] (handle_IRQ) from [<c0013524>]
+(__irq_svc+0x44/0x54)
+[  249.067358] [<c0013524>] (__irq_svc) from [<c00107f8>]
+(arch_cpu_idle+0x40/0x48)
+[  249.074916] [<c00107f8>] (arch_cpu_idle) from [<c005deb8>]
+(cpu_startup_entry+0x70/0x198)
+[  249.083258] [<c005deb8>] (cpu_startup_entry) from [<c060aac8>]
+(start_kernel+0x2a8/0x2f8)
+
+Best regards
+Stefan Wahren
