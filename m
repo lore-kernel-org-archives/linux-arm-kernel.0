@@ -1,74 +1,137 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 27 Mar 2014 18:32:11 +0100
-Subject: [RFC PATCH 03/12] pci: host: pcie-designware: Use *base-mask* for
- configuring the iATU
-In-Reply-To: <000001cf49b1$fcd8a810$f689f830$%han@samsung.com>
-References: <1395842272-15267-1-git-send-email-kishon@ti.com>
- <1395842272-15267-4-git-send-email-kishon@ti.com>
- <000001cf49b1$fcd8a810$f689f830$%han@samsung.com>
-Message-ID: <201403271832.11425.marex@denx.de>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Thu, 27 Mar 2014 10:35:55 -0700
+Subject: [PATCH v4 18/22] drivers: Enable building of Kirkwood drivers for
+ mach-mvebu
+In-Reply-To: <1393096504-11844-19-git-send-email-andrew@lunn.ch>
+References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
+ <1393096504-11844-19-git-send-email-andrew@lunn.ch>
+Message-ID: <CAK5ve-KCBYcKOqyNShEdEhKTMTZah_2cy884RBTG-wPJbO8g+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 27, 2014 at 12:45:01 PM, Jingoo Han wrote:
-> On Wednesday, March 26, 2014 10:58 PM, Kishon Vijay Abraham I wrote:
-> > In DRA7, the cpu sees 32bit address, but the pcie controller can see only
-> > 28bit address. So whenever the cpu issues a read/write request, the 4
-> > most significant bits are used by L3 to determine the target controller.
-> > For example, the cpu reserves 0x2000_0000 - 0x2FFF_FFFF for PCIe
-> > controller but the PCIe controller will see only (0x000_0000 -
-> > 0xFFF_FFF). So for programming the outbound translation window the
-> > *base* should be programmed as 0x000_0000. Whenever we try to write to
-> > say 0x2000_0000, it will be translated to whatever we have programmed in
-> > the translation window with base as 0x000_0000.
-> > 
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> (+cc Pratyush Anand, Marek Vasut, Richard Zhu)
+On Sat, Feb 22, 2014 at 11:15 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> With the move of kirkwood into mach-mvebu, drivers Kconfig need
+> tweeking to allow the kirkwood specific drivers to be built.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Mark Brown <broonie@linaro.org>
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Richard Purdie <rpurdie@rpsys.net>
+> Cc: Bryan Wu <cooloney@gmail.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+> ---
+> v2
+> Simplify cpufreq/Kconfig.arm
+>
+> Still needs ACKs from cpufreq, led and thermal maintainers.
+> ---
+>  drivers/cpufreq/Kconfig.arm | 2 +-
+>  drivers/cpuidle/Kconfig.arm | 2 +-
+>  drivers/leds/Kconfig        | 4 ++--
+>  drivers/phy/Kconfig         | 2 +-
+>  drivers/thermal/Kconfig     | 2 +-
+>  sound/soc/kirkwood/Kconfig  | 2 +-
+>  6 files changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 31297499a60a..077db3aa985b 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -113,7 +113,7 @@ config ARM_INTEGRATOR
+>           If in doubt, say Y.
+>
+>  config ARM_KIRKWOOD_CPUFREQ
+> -       def_bool ARCH_KIRKWOOD && OF
+> +       def_bool MACH_KIRKWOOD
+>         help
+>           This adds the CPUFreq driver for Marvell Kirkwood
+>           SoCs.
+> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> index d988948a89a0..97ccc31dbdd8 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -22,7 +22,7 @@ config ARM_HIGHBANK_CPUIDLE
+>
+>  config ARM_KIRKWOOD_CPUIDLE
+>         bool "CPU Idle Driver for Marvell Kirkwood SoCs"
+> -       depends on ARCH_KIRKWOOD
+> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+>         help
+>           This adds the CPU Idle driver for Marvell Kirkwood SoCs.
+>
+> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+> index 72156c123033..44c358ecf5a1 100644
+> --- a/drivers/leds/Kconfig
+> +++ b/drivers/leds/Kconfig
+> @@ -421,7 +421,7 @@ config LEDS_MC13783
+>  config LEDS_NS2
+>         tristate "LED support for Network Space v2 GPIO LEDs"
+>         depends on LEDS_CLASS
+> -       depends on ARCH_KIRKWOOD
+> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+>         default y
+>         help
+>           This option enable support for the dual-GPIO LED found on the
+> @@ -431,7 +431,7 @@ config LEDS_NS2
+>  config LEDS_NETXBIG
+>         tristate "LED support for Big Network series LEDs"
+>         depends on LEDS_CLASS
+> -       depends on ARCH_KIRKWOOD
+> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+>         default y
+>         help
+>           This option enable support for LEDs found on the LaCie 2Big
 
-Thanks.
+Acked-by: Bryan Wu <cooloney@gmail.com>
 
-> Acked-by: Jingoo Han <jg1.han@samsung.com>
+Thanks,
+-Bryan
 
-This patch has no impact on MX6, the mask on MX6 is ~0 . A few comments below 
-...
-[...]
 
-> > diff --git a/drivers/pci/host/pcie-designware.c
-> > b/drivers/pci/host/pcie-designware.c index 17ce88f..98b661c 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -464,6 +464,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> > 
-> >  		return -EINVAL;
-> >  	
-> >  	}
-> > 
-> > +	if (of_property_read_u64(np, "base-mask", &pp->base_mask))
-> > +		pp->base_mask = ~(0x0ULL);
-
-You can just use ~0x0ULL without the () I believe.
-
-[...]
-
-> > diff --git a/drivers/pci/host/pcie-designware.h
-> > b/drivers/pci/host/pcie-designware.h index 3063b35..3fa12a6 100644
-> > --- a/drivers/pci/host/pcie-designware.h
-> > +++ b/drivers/pci/host/pcie-designware.h
-> > @@ -35,6 +35,7 @@ struct pcie_port {
-> > 
-> >  	struct device		*dev;
-> >  	u8			root_bus_nr;
-> >  	void __iomem		*dbi_base;
-> > 
-> > +	u64			base_mask;
-> > 
-> >  	u64			cfg0_base;
-> >  	void __iomem		*va_cfg0_base;
-> >  	u64			cfg1_base;
-
-This structure contains a lot of slop, check [1] please. We really should be 
-more careful about the structures. I think a separate patch to clean this up 
-would be fine though.
-
-[1] http://www.catb.org/esr/structure-packing/
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index afa2354f6600..5e6b33f9c294 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
+>
+>  config PHY_MVEBU_SATA
+>         def_bool y
+> -       depends on ARCH_KIRKWOOD || ARCH_DOVE
+> +       depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD
+>         depends on OF
+>         select GENERIC_PHY
+>
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index 35c066489a19..1bc9cbc4f1b8 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -142,7 +142,7 @@ config RCAR_THERMAL
+>
+>  config KIRKWOOD_THERMAL
+>         tristate "Temperature sensor on Marvell Kirkwood SoCs"
+> -       depends on ARCH_KIRKWOOD
+> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+>         depends on OF
+>         help
+>           Support for the Kirkwood thermal sensor driver into the Linux thermal
+> diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
+> index 78ed4a42ad21..106e2e22fed2 100644
+> --- a/sound/soc/kirkwood/Kconfig
+> +++ b/sound/soc/kirkwood/Kconfig
+> @@ -1,6 +1,6 @@
+>  config SND_KIRKWOOD_SOC
+>         tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
+> -       depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
+> +       depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || COMPILE_TEST
+>         help
+>           Say Y or M if you want to add support for codecs attached to
+>           the Kirkwood I2S interface. You will also need to select the
+> --
+> 1.8.5.3
+>
