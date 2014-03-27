@@ -1,30 +1,157 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 27 Mar 2014 10:52:15 -0400
-Subject: [PATCH v4] ata: fix Marvell SATA driver dependencies
-In-Reply-To: <13175343.U1fiIXSeHv@amdc1032>
-References: <13175343.U1fiIXSeHv@amdc1032>
-Message-ID: <20140327145215.GB18503@htj.dyndns.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 27 Mar 2014 16:02:52 +0100
+Subject: [PATCH RFC v3 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <46532903.ghnH4Us8Zz@avalon>
+References: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
+ <77553409.zvN7VkNGe7@avalon> <53342E64.5060505@samsung.com>
+ <46532903.ghnH4Us8Zz@avalon>
+Message-ID: <53343D9C.6040605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 02:24:39PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> Make sata_mv host driver depend on PCI || ARCH_DOVE || ARCH_KIRKWOOD ||
-> ARCH_MV78XX0 || ARCH_MVEBU || ARCH_ORION5X config options as Marvell
-> SATA support covers both Marvell PCI devices and Marvell Dove, Kirkwood,
-> MV78xx0, Armada 370/XP and Orion5x SoCs (for non-PCI devices the driver
-> to work requires suitable device tree node or platform device to be
-> defined).  Additionally allow the driver build if COMPILE_TEST config
-> option is set.
+On 27/03/14 15:08, Laurent Pinchart wrote:
+> On Thursday 27 March 2014 14:57:56 Sylwester Nawrocki wrote:
+>> On 27/03/14 14:24, Laurent Pinchart wrote:
+>>> On Thursday 27 March 2014 13:16:19 Sylwester Nawrocki wrote:
+>>>> This function adds a helper function to configure clock parents and rates
+>>>> as specified in clock-parents, clock-rates DT properties for a consumer
+>>>> device and a call to it before driver is bound to a device.
+>>>>
+>>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>>> ---
+>> [...]
+>>>>  .../devicetree/bindings/clock/clock-bindings.txt   |   26 ++++++
+>>>>  drivers/base/dd.c                                  |    7 ++
+>>>>  drivers/clk/Makefile                               |    1 +
+>>>>  drivers/clk/clk-conf.c                             |   87 ++++++++++++++
+>>>>  drivers/clk/clk.c                                  |   10 ++-
+>>>>  include/linux/clk/clk-conf.h                       |   19 +++++
+>>>>  6 files changed, 149 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 drivers/clk/clk-conf.c
+>>>>  create mode 100644 include/linux/clk/clk-conf.h
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>> b/Documentation/devicetree/bindings/clock/clock-bindings.txt index
+>>>> 7c52c29..b452f80 100644
+>>>> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>>> @@ -115,3 +115,29 @@ clock signal, and a UART.
+>>>>    ("pll" and "pll-switched").
+>>>>  * The UART has its baud clock connected the external oscillator and its
+>>>>    register clock connected to the PLL clock (the "pll-switched" signal)
+>>>> +
+>>>> +==Assigned clock parents and rates==
+>>>> +
+>>>> +Some platforms require static initial configuration of parts of the
+>>>> clocks
+>>>> +controller. Such a configuration can be specified in a clock consumer
+>>>> node
+>>>> +through clock-parents and clock-rates DT properties. The former should
+>>>> contain
+>>>> +a list of parent clocks in form of phandle and clock specifier pairs,
+>>>> the
+>>>> +latter the list of assigned clock frequency values (one cell each).
+>>>> +
+>>>> +    uart at a000 {
+>>>> +        compatible = "fsl,imx-uart";
+>>>> +        reg = <0xa000 0x1000>;
+>>>> +        ...
+>>>> +        clocks = <&clkcon 0>, <&clkcon 3>;
+>>>> +        clock-names = "baud", "mux";
+>>>> +
+>>>> +        clock-parents = <0>, <&pll 1>;
+>>>> +        clock-rates = <460800>;
+>>>> +    };
+>>>> +
+>>>> +In this example the pll is set as parent of "mux" clock and frequency of
+>>>> "baud"
+>>>> +clock is specified as 460800 Hz.
+>>>
+>>> I'm curious, what should happen when two devices have conflicting
+>>> requirements ? If a different device required the <&clkcon 3> parent to
+>>> be set to <&pll 2> for instance, who should win ? Shouldn't a warning be
+>>> printed ?
+>>
+>> In general, the assumption is that the <&clkcon 3> clock would be used only
+>> by the uart at a000 device.
 > 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> OK. Removing the problem is a simple way to fix it :-) What about stating this 
+> explicitly in the documentation then ? Maybe by prefixing your proposed 
+> explanation below with something like
+> 
+> "Configuring a clock parent and rate through the device node that uses the 
+> clock is only supported for clocks that have a single user."
 
-Applied to libata/for-3.15.
+Looks good, we could add it. Or perhaps something like:
 
-Thanks.
+"Configuring a clock parent and rate through the device node that uses the
+ clock should be only done for clocks that have a single user. If a clock
+ is shared and conflicting parent or rate configuration is specified in
+ multiple consumer nodes a resulting configuration is undefined." ?
 
--- 
-tejun
+Not sure if it is acceptable to inject such an unpredictability to
+the kernel from DT though. Might be more reasonable to go with
+a clarification as you proposed.
+
+>> If a clock is shared I'd say it shouldn't be put in a multiple consumer
+>> device nodes. Instead it should be put in a clock provider node, as I was
+>> trying to explain in the sentence below.
+>>
+>> A warning could be useful, but it could complicate the code. We would need,
+>> for example, to store information about already configured clocks in a list
+>> and scan it before actually altering any clock parent or rate.
+> 
+> I'm fine with implementing that later if needed, we can keep the initial 
+> implementation simple.
+
+OK.
+>>>> +For clocks which are not directly connected to any consumer device
+>>>> similarly
+>>>> +clocks, clock-parents and/or clock-rates properties should be specified
+>>>> in
+>>>> +assigned-clocks subnode of a clock controller DT node.
+>>>
+>>> It might be that I'm not familiar enough with the clock framework, but
+>>> this sounds unclear to me. I'm not sure what you mean exactly.
+>>
+>> Sorry about not being precise here, would something like below be more
+>> clear ?
+>>
+>> "Configuration of common clocks, which affect multiple consumer devices
+>> can be specified in a dedicated 'assigned-clocks' subnode of a clock
+>> provider node, e.g.:
+>>
+>>     clkcon {
+>>         ...
+>>         #clock-cells = <1>;
+>>
+>>         assigned-clocks {
+>>             clocks = <&clkcon 16>, <&clkcon 17>;
+>>             clock-parents = <0>, <&clkcon 1>;
+>>             clock-rates = <200000>;
+>>         };
+>>     };
+>> "
+> 
+> That's clearer indeed. Can the parents and rates depend on the board, or on 
+> the SoC only ? We might be getting dangerously close to specifying platform 
+> configuration instead of describing the hardware. A real example might be nice 
+> to support the discussion.
+
+The clock parent and rates could be board specific, otherwise this API would
+become much less useful. The configuration often depends on what external
+devices are attached to an SoC.
+
+I don't have a real life example for the "global" configuration of shared
+clocks at the moment. I added this after seeing Tero's patches [1], maybe
+he could talk about some real use cases (just realized I missed to Cc him.
+fixing this mistake now).
+
+>> Naturally it's this just an RFC, any critics or suggestions are welcome.:)
+
+--
+Regards,
+Sylwester
+
+[1] http://www.spinics.net/lists/linux-omap/msg103069.html
