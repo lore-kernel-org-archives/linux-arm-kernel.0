@@ -1,37 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Mar 2014 02:28:19 +0100
-Subject: [GIT PULL v3] Xilinx Zynq changes for v3.15
-In-Reply-To: <532712D2.4020004@monstr.eu>
-References: <53061EBA.1080002@monstr.eu>
- <20140317044453.GA18210@quad.lixom.net> <532712D2.4020004@monstr.eu>
-Message-ID: <201403270228.19976.arnd@arndb.de>
+Date: Thu, 27 Mar 2014 02:37:00 +0100
+Subject: [PATCH] ARM: moxart: fix CPU selection
+Message-ID: <201403270237.00850.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 March 2014, Michal Simek wrote:
-> please pull these changes to your arm-soc tree. This branch is based
-> on zynq/dt branch.
-> Based on my discussion with Olof I have removed zynq-ocm driver
-> from this pull request and we will investigate different solution
-> 
-> Changes in v3: Remove OCM driver from pull request
-> Changes in v2: Fix incorrect git repo url
+Moxart uses an FA526 CPU core, which is ARMv4 based, not ARMv4T.
+Before moxart, we had no CONFIG_MULTI_V4 option, since no ARMv4 platform
+was enabled for multiplatform. This now adds the missing option, which
+will give us slightly more efficient code on pure moxart kernels,
+because we can build a pure FA526 kernel now rather than a combined
+FA526+ARM920T kernel that we used to.
 
-I have pulled it into the next/cleanup2 branch now, sorry for the
-delay. Unfortunately I noticed one more thing I didn't like and
-did not pull the final patch of the branch, but only the other patches.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+----
 
-The problem I noticed is the soc-bus support: I noticed that you
-are populating the entire device tree under the soc node, including
-any top-level devices, and that the "xlnx,zynq-devcfg-1.00.a"
-node is part of that.
+I've applied this one to the next/fixes-non-critical branch
 
-I think what you should try instead is to have only the
-amba bus and its children as part of the soc-bus, but other
-top-level devices (e.g. board clocks) outside of the soc
-node. Also, it would make sense to merge the devcfg stuff
-with the amba node, since it's really what makes up the
-soc. Does that make sense to you, or do you have reason to
-believe it won't work?
-
-	Arnd
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3dad961..4f85b09 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -893,6 +893,12 @@ menu "Multiple platform selection"
+ 
+ comment "CPU Core family selection"
+ 
++config ARCH_MULTI_V4
++	bool "ARMv4 based platforms (FA526)"
++	depends on !ARCH_MULTI_V6_V7
++	select ARCH_MULTI_V4_V5
++	select CPU_FA526
++
+ config ARCH_MULTI_V4T
+ 	bool "ARMv4T based platforms (ARM720T, ARM920T, ...)"
+ 	depends on !ARCH_MULTI_V6_V7
+diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
+index 3795ae2..e9b45bb 100644
+--- a/arch/arm/mach-moxart/Kconfig
++++ b/arch/arm/mach-moxart/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_MOXART
+-	bool "MOXA ART SoC" if ARCH_MULTI_V4T
++	bool "MOXA ART SoC" if ARCH_MULTI_V4
+ 	select CPU_FA526
+ 	select ARM_DMA_MEM_BUFFERABLE
+ 	select USE_OF
