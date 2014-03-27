@@ -1,64 +1,255 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 27 Mar 2014 15:00:17 +0100
-Subject: [PATCH 1/6] ARM: mvebu: introduce CPU reset code
-In-Reply-To: <1395927485-11842-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1395927485-11842-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395927485-11842-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53342EF1.3020508@free-electrons.com>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Thu, 27 Mar 2014 14:01:11 +0000
+Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based
+ on designware core driver
+In-Reply-To: <235376049.yyfljDtinu@wuerfel>
+References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
+ <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
+ <235376049.yyfljDtinu@wuerfel>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B7046EF3C5@DFLE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+>-----Original Message-----
+>From: Arnd Bergmann [mailto:arnd at arndb.de]
+>Sent: Tuesday, March 25, 2014 3:45 AM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Karicheri, Muralidharan; linux-pci at vger.kernel.org; linux-samsung-
+>soc at vger.kernel.org; linux-kernel at vger.kernel.org; Richard Zhu; Kukjin Kim; Mohit
+>Kumar; Jingoo Han; Shilimkar, Santosh; Bjorn Helgaas; Shawn Guo
+>Subject: Re: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based on
+>designware core driver
+>
+>On Monday 24 March 2014 20:35:26 Murali Karicheri wrote:
+>> +
+>> +int k2_pcie_platform_setup(struct platform_device *pdev) {
+>> +	struct resource *phy_base_r, *devstat_r;
+>> +	void __iomem *phy_base, *devstat;
+>> +	u32 val;
+>> +	int i;
+>> +
+>> +	devstat_r = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>> +						 "reg_devcfg");
+>> +	if (!devstat_r)
+>> +		return -ENODEV;
+>
+>It seems you have a distinct register set for the PHY that you are driving here. Why not
+>make this part generic PHY API driver?
+>
+>> +static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie) {
+>> +	struct pcie_port *pp = &ks_pcie->pp;
+>> +	int count = 0;
+>> +
+>> +	dw_pcie_setup_rc(pp);
+>> +
+>> +	/* check if the link is up or not */
+>> +	while (!dw_pcie_link_up(pp)) {
+>> +		mdelay(100);
+>> +		count++;
+>> +		if (count == 10)
+>> +			return -EINVAL;
+>> +	}
+>> +	return 0;
+>> +}
+>
+>You are blocking the CPU for up to one second here, which is really nasty. Please find a way
+>to move the code into a context where you can sleep and use msleep() instead, or better
+>use an interrupt if the hardware supports that and use wait_for_completion().
+>
+>> +
+>> +static void ks_pcie_msi_irq_handler(unsigned int irq, struct irq_desc
+>> +*desc) {
+>> +	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
+>> +	u32 offset = irq - ks_pcie->msi_host_irqs[0], pending, vector;
+>> +	struct pcie_port *pp = &ks_pcie->pp;
+>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> +	int src, virq;
+>
+>Did I understand this right that the MSI implementation can be used by any dw-pcie
+>hardware of the same version? If so, it would be good to move it into an extra file so it can
+>be shared with the next host driver that uses this version.
+>
+>> +/**
+>> + * ks_pcie_set_outbound_trans() - Set PHYADDR <-> BUSADDR
+>> + * mapping for outbound
+>> + */
+>> +static void ks_pcie_set_outbound_trans(struct keystone_pcie *ks_pcie)
+>
+>> +static void ks_pcie_set_inbound_trans(struct pcie_port *pp)
+>
+>Why do you need to set this up from the kernel? Please move the translation window setup
+>into the boot loader if you can.
+>
+>> +static struct hw_pci keystone_pcie_hw = {
+>> +	.nr_controllers	= 1,
+>> +	.setup		= dw_pcie_setup,
+>> +	.scan		= ks_pcie_scan_bus,
+>> +	.swizzle        = pci_common_swizzle,
+>> +	.add_bus	= dw_pcie_add_bus,
+>> +	.map_irq	= ks_pcie_map_irq,
+>> +};
+>
+>This can just be a local variable in the probe function.
+>
+>> +
+>> +static int ks_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8
+>> +pin) {
+>> +	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+>> +	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
+>> +
+>> +	dev_info(pp->dev, "ks_pcie_map_irq: pin %d\n", pin);
+>> +
+>> +	if (!pin || pin > ks_pcie->num_legacy_host_irqs) {
+>> +		dev_err(pp->dev, "pci irq pin out of range\n");
+>> +		return -1;
+>> +	}
+>> +
+>> +	/* pin has values from 1-4 */
+>> +	return (ks_pcie->virqs[pin - 1] >= 0) ?
+>> +		ks_pcie->virqs[pin - 1] : -1;
+>> +}
+>> +
+>> +
+>> +static void ack_irq(struct irq_data *d) { }
+>> +
+>> +static void mask_irq(struct irq_data *d) { }
+>> +
+>> +static void unmask_irq(struct irq_data *d) { }
+>> +
+>> +static struct irq_chip ks_pcie_legacy_irq_chip = {
+>> +	.name = "PCIe-LEGACY-IRQ",
+>> +	.irq_ack = ack_irq,
+>> +	.irq_mask = mask_irq,
+>> +	.irq_unmask = unmask_irq,
+>> +};
+>
+>Can you use the generic irqchip code here?
+>
+>> +	/*
+>> +	 * support upto MAX_LEGACY_HOST_IRQS host and legacy IRQs.
+>> +	 * In dt from index 0 to 3
+>> +	 */
+>> +	for (i = 0; i < MAX_LEGACY_HOST_IRQS; i++) {
+>> +		ks_pcie->legacy_host_irqs[i] = irq_of_parse_and_map(np, i);
+>> +		if (ks_pcie->legacy_host_irqs[i] < 0)
+>> +			break;
+>> +		ks_pcie->num_legacy_host_irqs++;
+>> +	}
+>> +
+>> +	if (ks_pcie->num_legacy_host_irqs) {
+>> +		ks_pcie->legacy_irqd = irq_domain_add_linear(np,
+>> +					ks_pcie->num_legacy_host_irqs,
+>> +					&irq_domain_simple_ops, NULL);
+>> +
+>> +		if (!ks_pcie->legacy_irqd) {
+>> +			dev_err(dev,
+>> +				"Failed to add irq domain for legacy irqs\n");
+>> +			return -EINVAL;
+>> +		}
+>> +	}
+>> +
+>> +	for (i = 0; i < ks_pcie->num_legacy_host_irqs; i++) {
+>> +		ks_pcie->virqs[i] =
+>> +			irq_create_mapping(ks_pcie->legacy_irqd, i);
+>> +		irq_set_chip_and_handler(ks_pcie->virqs[i],
+>> +			&ks_pcie_legacy_irq_chip, handle_level_irq);
+>> +		irq_set_chip_data(ks_pcie->virqs[i], ks_pcie);
+>> +		set_irq_flags(ks_pcie->virqs[i], IRQF_VALID);
+>> +
+>> +		if (ks_pcie->legacy_host_irqs[i] >= 0) {
+>> +			irq_set_handler_data(ks_pcie->legacy_host_irqs[i],
+>> +				ks_pcie);
+>> +			irq_set_chained_handler(ks_pcie->legacy_host_irqs[i],
+>> +				ks_pcie_legacy_irq_handler);
+>> +		}
+>> +		set_irq_flags(ks_pcie->legacy_host_irqs[i], IRQF_VALID);
+>> +	}
+>
+>I have no idea how this would work with the standard interrupt-map property, since the
+>legacy interrupt host is now the same device as the pci host.
+>
+>Maybe it's better to move the legacy irqchip handling entirely out of the driver and use a
+>separate device node for the registers so it can come with its own #interrupt-cells, and then
+>refer to this irqchip from the interrupt-map.
+>
+>> +	ks_pcie->clk = devm_clk_get(&pdev->dev, "pcie");
+>> +	if (IS_ERR(ks_pcie->clk)) {
+>> +		dev_err(&pdev->dev, "Failed to get pcie rc clock\n");
+>> +		return PTR_ERR(ks_pcie->clk);
+>> +	}
+>> +	ret = clk_prepare_enable(ks_pcie->clk);
+>> +	if (ret)
+>> +		return ret;
+>
+>Could you move the clock handling into the generic dw-pcie code?
+>
+>> +
+>> +/* Keystone PCIe driver does not allow module unload */ static int
+>> +__init ks_pcie_init(void) {
+>> +	return platform_driver_probe(&ks_pcie_driver, ks_pcie_probe); }
+>> +subsys_initcall(ks_pcie_init);
+>
+>Why subsys_initcall?
+>
+>We should probably try to fix unloading soon.
+>
+>> diff --git a/drivers/pci/host/pcie-ks-pdata.h
+>> b/drivers/pci/host/pcie-ks-pdata.h
+>> new file mode 100644
+>> index 0000000..a7626de
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pcie-ks-pdata.h
+>> @@ -0,0 +1,19 @@
+>> +/*
+>> + * Copyright (C) 2013-2014 Texas Instruments., Ltd.
+>> + *		http://www.ti.com
+>> + *
+>> + * Author: Murali Karicheri <m-karicheri2@ti.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> +modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +/* platform specific setup for k2 pcie */ int
+>> +k2_pcie_platform_setup(struct platform_device *pdev);
+>> +
+>> +/* keystone pcie pdata configurations */ struct keystone_pcie_pdata {
+>> +	int (*setup)(struct platform_device *pdev); };
+>
+>This should all go away once you have a proper PHY driver.
+>
+>> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c index
+>> 3a02717..7c3f777 100644
+>> --- a/drivers/pci/quirks.c
+>> +++ b/drivers/pci/quirks.c
+>> @@ -3461,3 +3461,15 @@ int pci_dev_specific_acs_enabled(struct pci_dev
+>> *dev, u16 acs_flags)
+>>
+>>  	return -ENOTTY;
+>>  }
+>> +
+>> +#ifdef CONFIG_PCIE_KEYSTONE
+>> +/*
+>> + * The KeyStone PCIe controller has maximum read request size of 256 bytes.
+>> + * Force this configuration for all EP including bridges.
+>> + */
+>> +static void quirk_limit_readrequest(struct pci_dev *dev) {
+>> +	pcie_set_readrq(dev, 256);
+>> +}
+>> +DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID,
+>> +quirk_limit_readrequest); #endif /* CONFIG_TI_KEYSTONE_PCIE */
+>
+>You can't do this:
+>
+>A quirk for a specific hardware must not be enabled by compile-time options.
+>You have to find a different way to do this.
+>
+>	Arnd
+All,
 
-On 27/03/2014 14:38, Thomas Petazzoni wrote:
-> The Armada 370 and Armada XP have registers that allow to reset the
-> CPUs, which is particularly useful to take the secondary CPUs out of
-> reset in the context of the SMP support.
-> 
-> Unfortunately, an implementation mistake was originally made and the
-> support for these registers was integrated into the PMSU driver, which
-> is in fact completely unrelated. And it turns out that the Armada 375
-> has the same CPU reset registers, but does not have the PMSU
-> registers.
-> 
-> Therefore, this commit creates a small CPU reset driver. All it does
-> is provide a simple mvebu_cpu_reset_deassert() function that the SMP
-> support code can call to take secondary CPUs out of reset. As of this
-> commit, the driver isn't being used, it will be used through changes
-> in the following commits.
-> 
-> Note that we initially planned to use the 'reset controller'
-> framework, but it requires the addition of "resets" properties in the
-> Device Tree, which are causing too many problems if we want to keep
-> the Device Tree backward compatibility. Moreover, the 'reset
-> controller' framework is mainly useful when a device driver needs to
-> request a reset of its device from a separate reset controller. In our
-> case, the CPU reset handling and the SMP core code are both located in
-> arch/arm/mach-mvebu/ and are tightly linked together, so there's no
-> real benefit in going through a separate framework.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
+Thanks for the comments. I will review them when I get a chance and respond.
 
-[...]
-
-> +static struct of_device_id of_cpu_reset_table[] = {
-> +	{.compatible = "marvell,armada-370-cpu-reset", .data = (void*) ARMADA_370_MAX_CPUS },
-What about removing the previous line. As explained in patch 5, the CPU
-reset driver is not really needed as Armada 370 is single core and the
-only use of the CPU reset driver is to boot secondary processors. So by
-removing this line we can keep the marvell,armada-370-cpu-reset node in
-the device tree without doing useless initialization.
-
-Thanks,
-
-Gregory
-
-> +	{.compatible = "marvell,armada-xp-cpu-reset",  .data = (void*) ARMADA_XP_MAX_CPUS },
-> +	{ /* end of list */ },
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Murali Karicheri
+Linux Kernel, Software Development
