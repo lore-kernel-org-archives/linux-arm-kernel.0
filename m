@@ -1,91 +1,118 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 27 Mar 2014 18:14:59 +0100
-Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to kernel
- warning
-Message-ID: <53345C93.9040005@i2se.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 27 Mar 2014 18:17:27 +0100
+Subject: [PATCH RFC v3 1/2] clk: Add function parsing arbitrary clock list
+ DT property
+In-Reply-To: <1395922579-28547-2-git-send-email-s.nawrocki@samsung.com>
+References: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
+ <1395922579-28547-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <3164460.aT5tTxdc17@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-i'm using a i.MX28 custom board with two leds and Kernel 3.14-rc5.
+Hi Sylwester,
 
-Here is the relevant dts part:
+On Thursday, March 27, 2014 01:16:18 PM Sylwester Nawrocki wrote:
+> The of_clk_get_by_property() function added by this patch is similar to
+> of_clk_get(), except it allows to pass name of a DT property containing
+> list of phandles and clock specifiers. For of_clk_get() this has been
+> hard coded to "clocks".
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+> Changes since v2:
+>  - moved the function declaration from drivers/clk/clk.h to
+>    include/linux/clk.h
+> 
+> Changes since v1:
+>  - s/of_clk_get_list_entry/of_clk_get_by_property.
+> ---
+>  drivers/clk/clkdev.c |   25 +++++++++++++++++++++----
+>  include/linux/clk.h  |    7 +++++++
+>  2 files changed, 28 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index a360b2e..1d41540 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -27,17 +27,28 @@ static LIST_HEAD(clocks);
+>  static DEFINE_MUTEX(clocks_mutex);
+>  
+>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+> -struct clk *of_clk_get(struct device_node *np, int index)
+> +/**
+> + * of_clk_get_by_property() - Parse and lookup a clock referenced by a device node
+> + * @np: pointer to clock consumer node
+> + * @list_name: name of the clock list property
+> + * @index: index to the clock list
+> + *
+> + * This function parses the @list_name property and together with @index
+> + * value indicating an entry of the list uses it to look up the struct clk
+> + * from the registered list of clock providers.
+> + */
+> +struct clk *of_clk_get_by_property(struct device_node *np,
+> +				   const char *list_name, int index)
+>  {
+>  	struct of_phandle_args clkspec;
+>  	struct clk *clk;
+>  	int rc;
+>  
+> -	if (index < 0)
+> +	if (index < 0 || !list_name)
+>  		return ERR_PTR(-EINVAL);
+>  
+> -	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
+> -					&clkspec);
+> +	rc = of_parse_phandle_with_args(np, list_name, "#clock-cells",
+> +					index, &clkspec);
+>  	if (rc)
+>  		return ERR_PTR(rc);
+>  
+> @@ -51,6 +62,12 @@ struct clk *of_clk_get(struct device_node *np, int index)
+>  	of_node_put(clkspec.np);
+>  	return clk;
+>  }
+> +EXPORT_SYMBOL(of_clk_get_by_property);
+> +
+> +struct clk *of_clk_get(struct device_node *np, int index)
+> +{
+> +	return of_clk_get_by_property(np, "clocks", index);
+> +}
+>  EXPORT_SYMBOL(of_clk_get);
+>  
+>  /**
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 0dd9114..f71235b 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -383,6 +383,8 @@ struct of_phandle_args;
+>  
+>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+>  struct clk *of_clk_get(struct device_node *np, int index);
+> +struct clk *of_clk_get_by_property(struct device_node *np,
+> +				   const char *list_name, int index);
+>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>  #else
+> @@ -395,6 +397,11 @@ static inline struct clk *of_clk_get_by_name(struct device_node *np,
+>  {
+>  	return ERR_PTR(-ENOENT);
+>  }
+> +struct clk *of_clk_get_by_property(struct device_node *np,
 
-pwmleds {
-        compatible = "pwm-leds";
-        pinctrl-names = "default";
-        pinctrl-0 = <&pwm0_pins_b>; /* MX28_PAD_AUART1_RX__PWM_0 */
-       
-        led0 {
-            label = "duckbill:red";
-            pwms = <&pwm 0 7812500>;
-            max-brightness = <127>;
-            linux,default-trigger = "none";
-        };
-};
+This causes build brake with s3c6400_defconfig
+(it should be 'static inline').
 
-gpioleds {
-        compatible = "gpio-leds";
-        pinctrl-names = "default";
-        pinctrl-0 = <&led_pins>;
+> +				   const char *list_name, int index)
+> +{
+> +	return ERR_PTR(-ENOENT);
+> +}
+>  #endif
+>  
+>  #endif
 
-        led1 {
-            label = "duckbill:green";
-            gpios = <&gpio3 5 0>;
-            linux,default-trigger = "heartbeat";
-        };
-};
-
-The gpio driven led works perfect as heartbeat. But if i change the
-trigger of the pwm
-driven led from none to heartbeat, it results always in a kernel warning
-and the pwm led
-keeps on:
-
-[  248.916168] WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856
-mutex_trylock+0x184/0x1a4()
-[  248.924745] DEBUG_LOCKS_WARN_ON(in_interrupt())
-[  248.929136] Modules linked in:
-[  248.932517] CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
-[  248.938781] [<c0015420>] (unwind_backtrace) from [<c0012cb0>]
-(show_stack+0x10/0x14)
-[  248.946672] [<c0012cb0>] (show_stack) from [<c001daf8>]
-(warn_slowpath_common+0x6c/0x8c)
-[  248.954902] [<c001daf8>] (warn_slowpath_common) from [<c001dbac>]
-(warn_slowpath_fmt+0x30/0x40)
-[  248.963742] [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>]
-(mutex_trylock+0x184/0x1a4)
-[  248.972147] [<c045df74>] (mutex_trylock) from [<c0360950>]
-(clk_prepare_lock+0xc/0xec)
-[  248.980132] [<c0360950>] (clk_prepare_lock) from [<c0362020>]
-(clk_get_rate+0xc/0x68)
-[  248.988105] [<c0362020>] (clk_get_rate) from [<c028d07c>]
-(mxs_pwm_config+0x20/0x198)
-[  248.996098] [<c028d07c>] (mxs_pwm_config) from [<c028bde8>]
-(pwm_config+0x60/0x70)
-[  249.003824] [<c028bde8>] (pwm_config) from [<c034b61c>]
-(__led_pwm_set+0x1c/0x3c)
-[  249.011442] [<c034b61c>] (__led_pwm_set) from [<c034bc3c>]
-(led_heartbeat_function+0x70/0x110)
-[  249.020114] [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>]
-(call_timer_fn+0x7c/0x164)
-[  249.028856] [<c00292f0>] (call_timer_fn) from [<c00295c8>]
-(run_timer_softirq+0x1f0/0x260)
-[  249.037267] [<c00295c8>] (run_timer_softirq) from [<c002255c>]
-(__do_softirq+0xc4/0x2f0)
-[  249.045507] [<c002255c>] (__do_softirq) from [<c0022890>]
-(irq_exit+0xa4/0x10c)
-[  249.052966] [<c0022890>] (irq_exit) from [<c0010240>]
-(handle_IRQ+0x34/0x84)
-[  249.060079] [<c0010240>] (handle_IRQ) from [<c0013524>]
-(__irq_svc+0x44/0x54)
-[  249.067358] [<c0013524>] (__irq_svc) from [<c00107f8>]
-(arch_cpu_idle+0x40/0x48)
-[  249.074916] [<c00107f8>] (arch_cpu_idle) from [<c005deb8>]
-(cpu_startup_entry+0x70/0x198)
-[  249.083258] [<c005deb8>] (cpu_startup_entry) from [<c060aac8>]
-(start_kernel+0x2a8/0x2f8)
-
-Best regards
-Stefan Wahren
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
