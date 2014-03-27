@@ -1,89 +1,226 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 27 Mar 2014 12:43:41 +0900
-Subject: [RFC PATCH 02/12] pci: host: pcie-dra7xx: add support for
- pcie-dra7xx controller
-In-Reply-To: <1395842272-15267-3-git-send-email-kishon@ti.com>
-References: <1395842272-15267-1-git-send-email-kishon@ti.com>
- <1395842272-15267-3-git-send-email-kishon@ti.com>
-Message-ID: <000c01cf496e$bf2c85b0$3d859110$%han@samsung.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 26 Mar 2014 22:45:10 -0500
+Subject: [PATCH net-next 1/3] net: stmmac: Add SOCFPGA glue driver
+In-Reply-To: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
+References: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1395891912-26855-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 26, 2014 10:58 PM, Kishon Vijay Abraham I wrote:
-> 
-> Added support for pcie controller in dra7xx. This driver re-uses
-> the designware core code that is already present in kernel.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Hi Kishon,
-Long time no see! I added trivial comments.
+Like the STi and sunxi series SOCs, Altera's SOCFPGA also needs a glue layer
+on top of the Synopsys gmac IP.
 
-> ---
->  Documentation/devicetree/bindings/pci/ti-pci.txt |   35 ++
->  drivers/pci/host/Kconfig                         |   10 +
->  drivers/pci/host/Makefile                        |    1 +
->  drivers/pci/host/pcie-dra7xx.c                   |  411 ++++++++++++++++++++++
+This patch adds the platform driver for the glue layer which configures the IP
+before the generic STMMAC driver takes over.
 
-How about using 'pci-' prefix?
-As it was discussed earlier, 'pci-' prefix is more proper.
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |   10 ++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
+ .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |  130 ++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h       |    3 +
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    3 +
+ 5 files changed, 147 insertions(+)
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
 
->  4 files changed, 457 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/ti-pci.txt
->  create mode 100644 drivers/pci/host/pcie-dra7xx.c
-
-[.....]
-
-> --- /dev/null
-> +++ b/drivers/pci/host/pcie-dra7xx.c
-
-[.....]
-
-> +#define	PCIECTRL_TI_CONF_IRQSTATUS_MAIN		0x0024
-> +#define	PCIECTRL_TI_CONF_IRQENABLE_SET_MAIN	0x0028
-
-I don't think that it's good to add vendor names such as TI
-to SFR names.
-
-How about adding 'DRA7XX' or just removing 'TI'?
-
-1. PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN
-
-2. PCIECTRL_CONF_IRQSTATUS_MAIN
-
-[.....]
-
-> +enum dra7xx_pcie_device_type {
-> +	DRA7XX_PCIE_UNKNOWN_TYPE,
-> +	DRA7XX_PCIE_EP_TYPE,
-> +	DRA7XX_PCIE_LEG_EP_TYPE,
-> +	DRA7XX_PCIE_RC_TYPE,
-> +};
-
-This driver can support only RC mode, so, these enum can be removed.
-
-[.....]
-
-> +	of_property_read_u32(node, "ti,device-type", &device_type);
-> +	switch (device_type) {
-> +	case DRA7XX_PCIE_RC_TYPE:
-> +		dra7xx_pcie_writel(dra7xx->base,
-> +			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_RC);
-> +		break;
-> +	case DRA7XX_PCIE_EP_TYPE:
-> +		dra7xx_pcie_writel(dra7xx->base,
-> +			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_EP);
-> +		break;
-> +	case DRA7XX_PCIE_LEG_EP_TYPE:
-> +		dra7xx_pcie_writel(dra7xx->base,
-> +			PCIECTRL_TI_CONF_DEVICE_TYPE, DEVICE_TYPE_LEG_EP);
-> +		break;
-> +	default:
-> +		dev_dbg(dev, "UNKNOWN device type %d\n", device_type);
-> +	}
-
-Thus, this switch can be removed.
-Others look good.
-
-Best regards,
-Jingoo Han
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index f2d7c70..2d09c11 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -26,6 +26,16 @@ config STMMAC_PLATFORM
+ 
+ 	  If unsure, say N.
+ 
++config DWMAC_SOCFPGA
++	bool "SOCFPGA dwmac support"
++	depends on STMMAC_PLATFORM && MFD_SYSCON && (ARCH_SOCFPGA || COMPILE_TEST)
++	help
++	  Support for ethernet controller on Altera SOCFPGA
++
++	  This selects the Altera SOCFPGA SoC glue layer support
++	  for the stmmac device driver. This driver is used for
++	  arria5 and cyclone5 FPGA SoCs.
++
+ config DWMAC_SUNXI
+ 	bool "Allwinner GMAC support"
+ 	depends on STMMAC_PLATFORM && ARCH_SUNXI
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
+index dcef287..18695eb 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Makefile
++++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
+@@ -3,6 +3,7 @@ stmmac-$(CONFIG_STMMAC_PLATFORM) += stmmac_platform.o
+ stmmac-$(CONFIG_STMMAC_PCI) += stmmac_pci.o
+ stmmac-$(CONFIG_DWMAC_SUNXI) += dwmac-sunxi.o
+ stmmac-$(CONFIG_DWMAC_STI) += dwmac-sti.o
++stmmac-$(CONFIG_DWMAC_SOCFPGA) += dwmac-socfpga.o
+ stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
+ 	      chain_mode.o dwmac_lib.o dwmac1000_core.o  dwmac1000_dma.o \
+ 	      dwmac100_core.o dwmac100_dma.o enh_desc.o  norm_desc.o \
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
+new file mode 100644
+index 0000000..246da38
+--- /dev/null
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
+@@ -0,0 +1,130 @@
++/* Copyright Altera Corporation (C) 2014. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2,
++ * as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Adopted from dwmac-sti.c
++ */
++
++#include <linux/mfd/syscon.h>
++#include <linux/of.h>
++#include <linux/of_net.h>
++#include <linux/phy.h>
++#include <linux/regmap.h>
++#include <linux/stmmac.h>
++
++#define SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_GMII_MII 0x0
++#define SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_RGMII 0x1
++#define SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_RMII 0x2
++#define SYSMGR_EMACGRP_CTRL_PHYSEL_WIDTH 2
++#define SYSMGR_EMACGRP_CTRL_PHYSEL_MASK 0x00000003
++
++struct socfpga_dwmac {
++	int	interface;
++	u32	reg_offset;
++	u32	reg_shift;
++	struct	device *dev;
++	struct regmap *sys_mgr_base_addr;
++};
++
++static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *dev)
++{
++	struct device_node *np	= dev->of_node;
++	struct regmap *sys_mgr_base_addr;
++	u32 reg_offset, reg_shift;
++	int ret;
++
++	dwmac->interface = of_get_phy_mode(np);
++
++	sys_mgr_base_addr = syscon_regmap_lookup_by_phandle(np, "altr,sysmgr-syscon");
++	if (IS_ERR(sys_mgr_base_addr)) {
++		dev_info(dev, "No sysmgr-syscon node found\n");
++		return PTR_ERR(sys_mgr_base_addr);
++	}
++
++	ret = of_property_read_u32_index(np, "altr,sysmgr-syscon", 1, &reg_offset);
++	if (ret) {
++		dev_info(dev, "Could not read reg_offset from sysmgr-syscon!\n");
++		return -EINVAL;
++	}
++
++	ret = of_property_read_u32_index(np, "altr,sysmgr-syscon", 2, &reg_shift);
++	if (ret) {
++		dev_info(dev, "Could not read reg_shift from sysmgr-syscon!\n");
++		return -EINVAL;
++	}
++
++	dwmac->reg_offset = reg_offset;
++	dwmac->reg_shift = reg_shift;
++	dwmac->sys_mgr_base_addr = sys_mgr_base_addr;
++	dwmac->dev = dev;
++
++	return 0;
++}
++
++static int socfpga_dwmac_setup(struct socfpga_dwmac *dwmac)
++{
++	struct regmap *sys_mgr_base_addr = dwmac->sys_mgr_base_addr;
++	int phymode = dwmac->interface;
++	u32 reg_offset = dwmac->reg_offset;
++	u32 reg_shift = dwmac->reg_shift;
++	u32 ctrl, val;
++
++	switch (phymode) {
++	case PHY_INTERFACE_MODE_RGMII:
++		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_RGMII;
++		break;
++	case PHY_INTERFACE_MODE_MII:
++	case PHY_INTERFACE_MODE_GMII:
++		val = SYSMGR_EMACGRP_CTRL_PHYSEL_ENUM_GMII_MII;
++		break;
++	default:
++		dev_err(dwmac->dev, "bad phy mode %d\n", phymode);
++		return -EINVAL;
++	}
++
++	regmap_read(sys_mgr_base_addr, reg_offset, &ctrl);
++	ctrl &= ~(SYSMGR_EMACGRP_CTRL_PHYSEL_MASK << reg_shift);
++	ctrl |= val << reg_shift;
++
++	regmap_write(sys_mgr_base_addr, reg_offset, ctrl);
++	return 0;
++}
++
++static void *socfpga_dwmac_probe(struct platform_device *pdev)
++{
++	struct device		*dev = &pdev->dev;
++	int			ret;
++	struct socfpga_dwmac	*dwmac;
++
++	dwmac = devm_kzalloc(dev, sizeof(*dwmac), GFP_KERNEL);
++	if (!dwmac)
++		return ERR_PTR(-ENOMEM);
++
++	ret = socfpga_dwmac_parse_data(dwmac, dev);
++	if (ret) {
++		dev_err(dev, "Unable to parse OF data\n");
++		return ERR_PTR(ret);
++	}
++
++	ret = socfpga_dwmac_setup(dwmac);
++	if (ret) {
++		dev_err(dev, "couldn't setup SoC glue (%d)\n", ret);
++		return ERR_PTR(ret);
++	}
++
++	return dwmac;
++}
++
++const struct stmmac_of_data socfpga_gmac_data = {
++	.setup = socfpga_dwmac_probe,
++};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac.h b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+index f9e60d7..ca01035 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac.h
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac.h
+@@ -136,6 +136,9 @@ extern const struct stmmac_of_data sun7i_gmac_data;
+ #ifdef CONFIG_DWMAC_STI
+ extern const struct stmmac_of_data sti_gmac_data;
+ #endif
++#ifdef CONFIG_DWMAC_SOCFPGA
++extern const struct stmmac_of_data socfpga_gmac_data;
++#endif
+ extern struct platform_driver stmmac_pltfr_driver;
+ static inline int stmmac_register_platform(void)
+ {
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 8fb32a8..46aef510 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -38,6 +38,9 @@ static const struct of_device_id stmmac_dt_ids[] = {
+ 	{ .compatible = "st,stih416-dwmac", .data = &sti_gmac_data},
+ 	{ .compatible = "st,stid127-dwmac", .data = &sti_gmac_data},
+ #endif
++#ifdef CONFIG_DWMAC_SOCFPGA
++	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
++#endif
+ 	/* SoC specific glue layers should come before generic bindings */
+ 	{ .compatible = "st,spear600-gmac"},
+ 	{ .compatible = "snps,dwmac-3.610"},
+-- 
+1.7.9.5
