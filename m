@@ -1,29 +1,32 @@
 From: mhei@heimpold.de (Michael Heimpold)
-Date: Thu, 27 Mar 2014 23:51:26 +0100
-Subject: [PATCH v2 0/4] arm: mxs: dts: small fixes for I2SE's duckbills
-Message-ID: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
+Date: Thu, 27 Mar 2014 23:51:29 +0100
+Subject: [PATCH v2 3/4] arm: mxs: dt: imx28: include gpio.h to allow use of
+ symbolic names
+In-Reply-To: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
+References: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
+Message-ID: <1395960690-19531-4-git-send-email-mhei@heimpold.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes two issues with the DT file: first, it frees up
-some GPIOs which are mis-used by MMC interface, and second, it
-fixes the GPIO used to reset the ethernet phy.
+Signed-off-by: Michael Heimpold <mhei@heimpold.de>
+---
+Changes since v1:
+- new patch
 
-While at it, use symbolic names for LED definitions.
+ arch/arm/boot/dts/imx28.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-Changes in v2:
- - add missing patch for imx28.dtsi to include gpio.h
-
-
-Michael Heimpold (4):
-  arm: mxs: dt: imx28-duckbill: fix mmc settings
-  arm: mxs: dt: imx28-duckbill: fix phy reset gpio
-  arm: mxs: dt: imx28: include gpio.h to allow use of symbolic names
-  arm: mxs: dt: imx28-duckbill: use symbolic names from gpio.h
-
- arch/arm/boot/dts/imx28-duckbill.dts |   12 ++++++------
- arch/arm/boot/dts/imx28.dtsi         |    1 +
- 2 files changed, 7 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 90a5795..a95cc53 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -9,6 +9,7 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
++#include <dt-bindings/gpio/gpio.h>
+ #include "skeleton.dtsi"
+ #include "imx28-pinfunc.h"
+ 
 -- 
 1.7.10.4
