@@ -1,31 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Mar 2014 01:55:46 +0100
-Subject: [GIT PULL] Keystone DTS fixes for 3.15
-In-Reply-To: <1395356879-3009-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1395356879-3009-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <201403270155.46291.arnd@arndb.de>
+Date: Thu, 27 Mar 2014 02:04:42 +0100
+Subject: [PATCH RESEND for ARM-SoC 0/2] ARM: STi: NOR Flash support
+In-Reply-To: <1395401588-8825-1-git-send-email-lee.jones@linaro.org>
+References: <1395401588-8825-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201403270204.42583.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 March 2014, Santosh Shilimkar wrote:
-> Please pull below keystone DTS fixes for 3.15. It merges ok with 'next/dt'
-> heads with a trivial makefile conflict. For the dependencies it is based
-> on top of the previous Keystone 3.15 pull request [1]
+On Friday 21 March 2014, Lee Jones wrote:
+> As requested by Arnd:
 > 
-> The following changes since commit 3babe30608dcfec811d64268bd9dc30b7c638e69:
+> ARM-SoC Maintainers,
 > 
->   ARM: dts: keystone: use common "ti,keystone" compatible instead of -evm (2014-03-20 17:00:27 -0400)
+> Please apply these two patches directly to ARM-SoC for inclusion
+> into the v3.15 merge window. All maintainer Acks are applied.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-fixes
-> 
-> for you to fetch changes up to 3babe30608dcfec811d64268bd9dc30b7c638e69:
-> 
->   ARM: dts: keystone: use common "ti,keystone" compatible instead of -evm (2014-03-20 17:00:27 -0400)
-> 
+> Kind regards,
 
-Something looks wrong with the message above, but the branch contents
-seem ok, so I've pulled it into next/dt.
+Applied to next/dt branch. I had a trivial conflict against the
+addition of the network device nodes, which I resolved on this
+branch.
+
+Thanks,
 
 	Arnd
