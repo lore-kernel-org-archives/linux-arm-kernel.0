@@ -1,58 +1,37 @@
-From: ulrich.hecht@gmail.com (Ulrich Hecht)
-Date: Thu, 27 Mar 2014 11:45:44 +0100
-Subject: [PATCH] ARM: shmobile: Use r8a7740 suffix for i2c, mmcif,
- fsi2 compat strings
-Message-ID: <1395917144-402-1-git-send-email-ulrich.hecht@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 27 Mar 2014 11:56:21 +0100
+Subject: [PATCH V3 00/12] CCF support for Renesas r7s72100
+In-Reply-To: <20140327064643.GA2687@katana>
+References: <1394208048-32495-1-git-send-email-wsa@the-dreams.de>
+ <1452941.Qc8gHZ8xpL@avalon> <20140327064643.GA2687@katana>
+Message-ID: <13047887.EV24E0bQlt@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "renesas,*-r8a7740" to the compatible strings for consistency with other
-devices.
+Hi Wolfram,
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
----
- arch/arm/boot/dts/r8a7740.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On Thursday 27 March 2014 07:46:43 Wolfram Sang wrote:
+> On Mon, Mar 10, 2014 at 12:59:05PM +0100, Laurent Pinchart wrote:
+> > On Monday 10 March 2014 08:27:19 Wolfram Sang wrote:
+> > > > Indeed, I got it wrong. We can leave it as-is then.
+> > > 
+> > > Great. So I guess, this series can be applied now?
+> > 
+> > There's just the issue of serial port aliases left. I've started a
+> > discussion about that on the DT mailing list (you've been CC'ed).
+> 
+> So, how to proceed with this series?
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 8280884..9f65986 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -126,7 +126,7 @@
- 	i2c0: i2c at fff20000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
- 		reg = <0xfff20000 0x425>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 201 IRQ_TYPE_LEVEL_HIGH
-@@ -139,7 +139,7 @@
- 	i2c1: i2c@e6c20000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		compatible = "renesas,rmobile-iic";
-+		compatible = "renesas,iic-r8a7740", "renesas,rmobile-iic";
- 		reg = <0xe6c20000 0x425>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH
-@@ -174,7 +174,7 @@
- 	};
- 
- 	mmcif0: mmc@e6bd0000 {
--		compatible = "renesas,sh-mmcif";
-+		compatible = "renesas,mmcif-r8a7740", "renesas,sh-mmcif";
- 		reg = <0xe6bd0000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH
-@@ -220,7 +220,7 @@
- 
- 	sh_fsi2: sound@fe1f0000 {
- 		#sound-dai-cells = <1>;
--		compatible = "renesas,sh_fsi2";
-+		compatible = "renesas,fsi2-r8a7740", "renesas,sh_fsi2";
- 		reg = <0xfe1f0000 0x400>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 9 0x4>;
+Could you please ping the DT maintainers to revive the discussion ?
+
 -- 
-1.8.4.5
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140327/21d8e56d/attachment.sig>
