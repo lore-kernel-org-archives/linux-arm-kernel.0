@@ -1,39 +1,31 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Wed, 26 Mar 2014 17:49:01 -0700
-Subject: [PATCH v5 3/5] ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
-In-Reply-To: <1395881343-13985-1-git-send-email-tim.kryger@linaro.org>
-References: <1395881343-13985-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1395881343-13985-4-git-send-email-tim.kryger@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Mar 2014 01:55:46 +0100
+Subject: [GIT PULL] Keystone DTS fixes for 3.15
+In-Reply-To: <1395356879-3009-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1395356879-3009-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <201403270155.46291.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree node for the PWM on bcm11351 SoCs.
+On Friday 21 March 2014, Santosh Shilimkar wrote:
+> Please pull below keystone DTS fixes for 3.15. It merges ok with 'next/dt'
+> heads with a trivial makefile conflict. For the dependencies it is based
+> on top of the previous Keystone 3.15 pull request [1]
+> 
+> The following changes since commit 3babe30608dcfec811d64268bd9dc30b7c638e69:
+> 
+>   ARM: dts: keystone: use common "ti,keystone" compatible instead of -evm (2014-03-20 17:00:27 -0400)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-fixes
+> 
+> for you to fetch changes up to 3babe30608dcfec811d64268bd9dc30b7c638e69:
+> 
+>   ARM: dts: keystone: use common "ti,keystone" compatible instead of -evm (2014-03-20 17:00:27 -0400)
+> 
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+Something looks wrong with the message above, but the branch contents
+seem ok, so I've pulled it into next/dt.
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 64d069b..6b05ae6 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -193,6 +193,14 @@
- 		status = "disabled";
- 	};
- 
-+	pwm: pwm at 3e01a000 {
-+		compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
-+		reg = <0x3e01a000 0xcc>;
-+		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_PWM>;
-+		#pwm-cells = <3>;
-+		status = "disabled";
-+	};
-+
- 	clocks {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.7.9.5
+	Arnd
