@@ -1,137 +1,116 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Thu, 27 Mar 2014 10:35:55 -0700
-Subject: [PATCH v4 18/22] drivers: Enable building of Kirkwood drivers for
- mach-mvebu
-In-Reply-To: <1393096504-11844-19-git-send-email-andrew@lunn.ch>
-References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
- <1393096504-11844-19-git-send-email-andrew@lunn.ch>
-Message-ID: <CAK5ve-KCBYcKOqyNShEdEhKTMTZah_2cy884RBTG-wPJbO8g+A@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 27 Mar 2014 18:43:26 +0100
+Subject: [PATCH 00/16] move at91 and avr32 to the PWM framework, remove
+ obsolete drivers
+In-Reply-To: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5334633E.6050708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 11:15 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> With the move of kirkwood into mach-mvebu, drivers Kconfig need
-> tweeking to allow the kirkwood specific drivers to be built.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Mark Brown <broonie@linaro.org>
-> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Bryan Wu <cooloney@gmail.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-> ---
-> v2
-> Simplify cpufreq/Kconfig.arm
->
-> Still needs ACKs from cpufreq, led and thermal maintainers.
-> ---
->  drivers/cpufreq/Kconfig.arm | 2 +-
->  drivers/cpuidle/Kconfig.arm | 2 +-
->  drivers/leds/Kconfig        | 4 ++--
->  drivers/phy/Kconfig         | 2 +-
->  drivers/thermal/Kconfig     | 2 +-
->  sound/soc/kirkwood/Kconfig  | 2 +-
->  6 files changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 31297499a60a..077db3aa985b 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -113,7 +113,7 @@ config ARM_INTEGRATOR
->           If in doubt, say Y.
->
->  config ARM_KIRKWOOD_CPUFREQ
-> -       def_bool ARCH_KIRKWOOD && OF
-> +       def_bool MACH_KIRKWOOD
->         help
->           This adds the CPUFreq driver for Marvell Kirkwood
->           SoCs.
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index d988948a89a0..97ccc31dbdd8 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -22,7 +22,7 @@ config ARM_HIGHBANK_CPUIDLE
->
->  config ARM_KIRKWOOD_CPUIDLE
->         bool "CPU Idle Driver for Marvell Kirkwood SoCs"
-> -       depends on ARCH_KIRKWOOD
-> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->         help
->           This adds the CPU Idle driver for Marvell Kirkwood SoCs.
->
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 72156c123033..44c358ecf5a1 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -421,7 +421,7 @@ config LEDS_MC13783
->  config LEDS_NS2
->         tristate "LED support for Network Space v2 GPIO LEDs"
->         depends on LEDS_CLASS
-> -       depends on ARCH_KIRKWOOD
-> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->         default y
->         help
->           This option enable support for the dual-GPIO LED found on the
-> @@ -431,7 +431,7 @@ config LEDS_NS2
->  config LEDS_NETXBIG
->         tristate "LED support for Big Network series LEDs"
->         depends on LEDS_CLASS
-> -       depends on ARCH_KIRKWOOD
-> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->         default y
->         help
->           This option enable support for LEDs found on the LaCie 2Big
+On 19/03/2014 14:03, Alexandre Belloni :
+> Hi,
+> 
+> This patch set swtiches the at91 and avr32 SoCs and board to the generic PWM
+> framework. This allows to remove the obsolete leds-atmel-pwm, atmel-pwm-bl and
+> atmel_pwm drivers.
+> 
+> The first 6 patches take care of the AT91 boards and removes a useless function
+> in the process.
+> 
+> Patch 7 makes pwm-ateml buildable for AVR32
+> 
+> Patch 8 allows setting the pwm polarity for pwm_bl when using platform data.
+> This is required afterwards for the favr-32
+> 
+> Patches 9-13 take care of the AVR32 boards. This has only been compile tested as
+> I don't own any of those boards.
+> 
+> And the last 3 patches are removing the now obsolete drivers.
+> 
+> As a note, the atmel_pwm driver has two features not yet available through
+> pwm-atmel:
+>  - it is possible to pass an IRQ handler that will get called each time one of
+>    the channel period has been acheived.
+>  - it was possible to set clka and clkb, two clock that divided mck before
+>    feeding the pwm controller.
+> 
+> Those features are not used by anything in the mainline. I'm not sure we can
+> implement the first one. We'll get back the second one once all the boards have
+> swtiched to the common clock framework.
+> 
+> 
+> Alexandre Belloni (16):
+>   ARM: at91: at91sam9g45: switch to generic PWM framework
+>   ARM: at91: sam9m10g45ek: use generic leds_pwm driver
+>   ARM: at91: at91sam9263: switch to generic PWM framework
+>   ARM: at91: sam9263ek: use generic leds_pwm driver
+>   ARM: at91: at91sam9rl: switch to generic PWM framework
+>   ARM: at91: remove useless at91_pwm_leds()
+>   PWM: atmel: allow building for AVR32
+>   backlight: pwm_bl: set pwm polarity when using platform data
+>   avr32/at32ap: switch to the generic PWM framework
+>   avr32: MRMT: use generic leds_pwm driver
+>   avr32: merisc: use generic leds_pwm driver
+>   avr32: favr-32: use generic pwm_bl driver
+>   avr32: update defconfig to use the generic PWM framework
+>   backlight: atmel-pwm-bl: remove obsolete driver
+>   leds: atmel-pwm: remove obsolete driver
+>   misc: atmel_pwm: remove obsolete driver
 
-Acked-by: Bryan Wu <cooloney@gmail.com>
+I am fine with the whole series. For the AT91 specific bits, you can add my:
 
-Thanks,
--Bryan
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+It is a very nice cleanup and I can take the series with me in the AT91
+git tree (likely the at91-3.16-cleanup or at91-3.16-drivers branch) if
+everybody agree.
+
+Bye,
+
+>  arch/arm/mach-at91/at91sam9263.c           |   1 +
+>  arch/arm/mach-at91/at91sam9263_devices.c   |  11 +-
+>  arch/arm/mach-at91/at91sam9g45.c           |   1 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c   |  11 +-
+>  arch/arm/mach-at91/at91sam9rl.c            |   1 +
+>  arch/arm/mach-at91/at91sam9rl_devices.c    |  11 +-
+>  arch/arm/mach-at91/board-sam9263ek.c       |  56 +++-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c    |  43 ++-
+>  arch/arm/mach-at91/board.h                 |   1 -
+>  arch/arm/mach-at91/leds.c                  |  37 ---
+>  arch/avr32/boards/atngw100/mrmt.c          |  35 ++-
+>  arch/avr32/boards/favr-32/setup.c          |  49 ++--
+>  arch/avr32/boards/merisc/setup.c           |  34 ++-
+>  arch/avr32/configs/atngw100_mrmt_defconfig |   5 +-
+>  arch/avr32/configs/atstk1002_defconfig     |   5 +-
+>  arch/avr32/configs/atstk1003_defconfig     |   5 +-
+>  arch/avr32/configs/atstk1004_defconfig     |   5 +-
+>  arch/avr32/configs/atstk1006_defconfig     |   5 +-
+>  arch/avr32/configs/favr-32_defconfig       |   6 +-
+>  arch/avr32/configs/merisc_defconfig        |   5 +-
+>  arch/avr32/mach-at32ap/at32ap700x.c        |   7 +-
+>  drivers/leds/Kconfig                       |   8 -
+>  drivers/leds/Makefile                      |   1 -
+>  drivers/leds/leds-atmel-pwm.c              | 149 -----------
+>  drivers/misc/Kconfig                       |   9 -
+>  drivers/misc/Makefile                      |   1 -
+>  drivers/misc/atmel_pwm.c                   | 402 -----------------------------
+>  drivers/pwm/Kconfig                        |   2 +-
+>  drivers/video/backlight/Kconfig            |  11 -
+>  drivers/video/backlight/Makefile           |   1 -
+>  drivers/video/backlight/atmel-pwm-bl.c     | 223 ----------------
+>  drivers/video/backlight/pwm_bl.c           |   8 +
+>  include/linux/atmel-pwm-bl.h               |  43 ---
+>  include/linux/atmel_pwm.h                  |  70 -----
+>  include/linux/pwm_backlight.h              |   1 +
+>  35 files changed, 199 insertions(+), 1064 deletions(-)
+>  delete mode 100644 drivers/leds/leds-atmel-pwm.c
+>  delete mode 100644 drivers/misc/atmel_pwm.c
+>  delete mode 100644 drivers/video/backlight/atmel-pwm-bl.c
+>  delete mode 100644 include/linux/atmel-pwm-bl.h
+>  delete mode 100644 include/linux/atmel_pwm.h
+> 
 
 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index afa2354f6600..5e6b33f9c294 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
->
->  config PHY_MVEBU_SATA
->         def_bool y
-> -       depends on ARCH_KIRKWOOD || ARCH_DOVE
-> +       depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD
->         depends on OF
->         select GENERIC_PHY
->
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 35c066489a19..1bc9cbc4f1b8 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -142,7 +142,7 @@ config RCAR_THERMAL
->
->  config KIRKWOOD_THERMAL
->         tristate "Temperature sensor on Marvell Kirkwood SoCs"
-> -       depends on ARCH_KIRKWOOD
-> +       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->         depends on OF
->         help
->           Support for the Kirkwood thermal sensor driver into the Linux thermal
-> diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
-> index 78ed4a42ad21..106e2e22fed2 100644
-> --- a/sound/soc/kirkwood/Kconfig
-> +++ b/sound/soc/kirkwood/Kconfig
-> @@ -1,6 +1,6 @@
->  config SND_KIRKWOOD_SOC
->         tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
-> -       depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
-> +       depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || COMPILE_TEST
->         help
->           Say Y or M if you want to add support for codecs attached to
->           the Kirkwood I2S interface. You will also need to select the
-> --
-> 1.8.5.3
->
+-- 
+Nicolas Ferre
