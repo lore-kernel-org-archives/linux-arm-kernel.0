@@ -1,51 +1,26 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 27 Mar 2014 20:34:39 +0800
-Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
-In-Reply-To: <5334078A.9010408@arm.com>
-References: <1395738060-18489-1-git-send-email-hanjun.guo@linaro.org>
- <533153BF.3070308@arm.com> <533163D4.6030205@linaro.org>
- <5334078A.9010408@arm.com>
-Message-ID: <53341ADF.2050904@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 27 Mar 2014 13:38:23 +0100
+Subject: [PATCH v3] ata: fix Marvell SATA driver dependencies
+In-Reply-To: <1668037.2oe7J2B7N4@amdc1032>
+References: <1668037.2oe7J2B7N4@amdc1032>
+Message-ID: <20140327123823.GM25349@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-3-27 19:12, Sudeep Holla wrote:
-> Hi Hanjun,
-> 
-> On 25/03/14 11:09, Hanjun Guo wrote:
->> Hi Sudeep,
->>
->> On 2014-3-25 18:00, Sudeep Holla wrote:
->>> Hi Hanjun,
->>>
->>> On 25/03/14 09:00, Hanjun Guo wrote:
->>>> After commit 74397174989e5 (arm64: Fix duplicated Kconfig entries),
->>>> I still get a duplicate Power management options section in linux-next
->>>> git repo, may be due to some merge conflicts, anyway, fix that in this
->>>> patch.
->>>>
->>> I reported this and Mark Brown posted the patch[1].
->>> I assumed it is already pulled, but looks like that's not the case.
->> [...]
->>> [1] http://www.spinics.net/lists/arm-kernel/msg314472.html
-> 
-> [...]
-> 
->> here is the link:
->> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm64/Kconfig
->>
-> 
-> Just had a look at the linux-next tree and looks like the original commit:
-> "cpufreq: enable ARM drivers on arm64" is pulled by both Catalin and Rafael
-> which has resulted in the fixup patch[1] not removing the duplicate entry
-> cleanly.
-> 
-> If not too late it better to ask either Rafael or Catalin to drop both patches
-> from their tree, instead of creating 4 patches in total to enable cpufreq :)
+On Thu, Mar 27, 2014 at 01:23:39PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> Make sata_mv host driver depend on PCI || ARCH_DOVE || ARCH_KIRKWOOD ||
+> ARCH_MV78XX0 || ARCH_MVEBU || ARCH_ORION5X config options as Marvell
+> SATA support covers both Marvell PCI devices and Marvell Dove, Kirkwood,
+> MV78xx0, Armada 370/XP and Orion5x SoCs (for non-PCI devices the driver
+> to work requires suitable device tree node to be defined).
 
-Rafael is on vacation now.
+Good old fashioned platform driver will also work. In fact, 95% of Orion5x
+and mv78xx0 devices don't have DT yet.
 
-Catalin, could you please handle this?
+You might also be able to simplify it to
 
-Thanks
-Hanjun
+PCI || PLAT_ORION || COMPILE_TEST
+
+But i suggest you build test to make sure.
+
+    Andrew
