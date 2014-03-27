@@ -1,103 +1,161 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 27 Mar 2014 01:06:32 +0100
-Subject: [PATCH v2] ARM: rockchip: convert smp bringup to CPU_METHOD_OF_DECLARE
-In-Reply-To: <2151573.evmqdkWnet@diego>
-References: <1632873.urGeGsUMPH@diego>
- <20140326110024.GR10341@e106331-lin.cambridge.arm.com>
- <2151573.evmqdkWnet@diego>
-Message-ID: <1878147.CvhHSZhTas@diego>
+From: neil@fatboyfat.co.uk (Neil Greatorex)
+Date: Thu, 27 Mar 2014 00:29:32 +0000 (GMT)
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada
+ 370)
+In-Reply-To: <20140326214259.GA12330@obsidianresearch.com>
+References: <CAAfodu1eC6=mKwfowW6bmTtf_DcOL_oNQg77kSz+ykfHkMTN-w@mail.gmail.com>
+ <20140325202249.GA10378@obsidianresearch.com> <20140325213638.5aba54b6@skate>
+ <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
+ <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+ <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+Message-ID: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the newly introduced CPU_METHOD_OF_DECLARE is not necessary anymore
-to reference the relevant smp_ops in the board file, but instead it can
-simply be set by the enable-method property of the cpu nodes.
+Jason,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v1:
-  - add a short description to the enable-method binding
+On Wed, Mar 26, 2014 at 9:42 PM, Jason Gunthorpe 
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Wed, Mar 26, 2014 at 08:34:19PM +0000, Neil Greatorex wrote:
+>> Thanks. Here's the relevant output with that patch:
+>>
+>> [    0.135772] mvebu-pcie pcie-controller.3: ICR is 0
+>> [    0.160889] mvebu-pcie pcie-controller.3: Vendor ID is ffffffff
+>> [    0.160897] mvebu-pcie pcie-controller.3: ICR is 800200
+>> [    1.170215] mvebu-pcie pcie-controller.3: Try 2: Vendor ID is 
+15218086
+>> [    1.170228] mvebu-pcie pcie-controller.3: ICR is 0
+>
+> Okay, this looks better..
+>
+<snip>
+>
+> I checked on my board here with the link down and I get:
+>
+> mvebu-pcie pex.1: Link is 0
+> mvebu-pcie pex.1: ICR is 0
+> mvebu-pcie pex.1: Vendor ID is ffffffff
+> mvebu-pcie pex.1: ICR is 201
+>
+> Which makes sense - NF Error + Tx while in Link down Error.
+>
+> In any event, lets try this.
+>
 
- Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
- arch/arm/boot/dts/rk3066a.dtsi                 | 1 +
- arch/arm/boot/dts/rk3188.dtsi                  | 1 +
- arch/arm/mach-rockchip/core.h                  | 2 --
- arch/arm/mach-rockchip/platsmp.c               | 3 ++-
- arch/arm/mach-rockchip/rockchip.c              | 1 -
- 6 files changed, 6 insertions(+), 4 deletions(-)
+I ran with this patch applied (but none of the previous ones you sent - 
+was that correct?) but the new dev_info line doesn't fire. I also no 
+longer get the ethernet card detected at boot, and get the weird dual XHCI 
+controller after a rescan.
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 333f4ae..f52a9ac 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
- 			    "qcom,gcc-msm8660"
- 			    "qcom,kpss-acc-v1"
- 			    "qcom,kpss-acc-v2"
-+			    "rockchip,rk3066-smp" - cpu-core handling of Socs
-+					from Rockchip starting with rk3066
- 
- 	- cpu-release-addr
- 		Usage: required for systems that have an "enable-method"
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 4d4dfbb..90b354d 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -24,6 +24,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "rockchip,rk3066-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index bb36596..7ad5103 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -24,6 +24,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "rockchip,rk3066-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
-index e2e7c9d..39bca96 100644
---- a/arch/arm/mach-rockchip/core.h
-+++ b/arch/arm/mach-rockchip/core.h
-@@ -18,5 +18,3 @@ extern char rockchip_secondary_trampoline_end;
- 
- extern unsigned long rockchip_boot_fn;
- extern void rockchip_secondary_startup(void);
--
--extern struct smp_operations rockchip_smp_ops;
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index dbfa5a2..a18b7f2 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -178,7 +178,8 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
- 		pmu_set_power_domain(0 + i, false);
- }
- 
--struct smp_operations rockchip_smp_ops __initdata = {
-+static struct smp_operations rockchip_smp_ops __initdata = {
- 	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
- 	.smp_boot_secondary	= rockchip_boot_secondary,
- };
-+CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index d211d6f..4499b0a 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -39,7 +39,6 @@ static const char * const rockchip_board_dt_compat[] = {
- };
- 
- DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
--	.smp		= smp_ops(rockchip_smp_ops),
- 	.init_machine	= rockchip_dt_init,
- 	.dt_compat	= rockchip_board_dt_compat,
- MACHINE_END
--- 
-1.9.0
+mirabox ~ # dmesg | grep "ID read"
+mirabox ~ # lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+02:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
+mirabox ~ # echo 1 > /sys/bus/pci/rescan
+mirabox ~ # lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+01:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+01:00.1 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+02:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev ff)
+03:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
+mirabox ~ # dmesg | grep "ID read"
+mirabox ~ #
+
+Full dmesg showing boot and rescan at https://gist.github.com/9796043
+
+I then added an extra dev_info to print the ICR just after you read it in 
+the loop, and get this:
+
+[    0.137047] pci_bus 0000:01: scanning bus
+[    0.161098] mvebu-pcie pcie-controller.3: ICR is 808200
+[    0.162104] mvebu-pcie pcie-controller.3: ICR is 808201
+[    0.162191] pci_bus 0000:01: fixups for bus
+
+So it seems that the first time we have NFErrDet and PexLinkFail, and on 
+the second time through the loop we have NFErrDet, PexLinkFail and 
+TxReqInDIDownErr, so it then errors out of the loop.
+
+Full dmesg for this boot is at https://gist.github.com/9796442
+
+Then, I added back in the 1 second delay just after the call to 
+mvebu_pcie_set_local_dev_nr and the card was detected again with the 
+following:
+
+[    2.133299] pci_bus 0000:01: scanning bus
+[    2.133313] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.133351] pci 0000:01:00.0: [8086:1521] type 00 class 0x020000
+[    2.133379] pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x0007ffff]
+[    2.133405] pci 0000:01:00.0: reg 0x18: [io  0x0000-0x001f]
+[    2.133422] pci 0000:01:00.0: reg 0x1c: [mem 0x00000000-0x00003fff]
+[    2.133456] pci 0000:01:00.0: reg 0x30: [mem 0x00000000-0x0007ffff pref]
+[    2.133473] pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x3c
+[    2.133589] pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
+[    2.133601] pci 0000:01:00.0: PME# disabled
+[    2.133658] pci 0000:01:00.0: reg 0x184: [mem 0x00000000-0x00003fff]
+[    2.133692] pci 0000:01:00.0: reg 0x190: [mem 0x00000000-0x00003fff]
+[    2.133945] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.133987] pci 0000:01:00.1: [8086:1521] type 00 class 0x020000
+[    2.134014] pci 0000:01:00.1: reg 0x10: [mem 0x00000000-0x0007ffff]
+[    2.134040] pci 0000:01:00.1: reg 0x18: [io  0x0000-0x001f]
+[    2.134057] pci 0000:01:00.1: reg 0x1c: [mem 0x00000000-0x00003fff]
+[    2.134091] pci 0000:01:00.1: reg 0x30: [mem 0x00000000-0x0007ffff pref]
+[    2.134106] pci 0000:01:00.1: calling pci_fixup_ide_bases+0x0/0x3c
+[    2.134215] pci 0000:01:00.1: PME# supported from D0 D3hot D3cold
+[    2.134226] pci 0000:01:00.1: PME# disabled
+[    2.134281] pci 0000:01:00.1: reg 0x184: [mem 0x00000000-0x00003fff]
+[    2.134316] pci 0000:01:00.1: reg 0x190: [mem 0x00000000-0x00003fff]
+[    2.134560] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.134571] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.134581] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.134590] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.134599] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.134607] mvebu-pcie pcie-controller.3: ICR is 808000
+[    2.134633] pci_bus 0000:01: fixups for bus
+
+mirabox ~ # lspci
+[   71.400126] mvebu-pcie pcie-controller.3: ICR is 0
+[   71.407226] mvebu-pcie pcie-controller.3: ICR is 808000
+[   71.412559] mvebu-pcie pcie-controller.3: ICR is 808000
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+01:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+01:00.1 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+03:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 02)
+
+Full dmesg for this boot is at: https://gist.github.com/9796851
+
+For clarity, the patch that I've applied on top of your last patch is at 
+the end of this e-mail...
+
+Cheers,
+Neil
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 75d2a73..46f72f54 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -273,6 +273,8 @@ static int mvebu_pcie_hw_rd_conf(struct 
+mvebu_pcie_port *port,
+
+  		if (where == 0) {
+  			u32 icr = mvebu_readl(port, PCIE_ICR);
++			dev_info(&port->pcie->pdev->dev,
++				 "ICR is %x\n", icr);
+  			if (icr & PCIE_ICR_TX_IN_DOWN)
+  				goto err_out;
+
+@@ -1018,6 +1020,7 @@ static int mvebu_pcie_probe(struct platform_device 
+*pdev)
+  		}
+
+  		mvebu_pcie_set_local_dev_nr(port, 1);
++		mdelay(1000);
+
+  		port->dn = child;
+  		spin_lock_init(&port->conf_lock);
