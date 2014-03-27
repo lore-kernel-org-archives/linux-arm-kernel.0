@@ -1,87 +1,103 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 27 Mar 2014 17:46:37 -0500
-Subject: [PATCH 2/3] dt/bindings: add versatile PCI binding
+Date: Thu, 27 Mar 2014 17:46:36 -0500
+Subject: [PATCH 1/3] ARM: hackup pcibios support for commmon bridge code
 In-Reply-To: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
 References: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1395960398-4238-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1395960398-4238-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-Add binding documentation for the PCI controller found on Versatile PB
-boards.
-
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/pci/versatile.txt          | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/versatile.txt
+ arch/arm/kernel/bios32.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/versatile.txt b/Documentation/devicetree/bindings/pci/versatile.txt
-new file mode 100644
-index 0000000..2cc6071
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/versatile.txt
-@@ -0,0 +1,59 @@
-+* ARM Versatile Platform Baseboard PCI interface
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 317da88..31ec14a 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -11,6 +11,7 @@
+ #include <linux/slab.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/of_pci.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+@@ -337,6 +338,15 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		u16 cmd;
+ 
++		/* Ignore fully discovered devices */
++		if (dev->is_added)
++			continue;
 +
-+PCI host controller found on the ARM Versatile PB board's FPGA.
++		set_dev_node(&dev->dev, pcibus_to_node(dev->bus));
 +
-+Required properties:
-+- compatible: should contain "arm,versatile-pci" to identify the Versatile PCI
-+  controller.
-+- reg: base addresses and lengths of the pci controller. There must be 3
-+  entries:
-+	- Versatile specific registers
-+	- Self Config space
-+	- Config space
-+- #address-cells: set to <3>
-+- #size-cells: set to <2>
-+- device_type: set to "pci"
-+- bus-range: set to <0 0xff>
-+- ranges: ranges for the PCI memory and I/O regions
-+- #interrupt-cells: set to <1>
-+- interrupt-map-mask and interrupt-map: standard PCI properties	to define
-+	the mapping of the PCI interface to interrupt numbers.
++		/* Read default IRQs and fixup if necessary */
++		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
 +
-+Example:
+ 		pci_read_config_word(dev, PCI_COMMAND, &cmd);
+ 		cmd |= features;
+ 		pci_write_config_word(dev, PCI_COMMAND, cmd);
+@@ -681,3 +691,56 @@ void __init pci_map_io_early(unsigned long pfn)
+ 	pci_io_desc.pfn = pfn;
+ 	iotable_init(&pci_io_desc, 1);
+ }
 +
-+pci-controller at 10001000 {
-+	compatible = "arm,versatile-pci";
-+	device_type = "pci";
-+	reg = <0x10001000 0x1000
-+	       0x41000000 0x10000
-+	       0x42000000 0x100000>;
-+	bus-range = <0 0xff>;
-+	#address-cells = <3>;
-+	#size-cells = <2>;
-+	#interrupt-cells = <1>;
-+
-+	ranges = <0x01000000 0 0x00000000 0x43000000 0 0x00010000   /* downstream I/O */
-+		  0x02000000 0 0x50000000 0x50000000 0 0x10000000   /* non-prefetchable memory */
-+		  0x42000000 0 0x60000000 0x60000000 0 0x10000000>; /* prefetchable memory */
-+
-+	interrupt-map-mask = <0x1800 0 0 7>;
-+	interrupt-map = <0x1800 0 0 1 &sic 28
-+			 0x1800 0 0 2 &sic 29
-+			 0x1800 0 0 3 &sic 30
-+			 0x1800 0 0 4 &sic 27
-+
-+			 0x1000 0 0 1 &sic 27
-+			 0x1000 0 0 2 &sic 28
-+			 0x1000 0 0 3 &sic 29
-+			 0x1000 0 0 4 &sic 30
-+
-+			 0x0800 0 0 1 &sic 30
-+			 0x0800 0 0 2 &sic 27
-+			 0x0800 0 0 3 &sic 28
-+			 0x0800 0 0 4 &sic 29
-+
-+			 0x0000 0 0 1 &sic 29
-+			 0x0000 0 0 2 &sic 30
-+			 0x0000 0 0 3 &sic 27
-+			 0x0000 0 0 4 &sic 28>;
++struct ioresource {
++	struct list_head list;
++	phys_addr_t start;
++	resource_size_t size;
 +};
++
++static LIST_HEAD(io_list);
++
++int pci_register_io_range(phys_addr_t address, resource_size_t size)
++{
++	struct ioresource *res;
++	resource_size_t allocated_size = 0;
++
++	/* find if the range has not been already allocated */
++	list_for_each_entry(res, &io_list, list) {
++		if (address >= res->start &&
++			address + size <= res->start + size)
++			return 0;
++		allocated_size += res->size;
++	}
++
++	/* range not already registered, check for space */
++	if (allocated_size + size > IO_SPACE_LIMIT)
++		return -E2BIG;
++
++	/* add the range in the list */
++	res = kzalloc(sizeof(*res), GFP_KERNEL);
++	if (!res)
++		return -ENOMEM;
++	res->start = address;
++	res->size = size;
++
++	list_add_tail(&res->list, &io_list);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(pci_register_io_range);
++
++unsigned long pci_address_to_pio(phys_addr_t address)
++{
++	struct ioresource *res;
++
++	list_for_each_entry(res, &io_list, list) {
++		if (address >= res->start &&
++			address < res->start + res->size) {
++			return res->start - address;
++		}
++	}
++
++	return (unsigned long)-1;
++}
++EXPORT_SYMBOL_GPL(pci_address_to_pio);
 -- 
 1.8.3.2
