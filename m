@@ -1,15 +1,16 @@
 From: mhei@heimpold.de (Michael Heimpold)
-Date: Thu, 27 Mar 2014 23:51:27 +0100
-Subject: [PATCH v2 1/4] arm: mxs: dt: imx28-duckbill: fix mmc settings
+Date: Thu, 27 Mar 2014 23:51:28 +0100
+Subject: [PATCH v2 2/4] arm: mxs: dt: imx28-duckbill: fix phy reset gpio
 In-Reply-To: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
 References: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
-Message-ID: <1395960690-19531-2-git-send-email-mhei@heimpold.de>
+Message-ID: <1395960690-19531-3-git-send-email-mhei@heimpold.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2SE's duckbills are only equipped with a micro SD card slot and
-thus only provide a 4-bit interface.
+Fix a copy & paste error: on duckbills the GPIO used for resetting
+the ethernet phy differs from FSL's MX28EVK board.
 
+Reported-by: Stefan Wahren <info@lategoodbye.de>
 Signed-off-by: Michael Heimpold <mhei@heimpold.de>
 ---
 Changes since v1:
@@ -19,20 +20,26 @@ Changes since v1:
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx28-duckbill.dts b/arch/arm/boot/dts/imx28-duckbill.dts
-index 5f326c1..a697870 100644
+index a697870..91c1a9a 100644
 --- a/arch/arm/boot/dts/imx28-duckbill.dts
 +++ b/arch/arm/boot/dts/imx28-duckbill.dts
-@@ -25,9 +25,9 @@
- 			ssp0: ssp at 80010000 {
- 				compatible = "fsl,imx28-mmc";
- 				pinctrl-names = "default";
--				pinctrl-0 = <&mmc0_8bit_pins_a
-+				pinctrl-0 = <&mmc0_4bit_pins_a
- 					&mmc0_cd_cfg &mmc0_sck_cfg>;
--				bus-width = <8>;
-+				bus-width = <4>;
- 				vmmc-supply = <&reg_3p3v>;
- 				status = "okay";
- 			};
+@@ -39,7 +39,7 @@
+ 				hog_pins_a: hog at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-						MX28_PAD_ENET0_RX_CLK__GPIO_4_13 /* PHY Reset */
++						MX28_PAD_SSP0_DATA7__GPIO_2_7 /* PHY Reset */
+ 					>;
+ 					fsl,drive-strength = <MXS_DRIVE_4mA>;
+ 					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+@@ -82,7 +82,7 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mac0_pins_a>;
+ 			phy-supply = <&reg_3p3v>;
+-			phy-reset-gpios = <&gpio4 13 0>;
++			phy-reset-gpios = <&gpio2 7 GPIO_ACTIVE_LOW>;
+ 			phy-reset-duration = <100>;
+ 			status = "okay";
+ 		};
 -- 
 1.7.10.4
