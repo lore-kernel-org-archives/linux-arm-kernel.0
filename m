@@ -1,45 +1,52 @@
-From: mhei@heimpold.de (Michael Heimpold)
-Date: Thu, 27 Mar 2014 23:51:28 +0100
-Subject: [PATCH v2 2/4] arm: mxs: dt: imx28-duckbill: fix phy reset gpio
-In-Reply-To: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
-References: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
-Message-ID: <1395960690-19531-3-git-send-email-mhei@heimpold.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 27 Mar 2014 23:57:52 +0100
+Subject: [PATCH 1/2] leds: add DT support for LEDs wired to supply and
+ default brightness
+In-Reply-To: <CAK5ve-+K+R=c7Lp+JaTCOcq9LYHTszQQg9Xp1fQHxqcQ2cVHHw@mail.gmail.com>
+References: <E1WJUvl-0003wc-0S@rmk-PC.arm.linux.org.uk>
+ <CAK5ve-+K+R=c7Lp+JaTCOcq9LYHTszQQg9Xp1fQHxqcQ2cVHHw@mail.gmail.com>
+Message-ID: <20140327225752.GD15793@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a copy & paste error: on duckbills the GPIO used for resetting
-the ethernet phy differs from FSL's MX28EVK board.
+On Thu, Mar 27, 2014 at 03:28:32PM -0700, Bryan Wu wrote:
+> On Fri, Feb 28, 2014 at 1:25 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > Some PWM outputs are wired such that the LED they're controlling is
+> > connected to supply rather than ground.  Therefore, the duty cycle
+> > needs to be inverted to make the LED behave as it should do.
+> >
+> > We also provide a way to specify the default brightness when a
+> > trigger is not specified.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  Documentation/devicetree/bindings/leds/leds-pwm.txt |  3 +++
+> >  drivers/leds/leds-pwm.c                             | 15 +++++++++++----
+> >  2 files changed, 14 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/leds/leds-pwm.txt b/Documentation/devicetree/bindings/leds/leds-pwm.txt
+> > index 7297107cf832..ffcb74ab61fd 100644
+> > --- a/Documentation/devicetree/bindings/leds/leds-pwm.txt
+> > +++ b/Documentation/devicetree/bindings/leds/leds-pwm.txt
+> > @@ -13,6 +13,9 @@ node's name represents the name of the corresponding LED.
+> >    For the pwms and pwm-names property please refer to:
+> >    Documentation/devicetree/bindings/pwm/pwm.txt
+> >  - max-brightness : Maximum brightness possible for the LED
+> > +- default-brightness : (optional) Default brightness for the LED
+> > +- active-low : (optional) For PWMs where the LED is wired to supply
+> > +  rather than ground.
+> >  - label :  (optional)
+> >    see Documentation/devicetree/bindings/leds/common.txt
+> >  - linux,default-trigger :  (optional)
+> 
+> Why remove "max-brightness", "label" and "linux,default-trigger" here?
+They are not removed, they are just unchanged list items after literal
+'-'s in the context of the patch.
 
-Reported-by: Stefan Wahren <info@lategoodbye.de>
-Signed-off-by: Michael Heimpold <mhei@heimpold.de>
----
-Changes since v1:
-- none
+Best regards
+Uwe
 
- arch/arm/boot/dts/imx28-duckbill.dts |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28-duckbill.dts b/arch/arm/boot/dts/imx28-duckbill.dts
-index a697870..91c1a9a 100644
---- a/arch/arm/boot/dts/imx28-duckbill.dts
-+++ b/arch/arm/boot/dts/imx28-duckbill.dts
-@@ -39,7 +39,7 @@
- 				hog_pins_a: hog at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--						MX28_PAD_ENET0_RX_CLK__GPIO_4_13 /* PHY Reset */
-+						MX28_PAD_SSP0_DATA7__GPIO_2_7 /* PHY Reset */
- 					>;
- 					fsl,drive-strength = <MXS_DRIVE_4mA>;
- 					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-@@ -82,7 +82,7 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mac0_pins_a>;
- 			phy-supply = <&reg_3p3v>;
--			phy-reset-gpios = <&gpio4 13 0>;
-+			phy-reset-gpios = <&gpio2 7 GPIO_ACTIVE_LOW>;
- 			phy-reset-duration = <100>;
- 			status = "okay";
- 		};
 -- 
-1.7.10.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
