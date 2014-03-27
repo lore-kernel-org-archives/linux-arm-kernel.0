@@ -1,43 +1,40 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 27 Mar 2014 15:11:30 +0000
-Subject: [PATCH V2] mm: hugetlb: Introduce huge_pte_{page,present,young}
-In-Reply-To: <1395321473-1257-1-git-send-email-steve.capper@linaro.org>
-References: <1395321473-1257-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140327151129.GA5117@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 27 Mar 2014 16:24:41 +0100
+Subject: [PATCH v2 4/5] mmc: dove: prepare new Dove DT Kconfig variable
+In-Reply-To: <20140304040357.GH1872@titan.lakedaemon.net>
+References: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393662801-17950-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140304040357.GH1872@titan.lakedaemon.net>
+Message-ID: <533442B9.80900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 01:17:53PM +0000, Steve Capper wrote:
-> Introduce huge pte versions of pte_page, pte_present and pte_young.
-> 
-> This allows ARM (without LPAE) to use alternative pte processing logic
-> for huge ptes.
-> 
-> Generic implementations that call the standard pte versions are also
-> added to asm-generic/hugetlb.h.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
-> Changed in V2 - moved from #ifndef,#define macros to entries in
-> asm-generic/hugetlb.h as it makes more sense to have these with the
-> other huge_pte_. definitions.
-> 
-> The only other architecture I can see that does not use
-> asm-generic/hugetlb.h is s390. This patch includes trivial definitions
-> for huge_pte_{page,present,young} for s390.
-> 
-> I've compile-tested this for s390, but don't have one under my desk so
-> have not been able to test it.
-> ---
->  arch/s390/include/asm/hugetlb.h | 15 +++++++++++++++
->  include/asm-generic/hugetlb.h   | 15 +++++++++++++++
->  mm/hugetlb.c                    | 22 +++++++++++-----------
->  3 files changed, 41 insertions(+), 11 deletions(-)
-> 
+On 03/04/2014 05:03 AM, Jason Cooper wrote:
+> On Sat, Mar 01, 2014 at 09:33:20AM +0100, Sebastian Hesselbarth wrote:
+>> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
+>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>> DT-only MACH_DOVE Kconfig.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>> Chris,
+>>
+>> Mark Brown requested to take the corresponding ASoC patch through
+>> his tree. Therefore, I have split the former patch into individual subsystem
+>> patches.
+>>
+>> Cc: Chris Ball <chris@printf.net>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>   drivers/mmc/host/Kconfig | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Hello,
-I was just wondering if this patch looked reasonable to people?
+Ping. Chris, can you please take it in for v3.15-rc1?
 
-Cheers,
--- 
-Steve
+Sebastian
