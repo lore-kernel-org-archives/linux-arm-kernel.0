@@ -1,45 +1,30 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 27 Mar 2014 14:24:39 +0100
-Subject: [PATCH v4] ata: fix Marvell SATA driver dependencies
-Message-ID: <13175343.U1fiIXSeHv@amdc1032>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu, 27 Mar 2014 14:27:37 +0100
+Subject: [PATCH] ARM: imx6/dt: add ccm dependency upon ckil, ckih1 and
+ osc clocks
+In-Reply-To: <CAOMZO5D+rinC8zDMGTS9ACA1nBQvy8X3PqXc7iyWToS54amesw@mail.gmail.com>
+References: <5333DA13.2080505@gmail.com>	<1395907913-23808-1-git-send-email-b.brezillon.dev@gmail.com>
+ <CAOMZO5D+rinC8zDMGTS9ACA1nBQvy8X3PqXc7iyWToS54amesw@mail.gmail.com>
+Message-ID: <53342749.6060403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sata_mv host driver depend on PCI || ARCH_DOVE || ARCH_KIRKWOOD ||
-ARCH_MV78XX0 || ARCH_MVEBU || ARCH_ORION5X config options as Marvell
-SATA support covers both Marvell PCI devices and Marvell Dove, Kirkwood,
-MV78xx0, Armada 370/XP and Orion5x SoCs (for non-PCI devices the driver
-to work requires suitable device tree node or platform device to be
-defined).  Additionally allow the driver build if COMPILE_TEST config
-option is set.
+Le 27/03/2014 12:19, Fabio Estevam a ?crit :
+> On Thu, Mar 27, 2014 at 5:11 AM, Boris BREZILLON
+> <brezillonboris@gmail.com> wrote:
+>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> Please provide a commit message, thanks.
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-v4:
-- updated patch description
-v3:
-- added dependencies for Marvel Dove and MV78xx0 
-v2:
-- resynced patch with libata/for-3.15 branch (previous patch was against
-  libata/for-next branch and SATA_MV selects GENERIC_PHY in that branch)
+This was sent as a test to verify my assumptions.
 
- drivers/ata/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+But if you want a commit message, how about this one ?
 
-Index: b/drivers/ata/Kconfig
-===================================================================
---- a/drivers/ata/Kconfig	2014-03-26 17:59:35.000000000 +0100
-+++ b/drivers/ata/Kconfig	2014-03-27 13:14:24.097787880 +0100
-@@ -281,6 +281,8 @@ config SATA_HIGHBANK
- 
- config SATA_MV
- 	tristate "Marvell SATA support"
-+	depends on PCI || ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
-+		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
- 	help
- 	  This option enables support for the Marvell Serial ATA family.
- 	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
+Define ccm clocks dependencies upon ckil, ckih1 and osc fixed clocks
+to enforce probing order.
+
+Anyway this patch is buggy (see my previous answer) and I'm not sure
+I'm one that should submit it :-).
+
+Best Regards,
+
+Boris
