@@ -1,44 +1,56 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 27 Mar 2014 09:29:53 +0100
-Subject: [PATCH resend] clk: axi-clkgen: Add support for v2
-In-Reply-To: <20140327023817.5762.48198@quantum>
-References: <1392629513-6114-1-git-send-email-lars@metafoo.de>
- <20140227010421.12081.82707@quantum> <530ED945.2050907@metafoo.de>
- <20140327023817.5762.48198@quantum>
-Message-ID: <5333E181.60607@metafoo.de>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Thu, 27 Mar 2014 09:39:04 +0100
+Subject: [PATCH] ARM: imx6/dt: add ccm dependency upon ckil, ckih1 and
+ osc clocks
+In-Reply-To: <1395907913-23808-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <5333DA13.2080505@gmail.com>
+ <1395907913-23808-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <5333E3A8.3050405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2014 03:38 AM, Mike Turquette wrote:
-> Quoting Lars-Peter Clausen (2014-02-26 22:20:53)
->> On 02/27/2014 02:04 AM, Mike Turquette wrote:
->>> Quoting Lars-Peter Clausen (2014-02-17 01:31:53)
->>>> This patch adds support for the new v2 version of the axi-clkgen core.
->>>> Unfortunately the method of accessing the registers is quite different on v2,
->>>> while the content still stays largely the same. So the patch adds a small
->>>> abstraction layer which implements the specific read and write functions for v1
->>>> and v2 in callback functions.
->>>
->>> Hi,
->>>
->>> This patch almost doubles the size of clk-axi-clkgen.c. Should it be a
->>> separate clock driver? I guess that depends on the relationship between
->>> "v1" and "v2". Are both of those versions of the clkgen core going into
->>> production?
->>
->> Hi,
->>
->> The only thing that is different between the two versions is how the PLL
->> registers are accessed. The content that is written to those register is a
->> 100% identical. So splitting it up into two drivers makes no sense, since
->> you'd have to copy&paste all the application logic. Both versions of the
->> core can be found in the wild.
+Le 27/03/2014 09:11, Boris BREZILLON a ?crit :
+> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> ---
+>   arch/arm/boot/dts/imx6qdl.dtsi |    4 ++++
+>   1 file changed, 4 insertions(+)
 >
-> Hi Lars,
->
-> I took this into clk-next some time ago but never replied to this thread
-> letting you know. Better late than never :-)
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index cfc85be..060e94c 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -62,16 +62,19 @@
+>   
+>   		ckil {
+Oops.
+You'll have to change this line into the line below in order to be able 
+to reference this clk.
 
-Yep, already saw it showing up in clk-next a while ago, thanks.
-
-- Lars
+                           ckil: ckil {
+>   			compatible = "fsl,imx-ckil", "fixed-clock";
+> +			#clock-cells = <0>;
+>   			clock-frequency = <32768>;
+>   		};
+>   
+>   		ckih1 {
+ditto
+>   			compatible = "fsl,imx-ckih1", "fixed-clock";
+> +			#clock-cells = <0>;
+>   			clock-frequency = <0>;
+>   		};
+>   
+>   		osc {
+ditto
+>   			compatible = "fsl,imx-osc", "fixed-clock";
+> +			#clock-cells = <0>;
+>   			clock-frequency = <24000000>;
+>   		};
+>   	};
+> @@ -489,6 +492,7 @@
+>   				interrupts = <0 87 IRQ_TYPE_LEVEL_HIGH>,
+>   					     <0 88 IRQ_TYPE_LEVEL_HIGH>;
+>   				#clock-cells = <1>;
+> +				clocks = <&ckil &ckih1 &osc>;
+>   			};
+>   
+>   			anatop: anatop at 020c8000 {
