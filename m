@@ -1,43 +1,55 @@
-From: john.tobias.ph@gmail.com (John Tobias)
-Date: Thu, 27 Mar 2014 13:33:56 -0700
-Subject: iMX6 GPIO input
-In-Reply-To: <CACUGKYPMJ5Cf4D61Ta_A1t6UuGL2s18V=caPS+skP8jbqnKE8Q@mail.gmail.com>
-References: <CACUGKYPMJ5Cf4D61Ta_A1t6UuGL2s18V=caPS+skP8jbqnKE8Q@mail.gmail.com>
-Message-ID: <CACUGKYObKh=ApqFrDGdQLEA+pPepMgJUvotrK+dijFCWmNJB=A@mail.gmail.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Thu, 27 Mar 2014 17:23:47 -0400
+Subject: [PATCH v3 0/3] PSCI v0.2 support and DT bindings
+Message-ID: <1395955430-26050-1-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, I found it.
-I need to set the active_low to 1 in order to return 0 or 1.
-echo 1 > /sys/class/gpio/gpio86/active_low
+This patchset adds some new functions introduced by the PSCI v0.2 spec.
+It also adds DT bindings to differentiate between PSCI v0.1 and v0.2 and
+appropriately selects the Function IDs. The third patch makes use of a
+new function, AFFINITY_INFO, added by PSCI v0.2 to ensure that CPU's
+killed after CPU_OFF are actually offlined.
 
-Regards,
+Changes in v3:
+        -       Roll up common functionality for getting conduit method.
+        -       Remove #defines for ARM32 and ARM64 in uapi/linux/psci.h
+        -       Remove functions not supported by PSCI v0.1
+        -       Misc cleanups.
+        -       Add PSCI_AFFINITY_INFO return types in uapi header.
+        -       Changed function names for PSCI v0.1 and PSCI v0.2
+        -       Added copyright info to uapi header.
+        -       Fixed args to affinity_info call.
+        -       Fix typo in psci_init definition when PSCI is not defined.
 
-john
+Changes in v2:
 
-On Thu, Mar 27, 2014 at 12:56 PM, John Tobias <john.tobias.ph@gmail.com> wrote:
-> Hello all,
->
-> I am using kernel 3.13 at the same time I pulled the latest for-next
-> of Shawn's repo. For the testing, I un-allocated the gpio3 pin 22 by
-> disabling cd-gpios = <&gpio3 22 0>;  in ushdc3 of imx6sl-evk.dts file
-> in order to export it in the userspace.
->
-> Then, I do the following in the userspace:
->
-> echo 86 > /sys/class/gpio/export
-> echo in > /sys/class/gpio/gpio86/direction
-> cat /sys/class/gpio/gpio86/value
->
-> I got 4194304 value which is correspond to gpio3 pin 22. If the SD
-> card is inserted, I got 0.
->
-> Previously, the gpio should return 1 or 0 (depending how the gpio is
-> configured). But, now it was returning a value based on bit
-> representation of the pin.
->
-> Is these a new implementation or it is a bug?
->
-> Regards,
->
-> john
+        -       Add AFFINITY_INFO and MIGRATE_INFO_TYPE functions.
+        -       Add binding Documentation.
+        -       Add function to get PSCI version.
+        -       Add common #defines in uapi/linux/psci.h
+        -       Implement cpu_kill and check if CPU is dead via AFFINITY_INFO.
+        -       Misc cleanups.
+
+Changes in v1:
+
+        -       Add new binding "arm, psci-0.2"
+        -       Separate conduit and PSCI function assignment methods.
+
+
+Ashwin Chaugule (3):
+  PSCI: Add initial support for PSCIv0.2 functions
+  Documentation: devicetree: Add new binding for PSCIv0.2
+  ARM: Check if a CPU has gone offline
+
+ Documentation/devicetree/bindings/arm/psci.txt |  35 +++++-
+ arch/arm/include/asm/psci.h                    |   7 +-
+ arch/arm/kernel/psci.c                         | 151 ++++++++++++++++++++----
+ arch/arm/kernel/psci_smp.c                     |  21 ++++
+ arch/arm64/kernel/psci.c                       | 154 +++++++++++++++++++++----
+ include/uapi/linux/psci.h                      |  45 ++++++++
+ 6 files changed, 367 insertions(+), 46 deletions(-)
+ create mode 100644 include/uapi/linux/psci.h
+
+-- 
+1.8.3.2
