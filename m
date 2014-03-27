@@ -1,58 +1,43 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 27 Mar 2014 16:18:43 +0100
-Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
-In-Reply-To: <53341ADF.2050904@linaro.org>
-References: <1395738060-18489-1-git-send-email-hanjun.guo@linaro.org>
- <5334078A.9010408@arm.com> <53341ADF.2050904@linaro.org>
-Message-ID: <2765234.k5FCzWzCDz@vostro.rjw.lan>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 27 Mar 2014 15:11:30 +0000
+Subject: [PATCH V2] mm: hugetlb: Introduce huge_pte_{page,present,young}
+In-Reply-To: <1395321473-1257-1-git-send-email-steve.capper@linaro.org>
+References: <1395321473-1257-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140327151129.GA5117@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 27, 2014 08:34:39 PM Hanjun Guo wrote:
-> On 2014-3-27 19:12, Sudeep Holla wrote:
-> > Hi Hanjun,
-> > 
-> > On 25/03/14 11:09, Hanjun Guo wrote:
-> >> Hi Sudeep,
-> >>
-> >> On 2014-3-25 18:00, Sudeep Holla wrote:
-> >>> Hi Hanjun,
-> >>>
-> >>> On 25/03/14 09:00, Hanjun Guo wrote:
-> >>>> After commit 74397174989e5 (arm64: Fix duplicated Kconfig entries),
-> >>>> I still get a duplicate Power management options section in linux-next
-> >>>> git repo, may be due to some merge conflicts, anyway, fix that in this
-> >>>> patch.
-> >>>>
-> >>> I reported this and Mark Brown posted the patch[1].
-> >>> I assumed it is already pulled, but looks like that's not the case.
-> >> [...]
-> >>> [1] http://www.spinics.net/lists/arm-kernel/msg314472.html
-> > 
-> > [...]
-> > 
-> >> here is the link:
-> >> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm64/Kconfig
-> >>
-> > 
-> > Just had a look at the linux-next tree and looks like the original commit:
-> > "cpufreq: enable ARM drivers on arm64" is pulled by both Catalin and Rafael
-> > which has resulted in the fixup patch[1] not removing the duplicate entry
-> > cleanly.
-> > 
-> > If not too late it better to ask either Rafael or Catalin to drop both patches
-> > from their tree, instead of creating 4 patches in total to enable cpufreq :)
+On Thu, Mar 20, 2014 at 01:17:53PM +0000, Steve Capper wrote:
+> Introduce huge pte versions of pte_page, pte_present and pte_young.
 > 
-> Rafael is on vacation now.
+> This allows ARM (without LPAE) to use alternative pte processing logic
+> for huge ptes.
 > 
-> Catalin, could you please handle this?
+> Generic implementations that call the standard pte versions are also
+> added to asm-generic/hugetlb.h.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+> Changed in V2 - moved from #ifndef,#define macros to entries in
+> asm-generic/hugetlb.h as it makes more sense to have these with the
+> other huge_pte_. definitions.
+> 
+> The only other architecture I can see that does not use
+> asm-generic/hugetlb.h is s390. This patch includes trivial definitions
+> for huge_pte_{page,present,young} for s390.
+> 
+> I've compile-tested this for s390, but don't have one under my desk so
+> have not been able to test it.
+> ---
+>  arch/s390/include/asm/hugetlb.h | 15 +++++++++++++++
+>  include/asm-generic/hugetlb.h   | 15 +++++++++++++++
+>  mm/hugetlb.c                    | 22 +++++++++++-----------
+>  3 files changed, 41 insertions(+), 11 deletions(-)
+> 
 
-Well, not really, I'm at a conference now.
+Hello,
+I was just wondering if this patch looked reasonable to people?
 
-Anyway, I'd rather not drop anything, but if you send me a revert, I can apply it.
-
-Thanks!
-
+Cheers,
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Steve
