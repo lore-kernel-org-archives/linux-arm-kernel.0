@@ -1,42 +1,81 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu, 27 Mar 2014 22:29:23 +0100
-Subject: [PATCH v3 09/10] ARM: sunxi: Add AXP20x support in defconfig
+Date: Thu, 27 Mar 2014 22:29:21 +0100
+Subject: [PATCH v3 07/10] ARM: sunxi: dt: Add x-powers-axp209.dtsi file
 In-Reply-To: <1395955764-18103-1-git-send-email-carlo@caione.org>
 References: <1395955764-18103-1-git-send-email-carlo@caione.org>
-Message-ID: <1395955764-18103-10-git-send-email-carlo@caione.org>
+Message-ID: <1395955764-18103-8-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This dtsi describes the axp209 PMIC, and is to be included from inside
+the i2c controller node to which the axp209 is connected.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- arch/arm/configs/sunxi_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/x-powers-axp209.dtsi | 54 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+ create mode 100644 arch/arm/boot/dts/x-powers-axp209.dtsi
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index b5df4a5..6e305da 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -40,6 +40,8 @@ CONFIG_SUN4I_EMAC=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_WLAN is not set
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_AXP20X_PEK=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=8
-@@ -55,6 +57,7 @@ CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
-+CONFIG_MFD_AXP20X=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -69,3 +72,4 @@ CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_REGULATOR_AXP20X=y
+diff --git a/arch/arm/boot/dts/x-powers-axp209.dtsi b/arch/arm/boot/dts/x-powers-axp209.dtsi
+new file mode 100644
+index 0000000..b05e54d
+--- /dev/null
++++ b/arch/arm/boot/dts/x-powers-axp209.dtsi
+@@ -0,0 +1,54 @@
++/*
++ * x-powers,axp209 common code to be include from inside the axp209 node
++ *
++ * Copyright 2014 - Carlo Caione <carlo@caione.org>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++regulators {
++	dcdc-freq = <1500>;
++
++	axp_dcdc2: dcdc2 {
++		regulator-min-microvolt = <700000>;
++		regulator-max-microvolt = <2275000>;
++		regulator-always-on;
++	};
++
++	axp_dcdc3: dcdc3 {
++		regulator-min-microvolt = <700000>;
++		regulator-max-microvolt = <3500000>;
++		regulator-always-on;
++	};
++
++	axp_ldo1: ldo1 {
++		regulator-min-microvolt = <1300000>;
++		regulator-max-microvolt = <1300000>;
++	};
++
++	axp_ldo2: ldo2 {
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	axp_ldo3: ldo3 {
++		regulator-min-microvolt = <700000>;
++		regulator-max-microvolt = <3500000>;
++	};
++
++	axp_ldo4: ldo4 {
++		regulator-min-microvolt = <1250000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	axp_ldo5: ldo5 {
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++	};
++};
 -- 
 1.8.3.2
