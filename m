@@ -1,78 +1,40 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Thu, 27 Mar 2014 11:38:34 -0400
-Subject: [PATCH v2 2/3] Documentation: devicetree: Add new binding for PSCIv0.2
-In-Reply-To: <1395934715-31348-1-git-send-email-ashwin.chaugule@linaro.org>
-References: <1395934715-31348-1-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <1395934715-31348-2-git-send-email-ashwin.chaugule@linaro.org>
+From: gcembed@gmail.com (=?UTF-8?B?R2HDq3RhbiBDYXJsaWVy?=)
+Date: Thu, 27 Mar 2014 16:40:48 +0100
+Subject: [PATCH 1/1] ARM: imx: Add DTSC02 platform (i.MX27)
+In-Reply-To: <CAOMZO5AwfrXVoZfCKFQHBTDcUm4cfAVVX6fJabY0_S0gtbX_eQ@mail.gmail.com>
+References: <1395934153-19416-1-git-send-email-gcembed@gmail.com>
+ <CAOMZO5AwfrXVoZfCKFQHBTDcUm4cfAVVX6fJabY0_S0gtbX_eQ@mail.gmail.com>
+Message-ID: <53344680.6080800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PSCI v0.2+ spec defines standard values for PSCI function IDs.
-Add a new binding entry so that pre v0.2 implementations can
-use DT entries for function IDs and v0.2+ implementations use
-standard entries as defined by the PSCIv0.2 specification.
-
-Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
----
- Documentation/devicetree/bindings/arm/psci.txt | 35 +++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index 433afe9..d01a90b 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -21,7 +21,15 @@ to #0.
- 
- Main node required properties:
- 
-- - compatible    : Must be "arm,psci"
-+ - compatible    : should contain at least one of:
-+
-+				 * "arm,psci" : for implementations complying to PSCI versions prior to
-+					0.2. For these cases function IDs must be provided.
-+
-+				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-+					IDs are not required and should be ignored by an OS with PSCI 0.2
-+					support, but are permitted to be present for compatibility with
-+					existing software when "arm,psci" is later in the compatible list.
- 
-  - method        : The method of calling the PSCI firmware. Permitted
-                    values are:
-@@ -45,6 +53,8 @@ Main node optional properties:
- 
- Example:
- 
-+Case 1: PSCI v0.1 only.
-+
- 	psci {
- 		compatible	= "arm,psci";
- 		method		= "smc";
-@@ -53,3 +63,26 @@ Example:
- 		cpu_on		= <0x95c10002>;
- 		migrate		= <0x95c10003>;
- 	};
-+
-+
-+Case 2: PSCI v0.2 only
-+
-+	psci {
-+		compatible	= "arm,psci-0.2";
-+		method		= "smc";
-+	};
-+
-+Case 3: PSCI v0.2 and PSCI v0.1.
-+
-+	As described above, for compatibility with existing kernels, the
-+	hypervisor will likely want to provide IDs, e.g.
-+
-+	psci {
-+		compatible = "arm,psci-0.2", "arm,psci";
-+		method = "hvc";
-+
-+		cpu_on = < arbitrary value >;
-+		cpu_off = < arbitrary value >;
-+
-+		...
-+	};
--- 
-1.8.3.2
+Hi Fabio,
+On 03/27/2014 04:35 PM, Fabio Estevam wrote:
+> Hi Ga?tan,
+>
+> On Thu, Mar 27, 2014 at 12:29 PM, Ga?tan Carlier <gcembed@gmail.com> wrote:
+>>
+>> Signed-off-by: Ga?tan Carlier <gcembed@gmail.com>
+>> ---
+>>   arch/arm/mach-imx/Kconfig       |   17 ++
+>>   arch/arm/mach-imx/Makefile      |    1 +
+>>   arch/arm/mach-imx/mach-dtsc02.c |  416 +++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 434 insertions(+), 0 deletions(-)
+>>   create mode 100644 arch/arm/mach-imx/mach-dtsc02.c
+>
+> My understanding is that new board files are not allowed for ARM.
+>
+> Have you considered creating a device tree implementation instead?
+>
+>  From a quick look, all the devices you are registering are currently
+> supported on device tree.
+Later, I will add emma-pp, emma-prp, sound which is actually not working 
+(error related to DMA coherent in ssi driver), coda. I will check how 
+device tree works.
+>
+> Regards,
+>
+> Fabio Estevam
+>
+Thanks.
+Ga?tan Carlier.
