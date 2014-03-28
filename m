@@ -1,38 +1,46 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Mar 2014 17:25:50 +0100
-Subject: [PATCH 1/2] ARM: dt-binding: fix GIC example
-Message-ID: <1396023951-32383-1-git-send-email-l.stach@pengutronix.de>
+From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
+Date: Fri, 28 Mar 2014 17:28:05 +0100
+Subject: [PATCH V2] mm: hugetlb: Introduce huge_pte_{page,present,young}
+In-Reply-To: <20140327151129.GA5117@linaro.org>
+References: <1395321473-1257-1-git-send-email-steve.capper@linaro.org>
+ <20140327151129.GA5117@linaro.org>
+Message-ID: <20140328172805.67f9ea0b@thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tim Harvey <tharvey@gateworks.com>
+On Thu, 27 Mar 2014 15:11:30 +0000
+Steve Capper <steve.capper@linaro.org> wrote:
 
-When using interrupt-maps, the size of a map entry is #address-cells +
-address-cells should be 0 as this is not used.
+> On Thu, Mar 20, 2014 at 01:17:53PM +0000, Steve Capper wrote:
+> > Introduce huge pte versions of pte_page, pte_present and pte_young.
+> > 
+> > This allows ARM (without LPAE) to use alternative pte processing logic
+> > for huge ptes.
+> > 
+> > Generic implementations that call the standard pte versions are also
+> > added to asm-generic/hugetlb.h.
+> > 
+> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > ---
+> > Changed in V2 - moved from #ifndef,#define macros to entries in
+> > asm-generic/hugetlb.h as it makes more sense to have these with the
+> > other huge_pte_. definitions.
+> > 
+> > The only other architecture I can see that does not use
+> > asm-generic/hugetlb.h is s390. This patch includes trivial definitions
+> > for huge_pte_{page,present,young} for s390.
+> > 
+> > I've compile-tested this for s390, but don't have one under my desk so
+> > have not been able to test it.
+> > ---
+> >  arch/s390/include/asm/hugetlb.h | 15 +++++++++++++++
+> >  include/asm-generic/hugetlb.h   | 15 +++++++++++++++
+> >  mm/hugetlb.c                    | 22 +++++++++++-----------
+> >  3 files changed, 41 insertions(+), 11 deletions(-)
+> > 
+> 
+> Hello,
+> I was just wondering if this patch looked reasonable to people?
 
-As #address-cells = <0> is the same as not specifying the
-property, simply remove it.
-
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-v2 lst:
-- completely remove the property
----
- Documentation/devicetree/bindings/arm/gic.txt | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index bae0d87a38b2..42ab3b28a266 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -55,7 +55,6 @@ Example:
- 	intc: interrupt-controller at fff11000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--		#address-cells = <1>;
- 		interrupt-controller;
- 		reg = <0xfff11000 0x1000>,
- 		      <0xfff10100 0x100>;
--- 
-1.9.0
+Looks good, and I also tested it on s390, so for the s390 part:
+Acked-by: Gerald Schaefer <gerald.schaefer@de.ibm.com>
