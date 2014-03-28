@@ -1,105 +1,105 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 28 Mar 2014 14:06:57 +0100
-Subject: [PATCH 01/10] ARM: mvebu: move Armada XP specific SMP initialization
- to platsmp.c
+Date: Fri, 28 Mar 2014 14:07:00 +0100
+Subject: [PATCH 04/10] ARM: mvebu: add Armada 375/38x support in cpu-reset
 In-Reply-To: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396012026-5997-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396012026-5997-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pmsu.c driver contained an armada_xp_boot_cpu() function that sets
-the boot address of a secondary CPUs and deasserts the reset. However,
-the Armada 375 needs a slightly different logic, so it makes more
-sense to move this code into the Armada XP specific platsmp.c.
-
-In order to achieve this, the mvebu_pmsu_set_cpu_boot_addr() function
-is exported. It will be needed for both the Armada XP and Armada 38x
-SMP implementations.
+This commit adds new compatible strings for the Armada 375 and Armada
+38x SOCs to the cpu-reset code of mach-mvebu. It will allow the
+upcoming SMP support for these SOCs to start the secondary CPUs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/common.h  |  1 +
- arch/arm/mach-mvebu/platsmp.c | 10 +++++++++-
- arch/arm/mach-mvebu/pmsu.c    | 26 +-------------------------
- 3 files changed, 11 insertions(+), 26 deletions(-)
+ .../devicetree/bindings/arm/armada-cpu-reset.txt       |  2 ++
+ arch/arm/mach-mvebu/armada-375.h                       | 18 ++++++++++++++++++
+ arch/arm/mach-mvebu/armada-380.h                       | 18 ++++++++++++++++++
+ arch/arm/mach-mvebu/cpu-reset.c                        |  4 ++++
+ 4 files changed, 42 insertions(+)
+ create mode 100644 arch/arm/mach-mvebu/armada-375.h
+ create mode 100644 arch/arm/mach-mvebu/armada-380.h
 
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index cfb129b..2b88eb0 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -19,6 +19,7 @@
+diff --git a/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt b/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+index 384cbf8..27e70df 100644
+--- a/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
++++ b/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+@@ -7,6 +7,8 @@ Required properties:
+   values are:
+     marvell,armada-370-cpu-reset
+     marvell,armada-xp-cpu-reset
++    marvell,armada-375-cpu-reset
++    marvell,armada-380-cpu-reset
  
- void mvebu_restart(enum reboot_mode mode, const char *cmd);
- int mvebu_cpu_reset_deassert(int cpu);
-+void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
- 
- void armada_xp_cpu_die(unsigned int cpu);
- 
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index a6da03f..e98075f 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -77,9 +77,17 @@ static void armada_xp_secondary_init(unsigned int cpu)
- 
- static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	int ret, hw_cpu;
+ - reg: should be register base and length as documented in the
+   datasheet for the CPU reset registers
+diff --git a/arch/arm/mach-mvebu/armada-375.h b/arch/arm/mach-mvebu/armada-375.h
+new file mode 100644
+index 0000000..3da7575
+--- /dev/null
++++ b/arch/arm/mach-mvebu/armada-375.h
+@@ -0,0 +1,18 @@
++/*
++ * Generic definitions for Marvell Armada 375 SoCs
++ *
++ * Copyright (C) 2014 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
- 	pr_info("Booting CPU %d\n", cpu);
++#ifndef __MACH_ARMADA_375_H
++#define __MACH_ARMADA_375_H
++
++#define ARMADA_375_MAX_CPUS 2
++
++#endif /* __MACH_ARMADA_375_H */
+diff --git a/arch/arm/mach-mvebu/armada-380.h b/arch/arm/mach-mvebu/armada-380.h
+new file mode 100644
+index 0000000..fdfc34f
+--- /dev/null
++++ b/arch/arm/mach-mvebu/armada-380.h
+@@ -0,0 +1,18 @@
++/*
++ * Generic definitions for Marvell Armada 38x SoCs
++ *
++ * Copyright (C) 2014 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_ARMADA_38X_H
++#define __MACH_ARMADA_38X_H
++
++#define ARMADA_380_MAX_CPUS 2
++
++#endif /* __MACH_ARMADA_38X_H */
+diff --git a/arch/arm/mach-mvebu/cpu-reset.c b/arch/arm/mach-mvebu/cpu-reset.c
+index e3821b1..8b84c94 100644
+--- a/arch/arm/mach-mvebu/cpu-reset.c
++++ b/arch/arm/mach-mvebu/cpu-reset.c
+@@ -16,10 +16,14 @@
+ #include <linux/io.h>
+ #include <linux/resource.h>
+ #include "armada-370-xp.h"
++#include "armada-375.h"
++#include "armada-380.h"
  
--	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
-+	hw_cpu = cpu_logical_map(cpu);
-+	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_xp_secondary_startup);
-+	ret = mvebu_cpu_reset_deassert(hw_cpu);
-+	if (ret) {
-+		pr_warn("unable to boot CPU: %d\n", ret);
-+		return ret;
-+	}
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 8361281..a1508de 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -41,36 +41,12 @@ static struct of_device_id of_pmsu_table[] = {
+ static struct of_device_id of_cpu_reset_table[] = {
+ 	{.compatible = "marvell,armada-370-cpu-reset", .data = (void*) ARMADA_370_MAX_CPUS },
+ 	{.compatible = "marvell,armada-xp-cpu-reset",  .data = (void*) ARMADA_XP_MAX_CPUS },
++	{.compatible = "marvell,armada-375-cpu-reset", .data = (void*) ARMADA_375_MAX_CPUS },
++	{.compatible = "marvell,armada-380-cpu-reset", .data = (void*) ARMADA_380_MAX_CPUS },
  	{ /* end of list */ },
  };
  
--static void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
-+void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
- {
- 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
- 		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
- }
- 
--#ifdef CONFIG_SMP
--int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
--{
--	int hw_cpu, ret;
--
--	if (!pmsu_mp_base) {
--		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
--		return -ENODEV;
--	}
--
--	hw_cpu = cpu_logical_map(cpu_id);
--
--	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, boot_addr);
--
--	ret = mvebu_cpu_reset_deassert(hw_cpu);
--	if (ret) {
--		pr_warn("unable to boot CPU: %d\n", ret);
--		return ret;
--	}
--
--	return 0;
--}
--#endif
--
- static int __init armada_370_xp_pmsu_init(void)
- {
- 	struct device_node *np;
 -- 
 1.8.3.2
