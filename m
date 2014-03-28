@@ -1,26 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Mar 2014 15:56:30 +0000
-Subject: [PATCH 05/75] ARM: l2c: remove unnecessary UL-suffix to mask
- values
-In-Reply-To: <CAL_Jsq+qaQ=CtqMKbd5Fcp1YAY+E40mS24kWe8RMwb2Bz1A9kQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Mar 2014 09:00:48 -0700
+Subject: [PATCH 49/75] ARM: l2c: fix register naming
+In-Reply-To: <E1WTYYH-0007GB-3M@rmk-PC.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYUW-0004WD-UP@rmk-PC.arm.linux.org.uk>
- <CAL_Jsq+qaQ=CtqMKbd5Fcp1YAY+E40mS24kWe8RMwb2Bz1A9kQ@mail.gmail.com>
-Message-ID: <20140328155630.GM7528@n2100.arm.linux.org.uk>
+ <E1WTYYH-0007GB-3M@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140328160047.GD24308@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 10:50:32AM -0500, Rob Herring wrote:
-> What about changing these callers to use l2x0_of_init(void) and
-> creating l2x0_of_init_legacy(val, mask) for ones that need the aux
-> ctrl setup? We do want to encourage people to either setup aux ctrl in
-> the bootloader or via DT properties.
+* Russell King <rmk+kernel@arm.linux.org.uk> [140328 08:22]:
+> We have a mixture of different devices with different register layouts,
+> but we group all the bits together in an opaque mess.  Split them out
+> into those which are L2C-310 specific and ones which refer to earlier
+> devices.  Provide full auxiliary control register definitions.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I have thought about that, but let's first sort out what platforms need.
-It sounds like some platforms really do need to manipulate the register,
-some really need to do it to have a functional setup because they never
-set the hardware configuration of the cache size.
+Acked-by: Tony Lindgren <tony@atomide.com>
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -212,15 +212,15 @@ static int __init omap_l2_cache_init(void)
+>  		return -ENOMEM;
+>  
+>  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+> -	aux_ctrl = (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
+> -			(0x1 << 25) |
+> -			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
+> -			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT)) |
+> -			(0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
+> -			(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
+> -			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
+> -			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
+> -			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT);
+> +	aux_ctrl = L310_AUX_CTRL_ASSOCIATIVITY_16 |
+> +		   L310_AUX_CTRL_CACHE_REPLACE_RR |
+> +		   L310_AUX_CTRL_NS_LOCKDOWN |
+> +		   L310_AUX_CTRL_NS_INT_CTRL |
+> +		   L2C_AUX_CTRL_WAY_SIZE(3) |
+> +		   L2C_AUX_CTRL_SHARED_OVERRIDE |
+> +		   L310_AUX_CTRL_DATA_PREFETCH |
+> +		   L310_AUX_CTRL_INSTR_PREFETCH |
+> +		   L310_AUX_CTRL_EARLY_BRESP;
+
+I guess eventually we can set up some common configuration mask
+define for these kind of things?
+
+Regards,
+
+Tony
