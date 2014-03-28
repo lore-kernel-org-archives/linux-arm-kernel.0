@@ -1,103 +1,105 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 28 Mar 2014 14:06:56 +0100
-Subject: [PATCH 00/10] SMP support for Armada 375 and 38x
-Message-ID: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 28 Mar 2014 14:06:57 +0100
+Subject: [PATCH 01/10] ARM: mvebu: move Armada XP specific SMP initialization
+ to platsmp.c
+In-Reply-To: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396012026-5997-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Andrew, Gregory, Sebastian,
+The pmsu.c driver contained an armada_xp_boot_cpu() function that sets
+the boot address of a secondary CPUs and deasserts the reset. However,
+the Armada 375 needs a slightly different logic, so it makes more
+sense to move this code into the Armada XP specific platsmp.c.
 
-This patch series adds SMP support for the Armada 375 and 38x. Most of
-the patches are fairly straight-forward, but here is a short overview
-of what's going on:
+In order to achieve this, the mvebu_pmsu_set_cpu_boot_addr() function
+is exported. It will be needed for both the Armada XP and Armada 38x
+SMP implementations.
 
- * Patches 1, 2, 3 make some preparatory clean-ups. Actually, patches
-   2 and 3 are not directly related to adding Armada 375 and 38x SMP
-   support, but they are related to the SMP support of Armada XP.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/common.h  |  1 +
+ arch/arm/mach-mvebu/platsmp.c | 10 +++++++++-
+ arch/arm/mach-mvebu/pmsu.c    | 26 +-------------------------
+ 3 files changed, 11 insertions(+), 26 deletions(-)
 
- * Patches 4, 5 and 6 add a few bits needed for the SMP support.
-
- * Patch 7 is adding the SMP support itself. Since both Armada 375 and
-   38x are Cortex-A9, their SMP logic is fairly similar, the only
-   difference being how to define the boot address of the secondary
-   CPU. Therefore, we've used a single smp_operations implementation.
-
- * Patch 8 add a workaround for a SMP booting bug affecting Armada 375
-   Z1 stepping. It requires using the Crypto SRAM loaded with a few
-   instructions of code as a replacement of the BootROM for booting
-   the secondary processor. For now, the workaround is unconditionally
-   applied on all Armada 375 platforms, but as soon as we get access
-   to more recent platforms, we'll add a mvebu-soc-id based test to
-   only enable the workaround if needed.
-
- * Patch 9 and 10 add the necessary Device Tree bits to enable SMP on
-   Armada 375 and 38x.
-
-In terms of dependencies, we will have 4 interconnected patch series:
-Armada 375/38x coherency support, the PMSU rework series, the cpuidle
-series, and this Armada 375/38x SMP support series. The relations are
-as follows
-
-  ---------------        ---------------------
-  | pmsu-rework |        | 375/38x coherency |
-  ---------------        ---------------------
-        ||   ||                 ||
-	||   \\____________     ||
-	\/                \/    \/
-  ---------------        ---------------
-  |   cpuidle   |        | 375/38x SMP |
-  ---------------        ---------------
-
-In other words, this 375/38x SMP support series needs *both* the
-375/38x coherency patch series to be applied, and the pmsu-rework to
-be applied.
-
-If needed, I can merge the 375/38x coherency and 375/38x SMP support
-together, but I believe shorter patch series are easier to
-review. Just let me know what works best for you.
-
-Thanks!
-
-Thomas
-
-Gregory CLEMENT (4):
-  ARM: mvebu: add function to set the resume boot address for Armada 375
-  ARM: mvebu: add SMP support for Armada 375 and Armada 38x
-  ARM: mvebu: add workaround for SMP support for Armada 375 stepping Z1
-  ARM: mvebu: add SMP support in the Armada 375 device tree
-
-Thomas Petazzoni (6):
-  ARM: mvebu: move Armada XP specific SMP initialization to platsmp.c
-  irqchip: irq-armada-370-xp: do the set_smp_cross_call() in the driver
-  irqchip: irq-armada-370-xp: use cpu notifier to initialize secondary
-    CPUs
-  ARM: mvebu: add Armada 375/38x support in cpu-reset
-  ARM: mvebu: add Armada 38x compatible string to pmsu
-  ARM: mvebu: add SMP support in the Armada 38x device tree
-
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |  9 +-
- .../devicetree/bindings/arm/armada-cpu-reset.txt   |  2 +
- arch/arm/boot/dts/armada-375.dtsi                  |  5 ++
- arch/arm/boot/dts/armada-38x.dtsi                  | 10 +++
- arch/arm/mach-mvebu/Kconfig                        |  4 +
- arch/arm/mach-mvebu/Makefile                       |  2 +-
- arch/arm/mach-mvebu/armada-370-xp.h                |  2 -
- arch/arm/mach-mvebu/armada-375.h                   | 18 ++++
- arch/arm/mach-mvebu/armada-380.h                   | 18 ++++
- arch/arm/mach-mvebu/board-v7.c                     |  2 +
- arch/arm/mach-mvebu/common.h                       |  6 ++
- arch/arm/mach-mvebu/cpu-reset.c                    |  4 +
- arch/arm/mach-mvebu/headsmp-a9.S                   | 34 ++++++++
- arch/arm/mach-mvebu/platsmp-a9.c                   | 95 ++++++++++++++++++++++
- arch/arm/mach-mvebu/platsmp.c                      | 18 ++--
- arch/arm/mach-mvebu/pmsu.c                         | 27 +-----
- arch/arm/mach-mvebu/system-controller.c            | 15 +++-
- drivers/irqchip/irq-armada-370-xp.c                | 24 +++++-
- 18 files changed, 252 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm/mach-mvebu/armada-375.h
- create mode 100644 arch/arm/mach-mvebu/armada-380.h
- create mode 100644 arch/arm/mach-mvebu/headsmp-a9.S
- create mode 100644 arch/arm/mach-mvebu/platsmp-a9.c
-
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index cfb129b..2b88eb0 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -19,6 +19,7 @@
+ 
+ void mvebu_restart(enum reboot_mode mode, const char *cmd);
+ int mvebu_cpu_reset_deassert(int cpu);
++void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
+ 
+ void armada_xp_cpu_die(unsigned int cpu);
+ 
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index a6da03f..e98075f 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -77,9 +77,17 @@ static void armada_xp_secondary_init(unsigned int cpu)
+ 
+ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
++	int ret, hw_cpu;
++
+ 	pr_info("Booting CPU %d\n", cpu);
+ 
+-	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
++	hw_cpu = cpu_logical_map(cpu);
++	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_xp_secondary_startup);
++	ret = mvebu_cpu_reset_deassert(hw_cpu);
++	if (ret) {
++		pr_warn("unable to boot CPU: %d\n", ret);
++		return ret;
++	}
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 8361281..a1508de 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -41,36 +41,12 @@ static struct of_device_id of_pmsu_table[] = {
+ 	{ /* end of list */ },
+ };
+ 
+-static void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
++void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+ {
+ 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
+ 		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
+ }
+ 
+-#ifdef CONFIG_SMP
+-int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+-{
+-	int hw_cpu, ret;
+-
+-	if (!pmsu_mp_base) {
+-		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
+-		return -ENODEV;
+-	}
+-
+-	hw_cpu = cpu_logical_map(cpu_id);
+-
+-	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, boot_addr);
+-
+-	ret = mvebu_cpu_reset_deassert(hw_cpu);
+-	if (ret) {
+-		pr_warn("unable to boot CPU: %d\n", ret);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-#endif
+-
+ static int __init armada_370_xp_pmsu_init(void)
+ {
+ 	struct device_node *np;
 -- 
 1.8.3.2
