@@ -1,34 +1,78 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Mar 2014 17:52:56 +0100
-Subject: [PATCH 5/8] PCI: imx6: drop old irq mapping
+Date: Fri, 28 Mar 2014 17:52:59 +0100
+Subject: [PATCH 8/8] PCI: imx6: add support for MSI
 In-Reply-To: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
 References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1396025579-14344-6-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1396025579-14344-9-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need this anymore. The irqs are now
-properly mapped through the DT.
+This patch adds support for Message Signaled Interrupts in the
+imx6-pcie driver.
 
+Signed-off-by: Harro Haan <hrhaan@gmail.com>
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/pci/host/pci-imx6.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/pci/host/pci-imx6.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 71730bbcd9a2..259a73687526 100644
+index 4c20fc4795e5..41008b7804f9 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -483,12 +483,6 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
+@@ -25,6 +25,7 @@
+ #include <linux/resource.h>
+ #include <linux/signal.h>
+ #include <linux/types.h>
++#include <linux/interrupt.h>
+ 
+ #include "pcie-designware.h"
+ 
+@@ -314,6 +315,13 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
+ 	return 0;
+ }
+ 
++static irqreturn_t imx6_pcie_msi_handler(int irq, void *arg)
++{
++	struct pcie_port *pp = arg;
++
++	return dw_handle_msi_irq(pp);
++}
++
+ static int imx6_pcie_start_link(struct pcie_port *pp)
+ {
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+@@ -388,6 +396,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 	dw_pcie_setup_rc(pp);
+ 
+ 	imx6_pcie_start_link(pp);
++
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		dw_pcie_msi_init(pp);
+ }
+ 
+ static void imx6_pcie_reset_phy(struct pcie_port *pp)
+@@ -477,6 +488,22 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
  {
  	int ret;
  
--	pp->irq = platform_get_irq(pdev, 0);
--	if (!pp->irq) {
--		dev_err(&pdev->dev, "failed to get irq\n");
--		return -ENODEV;
--	}
--
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
++		if (pp->msi_irq <= 0) {
++			dev_err(&pdev->dev, "failed to get MSI irq\n");
++			return -ENODEV;
++		}
++
++		ret = devm_request_irq(&pdev->dev, pp->msi_irq,
++		                       imx6_pcie_msi_handler,
++		                       IRQF_SHARED, "mx6-pcie-msi", pp);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to request MSI irq\n");
++			return -ENODEV;
++		}
++	}
++
  	pp->root_bus_nr = -1;
  	pp->ops = &imx6_pcie_host_ops;
  
