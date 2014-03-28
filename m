@@ -1,60 +1,56 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 28 Mar 2014 17:53:42 +0900
-Subject: [GIT PULL 1/2] Samsung 2nd cleanup for v3.15
-In-Reply-To: <53285457.80900@samsung.com>
-References: <53285457.80900@samsung.com>
-Message-ID: <021f01cf4a63$3876c800$a9645800$@samsung.com>
+Date: Fri, 28 Mar 2014 17:54:35 +0900
+Subject: [GIT PULL 1/4] Samsung 3rd cleanup for v3.15
+In-Reply-To: <532B6BDC.6040806@samsung.com>
+References: <532B6BDC.6040806@samsung.com>
+Message-ID: <022001cf4a63$57f4c330$07de4990$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kukjin Kim wrote:
 > 
 > The following changes since commit
-> d9671ca923445aa870ecc34df3db01dd602d87fc:
-> 
->    ARM: EXYNOS: Remove uncompress.h (2014-02-24 09:39:18 +0900)
-> 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-cleanup-2
-> 
-> for you to fetch changes up to 19a964644f1e655c3f67d539c1e99a9fbcc4588c:
+> 19a964644f1e655c3f67d539c1e99a9fbcc4588c:
 > 
 >    ARM: SAMSUNG: remove all custom uncompress.h (2014-03-11 22:05:18
 +0900)
 > 
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-cleanup-3
+> 
+> for you to fetch changes up to 1aa9c483d1be13831bc4e516ce4848d32ac3e944:
+> 
+>    ARM: EXYNOS: Remove hardware.h file (2014-03-21 04:49:03 +0900)
+> 
 > ----------------------------------------------------------------
-> Samsung cleanup-2 for v3.15
-> - use generic uncompress.h and remove all custom
->    uncompress.h in mach-s3c24xx, s3c64xx, s5p64x0,
->    s5pc100, s5pv210 and plat-samsung directories.
+> Samsung 3rd cleanup for v3.15
 > 
-> Note that based on previous tags/samsung-cleanup
+> - Remove <mach/hardware.h> in mach-exynos
+> - Remove invalid code from <mach/hardware.h> in mach-s3c24xx
+> 
+> Note that this is based on previous tags/samsung-cleanup-2
 > 
 > ----------------------------------------------------------------
-> Heiko Stuebner (2):
->        ARM: SAMSUNG: use generic uncompress.h
->        ARM: SAMSUNG: remove all custom uncompress.h
+> Sachin Kamat (3):
+>        ARM: S3C24XX: Remove invalid code from hardware.h
+>        ARM: SAMSUNG: Remove hardware.h inclusion
+>        ARM: EXYNOS: Remove hardware.h file
 > 
->   arch/arm/Kconfig.debug                          |   4 +-
->   arch/arm/mach-s3c24xx/include/mach/uncompress.h |  57 --------
->   arch/arm/mach-s3c64xx/include/mach/uncompress.h |  31 -----
->   arch/arm/mach-s5p64x0/include/mach/uncompress.h |  34 -----
->   arch/arm/mach-s5pc100/include/mach/uncompress.h |  30 ----
->   arch/arm/mach-s5pv210/include/mach/uncompress.h |  28 ----
->   arch/arm/plat-samsung/include/plat/uncompress.h | 175
-> ------------------------
->   7 files changed, 2 insertions(+), 357 deletions(-)
->   delete mode 100644 arch/arm/mach-s3c24xx/include/mach/uncompress.h
->   delete mode 100644 arch/arm/mach-s3c64xx/include/mach/uncompress.h
->   delete mode 100644 arch/arm/mach-s5p64x0/include/mach/uncompress.h
->   delete mode 100644 arch/arm/mach-s5pc100/include/mach/uncompress.h
->   delete mode 100644 arch/arm/mach-s5pv210/include/mach/uncompress.h
->   delete mode 100644 arch/arm/plat-samsung/include/plat/uncompress.h
+>   arch/arm/mach-exynos/include/mach/hardware.h  | 18 ------------------
+>   arch/arm/mach-exynos/platsmp.c                |  2 --
+>   arch/arm/mach-s3c24xx/include/mach/hardware.h | 14 +-------------
+>   arch/arm/plat-samsung/clock.c                 |  1 -
+>   arch/arm/plat-samsung/devs.c                  |  2 +-
+>   arch/arm/plat-samsung/init.c                  |  2 --
+>   arch/arm/plat-samsung/pm.c                    |  1 -
+>   arch/arm/plat-samsung/s5p-dev-uart.c          |  1 -
+>   8 files changed, 2 insertions(+), 39 deletions(-)
+>   delete mode 100644 arch/arm/mach-exynos/include/mach/hardware.h
 
 Hi,
 
-Gentle reminder ;-)
+Gentle reminder again ;-)
 
 - Kukjin
