@@ -1,61 +1,63 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 28 Mar 2014 15:01:32 +0000
-Subject: [RFC PATCH V4 7/7] arm64: mm: Enable RCU fast_gup
+Date: Fri, 28 Mar 2014 15:01:29 +0000
+Subject: [RFC PATCH V4 4/7] arm: mm: Enable RCU fast_gup
 In-Reply-To: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
 References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1396018892-6773-8-git-send-email-steve.capper@linaro.org>
+Message-ID: <1396018892-6773-5-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Activate the RCU fast_gup for ARM64. We also need to force THP splits
-to broadcast an IPI s.t. we block in the fast_gup page walker. As THP
+Activate the RCU fast_gup for ARM. We also need to force THP splits to
+broadcast an IPI s.t. we block in the fast_gup page walker. As THP
 splits are comparatively rare, this should not lead to a noticeable
 performance degradation.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- arch/arm64/Kconfig               |  3 +++
- arch/arm64/include/asm/pgtable.h |  4 ++++
- arch/arm64/mm/flush.c            | 19 +++++++++++++++++++
- 3 files changed, 26 insertions(+)
+ arch/arm/Kconfig                      |  3 +++
+ arch/arm/include/asm/pgtable-3level.h |  6 ++++++
+ arch/arm/mm/flush.c                   | 19 +++++++++++++++++++
+ 3 files changed, 28 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6185f95..9f5a81a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -86,6 +86,9 @@ config GENERIC_CSUM
- config GENERIC_CALIBRATE_DELAY
- 	def_bool y
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7d5340d..3cf589e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1788,6 +1788,9 @@ config ARCH_SELECT_MEMORY_MODEL
+ config HAVE_ARCH_PFN_VALID
+ 	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
  
 +config HAVE_RCU_GUP
 +	def_bool y
 +
- config ZONE_DMA32
- 	def_bool y
- 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index aa3917c..0e148ae 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -245,6 +245,10 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ config HIGHMEM
+ 	bool "High Memory Support"
+ 	depends on MMU
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index b286ba9..fdc4a4f 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -226,6 +226,12 @@ static inline pte_t pte_mkspecial(pte_t pte)
  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
  #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
  #define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
++
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
 +#define __HAVE_ARCH_PMDP_SPLITTING_FLUSH
-+struct vm_area_struct;
 +void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
 +			  pmd_t *pmdp);
++#endif
  #endif
  
  #define PMD_BIT_FUNC(fn,op) \
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index e4193e3..ddf96c1 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -103,3 +103,22 @@ EXPORT_SYMBOL(flush_dcache_page);
-  */
- EXPORT_SYMBOL(flush_cache_all);
- EXPORT_SYMBOL(flush_icache_range);
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 3387e60..91a2b59 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -377,3 +377,22 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
+ 	 */
+ 	__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+ }
 +
 +#ifdef CONFIG_TRANSPARENT_HUGEPAGE
 +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
