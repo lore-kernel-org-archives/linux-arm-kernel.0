@@ -1,46 +1,39 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Fri, 28 Mar 2014 17:28:05 +0100
-Subject: [PATCH V2] mm: hugetlb: Introduce huge_pte_{page,present,young}
-In-Reply-To: <20140327151129.GA5117@linaro.org>
-References: <1395321473-1257-1-git-send-email-steve.capper@linaro.org>
- <20140327151129.GA5117@linaro.org>
-Message-ID: <20140328172805.67f9ea0b@thinkpad>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 28 Mar 2014 17:35:24 +0100
+Subject: [ARM ATTEND] general discussion, DT (fragments?) and TrustZone
+Message-ID: <5335A4CC.2000406@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Mar 2014 15:11:30 +0000
-Steve Capper <steve.capper@linaro.org> wrote:
+Hi,
 
-> On Thu, Mar 20, 2014 at 01:17:53PM +0000, Steve Capper wrote:
-> > Introduce huge pte versions of pte_page, pte_present and pte_young.
-> > 
-> > This allows ARM (without LPAE) to use alternative pte processing logic
-> > for huge ptes.
-> > 
-> > Generic implementations that call the standard pte versions are also
-> > added to asm-generic/hugetlb.h.
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > ---
-> > Changed in V2 - moved from #ifndef,#define macros to entries in
-> > asm-generic/hugetlb.h as it makes more sense to have these with the
-> > other huge_pte_. definitions.
-> > 
-> > The only other architecture I can see that does not use
-> > asm-generic/hugetlb.h is s390. This patch includes trivial definitions
-> > for huge_pte_{page,present,young} for s390.
-> > 
-> > I've compile-tested this for s390, but don't have one under my desk so
-> > have not been able to test it.
-> > ---
-> >  arch/s390/include/asm/hugetlb.h | 15 +++++++++++++++
-> >  include/asm-generic/hugetlb.h   | 15 +++++++++++++++
-> >  mm/hugetlb.c                    | 22 +++++++++++-----------
-> >  3 files changed, 41 insertions(+), 11 deletions(-)
-> > 
-> 
-> Hello,
-> I was just wondering if this patch looked reasonable to people?
+I am Atmel AT91 Co-Maintainer and would like to attend the ARM Linux
+mini-summit or BoF. I will be attending ELC as well.
 
-Looks good, and I also tested it on s390, so for the s390 part:
-Acked-by: Gerald Schaefer <gerald.schaefer@de.ibm.com>
+I'd love to discuss the following topics with you guys:
+
+- current effort toward AT91 DT conversion, where do we stand, what
+  are the future plans and what are the best ways to move
+  old platforms to DT-only
+
+- integration of AT91 to ARM multiplatform initiative. Following our
+  adoption of CCF, I would like to summarize what is remaining to be
+  done before integrating the multiplatform single zImage kernel
+
+- best DT practices for handling little differences in
+  hardware platforms:
+  - subtle HW changes in relation to board revisions
+  - addition of daughter boards, modules, capes, shields
+  - use of DT fragments: status, best practices,
+    location of DT fragments
+  Without a proper mechanism we quickly observe a huge amount
+  of different .dtsi/.dts files popping up!
+
+- TrustZone and the Linaro Open Source Trusted Execution Environment:
+  how ARM Linux will interact with this initiative and which part of
+  the Linux kernel would implement the calls to the TEE API.
+
+
+Thanks, bye.
+-- 
+Nicolas Ferre
