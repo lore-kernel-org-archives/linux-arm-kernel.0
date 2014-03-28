@@ -1,56 +1,108 @@
-From: anderson@redhat.com (Dave Anderson)
-Date: Fri, 28 Mar 2014 11:44:33 -0400 (EDT)
-Subject: [PATCH 0/3] add LPAE support for kexec and kernel (Liu Hua)
-In-Reply-To: <53356590.3030005@huawei.com>
-References: <mailman.28599.1395907790.1059.kexec@lists.infradead.org>
- <420609342.5318732.1395929059090.JavaMail.zimbra@redhat.com>
- <53356590.3030005@huawei.com>
-Message-ID: <1897155363.7224032.1396021473883.JavaMail.zimbra@redhat.com>
+From: charles.garcia-tobin@arm.com (Charles Garcia-Tobin)
+Date: Fri, 28 Mar 2014 15:40:04 -0000
+Subject: [Linaro-acpi] [PATCH v3 1/3] PSCI: Add initial support
+ for	PSCIv0.2 functions
+In-Reply-To: <CAJ5Y-eaugzMAByxacsr7cO7T0vXPHqdBtSTXKjVQfNLHAMJV-Q@mail.gmail.com>
+References: <1395955430-26050-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1395955430-26050-2-git-send-email-ashwin.chaugule@linaro.org>
+ <CABGGisyMn6uuFOwcS3AfBX3c85fwore_TeBq68opmJqQPyR7wQ@mail.gmail.com>
+ <CAJ5Y-eaugzMAByxacsr7cO7T0vXPHqdBtSTXKjVQfNLHAMJV-Q@mail.gmail.com>
+Message-ID: <001301cf4a9b$fdff0a50$f9fd1ef0$@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
------ Original Message -----
-> On 2014/3/27 22:04, Dave Anderson wrote:
-> > 
-> > 
-> > ----- Original Message -----
-> > 
-> >> The patch series introduce LPAE support for user space
-> >> utility kexec(the last) and ARM linux kernel(the others).
-> >>
-> >> I have tested the patch series in armA15 platform which have
-> >> more than 4G memory.
-> > 
-> > Hello Liu,
-> > 
-> > I'm curious how you tested this?  The crash utility does not have
-> > any specific support for LPAE on ARM, and a couple years ago I
-> > asked on the crash-utility mailing list whether any of the ARM
-> > developers were working on it.  But at that time none of them were
-> > working with LPAE.  I see that you are on the crash-utility mailing
-> > list -- are you planning to post follow-up patches to the crash-utility?
-> > 
-> > Thanks,
-> >   Dave
+> -----Original Message-----
+> From: linaro-acpi-bounces at lists.linaro.org [mailto:linaro-acpi-
+> bounces at lists.linaro.org] On Behalf Of Ashwin Chaugule
+> Sent: 28 March 2014 15:00
+> To: rob.herring at linaro.org
+> Cc: Anup Patel; Patch Tracking; Marc Zyngier; linaro-acpi;
+linux-arm-kernel;
+> Christoffer Dall
+> Subject: Re: [Linaro-acpi] [PATCH v3 1/3] PSCI: Add initial support for
+PSCIv0.2
+> functions
 > 
-> Yes, you are very "sensitive"! our team has worked on it for a while. And
-> we went through the whole kdump process for LPAE enabled ARM. Our changes
-> include kexec-tools, makedumpfile, crash utility and the kernel.
+> Hi Rob,
 > 
-> But we did that in a rather limited time. So some patches are silly and
-> need to be reconstructed before submission. In addition, my job is quit
-> full now. So I decide to post the patch series that are clear and
-> independent of the others at first.
+> On 28 March 2014 09:54, Rob Herring <rob.herring@linaro.org> wrote:
 > 
-> But I got no response from the linux-arm and kexec mailinglist. What about
-> your opinion about the feature of LPAE support for kdump related tools
-> including crash utility and the kernel?
+> >> +#define PSCI_VER_MAJOR_MASK            0xffff0000
+> >> +#define PSCI_VER_MINOR_MASK            0x0000ffff
+> >> +#define PSCI_VER_MAJOR_SHIFT   16
+> >> +#define PSCI_VER_MAJOR(ver)            \
+> >> +       ((ver & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT)
+> >> +#define PSCI_VER_MINOR(ver)            (ver & PSCI_VER_MINOR_MASK)
+> >
+> > This can go in the header.
+> 
+> Will do.
+> 
+> >
+> > [snip]
+> >
+> >> +       ver = psci_get_version();
+> >> +
+> >> +       pr_info("PSCIv%d.%d detected in firmware.\n",
+PSCI_VER_MAJOR(ver),
+> >> +                       PSCI_VER_MINOR(ver));
+> >> +
+> >> +       if (PSCI_VER_MAJOR(ver) == 0 && PSCI_VER_MINOR(ver) < 2) {
+> >
+> > So we want to allow 0.3, but not 1.x? I think we want to allow any
+> > later version. Later versions either have to be backward's compatible
+> > with 0.2 or have to not have "arm,psci-0.2" compatible string.
+> 
+> If its 1.x, it should still go through? Should only fail for 0.1 or 0.0.
+> 
+> >
+> > Does this work if ver is an error value? We may have implementations
+> > that failed to implement this function (which should not be ignored
+> > for now).
+> 
+> True. What is a good err value to check for? negative values?
+> 
+> One would hope implementations would return (-7) NOT_PRESENT, but it
+> could also be garbage?
 
-I can't speak for the linux-arm and kexec mailing lists, but certainly 
-when you post your crash-related patches on the crash-utility mailing 
-list, I'll review, respond, and get them in place as soon as possible.
+So from v0.2 PSCI_VERSION is compulsory. It has to be implemented. If a
+function is not implemented it must return NOT_SUPPORTED(-1)
 
-Thanks,
-  Dave
+Cheers
+
+Charles
+
+>
+> >> + *
+> >> + *     Copyright (C) 2014, Ashwin Chaugule
+<ashwin.chaugule@linaro.org>
+> >
+> > I believe this should be:
+> >
+> > Copyright (C) 2014 Linaro Ltd.
+> > Author: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> >
+> > And typically the copyright is placed above the license.
+> 
+> Ok.
+> 
+> >> +
+> >> +#define PSCI_RET_SUCCESS               0
+> >> +#define PSCI_RET_EOPNOTSUPP            -1
+> >> +#define PSCI_RET_EINVAL                        -2
+> >> +#define PSCI_RET_EPERM                 -3
+> >
+> > Please fill out all error codes.
+> >
+> 
+> Ok, I see the return codes table. Will add all of it.
+> 
+> Cheers,
+> Ashwin
+> 
+> _______________________________________________
+> Linaro-acpi mailing list
+> Linaro-acpi at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-acpi
