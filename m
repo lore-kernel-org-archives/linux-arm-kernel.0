@@ -1,68 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Mar 2014 15:12:49 +0000
-Subject: [PATCH 00/75] l2c series
-Message-ID: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 28 Mar 2014 15:15:21 +0000
+Subject: [PATCH 12/75] ARM: l2c: split out cache unlock code
+In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+Message-ID: <E1WTYV7-0004Wh-4e@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is another posting of the L2 cache controller series.  I'm not
-planning for this for the upcoming merge window, but the one after,
-as people need to test it and still need to feed back to me on
-various issues.  Hence, this is not a finalised series.
+Split the cache unlock code out of l2x0_unlock().  We want to be able
+to re-use this functionality later.
 
-There are still various issues which I've raised, and have had no
-feedback on.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/cache-l2x0.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
-This series is being posted with Cc's on the individual patches.
-
- arch/arm/Kconfig                                   |   51 -
- arch/arm/boot/dts/imx6qdl.dtsi                     |    2 +
- arch/arm/boot/dts/imx6sl.dtsi                      |    2 +
- arch/arm/boot/dts/marco.dtsi                       |    2 +-
- arch/arm/boot/dts/prima2.dtsi                      |    2 +-
- arch/arm/include/asm/hardware/cache-l2x0.h         |  104 +-
- arch/arm/include/asm/outercache.h                  |   67 +-
- arch/arm/mach-berlin/berlin.c                      |    2 +-
- arch/arm/mach-cns3xxx/core.c                       |   10 +-
- arch/arm/mach-exynos/common.c                      |    5 +-
- arch/arm/mach-highbank/highbank.c                  |   18 +-
- arch/arm/mach-imx/mach-vf610.c                     |    2 +-
- arch/arm/mach-imx/system.c                         |    8 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |    2 +-
- arch/arm/mach-nomadik/cpu-8815.c                   |    2 +-
- arch/arm/mach-omap2/omap-mpuss-lowpower.c          |    2 +-
- arch/arm/mach-omap2/omap4-common.c                 |   79 +-
- arch/arm/mach-prima2/l2x0.c                        |   35 +-
- arch/arm/mach-prima2/pm.c                          |    1 -
- arch/arm/mach-realview/realview_eb.c               |    9 +-
- arch/arm/mach-realview/realview_pb1176.c           |    8 +-
- arch/arm/mach-realview/realview_pb11mp.c           |    9 +-
- arch/arm/mach-realview/realview_pbx.c              |    4 +-
- arch/arm/mach-rockchip/rockchip.c                  |    2 +-
- .../board-armadillo800eva-reference.c              |    4 +-
- arch/arm/mach-shmobile/board-armadillo800eva.c     |    4 +-
- arch/arm/mach-shmobile/board-kzm9g-reference.c     |    4 +-
- arch/arm/mach-shmobile/board-kzm9g.c               |    4 +-
- arch/arm/mach-shmobile/setup-r8a7778.c             |    4 +-
- arch/arm/mach-shmobile/setup-r8a7779.c             |    4 +-
- arch/arm/mach-socfpga/socfpga.c                    |    2 +-
- arch/arm/mach-spear/platsmp.c                      |   19 +-
- arch/arm/mach-spear/spear13xx.c                    |    8 +-
- arch/arm/mach-sti/board-dt.c                       |   12 +-
- arch/arm/mach-tegra/sleep.h                        |    8 +-
- arch/arm/mach-tegra/tegra.c                        |   18 +-
- arch/arm/mach-ux500/cache-l2x0.c                   |   32 +-
- arch/arm/mach-vexpress/ct-ca9x4.c                  |   28 +-
- arch/arm/mach-zynq/common.c                        |    2 +-
- arch/arm/mm/Kconfig                                |   51 +
- arch/arm/mm/Makefile                               |    1 +
- arch/arm/mm/cache-feroceon-l2.c                    |    1 -
- arch/arm/mm/cache-l2x0.c                           | 1520 +++++++++++++-------
- arch/arm/mm/l2c-common.c                           |   20 +
- arch/arm/plat-samsung/s5p-sleep.S                  |    8 +-
- 45 files changed, 1382 insertions(+), 800 deletions(-)
-
-
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 595c50519e41..a1313d20f205 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -50,6 +50,9 @@ struct l2x0_regs l2x0_saved_regs;
+ 
+ static bool of_init = false;
+ 
++/*
++ * Common code for all cache controllers.
++ */
+ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+ {
+ 	/* wait for cache operation by line or way to complete */
+@@ -67,6 +70,18 @@ static inline void l2c_set_debug(void __iomem *base, unsigned long val)
+ 	outer_cache.set_debug(val);
+ }
+ 
++static inline void l2c_unlock(void __iomem *base, unsigned num)
++{
++	unsigned i;
++
++	for (i = 0; i < num; i++) {
++		writel_relaxed(0, base + L2X0_LOCKDOWN_WAY_D_BASE +
++			       i * L2X0_LOCKDOWN_STRIDE);
++		writel_relaxed(0, base + L2X0_LOCKDOWN_WAY_I_BASE +
++			       i * L2X0_LOCKDOWN_STRIDE);
++	}
++}
++
+ #ifdef CONFIG_CACHE_PL310
+ static inline void cache_wait(void __iomem *reg, unsigned long mask)
+ {
+@@ -308,7 +323,6 @@ static void l2x0_disable(void)
+ static void l2x0_unlock(u32 cache_id)
+ {
+ 	int lockregs;
+-	int i;
+ 
+ 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	case L2X0_CACHE_ID_PART_L310:
+@@ -323,12 +337,7 @@ static void l2x0_unlock(u32 cache_id)
+ 		break;
+ 	}
+ 
+-	for (i = 0; i < lockregs; i++) {
+-		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
+-			       i * L2X0_LOCKDOWN_STRIDE);
+-		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
+-			       i * L2X0_LOCKDOWN_STRIDE);
+-	}
++	l2c_unlock(l2x0_base, lockregs);
+ }
+ 
+ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
