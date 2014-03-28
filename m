@@ -1,87 +1,138 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Mar 2014 17:52:58 +0100
-Subject: [PATCH 7/8] PCI: designware: make MSI isr shared irq aware
+Date: Fri, 28 Mar 2014 17:52:55 +0100
+Subject: [PATCH 4/8] PCI: imx6: use new clock names
 In-Reply-To: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
 References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1396025579-14344-8-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1396025579-14344-5-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6 the host controller MSI irq is shared
-with PCI legacy INTD. Make sure we don't bail too
-early from the irq handler.
-
-The issue is fairly theoretical as it would require
-a system setup with a PCIe switch where one connected
-device is using legacy INTD and another one using
-MSI, but better fix it now.
+As defined in the new binding.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/pci/host/pci-exynos.c      | 4 +---
- drivers/pci/host/pcie-designware.c | 6 +++++-
- drivers/pci/host/pcie-designware.h | 2 +-
- 3 files changed, 7 insertions(+), 5 deletions(-)
+ drivers/pci/host/pci-imx6.c | 74 ++++++++++++++++++---------------------------
+ 1 file changed, 29 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
-index 3de6bfbbe8e9..b616d34922d8 100644
---- a/drivers/pci/host/pci-exynos.c
-+++ b/drivers/pci/host/pci-exynos.c
-@@ -415,9 +415,7 @@ static irqreturn_t exynos_pcie_msi_irq_handler(int irq, void *arg)
- {
- 	struct pcie_port *pp = arg;
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index ee082509b0ba..71730bbcd9a2 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -35,10 +35,9 @@ struct imx6_pcie {
+ 	int			power_on_gpio;
+ 	int			wake_up_gpio;
+ 	int			disable_gpio;
+-	struct clk		*lvds_gate;
+-	struct clk		*sata_ref_100m;
+-	struct clk		*pcie_ref_125m;
+-	struct clk		*pcie_axi;
++	struct clk		*pcie_bus;
++	struct clk		*pcie_phy;
++	struct clk		*pcie;
+ 	struct pcie_port	pp;
+ 	struct regmap		*iomuxc_gpr;
+ 	void __iomem		*mem_base;
+@@ -239,28 +238,22 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
  
--	dw_handle_msi_irq(pp);
--
--	return IRQ_HANDLED;
-+	return dw_handle_msi_irq(pp);
- }
- 
- static void exynos_pcie_msi_init(struct pcie_port *pp)
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 98c118e04dba..cbce9b04b13d 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -156,15 +156,17 @@ static struct irq_chip dw_msi_irq_chip = {
- };
- 
- /* MSI int handler */
--void dw_handle_msi_irq(struct pcie_port *pp)
-+irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
- {
- 	unsigned long val;
- 	int i, pos, irq;
-+	irqreturn_t ret = IRQ_NONE;
- 
- 	for (i = 0; i < MAX_MSI_CTRLS; i++) {
- 		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
- 				(u32 *)&val);
- 		if (val) {
-+			ret = IRQ_HANDLED;
- 			pos = 0;
- 			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
- 				irq = irq_find_mapping(pp->irq_domain,
-@@ -177,6 +179,8 @@ void dw_handle_msi_irq(struct pcie_port *pp)
- 			}
- 		}
+-	ret = clk_prepare_enable(imx6_pcie->sata_ref_100m);
++	ret = clk_prepare_enable(imx6_pcie->pcie_phy);
+ 	if (ret) {
+-		dev_err(pp->dev, "unable to enable sata_ref_100m\n");
+-		goto err_sata_ref;
++		dev_err(pp->dev, "unable to enable pcie_phy clock\n");
++		goto err_pcie_phy;
  	}
-+
-+	return ret;
+ 
+-	ret = clk_prepare_enable(imx6_pcie->pcie_ref_125m);
++	ret = clk_prepare_enable(imx6_pcie->pcie_bus);
+ 	if (ret) {
+-		dev_err(pp->dev, "unable to enable pcie_ref_125m\n");
+-		goto err_pcie_ref;
++		dev_err(pp->dev, "unable to enable pcie_bus clock\n");
++		goto err_pcie_bus;
+ 	}
+ 
+-	ret = clk_prepare_enable(imx6_pcie->lvds_gate);
++	ret = clk_prepare_enable(imx6_pcie->pcie);
+ 	if (ret) {
+-		dev_err(pp->dev, "unable to enable lvds_gate\n");
+-		goto err_lvds_gate;
+-	}
+-
+-	ret = clk_prepare_enable(imx6_pcie->pcie_axi);
+-	if (ret) {
+-		dev_err(pp->dev, "unable to enable pcie_axi\n");
+-		goto err_pcie_axi;
++		dev_err(pp->dev, "unable to enable pcie clock\n");
++		goto err_pcie;
+ 	}
+ 
+ 	/* allow the clocks to stabilize */
+@@ -274,13 +267,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	}
+ 	return 0;
+ 
+-err_pcie_axi:
+-	clk_disable_unprepare(imx6_pcie->lvds_gate);
+-err_lvds_gate:
+-	clk_disable_unprepare(imx6_pcie->pcie_ref_125m);
+-err_pcie_ref:
+-	clk_disable_unprepare(imx6_pcie->sata_ref_100m);
+-err_sata_ref:
++err_pcie:
++	clk_disable_unprepare(imx6_pcie->pcie_bus);
++err_pcie_bus:
++	clk_disable_unprepare(imx6_pcie->pcie_phy);
++err_pcie_phy:
+ 	return ret;
+ 
  }
+@@ -583,32 +574,25 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 	}
  
- void dw_pcie_msi_init(struct pcie_port *pp)
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index 3063b3594d88..a169d22d517e 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -68,7 +68,7 @@ struct pcie_host_ops {
+ 	/* Fetch clocks */
+-	imx6_pcie->lvds_gate = devm_clk_get(&pdev->dev, "lvds_gate");
+-	if (IS_ERR(imx6_pcie->lvds_gate)) {
+-		dev_err(&pdev->dev,
+-			"lvds_gate clock select missing or invalid\n");
+-		return PTR_ERR(imx6_pcie->lvds_gate);
+-	}
+-
+-	imx6_pcie->sata_ref_100m = devm_clk_get(&pdev->dev, "sata_ref_100m");
+-	if (IS_ERR(imx6_pcie->sata_ref_100m)) {
++	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");
++	if (IS_ERR(imx6_pcie->pcie_phy)) {
+ 		dev_err(&pdev->dev,
+-			"sata_ref_100m clock source missing or invalid\n");
+-		return PTR_ERR(imx6_pcie->sata_ref_100m);
++			"pcie_phy clock source missing or invalid\n");
++		return PTR_ERR(imx6_pcie->pcie_phy);
+ 	}
  
- int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
- int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val);
--void dw_handle_msi_irq(struct pcie_port *pp);
-+irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
- void dw_pcie_msi_init(struct pcie_port *pp);
- int dw_pcie_link_up(struct pcie_port *pp);
- void dw_pcie_setup_rc(struct pcie_port *pp);
+-	imx6_pcie->pcie_ref_125m = devm_clk_get(&pdev->dev, "pcie_ref_125m");
+-	if (IS_ERR(imx6_pcie->pcie_ref_125m)) {
++	imx6_pcie->pcie_bus = devm_clk_get(&pdev->dev, "pcie_bus");
++	if (IS_ERR(imx6_pcie->pcie_bus)) {
+ 		dev_err(&pdev->dev,
+-			"pcie_ref_125m clock source missing or invalid\n");
+-		return PTR_ERR(imx6_pcie->pcie_ref_125m);
++			"pcie_bus clock source missing or invalid\n");
++		return PTR_ERR(imx6_pcie->pcie_bus);
+ 	}
+ 
+-	imx6_pcie->pcie_axi = devm_clk_get(&pdev->dev, "pcie_axi");
+-	if (IS_ERR(imx6_pcie->pcie_axi)) {
++	imx6_pcie->pcie = devm_clk_get(&pdev->dev, "pcie");
++	if (IS_ERR(imx6_pcie->pcie)) {
+ 		dev_err(&pdev->dev,
+-			"pcie_axi clock source missing or invalid\n");
+-		return PTR_ERR(imx6_pcie->pcie_axi);
++			"pcie clock source missing or invalid\n");
++		return PTR_ERR(imx6_pcie->pcie);
+ 	}
+ 
+ 	/* Grab GPR config register range */
 -- 
 1.9.0
