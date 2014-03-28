@@ -1,31 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Mar 2014 11:38:39 +0000
-Subject: [PATCH v3 08/10] ARM: sun7i/sun4i: dt: Add AXP209 support to
- various boards
-In-Reply-To: <20140328101146.GP6120@lukather>
-References: <1395955764-18103-1-git-send-email-carlo@caione.org>
- <1395955764-18103-9-git-send-email-carlo@caione.org>
- <20140328101146.GP6120@lukather>
-Message-ID: <20140328113839.GB30768@sirena.org.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 28 Mar 2014 11:46:18 +0000
+Subject: [PATCH 0/3] Versatile PCI DT support
+In-Reply-To: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
+References: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20140328114618.GY17163@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 11:11:46AM +0100, Maxime Ripard wrote:
+On Thu, Mar 27, 2014 at 10:46:35PM +0000, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> This series adds a platform driver for Versatile PB's PCI host using
+> Liviu's recent patch series[1] for DT parsing and setup.
+> 
+> The first patch is a hack to get Liviu's current patches to work on ARM.
+> It at least shows we are not that far off from being able to use the
+> series on ARM.
+> 
+> I've tested PCI under QEMU, but need someone with actual h/w to test.
+> A branch with this series and which includes full conversion of
+> Versatile to DT is available here[2].
 
-> Here, you would just include the dtsi at the top of the file, and in
-> the DTSI, you would have something like:
+Hi Rob,
 
-> &axp209 {
->    regulators {
->       ...
->    }
-> }
+Thanks for doing this. Hopefully others will take inspiration and start to
+convert their host bridge controllers as well.
 
-Hang on, what is an include file setting up regulators for?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/9c468972/attachment.sig>
+I will post an updated series soon. (Un)fortunately it will look slightly
+different than the last one I've posted as I am trying to get more code
+that I've currently placed in arch/arm64/kernel/pci.c into drivers/pci,
+so you will need to revisit your series.
+
+Regarding your comment about bridge->bus->self being needed: root busses
+are supposed to have bus->self == NULL, and the bridge->bus *is* the root
+bus. Where would you need to use bridge->bus->self?
+
+Best regards,
+Liviu
+
+> 
+> Rob
+> 
+> [1] https://lkml.org/lkml/2014/3/14/279
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git versatile
+> 
+> Rob Herring (3):
+>   ARM: hackup pcibios support for commmon bridge code
+>   dt/bindings: add versatile PCI binding
+>   pci: add DT based ARM Versatile PCI host driver
+> 
+>  .../devicetree/bindings/pci/versatile.txt          |  59 +++++
+>  arch/arm/kernel/bios32.c                           |  63 +++++
+>  drivers/pci/host/Kconfig                           |   4 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-versatile.c                   | 275 +++++++++++++++++++++
+>  5 files changed, 402 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/versatile.txt
+>  create mode 100644 drivers/pci/host/pci-versatile.c
+> 
+> -- 
+> 1.8.3.2
+> 
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
