@@ -1,32 +1,33 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Mar 2014 10:37:21 +0000
-Subject: [PATCHv2 1/3] arm64: Implement custom mmap functions for dma
- mapping
-In-Reply-To: <CALk7dXr3cZSkQ6dTUyCjUDStOd6=ghGN9-iO5RQiTfHCciGxLg@mail.gmail.com>
-References: <1394732716-11507-2-git-send-email-lauraa@codeaurora.org>
- <1394826745-24191-1-git-send-email-lauraa@codeaurora.org>
- <CALk7dXr3cZSkQ6dTUyCjUDStOd6=ghGN9-iO5RQiTfHCciGxLg@mail.gmail.com>
-Message-ID: <20140328103721.GF21330@arm.com>
+Date: Fri, 28 Mar 2014 10:43:49 +0000
+Subject: disabling MMU of ARMv7-A
+In-Reply-To: <015e01cf4a55$7f43a950$7dcafbf0$@samsung.com>
+References: <015e01cf4a55$7f43a950$7dcafbf0$@samsung.com>
+Message-ID: <20140328104349.GG21330@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 09:45:08AM +0000, Ritesh Harjani wrote:
-> On Sat, Mar 15, 2014 at 1:22 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > +static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
-> > +                            void *cpu_addr, dma_addr_t dma_addr, size_t size)
-> > +{
-> > +       int ret = -ENXIO;
-> > +       unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
-> > +                                       PAGE_SHIFT;
-> > +       unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> > +       unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
-> 
-> Why not __phys_to_pfn here ?? just asking, I know there is nothing wrong in
-> this too..
+On Fri, Mar 28, 2014 at 07:15:28AM +0000, Chanho Park wrote:
+> I want to know is there anyone who tried disabling MMU of ARMv7-A likes
+> cortex-a9.
+> Yes. I know this is a silly question :)
+> I turned off CONFIG_MMU option of my exynos4 board and specified
+> CONFIG_DRAM_BASE/SIZE and REMAP_VECTORS_TO_RAM.
+> The problem is occurred in here there is no way to specify the vector table
+> address.
+> As I know the cortex-M3/4 has VTOR(Vector table offset register) to specify
+> the vector table address.
+> However, ARMv7-A/R doesn't have such register. They can only control whether
+> use _HIGH_ vector or not.
+> In this situation, can I find a way to boot successfully with
+> nommu+cortex-a9?
 
-Because dma_addr is a DMA address (as seen by the device from the other
-side of the bus) rather than a CPU physical address. In many cases they
-are the same but not always.
+There is no way to set a random vectors address on A9. But even if you
+want a !MMU kernel, I would not recommend disabling the MMU entirely
+because your memory accesses are strongly ordered (and slow and
+unaligned accesses will not work). It's better to create some flat
+mapping, possibly before starting the kernel and keep the MMU enabled.
+Such mapping would contain a vectors page as well (low or high).
 
 -- 
 Catalin
