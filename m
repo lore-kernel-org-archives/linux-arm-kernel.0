@@ -1,50 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Mar 2014 09:03:59 -0700
-Subject: [PATCH 58/75] ARM: l2c: omap2: remove cache size override
-In-Reply-To: <E1WTYZ1-0007Gn-3J@rmk-PC.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYZ1-0007Gn-3J@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140328160358.GG24308@atomide.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 28 Mar 2014 17:25:51 +0100
+Subject: [PATCH 2/2] ARM: dts: imx: drop invalid size and address cells
+ properties
+In-Reply-To: <1396023951-32383-1-git-send-email-l.stach@pengutronix.de>
+References: <1396023951-32383-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1396023951-32383-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King <rmk+kernel@arm.linux.org.uk> [140328 08:22]:
+Those two properties should have been set to zero, which
+is the same as not specifying them.
 
-Missing description?
+Having address-cells set to 1 causes OF interrupt
+mapping routines to add 1 to the interrupt-cells
+property and as result fail because all calculations
+are off by one.
 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mach-omap2/omap4-common.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index ce2fad84a43c..c0f9a81a2d32 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -212,20 +212,18 @@ static int __init omap_l2_cache_init(void)
->  		return -ENOMEM;
->  
->  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
-> -	aux_ctrl = L310_AUX_CTRL_ASSOCIATIVITY_16 |
-> -		   L310_AUX_CTRL_CACHE_REPLACE_RR |
-> +	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
->  		   L310_AUX_CTRL_NS_LOCKDOWN |
->  		   L310_AUX_CTRL_NS_INT_CTRL |
-> -		   L2C_AUX_CTRL_WAY_SIZE(3) |
->  		   L2C_AUX_CTRL_SHARED_OVERRIDE |
->  		   L310_AUX_CTRL_DATA_PREFETCH |
->  		   L310_AUX_CTRL_INSTR_PREFETCH;
->  
->  	outer_cache.write_sec = omap4_l2c310_write_sec;
->  	if (of_have_populated_dt())
-> -		l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
-> +		l2x0_of_init(aux_ctrl, 0xc19fffff);
->  	else
-> -		l2x0_init(l2cache_base, aux_ctrl, L2X0_AUX_CTRL_MASK);
-> +		l2x0_init(l2cache_base, aux_ctrl, 0xc19fffff);
->  
->  	return 0;
->  }
-> -- 
-> 1.8.3.1
-> 
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 --
+ arch/arm/boot/dts/imx6sl.dtsi  | 2 --
+ 2 files changed, 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index fb28b2ecb1db..31bd844798a7 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -38,8 +38,6 @@
+ 	intc: interrupt-controller at 00a01000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+ 		interrupt-controller;
+ 		reg = <0x00a01000 0x1000>,
+ 		      <0x00a00100 0x100>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1aaf2d..276425089ea0 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -44,8 +44,6 @@
+ 	intc: interrupt-controller at 00a01000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+ 		interrupt-controller;
+ 		reg = <0x00a01000 0x1000>,
+ 		      <0x00a00100 0x100>;
+-- 
+1.9.0
