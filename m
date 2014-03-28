@@ -1,56 +1,96 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 28 Mar 2014 15:01:25 +0000
-Subject: [RFC PATCH V4 0/7] get_user_pages_fast for ARM and ARM64
-Message-ID: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
+Date: Fri, 28 Mar 2014 15:01:27 +0000
+Subject: [RFC PATCH V4 2/7] arm: mm: Introduce special ptes for LPAE
+In-Reply-To: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
+References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1396018892-6773-3-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-This RFC series implements get_user_pages_fast and __get_user_pages_fast.
-These are required for Transparent HugePages to function correctly, as
-a futex on a THP tail will otherwise result in an infinite loop (due to
-the core implementation of __get_user_pages_fast always returning 0).
-This series may also be beneficial for direct-IO heavy workloads and
-certain KVM workloads.
+We need a mechanism to tag ptes as being special, this indicates that
+no attempt should be made to access the underlying struct page *
+associated with the pte. This is used by the fast_gup when operating on
+ptes as it has no means to access VMAs (that also contain this
+information) locklessly.
 
-The main changes since RFC V3 are:
- * fast_gup now generalised and moved to core code.
- * pte_special logic now extended to reduce unnecessary icache syncs.
- * dropped the pte_accessible logic in fast_gup as it is unnecessary.
+The L_PTE_SPECIAL bit is already allocated for LPAE, this patch modifies
+pte_special and pte_mkspecial to make use of it, and defines
+__HAVE_ARCH_PTE_SPECIAL.
 
-I would really appreciate any comments (especially on the validity or
-otherwise of the core fast_gup implementation) and/or testers.
+This patch also excludes special ptes from the icache/dcache sync logic.
 
-Cheers,
---
-Steve
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Changed in V4: set_pte_at will not perform an icache sync for special
+ptes.
+---
+ arch/arm/include/asm/pgtable-2level.h | 2 ++
+ arch/arm/include/asm/pgtable-3level.h | 8 ++++++++
+ arch/arm/include/asm/pgtable.h        | 6 ++----
+ 3 files changed, 12 insertions(+), 4 deletions(-)
 
-Catalin Marinas (1):
-  arm64: Convert asm/tlb.h to generic mmu_gather
-
-Steve Capper (6):
-  mm: Introduce a general RCU get_user_pages_fast.
-  arm: mm: Introduce special ptes for LPAE
-  arm: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm: mm: Enable RCU fast_gup
-  arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-  arm64: mm: Enable RCU fast_gup
-
- arch/arm/Kconfig                      |   4 +
- arch/arm/include/asm/pgtable-2level.h |   2 +
- arch/arm/include/asm/pgtable-3level.h |  14 ++
- arch/arm/include/asm/pgtable.h        |   6 +-
- arch/arm/include/asm/tlb.h            |  38 ++++-
- arch/arm/mm/flush.c                   |  19 +++
- arch/arm64/Kconfig                    |   4 +
- arch/arm64/include/asm/pgtable.h      |   4 +
- arch/arm64/include/asm/tlb.h          | 140 +++-------------
- arch/arm64/mm/flush.c                 |  19 +++
- mm/Kconfig                            |   3 +
- mm/Makefile                           |   1 +
- mm/gup.c                              | 297 ++++++++++++++++++++++++++++++++++
- 13 files changed, 431 insertions(+), 120 deletions(-)
- create mode 100644 mm/gup.c
-
+diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+index dfff709..26d1742 100644
+--- a/arch/arm/include/asm/pgtable-2level.h
++++ b/arch/arm/include/asm/pgtable-2level.h
+@@ -181,6 +181,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ #define pmd_addr_end(addr,end) (end)
+ 
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
++#define pte_special(pte)	(0)
++static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
+ 
+ /*
+  * We don't have huge page support for short descriptors, for the moment
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 85c60ad..b286ba9 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -207,6 +207,14 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ #define pte_huge(pte)		(pte_val(pte) && !(pte_val(pte) & PTE_TABLE_BIT))
+ #define pte_mkhuge(pte)		(__pte(pte_val(pte) & ~PTE_TABLE_BIT))
+ 
++#define pte_special(pte)	(!!(pte_val(pte) & L_PTE_SPECIAL))
++static inline pte_t pte_mkspecial(pte_t pte)
++{
++	pte_val(pte) |= L_PTE_SPECIAL;
++	return pte;
++}
++#define	__HAVE_ARCH_PTE_SPECIAL
++
+ #define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
+ 
+ #define __HAVE_ARCH_PMD_WRITE
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 7d59b52..e6139e3 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -220,7 +220,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ #define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+ #define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
+ #define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
+-#define pte_special(pte)	(0)
+ 
+ #define pte_present_user(pte)  (pte_present(pte) && (pte_val(pte) & L_PTE_USER))
+ 
+@@ -238,7 +237,8 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	unsigned long ext = 0;
+ 
+ 	if (addr < TASK_SIZE && pte_present_user(pteval)) {
+-		__sync_icache_dcache(pteval);
++		if (!pte_special(pteval))
++			__sync_icache_dcache(pteval);
+ 		ext |= PTE_EXT_NG;
+ 	}
+ 
+@@ -257,8 +257,6 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
+ PTE_BIT_FUNC(mkexec,   &= ~L_PTE_XN);
+ PTE_BIT_FUNC(mknexec,   |= L_PTE_XN);
+ 
+-static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
+-
+ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+ {
+ 	const pteval_t mask = L_PTE_XN | L_PTE_RDONLY | L_PTE_USER |
 -- 
 1.8.1.4
