@@ -1,217 +1,121 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:20:29 +0000
-Subject: [PATCH 71/75] ARM: l2c: permit flush_all() on large flush_range() XXX
- Needs more thought XXX
+Date: Fri, 28 Mar 2014 15:20:34 +0000
+Subject: [PATCH 72/75] ARM: l2c: trial at enabling some Cortex-A9 optimisations
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYa5-0007Hi-HD@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYaA-0007Hp-Ki@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow flush_all() to be used in normal operation, we need
-some locking to prevent any other cache operations being issued while
-a background flush_all() operation is proceeding.  The read-write
-spinlock provides what's necessary here, but we must avoid bringing
-lockdep issues into this code.  Hence we continue to use the raw_*
-operations, and use the arch read/write spinlock implementation
-directly.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 90 ++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 79 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/hardware/cache-l2x0.h |  8 +++++
+ arch/arm/mm/cache-l2x0.c                   | 51 ++++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 3f2a9987b96c..c47ac8f3b12e 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -134,6 +134,14 @@
+ 
+ #define L310_ADDR_FILTER_EN		1
+ 
++#define L310_PREFETCH_CTRL_OFFSET_MASK		0x1f
++#define L310_PREFETCH_CTRL_DBL_LINEFILL_INCR	BIT(23)
++#define L310_PREFETCH_CTRL_PREFETCH_DROP	BIT(24)
++#define L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP	BIT(27)
++#define L310_PREFETCH_CTRL_DATA_PREFETCH	BIT(28)
++#define L310_PREFETCH_CTRL_INSTR_PREFETCH	BIT(29)
++#define L310_PREFETCH_CTRL_DBL_LINEFILL		BIT(30)
++
+ #define L2X0_CTRL_EN			1
+ 
+ #define L2X0_WAY_SIZE_SHIFT		3
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index cbf036dff6d1..c1750f1bf572 100644
+index c1750f1bf572..49155da7a8c4 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -53,6 +53,54 @@ struct l2x0_regs l2x0_saved_regs;
- /*
-  * Common code for all cache controllers.
+@@ -16,14 +16,17 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
   */
-+#ifdef CONFIG_SMP
-+static arch_rwlock_t l2c_rw_lock = __ARCH_RW_LOCK_UNLOCKED;
-+
-+static unsigned long l2c_lock_exclusive(void)
-+{
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	arch_write_lock(&l2c_rw_lock);
-+	return flags;
-+}
-+
-+static void l2c_unlock_exclusive(unsigned long flags)
-+{
-+	arch_write_unlock(&l2c_rw_lock);
-+	raw_local_irq_restore(flags);
-+}
-+
-+static void l2c_lock_shared(void)
-+{
-+	arch_read_lock(&l2c_rw_lock);
-+}
-+
-+static void l2c_unlock_shared(void)
-+{
-+	arch_read_unlock(&l2c_rw_lock);
-+}
-+#else
-+static unsigned long l2c_lock_exclusive(void)
-+{
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	return flags;
-+}
-+
-+static void l2c_unlock_exclusive(unsigned long flags)
-+{
-+	raw_local_irq_restore(flags);
-+}
-+
-+static void l2c_lock_shared(void)
-+{
-+}
-+
-+static void l2c_unlock_shared(void)
-+{
-+}
-+#endif
-+
- static inline void l2c_wait_mask(void __iomem *reg, unsigned long mask)
- {
- 	/* wait for cache operation by line or way to complete */
-@@ -233,6 +281,7 @@ static void l2c210_inv_range(unsigned long start, unsigned long end)
- {
- 	void __iomem *base = l2x0_base;
++#include <linux/cpu.h>
+ #include <linux/err.h>
+ #include <linux/init.h>
++#include <linux/smp.h>
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
  
-+	l2c_lock_shared();
- 	if (start & (CACHE_LINE_SIZE - 1)) {
- 		start &= ~(CACHE_LINE_SIZE - 1);
- 		writel_relaxed(start, base + L2X0_CLEAN_INV_LINE_PA);
-@@ -246,6 +295,7 @@ static void l2c210_inv_range(unsigned long start, unsigned long end)
- 
- 	__l2c210_op_pa_range(base + L2X0_INV_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_clean_range(unsigned long start, unsigned long end)
-@@ -253,8 +303,10 @@ static void l2c210_clean_range(unsigned long start, unsigned long end)
- 	void __iomem *base = l2x0_base;
- 
- 	start &= ~(CACHE_LINE_SIZE - 1);
-+	l2c_lock_shared();
- 	__l2c210_op_pa_range(base + L2X0_CLEAN_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_flush_range(unsigned long start, unsigned long end)
-@@ -262,23 +314,33 @@ static void l2c210_flush_range(unsigned long start, unsigned long end)
- 	void __iomem *base = l2x0_base;
- 
- 	start &= ~(CACHE_LINE_SIZE - 1);
-+	if ((end - start) >= l2x0_size) {
-+		outer_cache.flush_all();
-+		return;
-+	}
-+
-+	l2c_lock_shared();
- 	__l2c210_op_pa_range(base + L2X0_CLEAN_INV_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_flush_all(void)
- {
- 	void __iomem *base = l2x0_base;
-+	unsigned long flags;
- 
--	BUG_ON(!irqs_disabled());
--
-+	flags = l2c_lock_exclusive();
- 	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_exclusive(flags);
- }
- 
- static void l2c210_sync(void)
- {
-+	l2c_lock_shared();
- 	__l2c210_cache_sync(l2x0_base);
-+	l2c_unlock_shared();
- }
- 
- static void l2c210_resume(void)
-@@ -501,7 +563,7 @@ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
- 		unsigned long flags;
- 
- 		/* Erratum 588369 for both clean+invalidate operations */
--		raw_spin_lock_irqsave(&l2x0_lock, flags);
-+		flags = l2c_lock_exclusive();
- 		l2c_set_debug(base, 0x03);
- 
- 		if (start & (CACHE_LINE_SIZE - 1)) {
-@@ -518,20 +580,26 @@ static void l2c310_inv_range_erratum(unsigned long start, unsigned long end)
- 		}
- 
- 		l2c_set_debug(base, 0x00);
--		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+		l2c_unlock_exclusive(flags);
+ #include <asm/cacheflush.h>
++#include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include "cache-tauros3.h"
+@@ -691,6 +694,19 @@ static void l2c310_resume(void)
  	}
- 
-+	l2c_lock_shared();
- 	__l2c210_op_pa_range(base + L2X0_INV_LINE_PA, start, end);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_shared();
  }
  
- static void l2c310_flush_range_erratum(unsigned long start, unsigned long end)
- {
--	raw_spinlock_t *lock = &l2x0_lock;
- 	unsigned long flags;
- 	void __iomem *base = l2x0_base;
- 
--	raw_spin_lock_irqsave(lock, flags);
-+	if ((end - start) >= l2x0_size) {
-+		outer_cache.flush_all();
-+		return;
++static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, void *data)
++{
++	switch (act & ~CPU_TASKS_FROZEN) {
++	case CPU_STARTING:
++		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++		break;
++	case CPU_DYING:
++		set_auxcr(get_auxcr() & ~(BIT(3) | BIT(2) | BIT(1)));
++		break;
 +	}
++	return NOTIFY_OK;
++}
 +
-+	flags = l2c_lock_exclusive();
- 	while (start < end) {
- 		unsigned long blk_end = start + min(end - start, 4096UL);
- 
-@@ -544,12 +612,12 @@ static void l2c310_flush_range_erratum(unsigned long start, unsigned long end)
- 		l2c_set_debug(base, 0x00);
- 
- 		if (blk_end < end) {
--			raw_spin_unlock_irqrestore(lock, flags);
--			raw_spin_lock_irqsave(lock, flags);
-+			l2c_unlock_exclusive(flags);
-+			flags = l2c_lock_exclusive();
+ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ {
+ 	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
+@@ -706,7 +722,42 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
  		}
  	}
--	raw_spin_unlock_irqrestore(lock, flags);
- 	__l2c210_cache_sync(base);
-+	l2c_unlock_exclusive(flags);
+ 
++	if (cortex_a9) {
++		u32 aux_cur = readl_relaxed(base + L2X0_AUX_CTRL);
++		u32 acr = get_auxcr();
++
++		pr_debug("Cortex-A9 ACR=0x%08x\n", acr);
++
++		if (acr & BIT(3) && !(aux_cur & L310_AUX_CTRL_FULL_LINE_ZERO))
++			pr_err("L2C-310: full line of zeros enabled in Cortex-A9 but not L2C-310 - invalid\n");
++
++		if (aux & L310_AUX_CTRL_FULL_LINE_ZERO && !(acr & BIT(3)))
++			pr_err("L2C-310: enabling full line of zeros but not enabled in Cortex-A9\n");
++
++		if (!(aux & L310_AUX_CTRL_FULL_LINE_ZERO) && !outer_cache.write_sec) {
++			aux |= L310_AUX_CTRL_FULL_LINE_ZERO;
++			pr_info("L2C-310 full line of zeros enabled for Cortex-A9\n");
++		}
++	} else if (aux & (L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP)) {
++		pr_err("L2C-310: disabling Cortex-A9 specific feature bits\n");
++		aux &= ~(L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP);
++	}
++
++	if (aux & (L310_AUX_CTRL_DATA_PREFETCH | L310_AUX_CTRL_INSTR_PREFETCH)) {
++		u32 prefetch = readl_relaxed(base + L310_PREFETCH_CTRL);
++
++		pr_info("L2C-310 %s%s prefetch enabled, offset %u lines\n",
++			aux & L310_AUX_CTRL_INSTR_PREFETCH ? "I" : "",
++			aux & L310_AUX_CTRL_DATA_PREFETCH ? "D" : "",
++			1 + (prefetch & L310_PREFETCH_CTRL_OFFSET_MASK));
++	}
++
+ 	l2c_enable(base, aux, num_lock);
++
++	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
++		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++		cpu_notifier(l2c310_cpu_enable_flz, 0);
++	}
  }
  
- static void l2c310_flush_all_erratum(void)
-@@ -557,12 +625,12 @@ static void l2c310_flush_all_erratum(void)
- 	void __iomem *base = l2x0_base;
- 	unsigned long flags;
- 
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	flags = l2c_lock_exclusive();
- 	l2c_set_debug(base, 0x03);
- 	__l2c_op_way(base + L2X0_CLEAN_INV_WAY);
- 	l2c_set_debug(base, 0x00);
- 	__l2c210_cache_sync(base);
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+	l2c_unlock_exclusive(flags);
- }
- 
- static void __init l2c310_save(void __iomem *base)
+ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
 -- 
 1.8.3.1
