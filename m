@@ -1,109 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 28 Mar 2014 12:09:13 -0700
-Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
- call to the KVM MMIO bus
-In-Reply-To: <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
-References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
- <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <20140328190913.GJ25519@cbox>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 28 Mar 2014 15:35:53 -0400
+Subject: [PATCH 00/75] l2c series - Olof's boot failures
+In-Reply-To: <20140328183958.GP7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <20140328183958.GP7528@n2100.arm.linux.org.uk>
+Message-ID: <20140328193553.GN24294@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 13, 2014 at 04:57:26PM +0100, Antonios Motakis wrote:
-> On an unhandled IO memory abort, use the kvm_io_bus_* API in order to
-> handle the MMIO access through any registered read/write callbacks. This
-> is a dependency for eventfd support (ioeventfd and irqfd).
+On Fri, Mar 28, 2014 at 06:39:58PM +0000, Russell King wrote:
+> On Fri, Mar 28, 2014 at 03:12:49PM +0000, Russell King - ARM Linux wrote:
+> > This is another posting of the L2 cache controller series.  I'm not
+> > planning for this for the upcoming merge window, but the one after,
+> > as people need to test it and still need to feed back to me on
+> > various issues.  Hence, this is not a finalised series.
+> > 
+> > There are still various issues which I've raised, and have had no
+> > feedback on.
 > 
-> However, accesses to the VGIC are still left implemented independently,
-> since the kvm_io_bus_* API doesn't pass the VCPU pointer doing the access.
+> Olof's builder shows failures with this for:
 > 
-> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
-> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
-> ---
->  arch/arm/kvm/mmio.c | 32 ++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic.c |  5 ++++-
->  2 files changed, 36 insertions(+), 1 deletion(-)
+>     capri        multi_v7_defconfig            :        FAILED  1:03.10
+>     seaboard     tegra_defconfig               :        FAILED  1:29.70
+>     seaboard     multi_v7_defconfig            :        FAILED  1:26.35
 > 
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 4cb5a93..1d17831 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -162,6 +162,35 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	return 0;
->  }
->  
-> +/**
-> + * kvm_handle_mmio - handle an in-kernel MMIO access
-> + * @vcpu:	pointer to the vcpu performing the access
-> + * @run:	pointer to the kvm_run structure
-> + * @mmio:	pointer to the data describing the access
-> + *
-> + * returns true if the MMIO access has been performed in kernel space,
-> + * and false if it needs to be emulated in user space.
-> + */
-> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +		struct kvm_exit_mmio *mmio)
-> +{
-> +	int ret;
-> +	if (mmio->is_write) {
-> +		ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
-> +				mmio->len, &mmio->data);
-> +
-> +	} else {
-> +		ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
-> +				mmio->len, &mmio->data);
-> +	}
-> +	if (!ret) {
-> +		kvm_prepare_mmio(run, mmio);
-> +		kvm_handle_mmio_return(vcpu, run);
-> +	}
-> +
-> +	return !ret;
-> +}
-> +
->  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		 phys_addr_t fault_ipa)
->  {
-> @@ -200,6 +229,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	if (vgic_handle_mmio(vcpu, run, &mmio))
->  		return 1;
->  
-> +	if (handle_kernel_mmio(vcpu, run, &mmio))
-> +		return 1;
-> +
+> I have no way to debug these failures.
+> 
+> However, strangely:
+> 
+>     capri        bcm_defconfig                 :        passed  0:42.83
 
-this special-casing of the vgic is now really terrible.  Is there
-anything holding you back from doing the necessary restructure of the
-kvm_bus_io_*() API instead?  That would allow us to get rid of the ugly
-Fix it! in the vgic driver as well.
+This is fixed by the check cpu id for pj4 patch:
+http://www.spinics.net/lists/arm-kernel/msg316431.html
 
--Christoffer
+updated version:
+http://www.spinics.net/lists/arm-kernel/msg317283.html
+http://www.spinics.net/lists/arm-kernel/msg317284.html
 
->  	kvm_prepare_mmio(run, &mmio);
->  	return 0;
->  }
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 8ca405c..afdecc3 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -849,13 +849,16 @@ struct mmio_range *find_matching_range(const struct mmio_range *ranges,
->  }
->  
->  /**
-> - * vgic_handle_mmio - handle an in-kernel MMIO access
-> + * vgic_handle_mmio - handle an in-kernel vgic MMIO access
->   * @vcpu:	pointer to the vcpu performing the access
->   * @run:	pointer to the kvm_run structure
->   * @mmio:	pointer to the data describing the access
->   *
->   * returns true if the MMIO access has been performed in kernel space,
->   * and false if it needs to be emulated in user space.
-> + *
-> + * This is handled outside of kvm_handle_mmio because the kvm_io_bus only
-> + * passes the VM pointer, while we need the VCPU performing the access.
->   */
->  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		      struct kvm_exit_mmio *mmio)
-> -- 
-> 1.8.3.2
-> 
+bcm_defconfig is fine because ARCH_DOVE isn't enabled
+
+-Matt
