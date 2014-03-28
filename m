@@ -1,47 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Mar 2014 20:05:40 +0000
-Subject: [PATCH] ARM: Better virt_to_page() handling
-In-Reply-To: <alpine.LFD.2.11.1403281506250.1571@knanqh.ubzr>
-References: <20140328152831.GK7528@n2100.arm.linux.org.uk>
- <E1WTYiT-0007Jl-Fe@rmk-PC.arm.linux.org.uk>
- <alpine.LFD.2.11.1403281506250.1571@knanqh.ubzr>
-Message-ID: <20140328200540.GQ7528@n2100.arm.linux.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 28 Mar 2014 16:10:07 -0400 (EDT)
+Subject: [PATCHv3] net: mvneta: use devm_ioremap_resource() instead of
+ of_iomap()
+In-Reply-To: <1395916769-20475-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395916769-20475-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140328.161007.1937376826264802047.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 03:52:16PM -0400, Nicolas Pitre wrote:
-> I see it might be hard to make the last two common, unless it is defined 
-> up front and the odd case does a #undef virt_to_pfn before redefining 
-> it.  Which way is best I'm not sure.
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Thu, 27 Mar 2014 11:39:29 +0100
 
-Given the problems we've had in this area with changes ending up with
-build failures, I think it's far better to have simplicity even if it
-means duplicating definitions, rather than trying to invent some clever
-way to avoid duplications.
+> The mvneta driver currently uses of_iomap(), which has two drawbacks:
+> it doesn't request the resource, and it isn't devm-style so some error
+> handling is needed.
+> 
+> This commit switches to use devm_ioremap_resource() instead, which
+> automatically requests the resource (so the I/O registers region shows
+> up properly in /proc/iomem), and also is devm-style, which allows to
+> get rid of some error handling to unmap the I/O registers region.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-We've had soo many build failures due to trying to be too clever that
-I'm not playing the "try to be clever" game here anymore.  We can be
-more verbose instead.
+Does this actually fix any bugs?  It seems like the unmaps happen in
+all the necessary cases.
 
-> Also this needs to take care of those machines overriding PHYS_OFFSET at 
-> run time (see commit a77e0c7b2774f).
-
-Platforms don't override PHYS_OFFSET.  They override PLAT_PHYS_OFFSET
-instead.
-
-> However it looks like no code 
-> relying on the LPAE version of early_paging_init() has been merged in 
-> mainline yet.
-
-I believe that's fully reliant on CONFIG_ARM_PATCH_PHYS_VIRT being set,
-and the difference for that case would be setting __pv_phys_pfn_offset
-instead of __pv_phys_offset, which is a simple modification.
-
-However, that's something which should be done by core code, not
-individually by platforms.  Since we don't have any view of code doing
-this yet, it's not relevant here.  We can only deal with what is in
-mainline and not in external trees.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+If it's just a simplification or cleanup I'm going to apply this to
+net-next.
