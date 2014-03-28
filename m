@@ -1,27 +1,69 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 28 Mar 2014 16:39:00 +0800
-Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <20140328091646.1ce03f90@ipc1.ka-ro>
-References: <532BCFCC.4080205@freescale.com>	<1395399017-19005-1-git-send-email-LW@KARO-electronics.de>	<20140324095902.GB11377@localhost>	<20140326095156.3e5585b8@ipc1.ka-ro>	<5332AEE7.2040402@freescale.com>	<20140326125502.0e8d0657@ipc1.ka-ro>	<20140327095956.GA29623@localhost>	<20140327132109.06258526@ipc1.ka-ro>	<5334D9F7.2030001@freescale.com>
- <20140328091646.1ce03f90@ipc1.ka-ro>
-Message-ID: <53353524.9020605@freescale.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 28 Mar 2014 17:52:29 +0900
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+In-Reply-To: <532B43F9.9060001@samsung.com>
+References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
+ <20140309183523.GD22881@quad.lixom.net> <531CFA28.9020600@gmail.com>
+ <CAOesGMiqhVk6JYhx=4446E1ZFWy7CrQNsjp8U6jf_De8FzidFw@mail.gmail.com>
+ <01d001cf3ccc$39f339b0$add9ad10$@samsung.com>
+ <CAOesGMiYJa7uM21ot_h6mGRTQX+HLcOsmTjk78WS0KZD6=piyw@mail.gmail.com>
+ <20140319040149.30995.80279@quantum> <532B43F9.9060001@samsung.com>
+Message-ID: <021e01cf4a63$0cdb7380$26925a80$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014?03?28? 16:16, Lothar Wa?mann ??:
-> Still there is no need for the Linux NAND driver to be able to read or
-> write partitions in a format that the Boot ROM can understand. Thus it
-If you do not use the NAND boot, there really no need to do so.
+Kukjin Kim wrote:
+> 
+> On 03/19/14 13:01, Mike Turquette wrote:
+> > Quoting Olof Johansson (2014-03-10 19:52:01)
+> >> On Mon, Mar 10, 2014 at 6:50 PM, Kukjin Kim<kgene.kim@samsung.com>
+> wrote:
+> >>> Olof Johansson wrote:
+> >>>>
+> >>>>>> Hi,
+> >>>>>>
+> >>>>>> I don't see a single cc or acked-by line from Mike Turquette here.
+> I'll
+> >>>>>> hold
+> >>>>>> off until he's had a chance to take a look at these ones; I suspect
+> >>>>>> they'll be
+> >>>>>> fine since it's mostly code refactoring though.
+> >>>>>
+> >>>>>
+> >>>>> I guess I should have ACKed them too, but it felt kind of strange to
+> ACK
+> >>>> my
+> >>>>> own patches. ;)
+> >>>>>
+> >>>>> Anyway, for all samsung-clk patches:
+> >>>>>
+> >>>>> Acked-by: Tomasz Figa<t.figa@samsung.com>
+> >>>>
+> >>>> Yeah, self-acking doesn't make much sense. :)
+> >>>>
+> >>>> I'm mostly worried about patches touching other subsystems without
+> the
+> >>>> other maintainer being aware of it or having reviewed them. As I
+said,
+> >>>> these mostly look like refactorings but it's still good habit.
+> >>>>
+> >>> OK, agreed, I think Mike knew about that though. Let's wait for Mike's
+> >>> response.
+> >>>
+> >>> BTW, should I sort out the branch again if Mike gives ack on that?
+> >>
+> >> If I hear from Mike that he's OK with it then I can merge it, no need
+> to rebase.
+> >
+> Thanks :-)
+> 
+> > Acked-by: Mike Turquette<mturquette@linaro.org>
+> >
+> It's time. Please pull this [5/6] and "[GIT PULL 6/6] Samsung
+> clk-s3c24xx updates for v3.15".
+> 
+Hi Arnd, Olof and Mike,
 
-Since you need the NAND boot, we should enable the swapping for imx28.
-> is perfectly legal to allow disregarding the BB marks and solely rely on
-> a flash based BBT.
->
-The BB mark is in the page 0 of a NAND block. But the swapping can occur 
-in _each_ page of
-a NAND block, _NOT_ only the page 0.
+Still I cannot see this in arm-soc. Any problems?
 
-I think you are confusing at these two things.
-
-thanks
-Huang Shijie
+- Kukjin
