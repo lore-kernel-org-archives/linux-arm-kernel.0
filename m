@@ -1,68 +1,112 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 28 Mar 2014 14:22:33 +0000
-Subject: [PATCH V3 1/2] arm: mm: Introduce pte_isset and pte_isclear
-In-Reply-To: <1396016554-5843-1-git-send-email-steve.capper@linaro.org>
-References: <1396016554-5843-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1396016554-5843-2-git-send-email-steve.capper@linaro.org>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 28 Mar 2014 15:17:23 +0000
+Subject: [PATCH 35/75] ARM: l2c: convert Broadcom L2C-310 to new code
+In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+Message-ID: <E1WTYX5-0007FE-88@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Long descriptors on ARM are 64 bits, and some pte functions such as
-pte_dirty return a bitwise-and of a flag with the pte value. If the
-flag to be tested resides in the upper 32 bits of the pte, then we run
-into the danger of the result being dropped if downcast.
+The Broadcom L2C-310 devices use ARMs L2C-310 R2P3 or later.  These
+require no errata workarounds, and so we can directly call the l2c210
+functions from their methods.
 
-For example:
-	gather_stats(page, md, pte_dirty(*pte), 1);
-where pte_dirty(*pte) is downcast to an int.
-
-This patch introduces a new macro pte_isset which performs the bitwise
-and, then performs a double logical invert (where needed) to ensure
-predictable downcasting.
-
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-Changes in V3: back to pte_isset macro. Added (u32)(val) == (val) as
-recommended by Russell to simplify cases where we do not need to
-perform a double logical invert. Also added pte_isclear as recommended,
-as this makes the pte accessors look a lot cleaner.
+ arch/arm/mm/cache-l2x0.c | 27 +++++++++++----------------
+ 1 file changed, 11 insertions(+), 16 deletions(-)
 
-I have experimented with multiple implementations of pte_isclear in an
-attempt to simplify things for LPAE where (u32)val == val, but have
-been unable to come up with any convincing schemes.
----
- arch/arm/include/asm/pgtable.h | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 7d59b52..8790444 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -214,15 +214,19 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index ee2134671699..b059b8d885dc 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1360,16 +1360,16 @@ static void bcm_inv_range(unsigned long start, unsigned long end)
  
- #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
+ 	/* normal case, no cross section between start and end */
+ 	if (likely(bcm_addr_is_sys_emi(end) || !bcm_addr_is_sys_emi(start))) {
+-		l2x0_inv_range(new_start, new_end);
++		l2c210_inv_range(new_start, new_end);
+ 		return;
+ 	}
  
-+#define pte_isset(pte, val)	((u32)(val) == (val) ? pte_val(pte) & (val) \
-+						: !!(pte_val(pte) & (val)))
-+#define pte_isclear(pte, val)	(!(pte_val(pte) & (val)))
-+
- #define pte_none(pte)		(!pte_val(pte))
--#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
--#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
--#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
--#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
--#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
-+#define pte_present(pte)	(pte_isset((pte), L_PTE_PRESENT))
-+#define pte_write(pte)		(pte_isclear((pte), L_PTE_RDONLY))
-+#define pte_dirty(pte)		(pte_isset((pte), L_PTE_DIRTY))
-+#define pte_young(pte)		(pte_isset((pte), L_PTE_YOUNG))
-+#define pte_exec(pte)		(pte_isclear((pte), L_PTE_XN))
- #define pte_special(pte)	(0)
+ 	/* They cross sections, so it can only be a cross from section
+ 	 * 2 to section 3
+ 	 */
+-	l2x0_inv_range(new_start,
++	l2c210_inv_range(new_start,
+ 		bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR-1));
+-	l2x0_inv_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
++	l2c210_inv_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
+ 		new_end);
+ }
  
--#define pte_present_user(pte)  (pte_present(pte) && (pte_val(pte) & L_PTE_USER))
-+#define pte_present_user(pte)	(pte_present(pte) && pte_isset((pte), L_PTE_USER))
+@@ -1382,26 +1382,21 @@ static void bcm_clean_range(unsigned long start, unsigned long end)
+ 	if (unlikely(end <= start))
+ 		return;
  
- #if __LINUX_ARM_ARCH__ < 6
- static inline void __sync_icache_dcache(pte_t pteval)
+-	if ((end - start) >= l2x0_size) {
+-		l2x0_clean_all();
+-		return;
+-	}
+-
+ 	new_start = bcm_l2_phys_addr(start);
+ 	new_end = bcm_l2_phys_addr(end);
+ 
+ 	/* normal case, no cross section between start and end */
+ 	if (likely(bcm_addr_is_sys_emi(end) || !bcm_addr_is_sys_emi(start))) {
+-		l2x0_clean_range(new_start, new_end);
++		l2c210_clean_range(new_start, new_end);
+ 		return;
+ 	}
+ 
+ 	/* They cross sections, so it can only be a cross from section
+ 	 * 2 to section 3
+ 	 */
+-	l2x0_clean_range(new_start,
++	l2c210_clean_range(new_start,
+ 		bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR-1));
+-	l2x0_clean_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
++	l2c210_clean_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
+ 		new_end);
+ }
+ 
+@@ -1415,7 +1410,7 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
+ 		return;
+ 
+ 	if ((end - start) >= l2x0_size) {
+-		l2x0_flush_all();
++		outer_cache.flush_all();
+ 		return;
+ 	}
+ 
+@@ -1424,24 +1419,24 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
+ 
+ 	/* normal case, no cross section between start and end */
+ 	if (likely(bcm_addr_is_sys_emi(end) || !bcm_addr_is_sys_emi(start))) {
+-		l2x0_flush_range(new_start, new_end);
++		l2c210_flush_range(new_start, new_end);
+ 		return;
+ 	}
+ 
+ 	/* They cross sections, so it can only be a cross from section
+ 	 * 2 to section 3
+ 	 */
+-	l2x0_flush_range(new_start,
++	l2c210_flush_range(new_start,
+ 		bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR-1));
+-	l2x0_flush_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
++	l2c210_flush_range(bcm_l2_phys_addr(BCM_VC_EMI_SEC3_START_ADDR),
+ 		new_end);
+ }
+ 
++/* Broadcom L2C-310 start from ARMs R3P2 or later, and require no fixups */
+ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
+ 	.num_lock = 8,
+ 	.of_parse = l2c310_of_parse,
+ 	.enable = l2c_enable,
+-	.fixup = l2c310_fixup,
+ 	.save  = l2c310_save,
+ 	.outer_cache = {
+ 		.inv_range   = bcm_inv_range,
 -- 
-1.8.1.4
+1.8.3.1
