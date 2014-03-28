@@ -1,61 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Mar 2014 20:54:03 +0000
-Subject: [PATCH 32/75] ARM: l2c: implement L2C-310 erratum 588369 as a
- method override
-In-Reply-To: <CAL_JsqJc83QhK2zpYdT9XoU0_wOv7Dm31Ew0Mh6e68f9YU8O7w@mail.gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 28 Mar 2014 15:51:58 -0500
+Subject: [PATCH 41/75] ARM: l2c: provide generic hook to intercept writes
+ to secure registers
+In-Reply-To: <E1WTYXc-0007Fd-8A@rmk-PC.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYWp-0007F1-Tq@rmk-PC.arm.linux.org.uk>
- <CAL_JsqJc83QhK2zpYdT9XoU0_wOv7Dm31Ew0Mh6e68f9YU8O7w@mail.gmail.com>
-Message-ID: <20140328205402.GR7528@n2100.arm.linux.org.uk>
+ <E1WTYXc-0007Fd-8A@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140328205158.GC28265@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 03:41:46PM -0500, Rob Herring wrote:
-> On Fri, Mar 28, 2014 at 10:17 AM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > Implement L2C-310 erratum 588369 by overriding the invalidate range
-> > and flush range methods in the outer_cache operations structure.
-> > This allows us to sensibly contain the erratum code in one place
-> > without affecting other locations/implemetations.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> 
-> [snip]
-> 
-> > @@ -600,9 +659,19 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
-> >         const char *errata[4];
-> >         unsigned n = 0;
-> >
-> > +       /* For compatibility */
-> 
-> Compatibility of what?  This needs a better comment.
-> 
-> >         if (revision <= L310_CACHE_ID_RTL_R3P0)
-> >                 fns->set_debug = l2c310_set_debug;
+On Fri, Mar 28, 2014 at 03:17:56PM +0000, Russell King wrote:
+> @@ -60,13 +60,30 @@ static inline void l2c_wait_mask(void __iomem *reg, unsigned long mask)
+>  }
+>  
+>  /*
+> + * By default, we write directly to secure registers.  Platforms must
+> + * override this if they are running non-secure.
+> + */
+> +static void l2c_write_sec(unsigned long val, void __iomem *base, unsigned reg)
+> +{
+> +	if (val == readl_relaxed(base + reg))
+> +		return;
+> +	if (outer_cache.write_sec)
+> +		outer_cache.write_sec(val, reg);
+> +	else
+> +		writel_relaxed(val, base + reg);
+> +}
+> +
+> +/*
+[..]
+> @@ -97,7 +114,7 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>  
+>  	/* Only write the aux register if it needs changing */
+>  	if (readl_relaxed(base + L2X0_AUX_CTRL) != aux)
 
-With the way the existing code works with the set_debug method.  You
-may notice that this comment and code is removed in "ARM: l2c: remove
-old .set_debug method".
+It looks like this conditional can be dropped, since l2c_write_sec is
+just going to perform the same check.
 
-> >
-> > +       if (IS_ENABLED(CONFIG_PL310_ERRATA_588369) &&
-> > +           revision < L310_CACHE_ID_RTL_R2P0 &&
-> > +           /* For compatibility */
-> 
-> same here.
-> 
-> > +           fns->inv_range == l2x0_inv_range) {
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-hint - the comment is above the code which it applies to in both cases.
-
-It's referring to those which don't have a .inv_range of that, but are
-L2C-310.  Well, there's Broadcom's implementation which thankfully is
-R3 or later, though I later dropped the call to this function from
-the Broadcom stuff since I had confirmation that it was of a sufficiently
-modern version not to need any errata workarounds at all.
-
+> -		writel_relaxed(aux, base + L2X0_AUX_CTRL);
+> +		l2c_write_sec(aux, base, L2X0_AUX_CTRL);
+>  
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
