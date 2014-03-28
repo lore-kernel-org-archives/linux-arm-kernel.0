@@ -1,43 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 28 Mar 2014 10:50:32 -0500
-Subject: [PATCH 05/75] ARM: l2c: remove unnecessary UL-suffix to mask
- values
-In-Reply-To: <E1WTYUW-0004WD-UP@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Mar 2014 15:51:27 +0000
+Subject: [PATCH 74/75] ARM: l2c: always enable low power modes
+In-Reply-To: <CAL_Jsq+vja-BeNfiVnOicFAa+E6jigDfnb5KWWpxZCZ3eGkJiA@mail.gmail.com>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYUW-0004WD-UP@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_Jsq+qaQ=CtqMKbd5Fcp1YAY+E40mS24kWe8RMwb2Bz1A9kQ@mail.gmail.com>
+ <E1WTYaK-0007I0-Sm@rmk-PC.arm.linux.org.uk>
+ <CAL_Jsq+vja-BeNfiVnOicFAa+E6jigDfnb5KWWpxZCZ3eGkJiA@mail.gmail.com>
+Message-ID: <20140328155127.GL7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 10:14 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> They're u32, they're not unsigned long.  The UL suffix is not required
-> here.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mach-highbank/highbank.c   | 2 +-
->  arch/arm/mach-imx/mach-vf610.c      | 2 +-
->  arch/arm/mach-imx/system.c          | 2 +-
->  arch/arm/mach-mvebu/armada-370-xp.c | 2 +-
->  arch/arm/mach-rockchip/rockchip.c   | 2 +-
->  arch/arm/mach-socfpga/socfpga.c     | 2 +-
->  6 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-> index c7de89b263dd..38e1dc3b4c6e 100644
-> --- a/arch/arm/mach-highbank/highbank.c
-> +++ b/arch/arm/mach-highbank/highbank.c
-> @@ -69,7 +69,7 @@ static void __init highbank_init_irq(void)
->         if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
->             of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
->                 highbank_smc1(0x102, 0x1);
-> -               l2x0_of_init(0, ~0UL);
-> +               l2x0_of_init(0, ~0);
+On Fri, Mar 28, 2014 at 10:42:54AM -0500, Rob Herring wrote:
+> On Fri, Mar 28, 2014 at 10:20 AM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
+> 
+> I assume you want to squash this with patch 68/75? Or you are still
+> debating whether we want to do this or not? Given that it is r3px
+> only, that should greatly reduce any chance of breakage to newer
+> platforms.
 
-What about changing these callers to use l2x0_of_init(void) and
-creating l2x0_of_init_legacy(val, mask) for ones that need the aux
-ctrl setup? We do want to encourage people to either setup aux ctrl in
-the bootloader or via DT properties.
+I will eventually - I've kept it separate for the time being to give
+more options.  Let's see how people get on with it - it'll be running
+through Olof's builder later today, and there's some other people
+wanting to take it for a spin.
 
-Rob
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
