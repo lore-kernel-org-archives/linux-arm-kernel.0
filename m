@@ -1,91 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 28 Mar 2014 11:11:39 +0100
-Subject: [PATCH trivial 3/3] ARM: dts: Grammar /that will/it will/
-In-Reply-To: <1396001499-17638-1-git-send-email-geert@linux-m68k.org>
-References: <1396001499-17638-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1396001499-17638-3-git-send-email-geert@linux-m68k.org>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 28 Mar 2014 11:13:50 +0100
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <53354329.2020909@freescale.com>
+References: <532BCFCC.4080205@freescale.com>
+ <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+ <20140324095902.GB11377@localhost>
+ <20140326095156.3e5585b8@ipc1.ka-ro>
+ <5332AEE7.2040402@freescale.com>
+ <20140326125502.0e8d0657@ipc1.ka-ro>
+ <20140327095956.GA29623@localhost>
+ <20140327132109.06258526@ipc1.ka-ro>
+ <5334D9F7.2030001@freescale.com>
+ <20140328091646.1ce03f90@ipc1.ka-ro>
+ <53353524.9020605@freescale.com>
+ <20140328100158.042a3d68@ipc1.ka-ro>
+ <533541DE.7020606@freescale.com> <53354329.2020909@freescale.com>
+Message-ID: <20140328111350.003b9fce@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/boot/dts/am33xx.dtsi |    4 ++--
- arch/arm/boot/dts/dra7.dtsi   |    2 +-
- arch/arm/boot/dts/omap3.dtsi  |    2 +-
- arch/arm/boot/dts/omap4.dtsi  |    2 +-
- arch/arm/boot/dts/omap5.dtsi  |    2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
+Huang Shijie wrote:
+> ? 2014?03?28? 17:33, Huang Shijie ??:
+> > ? 2014?03?28? 17:01, Lothar Wa?mann ??:
+> >> There is no need for the ROM code to access any other partition than
+> >> the bootloader itself. Thus Linux can perfectly well be booted from
+> > Assume the ROM only access the partition which contains the 
+> > bootloader, and
+> > the ROM does the swapping for the pages(but we do not do the swapping 
+> > to these pages),
+> I mean the kernel do not do the swapping when we burn the uboot to the NAND.
+> 
+The kernel need not be able to write the bootloader to NAND. 
+If you want a kernel that can do it, you just need to boot it with one
+line in the DTB removed.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 70f7f3eb5fb4..2a66fd484284 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -90,8 +90,8 @@
- 
- 	/*
- 	 * XXX: Use a flat representation of the AM33XX interconnect.
--	 * The real AM33XX interconnect network is quite complex.Since
--	 * that will not bring real advantage to represent that in DT
-+	 * The real AM33XX interconnect network is quite complex. Since
-+	 * it will not bring real advantage to represent that in DT
- 	 * for the moment, just use a fake OCP bus entry to represent
- 	 * the whole bus hierarchy.
- 	 */
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index c19e90ecf95e..9daab63fe457 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -89,7 +89,7 @@
- 	/*
- 	 * XXX: Use a flat representation of the SOC interconnect.
- 	 * The real OMAP interconnect network is quite complex.
--	 * Since that will not bring real advantage to represent that in DT for
-+	 * Since it will not bring real advantage to represent that in DT for
- 	 * the moment, just use a fake OCP bus entry to represent the whole bus
- 	 * hierarchy.
- 	 */
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a5fc83b9c835..5ae8141d3713 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -69,7 +69,7 @@
- 	/*
- 	 * XXX: Use a flat representation of the OMAP3 interconnect.
- 	 * The real OMAP interconnect network is quite complex.
--	 * Since that will not bring real advantage to represent that in DT for
-+	 * Since it will not bring real advantage to represent that in DT for
- 	 * the moment, just use a fake OCP bus entry to represent the whole bus
- 	 * hierarchy.
- 	 */
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index a07ea359ae20..c95adadb0bbf 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -91,7 +91,7 @@
- 	/*
- 	 * XXX: Use a flat representation of the OMAP4 interconnect.
- 	 * The real OMAP interconnect network is quite complex.
--	 * Since that will not bring real advantage to represent that in DT for
-+	 * Since it will not bring real advantage to represent that in DT for
- 	 * the moment, just use a fake OCP bus entry to represent the whole bus
- 	 * hierarchy.
- 	 */
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index aa9878c0aaad..0d875ba32fa9 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -101,7 +101,7 @@
- 	/*
- 	 * XXX: Use a flat representation of the OMAP3 interconnect.
- 	 * The real OMAP interconnect network is quite complex.
--	 * Since that will not bring real advantage to represent that in DT for
-+	 * Since it will not bring real advantage to represent that in DT for
- 	 * the moment, just use a fake OCP bus entry to represent the whole bus
- 	 * hierarchy.
- 	 */
+
+Lothar Wa?mann
 -- 
-1.7.9.5
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
