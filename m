@@ -1,48 +1,48 @@
-From: elder@linaro.org (Alex Elder)
-Date: Fri, 28 Mar 2014 16:12:54 -0500
-Subject: [RFC PATCH 1/7] ARM: allow <asm/cputype.h> inclusion from assembly
-In-Reply-To: <1396041180-29897-1-git-send-email-elder@linaro.org>
-References: <1396041180-29897-1-git-send-email-elder@linaro.org>
-Message-ID: <1396041180-29897-2-git-send-email-elder@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 28 Mar 2014 16:20:28 -0500
+Subject: [PATCH 1/2] dt/bindings: add binding for ARM Versatile character LCD
+Message-ID: <1396041629-28820-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Conditionally exclude some portions of ARM <asm/cputype.h>
-to allow that file to be included from assembly source.
+From: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Alex Elder <elder@linaro.org>
+Add binding doc for Versatile platforms character LCD controller
+interface.
+
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
 ---
- arch/arm/include/asm/cputype.h |    4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/misc/arm-charlcd.txt | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/arm-charlcd.txt
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index acdde76..a74c671 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -2,7 +2,9 @@
- #define __ASM_ARM_CPUTYPE_H
- 
- #include <linux/stringify.h>
-+#ifndef __ASSEMBLY__
- #include <linux/kernel.h>
-+#endif
- 
- #define CPUID_ID	0
- #define CPUID_CACHETYPE	1
-@@ -77,6 +79,7 @@
- #define ARM_CPU_XSCALE_ARCH_V2		0x4000
- #define ARM_CPU_XSCALE_ARCH_V3		0x6000
- 
-+#ifndef __ASSEMBLY__
- extern unsigned int processor_id;
- 
- #ifdef CONFIG_CPU_CP15
-@@ -219,5 +222,6 @@ static inline int cpu_is_xsc3(void)
- #else
- #define	cpu_is_xscale()	1
- #endif
-+#endif /* !__ASSEMBLY__ */
- 
- #endif
+diff --git a/Documentation/devicetree/bindings/misc/arm-charlcd.txt b/Documentation/devicetree/bindings/misc/arm-charlcd.txt
+new file mode 100644
+index 0000000..e28e2aa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/arm-charlcd.txt
+@@ -0,0 +1,18 @@
++ARM Versatile Character LCD
++-----------------------------------------------------
++This binding defines the character LCD interface found on ARM Versatile AB
++and PB reference platforms.
++
++Required properties:
++- compatible : "arm,versatile-clcd"
++- reg : Location and size of character LCD registers
++
++Optional properties:
++- interrupts - single interrupt for character LCD. The character LCD can
++  operate in polled mode without an interrupt.
++
++Example:
++	lcd at 10008000 {
++		compatible = "arm,versatile-lcd";
++		reg = <0x10008000 0x1000>;
++	};
 -- 
-1.7.9.5
+1.8.3.2
