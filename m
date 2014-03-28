@@ -1,54 +1,29 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:18:57 +0000
-Subject: [PATCH 53/75] ARM: l2c: ux500: remove associativity and way size from
- aux_ctrl
+Date: Fri, 28 Mar 2014 15:19:07 +0000
+Subject: [PATCH 55/75] ARM: l2c: cns3xxx: remove cache size override
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYYb-0007GS-Ho@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYYl-0007Ga-Oe@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-ux500/cache-l2x0.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ arch/arm/mach-cns3xxx/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 067c37a054fb..5b891d051054 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -45,8 +45,6 @@ static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
+diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
+index dd2b9926a76c..bce1d36d0ffb 100644
+--- a/arch/arm/mach-cns3xxx/core.c
++++ b/arch/arm/mach-cns3xxx/core.c
+@@ -258,7 +258,7 @@ void __init cns3xxx_l2x0_init(void)
+ 	writel(val, base + L310_DATA_LATENCY_CTRL);
  
- static int __init ux500_l2x0_init(void)
- {
--	u32 aux_val = 0x3e000000;
--
- 	if (cpu_is_u8500_family() || cpu_is_ux540_family())
- 		l2x0_base = __io_address(U8500_L2CC_BASE);
- 	else
-@@ -56,21 +54,12 @@ static int __init ux500_l2x0_init(void)
- 	/* Unlock before init */
- 	ux500_l2x0_unlock();
- 
--	/* DBx540's L2 has 128KB way size */
--	if (cpu_is_ux540_family())
--		/* 128KB way size */
--		aux_val |= L2C_AUX_CTRL_WAY_SIZE(4);
--	else
--		/* 64KB way size */
--		aux_val |= L2C_AUX_CTRL_WAY_SIZE(3);
--
- 	outer_cache.write_sec = ux500_l2c310_write_sec;
- 
--	/* 64KB way size, 8 way associativity, force WA */
- 	if (of_have_populated_dt())
--		l2x0_of_init(aux_val, 0xc0000fff);
-+		l2x0_of_init(0x3e000000, 0xc00f0fff);
- 	else
--		l2x0_init(l2x0_base, aux_val, 0xc0000fff);
-+		l2x0_init(l2x0_base, 0x3e000000, 0xc00f0fff);
- 
- 	return 0;
+ 	/* 32 KiB, 8-way, parity disable */
+-	l2x0_init(base, 0x00540000, 0xfe000fff);
++	l2x0_init(base, 0x00500000, 0xfe0f0fff);
  }
+ 
+ #endif /* CONFIG_CACHE_L2X0 */
 -- 
 1.8.3.1
