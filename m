@@ -1,85 +1,138 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Fri, 28 Mar 2014 18:59:05 +0100
-Subject: [RFC PATCH v2 07/10] irqchip: atmel-aic: document new dt properties
- and children nodes
+Date: Fri, 28 Mar 2014 18:59:07 +0100
+Subject: [RFC PATCH v2 09/10] ARM: at91/dt: add new AIC irq mux definitions
+ for sam9x5 SoCs
 In-Reply-To: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
 References: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1396029548-10928-8-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1396029548-10928-10-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add irq muxing and irq-mapping dt bindings documentation.
+Add irq line muxing definition for sam9x5 SoCs.
 
 Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
 ---
- .../bindings/interrupt-controller/atmel,aic.txt    |   42 +++++++++++++++++++-
- 1 file changed, 41 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9x5.dtsi |  108 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 108 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
-index 2742e9c..d46ec8e 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
-@@ -18,8 +18,33 @@ Required properties:
-   The third cell is used to specify the irq priority from 0 (lowest) to 7
-   (highest).
- - reg: Should contain AIC registers location and length
-+- #address-cells: Shall be 2. The first cell encodes the irq line (or irq id).
-+  The second cell encodes the register offset within the iomem range.
-+- #size-cells: Shall be 1.
-+- ranges: Defines the iomem ranges attached to a given irq line (e.i. irq
-+  line 1 <=> SYSC range).
- - atmel,external-irqs: u32 array of external irqs.
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 174219d..ccdfdf3 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -69,6 +69,114 @@
+ 				interrupt-controller;
+ 				reg = <0xfffff000 0x200>;
+ 				atmel,external-irqs = <31>;
++				#address-cells = <2>;
++				#size-cells = <1>;
++				ranges = <1 0x0 0xffffc000 0x4000>,
++					 <2 0x0 0xfffff400 0x400>,
++					 <3 0x0 0xfffff800 0x400>,
++					 <17 0x0 0xf8008000 0x8000>;
++
++				dbgu_irq: irq-mux at 1,2e0c {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <1 0x2e0c 0x4>;
++					atmel,aic-mux-reg-mask = <0xc00002e3>;
++				};
++
++				pmc_irq: irq-mux at 1,3c64 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <1 0x3c64 0x4>;
++					atmel,aic-mux-reg-mask = <0x7034b>;
++				};
++
++				pmecc_irq: irq-mux at 1,2020 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <1 0x2020 0x4>;
++					atmel,aic-mux-reg-mask = <0x1>;
++				};
++
++				pmerrloc_irq: irq-mux at 1,2618 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <1 0x2618 0x4>;
++					atmel,aic-mux-reg-mask = <0x1>;
++				};
++
++				pit_irq: irq-mux at 1,3e30 {
++					compatible = "atmel,aic-mux-1reg-irq";
++					reg = <1 0x3e30 0x4>;
++					atmel,aic-mux-reg-mask = <0x2000000>;
++				};
++
++				wdt_irq: irq-mux at 1,3e40 {
++					compatible = "atmel,aic-mux-1reg-irq";
++					reg = <1 0x3e40 0x4>;
++					atmel,aic-mux-reg-mask = <0x1000>;
++				};
++
++				rtc_irq: irq-mux at 1,3ed4 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <1 0x3ed4 0x4>;
++					atmel,aic-mux-reg-mask = <0x1f>;
++				};
++
++				pioA_irq: irq-mux at 2,44 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <2 0x44 0x4>;
++					atmel,aic-mux-reg-mask = <0xffffffff>;
++				};
++
++				pioB_irq: irq-mux at 2,244 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <2 0x244 0x4>;
++					atmel,aic-mux-reg-mask = <0xffffffff>;
++				};
++
++				pioC_irq: irq-mux at 3,44 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <3 0x44 0x4>;
++					atmel,aic-mux-reg-mask = <0xffffffff>;
++				};
++
++				pioD_irq: irq-mux at 3,244 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <3 0x244 0x4>;
++					atmel,aic-mux-reg-mask = <0xffffffff>;
++				};
++
++				tc0_irq: irq-mux at 17,28 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <17 0x28 0x4>;
++					atmel,aic-mux-reg-mask = <0xff>;
++				};
++
++				tc1_irq: irq-mux at 17,68 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <17 0x68 0x4>;
++					atmel,aic-mux-reg-mask = <0xff>;
++				};
++
++				tc2_irq: irq-mux at 17,a8 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <17 0xa8 0x4>;
++					atmel,aic-mux-reg-mask = <0xff>;
++				};
++
++				tc3_irq: irq-mux at 17,4028 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <17 0x4028 0x4>;
++					atmel,aic-mux-reg-mask = <0xff>;
++				};
++
++				tc4_irq: irq-mux at 17,4068 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <17 0x4068 0x4>;
++					atmel,aic-mux-reg-mask = <0xff>;
++				};
++
++				tc5_irq: irq-mux at 17,40a8 {
++					compatible = "atmel,aic-mux-3reg-irq";
++					reg = <17 0x40a8 0x4>;
++					atmel,aic-mux-reg-mask = <0xff>;
++				};
+ 			};
  
-+Optional properties:
-+- atmel,irq-mapping: u32 mask array representing the available irqs:
-+    e.i. : atmel,irq-mapping = <0xffff1fff> => irqs 13 to 15 are unavailables
-+
-+Optional children nodes:
-+- muxed irq entries:
-+  Required properties:
-+   * compatible: Shall be
-+     "atmel,aic-mux-1reg-irq": irq enable/disable/retrieve-status is done by
-+     setting/clearing/reading flags in a specific register
-+     or
-+     "atmel,aic-mux-3reg-irq": irq enable/disable/retrieve-status is done
-+     by writing/reading flags in specific enable/disable/mask registers
-+   * reg: encode the interrupt control register.
-+     The first cell encode the irq line.
-+     The second cell encode the offset register within its iomem range
-+     The last cell encode the iomem region size (should always be set to 0x4).
-+   * atmel,aic-mux-reg-mask: define the mask used to disable the interrupts
-+     generated by the muxed entry.
-+
- Examples:
- 	/*
- 	 * AIC
-@@ -29,11 +54,26 @@ Examples:
- 		interrupt-controller;
- 		interrupt-parent;
- 		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <1>;
- 		reg = <0xfffff000 0x200>;
-+		ranges = <0x1 0x0 0xffffc000 0x4000>;
-+
-+		dbgu_irq: irq at 1,320c {
-+			compatible = "atmel,aic-mux-3reg-irq";
-+			reg = <1 0x320c 0x4>;
-+			atmel,aic-mux-reg-mask = <0xc0001afb>;
-+		};
-+
-+		pmc_irq: irq at 1,3c64 {
-+			compatible = "atmel,aic-mux-3reg-irq";
-+			reg = <1 0x3c64 0x4>;
-+			atmel,aic-mux-reg-mask = <0xf0f>;
-+		};
- 	};
- 
- 	/*
--	 * An interrupt generating device that is wired to an AIC.
-+	 * A device generating interrupts wired to the AIC.
- 	 */
- 	dma: dma-controller at ffffec00 {
- 		compatible = "atmel,at91sam9g45-dma";
+ 			ramc0: ramc at ffffe800 {
 -- 
 1.7.9.5
