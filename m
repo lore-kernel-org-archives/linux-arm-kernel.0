@@ -1,31 +1,66 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 28 Mar 2014 08:49:00 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix reset controller handling
-In-Reply-To: <1394449930-29696-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1394449930-29696-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140328074900.GC2708@katana>
+Date: Fri, 28 Mar 2014 08:55:49 +0100
+Subject: [PATCH 00/17] i2c: deprecate class based instantiation for
+ embedded I2C drivers
+In-Reply-To: <1392026654-5343-1-git-send-email-wsa@the-dreams.de>
+References: <1392026654-5343-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <20140328075548.GD2708@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 10, 2014 at 12:12:10PM +0100, Maxime Ripard wrote:
-> The reset framework recently gained optional stubs when CONFIG_RESET_CONTROLLER
-> is not selected. It also introduced a function reset_get_optional, that is also
-> dummy-defined whenever the framework isn't enabled, for drivers that needs an
-> optional reset controller.
+On Mon, Feb 10, 2014 at 11:03:54AM +0100, Wolfram Sang wrote:
+> With I2C, class based instantiation means if a master driver has e.g.
+> I2C_CLASS_HWMON set, all slave drivers with this class will try to probe a
+> device using an array of possible addresses and some heuristics. That creates
+> traffic and needs time, even when nothing is connected. This mechanism is
+> needed when you do not have another method to describe the slaves. Embedded I2C
+> drivers do not need class based instantiation, since there is i2c_board_info or
+> devicetree description. Some drivers have the class flags set, though, and it
+> has spread further over the years. We can't remove the flags directly, because
+> there might be users out there relying on this feature. So, we add a
+> deprecation warning if a device is instantiated via class attributes. After
+> giving some time to switch over, we can then finally remove the class flags and
+> gain boot time.
 > 
-> Switch to this function, since the mv64xxx driver is in this case. This also
-> fixes a compilation breakage whenever the reset framework wasn't selected:
+> Patch 1 adds some missing documentation. Patch 2 adds the deprecation feature.
+> Patches 3+4 are tested on hardware I need. Patches 5-17 are suggestions for
+> drivers I think could benefit from that. For those, acks are needed before I
+> will apply them to my tree. If you use a different driver which can also
+> benefit from this, just send a patch adding the new DEPRECATED flag.
 > 
-> drivers/i2c/busses/i2c-mv64xxx.c:771:2: error: implicit declaration of function 'devm_reset_control_get'
+> The series can also be found here:
 > 
-> While we're at it, remove the redundant test on dev.of_node surrounding the
-> calls to reset framework functions, since it will either be a valid pointer, an
-> error pointer in the case where we called reset_get_optional without an of_node
-> pointer or if it failed, or NULL if we're not loaded through DT.
+> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/deprecated_class
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Thanks,
+> 
+>    Wolfram
+> 
+> 
+> Wolfram Sang (17):
+>   Documentation: i2c: describe devicetree method for instantiating
+>     devices
+>   i2c: add deprecation warning for class based instantiation
+>   i2c: i2c-omap: deprecate class based instantiation
+>   i2c: i2c-at91: deprecate class based instantiation
+>   i2c: i2c-bcm2835: deprecate class based instantiation
+>   i2c: i2c-bfin-twi: deprecate class based instantiation
+>   i2c: i2c-davinci: deprecate class based instantiation
+>   i2c: i2c-designware-platdrv: deprecate class based instantiation
+>   i2c: i2c-mv64xxx: deprecate class based instantiation
+>   i2c: i2c-nomadik: deprecate class based instantiation
+>   i2c: i2c-ocores: deprecate class based instantiation
+>   i2c: i2c-rcar: deprecate class based instantiation
+>   i2c: i2c-s3c2410: deprecate class based instantiation
+>   i2c: i2c-sirf: deprecate class based instantiation
+>   i2c: i2c-stu300: deprecate class based instantiation
+>   i2c: i2c-tegra: deprecate class based instantiation
+>   i2c: i2c-xiic: deprecate class based instantiation
 
-Applied to for-next, thanks!
+I reconsidered and have now applied all patches. That way, all these
+drivers can be converted to no class based instantiation in one go after
+some grace period. If it turns out, one driver actually needs it, there
+is still the grace period left to remove the DEPRECATED flag again.
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -33,4 +68,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/81cece5a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/dd0e039f/attachment-0001.sig>
