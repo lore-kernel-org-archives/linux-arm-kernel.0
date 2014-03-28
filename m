@@ -1,80 +1,85 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Mar 2014 17:52:59 +0100
-Subject: [PATCH 8/8] PCI: imx6: add support for MSI
+Date: Fri, 28 Mar 2014 17:52:57 +0100
+Subject: [PATCH 6/8] PCI: imx6: rip out optional (and unused) irqs
 In-Reply-To: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
 References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1396025579-14344-9-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1396025579-14344-7-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Message Signaled Interrupts in the
-imx6-pcie driver.
+They are dropped with the new binding.
 
-Signed-off-by: Harro Haan <hrhaan@gmail.com>
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/pci/host/pci-imx6.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/pci/host/pci-imx6.c | 42 ------------------------------------------
+ 1 file changed, 42 deletions(-)
 
 diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 4c20fc4795e5..41008b7804f9 100644
+index 259a73687526..4c20fc4795e5 100644
 --- a/drivers/pci/host/pci-imx6.c
 +++ b/drivers/pci/host/pci-imx6.c
-@@ -25,6 +25,7 @@
- #include <linux/resource.h>
- #include <linux/signal.h>
- #include <linux/types.h>
-+#include <linux/interrupt.h>
+@@ -32,9 +32,6 @@
  
- #include "pcie-designware.h"
- 
-@@ -314,6 +315,13 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
- 	return 0;
- }
- 
-+static irqreturn_t imx6_pcie_msi_handler(int irq, void *arg)
-+{
-+	struct pcie_port *pp = arg;
-+
-+	return dw_handle_msi_irq(pp);
-+}
-+
- static int imx6_pcie_start_link(struct pcie_port *pp)
- {
+ struct imx6_pcie {
+ 	int			reset_gpio;
+-	int			power_on_gpio;
+-	int			wake_up_gpio;
+-	int			disable_gpio;
+ 	struct clk		*pcie_bus;
+ 	struct clk		*pcie_phy;
+ 	struct clk		*pcie;
+@@ -230,9 +227,6 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-@@ -388,6 +396,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
- 	dw_pcie_setup_rc(pp);
- 
- 	imx6_pcie_start_link(pp);
-+
-+	if (IS_ENABLED(CONFIG_PCI_MSI))
-+		dw_pcie_msi_init(pp);
- }
- 
- static void imx6_pcie_reset_phy(struct pcie_port *pp)
-@@ -477,6 +488,22 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
- {
  	int ret;
  
-+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
-+		if (pp->msi_irq <= 0) {
-+			dev_err(&pdev->dev, "failed to get MSI irq\n");
-+			return -ENODEV;
-+		}
-+
-+		ret = devm_request_irq(&pdev->dev, pp->msi_irq,
-+		                       imx6_pcie_msi_handler,
-+		                       IRQF_SHARED, "mx6-pcie-msi", pp);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to request MSI irq\n");
-+			return -ENODEV;
-+		}
-+	}
-+
- 	pp->root_bus_nr = -1;
- 	pp->ops = &imx6_pcie_host_ops;
+-	if (gpio_is_valid(imx6_pcie->power_on_gpio))
+-		gpio_set_value(imx6_pcie->power_on_gpio, 1);
+-
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+ 			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+ 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+@@ -531,42 +525,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
+-	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
+-	if (gpio_is_valid(imx6_pcie->power_on_gpio)) {
+-		ret = devm_gpio_request_one(&pdev->dev,
+-					imx6_pcie->power_on_gpio,
+-					GPIOF_OUT_INIT_LOW,
+-					"PCIe power enable");
+-		if (ret) {
+-			dev_err(&pdev->dev, "unable to get power-on gpio\n");
+-			return ret;
+-		}
+-	}
+-
+-	imx6_pcie->wake_up_gpio = of_get_named_gpio(np, "wake-up-gpio", 0);
+-	if (gpio_is_valid(imx6_pcie->wake_up_gpio)) {
+-		ret = devm_gpio_request_one(&pdev->dev,
+-					imx6_pcie->wake_up_gpio,
+-					GPIOF_IN,
+-					"PCIe wake up");
+-		if (ret) {
+-			dev_err(&pdev->dev, "unable to get wake-up gpio\n");
+-			return ret;
+-		}
+-	}
+-
+-	imx6_pcie->disable_gpio = of_get_named_gpio(np, "disable-gpio", 0);
+-	if (gpio_is_valid(imx6_pcie->disable_gpio)) {
+-		ret = devm_gpio_request_one(&pdev->dev,
+-					imx6_pcie->disable_gpio,
+-					GPIOF_OUT_INIT_HIGH,
+-					"PCIe disable endpoint");
+-		if (ret) {
+-			dev_err(&pdev->dev, "unable to get disable-ep gpio\n");
+-			return ret;
+-		}
+-	}
+-
+ 	/* Fetch clocks */
+ 	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");
+ 	if (IS_ERR(imx6_pcie->pcie_phy)) {
 -- 
 1.9.0
