@@ -1,55 +1,52 @@
-From: elder@linaro.org (Alex Elder)
-Date: Fri, 28 Mar 2014 16:12:57 -0500
-Subject: [RFC PATCH 4/7] ARM: vexpress: use central SMP spin-table routines
-In-Reply-To: <1396041180-29897-1-git-send-email-elder@linaro.org>
-References: <1396041180-29897-1-git-send-email-elder@linaro.org>
-Message-ID: <1396041180-29897-5-git-send-email-elder@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 28 Mar 2014 16:20:29 -0500
+Subject: [PATCH 2/2] misc: arm-charlcd: add DT probe support
+In-Reply-To: <1396041629-28820-1-git-send-email-robherring2@gmail.com>
+References: <1396041629-28820-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1396041629-28820-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second patch involved replacing the use of smp
-operations defined under arch/arm/mach-versatile.  Both realview and
-vexpress use the same smp_boot_secondary and smp_secondary_init
-functions, and those are equivalent to the common ones now available
-in arch/arm/kernel/smp.c.
+From: Rob Herring <robh@kernel.org>
 
-This converts mach-vexpress to use the common routines.
+Add the DT match table to enable DT based probe matching.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- arch/arm/mach-vexpress/platsmp.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/misc/arm-charlcd.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 993c9ae..1ed4078 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -22,8 +22,6 @@
+diff --git a/drivers/misc/arm-charlcd.c b/drivers/misc/arm-charlcd.c
+index b7ebf80..c72e96b 100644
+--- a/drivers/misc/arm-charlcd.c
++++ b/drivers/misc/arm-charlcd.c
+@@ -11,6 +11,7 @@
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ #include <linux/completion.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
+@@ -366,11 +367,17 @@ static const struct dev_pm_ops charlcd_pm_ops = {
+ 	.resume = charlcd_resume,
+ };
  
- #include <mach/motherboard.h>
- 
--#include <plat/platsmp.h>
--
- #include "core.h"
- 
- #if defined(CONFIG_OF)
-@@ -193,14 +191,14 @@ static void __init vexpress_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	vexpress_flags_set(virt_to_phys(versatile_secondary_startup));
-+	vexpress_flags_set(virt_to_phys(secondary_holding_pen));
- }
- 
- struct smp_operations __initdata vexpress_smp_ops = {
- 	.smp_init_cpus		= vexpress_smp_init_cpus,
- 	.smp_prepare_cpus	= vexpress_smp_prepare_cpus,
--	.smp_secondary_init	= versatile_secondary_init,
--	.smp_boot_secondary	= versatile_boot_secondary,
-+	.smp_secondary_init	= smp_secondary_init,
-+	.smp_boot_secondary	= smp_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= vexpress_cpu_die,
- #endif
++static const struct of_device_id charlcd_match[] = {
++	{ .compatible = "arm,versatile-lcd", },
++	{}
++};
++
+ static struct platform_driver charlcd_driver = {
+ 	.driver = {
+ 		.name = DRIVERNAME,
+ 		.owner = THIS_MODULE,
+ 		.pm = &charlcd_pm_ops,
++		.of_match_table = of_match_ptr(charlcd_match),
+ 	},
+ 	.remove = __exit_p(charlcd_remove),
+ };
 -- 
-1.7.9.5
+1.8.3.2
