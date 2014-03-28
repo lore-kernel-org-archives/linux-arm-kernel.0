@@ -1,48 +1,70 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Fri, 28 Mar 2014 20:05:36 +0800
-Subject: [PATCH 0/3] add LPAE support for kexec and kernel (Liu Hua)
-In-Reply-To: <420609342.5318732.1395929059090.JavaMail.zimbra@redhat.com>
-References: <mailman.28599.1395907790.1059.kexec@lists.infradead.org>
- <420609342.5318732.1395929059090.JavaMail.zimbra@redhat.com>
-Message-ID: <53356590.3030005@huawei.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Fri, 28 Mar 2014 17:33:40 +0530
+Subject: [PATCH v7 0/2] Add Xilinx AXI Video DMA Engine driver
+Message-ID: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/3/27 22:04, Dave Anderson wrote:
-> 
-> 
-> ----- Original Message -----
-> 
->> The patch series introduce LPAE support for user space
->> utility kexec(the last) and ARM linux kernel(the others).
->>
->> I have tested the patch series in armA15 platform which have
->> more than 4G memory.
-> 
-> Hello Liu,
-> 
-> I'm curious how you tested this?  The crash utility does not have
-> any specific support for LPAE on ARM, and a couple years ago I 
-> asked on the crash-utility mailing list whether any of the ARM
-> developers were working on it.  But at that time none of them were
-> working with LPAE.  I see that you are on the crash-utility mailing
-> list -- are you planning to post follow-up patches to the crash-utility?
-> 
-> Thanks,
->   Dave
+Hi,
 
-Yes, you are very "sensitive"! our team has worked on it for a while. And
-we went through the whole kdump process for LPAE enabled ARM. Our changes
-include kexec-tools, makedumpfile, crash utility and the kernel.
+This is the driver for Xilinx AXI Video Direct Memory Access Engine.
+It is a soft IP core, which provides high-bandwidth direct memory
+access between memory and AXI4-Stream video type target peripherals
+including peripherals which support AXI4-Stream Video Protocol. The
+core provides efficient two dimensional DMA operations with independent
+asynchronous read and write channel operation.
 
-But we did that in a rather limited time. So some patches are silly and
-need to be reconstructed before submission. In addition, my job is quit
-full now. So I decide to post the patch series that are clear and
-independent of the others at first.
+For more information on the IP, please refer to
+http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
 
-But I got no response from the linux-arm and kexec mailinglist. What about
-your opinion about the feature of LPAE support for kdump related tools
-including crash utility and the kernel?
+Use cases:
+++++++++++
+1. Xilinx Video Targeted Reference design
+   http://www.wiki.xilinx.com/Zynq+Base+TRD+14.5
+2. Common Display Framework
+   http://events.linuxfoundation.org/sites/events/files/slides/20131024-elce.pdf
 
-Thanks,
-Liu Hua
+Regards,
+Srikanth
+
+Changes in v7:
+- Fixed minor comments suggested by Jaswinder, Thanks.
+
+Changes in v6:
+- Fixed minor comments suggested by Andy, Thanks.
+
+Changes in v5:
+- Modified to accept only 1 frame per interleaved_dma() call, as
+  suggested by Jaswinder, Thanks.
+
+Changes in v4:
+- Rebased on v3.14.0-rc5
+- Reverted the changes that were done for the earlier patch series,
+  1/3 - 'Support multiple interleaved frames with non-contiguous memory' as
+  suggested by Jaswinder, Thanks.
+
+Changes in v3:
+- Created a separate patch for the DT binding documentation as suggested by
+  Vinod, Thanks.
+- Added support for interleaved frames with non-contiguous memory as suggested
+  by Lars, Thanks.
+- Rebased on v3.14.0-rc2
+
+Srikanth Thokala (2):
+  dma: Add Xilinx Video DMA DT Binding Documentation
+  dma: Add Xilinx AXI Video Direct Memory Access Engine driver support
+
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++
+ drivers/dma/Kconfig                                |   14 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xilinx/Makefile                        |    1 +
+ drivers/dma/xilinx/xilinx_vdma.c                   | 1380 ++++++++++++++++++++
+ include/linux/amba/xilinx_dma.h                    |   47 +
+ 6 files changed, 1518 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+ create mode 100644 drivers/dma/xilinx/Makefile
+ create mode 100644 drivers/dma/xilinx/xilinx_vdma.c
+ create mode 100644 include/linux/amba/xilinx_dma.h
+
+-- 
+1.7.9.5
