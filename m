@@ -1,85 +1,47 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Mar 2014 17:52:57 +0100
-Subject: [PATCH 6/8] PCI: imx6: rip out optional (and unused) irqs
-In-Reply-To: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1396025579-14344-7-git-send-email-l.stach@pengutronix.de>
+Date: Fri, 28 Mar 2014 17:52:51 +0100
+Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
+Message-ID: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They are dropped with the new binding.
+While working on MSI support for the i.MX6 PCIe host driver
+it has been discovered that the binding for this host controller
+is broken in many ways (refer to the patch descriptions for more
+info) and was introduced without proper discussion about what
+should/should not be in the binding.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/pci/host/pci-imx6.c | 42 ------------------------------------------
- 1 file changed, 42 deletions(-)
+This series fixes this and minimizes the difference of the
+i.MX6 binding to the common designware PCIe binding. I'm aware
+that this is a quite radical change, but I think it's justified
+to do this as long as there aren't many user of the old binding
+(most of the optional properties in the binding aren't even
+implemented).
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 259a73687526..4c20fc4795e5 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -32,9 +32,6 @@
- 
- struct imx6_pcie {
- 	int			reset_gpio;
--	int			power_on_gpio;
--	int			wake_up_gpio;
--	int			disable_gpio;
- 	struct clk		*pcie_bus;
- 	struct clk		*pcie_phy;
- 	struct clk		*pcie;
-@@ -230,9 +227,6 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
- 	int ret;
- 
--	if (gpio_is_valid(imx6_pcie->power_on_gpio))
--		gpio_set_value(imx6_pcie->power_on_gpio, 1);
--
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
- 			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
- 	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-@@ -531,42 +525,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	imx6_pcie->power_on_gpio = of_get_named_gpio(np, "power-on-gpio", 0);
--	if (gpio_is_valid(imx6_pcie->power_on_gpio)) {
--		ret = devm_gpio_request_one(&pdev->dev,
--					imx6_pcie->power_on_gpio,
--					GPIOF_OUT_INIT_LOW,
--					"PCIe power enable");
--		if (ret) {
--			dev_err(&pdev->dev, "unable to get power-on gpio\n");
--			return ret;
--		}
--	}
--
--	imx6_pcie->wake_up_gpio = of_get_named_gpio(np, "wake-up-gpio", 0);
--	if (gpio_is_valid(imx6_pcie->wake_up_gpio)) {
--		ret = devm_gpio_request_one(&pdev->dev,
--					imx6_pcie->wake_up_gpio,
--					GPIOF_IN,
--					"PCIe wake up");
--		if (ret) {
--			dev_err(&pdev->dev, "unable to get wake-up gpio\n");
--			return ret;
--		}
--	}
--
--	imx6_pcie->disable_gpio = of_get_named_gpio(np, "disable-gpio", 0);
--	if (gpio_is_valid(imx6_pcie->disable_gpio)) {
--		ret = devm_gpio_request_one(&pdev->dev,
--					imx6_pcie->disable_gpio,
--					GPIOF_OUT_INIT_HIGH,
--					"PCIe disable endpoint");
--		if (ret) {
--			dev_err(&pdev->dev, "unable to get disable-ep gpio\n");
--			return ret;
--		}
--	}
--
- 	/* Fetch clocks */
- 	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");
- 	if (IS_ERR(imx6_pcie->pcie_phy)) {
+Looking forward to your feedback.
+
+Lucas Stach (8):
+  ARM: imx6q-clk: parent lvds_gate from lvds_sel
+  PCI: designware: split Exynos and i.MX bindings
+  ARM: dts: imx6: update pcie to bring in line with new binding
+  PCI: imx6: use new clock names
+  PCI: imx6: drop old irq mapping
+  PCI: imx6: rip out optional (and unused) irqs
+  PCI: designware: make MSI isr shared irq aware
+  PCI: imx6: add support for MSI
+
+ .../devicetree/bindings/pci/designware-pcie.txt    |  74 +----------
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  38 ++++++
+ .../bindings/pci/samsung,exynos5440-pcie.txt       |  65 +++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   7 +-
+ arch/arm/mach-imx/clk-imx6q.c                      |   4 +-
+ drivers/pci/host/pci-exynos.c                      |   4 +-
+ drivers/pci/host/pci-imx6.c                        | 145 ++++++++-------------
+ drivers/pci/host/pcie-designware.c                 |   6 +-
+ drivers/pci/host/pcie-designware.h                 |   2 +-
+ 9 files changed, 176 insertions(+), 169 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/samsung,exynos5440-pcie.txt
+
 -- 
 1.9.0
