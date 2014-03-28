@@ -1,80 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Mar 2014 11:11:46 +0100
-Subject: [PATCH v3 08/10] ARM: sun7i/sun4i: dt: Add AXP209 support to
- various boards
-In-Reply-To: <1395955764-18103-9-git-send-email-carlo@caione.org>
-References: <1395955764-18103-1-git-send-email-carlo@caione.org>
- <1395955764-18103-9-git-send-email-carlo@caione.org>
-Message-ID: <20140328101146.GP6120@lukather>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 28 Mar 2014 11:18:05 +0100
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <53354A46.9040807@freescale.com>
+References: <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+ <20140324095902.GB11377@localhost>
+ <20140326095156.3e5585b8@ipc1.ka-ro>
+ <5332AEE7.2040402@freescale.com>
+ <20140326125502.0e8d0657@ipc1.ka-ro>
+ <20140327095956.GA29623@localhost>
+ <20140327132109.06258526@ipc1.ka-ro>
+ <5334D9F7.2030001@freescale.com>
+ <20140328091646.1ce03f90@ipc1.ka-ro>
+ <53353524.9020605@freescale.com>
+ <20140328090023.GB17250@pengutronix.de>
+ <53354057.6030004@freescale.com>
+ <20140328103147.3fdadfd7@ipc1.ka-ro>
+ <53354A46.9040807@freescale.com>
+Message-ID: <20140328111805.76b6513d@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 10:29:22PM +0100, Carlo Caione wrote:
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->  arch/arm/boot/dts/sun4i-a10-a1000.dts           | 13 +++++++++++++
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 13 +++++++++++++
->  arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 19 +++++++++++++++++++
->  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 13 +++++++++++++
->  arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 19 +++++++++++++++++++
->  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 19 +++++++++++++++++++
->  arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 13 +++++++++++++
->  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 14 ++++++++++++++
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 15 +++++++++++++++
->  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 14 ++++++++++++++
->  10 files changed, 152 insertions(+)
+Hi,
+
+Huang Shijie wrote:
+> ? 2014?03?28? 17:31, Lothar Wa?mann ??:
+> > Hi,
+> >
+> > Huang Shijie wrote:
+> >> ? 2014?03?28? 17:00, Sascha Hauer ??:
+> >>> - disables swapping of BB marks in the FCB the ROM won't swap bytes.
+> >> We can not disable the swapping in the FCB in the imx28.
+> >> The DISBBM bit in the FCB does _NOT_ exit in the imx28's FCB.
+> >>
+> > The Linux kernel does not have any business with the FCB, so it is
+> > completely irrelevant for Linux whether byte swapping can be disabled
+> > in the FCB or not.
+> >
+> But the gpmi is relevant to the ROM.
+> the gpmi driver should keep consistency with the ROM.
 > 
-> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> index fa746aea..cf18c4d 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> @@ -88,6 +88,19 @@
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&i2c0_pins_a>;
->  			status = "okay";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			axp: axp20x at 34 {
-> +				reg = <0x34>;
-> +				interrupts = <0>;
-> +
-> +				compatible = "x-powers,axp209";
-> +				interrupt-controller;
-> +				#interrupt-cells = <1>;
-> +
-> +				/include/ "x-powers-axp209.dtsi"
-> +			};
->  		};
->  	};
+> I do not object you add the swapping optional the gpmi driver(since it's 
+> ok for imx50/imx6q/imx6sx),
+> i just object that you enable this feature for imx28.
+> 
+We are talking about a Linux Kernel Driver here, not about a flashtool
+for i.MX28.
+It is a valid usecase for Linux not being able to write the bootloader,
+so there is no reason to disallow this feature in the driver code.
+Since it is a DT option it can be trivially switched on and off without
+having to change anything in the kernel.
 
-Actually, you can make the whole thing much more robust by using the
-&label syntax.
 
-Here, you would just include the dtsi at the top of the file, and in
-the DTSI, you would have something like:
-
-&axp209 {
-   regulators {
-      ...
-   }
-}
-
-(Given that the node in your DTS is axp209: pmic at something like
-Chen-Yu suggested)
-
-You don't rely any more on the position of the include, and you use a
-standard DT syntax.
-
+Lothar Wa?mann
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/a64d1732/attachment.sig>
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
