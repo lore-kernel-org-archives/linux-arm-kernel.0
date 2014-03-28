@@ -1,39 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 28 Mar 2014 02:09:13 -0300
-Subject: [PATCH 1/2] ARM: dts: imx53-qsb-common: Fix memory region description
-Message-ID: <1395983354-23196-1-git-send-email-festevam@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 28 Mar 2014 06:13:13 +0100
+Subject: [PATCH 2/2] ARM: dts: imx53-m53evk: Fix memory region description
+In-Reply-To: <1395983354-23196-2-git-send-email-festevam@gmail.com>
+References: <1395983354-23196-1-git-send-email-festevam@gmail.com>
+ <1395983354-23196-2-git-send-email-festevam@gmail.com>
+Message-ID: <201403280613.13798.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Friday, March 28, 2014 at 06:09:14 AM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> On m53evk there are two DRAM chip selects:
+> 
+> CS0 at 0x70000000
+> CS1 at 0xb0000000
+> 
+> Each bank has a 512MB DRAM, giving a total of 1GB of system DRAM.
+> 
+> Fix the memory layout to describe the hardware appropriately.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-On mx53qsb there are two DRAM chip selects:
+Acked-by: Marek Vasut <marex@denx.de>
 
-CS0 at 0x70000000
-CS1 at 0xb0000000
+Nice find Fabio, thanks!
 
-Each bank has a 512MB DRAM, giving a total of 1GB of system DRAM.
-
-Fix the memory layout to describe the hardware appropriately.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx53-qsb-common.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-index 2dca98b..d8ab280 100644
---- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-+++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-@@ -14,7 +14,8 @@
- 
- / {
- 	memory {
--		reg = <0x70000000 0x40000000>;
-+		reg = <0x70000000 0x20000000>,
-+		      <0xb0000000 0x20000000>;
- 	};
- 
- 	display at di0 {
--- 
-1.8.3.2
+Best regards,
+Marek Vasut
