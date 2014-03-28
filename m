@@ -1,45 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Mar 2014 15:21:59 -0700
-Subject: [PATCH 58/75] ARM: l2c: omap2: remove cache size override
-In-Reply-To: <20140328210945.GU7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYZ1-0007Gn-3J@rmk-PC.arm.linux.org.uk>
- <20140328160358.GG24308@atomide.com>
- <20140328210945.GU7528@n2100.arm.linux.org.uk>
-Message-ID: <20140328222159.GB30388@atomide.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 28 Mar 2014 23:44:35 +0100
+Subject: [PATCH v5 1/2] i2c: qup: Add device tree bindings information
+In-Reply-To: <1394762863-12154-2-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1394762863-12154-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1394762863-12154-2-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20140328224435.GA29200@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [140328 14:13]:
-> On Fri, Mar 28, 2014 at 09:03:59AM -0700, Tony Lindgren wrote:
-> > * Russell King <rmk+kernel@arm.linux.org.uk> [140328 08:22]:
-> > 
-> > Missing description?
+On Thu, Mar 13, 2014 at 07:07:42PM -0700, Bjorn Andersson wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 > 
-> No, I just got sick and tired of trying to write descriptions for these
-> patches.  Many of these I regard as totally unnecessary patches that
-> should never have been required had platform folk not invested in
-> cargo cult programming.
+> The Qualcomm Universal Peripherial (QUP) wraps I2C mini-core and
+> provide input and output FIFO's for it. I2C controller can operate
+> as master with supported bus speeds of 100Kbps and 400Kbps.
 > 
-> Given the number of patches I'm presently dealing with in my tree right
-> now, I don't actually have time to even follow the mailing lists at the
-> moment.  If I were to properly describe all of these patches, I'd
-> probably be at this for another few weeks.
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> [bjorn: reformulated part of binding description
+>         added version to compatible
+>         cleaned up example]
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
 
-Heh well I have a feeling you'll add some generic description anyways :)
- 
-> So, I'm at the point of "what you see is what you've got" as far as the
-> descriptions go... it's going to cause me a /lot/ of pain to just add
-> all the acks I'm going to need to these patches.
+...
 
-In that case here's one more painful ack for this patch:
+> + i2c at f9924000 {
+> + 	compatible = "qcom,i2c-qup-v2.2.1";
+> + 	reg = <0xf9924000 0x1000>;
+> + 	interrupts = <0 96 0>;
+> +
+> + 	clocks = <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+> + 	clock-names = "core", "iface";
+> +
+> + 	clock-frequency = <355000>;
+> +
+> + 	#address-cells = <1>;
+> + 	#size-cells = <0>;
+> +
+> + 	dummy at 60 {
+> + 		compatible = "dummy";
+> + 		reg = <0x60>;
+> + 	};
+> + };
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> And... don't expect me to send the series out again any time soon to
-> LAKML - it's taken four to five hours for all these patches to filter
-> through the lists.
+Removed the dummy child node (confusing example) and Applied to
+for-next, thanks!
 
-No need to repost on my part.
-
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/6b277826/attachment-0001.sig>
