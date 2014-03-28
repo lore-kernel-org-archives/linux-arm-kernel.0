@@ -1,225 +1,68 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:17:18 +0000
-Subject: [PATCH 34/75] ARM: l2c: add L2C-220 specific handlers
-In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYX0-0007F9-4x@rmk-PC.arm.linux.org.uk>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 28 Mar 2014 14:22:33 +0000
+Subject: [PATCH V3 1/2] arm: mm: Introduce pte_isset and pte_isclear
+In-Reply-To: <1396016554-5843-1-git-send-email-steve.capper@linaro.org>
+References: <1396016554-5843-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1396016554-5843-2-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The L2C-220 is different from the L2C-210 and L2C-310 in that every
-operation is a background operation: this means we have to use
-spinlocks to protect all operations, and we have to wait for every
-operation to complete.
+Long descriptors on ARM are 64 bits, and some pte functions such as
+pte_dirty return a bitwise-and of a flag with the pte value. If the
+flag to be tested resides in the upper 32 bits of the pte, then we run
+into the danger of the result being dropped if downcast.
 
-Should a second operation be attempted while a previous operation
-is in progress, the response will be an imprecise abort.
+For example:
+	gather_stats(page, md, pte_dirty(*pte), 1);
+where pte_dirty(*pte) is downcast to an int.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+This patch introduces a new macro pte_isset which performs the bitwise
+and, then performs a double logical invert (where needed) to ensure
+predictable downcasting.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- arch/arm/mm/cache-l2x0.c | 167 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 157 insertions(+), 10 deletions(-)
+Changes in V3: back to pte_isset macro. Added (u32)(val) == (val) as
+recommended by Russell to simplify cases where we do not need to
+perform a double logical invert. Also added pte_isclear as recommended,
+as this makes the pte accessors look a lot cleaner.
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 1e52fd75c3d5..ee2134671699 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -491,6 +491,148 @@ static const struct l2c_init_data l2c210_data __initconst = {
- };
+I have experimented with multiple implementations of pte_isclear in an
+attempt to simplify things for LPAE where (u32)val == val, but have
+been unable to come up with any convincing schemes.
+---
+ arch/arm/include/asm/pgtable.h | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 7d59b52..8790444 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -214,15 +214,19 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
  
- /*
-+ * L2C-220 specific code.
-+ *
-+ * All operations are background operations: they have to be waited for.
-+ * Conflicting requests generate a slave error (which will cause an
-+ * imprecise abort.)  Never uses sync_reg_offset, so we hard-code the
-+ * sync register here.
-+ *
-+ * However, we can re-use the l2c210_resume call.
-+ */
-+static inline void __l2c220_cache_sync(void __iomem *base)
-+{
-+	writel_relaxed(0, base + L2X0_CACHE_SYNC);
-+	l2c_wait_mask(base + L2X0_CACHE_SYNC, 1);
-+}
-+
-+static void l2c220_op_way(void __iomem *base, unsigned reg)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	__l2c_op_way(base + reg);
-+	__l2c220_cache_sync(base);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
-+static unsigned long l2c220_op_pa_range(void __iomem *reg, unsigned long start,
-+	unsigned long end, unsigned long flags)
-+{
-+	raw_spinlock_t *lock = &l2x0_lock;
-+
-+	while (start < end) {
-+		unsigned long blk_end = start + min(end - start, 4096UL);
-+
-+		while (start < blk_end) {
-+			l2c_wait_mask(reg, 1);
-+			writel_relaxed(start, reg);
-+			start += CACHE_LINE_SIZE;
-+		}
-+
-+		if (blk_end < end) {
-+			raw_spin_unlock_irqrestore(lock, flags);
-+			raw_spin_lock_irqsave(lock, flags);
-+		}
-+	}
-+
-+	return flags;
-+}
-+
-+static void l2c220_inv_range(unsigned long start, unsigned long end)
-+{
-+	void __iomem *base = l2x0_base;
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	if ((start | end) & (CACHE_LINE_SIZE - 1)) {
-+		if (start & (CACHE_LINE_SIZE - 1)) {
-+			start &= ~(CACHE_LINE_SIZE - 1);
-+			writel_relaxed(start, base + L2X0_CLEAN_INV_LINE_PA);
-+			start += CACHE_LINE_SIZE;
-+		}
-+
-+		if (end & (CACHE_LINE_SIZE - 1)) {
-+			end &= ~(CACHE_LINE_SIZE - 1);
-+			l2c_wait_mask(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+			writel_relaxed(end, base + L2X0_CLEAN_INV_LINE_PA);
-+		}
-+	}
-+
-+	flags = l2c220_op_pa_range(base + L2X0_INV_LINE_PA,
-+				   start, end, flags);
-+	l2c_wait_mask(base + L2X0_INV_LINE_PA, 1);
-+	__l2c220_cache_sync(base);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
-+static void l2c220_clean_range(unsigned long start, unsigned long end)
-+{
-+	void __iomem *base = l2x0_base;
-+	unsigned long flags;
-+
-+	start &= ~(CACHE_LINE_SIZE - 1);
-+	if ((end - start) >= l2x0_size) {
-+		l2c220_op_way(base, L2X0_CLEAN_WAY);
-+		return;
-+	}
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	flags = l2c220_op_pa_range(base + L2X0_CLEAN_LINE_PA,
-+				   start, end, flags);
-+	l2c_wait_mask(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+	__l2c220_cache_sync(base);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
-+static void l2c220_flush_range(unsigned long start, unsigned long end)
-+{
-+	void __iomem *base = l2x0_base;
-+	unsigned long flags;
-+
-+	start &= ~(CACHE_LINE_SIZE - 1);
-+	if ((end - start) >= l2x0_size) {
-+		l2c220_op_way(base, L2X0_CLEAN_INV_WAY);
-+		return;
-+	}
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	flags = l2c220_op_pa_range(base + L2X0_CLEAN_INV_LINE_PA,
-+				   start, end, flags);
-+	l2c_wait_mask(base + L2X0_CLEAN_INV_LINE_PA, 1);
-+	__l2c220_cache_sync(base);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
-+static void l2c220_flush_all(void)
-+{
-+	l2c220_op_way(l2x0_base, L2X0_CLEAN_INV_WAY);
-+}
-+
-+static void l2c220_sync(void)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2x0_lock, flags);
-+	__l2c220_cache_sync(l2x0_base);
-+	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+}
-+
-+static const struct l2c_init_data l2c220_data = {
-+	.num_lock = 1,
-+	.enable = l2c_enable,
-+	.outer_cache = {
-+		.inv_range = l2c220_inv_range,
-+		.clean_range = l2c220_clean_range,
-+		.flush_range = l2c220_flush_range,
-+		.flush_all = l2c220_flush_all,
-+		.disable = l2c_disable,
-+		.sync = l2c220_sync,
-+		.resume = l2c210_resume,
-+	},
-+};
-+
-+/*
-  * L2C-310 specific code.
-  *
-  * Very similar to L2C-210, the PA, set/way and sync operations are atomic,
-@@ -831,6 +973,10 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 		data = &l2c210_data;
- 		break;
+ #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
  
-+	case L2X0_CACHE_ID_PART_L220:
-+		data = &l2c220_data;
-+		break;
++#define pte_isset(pte, val)	((u32)(val) == (val) ? pte_val(pte) & (val) \
++						: !!(pte_val(pte) & (val)))
++#define pte_isclear(pte, val)	(!(pte_val(pte) & (val)))
 +
- 	case L2X0_CACHE_ID_PART_L310:
- 		data = &l2c310_init_fns;
- 		break;
-@@ -895,17 +1041,18 @@ static const struct l2c_init_data of_l2c210_data __initconst = {
- 	},
- };
+ #define pte_none(pte)		(!pte_val(pte))
+-#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
+-#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
+-#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+-#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
+-#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
++#define pte_present(pte)	(pte_isset((pte), L_PTE_PRESENT))
++#define pte_write(pte)		(pte_isclear((pte), L_PTE_RDONLY))
++#define pte_dirty(pte)		(pte_isset((pte), L_PTE_DIRTY))
++#define pte_young(pte)		(pte_isset((pte), L_PTE_YOUNG))
++#define pte_exec(pte)		(pte_isclear((pte), L_PTE_XN))
+ #define pte_special(pte)	(0)
  
--static const struct l2c_init_data of_l2x0_data __initconst = {
-+static const struct l2c_init_data of_l2c220_data __initconst = {
-+	.num_lock = 1,
- 	.of_parse = l2x0_of_parse,
--	.enable = l2x0_enable,
-+	.enable = l2c_enable,
- 	.outer_cache = {
--		.inv_range   = l2x0_inv_range,
--		.clean_range = l2x0_clean_range,
--		.flush_range = l2x0_flush_range,
--		.flush_all   = l2x0_flush_all,
--		.disable     = l2x0_disable,
--		.sync        = l2x0_cache_sync,
--		.resume      = l2x0_resume,
-+		.inv_range   = l2c220_inv_range,
-+		.clean_range = l2c220_clean_range,
-+		.flush_range = l2c220_flush_range,
-+		.flush_all   = l2c220_flush_all,
-+		.disable     = l2c_disable,
-+		.sync        = l2c220_sync,
-+		.resume      = l2c210_resume,
- 	},
- };
+-#define pte_present_user(pte)  (pte_present(pte) && (pte_val(pte) & L_PTE_USER))
++#define pte_present_user(pte)	(pte_present(pte) && pte_isset((pte), L_PTE_USER))
  
-@@ -1342,7 +1489,7 @@ static const struct l2c_init_data of_tauros3_data __initconst = {
- #define L2C_ID(name, fns) { .compatible = name, .data = (void *)&fns }
- static const struct of_device_id l2x0_ids[] __initconst = {
- 	L2C_ID("arm,l210-cache", of_l2c210_data),
--	L2C_ID("arm,l220-cache", of_l2x0_data),
-+	L2C_ID("arm,l220-cache", of_l2c220_data),
- 	L2C_ID("arm,pl310-cache", of_l2c310_data),
- 	L2C_ID("brcm,bcm11351-a2-pl310-cache", of_bcm_l2x0_data),
- 	L2C_ID("marvell,aurora-outer-cache", of_aurora_with_outer_data),
+ #if __LINUX_ARM_ARCH__ < 6
+ static inline void __sync_icache_dcache(pte_t pteval)
 -- 
-1.8.3.1
+1.8.1.4
