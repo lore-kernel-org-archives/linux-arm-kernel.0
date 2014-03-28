@@ -1,97 +1,77 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 28 Mar 2014 09:42:45 -0500
-Subject: [RFC/PATCH] base: platform: add generic clock handling for
- platform-bus
-In-Reply-To: <2775124.TXohNNxBKa@avalon>
-References: <1391191965-31102-1-git-send-email-balbi@ti.com>
- <2775124.TXohNNxBKa@avalon>
-Message-ID: <20140328144245.GD17820@saruman.home>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 28 Mar 2014 11:00:04 -0400
+Subject: [PATCH v3 1/3] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <CABGGisyMn6uuFOwcS3AfBX3c85fwore_TeBq68opmJqQPyR7wQ@mail.gmail.com>
+References: <1395955430-26050-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1395955430-26050-2-git-send-email-ashwin.chaugule@linaro.org>
+ <CABGGisyMn6uuFOwcS3AfBX3c85fwore_TeBq68opmJqQPyR7wQ@mail.gmail.com>
+Message-ID: <CAJ5Y-eaugzMAByxacsr7cO7T0vXPHqdBtSTXKjVQfNLHAMJV-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rob,
 
-On Wed, Mar 12, 2014 at 04:37:19PM +0100, Laurent Pinchart wrote:
-> Hi Felipe,
-> 
-> (CC'ing Geert Uytterhoeven as we happen to discuss runtime PM and clock 
-> handling for the Renesas SoCs at the moment)
-> 
-> Thank you for the patch. This is a bit of a late reply, but that's better than 
-> no reply I suppose. Please see below for a small comment.
-> 
-> On Friday 31 January 2014 12:12:45 Felipe Balbi wrote:
-> > Still TODO a commit log. Not for merging!!!!!
-> > 
-> > NYET-Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> > 
-> > This patch is an idea I've had recently in order to combine several
-> > different PM implementations into the platform-bus.
-> > 
-> > This patch is bare minimum for platforms which need to handle functional and
-> > interface clocks but the whole thing is made optional.
-> > 
-> > Note that this patch makes sure that by the time a platform_driver's probe
-> > is called, we already have clocks enabled and pm_runtime_set_active() has
-> > been called, thus making sure that a device driver's pm_runtime_get_sync()
-> > will solely increase the pm usage counter.
-> > 
-> > I have *NOT* tested this anywhere *YET*, but I suppose it shouldn't cause
-> > any issues since the clock API has ref counting too.
-> > 
-> > Would really like to get some review from several folks involved with ARM
-> > SoC PM so that's the reason for the wide audience. If I have missed
-> > anybody, please add them to Cc.
-> > 
-> > As mentioned above, this is *NOT* meant for merging, but serves as a
-> > starting point for discussing some convergence of several PM domain
-> > implementations on different arch/arm/mach-* directories.
-> > 
-> > For OMAP, this has the added benefit of removing clock handling from
-> > omap_device/omap_hwmod and, thus, dropping the need for so many DT_CLK()
-> > tables under drivers/clk/ti/
-> > 
-> >  drivers/base/platform.c         | 169 +++++++++++++++++++++++++++++++++++--
-> >  include/linux/platform_device.h |   9 +++
-> >  2 files changed, 173 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> > index 3a94b79..86aeb5b 100644
-> > --- a/drivers/base/platform.c
-> > +++ b/drivers/base/platform.c
-> > @@ -484,6 +484,21 @@ static int platform_drv_probe(struct device *_dev)
-> >  	if (ACPI_HANDLE(_dev))
-> >  		acpi_dev_pm_attach(_dev, true);
-> > 
-> > +	dev->fck = devm_clk_get(_dev, "fck");
-> > +	dev->ick = devm_clk_get(_dev, "ick");
-> 
-> My concern with this that some devices might want to handle their functional 
-> and interface clocks manually if they have exotic requirements. They would 
-> thus need a way to signal that the platform bus core should not try to perform 
-> clock management on its own.
-> 
-> One possible way would be to name the clocks differently for those devices, 
-> but we might then have a backward compatibility issue with DT.
-> 
-> Another concern is how to handle the DT backward compatibility for devices 
-> that would benefit from core management of their functional and interface 
-> clocks, but that currently don't name those clocks "fck" and "ick". Renaming 
-> those clocks in DT wouldn't be a problem for the future, but backward 
-> compatibility needs to be handled. Maybe platforms could provide aliases in 
-> that case.
+On 28 March 2014 09:54, Rob Herring <rob.herring@linaro.org> wrote:
 
-yeah, I guess alias would be the way to go. Another possible way would
-be grab the clocks by phandle if of_node is a valid pointer. At the end
-of the day, the name of the clock shouldn't matter.
+>> +#define PSCI_VER_MAJOR_MASK            0xffff0000
+>> +#define PSCI_VER_MINOR_MASK            0x0000ffff
+>> +#define PSCI_VER_MAJOR_SHIFT   16
+>> +#define PSCI_VER_MAJOR(ver)            \
+>> +       ((ver & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT)
+>> +#define PSCI_VER_MINOR(ver)            (ver & PSCI_VER_MINOR_MASK)
+>
+> This can go in the header.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/8dd4cbbd/attachment.sig>
+Will do.
+
+>
+> [snip]
+>
+>> +       ver = psci_get_version();
+>> +
+>> +       pr_info("PSCIv%d.%d detected in firmware.\n", PSCI_VER_MAJOR(ver),
+>> +                       PSCI_VER_MINOR(ver));
+>> +
+>> +       if (PSCI_VER_MAJOR(ver) == 0 && PSCI_VER_MINOR(ver) < 2) {
+>
+> So we want to allow 0.3, but not 1.x? I think we want to allow any
+> later version. Later versions either have to be backward's compatible
+> with 0.2 or have to not have "arm,psci-0.2" compatible string.
+
+If its 1.x, it should still go through? Should only fail for 0.1 or 0.0.
+
+>
+> Does this work if ver is an error value? We may have implementations
+> that failed to implement this function (which should not be ignored
+> for now).
+
+True. What is a good err value to check for? negative values?
+
+One would hope implementations would return (-7) NOT_PRESENT, but it
+could also be garbage?
+
+>> + *
+>> + *     Copyright (C) 2014, Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>
+> I believe this should be:
+>
+> Copyright (C) 2014 Linaro Ltd.
+> Author: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>
+> And typically the copyright is placed above the license.
+
+Ok.
+
+>> +
+>> +#define PSCI_RET_SUCCESS               0
+>> +#define PSCI_RET_EOPNOTSUPP            -1
+>> +#define PSCI_RET_EINVAL                        -2
+>> +#define PSCI_RET_EPERM                 -3
+>
+> Please fill out all error codes.
+>
+
+Ok, I see the return codes table. Will add all of it.
+
+Cheers,
+Ashwin
