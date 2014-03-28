@@ -1,34 +1,73 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 28 Mar 2014 18:09:10 +0800
-Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <20140328103147.3fdadfd7@ipc1.ka-ro>
-References: <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>	<20140324095902.GB11377@localhost>	<20140326095156.3e5585b8@ipc1.ka-ro>	<5332AEE7.2040402@freescale.com>	<20140326125502.0e8d0657@ipc1.ka-ro>	<20140327095956.GA29623@localhost>	<20140327132109.06258526@ipc1.ka-ro>	<5334D9F7.2030001@freescale.com>	<20140328091646.1ce03f90@ipc1.ka-ro>	<53353524.9020605@freescale.com>	<20140328090023.GB17250@pengutronix.de>	<53354057.6030004@freescale.com>
- <20140328103147.3fdadfd7@ipc1.ka-ro>
-Message-ID: <53354A46.9040807@freescale.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 28 Mar 2014 11:11:37 +0100
+Subject: [PATCH trivial 1/3] ARM: dts: Grammar /is uses/ is used/
+Message-ID: <1396001499-17638-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014?03?28? 17:31, Lothar Wa?mann ??:
-> Hi,
->
-> Huang Shijie wrote:
->> ? 2014?03?28? 17:00, Sascha Hauer ??:
->>> - disables swapping of BB marks in the FCB the ROM won't swap bytes.
->> We can not disable the swapping in the FCB in the imx28.
->> The DISBBM bit in the FCB does _NOT_ exit in the imx28's FCB.
->>
-> The Linux kernel does not have any business with the FCB, so it is
-> completely irrelevant for Linux whether byte swapping can be disabled
-> in the FCB or not.
->
-But the gpmi is relevant to the ROM.
-the gpmi driver should keep consistency with the ROM.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I do not object you add the swapping optional the gpmi driver(since it's 
-ok for imx50/imx6q/imx6sx),
-i just object that you enable this feature for imx28.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/am33xx.dtsi |    2 +-
+ arch/arm/boot/dts/dra7.dtsi   |    2 +-
+ arch/arm/boot/dts/omap4.dtsi  |    2 +-
+ arch/arm/boot/dts/omap5.dtsi  |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-
-
-thanks
-Huang Shijie
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 6d95d3df33c7..70f7f3eb5fb4 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -68,7 +68,7 @@
+ 	};
+ 
+ 	/*
+-	 * The soc node represents the soc top level view. It is uses for IPs
++	 * The soc node represents the soc top level view. It is used for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
+ 	 */
+ 	soc {
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 1fd75aa4639d..c19e90ecf95e 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -75,7 +75,7 @@
+ 	};
+ 
+ 	/*
+-	 * The soc node represents the soc top level view. It is uses for IPs
++	 * The soc node represents the soc top level view. It is used for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
+ 	 */
+ 	soc {
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index d3f8a6e8ca20..a07ea359ae20 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -67,7 +67,7 @@
+ 	};
+ 
+ 	/*
+-	 * The soc node represents the soc top level view. It is uses for IPs
++	 * The soc node represents the soc top level view. It is used for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
+ 	 */
+ 	soc {
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index a72813a9663e..aa9878c0aaad 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -87,7 +87,7 @@
+ 	};
+ 
+ 	/*
+-	 * The soc node represents the soc top level view. It is uses for IPs
++	 * The soc node represents the soc top level view. It is used for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
+ 	 */
+ 	soc {
+-- 
+1.7.9.5
