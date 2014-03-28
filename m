@@ -1,25 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Mar 2014 20:01:33 +0100
-Subject: [PATCH 49/75] ARM: l2c: fix register naming
-In-Reply-To: <E1WTYYH-0007GB-3M@rmk-PC.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYYH-0007GB-3M@rmk-PC.arm.linux.org.uk>
-Message-ID: <CACRpkdY99t-zd2C5yz9gjbucze99pZj6zOfKyL9jwDgk-FfoUw@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 28 Mar 2014 15:07:06 -0400 (EDT)
+Subject: [PATCH net-next 1/3] net: stmmac: Add SOCFPGA glue driver
+In-Reply-To: <1395891912-26855-2-git-send-email-dinguyen@altera.com>
+References: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
+ <1395891912-26855-2-git-send-email-dinguyen@altera.com>
+Message-ID: <20140328.150706.1512982620713301379.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 4:18 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
+From: <dinguyen@altera.com>
+Date: Wed, 26 Mar 2014 22:45:10 -0500
 
-> We have a mixture of different devices with different register layouts,
-> but we group all the bits together in an opaque mess.  Split them out
-> into those which are L2C-310 specific and ones which refer to earlier
-> devices.  Provide full auxiliary control register definitions.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Like the STi and sunxi series SOCs, Altera's SOCFPGA also needs a glue layer
+> on top of the Synopsys gmac IP.
+> 
+> This patch adds the platform driver for the glue layer which configures the IP
+> before the generic STMMAC driver takes over.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-For ux500.
+Applied, although:
 
-Yours,
-Linus Walleij
+> +	struct device_node *np	= dev->of_node;
+
+I had to fix that TAB between "np" and "=" into a space.
