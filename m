@@ -1,53 +1,101 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:15:00 +0000
-Subject: [PATCH 08/75] ARM: l2c: add helper for L2 cache controller DT IDs
+Date: Fri, 28 Mar 2014 15:14:44 +0000
+Subject: [PATCH 05/75] ARM: l2c: remove unnecessary UL-suffix to mask values
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYUm-0004WQ-Nq@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYUW-0004WD-UP@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it easier to declare L2 cache controller DT IDs by using a macro.
+They're u32, they're not unsigned long.  The UL suffix is not required
+here.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 23 ++++++++++-------------
- 1 file changed, 10 insertions(+), 13 deletions(-)
+ arch/arm/mach-highbank/highbank.c   | 2 +-
+ arch/arm/mach-imx/mach-vf610.c      | 2 +-
+ arch/arm/mach-imx/system.c          | 2 +-
+ arch/arm/mach-mvebu/armada-370-xp.c | 2 +-
+ arch/arm/mach-rockchip/rockchip.c   | 2 +-
+ arch/arm/mach-socfpga/socfpga.c     | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index f9985e5a208c..ac410b21edfb 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -946,20 +946,17 @@ static const struct l2x0_of_data bcm_l2x0_data = {
- 	},
- };
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index c7de89b263dd..38e1dc3b4c6e 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -69,7 +69,7 @@ static void __init highbank_init_irq(void)
+ 	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
+ 	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
+ 		highbank_smc1(0x102, 0x1);
+-		l2x0_of_init(0, ~0UL);
++		l2x0_of_init(0, ~0);
+ 		outer_cache.disable = highbank_l2x0_disable;
+ 	}
+ }
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+index 2d8aef5a6efa..6288a9690e78 100644
+--- a/arch/arm/mach-imx/mach-vf610.c
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -22,7 +22,7 @@ static void __init vf610_init_machine(void)
  
-+#define L2C_ID(name, fns) { .compatible = name, .data = (void *)&fns }
- static const struct of_device_id l2x0_ids[] __initconst = {
--	{ .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
--	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
--	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
--	{ .compatible = "bcm,bcm11351-a2-pl310-cache", /* deprecated name */
--	  .data = (void *)&bcm_l2x0_data},
--	{ .compatible = "brcm,bcm11351-a2-pl310-cache",
--	  .data = (void *)&bcm_l2x0_data},
--	{ .compatible = "marvell,aurora-outer-cache",
--	  .data = (void *)&aurora_with_outer_data},
--	{ .compatible = "marvell,aurora-system-cache",
--	  .data = (void *)&aurora_no_outer_data},
--	{ .compatible = "marvell,tauros3-cache",
--	  .data = (void *)&tauros3_data },
-+	L2C_ID("arm,l210-cache", l2x0_data),
-+	L2C_ID("arm,l220-cache", l2x0_data),
-+	L2C_ID("arm,pl310-cache", pl310_data),
-+	L2C_ID("brcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
-+	L2C_ID("marvell,aurora-outer-cache", aurora_with_outer_data),
-+	L2C_ID("marvell,aurora-system-cache", aurora_no_outer_data),
-+	L2C_ID("marvell,tauros3-cache", tauros3_data),
-+	/* Deprecated IDs */
-+	L2C_ID("bcm,bcm11351-a2-pl310-cache", bcm_l2x0_data),
- 	{}
- };
+ static void __init vf610_init_irq(void)
+ {
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ 	irqchip_init();
+ }
  
+diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
+index 5e3027d3692f..c6571f1de9fd 100644
+--- a/arch/arm/mach-imx/system.c
++++ b/arch/arm/mach-imx/system.c
+@@ -145,6 +145,6 @@ void __init imx_init_l2cache(void)
+ 	of_node_put(np);
+ 
+ out:
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ }
+ #endif
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index f6c9d1d85c14..9d6c401d8738 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -43,7 +43,7 @@ static void __init armada_370_xp_timer_and_clk_init(void)
+ 	coherency_init();
+ 	BUG_ON(mvebu_mbus_dt_init());
+ #ifdef CONFIG_CACHE_L2X0
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ #endif
+ }
+ 
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 82c0b0709712..de9dc5f87d55 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -25,7 +25,7 @@
+ 
+ static void __init rockchip_dt_init(void)
+ {
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index dd0d49cdbe09..395fa085b43e 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -104,7 +104,7 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
+ 
+ static void __init socfpga_cyclone5_init(void)
+ {
+-	l2x0_of_init(0, ~0UL);
++	l2x0_of_init(0, ~0);
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	socfpga_init_clocks();
+ }
 -- 
 1.8.3.1
