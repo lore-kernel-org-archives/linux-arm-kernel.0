@@ -1,74 +1,119 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 28 Mar 2014 11:46:18 +0000
-Subject: [PATCH 0/3] Versatile PCI DT support
-In-Reply-To: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
-References: <1395960398-4238-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20140328114618.GY17163@e106497-lin.cambridge.arm.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Fri, 28 Mar 2014 17:33:41 +0530
+Subject: [PATCH v7 1/2] dma: Add Xilinx Video DMA DT Binding Documentation
+In-Reply-To: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
+References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
+Message-ID: <1396008222-7058-2-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 10:46:35PM +0000, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
-> 
-> This series adds a platform driver for Versatile PB's PCI host using
-> Liviu's recent patch series[1] for DT parsing and setup.
-> 
-> The first patch is a hack to get Liviu's current patches to work on ARM.
-> It at least shows we are not that far off from being able to use the
-> series on ARM.
-> 
-> I've tested PCI under QEMU, but need someone with actual h/w to test.
-> A branch with this series and which includes full conversion of
-> Versatile to DT is available here[2].
+Device-tree binding documentation of Xilinx Video DMA Engine
 
-Hi Rob,
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+---
+Changes in v7:
+None
 
-Thanks for doing this. Hopefully others will take inspiration and start to
-convert their host bridge controllers as well.
+Changes in v6:
+None
 
-I will post an updated series soon. (Un)fortunately it will look slightly
-different than the last one I've posted as I am trying to get more code
-that I've currently placed in arch/arm64/kernel/pci.c into drivers/pci,
-so you will need to revisit your series.
+Changes in v5:
+None
 
-Regarding your comment about bridge->bus->self being needed: root busses
-are supposed to have bus->self == NULL, and the bridge->bus *is* the root
-bus. Where would you need to use bridge->bus->self?
+Changes in v4:
+None
 
-Best regards,
-Liviu
+Changes in v3:
+None
 
-> 
-> Rob
-> 
-> [1] https://lkml.org/lkml/2014/3/14/279
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git versatile
-> 
-> Rob Herring (3):
->   ARM: hackup pcibios support for commmon bridge code
->   dt/bindings: add versatile PCI binding
->   pci: add DT based ARM Versatile PCI host driver
-> 
->  .../devicetree/bindings/pci/versatile.txt          |  59 +++++
->  arch/arm/kernel/bios32.c                           |  63 +++++
->  drivers/pci/host/Kconfig                           |   4 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-versatile.c                   | 275 +++++++++++++++++++++
->  5 files changed, 402 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/versatile.txt
->  create mode 100644 drivers/pci/host/pci-versatile.c
-> 
-> -- 
-> 1.8.3.2
-> 
-> 
+Changes in v2:
+- Removed device-id DT property, as suggested by Arnd Bergmann
+- Properly documented DT bindings as suggested by Arnd Bergmann
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
 
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+new file mode 100644
+index 0000000..ab8be1a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+@@ -0,0 +1,75 @@
++Xilinx AXI VDMA engine, it does transfers between memory and video devices.
++It can be configured to have one channel or two channels. If configured
++as two channels, one is to transmit to the video device and another is
++to receive from the video device.
++
++Required properties:
++- compatible: Should be "xlnx,axi-vdma-1.00.a"
++- #dma-cells: Should be <1>, see "dmas" property below
++- reg: Should contain VDMA registers location and length.
++- xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
++- dma-channel child node: Should have atleast one channel and can have upto
++	two channels per device. This node specifies the properties of each
++	DMA channel (see child node properties below).
++
++Optional properties:
++- xlnx,include-sg: Tells whether configured for Scatter-mode in
++	the hardware.
++- xlnx,flush-fsync: Tells whether which channel to Flush on Frame sync.
++	It takes following values:
++	{1}, flush both channels
++	{2}, flush mm2s channel
++	{3}, flush s2mm channel
++
++Required child node properties:
++- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
++	"xlnx,axi-vdma-s2mm-channel".
++- interrupts: Should contain per channel VDMA interrupts.
++- xlnx,data-width: Should contain the stream data width, take values
++	{32,64...1024}.
++
++Option child node properties:
++- xlnx,include-dre: Tells whether hardware is configured for Data
++	Realignment Engine.
++- xlnx,genlock-mode: Tells whether Genlock synchronization is
++	enabled/disabled in hardware.
++
++Example:
++++++++++
++
++axi_vdma_0: axivdma at 40030000 {
++	compatible = "xlnx,axi-vdma-1.00.a";
++	#dma_cells = <1>;
++	reg = < 0x40030000 0x10000 >;
++	xlnx,num-fstores = <0x8>;
++	xlnx,flush-fsync = <0x1>;
++	dma-channel at 40030000 {
++		compatible = "xlnx,axi-vdma-mm2s-channel";
++		interrupts = < 0 54 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++	dma-channel at 40030030 {
++		compatible = "xlnx,axi-vdma-s2mm-channel";
++		interrupts = < 0 53 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++} ;
++
++
++* DMA client
++
++Required properties:
++- dmas: a list of <[Video DMA device phandle] [Channel ID]> pairs,
++	where Channel ID is '0' for write/tx and '1' for read/rx
++	channel.
++- dma-names: a list of DMA channel names, one per "dmas" entry
++
++Example:
++++++++++
++
++vdmatest_0: vdmatest at 0 {
++	compatible ="xlnx,axi-vdma-test-1.00.a";
++	dmas = <&axi_vdma_0 0
++		&axi_vdma_0 1>;
++	dma-names = "vdma0", "vdma1";
++} ;
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.7.9.5
