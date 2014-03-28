@@ -1,46 +1,109 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 28 Mar 2014 12:07:49 -0700
-Subject: [PATCH] clk: Fix minor errors in of_clk_init() function comments
-In-Reply-To: <1395918516-23822-1-git-send-email-s.nawrocki@samsung.com>
-References: <1395918516-23822-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140328190749.5762.7875@quantum>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 28 Mar 2014 12:09:13 -0700
+Subject: [RFC PATCH 1/4] ARM: KVM: on unhandled IO mem abort, route the
+ call to the KVM MMIO bus
+In-Reply-To: <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+References: <1394726249-1547-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1394726249-1547-2-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <20140328190913.GJ25519@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2014-03-27 04:08:36)
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
-Taken into clk-next.
-
-Thanks,
-Mike
-
-> ---
->  drivers/clk/clk.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On Thu, Mar 13, 2014 at 04:57:26PM +0100, Antonios Motakis wrote:
+> On an unhandled IO memory abort, use the kvm_io_bus_* API in order to
+> handle the MMIO access through any registered read/write callbacks. This
+> is a dependency for eventfd support (ioeventfd and irqfd).
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index c859adf..29dc1e7 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2575,7 +2575,7 @@ static int parent_ready(struct device_node *np)
->   * @matches: array of compatible values and init functions for providers.
->   *
->   * This function scans the device tree for matching clock providers
-> - * and calls their initialization functions. It also do it by trying
-> + * and calls their initialization functions. It also does it by trying
->   * to follow the dependencies.
->   */
->  void __init of_clk_init(const struct of_device_id *matches)
-> @@ -2612,7 +2612,7 @@ void __init of_clk_init(const struct of_device_id *matches)
->                 }
+> However, accesses to the VGIC are still left implemented independently,
+> since the kvm_io_bus_* API doesn't pass the VCPU pointer doing the access.
+> 
+> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+> ---
+>  arch/arm/kvm/mmio.c | 32 ++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic.c |  5 ++++-
+>  2 files changed, 36 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 4cb5a93..1d17831 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -162,6 +162,35 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	return 0;
+>  }
 >  
->                 /*
-> -                * We didn't managed to initialize any of the
-> +                * We didn't manage to initialize any of the
->                  * remaining providers during the last loop, so now we
->                  * initialize all the remaining ones unconditionally
->                  * in case the clock parent was not mandatory
+> +/**
+> + * kvm_handle_mmio - handle an in-kernel MMIO access
+> + * @vcpu:	pointer to the vcpu performing the access
+> + * @run:	pointer to the kvm_run structure
+> + * @mmio:	pointer to the data describing the access
+> + *
+> + * returns true if the MMIO access has been performed in kernel space,
+> + * and false if it needs to be emulated in user space.
+> + */
+> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> +		struct kvm_exit_mmio *mmio)
+> +{
+> +	int ret;
+> +	if (mmio->is_write) {
+> +		ret = kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
+> +				mmio->len, &mmio->data);
+> +
+> +	} else {
+> +		ret = kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, mmio->phys_addr,
+> +				mmio->len, &mmio->data);
+> +	}
+> +	if (!ret) {
+> +		kvm_prepare_mmio(run, mmio);
+> +		kvm_handle_mmio_return(vcpu, run);
+> +	}
+> +
+> +	return !ret;
+> +}
+> +
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa)
+>  {
+> @@ -200,6 +229,9 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  	if (vgic_handle_mmio(vcpu, run, &mmio))
+>  		return 1;
+>  
+> +	if (handle_kernel_mmio(vcpu, run, &mmio))
+> +		return 1;
+> +
+
+this special-casing of the vgic is now really terrible.  Is there
+anything holding you back from doing the necessary restructure of the
+kvm_bus_io_*() API instead?  That would allow us to get rid of the ugly
+Fix it! in the vgic driver as well.
+
+-Christoffer
+
+>  	kvm_prepare_mmio(run, &mmio);
+>  	return 0;
+>  }
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 8ca405c..afdecc3 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -849,13 +849,16 @@ struct mmio_range *find_matching_range(const struct mmio_range *ranges,
+>  }
+>  
+>  /**
+> - * vgic_handle_mmio - handle an in-kernel MMIO access
+> + * vgic_handle_mmio - handle an in-kernel vgic MMIO access
+>   * @vcpu:	pointer to the vcpu performing the access
+>   * @run:	pointer to the kvm_run structure
+>   * @mmio:	pointer to the data describing the access
+>   *
+>   * returns true if the MMIO access has been performed in kernel space,
+>   * and false if it needs to be emulated in user space.
+> + *
+> + * This is handled outside of kvm_handle_mmio because the kvm_io_bus only
+> + * passes the VM pointer, while we need the VCPU performing the access.
+>   */
+>  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		      struct kvm_exit_mmio *mmio)
 > -- 
-> 1.7.9.5
+> 1.8.3.2
 > 
