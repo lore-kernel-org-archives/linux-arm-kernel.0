@@ -1,41 +1,26 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 28 Mar 2014 15:54:31 -0500
-Subject: [PATCH] ARM: dts: am43xx-clocks: use ti,
- fixed-factor-clock for dpll_per_clkdcoldo
-Message-ID: <1396040071-17900-1-git-send-email-d-gerlach@ti.com>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 28 Mar 2014 14:56:35 -0600
+Subject: [PATCH 0/3] rtc: Add APM X-Gene SoC RTC driver
+Message-ID: <1396040198-13645-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the ti,fixed-factor-clock version so that autoidle for
-dpll_per_clkdcoldo is properly controlled after power management code
-is introduced. Without this the clock may be held active even when
-it is gated.
+This patch adds support for the APM X-Gene SoC RTC driver.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/boot/dts/am43xx-clocks.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
+--
+Loc Ho (3):
+  Documentation: Add documentation for the APM X-Gene SoC RTC DTS
+    binding
+  rtc: Add APM X-Gene SoC RTC driver
+  arm64: Add APM X-Gene SoC RTC DTS entry
 
-diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-index 142009c..1d9b6bb 100644
---- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-@@ -609,10 +609,13 @@
- 
- 	dpll_per_clkdcoldo: dpll_per_clkdcoldo {
- 		#clock-cells = <0>;
--		compatible = "fixed-factor-clock";
-+		compatible = "ti,fixed-factor-clock";
- 		clocks = <&dpll_per_ck>;
--		clock-mult = <1>;
--		clock-div = <1>;
-+		ti,clock-mult = <1>;
-+		ti,clock-div = <1>;
-+		ti,autoidle-shift = <8>;
-+		reg = <0x2e14>;
-+		ti,invert-autoidle-bit;
- 	};
- 
- 	dll_aging_clk_div: dll_aging_clk_div {
--- 
-1.9.0
+ .../devicetree/bindings/rtc/xgene-rtc.txt          |   28 ++
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   21 ++
+ drivers/rtc/Kconfig                                |    9 +
+ drivers/rtc/Makefile                               |    1 +
+ drivers/rtc/rtc-xgene.c                            |  278 ++++++++++++++++++++
+ 5 files changed, 337 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/xgene-rtc.txt
+ create mode 100644 drivers/rtc/rtc-xgene.c
