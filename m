@@ -1,33 +1,42 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Sat, 29 Mar 2014 11:11:03 +0100
-Subject: [RFC PATCH v2 05/10] ARM: at91: make use of the new AIC driver
- for dt enabled boards
-In-Reply-To: <20140329100756.272c978d@skate>
-References: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>	<1396029548-10928-6-git-send-email-b.brezillon.dev@gmail.com>
- <20140329100756.272c978d@skate>
-Message-ID: <53369C37.4030104@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 28 Mar 2014 14:21:07 +0000
+Subject: [PATCH] ARM: topology: Make it clear that all CPUs need to be
+ described
+Message-ID: <1396016467-23257-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+From: Mark Brown <broonie@linaro.org>
 
-Le 29/03/2014 10:07, Thomas Petazzoni a ?crit :
-> Dear Boris BREZILLON,
->
-> On Fri, 28 Mar 2014 18:59:03 +0100, Boris BREZILLON wrote:
->
->> +config ATMEL_AIC_IRQ
->> +	bool
->> +	default USE_OF
->> +	select GENERIC_IRQ_CHIP
->> +	select IRQ_DOMAIN
->> +	select MULTI_IRQ_HANDLER
-> This option should probably go in drivers/irqchip/Kconfig, no?
+The ARMv8 code will reject topologies that omit some CPUs (and it's not
+clear that it's ever sensible to do so). Update the binding document to
+make this clear.
 
-Absolutely, I'll move this section into drivers/irqchip/Kconfig.
+Since we're reformatting the text also fix incorrect grammar in the
+final "Any other configuration..." section by removing "consider".
 
-Best Regards,
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/topology.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Boris
->
-> Thomas
+diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+index 4aa20e7..1061faf 100644
+--- a/Documentation/devicetree/bindings/arm/topology.txt
++++ b/Documentation/devicetree/bindings/arm/topology.txt
+@@ -75,9 +75,10 @@ The cpu-map node can only contain three types of child nodes:
+ 
+ whose bindings are described in paragraph 3.
+ 
+-The nodes describing the CPU topology (cluster/core/thread) can only be
+-defined within the cpu-map node.
+-Any other configuration is consider invalid and therefore must be ignored.
++The nodes describing the CPU topology (cluster/core/thread) can only
++be defined within the cpu-map node and every core/thread in the system
++must be defined within the topology.  Any other configuration is
++invalid and therefore must be ignored.
+ 
+ ===========================================
+ 2.1 - cpu-map child nodes naming convention
+-- 
+1.9.1
