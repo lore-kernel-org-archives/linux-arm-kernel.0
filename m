@@ -1,85 +1,140 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 27 Mar 2014 19:20:28 -0500
-Subject: [PATCH v5] ARM: vDSO gettimeofday using generic timer architecture
-In-Reply-To: <CAGXu5jKojxJyhKSpPtLDT8Cw4wwUiKauoFUP5xuSJnKioDXGrQ@mail.gmail.com>
-References: <1395695873-12807-1-git-send-email-nathan_lynch@mentor.com>
- <CAGXu5jKojxJyhKSpPtLDT8Cw4wwUiKauoFUP5xuSJnKioDXGrQ@mail.gmail.com>
-Message-ID: <5334C04C.2050802@mentor.com>
+From: neil@fatboyfat.co.uk (Neil Greatorex)
+Date: Fri, 28 Mar 2014 01:03:55 +0000 (GMT)
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada
+ 370)
+In-Reply-To: <20140327044054.GA22681@obsidianresearch.com>
+References: <20140325202249.GA10378@obsidianresearch.com>
+ <20140325213638.5aba54b6@skate>
+ <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
+ <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+ <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+Message-ID: <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2014 06:06 PM, Kees Cook wrote:
-> On Mon, Mar 24, 2014 at 2:17 PM, Nathan Lynch <nathan_lynch@mentor.com> wrote:
->> +
->> +/* assumes mmap_sem is write-locked */
->> +void arm_install_vdso(struct mm_struct *mm)
->> +{
->> +       unsigned long vdso_base;
->> +       int ret;
->> +
->> +       mm->context.vdso = ~0UL;
->> +
->> +       if (vdso_pagelist == NULL)
->> +               return;
->> +
->> +       vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
-> 
-> While get_unmapped_area() should be returning an address that has been
-> base-offset randomized, I notice that x86 actually moves its vdso to a
-> random location near the stack instead (see vdso_addr() in
-> arch/x86/vdso/vma.c), in theory to avoid a hole in memory and to
-> separately randomize the vdso separately from heap and stack. I think
-> a similar thing be a benefit on ARM too.
+Jason, Thomas,
 
-OK, I'll look into this.  Perhaps a similar treatment for the sigpage?
+With the help you've given, I think I've identified what the problem is. 
+It is basically what Thomas suggested the problem was (that he'd seen with 
+the Armada 38x). The call to mvebu_pcie_set_local_dev_nr causes the PCIe 
+link to reset. In my tests with this Intel card, it takes ~25ms for the 
+link to go down, and then another ~13ms for it to come back up.
 
-I notice on my systems (OMAP5 and i.MX6) that vdso, sigpage, and ld.so
-are always mapped consecutively:
+I have put together a patch below that I would be interested to get your 
+opinions on and also for you to test against any cards you may have. I 
+only have the one mini PCIe card so it's not a great test!
 
-# grep -A2 vdso /proc/self/maps
-b6f44000-b6f46000 r-xp 00000000 00:00 0          [vdso]
-b6f46000-b6f47000 r-xp 00000000 00:00 0          [sigpage]
-b6f47000-b6f48000 r--p 00016000 00:01 1254       /lib/ld-2.19.90.so
+With my card, it is now detected correctly, and there are no issues when 
+rescanning the PCI bus.
 
-but I wonder if that's due to starved entropy pools, or is the VM
-already trying to prevent holes?
+Cheers,
+Neil
 
 
->> +       if (IS_ERR_VALUE(vdso_base)) {
->> +               pr_notice_once("%s: get_unapped_area failed (%ld)\n",
->> +                              __func__, (long)vdso_base);
->> +               return;
->> +       }
->> +
->> +       /*
->> +        * Put vDSO base into mm struct before calling
->> +        * install_special_mapping so the perf counter mmap tracking
->> +        * code will recognise it as a vDSO.
->> +        */
->> +       mm->context.vdso = vdso_base;
->> +
->> +       ret = install_special_mapping(mm, vdso_base, vdso_mapping_len,
->> +                                     VM_READ|VM_EXEC|
->> +                                     VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
->> +                                     vdso_pagelist);
-> 
-> Why is this given VM_MAYWRITE? (I would ask the same about x86's
-> implementation too.)
+>From a0ca1552e737c18b5651fe1f27ade76f512ca191 Mon Sep 17 00:00:00 2001
+From: Neil Greatorex <neil@fatboyfat.co.uk>
+Date: Fri, 28 Mar 2014 00:35:04 +0000
+Subject: [PATCH] PCI: mvebu: Wait for PCIe link to reset after setting
+  device number
 
-For setting breakpoints in the text area.  FWIW powerpc's
-arch_setup_additional_pages has this comment:
+After setting the local device nr, the PCIe link may go down briefly. If 
+we don't wait for the link to come back up we may miss that device when we 
+scan the bus (assuming it is not present).
 
-/*
- * our vma flags don't have VM_WRITE so by default, the process isn't
- * allowed to write those pages.
- * gdb can break that with ptrace interface, and thus trigger COW on
- * those pages but it's then your responsibility to never do that on
- * the "data" page of the vDSO or you'll stop getting kernel updates
- * and your nice userland gettimeofday will be totally dead.
- * It's fine to use that for setting breakpoints in the vDSO code
- * pages though.
- */
-rc = install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
-			     VM_READ|VM_EXEC|
-			     VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-			     vdso_pagelist);
+This patch waits up to 40ms for the link to go down, and if it did go down,
+waits up to 100ms for it to come back up. If the link was down to begin with,
+it will not wait at all.
+
+Signed-off-by: Neil Greatorex <neil@fatboyfat.co.uk>
+---
+  drivers/pci/host/pci-mvebu.c | 57 
+++++++++++++++++++++++++++++++++++++++++++++
+  1 file changed, 57 insertions(+)
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 0e79665..afd0dce 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -891,6 +891,7 @@ static int mvebu_pcie_probe(struct platform_device 
+*pdev)
+  	for_each_child_of_node(pdev->dev.of_node, child) {
+  		struct mvebu_pcie_port *port = &pcie->ports[i];
+  		enum of_gpio_flags flags;
++		u32 link_present, retry_count = 0;
+
+  		if (!of_device_is_available(child))
+  			continue;
+@@ -975,8 +976,64 @@ static int mvebu_pcie_probe(struct platform_device 
+*pdev)
+  			continue;
+  		}
+
++		/* After setting the local dev number, the PCI-E link may go
++		 * down for a period of time. If we don't wait for it to come
++		 * back up, then we risk missing enumerating that device when
++		 * we scan the bus. However, if the link was down to begin with,
++		 * there's no point waiting, so check now.
++		 */
++		link_present = mvebu_pcie_link_up(port);
++
+  		mvebu_pcie_set_local_dev_nr(port, 1);
+
++		if (link_present) {
++			/* In testing, the link took ~25ms to go down, and
++			 * another ~15ms to come back up, so wait ~40ms for the
++			 * link to go down, and then up to ~100ms for it to come
++			 * back up. If the link doesn't go down after ~40ms, then
++			 * it probably won't go down at all, so carry on.
++			 */
++			if (mvebu_pcie_link_up(port)) {
++				while (retry_count < 40) {
++					if (!mvebu_pcie_link_up(port))
++						break;
++					retry_count++;
++					mdelay(1);
++				}
++
++				if (retry_count == 40) {
++					dev_dbg(&pdev->dev,
++						"PCIe%d.%d: after setting dev nr, link stayed up\n",
++						port->port, port->lane);
++				} else {
++					dev_info(&pdev->dev,
++						 "PCIe%d.%d: after setting dev nr, link went down after %d polls\n",
++						 port->port, port->lane, retry_count);
++				}
++			}
++
++			retry_count = 0;
++
++			if (!mvebu_pcie_link_up(port)) {
++				while (retry_count < 100) {
++					if (mvebu_pcie_link_up(port))
++						break;
++					retry_count++;
++					mdelay(1);
++				}
++
++				if (retry_count == 100) {
++					dev_info(&pdev->dev,
++						"PCIe%d.%d: after setting dev nr, link failed to come back up (timeout)\n",
++						port->port, port->lane);
++				} else {
++					dev_info(&pdev->dev,
++						 "PCIe%d.%d: after setting dev nr, link came back up after %d polls ",
++						 port->port, port->lane, retry_count);
++				}
++			}
++		}
++
+  		port->dn = child;
+  		spin_lock_init(&port->conf_lock);
+  		mvebu_sw_pci_bridge_init(port);
+-- 
+1.8.3.2
