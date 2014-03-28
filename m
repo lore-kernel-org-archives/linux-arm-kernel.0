@@ -1,171 +1,125 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 28 Mar 2014 12:13:20 +0100
-Subject: [PATCH v6 00/11] CPU idle for Armada XP
-Message-ID: <1396005211-15573-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 28 Mar 2014 12:13:22 +0100
+Subject: [PATCH v6 02/11] ARM: mvebu: remove the address parameter for
+ ll_set_cpu_coherent
+In-Reply-To: <1396005211-15573-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1396005211-15573-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1396005211-15573-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds the CPU idle support for Armada XP and prepares
-the support for Armada 370. This was based on the work of Nadav
-Haklai.
+In order to be able to deal with the MMU enabled and the MMU disabled
+cases, the base address of the coherency registers was passed to the
+function. The address by itself was not interesting as it can't change
+for a given SoC, the only thing we need is to have a distinction
+between the physical or the virtual address.
 
-The main change in this new version is a rebasing onto the PMSU
-reworked series sent by Thomas Petazzoni:
-http://www.spinics.net/lists/arm-kernel/msg318534.html
+This patch add a check of the MMU bit to choose the accurate address,
+then the calling function doesn't have to pass this information.
 
-I also took into account the comments I received, see the changelog
-for the details.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c    |  6 +++---
+ arch/arm/mach-mvebu/coherency_ll.S | 22 ++++++++++++++++++++--
+ arch/arm/mach-mvebu/headsmp.S      |  9 ---------
+ 3 files changed, 23 insertions(+), 14 deletions(-)
 
-The first patch should go through ARM subsystem and should be taken by
-Russell King. There was no change since the last version, so I am
-submitting it to Russell's patch system.
-
-All the other patches can go to mvebu subsystem (and then arm-soc)
-even the patch 10, if the PM maintainers agree, of course in this case
-we need an acked-by from them.
-
-I would like also to have a acked-by (or at least a reviewed-by) from
-the PM maintainers for the patches 8 and 9.
-
-The whole series (and the pmsu patches needed) is also available in
-the branch CPU-idle-ArmadaXP-v6 at
-https://github.com/MISL-EBU-System-SW/mainline-public.git
-
-Thanks,
-
-Changelog:
-
-v5 -> v6:
-
- * rebased onto the pmsu reworked patch set
-
- * fixed the wrong indent for ARM_BE8 in coherency_ll.S
-
- * Improved the tests done in armada_370_xp_cpu_pm_init as suggested
-   by Thomas Petazzoni. Each condition is tested separately then it
-   will be more readable.
-
-v4 -> v5:
-
-* Call v7 version of suspend and resume from the pj4b callback instead
-  of copying the code, following Lorenzo advice.
-
-* Split the low level functions to manipulate HW coherency
-
-* Reorder the included headers in cpuidle-armada-370-xp.c
-
-* Added comment in the inline asm part of armada_370_xp_cpu_suspend
-  function where the CR_C is restored.
-
-* Added comment about the fact that Armada XP can us ldrex/strex
-  without MMU enabled
-
-* Fixed commit logs
-
-* Added the acked-by from Thomas Petazzoni
-
-* Extend the pmsu registers instead of adding a new set of register
-
-* Move the pm initialization outside of the board file in a
-  arch_initcall
-
-* Move most of the architecture specific code in arch/arm/mach-mvebu
-  and use platform device data file to pass the callback as suggested
-  by Daniel.
-
-* Added the tlb flush if the wfi failed.
-
-* Check the cpu_suspend return value
-
-* rebased on mvebu/for-next to be in sync all the change made in mach-mvebu
-
-v3 -> v4:
-
-* factorized the code in coherency_ll.S and make it autodetect as mush
-  as possible
-
-* reordered the introduction of the device tree binding
-
-* removed all the EXPORT_SYMBOL_GPL as the driver can only be built
-  into the kernel and never be built as a module.
-
-* moved the armada_370_xp_pmsu_enable_l2_powerdown_onidle function in
-  armada_370_cp.c file during the initialization of the platform.
-
-* fixed various coding style issue and typos pointed by Thomas
-
-* fixed all the coding issue style, made the comments more coherent
-  and add more comment in the suspend-armada-370-xp.S file.
-
-* moved all the device tree related check from
-  armada_370_xp_cpuidle_probe to armada_370_xp_dt_init.
-
-* used cpu_pm_enter() instead of directly calling platform code in
-  Armada_370_xp_enter_idle.
-
-* convert the sequence to disable the coherency to the one used in
-  TC2.
-
-* Rebased on v3.14-rc1
-
-v2 -> v3:
-
-* Converted the driver to use module_platform_driver. This lead to the
-  introduction of a new patch (PATCH 11). Pointed by Daniel Lezcano.
-
-* Used PUIDLE_DRIVER_FLAGS_MASK to store the deep idle information,
-  suggested by Daniel Lezcano.
-
-* Removed cpu_init call from armada_370_xp_enter_idle
-  function. Pointed by Lorenzo Pieralisi.
-
-* Rebased on v3.12-rc5
-
-
-v1 -> v2:
-
-* Removed the pm_level kernel parameter. As Kevin Hilman pointed, its
-  usage can be replaced by using
-  /sys/devices/system/cpu/cpu*/cpuidle/state*/disable or the kernel
-  parameter cpuidle.off.
-
-* Used BIT() macro (reported by Ezequiel)
-
-* Made the function more readable the
-  armada_370_xp_pmsu_idle_prepare() function (reported by Thomas)
-
-* Moved the config entry in Kconfig.arm, and rename the config symbol
-  according the pattern used by other arm cpu: ARM_"soc name"_CPUIDLE
-
-* Moved the build rule under the new ARM SoC section in the Makefile
-
-* Rebased on Linus Torvalds master branch of Thursday September 12
-
-Gregory CLEMENT (11):
-  ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
-  ARM: mvebu: remove the address parameter for ll_set_cpu_coherent
-  ARM: mvebu: ll_set_cpu_coherent always uses the current CPU
-  ARM: mvebu: Remove the unused argument of set_cpu_coherent()
-  ARM: mvebu: Split low level functions to manipulate HW coherency
-  ARM: mvebu: Low level function to disable HW coherency support
-  ARM: mvebu: Allow to power down L2 cache controller in idle mode
-  ARM: mvebu: Add the PMSU related part of the cpu idle functions
-  ARM: mvebu: Register notifier callback for the cpuidle transition
-  cpuidle: mvebu: Add initial CPU idle support for Armada 370/XP SoC
-  ARM: mvebu: register the cpuidle driver for the Armada XP SoCs
-
- arch/arm/mach-mvebu/coherency.c         |  16 +--
- arch/arm/mach-mvebu/coherency.h         |   2 +-
- arch/arm/mach-mvebu/coherency_ll.S      | 122 +++++++++++++++----
- arch/arm/mach-mvebu/headsmp.S           |  15 +--
- arch/arm/mach-mvebu/platsmp.c           |   2 +-
- arch/arm/mach-mvebu/pmsu.c              | 207 +++++++++++++++++++++++++++++++-
- arch/arm/mm/proc-v7.S                   |  28 ++++-
- drivers/cpuidle/Kconfig.arm             |   5 +
- drivers/cpuidle/Makefile                |   1 +
- drivers/cpuidle/cpuidle-armada-370-xp.c |  93 ++++++++++++++
- 10 files changed, 438 insertions(+), 53 deletions(-)
- create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
-
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 4e9d58148ca7..88dd507221fc 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -30,7 +30,7 @@
+ #include "coherency.h"
+ 
+ unsigned long coherency_phys_base;
+-static void __iomem *coherency_base;
++void __iomem *coherency_base;
+ static void __iomem *coherency_cpu_base;
+ 
+ /* Coherency fabric registers */
+@@ -44,7 +44,7 @@ static struct of_device_id of_coherency_table[] = {
+ };
+ 
+ /* Function defined in coherency_ll.S */
+-int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
++int ll_set_cpu_coherent(unsigned int hw_cpu_id);
+ 
+ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+ {
+@@ -54,7 +54,7 @@ int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+ 		return 1;
+ 	}
+ 
+-	return ll_set_cpu_coherent(coherency_base, hw_cpu_id);
++	return ll_set_cpu_coherent(hw_cpu_id);
+ }
+ 
+ static inline void mvebu_hwcc_sync_io_barrier(void)
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index ee7598fe75db..1f2bcd4b5424 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -21,13 +21,27 @@
+ #define ARMADA_XP_CFB_CFG_REG_OFFSET 0x4
+ 
+ #include <asm/assembler.h>
++#include <asm/cp15.h>
+ 
+ 	.text
+ /*
+- * r0: Coherency fabric base register address
+- * r1: HW CPU id
++ * r0: HW CPU id
+  */
+ ENTRY(ll_set_cpu_coherent)
++	mrc	p15, 0, r1, c1, c0, 0
++	tst	r1, #CR_M @ Check MMU bit enabled
++	bne	1f
++
++	/* use physical address of the coherency register*/
++	adr	r0, 3f
++	ldr	r3, [r0]
++	ldr	r0, [r0, r3]
++	b	2f
++1:
++	/* use virtual address of the coherency register*/
++	ldr	r0, =coherency_base
++	ldr	r0, [r0]
++2:
+ 	/* Create bit by cpu index */
+ 	mov	r3, #(1 << 24)
+ 	lsl	r1, r3, r1
+@@ -56,3 +70,7 @@ ARM_BE8(rev	r1, r1)
+ 	mov	r0, #0
+ 	mov	pc, lr
+ ENDPROC(ll_set_cpu_coherent)
++
++	.align 2
++3:
++	.long	coherency_phys_base - .
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index 3dd80df428f7..f30bc8d78871 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -31,11 +31,6 @@
+ ENTRY(armada_xp_secondary_startup)
+  ARM_BE8(setend	be )			@ go BE8 if entered LE
+ 
+-	/* Get coherency fabric base physical address */
+-	adr	r0, 1f
+-	ldr	r1, [r0]
+-	ldr	r0, [r0, r1]
+-
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+ 	and     r1, r1, #0xF
+@@ -45,7 +40,3 @@ ENTRY(armada_xp_secondary_startup)
+ 	b	secondary_startup
+ 
+ ENDPROC(armada_xp_secondary_startup)
+-
+-	.align 2
+-1:
+-	.long	coherency_phys_base - .
 -- 
 1.8.1.2
