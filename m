@@ -1,44 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Mar 2014 09:24:06 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix reset controller handling
-In-Reply-To: <20140328074900.GC2708@katana>
-References: <1394449930-29696-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140328074900.GC2708@katana>
-Message-ID: <20140328082406.GO6120@lukather>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 28 Mar 2014 14:05:28 +0530
+Subject: [PATCH 1/2] ARM: OMAP2+: L2 cache: use macro instead of const number
+Message-ID: <5ea7277c21215c7b4aa776d5379dc2d6263228c6.1395994759.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 08:49:00AM +0100, Wolfram Sang wrote:
-> On Mon, Mar 10, 2014 at 12:12:10PM +0100, Maxime Ripard wrote:
-> > The reset framework recently gained optional stubs when CONFIG_RESET_CONTROLLER
-> > is not selected. It also introduced a function reset_get_optional, that is also
-> > dummy-defined whenever the framework isn't enabled, for drivers that needs an
-> > optional reset controller.
-> > 
-> > Switch to this function, since the mv64xxx driver is in this case. This also
-> > fixes a compilation breakage whenever the reset framework wasn't selected:
-> > 
-> > drivers/i2c/busses/i2c-mv64xxx.c:771:2: error: implicit declaration of function 'devm_reset_control_get'
-> > 
-> > While we're at it, remove the redundant test on dev.of_node surrounding the
-> > calls to reset framework functions, since it will either be a valid pointer, an
-> > error pointer in the case where we called reset_get_optional without an of_node
-> > pointer or if it failed, or NULL if we're not loaded through DT.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Applied to for-next, thanks!
+From: Afzal Mohammed <afzal@ti.com>
 
-Thanks for your patience, and sorry for the mess.
+Its better to use the available macro than 0x1.
+No functional change.
 
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+This series applies to latest of linux-next/master
+
+ arch/arm/mach-omap2/omap4-common.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 95e171a..8f18460 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -219,7 +219,7 @@ static int __init omap_l2_cache_init(void)
+ 		omap_smc1(0x109, aux_ctrl);
+ 
+ 	/* Enable PL310 L2 Cache controller */
+-	omap_smc1(0x102, 0x1);
++	omap_smc1(0x102, L2X0_CTRL_EN);
+ 
+ 	if (of_have_populated_dt())
+ 		l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/c1e63c74/attachment.sig>
+1.7.10.1
