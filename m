@@ -1,61 +1,49 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 28 Mar 2014 10:01:58 +0100
-Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <53353524.9020605@freescale.com>
-References: <532BCFCC.4080205@freescale.com>
- <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
- <20140324095902.GB11377@localhost>
- <20140326095156.3e5585b8@ipc1.ka-ro>
- <5332AEE7.2040402@freescale.com>
- <20140326125502.0e8d0657@ipc1.ka-ro>
- <20140327095956.GA29623@localhost>
- <20140327132109.06258526@ipc1.ka-ro>
- <5334D9F7.2030001@freescale.com>
- <20140328091646.1ce03f90@ipc1.ka-ro>
- <53353524.9020605@freescale.com>
-Message-ID: <20140328100158.042a3d68@ipc1.ka-ro>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 28 Mar 2014 10:11:42 +0100
+Subject: [PATCH 1/1] mxc_nand : allow swapping the Bad block Indicator
+ for NFC v1.
+In-Reply-To: <5332DBDD.4090802@gmail.com>
+References: <1345811288.2848.308.camel@sauron.fi.intel.com>
+ <1345825064-9147-1-git-send-email-gcembed@gmail.com>
+ <201209061056.12386.jbe@pengutronix.de>
+ <504DF9BB.8050509@gmail.com>
+ <20120911071715.GB18243@pengutronix.de>
+ <5332DBDD.4090802@gmail.com>
+Message-ID: <20140328091142.GE17250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Huang Shijie wrote:
-> ? 2014?03?28? 16:16, Lothar Wa?mann ??:
-> > Still there is no need for the Linux NAND driver to be able to read or
-> > write partitions in a format that the Boot ROM can understand. Thus it
-> If you do not use the NAND boot, there really no need to do so.
->
-There is no need for the ROM code to access any other partition than
-the bootloader itself. Thus Linux can perfectly well be booted from
-NAND without any byte swapping.
-
-> Since you need the NAND boot, we should enable the swapping for imx28.
->
-Why? There is no need for Linux to do any swapping when not accessing
-the bootloader partition.
-
-> > is perfectly legal to allow disregarding the BB marks and solely rely on
-> > a flash based BBT.
+On Wed, Mar 26, 2014 at 02:53:33PM +0100, Ga?tan Carlier wrote:
+> Hi,
+> I don't see where the problem is. The fact that bad block marker are
+> used or not, is not related to "my" patch. This patch just places
+> data where they should be. If I take the Nand and connect it to a
+> not-bugged NFC controller, all data will be read correctly with data
+> is main area and OOB is spare area.
 > >
-> The BB mark is in the page 0 of a NAND block. But the swapping can occur 
-> in _each_ page of
-> a NAND block, _NOT_ only the page 0.
+> >In this form the patch is simply not correct and should be dropped.
+> >
+> Now I want to adapt and publish my platform file to latest kernel
+> version and I am still stopped with this biswap patch that is not
+> applied. As I said before, I must not be the only that have used
+> this damned original patch from Freescale that swaps byte in their
+> ATK programming soft, redboot and Kernel and it is impossible to
+> fallback to current NAND handling (without swapping).
 > 
-> I think you are confusing at these two things.
-> 
-No, I'm not confusing anything. The swapping in any other page than
-page 0 is completely useless. Thus, when there is no need to recognize
-the BB markers, there in no need to do any swapping too.
+> Is there any chance that if I send this patch against
+> linux-next/master branch, it will be finally accepted. Only people
+> that needs it will use it. There is so much option in menuconfig
+> with so little explaination and mark as "Only say Yes if you known
+> what you do".
+
+I'm ok with supporting a devicetree option that decides whether to do
+bad block marker swapping or not. It shouldn't be a Kconfig option.
+
+Sascha
 
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
