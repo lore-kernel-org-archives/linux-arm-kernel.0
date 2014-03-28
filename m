@@ -1,42 +1,75 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 28 Mar 2014 14:06:01 +0100
-Subject: [PATCH 2/3] clocksource: exynos_mct: Change exynos4_mct_tick_clear
- return type to void
-In-Reply-To: <1396011962-4467-1-git-send-email-k.kozlowski@samsung.com>
-References: <1396011962-4467-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1396011962-4467-2-git-send-email-k.kozlowski@samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 28 Mar 2014 14:06:58 +0100
+Subject: [PATCH 02/10] irqchip: irq-armada-370-xp: do the set_smp_cross_call()
+ in the driver
+In-Reply-To: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396012026-5997-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return value of exynos4_mct_tick_clear() was never checked so it can
-be safely changed to void.
+Instead of having the SoC code in arch/arm/mach-mvebu/platsmp.c do the
+set_smp_cross_call() to register the IPI-triggering function, it makes
+more sense to do exactly what the GIC driver is doing: let the irqchip
+driver do it. This way, it avoids having to expose the
+armada_mpic_send_doorbell() function between the irqchip driver and
+the SoC code.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/clocksource/exynos_mct.c |    8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/mach-mvebu/armada-370-xp.h | 1 -
+ arch/arm/mach-mvebu/platsmp.c       | 2 --
+ drivers/irqchip/irq-armada-370-xp.c | 6 +++++-
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 0b49b09dd1a9..2ac7d228743a 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -376,15 +376,11 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
- 	}
- }
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
+index 991ab32..dd3b8a1 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.h
++++ b/arch/arm/mach-mvebu/armada-370-xp.h
+@@ -21,7 +21,6 @@
+ #define ARMADA_370_MAX_CPUS 1
+ #define ARMADA_XP_MAX_CPUS  4
  
--static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
-+static void exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
- {
- 	/* Clear the MCT tick interrupt */
--	if (__raw_readl(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1) {
-+	if (__raw_readl(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1)
- 		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
--		return 1;
--	}
+-void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
+ void armada_xp_mpic_smp_cpu_init(void);
+ void armada_xp_secondary_startup(void);
+ extern struct smp_operations armada_xp_smp_ops;
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index e98075f..81bf517 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -98,8 +98,6 @@ static void __init armada_xp_smp_init_cpus(void)
+ 
+ 	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
+ 		panic("Invalid number of CPUs in DT\n");
 -
--	return 0;
+-	set_smp_cross_call(armada_mpic_send_doorbell);
  }
  
- static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index abb850b..0bf5aef 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -315,7 +315,8 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ }
+ 
+ #ifdef CONFIG_SMP
+-void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq)
++static void armada_mpic_send_doorbell(const struct cpumask *mask,
++				      unsigned int irq)
+ {
+ 	int cpu;
+ 	unsigned long map = 0;
+@@ -534,6 +535,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 	if (parent_irq <= 0) {
+ 		irq_set_default_host(armada_370_xp_mpic_domain);
+ 		set_handle_irq(armada_370_xp_handle_irq);
++#ifdef CONFIG_SMP
++		set_smp_cross_call(armada_mpic_send_doorbell);
++#endif
+ 	} else {
+ 		irq_set_chained_handler(parent_irq,
+ 					armada_370_xp_mpic_handle_cascade_irq);
 -- 
-1.7.9.5
+1.8.3.2
