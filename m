@@ -1,70 +1,62 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:14:39 +0000
-Subject: [PATCH 04/75] ARM: l2c: omap2: remove ES1.0 support
+Date: Fri, 28 Mar 2014 15:16:45 +0000
+Subject: [PATCH 28/75] ARM: l2c: simplify l2x0 unlocking code
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYUR-0004W9-RD@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYWT-0006sH-6q@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh says:
-> But we should kill all of that since we long back decided to remove
-> ES1.0 related code. The mach-omap code alreasy has removed the ES1.0
-> compatibility so feel free to remove any specific ES1.0
-> related stuff. That silicon is long dead.
+The l2x0 unlocking code is only called from l2x0_enable() now, so move
+the logic entirely into that function and simplify it.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/omap4-common.c | 25 ++++++++-----------------
+ arch/arm/mm/cache-l2x0.c | 25 ++++++++-----------------
  1 file changed, 8 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 6cd3f3772ecf..9f8d506f511d 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -181,7 +181,7 @@ static void omap4_l2x0_set_debug(unsigned long val)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index e3f4fcbcc88b..157fd7ae331a 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -352,30 +352,21 @@ static void l2x0_disable(void)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
  
- static int __init omap_l2_cache_init(void)
+-static void l2x0_unlock(u32 cache_id)
++static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
  {
--	u32 aux_ctrl = 0;
-+	u32 aux_ctrl;
+-	int lockregs;
++	unsigned id;
  
- 	/*
- 	 * To avoid code running on other OMAPs in
-@@ -195,27 +195,18 @@ static int __init omap_l2_cache_init(void)
- 	if (WARN_ON(!l2cache_base))
- 		return -ENOMEM;
- 
--	/*
--	 * 16-way associativity, parity disabled
--	 * Way size - 32KB (es1.0)
--	 * Way size - 64KB (es2.0 +)
--	 */
--	aux_ctrl = ((1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
-+	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
-+	aux_ctrl = (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
- 			(0x1 << 25) |
- 			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
--			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT));
--
--	if (omap_rev() == OMAP4430_REV_ES1_0) {
--		aux_ctrl |= 0x2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT;
--	} else {
--		aux_ctrl |= ((0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-+			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT)) |
-+			(0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
- 			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
--			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT));
+-	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+-	case L2X0_CACHE_ID_PART_L310:
+-		lockregs = 8;
+-		break;
+-	default:
+-		/* L210 and unknown types */
+-		lockregs = 1;
+-		break;
 -	}
--	if (omap_rev() != OMAP4430_REV_ES1_0)
--		omap_smc1(0x109, aux_ctrl);
-+			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT);
-+
-+	omap_smc1(0x109, aux_ctrl);
+-
+-	l2c_unlock(l2x0_base, lockregs);
+-}
++	id = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
++	if (id == L2X0_CACHE_ID_PART_L310)
++		num_lock = 8;
++	else
++		num_lock = 1;
  
- 	/* Enable PL310 L2 Cache controller */
- 	omap_smc1(0x102, 0x1);
+-static void l2x0_enable(void __iomem *base, u32 aux, unsigned num_lock)
+-{
+ 	/* l2x0 controller is disabled */
+ 	writel_relaxed(aux, base + L2X0_AUX_CTRL);
+ 
+ 	/* Make sure that I&D is not locked down when starting */
+-	l2x0_unlock(readl_relaxed(base + L2X0_CACHE_ID));
++	l2c_unlock(base, num_lock);
+ 
+ 	l2x0_inv_all();
+ 
 -- 
 1.8.3.1
