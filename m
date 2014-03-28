@@ -1,28 +1,46 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 28 Mar 2014 15:07:06 -0400 (EDT)
-Subject: [PATCH net-next 1/3] net: stmmac: Add SOCFPGA glue driver
-In-Reply-To: <1395891912-26855-2-git-send-email-dinguyen@altera.com>
-References: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
- <1395891912-26855-2-git-send-email-dinguyen@altera.com>
-Message-ID: <20140328.150706.1512982620713301379.davem@davemloft.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 28 Mar 2014 12:07:49 -0700
+Subject: [PATCH] clk: Fix minor errors in of_clk_init() function comments
+In-Reply-To: <1395918516-23822-1-git-send-email-s.nawrocki@samsung.com>
+References: <1395918516-23822-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20140328190749.5762.7875@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: <dinguyen@altera.com>
-Date: Wed, 26 Mar 2014 22:45:10 -0500
+Quoting Sylwester Nawrocki (2014-03-27 04:08:36)
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-> From: Dinh Nguyen <dinguyen@altera.com>
+Taken into clk-next.
+
+Thanks,
+Mike
+
+> ---
+>  drivers/clk/clk.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Like the STi and sunxi series SOCs, Altera's SOCFPGA also needs a glue layer
-> on top of the Synopsys gmac IP.
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index c859adf..29dc1e7 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -2575,7 +2575,7 @@ static int parent_ready(struct device_node *np)
+>   * @matches: array of compatible values and init functions for providers.
+>   *
+>   * This function scans the device tree for matching clock providers
+> - * and calls their initialization functions. It also do it by trying
+> + * and calls their initialization functions. It also does it by trying
+>   * to follow the dependencies.
+>   */
+>  void __init of_clk_init(const struct of_device_id *matches)
+> @@ -2612,7 +2612,7 @@ void __init of_clk_init(const struct of_device_id *matches)
+>                 }
+>  
+>                 /*
+> -                * We didn't managed to initialize any of the
+> +                * We didn't manage to initialize any of the
+>                  * remaining providers during the last loop, so now we
+>                  * initialize all the remaining ones unconditionally
+>                  * in case the clock parent was not mandatory
+> -- 
+> 1.7.9.5
 > 
-> This patch adds the platform driver for the glue layer which configures the IP
-> before the generic STMMAC driver takes over.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-
-Applied, although:
-
-> +	struct device_node *np	= dev->of_node;
-
-I had to fix that TAB between "np" and "=" into a space.
