@@ -1,103 +1,36 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:15:46 +0000
-Subject: [PATCH 17/75] ARM: l2c: pass iomem address into data->save function
+Date: Fri, 28 Mar 2014 15:16:29 +0000
+Subject: [PATCH 25/75] ARM: l2c: clean up L2 cache initialisation messages
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYVW-0005mm-TV@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYWD-0006ct-2i@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass the iomem address into this function so we don't have to keep
-accessing it from a global.
+Make one of them purely "English", and the other purely technical.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 0d83b24b7971..08f9cade028a 100644
+index a544f19c448f..713cdcef25d1 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -30,7 +30,7 @@
+@@ -545,9 +545,10 @@ static void __init __l2c_init(const struct l2c_init_data *data,
  
- struct l2c_init_data {
- 	void (*of_parse)(const struct device_node *, u32 *, u32 *);
--	void (*save)(void);
-+	void (*save)(void __iomem *);
- 	struct outer_cache_fns outer_cache;
- };
+ 	outer_cache = fns;
  
-@@ -764,47 +764,47 @@ static void __init pl310_of_parse(const struct device_node *np,
- 	}
+-	pr_info("%s cache controller enabled\n", type);
+-	pr_info("l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d kB\n",
+-		ways, cache_id, aux, l2x0_size >> 10);
++	pr_info("%s cache controller enabled, %d ways, %d kB\n",
++		type, ways, l2x0_size >> 10);
++	pr_info("%s: CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
++		type, cache_id, aux);
  }
  
--static void __init pl310_save(void)
-+static void __init pl310_save(void __iomem *base)
- {
--	u32 l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
-+	u32 l2x0_revision = readl_relaxed(base + L2X0_CACHE_ID) &
- 		L2X0_CACHE_ID_RTL_MASK;
- 
--	l2x0_saved_regs.tag_latency = readl_relaxed(l2x0_base +
-+	l2x0_saved_regs.tag_latency = readl_relaxed(base +
- 		L2X0_TAG_LATENCY_CTRL);
--	l2x0_saved_regs.data_latency = readl_relaxed(l2x0_base +
-+	l2x0_saved_regs.data_latency = readl_relaxed(base +
- 		L2X0_DATA_LATENCY_CTRL);
--	l2x0_saved_regs.filter_end = readl_relaxed(l2x0_base +
-+	l2x0_saved_regs.filter_end = readl_relaxed(base +
- 		L2X0_ADDR_FILTER_END);
--	l2x0_saved_regs.filter_start = readl_relaxed(l2x0_base +
-+	l2x0_saved_regs.filter_start = readl_relaxed(base +
- 		L2X0_ADDR_FILTER_START);
- 
- 	if (l2x0_revision >= L310_CACHE_ID_RTL_R2P0) {
- 		/*
- 		 * From r2p0, there is Prefetch offset/control register
- 		 */
--		l2x0_saved_regs.prefetch_ctrl = readl_relaxed(l2x0_base +
-+		l2x0_saved_regs.prefetch_ctrl = readl_relaxed(base +
- 			L2X0_PREFETCH_CTRL);
- 		/*
- 		 * From r3p0, there is Power control register
- 		 */
- 		if (l2x0_revision >= L310_CACHE_ID_RTL_R3P0)
--			l2x0_saved_regs.pwr_ctrl = readl_relaxed(l2x0_base +
-+			l2x0_saved_regs.pwr_ctrl = readl_relaxed(base +
- 				L2X0_POWER_CTRL);
- 	}
- }
- 
--static void aurora_save(void)
-+static void aurora_save(void __iomem *base)
- {
--	l2x0_saved_regs.ctrl = readl_relaxed(l2x0_base + L2X0_CTRL);
--	l2x0_saved_regs.aux_ctrl = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
-+	l2x0_saved_regs.ctrl = readl_relaxed(base + L2X0_CTRL);
-+	l2x0_saved_regs.aux_ctrl = readl_relaxed(base + L2X0_AUX_CTRL);
- }
- 
--static void __init tauros3_save(void)
-+static void __init tauros3_save(void __iomem *base)
- {
- 	l2x0_saved_regs.aux2_ctrl =
--		readl_relaxed(l2x0_base + TAUROS3_AUX2_CTRL);
-+		readl_relaxed(base + TAUROS3_AUX2_CTRL);
- 	l2x0_saved_regs.prefetch_ctrl =
--		readl_relaxed(l2x0_base + L2X0_PREFETCH_CTRL);
-+		readl_relaxed(base + L2X0_PREFETCH_CTRL);
- }
- 
- static void l2x0_resume(void)
-@@ -1024,7 +1024,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 	}
- 
- 	if (data->save)
--		data->save();
-+		data->save(l2x0_base);
- 
- 	if (cache_id_part_number_from_dt)
- 		cache_id = cache_id_part_number_from_dt;
+ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
 -- 
 1.8.3.1
