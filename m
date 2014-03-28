@@ -1,28 +1,59 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 28 Mar 2014 15:14:12 -0700
-Subject: [RESEND][PATCH 0/2] Cleanup asm/scatterlist.h
-In-Reply-To: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
-References: <1395512032-20575-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140328151412.9d3ce44ee4c5ad3b1c75751d@linux-foundation.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Mar 2014 15:15:32 -0700
+Subject: [PATCH 49/75] ARM: l2c: fix register naming
+In-Reply-To: <20140328210243.GT7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYYH-0007GB-3M@rmk-PC.arm.linux.org.uk>
+ <20140328160047.GD24308@atomide.com>
+ <20140328210243.GT7528@n2100.arm.linux.org.uk>
+Message-ID: <20140328221532.GA30388@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 22 Mar 2014 11:13:50 -0700 Laura Abbott <lauraa@codeaurora.org> wrote:
-
-> I haven't gotten many responses so I'm going to try sending again
-> (this time with a cover letter which I probably should have done in
-> the first place...)
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [140328 14:06]:
+> On Fri, Mar 28, 2014 at 09:00:48AM -0700, Tony Lindgren wrote:
+> > * Russell King <rmk+kernel@arm.linux.org.uk> [140328 08:22]:
+> > > We have a mixture of different devices with different register layouts,
+> > > but we group all the bits together in an opaque mess.  Split them out
+> > > into those which are L2C-310 specific and ones which refer to earlier
+> > > devices.  Provide full auxiliary control register definitions.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > > --- a/arch/arm/mach-omap2/omap4-common.c
+> > > +++ b/arch/arm/mach-omap2/omap4-common.c
+> > > @@ -212,15 +212,15 @@ static int __init omap_l2_cache_init(void)
+> > >  		return -ENOMEM;
+> > >  
+> > >  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+> > > -	aux_ctrl = (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
+> > > -			(0x1 << 25) |
+> > > -			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
+> > > -			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT)) |
+> > > -			(0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
+> > > -			(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
+> > > -			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
+> > > -			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
+> > > -			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT);
+> > > +	aux_ctrl = L310_AUX_CTRL_ASSOCIATIVITY_16 |
+> > > +		   L310_AUX_CTRL_CACHE_REPLACE_RR |
+> > > +		   L310_AUX_CTRL_NS_LOCKDOWN |
+> > > +		   L310_AUX_CTRL_NS_INT_CTRL |
+> > > +		   L2C_AUX_CTRL_WAY_SIZE(3) |
+> > > +		   L2C_AUX_CTRL_SHARED_OVERRIDE |
+> > > +		   L310_AUX_CTRL_DATA_PREFETCH |
+> > > +		   L310_AUX_CTRL_INSTR_PREFETCH |
+> > > +		   L310_AUX_CTRL_EARLY_BRESP;
+> > 
+> > I guess eventually we can set up some common configuration mask
+> > define for these kind of things?
 > 
-> ARCH_HAS_SG_CHAIN is currently defined as needed in asm/scatterlist.h.
-> It was suggested[1] that this should probably be a proper Kconfig.
-> At the same time, we can clean up most of the asm/scatterlist.h files
-> to reduce redundancy. This makes parisc the only architecture that still
-> has an asm/scatterlist.h file due to the #define sg_virt_addr (which
-> could probably be cleaned up further still)
-> 
-> Andrew, once we get a few more Acked-bys can we take this through your tree
-> as suggested by Will?
+> The idea is that eventually platforms should just specify no changes to
+> the auxctl configuration.  You will notice later patches remove a number
+> of the above flags.
 
-Grabbed.  It's super late for 3.15-rc1 and I'm thinking of merging this
-in 3.16-rc1.  Or I can maybe squeeze it into 3.15-rc2 is there's an
-immediatish need for it?
+OK thanks great!
+
+Tony
