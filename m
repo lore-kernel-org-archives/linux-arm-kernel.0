@@ -1,64 +1,89 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:18:32 +0000
-Subject: [PATCH 48/75] ARM: l2c: implement L2C-310 erratum 752271 in core L2C
- code
+Date: Fri, 28 Mar 2014 15:18:42 +0000
+Subject: [PATCH 50/75] ARM: l2c: add automatic enable of early BRESP
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYYC-0007G6-07@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYYM-0007GF-6u@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than having SoCs work around L2C erratum themselves, move them
-into core code.  This erratum affects the double linefill feature which
-needs to be disabled for r3p0 to r3p1-50rel0.
+The AXI bus protocol requires that a write response should only be
+sent back to the master when the last write has been accepted.  Early
+BRESP allows the L2C-310 to send the write response as soon as the
+store buffer accepts the write address.
+
+Cortex-A9 processors can signal to the L2C-310 that they wish to be
+notified early, and if this optimisation is enabled, the L2C-310 can
+signal an early write response.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ arch/arm/mm/cache-l2x0.c | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 96f57fd1a4e7..54ad15ea24eb 100644
+index cfea0f2aecd6..8af157031056 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -478,6 +478,11 @@ static const struct l2c_init_data l2c220_data = {
-  *	hit the line between the clean operation and invalidate operation,
-  *	resulting in the store being lost.
-  *
-+ * 752271: PL310 R3P0->R3P1-50REL0, fixed R3P2.
-+ *	Affects: 8x64-bit (double fill) line fetches
-+ *	double fill line fetches can fail to cause dirty data to be evicted
-+ *	from the cache before the new data overwrites the second line.
-+ *
-  * 753970: PL310 R3P0, fixed R3P1.
-  *	Affects: sync
-  *	prevents merging writes after the sync operation, until another L2C
-@@ -621,7 +626,7 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 	struct outer_cache_fns *fns)
- {
- 	unsigned revision = cache_id & L2X0_CACHE_ID_RTL_MASK;
--	const char *errata[4];
-+	const char *errata[8];
- 	unsigned n = 0;
+@@ -24,6 +24,7 @@
+ #include <linux/of_address.h>
  
- 	if (IS_ENABLED(CONFIG_PL310_ERRATA_588369) &&
-@@ -640,6 +645,17 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 		errata[n++] = "727915";
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include "cache-tauros3.h"
+ #include "cache-aurora-l2.h"
+@@ -622,6 +623,24 @@ static void l2c310_resume(void)
  	}
+ }
  
-+	if (revision >= L310_CACHE_ID_RTL_R3P0 &&
-+	    revision < L310_CACHE_ID_RTL_R3P2) {
-+		u32 val = readl_relaxed(base + L2X0_PREFETCH_CTRL);
-+		/* I don't think bit23 is required here... but iMX6 does so */
-+		if (val & (BIT(30) | BIT(23))) {
-+			val &= ~(BIT(30) | BIT(23));
-+			l2c_write_sec(val, base, L2X0_PREFETCH_CTRL);
-+			errata[n++] = "752271";
++static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
++{
++	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_PART_MASK;
++	bool cortex_a9 = read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9;
++
++	if (rev >= L310_CACHE_ID_RTL_R2P0) {
++		if (cortex_a9) {
++			aux |= L310_AUX_CTRL_EARLY_BRESP;
++			pr_info("L2C-310 enabling early BRESP for Cortex-A9\n");
++		} else if (aux & L310_AUX_CTRL_EARLY_BRESP) {
++			pr_warn("L2C-310 early BRESP only supported with Cortex-A9\n");
++			aux &= ~L310_AUX_CTRL_EARLY_BRESP;
 +		}
 +	}
 +
- 	if (IS_ENABLED(CONFIG_PL310_ERRATA_753970) &&
- 	    revision == L310_CACHE_ID_RTL_R3P0) {
- 		sync_reg_offset = L2X0_DUMMY_REG;
++	l2c_enable(base, aux, num_lock);
++}
++
+ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	struct outer_cache_fns *fns)
+ {
+@@ -679,7 +698,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
+ 	.type = "L2C-310",
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 8,
+-	.enable = l2c_enable,
++	.enable = l2c310_enable,
+ 	.fixup = l2c310_fixup,
+ 	.save = l2c310_save,
+ 	.outer_cache = {
+@@ -918,7 +937,7 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 8,
+ 	.of_parse = l2c310_of_parse,
+-	.enable = l2c_enable,
++	.enable = l2c310_enable,
+ 	.fixup = l2c310_fixup,
+ 	.save  = l2c310_save,
+ 	.outer_cache = {
+@@ -1266,7 +1285,7 @@ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 8,
+ 	.of_parse = l2c310_of_parse,
+-	.enable = l2c_enable,
++	.enable = l2c310_enable,
+ 	.save  = l2c310_save,
+ 	.outer_cache = {
+ 		.inv_range   = bcm_inv_range,
 -- 
 1.8.3.1
