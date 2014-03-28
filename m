@@ -1,47 +1,87 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Mar 2014 17:52:51 +0100
-Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
-Message-ID: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+Date: Fri, 28 Mar 2014 17:52:58 +0100
+Subject: [PATCH 7/8] PCI: designware: make MSI isr shared irq aware
+In-Reply-To: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1396025579-14344-8-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While working on MSI support for the i.MX6 PCIe host driver
-it has been discovered that the binding for this host controller
-is broken in many ways (refer to the patch descriptions for more
-info) and was introduced without proper discussion about what
-should/should not be in the binding.
+On i.MX6 the host controller MSI irq is shared
+with PCI legacy INTD. Make sure we don't bail too
+early from the irq handler.
 
-This series fixes this and minimizes the difference of the
-i.MX6 binding to the common designware PCIe binding. I'm aware
-that this is a quite radical change, but I think it's justified
-to do this as long as there aren't many user of the old binding
-(most of the optional properties in the binding aren't even
-implemented).
+The issue is fairly theoretical as it would require
+a system setup with a PCIe switch where one connected
+device is using legacy INTD and another one using
+MSI, but better fix it now.
 
-Looking forward to your feedback.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ drivers/pci/host/pci-exynos.c      | 4 +---
+ drivers/pci/host/pcie-designware.c | 6 +++++-
+ drivers/pci/host/pcie-designware.h | 2 +-
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
-Lucas Stach (8):
-  ARM: imx6q-clk: parent lvds_gate from lvds_sel
-  PCI: designware: split Exynos and i.MX bindings
-  ARM: dts: imx6: update pcie to bring in line with new binding
-  PCI: imx6: use new clock names
-  PCI: imx6: drop old irq mapping
-  PCI: imx6: rip out optional (and unused) irqs
-  PCI: designware: make MSI isr shared irq aware
-  PCI: imx6: add support for MSI
-
- .../devicetree/bindings/pci/designware-pcie.txt    |  74 +----------
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  38 ++++++
- .../bindings/pci/samsung,exynos5440-pcie.txt       |  65 +++++++++
- arch/arm/boot/dts/imx6qdl.dtsi                     |   7 +-
- arch/arm/mach-imx/clk-imx6q.c                      |   4 +-
- drivers/pci/host/pci-exynos.c                      |   4 +-
- drivers/pci/host/pci-imx6.c                        | 145 ++++++++-------------
- drivers/pci/host/pcie-designware.c                 |   6 +-
- drivers/pci/host/pcie-designware.h                 |   2 +-
- 9 files changed, 176 insertions(+), 169 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
- create mode 100644 Documentation/devicetree/bindings/pci/samsung,exynos5440-pcie.txt
-
+diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+index 3de6bfbbe8e9..b616d34922d8 100644
+--- a/drivers/pci/host/pci-exynos.c
++++ b/drivers/pci/host/pci-exynos.c
+@@ -415,9 +415,7 @@ static irqreturn_t exynos_pcie_msi_irq_handler(int irq, void *arg)
+ {
+ 	struct pcie_port *pp = arg;
+ 
+-	dw_handle_msi_irq(pp);
+-
+-	return IRQ_HANDLED;
++	return dw_handle_msi_irq(pp);
+ }
+ 
+ static void exynos_pcie_msi_init(struct pcie_port *pp)
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 98c118e04dba..cbce9b04b13d 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -156,15 +156,17 @@ static struct irq_chip dw_msi_irq_chip = {
+ };
+ 
+ /* MSI int handler */
+-void dw_handle_msi_irq(struct pcie_port *pp)
++irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
+ {
+ 	unsigned long val;
+ 	int i, pos, irq;
++	irqreturn_t ret = IRQ_NONE;
+ 
+ 	for (i = 0; i < MAX_MSI_CTRLS; i++) {
+ 		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
+ 				(u32 *)&val);
+ 		if (val) {
++			ret = IRQ_HANDLED;
+ 			pos = 0;
+ 			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
+ 				irq = irq_find_mapping(pp->irq_domain,
+@@ -177,6 +179,8 @@ void dw_handle_msi_irq(struct pcie_port *pp)
+ 			}
+ 		}
+ 	}
++
++	return ret;
+ }
+ 
+ void dw_pcie_msi_init(struct pcie_port *pp)
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index 3063b3594d88..a169d22d517e 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -68,7 +68,7 @@ struct pcie_host_ops {
+ 
+ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
+ int dw_pcie_cfg_write(void __iomem *addr, int where, int size, u32 val);
+-void dw_handle_msi_irq(struct pcie_port *pp);
++irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
+ void dw_pcie_msi_init(struct pcie_port *pp);
+ int dw_pcie_link_up(struct pcie_port *pp);
+ void dw_pcie_setup_rc(struct pcie_port *pp);
 -- 
 1.9.0
