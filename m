@@ -1,53 +1,43 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Mar 2014 16:47:36 +0100
-Subject: [PATCH v2 0/6] PCI irq mapping fixes and cleanups
-In-Reply-To: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
-References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1396021656.4563.3.camel@weser.hi.pengutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 28 Mar 2014 10:50:32 -0500
+Subject: [PATCH 05/75] ARM: l2c: remove unnecessary UL-suffix to mask
+ values
+In-Reply-To: <E1WTYUW-0004WD-UP@rmk-PC.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYUW-0004WD-UP@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+qaQ=CtqMKbd5Fcp1YAY+E40mS24kWe8RMwb2Bz1A9kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Friendly ping.
+On Fri, Mar 28, 2014 at 10:14 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> They're u32, they're not unsigned long.  The UL suffix is not required
+> here.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-highbank/highbank.c   | 2 +-
+>  arch/arm/mach-imx/mach-vf610.c      | 2 +-
+>  arch/arm/mach-imx/system.c          | 2 +-
+>  arch/arm/mach-mvebu/armada-370-xp.c | 2 +-
+>  arch/arm/mach-rockchip/rockchip.c   | 2 +-
+>  arch/arm/mach-socfpga/socfpga.c     | 2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index c7de89b263dd..38e1dc3b4c6e 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -69,7 +69,7 @@ static void __init highbank_init_irq(void)
+>         if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
+>             of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
+>                 highbank_smc1(0x102, 0x1);
+> -               l2x0_of_init(0, ~0UL);
+> +               l2x0_of_init(0, ~0);
 
-Bjorn could you please pick the patches labeled "PCI: ..." up? Both the
-Tegra and i.MX dts changes are already queued up for 3.15 and I think
-all patches gathered enough acks and tested-bys for this to be low risk.
+What about changing these callers to use l2x0_of_init(void) and
+creating l2x0_of_init_legacy(val, mask) for ones that need the aux
+ctrl setup? We do want to encourage people to either setup aux ctrl in
+the bootloader or via DT properties.
 
-Regards,
-Lucas
-
-Am Mittwoch, den 05.03.2014, 14:25 +0100 schrieb Lucas Stach:
-> This series cleans up the PCI irq mapping for all
-> the ARM PCI host drivers, so they handle it in the
-> way defined in the common PCI bindings.
-> 
-> I've worked in all the feedback I received on the first
-> round of this series and left out the i.MX pcie driver
-> changes, as these need more work includig breaking
-> of the existing binding, which I'll send as a separate
-> series.
-> 
-> Lucas Stach (6):
->   ARM: dts: tegra: add PCIe interrupt mapping properties
->   PCI: tegra: use new OF interrupt mapping when possible
->   PCI: rcar: use new OF interrupt mapping when possible
->   ARM: dts: exynos5440: fix PCIe interrupt mapping
->   ARM: dts: imx6: add PCIe interrupt mapping properties
->   PCI: designware: use new OF interrupt mapping when possible
-> 
->  .../devicetree/bindings/pci/nvidia,tegra20-pcie.txt          |  8 ++++++++
->  arch/arm/boot/dts/exynos5440.dtsi                            |  6 ++++--
->  arch/arm/boot/dts/imx6qdl.dtsi                               |  8 ++++++++
->  arch/arm/boot/dts/tegra20.dtsi                               |  4 ++++
->  arch/arm/boot/dts/tegra30.dtsi                               |  4 ++++
->  drivers/pci/host/pci-rcar-gen2.c                             | 12 +++++++++---
->  drivers/pci/host/pci-tegra.c                                 |  7 ++++++-
->  drivers/pci/host/pcie-designware.c                           | 12 +++++++++---
->  8 files changed, 52 insertions(+), 9 deletions(-)
-> 
-
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Rob
