@@ -1,43 +1,56 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri, 28 Mar 2014 23:35:57 +0800
-Subject: [PATCH v4 0/3] add hisilicon hip04 ethernet driver
-Message-ID: <1396020960-6170-1-git-send-email-zhangfei.gao@linaro.org>
+From: anderson@redhat.com (Dave Anderson)
+Date: Fri, 28 Mar 2014 11:44:33 -0400 (EDT)
+Subject: [PATCH 0/3] add LPAE support for kexec and kernel (Liu Hua)
+In-Reply-To: <53356590.3030005@huawei.com>
+References: <mailman.28599.1395907790.1059.kexec@lists.infradead.org>
+ <420609342.5318732.1395929059090.JavaMail.zimbra@redhat.com>
+ <53356590.3030005@huawei.com>
+Message-ID: <1897155363.7224032.1396021473883.JavaMail.zimbra@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v4:
-Modify accoringly to the suggetion from Arnd, Florian, Eric, David
-Use of_parse_phandle_with_fixed_args & syscon_node_to_regmap get ppe info
-Add skb_orphan() and tx_timer for reclaim since no tx_finished interrupt
-Update timeout, and move of_phy_connect to probe to reuse open/stop
 
-v3:
-Suggest from Arnd, use syscon & regmap_write/read to replace static void __iomem *ppebase.
-Modify hisilicon-hip04-net.txt accrordingly to suggestion from Florian and Sergei.
 
-v2:
-Got many suggestions from Russell, Arnd, Florian, Mark and Sergei
-Remove memcpy, use dma_map/unmap_single, use dma_alloc_coherent rather than dma_pool, etc.
-Refer property in ethernet.txt, change ppe description, etc.
+----- Original Message -----
+> On 2014/3/27 22:04, Dave Anderson wrote:
+> > 
+> > 
+> > ----- Original Message -----
+> > 
+> >> The patch series introduce LPAE support for user space
+> >> utility kexec(the last) and ARM linux kernel(the others).
+> >>
+> >> I have tested the patch series in armA15 platform which have
+> >> more than 4G memory.
+> > 
+> > Hello Liu,
+> > 
+> > I'm curious how you tested this?  The crash utility does not have
+> > any specific support for LPAE on ARM, and a couple years ago I
+> > asked on the crash-utility mailing list whether any of the ARM
+> > developers were working on it.  But at that time none of them were
+> > working with LPAE.  I see that you are on the crash-utility mailing
+> > list -- are you planning to post follow-up patches to the crash-utility?
+> > 
+> > Thanks,
+> >   Dave
+> 
+> Yes, you are very "sensitive"! our team has worked on it for a while. And
+> we went through the whole kdump process for LPAE enabled ARM. Our changes
+> include kexec-tools, makedumpfile, crash utility and the kernel.
+> 
+> But we did that in a rather limited time. So some patches are silly and
+> need to be reconstructed before submission. In addition, my job is quit
+> full now. So I decide to post the patch series that are clear and
+> independent of the others at first.
+> 
+> But I got no response from the linux-arm and kexec mailinglist. What about
+> your opinion about the feature of LPAE support for kdump related tools
+> including crash utility and the kernel?
 
-Zhangfei Gao (3):
-  Documentation: add Device tree bindings for Hisilicon hip04 ethernet
-  net: hisilicon: new hip04 MDIO driver
-  net: hisilicon: new hip04 ethernet driver
+I can't speak for the linux-arm and kexec mailing lists, but certainly 
+when you post your crash-related patches on the crash-utility mailing 
+list, I'll review, respond, and get them in place as soon as possible.
 
- .../bindings/net/hisilicon-hip04-net.txt           |   88 +++
- drivers/net/ethernet/Kconfig                       |    1 +
- drivers/net/ethernet/Makefile                      |    1 +
- drivers/net/ethernet/hisilicon/Kconfig             |   32 +
- drivers/net/ethernet/hisilicon/Makefile            |    5 +
- drivers/net/ethernet/hisilicon/hip04_eth.c         |  764 ++++++++++++++++++++
- drivers/net/ethernet/hisilicon/hip04_mdio.c        |  186 +++++
- 7 files changed, 1077 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
- create mode 100644 drivers/net/ethernet/hisilicon/Kconfig
- create mode 100644 drivers/net/ethernet/hisilicon/Makefile
- create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
- create mode 100644 drivers/net/ethernet/hisilicon/hip04_mdio.c
-
--- 
-1.7.9.5
+Thanks,
+  Dave
