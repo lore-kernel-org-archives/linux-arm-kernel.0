@@ -1,32 +1,99 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 28 Mar 2014 12:05:33 +0100
-Subject: [PATCH RFC 1/3] arm64/crypto: add shared macro to test for
- NEED_RESCHED
+Date: Fri, 28 Mar 2014 12:05:34 +0100
+Subject: [PATCH RFC 2/3] arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
 In-Reply-To: <1396004735-15475-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1396004735-15475-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1396004735-15475-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1396004735-15475-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds arch/arm64/crypto/preempt.h, currently containing just a single
-asm macro definition 'b_if_no_resched' that will be shared between multiple
-crypto algorithm implementations that need to test for preemption in the
-inner loop.
+This patch adds support for the SHA-1 Secure Hash Algorithm for CPUs that
+have support for the SHA-1 part of the ARM v8 Crypto Extensions.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/preempt.h | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 arch/arm64/crypto/preempt.h
+ arch/arm64/Kconfig               |   3 +
+ arch/arm64/Makefile              |   1 +
+ arch/arm64/crypto/Kconfig        |  13 +++
+ arch/arm64/crypto/Makefile       |  12 +++
+ arch/arm64/crypto/sha1-ce-core.S | 156 ++++++++++++++++++++++++++++++
+ arch/arm64/crypto/sha1-ce-glue.c | 201 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 386 insertions(+)
+ create mode 100644 arch/arm64/crypto/Kconfig
+ create mode 100644 arch/arm64/crypto/Makefile
+ create mode 100644 arch/arm64/crypto/sha1-ce-core.S
+ create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
 
-diff --git a/arch/arm64/crypto/preempt.h b/arch/arm64/crypto/preempt.h
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3d27a1c4e4ad..11f366a6f09d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -317,5 +317,8 @@ source "arch/arm64/Kconfig.debug"
+ source "security/Kconfig"
+ 
+ source "crypto/Kconfig"
++if CRYPTO
++source "arch/arm64/crypto/Kconfig"
++endif
+ 
+ source "lib/Kconfig"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index e0b75464b7f1..a4b3e253557d 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -46,6 +46,7 @@ core-y		+= arch/arm64/emu/
+ core-y		+= arch/arm64/kernel/ arch/arm64/mm/
+ core-$(CONFIG_KVM) += arch/arm64/kvm/
+ core-$(CONFIG_XEN) += arch/arm64/xen/
++core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+ libs-y		:= arch/arm64/lib/ $(libs-y)
+ libs-y		+= $(LIBGCC)
+ 
+diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
 new file mode 100644
-index 000000000000..94302d5b5ae9
+index 000000000000..af378bb608e8
 --- /dev/null
-+++ b/arch/arm64/crypto/preempt.h
-@@ -0,0 +1,28 @@
++++ b/arch/arm64/crypto/Kconfig
+@@ -0,0 +1,13 @@
++
++menuconfig ARM64_CRYPTO
++	bool "ARM64 Accelerated Cryptographic Algorithms"
++	depends on ARM64
++
++if ARM64_CRYPTO
++
++config CRYPTO_SHA1_ARM64_CE
++	tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
++	depends on ARM64 && KERNEL_MODE_NEON
++	select CRYPTO_HASH
++
++endif
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+new file mode 100644
+index 000000000000..0ed3caaec81b
+--- /dev/null
++++ b/arch/arm64/crypto/Makefile
+@@ -0,0 +1,12 @@
++#
++# linux/arch/arm64/crypto/Makefile
++#
++# Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License version 2 as
++# published by the Free Software Foundation.
++#
++
++obj-$(CONFIG_CRYPTO_SHA1_ARM64_CE) += sha1-ce.o
++sha1-ce-y := sha1-ce-glue.o sha1-ce-core.o
+diff --git a/arch/arm64/crypto/sha1-ce-core.S b/arch/arm64/crypto/sha1-ce-core.S
+new file mode 100644
+index 000000000000..019808854d10
+--- /dev/null
++++ b/arch/arm64/crypto/sha1-ce-core.S
+@@ -0,0 +1,156 @@
 +/*
-+ * preempt.h - shared macros to check preempt state
++ * sha1-ce-core.S - SHA-1 secure hash using ARMv8 Crypto Extensions
 + *
 + * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
@@ -35,23 +102,358 @@ index 000000000000..94302d5b5ae9
 + * published by the Free Software Foundation.
 + */
 +
-+#include <asm/asm-offsets.h>
-+#include <asm/thread_info.h>
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++#include "preempt.h"
++
++	.text
++	.arch		armv8-a+crypto
++
++	k0		.req	v0
++	k1		.req	v1
++	k2		.req	v2
++	k3		.req	v3
++
++	t0		.req	v4
++	t1		.req	v5
++
++	dga		.req	q6
++	dgav		.req	v6
++	dgb		.req	s7
++	dgbv		.req	v7
++
++	dg0q		.req	q12
++	dg0s		.req	s12
++	dg0v		.req	v12
++	dg1s		.req	s13
++	dg1v		.req	v13
++	dg2s		.req	s14
++
++	.macro		add_only, op, ev, rc, s0, dg1
++	.ifc		\ev, ev
++	add		t1.4s, v\s0\().4s, \rc\().4s
++	sha1h		dg2s, dg0s
++	.ifnb		\dg1
++	sha1\op		dg0q, \dg1, t0.4s
++	.else
++	sha1\op		dg0q, dg1s, t0.4s
++	.endif
++	.else
++	.ifnb		\s0
++	add		t0.4s, v\s0\().4s, \rc\().4s
++	.endif
++	sha1h		dg1s, dg0s
++	sha1\op		dg0q, dg2s, t1.4s
++	.endif
++	.endm
++
++	.macro		add_update, op, ev, rc, s0, s1, s2, s3, dg1
++	sha1su0		v\s0\().4s, v\s1\().4s, v\s2\().4s
++	sha1su1		v\s0\().4s, v\s3\().4s
++	add_only	\op, \ev, \rc, \s1, \dg1
++	.endm
 +
 +	/*
-+	 * Branch to 'lb' but only if we have not been tagged for preemption.
-+	 *
-+	 * Expects current->thread_info in ti, or NULL if running in interrupt
-+	 * context. reg is a scratch x register.
++	 * The SHA1 round constants
 +	 */
-+	.macro		b_if_no_resched, ti, reg, lb
-+#if defined(CONFIG_PREEMPT) || defined(CONFIG_PREEMPT_VOLUNTARY)
-+	cbz		\ti, \lb			// have thread_info?
-+	ldr		\reg, [\ti, #TI_FLAGS]		// get flags
-+	tbz	 	\reg, #TIF_NEED_RESCHED, \lb	// needs rescheduling?
-+#else
-+	b		\lb
-+#endif
-+	.endm
++	.align		4
++.Lsha1_rcon:
++	.word		0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6
++
++	/*
++	 * int sha1_ce_transform(int blocks, u8 const *src, u32 *state,
++	 * 			 u8 *head, long bytes, struct thread_info *ti)
++	 */
++ENTRY(sha1_ce_transform)
++	/* load round constants */
++	adr		x6, .Lsha1_rcon
++	ld1r		{k0.4s}, [x6], #4
++	ld1r		{k1.4s}, [x6], #4
++	ld1r		{k2.4s}, [x6], #4
++	ld1r		{k3.4s}, [x6]
++
++	/* load state */
++	ldr		dga, [x2]
++	ldr		dgb, [x2, #16]
++
++	/* load partial state (if supplied) */
++	cbz		x3, 0f
++	ld1		{v8.4s-v11.4s}, [x3]
++	b		1f
++
++	/* load input */
++0:	ld1		{v8.4s-v11.4s}, [x1], #64
++	sub		w0, w0, #1
++
++1:
++CPU_LE(	rev32		v8.16b, v8.16b		)
++CPU_LE(	rev32		v9.16b, v9.16b		)
++CPU_LE(	rev32		v10.16b, v10.16b	)
++CPU_LE(	rev32		v11.16b, v11.16b	)
++
++2:	add		t0.4s, v8.4s, k0.4s
++	mov		dg0v.16b, dgav.16b
++
++	add_update	c, ev, k0,  8,  9, 10, 11, dgb
++	add_update	c, od, k0,  9, 10, 11,  8
++	add_update	c, ev, k0, 10, 11,  8,  9
++	add_update	c, od, k0, 11,  8,  9, 10
++	add_update	c, ev, k1,  8,  9, 10, 11
++
++	add_update	p, od, k1,  9, 10, 11,  8
++	add_update	p, ev, k1, 10, 11,  8,  9
++	add_update	p, od, k1, 11,  8,  9, 10
++	add_update	p, ev, k1,  8,  9, 10, 11
++	add_update	p, od, k2,  9, 10, 11,  8
++
++	add_update	m, ev, k2, 10, 11,  8,  9
++	add_update	m, od, k2, 11,  8,  9, 10
++	add_update	m, ev, k2,  8,  9, 10, 11
++	add_update	m, od, k2,  9, 10, 11,  8
++	add_update	m, ev, k3, 10, 11,  8,  9
++
++	add_update	p, od, k3, 11,  8,  9, 10
++	add_only	p, ev, k3,  9
++	add_only	p, od, k3, 10
++	add_only	p, ev, k3, 11
++	add_only	p, od
++
++	/* update state */
++	add		dgbv.2s, dgbv.2s, dg1v.2s
++	add		dgav.4s, dgav.4s, dg0v.4s
++
++	cbz		w0, 4f
++	b_if_no_resched	x5, x8, 0b
++
++	/* store new state */
++3:	str		dga, [x2]
++	str		dgb, [x2, #16]
++	ret
++
++	/*
++	 * Final block: add padding and total bit count.
++	 * Skip if we have no total byte count in x4. In that case, the input
++	 * size was not a round multiple of the block size, and the padding is
++	 * handled by the C code.
++	 */
++4:	cbz		x4, 3b
++	movi		v9.2d, #0
++	mov		x8, #0x80000000
++	movi		v10.2d, #0
++	ror		x7, x4, #29		// ror(lsl(x4, 3), 32)
++	fmov		d8, x8
++	mov		x4, #0
++	mov		v11.d[0], xzr
++	mov		v11.d[1], x7
++	b		2b
++ENDPROC(sha1_ce_transform)
+diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
+new file mode 100644
+index 000000000000..69850a163668
+--- /dev/null
++++ b/arch/arm64/crypto/sha1-ce-glue.c
+@@ -0,0 +1,201 @@
++/*
++ * sha1-ce-glue.c - SHA-1 secure hash using ARMv8 Crypto Extensions
++ *
++ * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/neon.h>
++#include <asm/unaligned.h>
++#include <crypto/internal/hash.h>
++#include <crypto/sha.h>
++#include <linux/cpufeature.h>
++#include <linux/crypto.h>
++#include <linux/module.h>
++
++MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
++MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
++MODULE_LICENSE("GPL v2");
++
++asmlinkage int sha1_ce_transform(int blocks, u8 const *src, u32 *state,
++				 u8 *head, long bytes, struct thread_info *ti);
++
++static int sha1_init(struct shash_desc *desc)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++
++	*sctx = (struct sha1_state){
++		.state = { SHA1_H0, SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 },
++	};
++	return 0;
++}
++
++static int sha1_update(struct shash_desc *desc, const u8 *data,
++		       unsigned int len)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
++
++	sctx->count += len;
++
++	if ((partial + len) >= SHA1_BLOCK_SIZE) {
++		struct thread_info *ti = NULL;
++		int blocks;
++
++		if (partial) {
++			int p = SHA1_BLOCK_SIZE - partial;
++
++			memcpy(sctx->buffer + partial, data, p);
++			data += p;
++			len -= p;
++		}
++
++		/*
++		 * Pass current's thread info pointer to sha1_ce_transform()
++		 * below if we want it to play nice under preemption.
++		 */
++		if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
++		     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
++			ti = current_thread_info();
++
++		blocks = len / SHA1_BLOCK_SIZE;
++		len %= SHA1_BLOCK_SIZE;
++
++		do {
++			int rem;
++
++			kernel_neon_begin_partial(16);
++			rem = sha1_ce_transform(blocks, data, sctx->state,
++						partial ? sctx->buffer : NULL,
++						0, ti);
++			kernel_neon_end();
++
++			data += (blocks - rem) * SHA1_BLOCK_SIZE;
++			blocks = rem;
++			partial = 0;
++		} while (unlikely(ti && blocks > 0));
++	}
++	if (len)
++		memcpy(sctx->buffer + partial, data, len);
++	return 0;
++}
++
++static int sha1_final(struct shash_desc *desc, u8 *out)
++{
++	static const u8 padding[SHA1_BLOCK_SIZE] = { 0x80, };
++
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	__be64 bits = cpu_to_be64(sctx->count << 3);
++	__be32 *dst = (__be32 *)out;
++	int i;
++
++	u32 padlen = SHA1_BLOCK_SIZE
++		     - ((sctx->count + sizeof(bits)) % SHA1_BLOCK_SIZE);
++
++	sha1_update(desc, padding, padlen);
++	sha1_update(desc, (const u8 *)&bits, sizeof(bits));
++
++	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha1_state){};
++	return 0;
++}
++
++static int sha1_finup(struct shash_desc *desc, const u8 *data,
++		      unsigned int len, u8 *out)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct thread_info *ti = NULL;
++	__be32 *dst = (__be32 *)out;
++	int blocks;
++	int i;
++
++	if (sctx->count || !len || (len % SHA1_BLOCK_SIZE)) {
++		sha1_update(desc, data, len);
++		return sha1_final(desc, out);
++	}
++
++	/*
++	 * Use a fast path if the input is a multiple of 64 bytes. In
++	 * this case, there is no need to copy data around, and we can
++	 * perform the entire digest calculation in a single invocation
++	 * of sha1_ce_transform()
++	 */
++	blocks = len / SHA1_BLOCK_SIZE;
++
++	if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
++	     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
++		ti = current_thread_info();
++
++	do {
++		int rem;
++
++		kernel_neon_begin_partial(16);
++		rem = sha1_ce_transform(blocks, data, sctx->state,
++					NULL, len, ti);
++		kernel_neon_end();
++		data += (blocks - rem) * SHA1_BLOCK_SIZE;
++		blocks = rem;
++	} while (unlikely(ti && blocks > 0));
++
++	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
++		put_unaligned_be32(sctx->state[i], dst++);
++
++	*sctx = (struct sha1_state){};
++	return 0;
++}
++
++static int sha1_export(struct shash_desc *desc, void *out)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha1_state *dst = out;
++
++	*dst = *sctx;
++	return 0;
++}
++
++static int sha1_import(struct shash_desc *desc, const void *in)
++{
++	struct sha1_state *sctx = shash_desc_ctx(desc);
++	struct sha1_state const *src = in;
++
++	*sctx = *src;
++	return 0;
++}
++
++static struct shash_alg alg = {
++	.init			= sha1_init,
++	.update			= sha1_update,
++	.final			= sha1_final,
++	.finup			= sha1_finup,
++	.export			= sha1_export,
++	.import			= sha1_import,
++	.descsize		= sizeof(struct sha1_state),
++	.digestsize		= SHA1_DIGEST_SIZE,
++	.statesize		= sizeof(struct sha1_state),
++	.base			= {
++		.cra_name		= "sha1",
++		.cra_driver_name	= "sha1-ce",
++		.cra_priority		= 200,
++		.cra_flags		= CRYPTO_ALG_TYPE_SHASH,
++		.cra_blocksize		= SHA1_BLOCK_SIZE,
++		.cra_module		= THIS_MODULE,
++	}
++};
++
++static int __init sha1_ce_mod_init(void)
++{
++	return crypto_register_shash(&alg);
++}
++
++static void __exit sha1_ce_mod_fini(void)
++{
++	crypto_unregister_shash(&alg);
++}
++
++module_cpu_feature_match(SHA1, sha1_ce_mod_init);
++module_exit(sha1_ce_mod_fini);
 -- 
 1.8.3.2
