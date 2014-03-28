@@ -1,44 +1,44 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 28 Mar 2014 09:16:46 +0100
-Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <5334D9F7.2030001@freescale.com>
-References: <532BCFCC.4080205@freescale.com>
- <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
- <20140324095902.GB11377@localhost>
- <20140326095156.3e5585b8@ipc1.ka-ro>
- <5332AEE7.2040402@freescale.com>
- <20140326125502.0e8d0657@ipc1.ka-ro>
- <20140327095956.GA29623@localhost>
- <20140327132109.06258526@ipc1.ka-ro>
- <5334D9F7.2030001@freescale.com>
-Message-ID: <20140328091646.1ce03f90@ipc1.ka-ro>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Mar 2014 09:24:06 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix reset controller handling
+In-Reply-To: <20140328074900.GC2708@katana>
+References: <1394449930-29696-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140328074900.GC2708@katana>
+Message-ID: <20140328082406.GO6120@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Huang Shijie wrote:
-> ? 2014?03?27? 20:21, Lothar Wa?mann ??:
-> > I can assure you that the>100.000 i.MX28 based modules, that we sold
-> > up to now boot from NAND just fine without any block mark swapping in
-> > the U-Boot pages.
-> >
-> Our driver should follow the Reference manual, not the product.
+On Fri, Mar 28, 2014 at 08:49:00AM +0100, Wolfram Sang wrote:
+> On Mon, Mar 10, 2014 at 12:12:10PM +0100, Maxime Ripard wrote:
+> > The reset framework recently gained optional stubs when CONFIG_RESET_CONTROLLER
+> > is not selected. It also introduced a function reset_get_optional, that is also
+> > dummy-defined whenever the framework isn't enabled, for drivers that needs an
+> > optional reset controller.
+> > 
+> > Switch to this function, since the mv64xxx driver is in this case. This also
+> > fixes a compilation breakage whenever the reset framework wasn't selected:
+> > 
+> > drivers/i2c/busses/i2c-mv64xxx.c:771:2: error: implicit declaration of function 'devm_reset_control_get'
+> > 
+> > While we're at it, remove the redundant test on dev.of_node surrounding the
+> > calls to reset framework functions, since it will either be a valid pointer, an
+> > error pointer in the case where we called reset_get_optional without an of_node
+> > pointer or if it failed, or NULL if we're not loaded through DT.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-Still there is no need for the Linux NAND driver to be able to read or
-write partitions in a format that the Boot ROM can understand. Thus it
-is perfectly legal to allow disregarding the BB marks and solely rely on
-a flash based BBT.
+> Applied to for-next, thanks!
 
+Thanks for your patience, and sorry for the mess.
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/c1e63c74/attachment.sig>
