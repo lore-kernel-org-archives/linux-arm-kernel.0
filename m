@@ -1,42 +1,100 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 28 Mar 2014 15:35:53 -0400
-Subject: [PATCH 00/75] l2c series - Olof's boot failures
-In-Reply-To: <20140328183958.GP7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <20140328183958.GP7528@n2100.arm.linux.org.uk>
-Message-ID: <20140328193553.GN24294@beef>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 28 Mar 2014 12:37:33 -0700
+Subject: [PATCH] arm: KVM: fix possible misalignment of PGDs and bounce
+ page
+In-Reply-To: <1396016719-13807-1-git-send-email-msalter@redhat.com>
+References: <1396016719-13807-1-git-send-email-msalter@redhat.com>
+Message-ID: <20140328193733.GL25519@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 06:39:58PM +0000, Russell King wrote:
-> On Fri, Mar 28, 2014 at 03:12:49PM +0000, Russell King - ARM Linux wrote:
-> > This is another posting of the L2 cache controller series.  I'm not
-> > planning for this for the upcoming merge window, but the one after,
-> > as people need to test it and still need to feed back to me on
-> > various issues.  Hence, this is not a finalised series.
-> > 
-> > There are still various issues which I've raised, and have had no
-> > feedback on.
+On Fri, Mar 28, 2014 at 10:25:19AM -0400, Mark Salter wrote:
+> The kvm/mmu code shared by arm and arm64 uses kalloc() to allocate
+> a bounce page (if hypervisor init code crosses page boundary) and
+> hypervisor PGDs. The problem is that kalloc() does not guarantee
+> the proper alignment. In the case of the bounce page, the page sized
+> buffer allocated may also cross a page boundary negating the purpose
+> and leading to a hang during kvm initialization. Likewise the PGDs
+> allocated may not meet the minimum alignment requirements of the
+> underlying MMU. This patch uses __get_free_page() to guarantee the
+> worst case alignment needs of the bounce page and PGDs on both arm
+> and arm64.
 > 
-> Olof's builder shows failures with this for:
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm/kvm/mmu.c | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
 > 
->     capri        multi_v7_defconfig            :        FAILED  1:03.10
->     seaboard     tegra_defconfig               :        FAILED  1:29.70
->     seaboard     multi_v7_defconfig            :        FAILED  1:26.35
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 7789857..575d790 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -42,6 +42,8 @@ static unsigned long hyp_idmap_start;
+>  static unsigned long hyp_idmap_end;
+>  static phys_addr_t hyp_idmap_vector;
+>  
+> +#define pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+> +
+>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+>  
+>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+> @@ -199,14 +201,14 @@ void free_boot_hyp_pgd(void)
+>  	if (boot_hyp_pgd) {
+>  		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+>  		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+> -		kfree(boot_hyp_pgd);
+> +		free_pages((unsigned long)boot_hyp_pgd, pgd_order);
+>  		boot_hyp_pgd = NULL;
+>  	}
+>  
+>  	if (hyp_pgd)
+>  		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+>  
+> -	kfree(init_bounce_page);
+> +	free_page((unsigned long)init_bounce_page);
+>  	init_bounce_page = NULL;
+>  
+>  	mutex_unlock(&kvm_hyp_pgd_mutex);
+> @@ -236,7 +238,7 @@ void free_hyp_pgds(void)
+>  		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+>  			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+>  
+> -		kfree(hyp_pgd);
+> +		free_pages((unsigned long)hyp_pgd, pgd_order);
+>  		hyp_pgd = NULL;
+>  	}
+>  
+> @@ -930,7 +932,7 @@ int kvm_mmu_init(void)
+>  		size_t len = __hyp_idmap_text_end - __hyp_idmap_text_start;
+>  		phys_addr_t phys_base;
+>  
+> -		init_bounce_page = kmalloc(PAGE_SIZE, GFP_KERNEL);
+> +		init_bounce_page = (void *)__get_free_page(GFP_KERNEL);
+>  		if (!init_bounce_page) {
+>  			kvm_err("Couldn't allocate HYP init bounce page\n");
+>  			err = -ENOMEM;
+> @@ -956,8 +958,9 @@ int kvm_mmu_init(void)
+>  			 (unsigned long)phys_base);
+>  	}
+>  
+> -	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+> -	boot_hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+> +	hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, pgd_order);
+> +	boot_hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, pgd_order);
+> +
+>  	if (!hyp_pgd || !boot_hyp_pgd) {
+>  		kvm_err("Hyp mode PGD not allocated\n");
+>  		err = -ENOMEM;
+> -- 
+> 1.8.5.3
 > 
-> I have no way to debug these failures.
-> 
-> However, strangely:
-> 
->     capri        bcm_defconfig                 :        passed  0:42.83
+This looks right to me.  Funnily enough I seem to remember a discussion
+from when we originally merged this code where someone (maybe me) argued
+that kmalloc() would align to the size of the allocation, but I don't
+see anything backing this up at this point.
 
-This is fixed by the check cpu id for pj4 patch:
-http://www.spinics.net/lists/arm-kernel/msg316431.html
+So:
 
-updated version:
-http://www.spinics.net/lists/arm-kernel/msg317283.html
-http://www.spinics.net/lists/arm-kernel/msg317284.html
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-bcm_defconfig is fine because ARCH_DOVE isn't enabled
-
--Matt
+If Marc agrees I can queue this for -rc1.
