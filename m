@@ -1,41 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Mar 2014 13:54:12 +0100
-Subject: [PATCH v3 08/10] ARM: sun7i/sun4i: dt: Add AXP209 support to
- various boards
-In-Reply-To: <20140328113839.GB30768@sirena.org.uk>
-References: <1395955764-18103-1-git-send-email-carlo@caione.org>
- <1395955764-18103-9-git-send-email-carlo@caione.org>
- <20140328101146.GP6120@lukather>
- <20140328113839.GB30768@sirena.org.uk>
-Message-ID: <20140328125412.GT6120@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Mar 2014 13:02:36 +0000
+Subject: *READ THIS IF YOUR SOC HAS A L2 CACHE* PL310 auxctrl settings
+In-Reply-To: <5335704F.4090502@st.com>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140316152953.GX21483@n2100.arm.linux.org.uk>
+ <CAL_JsqLDun2VkCFK9Fec6n38bNz2w9mscPdXcGYeLiZtiXkVDg@mail.gmail.com>
+ <20140318112221.GV21483@n2100.arm.linux.org.uk> <5335704F.4090502@st.com>
+Message-ID: <20140328130236.GG7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 11:38:39AM +0000, Mark Brown wrote:
-> On Fri, Mar 28, 2014 at 11:11:46AM +0100, Maxime Ripard wrote:
-> 
-> > Here, you would just include the dtsi at the top of the file, and in
-> > the DTSI, you would have something like:
-> 
-> > &axp209 {
-> >    regulators {
-> >       ...
-> >    }
-> > }
-> 
-> Hang on, what is an include file setting up regulators for?
+On Fri, Mar 28, 2014 at 01:51:27PM +0100, Maxime Coquelin wrote:
+> On 03/18/2014 12:22 PM, Russell King - ARM Linux wrote:
+>> arch/arm/mach-sti/board-dt.c:                           Y  30480000 c0000fff
+>
+> For STiH416 SoC, the reset value of the AUX_CTRL register is 0x02000000.
+> So bits 19:17 = 0, whereas the expected value is bits 19:17 = 4.
 
-Look at patch 7. To share the regulators declaration across all boards
-and avoid duplication.
+Which L2 cache is it?  210/220/310 ?
+
+Thanks.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140328/a45285d7/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
