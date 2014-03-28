@@ -1,58 +1,65 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Fri, 28 Mar 2014 18:58:59 +0100
-Subject: [RFC PATCH v2 01/10] genirq: generic chip: export
- irq_map_generic_chip function
-In-Reply-To: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
-References: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1396029548-10928-2-git-send-email-b.brezillon.dev@gmail.com>
+Date: Fri, 28 Mar 2014 18:58:58 +0100
+Subject: [RFC PATCH v2 00/10] ARM: at91: move aic driver to drivers/irqchips
+Message-ID: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export the generic irq map function in order to provide irq_domain ops with
-generic mapping and specific of xlate function (needed by the new atmel
-AIC driver).
+Hello,
 
-Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
----
- include/linux/irq.h       |    2 ++
- kernel/irq/generic-chip.c |    5 +++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+This series is a proposal to move AIC driver to the irqchip directory.
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 7dc1003..19b5e3b 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -765,6 +765,8 @@ void irq_gc_eoi(struct irq_data *d);
- int irq_gc_set_wake(struct irq_data *d, unsigned int on);
- 
- /* Setup functions for irq_chip_generic */
-+int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-+			 irq_hw_number_t hw_irq);
- struct irq_chip_generic *
- irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
- 		       void __iomem *reg_base, irq_flow_handler_t handler);
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index 452d6f2..cf80e7b 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
- /*
-  * irq_map_generic_chip - Map a generic chip for an irq domain
-  */
--static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
--				irq_hw_number_t hw_irq)
-+int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
-+			 irq_hw_number_t hw_irq)
- {
- 	struct irq_data *data = irq_get_irq_data(virq);
- 	struct irq_domain_chip_generic *dgc = d->gc;
-@@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
- 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(irq_map_generic_chip);
- 
- struct irq_domain_ops irq_generic_chip_ops = {
- 	.map	= irq_map_generic_chip,
+It also changes the implementation design of the interrupt controller in
+several ways:
+ - make use of the generic chip framework whenever possible
+ - add support for irq muxing definition to prevent spurious interrupts
+   during system startup (see https://lkml.org/lkml/2013/3/8/175)
+ - only support dt enabled boards
+
+
+Best Regards,
+
+Boris
+
+Changes since v1:
+ - rework the irq-mux bindings
+
+Boris BREZILLON (10):
+  genirq: generic chip: export irq_map_generic_chip function
+  irqchip: atmel-aic: add new atmel AIC driver
+  ARM: at91: introduce OLD_IRQ_AT91 Kconfig option
+  ARM: at91: enclose at91_aic_xx calls in
+    IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks
+  ARM: at91: make use of the new AIC driver for dt enabled boards
+  irqchip: atmel-aic: move binding doc to interrupt-controller
+    directory
+  irqchip: atmel-aic: document new dt properties and children nodes
+  ARM: at91: remove old irq material
+  ARM: at91/dt: add new AIC irq mux definitions for sam9x5 SoCs
+  ARM: at91/dt: add new AIC irq mux definitions for sama5 SoCs
+
+ .../devicetree/bindings/arm/atmel-aic.txt          |   42 -
+ .../bindings/interrupt-controller/atmel,aic.txt    |   82 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |  108 +++
+ arch/arm/boot/dts/sama5d3.dtsi                     |   37 +
+ arch/arm/boot/dts/sama5d3_tcb1.dtsi                |   20 +
+ arch/arm/mach-at91/Kconfig                         |   11 +
+ arch/arm/mach-at91/Kconfig.non_dt                  |    7 +
+ arch/arm/mach-at91/Makefile                        |    3 +-
+ arch/arm/mach-at91/board-dt-rm9200.c               |   13 -
+ arch/arm/mach-at91/board-dt-sam9.c                 |   14 -
+ arch/arm/mach-at91/board-dt-sama5.c                |   13 -
+ arch/arm/mach-at91/irq.c                           |  270 +------
+ arch/arm/mach-at91/pm.c                            |   32 +-
+ arch/arm/mach-at91/setup.c                         |    3 +-
+ drivers/irqchip/Makefile                           |    1 +
+ drivers/irqchip/irq-atmel-aic.c                    |  851 ++++++++++++++++++++
+ include/linux/irq.h                                |    2 +
+ kernel/irq/generic-chip.c                          |    5 +-
+ 18 files changed, 1152 insertions(+), 362 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
+ create mode 100644 drivers/irqchip/irq-atmel-aic.c
+
 -- 
 1.7.9.5
