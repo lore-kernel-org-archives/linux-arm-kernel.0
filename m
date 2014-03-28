@@ -1,108 +1,181 @@
-From: keescook@google.com (Kees Cook)
-Date: Fri, 28 Mar 2014 11:42:10 -0700
-Subject: [PATCH v5] ARM: vDSO gettimeofday using generic timer architecture
-In-Reply-To: <5334C04C.2050802@mentor.com>
-References: <1395695873-12807-1-git-send-email-nathan_lynch@mentor.com>
- <CAGXu5jKojxJyhKSpPtLDT8Cw4wwUiKauoFUP5xuSJnKioDXGrQ@mail.gmail.com>
- <5334C04C.2050802@mentor.com>
-Message-ID: <CAGXu5jK01s1L=rF=gHKnks8scBvLY6uC_s7RO2+ecvp1Gw7wNg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 28 Mar 2014 11:45:17 -0700
+Subject: [RFC v2] ARM VM System Specification
+Message-ID: <20140328184517.GA27219@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 5:20 PM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
-> On 03/27/2014 06:06 PM, Kees Cook wrote:
->> On Mon, Mar 24, 2014 at 2:17 PM, Nathan Lynch <nathan_lynch@mentor.com> wrote:
->>> +
->>> +/* assumes mmap_sem is write-locked */
->>> +void arm_install_vdso(struct mm_struct *mm)
->>> +{
->>> +       unsigned long vdso_base;
->>> +       int ret;
->>> +
->>> +       mm->context.vdso = ~0UL;
->>> +
->>> +       if (vdso_pagelist == NULL)
->>> +               return;
->>> +
->>> +       vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
->>
->> While get_unmapped_area() should be returning an address that has been
->> base-offset randomized, I notice that x86 actually moves its vdso to a
->> random location near the stack instead (see vdso_addr() in
->> arch/x86/vdso/vma.c), in theory to avoid a hole in memory and to
->> separately randomize the vdso separately from heap and stack. I think
->> a similar thing be a benefit on ARM too.
->
-> OK, I'll look into this.  Perhaps a similar treatment for the sigpage?
+ARM VM System Specification
+===========================
 
-Oh, yeah. Unless there's a reason not too, it would be nice, yes.
+Goal
+----
+The goal of this spec is to allow suitably-built OS images to run on
+all ARM virtualization solutions, such as KVM or Xen.
 
-> I notice on my systems (OMAP5 and i.MX6) that vdso, sigpage, and ld.so
-> are always mapped consecutively:
->
-> # grep -A2 vdso /proc/self/maps
-> b6f44000-b6f46000 r-xp 00000000 00:00 0          [vdso]
-> b6f46000-b6f47000 r-xp 00000000 00:00 0          [sigpage]
-> b6f47000-b6f48000 r--p 00016000 00:01 1254       /lib/ld-2.19.90.so
->
-> but I wonder if that's due to starved entropy pools, or is the VM
-> already trying to prevent holes?
+Recommendations in this spec are valid for aarch32 and aarch64 alike, and
+they aim to be hypervisor agnostic.
 
-Right, this is because (I think) they're all using un-hinted
-get_unmapped_area(), which allocates consecutively. The base address
-is randomized, so each process should have a different starting
-address for the start of the range used to fulfill get_unmapped_area()
-calls.
+Note that simply adhering to the SBSA [2] is not a valid approach, for
+example because the SBSA mandates EL2, which will not be available for
+VMs.  Further, this spec also covers the aarch32 execution mode, not
+covered in the SBSA.
 
->
->
->>> +       if (IS_ERR_VALUE(vdso_base)) {
->>> +               pr_notice_once("%s: get_unapped_area failed (%ld)\n",
->>> +                              __func__, (long)vdso_base);
->>> +               return;
->>> +       }
->>> +
->>> +       /*
->>> +        * Put vDSO base into mm struct before calling
->>> +        * install_special_mapping so the perf counter mmap tracking
->>> +        * code will recognise it as a vDSO.
->>> +        */
->>> +       mm->context.vdso = vdso_base;
->>> +
->>> +       ret = install_special_mapping(mm, vdso_base, vdso_mapping_len,
->>> +                                     VM_READ|VM_EXEC|
->>> +                                     VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
->>> +                                     vdso_pagelist);
->>
->> Why is this given VM_MAYWRITE? (I would ask the same about x86's
->> implementation too.)
->
-> For setting breakpoints in the text area.  FWIW powerpc's
-> arch_setup_additional_pages has this comment:
->
-> /*
->  * our vma flags don't have VM_WRITE so by default, the process isn't
->  * allowed to write those pages.
->  * gdb can break that with ptrace interface, and thus trigger COW on
->  * those pages but it's then your responsibility to never do that on
->  * the "data" page of the vDSO or you'll stop getting kernel updates
->  * and your nice userland gettimeofday will be totally dead.
->  * It's fine to use that for setting breakpoints in the vDSO code
->  * pages though.
->  */
-> rc = install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
->                              VM_READ|VM_EXEC|
->                              VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
->                              vdso_pagelist);
 
-Ah-ha, thanks. As long as I'm asking dumb questions about vm
-internals... where is the COW flag for these pages stored? Nothing
-jumped out at me when I was reading install_special_mapping.
+Image format
+------------
+The image format, as presented to the VM, needs to be well-defined in
+order for prepared disk images to be bootable across various
+virtualization implementations.
 
-Thanks!
+The raw disk format as presented to the VM must be partitioned with a
+GUID Partition Table (GPT).  The bootable software must be placed in the
+EFI System Partition (ESP), using the UEFI removable media path, and
+must be an EFI application complying to the UEFI Specification 2.4
+Revision A [6].
 
--Kees
+The ESP partition's GPT entry's partition type GUID must be
+C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
+formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
 
--- 
-Kees Cook
-Chrome OS Security
+The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
+execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
+state as specified in Section 3.3 (3.3 (Boot Option Variables Default Boot
+Behavior) and 3.4.1.1 (Removable Media Boot Behavior) in [6].
+
+This ensures that tools for both Xen and KVM can load a binary UEFI
+firmware which can read and boot the EFI application in the disk image.
+
+A typical scenario will be GRUB2 packaged as an EFI application, which
+mounts the system boot partition and boots Linux.
+
+
+Virtual Firmware
+----------------
+The VM system must be UEFI compliant in order to be able to boot the EFI
+application in the ESP.  It is recommended that this is achieved by
+loading a UEFI binary as the first software executed by the VM, which
+then executes the EFI application.  The UEFI implementation should be
+compliant with UEFI Specification 2.4 Revision A [6] or later.
+
+This document strongly recommends that the VM implementation supports
+persistent environment storage for virtual firmware implementation in
+order to ensure probable use cases such as adding additional disk images
+to a VM or running installers to perform upgrades.
+
+This document strongly recommends that VM implementations implement
+persistent variable storage for their UEFI implementation.  Persistent
+variable storage shall be a property of a VM instance, but shall not be
+stored as part of a portable disk image.  Portable disk images shall
+conform to the UEFI removable disk requirements from the UEFI spec and
+cannot rely on on a pre-configured UEFI environment.
+
+The binary UEFI firmware implementation should not be distributed as
+part of the VM image, but is specific to the VM implementation.
+
+
+Hardware Description
+--------------------
+The VM system must be UEFI compliant and therefore the UEFI system table
+will provide a means to access hardware description data.
+
+The VM implementation must provide through its UEFI implementation:
+
+  a complete FDT which describes the entire VM system and will boot
+  mainline kernels driven by device tree alone
+
+For more information about the arm and arm64 boot conventions, see
+Documentation/arm/Booting and Documentation/arm64/booting.txt in the
+Linux kernel source tree.
+
+For more information about UEFI booting, see [4] and [5].
+
+
+VM Platform
+-----------
+The specification does not mandate any specific memory map.  The guest
+OS must be able to enumerate all processing elements, devices, and
+memory through HW description data (FDT) or a bus-specific
+mechanism such as PCI.
+
+If aarch64 physical CPUs implement support for the aarch32 execution
+state in EL1 and EL0 execution, it is recommended that the VM
+implementation supports booting the VM at EL1 in both aarch32 and
+aarch64 execution states.
+
+The virtual hardware platform must provide a number of mandatory
+peripherals:
+
+  Serial console:  The platform should provide a console,
+  based on an emulated pl011, a virtio-console, or a Xen PV console.
+
+  An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
+  limits the the number of virtual CPUs to 8 cores, newer GIC versions
+  removes this limitation.
+
+  The ARM virtual timer and counter should be available to the VM as
+  per the ARM Generic Timers specification in the ARM ARM [1].
+
+It is strongly recommended that the VM implementation provides a
+hotpluggable bus to support hotplug of at least block and network
+devices.  Suitable buses include a virtual PCIe bus and the Xen PV bus.
+
+For the VM image to be compliant with this spec, the following applies
+for the guest OS in the VM image:
+
+  The guest OS must include support for pl011 UART, virtio-console, and
+  the Xen PV console.
+
+  The guest OS must include support for GICv2 and any available newer
+  version of the GIC architecture to maintain compatibility with older
+  VM implementations.
+
+  It is strongly recommended to include support for all available
+  (block, network, console, balloon) virtio-pci, virtio-mmio, and Xen PV
+  drivers in the guest OS kernel or initial ramdisk.
+
+
+Other common peripherals for block devices, networking, and more can
+(and typically will) be provided, but OS software written and compiled
+to run on ARM VMs cannot make any assumptions about which variations
+of these should exist or which implementation they use (e.g. VirtIO or
+Xen PV).  See "Hardware Description" above.
+
+
+Changes from previous versions of this RFC
+------------------------------------------
+Changes v1-v2:
+ - Clearly specify that the guest must support the pl011,
+   virtio-console, and Xen PV console.  (Note that it was discussed to
+   mandate a pl011 during Linaro Connect Asia 2014, but that was under the
+   impression that the SBSA specification was an output-only no-irq
+   serial port, which is not the case.  The only two benefits from
+   mandating a specific serial type was to handle "console=ttyAMA0"
+   kernel command line parameters and earlyprintk; Grant Likely has
+   submitted patches to avoid the need for "console=" parameters, and
+   Rob Herring has submitted patches for paravirtualized earlyprintk
+   consoles.)
+ - Reference EFI specification for bootable paths.
+ - Remove discussion on ACPI boot methods and do not suggest ACPI
+   support in VMs.
+ - Add specification about UEFI persistent variable storage and
+   portability.
+
+
+References
+----------
+[1]: The ARM Architecture Reference Manual, ARMv8, Issue A.b
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
+
+[2]: ARM Server Base System Architecture
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029/index.html
+
+[3]: The ARM Generic Interrupt Controller Architecture Specifications v2.0
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
+
+[4]: http://www.secretlab.ca/archives/27
+
+[5]: https://git.linaro.org/people/leif.lindholm/linux.git/blob/refs/heads/uefi-for-upstream:/Documentation/arm/uefi.txt
+
+[6]: UEFI Specification 2.4 Revision A
+http://www.uefi.org/sites/default/files/resources/2_4_Errata_A.pdf
