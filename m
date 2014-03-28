@@ -1,29 +1,31 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:19:07 +0000
-Subject: [PATCH 55/75] ARM: l2c: cns3xxx: remove cache size override
-In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYYl-0007Ga-Oe@rmk-PC.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 28 Mar 2014 15:27:47 +0000
+Subject: [ARM ATTEND] Following discussions, device tree, ARM64
+Message-ID: <20140328152747.GC14113@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-cns3xxx/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hello,
 
-diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
-index dd2b9926a76c..bce1d36d0ffb 100644
---- a/arch/arm/mach-cns3xxx/core.c
-+++ b/arch/arm/mach-cns3xxx/core.c
-@@ -258,7 +258,7 @@ void __init cns3xxx_l2x0_init(void)
- 	writel(val, base + L310_DATA_LATENCY_CTRL);
- 
- 	/* 32 KiB, 8-way, parity disable */
--	l2x0_init(base, 0x00540000, 0xfe000fff);
-+	l2x0_init(base, 0x00500000, 0xfe0f0fff);
- }
- 
- #endif /* CONFIG_CACHE_L2X0 */
--- 
-1.8.3.1
+As one of the device tree bindings maintainers and as someone involved in arm64
+Linux development, I am interested in attending the ARM mini summit for the
+purpose of discussing:
+
+* ARM64 SoC support, and questions/plans regarding upstreaming and code sharing
+  with arm.
+
+* Device tree cleanup. There are currently many bindings and dts files which
+  serve as poor examples, but changes to bring them into line with
+  standards would involve breaking support for existing DTBs. We don't have
+  good mechanisms for deprecation of bindings; doubly so for those which are
+  widely used. How can we avoid/ameliorate this in future?
+
+* Device tree stabilisation. There are currently plans to move stable bindings
+  and/or dts out of the kernel tree and into a separate repo. How will stable
+  bindings and/or dts be chosen, and what does this mean for bindings left in the
+  kernel with regards to stability/deprecation?
+
+In addition to following general discussions.
+
+Cheers,
+Mark.
