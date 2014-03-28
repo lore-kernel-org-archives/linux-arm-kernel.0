@@ -1,368 +1,134 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 28 Mar 2014 15:01:26 +0000
-Subject: [RFC PATCH V4 1/7] mm: Introduce a general RCU get_user_pages_fast.
+Date: Fri, 28 Mar 2014 15:01:28 +0000
+Subject: [RFC PATCH V4 3/7] arm: mm: Enable HAVE_RCU_TABLE_FREE logic
 In-Reply-To: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
 References: <1396018892-6773-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1396018892-6773-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <1396018892-6773-4-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A general RCU implementation of get_user_pages_fast. It is based
-heavily on the PowerPC implementation.
+In order to implement fast_get_user_pages we need to ensure that the
+page table walker is protected from page table pages being freed from
+under it.
 
-The lockless page cache protocols are used as this implementation
-assumes that TLB invalidations do not necessarily need to be broadcast
-via IPI.
+One way to achieve this is to have the walker disable interrupts, and
+rely on IPIs from the TLB flushing code blocking before the page table
+pages are freed.
 
-This implementation does however assume that THP splits will broadcast
-an IPI, and this is why interrupts are disabled in the fast_gup walker
-(otherwise calls to rcu_read_(un)lock would suffice).
+On some ARM platforms we have hardware TLB invalidation, thus the TLB
+flushing code won't necessarily broadcast IPIs. Also spuriously
+broadcasting IPIs can hurt system performance if done too often.
+
+This problem has already been solved on PowerPC and Sparc by batching
+up page table pages belonging to more than one mm_user, then scheduling
+an rcu_sched callback to free the pages. If one were to disable
+interrupts, that would delay the scheduling interrupts thus block the
+page table pages being freed. This logic has also been promoted to core
+code and is activated when one enables HAVE_RCU_TABLE_FREE.
+
+This patch enables HAVE_RCU_TABLE_FREE and incorporates it into the
+existing ARM TLB logic.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
-This is my first attempt to generalise fast_gup to core code. At the
-moment there are two implicit assumptions that I know about:
-  o) 64-bit ptes can be atomically read.
-  o) hugetlb pages and thps have a similar bit layout.
+ arch/arm/Kconfig           |  1 +
+ arch/arm/include/asm/tlb.h | 38 ++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 37 insertions(+), 2 deletions(-)
 
-Any feedback from other architectures maintainers on how this could be
-tweaked to accommodate them, would be greatly appreciated! Especially
-as there is a lot of similarity between each architecture's fast_gup.
----
- mm/Kconfig  |   3 +
- mm/Makefile |   1 +
- mm/gup.c    | 297 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 301 insertions(+)
- create mode 100644 mm/gup.c
-
-diff --git a/mm/Kconfig b/mm/Kconfig
-index 2888024..0151e17 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -134,6 +134,9 @@ config HAVE_MEMBLOCK
- config HAVE_MEMBLOCK_NODE_MAP
- 	boolean
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1594945..7d5340d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -58,6 +58,7 @@ config ARM
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
+ 	select HAVE_PERF_USER_STACK_DUMP
++	select HAVE_RCU_TABLE_FREE if SMP
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_UID16
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index 0baf7f0..eaf7578 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -35,12 +35,39 @@
  
-+config HAVE_RCU_GUP
-+	boolean
-+
- config ARCH_DISCARD_MEMBLOCK
- 	boolean
+ #define MMU_GATHER_BUNDLE	8
  
-diff --git a/mm/Makefile b/mm/Makefile
-index 310c90a..0f19c5f 100644
---- a/mm/Makefile
-+++ b/mm/Makefile
-@@ -28,6 +28,7 @@ else
- endif
- 
- obj-$(CONFIG_HAVE_MEMBLOCK) += memblock.o
-+obj-$(CONFIG_HAVE_RCU_GUP) += gup.o
- 
- obj-$(CONFIG_BOUNCE)	+= bounce.o
- obj-$(CONFIG_SWAP)	+= page_io.o swap_state.o swapfile.o
-diff --git a/mm/gup.c b/mm/gup.c
-new file mode 100644
-index 0000000..b35296f
---- /dev/null
-+++ b/mm/gup.c
-@@ -0,0 +1,297 @@
-+/*
-+ * mm/gup.c
-+ *
-+ * Copyright (C) 2014 Linaro Ltd.
-+ *
-+ * Based on arch/powerpc/mm/gup.c which is:
-+ * Copyright (C) 2008 Nick Piggin
-+ * Copyright (C) 2008 Novell Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/sched.h>
-+#include <linux/mm.h>
-+#include <linux/pagemap.h>
-+#include <linux/rwsem.h>
-+#include <linux/hugetlb.h>
-+#include <asm/pgtable.h>
-+
-+#ifdef __HAVE_ARCH_PTE_SPECIAL
-+static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
-+			 int write, struct page **pages, int *nr)
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++static inline void __tlb_remove_table(void *_table)
 +{
-+	pte_t *ptep, *ptem;
-+	int ret = 0;
-+
-+	ptem = ptep = pte_offset_map(&pmd, addr);
-+	do {
-+		pte_t pte = ACCESS_ONCE(*ptep);
-+		struct page *page;
-+
-+		if (!pte_present(pte) || pte_special(pte)
-+			|| (write && !pte_write(pte)))
-+			goto pte_unmap;
-+
-+		VM_BUG_ON(!pfn_valid(pte_pfn(pte)));
-+		page = pte_page(pte);
-+
-+		if (!page_cache_get_speculative(page))
-+			goto pte_unmap;
-+
-+		if (unlikely(pte_val(pte) != pte_val(*ptep))) {
-+			put_page(page);
-+			goto pte_unmap;
-+		}
-+
-+		pages[*nr] = page;
-+		(*nr)++;
-+
-+	} while (ptep++, addr += PAGE_SIZE, addr != end);
-+
-+	ret = 1;
-+
-+pte_unmap:
-+	pte_unmap(ptem);
-+	return ret;
++	free_page_and_swap_cache((struct page *)_table);
 +}
++
++struct mmu_table_batch {
++	struct rcu_head		rcu;
++	unsigned int		nr;
++	void			*tables[0];
++};
++
++#define MAX_TABLE_BATCH		\
++	((PAGE_SIZE - sizeof(struct mmu_table_batch)) / sizeof(void *))
++
++extern void tlb_table_flush(struct mmu_gather *tlb);
++extern void tlb_remove_table(struct mmu_gather *tlb, void *table);
++
++#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
 +#else
++#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
++#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
 +
-+/*
-+ * If we can't determine whether or not a pte is special, then fail immediately
-+ * for ptes. Note, we can still pin HugeTLB and THP as these are guaranteed not
-+ * to be special.
-+ */
-+static inline int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
-+			 int write, struct page **pages, int *nr)
-+{
-+	return 0;
-+}
-+#endif /* __HAVE_ARCH_PTE_SPECIAL */
+ /*
+  * TLB handling.  This allows us to remove pages from the page
+  * tables, and efficiently handle the TLB issues.
+  */
+ struct mmu_gather {
+ 	struct mm_struct	*mm;
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++	struct mmu_table_batch	*batch;
++	unsigned int		need_flush;
++#endif
+ 	unsigned int		fullmm;
+ 	struct vm_area_struct	*vma;
+ 	unsigned long		start, end;
+@@ -101,6 +128,9 @@ static inline void __tlb_alloc_page(struct mmu_gather *tlb)
+ static inline void tlb_flush_mmu(struct mmu_gather *tlb)
+ {
+ 	tlb_flush(tlb);
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++	tlb_table_flush(tlb);
++#endif
+ 	free_pages_and_swap_cache(tlb->pages, tlb->nr);
+ 	tlb->nr = 0;
+ 	if (tlb->pages == tlb->local)
+@@ -119,6 +149,10 @@ tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start
+ 	tlb->pages = tlb->local;
+ 	tlb->nr = 0;
+ 	__tlb_alloc_page(tlb);
 +
-+static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
-+		unsigned long end, int write, struct page **pages, int *nr)
-+{
-+	struct page *head, *page, *tail;
-+	int refs;
-+
-+	if (!pmd_present(orig) || (write && !pmd_write(orig)))
-+		return 0;
-+
-+	refs = 0;
-+	head = pmd_page(orig);
-+	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
-+	tail = page;
-+	do {
-+		VM_BUG_ON(compound_head(page) != head);
-+		pages[*nr] = page;
-+		(*nr)++;
-+		page++;
-+		refs++;
-+	} while (addr += PAGE_SIZE, addr != end);
-+
-+	if (!page_cache_add_speculative(head, refs)) {
-+		*nr -= refs;
-+		return 0;
-+	}
-+
-+	if (unlikely(pmd_val(orig) != pmd_val(*pmdp))) {
-+		*nr -= refs;
-+		while (refs--)
-+			put_page(head);
-+		return 0;
-+	}
-+
-+	/*
-+	 * Any tail pages need their mapcount reference taken before we
-+	 * return. (This allows the THP code to bump their ref count when
-+	 * they are split into base pages).
-+	 */
-+	while (refs--) {
-+		if (PageTail(tail))
-+			get_huge_page_tail(tail);
-+		tail++;
-+	}
-+
-+	return 1;
-+}
-+
-+static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
-+		unsigned long end, int write, struct page **pages, int *nr)
-+{
-+	struct page *head, *page, *tail;
-+	pmd_t origpmd = __pmd(pud_val(orig));
-+	int refs;
-+
-+	if (!pmd_present(origpmd) || (write && !pmd_write(origpmd)))
-+		return 0;
-+
-+	refs = 0;
-+	head = pmd_page(origpmd);
-+	page = head + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-+	tail = page;
-+	do {
-+		VM_BUG_ON(compound_head(page) != head);
-+		pages[*nr] = page;
-+		(*nr)++;
-+		page++;
-+		refs++;
-+	} while (addr += PAGE_SIZE, addr != end);
-+
-+	if (!page_cache_add_speculative(head, refs)) {
-+		*nr -= refs;
-+		return 0;
-+	}
-+
-+	if (unlikely(pud_val(orig) != pud_val(*pudp))) {
-+		*nr -= refs;
-+		while (refs--)
-+			put_page(head);
-+		return 0;
-+	}
-+
-+	while (refs--) {
-+		if (PageTail(tail))
-+			get_huge_page_tail(tail);
-+		tail++;
-+	}
-+
-+	return 1;
-+}
-+
-+static int gup_pmd_range(pud_t pud, unsigned long addr, unsigned long end,
-+		int write, struct page **pages, int *nr)
-+{
-+	unsigned long next;
-+	pmd_t *pmdp;
-+
-+	pmdp = pmd_offset(&pud, addr);
-+	do {
-+		pmd_t pmd = ACCESS_ONCE(*pmdp);
-+		next = pmd_addr_end(addr, end);
-+		if (pmd_none(pmd) || pmd_trans_splitting(pmd))
-+			return 0;
-+
-+		if (unlikely(pmd_trans_huge(pmd) || pmd_huge(pmd))) {
-+			if (!gup_huge_pmd(pmd, pmdp, addr, next, write,
-+				pages, nr))
-+				return 0;
-+		} else {
-+			if (!gup_pte_range(pmd, addr, next, write, pages, nr))
-+				return 0;
-+		}
-+	} while (pmdp++, addr = next, addr != end);
-+
-+	return 1;
-+}
-+
-+static int gup_pud_range(pgd_t *pgdp, unsigned long addr, unsigned long end,
-+		int write, struct page **pages, int *nr)
-+{
-+	unsigned long next;
-+	pud_t *pudp;
-+
-+	pudp = pud_offset(pgdp, addr);
-+	do {
-+		pud_t pud = ACCESS_ONCE(*pudp);
-+		next = pud_addr_end(addr, end);
-+		if (pud_none(pud))
-+			return 0;
-+		if (pud_huge(pud)) {
-+			if (!gup_huge_pud(pud, pudp, addr, next, write,
-+					pages, nr))
-+				return 0;
-+		} else if (!gup_pmd_range(pud, addr, next, write, pages, nr))
-+			return 0;
-+	} while (pudp++, addr = next, addr != end);
-+
-+	return 1;
-+}
-+
-+/*
-+ * Like get_user_pages_fast() except its IRQ-safe in that it won't fall
-+ * back to the regular GUP.
-+ */
-+int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
-+			  struct page **pages)
-+{
-+	struct mm_struct *mm = current->mm;
-+	unsigned long addr, len, end;
-+	unsigned long next, flags;
-+	pgd_t *pgdp;
-+	int nr = 0;
-+
-+	start &= PAGE_MASK;
-+	addr = start;
-+	len = (unsigned long) nr_pages << PAGE_SHIFT;
-+	end = start + len;
-+
-+	if (unlikely(!access_ok(write ? VERIFY_WRITE : VERIFY_READ,
-+					start, len)))
-+		return 0;
-+
-+	/*
-+	 * Disable interrupts, we use the nested form as we can already
-+	 * have interrupts disabled by get_futex_key.
-+	 *
-+	 * With interrupts disabled, we block page table pages from being
-+	 * freed from under us. See mmu_gather_tlb in asm-generic/tlb.h
-+	 * for more details.
-+	 *
-+	 * We do not adopt an rcu_read_lock(.) here as we also want to
-+	 * block IPIs that come from THPs splitting.
-+	 */
-+
-+	local_irq_save(flags);
-+	pgdp = pgd_offset(mm, addr);
-+	do {
-+		next = pgd_addr_end(addr, end);
-+		if (pgd_none(*pgdp))
-+			break;
-+		else if (!gup_pud_range(pgdp, addr, next, write, pages, &nr))
-+			break;
-+	} while (pgdp++, addr = next, addr != end);
-+	local_irq_restore(flags);
-+
-+	return nr;
-+}
-+
-+int get_user_pages_fast(unsigned long start, int nr_pages, int write,
-+			struct page **pages)
-+{
-+	struct mm_struct *mm = current->mm;
-+	int nr, ret;
-+
-+	start &= PAGE_MASK;
-+	nr = __get_user_pages_fast(start, nr_pages, write, pages);
-+	ret = nr;
-+
-+	if (nr < nr_pages) {
-+		/* Try to get the remaining pages with get_user_pages */
-+		start += nr << PAGE_SHIFT;
-+		pages += nr;
-+
-+		down_read(&mm->mmap_sem);
-+		ret = get_user_pages(current, mm, start,
-+				     nr_pages - nr, write, 0, pages, NULL);
-+		up_read(&mm->mmap_sem);
-+
-+		/* Have to be a bit careful with return values */
-+		if (nr > 0) {
-+			if (ret < 0)
-+				ret = nr;
-+			else
-+				ret += nr;
-+		}
-+	}
-+
-+	return ret;
-+}
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++	tlb->batch = NULL;
++#endif
+ }
+ 
+ static inline void
+@@ -195,7 +229,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ 	tlb_add_flush(tlb, addr + SZ_1M);
+ #endif
+ 
+-	tlb_remove_page(tlb, pte);
++	tlb_remove_entry(tlb, pte);
+ }
+ 
+ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+@@ -203,7 +237,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ {
+ #ifdef CONFIG_ARM_LPAE
+ 	tlb_add_flush(tlb, addr);
+-	tlb_remove_page(tlb, virt_to_page(pmdp));
++	tlb_remove_entry(tlb, virt_to_page(pmdp));
+ #endif
+ }
+ 
 -- 
 1.8.1.4
