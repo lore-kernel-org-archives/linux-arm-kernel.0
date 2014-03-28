@@ -1,79 +1,175 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:20:44 +0000
-Subject: [PATCH 74/75] ARM: l2c: always enable low power modes
-In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYaK-0007I0-Sm@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Mar 2014 15:28:32 +0000
+Subject: __pv_phys_offset, inline assembly functions, and such like
+Message-ID: <20140328152831.GK7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
+Having spent a while looking at the Freescale FEC driver, including
+inspecting its assembly, I believe that we have made some pretty bad
+errors of judgement concerning various "optimisations" which have
+been done.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- Documentation/devicetree/bindings/arm/l2cc.txt |  2 --
- arch/arm/mm/cache-l2x0.c                       | 22 ++++++++++++----------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+One of the most striking is the conversion from virtual to physical
+addresses.
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index e0dd400ecea6..b513cb8196fe 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -40,8 +40,6 @@ implementations of the L2 cache controller with compatible programming models.
- - arm,filter-ranges : <start length> Starting address and length of window to
-   filter. Addresses in the filter window are directed to the M1 port. Other
-   addresses will go to the M0 port.
--- arm,dynamic-clk-gating : Enables dynamic clock gating (PL310)
--- arm,standby-mode : Enables standby mode (PL310)
- - interrupts : 1 combined interrupt.
- - cache-id-part: cache id part number to be used if it is not present
-   on hardware
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 700a66260f94..b1f103d402be 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -752,6 +752,18 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 			1 + (prefetch & L310_PREFETCH_CTRL_OFFSET_MASK));
- 	}
- 
-+	/* r3p0 or later has power control register */
-+	if (rev >= L310_CACHE_ID_RTL_R3P0) {
-+		u32 power_ctrl;
-+
-+		l2c_write_sec(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
-+			      base, L310_POWER_CTRL);
-+		power_ctrl = readl_relaxed(base + L310_POWER_CTRL);
-+		pr_info("L2C-310: dynamic clock gating %sabled, standby mode %sabled\n",
-+			power_ctrl & L310_DYNAMIC_CLK_GATING_EN ? "en" : "dis",
-+			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
-+	}
-+
- 	l2c_enable(base, aux, num_lock);
- 
- 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
-@@ -1033,7 +1045,6 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	u32 data[3] = { 0, 0, 0 };
- 	u32 tag[3] = { 0, 0, 0 };
- 	u32 filter[2] = { 0, 0 };
--	u32 val;
- 
- 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
- 	if (tag[0] && tag[1] && tag[2])
-@@ -1060,15 +1071,6 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
- 			       l2x0_base + L310_ADDR_FILTER_START);
- 	}
--
--	val = 0;
--	if (of_property_read_bool(np, "arm,dynamic-clk-gating"))
--		val |= L310_DYNAMIC_CLK_GATING_EN;
--	if (of_property_read_bool(np, "arm,standby-mode"))
--		val |= L310_STNDBY_MODE_EN;
--
--	if (val)
--		l2c_write_sec(val, l2x0_base, L310_POWER_CTRL);
- }
- 
- static const struct l2c_init_data of_l2c310_data __initconst = {
+Drivers make calls to the DMA API, and one such call is dma_map_single().
+This used to be a mere function call which didn't generate lots of code.
+However, this has changed since it is now an inline function, which
+involves this badly written code:
+
+        addr = ops->map_page(dev, virt_to_page(ptr),
+                             (unsigned long)ptr & ~PAGE_MASK, size,
+                             dir, attrs);
+        debug_dma_map_page(dev, virt_to_page(ptr),
+                           (unsigned long)ptr & ~PAGE_MASK, size,
+                           dir, addr, true);
+
+virt_to_page() is itself a macro which calls other macros which calls
+other functions.  So, virt_to_page() itself is not a trivial operation.
+We do this twice in the above code, once after a function pointer has
+been indirected through, so the compiler has no knowledge what side
+effects that may have.  So the first thing is that this crappily written
+generic function should be changed to:
+
+	struct page *page = virt_to_page(ptr);
+
+        addr = ops->map_page(dev, page, (unsigned long)ptr & ~PAGE_MASK, size,
+                             dir, attrs);
+        debug_dma_map_page(dev, page, (unsigned long)ptr & ~PAGE_MASK, size,
+                           dir, addr, true);
+
+I'm not going to make the above change here though...
+
+The second problem is virt_to_page() itself.  Let's look at what that
+involves:
+
+#define virt_to_page(kaddr)     pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+
+For flatmem (which is single-zImage's only supported memory model):
+
+#define __pfn_to_page(pfn)      (mem_map + ((pfn) - ARCH_PFN_OFFSET))
+
+#define ARCH_PFN_OFFSET         PHYS_PFN_OFFSET
+
+#define PHYS_PFN_OFFSET ((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+
+extern u64 __pv_phys_offset;
+#define PHYS_OFFSET __pv_phys_offset
+
+#define __pa(x)                 __virt_to_phys((unsigned long)(x))
+
+static inline phys_addr_t __virt_to_phys(unsigned long x)
+{
+        phys_addr_t t;
+
+        if (sizeof(phys_addr_t) == 4) {
+                __pv_stub(x, t, "add", __PV_BITS_31_24);
+        } else {
+                __pv_stub_mov_hi(t);
+                __pv_add_carry_stub(x, t);
+        }
+        return t;
+}
+
+Now, let's look at the code generated by the above with DMA debugging
+disabled, and marvell in awe:
+
+							; sl = virtual address
+
+     a38:       e59331d4        ldr     r3, [r3, #468]  ; get_dma_ops
+     a3c:       e3001000        movw    r1, #0
+                        a3c: R_ARM_MOVW_ABS_NC  arm_dma_ops
+     a40:       e3401000        movt    r1, #0		; r1 = &arm_dma_ops
+                        a40: R_ARM_MOVT_ABS     arm_dma_ops
+     a44:       e3530000        cmp     r3, #0		; get_dma_ops
+     a48:       01a03001        moveq   r3, r1		; get_dma_ops
+     a4c:       e3009000        movw    r9, #0
+                        a4c: R_ARM_MOVW_ABS_NC  __pv_phys_offset
+     a50:       e3409000        movt    r9, #0		; r9 = &__pv_phys_offset
+                        a50: R_ARM_MOVT_ABS     __pv_phys_offset
+     a54:       e3002000        movw    r2, #0
+                        a54: R_ARM_MOVW_ABS_NC  __pv_phys_offset
+     a58:       e3402000        movt    r2, #0		; r2 = &__pv_phys_offset
+                        a58: R_ARM_MOVT_ABS     __pv_phys_offset
+     a5c:       e5999004        ldr     r9, [r9, #4]	; r9 = high word of __pv_phys_offset
+     a60:       e3001000        movw    r1, #0
+                        a60: R_ARM_MOVW_ABS_NC  mem_map
+     a64:       e592c000        ldr     ip, [r2]	; ip = low word of __pv_phys_offset
+     a68:       e3401000        movt    r1, #0		; r1 = &mem_map
+                        a68: R_ARM_MOVT_ABS     mem_map
+     a6c:       e1a02a0a        lsl     r2, sl, #20	; r2 = part converted offset into page
+     a70:       e50b904c        str     r9, [fp, #-76]  ; save high word of __pv_phys_offset to stack
+     a74:       e3a09000        mov     r9, #0		; attrs
+     a78:       e591e000        ldr     lr, [r1]	; lr = mem_map
+     a7c:       e1a0162c        lsr     r1, ip, #12	; r1 = __pv_phys_offset(low) >> 12
+     a80:       e3a0c001        mov     ip, #1		; direction
+     a84:       e58dc000        str     ip, [sp]	; direction stacked for call
+     a88:       e51bc04c        ldr     ip, [fp, #-76]  ; get high word of __pv_phys_offset from stack
+     a8c:       e1a02a22        lsr     r2, r2, #20	; r2 = offset into page
+     a90:       e28aa481        add     sl, sl, #-2130706432    ; assembly virt_to_phys
+     a94:       e58d9004        str     r9, [sp, #4]	; attrs stacked for call
+     a98:       e1811a0c        orr     r1, r1, ip, lsl #20 ; r1 = __pv_phys_offset >> 12
+     a9c:       e593c010        ldr     ip, [r3, #16]	; ip = ops->map_page
+     aa0:       e061162a        rsb     r1, r1, sl, lsr #12 ; r1 = asm virt_to_phys(addr) >> 12 - __pv_phys_offset >> 12
+     aa4:       e1a03006        mov     r3, r6		; length
+     aa8:       e08e1281        add     r1, lr, r1, lsl #5 r1 = &mem_map[r1]
+     aac:       e12fff3c        blx     ip		; call map_page
+
+So, what this is doing is:
+
+	offset = (addr & 0xfff);
+	page = &mem_map[asm virt_to_phys(addr) >> 12 - __pv_phys_offset >> 12]
+
+Now, realise that the asm virt_to_phys(addr) is hiding this calculation
+from the compiler:
+
+	addr - PAGE_OFFSET + __pv_phys_offset
+
+Therefore, the above becomes:
+
+	page = &mem_map[(addr - PAGE_OFFSET + __pv_phys_offset) >> 12 - __pv_phys_offset >> 12]
+
+I'm sure it doesn't take many people long to realise that this is
+equivalent to:
+
+	page = &mem_map[(addr - PAGE_OFFSET) >> 12]
+
+IOW, no reference to the physical stuff at all.
+
+With the inline assembly eliminated from the macro, and __pv_phys_offset
+converted to a PFN offset instead, the above assembly code shrinks
+dramatically:
+
+     a20:       e59331d4        ldr     r3, [r3, #468]  ; get_dma_ops
+     a24:       e3001000        movw    r1, #0
+                        a24: R_ARM_MOVW_ABS_NC  arm_dma_ops
+     a28:       e3401000        movt    r1, #0		; &arm_dma_ops
+                        a28: R_ARM_MOVT_ABS     arm_dma_ops
+     a2c:       e3530000        cmp     r3, #0		; get_dma_ops
+     a30:       01a03001        moveq   r3, r1		; get_dma_ops
+     a34:       e28a1101        add     r1, sl, #1073741824 ; r1 = addr - PAGE_OFFSET
+     a38:       e3002000        movw    r2, #0
+                        a38: R_ARM_MOVW_ABS_NC  mem_map
+     a3c:       e3402000        movt    r2, #0		; r2 = &mem_map
+                        a3c: R_ARM_MOVT_ABS     mem_map
+     a40:       e3a0e001        mov     lr, #1		; direction
+     a44:       e1a01621        lsr     r1, r1, #12	; r1 = (addr - PAGE_OFFSET) >> 12 (pfn offset)
+     a48:       e592c000        ldr     ip, [r2]	; ip = &mem_map[0]
+     a4c:       e1a02a0a        lsl     r2, sl, #20	; r2 = part converted offset into page
+     a50:       e58de000        str     lr, [sp]	; stack direction
+     a54:       e3a0a000        mov     sl, #0		; attr
+     a58:       e08c1281        add     r1, ip, r1, lsl #5 ; r1 = &mem_map[(addr - PAGE_OFFSET) >> 12]
+     a5c:       e58da004        str     sl, [sp, #4]	; stack attr
+     a60:       e1a02a22        lsr     r2, r2, #20	; r2 = offset
+     a64:       e593c010        ldr     ip, [r3, #16]	; ops->map_page
+     a68:       e1a03006        mov     r3, r6		; length
+     a6c:       e12fff3c        blx     ip		; call map_page
+
+With this in place, I see a reduction of 4220 bytes in the kernel image,
+and that's from just fixing virt_to_page() and changing __pv_phys_offset
+to be PFN-based (so it can be 32-bit in all cases.)
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
