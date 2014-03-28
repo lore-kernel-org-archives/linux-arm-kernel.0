@@ -1,153 +1,166 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:17:46 +0000
-Subject: [PATCH 39/75] ARM: l2c: move way size calculation data into
- l2c_init_data
+Date: Fri, 28 Mar 2014 15:17:51 +0000
+Subject: [PATCH 40/75] ARM: l2c: move errata configuration options to
+ arch/arm/mm/Kconfig
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYXS-0007FV-05@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYXX-0007FZ-3w@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the way size calculation data (base of way size) out of the
-switch statement into the provided initialisation data.
+Move the L2C-310 errata configuration options to arch/arm/mm/Kconfig
+along side the option which enables support for this device.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-l2x0.c | 29 ++++++++++++++++++++---------
- 1 file changed, 20 insertions(+), 9 deletions(-)
+ arch/arm/Kconfig    | 51 ---------------------------------------------------
+ arch/arm/mm/Kconfig | 51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index f495d7c37fb9..6b304db6f1c2 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -30,6 +30,7 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 15949459611f..beacf698cdff 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1215,19 +1215,6 @@ config ARM_ERRATA_742231
+ 	  register of the Cortex-A9 which reduces the linefill issuing
+ 	  capabilities of the processor.
  
- struct l2c_init_data {
- 	const char *type;
-+	unsigned way_size_0;
- 	unsigned num_lock;
- 	void (*of_parse)(const struct device_node *, u32 *, u32 *);
- 	void (*enable)(void __iomem *, u32, unsigned);
-@@ -276,6 +277,7 @@ static void l2c210_resume(void)
- 
- static const struct l2c_init_data l2c210_data __initconst = {
- 	.type = "L2C-210",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
- 	.enable = l2c_enable,
- 	.outer_cache = {
-@@ -419,6 +421,7 @@ static void l2c220_sync(void)
- 
- static const struct l2c_init_data l2c220_data = {
- 	.type = "L2C-220",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
- 	.enable = l2c_enable,
- 	.outer_cache = {
-@@ -654,6 +657,7 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 
- static const struct l2c_init_data l2c310_init_fns __initconst = {
- 	.type = "L2C-310",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 8,
- 	.enable = l2c_enable,
- 	.fixup = l2c310_fixup,
-@@ -674,10 +678,8 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	u32 aux_val, u32 aux_mask, u32 cache_id)
- {
- 	struct outer_cache_fns fns;
-+	unsigned way_size_bits, ways;
- 	u32 aux;
--	u32 way_size = 0;
--	int ways;
--	int way_size_shift = L2X0_WAY_SIZE_SHIFT;
- 
- 	/*
- 	 * It is strange to save the register state before initialisation,
-@@ -708,7 +710,6 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	case AURORA_CACHE_ID:
- 		ways = (aux >> 13) & 0xf;
- 		ways = 2 << ((ways + 1) >> 2);
--		way_size_shift = AURORA_WAY_SIZE_SHIFT;
- 		break;
- 
- 	default:
-@@ -720,12 +721,15 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	l2x0_way_mask = (1 << ways) - 1;
- 
- 	/*
--	 * L2 cache Size =  Way size * Number of ways
-+	 * way_size_0 is the size that a way_size value of zero would be
-+	 * given the calculation: way_size = way_size_0 << way_size_bits.
-+	 * So, if way_size_bits=0 is reserved, but way_size_bits=1 is 16k,
-+	 * then way_size_0 would be 8k.
-+	 *
-+	 * L2 cache size = number of ways * way size.
- 	 */
--	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
--	way_size = 1 << (way_size + way_size_shift);
+-config PL310_ERRATA_588369
+-	bool "PL310 errata: Clean & Invalidate maintenance operations do not invalidate clean lines"
+-	depends on CACHE_L2X0
+-	help
+-	   The PL310 L2 cache controller implements three types of Clean &
+-	   Invalidate maintenance operations: by Physical Address
+-	   (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
+-	   They are architecturally defined to behave as the execution of a
+-	   clean operation followed immediately by an invalidate operation,
+-	   both performing to the same memory location. This functionality
+-	   is not correctly implemented in PL310 as clean lines are not
+-	   invalidated as a result of these operations.
 -
--	l2x0_size = ways * way_size * SZ_1K;
-+	way_size_bits = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
-+	l2x0_size = ways * (data->way_size_0 << way_size_bits);
+ config ARM_ERRATA_643719
+ 	bool "ARM errata: LoUIS bit field in CLIDR register is incorrect"
+ 	depends on CPU_V7 && SMP
+@@ -1250,17 +1237,6 @@ config ARM_ERRATA_720789
+ 	  tables. The workaround changes the TLB flushing routines to invalidate
+ 	  entries regardless of the ASID.
  
- 	fns = data->outer_cache;
- 	if (data->fixup)
-@@ -822,6 +826,7 @@ static void __init l2x0_of_parse(const struct device_node *np,
+-config PL310_ERRATA_727915
+-	bool "PL310 errata: Background Clean & Invalidate by Way operation can cause data corruption"
+-	depends on CACHE_L2X0
+-	help
+-	  PL310 implements the Clean & Invalidate by Way L2 cache maintenance
+-	  operation (offset 0x7FC). This operation runs in background so that
+-	  PL310 can handle normal accesses while it is in progress. Under very
+-	  rare circumstances, due to this erratum, write data can be lost when
+-	  PL310 treats a cacheable write transaction during a Clean &
+-	  Invalidate by Way operation.
+-
+ config ARM_ERRATA_743622
+ 	bool "ARM errata: Faulty hazard checking in the Store Buffer may lead to data corruption"
+ 	depends on CPU_V7
+@@ -1286,21 +1262,6 @@ config ARM_ERRATA_751472
+ 	  operation is received by a CPU before the ICIALLUIS has completed,
+ 	  potentially leading to corrupted entries in the cache or TLB.
  
- static const struct l2c_init_data of_l2c210_data __initconst = {
- 	.type = "L2C-210",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
- 	.of_parse = l2x0_of_parse,
- 	.enable = l2c_enable,
-@@ -838,6 +843,7 @@ static const struct l2c_init_data of_l2c210_data __initconst = {
+-config PL310_ERRATA_753970
+-	bool "PL310 errata: cache sync operation may be faulty"
+-	depends on CACHE_PL310
+-	help
+-	  This option enables the workaround for the 753970 PL310 (r3p0) erratum.
+-
+-	  Under some condition the effect of cache sync operation on
+-	  the store buffer still remains when the operation completes.
+-	  This means that the store buffer is always asked to drain and
+-	  this prevents it from merging any further writes. The workaround
+-	  is to replace the normal offset of cache sync operation (0x730)
+-	  by another offset targeting an unmapped PL310 register 0x740.
+-	  This has the same effect as the cache sync operation: store buffer
+-	  drain and waiting for all buffers empty.
+-
+ config ARM_ERRATA_754322
+ 	bool "ARM errata: possible faulty MMU translations following an ASID switch"
+ 	depends on CPU_V7
+@@ -1349,18 +1310,6 @@ config ARM_ERRATA_764369
+ 	  relevant cache maintenance functions and sets a specific bit
+ 	  in the diagnostic control register of the SCU.
  
- static const struct l2c_init_data of_l2c220_data __initconst = {
- 	.type = "L2C-220",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
- 	.of_parse = l2x0_of_parse,
- 	.enable = l2c_enable,
-@@ -888,6 +894,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
+-config PL310_ERRATA_769419
+-	bool "PL310 errata: no automatic Store Buffer drain"
+-	depends on CACHE_L2X0
+-	help
+-	  On revisions of the PL310 prior to r3p2, the Store Buffer does
+-	  not automatically drain. This can cause normal, non-cacheable
+-	  writes to be retained when the memory system is idle, leading
+-	  to suboptimal I/O performance for drivers using coherent DMA.
+-	  This option adds a write barrier to the cpu_idle loop so that,
+-	  on systems with an outer cache, the store buffer is drained
+-	  explicitly.
+-
+ config ARM_ERRATA_775420
+        bool "ARM errata: A data cache maintenance operation which aborts, might lead to deadlock"
+        depends on CPU_V7
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 1f8fed94c2a4..0e37c36e988e 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -898,6 +898,57 @@ config CACHE_PL310
+ 	  This option enables optimisations for the PL310 cache
+ 	  controller.
  
- static const struct l2c_init_data of_l2c310_data __initconst = {
- 	.type = "L2C-310",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 8,
- 	.of_parse = l2c310_of_parse,
- 	.enable = l2c_enable,
-@@ -1067,6 +1074,7 @@ static void __init aurora_of_parse(const struct device_node *np,
- 
- static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
- 	.type = "Aurora",
-+	.way_size_0 = SZ_4K,
- 	.num_lock = 4,
- 	.of_parse = aurora_of_parse,
- 	.enable = l2c_enable,
-@@ -1085,6 +1093,7 @@ static const struct l2c_init_data of_aurora_with_outer_data __initconst = {
- 
- static const struct l2c_init_data of_aurora_no_outer_data __initconst = {
- 	.type = "Aurora",
-+	.way_size_0 = SZ_4K,
- 	.num_lock = 4,
- 	.of_parse = aurora_of_parse,
- 	.enable = aurora_enable_no_outer,
-@@ -1234,6 +1243,7 @@ static void bcm_flush_range(unsigned long start, unsigned long end)
- /* Broadcom L2C-310 start from ARMs R3P2 or later, and require no fixups */
- static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
- 	.type = "BCM-L2C-310",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 8,
- 	.of_parse = l2c310_of_parse,
- 	.enable = l2c_enable,
-@@ -1273,6 +1283,7 @@ static void tauros3_resume(void)
- 
- static const struct l2c_init_data of_tauros3_data __initconst = {
- 	.type = "Tauros3",
-+	.way_size_0 = SZ_8K,
- 	.num_lock = 8,
- 	.enable = l2c_enable,
- 	.save  = tauros3_save,
++config PL310_ERRATA_588369
++	bool "PL310 errata: Clean & Invalidate maintenance operations do not invalidate clean lines"
++	depends on CACHE_L2X0
++	help
++	   The PL310 L2 cache controller implements three types of Clean &
++	   Invalidate maintenance operations: by Physical Address
++	   (offset 0x7F0), by Index/Way (0x7F8) and by Way (0x7FC).
++	   They are architecturally defined to behave as the execution of a
++	   clean operation followed immediately by an invalidate operation,
++	   both performing to the same memory location. This functionality
++	   is not correctly implemented in PL310 as clean lines are not
++	   invalidated as a result of these operations.
++
++config PL310_ERRATA_727915
++	bool "PL310 errata: Background Clean & Invalidate by Way operation can cause data corruption"
++	depends on CACHE_L2X0
++	help
++	  PL310 implements the Clean & Invalidate by Way L2 cache maintenance
++	  operation (offset 0x7FC). This operation runs in background so that
++	  PL310 can handle normal accesses while it is in progress. Under very
++	  rare circumstances, due to this erratum, write data can be lost when
++	  PL310 treats a cacheable write transaction during a Clean &
++	  Invalidate by Way operation.
++
++config PL310_ERRATA_753970
++	bool "PL310 errata: cache sync operation may be faulty"
++	depends on CACHE_PL310
++	help
++	  This option enables the workaround for the 753970 PL310 (r3p0) erratum.
++
++	  Under some condition the effect of cache sync operation on
++	  the store buffer still remains when the operation completes.
++	  This means that the store buffer is always asked to drain and
++	  this prevents it from merging any further writes. The workaround
++	  is to replace the normal offset of cache sync operation (0x730)
++	  by another offset targeting an unmapped PL310 register 0x740.
++	  This has the same effect as the cache sync operation: store buffer
++	  drain and waiting for all buffers empty.
++
++config PL310_ERRATA_769419
++	bool "PL310 errata: no automatic Store Buffer drain"
++	depends on CACHE_L2X0
++	help
++	  On revisions of the PL310 prior to r3p2, the Store Buffer does
++	  not automatically drain. This can cause normal, non-cacheable
++	  writes to be retained when the memory system is idle, leading
++	  to suboptimal I/O performance for drivers using coherent DMA.
++	  This option adds a write barrier to the cpu_idle loop so that,
++	  on systems with an outer cache, the store buffer is drained
++	  explicitly.
++
+ config CACHE_TAUROS2
+ 	bool "Enable the Tauros2 L2 cache controller"
+ 	depends on (ARCH_DOVE || ARCH_MMP || CPU_PJ4)
 -- 
 1.8.3.1
