@@ -1,63 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 28 Mar 2014 17:44:17 +0100
-Subject: [PATCH RFC v3 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <20140327144712.GW17250@pengutronix.de>
-References: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
- <46532903.ghnH4Us8Zz@avalon> <20140327144712.GW17250@pengutronix.de>
-Message-ID: <2134974.m5sRReBBJh@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Mar 2014 17:44:42 +0100
+Subject: __pv_phys_offset, inline assembly functions, and such like
+In-Reply-To: <20140328152831.GK7528@n2100.arm.linux.org.uk>
+References: <20140328152831.GK7528@n2100.arm.linux.org.uk>
+Message-ID: <31244110.z9r85lquQQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Thursday 27 March 2014 15:47:12 Sascha Hauer wrote:
-> On Thu, Mar 27, 2014 at 03:08:10PM +0100, Laurent Pinchart wrote:
-
-[snip]
-
-> > That's clearer indeed. Can the parents and rates depend on the board, or
-> > on the SoC only ? We might be getting dangerously close to specifying
-> > platform configuration instead of describing the hardware. A real example
-> > might be nice to support the discussion.
+On Friday 28 March 2014 15:28:32 Russell King - ARM Linux wrote:
 > 
-> This patch comes just at the right time. This is what I do with it:
+> The second problem is virt_to_page() itself.  Let's look at what that
+> involves:
 > 
-> #define cko1_sel 57
-> #define pll4_audio_div 203
-> #define pll4_audio 173
-> #define ssi3_sel 47
+> #define virt_to_page(kaddr)     pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 > 
-> &clks {
-> 	assigned-clocks {
-> 		clocks = <&clks cko1_sel>, <&clks ssi3_sel>, <&clks pll4_audio>;
-> 		clock-parents = <&clks pll4_audio_div>, <&clks pll4_audio_div>, <0>;
-> 		clock-rates = <0>, <0>, <786432000>;
-> 	};
-> };
+> For flatmem (which is single-zImage's only supported memory model):
+
+A side note on this: I don't think there is a strong reason why we
+can't also support sparsemem in multiplatform. I believe we have
+so far avoided it because nobody really needed it to be in multiplatform,
+and because the mach-realview Kconfig doesn't allow it in combination
+with ARM_PATCH_PHYS_VIRT.
+
+I would probably suggest changing two things here:
+a) allow sparsemem with multiplatform, for more efficient support
+   of some platforms
+b) change mach-realview to decouple sparsemem from the custom
+   __virt_to_phys implementation, at the same time as getting
+   realview ready for multiplatform.
+
+I don't think any of these will fundamentally change your analysis,
+but I thought it might help to mention this in case you see other
+problems with sparsemem enabled.
+
+> With the inline assembly eliminated from the macro, and __pv_phys_offset
+> converted to a PFN offset instead, the above assembly code shrinks
+> dramatically:
 > 
-> cko1_sel is a clock that can be routed out of the SoC. In my case it is
-> connected the sysclk of an external Audio Codec. ssi3_sel drives my SoC
-> internal I2S unit which I use in master mode. The above makes sure that
-> the I2S unit and the the external codec both get their clock from the
-> audio PLL. The audio PLL is configured to a rate of 786432000Hz which
-> is an exact multiple of the desired audio clock.
+>      a20:       e59331d4        ldr     r3, [r3, #468]  ; get_dma_ops
+>      a24:       e3001000        movw    r1, #0
+>                         a24: R_ARM_MOVW_ABS_NC  arm_dma_ops
+>      a28:       e3401000        movt    r1, #0		; &arm_dma_ops
+>                         a28: R_ARM_MOVT_ABS     arm_dma_ops
+>      a2c:       e3530000        cmp     r3, #0		; get_dma_ops
+>      a30:       01a03001        moveq   r3, r1		; get_dma_ops
+>      a34:       e28a1101        add     r1, sl, #1073741824 ; r1 = addr - PAGE_OFFSET
+>      a38:       e3002000        movw    r2, #0
+>                         a38: R_ARM_MOVW_ABS_NC  mem_map
+>      a3c:       e3402000        movt    r2, #0		; r2 = &mem_map
+>                         a3c: R_ARM_MOVT_ABS     mem_map
+>      a40:       e3a0e001        mov     lr, #1		; direction
+>      a44:       e1a01621        lsr     r1, r1, #12	; r1 = (addr - PAGE_OFFSET) >> 12 (pfn offset)
+>      a48:       e592c000        ldr     ip, [r2]	; ip = &mem_map[0]
+>      a4c:       e1a02a0a        lsl     r2, sl, #20	; r2 = part converted offset into page
+>      a50:       e58de000        str     lr, [sp]	; stack direction
+>      a54:       e3a0a000        mov     sl, #0		; attr
+>      a58:       e08c1281        add     r1, ip, r1, lsl #5 ; r1 = &mem_map[(addr - PAGE_OFFSET) >> 12]
+>      a5c:       e58da004        str     sl, [sp, #4]	; stack attr
+>      a60:       e1a02a22        lsr     r2, r2, #20	; r2 = offset
+>      a64:       e593c010        ldr     ip, [r3, #16]	; ops->map_page
+>      a68:       e1a03006        mov     r3, r6		; length
+>      a6c:       e12fff3c        blx     ip		; call map_page
+> 
+> With this in place, I see a reduction of 4220 bytes in the kernel image,
+> and that's from just fixing virt_to_page() and changing __pv_phys_offset
+> to be PFN-based (so it can be 32-bit in all cases.)
 
-Thank you for the example.
+Ah, nice. Another idea: have you considered making the entire function extern?
+The only advantage I see in the inline version is saving one function call,
+but even with your new version there seems to be a noticeable size overhead.
 
-Are the cko1_sel and ssi3_sel used only by the external audio codec and 
-internal I2S unit respectively ? If so, it might make sense to move the 
-configuration of their parent to the audio codec and I2S unit DT nodes. 
-However, grouping the parent configuration and the pll4 rate configuration in 
-a single place makes sense as well. Guidelines are probably needed.
-
-I get a slight feeling of uneasiness about this, probably because we're at the 
-boundary between hardware description and system configuration. Encoding in DT 
-that "for this particular board this particular clock must be configured this 
-particular way" sounds fine to me, but we need to make sure it won't turn to 
-software-driven rather than hardware-driven use case descriptions.
-
--- 
-Regards,
-
-Laurent Pinchart
+	Arnd
