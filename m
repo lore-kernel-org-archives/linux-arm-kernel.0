@@ -1,60 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Mar 2014 18:39:06 +0100
-Subject: __pv_phys_offset, inline assembly functions, and such like
-In-Reply-To: <20140328165642.GN7528@n2100.arm.linux.org.uk>
-References: <20140328152831.GK7528@n2100.arm.linux.org.uk>
- <31244110.z9r85lquQQ@wuerfel> <20140328165642.GN7528@n2100.arm.linux.org.uk>
-Message-ID: <4250082.rr7b7UU4r6@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 28 Mar 2014 18:42:16 +0100
+Subject: [PATCH 00/10] SMP support for Armada 375 and 38x
+In-Reply-To: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140328174216.GD22339@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 March 2014 16:56:43 Russell King - ARM Linux wrote:
-> On Fri, Mar 28, 2014 at 05:44:42PM +0100, Arnd Bergmann wrote:
-> > On Friday 28 March 2014 15:28:32 Russell King - ARM Linux wrote:
-> > > With the inline assembly eliminated from the macro, and __pv_phys_offset
-> > > converted to a PFN offset instead, the above assembly code shrinks
-> > > dramatically:
-> > > 
-> > >      a20:       e59331d4        ldr     r3, [r3, #468]  ; get_dma_ops
-> > >      a24:       e3001000        movw    r1, #0
-> > >                         a24: R_ARM_MOVW_ABS_NC  arm_dma_ops
-> > >      a28:       e3401000        movt    r1, #0              ; &arm_dma_ops
-> > >                         a28: R_ARM_MOVT_ABS     arm_dma_ops
-> > >      a2c:       e3530000        cmp     r3, #0              ; get_dma_ops
-> > >      a30:       01a03001        moveq   r3, r1              ; get_dma_ops
-> > >      a34:       e28a1101        add     r1, sl, #1073741824 ; r1 = addr - PAGE_OFFSET
-> > >      a38:       e3002000        movw    r2, #0
-> > >                         a38: R_ARM_MOVW_ABS_NC  mem_map
-> > >      a3c:       e3402000        movt    r2, #0              ; r2 = &mem_map
-> > >                         a3c: R_ARM_MOVT_ABS     mem_map
-> > >      a40:       e3a0e001        mov     lr, #1              ; direction
-> > >      a44:       e1a01621        lsr     r1, r1, #12 ; r1 = (addr - PAGE_OFFSET) >> 12 (pfn offset)
-> > >      a48:       e592c000        ldr     ip, [r2]    ; ip = &mem_map[0]
-> > >      a4c:       e1a02a0a        lsl     r2, sl, #20 ; r2 = part converted offset into page
-> > >      a50:       e58de000        str     lr, [sp]    ; stack direction
-> > >      a54:       e3a0a000        mov     sl, #0              ; attr
-> > >      a58:       e08c1281        add     r1, ip, r1, lsl #5 ; r1 = &mem_map[(addr - PAGE_OFFSET) >> 12]
-> > >      a5c:       e58da004        str     sl, [sp, #4]        ; stack attr
-> > >      a60:       e1a02a22        lsr     r2, r2, #20 ; r2 = offset
-> > >      a64:       e593c010        ldr     ip, [r3, #16]       ; ops->map_page
-> > >      a68:       e1a03006        mov     r3, r6              ; length
-> > >      a6c:       e12fff3c        blx     ip          ; call map_page
-> > > 
-> > > With this in place, I see a reduction of 4220 bytes in the kernel image,
-> > > and that's from just fixing virt_to_page() and changing __pv_phys_offset
-> > > to be PFN-based (so it can be 32-bit in all cases.)
-> > 
-> > Ah, nice. Another idea: have you considered making the entire function extern?
-> > The only advantage I see in the inline version is saving one function call,
-> > but even with your new version there seems to be a noticeable size overhead.
+On Fri, Mar 28, 2014 at 02:06:56PM +0100, Thomas Petazzoni wrote:
+> Jason, Andrew, Gregory, Sebastian,
 > 
-> The contribution above from virt_to_page() is just six instructions,
-> compared to 19 for the whole of dma_map_single().
+> This patch series adds SMP support for the Armada 375 and 38x. Most of
+> the patches are fairly straight-forward, but here is a short overview
+> of what's going on:
 > 
-> So, there's much more advantage to killing the inline functions in
-> include/asm-generic/dma-mapping.h, and moving them out of line.  That's
-> where much of the above assembly is coming from.
+>  * Patches 1, 2, 3 make some preparatory clean-ups. Actually, patches
+>    2 and 3 are not directly related to adding Armada 375 and 38x SMP
+>    support, but they are related to the SMP support of Armada XP.
+> 
+>  * Patches 4, 5 and 6 add a few bits needed for the SMP support.
+> 
+>  * Patch 7 is adding the SMP support itself. Since both Armada 375 and
+>    38x are Cortex-A9, their SMP logic is fairly similar, the only
+>    difference being how to define the boot address of the secondary
+>    CPU. Therefore, we've used a single smp_operations implementation.
+> 
+>  * Patch 8 add a workaround for a SMP booting bug affecting Armada 375
+>    Z1 stepping. It requires using the Crypto SRAM loaded with a few
+>    instructions of code as a replacement of the BootROM for booting
+>    the secondary processor. For now, the workaround is unconditionally
+>    applied on all Armada 375 platforms, but as soon as we get access
+>    to more recent platforms, we'll add a mvebu-soc-id based test to
+>    only enable the workaround if needed.
+> 
+>  * Patch 9 and 10 add the necessary Device Tree bits to enable SMP on
+>    Armada 375 and 38x.
 
-Yes, that's what I meant.
+Not my area of expertise, but it all looks O.K. The only comment,
+which i suspect Jason will say sometime soon, is that it would be nice
+if the workaround was triggered on the stepping, i.e. the same comment
+he made before for another similar workaround.
 
-	Arnd
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
