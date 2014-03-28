@@ -1,40 +1,87 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Fri, 28 Mar 2014 20:13:05 +0200
-Subject: [GIT PULL] ARM: kprobes: big-endian support
-In-Reply-To: <20140328112841.GF7528@n2100.arm.linux.org.uk>
-References: <52D3D784.2000600@linaro.org> <53053769.5090100@linaro.org>
- <5332AB5A.90109@linaro.org> <20140328112841.GF7528@n2100.arm.linux.org.uk>
-Message-ID: <5335BBB1.60402@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Mar 2014 11:13:21 -0700
+Subject: [PATCH 07/10] ARM: mvebu: add SMP support for Armada 375 and
+ Armada 38x
+In-Reply-To: <1396012026-5997-8-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1396012026-5997-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5335BBC1.6090804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2014 01:28 PM, Russell King - ARM Linux wrote:
-> On Wed, Mar 26, 2014 at 12:26:34PM +0200, Taras Kondratiuk wrote:
->> On 02/20/2014 12:59 AM, Taras Kondratiuk wrote:
->>
->> Hi Russell,
->>
->> Is there any issue with this pull request?
->> Should I do something to get it pulled?
-> 
-> There's nothing wrong, apart from me being far too busy hacking on really
-> crap code to care about reading much email - which means that lots of
-> email simply just gets buried and lost.
-> 
-> There is now a problem with this pull - it conflicts very badly with Dave
-> Long's uprobes code, which I've already pulled, so much so that I'm not
-> happy to do the conflict resolution since I know nothing about this code,
-> and it's a feature I don't make any use of.
+On 03/28/14 06:07, Thomas Petazzoni wrote:
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 8634222..e88d951 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -45,6 +45,8 @@ config MACH_ARMADA_375
+>  	select ARMADA_375_CLK
+>  	select CPU_V7
+>  	select HAVE_ARM_SCU
+> +	select HAVE_ARM_TWD
 
-I've rebased it onto your for-next branch. Kprobes are functional
-in LE and BE. I'll send an updated pull request after verifying uprobes.
+This should have "if SMP" appended to it (same for HAVE_ARM_SCU).
 
-> I notice that Dave Long and yourself are both under the Linaro umbrella,
-> but there seems to be no coordination between yourselves, despite working
-> on the same code...
+>
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 6260cb8..9ded4b9 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -146,6 +146,7 @@ static const char * const armada_375_dt_compat[] = {
+>  };
+>  
+>  DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
+> +	.smp		= smp_ops(mvebu_cortex_a9_smp_ops),
+>  	.init_time	= mvebu_timer_and_clk_init,
+>  	.restart	= mvebu_restart,
+>  	.dt_compat	= armada_375_dt_compat,
+> @@ -158,6 +159,7 @@ static const char * const armada_38x_dt_compat[] = {
+>  };
+>  
+>  DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
+> +	.smp		= smp_ops(mvebu_cortex_a9_smp_ops),
+>  	.init_time	= mvebu_timer_and_clk_init,
+>  	.restart	= mvebu_restart,
+>  	.dt_compat	= armada_38x_dt_compat,
 
-Yeah, we are working in different teams and unfortunately haven't coordinated
-an upstreaming sequence.
+You may want to look into using the enable-method property in devicetree
+so that you don't have to set the smp ops here. The patch to support
+that is sitting in -next as 6c3ff8b11a16 (ARM: Introduce
+CPU_METHOD_OF_DECLARE() for cpu hotplug/smp, 2013-10-30).
+
+> diff --git a/arch/arm/mach-mvebu/headsmp-a9.S b/arch/arm/mach-mvebu/headsmp-a9.S
+> new file mode 100644
+> index 0000000..78e66c9
+> --- /dev/null
+> +++ b/arch/arm/mach-mvebu/headsmp-a9.S
+> @@ -0,0 +1,22 @@
+> +/*
+> + * SMP support: Entry point for secondary CPUs of Marvell EBU
+> + * Cortex-A9 based SOCs (Armada 375 and Armada 38x).
+> + *
+> + * Copyright (C) 2014 Marvell
+> + *
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <linux/init.h>
+> +
+> +	__CPUINIT
+
+__CPUINIT is dead. Don't use it.
+
+> +ENTRY(mvebu_cortex_a9_secondary_startup)
+> +	bl      v7_invalidate_l1
+> +	b	secondary_startup
+> +ENDPROC(mvebu_cortex_a9_secondary_startup)
+>
 
 -- 
-Taras Kondratiuk
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
