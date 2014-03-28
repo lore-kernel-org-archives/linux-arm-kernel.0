@@ -1,118 +1,64 @@
-From: keescook@google.com (Kees Cook)
-Date: Fri, 28 Mar 2014 11:45:41 -0700
-Subject: [PATCH v4] ARM: mm: fix reporting of read-only PMD bits
-In-Reply-To: <20140323042050.GA15181@www.outflux.net>
-References: <20140323042050.GA15181@www.outflux.net>
-Message-ID: <CAGXu5j+GokV1MKv4Otb0AGt4Xvm8WXMLaOvGUUX+BJpo7Myg9g@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 28 Mar 2014 13:50:00 -0500
+Subject: [PATCH 00/44] outer cache changes
+In-Reply-To: <20140317001302.GY21483@n2100.arm.linux.org.uk>
+References: <20140317001302.GY21483@n2100.arm.linux.org.uk>
+Message-ID: <5335C458.8070202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 22, 2014 at 9:20 PM, Kees Cook <keescook@chromium.org> wrote:
-> On non-LPAE ARMv6+, read-only PMD bits are defined with the combination
-> "PMD_SECT_APX | PMD_SECT_AP_WRITE". Adjusted the bit masks to correctly
-> report this.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
-> v4:
->  - clean up defines for CPU versions; Rob Herring.
-> v3:
->  - check for pre-v6 CPUs on the page table report.
-> v2:
->  - reorder bits, suggested by Olof.
+On 03/16/2014 07:13 PM, Russell King - ARM Linux wrote:
+> This patch series is where I'm currently at with the total mess which
+> is L2 cache support.  That's putting it mildly.  This isn't intended
+> for anyone to pick up - this is still mostly in development.
 
-Can anyone give this a test or ack? I've done build tests for all CPU
-combinations, and runtime tests on v6 and LPAE.
-
-Thanks!
-
--Kees
-
-> ---
->  arch/arm/mm/dump.c |   47 ++++++++++++++++++++++++++++++++---------------
->  1 file changed, 32 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-> index ef69152f9b52..c508f41a43bc 100644
-> --- a/arch/arm/mm/dump.c
-> +++ b/arch/arm/mm/dump.c
-> @@ -120,34 +120,51 @@ static const struct prot_bits pte_bits[] = {
->  };
->
->  static const struct prot_bits section_bits[] = {
-> -#ifndef CONFIG_ARM_LPAE
-> -       /* These are approximate */
-> +#ifdef CONFIG_ARM_LPAE
-> +       {
-> +               .mask   = PMD_SECT_USER,
-> +               .val    = PMD_SECT_USER,
-> +               .set    = "USR",
-> +       }, {
-> +               .mask   = PMD_SECT_RDONLY,
-> +               .val    = PMD_SECT_RDONLY,
-> +               .set    = "ro",
-> +               .clear  = "RW",
-> +#elif __LINUX_ARM_ARCH__ >= 6
->         {
-> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> -               .val    = 0,
-> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .val    = PMD_SECT_APX | PMD_SECT_AP_WRITE,
->                 .set    = "    ro",
->         }, {
-> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->                 .val    = PMD_SECT_AP_WRITE,
->                 .set    = "    RW",
->         }, {
-> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->                 .val    = PMD_SECT_AP_READ,
->                 .set    = "USR ro",
->         }, {
-> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->                 .val    = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
->                 .set    = "USR RW",
-> -#else
-> +#else /* ARMv4/ARMv5  */
-> +       /* These are approximate */
->         {
-> -               .mask   = PMD_SECT_USER,
-> -               .val    = PMD_SECT_USER,
-> -               .set    = "USR",
-> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .val    = 0,
-> +               .set    = "    ro",
->         }, {
-> -               .mask   = PMD_SECT_RDONLY,
-> -               .val    = PMD_SECT_RDONLY,
-> -               .set    = "ro",
-> -               .clear  = "RW",
-> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .val    = PMD_SECT_AP_WRITE,
-> +               .set    = "    RW",
-> +       }, {
-> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .val    = PMD_SECT_AP_READ,
-> +               .set    = "USR ro",
-> +       }, {
-> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .val    = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-> +               .set    = "USR RW",
->  #endif
->         }, {
->                 .mask   = PMD_SECT_XN,
-> --
-> 1.7.9.5
->
->
-> --
-> Kees Cook
-> Chrome OS Security
+Quick boot test against v3.14-rc8 showed no regressions for the
+platforms I ran through - ofcourse, the tests are basic boot, and
+unfortunately not any comprehensive cache performance tests.
 
 
+russell-l2c-fc0adeb-v3.14-rc8-test-omap2plus_defconfig
+ 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s20BepYQRE
+ 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2UN5rONP3
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s24AcPGSZL
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2IArYgC7S
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s20JBi80c7
+ 6: BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s21KDOKenY
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2lXBwgynB
+ 8: beaglebone:  Boot PASS: http://slexy.org/raw/s2KzNGNIBt
+ 9: OMAP3430-Labrador(LDP):  Boot FAIL: http://slexy.org/raw/s21ekHLEY5
+(legacy problem - fix in linux-next)
+10: pandaboard-es:  Boot PASS: http://slexy.org/raw/s20dKIf8sa
+11:    sdp2430:  Boot PASS: http://slexy.org/raw/s20jxn1zA5
+12:    sdp3430:  Boot PASS: http://slexy.org/raw/s21m0nx262
+13:    sdp4430:  Boot PASS: http://slexy.org/raw/s21IxkfYTm
+14: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s20AKR1hRy
+TOTAL = 14 boards, Booted Boards = 13, No Boot boards = 1
+
+Vs:
+
+v3.14-rc8-omap2plus_defconfig
+ 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s21CKn6A7h
+ 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s20eC7gQ9T
+ 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s20amKvVx5
+ 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2yVk3doef
+ 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s22SsOWHaY
+ 6: BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s21TDD4jhW
+ 7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s20ltoXaiZ
+ 8: beaglebone:  Boot PASS: http://slexy.org/raw/s2DkrTbwG3
+ 9: OMAP3430-Labrador(LDP):  Boot FAIL: http://slexy.org/raw/s2JDOKtx9U
+(legacy problem - fix in linux-next)
+10: pandaboard-es:  Boot PASS: http://slexy.org/raw/s21WGaaGut
+11:    sdp2430:  Boot PASS: http://slexy.org/raw/s2Nr9p1Zyf
+12:    sdp3430:  Boot PASS: http://slexy.org/raw/s2kh0cfpGC
+13:    sdp4430:  Boot PASS: http://slexy.org/raw/s2Q6VyjmyW
+14: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s216EEpDwU
+TOTAL = 14 boards, Booted Boards = 13, No Boot boards = 1
+
+
+Please feel to add:
+Tested-by: Nishanth Menon <nm@ti.com>
 
 -- 
-Kees Cook
-Chrome OS Security
+Regards,
+Nishanth Menon
