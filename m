@@ -1,95 +1,25 @@
 From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Fri, 28 Mar 2014 18:59:02 +0100
-Subject: [RFC PATCH v2 04/10] ARM: at91: enclose at91_aic_xx calls in
- IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks
+Date: Fri, 28 Mar 2014 18:59:04 +0100
+Subject: [RFC PATCH v2 06/10] irqchip: atmel-aic: move binding doc to
+ interrupt-controller directory
 In-Reply-To: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
 References: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
-Message-ID: <1396029548-10928-5-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1396029548-10928-7-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enclose at91_aic_xx calls in IS_ENABLED(CONFIG_OLD_IRQ_AT91) blocks in
-order to prepare the migration to the new AIC driver.
-
-In the new AIC driver the suspend/resume functions are called by the
-generic irq framework and are no longer needed in the PM specific code.
-
-Moreover, the new AIC driver no longer exposes the at91_aic_base variable
-which is used by the at91_aic_read functions.
+Move atmel aic driver doc to the interrupt-controller directory as the new
+driver now lays in drivers/irqchip/atmel-aic.c.
 
 Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
 ---
- arch/arm/mach-at91/pm.c    |   32 ++++++++++++++++++++------------
- arch/arm/mach-at91/setup.c |    3 ++-
- 2 files changed, 22 insertions(+), 13 deletions(-)
+ .../atmel,aic.txt}                                 |    0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/atmel-aic.txt => interrupt-controller/atmel,aic.txt} (100%)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 590b52d..b9f4c5c 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -204,16 +204,19 @@ static int at91_pm_enter(suspend_state_t state)
- 		at91_pinctrl_gpio_suspend();
- 	else
- 		at91_gpio_suspend();
--	at91_irq_suspend();
- 
--	pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
--			/* remember all the always-wake irqs */
--			(at91_pmc_read(AT91_PMC_PCSR)
--					| (1 << AT91_ID_FIQ)
--					| (1 << AT91_ID_SYS)
--					| (at91_get_extern_irq()))
--				& at91_aic_read(AT91_AIC_IMR),
--			state);
-+	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91) && at91_aic_base) {
-+		at91_irq_suspend();
-+
-+		pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
-+				/* remember all the always-wake irqs */
-+				(at91_pmc_read(AT91_PMC_PCSR)
-+						| (1 << AT91_ID_FIQ)
-+						| (1 << AT91_ID_SYS)
-+						| (at91_get_extern_irq()))
-+					& at91_aic_read(AT91_AIC_IMR),
-+				state);
-+	}
- 
- 	switch (state) {
- 		/*
-@@ -278,12 +281,17 @@ static int at91_pm_enter(suspend_state_t state)
- 			goto error;
- 	}
- 
--	pr_debug("AT91: PM - wakeup %08x\n",
--			at91_aic_read(AT91_AIC_IPR) & at91_aic_read(AT91_AIC_IMR));
-+	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91) && at91_aic_base)
-+		pr_debug("AT91: PM - wakeup %08x\n",
-+			 at91_aic_read(AT91_AIC_IPR) &
-+			 at91_aic_read(AT91_AIC_IMR));
- 
- error:
- 	target_state = PM_SUSPEND_ON;
--	at91_irq_resume();
-+
-+	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91) && at91_aic_base)
-+		at91_irq_resume();
-+
- 	if (of_have_populated_dt())
- 		at91_pinctrl_gpio_resume();
- 	else
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index f7ca97b..1d8a6c8 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -49,7 +49,8 @@ void __init at91_init_irq_default(void)
- void __init at91_init_interrupts(unsigned int *priority)
- {
- 	/* Initialize the AIC interrupt controller */
--	at91_aic_init(priority, at91_boot_soc.extern_irq);
-+	if (IS_ENABLED(CONFIG_OLD_IRQ_AT91))
-+		at91_aic_init(priority, at91_boot_soc.extern_irq);
- 
- 	/* Enable GPIO interrupts */
- 	at91_gpio_irq_setup();
+diff --git a/Documentation/devicetree/bindings/arm/atmel-aic.txt b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/atmel-aic.txt
+rename to Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
 -- 
 1.7.9.5
