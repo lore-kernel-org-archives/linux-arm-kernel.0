@@ -1,73 +1,176 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Mar 2014 17:44:42 +0100
-Subject: __pv_phys_offset, inline assembly functions, and such like
-In-Reply-To: <20140328152831.GK7528@n2100.arm.linux.org.uk>
-References: <20140328152831.GK7528@n2100.arm.linux.org.uk>
-Message-ID: <31244110.z9r85lquQQ@wuerfel>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 28 Mar 2014 17:49:16 +0100
+Subject: [PATCH RFC v3 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <53343D9C.6040605@samsung.com>
+References: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
+ <46532903.ghnH4Us8Zz@avalon> <53343D9C.6040605@samsung.com>
+Message-ID: <5456863.skuFAcRA98@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 March 2014 15:28:32 Russell King - ARM Linux wrote:
+Hi Sylwester,
+
+On Thursday 27 March 2014 16:02:52 Sylwester Nawrocki wrote:
+> On 27/03/14 15:08, Laurent Pinchart wrote:
+> > On Thursday 27 March 2014 14:57:56 Sylwester Nawrocki wrote:
+> >> On 27/03/14 14:24, Laurent Pinchart wrote:
+> >>> On Thursday 27 March 2014 13:16:19 Sylwester Nawrocki wrote:
+> >>>> This function adds a helper function to configure clock parents and
+> >>>> rates as specified in clock-parents, clock-rates DT properties for a
+> >>>> consumer device and a call to it before driver is bound to a device.
+> >>>> 
+> >>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >>>> ---
+> >> 
+> >> [...]
+> >> 
+> >>>>  .../devicetree/bindings/clock/clock-bindings.txt   |   26 ++++++
+> >>>>  drivers/base/dd.c                                  |    7 ++
+> >>>>  drivers/clk/Makefile                               |    1 +
+> >>>>  drivers/clk/clk-conf.c                             |   87 ++++++++++++
+> >>>>  drivers/clk/clk.c                                  |   10 ++-
+> >>>>  include/linux/clk/clk-conf.h                       |   19 +++++
+> >>>>  6 files changed, 149 insertions(+), 1 deletion(-)
+> >>>>  create mode 100644 drivers/clk/clk-conf.c
+> >>>>  create mode 100644 include/linux/clk/clk-conf.h
+> >>>> 
+> >>>> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>> b/Documentation/devicetree/bindings/clock/clock-bindings.txt index
+> >>>> 7c52c29..b452f80 100644
+> >>>> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >>>> @@ -115,3 +115,29 @@ clock signal, and a UART.
+> >>>>    ("pll" and "pll-switched").
+> >>>>  
+> >>>>  * The UART has its baud clock connected the external oscillator and
+> >>>>    its register clock connected to the PLL clock (the "pll-switched"
+> >>>>    signal)
+> >>>> 
+> >>>> +
+> >>>> +==Assigned clock parents and rates==
+> >>>> +
+> >>>> +Some platforms require static initial configuration of parts of the
+> >>>> clocks
+> >>>> +controller. Such a configuration can be specified in a clock consumer
+> >>>> node
+> >>>> +through clock-parents and clock-rates DT properties. The former should
+> >>>> contain
+> >>>> +a list of parent clocks in form of phandle and clock specifier pairs,
+> >>>> the
+> >>>> +latter the list of assigned clock frequency values (one cell each).
+> >>>> +
+> >>>> +    uart at a000 {
+> >>>> +        compatible = "fsl,imx-uart";
+> >>>> +        reg = <0xa000 0x1000>;
+> >>>> +        ...
+> >>>> +        clocks = <&clkcon 0>, <&clkcon 3>;
+> >>>> +        clock-names = "baud", "mux";
+> >>>> +
+> >>>> +        clock-parents = <0>, <&pll 1>;
+> >>>> +        clock-rates = <460800>;
+> >>>> +    };
+> >>>> +
+> >>>> +In this example the pll is set as parent of "mux" clock and frequency
+> >>>> of "baud"
+> >>>> +clock is specified as 460800 Hz.
+> >>> 
+> >>> I'm curious, what should happen when two devices have conflicting
+> >>> requirements ? If a different device required the <&clkcon 3> parent to
+> >>> be set to <&pll 2> for instance, who should win ? Shouldn't a warning be
+> >>> printed ?
+> >> 
+> >> In general, the assumption is that the <&clkcon 3> clock would be used
+> >> only by the uart at a000 device.
+> > 
+> > OK. Removing the problem is a simple way to fix it :-) What about stating
+> > this explicitly in the documentation then ? Maybe by prefixing your
+> > proposed explanation below with something like
+> > 
+> > "Configuring a clock parent and rate through the device node that uses the
+> > clock is only supported for clocks that have a single user."
 > 
-> The second problem is virt_to_page() itself.  Let's look at what that
-> involves:
+> Looks good, we could add it. Or perhaps something like:
 > 
-> #define virt_to_page(kaddr)     pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+> "Configuring a clock parent and rate through the device node that uses the
+>  clock should be only done for clocks that have a single user. If a clock
+>  is shared and conflicting parent or rate configuration is specified in
+>  multiple consumer nodes a resulting configuration is undefined." ?
 > 
-> For flatmem (which is single-zImage's only supported memory model):
+> Not sure if it is acceptable to inject such an unpredictability to the
+> kernel from DT though. Might be more reasonable to go with a clarification
+> as you proposed.
 
-A side note on this: I don't think there is a strong reason why we
-can't also support sparsemem in multiplatform. I believe we have
-so far avoided it because nobody really needed it to be in multiplatform,
-and because the mach-realview Kconfig doesn't allow it in combination
-with ARM_PATCH_PHYS_VIRT.
+I would go further and forbid it.
 
-I would probably suggest changing two things here:
-a) allow sparsemem with multiplatform, for more efficient support
-   of some platforms
-b) change mach-realview to decouple sparsemem from the custom
-   __virt_to_phys implementation, at the same time as getting
-   realview ready for multiplatform.
+"Configuring a clock parent and rate through the device node that uses the
+clock can be done only for clocks that have a single user. Specifying 
+conflicting parent or rate configuration in multiple consumer nodes for a 
+shared clock is forbidden."
 
-I don't think any of these will fundamentally change your analysis,
-but I thought it might help to mention this in case you see other
-problems with sparsemem enabled.
-
-> With the inline assembly eliminated from the macro, and __pv_phys_offset
-> converted to a PFN offset instead, the above assembly code shrinks
-> dramatically:
+> >> If a clock is shared I'd say it shouldn't be put in a multiple consumer
+> >> device nodes. Instead it should be put in a clock provider node, as I was
+> >> trying to explain in the sentence below.
+> >> 
+> >> A warning could be useful, but it could complicate the code. We would
+> >> need, for example, to store information about already configured clocks
+> >> in a list and scan it before actually altering any clock parent or rate.
+> > 
+> > I'm fine with implementing that later if needed, we can keep the initial
+> > implementation simple.
 > 
->      a20:       e59331d4        ldr     r3, [r3, #468]  ; get_dma_ops
->      a24:       e3001000        movw    r1, #0
->                         a24: R_ARM_MOVW_ABS_NC  arm_dma_ops
->      a28:       e3401000        movt    r1, #0		; &arm_dma_ops
->                         a28: R_ARM_MOVT_ABS     arm_dma_ops
->      a2c:       e3530000        cmp     r3, #0		; get_dma_ops
->      a30:       01a03001        moveq   r3, r1		; get_dma_ops
->      a34:       e28a1101        add     r1, sl, #1073741824 ; r1 = addr - PAGE_OFFSET
->      a38:       e3002000        movw    r2, #0
->                         a38: R_ARM_MOVW_ABS_NC  mem_map
->      a3c:       e3402000        movt    r2, #0		; r2 = &mem_map
->                         a3c: R_ARM_MOVT_ABS     mem_map
->      a40:       e3a0e001        mov     lr, #1		; direction
->      a44:       e1a01621        lsr     r1, r1, #12	; r1 = (addr - PAGE_OFFSET) >> 12 (pfn offset)
->      a48:       e592c000        ldr     ip, [r2]	; ip = &mem_map[0]
->      a4c:       e1a02a0a        lsl     r2, sl, #20	; r2 = part converted offset into page
->      a50:       e58de000        str     lr, [sp]	; stack direction
->      a54:       e3a0a000        mov     sl, #0		; attr
->      a58:       e08c1281        add     r1, ip, r1, lsl #5 ; r1 = &mem_map[(addr - PAGE_OFFSET) >> 12]
->      a5c:       e58da004        str     sl, [sp, #4]	; stack attr
->      a60:       e1a02a22        lsr     r2, r2, #20	; r2 = offset
->      a64:       e593c010        ldr     ip, [r3, #16]	; ops->map_page
->      a68:       e1a03006        mov     r3, r6		; length
->      a6c:       e12fff3c        blx     ip		; call map_page
+> OK.
 > 
-> With this in place, I see a reduction of 4220 bytes in the kernel image,
-> and that's from just fixing virt_to_page() and changing __pv_phys_offset
-> to be PFN-based (so it can be 32-bit in all cases.)
+> >>>> +For clocks which are not directly connected to any consumer device
+> >>>> similarly
+> >>>> +clocks, clock-parents and/or clock-rates properties should be
+> >>>> specified in
+> >>>> +assigned-clocks subnode of a clock controller DT node.
+> >>> 
+> >>> It might be that I'm not familiar enough with the clock framework, but
+> >>> this sounds unclear to me. I'm not sure what you mean exactly.
+> >> 
+> >> Sorry about not being precise here, would something like below be more
+> >> clear ?
+> >> 
+> >> "Configuration of common clocks, which affect multiple consumer devices
+> >> can be specified in a dedicated 'assigned-clocks' subnode of a clock
+> >> 
+> >> provider node, e.g.:
+> >>     clkcon {
+> >>         ...
+> >>         #clock-cells = <1>;
+> >>         assigned-clocks {
+> >>             clocks = <&clkcon 16>, <&clkcon 17>;
+> >>             clock-parents = <0>, <&clkcon 1>;
+> >>             clock-rates = <200000>;
+> >>         };
+> >>     };
+> >> "
+> > 
+> > That's clearer indeed. Can the parents and rates depend on the board, or
+> > on the SoC only ? We might be getting dangerously close to specifying
+> > platform configuration instead of describing the hardware. A real example
+> > might be nice to support the discussion.
+> 
+> The clock parent and rates could be board specific, otherwise this API would
+> become much less useful. The configuration often depends on what external
+> devices are attached to an SoC.
+> 
+> I don't have a real life example for the "global" configuration of shared
+> clocks at the moment. I added this after seeing Tero's patches [1], maybe
+> he could talk about some real use cases (just realized I missed to Cc him.
+> fixing this mistake now).
 
-Ah, nice. Another idea: have you considered making the entire function extern?
-The only advantage I see in the inline version is saving one function call,
-but even with your new version there seems to be a noticeable size overhead.
+Sascha has posted a nice example of an assigned-clocks node, let's discuss 
+this in replies to his e-mail.
 
-	Arnd
+> >> Naturally it's this just an RFC, any critics or suggestions are
+> >> welcome.:)
+>
+> [1] http://www.spinics.net/lists/linux-omap/msg103069.html
+
+-- 
+Regards,
+
+Laurent Pinchart
