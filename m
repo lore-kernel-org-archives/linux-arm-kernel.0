@@ -1,94 +1,32 @@
-From: rob.herring@linaro.org (Rob Herring)
-Date: Fri, 28 Mar 2014 08:31:06 -0500
-Subject: [PATCH v3 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <1395955430-26050-4-git-send-email-ashwin.chaugule@linaro.org>
-References: <1395955430-26050-1-git-send-email-ashwin.chaugule@linaro.org>
- <1395955430-26050-4-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <CABGGisyLMhgzN3fHCL2=sZqeSGTqwXPMzn2AZM7ZqZjt8AESQg@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 28 Mar 2014 14:32:36 +0100
+Subject: *READ THIS IF YOUR SOC HAS A L2 CACHE* PL310 auxctrl settings
+In-Reply-To: <20140328130236.GG7528@n2100.arm.linux.org.uk>
+References: <20140314144835.GP21483@n2100.arm.linux.org.uk>
+ <20140316152953.GX21483@n2100.arm.linux.org.uk>
+ <CAL_JsqLDun2VkCFK9Fec6n38bNz2w9mscPdXcGYeLiZtiXkVDg@mail.gmail.com>
+ <20140318112221.GV21483@n2100.arm.linux.org.uk> <5335704F.4090502@st.com>
+ <20140328130236.GG7528@n2100.arm.linux.org.uk>
+Message-ID: <533579F4.2010201@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 4:23 PM, Ashwin Chaugule
-<ashwin.chaugule@linaro.org> wrote:
-> PSCIv0.2 adds a new function called AFFINITY_INFO, which
-> can be used to query if a specified CPU has actually gone
-> offline. Calling this function via cpu_kill ensures that
-> a CPU has quiesced after a call to cpu_die.
->
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
 
-One minor nit, but otherwise:
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On 03/28/2014 02:02 PM, Russell King - ARM Linux wrote:
+> On Fri, Mar 28, 2014 at 01:51:27PM +0100, Maxime Coquelin wrote:
+>> On 03/18/2014 12:22 PM, Russell King - ARM Linux wrote:
+>>> arch/arm/mach-sti/board-dt.c:                           Y  30480000 c0000fff
+>>
+>> For STiH416 SoC, the reset value of the AUX_CTRL register is 0x02000000.
+>> So bits 19:17 = 0, whereas the expected value is bits 19:17 = 4.
+>
+> Which L2 cache is it?  210/220/310 ?
+It is the 310.
 
-> ---
->  arch/arm/kernel/psci_smp.c | 21 +++++++++++++++++++++
->  include/uapi/linux/psci.h  |  5 +++++
->  2 files changed, 26 insertions(+)
->
-> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> index 570a48c..4c1adf9 100644
-> --- a/arch/arm/kernel/psci_smp.c
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -16,6 +16,7 @@
->  #include <linux/init.h>
->  #include <linux/smp.h>
->  #include <linux/of.h>
-> +#include <uapi/linux/psci.h>
->
->  #include <asm/psci.h>
->  #include <asm/smp_plat.h>
-> @@ -66,6 +67,25 @@ void __ref psci_cpu_die(unsigned int cpu)
->         /* We should never return */
->         panic("psci: cpu %d failed to shutdown\n", cpu);
->  }
-> +
-> +int __ref psci_cpu_kill(unsigned int cpu)
-> +{
-> +       int err;
-> +
-> +       if (!psci_ops.affinity_info)
-> +               return 1;
-> +
-> +       err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-> +
-> +       if (err != PSCI_AFFINITY_INFO_RET_OFF) {
-> +               pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
-> +                               cpu, err);
-> +               /* Make platform_cpu_kill() fail. */
-> +               return 0;
-> +       }
-> +       return err;
+Regards,
+Maxime
 
-I think this should just be "return 1;" PSCI_AFFINITY_INFO_RET_OFF
-happens to match, but it's really different meanings.
-
-> +}
-> +
->  #endif
 >
->  bool __init psci_smp_available(void)
-> @@ -78,5 +98,6 @@ struct smp_operations __initdata psci_smp_ops = {
->         .smp_boot_secondary     = psci_boot_secondary,
->  #ifdef CONFIG_HOTPLUG_CPU
->         .cpu_die                = psci_cpu_die,
-> +       .cpu_kill               = psci_cpu_kill,
->  #endif
->  };
-> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-> index c523051..2c177f5 100644
-> --- a/include/uapi/linux/psci.h
-> +++ b/include/uapi/linux/psci.h
-> @@ -37,4 +37,9 @@
->  #define PSCI_RET_EINVAL                        -2
->  #define PSCI_RET_EPERM                 -3
->
-> +/* Return values from the PSCI_ID_AFFINITY_INFO Function. */
-> +#define PSCI_AFFINITY_INFO_RET_ON                      0
-> +#define PSCI_AFFINITY_INFO_RET_OFF                     1
-> +#define PSCI_AFFINITY_INFO_RET_ON_PENDING      2
-> +
->  #endif /* _UAPI_LINUX_PSCI_H */
-> --
-> 1.8.3.2
+> Thanks.
 >
