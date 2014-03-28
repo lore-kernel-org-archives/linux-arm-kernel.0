@@ -1,48 +1,62 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:18:16 +0000
-Subject: [PATCH 45/75] ARM: l2c: highbank: remove explicit SMI call in L2
- cache initialisation
+Date: Fri, 28 Mar 2014 15:18:21 +0000
+Subject: [PATCH 46/75] ARM: l2c: ux500: implement dummy write_sec method
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYXw-0007Ft-Lh@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYY1-0007Fx-PG@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that highbank uses the write_sec method, we don't need to enable
-the L2 cache in SoC specific code; this can be done via the normal
-mechanisms in the L2C code.
-
-Checking with Rob Herring:
-> > Can we kill the "highbank_smc1(0x102, 0x1);" here?	That means
-> > l2x0_of_init() will see the L2 cache disabled, and will try to enable
-> > it via the write_sec hook, so it should do the right thing.
->
-> Yes, that should work. You should be able to just call l2x0_of_init
-> unconditionally. The condition was really to just avoid the smc on
-> Midway which does get handled on h/w, but not if running virtualized.
-
-So also drop the DT check too.  I'm leaving the config check in place
-so that if L2 is disabled, the write_sec hook can be optimised away.
+ux500 can't write to any of the secure registers on the L2C controllers,
+so provide a dummy handler which ignores all writes.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-highbank/highbank.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-ux500/cache-l2x0.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 4712aed3d9f6..245e588859ec 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -68,9 +68,7 @@ static void __init highbank_init_irq(void)
- 		highbank_scu_map_io();
+diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
+index 264f894c0e3d..5cc7e3625d8c 100644
+--- a/arch/arm/mach-ux500/cache-l2x0.c
++++ b/arch/arm/mach-ux500/cache-l2x0.c
+@@ -35,6 +35,14 @@ static int __init ux500_l2x0_unlock(void)
+ 	return 0;
+ }
  
- 	/* Enable PL310 L2 Cache controller */
--	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
--	    of_find_compatible_node(NULL, NULL, "arm,pl310-cache")) {
--		highbank_smc1(0x102, 0x1);
-+	if (IS_ENABLED(CONFIG_CACHE_L2X0)) {
- 		outer_cache.write_sec = highbank_l2c310_write_sec;
- 		l2x0_of_init(0, ~0);
- 	}
++static void ux500_l2c310_write_sec(unsigned long val, unsigned reg)
++{
++	/*
++	 * We can't write to secure registers as we are in non-secure
++	 * mode, until we have some SMI service available.
++	 */
++}
++
+ static int __init ux500_l2x0_init(void)
+ {
+ 	u32 aux_val = 0x3e000000;
+@@ -56,21 +64,14 @@ static int __init ux500_l2x0_init(void)
+ 		/* 64KB way size */
+ 		aux_val |= (0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+ 
++	outer_cache.write_sec = ux500_l2c310_write_sec;
++
+ 	/* 64KB way size, 8 way associativity, force WA */
+ 	if (of_have_populated_dt())
+ 		l2x0_of_init(aux_val, 0xc0000fff);
+ 	else
+ 		l2x0_init(l2x0_base, aux_val, 0xc0000fff);
+ 
+-	/*
+-	 * We can't disable l2 as we are in non secure mode, currently
+-	 * this seems be called only during kexec path. So let's
+-	 * override outer.disable with nasty assignment until we have
+-	 * some SMI service available.
+-	 */
+-	outer_cache.disable = NULL;
+-	outer_cache.set_debug = NULL;
+-
+ 	return 0;
+ }
+ 
 -- 
 1.8.3.1
