@@ -1,39 +1,63 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 28 Mar 2014 17:35:24 +0100
-Subject: [ARM ATTEND] general discussion, DT (fragments?) and TrustZone
-Message-ID: <5335A4CC.2000406@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 28 Mar 2014 17:44:17 +0100
+Subject: [PATCH RFC v3 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <20140327144712.GW17250@pengutronix.de>
+References: <1395922579-28547-1-git-send-email-s.nawrocki@samsung.com>
+ <46532903.ghnH4Us8Zz@avalon> <20140327144712.GW17250@pengutronix.de>
+Message-ID: <2134974.m5sRReBBJh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha,
 
-I am Atmel AT91 Co-Maintainer and would like to attend the ARM Linux
-mini-summit or BoF. I will be attending ELC as well.
+On Thursday 27 March 2014 15:47:12 Sascha Hauer wrote:
+> On Thu, Mar 27, 2014 at 03:08:10PM +0100, Laurent Pinchart wrote:
 
-I'd love to discuss the following topics with you guys:
+[snip]
 
-- current effort toward AT91 DT conversion, where do we stand, what
-  are the future plans and what are the best ways to move
-  old platforms to DT-only
+> > That's clearer indeed. Can the parents and rates depend on the board, or
+> > on the SoC only ? We might be getting dangerously close to specifying
+> > platform configuration instead of describing the hardware. A real example
+> > might be nice to support the discussion.
+> 
+> This patch comes just at the right time. This is what I do with it:
+> 
+> #define cko1_sel 57
+> #define pll4_audio_div 203
+> #define pll4_audio 173
+> #define ssi3_sel 47
+> 
+> &clks {
+> 	assigned-clocks {
+> 		clocks = <&clks cko1_sel>, <&clks ssi3_sel>, <&clks pll4_audio>;
+> 		clock-parents = <&clks pll4_audio_div>, <&clks pll4_audio_div>, <0>;
+> 		clock-rates = <0>, <0>, <786432000>;
+> 	};
+> };
+> 
+> cko1_sel is a clock that can be routed out of the SoC. In my case it is
+> connected the sysclk of an external Audio Codec. ssi3_sel drives my SoC
+> internal I2S unit which I use in master mode. The above makes sure that
+> the I2S unit and the the external codec both get their clock from the
+> audio PLL. The audio PLL is configured to a rate of 786432000Hz which
+> is an exact multiple of the desired audio clock.
 
-- integration of AT91 to ARM multiplatform initiative. Following our
-  adoption of CCF, I would like to summarize what is remaining to be
-  done before integrating the multiplatform single zImage kernel
+Thank you for the example.
 
-- best DT practices for handling little differences in
-  hardware platforms:
-  - subtle HW changes in relation to board revisions
-  - addition of daughter boards, modules, capes, shields
-  - use of DT fragments: status, best practices,
-    location of DT fragments
-  Without a proper mechanism we quickly observe a huge amount
-  of different .dtsi/.dts files popping up!
+Are the cko1_sel and ssi3_sel used only by the external audio codec and 
+internal I2S unit respectively ? If so, it might make sense to move the 
+configuration of their parent to the audio codec and I2S unit DT nodes. 
+However, grouping the parent configuration and the pll4 rate configuration in 
+a single place makes sense as well. Guidelines are probably needed.
 
-- TrustZone and the Linaro Open Source Trusted Execution Environment:
-  how ARM Linux will interact with this initiative and which part of
-  the Linux kernel would implement the calls to the TEE API.
+I get a slight feeling of uneasiness about this, probably because we're at the 
+boundary between hardware description and system configuration. Encoding in DT 
+that "for this particular board this particular clock must be configured this 
+particular way" sounds fine to me, but we need to make sure it won't turn to 
+software-driven rather than hardware-driven use case descriptions.
 
-
-Thanks, bye.
 -- 
-Nicolas Ferre
+Regards,
+
+Laurent Pinchart
