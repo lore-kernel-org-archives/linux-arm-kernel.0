@@ -1,181 +1,118 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 28 Mar 2014 11:45:17 -0700
-Subject: [RFC v2] ARM VM System Specification
-Message-ID: <20140328184517.GA27219@cbox>
+From: keescook@google.com (Kees Cook)
+Date: Fri, 28 Mar 2014 11:45:41 -0700
+Subject: [PATCH v4] ARM: mm: fix reporting of read-only PMD bits
+In-Reply-To: <20140323042050.GA15181@www.outflux.net>
+References: <20140323042050.GA15181@www.outflux.net>
+Message-ID: <CAGXu5j+GokV1MKv4Otb0AGt4Xvm8WXMLaOvGUUX+BJpo7Myg9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM VM System Specification
-===========================
+On Sat, Mar 22, 2014 at 9:20 PM, Kees Cook <keescook@chromium.org> wrote:
+> On non-LPAE ARMv6+, read-only PMD bits are defined with the combination
+> "PMD_SECT_APX | PMD_SECT_AP_WRITE". Adjusted the bit masks to correctly
+> report this.
+>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+> v4:
+>  - clean up defines for CPU versions; Rob Herring.
+> v3:
+>  - check for pre-v6 CPUs on the page table report.
+> v2:
+>  - reorder bits, suggested by Olof.
 
-Goal
-----
-The goal of this spec is to allow suitably-built OS images to run on
-all ARM virtualization solutions, such as KVM or Xen.
+Can anyone give this a test or ack? I've done build tests for all CPU
+combinations, and runtime tests on v6 and LPAE.
 
-Recommendations in this spec are valid for aarch32 and aarch64 alike, and
-they aim to be hypervisor agnostic.
+Thanks!
 
-Note that simply adhering to the SBSA [2] is not a valid approach, for
-example because the SBSA mandates EL2, which will not be available for
-VMs.  Further, this spec also covers the aarch32 execution mode, not
-covered in the SBSA.
+-Kees
 
-
-Image format
-------------
-The image format, as presented to the VM, needs to be well-defined in
-order for prepared disk images to be bootable across various
-virtualization implementations.
-
-The raw disk format as presented to the VM must be partitioned with a
-GUID Partition Table (GPT).  The bootable software must be placed in the
-EFI System Partition (ESP), using the UEFI removable media path, and
-must be an EFI application complying to the UEFI Specification 2.4
-Revision A [6].
-
-The ESP partition's GPT entry's partition type GUID must be
-C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
-formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
-
-The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
-execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
-state as specified in Section 3.3 (3.3 (Boot Option Variables Default Boot
-Behavior) and 3.4.1.1 (Removable Media Boot Behavior) in [6].
-
-This ensures that tools for both Xen and KVM can load a binary UEFI
-firmware which can read and boot the EFI application in the disk image.
-
-A typical scenario will be GRUB2 packaged as an EFI application, which
-mounts the system boot partition and boots Linux.
-
-
-Virtual Firmware
-----------------
-The VM system must be UEFI compliant in order to be able to boot the EFI
-application in the ESP.  It is recommended that this is achieved by
-loading a UEFI binary as the first software executed by the VM, which
-then executes the EFI application.  The UEFI implementation should be
-compliant with UEFI Specification 2.4 Revision A [6] or later.
-
-This document strongly recommends that the VM implementation supports
-persistent environment storage for virtual firmware implementation in
-order to ensure probable use cases such as adding additional disk images
-to a VM or running installers to perform upgrades.
-
-This document strongly recommends that VM implementations implement
-persistent variable storage for their UEFI implementation.  Persistent
-variable storage shall be a property of a VM instance, but shall not be
-stored as part of a portable disk image.  Portable disk images shall
-conform to the UEFI removable disk requirements from the UEFI spec and
-cannot rely on on a pre-configured UEFI environment.
-
-The binary UEFI firmware implementation should not be distributed as
-part of the VM image, but is specific to the VM implementation.
-
-
-Hardware Description
---------------------
-The VM system must be UEFI compliant and therefore the UEFI system table
-will provide a means to access hardware description data.
-
-The VM implementation must provide through its UEFI implementation:
-
-  a complete FDT which describes the entire VM system and will boot
-  mainline kernels driven by device tree alone
-
-For more information about the arm and arm64 boot conventions, see
-Documentation/arm/Booting and Documentation/arm64/booting.txt in the
-Linux kernel source tree.
-
-For more information about UEFI booting, see [4] and [5].
-
-
-VM Platform
------------
-The specification does not mandate any specific memory map.  The guest
-OS must be able to enumerate all processing elements, devices, and
-memory through HW description data (FDT) or a bus-specific
-mechanism such as PCI.
-
-If aarch64 physical CPUs implement support for the aarch32 execution
-state in EL1 and EL0 execution, it is recommended that the VM
-implementation supports booting the VM at EL1 in both aarch32 and
-aarch64 execution states.
-
-The virtual hardware platform must provide a number of mandatory
-peripherals:
-
-  Serial console:  The platform should provide a console,
-  based on an emulated pl011, a virtio-console, or a Xen PV console.
-
-  An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
-  limits the the number of virtual CPUs to 8 cores, newer GIC versions
-  removes this limitation.
-
-  The ARM virtual timer and counter should be available to the VM as
-  per the ARM Generic Timers specification in the ARM ARM [1].
-
-It is strongly recommended that the VM implementation provides a
-hotpluggable bus to support hotplug of at least block and network
-devices.  Suitable buses include a virtual PCIe bus and the Xen PV bus.
-
-For the VM image to be compliant with this spec, the following applies
-for the guest OS in the VM image:
-
-  The guest OS must include support for pl011 UART, virtio-console, and
-  the Xen PV console.
-
-  The guest OS must include support for GICv2 and any available newer
-  version of the GIC architecture to maintain compatibility with older
-  VM implementations.
-
-  It is strongly recommended to include support for all available
-  (block, network, console, balloon) virtio-pci, virtio-mmio, and Xen PV
-  drivers in the guest OS kernel or initial ramdisk.
+> ---
+>  arch/arm/mm/dump.c |   47 ++++++++++++++++++++++++++++++++---------------
+>  1 file changed, 32 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+> index ef69152f9b52..c508f41a43bc 100644
+> --- a/arch/arm/mm/dump.c
+> +++ b/arch/arm/mm/dump.c
+> @@ -120,34 +120,51 @@ static const struct prot_bits pte_bits[] = {
+>  };
+>
+>  static const struct prot_bits section_bits[] = {
+> -#ifndef CONFIG_ARM_LPAE
+> -       /* These are approximate */
+> +#ifdef CONFIG_ARM_LPAE
+> +       {
+> +               .mask   = PMD_SECT_USER,
+> +               .val    = PMD_SECT_USER,
+> +               .set    = "USR",
+> +       }, {
+> +               .mask   = PMD_SECT_RDONLY,
+> +               .val    = PMD_SECT_RDONLY,
+> +               .set    = "ro",
+> +               .clear  = "RW",
+> +#elif __LINUX_ARM_ARCH__ >= 6
+>         {
+> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> -               .val    = 0,
+> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .val    = PMD_SECT_APX | PMD_SECT_AP_WRITE,
+>                 .set    = "    ro",
+>         }, {
+> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+>                 .val    = PMD_SECT_AP_WRITE,
+>                 .set    = "    RW",
+>         }, {
+> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+>                 .val    = PMD_SECT_AP_READ,
+>                 .set    = "USR ro",
+>         }, {
+> -               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .mask   = PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+>                 .val    = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+>                 .set    = "USR RW",
+> -#else
+> +#else /* ARMv4/ARMv5  */
+> +       /* These are approximate */
+>         {
+> -               .mask   = PMD_SECT_USER,
+> -               .val    = PMD_SECT_USER,
+> -               .set    = "USR",
+> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .val    = 0,
+> +               .set    = "    ro",
+>         }, {
+> -               .mask   = PMD_SECT_RDONLY,
+> -               .val    = PMD_SECT_RDONLY,
+> -               .set    = "ro",
+> -               .clear  = "RW",
+> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .val    = PMD_SECT_AP_WRITE,
+> +               .set    = "    RW",
+> +       }, {
+> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .val    = PMD_SECT_AP_READ,
+> +               .set    = "USR ro",
+> +       }, {
+> +               .mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .val    = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+> +               .set    = "USR RW",
+>  #endif
+>         }, {
+>                 .mask   = PMD_SECT_XN,
+> --
+> 1.7.9.5
+>
+>
+> --
+> Kees Cook
+> Chrome OS Security
 
 
-Other common peripherals for block devices, networking, and more can
-(and typically will) be provided, but OS software written and compiled
-to run on ARM VMs cannot make any assumptions about which variations
-of these should exist or which implementation they use (e.g. VirtIO or
-Xen PV).  See "Hardware Description" above.
 
-
-Changes from previous versions of this RFC
-------------------------------------------
-Changes v1-v2:
- - Clearly specify that the guest must support the pl011,
-   virtio-console, and Xen PV console.  (Note that it was discussed to
-   mandate a pl011 during Linaro Connect Asia 2014, but that was under the
-   impression that the SBSA specification was an output-only no-irq
-   serial port, which is not the case.  The only two benefits from
-   mandating a specific serial type was to handle "console=ttyAMA0"
-   kernel command line parameters and earlyprintk; Grant Likely has
-   submitted patches to avoid the need for "console=" parameters, and
-   Rob Herring has submitted patches for paravirtualized earlyprintk
-   consoles.)
- - Reference EFI specification for bootable paths.
- - Remove discussion on ACPI boot methods and do not suggest ACPI
-   support in VMs.
- - Add specification about UEFI persistent variable storage and
-   portability.
-
-
-References
-----------
-[1]: The ARM Architecture Reference Manual, ARMv8, Issue A.b
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
-
-[2]: ARM Server Base System Architecture
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029/index.html
-
-[3]: The ARM Generic Interrupt Controller Architecture Specifications v2.0
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
-
-[4]: http://www.secretlab.ca/archives/27
-
-[5]: https://git.linaro.org/people/leif.lindholm/linux.git/blob/refs/heads/uefi-for-upstream:/Documentation/arm/uefi.txt
-
-[6]: UEFI Specification 2.4 Revision A
-http://www.uefi.org/sites/default/files/resources/2_4_Errata_A.pdf
+-- 
+Kees Cook
+Chrome OS Security
