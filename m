@@ -1,44 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Mar 2014 18:45:44 +0100
-Subject: mvebu: Kirkwood: Device Tree file for Zyxel NSA320
-In-Reply-To: <53335D9D.5070100@baker-net.org.uk>
-References: <53112C83.9010700@baker-net.org.uk>
- <20140301103417.GK27832@lunn.ch>
- <5313C24A.9070306@baker-net.org.uk>
- <20140303094102.GA13805@lunn.ch>
- <20140326010658.GN28304@titan.lakedaemon.net>
- <53335D9D.5070100@baker-net.org.uk>
-Message-ID: <20140328174544.GE22339@lunn.ch>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Fri, 28 Mar 2014 18:58:59 +0100
+Subject: [RFC PATCH v2 01/10] genirq: generic chip: export
+ irq_map_generic_chip function
+In-Reply-To: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
+References: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <1396029548-10928-2-git-send-email-b.brezillon.dev@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 11:07:09PM +0000, Adam Baker wrote:
-> On 26/03/14 01:06, Jason Cooper wrote:
-> > Adam,
-> > 
-> > Any progress on this?
-> > 
-> > thx,
-> > 
-> > Jason.
-> 
-> I think it's about ready, I'm just trying to find time to tidy it up to
-> post properly. My current thinking is that it should be split into 3 patches
-> 
-> 1 - Move some things that are common to both nsa310, nsa310a and nsa320 into
->     kirkwood-nsa310-common.dtsi
-> 2 - add the dts for nsa320
-> 3 - rename kirkwood-nsa310-common.dtsi to kirkwood-nsa3x0-common.dtsi (I suspect
->     the nsa325 is sufficiently different to not share this file). I suggest
->     making this change last as it can easily be dropped till later if it causes
->     conflicts.
-> 
-> Current diff for changes 1 & 2 is below in case anyone wants to make any further
-> comments.
+Export the generic irq map function in order to provide irq_domain ops with
+generic mapping and specific of xlate function (needed by the new atmel
+AIC driver).
 
-Hi Adam
+Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+---
+ include/linux/irq.h       |    2 ++
+ kernel/irq/generic-chip.c |    5 +++--
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-I took a quick look. Everything looks O.K. Shame the buzzer does not
-work via a simple GPIO.
-
-     Andrew
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 7dc1003..19b5e3b 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -765,6 +765,8 @@ void irq_gc_eoi(struct irq_data *d);
+ int irq_gc_set_wake(struct irq_data *d, unsigned int on);
+ 
+ /* Setup functions for irq_chip_generic */
++int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
++			 irq_hw_number_t hw_irq);
+ struct irq_chip_generic *
+ irq_alloc_generic_chip(const char *name, int nr_ct, unsigned int irq_base,
+ 		       void __iomem *reg_base, irq_flow_handler_t handler);
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index 452d6f2..cf80e7b 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -341,8 +341,8 @@ static struct lock_class_key irq_nested_lock_class;
+ /*
+  * irq_map_generic_chip - Map a generic chip for an irq domain
+  */
+-static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+-				irq_hw_number_t hw_irq)
++int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
++			 irq_hw_number_t hw_irq)
+ {
+ 	struct irq_data *data = irq_get_irq_data(virq);
+ 	struct irq_domain_chip_generic *dgc = d->gc;
+@@ -394,6 +394,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+ 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(irq_map_generic_chip);
+ 
+ struct irq_domain_ops irq_generic_chip_ops = {
+ 	.map	= irq_map_generic_chip,
+-- 
+1.7.9.5
