@@ -1,93 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 28 Mar 2014 19:19:41 +0100
-Subject: [PATCH 07/10] ARM: mvebu: add SMP support for Armada 375 and
- Armada 38x
-In-Reply-To: <5335BBC1.6090804@codeaurora.org>
-References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1396012026-5997-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <5335BBC1.6090804@codeaurora.org>
-Message-ID: <20140328191941.4c92ff62@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Mar 2014 18:22:56 +0000
+Subject: [GIT PULL] ARM: kprobes: big-endian support
+In-Reply-To: <5335BBB1.60402@linaro.org>
+References: <52D3D784.2000600@linaro.org> <53053769.5090100@linaro.org>
+ <5332AB5A.90109@linaro.org> <20140328112841.GF7528@n2100.arm.linux.org.uk>
+ <5335BBB1.60402@linaro.org>
+Message-ID: <20140328182256.GO7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Boyd,
-
-On Fri, 28 Mar 2014 11:13:21 -0700, Stephen Boyd wrote:
-> On 03/28/14 06:07, Thomas Petazzoni wrote:
-> > diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> > index 8634222..e88d951 100644
-> > --- a/arch/arm/mach-mvebu/Kconfig
-> > +++ b/arch/arm/mach-mvebu/Kconfig
-> > @@ -45,6 +45,8 @@ config MACH_ARMADA_375
-> >  	select ARMADA_375_CLK
-> >  	select CPU_V7
-> >  	select HAVE_ARM_SCU
-> > +	select HAVE_ARM_TWD
+On Fri, Mar 28, 2014 at 08:13:05PM +0200, Taras Kondratiuk wrote:
+> On 03/28/2014 01:28 PM, Russell King - ARM Linux wrote:
+> > On Wed, Mar 26, 2014 at 12:26:34PM +0200, Taras Kondratiuk wrote:
+> >> On 02/20/2014 12:59 AM, Taras Kondratiuk wrote:
+> >>
+> >> Hi Russell,
+> >>
+> >> Is there any issue with this pull request?
+> >> Should I do something to get it pulled?
+> > 
+> > There's nothing wrong, apart from me being far too busy hacking on really
+> > crap code to care about reading much email - which means that lots of
+> > email simply just gets buried and lost.
+> > 
+> > There is now a problem with this pull - it conflicts very badly with Dave
+> > Long's uprobes code, which I've already pulled, so much so that I'm not
+> > happy to do the conflict resolution since I know nothing about this code,
+> > and it's a feature I don't make any use of.
 > 
-> This should have "if SMP" appended to it (same for HAVE_ARM_SCU).
+> I've rebased it onto your for-next branch. Kprobes are functional
+> in LE and BE. I'll send an updated pull request after verifying uprobes.
 
-Thanks, will do. The HAVE_ARM_SCU addition is part of a separate
-series, the Armada 375/38x coherency series, so I'll fix it in there.
+That's not going to work.  for-next is an unstable branch - all the
+merge commits there get regenerated on a fairly regular basis.
 
-> > diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-> > index 6260cb8..9ded4b9 100644
-> > --- a/arch/arm/mach-mvebu/board-v7.c
-> > +++ b/arch/arm/mach-mvebu/board-v7.c
-> > @@ -146,6 +146,7 @@ static const char * const armada_375_dt_compat[] = {
-> >  };
-> >  
-> >  DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
-> > +	.smp		= smp_ops(mvebu_cortex_a9_smp_ops),
-> >  	.init_time	= mvebu_timer_and_clk_init,
-> >  	.restart	= mvebu_restart,
-> >  	.dt_compat	= armada_375_dt_compat,
-> > @@ -158,6 +159,7 @@ static const char * const armada_38x_dt_compat[] = {
-> >  };
-> >  
-> >  DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
-> > +	.smp		= smp_ops(mvebu_cortex_a9_smp_ops),
-> >  	.init_time	= mvebu_timer_and_clk_init,
-> >  	.restart	= mvebu_restart,
-> >  	.dt_compat	= armada_38x_dt_compat,
-> 
-> You may want to look into using the enable-method property in devicetree
-> so that you don't have to set the smp ops here. The patch to support
-> that is sitting in -next as 6c3ff8b11a16 (ARM: Introduce
-> CPU_METHOD_OF_DECLARE() for cpu hotplug/smp, 2013-10-30).
+A better solution would be to base your patches on top of Dave Long's
+changes, which can be found at
 
-Hm, ok, I'll have a look into that.
+ git://git.linaro.org/people/dave.long/linux uprobes-v7
 
-> > diff --git a/arch/arm/mach-mvebu/headsmp-a9.S b/arch/arm/mach-mvebu/headsmp-a9.S
-> > new file mode 100644
-> > index 0000000..78e66c9
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mvebu/headsmp-a9.S
-> > @@ -0,0 +1,22 @@
-> > +/*
-> > + * SMP support: Entry point for secondary CPUs of Marvell EBU
-> > + * Cortex-A9 based SOCs (Armada 375 and Armada 38x).
-> > + *
-> > + * Copyright (C) 2014 Marvell
-> > + *
-> > + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> > +
-> > +#include <linux/linkage.h>
-> > +#include <linux/init.h>
-> > +
-> > +	__CPUINIT
-> 
-> __CPUINIT is dead. Don't use it.
+and should have an ID of c7edc9e326d5.
 
-Sure, will fix, thanks.
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
