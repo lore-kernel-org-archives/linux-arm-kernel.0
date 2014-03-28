@@ -1,61 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 28 Mar 2014 12:05:32 +0100
-Subject: [PATCH RFC 0/3] arm64: NEON crypto under CONFIG_PREEMPT
-Message-ID: <1396004735-15475-1-git-send-email-ard.biesheuvel@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 28 Mar 2014 12:13:21 +0100
+Subject: [PATCH v6 01/11] ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
+In-Reply-To: <1396005211-15573-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1396005211-15573-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1396005211-15573-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is an attempt to reduce latency under CONFIG_PREEMPT while
-maintaining optimal throughput otherwise, i.e., under !CONFIG_PREEMPT or
-while running outside of process context.
+PJ4B needs extra instructions for suspend and resume, so instead of
+using the armv7 version, this commit introduces specific versions for
+PJ4B.
 
-In the in_interrupt() case, the calls to kernel_neon_begin and kernel_neon_end
-incur a fixed penalty (i.e., each call needs to stack/unstack a fixed number of
-registers), and preemption is not possible anyway, so the call into the crypto
-algorithm should just complete as fast as possible, ideally by processing all
-of the input in the core loop without having to spill state to memory or reload
-round keys (e.g., SHA-256 uses 64 32-bit round keys to process each input block
-of 64 bytes)
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mm/proc-v7.S | 28 +++++++++++++++++++++++++---
+ 1 file changed, 25 insertions(+), 3 deletions(-)
 
-In contrast, when running in process context, we should avoid hogging the CPU by
-spending unreasonable amounts of time inside a kernel_neon_begin/kernel_neon_end
-section. However, reloading those 64 32-byte round keys to process each 64-byte
-block one by one is far from optimal.
-
-The solution proposed here is to allow the inner loops of the crypto algorithms
-to test the TIF_NEED_RESCHED flag, and terminate early if it is set. This is
-essentially CONFIG_PREEMPT_VOLUNTARY, even under CONFIG_PREEMPT, but it is the
-best we can do when running with preemption disabled.
-
-Patch #1 introduces the shared asm macro, patches #2 and #3 are the SHA-1 and
-SHA-224/SHA-256 implementations I posted earlier, but reworked to utilize
-voluntary preemption.
-
-Note that this series depends on my kernel mode NEON optimization patches posted
-a while ago.
-
-Ard Biesheuvel (3):
-  arm64/crypto: add shared macro to test for NEED_RESCHED
-  arm64/crypto: SHA-1 using ARMv8 Crypto Extensions
-  arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto Extensions
-
- arch/arm64/Kconfig               |   3 +
- arch/arm64/Makefile              |   1 +
- arch/arm64/crypto/Kconfig        |  18 +++
- arch/arm64/crypto/Makefile       |  15 +++
- arch/arm64/crypto/preempt.h      |  28 ++++
- arch/arm64/crypto/sha1-ce-core.S | 156 ++++++++++++++++++++++
- arch/arm64/crypto/sha1-ce-glue.c | 201 ++++++++++++++++++++++++++++
- arch/arm64/crypto/sha2-ce-core.S | 161 ++++++++++++++++++++++
- arch/arm64/crypto/sha2-ce-glue.c | 280 +++++++++++++++++++++++++++++++++++++++
- 9 files changed, 863 insertions(+)
- create mode 100644 arch/arm64/crypto/Kconfig
- create mode 100644 arch/arm64/crypto/Makefile
- create mode 100644 arch/arm64/crypto/preempt.h
- create mode 100644 arch/arm64/crypto/sha1-ce-core.S
- create mode 100644 arch/arm64/crypto/sha1-ce-glue.c
- create mode 100644 arch/arm64/crypto/sha2-ce-core.S
- create mode 100644 arch/arm64/crypto/sha2-ce-glue.c
-
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index bd1781979a39..3c49ac86d9d2 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -169,9 +169,31 @@ ENDPROC(cpu_pj4b_do_idle)
+ 	globl_equ	cpu_pj4b_do_idle,  	cpu_v7_do_idle
+ #endif
+ 	globl_equ	cpu_pj4b_dcache_clean_area,	cpu_v7_dcache_clean_area
+-	globl_equ	cpu_pj4b_do_suspend,	cpu_v7_do_suspend
+-	globl_equ	cpu_pj4b_do_resume,	cpu_v7_do_resume
+-	globl_equ	cpu_pj4b_suspend_size,	cpu_v7_suspend_size
++#ifdef CONFIG_ARM_CPU_SUSPEND
++ENTRY(cpu_pj4b_do_suspend)
++	stmfd	sp!, {r6 - r10}
++	mrc	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
++	mrc	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
++	mrc	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
++	mrc	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
++	mrc	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
++	stmia	r0!, {r6 - r10}
++	ldmfd	sp!, {r6 - r10}
++	b cpu_v7_do_suspend
++ENDPROC(cpu_pj4b_do_suspend)
++
++ENTRY(cpu_pj4b_do_resume)
++	ldmia	r0!, {r6 - r10}
++	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
++	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
++	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
++	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
++	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
++	b cpu_v7_do_resume
++ENDPROC(cpu_pj4b_do_resume)
++#endif
++.globl	cpu_pj4b_suspend_size
++.equ	cpu_pj4b_suspend_size, 4 * 14
+ 
+ #endif
+ 
 -- 
-1.8.3.2
+1.8.1.2
