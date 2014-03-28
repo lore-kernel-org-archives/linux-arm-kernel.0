@@ -1,29 +1,39 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:19:38 +0000
-Subject: [PATCH 61/75] ARM: l2c: spear13xx: remove cache size override
+Date: Fri, 28 Mar 2014 15:19:43 +0000
+Subject: [PATCH 62/75] ARM: l2c: sti: remove cache size override
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYZG-0007Gz-E3@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYZL-0007H3-HP@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-spear/spear13xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-sti/board-dt.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index dcb300443b66..c9897ea38980 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -46,7 +46,7 @@ void __init spear13xx_l2x0_init(void)
- 	 */
- 	writel_relaxed(0x221, VA_L2CC_BASE + L310_TAG_LATENCY_CTRL);
- 	writel_relaxed(0x441, VA_L2CC_BASE + L310_DATA_LATENCY_CTRL);
--	l2x0_init(VA_L2CC_BASE, 0x30a60001, 0xfe00ffff);
-+	l2x0_init(VA_L2CC_BASE, 0x30a00001, 0xfe0fffff);
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index dc8669efc12d..cf716ae10726 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -16,15 +16,9 @@
+ 
+ void __init stih41x_l2x0_init(void)
+ {
+-	u32 way_size = 0x4;
+-	u32 aux_ctrl;
+-	/* may be this can be encoded in macros like BIT*() */
+-	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
+-		   L310_AUX_CTRL_DATA_PREFETCH |
+-		   L310_AUX_CTRL_INSTR_PREFETCH |
+-		   L2C_AUX_CTRL_WAY_SIZE(way_size);
+-
+-	l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
++	l2x0_of_init(L2C_AUX_CTRL_SHARED_OVERRIDE |
++		     L310_AUX_CTRL_DATA_PREFETCH |
++		     L310_AUX_CTRL_INSTR_PREFETCH, 0xc00f0fff);
  }
  
- /*
+ static void __init stih41x_machine_init(void)
 -- 
 1.8.3.1
