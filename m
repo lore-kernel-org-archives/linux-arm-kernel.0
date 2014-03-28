@@ -1,81 +1,49 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Fri, 28 Mar 2014 16:27:20 +0900
-Subject: disabling MMU of ARMv7-A
-In-Reply-To: <CAO1A-8DB_xAqAb2DOED3fmQ0GEOP4FFNyuZTVnjX+kiv4sRrtA@mail.gmail.com>
-References: <015e01cf4a55$7f43a950$7dcafbf0$@samsung.com>
- <CAO1A-8DB_xAqAb2DOED3fmQ0GEOP4FFNyuZTVnjX+kiv4sRrtA@mail.gmail.com>
-Message-ID: <016401cf4a57$27d822c0$77886840$@samsung.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 28 Mar 2014 08:37:06 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 08/10] ARM: sun7i/sun4i: dt: Add
+ AXP209 support to various boards
+In-Reply-To: <CAGb2v67a6kVMe9vxBYrQQtucVqpyvUby1Hyt3RBina8sKj9HOw@mail.gmail.com>
+References: <1395955764-18103-1-git-send-email-carlo@caione.org>
+ <1395955764-18103-9-git-send-email-carlo@caione.org>
+ <CAGb2v67a6kVMe9vxBYrQQtucVqpyvUby1Hyt3RBina8sKj9HOw@mail.gmail.com>
+Message-ID: <CAOQ7t2bHdNHAtAS9dr6L=tJek+kP5NeNdmqSMy26vAdGX2=4Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Fri, Mar 28, 2014 at 4:12 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> index fa746aea..cf18c4d 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> @@ -88,6 +88,19 @@
+>>                         pinctrl-names = "default";
+>>                         pinctrl-0 = <&i2c0_pins_a>;
+>>                         status = "okay";
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +
+>> +                       axp: axp20x at 34 {
+>
+> Hi,
+>
+> Sorry for spotting this just now. I suggest you change it to
+>
+>                           axp209: pmic at 34 {
+>
+> or
+>
+>                           axp209_pmic at 34 {
+>
+> to match the ePAPR policy that node names should be generic and
+> describe functionality. The latter is what some DTs use.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Marc C
-> Sent: Friday, March 28, 2014 4:24 PM
-> To: Chanho Park
-> Cc: Will Deacon; Russell King - ARM Linux; linux-arm-
-> kernel at lists.arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
-> Catalin Marinas
-> Subject: Re: disabling MMU of ARMv7-A
-> 
-> Hi Chanho,
-> 
-> > However, ARMv7-A/R doesn't have such register. They can only control
-> whether
-> > use _HIGH_ vector or no
-> 
-> Not entirely accurate. ARMv7-A, and the Cortex-A9, specify the Vector
-> Base Address
-> Register, or VBAR [1].
+Right. Thanks for reviewing this.
 
-Thank you for your valuable information :)
-I'll try this one.
+> Same for all the other files.
+>
+> Thanks for working on this!
 
-Best Regards,
-Chanho Park
+Thank you,
 
-> 
-> -Marc
-> 
-> [1]http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/
-> CIHGDDEI.html
-> 
-> On Fri, Mar 28, 2014 at 12:15 AM, Chanho Park
-> <chanho61.park@samsung.com> wrote:
-> > Hi all,
-> >
-> > I want to know is there anyone who tried disabling MMU of ARMv7-A
-> likes
-> > cortex-a9.
-> > Yes. I know this is a silly question :)
-> > I turned off CONFIG_MMU option of my exynos4 board and specified
-> > CONFIG_DRAM_BASE/SIZE and REMAP_VECTORS_TO_RAM.
-> > The problem is occurred in here there is no way to specify the vector
-> table
-> > address.
-> > As I know the cortex-M3/4 has VTOR(Vector table offset register) to
-> specify
-> > the vector table address.
-> > However, ARMv7-A/R doesn't have such register. They can only control
-> whether
-> > use _HIGH_ vector or not.
-> > In this situation, can I find a way to boot successfully with
-> > nommu+cortex-a9?
-> >
-> > Thanks.
-> >
-> > Best Regards,
-> > Chanho Park
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Carlo Caione
