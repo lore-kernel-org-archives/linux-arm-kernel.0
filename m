@@ -1,38 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 28 Mar 2014 08:01:37 +0000
-Subject: [PATCH v3 00/10] mfd: AXP20x: Add support for AXP202 and AXP209
-In-Reply-To: <1395955764-18103-1-git-send-email-carlo@caione.org>
-References: <1395955764-18103-1-git-send-email-carlo@caione.org>
-Message-ID: <20140328080137.GE17779@lee--X1>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 28 Mar 2014 09:16:46 +0100
+Subject: [PATCHv2 1/1] mtd: gpmi: make blockmark swapping optional
+In-Reply-To: <5334D9F7.2030001@freescale.com>
+References: <532BCFCC.4080205@freescale.com>
+ <1395399017-19005-1-git-send-email-LW@KARO-electronics.de>
+ <20140324095902.GB11377@localhost>
+ <20140326095156.3e5585b8@ipc1.ka-ro>
+ <5332AEE7.2040402@freescale.com>
+ <20140326125502.0e8d0657@ipc1.ka-ro>
+ <20140327095956.GA29623@localhost>
+ <20140327132109.06258526@ipc1.ka-ro>
+ <5334D9F7.2030001@freescale.com>
+Message-ID: <20140328091646.1ce03f90@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> AXP209 and AXP202 are the PMUs (Power Management Unit) used by A10, A13
-> and A20 SoCs and developed by X-Powers, a sister company of Allwinner.
-> AXP20x comprises an adaptive USB-Compatible PWM charger, 2 BUCK DC-DC
-> converters, 5 LDOs, multiple 12-bit ADCs of voltage, current and temperature
-> as well as 4 configurable GPIOs. 
+Hi,
 
-[...]
+Huang Shijie wrote:
+> ? 2014?03?27? 20:21, Lothar Wa?mann ??:
+> > I can assure you that the>100.000 i.MX28 based modules, that we sold
+> > up to now boot from NAND just fine without any block mark swapping in
+> > the U-Boot pages.
+> >
+> Our driver should follow the Reference manual, not the product.
+> 
+Still there is no need for the Linux NAND driver to be able to read or
+write partitions in a format that the Boot ROM can understand. Thus it
+is perfectly legal to allow disregarding the BB marks and solely rely on
+a flash based BBT.
 
-> Carlo Caione (10):
->   mfd: AXP20x: Add mfd driver for AXP20x PMIC
->   dt-bindings: add vendor-prefix for X-Powers
->   mfd: AXP20x: Add bindings documentation
->   input: misc: Add driver for AXP20x Power Enable Key
->   input: misc: Add ABI docs for AXP20x PEK
->   regulator: AXP20x: Add support for regulators subsystem
->   ARM: sunxi: dt: Add x-powers-axp209.dtsi file
->   ARM: sun7i/sun4i: dt: Add AXP209 support to various boards
->   ARM: sunxi: Add AXP20x support in defconfig
->   ARM: sunxi: Add AXP20x support multi_v7_defconfig
 
-I'm only CC'ed on two of these patches. In order to gain a full
-appreciation what what the set is trying to achieve, can you CC me on
-the entire set please?
-
+Lothar Wa?mann
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
