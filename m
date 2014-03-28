@@ -1,75 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 28 Mar 2014 14:06:58 +0100
-Subject: [PATCH 02/10] irqchip: irq-armada-370-xp: do the set_smp_cross_call()
- in the driver
-In-Reply-To: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396012026-5997-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 28 Mar 2014 14:06:56 +0100
+Subject: [PATCH 00/10] SMP support for Armada 375 and 38x
+Message-ID: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having the SoC code in arch/arm/mach-mvebu/platsmp.c do the
-set_smp_cross_call() to register the IPI-triggering function, it makes
-more sense to do exactly what the GIC driver is doing: let the irqchip
-driver do it. This way, it avoids having to expose the
-armada_mpic_send_doorbell() function between the irqchip driver and
-the SoC code.
+Jason, Andrew, Gregory, Sebastian,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/armada-370-xp.h | 1 -
- arch/arm/mach-mvebu/platsmp.c       | 2 --
- drivers/irqchip/irq-armada-370-xp.c | 6 +++++-
- 3 files changed, 5 insertions(+), 4 deletions(-)
+This patch series adds SMP support for the Armada 375 and 38x. Most of
+the patches are fairly straight-forward, but here is a short overview
+of what's going on:
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index 991ab32..dd3b8a1 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -21,7 +21,6 @@
- #define ARMADA_370_MAX_CPUS 1
- #define ARMADA_XP_MAX_CPUS  4
- 
--void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
- void armada_xp_mpic_smp_cpu_init(void);
- void armada_xp_secondary_startup(void);
- extern struct smp_operations armada_xp_smp_ops;
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index e98075f..81bf517 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -98,8 +98,6 @@ static void __init armada_xp_smp_init_cpus(void)
- 
- 	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
- 		panic("Invalid number of CPUs in DT\n");
--
--	set_smp_cross_call(armada_mpic_send_doorbell);
- }
- 
- static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index abb850b..0bf5aef 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -315,7 +315,8 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- }
- 
- #ifdef CONFIG_SMP
--void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq)
-+static void armada_mpic_send_doorbell(const struct cpumask *mask,
-+				      unsigned int irq)
- {
- 	int cpu;
- 	unsigned long map = 0;
-@@ -534,6 +535,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 	if (parent_irq <= 0) {
- 		irq_set_default_host(armada_370_xp_mpic_domain);
- 		set_handle_irq(armada_370_xp_handle_irq);
-+#ifdef CONFIG_SMP
-+		set_smp_cross_call(armada_mpic_send_doorbell);
-+#endif
- 	} else {
- 		irq_set_chained_handler(parent_irq,
- 					armada_370_xp_mpic_handle_cascade_irq);
+ * Patches 1, 2, 3 make some preparatory clean-ups. Actually, patches
+   2 and 3 are not directly related to adding Armada 375 and 38x SMP
+   support, but they are related to the SMP support of Armada XP.
+
+ * Patches 4, 5 and 6 add a few bits needed for the SMP support.
+
+ * Patch 7 is adding the SMP support itself. Since both Armada 375 and
+   38x are Cortex-A9, their SMP logic is fairly similar, the only
+   difference being how to define the boot address of the secondary
+   CPU. Therefore, we've used a single smp_operations implementation.
+
+ * Patch 8 add a workaround for a SMP booting bug affecting Armada 375
+   Z1 stepping. It requires using the Crypto SRAM loaded with a few
+   instructions of code as a replacement of the BootROM for booting
+   the secondary processor. For now, the workaround is unconditionally
+   applied on all Armada 375 platforms, but as soon as we get access
+   to more recent platforms, we'll add a mvebu-soc-id based test to
+   only enable the workaround if needed.
+
+ * Patch 9 and 10 add the necessary Device Tree bits to enable SMP on
+   Armada 375 and 38x.
+
+In terms of dependencies, we will have 4 interconnected patch series:
+Armada 375/38x coherency support, the PMSU rework series, the cpuidle
+series, and this Armada 375/38x SMP support series. The relations are
+as follows
+
+  ---------------        ---------------------
+  | pmsu-rework |        | 375/38x coherency |
+  ---------------        ---------------------
+        ||   ||                 ||
+	||   \\____________     ||
+	\/                \/    \/
+  ---------------        ---------------
+  |   cpuidle   |        | 375/38x SMP |
+  ---------------        ---------------
+
+In other words, this 375/38x SMP support series needs *both* the
+375/38x coherency patch series to be applied, and the pmsu-rework to
+be applied.
+
+If needed, I can merge the 375/38x coherency and 375/38x SMP support
+together, but I believe shorter patch series are easier to
+review. Just let me know what works best for you.
+
+Thanks!
+
+Thomas
+
+Gregory CLEMENT (4):
+  ARM: mvebu: add function to set the resume boot address for Armada 375
+  ARM: mvebu: add SMP support for Armada 375 and Armada 38x
+  ARM: mvebu: add workaround for SMP support for Armada 375 stepping Z1
+  ARM: mvebu: add SMP support in the Armada 375 device tree
+
+Thomas Petazzoni (6):
+  ARM: mvebu: move Armada XP specific SMP initialization to platsmp.c
+  irqchip: irq-armada-370-xp: do the set_smp_cross_call() in the driver
+  irqchip: irq-armada-370-xp: use cpu notifier to initialize secondary
+    CPUs
+  ARM: mvebu: add Armada 375/38x support in cpu-reset
+  ARM: mvebu: add Armada 38x compatible string to pmsu
+  ARM: mvebu: add SMP support in the Armada 38x device tree
+
+ .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |  9 +-
+ .../devicetree/bindings/arm/armada-cpu-reset.txt   |  2 +
+ arch/arm/boot/dts/armada-375.dtsi                  |  5 ++
+ arch/arm/boot/dts/armada-38x.dtsi                  | 10 +++
+ arch/arm/mach-mvebu/Kconfig                        |  4 +
+ arch/arm/mach-mvebu/Makefile                       |  2 +-
+ arch/arm/mach-mvebu/armada-370-xp.h                |  2 -
+ arch/arm/mach-mvebu/armada-375.h                   | 18 ++++
+ arch/arm/mach-mvebu/armada-380.h                   | 18 ++++
+ arch/arm/mach-mvebu/board-v7.c                     |  2 +
+ arch/arm/mach-mvebu/common.h                       |  6 ++
+ arch/arm/mach-mvebu/cpu-reset.c                    |  4 +
+ arch/arm/mach-mvebu/headsmp-a9.S                   | 34 ++++++++
+ arch/arm/mach-mvebu/platsmp-a9.c                   | 95 ++++++++++++++++++++++
+ arch/arm/mach-mvebu/platsmp.c                      | 18 ++--
+ arch/arm/mach-mvebu/pmsu.c                         | 27 +-----
+ arch/arm/mach-mvebu/system-controller.c            | 15 +++-
+ drivers/irqchip/irq-armada-370-xp.c                | 24 +++++-
+ 18 files changed, 252 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/armada-375.h
+ create mode 100644 arch/arm/mach-mvebu/armada-380.h
+ create mode 100644 arch/arm/mach-mvebu/headsmp-a9.S
+ create mode 100644 arch/arm/mach-mvebu/platsmp-a9.c
+
 -- 
 1.8.3.2
