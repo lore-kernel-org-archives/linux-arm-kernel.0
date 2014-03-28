@@ -1,55 +1,59 @@
 From: lho@apm.com (Loc Ho)
-Date: Fri, 28 Mar 2014 14:56:36 -0600
-Subject: [PATCH 1/3] Documentation: Add documentation for the APM X-Gene SoC
- RTC DTS binding
-In-Reply-To: <1396040198-13645-1-git-send-email-lho@apm.com>
+Date: Fri, 28 Mar 2014 14:56:38 -0600
+Subject: [PATCH 3/3] arm64: Add APM X-Gene SoC RTC DTS entry
+In-Reply-To: <1396040198-13645-3-git-send-email-lho@apm.com>
 References: <1396040198-13645-1-git-send-email-lho@apm.com>
-Message-ID: <1396040198-13645-2-git-send-email-lho@apm.com>
+ <1396040198-13645-2-git-send-email-lho@apm.com>
+ <1396040198-13645-3-git-send-email-lho@apm.com>
+Message-ID: <1396040198-13645-4-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the APM X-Gene SoC RTC DTS binding.
+This patch adds APM X-Gene SoC RTC DTS entry.
 
 Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- .../devicetree/bindings/rtc/xgene-rtc.txt          |   28 ++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/xgene-rtc.txt
+ arch/arm64/boot/dts/apm-storm.dtsi |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/rtc/xgene-rtc.txt b/Documentation/devicetree/bindings/rtc/xgene-rtc.txt
-new file mode 100644
-index 0000000..fd195c3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/xgene-rtc.txt
-@@ -0,0 +1,28 @@
-+* APM X-Gene Real Time Clock
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index 93f4b2d..4917f3b 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -257,6 +257,19 @@
+ 				enable-offset = <0x0>;
+ 				enable-mask = <0x39>;
+ 			};
 +
-+RTC controller for the APM X-Gene Real Time Clock
++			rtcclk: rtcclk at 17000000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				reg = <0x0 0x17000000 0x0 0x2000>;
++				reg-names = "csr-reg";
++				csr-offset = <0xc>;
++				csr-mask = <0x2>;
++				enable-offset = <0x10>;
++				enable-mask = <0x2>;
++				clock-output-names = "rtcclk";
++			};
+ 		};
+ 
+ 		serial0: serial at 1c020000 {
+@@ -339,5 +352,13 @@
+ 			phys = <&phy3 0>;
+ 			phy-names = "sata-phy";
+ 		};
 +
-+Required properties:
-+- compatible : Should be "apm,xgene-rtc"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: IRQ line for the RTC.
-+- #clock-cells: Should be 1.
-+- clocks: Reference to the clock entry.
-+
-+Example:
-+
-+rtcclk: rtcclk {
-+	compatible = "fixed-clock";
-+	#clock-cells = <1>;
-+	clock-frequency = <100000000>;
-+	clock-output-names = "rtcclk";
-+};
-+
-+rtc: rtc at 10510000 {
-+	compatible = "apm,xgene-rtc";
-+	reg = <0x0 0x10510000 0x0 0x400>;
-+	interrupts = <0x0 0x46 0x4>;
-+	#clock-cells = <1>;
-+	clocks = <&rtcclk 0>;
-+};
++		rtc: rtc at 10510000 {
++			compatible = "apm,xgene-rtc";
++			reg = <0x0 0x10510000 0x0 0x400>;
++			interrupts = <0x0 0x46 0x4>;
++			#clock-cells = <1>;
++			clocks = <&rtcclk 0>;
++		};
+ 	};
+ };
 -- 
 1.5.5
