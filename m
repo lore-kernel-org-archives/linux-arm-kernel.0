@@ -1,94 +1,79 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:20:14 +0000
-Subject: [PATCH 68/75] ARM: l2c: add L2C-310 power control DT properties
+Date: Fri, 28 Mar 2014 15:20:24 +0000
+Subject: [PATCH 70/75] ARM: l2c: add warnings for stuff modifying aux_ctrl
+ register values
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYZq-0007HV-6q@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYa0-0007Hd-Dy@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two new properties for setting thte L3 power control register.  Two
-new properties are added:
-
-	arm,dynamic-clk-gating
-	arm,standby-mode
-
-iMX6 sets both these, add the properties there.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- Documentation/devicetree/bindings/arm/l2cc.txt |  2 ++
- arch/arm/boot/dts/imx6qdl.dtsi                 |  2 ++
- arch/arm/boot/dts/imx6sl.dtsi                  |  2 ++
- arch/arm/mm/cache-l2x0.c                       | 10 ++++++++++
- 4 files changed, 16 insertions(+)
+ arch/arm/mm/cache-l2x0.c | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index b513cb8196fe..e0dd400ecea6 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -40,6 +40,8 @@ implementations of the L2 cache controller with compatible programming models.
- - arm,filter-ranges : <start length> Starting address and length of window to
-   filter. Addresses in the filter window are directed to the M1 port. Other
-   addresses will go to the M0 port.
-+- arm,dynamic-clk-gating : Enables dynamic clock gating (PL310)
-+- arm,standby-mode : Enables standby mode (PL310)
- - interrupts : 1 combined interrupt.
- - cache-id-part: cache id part number to be used if it is not present
-   on hardware
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index fb28b2ecb1db..dea6ee66a01e 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -114,6 +114,8 @@
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
- 			arm,data-latency = <4 2 3>;
-+			arm,dynamic-clk-gating;
-+			arm,standby-mode;
- 		};
- 
- 		pcie: pcie at 0x01000000 {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1aaf2d..8094ac1cedc5 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -81,6 +81,8 @@
- 			cache-level = <2>;
- 			arm,tag-latency = <4 2 3>;
- 			arm,data-latency = <4 2 3>;
-+			arm,dynamic-clk-gating;
-+			arm,standby-mode;
- 		};
- 
- 		pmu {
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 462675847cb7..655a363918f5 100644
+index dd3de310b4ea..cbf036dff6d1 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -906,6 +906,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	u32 data[3] = { 0, 0, 0 };
- 	u32 tag[3] = { 0, 0, 0 };
- 	u32 filter[2] = { 0, 0 };
-+	u32 val;
- 
- 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
- 	if (tag[0] && tag[1] && tag[2])
-@@ -932,6 +933,15 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L310_ADDR_FILTER_EN,
- 			       l2x0_base + L310_ADDR_FILTER_START);
- 	}
+@@ -717,7 +717,15 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ {
+ 	struct outer_cache_fns fns;
+ 	unsigned way_size_bits, ways;
+-	u32 aux;
++	u32 aux, old_aux;
 +
-+	val = 0;
-+	if (of_property_read_bool(np, "arm,dynamic-clk-gating"))
-+		val |= L310_DYNAMIC_CLK_GATING_EN;
-+	if (of_property_read_bool(np, "arm,standby-mode"))
-+		val |= L310_STNDBY_MODE_EN;
-+
-+	if (val)
-+		l2c_write_sec(val, l2x0_base, L310_POWER_CTRL);
- }
++	/*
++	 * Sanity check the aux values.  aux_mask is the bits we preserve
++	 * from reading the hardware register, and aux_val is the bits we
++	 * set.
++	 */
++	if (aux_val & aux_mask)
++		pr_alert("L2C: platform provided aux values permit register corruption.\n");
  
- static const struct l2c_init_data of_l2c310_data __initconst = {
+ 	/*
+ 	 * It is strange to save the register state before initialisation,
+@@ -726,11 +734,14 @@ static void __init __l2c_init(const struct l2c_init_data *data,
+ 	if (data->save)
+ 		data->save(l2x0_base);
+ 
+-	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+-
++	old_aux = aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+ 	aux &= aux_mask;
+ 	aux |= aux_val;
+ 
++	if (old_aux != aux)
++		pr_warn("L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x\n",
++		        old_aux, aux);
++
+ 	/* Determine the number of ways */
+ 	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	case L2X0_CACHE_ID_PART_L310:
+@@ -1363,7 +1374,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	const struct l2c_init_data *data;
+ 	struct device_node *np;
+ 	struct resource res;
+-	u32 cache_id;
++	u32 cache_id, old_aux;
+ 
+ 	np = of_find_matching_node(NULL, l2x0_ids);
+ 	if (!np)
+@@ -1380,6 +1391,14 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 
+ 	data = of_match_node(l2x0_ids, np)->data;
+ 
++	old_aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
++	if (old_aux != ((old_aux & aux_mask) | aux_val)) {
++		pr_warn("L2C: platform modifies aux control register: 0x%08x -> 0x%08x\n",
++		        old_aux, (old_aux & aux_mask) | aux_val);
++	} else if (aux_mask != ~0U && aux_val != 0) {
++		pr_alert("L2C: platform provided aux values match the hardware, so have no effect.  Please remove them.\n");
++	}
++
+ 	/* All L2 caches are unified, so this property should be specified */
+ 	if (!of_property_read_bool(np, "cache-unified"))
+ 		pr_err("L2C: device tree omits to specify unified cache\n");
 -- 
 1.8.3.1
