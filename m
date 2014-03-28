@@ -1,153 +1,87 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:17:56 +0000
-Subject: [PATCH 41/75] ARM: l2c: provide generic hook to intercept writes to
- secure registers
+Date: Fri, 28 Mar 2014 15:18:01 +0000
+Subject: [PATCH 42/75] ARM: l2c: omap2: implement new write_sec method
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYXc-0007Fd-8A@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYXh-0007Fh-BP@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When Linux is running in the non-secure world, any write to a secure
-L2C register will generate an abort.  Platforms normally have to call
-firmware to work around this.  Provide a hook for them to intercept
-any L2C secure register write.
-
-l2c_write_sec() avoids writes to secure registers which are already set
-to the appropriate value, thus avoiding the overhead of needlessly
-calling into the secure monitor.
+With the write_sec method, we no longer need to override the default
+L2C disable method, and we no longer need the L2C set_debug method.
+Both of these can be handled via the write_sec method.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/outercache.h |  5 ++++-
- arch/arm/mm/cache-l2x0.c          | 40 +++++++++++++++++++++++++++++----------
- 2 files changed, 34 insertions(+), 11 deletions(-)
+ arch/arm/mach-omap2/omap4-common.c | 42 +++++++++++++++++++++++---------------
+ 1 file changed, 26 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 1ee2cf23fae1..69f57a5c0dd3 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -33,8 +33,11 @@ struct outer_cache_fns {
- #ifdef CONFIG_OUTER_CACHE_SYNC
- 	void (*sync)(void);
- #endif
--	void (*set_debug)(unsigned long);
- 	void (*resume)(void);
-+
-+	/* This is an ARM L2C thing */
-+	void (*set_debug)(unsigned long);
-+	void (*write_sec)(unsigned long, unsigned);
- };
- 
- extern struct outer_cache_fns outer_cache;
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 6b304db6f1c2..72a5f636b322 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -60,13 +60,30 @@ static inline void l2c_wait_mask(void __iomem *reg, unsigned long mask)
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 9f8d506f511d..7abc1eb15bf9 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -166,17 +166,33 @@ void __iomem *omap4_get_l2cache_base(void)
+ 	return l2cache_base;
  }
  
- /*
-+ * By default, we write directly to secure registers.  Platforms must
-+ * override this if they are running non-secure.
-+ */
-+static void l2c_write_sec(unsigned long val, void __iomem *base, unsigned reg)
-+{
-+	if (val == readl_relaxed(base + reg))
+-static void omap4_l2x0_disable(void)
++static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
+ {
+-	outer_flush_all();
+-	/* Disable PL310 L2 Cache controller */
+-	omap_smc1(0x102, 0x0);
+-}
++	unsigned smc_op;
+ 
+-static void omap4_l2x0_set_debug(unsigned long val)
+-{
+-	/* Program PL310 L2 Cache controller debug register */
+-	omap_smc1(0x100, val);
++	switch (reg) {
++	case L2X0_CTRL:
++		smc_op = OMAP4_MON_L2X0_CTRL_INDEX;
++		break;
++
++	case L2X0_AUX_CTRL:
++		smc_op = OMAP4_MON_L2X0_AUXCTRL_INDEX;
++		break;
++
++	case L2X0_DEBUG_CTRL:
++		smc_op = OMAP4_MON_L2X0_DBG_CTRL_INDEX;
++		break;
++
++	case L310_PREFETCH_CTRL:
++		smc_op = OMAP4_MON_L2X0_PREFETCH_INDEX;
++		break;
++
++	default:
++		WARN_ONCE(1, "OMAP L2C310: ignoring write to reg 0x%x\n", reg);
 +		return;
-+	if (outer_cache.write_sec)
-+		outer_cache.write_sec(val, reg);
-+	else
-+		writel_relaxed(val, base + reg);
-+}
++	}
 +
-+/*
-  * This should only be called when we have a requirement that the
-  * register be written due to a work-around, as platforms running
-  * in non-secure mode may not be able to access this register.
-  */
- static inline void l2c_set_debug(void __iomem *base, unsigned long val)
- {
--	outer_cache.set_debug(val);
-+	if (outer_cache.set_debug)
-+		outer_cache.set_debug(val);
-+	else
-+		l2c_write_sec(val, base, L2X0_DEBUG_CTRL);
++	omap_smc1(smc_op, val);
  }
  
- static void __l2c_op_way(void __iomem *reg)
-@@ -97,7 +114,7 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ static int __init omap_l2_cache_init(void)
+@@ -211,18 +227,12 @@ static int __init omap_l2_cache_init(void)
+ 	/* Enable PL310 L2 Cache controller */
+ 	omap_smc1(0x102, 0x1);
  
- 	/* Only write the aux register if it needs changing */
- 	if (readl_relaxed(base + L2X0_AUX_CTRL) != aux)
--		writel_relaxed(aux, base + L2X0_AUX_CTRL);
-+		l2c_write_sec(aux, base, L2X0_AUX_CTRL);
++	outer_cache.write_sec = omap4_l2c310_write_sec;
+ 	if (of_have_populated_dt())
+ 		l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
+ 	else
+ 		l2x0_init(l2cache_base, aux_ctrl, L2X0_AUX_CTRL_MASK);
  
- 	l2c_unlock(base, num_lock);
- 
-@@ -107,7 +124,7 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 	l2c_wait_mask(base + sync_reg_offset, 1);
- 	local_irq_restore(flags);
- 
--	writel_relaxed(L2X0_CTRL_EN, base + L2X0_CTRL);
-+	l2c_write_sec(L2X0_CTRL_EN, base, L2X0_CTRL);
+-	/*
+-	 * Override default outer_cache.disable with a OMAP4
+-	 * specific one
+-	*/
+-	outer_cache.disable = omap4_l2x0_disable;
+-	outer_cache.set_debug = omap4_l2x0_set_debug;
+-
+ 	return 0;
  }
- 
- static void l2c_disable(void)
-@@ -115,7 +132,7 @@ static void l2c_disable(void)
- 	void __iomem *base = l2x0_base;
- 
- 	outer_cache.flush_all();
--	writel_relaxed(0, base + L2X0_CTRL);
-+	l2c_write_sec(0, base, L2X0_CTRL);
- 	dsb(st);
- }
- 
-@@ -139,7 +156,7 @@ static inline void cache_sync(void)
- #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
- static inline void debug_writel(unsigned long val)
- {
--	if (outer_cache.set_debug)
-+	if (outer_cache.set_debug || outer_cache.write_sec)
- 		l2c_set_debug(l2x0_base, val);
- }
- #else
-@@ -182,7 +199,7 @@ static void l2x0_disable(void)
- 
- 	raw_spin_lock_irqsave(&l2x0_lock, flags);
- 	__l2x0_flush_all();
--	writel_relaxed(0, l2x0_base + L2X0_CTRL);
-+	l2c_write_sec(0, l2x0_base, L2X0_CTRL);
- 	dsb(st);
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- }
-@@ -599,11 +616,11 @@ static void l2c310_resume(void)
- 				L2X0_CACHE_ID_RTL_MASK;
- 
- 		if (revision >= L310_CACHE_ID_RTL_R2P0)
--			writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
--				       base + L2X0_PREFETCH_CTRL);
-+			l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
-+				      L2X0_PREFETCH_CTRL);
- 		if (revision >= L310_CACHE_ID_RTL_R3P0)
--			writel_relaxed(l2x0_saved_regs.pwr_ctrl,
--				       base + L2X0_POWER_CTRL);
-+			l2c_write_sec(l2x0_saved_regs.pwr_ctrl, base,
-+				      L2X0_POWER_CTRL);
- 
- 		l2c_enable(base, l2x0_saved_regs.aux_ctrl, 8);
- 	}
-@@ -732,8 +749,11 @@ static void __init __l2c_init(const struct l2c_init_data *data,
- 	l2x0_size = ways * (data->way_size_0 << way_size_bits);
- 
- 	fns = data->outer_cache;
-+	fns.write_sec = outer_cache.write_sec;
- 	if (data->fixup)
- 		data->fixup(l2x0_base, cache_id, &fns);
-+	if (fns.write_sec)
-+		fns.set_debug = NULL;
- 
- 	/*
- 	 * Check if l2x0 controller is already enabled.  If we are booting
+ omap_early_initcall(omap_l2_cache_init);
 -- 
 1.8.3.1
