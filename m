@@ -1,46 +1,44 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Mar 2014 18:42:16 +0100
-Subject: [PATCH 00/10] SMP support for Armada 375 and 38x
-In-Reply-To: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1396012026-5997-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140328174216.GD22339@lunn.ch>
+Date: Fri, 28 Mar 2014 18:45:44 +0100
+Subject: mvebu: Kirkwood: Device Tree file for Zyxel NSA320
+In-Reply-To: <53335D9D.5070100@baker-net.org.uk>
+References: <53112C83.9010700@baker-net.org.uk>
+ <20140301103417.GK27832@lunn.ch>
+ <5313C24A.9070306@baker-net.org.uk>
+ <20140303094102.GA13805@lunn.ch>
+ <20140326010658.GN28304@titan.lakedaemon.net>
+ <53335D9D.5070100@baker-net.org.uk>
+Message-ID: <20140328174544.GE22339@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 02:06:56PM +0100, Thomas Petazzoni wrote:
-> Jason, Andrew, Gregory, Sebastian,
+On Wed, Mar 26, 2014 at 11:07:09PM +0000, Adam Baker wrote:
+> On 26/03/14 01:06, Jason Cooper wrote:
+> > Adam,
+> > 
+> > Any progress on this?
+> > 
+> > thx,
+> > 
+> > Jason.
 > 
-> This patch series adds SMP support for the Armada 375 and 38x. Most of
-> the patches are fairly straight-forward, but here is a short overview
-> of what's going on:
+> I think it's about ready, I'm just trying to find time to tidy it up to
+> post properly. My current thinking is that it should be split into 3 patches
 > 
->  * Patches 1, 2, 3 make some preparatory clean-ups. Actually, patches
->    2 and 3 are not directly related to adding Armada 375 and 38x SMP
->    support, but they are related to the SMP support of Armada XP.
+> 1 - Move some things that are common to both nsa310, nsa310a and nsa320 into
+>     kirkwood-nsa310-common.dtsi
+> 2 - add the dts for nsa320
+> 3 - rename kirkwood-nsa310-common.dtsi to kirkwood-nsa3x0-common.dtsi (I suspect
+>     the nsa325 is sufficiently different to not share this file). I suggest
+>     making this change last as it can easily be dropped till later if it causes
+>     conflicts.
 > 
->  * Patches 4, 5 and 6 add a few bits needed for the SMP support.
-> 
->  * Patch 7 is adding the SMP support itself. Since both Armada 375 and
->    38x are Cortex-A9, their SMP logic is fairly similar, the only
->    difference being how to define the boot address of the secondary
->    CPU. Therefore, we've used a single smp_operations implementation.
-> 
->  * Patch 8 add a workaround for a SMP booting bug affecting Armada 375
->    Z1 stepping. It requires using the Crypto SRAM loaded with a few
->    instructions of code as a replacement of the BootROM for booting
->    the secondary processor. For now, the workaround is unconditionally
->    applied on all Armada 375 platforms, but as soon as we get access
->    to more recent platforms, we'll add a mvebu-soc-id based test to
->    only enable the workaround if needed.
-> 
->  * Patch 9 and 10 add the necessary Device Tree bits to enable SMP on
->    Armada 375 and 38x.
+> Current diff for changes 1 & 2 is below in case anyone wants to make any further
+> comments.
 
-Not my area of expertise, but it all looks O.K. The only comment,
-which i suspect Jason will say sometime soon, is that it would be nice
-if the workaround was triggered on the stepping, i.e. the same comment
-he made before for another similar workaround.
+Hi Adam
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+I took a quick look. Everything looks O.K. Shame the buzzer does not
+work via a simple GPIO.
 
-	  Andrew
+     Andrew
