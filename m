@@ -1,66 +1,85 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 28 Mar 2014 15:14:34 +0000
-Subject: [PATCH 03/75] ARM: l2c: avoid calling outer_flush_all() unnecessarily
- (Spear)
+Date: Fri, 28 Mar 2014 15:14:55 +0000
+Subject: [PATCH 07/75] ARM: outer cache: add WARN_ON() to outer_disable()
 In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
-Message-ID: <E1WTYUM-0004W5-Ny@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WTYUh-0004WM-K8@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Spear calls outer_flush_all() from it's SMP bringup function.  This
-is potentially dangerous as the L2C set/way operations which implement
-this don't take kindly to concurrent operations.  Besides, there's
-better solutions to this, as implemented on other platforms.
+Add WARN_ON() conditions to outer_disable() to ensure that its
+requirements aren't violated.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-spear/platsmp.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/outercache.h |  7 ++-----
+ arch/arm/mm/Makefile              |  1 +
+ arch/arm/mm/l2c-common.c          | 20 ++++++++++++++++++++
+ 3 files changed, 23 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/mm/l2c-common.c
 
-diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
-index 5c4a19887b2b..eb9f2ef1e974 100644
---- a/arch/arm/mach-spear/platsmp.c
-+++ b/arch/arm/mach-spear/platsmp.c
-@@ -20,6 +20,18 @@
- #include <mach/spear.h>
- #include "generic.h"
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index bd80540fe8b9..1ee2cf23fae1 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -21,6 +21,7 @@
+ #ifndef __ASM_OUTERCACHE_H
+ #define __ASM_OUTERCACHE_H
  
++#include <linux/bug.h>
+ #include <linux/types.h>
+ 
+ struct outer_cache_fns {
+@@ -96,11 +97,7 @@ static inline void outer_flush_all(void)
+  * cache is pushed out to lower levels of system memory.  The note and
+  * conditions above concerning outer_flush_all() applies here.
+  */
+-static inline void outer_disable(void)
+-{
+-	if (outer_cache.disable)
+-		outer_cache.disable();
+-}
++extern void outer_disable(void);
+ 
+ /**
+  * outer_resume: restore the cache configuration and re-enable outer cache
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 7f39ce2f841f..de5a6a27081b 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -95,6 +95,7 @@ obj-$(CONFIG_CPU_V7M)		+= proc-v7m.o
+ AFLAGS_proc-v6.o	:=-Wa,-march=armv6
+ AFLAGS_proc-v7.o	:=-Wa,-march=armv7-a
+ 
++obj-$(CONFIG_OUTER_CACHE)	+= l2c-common.o
+ obj-$(CONFIG_CACHE_FEROCEON_L2)	+= cache-feroceon-l2.o
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
+ obj-$(CONFIG_CACHE_XSC3L2)	+= cache-xsc3l2.o
+diff --git a/arch/arm/mm/l2c-common.c b/arch/arm/mm/l2c-common.c
+new file mode 100644
+index 000000000000..10a3cf28c362
+--- /dev/null
++++ b/arch/arm/mm/l2c-common.c
+@@ -0,0 +1,20 @@
 +/*
-+ * Write pen_release in a way that is guaranteed to be visible to all
-+ * observers, irrespective of whether they're taking part in coherency
-+ * or not.  This is necessary for the hotplug code to work reliably.
++ * Copyright (C) 2010 ARM Ltd.
++ * Written by Catalin Marinas <catalin.marinas@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+static void write_pen_release(int val)
-+{
-+	pen_release = val;
-+	smp_wmb();
-+	sync_cache_w(&pen_release);
-+}
++#include <linux/bug.h>
++#include <linux/smp.h>
++#include <asm/outercache.h>
 +
- static DEFINE_SPINLOCK(boot_lock);
- 
- static void __iomem *scu_base = IOMEM(VA_SCU_BASE);
-@@ -30,8 +42,7 @@ static void spear13xx_secondary_init(unsigned int cpu)
- 	 * let the primary processor know we're out of the
- 	 * pen, then head off into the C entry point
- 	 */
--	pen_release = -1;
--	smp_wmb();
-+	write_pen_release(-1);
- 
- 	/*
- 	 * Synchronise with the boot thread.
-@@ -58,9 +69,7 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 * Note that "pen_release" is the hardware CPU ID, whereas
- 	 * "cpu" is Linux's internal ID.
- 	 */
--	pen_release = cpu;
--	flush_cache_all();
--	outer_flush_all();
-+	write_pen_release(cpu);
- 
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
++void outer_disable(void)
++{
++	WARN_ON(!irqs_disabled());
++	WARN_ON(num_online_cpus() > 1);
++
++	if (outer_cache.disable)
++		outer_cache.disable();
++}
 -- 
 1.8.3.1
