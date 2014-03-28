@@ -1,10 +1,10 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Mar 2014 09:00:48 -0700
+Date: Fri, 28 Mar 2014 09:01:49 -0700
 Subject: [PATCH 49/75] ARM: l2c: fix register naming
 In-Reply-To: <E1WTYYH-0007GB-3M@rmk-PC.arm.linux.org.uk>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
  <E1WTYYH-0007GB-3M@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140328160047.GD24308@atomide.com>
+Message-ID: <20140328160148.GE24308@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,35 +17,3 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
 Acked-by: Tony Lindgren <tony@atomide.com>
-
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -212,15 +212,15 @@ static int __init omap_l2_cache_init(void)
->  		return -ENOMEM;
->  
->  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
-> -	aux_ctrl = (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT) |
-> -			(0x1 << 25) |
-> -			(0x1 << L2X0_AUX_CTRL_NS_LOCKDOWN_SHIFT) |
-> -			(0x1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT)) |
-> -			(0x3 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
-> -			(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
-> -			(1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
-> -			(1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
-> -			(1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT);
-> +	aux_ctrl = L310_AUX_CTRL_ASSOCIATIVITY_16 |
-> +		   L310_AUX_CTRL_CACHE_REPLACE_RR |
-> +		   L310_AUX_CTRL_NS_LOCKDOWN |
-> +		   L310_AUX_CTRL_NS_INT_CTRL |
-> +		   L2C_AUX_CTRL_WAY_SIZE(3) |
-> +		   L2C_AUX_CTRL_SHARED_OVERRIDE |
-> +		   L310_AUX_CTRL_DATA_PREFETCH |
-> +		   L310_AUX_CTRL_INSTR_PREFETCH |
-> +		   L310_AUX_CTRL_EARLY_BRESP;
-
-I guess eventually we can set up some common configuration mask
-define for these kind of things?
-
-Regards,
-
-Tony
