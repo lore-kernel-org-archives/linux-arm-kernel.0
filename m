@@ -1,31 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 29 Mar 2014 01:18:06 +0100
-Subject: [PATCH net-next 0/3] net: stmmac: Add glue layer for socfpga
- platform
-In-Reply-To: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
-References: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
-Message-ID: <201403290118.07163.arnd@arndb.de>
+Date: Sat, 29 Mar 2014 01:22:24 +0100
+Subject: [PATCH 0/5] Kirkwood DT Documentation
+In-Reply-To: <20140324002233.GZ15608@titan.lakedaemon.net>
+References: <1395492360-1865-1-git-send-email-andrew@lunn.ch>
+ <20140324002233.GZ15608@titan.lakedaemon.net>
+Message-ID: <201403290122.24713.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 March 2014, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On Monday 24 March 2014, Jason Cooper wrote:
+> arm-soc maintainers,
 > 
-> Hi David,
+> On Sat, Mar 22, 2014 at 01:45:55PM +0100, Andrew Lunn wrote:
+> > This patchset fixes up a number of issues found by checkpatch in the
+> > kirkwood DT files or binding Documentation. Vendor Prefixes are
+> > documented, missing prefixes are added, incorrect prefixes are
+> > corrected, and Kirkwood SoCs are documented.
+> > 
+> > Note that some of these patches contain UTF-8 characters, which the
+> > mailing lists sometime don't like. The patches can also be found in
+> > 
+> > https://github.com/lunn/linux.git v3.14-rc7-next-20140321-dt
+> > 
+> > which is based on linux-next tag next-20140321.
 > 
-> I'm re-submitting the patch series to add the socfpga glue layer for the
-> stmmac ethernet driver. My original patch did not build for kernel module,
-> and I apologize for not testing against that.
+> I'd like to take this in as 'fixes-non-critical' for v3.15.  However,
+> I'm having trouble finding a stable, conflict-free branch to base it on.
+> The main problem seems to be vendor-prefixes.txt.
 > 
-> This patch is also better aligned with the other stmmac glue
-> layers(sti and sunxi).
+> How would you prefer I handle this?  Or, would you guys just like to
+> take the series directly?  I'm fine either way.
 > 
-> I'd like to take the "net: stmmac: Add SOCFPGA glue driver" patch into your
-> tree and the other 2 dts patches through the arm-soc tree.
+> If taking directly,
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-I've applied patches 2 and 3 to the arm-soc/next/dt branch now.
-
-Unfortunately there is still one trivial conflict against the net-next tree
-left in the binding document, but I'm not too worried about that.
+I think Rob should take the binding changes, we can take the dts file
+changes. Can you send them as patches relative to the next/dt branch
+to arm at kernel.org?
 
 	Arnd
