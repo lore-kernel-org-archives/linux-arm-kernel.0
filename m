@@ -1,20 +1,31 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 28 Mar 2014 16:52:16 -0700
-Subject: [ARM ATTEND] DeviceTree status
-In-Reply-To: <53315BE0.8030501@codethink.co.uk>
-References: <CAL_JsqLe0s6iw_BuZg4B8RwByKSbVABLfTP9hiYhTfzvaaQp_A@mail.gmail.
- com> <53315BE0.8030501@codethink.co.uk>
-Message-ID: <20140328235216.790D6C41FF4@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 29 Mar 2014 01:18:06 +0100
+Subject: [PATCH net-next 0/3] net: stmmac: Add glue layer for socfpga
+ platform
+In-Reply-To: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
+References: <1395891912-26855-1-git-send-email-dinguyen@altera.com>
+Message-ID: <201403290118.07163.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Mar 2014 10:35:12 +0000, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 24/03/14 14:55, Rob Herring wrote:
-> > I will be attending ELC. I think I may be the only DT maintainer
-> > attending (the rest were too scared).
+On Thursday 27 March 2014, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> I thought Grant was listed?
+> Hi David,
+> 
+> I'm re-submitting the patch series to add the socfpga glue layer for the
+> stmmac ethernet driver. My original patch did not build for kernel module,
+> and I apologize for not testing against that.
+> 
+> This patch is also better aligned with the other stmmac glue
+> layers(sti and sunxi).
+> 
+> I'd like to take the "net: stmmac: Add SOCFPGA glue driver" patch into your
+> tree and the other 2 dts patches through the arm-soc tree.
 
-I have a family conflict. I will not be there.
+I've applied patches 2 and 3 to the arm-soc/next/dt branch now.
 
-g.
+Unfortunately there is still one trivial conflict against the net-next tree
+left in the binding document, but I'm not too worried about that.
+
+	Arnd
