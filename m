@@ -1,26 +1,31 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Fri, 28 Mar 2014 18:11:01 -0700
-Subject: [PATCH] staging: imx-drm: add LVDS666 support for parallel display
-In-Reply-To: <1396047954-27175-1-git-send-email-kernel@esmil.dk>
-References: <1396047954-27175-1-git-send-email-kernel@esmil.dk>
-Message-ID: <53361DA5.4070806@boundarydevices.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 29 Mar 2014 02:47:33 +0100
+Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
+In-Reply-To: <021e01cf4a63$0cdb7380$26925a80$@samsung.com>
+References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
+ <532B43F9.9060001@samsung.com> <021e01cf4a63$0cdb7380$26925a80$@samsung.com>
+Message-ID: <201403290247.33924.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/28/2014 4:05 PM, Emil Renner Berthing wrote:
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-> index 156bbea..9945609 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
->  
-> +	/* lvds666 */
-> +	ipu_dc_map_clear(priv, IPU_DC_MAP_LVDS666);
-> +	ipu_dc_map_config(priv, IPU_DC_MAP_LVDS666, 0, 5, 0xfc); /* blue */
-> +	ipu_dc_map_config(priv, IPU_DC_MAP_LVDS666, 1, 15, 0xfc); /* green */
-> +	ipu_dc_map_config(priv, IPU_DC_MAP_LVDS666, 2, 21, 0xfc); /* red */
-> +
+On Friday 28 March 2014, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> > 
+> > On 03/19/14 13:01, Mike Turquette wrote:
+> > >
+> > Thanks :-)
+> > 
+> > > Acked-by: Mike Turquette<mturquette@linaro.org>
+> > >
+> > It's time. Please pull this [5/6] and "[GIT PULL 6/6] Samsung
+> > clk-s3c24xx updates for v3.15".
+> > 
+> Hi Arnd, Olof and Mike,
+> 
+> Still I cannot see this in arm-soc. Any problems?
+> 
 
-Should the 15 above be 13. ie 5+8=13, 13+8=21
-Also, imx_3.0.35_4.1.0 uses 13.
+Sorry, I didn't have this one on my radar any more, merged into
+next/drivers now.
 
-Troy
+	Arnd
