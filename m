@@ -1,53 +1,123 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 28 Mar 2014 22:51:51 -0400 (EDT)
-Subject: [PATCH] ARM: Better virt_to_page() handling
-In-Reply-To: <20140328200540.GQ7528@n2100.arm.linux.org.uk>
-References: <20140328152831.GK7528@n2100.arm.linux.org.uk>
- <E1WTYiT-0007Jl-Fe@rmk-PC.arm.linux.org.uk>
- <alpine.LFD.2.11.1403281506250.1571@knanqh.ubzr>
- <20140328200540.GQ7528@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1403282244430.1571@knanqh.ubzr>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Sat, 29 Mar 2014 10:14:45 +0530
+Subject: [PATCH 1/2] GPIO: Add driver for Zynq GPIO controller
+In-Reply-To: <CACRpkdbU35xG1QtagB+9e9vxvehf1UQFaF4PikJhsPNAMw=D1Q@mail.gmail.com>
+References: <1395933906-2268-1-git-send-email-harinik@xilinx.com>
+ <CACRpkdbU35xG1QtagB+9e9vxvehf1UQFaF4PikJhsPNAMw=D1Q@mail.gmail.com>
+Message-ID: <CAFcVECJsEp_s2V5=oK_UJahGRUpWYWMCxTMxqdpX+O0qebP41A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Mar 2014, Russell King - ARM Linux wrote:
+Hi Linus,
 
-> On Fri, Mar 28, 2014 at 03:52:16PM -0400, Nicolas Pitre wrote:
-> > I see it might be hard to make the last two common, unless it is defined 
-> > up front and the odd case does a #undef virt_to_pfn before redefining 
-> > it.  Which way is best I'm not sure.
-> 
-> Given the problems we've had in this area with changes ending up with
-> build failures, I think it's far better to have simplicity even if it
-> means duplicating definitions, rather than trying to invent some clever
-> way to avoid duplications.
+On Sat, Mar 29, 2014 at 3:20 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Mar 27, 2014 at 4:25 PM, Harini Katakam <harinik@xilinx.com> wrote:
+>
+>> Add support for GPIO controller used by Xilinx Zynq
+>>
+>> Signed-off-by: Harini Katakam <harinik@xilinx.com>
+>
+> This will not be integrated before v3.16 so we have some time to
+> think things over.
+>
+>> +config GPIO_ZYNQ
+>> +       bool "Xilinx ZYNQ GPIO support"
+>> +       depends on ARCH_ZYNQ
+>> +       select GENERIC_IRQ_CHIP
+>
+> I think that rather than selecting GENERIC_IRQ_CHIP,
+> select my new GPIOLIB_IRQCHIP and use the new helpers
+> gpiochip_irqchip_add() and gpiochip_set_chained_irqchip().
+>
+> Look in drivers/gpio/gpio-pl061.c for example usage.
+>
+> This is available in the "devel" or "for-next" branch of my
+> gpio tree at
+> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-gpio.git/
+>
 
-OK, fair enough.
+OK.
 
-> > Also this needs to take care of those machines overriding PHYS_OFFSET at 
-> > run time (see commit a77e0c7b2774f).
-> 
-> Platforms don't override PHYS_OFFSET.  They override PLAT_PHYS_OFFSET
-> instead.
-> 
-> > However it looks like no code 
-> > relying on the LPAE version of early_paging_init() has been merged in 
-> > mainline yet.
-> 
-> I believe that's fully reliant on CONFIG_ARM_PATCH_PHYS_VIRT being set,
-> and the difference for that case would be setting __pv_phys_pfn_offset
-> instead of __pv_phys_offset, which is a simple modification.
+<snip>
+>> +/* Read/Write access to the GPIO PS registers */
+>> +static inline u32 zynq_gpio_readreg(void __iomem *offset)
+>> +{
+>> +       return readl_relaxed(offset);
+>> +}
+>> +
+>> +static inline void zynq_gpio_writereg(void __iomem *offset, u32 val)
+>> +{
+>> +       writel_relaxed(val, offset);
+>> +}
+>
+> I think this is unnecessary and confusing indirection.
+> Just use the readl_relaxed/writel_relaxed functions directly in
+> the code.
+>
 
-Indeed.
+This is just to be flexible.
 
-> However, that's something which should be done by core code, not
-> individually by platforms.  Since we don't have any view of code doing
-> this yet, it's not relevant here.  We can only deal with what is in
-> mainline and not in external trees.
+<snip>
+>> +                       if (!(int_sts & 1))
+>> +                               continue;
+>> +                       gpio_irq_desc = irq_to_desc(gpio_irq);
+>> +                       BUG_ON(!gpio_irq_desc);
+>> +                       chip = irq_desc_get_chip(gpio_irq_desc);
+>> +                       BUG_ON(!chip);
+>> +                       chip->irq_ack(&gpio_irq_desc->irq_data);
+>> +
+>> +                       /* call the pin specific handler */
+>> +                       generic_handle_irq(gpio_irq);
+>> +               }
+>> +               /* shift to first virtual irq of next bank */
+>> +               gpio_irq = gpio->irq_base + zynq_gpio_pin_table[bank_num] + 1;
+>
+> This is also pretty convoluted. Are you sure you don't want to
+> implement one gpiochip per bank instead? I guess the final "+1"
+> means there is actually one IRQ per bank even?
+>
 
-Hence my suggestion to simply add a note to the commit log for this 
-patch, or better would be a note added to the comment for 
-early_paging_init() to that effect.
+There is only one IRQ for all four banks.
+I will try to make this logic and other places in the driver you pointed out,
+less convoluted.
+The handling is (very) slightly different for the upper two banks and
+lower two banks.
 
+<snip>
+>> +static const struct dev_pm_ops zynq_gpio_dev_pm_ops = {
+>> +       SET_SYSTEM_SLEEP_PM_OPS(zynq_gpio_suspend, zynq_gpio_resume)
+>> +       SET_RUNTIME_PM_OPS(zynq_gpio_runtime_suspend, zynq_gpio_runtime_resume,
+>> +                          zynq_gpio_idle)
+>> +};
+>
+> Is this runtime PM implementation aligned with Ulf Hansson's recent
+> new helpers to simplify suspend+runtime PM coexistance?
+>
 
-Nicolas
+I'm sorry i just looked at them -
+pm_runtime_force_suspend/resume are not used here.
+
+>> +       chip->dbg_show = NULL;
+>> +       chip->base = 0;         /* default pin base */
+>
+> The GPIO numberspace is not the same as the pin number space.
+> This is only going to work if you have no other GPIO controllers
+> on your system. Use -1 as base so you get dynamic allocation
+> of a GPIO number range instead.
+>
+> Make sure to use the new descriptor API for defining and accessing
+> GPIOs in all drivers and it will not matter which base you get.
+> (Good eh? :-)
+>
+> As it appears you're using device tree, it is all transparent and
+> you need not worry.
+>
+
+OK.
+
+<snip>
+
+Thanks for the review!
+
+Regards,
+Harini
