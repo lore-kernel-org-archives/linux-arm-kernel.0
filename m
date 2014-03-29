@@ -1,116 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 29 Mar 2014 14:01:57 +0000
-Subject: [PATCH] arm: KVM: fix possible misalignment of PGDs and bounce
- page
-In-Reply-To: <20140328193733.GL25519@cbox>
-References: <1396016719-13807-1-git-send-email-msalter@redhat.com>
- <20140328193733.GL25519@cbox>
-Message-ID: <e44e99a81131febf3b97edd9b099b859@www.loen.fr>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 29 Mar 2014 09:33:22 -0500
+Subject: [PATCH 0/8] Generic serial earlycon
+In-Reply-To: <20140329001732.BECE2C41FF4@trevor.secretlab.ca>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com>
+ <20140329001732.BECE2C41FF4@trevor.secretlab.ca>
+Message-ID: <CAL_JsqKAtiPXsP6fotT8FSTyy+8SJW5Cg2QKLBnL7Ya6KyKCog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-03-28 19:37, Christoffer Dall wrote:
-> On Fri, Mar 28, 2014 at 10:25:19AM -0400, Mark Salter wrote:
->> The kvm/mmu code shared by arm and arm64 uses kalloc() to allocate
->> a bounce page (if hypervisor init code crosses page boundary) and
->> hypervisor PGDs. The problem is that kalloc() does not guarantee
->> the proper alignment. In the case of the bounce page, the page sized
->> buffer allocated may also cross a page boundary negating the purpose
->> and leading to a hang during kvm initialization. Likewise the PGDs
->> allocated may not meet the minimum alignment requirements of the
->> underlying MMU. This patch uses __get_free_page() to guarantee the
->> worst case alignment needs of the bounce page and PGDs on both arm
->> and arm64.
+On Fri, Mar 28, 2014 at 7:17 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Sat, 22 Mar 2014 09:14:31 -0500, Rob Herring <robherring2@gmail.com> wrote:
+>> On Sat, Mar 22, 2014 at 4:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 21 March 2014, Rob Herring wrote:
+>> >> From: Rob Herring <robh@kernel.org>
+>> >>
+>> >> This started out as an attempt to add arm64's earlyprintk support to ARM
+>> >> in order to get an earlier, runtime setup console on multi-platform
+>> >> kernels. The first issue was needing the fixmap support which
+>> >> conveniently Mark Salter was working on and is mostly in place now. Like
+>> >> many things on ARM and arm64 now, it then became where do I put the now
+>> >> common, shared code. After digging more into various early console/printk
+>> >> support, it turns out the 8250_early.c setup code was the best starting
+>> >> point.
+>> >>
+>> >> This is based on Mark Salter's fixmap support currently in linux-next.
+>> >> This is tested on arm64 and ARM with pl011 and 8250. The ARM support
+>> >> also requires fixmap and fixed mapping support which are not yet in place.
+>> >> I have some patches in my tree to support fixmap, but they need some more
+>> >> work. Fortunately, once fixmap is in place, it is just a Kconfig option
+>> >> to enable earlycon support on ARM. A git tree is available here[1].
+>> >>
+>> >> Based on this series, I would like to add support for doing earlycon
+>> >> setup using DT.
+>> >
+>> > Hi Rob,
+>> >
+>> > I like this series a lot, great work!
+>> >
+>> > I would consider the DT parsing support essential here, we should not
+>> > merge the patches until that is done as well, because I don't want
+>> > to see users pass earlycon command line options in DT when they can
+>> > use the established "linux,stdout-path" property instead. I would
+>> > expect that in almost every case in which we are booting using DT
+>> > today, we can just use linux,stdout-path to locate the device that
+>> > the boot loader has already set up and start usign it.
 >>
->> Signed-off-by: Mark Salter <msalter@redhat.com>
->> ---
->>  arch/arm/kvm/mmu.c | 15 +++++++++------
->>  1 file changed, 9 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 7789857..575d790 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -42,6 +42,8 @@ static unsigned long hyp_idmap_start;
->>  static unsigned long hyp_idmap_end;
->>  static phys_addr_t hyp_idmap_vector;
->>
->> +#define pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
->> +
->>  #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
->>
->>  static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t 
->> ipa)
->> @@ -199,14 +201,14 @@ void free_boot_hyp_pgd(void)
->>  	if (boot_hyp_pgd) {
->>  		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
->>  		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
->> -		kfree(boot_hyp_pgd);
->> +		free_pages((unsigned long)boot_hyp_pgd, pgd_order);
->>  		boot_hyp_pgd = NULL;
->>  	}
->>
->>  	if (hyp_pgd)
->>  		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
->>
->> -	kfree(init_bounce_page);
->> +	free_page((unsigned long)init_bounce_page);
->>  	init_bounce_page = NULL;
->>
->>  	mutex_unlock(&kvm_hyp_pgd_mutex);
->> @@ -236,7 +238,7 @@ void free_hyp_pgds(void)
->>  		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += 
->> PGDIR_SIZE)
->>  			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
->>
->> -		kfree(hyp_pgd);
->> +		free_pages((unsigned long)hyp_pgd, pgd_order);
->>  		hyp_pgd = NULL;
->>  	}
->>
->> @@ -930,7 +932,7 @@ int kvm_mmu_init(void)
->>  		size_t len = __hyp_idmap_text_end - __hyp_idmap_text_start;
->>  		phys_addr_t phys_base;
->>
->> -		init_bounce_page = kmalloc(PAGE_SIZE, GFP_KERNEL);
->> +		init_bounce_page = (void *)__get_free_page(GFP_KERNEL);
->>  		if (!init_bounce_page) {
->>  			kvm_err("Couldn't allocate HYP init bounce page\n");
->>  			err = -ENOMEM;
->> @@ -956,8 +958,9 @@ int kvm_mmu_init(void)
->>  			 (unsigned long)phys_base);
->>  	}
->>
->> -	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
->> -	boot_hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
->> +	hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 
->> pgd_order);
->> +	boot_hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 
->> pgd_order);
->> +
->>  	if (!hyp_pgd || !boot_hyp_pgd) {
->>  		kvm_err("Hyp mode PGD not allocated\n");
->>  		err = -ENOMEM;
->> --
->> 1.8.5.3
->>
-> This looks right to me.  Funnily enough I seem to remember a 
-> discussion
-> from when we originally merged this code where someone (maybe me) 
-> argued
-> that kmalloc() would align to the size of the allocation, but I don't
-> see anything backing this up at this point.
+>> I think this series stands on its own. It is largely refactoring
+>> existing code and supporting existing command line options (arm64 just
+>> changes from earlyprintk= to earlycon=). There will be cases where
+>> changing the kernel command line is the only way to setup the
+>> earlycon. Also, I think we would still want the kernel command line to
+>> control whether or not we enable the earlycon (i.e. earlycon=dt).
+>> There's not a standard way for how bootloaders would decide to set
+>> "linux,stdout-path" or not.
 >
-> So:
+> I agree. I really like this series and I don't think it needs to wait
+> for DT parsing.
 >
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->
-> If Marc agrees I can queue this for -rc1.
+> Another issue is that the earlycon assumes the port is already set up,
+> but the /chosen/stdout-path binding doesn't guarantee that. We'll have
+> to make sure the kernel knows when it is valid to use
+> /chosen/stdout-path before enabling an early console.
 
-Looks good to me indeed.
+It's driver dependent whether the port setup is done in the earlycon
+driver or not. The 8250 driver does port setup while the pl011 driver
+does not. We could add setup to the pl011 or checks that it is setup
+already, but then it would not work with SBSA compliant UARTs.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I don't think we want to enable earlycon solely if stdout-path is set.
+My plan here is that adding "earlycon" with no parameters to the
+command line enables DT based setup of earlycon. That doesn't really
+solve the issue with setup, but does limit it to a developer's feature
+at least.
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+Rob
