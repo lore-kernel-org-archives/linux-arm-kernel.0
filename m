@@ -1,21 +1,50 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sat, 29 Mar 2014 12:50:07 -0700
-Subject: [PATCH v5 0/9] Use regmap+devm+DT in pm8xxx input drivers
-In-Reply-To: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-References: <1393958088-1456-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140329195007.GA14270@core.coreip.homeip.net>
+From: kernel@esmil.dk (Emil Renner Berthing)
+Date: Sun, 30 Mar 2014 00:17:09 +0100
+Subject: [PATCH] staging: imx-drm: imx-hdmi: clean up
+ hdmi_phy_wait_i2c_done
+In-Reply-To: <533712D1.6040505@boundarydevices.com>
+References: <1396097891-12209-1-git-send-email-kernel@esmil.dk>
+ <533712D1.6040505@boundarydevices.com>
+Message-ID: <CANBLGcy5kM37+1FrcYSzDbCTKbhLrvDdpC=2CQ8qw9CWwujxtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 04, 2014 at 10:34:39AM -0800, Stephen Boyd wrote:
-> These patches move the pm8xxx input drivers over to use devm_* APIs
-> and regmap. This breaks the dependency of these drivers on the pm8xxx
-> specific read/write calls and also simplifies the probe code a bit.
-> Finally we add devicetree support to these drivers so they can be probed
-> on the platforms that are supported upstream.
+On 29 March 2014 19:37, Troy Kisky <troy.kisky@boundarydevices.com> wrote:
+> On 3/29/2014 5:58 AM, Emil Renner Berthing wrote:
+>> Simplify hdmi_phy_wait_i2c_done so the call to hdmi_readb is
+>> only done in one place. This also fixes a checkpatch warning.
+>>
+>> Signed-off-by: Emil Renner Berthing <kernel@esmil.dk>
+>> ---
+>>  drivers/staging/imx-drm/imx-hdmi.c | 5 +----
+>>  1 file changed, 1 insertion(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
+>> index da71d8d..cc8d232 100644
+>> --- a/drivers/staging/imx-drm/imx-hdmi.c
+>> +++ b/drivers/staging/imx-drm/imx-hdmi.c
+>> @@ -660,13 +660,10 @@ static inline void hdmi_phy_test_dout(struct imx_hdmi *hdmi,
+>>
+>>  static bool hdmi_phy_wait_i2c_done(struct imx_hdmi *hdmi, int msec)
+>>  {
+>> -     unsigned char val = 0;
+>> -     val = hdmi_readb(hdmi, HDMI_IH_I2CMPHY_STAT0) & 0x3;
+>> -     while (!val) {
+>> +     while ((hdmi_readb(hdmi, HDMI_IH_I2CMPHY_STAT0) & 0x3) == 0) {
+>>               udelay(1000);
+>>               if (msec-- == 0)
+>>                       return false;
+>> -             val = hdmi_readb(hdmi, HDMI_IH_I2CMPHY_STAT0) & 0x3;
+>>       }
+>>       return true;
+>>  }
+>>
+>
+> I'd prefer to have the msec check before the delay, not your
+> fault, but while your in the area anyway. That way a wait
+> of 0 ms doesn't wait at all and just checks if it is done.
 
-Applied all (and folded DT binding patches into respective driver
-changes).
+Makes perfect sense. I'll resend the patch although this was mostly to
+make the Eudyptula scripts happy ;)
 
--- 
-Dmitry
+/Emil
