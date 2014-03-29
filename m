@@ -1,31 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 29 Mar 2014 02:47:33 +0100
-Subject: [GIT PULL 5/6] Samsung PM updates for v3.15
-In-Reply-To: <021e01cf4a63$0cdb7380$26925a80$@samsung.com>
-References: <8259832.260591393840570438.JavaMail.weblogic@epml16>
- <532B43F9.9060001@samsung.com> <021e01cf4a63$0cdb7380$26925a80$@samsung.com>
-Message-ID: <201403290247.33924.arnd@arndb.de>
+Date: Sat, 29 Mar 2014 02:49:04 +0100
+Subject: [GIT PULL 1/2] Samsung 2nd cleanup for v3.15
+In-Reply-To: <53285457.80900@samsung.com>
+References: <53285457.80900@samsung.com>
+Message-ID: <201403290249.04949.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 March 2014, Kukjin Kim wrote:
-> Kukjin Kim wrote:
-> > 
-> > On 03/19/14 13:01, Mike Turquette wrote:
-> > >
-> > Thanks :-)
-> > 
-> > > Acked-by: Mike Turquette<mturquette@linaro.org>
-> > >
-> > It's time. Please pull this [5/6] and "[GIT PULL 6/6] Samsung
-> > clk-s3c24xx updates for v3.15".
-> > 
-> Hi Arnd, Olof and Mike,
+On Tuesday 18 March 2014, Kukjin Kim wrote:
+> The following changes since commit d9671ca923445aa870ecc34df3db01dd602d87fc:
 > 
-> Still I cannot see this in arm-soc. Any problems?
+>    ARM: EXYNOS: Remove uncompress.h (2014-02-24 09:39:18 +0900)
 > 
+> are available in the git repository at:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> tags/samsung-cleanup-2
+> 
+> for you to fetch changes up to 19a964644f1e655c3f67d539c1e99a9fbcc4588c:
+> 
+>    ARM: SAMSUNG: remove all custom uncompress.h (2014-03-11 22:05:18 +0900)
+> 
+> ----------------------------------------------------------------
+> Samsung cleanup-2 for v3.15
+> - use generic uncompress.h and remove all custom
+>    uncompress.h in mach-s3c24xx, s3c64xx, s5p64x0,
+>    s5pc100, s5pv210 and plat-samsung directories.
+> 
+> Note that based on previous tags/samsung-cleanup
 
-Sorry, I didn't have this one on my radar any more, merged into
-next/drivers now.
+I've started a new next/cleanup3 branch for this one and the following
+five samsung branches. I found one small issue with one of the branches,
+if we all agree on a solution for that, I expect we can just send out
+the cleanup3 branch together with cleanup2.
 
 	Arnd
