@@ -1,123 +1,34 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Sat, 29 Mar 2014 10:14:45 +0530
-Subject: [PATCH 1/2] GPIO: Add driver for Zynq GPIO controller
-In-Reply-To: <CACRpkdbU35xG1QtagB+9e9vxvehf1UQFaF4PikJhsPNAMw=D1Q@mail.gmail.com>
-References: <1395933906-2268-1-git-send-email-harinik@xilinx.com>
- <CACRpkdbU35xG1QtagB+9e9vxvehf1UQFaF4PikJhsPNAMw=D1Q@mail.gmail.com>
-Message-ID: <CAFcVECJsEp_s2V5=oK_UJahGRUpWYWMCxTMxqdpX+O0qebP41A@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 29 Mar 2014 10:48:25 +0400
+Subject: [PATCH] ARM: dts: imx27-phytec-phycore-rdk: Add display control
+ signal definitions
+Message-ID: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This patch adds display control signal definitions.
+These fields are not used in the driver yet, but will be used for
+reference to indicate the polarity of the signals.
 
-On Sat, Mar 29, 2014 at 3:20 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Mar 27, 2014 at 4:25 PM, Harini Katakam <harinik@xilinx.com> wrote:
->
->> Add support for GPIO controller used by Xilinx Zynq
->>
->> Signed-off-by: Harini Katakam <harinik@xilinx.com>
->
-> This will not be integrated before v3.16 so we have some time to
-> think things over.
->
->> +config GPIO_ZYNQ
->> +       bool "Xilinx ZYNQ GPIO support"
->> +       depends on ARCH_ZYNQ
->> +       select GENERIC_IRQ_CHIP
->
-> I think that rather than selecting GENERIC_IRQ_CHIP,
-> select my new GPIOLIB_IRQCHIP and use the new helpers
-> gpiochip_irqchip_add() and gpiochip_set_chained_irqchip().
->
-> Look in drivers/gpio/gpio-pl061.c for example usage.
->
-> This is available in the "devel" or "for-next" branch of my
-> gpio tree at
-> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-gpio.git/
->
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-OK.
-
-<snip>
->> +/* Read/Write access to the GPIO PS registers */
->> +static inline u32 zynq_gpio_readreg(void __iomem *offset)
->> +{
->> +       return readl_relaxed(offset);
->> +}
->> +
->> +static inline void zynq_gpio_writereg(void __iomem *offset, u32 val)
->> +{
->> +       writel_relaxed(val, offset);
->> +}
->
-> I think this is unnecessary and confusing indirection.
-> Just use the readl_relaxed/writel_relaxed functions directly in
-> the code.
->
-
-This is just to be flexible.
-
-<snip>
->> +                       if (!(int_sts & 1))
->> +                               continue;
->> +                       gpio_irq_desc = irq_to_desc(gpio_irq);
->> +                       BUG_ON(!gpio_irq_desc);
->> +                       chip = irq_desc_get_chip(gpio_irq_desc);
->> +                       BUG_ON(!chip);
->> +                       chip->irq_ack(&gpio_irq_desc->irq_data);
->> +
->> +                       /* call the pin specific handler */
->> +                       generic_handle_irq(gpio_irq);
->> +               }
->> +               /* shift to first virtual irq of next bank */
->> +               gpio_irq = gpio->irq_base + zynq_gpio_pin_table[bank_num] + 1;
->
-> This is also pretty convoluted. Are you sure you don't want to
-> implement one gpiochip per bank instead? I guess the final "+1"
-> means there is actually one IRQ per bank even?
->
-
-There is only one IRQ for all four banks.
-I will try to make this logic and other places in the driver you pointed out,
-less convoluted.
-The handling is (very) slightly different for the upper two banks and
-lower two banks.
-
-<snip>
->> +static const struct dev_pm_ops zynq_gpio_dev_pm_ops = {
->> +       SET_SYSTEM_SLEEP_PM_OPS(zynq_gpio_suspend, zynq_gpio_resume)
->> +       SET_RUNTIME_PM_OPS(zynq_gpio_runtime_suspend, zynq_gpio_runtime_resume,
->> +                          zynq_gpio_idle)
->> +};
->
-> Is this runtime PM implementation aligned with Ulf Hansson's recent
-> new helpers to simplify suspend+runtime PM coexistance?
->
-
-I'm sorry i just looked at them -
-pm_runtime_force_suspend/resume are not used here.
-
->> +       chip->dbg_show = NULL;
->> +       chip->base = 0;         /* default pin base */
->
-> The GPIO numberspace is not the same as the pin number space.
-> This is only going to work if you have no other GPIO controllers
-> on your system. Use -1 as base so you get dynamic allocation
-> of a GPIO number range instead.
->
-> Make sure to use the new descriptor API for defining and accessing
-> GPIOs in all drivers and it will not matter which base you get.
-> (Good eh? :-)
->
-> As it appears you're using device tree, it is all transparent and
-> you need not worry.
->
-
-OK.
-
-<snip>
-
-Thanks for the review!
-
-Regards,
-Harini
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index 4a43bfd..9117a3c 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -30,6 +30,10 @@
+ 				vback-porch = <7>;
+ 				vsync-len = <1>;
+ 				vfront-porch = <9>;
++				pixelclk-active = <1>;
++				hsync-active = <1>;
++				vsync-active = <1>;
++				de-active = <0>;
+ 			};
+ 		};
+ 	};
+-- 
+1.8.3.2
