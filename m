@@ -1,86 +1,314 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 29 Mar 2014 15:34:25 +0000
-Subject: [PATCH 0/8] Generic serial earlycon
-In-Reply-To: <CAL_JsqKAtiPXsP6fotT8FSTyy+8SJW5Cg2QKLBnL7Ya6KyKCog@mail.gmail.com>
-References: <1395436128-11244-1-git-send-email-robherring2@gmail.com> <
- CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com> <
- 20140329001732.BECE2C41FF4@trevor.secretlab.ca> <
- CAL_JsqKAtiPXsP6fotT8FSTyy+8SJW5Cg2QKLBnL7Ya6KyKCog@mail.gmail.com>
-Message-ID: <20140329153425.6BF73C40ADB@trevor.secretlab.ca>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 29 Mar 2014 16:36:24 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 04/10] input: misc: Add driver for
+ AXP20x Power Enable Key
+In-Reply-To: <20140328073803.GA22093@core.coreip.homeip.net>
+References: <1395955764-18103-1-git-send-email-carlo@caione.org>
+ <1395955764-18103-5-git-send-email-carlo@caione.org>
+ <20140328073803.GA22093@core.coreip.homeip.net>
+Message-ID: <20140329153624.GA3952@localhost.fastwebnet.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 29 Mar 2014 09:33:22 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> On Fri, Mar 28, 2014 at 7:17 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> > On Sat, 22 Mar 2014 09:14:31 -0500, Rob Herring <robherring2@gmail.com> wrote:
-> >> On Sat, Mar 22, 2014 at 4:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Friday 21 March 2014, Rob Herring wrote:
-> >> >> From: Rob Herring <robh@kernel.org>
-> >> >>
-> >> >> This started out as an attempt to add arm64's earlyprintk support to ARM
-> >> >> in order to get an earlier, runtime setup console on multi-platform
-> >> >> kernels. The first issue was needing the fixmap support which
-> >> >> conveniently Mark Salter was working on and is mostly in place now. Like
-> >> >> many things on ARM and arm64 now, it then became where do I put the now
-> >> >> common, shared code. After digging more into various early console/printk
-> >> >> support, it turns out the 8250_early.c setup code was the best starting
-> >> >> point.
-> >> >>
-> >> >> This is based on Mark Salter's fixmap support currently in linux-next.
-> >> >> This is tested on arm64 and ARM with pl011 and 8250. The ARM support
-> >> >> also requires fixmap and fixed mapping support which are not yet in place.
-> >> >> I have some patches in my tree to support fixmap, but they need some more
-> >> >> work. Fortunately, once fixmap is in place, it is just a Kconfig option
-> >> >> to enable earlycon support on ARM. A git tree is available here[1].
-> >> >>
-> >> >> Based on this series, I would like to add support for doing earlycon
-> >> >> setup using DT.
-> >> >
-> >> > Hi Rob,
-> >> >
-> >> > I like this series a lot, great work!
-> >> >
-> >> > I would consider the DT parsing support essential here, we should not
-> >> > merge the patches until that is done as well, because I don't want
-> >> > to see users pass earlycon command line options in DT when they can
-> >> > use the established "linux,stdout-path" property instead. I would
-> >> > expect that in almost every case in which we are booting using DT
-> >> > today, we can just use linux,stdout-path to locate the device that
-> >> > the boot loader has already set up and start usign it.
-> >>
-> >> I think this series stands on its own. It is largely refactoring
-> >> existing code and supporting existing command line options (arm64 just
-> >> changes from earlyprintk= to earlycon=). There will be cases where
-> >> changing the kernel command line is the only way to setup the
-> >> earlycon. Also, I think we would still want the kernel command line to
-> >> control whether or not we enable the earlycon (i.e. earlycon=dt).
-> >> There's not a standard way for how bootloaders would decide to set
-> >> "linux,stdout-path" or not.
-> >
-> > I agree. I really like this series and I don't think it needs to wait
-> > for DT parsing.
-> >
-> > Another issue is that the earlycon assumes the port is already set up,
-> > but the /chosen/stdout-path binding doesn't guarantee that. We'll have
-> > to make sure the kernel knows when it is valid to use
-> > /chosen/stdout-path before enabling an early console.
+On Fri, Mar 28, 2014 at 12:38:03AM -0700, Dmitry Torokhov wrote:
+> Hi Carlo,
+
+Hi Dmitry,
+
 > 
-> It's driver dependent whether the port setup is done in the earlycon
-> driver or not. The 8250 driver does port setup while the pl011 driver
-> does not. We could add setup to the pl011 or checks that it is setup
-> already, but then it would not work with SBSA compliant UARTs.
+> On Thu, Mar 27, 2014 at 10:29:18PM +0100, Carlo Caione wrote:
 
-Well, it would work in most cases, but would be unnecessary and makes it
-more likely that there will be no output if the kernel gets the setup
-wrong.
+[...]
 
-> I don't think we want to enable earlycon solely if stdout-path is set.
-> My plan here is that adding "earlycon" with no parameters to the
-> command line enables DT based setup of earlycon. That doesn't really
-> solve the issue with setup, but does limit it to a developer's feature
-> at least.
+> > +#include <linux/errno.h>
+> > +#include <linux/irq.h>
+> > +#include <linux/init.h>
+> > +#include <linux/input.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/mfd/axp20x.h>
+> > +#include <linux/module.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#define AXP20X_PEK_STARTUP_MASK		(0xc0)
+> > +#define AXP20X_PEK_SHUTDOWN_MASK	(0x03)
+> > +
+> > +static const char const *startup_time[] = { "128ms", "3s" , "1s", "2s" };
+> > +static const char const *shutdown_time[] = { "4s", "6s" , "8s", "10s" };
+> 
+> Why not have everything expressed in milliseconds and have sysfs
+> attribute apply the closest one possible?
 
-That is reasonable. Alternately, we could also add a property to chosen
-indicating that the console is set up and ready to go.
+Yep, I agree that could be nice. Fix in v3.
 
-g.
+> By the way, do you want to plumb these through device tree as well?
+
+Hum, not sure about that. AFAIK device tree is used for hardware
+description whereas these are configuration parameters. Moreover you
+would have these parameters saved through reboots.
+
+> > +
+> > +struct axp20x_pek {
+> > +	struct axp20x_dev *axp20x;
+> > +	struct input_dev *input;
+> > +	int irq_dbr;
+> > +	int irq_dbf;
+> > +};
+> > +
+> > +struct axp20x_pek_ext_attr {
+> > +	const char const **str;
+> > +	unsigned int mask;
+> > +};
+> > +
+> > +static struct axp20x_pek_ext_attr axp20x_pek_startup_ext_attr = {
+> > +	.str	= startup_time,
+> > +	.mask	= AXP20X_PEK_STARTUP_MASK,
+> > +};
+> > +
+> > +static struct axp20x_pek_ext_attr axp20x_pek_shutdown_ext_attr = {
+> > +	.str	= shutdown_time,
+> > +	.mask	= AXP20X_PEK_SHUTDOWN_MASK,
+> > +};
+> > +
+> > +static struct axp20x_pek_ext_attr *get_axp_ext_attr(struct device_attribute *attr)
+> > +{
+> > +	return container_of(attr, struct dev_ext_attribute, attr)->var;
+> > +}
+> > +
+> > +static ssize_t axp20x_show_ext_attr(struct device *dev, struct device_attribute *attr,
+> > +			     char *buf)
+> > +{
+> > +	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+> > +	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
+> > +	unsigned int val;
+> > +	int ret, i;
+> > +	int cnt = 0;
+> > +
+> > +	ret = regmap_read(axp20x_pek->axp20x->regmap, AXP20X_PEK_KEY, &val);
+> > +	if (ret != 0)
+> > +		return ret;
+> > +
+> > +	val &= axp20x_ea->mask;
+> > +	val >>= ffs(axp20x_ea->mask) - 1;
+> > +
+> > +	for (i = 0; i < 4; i++) {
+> > +		if (val == i)
+> > +			cnt += sprintf(buf + cnt, "[%s] ", axp20x_ea->str[i]);
+> > +		else
+> > +			cnt += sprintf(buf + cnt, "%s ", axp20x_ea->str[i]);
+> 
+> Please just return the current value; why do we need pretty-printing?
+
+It was done to have the possibility to look at the accepted values. With
+the modification you suggested before this is not necessary anymore.
+I'll change it.
+
+> > +	}
+> > +
+> > +	cnt += sprintf(buf + cnt, "\n");
+> > +
+> > +	return cnt;
+> > +}
+> > +
+> > +static ssize_t axp20x_store_ext_attr(struct device *dev, struct device_attribute *attr,
+> > +			      const char *buf, size_t count)
+> > +{
+> > +	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+> > +	struct axp20x_pek_ext_attr *axp20x_ea = get_axp_ext_attr(attr);
+> > +	char val_str[20];
+> > +	int ret, i;
+> > +	size_t len;
+> > +
+> > +	val_str[sizeof(val_str) - 1] = '\0';
+> > +	strncpy(val_str, buf, sizeof(val_str) - 1);
+> > +	len = strlen(val_str);
+> > +
+> > +	if (len && val_str[len - 1] == '\n')
+> > +		val_str[len - 1] = '\0';
+> > +
+> > +	for (i = 0; i < 4; i++) {
+> > +		if (!strcmp(val_str, axp20x_ea->str[i])) {
+> > +
+> > +			i <<= ffs(axp20x_ea->mask) - 1;
+> > +			ret = regmap_update_bits(axp20x_pek->axp20x->regmap,
+> > +						 AXP20X_PEK_KEY,
+> > +						 axp20x_ea->mask, i);
+> > +			if (ret != 0)
+> > +				return -EINVAL;
+> > +			return count;
+> > +		}
+> > +	}
+> > +
+> > +	return -EINVAL;
+> > +}
+> > +
+> > +static struct dev_ext_attribute axp20x_dev_attr_startup = {
+> > +	.attr	= __ATTR(startup, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+> > +	.var	= &axp20x_pek_startup_ext_attr
+> > +};
+> > +
+> > +static struct dev_ext_attribute axp20x_dev_attr_shutdown = {
+> > +	__ATTR(shutdown, 0644, axp20x_show_ext_attr, axp20x_store_ext_attr),
+> > +	&axp20x_pek_shutdown_ext_attr
+> > +};
+> > +
+> > +static struct attribute *dev_attrs[] = {
+> > +	&axp20x_dev_attr_startup.attr.attr,
+> > +	&axp20x_dev_attr_shutdown.attr.attr,
+> > +	NULL,
+> > +};
+> > +
+> > +static struct attribute_group dev_attr_group = {
+> > +	.attrs	= dev_attrs,
+> > +};
+> > +
+> > +static const struct attribute_group *dev_attr_groups[] = {
+> > +	&dev_attr_group,
+> > +	NULL,
+> > +};
+> > +
+> > +static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
+> > +{
+> > +	struct input_dev *idev = pwr;
+> > +	struct axp20x_pek *axp20x_pek = input_get_drvdata(idev);
+> > +
+> > +	if (irq == axp20x_pek->irq_dbr)
+> > +		input_report_key(idev, KEY_POWER, true);
+> > +	else if (irq == axp20x_pek->irq_dbf)
+> > +		input_report_key(idev, KEY_POWER, false);
+> > +
+> > +	input_sync(idev);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int axp20x_pek_probe(struct platform_device *pdev)
+> > +{
+> > +	struct axp20x_pek *axp20x_pek;
+> > +	struct axp20x_dev *axp20x;
+> > +	struct input_dev *idev;
+> > +	int error;
+> > +
+> > +	axp20x_pek = devm_kzalloc(&pdev->dev, sizeof(struct axp20x_pek),
+> > +				  GFP_KERNEL);
+> > +	if (!axp20x_pek)
+> > +		return -ENOMEM;
+> > +
+> > +	axp20x_pek->axp20x = dev_get_drvdata(pdev->dev.parent);
+> > +	axp20x = axp20x_pek->axp20x;
+> > +
+> > +	axp20x_pek->irq_dbr = platform_get_irq_byname(pdev, "PEK_DBR");
+> > +	if (axp20x_pek->irq_dbr < 0) {
+> > +		dev_err(&pdev->dev, "No IRQ for PEK_DBR, error=%d\n",
+> > +				axp20x_pek->irq_dbr);
+> > +		return axp20x_pek->irq_dbr;
+> > +	}
+> > +	axp20x_pek->irq_dbr = regmap_irq_get_virq(axp20x->regmap_irqc,
+> > +						  axp20x_pek->irq_dbr);
+> > +
+> > +	axp20x_pek->irq_dbf = platform_get_irq_byname(pdev, "PEK_DBF");
+> > +	if (axp20x_pek->irq_dbf < 0) {
+> > +		dev_err(&pdev->dev, "No IRQ for PEK_DBF, error=%d\n",
+> > +				axp20x_pek->irq_dbf);
+> > +		return axp20x_pek->irq_dbf;
+> > +	}
+> > +	axp20x_pek->irq_dbf = regmap_irq_get_virq(axp20x->regmap_irqc,
+> > +						  axp20x_pek->irq_dbf);
+> > +
+> > +	axp20x_pek->input = devm_input_allocate_device(&pdev->dev);
+> > +	if (!axp20x_pek->input)
+> > +		return -ENOMEM;
+> > +
+> > +	idev = axp20x_pek->input;
+> > +
+> > +	idev->name = "axp20x-pek";
+> > +	idev->phys = "m1kbd/input2";
+> > +	idev->dev.parent = &pdev->dev;
+> > +
+> > +	input_set_capability(idev, EV_KEY, KEY_POWER);
+> > +
+> > +	input_set_drvdata(idev, axp20x_pek);
+> > +
+> > +	error = devm_request_threaded_irq(&pdev->dev, axp20x_pek->irq_dbr,
+> > +					  NULL, axp20x_pek_irq, 0,
+> > +					  "axp20x-pek-dbr", idev);
+> 
+> Why does it have to be threaded IRQ?
+
+Because this is already handled as a nested irq from a irq thread. The
+parent threaded irq is installed by regmap_add_irq_chip() in the MFD
+driver core.
+
+> > +	if (error) {
+> > +		dev_err(axp20x->dev, "Failed to request dbr IRQ#%d: %d\n",
+> > +			axp20x_pek->irq_dbr, error);
+> > +
+> > +		return error;
+> > +	}
+> > +
+> > +	error = devm_request_threaded_irq(&pdev->dev, axp20x_pek->irq_dbf,
+> > +					  NULL, axp20x_pek_irq, 0,
+> > +					  "axp20x-pek-dbf", idev);
+> > +	if (error) {
+> > +		dev_err(axp20x->dev, "Failed to request dbf IRQ#%d: %d\n",
+> > +			axp20x_pek->irq_dbf, error);
+> > +		return error;
+> > +	}
+> > +
+> > +	idev->dev.groups = dev_attr_groups;
+> 
+> These are not generic input attributes so they should belong to the platform
+> device, not input device.
+
+Ok. Can I ask why they cannot be considered an input attributes?
+
+> > +	error = input_register_device(idev);
+> > +	if (error) {
+> > +		dev_err(axp20x->dev, "Can't register input device: %d\n", error);
+> > +		return error;
+> > +	}
+> > +
+> > +	platform_set_drvdata(pdev, axp20x_pek);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int axp20x_pek_remove(struct platform_device *pdev)
+> > +{
+> > +	struct axp20x_pek *axp20x_pek = platform_get_drvdata(pdev);
+> > +
+> > +	input_unregister_device(axp20x_pek->input);
+> 
+> No need to call input_unregister_device() for managed input devices.
+
+Right. Fix in v3.
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct platform_driver axp20x_pek_driver = {
+> > +	.probe		= axp20x_pek_probe,
+> > +	.remove		= axp20x_pek_remove,
+> > +	.driver		= {
+> > +		.name		= "axp20x-pek",
+> > +		.owner		= THIS_MODULE,
+> > +	},
+> > +};
+> > +module_platform_driver(axp20x_pek_driver);
+> > +
+> > +MODULE_DESCRIPTION("axp20x Power Button");
+> > +MODULE_AUTHOR("Carlo Caione <carlo@caione.org>");
+> > +MODULE_LICENSE("GPL");
+> > -- 
+> > 1.8.3.2
+> > 
+> 
+> Thanks.
+
+Thank you,
+
+-- 
+Carlo Caione
