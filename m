@@ -1,77 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 29 Mar 2014 09:33:22 -0500
-Subject: [PATCH 0/8] Generic serial earlycon
-In-Reply-To: <20140329001732.BECE2C41FF4@trevor.secretlab.ca>
-References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
- <CAL_JsqKjGjyYypwneCmNc1qeKe0ZOG9gz3QSJ37-HwHXKu3iRA@mail.gmail.com>
- <20140329001732.BECE2C41FF4@trevor.secretlab.ca>
-Message-ID: <CAL_JsqKAtiPXsP6fotT8FSTyy+8SJW5Cg2QKLBnL7Ya6KyKCog@mail.gmail.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Sat, 29 Mar 2014 20:58:39 +0530
+Subject: [PATCH 1/2] dma: Add Xilinx AXI DMA DT Binding Documentation
+Message-ID: <1396106920-19015-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 7:17 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Sat, 22 Mar 2014 09:14:31 -0500, Rob Herring <robherring2@gmail.com> wrote:
->> On Sat, Mar 22, 2014 at 4:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 21 March 2014, Rob Herring wrote:
->> >> From: Rob Herring <robh@kernel.org>
->> >>
->> >> This started out as an attempt to add arm64's earlyprintk support to ARM
->> >> in order to get an earlier, runtime setup console on multi-platform
->> >> kernels. The first issue was needing the fixmap support which
->> >> conveniently Mark Salter was working on and is mostly in place now. Like
->> >> many things on ARM and arm64 now, it then became where do I put the now
->> >> common, shared code. After digging more into various early console/printk
->> >> support, it turns out the 8250_early.c setup code was the best starting
->> >> point.
->> >>
->> >> This is based on Mark Salter's fixmap support currently in linux-next.
->> >> This is tested on arm64 and ARM with pl011 and 8250. The ARM support
->> >> also requires fixmap and fixed mapping support which are not yet in place.
->> >> I have some patches in my tree to support fixmap, but they need some more
->> >> work. Fortunately, once fixmap is in place, it is just a Kconfig option
->> >> to enable earlycon support on ARM. A git tree is available here[1].
->> >>
->> >> Based on this series, I would like to add support for doing earlycon
->> >> setup using DT.
->> >
->> > Hi Rob,
->> >
->> > I like this series a lot, great work!
->> >
->> > I would consider the DT parsing support essential here, we should not
->> > merge the patches until that is done as well, because I don't want
->> > to see users pass earlycon command line options in DT when they can
->> > use the established "linux,stdout-path" property instead. I would
->> > expect that in almost every case in which we are booting using DT
->> > today, we can just use linux,stdout-path to locate the device that
->> > the boot loader has already set up and start usign it.
->>
->> I think this series stands on its own. It is largely refactoring
->> existing code and supporting existing command line options (arm64 just
->> changes from earlyprintk= to earlycon=). There will be cases where
->> changing the kernel command line is the only way to setup the
->> earlycon. Also, I think we would still want the kernel command line to
->> control whether or not we enable the earlycon (i.e. earlycon=dt).
->> There's not a standard way for how bootloaders would decide to set
->> "linux,stdout-path" or not.
->
-> I agree. I really like this series and I don't think it needs to wait
-> for DT parsing.
->
-> Another issue is that the earlycon assumes the port is already set up,
-> but the /chosen/stdout-path binding doesn't guarantee that. We'll have
-> to make sure the kernel knows when it is valid to use
-> /chosen/stdout-path before enabling an early console.
+Device-tree binding documentation of Xilinx DMA Engine
 
-It's driver dependent whether the port setup is done in the earlycon
-driver or not. The 8250 driver does port setup while the pl011 driver
-does not. We could add setup to the pl011 or checks that it is setup
-already, but then it would not work with SBSA compliant UARTs.
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |   65 ++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
 
-I don't think we want to enable earlycon solely if stdout-path is set.
-My plan here is that adding "earlycon" with no parameters to the
-command line enables DT based setup of earlycon. That doesn't really
-solve the issue with setup, but does limit it to a developer's feature
-at least.
-
-Rob
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+new file mode 100644
+index 0000000..18e8bcc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -0,0 +1,65 @@
++Xilinx AXI DMA engine, it does transfers between memory and AXI4 stream
++target devices. It can be configured to have one channel or two channels.
++If configured as two channels, one is to transmit to the device and another
++is to receive from the device.
++
++Required properties:
++- compatible: Should be "xlnx,axi-dma-1.00.a"
++- #dma-cells: Should be <1>, see "dmas" property below
++- reg: Should contain DMA registers location and length.
++- dma-channel child node: Should have atleast one channel and can have upto
++	two channels per device. This node specifies the properties of each
++	DMA channel (see child node properties below).
++
++Optional properties:
++- xlnx,include-sg: Tells whether configured for Scatter-mode in
++	the hardware.
++
++Required child node properties:
++- compatible: It should be either "xlnx,axi-dma-mm2s-channel" or
++	"xlnx,axi-dma-s2mm-channel".
++- interrupts: Should contain per channel DMA interrupts.
++- xlnx,data-width: Should contain the stream data width, take values
++	{32,64...1024}.
++
++Option child node properties:
++- xlnx,include-dre: Tells whether hardware is configured for Data
++	Realignment Engine.
++
++Example:
++++++++++
++
++axi_dma_0: axidma at 40400000 {
++	compatible = "xlnx,axi-dma-1.00.a";
++	#dma_cells = <1>;
++	reg = < 0x40400000 0x10000 >;
++	dma-channel at 40400000 {
++		compatible = "xlnx,axi-dma-mm2s-channel";
++		interrupts = < 0 59 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++	dma-channel at 40400030 {
++		compatible = "xlnx,axi-dma-s2mm-channel";
++		interrupts = < 0 58 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++} ;
++
++
++* DMA client
++
++Required properties:
++- dmas: a list of <[DMA device phandle] [Channel ID]> pairs,
++	where Channel ID is '0' for write/tx and '1' for read/rx
++	channel.
++- dma-names: a list of DMA channel names, one per "dmas" entry
++
++Example:
++++++++++
++
++dmatest_0: dmatest at 0 {
++	compatible ="xlnx,axi-dma-test-1.00.a";
++	dmas = <&axi_dma_0 0
++		&axi_dma_0 1>;
++	dma-names = "dma0", "dma1";
++} ;
+-- 
+1.7.9.5
