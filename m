@@ -1,31 +1,55 @@
-From: kernel@esmil.dk (Emil Renner Berthing)
-Date: Sat, 29 Mar 2014 10:41:06 +0100
-Subject: [PATCH] staging: imx-drm: add LVDS666 support for parallel display
-In-Reply-To: <53361DA5.4070806@boundarydevices.com>
-References: <1396047954-27175-1-git-send-email-kernel@esmil.dk>
- <53361DA5.4070806@boundarydevices.com>
-Message-ID: <CANBLGczyZFdUzhYfmOy6gG4h8rYYXOxbOiQWNRWUOU=DSt+4+A@mail.gmail.com>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Sat, 29 Mar 2014 10:52:56 +0100
+Subject: [RFC PATCH v2 03/10] ARM: at91: introduce OLD_IRQ_AT91 Kconfig
+ option
+In-Reply-To: <7407417.cSDunZuEhW@wuerfel>
+References: <1396029548-10928-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1396029548-10928-4-git-send-email-b.brezillon.dev@gmail.com>
+ <20140329100639.5ea454bc@skate> <7407417.cSDunZuEhW@wuerfel>
+Message-ID: <533697F8.5000903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2014 02:11, Troy Kisky <troy.kisky@boundarydevices.com> wrote:
-> On 3/28/2014 4:05 PM, Emil Renner Berthing wrote:
->> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
->> index 156bbea..9945609 100644
->> --- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
->> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+Le 29/03/2014 10:12, Arnd Bergmann a ?crit :
+> On Saturday 29 March 2014 10:06:39 Thomas Petazzoni wrote:
+>> Dear Boris BREZILLON,
 >>
->> +     /* lvds666 */
->> +     ipu_dc_map_clear(priv, IPU_DC_MAP_LVDS666);
->> +     ipu_dc_map_config(priv, IPU_DC_MAP_LVDS666, 0, 5, 0xfc); /* blue */
->> +     ipu_dc_map_config(priv, IPU_DC_MAP_LVDS666, 1, 15, 0xfc); /* green */
->> +     ipu_dc_map_config(priv, IPU_DC_MAP_LVDS666, 2, 21, 0xfc); /* red */
->> +
+>> On Fri, 28 Mar 2014 18:59:01 +0100, Boris BREZILLON wrote:
+>>
+>>> +config OLD_IRQ_AT91
+>>> +     bool
+>>> +     default false
+>> I don't think "default false" is a valid Kconfig construct. It could be
+>> "default n", but that's useless since "default n" is the default
+>> behavior. So I believe you can simply get rid of that line.
+
+I'll fix it for the next version.
+
+> I think the above is syntactically correct, but it would be highly confusing in
+> anyone ever does
 >
-> Should the 15 above be 13. ie 5+8=13, 13+8=21
-> Also, imx_3.0.35_4.1.0 uses 13.
+> config false
+> 	def_bool y
+>
+> ;-)
+>
+> Aside from that, these three have completely identical meaning:
+>
+> config OLD_IRQ_AT91
+> 	bool
+>
+> config OLD_IRQ_AT91
+> 	def_bool n
+>
+> config OLD_IRQ_AT91
+> 	bool
+> 	default n
+>
+> 	Arnd
+>
+>
+Thanks for the detailled explanation :-).
 
-You're absolutely right, thanks. Don't know how I made that typo. I'll
-resend an updated patch.
+Best Regards,
 
-/Emil
+Boris
