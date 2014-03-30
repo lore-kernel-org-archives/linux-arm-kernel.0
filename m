@@ -1,31 +1,43 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 30 Mar 2014 19:41:52 +0200
-Subject: [PATCH 0/8] i.MX6 PCIe binding change and MSI support
-In-Reply-To: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
+Date: Sun, 30 Mar 2014 19:36:49 +0200
+Subject: [PATCH 2/8] PCI: designware: split Exynos and i.MX bindings
+In-Reply-To: <1396025579-14344-3-git-send-email-l.stach@pengutronix.de>
 References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <201403301941.52149.marex@denx.de>
+ <1396025579-14344-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <201403301936.49692.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 28, 2014 at 05:52:51 PM, Lucas Stach wrote:
-> While working on MSI support for the i.MX6 PCIe host driver
-> it has been discovered that the binding for this host controller
-> is broken in many ways (refer to the patch descriptions for more
-> info) and was introduced without proper discussion about what
-> should/should not be in the binding.
+On Friday, March 28, 2014 at 05:52:53 PM, Lucas Stach wrote:
+> The glue around the core designware IP is significantly
+> different between the Exynos and i.MX implementation,
+> which is reflected in the DT bindings.
 > 
-> This series fixes this and minimizes the difference of the
-> i.MX6 binding to the common designware PCIe binding. I'm aware
-> that this is a quite radical change, but I think it's justified
-> to do this as long as there aren't many user of the old binding
-> (most of the optional properties in the binding aren't even
-> implemented).
+> This changes the i.MX6 binding to reuse as much as
+> possible from the common designware binding and
+> removes old cruft.
 > 
-> Looking forward to your feedback.
+> I removed the optional GPIOs with the following reasoning:
+> - disable-gpio: endpoint specific GPIO, not currently
+>   wired up in any code. Should be handled by the PCI device
+>   driver, not the host controller driver.
+> - wake-up-gpio: same as above.
+> - power-on-gpio: No user in any upstream DT. This should
+>   be handled by a regulator which shouldn't be controlled
+>   by the host driver, but rather by the PCI device driver.
 
-Other but 2/8, which needs further discussion,
+This power-on-gpio should indeed be handled by the regulator, but the regulator 
+cannot be handled by the PCIe device driver. This power-on-gpio must be operated 
+on per-slot basis if I understand it correctly, so it cannot be controlled by 
+the host controller driver either.
 
-Reviewed-by: Marek Vasut <marex@denx.de>
+The reason why this cannot be controlled by the device driver is that if the 
+device is powered down, it won't be detected on the PCIe bus, thus it cannot 
+enable the regulator which will power up the slot the device is sitting in.
+
+[...]
+
+btw. am I blind or do I just not see devicetree-discuss on CC ?
 
 Best regards,
 Marek Vasut
