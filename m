@@ -1,21 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 30 Mar 2014 17:23:13 -0400 (EDT)
-Subject: [PATCH 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <1396020960-6170-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1396020960-6170-1-git-send-email-zhangfei.gao@linaro.org>
- <1396020960-6170-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20140330.172313.2128642789143277676.davem@davemloft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 30 Mar 2014 15:10:50 -0700
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <20140328184517.GA27219@cbox>
+References: <20140328184517.GA27219@cbox>
+Message-ID: <CAOesGMh7AFfuq73SxOWiiLV0eJNLpA0M5hr0OwRo8=BLWueWwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhangfei Gao <zhangfei.gao@linaro.org>
-Date: Fri, 28 Mar 2014 23:35:59 +0800
+On Fri, Mar 28, 2014 at 11:45 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> ARM VM System Specification
+> ===========================
 
-> +	  Note that the answer to this question doesn't directly affect the
-> +	  kernel: saying N will just cause the configurator to skip all
-> +	  the questions about MOXA ART devices. If you say Y, you will be asked
-> +	  for your specific card in the following questions.
+[not quoting the whole spec here]
 
-Please don't just cut and paste things from unrelated Kconfig entries.
+This looks very sane to me, and aligns very well with non-virtualized images.
 
-This Kconfig option has nothing to do with MOXA ART devices.
+For what it's worth, even though it's not a patch:
+
+Acked-by: Olof Johansson <olof@lixom.net>
+
+What's the plan on how to lock this in? Where's this document going to
+live? In the kernel sources under Documentation/, or external?
+
+
+-Olof
