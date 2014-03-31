@@ -1,105 +1,83 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 31 Mar 2014 12:38:01 +0200
-Subject: [PATCH 2/8] PCI: designware: split Exynos and i.MX bindings
-In-Reply-To: <201403311136.49280.marex@denx.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <201403301936.49692.marex@denx.de>
- <1396258109.5533.11.camel@weser.hi.pengutronix.de>
- <201403311136.49280.marex@denx.de>
-Message-ID: <1396262281.5533.21.camel@weser.hi.pengutronix.de>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 31 Mar 2014 16:16:01 +0530
+Subject: [PATCH v6 00/12] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
+Message-ID: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 31.03.2014, 11:36 +0200 schrieb Marek Vasut:
-> On Monday, March 31, 2014 at 11:28:29 AM, Lucas Stach wrote:
-> > Am Sonntag, den 30.03.2014, 19:36 +0200 schrieb Marek Vasut:
-> > > On Friday, March 28, 2014 at 05:52:53 PM, Lucas Stach wrote:
-> > > > The glue around the core designware IP is significantly
-> > > > different between the Exynos and i.MX implementation,
-> > > > which is reflected in the DT bindings.
-> > > > 
-> > > > This changes the i.MX6 binding to reuse as much as
-> > > > possible from the common designware binding and
-> > > > removes old cruft.
-> > > > 
-> > > > I removed the optional GPIOs with the following reasoning:
-> > > > - disable-gpio: endpoint specific GPIO, not currently
-> > > > 
-> > > >   wired up in any code. Should be handled by the PCI device
-> > > >   driver, not the host controller driver.
-> > > > 
-> > > > - wake-up-gpio: same as above.
-> > > > - power-on-gpio: No user in any upstream DT. This should
-> > > > 
-> > > >   be handled by a regulator which shouldn't be controlled
-> > > >   by the host driver, but rather by the PCI device driver.
-> > > 
-> > > This power-on-gpio should indeed be handled by the regulator, but the
-> > > regulator cannot be handled by the PCIe device driver. This
-> > > power-on-gpio must be operated on per-slot basis if I understand it
-> > > correctly, so it cannot be controlled by the host controller driver
-> > > either.
-> > > 
-> > > The reason why this cannot be controlled by the device driver is that if
-> > > the device is powered down, it won't be detected on the PCIe bus, thus
-> > > it cannot enable the regulator which will power up the slot the device
-> > > is sitting in.
-> > 
-> > So we are on the same page with regard to a GPIO being the wrong
-> > abstraction for this, I think.
-> 
-> Yes.
-> 
-> > For the regulator part I would argue that PCI is a bus that is built
-> > around the ability to inspect the bus and detect devices on the bus at
-> > probe time, so any regulator that's powering a PCI device should be
-> > boot-on.
-> 
-> This thing about regulator being boot-on should really be documented.
-> 
-> Moreover, I think it's a waste of power to keep the devices ON on boot even if 
-> the PCIe bus was not started (yet). The bus might not be started at all and the 
-> regulators would still be ON, which would be quite a waste.
-> 
+Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
+and Coordination Interface (PSCI) v0.1.
 
-It's the exact same behavior that you get on x86: all devices are
-powered after boot, once you loaded a device driver it may choose to
-turn the device off. I don't think it makes sense to deviate here for
-the sake of being embedded and special.
+This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
+such that it does not break current KVM ARM/ARM64 ABI.
 
-> > Only after the device driver is loaded it should be able to fetch the
-> > regulator to power down/up the device as it wishes. In the x86 world
-> > this is AFAIK done using ACPI methods.
-> > 
-> > I think the host controller driver has no business in controlling the
-> > device power, more so as there possibly could be a lot of devices on the
-> > bus even with a single host lane.
-> 
-> The power should be controlled per-slot, but I don't know how to model that. 
-> Note that there might be a PCIe device with a switch popped into a single slot, 
-> which makes things much more interesting. In such case, you need to power up the 
-> slot and neither of the downstream devices should control the power regulator of 
-> that slot.
-> 
-We could just add the regulator to the PCI hierarchy in the DT and
-handle it similar to IRQs where we just walk up the DT starting from the
-device until we find the matching IRQ/regulator.
+The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
+KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
+PSCI v0.2 to VCPUs.
 
-Still for this to work with a regulator shared between several devices,
-all the device drivers have to be aware of the regulator. Otherwise a
-single device may choose to power down and erroneously cut power to a
-sibling device, where the driver hasn't requested the regulator.
+Changlog:
 
-In all those scenarios the host controller driver still would not have
-any business dealing with the regulator. Same situation as with the
-legacy IRQs, that aren't handled by the host driver, but just routed to
-the right instance through the DT.
+V6:
+ - Introduce uapi/linux/psci.h for sharing PSCI defines between
+   ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space
+ - Make CPU_SUSPEND emulation similar to WFI emulation
 
-Regards,
-Lucas
+V5:
+ - Have separate last patch to advertise KVM_CAP_ARM_PSCI_0_2
+ - Use kvm_psci_version() in kvm_psci_vcpu_on()
+ - Return ALREADY_ON for PSCI v0.2 CPU_ON if VCPU is not paused
+ - Remove per-VCPU suspend context
+ - As-per PSCI v0.2 spec, only current CPU can suspend itself
+
+V4:
+ - Implement all mandatory functions required by PSCI v0.2
+
+V3:
+ - Make KVM_ARM_VCPU_PSCI_0_2 feature experiementatl for now so that
+   it fails for user space till all mandatory PSCI v0.2 functions are
+   emulated by KVM ARM/ARM64
+ - Have separate patch for making KVM_ARM_VCPU_PSCI_0_2 feature available
+   to user space. This patch can be defferred for now
+
+V2:
+ - Don't rename PSCI return values KVM_PSCI_RET_NI and KVM_PSCI_RET_INVAL
+ - Added kvm_psci_version() to get PSCI version available to VCPU
+ - Fixed grammer in Documentation/virtual/kvm/api.txt
+
+V1:
+ - Initial RFC PATCH
+
+Anup Patel (12):
+  KVM: Add capability to advertise PSCI v0.2 support
+  ARM/ARM64: KVM: Add common header for PSCI related defines
+  ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+  KVM: Documentation: Add info regarding KVM_ARM_VCPU_PSCI_0_2 feature
+  ARM/ARM64: KVM: Make kvm_psci_call() return convention more flexible
+  KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API header
+  ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET
+  ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
+  ARM/ARM64: KVM: Emulate PSCI v0.2 MIGRATE_INFO_TYPE and related
+    functions
+  ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI v0.2
+  ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
+  ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to user space
+
+ Documentation/virtual/kvm/api.txt |   17 +++
+ arch/arm/include/asm/kvm_host.h   |    2 +-
+ arch/arm/include/asm/kvm_psci.h   |    6 +-
+ arch/arm/include/uapi/asm/kvm.h   |   19 +--
+ arch/arm/kvm/arm.c                |    1 +
+ arch/arm/kvm/handle_exit.c        |   10 +-
+ arch/arm/kvm/psci.c               |  233 ++++++++++++++++++++++++++++++++++---
+ arch/arm64/include/asm/kvm_host.h |    2 +-
+ arch/arm64/include/asm/kvm_psci.h |    6 +-
+ arch/arm64/include/uapi/asm/kvm.h |   21 ++--
+ arch/arm64/kvm/handle_exit.c      |   10 +-
+ include/uapi/linux/Kbuild         |    1 +
+ include/uapi/linux/kvm.h          |    9 ++
+ include/uapi/linux/psci.h         |   55 +++++++++
+ 14 files changed, 344 insertions(+), 48 deletions(-)
+ create mode 100644 include/uapi/linux/psci.h
 
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
