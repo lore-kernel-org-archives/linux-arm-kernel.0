@@ -1,99 +1,135 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 31 Mar 2014 14:59:51 -0500
-Subject: [PATCH 00/55]: ARM: OMAP2+: PRCM move to drivers
-In-Reply-To: <53399C21.1070908@ti.com>
-References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
- <53399C21.1070908@ti.com>
-Message-ID: <5339C937.8060308@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 31 Mar 2014 13:06:20 -0700
+Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
+References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+ <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20140331200620.GA13881@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2014 11:47 AM, Nishanth Menon wrote:
-> On 03/31/2014 10:15 AM, Tero Kristo wrote:
->> Hi,
->>
->> This set is continuation for the work started earlier to cleanup the CM/PRM
->> and attempt to make it a separate driver. This set depends on these
->> two sets:
->>
->> CM/PRM cleanup set:
->> http://marc.info/?l=linux-omap&m=139395000918201&w=2
->>
->> OMAP2 clock DT set:
->> http://comments.gmane.org/gmane.linux.ports.arm.omap/111257
->>
->> This set is pretty huge but the patches can be applied in stages if need be.
->> Anyway, it would be good to get some feedback whether the driver folder
->> locations etc. are good, and whether the effort taken here will be enough
->> to actually move the driver. Clockdomain / powerdomain code can also be
->> moved easily under the drivers/power/omap folder (or someplace else if
->> requested) once this set is in. Also, clockdomain / powerdomain data
->> should be possible to convert to DT format or some sort of firmware
->> blob once this is done.
->>
->> Patch #55 in this set is pretty massive as it moves all the C files at
->> the same time, this should probably be split up as multiple patches.
->>
->> Testing branch pushed here (contains also the CM/PRM cleanup set and OMAP2
->> clock DT conversion):
->>
->> tree: https://github.com/t-kristo/linux-pm.git
->> branch: 3.14-rc4-cm-prm-driver-v1
->>
+On Mon, Mar 31, 2014 at 06:41:56PM +0200, Sylwester Nawrocki wrote:
+> This function adds a helper function to configure clock parents and rates
+> as specified in clock-parents, clock-rates DT properties for a consumer
+> device and a call to it before driver is bound to a device.
 > 
-> Tested this branch after rebase to v3.14 final (needed a few manual
-> rebase fixes.. trivial ones)
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+> Changes since v3:
+>  - added detailed description of the assigned-clocks subnode,
+>  - clk-conf.c is now excluded when CONFIG_OF is not set,
+>  - s/of_clk_device_setup/of_clk_device_init,
+>  - added missing 'static inline' to the function stub definition.
 > 
-> major fail is around sdp2430 which fails to boot ->
-> with DEBUG_LL sdp2430 : http://slexy.org/raw/s2MRoxsaJH
+> Changes since v2:
+>  - edited in clock-bindings.txt, added note about 'assigned-clocks'
+>    subnode which may be used to specify "global" clocks configuration
+>    at a clock provider node,
+>  - moved of_clk_device_setup() function declaration from clk-provider.h
+>    to clk-conf.h so required function stubs are available when
+>    CONFIG_COMMON_CLK is not enabled,
 > 
+> Changes since v1:
+>  - the helper function to parse and set assigned clock parents and
+>    rates made public so it is available to clock providers to call
+>    directly;
+>  - dropped the platform bus notification and call of_clk_device_setup()
+>    is is now called from the driver core, rather than from the
+>    notification callback;
+>  - s/of_clk_get_list_entry/of_clk_get_by_property.
+> ---
+>  .../devicetree/bindings/clock/clock-bindings.txt   |   42 ++++++++++
+>  drivers/base/dd.c                                  |    7 ++
+>  drivers/clk/Makefile                               |    3 +
+>  drivers/clk/clk-conf.c                             |   87 ++++++++++++++++++++
+>  drivers/clk/clk.c                                  |   10 ++-
+>  include/linux/clk/clk-conf.h                       |   19 +++++
+>  6 files changed, 167 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/clk-conf.c
+>  create mode 100644 include/linux/clk/clk-conf.h
 > 
-> kristo-3.14-cm-prm-driver-v1-omap2plus_defconfig
->  1: am335x-evm:  Boot PASS: http://slexy.org/raw/s2YLPt80Ui
->  2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s21fyrFaCx
->  3: am3517-evm:  Boot PASS: http://slexy.org/raw/s21lquhrjO
->  4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2VAGZMV5L
->  5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21vX0JPy6
->  6: BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s2tfyxYceR
->  7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2zQOfp9JM
->  8: beaglebone:  Boot PASS: http://slexy.org/raw/s2K848ipJj
->  9: DRA7xx-EVM:  Boot PASS: http://slexy.org/raw/s20OteG4I3
-> 10: OMAP3430-Labrador(LDP):  Boot FAIL: http://slexy.org/raw/s21DupyTRc
-> ^^ legacy behavior
-> 11: pandaboard-es:  Boot PASS: http://slexy.org/raw/s21HMWU7XE
-> 12:    sdp2430:  Boot FAIL: http://slexy.org/raw/s2ex7L8gYg
-> ^^ regression
-> 13:    sdp3430:  Boot PASS: http://slexy.org/raw/s21Xl1pQGp
-> 14:    sdp4430:  Boot PASS: http://slexy.org/raw/s2oYwjOXu5
-> 15: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s20havbuwY
-> TOTAL = 15 boards, Booted Boards = 13, No Boot boards = 2
+> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> index 700e7aa..59fbb4e 100644
+> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> @@ -132,3 +132,45 @@ clock signal, and a UART.
+>    ("pll" and "pll-switched").
+>  * The UART has its baud clock connected the external oscillator and its
+>    register clock connected to the PLL clock (the "pll-switched" signal)
+> +
+> +==Assigned clock parents and rates==
+> +
+> +Some platforms require static initial configuration of parts of the clocks
+> +controller. Such a configuration can be specified in a clock consumer node
+> +through clock-parents and clock-rates DT properties. The former should
+> +contain a list of parent clocks in form of phandle and clock specifier pairs,
+> +the latter the list of assigned clock frequency values (one cell each).
+> +
+> +    uart at a000 {
+> +        compatible = "fsl,imx-uart";
+> +        reg = <0xa000 0x1000>;
+> +        ...
+> +        clocks = <&clkcon 0>, <&clkcon 3>;
+> +        clock-names = "baud", "mux";
+> +
+> +        clock-parents = <0>, <&pll 1>;
+> +        clock-rates = <460800>;
+> +    };
+> +
+> +In this example the pll is set as parent of "mux" clock and frequency of "baud"
+> +clock is specified as 460800 Hz.
+> +
+> +Configuring a clock parent and rate through the device node that uses
+> +the clock can be done only for clocks that have a single user. Specifying
+> +conflicting parent or rate configuration in multiple consumer nodes for
+> +a shared clock is forbidden.
+> +
+> +Configuration of common clocks, which affect multiple consumer devices
+> +can be specified in a dedicated 'assigned-clocks' subnode of a clock
+> +provider node, e.g.:
+> +
+> +    clkcon {
+> +        ...
+> +        #clock-cells = <1>;
+> +
+> +        assigned-clocks {
+> +            clocks = <&clkcon 16>, <&clkcon 17>;
+> +            clock-parents = <0>, <&clkcon 1>;
+> +            clock-rates = <200000>;
+> +        };
+> +    };
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 0605176..4c633e7 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/async.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pinctrl/devinfo.h>
+> +#include <linux/clk/clk-conf.h>
 > 
-> v3.14-omap2plus_defconfig
->  1: am335x-evm:  Boot PASS: http://slexy.org/raw/s2fsTX7RLo
->  2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s204it5W7s
->  3: am3517-evm:  Boot PASS: http://slexy.org/raw/s20RHMAlQk
->  4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2y0jKiClC
->  5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2094U1Iwa
->  6: BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s2jfuRAl9n
->  7: beaglebone-black:  Boot PASS: http://slexy.org/raw/s28LGuHny3
->  8: beaglebone:  Boot PASS: http://slexy.org/raw/s2zSlZ6hbK
->  9: DRA7xx-EVM:  Boot PASS: http://slexy.org/raw/s21IA9TS0U
-> 10: OMAP3430-Labrador(LDP):  Boot FAIL: http://slexy.org/raw/s2ZKEdCt2g
-> ^^ legacy behavior
-> 11: pandaboard-es:  Boot PASS: http://slexy.org/raw/s2IJBjcuU1
-> 12:    sdp2430:  Boot PASS: http://slexy.org/raw/s2YjBF8dq8
-> 13:    sdp3430:  Boot PASS: http://slexy.org/raw/s22vE9i5W5
-> 14:    sdp4430:  Boot PASS: http://slexy.org/raw/s2EIb4li37
-> 15: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s2hBJQyZ4M
-> TOTAL = 15 boards, Booted Boards = 14, No Boot boards = 1
+>  #include "base.h"
+>  #include "power/power.h"
+> @@ -278,6 +279,12 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+>  	if (ret)
+>  		goto probe_failed;
 > 
-> 
+> +	if (dev->of_node) {
+> +		ret = of_clk_device_init(dev->of_node);
+> +		if (ret)
+> +			goto probe_failed;
+> +	}
+> +
+>  	if (driver_sysfs_add(dev)) {
+>  		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
+>  			__func__, dev_name(dev));
 
-and a kernel_patch_verify static check report:
-http://slexy.org/view/s20MhigkXd
 
-I think many of these could be squelched as well.
+I don't understand why you need the driver core to initialize this one
+type of thing?  That should be in a driver, or in a class, or at worse
+case, the platform code.
 
--- 
-Regards,
-Nishanth Menon
+What makes clocks so "unique" here?
+
+greg k-h
