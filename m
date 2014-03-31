@@ -1,42 +1,35 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 31 Mar 2014 11:12:33 -0700
-Subject: [PATCH v4] ARM: mm: fix reporting of read-only PMD bits
-In-Reply-To: <CAGXu5j+GokV1MKv4Otb0AGt4Xvm8WXMLaOvGUUX+BJpo7Myg9g@mail.gmail.com>
-References: <20140323042050.GA15181@www.outflux.net>
- <CAGXu5j+GokV1MKv4Otb0AGt4Xvm8WXMLaOvGUUX+BJpo7Myg9g@mail.gmail.com>
-Message-ID: <5339B011.7070006@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 31 Mar 2014 11:14:24 -0700
+Subject: [PATCH] Input: pmic8xxx-pwrkey - Set sane default for debounce time
+Message-ID: <1396289664-31893-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/28/2014 11:45 AM, Kees Cook wrote:
-> On Sat, Mar 22, 2014 at 9:20 PM, Kees Cook <keescook@chromium.org> wrote:
->> On non-LPAE ARMv6+, read-only PMD bits are defined with the combination
->> "PMD_SECT_APX | PMD_SECT_AP_WRITE". Adjusted the bit masks to correctly
->> report this.
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->> v4:
->>  - clean up defines for CPU versions; Rob Herring.
->> v3:
->>  - check for pre-v6 CPUs on the page table report.
->> v2:
->>  - reorder bits, suggested by Olof.
-> 
-> Can anyone give this a test or ack? I've done build tests for all CPU
-> combinations, and runtime tests on v6 and LPAE.
-> 
-> Thanks!
-> 
-> -Kees
-> 
+If the debounce time is 0 our usage of ilog2() later on in this
+driver will cause undefined behavior. If CONFIG_OF=n this fact is
+evident to the compiler, and it emits a call to ____ilog2_NaN()
+which doesn't exist. Fix this by setting a sane default for
+debounce.
 
-You are welcome to add
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/input/misc/pmic8xxx-pwrkey.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tested-by: Laura Abbott <lauraa@codeaurora.org>
-
-Laura
-
+diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+index 1cb8fda7a166..27add04676e1 100644
+--- a/drivers/input/misc/pmic8xxx-pwrkey.c
++++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+@@ -92,7 +92,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+ 	bool pull_up;
+ 
+ 	if (of_property_read_u32(pdev->dev.of_node, "debounce", &kpd_delay))
+-		kpd_delay = 0;
++		kpd_delay = 15625;
+ 
+ 	pull_up = of_property_read_bool(pdev->dev.of_node, "pull-up");
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
