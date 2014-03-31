@@ -1,54 +1,79 @@
 From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Mon, 31 Mar 2014 11:02:56 -0400
-Subject: [PATCH v4 0/3] PSCI v0.2 support and DT bindings
-Message-ID: <1396278179-28181-1-git-send-email-ashwin.chaugule@linaro.org>
+Date: Mon, 31 Mar 2014 11:02:58 -0400
+Subject: [PATCH v4 2/3] Documentation: devicetree: Add new binding for PSCIv0.2
+In-Reply-To: <1396278179-28181-1-git-send-email-ashwin.chaugule@linaro.org>
+References: <1396278179-28181-1-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <1396278179-28181-3-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v4:
-		-		Correct copyright banner format.
-		-		Check if PSCI Version ID is supported.
-		-		Add all PSCI RET codes in uapi header.
-		-		Explicitely ret 1 from psci_cpu_kill()
+The PSCI v0.2+ spec defines standard values for PSCI function IDs.
+Add a new binding entry so that pre v0.2 implementations can
+use DT entries for function IDs and v0.2+ implementations use
+standard entries as defined by the PSCIv0.2 specification.
 
-Changes in v3:
-        -       Roll up common functionality for getting conduit method.
-        -       Remove #defines for ARM32 and ARM64 in uapi/linux/psci.h
-        -       Remove functions not supported by PSCI v0.1
-        -       Misc cleanups.
-        -       Add PSCI_AFFINITY_INFO return types in uapi header.
-        -       Changed function names for PSCI v0.1 and PSCI v0.2
-        -       Added copyright info to uapi header.
-        -       Fixed args to affinity_info call.
-        -       Fix typo in psci_init definition when PSCI is not defined.
+Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 35 +++++++++++++++++++++++++-
+ 1 file changed, 34 insertions(+), 1 deletion(-)
 
-Changes in v2:
-
-        -       Add AFFINITY_INFO and MIGRATE_INFO_TYPE functions.
-        -       Add binding Documentation.
-        -       Add function to get PSCI version.
-        -       Add common #defines in uapi/linux/psci.h
-        -       Implement cpu_kill and check if CPU is dead via AFFINITY_INFO.
-        -       Misc cleanups.
-
-Changes in v1:
-
-        -       Add new binding "arm, psci-0.2"
-        -       Separate conduit and PSCI function assignment methods.
-
-Ashwin Chaugule (3):
-  PSCI: Add initial support for PSCIv0.2 functions
-  Documentation: devicetree: Add new binding for PSCIv0.2
-  ARM: Check if a CPU has gone offline
-
- Documentation/devicetree/bindings/arm/psci.txt |  35 +++++-
- arch/arm/include/asm/psci.h                    |   7 +-
- arch/arm/kernel/psci.c                         | 155 +++++++++++++++++++-----
- arch/arm/kernel/psci_smp.c                     |  21 ++++
- arch/arm64/kernel/psci.c                       | 160 ++++++++++++++++++++-----
- include/uapi/linux/psci.h                      |  66 ++++++++++
- 6 files changed, 383 insertions(+), 61 deletions(-)
- create mode 100644 include/uapi/linux/psci.h
-
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..d01a90b 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -21,7 +21,15 @@ to #0.
+ 
+ Main node required properties:
+ 
+- - compatible    : Must be "arm,psci"
++ - compatible    : should contain at least one of:
++
++				 * "arm,psci" : for implementations complying to PSCI versions prior to
++					0.2. For these cases function IDs must be provided.
++
++				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
++					IDs are not required and should be ignored by an OS with PSCI 0.2
++					support, but are permitted to be present for compatibility with
++					existing software when "arm,psci" is later in the compatible list.
+ 
+  - method        : The method of calling the PSCI firmware. Permitted
+                    values are:
+@@ -45,6 +53,8 @@ Main node optional properties:
+ 
+ Example:
+ 
++Case 1: PSCI v0.1 only.
++
+ 	psci {
+ 		compatible	= "arm,psci";
+ 		method		= "smc";
+@@ -53,3 +63,26 @@ Example:
+ 		cpu_on		= <0x95c10002>;
+ 		migrate		= <0x95c10003>;
+ 	};
++
++
++Case 2: PSCI v0.2 only
++
++	psci {
++		compatible	= "arm,psci-0.2";
++		method		= "smc";
++	};
++
++Case 3: PSCI v0.2 and PSCI v0.1.
++
++	As described above, for compatibility with existing kernels, the
++	hypervisor will likely want to provide IDs, e.g.
++
++	psci {
++		compatible = "arm,psci-0.2", "arm,psci";
++		method = "hvc";
++
++		cpu_on = < arbitrary value >;
++		cpu_off = < arbitrary value >;
++
++		...
++	};
 -- 
 1.8.3.2
