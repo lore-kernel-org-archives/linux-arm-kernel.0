@@ -1,40 +1,45 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Mon, 31 Mar 2014 13:25:26 -0400
-Subject: [Linaro-acpi] [PATCH v4 1/3] PSCI: Add initial support for
- PSCIv0.2 functions
-In-Reply-To: <CAJ5Y-eaC81rqOewzVDEZm=wHbLNWBh32RrLq4nFVa5yHJTT6pQ@mail.gmail.com>
-References: <1396278179-28181-1-git-send-email-ashwin.chaugule@linaro.org>
- <1396278179-28181-2-git-send-email-ashwin.chaugule@linaro.org>
- <53399D62.5060704@arm.com>
- <CAJ5Y-eaC81rqOewzVDEZm=wHbLNWBh32RrLq4nFVa5yHJTT6pQ@mail.gmail.com>
-Message-ID: <CAJ5Y-eafEJz487nwg6MRPqL=E3a1gVvWH8yGqYrP+ZqqO-pW9Q@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 31 Mar 2014 10:26:13 -0700
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <CAOesGMh7AFfuq73SxOWiiLV0eJNLpA0M5hr0OwRo8=BLWueWwQ@mail.gmail.com>
+References: <20140328184517.GA27219@cbox>
+ <CAOesGMh7AFfuq73SxOWiiLV0eJNLpA0M5hr0OwRo8=BLWueWwQ@mail.gmail.com>
+Message-ID: <20140331172613.GA4756@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 March 2014 13:09, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
-> Hi Sudeep,
->
-> On 31 March 2014 12:52, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->>> +       if (ver == PSCI_RET_EOPNOTSUPP) {
->>> +               pr_info("PSCI_ID_VERSION Function not supported in firmware.\n");
->>
->> IMO you should stop here as the implementation conforming to the specification
->> must return a minor version number of 2 and major version number of 0. You
->> can't proceed, assume ids and use them.
->>
->
-> hm, you're right, I missed that.
+On Sun, Mar 30, 2014 at 03:10:50PM -0700, Olof Johansson wrote:
+> On Fri, Mar 28, 2014 at 11:45 AM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > ARM VM System Specification
+> > ===========================
+> 
+> [not quoting the whole spec here]
+> 
+> This looks very sane to me, and aligns very well with non-virtualized images.
+> 
+> For what it's worth, even though it's not a patch:
+> 
+> Acked-by: Olof Johansson <olof@lixom.net>
 
-Something like this?
+Thanks, appreciate it.
 
-if (ver == PSCI_RET_EOPNOTSUPP) {
-         /* PSCI v0.2+ mandates implementation of PSCI_ID_VERSION. */
-         pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
-         err = -EOPNOTSUPP;
-         goto out_put_node;
+> 
+> What's the plan on how to lock this in? Where's this document going to
+> live? In the kernel sources under Documentation/, or external?
+> 
 
+There were talks during LCA14 about publishing it as a Linaro
+white-paper, but I would like it to be hosted by the open-source
+projects that relate to it, for example the Linux kernel under
+Documentaiton/ to represent both the guest and KVM side, and the Xen
+sources too.
 
->
-> Cheers,
-> Ashwin
+However, that may be a pain to update so the preferred method could be
+to host it in either its current form (clear-text) or publish some
+versioned PDF somewhere and simply point to it from the compliant
+software pieces.
+
+Suggestions or input welcome.
+
+-Christoffer
