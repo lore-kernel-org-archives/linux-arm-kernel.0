@@ -1,32 +1,39 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 31 Mar 2014 18:47:27 +0100
-Subject: [PATCH] clk: shmobile: fix setting paretn clock rate
-Message-ID: <1396288047-6647-1-git-send-email-ben.dooks@codethink.co.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 31 Mar 2014 19:49 +0200
+Subject: [PATCH] pata_arasan_cf: fix ata_host_activate() failure handling
+Message-ID: <7093981.6c4k98qyGh@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the driver needs to change a clock rate, then it must be propogated
-through the MSTP clock to the parent clock (such as shdi0 -> sd0). Without
-this we cannot up-rate default clocks which are really slow (such as the
-mmcif1 which defaults to 12MHz where it could be running at 97MHz)
+Add missing cf_exit() and clk_put() calls to ata_host_activate()
+failure path.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/clk/shmobile/clk-mstp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/ata/pata_arasan_cf.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-index 7bfdcfc..9fc754b 100644
---- a/drivers/clk/shmobile/clk-mstp.c
-+++ b/drivers/clk/shmobile/clk-mstp.c
-@@ -139,7 +139,7 @@ cpg_mstp_clock_register(const char *name, const char *parent_name,
+Index: b/drivers/ata/pata_arasan_cf.c
+===================================================================
+--- a/drivers/ata/pata_arasan_cf.c	2014-03-31 16:57:47.443727785 +0200
++++ b/drivers/ata/pata_arasan_cf.c	2014-03-31 17:09:48.171715498 +0200
+@@ -898,9 +898,15 @@ static int arasan_cf_probe(struct platfo
  
- 	init.name = name;
- 	init.ops = &cpg_mstp_clock_ops;
--	init.flags = CLK_IS_BASIC;
-+	init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
- 	init.parent_names = &parent_name;
- 	init.num_parents = 1;
+ 	cf_card_detect(acdev, 0);
  
--- 
-1.9.0
+-	return ata_host_activate(host, acdev->irq, irq_handler, 0,
+-			&arasan_cf_sht);
++	ret = ata_host_activate(host, acdev->irq, irq_handler, 0,
++				&arasan_cf_sht);
++	if (ret)
++		goto exit_cf;
+ 
++	return 0;
++
++exit_cf:
++	cf_exit(acdev);
+ free_clk:
+ 	clk_put(acdev->clk);
+ 	return ret;
