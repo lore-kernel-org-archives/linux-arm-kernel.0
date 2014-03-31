@@ -1,30 +1,43 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 31 Mar 2014 10:06:59 +0800
-Subject: [PATCHv3 1/2] mtd: gpmi: make blockmark swapping optional
-In-Reply-To: <1396002907-17750-2-git-send-email-LW@KARO-electronics.de>
-References: <1395235406-13449-1-git-send-email-y>
- <1396002907-17750-1-git-send-email-LW@KARO-electronics.de>
- <1396002907-17750-2-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140331020657.GA32650@localhost>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Mon, 31 Mar 2014 12:51:07 +0900
+Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
+Message-ID: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 11:35:06AM +0100, Lothar Wa?mann wrote:
-> +  - fsl,no-blockmark-swap: Don't swap the bad block marker from the OOB
-> +                       area with the byte in the data area but rely on the
-> +                       flash based BBT for identifying bad blocks.
-> +                       NOTE: this is only valid in conjunction with
-> +                             'nand-on-flash-bbt'.
-> +                       WARNING: on i.MX28 blockmark swapping cannot be
-> +                       disabled for the BootROM in the FCB. Thus,
-> +                       partitions written from Linux with this feature
-> +                       turned on may not be accessible by the BootROM
-> +                       code.
+Dear All
 
-Thanks for adding this warning.
+Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
+space described in [1] due to one major issue + one minor issue.
 
-Acked-by: Huang Shijie <b32955@freescale.com>
+Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
+cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
+kernel fails to create mapping for this region in map_mem function
+(arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
+address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
+
+Secondly, vmemmap space is not enough to cover over about 585GB physical
+address space. Fortunately, this issue can be resolved as utilizing an extra
+vmemmap space (0xffffffbe00000000-0xffffffbffbbfffff) in [2]. However,
+it would not cover systems having a couple of terabytes DRAM.
+
+Therefore, it would be needed to implement 4 level page table translations
+for 4KB pages on 40-bit physical address space platforms. Someone might
+suggest use of 64KB pages in this case, but I'm not sure about how to
+deal with internal memory fragmentation.
+
+I would like to contribute 4 level page table translations to upstream,
+the target of which is 3.16 kernel, if there is no movement on it. I saw
+some related RFC patches a couple of months ago, but they didn't seem to 
+be merged into maintainer's tree.
 
 
-thanks
-Huang Shijie
+Best Regards
+Jungseok Lee
+
+
+References
+----------
+[1]: Principles of ARM Memory Maps, Whit Paper, Issue C
+
+[2]: Documentation/arm64/memory.txt
