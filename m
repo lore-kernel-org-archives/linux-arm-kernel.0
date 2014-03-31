@@ -1,80 +1,36 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 31 Mar 2014 17:40:02 +0200
-Subject: [PATCH 5/6] ARM: socfpga: dts: add support for EBV SOCrates
+Date: Mon, 31 Mar 2014 17:39:59 +0200
+Subject: [PATCH 2/6] ARM: socfpga: dts: add remaining interrupts for pdma
 In-Reply-To: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1396280404-2041-5-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1396280404-2041-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SOCrates is a SOCFpga-Cyclone5 based board from EBV.
-Add support for it.
-
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 41 +++++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+ arch/arm/boot/dts/socfpga.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0320303..4308695 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -267,6 +267,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_cyclone5_socdk.dtb \
- 	socfpga_cyclone5_sockit.dtb \
-+	socfpga_cyclone5_socrates.dtb \
- 	socfpga_vt.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
- 	spear1340-evb.dtb
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-new file mode 100644
-index 0000000..1e31f32
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-@@ -0,0 +1,41 @@
-+/*
-+ *  Copyright (C) 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/include/ "socfpga_cyclone5.dtsi"
-+
-+/ {
-+	model = "EBV SOCrates";
-+	compatible = "ebv,socrates", "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>; /* 1GB */
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+};
-+
-+&mmc {
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 0c3344f..7867e7f 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -75,7 +75,14 @@
+ 			pdma: pdma at ffe01000 {
+ 				compatible = "arm,pl330", "arm,primecell";
+ 				reg = <0xffe01000 0x1000>;
+-				interrupts = <0 104 4>;
++				interrupts = <0 104 4>,
++					     <0 105 4>,
++					     <0 106 4>,
++					     <0 107 4>,
++					     <0 108 4>,
++					     <0 109 4>,
++					     <0 110 4>,
++					     <0 111 4>;
+ 				#dma-cells = <1>;
+ 				#dma-channels = <8>;
+ 				#dma-requests = <32>;
 -- 
 1.9.1
