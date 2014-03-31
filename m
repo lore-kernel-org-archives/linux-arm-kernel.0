@@ -1,102 +1,183 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:16:00 +0300
-Subject: [PATCH 21/55] ARM: OMAP2+: PRCM: remove references to clock.h from
- PRCM core code
+Date: Mon, 31 Mar 2014 18:16:02 +0300
+Subject: [PATCH 23/55] ARM: AM33xx: CM: move cm33xx.h header to a public
+ location
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-22-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-24-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Done in preparation to make PRCM a standalone driver.
+This file needs to be accessible from the PRCM core and mach-omap2 board
+support code.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clockdomain.c |    1 -
- arch/arm/mach-omap2/clockdomain.h |    2 +-
- arch/arm/mach-omap2/prcm-common.h |    2 ++
- arch/arm/mach-omap2/prm_common.c  |   11 ++++-------
- 4 files changed, 7 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/cm33xx.c      |    2 +-
+ arch/arm/mach-omap2/cm33xx.h      |   50 +--------------------------
+ include/linux/power/omap/cm33xx.h |   68 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 70 insertions(+), 50 deletions(-)
+ create mode 100644 include/linux/power/omap/cm33xx.h
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 2da3b5e..9a59efb 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -29,7 +29,6 @@
- #include <linux/bitops.h>
+diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+index c7be4e4..7a7b2e7 100644
+--- a/arch/arm/mach-omap2/cm33xx.c
++++ b/arch/arm/mach-omap2/cm33xx.c
+@@ -24,7 +24,7 @@
  
- #include "soc.h"
--#include "clock.h"
  #include "clockdomain.h"
+ #include "cm.h"
+-#include "cm33xx.h"
++#include <linux/power/omap/cm33xx.h>
+ #include "prm33xx.h"
  
- /* clkdm_list contains all registered struct clockdomains */
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index 82c37b1..4322a28 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -17,7 +17,6 @@
- #include <linux/init.h>
+ #define AM33XX_MODULEMODE_SHIFT			0
+diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
+index 8f9e479..67f1d49 100644
+--- a/arch/arm/mach-omap2/cm33xx.h
++++ b/arch/arm/mach-omap2/cm33xx.h
+@@ -18,6 +18,7 @@
+ #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
  
- #include "powerdomain.h"
--#include "clock.h"
+ #include "cm.h"
++#include <linux/power/omap/cm33xx.h>
  
- /*
-  * Clockdomain flags
-@@ -98,6 +97,7 @@ struct clkdm_dep {
- #define _CLKDM_FLAG_HWSUP_ENABLED		BIT(0)
+ /* CM base address */
+ #define AM33XX_CM_BASE		0x44e00000
+@@ -25,16 +26,6 @@
+ #define AM33XX_CM_REGADDR(inst, reg)				\
+ 	AM33XX_L4_WK_IO_ADDRESS(AM33XX_CM_BASE + (inst) + (reg))
  
- struct omap_hwmod;
-+struct clk;
- 
- /**
-  * struct clockdomain - OMAP clockdomain
-diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-index f356532..1a05d04 100644
---- a/arch/arm/mach-omap2/prcm-common.h
-+++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -519,6 +519,8 @@ struct omap_prcm_irq_setup {
- 
- struct of_device_id;
- 
-+extern void __iomem *clk_memmaps[];
-+
- extern void omap_prcm_irq_cleanup(void);
- extern int omap_prcm_register_chain_handler(
- 	struct omap_prcm_irq_setup *irq_setup);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 080b3ed..090d13f 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -32,7 +32,6 @@
- #include "prm2xxx.h"
- #include "prm3xxx.h"
- #include "prm44xx.h"
--#include "clock.h"
- 
- /*
-  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
-@@ -481,18 +480,16 @@ static struct of_device_id omap_prcm_dt_match_table[] = {
- 	{ }
- };
- 
--static struct clk_hw_omap memmap_dummy_ck = {
--	.flags = MEMMAP_ADDRESSING,
--};
+-/* CM instances */
+-#define AM33XX_CM_PER_MOD		0x0000
+-#define AM33XX_CM_WKUP_MOD		0x0400
+-#define AM33XX_CM_DPLL_MOD		0x0500
+-#define AM33XX_CM_MPU_MOD		0x0600
+-#define AM33XX_CM_DEVICE_MOD		0x0700
+-#define AM33XX_CM_RTC_MOD		0x0800
+-#define AM33XX_CM_GFX_MOD		0x0900
+-#define AM33XX_CM_CEFUSE_MOD		0x0A00
 -
- static u32 prm_clk_readl(void __iomem *reg)
- {
--	return omap2_clk_readl(&memmap_dummy_ck, reg);
-+	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
-+	return readl_relaxed(clk_memmaps[r->index] + r->offset);
- }
+ /* CM */
  
- static void prm_clk_writel(u32 val, void __iomem *reg)
- {
--	omap2_clk_writel(val, &memmap_dummy_ck, reg);
-+	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
-+	writel_relaxed(val, clk_memmaps[r->index] + r->offset);
- }
+ /* CM.PER_CM register offsets */
+@@ -371,43 +362,4 @@
+ #define AM33XX_CM_CEFUSE_CEFUSE_CLKCTRL_OFFSET		0x0020
+ #define AM33XX_CM_CEFUSE_CEFUSE_CLKCTRL			AM33XX_CM_REGADDR(AM33XX_CM_CEFUSE_MOD, 0x0020)
  
- static struct ti_clk_ll_ops omap_clk_ll_ops = {
+-
+-#ifndef __ASSEMBLER__
+-bool am33xx_cm_is_clkdm_in_hwsup(u16 inst, u16 cdoffs);
+-void am33xx_cm_clkdm_enable_hwsup(u16 inst, u16 cdoffs);
+-void am33xx_cm_clkdm_disable_hwsup(u16 inst, u16 cdoffs);
+-void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
+-void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
+-
+-#ifdef CONFIG_SOC_AM33XX
+-extern int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs);
+-extern void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs);
+-extern void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs);
+-extern int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs);
+-#else
+-static inline int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs)
+-{
+-	return 0;
+-}
+-static inline void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs)
+-{
+-}
+-static inline void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs)
+-{
+-}
+-static inline int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs)
+-{
+-	return 0;
+-}
+-#endif
+-
+-#endif /* ASSEMBLER */
+ #endif
+diff --git a/include/linux/power/omap/cm33xx.h b/include/linux/power/omap/cm33xx.h
+new file mode 100644
+index 0000000..2449ba8
+--- /dev/null
++++ b/include/linux/power/omap/cm33xx.h
+@@ -0,0 +1,68 @@
++/*
++ * AM33XX CM offset macros
++ *
++ * Copyright (C) 2011-2012 Texas Instruments Incorporated - http://www.ti.com/
++ * Vaibhav Hiremath <hvaibhav@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_POWER_OMAP_CM33XX_H
++#define __LINUX_POWER_OMAP_CM33XX_H
++
++/* CM instances */
++#define AM33XX_CM_PER_MOD		0x0000
++#define AM33XX_CM_WKUP_MOD		0x0400
++#define AM33XX_CM_DPLL_MOD		0x0500
++#define AM33XX_CM_MPU_MOD		0x0600
++#define AM33XX_CM_DEVICE_MOD		0x0700
++#define AM33XX_CM_RTC_MOD		0x0800
++#define AM33XX_CM_GFX_MOD		0x0900
++#define AM33XX_CM_CEFUSE_MOD		0x0A00
++
++#ifndef __ASSEMBLER__
++bool am33xx_cm_is_clkdm_in_hwsup(u16 inst, u16 cdoffs);
++void am33xx_cm_clkdm_enable_hwsup(u16 inst, u16 cdoffs);
++void am33xx_cm_clkdm_disable_hwsup(u16 inst, u16 cdoffs);
++void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
++void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
++
++#ifdef CONFIG_SOC_AM33XX
++int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
++			       u16 clkctrl_offs);
++void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
++			     u16 clkctrl_offs);
++void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
++			      u16 clkctrl_offs);
++int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
++				u16 clkctrl_offs);
++#else
++static inline int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
++					u16 clkctrl_offs)
++{
++	return 0;
++}
++static inline void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
++					u16 clkctrl_offs)
++{
++}
++static inline void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
++					u16 clkctrl_offs)
++{
++}
++static inline int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
++					u16 clkctrl_offs)
++{
++	return 0;
++}
++#endif
++
++#endif /* ASSEMBLER */
++#endif
 -- 
 1.7.9.5
