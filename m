@@ -1,69 +1,158 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 31 Mar 2014 17:18:01 +0200
-Subject: [PATCH V2 00/19] mmc: mmci: Improve DT support
-Message-ID: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
+Date: Mon, 31 Mar 2014 17:18:17 +0200
+Subject: [PATCH V2 16/19] mmc: mmci: Enforce DT for signal direction and
+ feedback clock
+In-Reply-To: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
+References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1396279100-2920-17-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Step by step, improve the DT support for the mmci host driver.
+Remove the option to provide signal direction configuration and
+feeback clock as platform data, enforce it through DT.
 
-This enables us to move the final pieces of platform data for mmci for ux500
-into DT. We are then able to remove yet another machine specific file for ux500.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/mmc/host/mmci.c   |   34 ++++++++++++++--------------------
+ drivers/mmc/host/mmci.h   |   11 +++++++++++
+ include/linux/amba/mmci.h |   16 ----------------
+ 3 files changed, 25 insertions(+), 36 deletions(-)
 
-This patchset needs to be merged together. I suggest we go through Russell's
-ARM tree, since most of the patches are mmci specific which he maintains -
-unless someone think there is a better alternative.
-
-I will thus seek acks from the SOC maintainers for the SOC specific patches.
-
-The goal is to queue this for 3.16, thus I might need to rebase the patches for
-3.15 rc[n]. Still I would appreciate any comments at this point.
-
-Changes in v2:
-	- Adopting to review comments from Rob Herring and Linus Walleij. More
-	or less causing each an every patch to be rebased.
-	- Removed the patch for regulator for the db8500-prcmu from this
-	patchset, since Mark Brown already queued it for 3.15.
-
-Ulf Hansson (19):
-  mmc: mmci: Convert to the mmc gpio API
-  mmc: mmci: Convert to devm functions
-  mmc: mmci: Update DT documentation
-  mmc: mmci: Add DT bindings for signal direction
-  mmc: mmci: Add DT bindings for feedback clock pin
-  mmc: mmci: Use the common mmc DT parser
-  ARM: ux500: Add mmci signal directions and feeback clock in DT for
-    href
-  ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
-  ARM: nomadik: Convert to the common mmc DT bindings for highspeed
-    mode
-  ARM: u300: Convert to the common mmc DT bindings for highspeed mode
-  mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
-  mmc: mmci: Enable MMC_CAP_CMD23
-  ARM: ux500: Add the mmc capabilities flags to DT
-  ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for
-    href
-  ARM: ux500: Remove redundant board file for mmci platform data
-  mmc: mmci: Enforce DT for signal direction and feedback clock
-  mmc: mmci: Enforce mmc capabilities through DT
-  mmc: mmci: Enforce DMA configuration through DT
-  mmc: mmci: Enforce max frequency configuration through DT
-
- Documentation/devicetree/bindings/mmc/mmci.txt |   54 ++++-
- arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
- arch/arm/boot/dts/ste-href.dtsi                |   19 +-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
- arch/arm/boot/dts/ste-snowball.dts             |    4 +-
- arch/arm/boot/dts/ste-u300.dts                 |    4 +-
- arch/arm/mach-ux500/Makefile                   |    3 +-
- arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ---------------
- arch/arm/mach-ux500/board-mop500.h             |    5 -
- arch/arm/mach-ux500/cpu-db8500.c               |    4 -
- drivers/mmc/host/mmci.c                        |  265 +++++++-----------------
- drivers/mmc/host/mmci.h                        |   14 +-
- include/linux/amba/mmci.h                      |   42 ----
- 13 files changed, 157 insertions(+), 433 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 8db90fd..4a3f582 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1287,7 +1287,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		 * indicating signal direction for the signals in
+ 		 * the SD/MMC bus and feedback-clock usage.
+ 		 */
+-		pwr |= host->plat->sigdir;
++		pwr |= host->pwr_reg_add;
+ 
+ 		if (ios->bus_width == MMC_BUS_WIDTH_4)
+ 			pwr &= ~MCI_ST_DATA74DIREN;
+@@ -1386,29 +1386,26 @@ static struct mmc_host_ops mmci_ops = {
+ 	.start_signal_voltage_switch = mmci_sig_volt_switch,
+ };
+ 
+-static void mmci_dt_populate_generic_pdata(struct device_node *np,
+-					struct mmci_platform_data *pdata)
++static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
+ {
++	struct mmci_host *host = mmc_priv(mmc);
++	int ret = mmc_of_parse(mmc);
++
++	if (ret)
++		return ret;
++
+ 	if (of_get_property(np, "st,sig-dir-dat0", NULL))
+-		pdata->sigdir |= MCI_ST_DATA0DIREN;
++		host->pwr_reg_add |= MCI_ST_DATA0DIREN;
+ 	if (of_get_property(np, "st,sig-dir-dat2", NULL))
+-		pdata->sigdir |= MCI_ST_DATA2DIREN;
++		host->pwr_reg_add |= MCI_ST_DATA2DIREN;
+ 	if (of_get_property(np, "st,sig-dir-dat31", NULL))
+-		pdata->sigdir |= MCI_ST_DATA31DIREN;
++		host->pwr_reg_add |= MCI_ST_DATA31DIREN;
+ 	if (of_get_property(np, "st,sig-dir-dat74", NULL))
+-		pdata->sigdir |= MCI_ST_DATA74DIREN;
++		host->pwr_reg_add |= MCI_ST_DATA74DIREN;
+ 	if (of_get_property(np, "st,sig-dir-cmd", NULL))
+-		pdata->sigdir |= MCI_ST_CMDDIREN;
++		host->pwr_reg_add |= MCI_ST_CMDDIREN;
+ 	if (of_get_property(np, "st,sig-pin-fbclk", NULL))
+-		pdata->sigdir |= MCI_ST_FBCLKEN;
+-}
+-
+-static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
+-{
+-	int ret = mmc_of_parse(mmc);
+-
+-	if (ret)
+-		return ret;
++		host->pwr_reg_add |= MCI_ST_FBCLKEN;
+ 
+ 	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+ 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
+@@ -1440,9 +1437,6 @@ static int mmci_probe(struct amba_device *dev,
+ 			return -ENOMEM;
+ 	}
+ 
+-	if (np)
+-		mmci_dt_populate_generic_pdata(np, plat);
+-
+ 	if (!devm_request_mem_region(&dev->dev, dev->res.start,
+ 				resource_size(&dev->res), DRIVER_NAME))
+ 		return -ENOMEM;
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 8fc5814..347d942 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -13,6 +13,16 @@
+ #define MCI_PWR_ON		0x03
+ #define MCI_OD			(1 << 6)
+ #define MCI_ROD			(1 << 7)
++/*
++ * The ST Micro version does not have ROD and reuse the voltage registers for
++ * direction settings.
++ */
++#define MCI_ST_DATA2DIREN	(1 << 2)
++#define MCI_ST_CMDDIREN		(1 << 3)
++#define MCI_ST_DATA0DIREN	(1 << 4)
++#define MCI_ST_DATA31DIREN	(1 << 5)
++#define MCI_ST_FBCLKEN		(1 << 7)
++#define MCI_ST_DATA74DIREN	(1 << 8)
+ 
+ #define MMCICLOCK		0x004
+ #define MCI_CLK_ENABLE		(1 << 8)
+@@ -183,6 +193,7 @@ struct mmci_host {
+ 	unsigned int		mclk;
+ 	unsigned int		cclk;
+ 	u32			pwr_reg;
++	u32			pwr_reg_add;
+ 	u32			clk_reg;
+ 	u32			datactrl_reg;
+ 	u32			busy_status;
+diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+index 32a89cf..0d3ff95 100644
+--- a/include/linux/amba/mmci.h
++++ b/include/linux/amba/mmci.h
+@@ -6,19 +6,6 @@
+ 
+ #include <linux/mmc/host.h>
+ 
+-
+-/*
+- * These defines is places here due to access is needed from machine
+- * configuration files. The ST Micro version does not have ROD and
+- * reuse the voltage registers for direction settings.
+- */
+-#define MCI_ST_DATA2DIREN	(1 << 2)
+-#define MCI_ST_CMDDIREN		(1 << 3)
+-#define MCI_ST_DATA0DIREN	(1 << 4)
+-#define MCI_ST_DATA31DIREN	(1 << 5)
+-#define MCI_ST_FBCLKEN		(1 << 7)
+-#define MCI_ST_DATA74DIREN	(1 << 8)
+-
+ /* Just some dummy forwarding */
+ struct dma_chan;
+ 
+@@ -45,8 +32,6 @@ struct dma_chan;
+  * @capabilities: the capabilities of the block as implemented in
+  * this platform, signify anything MMC_CAP_* from mmc/host.h
+  * @capabilities2: more capabilities, MMC_CAP2_* from mmc/host.h
+- * @sigdir: a bit field indicating for what bits in the MMC bus the host
+- * should enable signal direction indication.
+  * @dma_filter: function used to select an appropriate RX and TX
+  * DMA channel to be used for DMA, if and only if you're deploying the
+  * generic DMA engine
+@@ -69,7 +54,6 @@ struct mmci_platform_data {
+ 	bool	cd_invert;
+ 	unsigned long capabilities;
+ 	unsigned long capabilities2;
+-	u32 sigdir;
+ 	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+ 	void *dma_rx_param;
+ 	void *dma_tx_param;
 -- 
 1.7.9.5
