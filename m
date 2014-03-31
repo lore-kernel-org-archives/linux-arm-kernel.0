@@ -1,230 +1,123 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:16:03 +0300
-Subject: [PATCH 24/55] ARM: OMAP3: CM: move cm3xxx.h header to public location
+Date: Mon, 31 Mar 2014 18:16:07 +0300
+Subject: [PATCH 28/55] ARM: OMAP4: CM: make all omap4_cminst_read/write calls
+ static
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-25-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-29-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file needs to be accessible from the PRCM core and mach-omap2 board
-support code.
+These are not used outside the cminst44xx.c anymore, thus make them static.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm3xxx.c      |    2 +-
- arch/arm/mach-omap2/cm3xxx.h      |   66 +----------------------------
- arch/arm/mach-omap2/cm_common.c   |    2 +-
- arch/arm/mach-omap2/prm3xxx.c     |    2 +-
- include/linux/power/omap/cm3xxx.h |   82 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 86 insertions(+), 68 deletions(-)
- create mode 100644 include/linux/power/omap/cm3xxx.h
+ arch/arm/mach-omap2/cminst44xx.c |   23 +++++++++++------------
+ arch/arm/mach-omap2/cminst44xx.h |   14 --------------
+ 2 files changed, 11 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 859c2fd..cbba617 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -21,7 +21,7 @@
- #include "prm2xxx_3xxx.h"
- #include "cm.h"
- #include "cm2xxx_3xxx_private.h"
--#include "cm3xxx.h"
-+#include <linux/power/omap/cm3xxx.h>
- #include "clockdomain.h"
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index dfb1a93..20681de 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -80,6 +80,8 @@ void omap_cm_base_init(void)
  
- #define OMAP34XX_CLKSTCTRL_DISABLE_AUTO		0x0
-diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
-index 0301557..9c2047f 100644
---- a/arch/arm/mach-omap2/cm3xxx.h
-+++ b/arch/arm/mach-omap2/cm3xxx.h
-@@ -18,73 +18,9 @@
+ /* Private functions */
  
- #include "prcm-common.h"
- #include "cm2xxx_3xxx.h"
-+#include <linux/power/omap/cm3xxx.h>
++static u32 omap4_cminst_read_inst_reg(u8 part, u16 inst, u16 idx);
++
+ /**
+  * _clkctrl_idlest - read a CM_*_CLKCTRL register; mask & shift IDLEST bitfield
+  * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+@@ -118,10 +120,8 @@ static bool _is_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
+ 		v == CLKCTRL_IDLEST_INTERFACE_IDLE) ? true : false;
+ }
  
- #define OMAP34XX_CM_REGADDR(module, reg)				\
- 			OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE + (module) + (reg))
- 
+-/* Public functions */
 -
+ /* Read a register in a CM instance */
+-u32 omap4_cminst_read_inst_reg(u8 part, u16 inst, u16 idx)
++static u32 omap4_cminst_read_inst_reg(u8 part, u16 inst, u16 idx)
+ {
+ 	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
+ 	       part == OMAP4430_INVALID_PRCM_PARTITION ||
+@@ -130,7 +130,7 @@ u32 omap4_cminst_read_inst_reg(u8 part, u16 inst, u16 idx)
+ }
+ 
+ /* Write into a register in a CM instance */
+-void omap4_cminst_write_inst_reg(u32 val, u8 part, u16 inst, u16 idx)
++static void omap4_cminst_write_inst_reg(u32 val, u8 part, u16 inst, u16 idx)
+ {
+ 	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
+ 	       part == OMAP4430_INVALID_PRCM_PARTITION ||
+@@ -139,8 +139,8 @@ void omap4_cminst_write_inst_reg(u32 val, u8 part, u16 inst, u16 idx)
+ }
+ 
+ /* Read-modify-write a register in CM1. Caller must lock */
+-u32 omap4_cminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part, u16 inst,
+-				   s16 idx)
++static u32 omap4_cminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part, u16 inst,
++					  s16 idx)
+ {
+ 	u32 v;
+ 
+@@ -152,17 +152,18 @@ u32 omap4_cminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part, u16 inst,
+ 	return v;
+ }
+ 
+-u32 omap4_cminst_set_inst_reg_bits(u32 bits, u8 part, u16 inst, s16 idx)
++static u32 omap4_cminst_set_inst_reg_bits(u32 bits, u8 part, u16 inst, s16 idx)
+ {
+ 	return omap4_cminst_rmw_inst_reg_bits(bits, bits, part, inst, idx);
+ }
+ 
+-u32 omap4_cminst_clear_inst_reg_bits(u32 bits, u8 part, u16 inst, s16 idx)
++static u32 omap4_cminst_clear_inst_reg_bits(u32 bits, u8 part, u16 inst,
++					    s16 idx)
+ {
+ 	return omap4_cminst_rmw_inst_reg_bits(bits, 0x0, part, inst, idx);
+ }
+ 
+-u32 omap4_cminst_read_inst_reg_bits(u8 part, u16 inst, s16 idx, u32 mask)
++static u32 omap4_cminst_read_inst_reg_bits(u8 part, u16 inst, s16 idx, u32 mask)
+ {
+ 	u32 v;
+ 
+@@ -173,9 +174,7 @@ u32 omap4_cminst_read_inst_reg_bits(u8 part, u16 inst, s16 idx, u32 mask)
+ 	return v;
+ }
+ 
 -/*
-- * OMAP3-specific global CM registers
-- * Use cm_{read,write}_reg() with these registers.
-- * These registers appear once per CM module.
+- *
 - */
--
--#define OMAP3430_CM_SYSCONFIG		0x0010
--#define OMAP3430_CM_POLCTRL		0x009c
--
--#define OMAP3_CM_CLKOUT_CTRL_OFFSET	0x0070
--
++/* Public functions */
+ 
+ /**
+  * _clktrctrl_write - write @c to a CM_CLKSTCTRL.CLKTRCTRL register bitfield
+diff --git a/arch/arm/mach-omap2/cminst44xx.h b/arch/arm/mach-omap2/cminst44xx.h
+index 7f56ea4..ad06525 100644
+--- a/arch/arm/mach-omap2/cminst44xx.h
++++ b/arch/arm/mach-omap2/cminst44xx.h
+@@ -23,20 +23,6 @@ extern void omap4_cminst_module_enable(u8 mode, u8 part, u16 inst, s16 cdoffs,
+ 				       u16 clkctrl_offs);
+ extern void omap4_cminst_module_disable(u8 part, u16 inst, s16 cdoffs,
+ 					u16 clkctrl_offs);
 -/*
-- * Module specific CM register offsets from CM_BASE + domain offset
-- * Use cm_{read,write}_mod_reg() with these registers.
-- * These register offsets generally appear in more than one PRCM submodule.
+- * In an ideal world, we would not export these low-level functions,
+- * but this will probably take some time to fix properly
 - */
--
--/* OMAP3-specific register offsets */
--
--#define OMAP3430_CM_CLKEN_PLL				0x0004
--#define OMAP3430ES2_CM_CLKEN2				0x0004
--#define OMAP3430ES2_CM_FCLKEN3				0x0008
--#define OMAP3430_CM_IDLEST_PLL				CM_IDLEST2
--#define OMAP3430_CM_AUTOIDLE_PLL			CM_AUTOIDLE2
--#define OMAP3430ES2_CM_AUTOIDLE2_PLL			CM_AUTOIDLE2
--#define OMAP3430_CM_CLKSEL1				CM_CLKSEL
--#define OMAP3430_CM_CLKSEL1_PLL				CM_CLKSEL
--#define OMAP3430_CM_CLKSEL2_PLL				CM_CLKSEL2
--#define OMAP3430_CM_SLEEPDEP				CM_CLKSEL2
--#define OMAP3430_CM_CLKSEL3				OMAP2_CM_CLKSTCTRL
--#define OMAP3430_CM_CLKSTST				0x004c
--#define OMAP3430ES2_CM_CLKSEL4				0x004c
--#define OMAP3430ES2_CM_CLKSEL5				0x0050
--#define OMAP3430_CM_CLKSEL2_EMU				0x0050
--#define OMAP3430_CM_CLKSEL3_EMU				0x0054
--
--
--/* CM_IDLEST bit field values to indicate deasserted IdleReq */
--
--#define OMAP34XX_CM_IDLEST_VAL				1
--
--
--#ifndef __ASSEMBLER__
--
--extern void omap3xxx_cm_clkdm_enable_hwsup(s16 module, u32 mask);
--extern void omap3xxx_cm_clkdm_disable_hwsup(s16 module, u32 mask);
--extern void omap3xxx_cm_clkdm_force_sleep(s16 module, u32 mask);
--extern void omap3xxx_cm_clkdm_force_wakeup(s16 module, u32 mask);
--
--extern bool omap3xxx_cm_is_clkdm_in_hwsup(s16 module, u32 mask);
--extern int omap3xxx_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id,
--					 u8 idlest_shift);
--
--extern int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
--					s16 *prcm_inst, u8 *idlest_reg_id);
--
--extern void omap3_cm_save_context(void);
--extern void omap3_cm_restore_context(void);
--extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
--
--extern int __init omap3xxx_cm_init(void);
--
--#endif
--
- #endif
-diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
-index 9a53eb5..f8f9343 100644
---- a/arch/arm/mach-omap2/cm_common.c
-+++ b/arch/arm/mach-omap2/cm_common.c
-@@ -17,7 +17,7 @@
- #include <linux/of.h>
+-u32 omap4_cminst_read_inst_reg(u8 part, u16 inst, u16 idx);
+-void omap4_cminst_write_inst_reg(u32 val, u8 part, u16 inst, u16 idx);
+-u32 omap4_cminst_rmw_inst_reg_bits(u32 mask, u32 bits, u8 part,
+-				   u16 inst, s16 idx);
+-u32 omap4_cminst_set_inst_reg_bits(u32 bits, u8 part, u16 inst,
+-				   s16 idx);
+-u32 omap4_cminst_clear_inst_reg_bits(u32 bits, u8 part, u16 inst,
+-				     s16 idx);
+-extern u32 omap4_cminst_read_inst_reg_bits(u8 part, u16 inst, s16 idx,
+-					   u32 mask);
  
- #include <linux/power/omap/cm2xxx.h>
--#include "cm3xxx.h"
-+#include <linux/power/omap/cm3xxx.h>
- #include "cm44xx.h"
+ extern void omap_cm_base_init(void);
  
- /*
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 852bc4d..4700605 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -23,7 +23,7 @@
- #include "prm3xxx.h"
- #include "prm2xxx_3xxx_private.h"
- #include "cm2xxx_3xxx_private.h"
--#include "cm3xxx.h"
-+#include <linux/power/omap/cm3xxx.h>
- 
- #define OMAP3430_GLOBAL_COLD_RST_MASK			(1 << 0)
- #define OMAP3430_GLOBAL_COLD_RST_SHIFT			0
-diff --git a/include/linux/power/omap/cm3xxx.h b/include/linux/power/omap/cm3xxx.h
-new file mode 100644
-index 0000000..ef3204b
---- /dev/null
-+++ b/include/linux/power/omap/cm3xxx.h
-@@ -0,0 +1,82 @@
-+/*
-+ * OMAP2/3 Clock Management (CM) register definitions
-+ *
-+ * Copyright (C) 2007-2009 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2010 Nokia Corporation
-+ * Paul Walmsley
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * The CM hardware modules on the OMAP2/3 are quite similar to each
-+ * other.  The CM modules/instances on OMAP4 are quite different, so
-+ * they are handled in a separate file.
-+ */
-+#ifndef __LINUX_POWER_OMAP_CM3XXX_H
-+#define __LINUX_POWER_OMAP_CM3XXX_H
-+
-+/*
-+ * OMAP3-specific global CM registers
-+ * Use cm_{read,write}_reg() with these registers.
-+ * These registers appear once per CM module.
-+ */
-+
-+#define OMAP3430_CM_SYSCONFIG		0x0010
-+#define OMAP3430_CM_POLCTRL		0x009c
-+
-+#define OMAP3_CM_CLKOUT_CTRL_OFFSET	0x0070
-+
-+/*
-+ * Module specific CM register offsets from CM_BASE + domain offset
-+ * Use cm_{read,write}_mod_reg() with these registers.
-+ * These register offsets generally appear in more than one PRCM submodule.
-+ */
-+
-+/* OMAP3-specific register offsets */
-+
-+#define OMAP3430_CM_CLKEN_PLL				0x0004
-+#define OMAP3430ES2_CM_CLKEN2				0x0004
-+#define OMAP3430ES2_CM_FCLKEN3				0x0008
-+#define OMAP3430_CM_IDLEST_PLL				CM_IDLEST2
-+#define OMAP3430_CM_AUTOIDLE_PLL			CM_AUTOIDLE2
-+#define OMAP3430ES2_CM_AUTOIDLE2_PLL			CM_AUTOIDLE2
-+#define OMAP3430_CM_CLKSEL1				CM_CLKSEL
-+#define OMAP3430_CM_CLKSEL1_PLL				CM_CLKSEL
-+#define OMAP3430_CM_CLKSEL2_PLL				CM_CLKSEL2
-+#define OMAP3430_CM_SLEEPDEP				CM_CLKSEL2
-+#define OMAP3430_CM_CLKSEL3				OMAP2_CM_CLKSTCTRL
-+#define OMAP3430_CM_CLKSTST				0x004c
-+#define OMAP3430ES2_CM_CLKSEL4				0x004c
-+#define OMAP3430ES2_CM_CLKSEL5				0x0050
-+#define OMAP3430_CM_CLKSEL2_EMU				0x0050
-+#define OMAP3430_CM_CLKSEL3_EMU				0x0054
-+
-+
-+/* CM_IDLEST bit field values to indicate deasserted IdleReq */
-+
-+#define OMAP34XX_CM_IDLEST_VAL				1
-+
-+#ifndef __ASSEMBLER__
-+
-+void omap3xxx_cm_clkdm_enable_hwsup(s16 module, u32 mask);
-+void omap3xxx_cm_clkdm_disable_hwsup(s16 module, u32 mask);
-+void omap3xxx_cm_clkdm_force_sleep(s16 module, u32 mask);
-+void omap3xxx_cm_clkdm_force_wakeup(s16 module, u32 mask);
-+
-+bool omap3xxx_cm_is_clkdm_in_hwsup(s16 module, u32 mask);
-+int omap3xxx_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id,
-+				  u8 idlest_shift);
-+
-+int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
-+				 s16 *prcm_inst, u8 *idlest_reg_id);
-+
-+void omap3_cm_save_context(void);
-+void omap3_cm_restore_context(void);
-+void omap3_cm_save_scratchpad_contents(u32 *ptr);
-+
-+int __init omap3xxx_cm_init(void);
-+
-+#endif
-+
-+#endif
 -- 
 1.7.9.5
