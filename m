@@ -1,90 +1,155 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 30 Apr 2014 23:26:35 -0700
-Subject: [PATCH v2 00/12] defconfigs: add MTD_SPI_NOR (new subsystem
- dependency for M25P80)
-Message-ID: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Apr 2014 01:11:34 +0200
+Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
+In-Reply-To: <20140331152719.GH29871@arm.com>
+References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
+ <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
+Message-ID: <7050133.LRSn2ENgQ4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v1 --> v2: split ARM defconfig changes into their sub-architectures. No change
-           in the overall diff.
+On Monday 31 March 2014 16:27:19 Catalin Marinas wrote:
+> On Mon, Mar 31, 2014 at 01:53:20PM +0100, Arnd Bergmann wrote:
+> > On Monday 31 March 2014 12:31:14 Catalin Marinas wrote:
+> > > On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
+> > > > On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
+> > > > > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
+> > > > > space described in [1] due to one major issue + one minor issue.
+> > > > > 
+> > > > > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
+> > > > > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
+> > > > > kernel fails to create mapping for this region in map_mem function
+> > > > > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
+> > > > > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
+> > > > 
+> > > > It took me a while to understand what is going on, but it essentially comes
+> > > > down to the logical memory map (0xffffffc000000000-0xffffffffffffffff)
+> > > > being able to represent only RAM in the first 256GB of address space.
+> > > > 
+> > > > More importantly, this means that any system following [1] will only be
+> > > > able to use 32GB of RAM, which is a much more severe restriction than
+> > > > what it sounds like at first.
+> > > 
+> > > On a 64-bit platform, do we still need the alias at the bottom and the
+> > > 512-544GB hole (even for 32-bit DMA, top address bits can be wired to
+> > > 512GB)? Only the idmap would need 4 levels, but that's static, we don't
+> > > need to switch Linux to 4-levels. Otherwise the memory is too sparse.
+> > 
+> > I think we should keep a static virtual-to-physical mapping,
+> 
+> Just so that I understand: with a PHYS_OFFSET of 0?
 
-Hi all,
+I hadn't realized at first that it's variable, but I guess 0 would be the easiest,
+otherwise we wouldn't be able to use 512GB pages to map the high memory range.
 
-We are introducing a new SPI-NOR subsystem/framework for MTD, to support
-various types of SPI-NOR flash controllers which require (or benefit from)
-intimate knowledge of the flash interface, rather than just the relatively dumb
-SPI interface. This framework borrows much of the m25p80 driver for its
-abstraction and moves this code into a spi-nor module.
+> > and to keep
+> > relocating the kernel at compile time without a hack like ARM_PATCH_PHYS_VIRT
+> > if at all possible.
+> 
+> and the kernel running at a virtual alias at a higher position than the
+> end of the mapped RAM? IIUC x86_64 does something similar.
 
-This means CONFIG_M25P80 now has a dependency on CONFIG_MTD_SPI_NOR, which
-should be added to the defconfigs. I expect that each (sub)architecture
-maintainer can merge these patches to their own tree.
+That would work, yes.
 
-Note that without the new CONFIG_MTD_SPI_NOR symbol in your defconfig, Kconfig
-will automatically drop M25P80 for you.
+Another idea is to always run the kernel at PAGE_OFFSET, as today, but create
+an alias there if there isn't already RAM at that location with the fixed
+PHYS_OFFSET.
 
-Please keep general comments to the cover letter, so all parties can see.
+> > > > > Secondly, vmemmap space is not enough to cover over about 585GB physical
+> > > > > address space. Fortunately, this issue can be resolved as utilizing an extra
+> > > > > vmemmap space (0xffffffbe00000000-0xffffffbffbbfffff) in [2]. However,
+> > > > > it would not cover systems having a couple of terabytes DRAM.
+> > > > 
+> > > > This one can be trivially changed by taking more space out of the vmalloc
+> > > > area, to go much higher if necessary. vmemmap space is always just a fraction
+> > > > of the linear mapping size, so we can accommodate it by definition if we
+> > > > find space to fit the physical memory.
+> > > 
+> > > vmemmap is the total range / page size * sizeof(struct page). So for 1TB
+> > > range and 4K pages we would need 8GB (the current value, unless I
+> > > miscalculated the above). Anyway, you can't cover 1TB range with
+> > > 3-levels.
+> > 
+> > The size of 'struct page' depends on a couple of configuration variables.
+> > If they are all enabled, you might need a bit more, even for configurations
+> > that don't have that much address space.
+> 
+> Yes. We could make vmemmap configurable at run-time or just go for a
+> maximum value.
 
-This series is based on 3.15-rc1.
+I would just aim for 'large enough': pick a reasonable maximum RAM size
+and then leave space for four times as much mem_map as we need.
 
-The SPI-NOR development code (in -next, queued for 3.16) is here:
+> > > > > Therefore, it would be needed to implement 4 level page table translations
+> > > > > for 4KB pages on 40-bit physical address space platforms. Someone might
+> > > > > suggest use of 64KB pages in this case, but I'm not sure about how to
+> > > > > deal with internal memory fragmentation.
+> > > > > 
+> > > > > I would like to contribute 4 level page table translations to upstream,
+> > > > > the target of which is 3.16 kernel, if there is no movement on it. I saw
+> > > > > some related RFC patches a couple of months ago, but they didn't seem to 
+> > > > > be merged into maintainer's tree.
+> > > > 
+> > > > I think you are answering the wrong question here. Four level page tables
+> > > > should not be required to support >32GB of RAM, that would be very silly.
+> > > 
+> > > I agree, we should only enable 4-levels of page table if we have close
+> > > to 512GB of RAM or the range is too sparse but I would actually push
+> > > back on the hardware guys to keep it tighter.
+> > 
+> > But remember this part:
+> > 
+> > > > There are good reasons to use a 50 bit virtual address space in user
+> > > > land, e.g. for supporting data base applications that mmap huge files.
+> > 
+> > You may actually need 4-level tables even if you have much less installed
+> > memory, depending on how the application is written. Note that x86, powerpc
+> > and s390 all chose to use 4-level tables for 64-bit kernels all the
+> > time, even thought they can also use 3-level of 5-level in some cases.
+> 
+> I don't mind 4-level tables by default but I would still keep a
+> configuration option (or at least doing some benchmarks to assess the
+> impact before switching permanently to 4-levels). There are mobile
+> platforms that don't really need as much VA space (and people are even
+> talking about ILP32).
 
-  git://git.infradead.org/l2-mtd.git +spinor
+Yes, I wasn't suggesting we do it all the time. A related question
+is whether we would also want to support 3-level 64k page tables, to
+extend the addressable area from 42 bit (4TB) to 55 bit (large enough).
+Is that actually a supported configuration?
 
-This defconfig series is available in the same repo at:
+> > > > If this is not the goal however, we should not pay for the overhead
+> > > > of the extra page table in user space. I can see two other possible
+> > > > solutions for the problem:
+> > > > 
+> > > > a) always use a four-level page table in kernel space, regardless of
+> > > > whether we do it in user space. We can move the kernel mappings down
+> > > > in address space either by one 512GB entry to 0xffffff0000000000, or
+> > > > to match the 64k-page location at 0xfffffc0000000000, or all the way
+> > > > to to 0xfffc000000000000. In any case, we can have all the dynamic
+> > > > mappings within one 512GB area and pretend we have a three-level
+> > > > page table for them, while the rest of DRAM is mapped statically at
+> > > > early boot time using 512GB large pages.
+> > > 
+> > > That's a workaround but we end up with two (or more) kernel pgds - one
+> > > for vmalloc, ioremap etc. and another (static) one for the kernel linear
+> > > mapping. So far there isn't any memory mapping carved out but we have to
+> > > be careful in the future.
+> > > 
+> > > However, kernel page table walking would be a bit slower with 4-levels.
+> > 
+> > Do we actually walk the kernel page tables that often? With what I suggested,
+> > we can still pretend that it's 3-level for all practical purposes, since
+> > you wouldn't walk the page tables for the linear mapping.
+> 
+> I was referring to hardware page table walk (TLB miss). Again, we need
+> some benchmarks (it gets worse in a guest as it needs to walk the stage
+> 2 for each stage 1 level miss; if you are really unlucky you can have up
+> to 24 memory accesses for a TLB miss with two translation stages and 4
+> levels each).
 
-  git://git.infradead.org/l2-mtd.git +defconfigs
+Ah right, of course. It would only be important for MMIO mappings though, as
+the linear mapping can be done using 1GB or 512GB large pages, and these
+tend to not cause noticeable overhead during lookup.
 
-Thanks,
-Brian
-
-Brian Norris (12):
-  ARM: imx/mxs defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
-  ARM: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
-  ARM: keystone: add MTD_SPI_NOR (new dependency for M25P80)
-  ARM: tegra: add MTD_SPI_NOR (new dependency for M25P80)
-  ARM: lpc32xx: add MTD_SPI_NOR (new dependency for M25P80)
-  ARM: at91: add MTD_SPI_NOR (new dependency for M25P80)
-  ARM: shmobile: add MTD_SPI_NOR (new dependency for M25P80)
-  ARM: marvell: add MTD_SPI_NOR (new dependency for M25P80)
-  blackfin: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
-  mips: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
-  powerpc: defconfigs: add MTD_SPI_NOR (new dependency for M25P80)
-  sh: defconfig: add MTD_SPI_NOR (new dependency for M25P80)
-
- arch/arm/configs/bockw_defconfig               | 2 +-
- arch/arm/configs/dove_defconfig                | 2 +-
- arch/arm/configs/imx_v6_v7_defconfig           | 1 +
- arch/arm/configs/keystone_defconfig            | 1 +
- arch/arm/configs/kirkwood_defconfig            | 1 +
- arch/arm/configs/koelsch_defconfig             | 1 +
- arch/arm/configs/lager_defconfig               | 1 +
- arch/arm/configs/lpc32xx_defconfig             | 2 +-
- arch/arm/configs/multi_v5_defconfig            | 1 +
- arch/arm/configs/multi_v7_defconfig            | 1 +
- arch/arm/configs/mvebu_v5_defconfig            | 1 +
- arch/arm/configs/mvebu_v7_defconfig            | 1 +
- arch/arm/configs/mxs_defconfig                 | 1 +
- arch/arm/configs/sama5_defconfig               | 2 +-
- arch/arm/configs/shmobile_defconfig            | 1 +
- arch/arm/configs/tegra_defconfig               | 1 +
- arch/blackfin/configs/BF526-EZBRD_defconfig    | 2 +-
- arch/blackfin/configs/BF527-EZKIT-V2_defconfig | 2 +-
- arch/blackfin/configs/BF527-EZKIT_defconfig    | 2 +-
- arch/blackfin/configs/BF548-EZKIT_defconfig    | 2 +-
- arch/blackfin/configs/BF609-EZKIT_defconfig    | 2 +-
- arch/blackfin/configs/BlackStamp_defconfig     | 3 +--
- arch/blackfin/configs/H8606_defconfig          | 3 +--
- arch/mips/configs/ath79_defconfig              | 3 +--
- arch/mips/configs/db1xxx_defconfig             | 1 +
- arch/mips/configs/rt305x_defconfig             | 2 +-
- arch/powerpc/configs/corenet32_smp_defconfig   | 2 +-
- arch/powerpc/configs/corenet64_smp_defconfig   | 2 +-
- arch/powerpc/configs/mpc85xx_defconfig         | 2 +-
- arch/powerpc/configs/mpc85xx_smp_defconfig     | 2 +-
- arch/sh/configs/sh7757lcr_defconfig            | 2 +-
- 31 files changed, 31 insertions(+), 21 deletions(-)
-
--- 
-1.8.3.2
+	Arnd
