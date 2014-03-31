@@ -1,79 +1,82 @@
 From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Mon, 31 Mar 2014 11:02:58 -0400
-Subject: [PATCH v4 2/3] Documentation: devicetree: Add new binding for PSCIv0.2
+Date: Mon, 31 Mar 2014 11:02:59 -0400
+Subject: [PATCH v4 3/3] ARM: Check if a CPU has gone offline
 In-Reply-To: <1396278179-28181-1-git-send-email-ashwin.chaugule@linaro.org>
 References: <1396278179-28181-1-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <1396278179-28181-3-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <1396278179-28181-4-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PSCI v0.2+ spec defines standard values for PSCI function IDs.
-Add a new binding entry so that pre v0.2 implementations can
-use DT entries for function IDs and v0.2+ implementations use
-standard entries as defined by the PSCIv0.2 specification.
+PSCIv0.2 adds a new function called AFFINITY_INFO, which
+can be used to query if a specified CPU has actually gone
+offline. Calling this function via cpu_kill ensures that
+a CPU has quiesced after a call to cpu_die.
 
 Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/psci.txt | 35 +++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+ arch/arm/kernel/psci_smp.c | 21 +++++++++++++++++++++
+ include/uapi/linux/psci.h  |  5 +++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index 433afe9..d01a90b 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -21,7 +21,15 @@ to #0.
+diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+index 570a48c..c6f1420 100644
+--- a/arch/arm/kernel/psci_smp.c
++++ b/arch/arm/kernel/psci_smp.c
+@@ -16,6 +16,7 @@
+ #include <linux/init.h>
+ #include <linux/smp.h>
+ #include <linux/of.h>
++#include <uapi/linux/psci.h>
  
- Main node required properties:
+ #include <asm/psci.h>
+ #include <asm/smp_plat.h>
+@@ -66,6 +67,25 @@ void __ref psci_cpu_die(unsigned int cpu)
+        /* We should never return */
+        panic("psci: cpu %d failed to shutdown\n", cpu);
+ }
++
++int __ref psci_cpu_kill(unsigned int cpu)
++{
++	int err;
++
++	if (!psci_ops.affinity_info)
++		return 1;
++
++	err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
++
++	if (err != PSCI_AFFINITY_INFO_RET_OFF) {
++		pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
++				cpu, err);
++		/* Make platform_cpu_kill() fail. */
++		return 0;
++	}
++	return 1;
++}
++
+ #endif
  
-- - compatible    : Must be "arm,psci"
-+ - compatible    : should contain at least one of:
-+
-+				 * "arm,psci" : for implementations complying to PSCI versions prior to
-+					0.2. For these cases function IDs must be provided.
-+
-+				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
-+					IDs are not required and should be ignored by an OS with PSCI 0.2
-+					support, but are permitted to be present for compatibility with
-+					existing software when "arm,psci" is later in the compatible list.
+ bool __init psci_smp_available(void)
+@@ -78,5 +98,6 @@ struct smp_operations __initdata psci_smp_ops = {
+ 	.smp_boot_secondary	= psci_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= psci_cpu_die,
++	.cpu_kill		= psci_cpu_kill,
+ #endif
+ };
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 0354bb1..65b4878 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -58,4 +58,9 @@
+ 	((ver & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT)
+ #define PSCI_VER_MINOR(ver)		(ver & PSCI_VER_MINOR_MASK)
  
-  - method        : The method of calling the PSCI firmware. Permitted
-                    values are:
-@@ -45,6 +53,8 @@ Main node optional properties:
- 
- Example:
- 
-+Case 1: PSCI v0.1 only.
++/* Return values from the PSCI_ID_AFFINITY_INFO Function. */
++#define PSCI_AFFINITY_INFO_RET_ON			0
++#define PSCI_AFFINITY_INFO_RET_OFF			1
++#define PSCI_AFFINITY_INFO_RET_ON_PENDING	2
 +
- 	psci {
- 		compatible	= "arm,psci";
- 		method		= "smc";
-@@ -53,3 +63,26 @@ Example:
- 		cpu_on		= <0x95c10002>;
- 		migrate		= <0x95c10003>;
- 	};
-+
-+
-+Case 2: PSCI v0.2 only
-+
-+	psci {
-+		compatible	= "arm,psci-0.2";
-+		method		= "smc";
-+	};
-+
-+Case 3: PSCI v0.2 and PSCI v0.1.
-+
-+	As described above, for compatibility with existing kernels, the
-+	hypervisor will likely want to provide IDs, e.g.
-+
-+	psci {
-+		compatible = "arm,psci-0.2", "arm,psci";
-+		method = "hvc";
-+
-+		cpu_on = < arbitrary value >;
-+		cpu_off = < arbitrary value >;
-+
-+		...
-+	};
+ #endif /* _UAPI_LINUX_PSCI_H */
 -- 
 1.8.3.2
