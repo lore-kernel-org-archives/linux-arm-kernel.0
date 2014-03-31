@@ -1,35 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 31 Mar 2014 11:14:24 -0700
-Subject: [PATCH] Input: pmic8xxx-pwrkey - Set sane default for debounce time
-Message-ID: <1396289664-31893-1-git-send-email-sboyd@codeaurora.org>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Mon, 31 Mar 2014 14:18:20 -0400
+Subject: [PATCH v6 02/12] ARM/ARM64: KVM: Add common header for PSCI
+ related defines
+In-Reply-To: <20140331180722.GD4756@lvm>
+References: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
+ <1396262773-7723-3-git-send-email-anup.patel@linaro.org>
+ <20140331180722.GD4756@lvm>
+Message-ID: <CAJ5Y-eaGsM4Moz815P7QM=7qh87RyzU-MVyeLOT64CLEaR0HQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the debounce time is 0 our usage of ilog2() later on in this
-driver will cause undefined behavior. If CONFIG_OF=n this fact is
-evident to the compiler, and it emits a call to ____ilog2_NaN()
-which doesn't exist. Fix this by setting a sane default for
-debounce.
+Hello,
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/input/misc/pmic8xxx-pwrkey.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 31 March 2014 14:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Mon, Mar 31, 2014 at 04:16:03PM +0530, Anup Patel wrote:
+>> We need a common place to share PSCI related defines among ARM kernel,
+>> ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
+>>
+>> We introduce uapi/linux/psci.h for this purpose. This newly added
+>> header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
+>> and user space (i.e. QEMU or KVMTOOL).
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> ---
+>>  include/uapi/linux/Kbuild |    1 +
+>>  include/uapi/linux/psci.h |   55 +++++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 56 insertions(+)
+>>  create mode 100644 include/uapi/linux/psci.h
+>>
+>
+> You should coordinate with Ashwin's work so you don't step on each
+> other's definitions and one patch set should depend on the other one.
 
-diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
-index 1cb8fda7a166..27add04676e1 100644
---- a/drivers/input/misc/pmic8xxx-pwrkey.c
-+++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-@@ -92,7 +92,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
- 	bool pull_up;
- 
- 	if (of_property_read_u32(pdev->dev.of_node, "debounce", &kpd_delay))
--		kpd_delay = 0;
-+		kpd_delay = 15625;
- 
- 	pull_up = of_property_read_bool(pdev->dev.of_node, "pull-up");
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+So, apart from some extra #defines we mostly differ on style. Whats
+the general recommendation here?
+Mine looks simpler [1] ;)
+
+
+Cheers,
+Ashwin
+
+[1] http://www.spinics.net/lists/arm-kernel/msg319090.html
