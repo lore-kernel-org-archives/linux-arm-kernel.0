@@ -1,10 +1,10 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:15:59 +0300
-Subject: [PATCH 20/55] ARM: OMAP3+: PRCM: remove references to
- cm-regbits-34xx.h from PRCM core code
+Date: Mon, 31 Mar 2014 18:16:00 +0300
+Subject: [PATCH 21/55] ARM: OMAP2+: PRCM: remove references to clock.h from
+ PRCM core code
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-21-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-22-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,118 +12,91 @@ Done in preparation to make PRCM a standalone driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm33xx.c             |    6 +++++-
- arch/arm/mach-omap2/cm3xxx.c             |    8 +++++++-
- arch/arm/mach-omap2/cminst44xx.c         |    6 +++++-
- arch/arm/mach-omap2/powerdomain-common.c |    1 -
- arch/arm/mach-omap2/prm3xxx.c            |    7 ++++++-
- 5 files changed, 23 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/clockdomain.c |    1 -
+ arch/arm/mach-omap2/clockdomain.h |    2 +-
+ arch/arm/mach-omap2/prcm-common.h |    2 ++
+ arch/arm/mach-omap2/prm_common.c  |   11 ++++-------
+ 4 files changed, 7 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index 728ac3f..c7be4e4 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -25,7 +25,6 @@
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index 2da3b5e..9a59efb 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -29,7 +29,6 @@
+ #include <linux/bitops.h>
+ 
+ #include "soc.h"
+-#include "clock.h"
  #include "clockdomain.h"
- #include "cm.h"
- #include "cm33xx.h"
--#include "cm-regbits-34xx.h"
- #include "prm33xx.h"
  
- #define AM33XX_MODULEMODE_SHIFT			0
-@@ -36,6 +35,11 @@
- #define AM33XX_IDLEST_SHIFT			16
- #define AM33XX_IDLEST_MASK			(0x3 << 16)
+ /* clkdm_list contains all registered struct clockdomains */
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index 82c37b1..4322a28 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -17,7 +17,6 @@
+ #include <linux/init.h>
  
-+#define OMAP34XX_CLKSTCTRL_DISABLE_AUTO		0x0
-+#define OMAP34XX_CLKSTCTRL_FORCE_SLEEP		0x1
-+#define OMAP34XX_CLKSTCTRL_FORCE_WAKEUP		0x2
-+#define OMAP34XX_CLKSTCTRL_ENABLE_AUTO		0x3
-+
+ #include "powerdomain.h"
+-#include "clock.h"
+ 
  /*
-  * CLKCTRL_IDLEST_*: possible values for the CM_*_CLKCTRL.IDLEST bitfield:
-  *
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 989590e..859c2fd 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -22,9 +22,15 @@
- #include "cm.h"
- #include "cm2xxx_3xxx_private.h"
- #include "cm3xxx.h"
--#include "cm-regbits-34xx.h"
- #include "clockdomain.h"
+  * Clockdomain flags
+@@ -98,6 +97,7 @@ struct clkdm_dep {
+ #define _CLKDM_FLAG_HWSUP_ENABLED		BIT(0)
  
-+#define OMAP34XX_CLKSTCTRL_DISABLE_AUTO		0x0
-+#define OMAP34XX_CLKSTCTRL_FORCE_SLEEP		0x1
-+#define OMAP34XX_CLKSTCTRL_FORCE_WAKEUP		0x2
-+#define OMAP34XX_CLKSTCTRL_ENABLE_AUTO		0x3
+ struct omap_hwmod;
++struct clk;
+ 
+ /**
+  * struct clockdomain - OMAP clockdomain
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index f356532..1a05d04 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -519,6 +519,8 @@ struct omap_prcm_irq_setup {
+ 
+ struct of_device_id;
+ 
++extern void __iomem *clk_memmaps[];
 +
-+#define OMAP3430_AUTO_PERIPH_DPLL_MASK		(0x7 << 3)
-+
- static const u8 omap3xxx_cm_idlest_offs[] = {
- 	CM_IDLEST1, CM_IDLEST2, OMAP2430_CM_IDLEST3
- };
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index c2712d3..58e01c7 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -27,7 +27,6 @@
- #include "cm2_44xx.h"
- #include "cm44xx.h"
- #include "cminst44xx.h"
--#include "cm-regbits-34xx.h"
- #include "prcm44xx.h"
+ extern void omap_prcm_irq_cleanup(void);
+ extern int omap_prcm_register_chain_handler(
+ 	struct omap_prcm_irq_setup *irq_setup);
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 080b3ed..090d13f 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -32,7 +32,6 @@
+ #include "prm2xxx.h"
+ #include "prm3xxx.h"
  #include "prm44xx.h"
- #include "prcm_mpu44xx.h"
-@@ -40,6 +39,11 @@
- #define OMAP4430_MODULEMODE_SHIFT	0
- #define OMAP4430_MODULEMODE_MASK	(0x3 << 0)
+-#include "clock.h"
  
-+#define OMAP34XX_CLKSTCTRL_DISABLE_AUTO	0x0
-+#define OMAP34XX_CLKSTCTRL_FORCE_SLEEP	0x1
-+#define OMAP34XX_CLKSTCTRL_FORCE_WAKEUP	0x2
-+#define OMAP34XX_CLKSTCTRL_ENABLE_AUTO	0x3
-+
  /*
-  * CLKCTRL_IDLEST_*: possible values for the CM_*_CLKCTRL.IDLEST bitfield:
-  *
-diff --git a/arch/arm/mach-omap2/powerdomain-common.c b/arch/arm/mach-omap2/powerdomain-common.c
-index c40e5f0..2c62cd9 100644
---- a/arch/arm/mach-omap2/powerdomain-common.c
-+++ b/arch/arm/mach-omap2/powerdomain-common.c
-@@ -16,7 +16,6 @@
- #include <linux/bug.h>
- #include "pm.h"
- #include "cm.h"
--#include "cm-regbits-34xx.h"
- #include "prm-regbits-34xx.h"
- #include "prm-regbits-44xx.h"
+  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
+@@ -481,18 +480,16 @@ static struct of_device_id omap_prcm_dt_match_table[] = {
+ 	{ }
+ };
  
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 8ae209a..852bc4d 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -24,7 +24,6 @@
- #include "prm2xxx_3xxx_private.h"
- #include "cm2xxx_3xxx_private.h"
- #include "cm3xxx.h"
--#include "cm-regbits-34xx.h"
+-static struct clk_hw_omap memmap_dummy_ck = {
+-	.flags = MEMMAP_ADDRESSING,
+-};
+-
+ static u32 prm_clk_readl(void __iomem *reg)
+ {
+-	return omap2_clk_readl(&memmap_dummy_ck, reg);
++	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++	return readl_relaxed(clk_memmaps[r->index] + r->offset);
+ }
  
- #define OMAP3430_GLOBAL_COLD_RST_MASK			(1 << 0)
- #define OMAP3430_GLOBAL_COLD_RST_SHIFT			0
-@@ -79,6 +78,12 @@
- #define OMAP3430_LASTPOWERSTATEENTERED_MASK		(0x3 << 0)
- #define OMAP3430_LOGICSTATEST_MASK			(1 << 2)
+ static void prm_clk_writel(u32 val, void __iomem *reg)
+ {
+-	omap2_clk_writel(val, &memmap_dummy_ck, reg);
++	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++	writel_relaxed(val, clk_memmaps[r->index] + r->offset);
+ }
  
-+#define OMAP3430ES2_EN_USBHOST2_SHIFT			1
-+
-+#define OMAP3430_CM_FCLKEN_IVA2_EN_IVA2_MASK		(1 << 0)
-+
-+#define OMAP3430_CLKACTIVITY_IVA2_MASK			(1 << 0)
-+
- static const struct omap_prcm_irq omap3_prcm_irqs[] = {
- 	OMAP_PRCM_IRQ("wkup",	0,	0),
- 	OMAP_PRCM_IRQ("io",	9,	1),
+ static struct ti_clk_ll_ops omap_clk_ll_ops = {
 -- 
 1.7.9.5
