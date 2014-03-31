@@ -1,53 +1,89 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 31 Mar 2014 21:04:33 +0200
-Subject: [PATCH RFC 0/3] arm64: NEON crypto under CONFIG_PREEMPT
-In-Reply-To: <alpine.LFD.2.11.1403282155290.1571@knanqh.ubzr>
+Date: Mon, 31 Mar 2014 21:07:10 +0200
+Subject: [PATCH RFC 1/3] arm64/crypto: add shared macro to test for
+ NEED_RESCHED
+In-Reply-To: <alpine.LFD.2.11.1403282141230.1571@knanqh.ubzr>
 References: <1396004735-15475-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.11.1403282155290.1571@knanqh.ubzr>
-Message-ID: <CAKv+Gu9WEDVF=eNQxTx4U5C=++to5nEppwCXSDP-OybNtYKiLQ@mail.gmail.com>
+ <1396004735-15475-2-git-send-email-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.11.1403282141230.1571@knanqh.ubzr>
+Message-ID: <CAKv+Gu83fc=Do301mV=V=XcBWWTORjBP8GMrK+45jSbHEDEcJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2014 03:03, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+On 29 March 2014 02:53, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
 > On Fri, 28 Mar 2014, Ard Biesheuvel wrote:
 >
->> This series is an attempt to reduce latency under CONFIG_PREEMPT while
->> maintaining optimal throughput otherwise, i.e., under !CONFIG_PREEMPT or
->> while running outside of process context.
->>
->> In the in_interrupt() case, the calls to kernel_neon_begin and kernel_neon_end
->> incur a fixed penalty (i.e., each call needs to stack/unstack a fixed number of
->> registers), and preemption is not possible anyway, so the call into the crypto
->> algorithm should just complete as fast as possible, ideally by processing all
->> of the input in the core loop without having to spill state to memory or reload
->> round keys (e.g., SHA-256 uses 64 32-bit round keys to process each input block
->> of 64 bytes)
->>
->> In contrast, when running in process context, we should avoid hogging the CPU by
->> spending unreasonable amounts of time inside a kernel_neon_begin/kernel_neon_end
->> section. However, reloading those 64 32-byte round keys to process each 64-byte
->> block one by one is far from optimal.
->>
->> The solution proposed here is to allow the inner loops of the crypto algorithms
->> to test the TIF_NEED_RESCHED flag, and terminate early if it is set. This is
->> essentially CONFIG_PREEMPT_VOLUNTARY, even under CONFIG_PREEMPT, but it is the
->> best we can do when running with preemption disabled.
->>
->> Patch #1 introduces the shared asm macro, patches #2 and #3 are the SHA-1 and
->> SHA-224/SHA-256 implementations I posted earlier, but reworked to utilize
->> voluntary preemption.
+>> This adds arch/arm64/crypto/preempt.h, currently containing just a single
+>> asm macro definition 'b_if_no_resched' that will be shared between multiple
+>> crypto algorithm implementations that need to test for preemption in the
+>> inner loop.
 >
-> How extensive is the required rework?  If reasonably small, I think this
-> would be better to have #2 and #3 as patches to be applied on top of
-> your initial implementations instead.  It helps with patch review, and
-> it makes it easier in the occurrence of a problem to tell users to just
-> revert commit xyz in order to get the SHA code without voluntary
-> preemption for testing.
+> This file is a rather bad choice for this pretty generic macro.  There
+> is nothing crypto specific about it, even if crypto might be the only
+> user for now.  This should live in include/asm/assembler.h, or a
+> separate file in that directory only if including <asm/asm-offsets.h>
+> from assembler.h is considered a nuisance.
 >
 
-I can do that. I will also put the preempt.h include file elsewhere,
-as you suggested in the other thread, and post back with a v2 series
-tomorrow
+True, there is nothing crypto specific about it,
 
-Regards,
+@Catalin: would you object to adding this macro (and the #include
+asm-offsets.h) to assembler.h?
+Or would you prefer to have it in a separate file?
+
+-- 
 Ard.
+
+
+
+>
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/crypto/preempt.h | 28 ++++++++++++++++++++++++++++
+>>  1 file changed, 28 insertions(+)
+>>  create mode 100644 arch/arm64/crypto/preempt.h
+>>
+>> diff --git a/arch/arm64/crypto/preempt.h b/arch/arm64/crypto/preempt.h
+>> new file mode 100644
+>> index 000000000000..94302d5b5ae9
+>> --- /dev/null
+>> +++ b/arch/arm64/crypto/preempt.h
+>> @@ -0,0 +1,28 @@
+>> +/*
+>> + * preempt.h - shared macros to check preempt state
+>> + *
+>> + * Copyright (C) 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <asm/asm-offsets.h>
+>> +#include <asm/thread_info.h>
+>> +
+>> +     /*
+>> +      * Branch to 'lb' but only if we have not been tagged for preemption.
+>> +      *
+>> +      * Expects current->thread_info in ti, or NULL if running in interrupt
+>> +      * context. reg is a scratch x register.
+>> +      */
+>> +     .macro          b_if_no_resched, ti, reg, lb
+>> +#if defined(CONFIG_PREEMPT) || defined(CONFIG_PREEMPT_VOLUNTARY)
+>> +     cbz             \ti, \lb                        // have thread_info?
+>> +     ldr             \reg, [\ti, #TI_FLAGS]          // get flags
+>> +     tbz             \reg, #TIF_NEED_RESCHED, \lb    // needs rescheduling?
+>> +#else
+>> +     b               \lb
+>> +#endif
+>> +     .endm
+>> --
+>> 1.8.3.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
