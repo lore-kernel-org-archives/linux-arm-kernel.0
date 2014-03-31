@@ -1,140 +1,412 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 31 Mar 2014 14:53:20 +0200
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <20140331113113.GE29871@arm.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <76240593.SAyloCy7nR@wuerfel> <20140331113113.GE29871@arm.com>
-Message-ID: <9531814.OxBzcO1V3J@wuerfel>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Mon, 31 Mar 2014 09:53:16 -0300
+Subject: [PATCH 1/4] pwm: Add Allwinner SoC support
+In-Reply-To: <1396267649-18009-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1396267649-18009-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5339653C.4090601@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 March 2014 12:31:14 Catalin Marinas wrote:
-> On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
-> > On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
-> > > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
-> > > space described in [1] due to one major issue + one minor issue.
-> > > 
-> > > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
-> > > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
-> > > kernel fails to create mapping for this region in map_mem function
-> > > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
-> > > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
-> > 
-> > It took me a while to understand what is going on, but it essentially comes
-> > down to the logical memory map (0xffffffc000000000-0xffffffffffffffff)
-> > being able to represent only RAM in the first 256GB of address space.
-> > 
-> > More importantly, this means that any system following [1] will only be
-> > able to use 32GB of RAM, which is a much more severe restriction than
-> > what it sounds like at first.
-> 
-> On a 64-bit platform, do we still need the alias at the bottom and the
-> 512-544GB hole (even for 32-bit DMA, top address bits can be wired to
-> 512GB)? Only the idmap would need 4 levels, but that's static, we don't
-> need to switch Linux to 4-levels. Otherwise the memory is too sparse.
+Hi,
 
-I think we should keep a static virtual-to-physical mapping, and to keep
-relocating the kernel at compile time without a hack like ARM_PATCH_PHYS_VIRT
-if at all possible. Further, the same document that describes the
-"much-too-sparse" memory map also says that there should be no alias,
-so we have to load the kernel to 0x8000.0000 physical and address most of
-the memory at 0x80.0000.0000
+I had a quick look and spotted a couple of things here, see inline.
 
-> Of course, if you have 512GB of RAM and you want 4K pages, 3 levels are
-> no longer enough (with 64K pages you get to 42-bit VA space).
+El 31/03/14 09:07, Alexandre Belloni escribi?:
+> This adds a generic PWM framework driver for the PWM controller
+> found on Allwinner SoCs.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   drivers/pwm/Kconfig     |   9 ++
+>   drivers/pwm/Makefile    |   1 +
+>   drivers/pwm/pwm-sunxi.c | 325 ++++++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 335 insertions(+)
+>   create mode 100644 drivers/pwm/pwm-sunxi.c
+>
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index 22f2f2857b82..f7381def0fd2 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -187,6 +187,15 @@ config PWM_SPEAR
+>   	  To compile this driver as a module, choose M here: the module
+>   	  will be called pwm-spear.
+>
+> +config PWM_SUNXI
+> +	tristate "Allwinner PWM support"
+> +	depends on ARCH_SUNXI
+> +	help
+> +	  Generic PWM framework driver for Allwinner SoCs.
+> +
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called pwm-sunxi.
+> +
+>   config PWM_TEGRA
+>   	tristate "NVIDIA Tegra PWM support"
+>   	depends on ARCH_TEGRA
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> index d8906ec69976..e110259b6c03 100644
+> --- a/drivers/pwm/Makefile
+> +++ b/drivers/pwm/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
+>   obj-$(CONFIG_PWM_RENESAS_TPU)	+= pwm-renesas-tpu.o
+>   obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+>   obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+> +obj-$(CONFIG_PWM_SUNXI)		+= pwm-sunxi.o
+>   obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+>   obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
+>   obj-$(CONFIG_PWM_TIEHRPWM)	+= pwm-tiehrpwm.o
+> diff --git a/drivers/pwm/pwm-sunxi.c b/drivers/pwm/pwm-sunxi.c
+> new file mode 100644
+> index 000000000000..be39abee0a24
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-sunxi.c
+> @@ -0,0 +1,325 @@
+> +/*
+> + * Driver for Allwinner Pulse Width Modulation Controller
+> + *
+> + * Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> + *
+> + * Licensed under GPLv2.
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pwm.h>
+> +#include <linux/slab.h>
+> +
+> +#define PWM_CTRL_REG		0x0
+> +
+> +#define PWM_CH_PRD_BASE		0x4
+> +#define PWM_CH_PRD_OFF		0x4
+> +#define PWM_CH_PRD(x)		(PWM_CH_PRD_BASE + PWM_CH_PRD_OFF * x)
+> +
+> +#define	PWMCH_OFFSET		15
+> +#define PWM_PRESCAL_MASK	(BIT(0)|BIT(1)|BIT(2)|BIT(3))
 
-Right, that is a separate issue. I don't know at what point we'll have
-to address this one. For now, we have to break the 32GB barrier, then
-we can think about the 256GB barrier ;-)
+0xF looks better in my opinion
 
-> > > Secondly, vmemmap space is not enough to cover over about 585GB physical
-> > > address space. Fortunately, this issue can be resolved as utilizing an extra
-> > > vmemmap space (0xffffffbe00000000-0xffffffbffbbfffff) in [2]. However,
-> > > it would not cover systems having a couple of terabytes DRAM.
-> > 
-> > This one can be trivially changed by taking more space out of the vmalloc
-> > area, to go much higher if necessary. vmemmap space is always just a fraction
-> > of the linear mapping size, so we can accommodate it by definition if we
-> > find space to fit the physical memory.
-> 
-> vmemmap is the total range / page size * sizeof(struct page). So for 1TB
-> range and 4K pages we would need 8GB (the current value, unless I
-> miscalculated the above). Anyway, you can't cover 1TB range with
-> 3-levels.
+> +#define PWM_PRESCAL_OFF		0
+> +#define PWM_EN			BIT(4)
+> +#define PWM_ACT_STATE		BIT(5)
+> +#define PWM_CLK_GATING		BIT(6)
+> +#define PWM_MODE		BIT(7)
+> +#define PWM_PULSE		BIT(8)
+> +#define PWM_BYPASS		BIT(9)
+> +
+> +#define PWM_RDY_BASE		28
+> +#define PWM_RDY_OFF		1
+> +#define PWM_RDY(x)		BIT(PWM_RDY_BASE + PWM_RDY_OFF * x)
+> +
+> +#define PWM_PRD_ACT_MASK	0xFF
+> +#define PWM_PRD(x)		(x << 16)
+> +#define PWM_PRD_MASK		0xFF
+> +
+> +#define	BIT_CH(bit, chan)	(bit << (chan * PWMCH_OFFSET))
+> +
+> +u32 prescal_table[] = { 120, 180, 240, 360, 480, 0, 0, 0,
+> +			12000, 24000, 36000, 48000, 72000,
+> +			0, 0, 1 };
+> +
+> +struct sunxi_pwm_data {
+> +	bool has_rdy;
+> +};
+> +
+> +struct sunxi_pwm_chip {
+> +	struct pwm_chip chip;
+> +	struct clk *clk;
+> +	void __iomem *base;
+> +	const struct sunxi_pwm_data *data;
+> +};
+> +
+> +#define to_sunxi_pwm_chip(chip) container_of(chip, struct sunxi_pwm_chip, chip)
+> +
+> +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
+> +				  unsigned long offset)
+> +{
+> +	return readl_relaxed(chip->base + offset);
+> +}
+> +
+> +static inline void sunxi_pwm_writel(struct sunxi_pwm_chip *chip,
+> +				    unsigned long offset, unsigned long val)
+> +{
+> +	writel_relaxed(val, chip->base + offset);
+> +}
+> +
+> +static int sunxi_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			    int duty_ns, int period_ns)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
+> +	u32 clk_rate, prd, dty;
+> +	u64 div;
+> +	u32 val, clk_gate;
+> +	int i, ret;
+> +
+> +	clk_rate = clk_get_rate(sunxi_pwm->clk);
+> +
+> +
+> +	/* First, test without any divider */
+> +	i = PWM_PRESCAL_MASK;
+> +	div = clk_rate * period_ns;
+> +	do_div(div, 1000000000);
+> +	if (div > PWM_PRD_MASK) {
+> +		/* Then go up from the first divider */
+> +		for (i = 0; i < PWM_PRESCAL_MASK; i++) {
+> +			if (!prescal_table[i])
+> +				continue;
+> +			div = clk_rate / prescal_table[i];
+> +			div = div * period_ns;
+> +			do_div(div, 1000000000);
+> +			if (div <= PWM_PRD_MASK)
+> +				break;
+> +		}
+> +	}
+> +
+> +	if (div > PWM_PRD_MASK) {
+> +		dev_err(chip->dev, "prescaler exceeds the maximum value\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	prd = div;
+> +	div *= duty_ns;
+> +	do_div(div, period_ns);
+> +	dty = div;
+> +
+> +	ret = clk_enable(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +
+> +	if (sunxi_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm)))
+> +		return -EBUSY;
+> +
+> +	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
+> +	val |= i;
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CH_PRD(pwm->hwpwm), dty | PWM_PRD(prd));
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +	val |= clk_gate;
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +
+> +	clk_disable(sunxi_pwm->clk);
+> +	return ret;
+> +}
+> +
+> +static int sunxi_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				  enum pwm_polarity polarity)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
+> +	u32 val;
+> +	int ret;
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +
+> +	if (polarity != PWM_POLARITY_NORMAL)
+> +		val &= ~BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
+> +	else
+> +		val |= BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
+> +
+> +	ret = clk_enable(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +
+> +	clk_disable(sunxi_pwm->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sunxi_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = clk_enable(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(chip->dev, "failed to enable PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +	val |= BIT_CH(PWM_EN, pwm->hwpwm);
+> +	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +
+> +	return 0;
+> +}
+> +
+> +static void sunxi_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
+> +	u32 val;
+> +
+> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
+> +	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
+> +	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
+> +
+> +	clk_disable(sunxi_pwm->clk);
+> +}
+> +
+> +static const struct pwm_ops sunxi_pwm_ops = {
+> +	.config = sunxi_pwm_config,
+> +	.set_polarity = sunxi_pwm_set_polarity,
+> +	.enable = sunxi_pwm_enable,
+> +	.disable = sunxi_pwm_disable,
+> +	.owner = THIS_MODULE,
+> +};
+> +
+> +static const struct sunxi_pwm_data sunxi_pwm_data_v1 = {
+> +	.has_rdy = false,
+> +};
+> +
+> +static const struct sunxi_pwm_data sunxi_pwm_data_v2 = {
+> +	.has_rdy = true,
+> +};
 
-The size of 'struct page' depends on a couple of configuration variables.
-If they are all enabled, you might need a bit more, even for configurations
-that don't have that much address space.
+Is there any special reason why you used v1 and v2?
 
-> > > Therefore, it would be needed to implement 4 level page table translations
-> > > for 4KB pages on 40-bit physical address space platforms. Someone might
-> > > suggest use of 64KB pages in this case, but I'm not sure about how to
-> > > deal with internal memory fragmentation.
-> > > 
-> > > I would like to contribute 4 level page table translations to upstream,
-> > > the target of which is 3.16 kernel, if there is no movement on it. I saw
-> > > some related RFC patches a couple of months ago, but they didn't seem to 
-> > > be merged into maintainer's tree.
-> > 
-> > I think you are answering the wrong question here. Four level page tables
-> > should not be required to support >32GB of RAM, that would be very silly.
-> 
-> I agree, we should only enable 4-levels of page table if we have close
-> to 512GB of RAM or the range is too sparse but I would actually push
-> back on the hardware guys to keep it tighter.
+> +static const struct of_device_id sunxi_pwm_dt_ids[] = {
+> +	{
+> +		.compatible = "allwinner,sun4i-pwm",
+> +		.data = &sunxi_pwm_data_v1,
+> +	}, {
+> +		.compatible = "allwinner,sun7i-pwm",
+> +		.data = &sunxi_pwm_data_v2,
 
-But remember this part:
+Please adjust your compatibles to also indicate SoC, as on all of the 
+other devices:
 
-> > There are good reasons to use a 50 bit virtual address space in user
-> > land, e.g. for supporting data base applications that mmap huge files.
+allwinner,sun4i-a10-pwm
+allwinner,sun7i-a20-pwm
 
-You may actually need 4-level tables even if you have much less installed
-memory, depending on how the application is written. Note that x86, powerpc
-and s390 all chose to use 4-level tables for 64-bit kernels all the
-time, even thought they can also use 3-level of 5-level in some cases.
+> +	}, {
+> +		/* sentinel */
+> +	},
+> +};
+> +MODULE_DEVICE_TABLE(of, sunxi_pwm_dt_ids);
+> +
+> +static int sunxi_pwm_probe(struct platform_device *pdev)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	const struct of_device_id *match;
+> +
+> +	match = of_match_device(sunxi_pwm_dt_ids, &pdev->dev);
+> +	if (!match || !match->data)
+> +		return -ENODEV;
+> +
+> +	sunxi_pwm = devm_kzalloc(&pdev->dev, sizeof(*sunxi_pwm), GFP_KERNEL);
+> +	if (!sunxi_pwm)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	sunxi_pwm->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(sunxi_pwm->base))
+> +		return PTR_ERR(sunxi_pwm->base);
+> +
+> +	sunxi_pwm->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(sunxi_pwm->clk))
+> +		return PTR_ERR(sunxi_pwm->clk);
+> +
+> +	ret = clk_prepare(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to prepare PWM clock\n");
+> +		return ret;
+> +	}
+> +
+> +	sunxi_pwm->chip.dev = &pdev->dev;
+> +	sunxi_pwm->chip.ops = &sunxi_pwm_ops;
+> +
+> +	if (pdev->dev.of_node) {
+> +		sunxi_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
+> +		sunxi_pwm->chip.of_pwm_n_cells = 3;
+> +	}
+> +
+> +	sunxi_pwm->chip.base = -1;
+> +	sunxi_pwm->chip.npwm = 2;
+> +	sunxi_pwm->data = match->data;
+> +
+> +	/* By default, the polarity is inversed, set it to normal */
 
-> > If this is not the goal however, we should not pay for the overhead
-> > of the extra page table in user space. I can see two other possible
-> > solutions for the problem:
-> > 
-> > a) always use a four-level page table in kernel space, regardless of
-> > whether we do it in user space. We can move the kernel mappings down
-> > in address space either by one 512GB entry to 0xffffff0000000000, or
-> > to match the 64k-page location at 0xfffffc0000000000, or all the way
-> > to to 0xfffc000000000000. In any case, we can have all the dynamic
-> > mappings within one 512GB area and pretend we have a three-level
-> > page table for them, while the rest of DRAM is mapped statically at
-> > early boot time using 512GB large pages.
-> 
-> That's a workaround but we end up with two (or more) kernel pgds - one
-> for vmalloc, ioremap etc. and another (static) one for the kernel linear
-> mapping. So far there isn't any memory mapping carved out but we have to
-> be careful in the future.
-> 
-> However, kernel page table walking would be a bit slower with 4-levels.
+This comment seems to be misplaced
 
-Do we actually walk the kernel page tables that often? With what I suggested,
-we can still pretend that it's 3-level for all practical purposes, since
-you wouldn't walk the page tables for the linear mapping.
+> +	ret = clk_enable(sunxi_pwm->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable PWM clock\n");
+> +		goto unprepare_clk;
+> +	}
+> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG,
+> +			 BIT_CH(PWM_ACT_STATE, 0) |
+> +			 BIT_CH(PWM_ACT_STATE, 1));
+> +	clk_disable(sunxi_pwm->clk);
+> +
+> +	ret = pwmchip_add(&sunxi_pwm->chip);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
+> +		goto unprepare_clk;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, sunxi_pwm);
+> +
+> +
+> +	return ret;
+> +
+> +unprepare_clk:
+> +	clk_unprepare(sunxi_pwm->clk);
+> +	return ret;
+> +}
+> +
+> +static int sunxi_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct sunxi_pwm_chip *sunxi_pwm = platform_get_drvdata(pdev);
+> +
+> +	clk_unprepare(sunxi_pwm->clk);
+> +
+> +	return pwmchip_remove(&sunxi_pwm->chip);
+> +}
+> +
+> +static struct platform_driver sunxi_pwm_driver = {
+> +	.driver = {
+> +		.name = "sunxi-pwm",
+> +		.of_match_table = of_match_ptr(sunxi_pwm_dt_ids),
+> +	},
+> +	.probe = sunxi_pwm_probe,
+> +	.remove = sunxi_pwm_remove,
+> +};
+> +module_platform_driver(sunxi_pwm_driver);
+> +
+> +MODULE_ALIAS("platform:sunxi-pwm");
+> +MODULE_AUTHOR("alexandre Belloni <alexandre.belloni@free-electrons.com>");
 
-> > b) If there is a reasonable assumption that everybody is using the
-> > memory map from [1], then we can change the __virt_to_phys
-> > and __phys_to_virt functions to accomodate that and move everything
-> > into a flat contiguous virtual address space of 256GB. This would
-> > also enable the use of a more efficient mem_map array instead of the
-> > vmemmap, but would break running on any system that doesn't follow
-> > the same convention. I have no idea yet how common this memory map
-> > is, so I can't tell if this would be a realistic solution for what
-> > you are targeting. We clearly wouldn't do it if it implies distributions
-> > to ship an extra kernel binary for systems based on different memory
-> > maps.
-> 
-> We end up with hacks like the Realview phys/virt conversion. I don't
-> think we can guarantee that all ARMv8 platforms would follow the above
-> guidance.
+You may want to make that a capital A.
 
-What I was thinking is that if all SBSA machines for instance follow this
-model, then some distros that only support those machines anyway can
-turn it on.
+> +MODULE_DESCRIPTION("Allwinner PWM driver");
+> +MODULE_LICENSE("GPL v2");
+>
 
-	Arnd
+Thanks for working on this!
+
+Emilio
