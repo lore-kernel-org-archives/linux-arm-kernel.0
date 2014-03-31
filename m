@@ -1,61 +1,54 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:15:55 +0300
-Subject: [PATCH 16/55] ARM: OMAP2: PRM: remove references to
- prm-regbits-24xx.h from PRM core code
+Date: Mon, 31 Mar 2014 18:15:54 +0300
+Subject: [PATCH 15/55] ARM: AM33xx: CM: remove references to cm-regbits-33xx.h
+ from CM core code
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-17-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Done in preparation to make PRM a standalone driver.
+Done in preparation to make CM a standalone driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm2xxx.c      |   16 +++++++++++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.c |    1 -
- 2 files changed, 15 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/cm33xx.c |    9 ++++++++-
+ arch/arm/mach-omap2/cm33xx.h |    1 -
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
-index a7f1cac..7264ae6 100644
---- a/arch/arm/mach-omap2/prm2xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx.c
-@@ -20,9 +20,23 @@
+diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+index 40a22e5..728ac3f 100644
+--- a/arch/arm/mach-omap2/cm33xx.c
++++ b/arch/arm/mach-omap2/cm33xx.c
+@@ -26,9 +26,16 @@
+ #include "cm.h"
+ #include "cm33xx.h"
+ #include "cm-regbits-34xx.h"
+-#include "cm-regbits-33xx.h"
+ #include "prm33xx.h"
  
- #include "powerdomain.h"
- #include "clockdomain.h"
-+#include "prm2xxx.h"
- #include "prm2xxx_3xxx_private.h"
- #include "cm2xxx_3xxx.h"
--#include "prm-regbits-24xx.h"
++#define AM33XX_MODULEMODE_SHIFT			0
++#define AM33XX_MODULEMODE_MASK			(0x3 << 0)
 +
-+#define OMAP24XX_FORCESTATE_MASK		(1 << 18)
-+#define OMAP24XX_AUTOIDLE_MASK			(1 << 0)
-+#define OMAP24XX_AUTO_EXTVOLT_MASK		(1 << 15)
++#define AM33XX_CLKTRCTRL_SHIFT			0
++#define AM33XX_CLKTRCTRL_MASK			(0x3 << 0)
++#define AM33XX_IDLEST_SHIFT			16
++#define AM33XX_IDLEST_MASK			(0x3 << 16)
 +
-+#define OMAP24XX_SETOFF_LEVEL_SHIFT		12
-+#define OMAP24XX_MEMRETCTRL_MASK		(1 << 8)
-+#define OMAP24XX_SETRET_LEVEL_SHIFT		6
-+#define OMAP24XX_VOLT_LEVEL_SHIFT		0
-+
-+#define OMAP24XX_EXTWMPU_RST_SHIFT		6
-+#define OMAP24XX_SECU_WD_RST_SHIFT		5
-+#define OMAP24XX_MPU_WD_RST_SHIFT		4
-+#define OMAP24XX_SECU_VIOL_RST_SHIFT		3
- 
  /*
-  * OMAP24xx PM_PWSTCTRL_*.POWERSTATE and PM_PWSTST_*.LASTSTATEENTERED bits -
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index d891499..d8044f9 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+  * CLKCTRL_IDLEST_*: possible values for the CM_*_CLKCTRL.IDLEST bitfield:
+  *
+diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
+index 15a778c..8f9e479 100644
+--- a/arch/arm/mach-omap2/cm33xx.h
++++ b/arch/arm/mach-omap2/cm33xx.h
 @@ -18,7 +18,6 @@
+ #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
  
- #include "powerdomain.h"
- #include "prm2xxx_3xxx_private.h"
--#include "prm-regbits-24xx.h"
- #include "clockdomain.h"
+ #include "cm.h"
+-#include "cm-regbits-33xx.h"
  
- /**
+ /* CM base address */
+ #define AM33XX_CM_BASE		0x44e00000
 -- 
 1.7.9.5
