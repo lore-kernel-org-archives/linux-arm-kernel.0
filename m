@@ -1,59 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 31 Mar 2014 14:07:28 +0200
-Subject: [PATCH 3/4] ARM: sun7i: dt: add PWM support
+Date: Mon, 31 Mar 2014 14:07:29 +0200
+Subject: [PATCH 4/4] ARM: sunxi: dt: Add PWM support for the cubietruck
 In-Reply-To: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1396267649-18009-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1396267649-18009-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds the PWM bindings for the Allwinner A20.
-Also adds the pinctrl descriptions for both PWM channels.
+Enables the PWM for both PWM channels on the cubietruck. They can be found on
+connector CN8.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 6f25cf559ad0..0dd15fcb8955 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -366,6 +366,20 @@
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
- 
-+			pwm0_pins_a: pwm0 at 0 {
-+				allwinner,pins = "PB2";
-+				allwinner,function = "pwm";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			pwm1_pins_a: pwm1 at 0 {
-+				allwinner,pins = "PI3";
-+				allwinner,function = "pwm";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PB22", "PB23";
- 				allwinner,function = "uart0";
-@@ -446,6 +460,14 @@
- 			clocks = <&osc24M>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index f9dcb61a5305..b6843839b380 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -28,6 +28,12 @@
+ 			};
  		};
  
 +		pwm: pwm at 01c20e00 {
-+			compatible = "allwinner,sun7i-pwm";
-+			reg = <0x01c20e00 0xc>;
-+			clocks = <&osc24M>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pwm0_pins_a>, <&pwm1_pins_a>;
++			status = "okay";
 +		};
 +
- 		wdt: watchdog at 01c20c90 {
- 			compatible = "allwinner,sun4i-wdt";
- 			reg = <0x01c20c90 0x10>;
+ 		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_pins_a>;
 -- 
 1.8.3.2
