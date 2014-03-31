@@ -1,83 +1,108 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 31 Mar 2014 18:41:54 +0200
-Subject: [PATCH RFC v4 0/2] clk: Support for DT assigned clock parents and
- rates
-Message-ID: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+Date: Mon, 31 Mar 2014 18:41:55 +0200
+Subject: [PATCH RFC v4 1/2] clk: Add function parsing arbitrary clock list DT
+ property
+In-Reply-To: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1396284116-19178-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds a DT binding documentation for new 'clock-parents'
-and 'clock-rates' DT properties and a helper function to parse them.
-The helper is now being called from within the driver core, similarly
-as it is done for the pins configuration binding to a device.
+The of_clk_get_by_property() function added by this patch is similar to
+of_clk_get(), except it allows to pass name of a DT property containing
+list of phandles and clock specifiers. For of_clk_get() this has been
+hard coded to "clocks".
 
-Patch 1/2 adds a variant of of_clk_get() function which accepts name of
-a DT property containing list of phandle + clock specifier pairs, as
-opposed to hard coded "clocks" property name in of_clk_get().
-
-Patch 2/2 actually adds the code searching for related DT properties
-at device node and performing re-parenting and/or clock frequency
-setting as specified.
-
-I didn't add sorting of clocks depending on parentship relation when
-setting the clock rates, it could be added in next iteration if it's
-decided it's required.
-
-Thank you for all the review comments.
-
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
 Changes since v3:
- - improved documentation of the DT binding,
- - fixed build errors for !CONFIG_OF, the parsing helpers are only
-   compiled in if CONFIG_OF is set.
+ - added missing 'static inline' to the function stub definition.
 
 Changes since v2:
- - code reordering to ensure there is no build errors, the clock
-   configuration code moved to a separate file,
- - introduced an 'assigned-clocks' DT node which is supposed to contain
-   clocks, clock-parents, clock-rates properties and be child node
-   a clock provider node, and a code parsing it called from of_clk_init();
-   It's for clocks which are not directly connected to consumer devices.
-   An alternative would be to list such assigned clocks in 'clocks'
-   property, along with "proper" parent clocks, but then there would
-   be phandles in clocks property of a node pointing to itself and it
-   would require proper handling in of_clock_init().
-   I actually tried it but it looked a bit ugly and chose this time to
-   use an extra subnode.
+ - moved the function declaration from drivers/clk/clk.h to
+   include/linux/clk.h
 
 Changes since v1:
- - updated DT binding documentation,
- - dropped the platform bus notifier, the clock setup routine is now
-   being called directly from the driver core before a driver probe() call;
-   this has an advantage such as all bus types are handled and any errors
-   are propagated, so that, for instance a driver probe() can be deferred
-   also when resources specified by clock-parents/clock-rates properties
-   are not yet available; an alternative would be to let drivers call
-   of_clk_device_setup() directly,
- - dropped the patch adding a macro definition for maximum DT property
-   name length for now.
+ - s/of_clk_get_list_entry/of_clk_get_by_property.
+---
+ drivers/clk/clkdev.c |   25 +++++++++++++++++++++----
+ include/linux/clk.h  |    7 +++++++
+ 2 files changed, 28 insertions(+), 4 deletions(-)
 
-Open issues:
- - handling of errors from of_clk_get_by_property() could be improved,
-   currently ENOENT is returned by this function not only for a null
-   entry.
-
-This series has been tested on ARM, on Exynos4412 Trats2 board.
-
-Sylwester Nawrocki (2):
-  clk: Add function parsing arbitrary clock list DT property
-  clk: Add handling of clk parent and rate assigned from DT
-
- .../devicetree/bindings/clock/clock-bindings.txt   |   42 ++++++++++
- drivers/base/dd.c                                  |    7 ++
- drivers/clk/Makefile                               |    3 +
- drivers/clk/clk-conf.c                             |   87 ++++++++++++++++++++
- drivers/clk/clk.c                                  |   10 ++-
- drivers/clk/clkdev.c                               |   25 +++++-
- include/linux/clk.h                                |    7 ++
- include/linux/clk/clk-conf.h                       |   19 +++++
- 8 files changed, 195 insertions(+), 5 deletions(-)
- create mode 100644 drivers/clk/clk-conf.c
- create mode 100644 include/linux/clk/clk-conf.h
-
---
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index a360b2e..1d41540 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -27,17 +27,28 @@ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+-struct clk *of_clk_get(struct device_node *np, int index)
++/**
++ * of_clk_get_by_property() - Parse and lookup a clock referenced by a device node
++ * @np: pointer to clock consumer node
++ * @list_name: name of the clock list property
++ * @index: index to the clock list
++ *
++ * This function parses the @list_name property and together with @index
++ * value indicating an entry of the list uses it to look up the struct clk
++ * from the registered list of clock providers.
++ */
++struct clk *of_clk_get_by_property(struct device_node *np,
++				   const char *list_name, int index)
+ {
+ 	struct of_phandle_args clkspec;
+ 	struct clk *clk;
+ 	int rc;
+ 
+-	if (index < 0)
++	if (index < 0 || !list_name)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
+-					&clkspec);
++	rc = of_parse_phandle_with_args(np, list_name, "#clock-cells",
++					index, &clkspec);
+ 	if (rc)
+ 		return ERR_PTR(rc);
+ 
+@@ -51,6 +62,12 @@ struct clk *of_clk_get(struct device_node *np, int index)
+ 	of_node_put(clkspec.np);
+ 	return clk;
+ }
++EXPORT_SYMBOL(of_clk_get_by_property);
++
++struct clk *of_clk_get(struct device_node *np, int index)
++{
++	return of_clk_get_by_property(np, "clocks", index);
++}
+ EXPORT_SYMBOL(of_clk_get);
+ 
+ /**
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index fb5e097..f3811d3 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -397,6 +397,8 @@ struct of_phandle_args;
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+ struct clk *of_clk_get(struct device_node *np, int index);
++struct clk *of_clk_get_by_property(struct device_node *np,
++				   const char *list_name, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+ #else
+@@ -409,6 +411,11 @@ static inline struct clk *of_clk_get_by_name(struct device_node *np,
+ {
+ 	return ERR_PTR(-ENOENT);
+ }
++static inline struct clk *of_clk_get_by_property(struct device_node *np,
++				   const char *list_name, int index)
++{
++	return ERR_PTR(-ENOENT);
++}
+ #endif
+ 
+ #endif
+-- 
 1.7.9.5
