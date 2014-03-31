@@ -1,51 +1,47 @@
-From: yamada.m@jp.panasonic.com (Masahiro Yamada)
-Date: Mon, 31 Mar 2014 10:07:37 +0900
-Subject: [PATCH,RESEND] arm: Do not define "comma" twice
-Message-ID: <1396228057-1488-1-git-send-email-yamada.m@jp.panasonic.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 31 Mar 2014 13:24:57 +1100
+Subject: linux-next: manual merge of the net-next tree with the arm-soc tree
+Message-ID: <20140331132457.2d8d71019a52033bbef5b2c2@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have the definition of "comma" in scripts/Kbuild.include.
-We should not double it.
+Hi all,
 
-Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
----
+Today's linux-next merge of the net-next tree got a conflict in
+Documentation/devicetree/bindings/net/stmmac.txt between commit
+50b4af414d41 ("dts: stmmac: Document the clocks property in the stmmac
+base document") from the arm-soc tree and commit e8f08ee0ad86 ("DT: net:
+document Ethernet bindings in one place") from the net-next tree.
 
-First I posted this patch to linux-kbuild ML.
-But, Michal Marek recommended me to send it to linux-arm-kernel ML.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-So this is here now.
-
-
- arch/arm/Makefile   | 2 --
- arch/arm64/Makefile | 2 --
- 2 files changed, 4 deletions(-)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 08a9ef5..72f7b8c 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -50,8 +50,6 @@ AS		+= -EL
- LD		+= -EL
- endif
- 
--comma = ,
--
- # This selects which instruction set is used.
- # Note that GCC does not numerically define an architecture version
- # macro, but instead defines a whole series of macros which makes
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 2fceb71..473a050 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -30,8 +30,6 @@ AS		+= -EL
- LD		+= -EL
- endif
- 
--comma = ,
--
- CHECKFLAGS	+= -D__aarch64__
- 
- # Default value
 -- 
-1.8.3.2
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc Documentation/devicetree/bindings/net/stmmac.txt
+index 9a0c1b7bee29,5748351fb9df..000000000000
+--- a/Documentation/devicetree/bindings/net/stmmac.txt
++++ b/Documentation/devicetree/bindings/net/stmmac.txt
+@@@ -31,13 -30,7 +30,11 @@@ Optional properties
+  - resets: Should contain a phandle to the STMMAC reset signal, if any
+  - reset-names: Should contain the reset signal name "stmmaceth", if a
+  	reset phandle is given
+- - max-frame-size:	Maximum Transfer Unit (IEEE defined MTU), rather
+- 			than the maximum frame size.
++ - max-frame-size: See ethernet.txt file in the same directory
+ +- clocks: If present, the first clock should be the GMAC main clock,
+ +  further clocks may be specified in derived bindings.
+ +- clocks-names: One name for each entry in the clocks property, the
+ +  first one should be "stmmaceth".
+  
+  Examples:
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140331/d9266fa6/attachment.sig>
