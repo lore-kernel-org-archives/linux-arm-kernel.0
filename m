@@ -1,59 +1,191 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 31 Mar 2014 14:58:42 +0200
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <20140331124551.GF29871@arm.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <20140331113113.GE29871@arm.com> <20140331124551.GF29871@arm.com>
-Message-ID: <5809099.Oi9cSqsgql@wuerfel>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Mon, 31 Mar 2014 18:53:08 +0530
+Subject: [PATCH 2/2] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <1396258236.3376.21.camel@smile.fi.intel.com>
+References: <1396106920-19015-1-git-send-email-sthokal@xilinx.com>
+ <1396106920-19015-2-git-send-email-sthokal@xilinx.com>
+ <1396258236.3376.21.camel@smile.fi.intel.com>
+Message-ID: <CA+mB=1Lw5AT4LNXwKckmvs3=BFowVQOKHK0pJHvNLZs2_9LR_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 March 2014 13:45:51 Catalin Marinas wrote:
-> On Mon, Mar 31, 2014 at 12:31:14PM +0100, Catalin Marinas wrote:
-> > On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
-> > > On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
-> > > > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
-> > > > space described in [1] due to one major issue + one minor issue.
-> > > > 
-> > > > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
-> > > > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
-> > > > kernel fails to create mapping for this region in map_mem function
-> > > > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
-> > > > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
-> [...]
-> > > a) always use a four-level page table in kernel space, regardless of
-> > > whether we do it in user space. We can move the kernel mappings down
-> > > in address space either by one 512GB entry to 0xffffff0000000000, or
-> > > to match the 64k-page location at 0xfffffc0000000000, or all the way
-> > > to to 0xfffc000000000000. In any case, we can have all the dynamic
-> > > mappings within one 512GB area and pretend we have a three-level
-> > > page table for them, while the rest of DRAM is mapped statically at
-> > > early boot time using 512GB large pages.
-> > 
-> > That's a workaround but we end up with two (or more) kernel pgds - one
-> > for vmalloc, ioremap etc. and another (static) one for the kernel linear
-> > mapping. So far there isn't any memory mapping carved out but we have to
-> > be careful in the future.
-> > 
-> > However, kernel page table walking would be a bit slower with 4-levels.
-> 
-> Yet another approach would be to enable 4-levels of page tables (no
-> nopud.h) in the kernel with pgd_offset_k doing the right thing for 4
-> levels but user space configured to 3-levels only and pgd_offset
-> returning 0 while pud_offset does what pgd_offset currently implements
-> for 3 levels.
+On Mon, Mar 31, 2014 at 3:00 PM, Andy Shevchenko
+<andriy.shevchenko@linux.intel.com> wrote:
+> On Sat, 2014-03-29 at 20:58 +0530, Srikanth Thokala wrote:
+>> This is the driver for the AXI Direct Memory Access (AXI DMA)
+>> core, which is a soft Xilinx IP core that provides high-
+>> bandwidth direct memory access between memory and AXI4-Stream
+>> type target peripherals.
+>>
+>> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
+>
+> Few nitpicks below.
+>
+>>
+>> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+>> ---
+>> - This driver patch is created on top of earlier series,
+>>   1/2 - "dma: Add Xilinx Video DMA DT Binding Documentation"
+>>   2/2 - "dma: Add Xilinx AXI Video Direct Memory Access Engine driver support"
+>> - Rebased on v3.14.0-rc8
 
-Either I was unclear earlier, or I misunderstand what you are saying
-here. How is that different from what I wrote above?
+[...]
 
-> This solves the page table walk latency for user but not for kernel.
-> Anyway, if the hardware memory map is so sparse (a real SoC, not the
-> spec), I don't think we have other ways to support it with 3-levels of
-> page table for the kernel, unless we hack __virt_to_phys/__phys_to_virt.
+>> +
+>> +     for (i = 0; i < XILINX_DMA_NUM_DESCS; i++) {
+>> +             chan->seg_v[i].hw.next_desc =
+>> +                             chan->seg_p + sizeof(*chan->seg_v) *
+>> +                             ((i + 1) % XILINX_DMA_NUM_DESCS);
+>> +             chan->seg_v[i].phys =
+>> +                             chan->seg_p + sizeof(*chan->seg_v) *
+>> +                             (i % XILINX_DMA_NUM_DESCS);
+>
+> i can't be higher than NUM_DESCS - 1, thus, i % XILINX_DMA_NUM_DESCS =
+> i.
 
-Right. I also wonder if the SoCs are configurable with the way they
-map the memory, they might just be able to do something smarter than
-what the document says and map the >2GB memory contiguously starting at
-0x08.8000.0000.
+I will correct it, Thanks.
 
-	Arnd
+>
+>> +             list_add_tail(&chan->seg_v[i].node, &chan->free_seg_list);
+>> +     }
+>> +
+>> +     dma_cookie_init(dchan);
+>> +     return 0;
+>> +}
+>> +
+
+[...]
+
+>> +
+>> +/**
+>> + * xilinx_dma_is_running - Check if DMA channel is running
+>> + * @chan: Driver specific DMA channel
+>> + *
+>> + * Return: '1' if running, '0' if not.
+>
+> true, false.
+
+Ok.
+
+>
+>> + */
+>> +static bool xilinx_dma_is_running(struct xilinx_dma_chan *chan)
+>> +{
+>> +     return !(dma_ctrl_read(chan, XILINX_DMA_REG_STATUS) &
+>> +              XILINX_DMA_SR_HALTED_MASK) &&
+>> +             (dma_ctrl_read(chan, XILINX_DMA_REG_CONTROL) &
+>> +              XILINX_DMA_CR_RUNSTOP_MASK);
+>> +}
+>> +
+>> +/**
+>> + * xilinx_dma_is_idle - Check if DMA channel is idle
+>> + * @chan: Driver specific DMA channel
+>> + *
+>> + * Return: '1' if idle, '0' if not.
+>
+> Ditto.
+
+Ok.
+
+>
+>> + */
+>> +static bool xilinx_dma_is_idle(struct xilinx_dma_chan *chan)
+>> +{
+>> +     return dma_ctrl_read(chan, XILINX_DMA_REG_STATUS) &
+>> +             XILINX_DMA_SR_IDLE_MASK;
+>> +}
+>> +
+>> +/**
+>> + * xilinx_dma_halt - Halt DMA channel
+
+[...]
+
+>> +                             goto error;
+>> +
+>> +                     /*
+>> +                      * Calculate the maximum number of bytes to transfer,
+>> +                      * making sure it is less than the hw limit
+>> +                      */
+>> +                     copy = min((size_t)(sg_dma_len(sg) - sg_used),
+>> +                                     (size_t)XILINX_DMA_MAX_TRANS_LEN);
+>
+> min_t(size_t, ...)
+
+Ok, I will correct it.
+
+>
+>
+>> +                     hw = &(segment->hw);
+>
+> Seems useless parentheses.
+
+Ok.
+
+>
+>> +
+>> +                     /* Fill in the descriptor */
+>> +                     hw->buf_addr = sg_dma_address(sg) + sg_used;
+>> +
+>> +                     hw->control = copy;
+>> +
+>> +                     if ((direction == DMA_MEM_TO_DEV) && app_w)
+>> +                             memcpy(hw->app, app_w,
+>> +                                     sizeof(u32) * XILINX_DMA_NUM_APP_WORDS);
+>> +
+>> +                     /* For the first DMA_MEM_TO_DEV transfer, set SOP */
+>> +                     if (!i)
+>> +                             if (direction == DMA_MEM_TO_DEV)
+>> +                                     hw->control |= XILINX_DMA_BD_SOP;
+>
+> You may group previous conditions like
+> if (direction = ...) {
+>  if (app_w)
+>  ...
+>  if (!i)
+>  ...
+> }
+>
+> But it's up to you.
+
+I will organize them, Thanks.
+
+>
+>> +
+>> +                     sg_used += copy;
+>> +
+>> +                     /*
+>> +                      * Insert the segment into the descriptor segments
+>> +                      * list.
+>> +                      */
+>> +                     list_add_tail(&segment->node, &desc->segments);
+>> +             }
+>> +     }
+>> +
+
+[...]
+
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     /* find the IRQ line, if it exists in the device tree */
+>
+> Maybe first letter should be capital across all comments in the code?
+
+Ok, I will correct them in all places, if any.
+
+Srikanth
+
+[...]
+
+>
+>
+> --
+> Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Intel Finland Oy
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
