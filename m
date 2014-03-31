@@ -1,34 +1,100 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 31 Mar 2014 16:16:02 +0530
-Subject: [PATCH v6 01/12] KVM: Add capability to advertise PSCI v0.2 support
+Date: Mon, 31 Mar 2014 16:16:03 +0530
+Subject: [PATCH v6 02/12] ARM/ARM64: KVM: Add common header for PSCI related
+ defines
 In-Reply-To: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
 References: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1396262773-7723-2-git-send-email-anup.patel@linaro.org>
+Message-ID: <1396262773-7723-3-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
-ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
-define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
+We need a common place to share PSCI related defines among ARM kernel,
+ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
+
+We introduce uapi/linux/psci.h for this purpose. This newly added
+header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
+and user space (i.e. QEMU or KVMTOOL).
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/uapi/linux/kvm.h |    1 +
- 1 file changed, 1 insertion(+)
+ include/uapi/linux/Kbuild |    1 +
+ include/uapi/linux/psci.h |   55 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+ create mode 100644 include/uapi/linux/psci.h
 
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index a7518be..260d3ae 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -741,6 +741,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_EXT_EMUL_CPUID 95
- #define KVM_CAP_HYPERV_TIME 96
- #define KVM_CAP_IOAPIC_POLARITY_IGNORED 97
-+#define KVM_CAP_ARM_PSCI_0_2 98
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
+diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
+index 6929571..24e9033 100644
+--- a/include/uapi/linux/Kbuild
++++ b/include/uapi/linux/Kbuild
+@@ -317,6 +317,7 @@ header-y += ppp-ioctl.h
+ header-y += ppp_defs.h
+ header-y += pps.h
+ header-y += prctl.h
++header-y += psci.h
+ header-y += ptp_clock.h
+ header-y += ptrace.h
+ header-y += qnx4_fs.h
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+new file mode 100644
+index 0000000..41f727e
+--- /dev/null
++++ b/include/uapi/linux/psci.h
+@@ -0,0 +1,55 @@
++/*
++ * ARM Power State and Coordination Interface (PSCI) header
++ *
++ * This header holds common PSCI defines and macros shared by:
++ * ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space.
++ *
++ * Copyright (C) 2014   Anup Patel <anup.patel@linaro.org>
++ */
++
++#ifndef _UAPI_LINUX_PSCI_H
++#define _UAPI_LINUX_PSCI_H
++
++/* PSCI v0.1 interface */
++#define PSCI_FN(base, n)			((base) + (n))
++
++#define PSCI_FN_CPU_SUSPEND(base)		PSCI_FN(base, 0)
++#define PSCI_FN_CPU_OFF(base)			PSCI_FN(base, 1)
++#define PSCI_FN_CPU_ON(base)			PSCI_FN(base, 2)
++#define PSCI_FN_MIGRATE(base)			PSCI_FN(base, 3)
++
++/* PSCI v0.2 interface */
++#define PSCI_0_2_FN_BASE			0x84000000
++#define PSCI_0_2_FN(n)				(PSCI_0_2_FN_BASE + (n))
++#define PSCI_0_2_FN64_BASE			0xC4000000
++#define PSCI_0_2_FN64(n)			(PSCI_0_2_FN64_BASE + (n))
++
++#define PSCI_0_2_FN_PSCI_VERSION		PSCI_0_2_FN(0)
++#define PSCI_0_2_FN_CPU_SUSPEND			PSCI_0_2_FN(1)
++#define PSCI_0_2_FN_CPU_OFF			PSCI_0_2_FN(2)
++#define PSCI_0_2_FN_CPU_ON			PSCI_0_2_FN(3)
++#define PSCI_0_2_FN_AFFINITY_INFO		PSCI_0_2_FN(4)
++#define PSCI_0_2_FN_MIGRATE			PSCI_0_2_FN(5)
++#define PSCI_0_2_FN_MIGRATE_INFO_TYPE		PSCI_0_2_FN(6)
++#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU		PSCI_0_2_FN(7)
++#define PSCI_0_2_FN_SYSTEM_OFF			PSCI_0_2_FN(8)
++#define PSCI_0_2_FN_SYSTEM_RESET		PSCI_0_2_FN(9)
++
++#define PSCI_0_2_FN64_CPU_SUSPEND		PSCI_0_2_FN64(1)
++#define PSCI_0_2_FN64_CPU_ON			PSCI_0_2_FN64(3)
++#define PSCI_0_2_FN64_AFFINITY_INFO		PSCI_0_2_FN64(4)
++#define PSCI_0_2_FN64_MIGRATE			PSCI_0_2_FN64(5)
++#define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU	PSCI_0_2_FN64(7)
++
++/* PSCI return values */
++#define PSCI_RET_SUCCESS			0
++#define PSCI_RET_NOT_SUPPORTED			((unsigned long)-1)
++#define PSCI_RET_INVALID_PARAMS			((unsigned long)-2)
++#define PSCI_RET_DENIED				((unsigned long)-3)
++#define PSCI_RET_ALREADY_ON			((unsigned long)-4)
++#define PSCI_RET_ON_PENDING			((unsigned long)-5)
++#define PSCI_RET_INTERNAL_FAILURE		((unsigned long)-6)
++#define PSCI_RET_NOT_PRESENT			((unsigned long)-7)
++#define PSCI_RET_DISABLED			((unsigned long)-8)
++
++#endif /* _UAPI_LINUX_PSCI_H */
 -- 
 1.7.9.5
