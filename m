@@ -1,44 +1,52 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:15:39 +0300
-Subject: [PATCH 00/55]: ARM: OMAP2+: PRCM move to drivers
-Message-ID: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+Date: Mon, 31 Mar 2014 18:15:40 +0300
+Subject: [PATCH 01/55] ARM: OMAP4: CM: use cm_base* in register address
+ calculations
+In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+OMAP44XX_CM*_REGADDR macros should be avoided, instead use the cm_base*
+iomaps.
 
-This set is continuation for the work started earlier to cleanup the CM/PRM
-and attempt to make it a separate driver. This set depends on these
-two sets:
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/cm44xx.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-CM/PRM cleanup set:
-http://marc.info/?l=linux-omap&m=139395000918201&w=2
-
-OMAP2 clock DT set:
-http://comments.gmane.org/gmane.linux.ports.arm.omap/111257
-
-This set is pretty huge but the patches can be applied in stages if need be.
-Anyway, it would be good to get some feedback whether the driver folder
-locations etc. are good, and whether the effort taken here will be enough
-to actually move the driver. Clockdomain / powerdomain code can also be
-moved easily under the drivers/power/omap folder (or someplace else if
-requested) once this set is in. Also, clockdomain / powerdomain data
-should be possible to convert to DT format or some sort of firmware
-blob once this is done.
-
-Patch #55 in this set is pretty massive as it moves all the C files at
-the same time, this should probably be split up as multiple patches.
-
-Testing branch pushed here (contains also the CM/PRM cleanup set and OMAP2
-clock DT conversion):
-
-tree: https://github.com/t-kristo/linux-pm.git
-branch: 3.14-rc4-cm-prm-driver-v1
-
-Testing done:
-- am335x-bone: boot
-- omap3-beagle: boot, suspend-resume (ret/off)
-- omap4-panda-es: boot, suspend-resume (ret)
-- omap5-uevm: boot
-
--Tero
+diff --git a/arch/arm/mach-omap2/cm44xx.c b/arch/arm/mach-omap2/cm44xx.c
+index 535d66e..5627072 100644
+--- a/arch/arm/mach-omap2/cm44xx.c
++++ b/arch/arm/mach-omap2/cm44xx.c
+@@ -30,23 +30,23 @@
+ /* Read a register in CM1 */
+ u32 omap4_cm1_read_inst_reg(s16 inst, u16 reg)
+ {
+-	return __raw_readl(OMAP44XX_CM1_REGADDR(inst, reg));
++	return __raw_readl(cm_base + inst + reg);
+ }
+ 
+ /* Write into a register in CM1 */
+ void omap4_cm1_write_inst_reg(u32 val, s16 inst, u16 reg)
+ {
+-	__raw_writel(val, OMAP44XX_CM1_REGADDR(inst, reg));
++	__raw_writel(val, cm_base + inst + reg);
+ }
+ 
+ /* Read a register in CM2 */
+ u32 omap4_cm2_read_inst_reg(s16 inst, u16 reg)
+ {
+-	return __raw_readl(OMAP44XX_CM2_REGADDR(inst, reg));
++	return __raw_readl(cm2_base + inst + reg);
+ }
+ 
+ /* Write into a register in CM2 */
+ void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 reg)
+ {
+-	__raw_writel(val, OMAP44XX_CM2_REGADDR(inst, reg));
++	__raw_writel(val, cm2_base + inst + reg);
+ }
+-- 
+1.7.9.5
