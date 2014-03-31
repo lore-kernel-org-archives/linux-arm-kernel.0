@@ -1,56 +1,73 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 31 Mar 2014 17:18:12 +0200
-Subject: [PATCH V2 11/19] mmc: mmci: Mark the DT bindings for highspeed mode
- as deprecated
-In-Reply-To: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
-References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1396279100-2920-12-git-send-email-ulf.hansson@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 31 Mar 2014 18:16:33 +0300
+Subject: [PATCH 54/55] ARM: OMAP4: PRCM: move prcm_mpu_base definition to a
+ public header
+In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-55-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common mmc DT parser supports bindings for highspeed mode, thus
-there are no need for mmci to provide it's own versions for these. Mark
-them as deprecated in the documentation.
+Needed from both PRCM core code and mach-omap2 board code. This gets
+rid of need to include the prcm_mpu_44xx_54xx.h header to the PRCM
+core code.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- Documentation/devicetree/bindings/mmc/mmci.txt |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/cminst44xx.c         |    1 -
+ arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h |    2 --
+ arch/arm/mach-omap2/prminst44xx.c        |    1 -
+ include/linux/power/omap/prcm-common.h   |    1 +
+ 4 files changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-index 2c8756f..03796cf 100644
---- a/Documentation/devicetree/bindings/mmc/mmci.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-@@ -15,8 +15,6 @@ Required properties:
- Optional properties:
- - arm,primecell-periphid : contains the PrimeCell Peripheral ID, it overrides
-                            the ID provided by the HW
--- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
--- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
- - vqmmc-supply           : phandle to the regulator device tree node, mentioned
-                            as the VCCQ/VDD_IO supply in the eMMC/SD specs.
- - st,sig-dir-dat0        : bus signal direction pin used for DAT[0].
-@@ -26,6 +24,10 @@ Optional properties:
- - st,sig-dir-cmd         : cmd signal direction pin used for CMD.
- - st,sig-pin-fbclk       : feedback clock signal pin used.
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 3d0b8ae..875634b 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -27,7 +27,6 @@
+ #include <linux/power/omap/cm44xx.h>
+ #include <linux/power/omap/prcm44xx.h>
+ #include <linux/power/omap/prm44xx.h>
+-#include "prcm_mpu44xx.h"
+ #include <linux/power/omap/prcm-common.h>
  
-+Deprecated properties:
-+- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
-+- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
-+
- Example:
+ #define OMAP4430_IDLEST_SHIFT		16
+diff --git a/arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h b/arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
+index ca149e7..2b1c995 100644
+--- a/arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
++++ b/arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
+@@ -24,8 +24,6 @@
+ #define __ARCH_ARM_MACH_OMAP2_PRCM_MPU_44XX_54XX_H
  
- sdi0_per1 at 80126000 {
-@@ -42,8 +44,8 @@ sdi0_per1 at 80126000 {
+ #ifndef __ASSEMBLER__
+-extern void __iomem *prcm_mpu_base;
+-
+ extern u32 omap4_prcm_mpu_read_inst_reg(s16 inst, u16 idx);
+ extern void omap4_prcm_mpu_write_inst_reg(u32 val, s16 inst, u16 idx);
+ extern u32 omap4_prcm_mpu_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst,
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index 5b7c17e..e97d877 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -22,7 +22,6 @@
+ #include <linux/power/omap/prm54xx.h>
+ #include <linux/power/omap/prm7xx.h>
+ #include <linux/power/omap/prcm44xx.h>
+-#include "prcm_mpu44xx.h"
  
- 	max-frequency = <100000000>;
- 	bus-width = <4>;
--	mmc-cap-sd-highspeed;
--	mmc-cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
- 	cd-gpios  = <&gpio2 31 0x4>; // 95
- 	st,sig-dir-dat0;
- 	st,sig-dir-dat2;
+ #define OMAP4430_RST_GLOBAL_WARM_SW_MASK		(1 << 0)
+ 
+diff --git a/include/linux/power/omap/prcm-common.h b/include/linux/power/omap/prcm-common.h
+index b9cce23..a881607 100644
+--- a/include/linux/power/omap/prcm-common.h
++++ b/include/linux/power/omap/prcm-common.h
+@@ -535,6 +535,7 @@ enum {
+ };
+ 
+ extern void __iomem *clk_memmaps[];
++extern void __iomem *prcm_mpu_base;
+ 
+ void omap_prcm_irq_cleanup(void);
+ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup);
 -- 
 1.7.9.5
