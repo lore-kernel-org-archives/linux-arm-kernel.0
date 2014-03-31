@@ -1,46 +1,79 @@
 From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Mon, 31 Mar 2014 15:43:00 -0400
-Subject: [PATCH v6 02/12] ARM/ARM64: KVM: Add common header for PSCI
- related defines
-In-Reply-To: <CAJ5Y-eb=JFtHWgLpxxm+L8z0w92GjBcJyUo8hWj6ik6GoakrtQ@mail.gmail.com>
-References: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
- <1396262773-7723-3-git-send-email-anup.patel@linaro.org>
- <20140331180722.GD4756@lvm>
- <CAJ5Y-eaGsM4Moz815P7QM=7qh87RyzU-MVyeLOT64CLEaR0HQA@mail.gmail.com>
- <20140331183629.GF4756@lvm>
- <CAJ5Y-eb=JFtHWgLpxxm+L8z0w92GjBcJyUo8hWj6ik6GoakrtQ@mail.gmail.com>
-Message-ID: <CAJ5Y-ebjR3zdYrDx2HReXeCG2wSYwVgBXBdezjoQFKFmOcj7YA@mail.gmail.com>
+Date: Mon, 31 Mar 2014 15:40:14 -0400
+Subject: [PATCH v5 2/3] Documentation: devicetree: Add new binding for PSCIv0.2
+In-Reply-To: <1396294815-12019-1-git-send-email-ashwin.chaugule@linaro.org>
+References: <1396294815-12019-1-git-send-email-ashwin.chaugule@linaro.org>
+Message-ID: <1396294815-12019-3-git-send-email-ashwin.chaugule@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 March 2014 15:26, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
-> Hi Christoffer,
->
-> On 31 March 2014 14:36, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->
->>>
->> I think Marc brought up the point previously that we may get to PSCI
->> spec v42.17 and the defines should perhaps encompass the version we are
->> defining things for right now...
->>
->> That being said, assuming new spec versions don't break backwards
->> compatibility in the numbering, the wording proposed by your patch does
->> look simpler.
->>
->> I do like the hardcoded IDs because that's how it's presented in the
->> spec itself.
->
-> Cool. I'll just add the following line in kbuild to this patch and resend.
+The PSCI v0.2+ spec defines standard values for PSCI function IDs.
+Add a new binding entry so that pre v0.2 implementations can
+use DT entries for function IDs and v0.2+ implementations use
+standard entries as defined by the PSCIv0.2 specification.
 
-by "this" patch, I  meant my version. Sorry if I caused any confusion. :)
+Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 35 +++++++++++++++++++++++++-
+ 1 file changed, 34 insertions(+), 1 deletion(-)
 
->
->  include/uapi/linux/Kbuild |    1 +
->
-> +header-y += psci.h
->
-> Meanwhile, if there are any strong preferences to using the uapi
-> header in Anup's patch, then I can rebase later.
->
-> Thanks,
-> Ashwin
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..d01a90b 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -21,7 +21,15 @@ to #0.
+ 
+ Main node required properties:
+ 
+- - compatible    : Must be "arm,psci"
++ - compatible    : should contain at least one of:
++
++				 * "arm,psci" : for implementations complying to PSCI versions prior to
++					0.2. For these cases function IDs must be provided.
++
++				 * "arm,psci-0.2" : for implementations complying to PSCI 0.2. Function
++					IDs are not required and should be ignored by an OS with PSCI 0.2
++					support, but are permitted to be present for compatibility with
++					existing software when "arm,psci" is later in the compatible list.
+ 
+  - method        : The method of calling the PSCI firmware. Permitted
+                    values are:
+@@ -45,6 +53,8 @@ Main node optional properties:
+ 
+ Example:
+ 
++Case 1: PSCI v0.1 only.
++
+ 	psci {
+ 		compatible	= "arm,psci";
+ 		method		= "smc";
+@@ -53,3 +63,26 @@ Example:
+ 		cpu_on		= <0x95c10002>;
+ 		migrate		= <0x95c10003>;
+ 	};
++
++
++Case 2: PSCI v0.2 only
++
++	psci {
++		compatible	= "arm,psci-0.2";
++		method		= "smc";
++	};
++
++Case 3: PSCI v0.2 and PSCI v0.1.
++
++	As described above, for compatibility with existing kernels, the
++	hypervisor will likely want to provide IDs, e.g.
++
++	psci {
++		compatible = "arm,psci-0.2", "arm,psci";
++		method = "hvc";
++
++		cpu_on = < arbitrary value >;
++		cpu_off = < arbitrary value >;
++
++		...
++	};
+-- 
+1.8.3.2
