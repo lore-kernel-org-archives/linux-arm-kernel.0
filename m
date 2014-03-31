@@ -1,155 +1,142 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:16:13 +0300
-Subject: [PATCH 34/55] ARM: AM33XX: PRM: move parts of the prm33xx.h header
- file to public location
+Date: Mon, 31 Mar 2014 18:16:14 +0300
+Subject: [PATCH 35/55] ARM: OMAP3: PRM: remove direct register declaration
+ macros
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-35-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-36-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parts of this file are needed from both the driver and mach-omap2 board
-code.
+Only a handful of these are currently used in the kernel, so cleanup.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/am33xx-restart.c |    2 +-
- arch/arm/mach-omap2/cm33xx.c         |    3 ++-
- arch/arm/mach-omap2/prm33xx.c        |    3 ++-
- arch/arm/mach-omap2/prm33xx.h        |   23 +---------------------
- include/linux/power/omap/prm33xx.h   |   36 ++++++++++++++++++++++++++++++++++
- 5 files changed, 42 insertions(+), 25 deletions(-)
- create mode 100644 include/linux/power/omap/prm33xx.h
+ arch/arm/mach-omap2/cclock3xxx_data.c |   14 ++++++++-----
+ arch/arm/mach-omap2/prm3xxx.h         |   37 ---------------------------------
+ 2 files changed, 9 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/am33xx-restart.c b/arch/arm/mach-omap2/am33xx-restart.c
-index 7286389..9ae249c 100644
---- a/arch/arm/mach-omap2/am33xx-restart.c
-+++ b/arch/arm/mach-omap2/am33xx-restart.c
-@@ -10,7 +10,7 @@
+diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+index d5fefb9..6d7aea5 100644
+--- a/arch/arm/mach-omap2/cclock3xxx_data.c
++++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+@@ -79,12 +79,15 @@ static const char *osc_sys_ck_parent_names[] = {
+ };
  
- #include "common.h"
- #include "prm-regbits-33xx.h"
--#include "prm33xx.h"
-+#include <linux/power/omap/prm33xx.h>
+ DEFINE_CLK_MUX(osc_sys_ck, osc_sys_ck_parent_names, NULL, 0x0,
+-	       OMAP3430_PRM_CLKSEL, OMAP3430_SYS_CLKIN_SEL_SHIFT,
+-	       OMAP3430_SYS_CLKIN_SEL_WIDTH, 0x0, NULL);
++	       OMAP34XX_PRM_REGADDR(OMAP3430_CCR_MOD, OMAP3_PRM_CLKSEL_OFFSET),
++	       OMAP3430_SYS_CLKIN_SEL_SHIFT, OMAP3430_SYS_CLKIN_SEL_WIDTH, 0x0,
++	       NULL);
  
- /**
-  * am3xx_restart - trigger a software restart of the SoC
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index 7717eeb..43e4f26 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -25,7 +25,8 @@
- #include "clockdomain.h"
- #include <linux/power/omap/cm.h>
- #include <linux/power/omap/cm33xx.h>
--#include "prm33xx.h"
-+#include <linux/power/omap/prm33xx.h>
-+#include "prcm-common.h"
+ DEFINE_CLK_DIVIDER(sys_ck, "osc_sys_ck", &osc_sys_ck, 0x0,
+-		   OMAP3430_PRM_CLKSRC_CTRL, OMAP_SYSCLKDIV_SHIFT,
+-		   OMAP_SYSCLKDIV_WIDTH, CLK_DIVIDER_ONE_BASED, NULL);
++		   OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD,
++					OMAP3_PRM_CLKSRC_CTRL_OFFSET),
++		   OMAP_SYSCLKDIV_SHIFT, OMAP_SYSCLKDIV_WIDTH,
++		   CLK_DIVIDER_ONE_BASED, NULL);
  
- #define AM33XX_MODULEMODE_SHIFT			0
- #define AM33XX_MODULEMODE_MASK			(0x3 << 0)
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-index a08b1da..436cd12 100644
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -18,9 +18,10 @@
- #include <linux/errno.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/power/omap/prm33xx.h>
+ static struct dpll_data dpll3_dd = {
+ 	.mult_div1_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
+@@ -2824,7 +2827,8 @@ static struct clk_hw_omap sys_clkout1_hw = {
+ 	.hw = {
+ 		.clk = &sys_clkout1,
+ 	},
+-	.enable_reg	= OMAP3430_PRM_CLKOUT_CTRL,
++	.enable_reg	= OMAP34XX_PRM_REGADDR(OMAP3430_CCR_MOD,
++					       OMAP3_PRM_CLKOUT_CTRL_OFFSET),
+ 	.enable_bit	= OMAP3430_CLKOUT_EN_SHIFT,
+ };
  
- #include "powerdomain.h"
--#include "prm33xx.h"
-+#include "prm.h"
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index c79f4c6..ffc8177 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -34,83 +34,46 @@
+  */
  
- #define AM33XX_LASTPOWERSTATEENTERED_SHIFT	24
- #define AM33XX_LASTPOWERSTATEENTERED_MASK	(0x3 << 24)
-diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
-index 9b9918d..7825b1c 100644
---- a/arch/arm/mach-omap2/prm33xx.h
-+++ b/arch/arm/mach-omap2/prm33xx.h
-@@ -18,23 +18,13 @@
+ #define OMAP3_PRM_REVISION_OFFSET	0x0004
+-#define OMAP3430_PRM_REVISION		OMAP34XX_PRM_REGADDR(OCP_MOD, 0x0004)
+ #define OMAP3_PRM_SYSCONFIG_OFFSET	0x0014
+-#define OMAP3430_PRM_SYSCONFIG		OMAP34XX_PRM_REGADDR(OCP_MOD, 0x0014)
  
- #include "prcm-common.h"
- #include "prm.h"
-+#include <linux/power/omap/prm33xx.h>
+ #define OMAP3_PRM_IRQSTATUS_MPU_OFFSET	0x0018
+-#define OMAP3430_PRM_IRQSTATUS_MPU	OMAP34XX_PRM_REGADDR(OCP_MOD, 0x0018)
+ #define OMAP3_PRM_IRQENABLE_MPU_OFFSET	0x001c
+-#define OMAP3430_PRM_IRQENABLE_MPU	OMAP34XX_PRM_REGADDR(OCP_MOD, 0x001c)
  
- #define AM33XX_PRM_BASE               0x44E00000
  
- #define AM33XX_PRM_REGADDR(inst, reg)                         \
- 	AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRM_BASE + (inst) + (reg))
+ #define OMAP3_PRM_VC_SMPS_SA_OFFSET	0x0020
+-#define OMAP3430_PRM_VC_SMPS_SA		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0020)
+ #define OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET	0x0024
+-#define OMAP3430_PRM_VC_SMPS_VOL_RA	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0024)
+ #define OMAP3_PRM_VC_SMPS_CMD_RA_OFFSET	0x0028
+-#define OMAP3430_PRM_VC_SMPS_CMD_RA	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0028)
+ #define OMAP3_PRM_VC_CMD_VAL_0_OFFSET	0x002c
+-#define OMAP3430_PRM_VC_CMD_VAL_0	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x002c)
+ #define OMAP3_PRM_VC_CMD_VAL_1_OFFSET	0x0030
+-#define OMAP3430_PRM_VC_CMD_VAL_1	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0030)
+ #define OMAP3_PRM_VC_CH_CONF_OFFSET	0x0034
+-#define OMAP3430_PRM_VC_CH_CONF		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0034)
+ #define OMAP3_PRM_VC_I2C_CFG_OFFSET	0x0038
+-#define OMAP3430_PRM_VC_I2C_CFG		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0038)
+ #define OMAP3_PRM_VC_BYPASS_VAL_OFFSET	0x003c
+-#define OMAP3430_PRM_VC_BYPASS_VAL	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x003c)
+ #define OMAP3_PRM_RSTCTRL_OFFSET	0x0050
+-#define OMAP3430_PRM_RSTCTRL		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0050)
+ #define OMAP3_PRM_RSTTIME_OFFSET	0x0054
+-#define OMAP3430_PRM_RSTTIME		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0054)
+ #define OMAP3_PRM_RSTST_OFFSET	0x0058
+-#define OMAP3430_PRM_RSTST		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0058)
+ #define OMAP3_PRM_VOLTCTRL_OFFSET	0x0060
+-#define OMAP3430_PRM_VOLTCTRL		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0060)
+ #define OMAP3_PRM_SRAM_PCHARGE_OFFSET	0x0064
+-#define OMAP3430_PRM_SRAM_PCHARGE	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0064)
+ #define OMAP3_PRM_CLKSRC_CTRL_OFFSET	0x0070
+-#define OMAP3430_PRM_CLKSRC_CTRL	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0070)
+ #define OMAP3_PRM_VOLTSETUP1_OFFSET	0x0090
+-#define OMAP3430_PRM_VOLTSETUP1		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0090)
+ #define OMAP3_PRM_VOLTOFFSET_OFFSET	0x0094
+-#define OMAP3430_PRM_VOLTOFFSET		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0094)
+ #define OMAP3_PRM_CLKSETUP_OFFSET	0x0098
+-#define OMAP3430_PRM_CLKSETUP		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x0098)
+ #define OMAP3_PRM_POLCTRL_OFFSET	0x009c
+-#define OMAP3430_PRM_POLCTRL		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x009c)
+ #define OMAP3_PRM_VOLTSETUP2_OFFSET	0x00a0
+-#define OMAP3430_PRM_VOLTSETUP2		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00a0)
+ #define OMAP3_PRM_VP1_CONFIG_OFFSET	0x00b0
+-#define OMAP3430_PRM_VP1_CONFIG		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00b0)
+ #define OMAP3_PRM_VP1_VSTEPMIN_OFFSET	0x00b4
+-#define OMAP3430_PRM_VP1_VSTEPMIN	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00b4)
+ #define OMAP3_PRM_VP1_VSTEPMAX_OFFSET	0x00b8
+-#define OMAP3430_PRM_VP1_VSTEPMAX	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00b8)
+ #define OMAP3_PRM_VP1_VLIMITTO_OFFSET	0x00bc
+-#define OMAP3430_PRM_VP1_VLIMITTO	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00bc)
+ #define OMAP3_PRM_VP1_VOLTAGE_OFFSET	0x00c0
+-#define OMAP3430_PRM_VP1_VOLTAGE	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00c0)
+ #define OMAP3_PRM_VP1_STATUS_OFFSET	0x00c4
+-#define OMAP3430_PRM_VP1_STATUS		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00c4)
+ #define OMAP3_PRM_VP2_CONFIG_OFFSET	0x00d0
+-#define OMAP3430_PRM_VP2_CONFIG		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00d0)
+ #define OMAP3_PRM_VP2_VSTEPMIN_OFFSET	0x00d4
+-#define OMAP3430_PRM_VP2_VSTEPMIN	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00d4)
+ #define OMAP3_PRM_VP2_VSTEPMAX_OFFSET	0x00d8
+-#define OMAP3430_PRM_VP2_VSTEPMAX	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00d8)
+ #define OMAP3_PRM_VP2_VLIMITTO_OFFSET	0x00dc
+-#define OMAP3430_PRM_VP2_VLIMITTO	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00dc)
+ #define OMAP3_PRM_VP2_VOLTAGE_OFFSET	0x00e0
+-#define OMAP3430_PRM_VP2_VOLTAGE	OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00e0)
+ #define OMAP3_PRM_VP2_STATUS_OFFSET	0x00e4
+-#define OMAP3430_PRM_VP2_STATUS		OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, 0x00e4)
  
--
--/* PRM instances */
--#define AM33XX_PRM_OCP_SOCKET_MOD	0x0B00
--#define AM33XX_PRM_PER_MOD		0x0C00
--#define AM33XX_PRM_WKUP_MOD		0x0D00
--#define AM33XX_PRM_MPU_MOD		0x0E00
--#define AM33XX_PRM_DEVICE_MOD		0x0F00
--#define AM33XX_PRM_RTC_MOD		0x1000
--#define AM33XX_PRM_GFX_MOD		0x1100
--#define AM33XX_PRM_CEFUSE_MOD		0x1200
--
- /* PRM */
+ #define OMAP3_PRM_CLKSEL_OFFSET	0x0040
+-#define OMAP3430_PRM_CLKSEL		OMAP34XX_PRM_REGADDR(OMAP3430_CCR_MOD, 0x0040)
+ #define OMAP3_PRM_CLKOUT_CTRL_OFFSET	0x0070
+-#define OMAP3430_PRM_CLKOUT_CTRL	OMAP34XX_PRM_REGADDR(OMAP3430_CCR_MOD, 0x0070)
  
- /* PRM.OCP_SOCKET_PRM register offsets */
-@@ -117,15 +107,4 @@
- #define AM33XX_PM_CEFUSE_PWRSTST_OFFSET		0x0004
- #define AM33XX_PM_CEFUSE_PWRSTST		AM33XX_PRM_REGADDR(AM33XX_PRM_CEFUSE_MOD, 0x0004)
- 
--#ifndef __ASSEMBLER__
--extern u32 am33xx_prm_read_reg(s16 inst, u16 idx);
--extern void am33xx_prm_write_reg(u32 val, s16 inst, u16 idx);
--extern u32 am33xx_prm_rmw_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
--extern void am33xx_prm_global_warm_sw_reset(void);
--extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
--		u16 rstctrl_offs);
--extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
--extern int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, s16 inst,
--		u16 rstctrl_offs, u16 rstst_offs);
--#endif /* ASSEMBLER */
- #endif
-diff --git a/include/linux/power/omap/prm33xx.h b/include/linux/power/omap/prm33xx.h
-new file mode 100644
-index 0000000..ea72bf0
---- /dev/null
-+++ b/include/linux/power/omap/prm33xx.h
-@@ -0,0 +1,36 @@
-+/*
-+ * AM33XX PRM instance offset macros
-+ *
-+ * Copyright (C) 2011-2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __LINUX_POWER_OMAP_PRM33XX_H
-+#define __LINUX_POWER_OMAP_PRM33XX_H
-+
-+/* PRM instances */
-+#define AM33XX_PRM_OCP_SOCKET_MOD	0x0B00
-+#define AM33XX_PRM_PER_MOD		0x0C00
-+#define AM33XX_PRM_WKUP_MOD		0x0D00
-+#define AM33XX_PRM_MPU_MOD		0x0E00
-+#define AM33XX_PRM_DEVICE_MOD		0x0F00
-+#define AM33XX_PRM_RTC_MOD		0x1000
-+#define AM33XX_PRM_GFX_MOD		0x1100
-+#define AM33XX_PRM_CEFUSE_MOD		0x1200
-+
-+#ifndef __ASSEMBLER__
-+void am33xx_prm_global_warm_sw_reset(void);
-+int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst, u16 rstctrl_offs);
-+int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
-+int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, s16 inst,
-+				  u16 rstctrl_offs, u16 rstst_offs);
-+#endif /* ASSEMBLER */
-+#endif
+ /* OMAP3 specific register offsets */
+ #define OMAP3430ES2_PM_WKEN3				0x00f0
 -- 
 1.7.9.5
