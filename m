@@ -1,183 +1,103 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:16:02 +0300
-Subject: [PATCH 23/55] ARM: AM33xx: CM: move cm33xx.h header to a public
- location
+Date: Mon, 31 Mar 2014 18:16:04 +0300
+Subject: [PATCH 25/55] ARM: OMAP4: CM: remove unnecessary cm44xx.h header file
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-24-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-26-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file needs to be accessible from the PRCM core and mach-omap2 board
-support code.
+Contains only two defines used by a single source code file, so move the
+definitions over and delete the file.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm33xx.c      |    2 +-
- arch/arm/mach-omap2/cm33xx.h      |   50 +--------------------------
- include/linux/power/omap/cm33xx.h |   68 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 70 insertions(+), 50 deletions(-)
- create mode 100644 include/linux/power/omap/cm33xx.h
+ arch/arm/mach-omap2/cm44xx.h      |   26 --------------------------
+ arch/arm/mach-omap2/cm_common.c   |    3 ++-
+ arch/arm/mach-omap2/cminst44xx.c  |    4 +++-
+ arch/arm/mach-omap2/powerdomain.c |    1 -
+ 4 files changed, 5 insertions(+), 29 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/cm44xx.h
 
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index c7be4e4..7a7b2e7 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -24,7 +24,7 @@
- 
- #include "clockdomain.h"
- #include "cm.h"
--#include "cm33xx.h"
-+#include <linux/power/omap/cm33xx.h>
- #include "prm33xx.h"
- 
- #define AM33XX_MODULEMODE_SHIFT			0
-diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
-index 8f9e479..67f1d49 100644
---- a/arch/arm/mach-omap2/cm33xx.h
-+++ b/arch/arm/mach-omap2/cm33xx.h
-@@ -18,6 +18,7 @@
- #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
- 
- #include "cm.h"
-+#include <linux/power/omap/cm33xx.h>
- 
- /* CM base address */
- #define AM33XX_CM_BASE		0x44e00000
-@@ -25,16 +26,6 @@
- #define AM33XX_CM_REGADDR(inst, reg)				\
- 	AM33XX_L4_WK_IO_ADDRESS(AM33XX_CM_BASE + (inst) + (reg))
- 
--/* CM instances */
--#define AM33XX_CM_PER_MOD		0x0000
--#define AM33XX_CM_WKUP_MOD		0x0400
--#define AM33XX_CM_DPLL_MOD		0x0500
--#define AM33XX_CM_MPU_MOD		0x0600
--#define AM33XX_CM_DEVICE_MOD		0x0700
--#define AM33XX_CM_RTC_MOD		0x0800
--#define AM33XX_CM_GFX_MOD		0x0900
--#define AM33XX_CM_CEFUSE_MOD		0x0A00
+diff --git a/arch/arm/mach-omap2/cm44xx.h b/arch/arm/mach-omap2/cm44xx.h
+deleted file mode 100644
+index 3380bee..0000000
+--- a/arch/arm/mach-omap2/cm44xx.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- * OMAP4 Clock Management (CM) definitions
+- *
+- * Copyright (C) 2007-2011 Texas Instruments, Inc.
+- * Copyright (C) 2007-2009 Nokia Corporation
+- *
+- * Written by Paul Walmsley
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * OMAP4 has two separate CM blocks, CM1 and CM2.  This file contains
+- * macros and function prototypes that are applicable to both.
+- */
+-#ifndef __ARCH_ASM_MACH_OMAP2_CM44XX_H
+-#define __ARCH_ASM_MACH_OMAP2_CM44XX_H
 -
- /* CM */
- 
- /* CM.PER_CM register offsets */
-@@ -371,43 +362,4 @@
- #define AM33XX_CM_CEFUSE_CEFUSE_CLKCTRL_OFFSET		0x0020
- #define AM33XX_CM_CEFUSE_CEFUSE_CLKCTRL			AM33XX_CM_REGADDR(AM33XX_CM_CEFUSE_MOD, 0x0020)
- 
 -
--#ifndef __ASSEMBLER__
--bool am33xx_cm_is_clkdm_in_hwsup(u16 inst, u16 cdoffs);
--void am33xx_cm_clkdm_enable_hwsup(u16 inst, u16 cdoffs);
--void am33xx_cm_clkdm_disable_hwsup(u16 inst, u16 cdoffs);
--void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
--void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
+-#include "prcm-common.h"
+-#include "cm.h"
 -
--#ifdef CONFIG_SOC_AM33XX
--extern int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
--					u16 clkctrl_offs);
--extern void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
--					u16 clkctrl_offs);
--extern void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
--					u16 clkctrl_offs);
--extern int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
--					u16 clkctrl_offs);
--#else
--static inline int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
--					u16 clkctrl_offs)
--{
--	return 0;
--}
--static inline void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
--					u16 clkctrl_offs)
--{
--}
--static inline void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
--					u16 clkctrl_offs)
--{
--}
--static inline int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
--					u16 clkctrl_offs)
--{
--	return 0;
--}
+-#define OMAP4_CM_CLKSTCTRL				0x0000
+-#define OMAP4_CM_STATICDEP				0x0004
+-
 -#endif
--
--#endif /* ASSEMBLER */
- #endif
-diff --git a/include/linux/power/omap/cm33xx.h b/include/linux/power/omap/cm33xx.h
-new file mode 100644
-index 0000000..2449ba8
---- /dev/null
-+++ b/include/linux/power/omap/cm33xx.h
-@@ -0,0 +1,68 @@
-+/*
-+ * AM33XX CM offset macros
-+ *
-+ * Copyright (C) 2011-2012 Texas Instruments Incorporated - http://www.ti.com/
-+ * Vaibhav Hiremath <hvaibhav@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+index f8f9343..8655538 100644
+--- a/arch/arm/mach-omap2/cm_common.c
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -18,7 +18,8 @@
+ 
+ #include <linux/power/omap/cm2xxx.h>
+ #include <linux/power/omap/cm3xxx.h>
+-#include "cm44xx.h"
++#include "cm.h"
++#include "prcm-common.h"
+ 
+ /*
+  * cm_ll_data: function pointers to SoC-specific implementations of
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 58e01c7..dfb1a93 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -25,7 +25,6 @@
+ #include "cm.h"
+ #include "cm1_44xx.h"
+ #include "cm2_44xx.h"
+-#include "cm44xx.h"
+ #include "cminst44xx.h"
+ #include "prcm44xx.h"
+ #include "prm44xx.h"
+@@ -44,6 +43,9 @@
+ #define OMAP34XX_CLKSTCTRL_FORCE_WAKEUP	0x2
+ #define OMAP34XX_CLKSTCTRL_ENABLE_AUTO	0x3
+ 
++#define OMAP4_CM_CLKSTCTRL		0x0000
++#define OMAP4_CM_STATICDEP		0x0004
 +
-+#ifndef __LINUX_POWER_OMAP_CM33XX_H
-+#define __LINUX_POWER_OMAP_CM33XX_H
-+
-+/* CM instances */
-+#define AM33XX_CM_PER_MOD		0x0000
-+#define AM33XX_CM_WKUP_MOD		0x0400
-+#define AM33XX_CM_DPLL_MOD		0x0500
-+#define AM33XX_CM_MPU_MOD		0x0600
-+#define AM33XX_CM_DEVICE_MOD		0x0700
-+#define AM33XX_CM_RTC_MOD		0x0800
-+#define AM33XX_CM_GFX_MOD		0x0900
-+#define AM33XX_CM_CEFUSE_MOD		0x0A00
-+
-+#ifndef __ASSEMBLER__
-+bool am33xx_cm_is_clkdm_in_hwsup(u16 inst, u16 cdoffs);
-+void am33xx_cm_clkdm_enable_hwsup(u16 inst, u16 cdoffs);
-+void am33xx_cm_clkdm_disable_hwsup(u16 inst, u16 cdoffs);
-+void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
-+void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
-+
-+#ifdef CONFIG_SOC_AM33XX
-+int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
-+			       u16 clkctrl_offs);
-+void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
-+			     u16 clkctrl_offs);
-+void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
-+			      u16 clkctrl_offs);
-+int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
-+				u16 clkctrl_offs);
-+#else
-+static inline int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
-+					u16 clkctrl_offs)
-+{
-+	return 0;
-+}
-+static inline void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
-+					u16 clkctrl_offs)
-+{
-+}
-+static inline void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
-+					u16 clkctrl_offs)
-+{
-+}
-+static inline int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
-+					u16 clkctrl_offs)
-+{
-+	return 0;
-+}
-+#endif
-+
-+#endif /* ASSEMBLER */
-+#endif
+ /*
+  * CLKCTRL_IDLEST_*: possible values for the CM_*_CLKCTRL.IDLEST bitfield:
+  *
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index faebd5f..62649ba 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -24,7 +24,6 @@
+ 
+ #include "cm2xxx_3xxx.h"
+ #include "prcm44xx.h"
+-#include "cm44xx.h"
+ #include "prm2xxx_3xxx.h"
+ #include "prm44xx.h"
+ 
 -- 
 1.7.9.5
