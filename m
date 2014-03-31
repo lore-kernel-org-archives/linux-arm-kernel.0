@@ -1,42 +1,32 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 31 Mar 2014 16:13:35 -0700
-Subject: [PATCH] clk: shmobile: fix setting paretn clock rate
-In-Reply-To: <1396288047-6647-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1396288047-6647-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20140331231335.5762.46624@quantum>
+From: nitin.garg@freescale.com (Nitin Garg)
+Date: Mon, 31 Mar 2014 18:29:24 -0500
+Subject: [PATCH] ARM: errata: Fix the workaround for erratum 764369
+Message-ID: <1396308564-4613-1-git-send-email-nitin.garg@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ben Dooks (2014-03-31 10:47:27)
-> If the driver needs to change a clock rate, then it must be propogated
-> through the MSTP clock to the parent clock (such as shdi0 -> sd0). Without
-> this we cannot up-rate default clocks which are really slow (such as the
-> mmcif1 which defaults to 12MHz where it could be running at 97MHz)
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+The SCU diagnostic control register at offset 0x30 is
+write-only register, so do not do read-modify write.
 
-Taken into clk-next.
+Signed-off-by: Nitin Garg <nitin.garg@freescale.com>
+---
+ arch/arm/kernel/smp_scu.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-Regards,
-Mike
-
-> ---
->  drivers/clk/shmobile/clk-mstp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-> index 7bfdcfc..9fc754b 100644
-> --- a/drivers/clk/shmobile/clk-mstp.c
-> +++ b/drivers/clk/shmobile/clk-mstp.c
-> @@ -139,7 +139,7 @@ cpg_mstp_clock_register(const char *name, const char *parent_name,
->  
->         init.name = name;
->         init.ops = &cpg_mstp_clock_ops;
-> -       init.flags = CLK_IS_BASIC;
-> +       init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
->         init.parent_names = &parent_name;
->         init.num_parents = 1;
->  
-> -- 
-> 1.9.0
-> 
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 1aafa0d..b0cca7e 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -42,9 +42,7 @@ void scu_enable(void __iomem *scu_base)
+ #ifdef CONFIG_ARM_ERRATA_764369
+ 	/* Cortex-A9 only */
+ 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
+-		scu_ctrl = readl_relaxed(scu_base + 0x30);
+-		if (!(scu_ctrl & 1))
+-			writel_relaxed(scu_ctrl | 0x1, scu_base + 0x30);
++		writel_relaxed(0x1, scu_base + 0x30);
+ 	}
+ #endif
+ 
+-- 
+1.7.4.1
