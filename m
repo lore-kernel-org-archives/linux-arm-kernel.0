@@ -1,51 +1,51 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Mon, 31 Mar 2014 14:35:41 +0200
-Subject: [PATCH 3.12 20/48] clocksource: vf_pit_timer: use complement for
- sched_clock reading
-In-Reply-To: <3d316682dc951d54ac0c9927968fdfe372d47c37.1396269188.git.jslaby@suse.cz>
-References: <3d316682dc951d54ac0c9927968fdfe372d47c37.1396269188.git.jslaby@suse.cz>
-Message-ID: <07a2f05ccb2b392a0360653eb6f9d32906e2d516.1396269188.git.jslaby@suse.cz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 31 Mar 2014 13:45:51 +0100
+Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
+In-Reply-To: <20140331113113.GE29871@arm.com>
+References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
+ <76240593.SAyloCy7nR@wuerfel> <20140331113113.GE29871@arm.com>
+Message-ID: <20140331124551.GF29871@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
+On Mon, Mar 31, 2014 at 12:31:14PM +0100, Catalin Marinas wrote:
+> On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
+> > On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
+> > > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
+> > > space described in [1] due to one major issue + one minor issue.
+> > > 
+> > > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
+> > > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
+> > > kernel fails to create mapping for this region in map_mem function
+> > > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
+> > > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
+[...]
+> > a) always use a four-level page table in kernel space, regardless of
+> > whether we do it in user space. We can move the kernel mappings down
+> > in address space either by one 512GB entry to 0xffffff0000000000, or
+> > to match the 64k-page location at 0xfffffc0000000000, or all the way
+> > to to 0xfffc000000000000. In any case, we can have all the dynamic
+> > mappings within one 512GB area and pretend we have a three-level
+> > page table for them, while the rest of DRAM is mapped statically at
+> > early boot time using 512GB large pages.
+> 
+> That's a workaround but we end up with two (or more) kernel pgds - one
+> for vmalloc, ioremap etc. and another (static) one for the kernel linear
+> mapping. So far there isn't any memory mapping carved out but we have to
+> be careful in the future.
+> 
+> However, kernel page table walking would be a bit slower with 4-levels.
 
-3.12-stable review patch.  If anyone has any objections, please let me know.
+Yet another approach would be to enable 4-levels of page tables (no
+nopud.h) in the kernel with pgd_offset_k doing the right thing for 4
+levels but user space configured to 3-levels only and pgd_offset
+returning 0 while pud_offset does what pgd_offset currently implements
+for 3 levels.
 
-===============
+This solves the page table walk latency for user but not for kernel.
+Anyway, if the hardware memory map is so sparse (a real SoC, not the
+spec), I don't think we have other ways to support it with 3-levels of
+page table for the kernel, unless we hack __virt_to_phys/__phys_to_virt.
 
-commit 224aa3ed45c8735ae02bb2ecca002409fa6aa772 upstream.
-
-Vybrids PIT register is monitonic decreasing. However, sched_clock
-reading needs to be monitonic increasing. Use bitwise not to get
-the complement of the clock register. This fixes the clock going
-backward. Also, the clock now starts at 0 since we load the
-register with the maximum value at start.
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: daniel.lezcano at linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux at arm.linux.org.uk
-Link: http://lkml.kernel.org/r/d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan at agner.ch
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Jiri Slaby <jslaby@suse.cz>
----
- drivers/clocksource/vf_pit_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
-index 587e0202a70b..e5590953630e 100644
---- a/drivers/clocksource/vf_pit_timer.c
-+++ b/drivers/clocksource/vf_pit_timer.c
-@@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
- 
- static unsigned int pit_read_sched_clock(void)
- {
--	return __raw_readl(clksrc_base + PITCVAL);
-+	return ~__raw_readl(clksrc_base + PITCVAL);
- }
- 
- static int __init pit_clocksource_init(unsigned long rate)
 -- 
-1.9.1
+Catalin
