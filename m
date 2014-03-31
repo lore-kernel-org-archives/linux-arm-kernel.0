@@ -1,10 +1,9 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:16:29 +0300
-Subject: [PATCH 50/55] ARM: OMAP2+: clockdomain: move clockdomain.h header to
- public location
+Date: Mon, 31 Mar 2014 18:16:27 +0300
+Subject: [PATCH 48/55] ARM: OMAP2+: move prm.h header to public location
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-51-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-49-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,79 +12,230 @@ support code.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/clock.c                      |    2 +-
- arch/arm/mach-omap2/clockdomain.c                |    3 +-
- arch/arm/mach-omap2/clockdomain.h                |  237 ---------------------
- arch/arm/mach-omap2/clockdomains2420_data.c      |    2 +-
- arch/arm/mach-omap2/clockdomains2430_data.c      |    2 +-
- arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    2 +-
- arch/arm/mach-omap2/clockdomains33xx_data.c      |    2 +-
- arch/arm/mach-omap2/clockdomains3xxx_data.c      |    2 +-
- arch/arm/mach-omap2/clockdomains43xx_data.c      |    2 +-
- arch/arm/mach-omap2/clockdomains44xx_data.c      |    2 +-
- arch/arm/mach-omap2/clockdomains54xx_data.c      |    2 +-
- arch/arm/mach-omap2/clockdomains7xx_data.c       |    2 +-
- arch/arm/mach-omap2/cm2xxx.c                     |    3 +-
- arch/arm/mach-omap2/cm33xx.c                     |    2 +-
- arch/arm/mach-omap2/cm3xxx.c                     |    3 +-
  arch/arm/mach-omap2/cminst44xx.c                 |    2 +-
- arch/arm/mach-omap2/cpuidle34xx.c                |    2 +-
  arch/arm/mach-omap2/cpuidle44xx.c                |    2 +-
- arch/arm/mach-omap2/dpll3xxx.c                   |    2 +-
+ arch/arm/mach-omap2/display.c                    |    2 +-
+ arch/arm/mach-omap2/hdq1w.c                      |    2 +-
+ arch/arm/mach-omap2/i2c.c                        |    3 +-
  arch/arm/mach-omap2/io.c                         |    2 +-
- arch/arm/mach-omap2/omap-smp.c                   |    2 +-
+ arch/arm/mach-omap2/msdi.c                       |    2 +-
+ arch/arm/mach-omap2/mux.c                        |    3 +-
  arch/arm/mach-omap2/omap_hwmod.c                 |    2 +-
- arch/arm/mach-omap2/pm-debug.c                   |    2 +-
- arch/arm/mach-omap2/pm.c                         |    2 +-
- arch/arm/mach-omap2/pm24xx.c                     |    2 +-
- arch/arm/mach-omap2/pm34xx.c                     |    2 +-
- arch/arm/mach-omap2/pm44xx.c                     |    2 +-
  arch/arm/mach-omap2/powerdomain.c                |    2 +-
- arch/arm/mach-omap2/prm2xxx.c                    |    2 +-
- arch/arm/mach-omap2/prm2xxx_3xxx.c               |    2 +-
- include/linux/power/omap/clockdomain.h           |  242 ++++++++++++++++++++++
- 31 files changed, 274 insertions(+), 266 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/clockdomain.h
- create mode 100644 include/linux/power/omap/clockdomain.h
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |    2 +-
+ arch/arm/mach-omap2/prm-regbits-33xx.h           |    2 +-
+ arch/arm/mach-omap2/prm.h                        |  164 ----------------------
+ arch/arm/mach-omap2/prm2xxx.h                    |    2 +-
+ arch/arm/mach-omap2/prm2xxx_3xxx_private.h       |    2 +-
+ arch/arm/mach-omap2/prm33xx.c                    |    2 +-
+ arch/arm/mach-omap2/prm33xx.h                    |    2 +-
+ arch/arm/mach-omap2/prm3xxx.h                    |    2 +-
+ arch/arm/mach-omap2/prm44xx.c                    |    2 +-
+ arch/arm/mach-omap2/prm44xx.h                    |    2 +-
+ arch/arm/mach-omap2/prm54xx.h                    |    2 +-
+ arch/arm/mach-omap2/prm7xx.h                     |    2 +-
+ arch/arm/mach-omap2/prm_common.c                 |    2 +-
+ arch/arm/mach-omap2/prminst44xx.c                |    2 +-
+ arch/arm/mach-omap2/wd_timer.c                   |    2 +-
+ include/linux/power/omap/prm.h                   |  164 ++++++++++++++++++++++
+ 26 files changed, 189 insertions(+), 189 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/prm.h
+ create mode 100644 include/linux/power/omap/prm.h
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 4276c46..035f413 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -29,7 +29,7 @@
- #include <trace/events/power.h>
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 5ebd8e3..0fd50d7 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -21,7 +21,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
  
- #include "soc.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "clock.h"
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include "clockdomain.h"
  #include <linux/power/omap/cm.h>
- #include "cm2xxx.h"
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 9a59efb..298fb05 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -29,7 +29,8 @@
- #include <linux/bitops.h>
+ #include "cm1_44xx.h"
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 4c158c8..4324e4e 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -20,7 +20,7 @@
+ 
+ #include "common.h"
+ #include "pm.h"
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include "clockdomain.h"
+ 
+ /* Machine specific information */
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index 4cf1655..64a1331 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -23,6 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/delay.h>
++#include <linux/power/omap/prm.h>
+ 
+ #include <video/omapdss.h>
+ #include "omap_hwmod.h"
+@@ -34,7 +35,6 @@
+ #include "iomap.h"
+ #include "control.h"
+ #include "display.h"
+-#include "prm.h"
+ 
+ #define DISPC_CONTROL		0x0040
+ #define DISPC_CONTROL2		0x0238
+diff --git a/arch/arm/mach-omap2/hdq1w.c b/arch/arm/mach-omap2/hdq1w.c
+index cbc8e3c..4bbc313 100644
+--- a/arch/arm/mach-omap2/hdq1w.c
++++ b/arch/arm/mach-omap2/hdq1w.c
+@@ -26,13 +26,13 @@
+ #include <linux/init.h>
+ #include <linux/err.h>
+ #include <linux/platform_device.h>
++#include <linux/power/omap/prm.h>
  
  #include "soc.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
-+#include "powerdomain.h"
+ #include "omap_hwmod.h"
+ #include "omap_device.h"
+ #include "hdq1w.h"
  
- /* clkdm_list contains all registered struct clockdomains */
- static LIST_HEAD(clkdm_list);
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+-#include "prm.h"
+ #include "common.h"
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
+index b456b44..b8f9dd5 100644
+--- a/arch/arm/mach-omap2/i2c.c
++++ b/arch/arm/mach-omap2/i2c.c
+@@ -19,12 +19,13 @@
+  *
+  */
+ 
++#include <linux/power/omap/prm.h>
++
+ #include "soc.h"
+ #include "omap_hwmod.h"
+ #include "omap_device.h"
+ #include "omap-pm.h"
+ 
+-#include "prm.h"
+ #include "common.h"
+ #include "mux.h"
+ #include "i2c.h"
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 96d498f..e9f7db9 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -45,7 +45,7 @@
+ #include "sram.h"
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/cm.h>
+ #include "prcm_mpu44xx.h"
+ #include <linux/power/omap/cm44xx.h>
+diff --git a/arch/arm/mach-omap2/msdi.c b/arch/arm/mach-omap2/msdi.c
+index 828e0db..5abf695 100644
+--- a/arch/arm/mach-omap2/msdi.c
++++ b/arch/arm/mach-omap2/msdi.c
+@@ -24,8 +24,8 @@
+ #include <linux/kernel.h>
+ #include <linux/err.h>
+ #include <linux/platform_data/gpio-omap.h>
++#include <linux/power/omap/prm.h>
+ 
+-#include "prm.h"
+ #include "common.h"
+ #include "control.h"
+ #include "omap_hwmod.h"
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 48094b5..8e865eb 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -34,14 +34,13 @@
+ #include <linux/uaccess.h>
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
+-
++#include <linux/power/omap/prm.h>
+ 
+ #include "omap_hwmod.h"
+ 
+ #include "soc.h"
+ #include "control.h"
+ #include "mux.h"
+-#include "prm.h"
+ #include "common.h"
+ 
+ #define OMAP_MUX_BASE_OFFSET		0x30	/* Offset from CTRL_BASE */
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 096c43d..df0c2a0 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -155,7 +155,7 @@
+ #include "cm3xxx.h"
+ #include <linux/power/omap/cm44xx.h>
+ #include "cm33xx.h"
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include "prm3xxx.h"
+ #include "prm44xx.h"
+ #include "prm33xx.h"
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index a29d50c..7262b3d 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -29,7 +29,7 @@
+ 
+ #include <asm/cpu.h>
+ 
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include "powerdomain.h"
+ #include "clockdomain.h"
+ #include "voltage.h"
+diff --git a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+index 57abec8..823bc4d 100644
+--- a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+@@ -34,7 +34,7 @@
+ #include "powerdomain.h"
+ 
+ #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ 
+ /* OMAP2/3-common powerdomains */
+ 
+diff --git a/arch/arm/mach-omap2/prm-regbits-33xx.h b/arch/arm/mach-omap2/prm-regbits-33xx.h
+index 84feece..70d22b6 100644
+--- a/arch/arm/mach-omap2/prm-regbits-33xx.h
++++ b/arch/arm/mach-omap2/prm-regbits-33xx.h
+@@ -16,7 +16,7 @@
+ #ifndef __ARCH_ARM_MACH_OMAP2_PRM_REGBITS_33XX_H
+ #define __ARCH_ARM_MACH_OMAP2_PRM_REGBITS_33XX_H
+ 
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ 
+ #define AM33XX_GFX_MEM_ONSTATE_MASK			(0x3 << 17)
+ #define AM33XX_GFX_MEM_RETSTATE_MASK			(1 << 6)
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
 deleted file mode 100644
-index 4322a28..0000000
---- a/arch/arm/mach-omap2/clockdomain.h
+index 6a02cf3..0000000
+--- a/arch/arm/mach-omap2/prm.h
 +++ /dev/null
-@@ -1,237 +0,0 @@
+@@ -1,164 +0,0 @@
 -/*
-- * OMAP2/3 clockdomain framework functions
+- * OMAP2/3/4 Power/Reset Management (PRM) bitfield definitions
 - *
-- * Copyright (C) 2008, 2012 Texas Instruments, Inc.
-- * Copyright (C) 2008-2011 Nokia Corporation
+- * Copyright (C) 2007-2009, 2012 Texas Instruments, Inc.
+- * Copyright (C) 2010 Nokia Corporation
 - *
 - * Paul Walmsley
 - *
@@ -93,598 +243,330 @@ index 4322a28..0000000
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 - */
+-#ifndef __ARCH_ARM_MACH_OMAP2_PRM_H
+-#define __ARCH_ARM_MACH_OMAP2_PRM_H
 -
--#ifndef __ARCH_ARM_MACH_OMAP2_CLOCKDOMAIN_H
--#define __ARCH_ARM_MACH_OMAP2_CLOCKDOMAIN_H
+-#include <linux/power/omap/prcm-common.h>
 -
--#include <linux/init.h>
--
--#include "powerdomain.h"
+-# ifndef __ASSEMBLER__
+-extern void __iomem *prm_base;
+-extern u16 prm_dev_inst;
+-extern u16 prm_features;
+-extern void omap2_set_globals_prm(void __iomem *prm);
+-int of_prcm_init(void);
+-# endif
 -
 -/*
-- * Clockdomain flags
+- * prm_features flag values
 - *
-- * XXX Document CLKDM_CAN_* flags
-- *
-- * CLKDM_NO_AUTODEPS: Prevent "autodeps" from being added/removed from this
-- *     clockdomain.  (Currently, this applies to OMAP3 clockdomains only.)
-- * CLKDM_ACTIVE_WITH_MPU: The PRCM guarantees that this clockdomain is
-- *     active whenever the MPU is active.  True for interconnects and
-- *     the WKUP clockdomains.
-- * CLKDM_MISSING_IDLE_REPORTING: The idle status of the IP blocks and
-- *     clocks inside this clockdomain are not taken into account by
-- *     the PRCM when determining whether the clockdomain is idle.
-- *     Without this flag, if the clockdomain is set to
-- *     hardware-supervised idle mode, the PRCM may transition the
-- *     enclosing powerdomain to a low power state, even when devices
-- *     inside the clockdomain and powerdomain are in use.  (An example
-- *     of such a clockdomain is the EMU clockdomain on OMAP3/4.)  If
-- *     this flag is set, and the clockdomain does not support the
-- *     force-sleep mode, then the HW_AUTO mode will be used to put the
-- *     clockdomain to sleep.  Similarly, if the clockdomain supports
-- *     the force-wakeup mode, then it will be used whenever a clock or
-- *     IP block inside the clockdomain is active, rather than the
-- *     HW_AUTO mode.
+- * PRM_HAS_IO_WAKEUP: has IO wakeup capability
+- * PRM_HAS_VOLTAGE: has voltage domains
 - */
--#define CLKDM_CAN_FORCE_SLEEP			(1 << 0)
--#define CLKDM_CAN_FORCE_WAKEUP			(1 << 1)
--#define CLKDM_CAN_ENABLE_AUTO			(1 << 2)
--#define CLKDM_CAN_DISABLE_AUTO			(1 << 3)
--#define CLKDM_NO_AUTODEPS			(1 << 4)
--#define CLKDM_ACTIVE_WITH_MPU			(1 << 5)
--#define CLKDM_MISSING_IDLE_REPORTING		(1 << 6)
+-#define PRM_HAS_IO_WAKEUP	(1 << 0)
+-#define PRM_HAS_VOLTAGE		(1 << 1)
 -
--#define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
--#define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
--#define CLKDM_CAN_HWSUP_SWSUP	(CLKDM_CAN_SWSUP | CLKDM_CAN_HWSUP)
+-#ifndef __ASSEMBLER__
+-enum {
+-	PRM_OMAP3430 = 0,
+-	PRM_OMAP3630,
+-	PRM_OMAP3_OTHER,
+-	PRM_OMAP4,
+-	PRM_OMAP5,
+-	PRM_DRA7,
+-};
+-#endif
+-
+-/*
+- * MAX_MODULE_SOFTRESET_WAIT: Maximum microseconds to wait for OMAP
+- * module to softreset
+- */
+-#define MAX_MODULE_SOFTRESET_WAIT		10000
+-
+-/*
+- * MAX_MODULE_HARDRESET_WAIT: Maximum microseconds to wait for an OMAP
+- * submodule to exit hardreset
+- */
+-#define MAX_MODULE_HARDRESET_WAIT		10000
+-
+-/*
+- * Register bitfields
+- */
+-
+-/*
+- * 24XX: PM_PWSTST_CORE, PM_PWSTST_GFX, PM_PWSTST_MPU, PM_PWSTST_DSP
+- *
+- * 2430: PM_PWSTST_MDM
+- *
+- * 3430: PM_PWSTST_IVA2, PM_PWSTST_MPU, PM_PWSTST_CORE, PM_PWSTST_GFX,
+- *	 PM_PWSTST_DSS, PM_PWSTST_CAM, PM_PWSTST_PER, PM_PWSTST_EMU,
+- *	 PM_PWSTST_NEON
+- */
+-#define OMAP_INTRANSITION_MASK				(1 << 20)
+-
+-
+-/*
+- * 24XX: PM_PWSTST_GFX, PM_PWSTST_DSP
+- *
+- * 2430: PM_PWSTST_MDM
+- *
+- * 3430: PM_PWSTST_IVA2, PM_PWSTST_MPU, PM_PWSTST_CORE, PM_PWSTST_GFX,
+- *	 PM_PWSTST_DSS, PM_PWSTST_CAM, PM_PWSTST_PER, PM_PWSTST_EMU,
+- *	 PM_PWSTST_NEON
+- */
+-#define OMAP_POWERSTATEST_SHIFT				0
+-#define OMAP_POWERSTATEST_MASK				(0x3 << 0)
+-
+-/*
+- * 24XX: PM_PWSTCTRL_MPU, PM_PWSTCTRL_CORE, PM_PWSTCTRL_GFX,
+- *       PM_PWSTCTRL_DSP, PM_PWSTST_MPU
+- *
+- * 2430: PM_PWSTCTRL_MDM shared bits
+- *
+- * 3430: PM_PWSTCTRL_IVA2, PM_PWSTCTRL_MPU, PM_PWSTCTRL_CORE,
+- *	 PM_PWSTCTRL_GFX, PM_PWSTCTRL_DSS, PM_PWSTCTRL_CAM, PM_PWSTCTRL_PER,
+- *	 PM_PWSTCTRL_NEON shared bits
+- */
+-#define OMAP_POWERSTATE_SHIFT				0
+-#define OMAP_POWERSTATE_MASK				(0x3 << 0)
+-
+-/*
+- * Standardized OMAP reset source bits
+- *
+- * To the extent these happen to match the hardware register bit
+- * shifts, it's purely coincidental.  Used by omap-wdt.c.
+- * OMAP_UNKNOWN_RST_SRC_ID_SHIFT is a special value, used whenever
+- * there are any bits remaining in the global PRM_RSTST register that
+- * haven't been identified, or when the PRM code for the current SoC
+- * doesn't know how to interpret the register.
+- */
+-#define OMAP_GLOBAL_COLD_RST_SRC_ID_SHIFT			0
+-#define OMAP_GLOBAL_WARM_RST_SRC_ID_SHIFT			1
+-#define OMAP_SECU_VIOL_RST_SRC_ID_SHIFT				2
+-#define OMAP_MPU_WD_RST_SRC_ID_SHIFT				3
+-#define OMAP_SECU_WD_RST_SRC_ID_SHIFT				4
+-#define OMAP_EXTWARM_RST_SRC_ID_SHIFT				5
+-#define OMAP_VDD_MPU_VM_RST_SRC_ID_SHIFT			6
+-#define OMAP_VDD_IVA_VM_RST_SRC_ID_SHIFT			7
+-#define OMAP_VDD_CORE_VM_RST_SRC_ID_SHIFT			8
+-#define OMAP_ICEPICK_RST_SRC_ID_SHIFT				9
+-#define OMAP_ICECRUSHER_RST_SRC_ID_SHIFT			10
+-#define OMAP_C2C_RST_SRC_ID_SHIFT				11
+-#define OMAP_UNKNOWN_RST_SRC_ID_SHIFT				12
+-
+-#ifndef __ASSEMBLER__
 -
 -/**
-- * struct clkdm_autodep - clkdm deps to add when entering/exiting hwsup mode
-- * @clkdm: clockdomain to add wkdep+sleepdep on - set name member only
+- * struct prm_reset_src_map - map register bitshifts to standard bitshifts
+- * @reg_shift: bitshift in the PRM reset source register
+- * @std_shift: bitshift equivalent in the standard reset source list
 - *
-- * A clockdomain that should have wkdeps and sleepdeps added when a
-- * clockdomain should stay active in hwsup mode; and conversely,
-- * removed when the clockdomain should be allowed to go inactive in
-- * hwsup mode.
-- *
-- * Autodeps are deprecated and should be removed after
-- * omap_hwmod-based fine-grained module idle control is added.
+- * The fields are signed because -1 is used as a terminator.
 - */
--struct clkdm_autodep {
--	union {
--		const char *name;
--		struct clockdomain *ptr;
--	} clkdm;
+-struct prm_reset_src_map {
+-	s8 reg_shift;
+-	s8 std_shift;
 -};
 -
 -/**
-- * struct clkdm_dep - encode dependencies between clockdomains
-- * @clkdm_name: clockdomain name
-- * @clkdm: pointer to the struct clockdomain of @clkdm_name
-- * @wkdep_usecount: Number of wakeup dependencies causing this clkdm to wake
-- * @sleepdep_usecount: Number of sleep deps that could prevent clkdm from idle
+- * struct prm_ll_data - fn ptrs to per-SoC PRM function implementations
+- * @read_reset_sources: ptr to the SoC PRM-specific get_reset_source impl
+- * @was_any_context_lost_old: ptr to the SoC PRM context loss test fn
+- * @clear_context_loss_flags_old: ptr to the SoC PRM context loss flag clear fn
+- * @late_init: ptr to the late init function
 - *
-- * Statically defined.  @clkdm is resolved from @clkdm_name@runtime and
-- * should not be pre-initialized.
-- *
-- * XXX Should also include hardware (fixed) dependencies.
+- * XXX @was_any_context_lost_old and @clear_context_loss_flags_old are
+- * deprecated.
 - */
--struct clkdm_dep {
--	const char *clkdm_name;
--	struct clockdomain *clkdm;
--	s16 wkdep_usecount;
--	s16 sleepdep_usecount;
+-struct prm_ll_data {
+-	u32 (*read_reset_sources)(void);
+-	bool (*was_any_context_lost_old)(u8 part, s16 inst, u16 idx);
+-	void (*clear_context_loss_flags_old)(u8 part, s16 inst, u16 idx);
+-	int (*late_init)(void);
 -};
 -
--/* Possible flags for struct clockdomain._flags */
--#define _CLKDM_FLAG_HWSUP_ENABLED		BIT(0)
+-extern int prm_register(struct prm_ll_data *pld);
+-extern int prm_unregister(struct prm_ll_data *pld);
 -
--struct omap_hwmod;
--struct clk;
--
--/**
-- * struct clockdomain - OMAP clockdomain
-- * @name: clockdomain name
-- * @pwrdm: powerdomain containing this clockdomain
-- * @clktrctrl_reg: CLKSTCTRL reg for the given clock domain
-- * @clktrctrl_mask: CLKTRCTRL/AUTOSTATE field mask in CM_CLKSTCTRL reg
-- * @flags: Clockdomain capability flags
-- * @_flags: Flags for use only by internal clockdomain code
-- * @dep_bit: Bit shift of this clockdomain's PM_WKDEP/CM_SLEEPDEP bit
-- * @prcm_partition: (OMAP4 only) PRCM partition ID for this clkdm's registers
-- * @cm_inst: (OMAP4 only) CM instance register offset
-- * @clkdm_offs: (OMAP4 only) CM clockdomain register offset
-- * @wkdep_srcs: Clockdomains that can be told to wake this powerdomain up
-- * @sleepdep_srcs: Clockdomains that can be told to keep this clkdm from inact
-- * @usecount: Usecount tracking
-- * @node: list_head to link all clockdomains together
-- *
-- * @prcm_partition should be a macro from mach-omap2/prcm44xx.h (OMAP4 only)
-- * @cm_inst should be a macro ending in _INST from the OMAP4 CM instance
-- *     definitions (OMAP4 only)
-- * @clkdm_offs should be a macro ending in _CDOFFS from the OMAP4 CM instance
-- *     definitions (OMAP4 only)
-- */
--struct clockdomain {
--	const char *name;
--	union {
--		const char *name;
--		struct powerdomain *ptr;
--	} pwrdm;
--	const u16 clktrctrl_mask;
--	const u8 flags;
--	u8 _flags;
--	const u8 dep_bit;
--	const u8 prcm_partition;
--	const u16 cm_inst;
--	const u16 clkdm_offs;
--	struct clkdm_dep *wkdep_srcs;
--	struct clkdm_dep *sleepdep_srcs;
--	int usecount;
--	struct list_head node;
--};
--
--/**
-- * struct clkdm_ops - Arch specific function implementations
-- * @clkdm_add_wkdep: Add a wakeup dependency between clk domains
-- * @clkdm_del_wkdep: Delete a wakeup dependency between clk domains
-- * @clkdm_read_wkdep: Read wakeup dependency state between clk domains
-- * @clkdm_clear_all_wkdeps: Remove all wakeup dependencies from the clk domain
-- * @clkdm_add_sleepdep: Add a sleep dependency between clk domains
-- * @clkdm_del_sleepdep: Delete a sleep dependency between clk domains
-- * @clkdm_read_sleepdep: Read sleep dependency state between clk domains
-- * @clkdm_clear_all_sleepdeps: Remove all sleep dependencies from the clk domain
-- * @clkdm_sleep: Force a clockdomain to sleep
-- * @clkdm_wakeup: Force a clockdomain to wakeup
-- * @clkdm_allow_idle: Enable hw supervised idle transitions for clock domain
-- * @clkdm_deny_idle: Disable hw supervised idle transitions for clock domain
-- * @clkdm_clk_enable: Put the clkdm in right state for a clock enable
-- * @clkdm_clk_disable: Put the clkdm in right state for a clock disable
-- */
--struct clkdm_ops {
--	int	(*clkdm_add_wkdep)(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--	int	(*clkdm_del_wkdep)(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--	int	(*clkdm_read_wkdep)(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--	int	(*clkdm_clear_all_wkdeps)(struct clockdomain *clkdm);
--	int	(*clkdm_add_sleepdep)(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--	int	(*clkdm_del_sleepdep)(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--	int	(*clkdm_read_sleepdep)(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--	int	(*clkdm_clear_all_sleepdeps)(struct clockdomain *clkdm);
--	int	(*clkdm_sleep)(struct clockdomain *clkdm);
--	int	(*clkdm_wakeup)(struct clockdomain *clkdm);
--	void	(*clkdm_allow_idle)(struct clockdomain *clkdm);
--	void	(*clkdm_deny_idle)(struct clockdomain *clkdm);
--	int	(*clkdm_clk_enable)(struct clockdomain *clkdm);
--	int	(*clkdm_clk_disable)(struct clockdomain *clkdm);
--};
--
--int clkdm_register_platform_funcs(struct clkdm_ops *co);
--int clkdm_register_autodeps(struct clkdm_autodep *ia);
--int clkdm_register_clkdms(struct clockdomain **c);
--int clkdm_complete_init(void);
--
--struct clockdomain *clkdm_lookup(const char *name);
--
--int clkdm_for_each(int (*fn)(struct clockdomain *clkdm, void *user),
--			void *user);
--struct powerdomain *clkdm_get_pwrdm(struct clockdomain *clkdm);
--
--int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--int clkdm_clear_all_wkdeps(struct clockdomain *clkdm);
--int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--int clkdm_read_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
--int clkdm_clear_all_sleepdeps(struct clockdomain *clkdm);
--
--void clkdm_allow_idle_nolock(struct clockdomain *clkdm);
--void clkdm_allow_idle(struct clockdomain *clkdm);
--void clkdm_deny_idle_nolock(struct clockdomain *clkdm);
--void clkdm_deny_idle(struct clockdomain *clkdm);
--bool clkdm_in_hwsup(struct clockdomain *clkdm);
--bool clkdm_missing_idle_reporting(struct clockdomain *clkdm);
--
--int clkdm_wakeup_nolock(struct clockdomain *clkdm);
--int clkdm_wakeup(struct clockdomain *clkdm);
--int clkdm_sleep_nolock(struct clockdomain *clkdm);
--int clkdm_sleep(struct clockdomain *clkdm);
--
--int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk);
--int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk);
--int clkdm_hwmod_enable(struct clockdomain *clkdm, struct omap_hwmod *oh);
--int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh);
--
--extern void __init omap242x_clockdomains_init(void);
--extern void __init omap243x_clockdomains_init(void);
--extern void __init omap3xxx_clockdomains_init(void);
--extern void __init am33xx_clockdomains_init(void);
--extern void __init omap44xx_clockdomains_init(void);
--extern void __init omap54xx_clockdomains_init(void);
--extern void __init dra7xx_clockdomains_init(void);
--void am43xx_clockdomains_init(void);
--
--extern void clkdm_add_autodeps(struct clockdomain *clkdm);
--extern void clkdm_del_autodeps(struct clockdomain *clkdm);
--
--extern struct clkdm_ops omap2_clkdm_operations;
--extern struct clkdm_ops omap3_clkdm_operations;
--extern struct clkdm_ops omap4_clkdm_operations;
--extern struct clkdm_ops am33xx_clkdm_operations;
--extern struct clkdm_ops am43xx_clkdm_operations;
--
--extern struct clkdm_dep gfx_24xx_wkdeps[];
--extern struct clkdm_dep dsp_24xx_wkdeps[];
--extern struct clockdomain wkup_common_clkdm;
+-extern u32 prm_read_reset_sources(void);
+-extern bool prm_was_any_context_lost_old(u8 part, s16 inst, u16 idx);
+-extern void prm_clear_context_loss_flags_old(u8 part, s16 inst, u16 idx);
 -
 -#endif
-diff --git a/arch/arm/mach-omap2/clockdomains2420_data.c b/arch/arm/mach-omap2/clockdomains2420_data.c
-index 432cb14..b54a3e8 100644
---- a/arch/arm/mach-omap2/clockdomains2420_data.c
-+++ b/arch/arm/mach-omap2/clockdomains2420_data.c
-@@ -36,7 +36,7 @@
- #include <linux/io.h>
- 
- #include "soc.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/prm2xxx_3xxx.h>
- #include <linux/power/omap/cm2xxx_3xxx.h>
- #include "cm-regbits-24xx.h"
-diff --git a/arch/arm/mach-omap2/clockdomains2430_data.c b/arch/arm/mach-omap2/clockdomains2430_data.c
-index 48df0fb..c0030bc 100644
---- a/arch/arm/mach-omap2/clockdomains2430_data.c
-+++ b/arch/arm/mach-omap2/clockdomains2430_data.c
-@@ -36,7 +36,7 @@
- #include <linux/io.h>
- 
- #include "soc.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/prm2xxx_3xxx.h>
- #include <linux/power/omap/cm2xxx_3xxx.h>
- #include "cm-regbits-24xx.h"
-diff --git a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-index 435e5c3..f8666d7 100644
---- a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-@@ -35,7 +35,7 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- 
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/prm2xxx_3xxx.h>
- #include <linux/power/omap/cm2xxx_3xxx.h>
- #include "cm-regbits-24xx.h"
-diff --git a/arch/arm/mach-omap2/clockdomains33xx_data.c b/arch/arm/mach-omap2/clockdomains33xx_data.c
-index e86f84e..0a6160b 100644
---- a/arch/arm/mach-omap2/clockdomains33xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains33xx_data.c
+-
+-
+-#endif
+diff --git a/arch/arm/mach-omap2/prm2xxx.h b/arch/arm/mach-omap2/prm2xxx.h
+index b86486b..8f8a515 100644
+--- a/arch/arm/mach-omap2/prm2xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx.h
 @@ -17,7 +17,7 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
+ #define __ARCH_ARM_MACH_OMAP2_PRM2XXX_H
  
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/cm.h>
- #include "cm33xx.h"
- #include "cm-regbits-33xx.h"
-diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-index 9272baf..fcdee72 100644
---- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-@@ -34,7 +34,7 @@
- #include <linux/io.h>
- 
- #include "soc.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/prm2xxx_3xxx.h>
- #include <linux/power/omap/cm2xxx_3xxx.h>
- #include "cm-regbits-34xx.h"
-diff --git a/arch/arm/mach-omap2/clockdomains43xx_data.c b/arch/arm/mach-omap2/clockdomains43xx_data.c
-index 11a319b..5f1ddb9 100644
---- a/arch/arm/mach-omap2/clockdomains43xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains43xx_data.c
-@@ -11,7 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- 
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "prcm43xx.h"
- 
- static struct clockdomain l4_cefuse_43xx_clkdm = {
-diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-index a335303..965d56f 100644
---- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-@@ -22,7 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- 
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "cm1_44xx.h"
- #include "cm2_44xx.h"
- 
-diff --git a/arch/arm/mach-omap2/clockdomains54xx_data.c b/arch/arm/mach-omap2/clockdomains54xx_data.c
-index 59ea31e..6699aaf6 100644
---- a/arch/arm/mach-omap2/clockdomains54xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains54xx_data.c
-@@ -21,7 +21,7 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- 
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "cm1_54xx.h"
- #include "cm2_54xx.h"
- 
-diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
-index b169667..52d1226 100644
---- a/arch/arm/mach-omap2/clockdomains7xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
-@@ -23,7 +23,7 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- 
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "cm1_7xx.h"
- #include "cm2_7xx.h"
- 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index f7365c7..93efae1 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -22,9 +22,10 @@
- #include <linux/power/omap/cm.h>
- #include "cm2xxx_3xxx_private.h"
- #include <linux/power/omap/cm2xxx.h>
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
  #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prm2xxx.h>
  #include <linux/power/omap/prm2xxx_3xxx.h>
-+#include "powerdomain.h"
  
- /* CM_AUTOIDLE_PLL.AUTO_* bit values for DPLLs */
- #define DPLL_AUTOIDLE_DISABLE				0x0
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index 1f68cde..ea9598c 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -22,7 +22,7 @@
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx_private.h b/arch/arm/mach-omap2/prm2xxx_3xxx_private.h
+index c02a267..5d6861a 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx_private.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx_private.h
+@@ -17,7 +17,7 @@
+ #define __ARCH_ARM_MACH_OMAP2_PRM2XXX_3XXX_PRIVATE_H
+ 
+ #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prm2xxx_3xxx.h>
+ 
+ #ifndef __ASSEMBLER__
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 436cd12..b5864c9 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -21,7 +21,7 @@
+ #include <linux/power/omap/prm33xx.h>
+ 
+ #include "powerdomain.h"
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ 
+ #define AM33XX_LASTPOWERSTATEENTERED_SHIFT	24
+ #define AM33XX_LASTPOWERSTATEENTERED_MASK	(0x3 << 24)
+diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+index 598ba48..c27b5a0 100644
+--- a/arch/arm/mach-omap2/prm33xx.h
++++ b/arch/arm/mach-omap2/prm33xx.h
+@@ -17,7 +17,7 @@
+ #define __ARCH_ARM_MACH_OMAP2_PRM33XX_H
+ 
+ #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prm33xx.h>
+ 
+ #define AM33XX_PRM_BASE               0x44E00000
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index 693b5ad..e48f7be 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -17,7 +17,7 @@
+ #define __ARCH_ARM_MACH_OMAP2_PRM3XXX_H
+ 
+ #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prm2xxx_3xxx.h>
+ #include <linux/power/omap/prm3xxx.h>
+ 
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 705509a..cf312a8 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -25,7 +25,7 @@
+ #include "prcm44xx.h"
+ #include "prminst44xx_private.h"
+ #include "powerdomain.h"
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prcm-common.h>
+ #include <linux/power/omap/prm44xx_54xx.h>
+ 
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index b7066fd..dc9d21c 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -27,7 +27,7 @@
+ 
+ #include <linux/power/omap/prm44xx_54xx.h>
+ #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prm44xx.h>
+ 
+ #define OMAP4430_PRM_BASE		0x4a306000
+diff --git a/arch/arm/mach-omap2/prm54xx.h b/arch/arm/mach-omap2/prm54xx.h
+index 250c2d5..a3895f7 100644
+--- a/arch/arm/mach-omap2/prm54xx.h
++++ b/arch/arm/mach-omap2/prm54xx.h
+@@ -23,7 +23,7 @@
+ 
+ #include <linux/power/omap/prm44xx_54xx.h>
+ #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prm54xx.h>
+ 
+ #define OMAP54XX_PRM_BASE		0x4ae06000
+diff --git a/arch/arm/mach-omap2/prm7xx.h b/arch/arm/mach-omap2/prm7xx.h
+index 6e84906..de2ce3d 100644
+--- a/arch/arm/mach-omap2/prm7xx.h
++++ b/arch/arm/mach-omap2/prm7xx.h
+@@ -24,7 +24,7 @@
+ 
+ #include <linux/power/omap/prm44xx_54xx.h>
+ #include <linux/power/omap/prcm-common.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prm7xx.h>
+ 
+ #define DRA7XX_PRM_BASE		0x4ae06000
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index acdd0f1..fb377e1 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -33,7 +33,7 @@
+ #include <linux/power/omap/prm3xxx.h>
+ #include <linux/power/omap/prm44xx.h>
+ 
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
+ #include <linux/power/omap/prcm-common.h>
+ 
+ /*
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index 50c660d..30015d1 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -16,7 +16,7 @@
  #include <linux/err.h>
  #include <linux/io.h>
  
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/cm.h>
- #include <linux/power/omap/cm33xx.h>
- #include <linux/power/omap/prm33xx.h>
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 01c69f2..47d0e49 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -22,8 +22,9 @@
- #include <linux/power/omap/cm.h>
- #include "cm2xxx_3xxx_private.h"
- #include <linux/power/omap/cm3xxx.h>
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
+-#include "prm.h"
++#include <linux/power/omap/prm.h>
  #include <linux/power/omap/prcm-common.h>
-+#include "powerdomain.h"
+ #include <linux/power/omap/prm44xx.h>
+ #include <linux/power/omap/prm54xx.h>
+diff --git a/arch/arm/mach-omap2/wd_timer.c b/arch/arm/mach-omap2/wd_timer.c
+index d15c7bb..9d528c6 100644
+--- a/arch/arm/mach-omap2/wd_timer.c
++++ b/arch/arm/mach-omap2/wd_timer.c
+@@ -14,12 +14,12 @@
+ #include <linux/err.h>
  
- #define OMAP34XX_CLKSTCTRL_DISABLE_AUTO		0x0
- #define OMAP34XX_CLKSTCTRL_FORCE_SLEEP		0x1
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 3b95fc6..13c4e0b 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -22,7 +22,7 @@
- #include <linux/io.h>
+ #include <linux/platform_data/omap-wd-timer.h>
++#include <linux/power/omap/prm.h>
  
- #include <linux/power/omap/prm.h>
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/cm.h>
- #include "cm1_44xx.h"
- #include "cm2_44xx.h"
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index e18709d..858a28a 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -29,7 +29,7 @@
- #include <asm/cpuidle.h>
- 
- #include "powerdomain.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- 
- #include "pm.h"
- #include "control.h"
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 4324e4e..1ddc4fe 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -21,7 +21,7 @@
+ #include "omap_hwmod.h"
+ #include "omap_device.h"
+ #include "wd_timer.h"
  #include "common.h"
- #include "pm.h"
- #include <linux/power/omap/prm.h>
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- 
- /* Machine specific information */
- struct idle_statedata {
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index 79ce6e8..60a58ff 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -29,7 +29,7 @@
- #include <linux/clkdev.h>
- 
+-#include "prm.h"
  #include "soc.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "clock.h"
- #include <linux/power/omap/cm2xxx_3xxx.h>
- #include "cm-regbits-34xx.h"
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index e9f7db9..b12ca79 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -32,7 +32,7 @@
- #include "iomap.h"
- #include "voltage.h"
- #include "powerdomain.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "common.h"
- #include "clock.h"
- #include "clock2xxx.h"
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 17550aa..a9f4979 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -30,7 +30,7 @@
- #include "soc.h"
- #include "iomap.h"
- #include "common.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "pm.h"
  
- #define CPU_MASK		0xff0ffff0
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index df0c2a0..bfd3c19 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -149,7 +149,7 @@
- 
- #include "soc.h"
- #include "common.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "powerdomain.h"
- #include "cm2xxx.h"
- #include "cm3xxx.h"
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index d2e4fb8..766012e 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -29,7 +29,7 @@
- 
- #include "clock.h"
- #include "powerdomain.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "omap-pm.h"
- 
- #include "soc.h"
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index f464aed..8ee7b14 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -28,7 +28,7 @@
- #include <linux/power/omap/prcm-common.h>
- #include "voltage.h"
- #include "powerdomain.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "pm.h"
- #include "twl-common.h"
- 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 97b3831..6c1b8d6 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -52,7 +52,7 @@
- #include "pm.h"
- #include "control.h"
- #include "powerdomain.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- 
- static void (*omap2_sram_suspend)(u32 dllctrl, void __iomem *sdrc_dlla_ctrl,
- 				  void __iomem *sdrc_power);
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 4ba0cce..119b9ff 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -37,7 +37,7 @@
- #include <asm/suspend.h>
- #include <asm/system_misc.h>
- 
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "powerdomain.h"
- #include "soc.h"
- #include "common.h"
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index eefb30c..47f664f 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -20,7 +20,7 @@
- 
- #include "soc.h"
- #include "common.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "powerdomain.h"
- #include "pm.h"
- 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 86ef5f6..63fd500 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -31,7 +31,7 @@
- 
- #include <linux/power/omap/prm.h>
- #include "powerdomain.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include "voltage.h"
- 
- #include "soc.h"
-diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
-index 849b415..7969cb9 100644
---- a/arch/arm/mach-omap2/prm2xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx.c
-@@ -19,7 +19,7 @@
- #include <linux/irq.h>
- 
- #include "powerdomain.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- #include <linux/power/omap/prm2xxx.h>
- #include "prm2xxx_3xxx_private.h"
- #include <linux/power/omap/cm2xxx_3xxx.h>
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index d8044f9..a25d1d0 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -18,7 +18,7 @@
- 
- #include "powerdomain.h"
- #include "prm2xxx_3xxx_private.h"
--#include "clockdomain.h"
-+#include <linux/power/omap/clockdomain.h>
- 
- /**
-  * omap2_prm_is_hardreset_asserted - read the HW reset line state of
-diff --git a/include/linux/power/omap/clockdomain.h b/include/linux/power/omap/clockdomain.h
+ /*
+diff --git a/include/linux/power/omap/prm.h b/include/linux/power/omap/prm.h
 new file mode 100644
-index 0000000..96f1dc7
+index 0000000..4bc93ca
 --- /dev/null
-+++ b/include/linux/power/omap/clockdomain.h
-@@ -0,0 +1,242 @@
++++ b/include/linux/power/omap/prm.h
+@@ -0,0 +1,164 @@
 +/*
-+ * OMAP2/3 clockdomain framework functions
++ * OMAP2/3/4 Power/Reset Management (PRM) bitfield definitions
 + *
-+ * Copyright (C) 2008, 2012 Texas Instruments, Inc.
-+ * Copyright (C) 2008-2011 Nokia Corporation
++ * Copyright (C) 2007-2009, 2012 Texas Instruments, Inc.
++ * Copyright (C) 2010 Nokia Corporation
 + *
 + * Paul Walmsley
 + *
@@ -692,234 +574,156 @@ index 0000000..96f1dc7
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
++#ifndef __LINUX_POWER_OMAP_PRM_H
++#define __LINUX_POWER_OMAP_PRM_H
 +
-+#ifndef __LINUX_POWER_OMAP_CLOCKDOMAIN_H
-+#define __LINUX_POWER_OMAP_CLOCKDOMAIN_H
++#include <linux/power/omap/prcm-common.h>
 +
-+#include <linux/init.h>
++# ifndef __ASSEMBLER__
++extern void __iomem *prm_base;
++extern u16 prm_dev_inst;
++extern u16 prm_features;
++void omap2_set_globals_prm(void __iomem *prm);
++int of_prcm_init(void);
++# endif
 +
 +/*
-+ * Clockdomain flags
++ * prm_features flag values
 + *
-+ * XXX Document CLKDM_CAN_* flags
-+ *
-+ * CLKDM_NO_AUTODEPS: Prevent "autodeps" from being added/removed from this
-+ *     clockdomain.  (Currently, this applies to OMAP3 clockdomains only.)
-+ * CLKDM_ACTIVE_WITH_MPU: The PRCM guarantees that this clockdomain is
-+ *     active whenever the MPU is active.  True for interconnects and
-+ *     the WKUP clockdomains.
-+ * CLKDM_MISSING_IDLE_REPORTING: The idle status of the IP blocks and
-+ *     clocks inside this clockdomain are not taken into account by
-+ *     the PRCM when determining whether the clockdomain is idle.
-+ *     Without this flag, if the clockdomain is set to
-+ *     hardware-supervised idle mode, the PRCM may transition the
-+ *     enclosing powerdomain to a low power state, even when devices
-+ *     inside the clockdomain and powerdomain are in use.  (An example
-+ *     of such a clockdomain is the EMU clockdomain on OMAP3/4.)  If
-+ *     this flag is set, and the clockdomain does not support the
-+ *     force-sleep mode, then the HW_AUTO mode will be used to put the
-+ *     clockdomain to sleep.  Similarly, if the clockdomain supports
-+ *     the force-wakeup mode, then it will be used whenever a clock or
-+ *     IP block inside the clockdomain is active, rather than the
-+ *     HW_AUTO mode.
++ * PRM_HAS_IO_WAKEUP: has IO wakeup capability
++ * PRM_HAS_VOLTAGE: has voltage domains
 + */
-+#define CLKDM_CAN_FORCE_SLEEP			(1 << 0)
-+#define CLKDM_CAN_FORCE_WAKEUP			(1 << 1)
-+#define CLKDM_CAN_ENABLE_AUTO			(1 << 2)
-+#define CLKDM_CAN_DISABLE_AUTO			(1 << 3)
-+#define CLKDM_NO_AUTODEPS			(1 << 4)
-+#define CLKDM_ACTIVE_WITH_MPU			(1 << 5)
-+#define CLKDM_MISSING_IDLE_REPORTING		(1 << 6)
++#define PRM_HAS_IO_WAKEUP	(1 << 0)
++#define PRM_HAS_VOLTAGE		(1 << 1)
 +
-+#define CLKDM_CAN_HWSUP		(CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_DISABLE_AUTO)
-+#define CLKDM_CAN_SWSUP		(CLKDM_CAN_FORCE_SLEEP | CLKDM_CAN_FORCE_WAKEUP)
-+#define CLKDM_CAN_HWSUP_SWSUP	(CLKDM_CAN_SWSUP | CLKDM_CAN_HWSUP)
++#ifndef __ASSEMBLER__
++enum {
++	PRM_OMAP3430 = 0,
++	PRM_OMAP3630,
++	PRM_OMAP3_OTHER,
++	PRM_OMAP4,
++	PRM_OMAP5,
++	PRM_DRA7,
++};
++#endif
++
++/*
++ * MAX_MODULE_SOFTRESET_WAIT: Maximum microseconds to wait for OMAP
++ * module to softreset
++ */
++#define MAX_MODULE_SOFTRESET_WAIT		10000
++
++/*
++ * MAX_MODULE_HARDRESET_WAIT: Maximum microseconds to wait for an OMAP
++ * submodule to exit hardreset
++ */
++#define MAX_MODULE_HARDRESET_WAIT		10000
++
++/*
++ * Register bitfields
++ */
++
++/*
++ * 24XX: PM_PWSTST_CORE, PM_PWSTST_GFX, PM_PWSTST_MPU, PM_PWSTST_DSP
++ *
++ * 2430: PM_PWSTST_MDM
++ *
++ * 3430: PM_PWSTST_IVA2, PM_PWSTST_MPU, PM_PWSTST_CORE, PM_PWSTST_GFX,
++ *	 PM_PWSTST_DSS, PM_PWSTST_CAM, PM_PWSTST_PER, PM_PWSTST_EMU,
++ *	 PM_PWSTST_NEON
++ */
++#define OMAP_INTRANSITION_MASK				(1 << 20)
++
++
++/*
++ * 24XX: PM_PWSTST_GFX, PM_PWSTST_DSP
++ *
++ * 2430: PM_PWSTST_MDM
++ *
++ * 3430: PM_PWSTST_IVA2, PM_PWSTST_MPU, PM_PWSTST_CORE, PM_PWSTST_GFX,
++ *	 PM_PWSTST_DSS, PM_PWSTST_CAM, PM_PWSTST_PER, PM_PWSTST_EMU,
++ *	 PM_PWSTST_NEON
++ */
++#define OMAP_POWERSTATEST_SHIFT				0
++#define OMAP_POWERSTATEST_MASK				(0x3 << 0)
++
++/*
++ * 24XX: PM_PWSTCTRL_MPU, PM_PWSTCTRL_CORE, PM_PWSTCTRL_GFX,
++ *       PM_PWSTCTRL_DSP, PM_PWSTST_MPU
++ *
++ * 2430: PM_PWSTCTRL_MDM shared bits
++ *
++ * 3430: PM_PWSTCTRL_IVA2, PM_PWSTCTRL_MPU, PM_PWSTCTRL_CORE,
++ *	 PM_PWSTCTRL_GFX, PM_PWSTCTRL_DSS, PM_PWSTCTRL_CAM, PM_PWSTCTRL_PER,
++ *	 PM_PWSTCTRL_NEON shared bits
++ */
++#define OMAP_POWERSTATE_SHIFT				0
++#define OMAP_POWERSTATE_MASK				(0x3 << 0)
++
++/*
++ * Standardized OMAP reset source bits
++ *
++ * To the extent these happen to match the hardware register bit
++ * shifts, it's purely coincidental.  Used by omap-wdt.c.
++ * OMAP_UNKNOWN_RST_SRC_ID_SHIFT is a special value, used whenever
++ * there are any bits remaining in the global PRM_RSTST register that
++ * haven't been identified, or when the PRM code for the current SoC
++ * doesn't know how to interpret the register.
++ */
++#define OMAP_GLOBAL_COLD_RST_SRC_ID_SHIFT			0
++#define OMAP_GLOBAL_WARM_RST_SRC_ID_SHIFT			1
++#define OMAP_SECU_VIOL_RST_SRC_ID_SHIFT				2
++#define OMAP_MPU_WD_RST_SRC_ID_SHIFT				3
++#define OMAP_SECU_WD_RST_SRC_ID_SHIFT				4
++#define OMAP_EXTWARM_RST_SRC_ID_SHIFT				5
++#define OMAP_VDD_MPU_VM_RST_SRC_ID_SHIFT			6
++#define OMAP_VDD_IVA_VM_RST_SRC_ID_SHIFT			7
++#define OMAP_VDD_CORE_VM_RST_SRC_ID_SHIFT			8
++#define OMAP_ICEPICK_RST_SRC_ID_SHIFT				9
++#define OMAP_ICECRUSHER_RST_SRC_ID_SHIFT			10
++#define OMAP_C2C_RST_SRC_ID_SHIFT				11
++#define OMAP_UNKNOWN_RST_SRC_ID_SHIFT				12
++
++#ifndef __ASSEMBLER__
 +
 +/**
-+ * struct clkdm_autodep - clkdm deps to add when entering/exiting hwsup mode
-+ * @clkdm: clockdomain to add wkdep+sleepdep on - set name member only
++ * struct prm_reset_src_map - map register bitshifts to standard bitshifts
++ * @reg_shift: bitshift in the PRM reset source register
++ * @std_shift: bitshift equivalent in the standard reset source list
 + *
-+ * A clockdomain that should have wkdeps and sleepdeps added when a
-+ * clockdomain should stay active in hwsup mode; and conversely,
-+ * removed when the clockdomain should be allowed to go inactive in
-+ * hwsup mode.
-+ *
-+ * Autodeps are deprecated and should be removed after
-+ * omap_hwmod-based fine-grained module idle control is added.
++ * The fields are signed because -1 is used as a terminator.
 + */
-+struct clkdm_autodep {
-+	union {
-+		const char *name;
-+		struct clockdomain *ptr;
-+	} clkdm;
++struct prm_reset_src_map {
++	s8 reg_shift;
++	s8 std_shift;
 +};
 +
 +/**
-+ * struct clkdm_dep - encode dependencies between clockdomains
-+ * @clkdm_name: clockdomain name
-+ * @clkdm: pointer to the struct clockdomain of @clkdm_name
-+ * @wkdep_usecount: Number of wakeup dependencies causing this clkdm to wake
-+ * @sleepdep_usecount: Number of sleep deps that could prevent clkdm from idle
++ * struct prm_ll_data - fn ptrs to per-SoC PRM function implementations
++ * @read_reset_sources: ptr to the SoC PRM-specific get_reset_source impl
++ * @was_any_context_lost_old: ptr to the SoC PRM context loss test fn
++ * @clear_context_loss_flags_old: ptr to the SoC PRM context loss flag clear fn
++ * @late_init: ptr to the late init function
 + *
-+ * Statically defined.  @clkdm is resolved from @clkdm_name@runtime and
-+ * should not be pre-initialized.
-+ *
-+ * XXX Should also include hardware (fixed) dependencies.
++ * XXX @was_any_context_lost_old and @clear_context_loss_flags_old are
++ * deprecated.
 + */
-+struct clkdm_dep {
-+	const char *clkdm_name;
-+	struct clockdomain *clkdm;
-+	s16 wkdep_usecount;
-+	s16 sleepdep_usecount;
++struct prm_ll_data {
++	u32 (*read_reset_sources)(void);
++	bool (*was_any_context_lost_old)(u8 part, s16 inst, u16 idx);
++	void (*clear_context_loss_flags_old)(u8 part, s16 inst, u16 idx);
++	int (*late_init)(void);
 +};
 +
-+/* Possible flags for struct clockdomain._flags */
-+#define _CLKDM_FLAG_HWSUP_ENABLED		BIT(0)
++int prm_register(struct prm_ll_data *pld);
++int prm_unregister(struct prm_ll_data *pld);
 +
-+struct omap_hwmod;
-+struct clk;
-+struct powerdomain;
++u32 prm_read_reset_sources(void);
++bool prm_was_any_context_lost_old(u8 part, s16 inst, u16 idx);
++void prm_clear_context_loss_flags_old(u8 part, s16 inst, u16 idx);
 +
-+/**
-+ * struct clockdomain - OMAP clockdomain
-+ * @name: clockdomain name
-+ * @pwrdm: powerdomain containing this clockdomain
-+ * @clktrctrl_reg: CLKSTCTRL reg for the given clock domain
-+ * @clktrctrl_mask: CLKTRCTRL/AUTOSTATE field mask in CM_CLKSTCTRL reg
-+ * @flags: Clockdomain capability flags
-+ * @_flags: Flags for use only by internal clockdomain code
-+ * @dep_bit: Bit shift of this clockdomain's PM_WKDEP/CM_SLEEPDEP bit
-+ * @prcm_partition: (OMAP4 only) PRCM partition ID for this clkdm's registers
-+ * @cm_inst: (OMAP4 only) CM instance register offset
-+ * @clkdm_offs: (OMAP4 only) CM clockdomain register offset
-+ * @wkdep_srcs: Clockdomains that can be told to wake this powerdomain up
-+ * @sleepdep_srcs: Clockdomains that can be told to keep this clkdm from inact
-+ * @usecount: Usecount tracking
-+ * @node: list_head to link all clockdomains together
-+ *
-+ * @prcm_partition should be a macro from mach-omap2/prcm44xx.h (OMAP4 only)
-+ * @cm_inst should be a macro ending in _INST from the OMAP4 CM instance
-+ *     definitions (OMAP4 only)
-+ * @clkdm_offs should be a macro ending in _CDOFFS from the OMAP4 CM instance
-+ *     definitions (OMAP4 only)
-+ */
-+struct clockdomain {
-+	const char *name;
-+	union {
-+		const char *name;
-+		struct powerdomain *ptr;
-+	} pwrdm;
-+	const u16 clktrctrl_mask;
-+	const u8 flags;
-+	u8 _flags;
-+	const u8 dep_bit;
-+	const u8 prcm_partition;
-+	const u16 cm_inst;
-+	const u16 clkdm_offs;
-+	struct clkdm_dep *wkdep_srcs;
-+	struct clkdm_dep *sleepdep_srcs;
-+	int usecount;
-+	struct list_head node;
-+};
++#endif
 +
-+/**
-+ * struct clkdm_ops - Arch specific function implementations
-+ * @clkdm_add_wkdep: Add a wakeup dependency between clk domains
-+ * @clkdm_del_wkdep: Delete a wakeup dependency between clk domains
-+ * @clkdm_read_wkdep: Read wakeup dependency state between clk domains
-+ * @clkdm_clear_all_wkdeps: Remove all wakeup dependencies from the clk domain
-+ * @clkdm_add_sleepdep: Add a sleep dependency between clk domains
-+ * @clkdm_del_sleepdep: Delete a sleep dependency between clk domains
-+ * @clkdm_read_sleepdep: Read sleep dependency state between clk domains
-+ * @clkdm_clear_all_sleepdeps: Remove all sleep dependencies from the clk domain
-+ * @clkdm_sleep: Force a clockdomain to sleep
-+ * @clkdm_wakeup: Force a clockdomain to wakeup
-+ * @clkdm_allow_idle: Enable hw supervised idle transitions for clock domain
-+ * @clkdm_deny_idle: Disable hw supervised idle transitions for clock domain
-+ * @clkdm_clk_enable: Put the clkdm in right state for a clock enable
-+ * @clkdm_clk_disable: Put the clkdm in right state for a clock disable
-+ */
-+struct clkdm_ops {
-+	int	(*clkdm_add_wkdep)(struct clockdomain *clkdm1,
-+				   struct clockdomain *clkdm2);
-+	int	(*clkdm_del_wkdep)(struct clockdomain *clkdm1,
-+				   struct clockdomain *clkdm2);
-+	int	(*clkdm_read_wkdep)(struct clockdomain *clkdm1,
-+				    struct clockdomain *clkdm2);
-+	int	(*clkdm_clear_all_wkdeps)(struct clockdomain *clkdm);
-+	int	(*clkdm_add_sleepdep)(struct clockdomain *clkdm1,
-+				      struct clockdomain *clkdm2);
-+	int	(*clkdm_del_sleepdep)(struct clockdomain *clkdm1,
-+				      struct clockdomain *clkdm2);
-+	int	(*clkdm_read_sleepdep)(struct clockdomain *clkdm1,
-+				       struct clockdomain *clkdm2);
-+	int	(*clkdm_clear_all_sleepdeps)(struct clockdomain *clkdm);
-+	int	(*clkdm_sleep)(struct clockdomain *clkdm);
-+	int	(*clkdm_wakeup)(struct clockdomain *clkdm);
-+	void	(*clkdm_allow_idle)(struct clockdomain *clkdm);
-+	void	(*clkdm_deny_idle)(struct clockdomain *clkdm);
-+	int	(*clkdm_clk_enable)(struct clockdomain *clkdm);
-+	int	(*clkdm_clk_disable)(struct clockdomain *clkdm);
-+};
-+
-+int clkdm_register_platform_funcs(struct clkdm_ops *co);
-+int clkdm_register_autodeps(struct clkdm_autodep *ia);
-+int clkdm_register_clkdms(struct clockdomain **c);
-+int clkdm_complete_init(void);
-+
-+struct clockdomain *clkdm_lookup(const char *name);
-+
-+int clkdm_for_each(int (*fn)(struct clockdomain *clkdm, void *user),
-+			void *user);
-+struct powerdomain *clkdm_get_pwrdm(struct clockdomain *clkdm);
-+
-+int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
-+int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
-+int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
-+int clkdm_clear_all_wkdeps(struct clockdomain *clkdm);
-+int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
-+int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
-+int clkdm_read_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
-+int clkdm_clear_all_sleepdeps(struct clockdomain *clkdm);
-+
-+void clkdm_allow_idle_nolock(struct clockdomain *clkdm);
-+void clkdm_allow_idle(struct clockdomain *clkdm);
-+void clkdm_deny_idle_nolock(struct clockdomain *clkdm);
-+void clkdm_deny_idle(struct clockdomain *clkdm);
-+bool clkdm_in_hwsup(struct clockdomain *clkdm);
-+bool clkdm_missing_idle_reporting(struct clockdomain *clkdm);
-+
-+int clkdm_wakeup_nolock(struct clockdomain *clkdm);
-+int clkdm_wakeup(struct clockdomain *clkdm);
-+int clkdm_sleep_nolock(struct clockdomain *clkdm);
-+int clkdm_sleep(struct clockdomain *clkdm);
-+
-+int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk);
-+int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk);
-+int clkdm_hwmod_enable(struct clockdomain *clkdm, struct omap_hwmod *oh);
-+int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh);
-+
-+void __init omap242x_clockdomains_init(void);
-+void __init omap243x_clockdomains_init(void);
-+void __init omap3xxx_clockdomains_init(void);
-+void __init am33xx_clockdomains_init(void);
-+void __init omap44xx_clockdomains_init(void);
-+void __init omap54xx_clockdomains_init(void);
-+void __init dra7xx_clockdomains_init(void);
-+void am43xx_clockdomains_init(void);
-+
-+void clkdm_add_autodeps(struct clockdomain *clkdm);
-+void clkdm_del_autodeps(struct clockdomain *clkdm);
-+
-+extern struct clkdm_ops omap2_clkdm_operations;
-+extern struct clkdm_ops omap3_clkdm_operations;
-+extern struct clkdm_ops omap4_clkdm_operations;
-+extern struct clkdm_ops am33xx_clkdm_operations;
-+extern struct clkdm_ops am43xx_clkdm_operations;
-+
-+extern struct clkdm_dep gfx_24xx_wkdeps[];
-+extern struct clkdm_dep dsp_24xx_wkdeps[];
-+extern struct clockdomain wkup_common_clkdm;
 +
 +#endif
 -- 
