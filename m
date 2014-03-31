@@ -1,65 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Mar 2014 10:22:09 +0200
-Subject: [PATCH 1/2] GPIO: Add driver for Zynq GPIO controller
-In-Reply-To: <CAFcVECJsEp_s2V5=oK_UJahGRUpWYWMCxTMxqdpX+O0qebP41A@mail.gmail.com>
-References: <1395933906-2268-1-git-send-email-harinik@xilinx.com>
- <CACRpkdbU35xG1QtagB+9e9vxvehf1UQFaF4PikJhsPNAMw=D1Q@mail.gmail.com>
- <CAFcVECJsEp_s2V5=oK_UJahGRUpWYWMCxTMxqdpX+O0qebP41A@mail.gmail.com>
-Message-ID: <CACRpkdZEFsJubRVwCp6nTie7s7+DZOym6SWsA2ZynN_devi-2Q@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Mon, 31 Mar 2014 10:28:46 +0200
+Subject: [[PATCH 62/75] ARM: l2c: sti: remove cache size override
+In-Reply-To: <E1WTYZL-0007H3-HP@rmk-PC.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYZL-0007H3-HP@rmk-PC.arm.linux.org.uk>
+Message-ID: <5339273E.4030605@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 29, 2014 at 5:44 AM, Harini Katakam
-<harinikatakamlinux@gmail.com> wrote:
-> On Sat, Mar 29, 2014 at 3:20 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Thu, Mar 27, 2014 at 4:25 PM, Harini Katakam <harinik@xilinx.com> wrote:
 
->>> +/* Read/Write access to the GPIO PS registers */
->>> +static inline u32 zynq_gpio_readreg(void __iomem *offset)
->>> +{
->>> +       return readl_relaxed(offset);
->>> +}
->>> +
->>> +static inline void zynq_gpio_writereg(void __iomem *offset, u32 val)
->>> +{
->>> +       writel_relaxed(val, offset);
->>> +}
->>
->> I think this is unnecessary and confusing indirection.
->> Just use the readl_relaxed/writel_relaxed functions directly in
->> the code.
->>
+
+On 03/28/2014 04:19 PM, Russell King wrote:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   arch/arm/mach-sti/board-dt.c | 12 +++---------
+>   1 file changed, 3 insertions(+), 9 deletions(-)
 >
-> This is just to be flexible.
-
-Define exactly what you mean with "flexible" in this context. I
-only see unnecessary overhead and hard-to-read code.
-
->> This is also pretty convoluted. Are you sure you don't want to
->> implement one gpiochip per bank instead? I guess the final "+1"
->> means there is actually one IRQ per bank even?
+> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+> index dc8669efc12d..cf716ae10726 100644
+> --- a/arch/arm/mach-sti/board-dt.c
+> +++ b/arch/arm/mach-sti/board-dt.c
+> @@ -16,15 +16,9 @@
 >
-> There is only one IRQ for all four banks.
+>   void __init stih41x_l2x0_init(void)
+>   {
+> -	u32 way_size = 0x4;
+> -	u32 aux_ctrl;
+> -	/* may be this can be encoded in macros like BIT*() */
+> -	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
+> -		   L310_AUX_CTRL_DATA_PREFETCH |
+> -		   L310_AUX_CTRL_INSTR_PREFETCH |
+> -		   L2C_AUX_CTRL_WAY_SIZE(way_size);
+> -
+> -	l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
+> +	l2x0_of_init(L2C_AUX_CTRL_SHARED_OVERRIDE |
+> +		     L310_AUX_CTRL_DATA_PREFETCH |
+> +		     L310_AUX_CTRL_INSTR_PREFETCH, 0xc00f0fff);
 
-OK I get it. Then it makes sense to have all banks registered as
-one device and the IRQ tied to this one device.
+As discussed last week, the STiH416 SoC has his way size value set to 0 
+at reset instead of 4.
 
->>> +static const struct dev_pm_ops zynq_gpio_dev_pm_ops = {
->>> +       SET_SYSTEM_SLEEP_PM_OPS(zynq_gpio_suspend, zynq_gpio_resume)
->>> +       SET_RUNTIME_PM_OPS(zynq_gpio_runtime_suspend, zynq_gpio_runtime_resume,
->>> +                          zynq_gpio_idle)
->>> +};
->>
->> Is this runtime PM implementation aligned with Ulf Hansson's recent
->> new helpers to simplify suspend+runtime PM coexistance?
->>
+I think this should be done by the bootloader instead of the Kernel.
+Sadly the bootloader don't set it for now, but I will request it to be 
+implemented.
+
+Regards,
+Maxime
+
+>   }
 >
-> I'm sorry i just looked at them -
-> pm_runtime_force_suspend/resume are not used here.
-
-Sorry, I was more thinking of change
-717e5d458e3bfca495a38dca61c64f274c049e46
-"PM / Runtime: Implement the pm_generic_runtime functions for CONFIG_PM"
-
-Yours,
-Linus Walleij
+>   static void __init stih41x_machine_init(void)
+>
