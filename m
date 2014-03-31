@@ -1,16 +1,17 @@
 From: tthayer@altera.com (tthayer at altera.com)
-Date: Mon, 31 Mar 2014 17:07:06 -0500
-Subject: [PATCH 1/2] dts: socfpga: Add bindings for Altera SoC SDRAM controller
+Date: Mon, 31 Mar 2014 17:07:07 -0500
+Subject: [PATCH 2/2] arm: socfpga: Add support for Altera SoC SDRAM controller
 In-Reply-To: <1396303627-29198-1-git-send-email-tthayer@altera.com>
 References: <1396303627-29198-1-git-send-email-tthayer@altera.com>
-Message-ID: <1396303627-29198-2-git-send-email-tthayer@altera.com>
+Message-ID: <1396303627-29198-3-git-send-email-tthayer@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@altera.com>
 
-Addition of the Altera SDRAM controller bindings and device
-tree changes to the Altera SoC project.
+Addition of the Altera SDRAM controller registers to the
+Altera SoC project. These registers are shared by future
+drivers such as ECC and the FPGA bridge.
 
 Signed-off-by: Thor Thayer <tthayer@altera.com>
 To: Rob Herring <rob.herring@calxeda.com>
@@ -26,46 +27,36 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- .../bindings/arm/altera/socfpga-sdram.txt          |   14 ++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
- 2 files changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+ arch/arm/mach-socfpga/socfpga.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-new file mode 100644
-index 0000000..351ab7b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-@@ -0,0 +1,14 @@
-+Altera SOCFPGA SDRAM Controller
-+
-+Required properties:
-+- compatible : "altr,sdr-ctl", "syscon";
-+                Note that syscon is invoked for this device to support the FPGA
-+		bridge driver and possibly other devices in the future.  See
-+		also Documentation/devicetree/bindings/mfd/syscon.txt
-+- reg : Should contain 1 register ranges(address and length)
-+
-+Example:
-+	sdrctl at 0xffc25000 {
-+		compatible = "altr,sdr-ctl", "syscon";
-+		reg = <0xffc25000 0x1000>;
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 9e78c1d..3634de7 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -528,6 +528,11 @@
- 			reg-io-width = <4>;
- 		};
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index 21d6026..d514e8a 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -32,6 +32,7 @@
+ void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
+ void __iomem *sys_manager_base_addr;
+ void __iomem *rst_manager_base_addr;
++void __iomem *sdr_ctl_base_addr;
+ void __iomem *clk_mgr_base_addr;
+ unsigned long cpu1start_addr;
  
-+		sdrctl at 0xffc25000 {
-+			compatible = "altr,sdr-ctl", "syscon";
-+			reg = <0xffc25000 0x1000>;
-+		};
+@@ -150,6 +151,15 @@ void __init socfpga_sysmgr_init(void)
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
+ 	clk_mgr_base_addr = of_iomap(np, 0);
 +
- 		rstmgr at ffd05000 {
- 			compatible = "altr,rst-mgr";
- 			reg = <0xffd05000 0x1000>;
++	np = of_find_compatible_node(NULL, NULL, "altr,sdr-ctl");
++	if (!np) {
++		pr_err("SOCFPGA: Unable to find sdr-ctl\n");
++		return;
++	}
++
++	sdr_ctl_base_addr = of_iomap(np, 0);
++	WARN_ON(!sdr_ctl_base_addr);
+ }
+ 
+ static void __init socfpga_init_irq(void)
 -- 
 1.7.9.5
