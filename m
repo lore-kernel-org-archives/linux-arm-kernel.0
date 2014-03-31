@@ -1,412 +1,59 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Mon, 31 Mar 2014 09:53:16 -0300
-Subject: [PATCH 1/4] pwm: Add Allwinner SoC support
-In-Reply-To: <1396267649-18009-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1396267649-18009-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5339653C.4090601@elopez.com.ar>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 31 Mar 2014 14:58:42 +0200
+Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
+In-Reply-To: <20140331124551.GF29871@arm.com>
+References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
+ <20140331113113.GE29871@arm.com> <20140331124551.GF29871@arm.com>
+Message-ID: <5809099.Oi9cSqsgql@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 31 March 2014 13:45:51 Catalin Marinas wrote:
+> On Mon, Mar 31, 2014 at 12:31:14PM +0100, Catalin Marinas wrote:
+> > On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
+> > > On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
+> > > > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
+> > > > space described in [1] due to one major issue + one minor issue.
+> > > > 
+> > > > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
+> > > > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
+> > > > kernel fails to create mapping for this region in map_mem function
+> > > > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
+> > > > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
+> [...]
+> > > a) always use a four-level page table in kernel space, regardless of
+> > > whether we do it in user space. We can move the kernel mappings down
+> > > in address space either by one 512GB entry to 0xffffff0000000000, or
+> > > to match the 64k-page location at 0xfffffc0000000000, or all the way
+> > > to to 0xfffc000000000000. In any case, we can have all the dynamic
+> > > mappings within one 512GB area and pretend we have a three-level
+> > > page table for them, while the rest of DRAM is mapped statically at
+> > > early boot time using 512GB large pages.
+> > 
+> > That's a workaround but we end up with two (or more) kernel pgds - one
+> > for vmalloc, ioremap etc. and another (static) one for the kernel linear
+> > mapping. So far there isn't any memory mapping carved out but we have to
+> > be careful in the future.
+> > 
+> > However, kernel page table walking would be a bit slower with 4-levels.
+> 
+> Yet another approach would be to enable 4-levels of page tables (no
+> nopud.h) in the kernel with pgd_offset_k doing the right thing for 4
+> levels but user space configured to 3-levels only and pgd_offset
+> returning 0 while pud_offset does what pgd_offset currently implements
+> for 3 levels.
 
-I had a quick look and spotted a couple of things here, see inline.
+Either I was unclear earlier, or I misunderstand what you are saying
+here. How is that different from what I wrote above?
 
-El 31/03/14 09:07, Alexandre Belloni escribi?:
-> This adds a generic PWM framework driver for the PWM controller
-> found on Allwinner SoCs.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->   drivers/pwm/Kconfig     |   9 ++
->   drivers/pwm/Makefile    |   1 +
->   drivers/pwm/pwm-sunxi.c | 325 ++++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 335 insertions(+)
->   create mode 100644 drivers/pwm/pwm-sunxi.c
->
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 22f2f2857b82..f7381def0fd2 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -187,6 +187,15 @@ config PWM_SPEAR
->   	  To compile this driver as a module, choose M here: the module
->   	  will be called pwm-spear.
->
-> +config PWM_SUNXI
-> +	tristate "Allwinner PWM support"
-> +	depends on ARCH_SUNXI
-> +	help
-> +	  Generic PWM framework driver for Allwinner SoCs.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-sunxi.
-> +
->   config PWM_TEGRA
->   	tristate "NVIDIA Tegra PWM support"
->   	depends on ARCH_TEGRA
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index d8906ec69976..e110259b6c03 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
->   obj-$(CONFIG_PWM_RENESAS_TPU)	+= pwm-renesas-tpu.o
->   obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
->   obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
-> +obj-$(CONFIG_PWM_SUNXI)		+= pwm-sunxi.o
->   obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
->   obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
->   obj-$(CONFIG_PWM_TIEHRPWM)	+= pwm-tiehrpwm.o
-> diff --git a/drivers/pwm/pwm-sunxi.c b/drivers/pwm/pwm-sunxi.c
-> new file mode 100644
-> index 000000000000..be39abee0a24
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-sunxi.c
-> @@ -0,0 +1,325 @@
-> +/*
-> + * Driver for Allwinner Pulse Width Modulation Controller
-> + *
-> + * Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> + *
-> + * Licensed under GPLv2.
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pwm.h>
-> +#include <linux/slab.h>
-> +
-> +#define PWM_CTRL_REG		0x0
-> +
-> +#define PWM_CH_PRD_BASE		0x4
-> +#define PWM_CH_PRD_OFF		0x4
-> +#define PWM_CH_PRD(x)		(PWM_CH_PRD_BASE + PWM_CH_PRD_OFF * x)
-> +
-> +#define	PWMCH_OFFSET		15
-> +#define PWM_PRESCAL_MASK	(BIT(0)|BIT(1)|BIT(2)|BIT(3))
+> This solves the page table walk latency for user but not for kernel.
+> Anyway, if the hardware memory map is so sparse (a real SoC, not the
+> spec), I don't think we have other ways to support it with 3-levels of
+> page table for the kernel, unless we hack __virt_to_phys/__phys_to_virt.
 
-0xF looks better in my opinion
+Right. I also wonder if the SoCs are configurable with the way they
+map the memory, they might just be able to do something smarter than
+what the document says and map the >2GB memory contiguously starting at
+0x08.8000.0000.
 
-> +#define PWM_PRESCAL_OFF		0
-> +#define PWM_EN			BIT(4)
-> +#define PWM_ACT_STATE		BIT(5)
-> +#define PWM_CLK_GATING		BIT(6)
-> +#define PWM_MODE		BIT(7)
-> +#define PWM_PULSE		BIT(8)
-> +#define PWM_BYPASS		BIT(9)
-> +
-> +#define PWM_RDY_BASE		28
-> +#define PWM_RDY_OFF		1
-> +#define PWM_RDY(x)		BIT(PWM_RDY_BASE + PWM_RDY_OFF * x)
-> +
-> +#define PWM_PRD_ACT_MASK	0xFF
-> +#define PWM_PRD(x)		(x << 16)
-> +#define PWM_PRD_MASK		0xFF
-> +
-> +#define	BIT_CH(bit, chan)	(bit << (chan * PWMCH_OFFSET))
-> +
-> +u32 prescal_table[] = { 120, 180, 240, 360, 480, 0, 0, 0,
-> +			12000, 24000, 36000, 48000, 72000,
-> +			0, 0, 1 };
-> +
-> +struct sunxi_pwm_data {
-> +	bool has_rdy;
-> +};
-> +
-> +struct sunxi_pwm_chip {
-> +	struct pwm_chip chip;
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +	const struct sunxi_pwm_data *data;
-> +};
-> +
-> +#define to_sunxi_pwm_chip(chip) container_of(chip, struct sunxi_pwm_chip, chip)
-> +
-> +static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
-> +				  unsigned long offset)
-> +{
-> +	return readl_relaxed(chip->base + offset);
-> +}
-> +
-> +static inline void sunxi_pwm_writel(struct sunxi_pwm_chip *chip,
-> +				    unsigned long offset, unsigned long val)
-> +{
-> +	writel_relaxed(val, chip->base + offset);
-> +}
-> +
-> +static int sunxi_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +			    int duty_ns, int period_ns)
-> +{
-> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-> +	u32 clk_rate, prd, dty;
-> +	u64 div;
-> +	u32 val, clk_gate;
-> +	int i, ret;
-> +
-> +	clk_rate = clk_get_rate(sunxi_pwm->clk);
-> +
-> +
-> +	/* First, test without any divider */
-> +	i = PWM_PRESCAL_MASK;
-> +	div = clk_rate * period_ns;
-> +	do_div(div, 1000000000);
-> +	if (div > PWM_PRD_MASK) {
-> +		/* Then go up from the first divider */
-> +		for (i = 0; i < PWM_PRESCAL_MASK; i++) {
-> +			if (!prescal_table[i])
-> +				continue;
-> +			div = clk_rate / prescal_table[i];
-> +			div = div * period_ns;
-> +			do_div(div, 1000000000);
-> +			if (div <= PWM_PRD_MASK)
-> +				break;
-> +		}
-> +	}
-> +
-> +	if (div > PWM_PRD_MASK) {
-> +		dev_err(chip->dev, "prescaler exceeds the maximum value\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	prd = div;
-> +	div *= duty_ns;
-> +	do_div(div, period_ns);
-> +	dty = div;
-> +
-> +	ret = clk_enable(sunxi_pwm->clk);
-> +	if (ret) {
-> +		dev_err(chip->dev, "failed to enable PWM clock\n");
-> +		return ret;
-> +	}
-> +
-> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-> +
-> +	if (sunxi_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm)))
-> +		return -EBUSY;
-> +
-> +	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> +	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-> +
-> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-> +	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
-> +	val |= i;
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-> +
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CH_PRD(pwm->hwpwm), dty | PWM_PRD(prd));
-> +
-> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-> +	val |= clk_gate;
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-> +
-> +	clk_disable(sunxi_pwm->clk);
-> +	return ret;
-> +}
-> +
-> +static int sunxi_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-> +				  enum pwm_polarity polarity)
-> +{
-> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-> +	u32 val;
-> +	int ret;
-> +
-> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-> +
-> +	if (polarity != PWM_POLARITY_NORMAL)
-> +		val &= ~BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
-> +	else
-> +		val |= BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
-> +
-> +	ret = clk_enable(sunxi_pwm->clk);
-> +	if (ret) {
-> +		dev_err(chip->dev, "failed to enable PWM clock\n");
-> +		return ret;
-> +	}
-> +
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-> +
-> +	clk_disable(sunxi_pwm->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-> +	u32 val;
-> +	int ret;
-> +
-> +	ret = clk_enable(sunxi_pwm->clk);
-> +	if (ret) {
-> +		dev_err(chip->dev, "failed to enable PWM clock\n");
-> +		return ret;
-> +	}
-> +
-> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-> +	val |= BIT_CH(PWM_EN, pwm->hwpwm);
-> +	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-> +
-> +	return 0;
-> +}
-> +
-> +static void sunxi_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-> +{
-> +	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-> +	u32 val;
-> +
-> +	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-> +	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
-> +	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-> +
-> +	clk_disable(sunxi_pwm->clk);
-> +}
-> +
-> +static const struct pwm_ops sunxi_pwm_ops = {
-> +	.config = sunxi_pwm_config,
-> +	.set_polarity = sunxi_pwm_set_polarity,
-> +	.enable = sunxi_pwm_enable,
-> +	.disable = sunxi_pwm_disable,
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +static const struct sunxi_pwm_data sunxi_pwm_data_v1 = {
-> +	.has_rdy = false,
-> +};
-> +
-> +static const struct sunxi_pwm_data sunxi_pwm_data_v2 = {
-> +	.has_rdy = true,
-> +};
-
-Is there any special reason why you used v1 and v2?
-
-> +static const struct of_device_id sunxi_pwm_dt_ids[] = {
-> +	{
-> +		.compatible = "allwinner,sun4i-pwm",
-> +		.data = &sunxi_pwm_data_v1,
-> +	}, {
-> +		.compatible = "allwinner,sun7i-pwm",
-> +		.data = &sunxi_pwm_data_v2,
-
-Please adjust your compatibles to also indicate SoC, as on all of the 
-other devices:
-
-allwinner,sun4i-a10-pwm
-allwinner,sun7i-a20-pwm
-
-> +	}, {
-> +		/* sentinel */
-> +	},
-> +};
-> +MODULE_DEVICE_TABLE(of, sunxi_pwm_dt_ids);
-> +
-> +static int sunxi_pwm_probe(struct platform_device *pdev)
-> +{
-> +	struct sunxi_pwm_chip *sunxi_pwm;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	const struct of_device_id *match;
-> +
-> +	match = of_match_device(sunxi_pwm_dt_ids, &pdev->dev);
-> +	if (!match || !match->data)
-> +		return -ENODEV;
-> +
-> +	sunxi_pwm = devm_kzalloc(&pdev->dev, sizeof(*sunxi_pwm), GFP_KERNEL);
-> +	if (!sunxi_pwm)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	sunxi_pwm->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(sunxi_pwm->base))
-> +		return PTR_ERR(sunxi_pwm->base);
-> +
-> +	sunxi_pwm->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(sunxi_pwm->clk))
-> +		return PTR_ERR(sunxi_pwm->clk);
-> +
-> +	ret = clk_prepare(sunxi_pwm->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to prepare PWM clock\n");
-> +		return ret;
-> +	}
-> +
-> +	sunxi_pwm->chip.dev = &pdev->dev;
-> +	sunxi_pwm->chip.ops = &sunxi_pwm_ops;
-> +
-> +	if (pdev->dev.of_node) {
-> +		sunxi_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-> +		sunxi_pwm->chip.of_pwm_n_cells = 3;
-> +	}
-> +
-> +	sunxi_pwm->chip.base = -1;
-> +	sunxi_pwm->chip.npwm = 2;
-> +	sunxi_pwm->data = match->data;
-> +
-> +	/* By default, the polarity is inversed, set it to normal */
-
-This comment seems to be misplaced
-
-> +	ret = clk_enable(sunxi_pwm->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable PWM clock\n");
-> +		goto unprepare_clk;
-> +	}
-> +	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG,
-> +			 BIT_CH(PWM_ACT_STATE, 0) |
-> +			 BIT_CH(PWM_ACT_STATE, 1));
-> +	clk_disable(sunxi_pwm->clk);
-> +
-> +	ret = pwmchip_add(&sunxi_pwm->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
-> +		goto unprepare_clk;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, sunxi_pwm);
-> +
-> +
-> +	return ret;
-> +
-> +unprepare_clk:
-> +	clk_unprepare(sunxi_pwm->clk);
-> +	return ret;
-> +}
-> +
-> +static int sunxi_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct sunxi_pwm_chip *sunxi_pwm = platform_get_drvdata(pdev);
-> +
-> +	clk_unprepare(sunxi_pwm->clk);
-> +
-> +	return pwmchip_remove(&sunxi_pwm->chip);
-> +}
-> +
-> +static struct platform_driver sunxi_pwm_driver = {
-> +	.driver = {
-> +		.name = "sunxi-pwm",
-> +		.of_match_table = of_match_ptr(sunxi_pwm_dt_ids),
-> +	},
-> +	.probe = sunxi_pwm_probe,
-> +	.remove = sunxi_pwm_remove,
-> +};
-> +module_platform_driver(sunxi_pwm_driver);
-> +
-> +MODULE_ALIAS("platform:sunxi-pwm");
-> +MODULE_AUTHOR("alexandre Belloni <alexandre.belloni@free-electrons.com>");
-
-You may want to make that a capital A.
-
-> +MODULE_DESCRIPTION("Allwinner PWM driver");
-> +MODULE_LICENSE("GPL v2");
->
-
-Thanks for working on this!
-
-Emilio
+	Arnd
