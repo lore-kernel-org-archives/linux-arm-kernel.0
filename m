@@ -1,77 +1,44 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 31 Mar 2014 18:04:54 +0100
-Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
-References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
- <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <5339A036.6090703@codethink.co.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 31 Mar 2014 10:05:15 -0700
+Subject: [PATCH] clk: reverse default clk provider initialization order in
+ of_clk_init()
+In-Reply-To: <7h1txi76rh.fsf@paris.lan>
+References: <1395917012-23483-1-git-send-email-s.nawrocki@samsung.com>
+ <20140329084147.5762.51815@quantum> <7h1txi76rh.fsf@paris.lan>
+Message-ID: <20140331170515.5762.3498@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/14 17:41, Sylwester Nawrocki wrote:
-> This function adds a helper function to configure clock parents and rates
-> as specified in clock-parents, clock-rates DT properties for a consumer
-> device and a call to it before driver is bound to a device.
+Quoting Kevin Hilman (2014-03-31 08:00:18)
+> Mike Turquette <mturquette@linaro.org> writes:
+> 
+> > Quoting Sylwester Nawrocki (2014-03-27 03:43:32)
+> >> This restores the default clocks registration order as parsed from
+> >> devicetree, i.e. as before commit 1771b10d605d26ccee771a7fb4b08718
+> >> "clk: respect the clock dependencies in of_clk_init", for when there
+> >> is no explicit parent clock dependencies between clock providers
+> >> specified in the device tree.
+> >> 
+> >> It prevents regressions (boot failure, division by 0 errors) on
+> >> imx and exynos platforms.
+> >> 
+> >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >
+> > I pulled this into clk-next but it didn't seem to get picked up by
+> > linux-next in time for today's build. Let's test the next linux-next to
+> > insure that the regressions are gone. If not then I'll likely need to
+> > drop "clk: respect the clock dependencies in of_clk_init" from clk-next
+> > for 3.15.
+> 
+> It looks like all the boot failures caused by this problem are gone as
+> of next-20140331[1], so it looks good to me.
 
-[snip]
+Great, thanks for testing and letting us know!
 
-tree/bindings/clock/clock-bindings.txt 
-b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> index 700e7aa..59fbb4e 100644
-> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -132,3 +132,45 @@ clock signal, and a UART.
->     ("pll" and "pll-switched").
->   * The UART has its baud clock connected the external oscillator and its
->     register clock connected to the PLL clock (the "pll-switched" signal)
-> +
-> +==Assigned clock parents and rates==
-> +
-> +Some platforms require static initial configuration of parts of the clocks
-> +controller. Such a configuration can be specified in a clock consumer node
-> +through clock-parents and clock-rates DT properties. The former should
-> +contain a list of parent clocks in form of phandle and clock specifier pairs,
-> +the latter the list of assigned clock frequency values (one cell each).
-> +
-> +    uart at a000 {
-> +        compatible = "fsl,imx-uart";
-> +        reg = <0xa000 0x1000>;
-> +        ...
-> +        clocks = <&clkcon 0>, <&clkcon 3>;
-> +        clock-names = "baud", "mux";
-> +
-> +        clock-parents = <0>, <&pll 1>;
-> +        clock-rates = <460800>;
-> +    };
-> +
-> +In this example the pll is set as parent of "mux" clock and frequency of "baud"
-> +clock is specified as 460800 Hz.
-> +
-> +Configuring a clock parent and rate through the device node that uses
-> +the clock can be done only for clocks that have a single user. Specifying
-> +conflicting parent or rate configuration in multiple consumer nodes for
-> +a shared clock is forbidden.
-> +
-> +Configuration of common clocks, which affect multiple consumer devices
-> +can be specified in a dedicated 'assigned-clocks' subnode of a clock
-> +provider node, e.g.:
-> +
-> +    clkcon {
-> +        ...
-> +        #clock-cells = <1>;
-> +
-> +        assigned-clocks {
-> +            clocks = <&clkcon 16>, <&clkcon 17>;
-> +            clock-parents = <0>, <&clkcon 1>;
-> +            clock-rates = <200000>;
-> +        };
-> +    };
+Regards,
+Mike
 
-How do you support not-setting a rate for a clock?
-
-[snip code]
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> 
+> Kevin
+> 
+> [1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-March/002988.html
