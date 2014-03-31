@@ -1,36 +1,35 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 31 Mar 2014 14:07:29 +0200
-Subject: [PATCH 4/4] ARM: sunxi: dt: Add PWM support for the cubietruck
-In-Reply-To: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1396267649-18009-5-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 31 Mar 2014 14:07:25 +0200
+Subject: [PATCH 0/4] Add Allwinner SoCs PWM support
+Message-ID: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the PWM for both PWM channels on the cubietruck. They can be found on
-connector CN8.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+This patch set adds support for the PWM controller found on the Allwinner SoCs.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index f9dcb61a5305..b6843839b380 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -28,6 +28,12 @@
- 			};
- 		};
- 
-+		pwm: pwm at 01c20e00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pwm0_pins_a>, <&pwm1_pins_a>;
-+			status = "okay";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
+The first patch adds the driver itself.
+The second patch adds the DT binding documentation
+The third patch adds the bindings to the sun7i-a20 DTS include.
+And finally, the la patch adds support for the PWMs to the cubietruck which is
+the board I used to test.
+
+Alexandre Belloni (4):
+  pwm: Add Allwinner SoC support
+  pwm: sunxi: document OF bindings
+  ARM: sun7i: dt: add PWM support
+  ARM: sunxi: dt: Add PWM support for the cubietruck
+
+ .../devicetree/bindings/pwm/pwm-sunxi.txt          |  19 ++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  22 ++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-sunxi.c                            | 325 +++++++++++++++++++++
+ 6 files changed, 382 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+ create mode 100644 drivers/pwm/pwm-sunxi.c
+
 -- 
 1.8.3.2
