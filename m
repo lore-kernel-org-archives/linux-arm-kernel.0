@@ -1,32 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Mar 2014 08:58:30 +0200
-Subject: [PATCH] gpio: unmap gpio irqs properly
-In-Reply-To: <CAAVeFu+Z33toX=ye7yncE+HhsymKO114QtD_OZsACDQdm69N=g@mail.gmail.com>
-References: <1396035858-23758-1-git-send-email-linus.walleij@linaro.org>
- <CAAVeFu+Z33toX=ye7yncE+HhsymKO114QtD_OZsACDQdm69N=g@mail.gmail.com>
-Message-ID: <CACRpkdZ9=tUg62Au3MNyamT4QgYzFDsA11_o_0VADa=4to0=Zw@mail.gmail.com>
+Date: Mon, 31 Mar 2014 08:59:29 +0200
+Subject: [PATCH 57/75] ARM: l2c: nomadik: remove cache size override
+In-Reply-To: <E1WTYYv-0007Gi-W0@rmk-PC.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYYv-0007Gi-W0@rmk-PC.arm.linux.org.uk>
+Message-ID: <CACRpkdYH8jRVW3msLEzbCO4ymKadEKmDriPVZpuN6saKEqc0og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 29, 2014 at 5:27 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Sat, Mar 29, 2014 at 4:44 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, Mar 28, 2014 at 4:19 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
 
->> +static void gpiochip_irq_unmap(struct irq_domain *d, unsigned int irq)
->> +{
->> +#ifdef CONFIG_ARM
->> +       set_irq_flags(irq, 0);
->> +#endif
->
-> Just curious here, why is a special case needed for ARM? I would not
-> expect architecture-specific code on gpiolib, but I'm sure you have
-> your reasons for that.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This is open-coded like this in all ARM-applicable drivers so I'm
-just refactoring really.
-
-I don't really know why but I was under the impression that this
-ARM-specific function exists because the IRQ implementations in
-the different archs have never really converged.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
