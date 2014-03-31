@@ -1,99 +1,38 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 31 Mar 2014 12:52:15 +0200
-Subject: [PATCH 2/8] PCI: designware: split Exynos and i.MX bindings
-In-Reply-To: <1396262281.5533.21.camel@weser.hi.pengutronix.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <201403311136.49280.marex@denx.de>
- <1396262281.5533.21.camel@weser.hi.pengutronix.de>
-Message-ID: <201403311252.16096.marex@denx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Mar 2014 11:55:49 +0100
+Subject: [PATCH 58/75] ARM: l2c: omap2: remove cache size override
+In-Reply-To: <20140328222159.GB30388@atomide.com>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYZ1-0007Gn-3J@rmk-PC.arm.linux.org.uk>
+ <20140328160358.GG24308@atomide.com>
+ <20140328210945.GU7528@n2100.arm.linux.org.uk>
+ <20140328222159.GB30388@atomide.com>
+Message-ID: <20140331105549.GF27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 31, 2014 at 12:38:01 PM, Lucas Stach wrote:
-> Am Montag, den 31.03.2014, 11:36 +0200 schrieb Marek Vasut:
-> > On Monday, March 31, 2014 at 11:28:29 AM, Lucas Stach wrote:
-> > > Am Sonntag, den 30.03.2014, 19:36 +0200 schrieb Marek Vasut:
-> > > > On Friday, March 28, 2014 at 05:52:53 PM, Lucas Stach wrote:
-> > > > > The glue around the core designware IP is significantly
-> > > > > different between the Exynos and i.MX implementation,
-> > > > > which is reflected in the DT bindings.
-> > > > > 
-> > > > > This changes the i.MX6 binding to reuse as much as
-> > > > > possible from the common designware binding and
-> > > > > removes old cruft.
-> > > > > 
-> > > > > I removed the optional GPIOs with the following reasoning:
-> > > > > - disable-gpio: endpoint specific GPIO, not currently
-> > > > > 
-> > > > >   wired up in any code. Should be handled by the PCI device
-> > > > >   driver, not the host controller driver.
-> > > > > 
-> > > > > - wake-up-gpio: same as above.
-> > > > > - power-on-gpio: No user in any upstream DT. This should
-> > > > > 
-> > > > >   be handled by a regulator which shouldn't be controlled
-> > > > >   by the host driver, but rather by the PCI device driver.
-> > > > 
-> > > > This power-on-gpio should indeed be handled by the regulator, but the
-> > > > regulator cannot be handled by the PCIe device driver. This
-> > > > power-on-gpio must be operated on per-slot basis if I understand it
-> > > > correctly, so it cannot be controlled by the host controller driver
-> > > > either.
-> > > > 
-> > > > The reason why this cannot be controlled by the device driver is that
-> > > > if the device is powered down, it won't be detected on the PCIe bus,
-> > > > thus it cannot enable the regulator which will power up the slot the
-> > > > device is sitting in.
+On Fri, Mar 28, 2014 at 03:21:59PM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [140328 14:13]:
+> > On Fri, Mar 28, 2014 at 09:03:59AM -0700, Tony Lindgren wrote:
+> > > * Russell King <rmk+kernel@arm.linux.org.uk> [140328 08:22]:
 > > > 
-> > > So we are on the same page with regard to a GPIO being the wrong
-> > > abstraction for this, I think.
+> > > Missing description?
 > > 
-> > Yes.
+> > No, I just got sick and tired of trying to write descriptions for these
+> > patches.  Many of these I regard as totally unnecessary patches that
+> > should never have been required had platform folk not invested in
+> > cargo cult programming.
 > > 
-> > > For the regulator part I would argue that PCI is a bus that is built
-> > > around the ability to inspect the bus and detect devices on the bus at
-> > > probe time, so any regulator that's powering a PCI device should be
-> > > boot-on.
-> > 
-> > This thing about regulator being boot-on should really be documented.
-> > 
-> > Moreover, I think it's a waste of power to keep the devices ON on boot
-> > even if the PCIe bus was not started (yet). The bus might not be started
-> > at all and the regulators would still be ON, which would be quite a
-> > waste.
+> > Given the number of patches I'm presently dealing with in my tree right
+> > now, I don't actually have time to even follow the mailing lists at the
+> > moment.  If I were to properly describe all of these patches, I'd
+> > probably be at this for another few weeks.
 > 
-> It's the exact same behavior that you get on x86: all devices are
-> powered after boot, once you loaded a device driver it may choose to
-> turn the device off. I don't think it makes sense to deviate here for
-> the sake of being embedded and special.
-> 
-> > > Only after the device driver is loaded it should be able to fetch the
-> > > regulator to power down/up the device as it wishes. In the x86 world
-> > > this is AFAIK done using ACPI methods.
-> > > 
-> > > I think the host controller driver has no business in controlling the
-> > > device power, more so as there possibly could be a lot of devices on
-> > > the bus even with a single host lane.
-> > 
-> > The power should be controlled per-slot, but I don't know how to model
-> > that. Note that there might be a PCIe device with a switch popped into a
-> > single slot, which makes things much more interesting. In such case, you
-> > need to power up the slot and neither of the downstream devices should
-> > control the power regulator of that slot.
-> 
-> We could just add the regulator to the PCI hierarchy in the DT and
-> handle it similar to IRQs where we just walk up the DT starting from the
-> device until we find the matching IRQ/regulator.
-> 
-> Still for this to work with a regulator shared between several devices,
-> all the device drivers have to be aware of the regulator. Otherwise a
-> single device may choose to power down and erroneously cut power to a
-> sibling device, where the driver hasn't requested the regulator.
-> 
-> In all those scenarios the host controller driver still would not have
-> any business dealing with the regulator. Same situation as with the
-> legacy IRQs, that aren't handled by the host driver, but just routed to
-> the right instance through the DT.
+> Heh well I have a feeling you'll add some generic description anyways :)
 
-OK, it all makes sense. What I find a bit unfortunate is that we loose the Plug-
-n-Play nature of the PCIe here, but I guess that cannot be helped.
+If I end up merging each of these patches removingthe cache override
+together into one commit touching many of the SoCs, then yes.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
