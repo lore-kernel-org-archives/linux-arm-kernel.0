@@ -1,43 +1,50 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon, 31 Mar 2014 13:23:42 -0500
-Subject: [PATCH] Input: pmic8xxx-pwrkey - Set sane default for debounce
- time
-In-Reply-To: <1396289664-31893-1-git-send-email-sboyd@codeaurora.org>
-References: <1396289664-31893-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140331182342.GD28265@joshc.qualcomm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 31 Mar 2014 21:59:38 +0400
+Subject: [PATCH] pata_at91: fix ata_host_activate() failure handling
+In-Reply-To: <3354637.ASvWtLs5Rq@amdc1032>
+References: <3354637.ASvWtLs5Rq@amdc1032>
+Message-ID: <5339AD0A.6050404@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 11:14:24AM -0700, Stephen Boyd wrote:
-> If the debounce time is 0 our usage of ilog2() later on in this
-> driver will cause undefined behavior. If CONFIG_OF=n this fact is
-> evident to the compiler, and it emits a call to ____ilog2_NaN()
-> which doesn't exist. Fix this by setting a sane default for
-> debounce.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Hello.
+
+On 03/31/2014 09:51 PM, Bartlomiej Zolnierkiewicz wrote:
+
+> Add missing clk_put() call to ata_host_activate() failure path.
+
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > ---
->  drivers/input/misc/pmic8xxx-pwrkey.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
-> index 1cb8fda7a166..27add04676e1 100644
-> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
-> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-> @@ -92,7 +92,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
->  	bool pull_up;
->  
->  	if (of_property_read_u32(pdev->dev.of_node, "debounce", &kpd_delay))
-> -		kpd_delay = 0;
-> +		kpd_delay = 15625;
+>   drivers/ata/pata_at91.c |   11 ++++++-----
+>   1 file changed, 6 insertions(+), 5 deletions(-)
 
-Should "debounce" even be optional?  I'm wondering if we should just
-make it required...
+> Index: b/drivers/ata/pata_at91.c
+> ===================================================================
+> --- a/drivers/ata/pata_at91.c	2014-03-14 16:45:04.196724381 +0100
+> +++ b/drivers/ata/pata_at91.c	2014-03-31 17:46:40.127677782 +0200
+> @@ -407,12 +407,13 @@ static int pata_at91_probe(struct platfo
+>
+>   	host->private_data = info;
+>
+> -	return ata_host_activate(host, gpio_is_valid(irq) ? gpio_to_irq(irq) : 0,
+> -			gpio_is_valid(irq) ? ata_sff_interrupt : NULL,
+> -			irq_flags, &pata_at91_sht);
+> +	ret = ata_host_activate(host, gpio_is_valid(irq) ? gpio_to_irq(irq) : 0,
+> +				gpio_is_valid(irq) ? ata_sff_interrupt : NULL,
+> +				irq_flags, &pata_at91_sht);
+> +	if (ret)
+> +		goto err_put;
+>
+> -	if (!ret)
+> -		return 0;
+> +	return 0;
 
-At the very least this default value should be documented in the DT
-binding.
+    Hm, I have once fixed that (see that *if* (!ret)) but looks like a later 
+commit 477c87e90853d136b188c50c0e4a93d01cad872e (ARM: at91/pata: use 
+gpio_is_valid to check the gpio) broke it again. :-( Would be good if the 
+changelog did mention that...
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+MBR, Sergei
