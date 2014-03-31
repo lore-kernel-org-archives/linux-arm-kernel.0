@@ -1,46 +1,42 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 31 Mar 2014 11:23:15 -0700
-Subject: [PATCH] Input: pmic8xxx-pwrkey - Set sane default for debounce
- time
-In-Reply-To: <1396289664-31893-1-git-send-email-sboyd@codeaurora.org>
-References: <1396289664-31893-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140331182315.GA9198@core.coreip.homeip.net>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 31 Mar 2014 19:25:34 +0100
+Subject: [Linaro-acpi] [PATCH v4 1/3] PSCI: Add initial support for
+ PSCIv0.2 functions
+In-Reply-To: <CAJ5Y-eafEJz487nwg6MRPqL=E3a1gVvWH8yGqYrP+ZqqO-pW9Q@mail.gmail.com>
+References: <1396278179-28181-1-git-send-email-ashwin.chaugule@linaro.org>	<1396278179-28181-2-git-send-email-ashwin.chaugule@linaro.org>	<53399D62.5060704@arm.com>	<CAJ5Y-eaC81rqOewzVDEZm=wHbLNWBh32RrLq4nFVa5yHJTT6pQ@mail.gmail.com>
+ <CAJ5Y-eafEJz487nwg6MRPqL=E3a1gVvWH8yGqYrP+ZqqO-pW9Q@mail.gmail.com>
+Message-ID: <5339B31E.5090406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 11:14:24AM -0700, Stephen Boyd wrote:
-> If the debounce time is 0 our usage of ilog2() later on in this
-> driver will cause undefined behavior. If CONFIG_OF=n this fact is
-> evident to the compiler, and it emits a call to ____ilog2_NaN()
-> which doesn't exist. Fix this by setting a sane default for
-> debounce.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/input/misc/pmic8xxx-pwrkey.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
-> index 1cb8fda7a166..27add04676e1 100644
-> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
-> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-> @@ -92,7 +92,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
->  	bool pull_up;
->  
->  	if (of_property_read_u32(pdev->dev.of_node, "debounce", &kpd_delay))
-> -		kpd_delay = 0;
-> +		kpd_delay = 15625;
+Hi Ashwin,
 
-What if somebody supplied 0 via DT? Can we check and return -EINVAL?
-
->  
->  	pull_up = of_property_read_bool(pdev->dev.of_node, "pull-up");
->  
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+On 31/03/14 18:25, Ashwin Chaugule wrote:
+> On 31 March 2014 13:09, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
+>> Hi Sudeep,
+>>
+>> On 31 March 2014 12:52, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>>> +       if (ver == PSCI_RET_EOPNOTSUPP) {
+>>>> +               pr_info("PSCI_ID_VERSION Function not supported in firmware.\n");
+>>>
+>>> IMO you should stop here as the implementation conforming to the specification
+>>> must return a minor version number of 2 and major version number of 0. You
+>>> can't proceed, assume ids and use them.
+>>>
+>>
+>> hm, you're right, I missed that.
+> 
+> Something like this?
+> 
+> if (ver == PSCI_RET_EOPNOTSUPP) {
+>          /* PSCI v0.2+ mandates implementation of PSCI_ID_VERSION. */
+>          pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
+>          err = -EOPNOTSUPP;
+>          goto out_put_node;
 > 
 
--- 
-Dmitry
+Yes that looks fine to me.
+
+Regards,
+Sudeep
