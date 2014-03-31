@@ -1,37 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 31 Mar 2014 17:18:10 +0200
-Subject: [PATCH V2 09/19] ARM: nomadik: Convert to the common mmc DT bindings
- for highspeed mode
-In-Reply-To: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
-References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1396279100-2920-10-git-send-email-ulf.hansson@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 31 Mar 2014 18:16:32 +0300
+Subject: [PATCH 53/55] ARM: OMAP4: CM: remove unnecessary cm*_44xx.h header
+ files from core code
+In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-54-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmci host driver supports the common mmc DT parser, which enables
-us to use the use common names instead.
+These are not needed for anything.
 
-Cc: Alessandro Rubini <rubini@unipv.it>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/cm44xx.c     |    2 --
+ arch/arm/mach-omap2/cminst44xx.c |    2 --
+ 2 files changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 5acc044..d316c95 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -840,8 +840,8 @@
- 			interrupts = <22>;
- 			max-frequency = <48000000>;
- 			bus-width = <4>;
--			mmc-cap-mmc-highspeed;
--			mmc-cap-sd-highspeed;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 			cd-gpios = <&gpio3 15 0x1>;
- 			cd-inverted;
- 			pinctrl-names = "default";
+diff --git a/arch/arm/mach-omap2/cm44xx.c b/arch/arm/mach-omap2/cm44xx.c
+index 506974b..14d8256 100644
+--- a/arch/arm/mach-omap2/cm44xx.c
++++ b/arch/arm/mach-omap2/cm44xx.c
+@@ -19,8 +19,6 @@
+ #include <linux/io.h>
+ 
+ #include <linux/power/omap/cm.h>
+-#include "cm1_44xx.h"
+-#include "cm2_44xx.h"
+ 
+ /* CM1 hardware module low-level functions */
+ 
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 13c4e0b..3d0b8ae 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -24,8 +24,6 @@
+ #include <linux/power/omap/prm.h>
+ #include <linux/power/omap/clockdomain.h>
+ #include <linux/power/omap/cm.h>
+-#include "cm1_44xx.h"
+-#include "cm2_44xx.h"
+ #include <linux/power/omap/cm44xx.h>
+ #include <linux/power/omap/prcm44xx.h>
+ #include <linux/power/omap/prm44xx.h>
 -- 
 1.7.9.5
