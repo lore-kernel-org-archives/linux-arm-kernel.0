@@ -1,385 +1,594 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 31 Mar 2014 14:07:26 +0200
-Subject: [PATCH 1/4] pwm: Add Allwinner SoC support
-In-Reply-To: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1396267649-18009-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Mon, 31 Mar 2014 14:23:23 +0200
+Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
+Message-ID: <20140331122323.GC6044@type.bordeaux.inria.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a generic PWM framework driver for the PWM controller
-found on Allwinner SoCs.
+This permits to reassign keyboard LEDs to something else than keyboard "leds"
+state, by adding keyboard led and modifier triggers connected to a series
+of VT input LEDs, themselves connected to VT input triggers, which
+per-input device LEDs use by default.  Userland can thus easily change the LED
+behavior of (a priori) all input devices, or of particular input devices.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+This also permits to fix #7063 from userland by using a modifier to implement
+proper CapsLock behavior and have the keyboard caps lock led show that modifier
+state.
+
+[ebroder at mokafive.com: Rebased to 3.2-rc1 or so, cleaned up some includes, and fixed some constants]
+[blogic at openwrt.org: CONFIG_INPUT_LEDS stubs should be static inline]
+[akpm at linux-foundation.org: remove unneeded `extern', fix comment layout]
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Signed-off-by: Evan Broder <evan@ebroder.net>
+Reviewed-by: David Herrmann <dh.herrmann@gmail.com>
+Tested-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+Signed-off-by: John Crispin <blogic@openwrt.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- drivers/pwm/Kconfig     |   9 ++
- drivers/pwm/Makefile    |   1 +
- drivers/pwm/pwm-sunxi.c | 325 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 335 insertions(+)
- create mode 100644 drivers/pwm/pwm-sunxi.c
+Changed in this version:
+- fixes symbol dependencies between input.c and leds.c (notably
+  input_led_connect/disconnect) by stuffing them together in input.ko.
+- documents the new leds field of struct input_dev.
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 22f2f2857b82..f7381def0fd2 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -187,6 +187,15 @@ config PWM_SPEAR
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-spear.
+--- a/Documentation/leds/leds-class.txt
++++ b/Documentation/leds/leds-class.txt
+@@ -2,9 +2,6 @@
+ LED handling under Linux
+ ========================
  
-+config PWM_SUNXI
-+	tristate "Allwinner PWM support"
-+	depends on ARCH_SUNXI
+-If you're reading this and thinking about keyboard leds, these are
+-handled by the input subsystem and the led class is *not* needed.
+-
+ In its simplest form, the LED class just allows control of LEDs from
+ userspace. LEDs appear in /sys/class/leds/. The maximum brightness of the
+ LED is defined in max_brightness file. The brightness file will set the brightness
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -708,6 +708,9 @@ static void input_disconnect_device(stru
+ 		handle->open = 0;
+ 
+ 	spin_unlock_irq(&dev->event_lock);
++
++	if (is_event_supported(EV_LED, dev->evbit, EV_MAX))
++		input_led_disconnect(dev);
+ }
+ 
+ /**
+@@ -2134,6 +2137,9 @@ int input_register_device(struct input_d
+ 
+ 	list_add_tail(&dev->node, &input_dev_list);
+ 
++	if (is_event_supported(EV_LED, dev->evbit, EV_MAX))
++		input_led_connect(dev);
++
+ 	list_for_each_entry(handler, &input_handler_list, node)
+ 		input_attach_handler(dev, handler);
+ 
+--- a/drivers/input/Kconfig
++++ b/drivers/input/Kconfig
+@@ -178,6 +178,15 @@ comment "Input Device Drivers"
+ 
+ source "drivers/input/keyboard/Kconfig"
+ 
++config INPUT_LEDS
++	bool "LED Support"
++	depends on LEDS_CLASS = INPUT || LEDS_CLASS = y
++	select LEDS_TRIGGERS
++	default y
 +	help
-+	  Generic PWM framework driver for Allwinner SoCs.
++	  This option enables support for LEDs on keyboards managed
++	  by the input layer.
 +
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-sunxi.
+ source "drivers/input/mouse/Kconfig"
+ 
+ source "drivers/input/joystick/Kconfig"
+--- a/drivers/input/Makefile
++++ b/drivers/input/Makefile
+@@ -6,6 +6,9 @@
+ 
+ obj-$(CONFIG_INPUT)		+= input-core.o
+ input-core-y := input.o input-compat.o input-mt.o ff-core.o
++ifeq ($(CONFIG_INPUT_LEDS),y)
++input-core-y += leds.o
++endif
+ 
+ obj-$(CONFIG_INPUT_FF_MEMLESS)	+= ff-memless.o
+ obj-$(CONFIG_INPUT_POLLDEV)	+= input-polldev.o
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -11,9 +11,6 @@ menuconfig NEW_LEDS
+ 	  Say Y to enable Linux LED support.  This allows control of supported
+ 	  LEDs from both userspace and optionally, by kernel events (triggers).
+ 
+-	  This is not related to standard keyboard LEDs which are controlled
+-	  via the input system.
+-
+ if NEW_LEDS
+ 
+ config LEDS_CLASS
+--- a/drivers/tty/Kconfig
++++ b/drivers/tty/Kconfig
+@@ -13,6 +13,10 @@ config VT
+ 	bool "Virtual terminal" if EXPERT
+ 	depends on !S390 && !UML
+ 	select INPUT
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_TRIGGERS
++	select INPUT_LEDS
+ 	default y
+ 	---help---
+ 	  If you say Y here, you will get support for terminal devices with
+--- a/drivers/tty/vt/keyboard.c
++++ b/drivers/tty/vt/keyboard.c
+@@ -33,6 +33,7 @@
+ #include <linux/string.h>
+ #include <linux/init.h>
+ #include <linux/slab.h>
++#include <linux/leds.h>
+ 
+ #include <linux/kbd_kern.h>
+ #include <linux/kbd_diacr.h>
+@@ -130,6 +131,7 @@ static char rep;					/* flag telling cha
+ static int shift_state = 0;
+ 
+ static unsigned char ledstate = 0xff;			/* undefined */
++static unsigned char lockstate = 0xff;			/* undefined */
+ static unsigned char ledioctl;
+ 
+ /*
+@@ -961,6 +963,41 @@ static void k_brl(struct vc_data *vc, un
+ 	}
+ }
+ 
++/* We route VT keyboard "leds" through triggers */
++static void kbd_ledstate_trigger_activate(struct led_classdev *cdev);
 +
- config PWM_TEGRA
- 	tristate "NVIDIA Tegra PWM support"
- 	depends on ARCH_TEGRA
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index d8906ec69976..e110259b6c03 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
- obj-$(CONFIG_PWM_RENESAS_TPU)	+= pwm-renesas-tpu.o
- obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
- obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
-+obj-$(CONFIG_PWM_SUNXI)		+= pwm-sunxi.o
- obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
- obj-$(CONFIG_PWM_TIECAP)	+= pwm-tiecap.o
- obj-$(CONFIG_PWM_TIEHRPWM)	+= pwm-tiehrpwm.o
-diff --git a/drivers/pwm/pwm-sunxi.c b/drivers/pwm/pwm-sunxi.c
-new file mode 100644
-index 000000000000..be39abee0a24
++static struct led_trigger ledtrig_ledstate[] = {
++#define DEFINE_LEDSTATE_TRIGGER(kbd_led, nam) \
++	[kbd_led] = { \
++		.name = nam, \
++		.activate = kbd_ledstate_trigger_activate, \
++	}
++	DEFINE_LEDSTATE_TRIGGER(VC_SCROLLOCK, "kbd-scrollock"),
++	DEFINE_LEDSTATE_TRIGGER(VC_NUMLOCK,   "kbd-numlock"),
++	DEFINE_LEDSTATE_TRIGGER(VC_CAPSLOCK,  "kbd-capslock"),
++	DEFINE_LEDSTATE_TRIGGER(VC_KANALOCK,  "kbd-kanalock"),
++#undef DEFINE_LEDSTATE_TRIGGER
++};
++
++static void kbd_lockstate_trigger_activate(struct led_classdev *cdev);
++
++static struct led_trigger ledtrig_lockstate[] = {
++#define DEFINE_LOCKSTATE_TRIGGER(kbd_led, nam) \
++	[kbd_led] = { \
++		.name = nam, \
++		.activate = kbd_lockstate_trigger_activate, \
++	}
++	DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTLOCK,  "kbd-shiftlock"),
++	DEFINE_LOCKSTATE_TRIGGER(VC_ALTGRLOCK,  "kbd-altgrlock"),
++	DEFINE_LOCKSTATE_TRIGGER(VC_CTRLLOCK,   "kbd-ctrllock"),
++	DEFINE_LOCKSTATE_TRIGGER(VC_ALTLOCK,    "kbd-altlock"),
++	DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTLLOCK, "kbd-shiftllock"),
++	DEFINE_LOCKSTATE_TRIGGER(VC_SHIFTRLOCK, "kbd-shiftrlock"),
++	DEFINE_LOCKSTATE_TRIGGER(VC_CTRLLLOCK,  "kbd-ctrlllock"),
++	DEFINE_LOCKSTATE_TRIGGER(VC_CTRLRLOCK,  "kbd-ctrlrlock"),
++#undef DEFINE_LOCKSTATE_TRIGGER
++};
++
+ /*
+  * The leds display either (i) the status of NumLock, CapsLock, ScrollLock,
+  * or (ii) whatever pattern of lights people want to show using KDSETLED,
+@@ -995,18 +1032,25 @@ static inline unsigned char getleds(void
+ 	return kbd->ledflagstate;
+ }
+ 
+-static int kbd_update_leds_helper(struct input_handle *handle, void *data)
++/* Called on trigger connection, to set initial state */
++static void kbd_ledstate_trigger_activate(struct led_classdev *cdev)
+ {
+-	unsigned char leds = *(unsigned char *)data;
++	struct led_trigger *trigger = cdev->trigger;
++	int led = trigger - ledtrig_ledstate;
+ 
+-	if (test_bit(EV_LED, handle->dev->evbit)) {
+-		input_inject_event(handle, EV_LED, LED_SCROLLL, !!(leds & 0x01));
+-		input_inject_event(handle, EV_LED, LED_NUML,    !!(leds & 0x02));
+-		input_inject_event(handle, EV_LED, LED_CAPSL,   !!(leds & 0x04));
+-		input_inject_event(handle, EV_SYN, SYN_REPORT, 0);
+-	}
++	tasklet_disable(&keyboard_tasklet);
++	led_trigger_event(trigger, ledstate & (1 << led) ? LED_FULL : LED_OFF);
++	tasklet_enable(&keyboard_tasklet);
++}
+ 
+-	return 0;
++static void kbd_lockstate_trigger_activate(struct led_classdev *cdev)
++{
++	struct led_trigger *trigger = cdev->trigger;
++	int led = trigger - ledtrig_lockstate;
++
++	tasklet_disable(&keyboard_tasklet);
++	led_trigger_event(trigger, lockstate & (1 << led) ? LED_FULL : LED_OFF);
++	tasklet_enable(&keyboard_tasklet);
+ }
+ 
+ /**
+@@ -1095,16 +1139,29 @@ static void kbd_bh(unsigned long dummy)
+ {
+ 	unsigned char leds;
+ 	unsigned long flags;
+-	
++	int i;
++
+ 	spin_lock_irqsave(&led_lock, flags);
+ 	leds = getleds();
+ 	spin_unlock_irqrestore(&led_lock, flags);
+ 
+ 	if (leds != ledstate) {
+-		input_handler_for_each_handle(&kbd_handler, &leds,
+-					      kbd_update_leds_helper);
++		for (i = 0; i < ARRAY_SIZE(ledtrig_ledstate); i++)
++			if ((leds ^ ledstate) & (1 << i))
++				led_trigger_event(&ledtrig_ledstate[i],
++						leds & (1 << i)
++						? LED_FULL : LED_OFF);
+ 		ledstate = leds;
+ 	}
++
++	if (kbd->lockstate != lockstate) {
++		for (i = 0; i < ARRAY_SIZE(ledtrig_lockstate); i++)
++			if ((kbd->lockstate ^ lockstate) & (1 << i))
++				led_trigger_event(&ledtrig_lockstate[i],
++						kbd->lockstate & (1 << i)
++						? LED_FULL : LED_OFF);
++		lockstate = kbd->lockstate;
++	}
+ }
+ 
+ DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
+@@ -1442,20 +1499,6 @@ static void kbd_disconnect(struct input_
+ 	kfree(handle);
+ }
+ 
+-/*
+- * Start keyboard handler on the new keyboard by refreshing LED state to
+- * match the rest of the system.
+- */
+-static void kbd_start(struct input_handle *handle)
+-{
+-	tasklet_disable(&keyboard_tasklet);
+-
+-	if (ledstate != 0xff)
+-		kbd_update_leds_helper(handle, &ledstate);
+-
+-	tasklet_enable(&keyboard_tasklet);
+-}
+-
+ static const struct input_device_id kbd_ids[] = {
+ 	{
+ 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+@@ -1477,7 +1520,6 @@ static struct input_handler kbd_handler
+ 	.match		= kbd_match,
+ 	.connect	= kbd_connect,
+ 	.disconnect	= kbd_disconnect,
+-	.start		= kbd_start,
+ 	.name		= "kbd",
+ 	.id_table	= kbd_ids,
+ };
+@@ -1501,6 +1543,20 @@ int __init kbd_init(void)
+ 	if (error)
+ 		return error;
+ 
++	for (i = 0; i < ARRAY_SIZE(ledtrig_ledstate); i++) {
++		error = led_trigger_register(&ledtrig_ledstate[i]);
++		if (error)
++			pr_err("error %d while registering trigger %s\n",
++					error, ledtrig_ledstate[i].name);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(ledtrig_lockstate); i++) {
++		error = led_trigger_register(&ledtrig_lockstate[i]);
++		if (error)
++			pr_err("error %d while registering trigger %s\n",
++					error, ledtrig_lockstate[i].name);
++	}
++
+ 	tasklet_enable(&keyboard_tasklet);
+ 	tasklet_schedule(&keyboard_tasklet);
+ 
+--- a/include/linux/input.h
++++ b/include/linux/input.h
+@@ -79,6 +79,7 @@ struct input_value {
+  * @led: reflects current state of device's LEDs
+  * @snd: reflects current state of sound effects
+  * @sw: reflects current state of device's switches
++ * @leds: leds objects for the device's LEDs
+  * @open: this method is called when the very first user calls
+  *	input_open_device(). The driver must prepare the device
+  *	to start generating events (start polling thread,
+@@ -164,6 +165,8 @@ struct input_dev {
+ 	unsigned long snd[BITS_TO_LONGS(SND_CNT)];
+ 	unsigned long sw[BITS_TO_LONGS(SW_CNT)];
+ 
++	struct led_classdev *leds;
++
+ 	int (*open)(struct input_dev *dev);
+ 	void (*close)(struct input_dev *dev);
+ 	int (*flush)(struct input_dev *dev, struct file *file);
+@@ -531,4 +534,22 @@ int input_ff_erase(struct input_dev *dev
+ int input_ff_create_memless(struct input_dev *dev, void *data,
+ 		int (*play_effect)(struct input_dev *, void *, struct ff_effect *));
+ 
++#ifdef CONFIG_INPUT_LEDS
++
++int input_led_connect(struct input_dev *dev);
++void input_led_disconnect(struct input_dev *dev);
++
++#else
++
++static inline int input_led_connect(struct input_dev *dev)
++{
++	return 0;
++}
++
++static inline void input_led_disconnect(struct input_dev *dev)
++{
++}
++
++#endif
++
+ #endif
 --- /dev/null
-+++ b/drivers/pwm/pwm-sunxi.c
-@@ -0,0 +1,325 @@
++++ b/drivers/input/leds.c
+@@ -0,0 +1,249 @@
 +/*
-+ * Driver for Allwinner Pulse Width Modulation Controller
++ * LED support for the input layer
 + *
-+ * Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
++ * Copyright 2010-2014 Samuel Thibault <samuel.thibault@ens-lyon.org>
 + *
-+ * Licensed under GPLv2.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
++#include <linux/kernel.h>
 +#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/leds.h>
++#include <linux/input.h>
 +
-+#define PWM_CTRL_REG		0x0
++/*
++ * Keyboard LEDs are propagated by default like the following example:
++ *
++ * VT keyboard numlock trigger
++ * -> vt::numl VT LED
++ * -> vt-numl VT trigger
++ * -> per-device inputX::numl LED
++ *
++ * Userland can however choose the trigger for the vt::numl LED, or
++ * independently choose the trigger for any inputx::numl LED.
++ *
++ *
++ * VT LED classes and triggers are registered on-demand according to
++ * existing LED devices
++ */
 +
-+#define PWM_CH_PRD_BASE		0x4
-+#define PWM_CH_PRD_OFF		0x4
-+#define PWM_CH_PRD(x)		(PWM_CH_PRD_BASE + PWM_CH_PRD_OFF * x)
-+
-+#define	PWMCH_OFFSET		15
-+#define PWM_PRESCAL_MASK	(BIT(0)|BIT(1)|BIT(2)|BIT(3))
-+#define PWM_PRESCAL_OFF		0
-+#define PWM_EN			BIT(4)
-+#define PWM_ACT_STATE		BIT(5)
-+#define PWM_CLK_GATING		BIT(6)
-+#define PWM_MODE		BIT(7)
-+#define PWM_PULSE		BIT(8)
-+#define PWM_BYPASS		BIT(9)
-+
-+#define PWM_RDY_BASE		28
-+#define PWM_RDY_OFF		1
-+#define PWM_RDY(x)		BIT(PWM_RDY_BASE + PWM_RDY_OFF * x)
-+
-+#define PWM_PRD_ACT_MASK	0xFF
-+#define PWM_PRD(x)		(x << 16)
-+#define PWM_PRD_MASK		0xFF
-+
-+#define	BIT_CH(bit, chan)	(bit << (chan * PWMCH_OFFSET))
-+
-+u32 prescal_table[] = { 120, 180, 240, 360, 480, 0, 0, 0,
-+			12000, 24000, 36000, 48000, 72000,
-+			0, 0, 1 };
-+
-+struct sunxi_pwm_data {
-+	bool has_rdy;
++/* Handler for VT LEDs, just triggers the corresponding VT trigger. */
++static void vt_led_set(struct led_classdev *cdev,
++			  enum led_brightness brightness);
++static struct led_classdev vt_leds[LED_CNT] = {
++#define DEFINE_INPUT_LED(vt_led, nam, deftrig) \
++	[vt_led] = { \
++		.name = "vt::"nam, \
++		.max_brightness = 1, \
++		.brightness_set = vt_led_set, \
++		.default_trigger = deftrig, \
++	}
++/* Default triggers for the VT LEDs just correspond to the legacy
++ * usage. */
++	DEFINE_INPUT_LED(LED_NUML, "numl", "kbd-numlock"),
++	DEFINE_INPUT_LED(LED_CAPSL, "capsl", "kbd-capslock"),
++	DEFINE_INPUT_LED(LED_SCROLLL, "scrolll", "kbd-scrollock"),
++	DEFINE_INPUT_LED(LED_COMPOSE, "compose", NULL),
++	DEFINE_INPUT_LED(LED_KANA, "kana", "kbd-kanalock"),
++	DEFINE_INPUT_LED(LED_SLEEP, "sleep", NULL),
++	DEFINE_INPUT_LED(LED_SUSPEND, "suspend", NULL),
++	DEFINE_INPUT_LED(LED_MUTE, "mute", NULL),
++	DEFINE_INPUT_LED(LED_MISC, "misc", NULL),
++	DEFINE_INPUT_LED(LED_MAIL, "mail", NULL),
++	DEFINE_INPUT_LED(LED_CHARGING, "charging", NULL),
++};
++static const char *const vt_led_names[LED_CNT] = {
++	[LED_NUML] = "numl",
++	[LED_CAPSL] = "capsl",
++	[LED_SCROLLL] = "scrolll",
++	[LED_COMPOSE] = "compose",
++	[LED_KANA] = "kana",
++	[LED_SLEEP] = "sleep",
++	[LED_SUSPEND] = "suspend",
++	[LED_MUTE] = "mute",
++	[LED_MISC] = "misc",
++	[LED_MAIL] = "mail",
++	[LED_CHARGING] = "charging",
++};
++/* Handler for hotplug initialization */
++static void vt_led_trigger_activate(struct led_classdev *cdev);
++/* VT triggers */
++static struct led_trigger vt_led_triggers[LED_CNT] = {
++#define DEFINE_INPUT_LED_TRIGGER(vt_led, nam) \
++	[vt_led] = { \
++		.name = "vt-"nam, \
++		.activate = vt_led_trigger_activate, \
++	}
++	DEFINE_INPUT_LED_TRIGGER(LED_NUML, "numl"),
++	DEFINE_INPUT_LED_TRIGGER(LED_CAPSL, "capsl"),
++	DEFINE_INPUT_LED_TRIGGER(LED_SCROLLL, "scrolll"),
++	DEFINE_INPUT_LED_TRIGGER(LED_COMPOSE, "compose"),
++	DEFINE_INPUT_LED_TRIGGER(LED_KANA, "kana"),
++	DEFINE_INPUT_LED_TRIGGER(LED_SLEEP, "sleep"),
++	DEFINE_INPUT_LED_TRIGGER(LED_SUSPEND, "suspend"),
++	DEFINE_INPUT_LED_TRIGGER(LED_MUTE, "mute"),
++	DEFINE_INPUT_LED_TRIGGER(LED_MISC, "misc"),
++	DEFINE_INPUT_LED_TRIGGER(LED_MAIL, "mail"),
++	DEFINE_INPUT_LED_TRIGGER(LED_CHARGING, "charging"),
 +};
 +
-+struct sunxi_pwm_chip {
-+	struct pwm_chip chip;
-+	struct clk *clk;
-+	void __iomem *base;
-+	const struct sunxi_pwm_data *data;
-+};
++/* Lock for registration coherency */
++static DEFINE_MUTEX(vt_led_registered_lock);
 +
-+#define to_sunxi_pwm_chip(chip) container_of(chip, struct sunxi_pwm_chip, chip)
++/* Which VT LED classes and triggers are registered */
++static unsigned long vt_led_registered[BITS_TO_LONGS(LED_CNT)];
 +
-+static inline u32 sunxi_pwm_readl(struct sunxi_pwm_chip *chip,
-+				  unsigned long offset)
++/* Number of input devices having each LED */
++static int vt_led_references[LED_CNT];
++
++/* VT LED state change, tell the VT trigger.  */
++static void vt_led_set(struct led_classdev *cdev,
++			  enum led_brightness brightness)
 +{
-+	return readl_relaxed(chip->base + offset);
++	int led = cdev - vt_leds;
++
++	led_trigger_event(&vt_led_triggers[led], !!brightness);
 +}
 +
-+static inline void sunxi_pwm_writel(struct sunxi_pwm_chip *chip,
-+				    unsigned long offset, unsigned long val)
++/* LED state change for some keyboard, notify that keyboard.  */
++static void perdevice_input_led_set(struct led_classdev *cdev,
++			  enum led_brightness brightness)
 +{
-+	writel_relaxed(val, chip->base + offset);
++	struct input_dev *dev;
++	struct led_classdev *leds;
++	int led;
++
++	dev = cdev->dev->platform_data;
++	if (!dev)
++		/* Still initializing */
++		return;
++	leds = dev->leds;
++	led = cdev - leds;
++
++	input_event(dev, EV_LED, led, !!brightness);
++	input_event(dev, EV_SYN, SYN_REPORT, 0);
 +}
 +
-+static int sunxi_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			    int duty_ns, int period_ns)
++/* Keyboard hotplug, initialize its LED status */
++static void vt_led_trigger_activate(struct led_classdev *cdev)
 +{
-+	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-+	u32 clk_rate, prd, dty;
-+	u64 div;
-+	u32 val, clk_gate;
-+	int i, ret;
++	struct led_trigger *trigger = cdev->trigger;
++	int led = trigger - vt_led_triggers;
 +
-+	clk_rate = clk_get_rate(sunxi_pwm->clk);
++	if (cdev->brightness_set)
++		cdev->brightness_set(cdev, vt_leds[led].brightness);
++}
 +
-+
-+	/* First, test without any divider */
-+	i = PWM_PRESCAL_MASK;
-+	div = clk_rate * period_ns;
-+	do_div(div, 1000000000);
-+	if (div > PWM_PRD_MASK) {
-+		/* Then go up from the first divider */
-+		for (i = 0; i < PWM_PRESCAL_MASK; i++) {
-+			if (!prescal_table[i])
-+				continue;
-+			div = clk_rate / prescal_table[i];
-+			div = div * period_ns;
-+			do_div(div, 1000000000);
-+			if (div <= PWM_PRD_MASK)
-+				break;
++/* Free led stuff from input device, used at abortion and disconnection.  */
++static void input_led_delete(struct input_dev *dev)
++{
++	if (dev) {
++		struct led_classdev *leds = dev->leds;
++		if (leds) {
++			int i;
++			for (i = 0; i < LED_CNT; i++)
++				kfree(leds[i].name);
++			kfree(leds);
++			dev->leds = NULL;
 +		}
 +	}
-+
-+	if (div > PWM_PRD_MASK) {
-+		dev_err(chip->dev, "prescaler exceeds the maximum value\n");
-+		return -EINVAL;
-+	}
-+
-+	prd = div;
-+	div *= duty_ns;
-+	do_div(div, period_ns);
-+	dty = div;
-+
-+	ret = clk_enable(sunxi_pwm->clk);
-+	if (ret) {
-+		dev_err(chip->dev, "failed to enable PWM clock\n");
-+		return ret;
-+	}
-+
-+	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-+
-+	if (sunxi_pwm->data->has_rdy && (val & PWM_RDY(pwm->hwpwm)))
-+		return -EBUSY;
-+
-+	clk_gate = val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-+
-+	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-+	val &= ~BIT_CH(PWM_PRESCAL_MASK, pwm->hwpwm);
-+	val |= i;
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-+
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CH_PRD(pwm->hwpwm), dty | PWM_PRD(prd));
-+
-+	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-+	val |= clk_gate;
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-+
-+	clk_disable(sunxi_pwm->clk);
-+	return ret;
 +}
 +
-+static int sunxi_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+				  enum pwm_polarity polarity)
++/* A new input device with potential LEDs to connect.  */
++int input_led_connect(struct input_dev *dev)
 +{
-+	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-+	u32 val;
-+	int ret;
++	int i, error = 0;
++	struct led_classdev *leds;
 +
-+	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-+
-+	if (polarity != PWM_POLARITY_NORMAL)
-+		val &= ~BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
-+	else
-+		val |= BIT_CH(PWM_ACT_STATE, pwm->hwpwm);
-+
-+	ret = clk_enable(sunxi_pwm->clk);
-+	if (ret) {
-+		dev_err(chip->dev, "failed to enable PWM clock\n");
-+		return ret;
-+	}
-+
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-+
-+	clk_disable(sunxi_pwm->clk);
-+
-+	return 0;
-+}
-+
-+static int sunxi_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-+	u32 val;
-+	int ret;
-+
-+	ret = clk_enable(sunxi_pwm->clk);
-+	if (ret) {
-+		dev_err(chip->dev, "failed to enable PWM clock\n");
-+		return ret;
-+	}
-+
-+	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-+	val |= BIT_CH(PWM_EN, pwm->hwpwm);
-+	val |= BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-+
-+	return 0;
-+}
-+
-+static void sunxi_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct sunxi_pwm_chip *sunxi_pwm = to_sunxi_pwm_chip(chip);
-+	u32 val;
-+
-+	val = sunxi_pwm_readl(sunxi_pwm, PWM_CTRL_REG);
-+	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
-+	val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG, val);
-+
-+	clk_disable(sunxi_pwm->clk);
-+}
-+
-+static const struct pwm_ops sunxi_pwm_ops = {
-+	.config = sunxi_pwm_config,
-+	.set_polarity = sunxi_pwm_set_polarity,
-+	.enable = sunxi_pwm_enable,
-+	.disable = sunxi_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+static const struct sunxi_pwm_data sunxi_pwm_data_v1 = {
-+	.has_rdy = false,
-+};
-+
-+static const struct sunxi_pwm_data sunxi_pwm_data_v2 = {
-+	.has_rdy = true,
-+};
-+
-+static const struct of_device_id sunxi_pwm_dt_ids[] = {
-+	{
-+		.compatible = "allwinner,sun4i-pwm",
-+		.data = &sunxi_pwm_data_v1,
-+	}, {
-+		.compatible = "allwinner,sun7i-pwm",
-+		.data = &sunxi_pwm_data_v2,
-+	}, {
-+		/* sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(of, sunxi_pwm_dt_ids);
-+
-+static int sunxi_pwm_probe(struct platform_device *pdev)
-+{
-+	struct sunxi_pwm_chip *sunxi_pwm;
-+	struct resource *res;
-+	int ret;
-+
-+	const struct of_device_id *match;
-+
-+	match = of_match_device(sunxi_pwm_dt_ids, &pdev->dev);
-+	if (!match || !match->data)
-+		return -ENODEV;
-+
-+	sunxi_pwm = devm_kzalloc(&pdev->dev, sizeof(*sunxi_pwm), GFP_KERNEL);
-+	if (!sunxi_pwm)
++	dev->leds = leds = kcalloc(LED_CNT, sizeof(*leds), GFP_KERNEL);
++	if (!dev->leds)
 +		return -ENOMEM;
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	sunxi_pwm->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(sunxi_pwm->base))
-+		return PTR_ERR(sunxi_pwm->base);
++	/* lazily register missing VT LEDs */
++	mutex_lock(&vt_led_registered_lock);
++	for (i = 0; i < LED_CNT; i++)
++		if (vt_leds[i].name && test_bit(i, dev->ledbit)) {
++			if (!vt_led_references[i]) {
++				led_trigger_register(&vt_led_triggers[i]);
++				/* This keyboard is first to have led i,
++				 * try to register it */
++				if (!led_classdev_register(NULL, &vt_leds[i]))
++					vt_led_references[i] = 1;
++				else
++					led_trigger_unregister(&vt_led_triggers[i]);
++			} else
++				vt_led_references[i]++;
++		}
++	mutex_unlock(&vt_led_registered_lock);
 +
-+	sunxi_pwm->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(sunxi_pwm->clk))
-+		return PTR_ERR(sunxi_pwm->clk);
++	/* and register this device's LEDs */
++	for (i = 0; i < LED_CNT; i++)
++		if (vt_leds[i].name && test_bit(i, dev->ledbit)) {
++			leds[i].name = kasprintf(GFP_KERNEL, "%s::%s",
++						dev_name(&dev->dev),
++						vt_led_names[i]);
++			if (!leds[i].name) {
++				error = -ENOMEM;
++				goto err;
++			}
++			leds[i].max_brightness = 1;
++			leds[i].brightness_set = perdevice_input_led_set;
++			leds[i].default_trigger = vt_led_triggers[i].name;
++		}
 +
-+	ret = clk_prepare(sunxi_pwm->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to prepare PWM clock\n");
-+		return ret;
-+	}
++	/* No issue so far, we can register for real.  */
++	for (i = 0; i < LED_CNT; i++)
++		if (leds[i].name) {
++			led_classdev_register(&dev->dev, &leds[i]);
++			leds[i].dev->platform_data = dev;
++			perdevice_input_led_set(&leds[i],
++					vt_leds[i].brightness);
++		}
 +
-+	sunxi_pwm->chip.dev = &pdev->dev;
-+	sunxi_pwm->chip.ops = &sunxi_pwm_ops;
++	return 0;
 +
-+	if (pdev->dev.of_node) {
-+		sunxi_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
-+		sunxi_pwm->chip.of_pwm_n_cells = 3;
-+	}
-+
-+	sunxi_pwm->chip.base = -1;
-+	sunxi_pwm->chip.npwm = 2;
-+	sunxi_pwm->data = match->data;
-+
-+	/* By default, the polarity is inversed, set it to normal */
-+	ret = clk_enable(sunxi_pwm->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to enable PWM clock\n");
-+		goto unprepare_clk;
-+	}
-+	sunxi_pwm_writel(sunxi_pwm, PWM_CTRL_REG,
-+			 BIT_CH(PWM_ACT_STATE, 0) |
-+			 BIT_CH(PWM_ACT_STATE, 1));
-+	clk_disable(sunxi_pwm->clk);
-+
-+	ret = pwmchip_add(&sunxi_pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add PWM chip %d\n", ret);
-+		goto unprepare_clk;
-+	}
-+
-+	platform_set_drvdata(pdev, sunxi_pwm);
-+
-+
-+	return ret;
-+
-+unprepare_clk:
-+	clk_unprepare(sunxi_pwm->clk);
-+	return ret;
++err:
++	input_led_delete(dev);
++	return error;
 +}
 +
-+static int sunxi_pwm_remove(struct platform_device *pdev)
++/*
++ * Disconnected input device. Clean it, and deregister now-useless VT LEDs
++ * and triggers.
++ */
++void input_led_disconnect(struct input_dev *dev)
 +{
-+	struct sunxi_pwm_chip *sunxi_pwm = platform_get_drvdata(pdev);
++	int i;
++	struct led_classdev *leds = dev->leds;
 +
-+	clk_unprepare(sunxi_pwm->clk);
++	for (i = 0; i < LED_CNT; i++)
++		if (leds[i].name)
++			led_classdev_unregister(&leds[i]);
 +
-+	return pwmchip_remove(&sunxi_pwm->chip);
++	input_led_delete(dev);
++
++	mutex_lock(&vt_led_registered_lock);
++	for (i = 0; i < LED_CNT; i++) {
++		if (!vt_leds[i].name || !test_bit(i, dev->ledbit))
++			continue;
++
++		vt_led_references[i]--;
++		if (vt_led_references[i]) {
++			/* Still some devices needing it */
++			continue;
++		}
++
++		led_classdev_unregister(&vt_leds[i]);
++		led_trigger_unregister(&vt_led_triggers[i]);
++		clear_bit(i, vt_led_registered);
++	}
++	mutex_unlock(&vt_led_registered_lock);
 +}
 +
-+static struct platform_driver sunxi_pwm_driver = {
-+	.driver = {
-+		.name = "sunxi-pwm",
-+		.of_match_table = of_match_ptr(sunxi_pwm_dt_ids),
-+	},
-+	.probe = sunxi_pwm_probe,
-+	.remove = sunxi_pwm_remove,
-+};
-+module_platform_driver(sunxi_pwm_driver);
-+
-+MODULE_ALIAS("platform:sunxi-pwm");
-+MODULE_AUTHOR("alexandre Belloni <alexandre.belloni@free-electrons.com>");
-+MODULE_DESCRIPTION("Allwinner PWM driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.8.3.2
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("User LED support for input layer");
++MODULE_AUTHOR("Samuel Thibault <samuel.thibault@ens-lyon.org>");
