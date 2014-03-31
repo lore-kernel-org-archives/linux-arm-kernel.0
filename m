@@ -1,110 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 31 Mar 2014 12:31:14 +0100
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <76240593.SAyloCy7nR@wuerfel>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <76240593.SAyloCy7nR@wuerfel>
-Message-ID: <20140331113113.GE29871@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 31 Mar 2014 13:39:52 +0200
+Subject: [RFC PATCH v2 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <20140325225446.5762.15937@quantum>
+References: <1393870533-20845-1-git-send-email-s.nawrocki@samsung.com>
+ <1393870975-21020-1-git-send-email-s.nawrocki@samsung.com>
+ <5331664E.2050008@samsung.com> <20140325225446.5762.15937@quantum>
+Message-ID: <53395408.9020709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
-> On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
-> > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
-> > space described in [1] due to one major issue + one minor issue.
-> > 
-> > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
-> > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
-> > kernel fails to create mapping for this region in map_mem function
-> > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
-> > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
+Hi Mike,
+
+On 25/03/14 23:54, Mike Turquette wrote:
+> Quoting Sylwester Nawrocki (2014-03-25 04:19:42)
+>> > On 03/03/14 19:22, Sylwester Nawrocki wrote:
+[...]
+>>> > > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt 
+>>> > > b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>> > > index 7c52c29..eb8d547 100644
+>>> > > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>> > > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>> > > @@ -115,3 +115,26 @@ clock signal, and a UART.
+>>> > >    ("pll" and "pll-switched").
+>>> > >  * The UART has its baud clock connected the external oscillator and its
+>>> > >    register clock connected to the PLL clock (the "pll-switched" signal)
+>>> > > +
+>>> > > +==Assigned clock parents and rates==
+>>> > > +
+>>> > > +Some platforms require static configuration of (parts of) the clock controller
+>>> > > +often determined by the board design. Such a configuration can be specified in
+>>> > > +a clock consumer node through clock-parents and clock-rates DT properties.
+>>> > > +The former should contain list of parent clocks in form of phandle and clock
+>>> > > +specifier pairs, the latter the list of assigned clock frequency values
+>>> > > +(one cell each).
+>>> > > +
+>>> > > +    uart at a000 {
+>>> > > +        compatible = "fsl,imx-uart";
+>>> > > +        reg = <0xa000 0x1000>;
+>>> > > +        ...
+>>> > > +        clocks = <&clkcon 0>, <&clkcon 3>;
+>>> > > +        clock-names = "baud", "mux";
+>>> > > +
+>>> > > +        clock-parents = <0>, <&pll 1>;
+>> > 
+>> > I have some doubts here, i.e. the order in which clocks are being 
+>> > configured may be important in some cases. Should the binding then be
+>> > specifying that the clocks will be configured in a sequence exactly 
+>> > as listed in the clock-parents property ?
+>
+> That's a good point, and I think we should re-examine the role of a DT
+> binding for this purpose. From my limited experience with DT, it seems
+> to be really bad at anything involving sequencing. It doesn't give us
+> function pointers/callbacks in the way that the old board files used to.
+>
+> So I think the binding you proposed is still a good idea, but only for
+> the very simple case. If your platform has some detailed integration
+> requirements that have corner cases like you describe below, then this
+> DT binding might not be a good place to put the info.
 > 
-> It took me a while to understand what is going on, but it essentially comes
-> down to the logical memory map (0xffffffc000000000-0xffffffffffffffff)
-> being able to represent only RAM in the first 256GB of address space.
-> 
-> More importantly, this means that any system following [1] will only be
-> able to use 32GB of RAM, which is a much more severe restriction than
-> what it sounds like at first.
+> A platform that provides its own pm runtime backend could neatly manage
+> this by having a call to pm_runtime_get deal with these integration
+> details such that the driver does not have to be aware of them. (caveat:
+> that assumes in the example below that the only thing you want to do is
+> set up your clocks once and then never touch them again)
 
-On a 64-bit platform, do we still need the alias at the bottom and the
-512-544GB hole (even for 32-bit DMA, top address bits can be wired to
-512GB)? Only the idmap would need 4 levels, but that's static, we don't
-need to switch Linux to 4-levels. Otherwise the memory is too sparse.
+This sounds reasonable, my impression was also that devicetree might be 
+not the best place to put such a sequencing information.
 
-Of course, if you have 512GB of RAM and you want 4K pages, 3 levels are
-no longer enough (with 64K pages you get to 42-bit VA space).
+We would just provide a one-time configuration data, without an indication 
+of how the configuration should be performed when there are multiple 
+clocks listed. As an usual DT practice the order of configuration wouldn't
+be defined by the binding.
 
-> > Secondly, vmemmap space is not enough to cover over about 585GB physical
-> > address space. Fortunately, this issue can be resolved as utilizing an extra
-> > vmemmap space (0xffffffbe00000000-0xffffffbffbbfffff) in [2]. However,
-> > it would not cover systems having a couple of terabytes DRAM.
-> 
-> This one can be trivially changed by taking more space out of the vmalloc
-> area, to go much higher if necessary. vmemmap space is always just a fraction
-> of the linear mapping size, so we can accommodate it by definition if we
-> find space to fit the physical memory.
-
-vmemmap is the total range / page size * sizeof(struct page). So for 1TB
-range and 4K pages we would need 8GB (the current value, unless I
-miscalculated the above). Anyway, you can't cover 1TB range with
-3-levels.
-
-> > Therefore, it would be needed to implement 4 level page table translations
-> > for 4KB pages on 40-bit physical address space platforms. Someone might
-> > suggest use of 64KB pages in this case, but I'm not sure about how to
-> > deal with internal memory fragmentation.
-> > 
-> > I would like to contribute 4 level page table translations to upstream,
-> > the target of which is 3.16 kernel, if there is no movement on it. I saw
-> > some related RFC patches a couple of months ago, but they didn't seem to 
-> > be merged into maintainer's tree.
-> 
-> I think you are answering the wrong question here. Four level page tables
-> should not be required to support >32GB of RAM, that would be very silly.
-
-I agree, we should only enable 4-levels of page table if we have close
-to 512GB of RAM or the range is too sparse but I would actually push
-back on the hardware guys to keep it tighter.
-
-> There are good reasons to use a 50 bit virtual address space in user
-> land, e.g. for supporting data base applications that mmap huge files.
-> 
-> If this is not the goal however, we should not pay for the overhead
-> of the extra page table in user space. I can see two other possible
-> solutions for the problem:
-> 
-> a) always use a four-level page table in kernel space, regardless of
-> whether we do it in user space. We can move the kernel mappings down
-> in address space either by one 512GB entry to 0xffffff0000000000, or
-> to match the 64k-page location at 0xfffffc0000000000, or all the way
-> to to 0xfffc000000000000. In any case, we can have all the dynamic
-> mappings within one 512GB area and pretend we have a three-level
-> page table for them, while the rest of DRAM is mapped statically at
-> early boot time using 512GB large pages.
-
-That's a workaround but we end up with two (or more) kernel pgds - one
-for vmalloc, ioremap etc. and another (static) one for the kernel linear
-mapping. So far there isn't any memory mapping carved out but we have to
-be careful in the future.
-
-However, kernel page table walking would be a bit slower with 4-levels.
-
-> b) If there is a reasonable assumption that everybody is using the
-> memory map from [1], then we can change the __virt_to_phys
-> and __phys_to_virt functions to accomodate that and move everything
-> into a flat contiguous virtual address space of 256GB. This would
-> also enable the use of a more efficient mem_map array instead of the
-> vmemmap, but would break running on any system that doesn't follow
-> the same convention. I have no idea yet how common this memory map
-> is, so I can't tell if this would be a realistic solution for what
-> you are targeting. We clearly wouldn't do it if it implies distributions
-> to ship an extra kernel binary for systems based on different memory
-> maps.
-
-We end up with hacks like the Realview phys/virt conversion. I don't
-think we can guarantee that all ARMv8 platforms would follow the above
-guidance.
-
--- 
-Catalin
+--
+Regards,
+Sylwester
