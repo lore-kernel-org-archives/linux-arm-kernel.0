@@ -1,54 +1,67 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 31 Mar 2014 11:48:37 -0700
-Subject: [PATCH] Input: pmic8xxx-pwrkey - Set sane default for debounce
- time
-In-Reply-To: <20140331182342.GD28265@joshc.qualcomm.com>
-References: <1396289664-31893-1-git-send-email-sboyd@codeaurora.org>
- <20140331182342.GD28265@joshc.qualcomm.com>
-Message-ID: <5339B885.5070802@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 31 Mar 2014 20:51:54 +0200
+Subject: [PATCH] asm-generic: allow generic unaligned access if the arch
+ supports it
+In-Reply-To: <20140331183618.GY7528@n2100.arm.linux.org.uk>
+References: <1395942387-14177-1-git-send-email-ard.biesheuvel@linaro.org>
+ <201403281914.20201.arnd@arndb.de>
+ <CAKv+Gu_9yD1jWhxkPxSUbwjJk4QxPNXBR=EXfmfCgzD1Pdig2g@mail.gmail.com>
+ <20140331095941.GA29871@arm.com>
+ <CAKv+Gu_05nmZrQxwELXae4tiK=-MpjUjmEKrULdg+6YuC-DW8Q@mail.gmail.com>
+ <20140331172436.GL29871@arm.com>
+ <CAKv+Gu9RATUkhya0zytS8FbSM8=49xwNg0m24Xp1LtCWoarDRQ@mail.gmail.com>
+ <20140331183618.GY7528@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu9TkLSivLuJH-oWnK0xpFb4jrhYDx6bTZBKUSmSJftCbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/14 11:23, Josh Cartwright wrote:
-> On Mon, Mar 31, 2014 at 11:14:24AM -0700, Stephen Boyd wrote:
->> If the debounce time is 0 our usage of ilog2() later on in this
->> driver will cause undefined behavior. If CONFIG_OF=n this fact is
->> evident to the compiler, and it emits a call to ____ilog2_NaN()
->> which doesn't exist. Fix this by setting a sane default for
->> debounce.
+On 31 March 2014 20:36, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 31, 2014 at 08:22:43PM +0200, Ard Biesheuvel wrote:
+>> On 31 March 2014 19:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > It actually affects arch/arm as well which selects
+>> > HAVE_EFFICIENT_UNALIGNED_ACCESS for v6/v7 and uses the generic
+>> > unaligned.h
+>> >
 >>
->> Reported-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  drivers/input/misc/pmic8xxx-pwrkey.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> Oops, my bad. I did a quick 'find -name unaligned.h' but misread 'arc'
+>> for 'arm'.
 >>
->> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
->> index 1cb8fda7a166..27add04676e1 100644
->> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
->> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
->> @@ -92,7 +92,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
->>  	bool pull_up;
->>  
->>  	if (of_property_read_u32(pdev->dev.of_node, "debounce", &kpd_delay))
->> -		kpd_delay = 0;
->> +		kpd_delay = 15625;
-> Should "debounce" even be optional?  I'm wondering if we should just
-> make it required...
-
-Hmm maybe. It's not like things won't work without it set though.
-
+>> @Russell: ARM is a user of asm-generic/unaligned.h, and I proposed a
+>> patch to asm-generic that switches to unaligned accesses if
+>> HAVE_EFFICIENT_UNALIGNED_ACCESS is set by the arch. This should affect
+>> a fair amount of code living under net/ and drivers/ that don't test
+>> for the Kconfig symbol but expect get_unaligned_xx/put_unaligned_xx to
+>> turn into something suitable depending on the arch. Any objections?
 >
-> At the very least this default value should be documented in the DT
-> binding.
+> I'm not sure what you're talking about here, or what change you're
+> proposing.  Without any kind of frame of reference, I can't comment.
+> Sorry.
 >
 
-I never understood this. The default value is something that is entirely
-software driven. It could change at any time. If DT implementers aren't
-specifying it they're saying "I don't care what the value is, let the
-driver decide if they care". They're not saying, "Oh, that default value
-in the binding is good enough for me so I don't need to specify this".
+My apologies. I assumed the mail thread including a link to the patch
+would be clear enough.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Currently, asm-generic's version of unaligned.h (defining stuff like
+get_unaligned() and put_unaligned()) unconditionally defaults to the
+most cautious method of performing unaligned memory accesses, even if
+the Kconfig symbol HAVE_EFFICIENT_UNALIGNED_ACCESS is defined.
+However, in that case, it makes sense to use a definition for
+get_unaligned()/put_unaligned() that lets the hardware perform the
+unaligned accesses instead.
+
+So that is what I proposed here
+
+http://marc.info/?l=linux-arch&m=139594237116121&w=2
+
+and in the mail exchange that followed, I stated that arm64 should be
+the only arch affected by this change. However, I didn't look
+carefully enough and, as Catalin pointed out, ARM will also be
+affected by it.
+
+So that is why I redirected this thread to you: would you object to
+changing asm-generic/unaligned.h so that calls to
+get_aligned()/put_aligned() on ARM v6/v7 will let the CPU perform the
+unaligned access?
+
+Regards,
+Ard.
