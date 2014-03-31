@@ -1,29 +1,45 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 31 Mar 2014 17:39:58 +0200
-Subject: [PATCH 1/6] ARM: socfpga: dts: fix pdma interrupt
-Message-ID: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
+Date: Mon, 31 Mar 2014 17:40:01 +0200
+Subject: [PATCH 4/6] ARM: socfpga: dts: add can0+1
+In-Reply-To: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1396280404-2041-4-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first interrupt is not at 180 but 104. Fix it.
+Add both can controllers to the dtsi.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 537f1a5..0c3344f 100644
+index d0594c3..51148b8 100644
 --- a/arch/arm/boot/dts/socfpga.dtsi
 +++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -75,7 +75,7 @@
- 			pdma: pdma at ffe01000 {
- 				compatible = "arm,pl330", "arm,primecell";
- 				reg = <0xffe01000 0x1000>;
--				interrupts = <0 180 4>;
-+				interrupts = <0 104 4>;
- 				#dma-cells = <1>;
- 				#dma-channels = <8>;
- 				#dma-requests = <32>;
+@@ -470,6 +470,22 @@
+ 			status = "disabled";
+ 		};
+ 
++		can0: can at 0xffc00000 {
++			compatible = "bosch,d_can";
++			reg = <0xffc00000 0x1000>;
++			interrupts = <0 131 4>, <0 132 4>, <0 133 4>, <0 134 4>;
++			clocks = <&can0_clk>;
++			status = "disabled";
++		};
++
++		can1: can at 0xffc01000 {
++			compatible = "bosch,d_can";
++			reg = <0xffc01000 0x1000>;
++			interrupts = <0 135 4>, <0 136 4>, <0 137 4>, <0 138 4>;
++			clocks = <&can1_clk>;
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at 0xffc04000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 1.9.1
