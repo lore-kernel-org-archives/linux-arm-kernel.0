@@ -1,117 +1,199 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 31 Mar 2014 18:15:42 +0300
-Subject: [PATCH 03/55] ARM: OMAP2+: PRM: remove unnecessary cpu_is_XXX calls
- from prm_init / exit
+Date: Mon, 31 Mar 2014 18:15:41 +0300
+Subject: [PATCH 02/55] ARM: OMAP2+: PRCM: cleanup some header includes
 In-Reply-To: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
 References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1396278994-12624-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1396278994-12624-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Done in preparation to make PRM its own driver, as the cpu_is_XXX calls are
-not available outside mach-omap2 folder.
-
-The init functions are called only from cpu specific init chain, and thus
-don't need to double check against cpu type.
-
-The exit calls check against the data provided during init-time registration
-and thus don't need cpu check either.
+Some of the includes are totally unnecessary, remove some others in
+preparation to make the PRCM its own driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm2xxx.c |   13 +------------
- arch/arm/mach-omap2/prm3xxx.c |   10 +---------
- arch/arm/mach-omap2/prm44xx.c |   10 +---------
- 3 files changed, 3 insertions(+), 30 deletions(-)
+ arch/arm/mach-omap2/clockdomain.h                  |    3 ++-
+ arch/arm/mach-omap2/cm33xx.h                       |    3 ---
+ arch/arm/mach-omap2/cm44xx.c                       |    2 --
+ arch/arm/mach-omap2/cm_common.c                    |    1 -
+ arch/arm/mach-omap2/cminst44xx.c                   |    2 --
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |    1 +
+ arch/arm/mach-omap2/powerdomain.c                  |    1 +
+ arch/arm/mach-omap2/powerdomain.h                  |    3 +--
+ arch/arm/mach-omap2/prcm-common.h                  |    2 ++
+ arch/arm/mach-omap2/prcm_mpu44xx.h                 |    1 -
+ arch/arm/mach-omap2/prm2xxx_3xxx.c                 |    1 -
+ arch/arm/mach-omap2/prm33xx.c                      |    1 -
+ 12 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
-index 45f83dd..a7f1cac 100644
---- a/arch/arm/mach-omap2/prm2xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx.c
-@@ -18,9 +18,6 @@
- #include <linux/io.h>
- #include <linux/irq.h>
+diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
+index f17f006..82c37b1 100644
+--- a/arch/arm/mach-omap2/clockdomain.h
++++ b/arch/arm/mach-omap2/clockdomain.h
+@@ -18,7 +18,6 @@
  
--#include "soc.h"
+ #include "powerdomain.h"
+ #include "clock.h"
+-#include "omap_hwmod.h"
+ 
+ /*
+  * Clockdomain flags
+@@ -98,6 +97,8 @@ struct clkdm_dep {
+ /* Possible flags for struct clockdomain._flags */
+ #define _CLKDM_FLAG_HWSUP_ENABLED		BIT(0)
+ 
++struct omap_hwmod;
++
+ /**
+  * struct clockdomain - OMAP clockdomain
+  * @name: clockdomain name
+diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
+index cfb8891..15a778c 100644
+--- a/arch/arm/mach-omap2/cm33xx.h
++++ b/arch/arm/mach-omap2/cm33xx.h
+@@ -17,11 +17,8 @@
+ #ifndef __ARCH_ARM_MACH_OMAP2_CM_33XX_H
+ #define __ARCH_ARM_MACH_OMAP2_CM_33XX_H
+ 
 -#include "common.h"
--#include "vp.h"
+-
+ #include "cm.h"
+ #include "cm-regbits-33xx.h"
+-#include "iomap.h"
+ 
+ /* CM base address */
+ #define AM33XX_CM_BASE		0x44e00000
+diff --git a/arch/arm/mach-omap2/cm44xx.c b/arch/arm/mach-omap2/cm44xx.c
+index 5627072..37ba6e8 100644
+--- a/arch/arm/mach-omap2/cm44xx.c
++++ b/arch/arm/mach-omap2/cm44xx.c
+@@ -18,8 +18,6 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
+-#include "iomap.h"
+-#include "common.h"
+ #include "cm.h"
+ #include "cm1_44xx.h"
+ #include "cm2_44xx.h"
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+index 40b3b5a..9e2482a 100644
+--- a/arch/arm/mach-omap2/cm_common.c
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -18,7 +18,6 @@
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
+ #include "cm44xx.h"
+-#include "common.h"
+ 
+ /*
+  * cm_ll_data: function pointers to SoC-specific implementations of
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 731ca13..d27d2bd 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -21,8 +21,6 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
+-#include "iomap.h"
+-#include "common.h"
+ #include "clockdomain.h"
+ #include "cm.h"
+ #include "cm1_44xx.h"
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+index 0f17862..a579b89 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+@@ -24,6 +24,7 @@
+ #include "prm33xx.h"
+ #include "omap_hwmod_33xx_43xx_common_data.h"
+ #include "prcm43xx.h"
++#include "common.h"
+ 
+ #define CLKCTRL(oh, clkctrl) ((oh).prcm.omap4.clkctrl_offs = (clkctrl))
+ #define RSTCTRL(oh, rstctrl) ((oh).prcm.omap4.rstctrl_offs = (rstctrl))
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 93a2a6e..faebd5f 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -32,6 +32,7 @@
+ 
  #include "powerdomain.h"
  #include "clockdomain.h"
++#include "voltage.h"
+ 
+ #include "soc.h"
+ #include "pm.h"
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index da5a59a..f472711 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -21,8 +21,6 @@
+ #include <linux/list.h>
+ #include <linux/spinlock.h>
+ 
+-#include "voltage.h"
+-
+ /* Powerdomain basic power states */
+ #define PWRDM_POWER_OFF		0x0
+ #define PWRDM_POWER_RET		0x1
+@@ -75,6 +73,7 @@
+ 
+ struct clockdomain;
+ struct powerdomain;
++struct voltagedomain;
+ 
+ /**
+  * struct powerdomain - OMAP powerdomain
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index e982598..ee2384a 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -428,6 +428,8 @@
+ #define MAX_IOPAD_LATCH_TIME			100
+ # ifndef __ASSEMBLER__
+ 
++#include <linux/delay.h>
++
+ /**
+  * omap_test_timeout - busy-loop, testing a condition
+  * @cond: condition to test until it evaluates to true
+diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.h b/arch/arm/mach-omap2/prcm_mpu44xx.h
+index 059bd4f..ac9cb45 100644
+--- a/arch/arm/mach-omap2/prcm_mpu44xx.h
++++ b/arch/arm/mach-omap2/prcm_mpu44xx.h
+@@ -26,7 +26,6 @@
+ #define __ARCH_ARM_MACH_OMAP2_PRCM_MPU44XX_H
+ 
+ #include "prcm_mpu_44xx_54xx.h"
+-#include "common.h"
+ 
+ #define OMAP4430_PRCM_MPU_BASE			0x48243000
+ 
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index 5209823..d891499 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -16,7 +16,6 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
+-#include "common.h"
+ #include "powerdomain.h"
  #include "prm2xxx_3xxx_private.h"
-@@ -261,19 +258,11 @@ static struct prm_ll_data omap2xxx_prm_ll_data = {
+ #include "prm-regbits-24xx.h"
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 7204407..0660105 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -19,7 +19,6 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
  
- int __init omap2xxx_prm_init(void)
- {
--	if (!cpu_is_omap24xx())
--		return 0;
--
- 	return prm_register(&omap2xxx_prm_ll_data);
- }
- 
- static void __exit omap2xxx_prm_exit(void)
- {
--	if (!cpu_is_omap24xx())
--		return;
--
--	/* Should never happen */
--	WARN(prm_unregister(&omap2xxx_prm_ll_data),
--	     "%s: prm_ll_data function pointer mismatch\n", __func__);
-+	prm_unregister(&omap2xxx_prm_ll_data);
- }
- __exitcall(omap2xxx_prm_exit);
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 6d3e9c2..1a39954 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -639,9 +639,6 @@ static struct prm_ll_data omap3xxx_prm_ll_data = {
- 
- int __init omap3xxx_prm_init(void)
- {
--	if (!cpu_is_omap34xx())
--		return 0;
--
- 	return prm_register(&omap3xxx_prm_ll_data);
- }
- 
-@@ -664,11 +661,6 @@ omap_subsys_initcall(omap3xxx_prm_late_init);
- 
- static void __exit omap3xxx_prm_exit(void)
- {
--	if (!cpu_is_omap34xx())
--		return;
--
--	/* Should never happen */
--	WARN(prm_unregister(&omap3xxx_prm_ll_data),
--	     "%s: prm_ll_data function pointer mismatch\n", __func__);
-+	prm_unregister(&omap3xxx_prm_ll_data);
- }
- __exitcall(omap3xxx_prm_exit);
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 3655e16..be96881 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -660,9 +660,6 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
- 
- int __init omap44xx_prm_init(void)
- {
--	if (!cpu_is_omap44xx() && !soc_is_omap54xx() && !soc_is_dra7xx())
--		return 0;
--
- 	return prm_register(&omap44xx_prm_ll_data);
- }
- 
-@@ -679,11 +676,6 @@ omap_subsys_initcall(omap44xx_prm_late_init);
- 
- static void __exit omap44xx_prm_exit(void)
- {
--	if (!cpu_is_omap44xx())
--		return;
--
--	/* Should never happen */
--	WARN(prm_unregister(&omap44xx_prm_ll_data),
--	     "%s: prm_ll_data function pointer mismatch\n", __func__);
-+	prm_unregister(&omap44xx_prm_ll_data);
- }
- __exitcall(omap44xx_prm_exit);
+-#include "common.h"
+ #include "powerdomain.h"
+ #include "prm33xx.h"
+ #include "prm-regbits-33xx.h"
 -- 
 1.7.9.5
