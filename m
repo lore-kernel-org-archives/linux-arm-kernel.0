@@ -1,35 +1,45 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 31 Mar 2014 14:07:25 +0200
-Subject: [PATCH 0/4] Add Allwinner SoCs PWM support
-Message-ID: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 31 Mar 2014 14:07:27 +0200
+Subject: [PATCH 2/4] pwm: sunxi: document OF bindings
+In-Reply-To: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1396267649-18009-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1396267649-18009-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is the documentation for the Allwinner Socs PWM bindings.
 
-This patch set adds support for the PWM controller found on the Allwinner SoCs.
-
-The first patch adds the driver itself.
-The second patch adds the DT binding documentation
-The third patch adds the bindings to the sun7i-a20 DTS include.
-And finally, the la patch adds support for the PWMs to the cubietruck which is
-the board I used to test.
-
-Alexandre Belloni (4):
-  pwm: Add Allwinner SoC support
-  pwm: sunxi: document OF bindings
-  ARM: sun7i: dt: add PWM support
-  ARM: sunxi: dt: Add PWM support for the cubietruck
-
- .../devicetree/bindings/pwm/pwm-sunxi.txt          |  19 ++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  22 ++
- drivers/pwm/Kconfig                                |   9 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-sunxi.c                            | 325 +++++++++++++++++++++
- 6 files changed, 382 insertions(+)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Cc: devicetree at vger.kernel.org
+ Documentation/devicetree/bindings/pwm/pwm-sunxi.txt | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
- create mode 100644 drivers/pwm/pwm-sunxi.c
 
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt b/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+new file mode 100644
+index 000000000000..e295a50813af
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+@@ -0,0 +1,19 @@
++Allwinner PWM controller
++
++Required properties:
++  - compatible: should be one of:
++    - "allwinner,sun4i-pwm"
++    - "allwinner,sun7i-pwm"
++  - reg: physical base address and length of the controller's registers
++  - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
++    the cells format.
++
++Example:
++
++	pwm: pwm at 01c20e00 {
++		compatible = "allwinner,sun7i-pwm";
++		reg = <0x01c20e00 0xc>;
++		clocks = <&osc24M>;
++		#pwm-cells = <3>;
++		status = "disabled";
++	};
 -- 
 1.8.3.2
