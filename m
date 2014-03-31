@@ -1,53 +1,40 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 31 Mar 2014 11:36:29 -0700
-Subject: [PATCH v6 02/12] ARM/ARM64: KVM: Add common header for PSCI
- related defines
-In-Reply-To: <CAJ5Y-eaGsM4Moz815P7QM=7qh87RyzU-MVyeLOT64CLEaR0HQA@mail.gmail.com>
-References: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
- <1396262773-7723-3-git-send-email-anup.patel@linaro.org>
- <20140331180722.GD4756@lvm>
- <CAJ5Y-eaGsM4Moz815P7QM=7qh87RyzU-MVyeLOT64CLEaR0HQA@mail.gmail.com>
-Message-ID: <20140331183629.GF4756@lvm>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Mar 2014 19:36:18 +0100
+Subject: [PATCH] asm-generic: allow generic unaligned access if the
+ arch supports it
+In-Reply-To: <CAKv+Gu9RATUkhya0zytS8FbSM8=49xwNg0m24Xp1LtCWoarDRQ@mail.gmail.com>
+References: <1395942387-14177-1-git-send-email-ard.biesheuvel@linaro.org>
+ <201403281914.20201.arnd@arndb.de>
+ <CAKv+Gu_9yD1jWhxkPxSUbwjJk4QxPNXBR=EXfmfCgzD1Pdig2g@mail.gmail.com>
+ <20140331095941.GA29871@arm.com>
+ <CAKv+Gu_05nmZrQxwELXae4tiK=-MpjUjmEKrULdg+6YuC-DW8Q@mail.gmail.com>
+ <20140331172436.GL29871@arm.com>
+ <CAKv+Gu9RATUkhya0zytS8FbSM8=49xwNg0m24Xp1LtCWoarDRQ@mail.gmail.com>
+Message-ID: <20140331183618.GY7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 02:18:20PM -0400, Ashwin Chaugule wrote:
-> Hello,
-> 
-> On 31 March 2014 14:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Mon, Mar 31, 2014 at 04:16:03PM +0530, Anup Patel wrote:
-> >> We need a common place to share PSCI related defines among ARM kernel,
-> >> ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
-> >>
-> >> We introduce uapi/linux/psci.h for this purpose. This newly added
-> >> header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
-> >> and user space (i.e. QEMU or KVMTOOL).
-> >>
-> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> >> ---
-> >>  include/uapi/linux/Kbuild |    1 +
-> >>  include/uapi/linux/psci.h |   55 +++++++++++++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 56 insertions(+)
-> >>  create mode 100644 include/uapi/linux/psci.h
-> >>
+On Mon, Mar 31, 2014 at 08:22:43PM +0200, Ard Biesheuvel wrote:
+> On 31 March 2014 19:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > It actually affects arch/arm as well which selects
+> > HAVE_EFFICIENT_UNALIGNED_ACCESS for v6/v7 and uses the generic
+> > unaligned.h
 > >
-> > You should coordinate with Ashwin's work so you don't step on each
-> > other's definitions and one patch set should depend on the other one.
 > 
-> So, apart from some extra #defines we mostly differ on style. Whats
-> the general recommendation here?
-> Mine looks simpler [1] ;)
+> Oops, my bad. I did a quick 'find -name unaligned.h' but misread 'arc'
+> for 'arm'.
 > 
-I think Marc brought up the point previously that we may get to PSCI
-spec v42.17 and the defines should perhaps encompass the version we are
-defining things for right now...
+> @Russell: ARM is a user of asm-generic/unaligned.h, and I proposed a
+> patch to asm-generic that switches to unaligned accesses if
+> HAVE_EFFICIENT_UNALIGNED_ACCESS is set by the arch. This should affect
+> a fair amount of code living under net/ and drivers/ that don't test
+> for the Kconfig symbol but expect get_unaligned_xx/put_unaligned_xx to
+> turn into something suitable depending on the arch. Any objections?
 
-That being said, assuming new spec versions don't break backwards
-compatibility in the numbering, the wording proposed by your patch does
-look simpler.
+I'm not sure what you're talking about here, or what change you're
+proposing.  Without any kind of frame of reference, I can't comment.
+Sorry.
 
-I do like the hardcoded IDs because that's how it's presented in the
-spec itself.
-
--Christoffer
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
