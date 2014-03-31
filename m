@@ -1,32 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 31 Mar 2014 11:07:22 -0700
-Subject: [PATCH v6 02/12] ARM/ARM64: KVM: Add common header for PSCI
- related defines
-In-Reply-To: <1396262773-7723-3-git-send-email-anup.patel@linaro.org>
-References: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
- <1396262773-7723-3-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140331180722.GD4756@lvm>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 31 Mar 2014 11:12:33 -0700
+Subject: [PATCH v4] ARM: mm: fix reporting of read-only PMD bits
+In-Reply-To: <CAGXu5j+GokV1MKv4Otb0AGt4Xvm8WXMLaOvGUUX+BJpo7Myg9g@mail.gmail.com>
+References: <20140323042050.GA15181@www.outflux.net>
+ <CAGXu5j+GokV1MKv4Otb0AGt4Xvm8WXMLaOvGUUX+BJpo7Myg9g@mail.gmail.com>
+Message-ID: <5339B011.7070006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 04:16:03PM +0530, Anup Patel wrote:
-> We need a common place to share PSCI related defines among ARM kernel,
-> ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
+On 3/28/2014 11:45 AM, Kees Cook wrote:
+> On Sat, Mar 22, 2014 at 9:20 PM, Kees Cook <keescook@chromium.org> wrote:
+>> On non-LPAE ARMv6+, read-only PMD bits are defined with the combination
+>> "PMD_SECT_APX | PMD_SECT_AP_WRITE". Adjusted the bit masks to correctly
+>> report this.
+>>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> ---
+>> v4:
+>>  - clean up defines for CPU versions; Rob Herring.
+>> v3:
+>>  - check for pre-v6 CPUs on the page table report.
+>> v2:
+>>  - reorder bits, suggested by Olof.
 > 
-> We introduce uapi/linux/psci.h for this purpose. This newly added
-> header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
-> and user space (i.e. QEMU or KVMTOOL).
+> Can anyone give this a test or ack? I've done build tests for all CPU
+> combinations, and runtime tests on v6 and LPAE.
 > 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  include/uapi/linux/Kbuild |    1 +
->  include/uapi/linux/psci.h |   55 +++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 56 insertions(+)
->  create mode 100644 include/uapi/linux/psci.h
+> Thanks!
+> 
+> -Kees
 > 
 
-You should coordinate with Ashwin's work so you don't step on each
-other's definitions and one patch set should depend on the other one.
+You are welcome to add
 
--Christoffer
+Tested-by: Laura Abbott <lauraa@codeaurora.org>
+
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
