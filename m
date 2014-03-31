@@ -1,215 +1,135 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 31 Mar 2014 17:18:02 +0200
-Subject: [PATCH V2 01/19] mmc: mmci: Convert to the mmc gpio API
-In-Reply-To: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
-References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1396279100-2920-2-git-send-email-ulf.hansson@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 31 Mar 2014 16:27:19 +0100
+Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
+In-Reply-To: <9531814.OxBzcO1V3J@wuerfel>
+References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
+ <76240593.SAyloCy7nR@wuerfel> <20140331113113.GE29871@arm.com>
+ <9531814.OxBzcO1V3J@wuerfel>
+Message-ID: <20140331152719.GH29871@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid duplication of code while handling card detect and write
-protect GPIO pins/irqs, let's convert to use the mmc gpio API.
+On Mon, Mar 31, 2014 at 01:53:20PM +0100, Arnd Bergmann wrote:
+> On Monday 31 March 2014 12:31:14 Catalin Marinas wrote:
+> > On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
+> > > On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
+> > > > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
+> > > > space described in [1] due to one major issue + one minor issue.
+> > > > 
+> > > > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
+> > > > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
+> > > > kernel fails to create mapping for this region in map_mem function
+> > > > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
+> > > > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
+> > > 
+> > > It took me a while to understand what is going on, but it essentially comes
+> > > down to the logical memory map (0xffffffc000000000-0xffffffffffffffff)
+> > > being able to represent only RAM in the first 256GB of address space.
+> > > 
+> > > More importantly, this means that any system following [1] will only be
+> > > able to use 32GB of RAM, which is a much more severe restriction than
+> > > what it sounds like at first.
+> > 
+> > On a 64-bit platform, do we still need the alias at the bottom and the
+> > 512-544GB hole (even for 32-bit DMA, top address bits can be wired to
+> > 512GB)? Only the idmap would need 4 levels, but that's static, we don't
+> > need to switch Linux to 4-levels. Otherwise the memory is too sparse.
+> 
+> I think we should keep a static virtual-to-physical mapping,
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |   97 ++++++++---------------------------------------
- drivers/mmc/host/mmci.h |    3 --
- 2 files changed, 15 insertions(+), 85 deletions(-)
+Just so that I understand: with a PHYS_OFFSET of 0?
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 771c60a..b0b81ac 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -23,6 +23,7 @@
- #include <linux/mmc/pm.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
-+#include <linux/mmc/slot-gpio.h>
- #include <linux/amba/bus.h>
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
-@@ -1326,35 +1327,18 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	pm_runtime_put_autosuspend(mmc_dev(mmc));
- }
- 
--static int mmci_get_ro(struct mmc_host *mmc)
--{
--	struct mmci_host *host = mmc_priv(mmc);
--
--	if (host->gpio_wp == -ENOSYS)
--		return -ENOSYS;
--
--	return gpio_get_value_cansleep(host->gpio_wp);
--}
--
- static int mmci_get_cd(struct mmc_host *mmc)
- {
- 	struct mmci_host *host = mmc_priv(mmc);
- 	struct mmci_platform_data *plat = host->plat;
--	unsigned int status;
-+	unsigned int status = mmc_gpio_get_cd(mmc);
- 
--	if (host->gpio_cd == -ENOSYS) {
-+	if (status == -ENOSYS) {
- 		if (!plat->status)
- 			return 1; /* Assume always present */
- 
- 		status = plat->status(mmc_dev(host->mmc));
--	} else
--		status = !!gpio_get_value_cansleep(host->gpio_cd)
--			^ plat->cd_invert;
--
--	/*
--	 * Use positive logic throughout - status is zero for no card,
--	 * non-zero for card inserted.
--	 */
-+	}
- 	return status;
- }
- 
-@@ -1391,21 +1375,12 @@ static int mmci_sig_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
- 	return ret;
- }
- 
--static irqreturn_t mmci_cd_irq(int irq, void *dev_id)
--{
--	struct mmci_host *host = dev_id;
--
--	mmc_detect_change(host->mmc, msecs_to_jiffies(500));
--
--	return IRQ_HANDLED;
--}
--
- static struct mmc_host_ops mmci_ops = {
- 	.request	= mmci_request,
- 	.pre_req	= mmci_pre_request,
- 	.post_req	= mmci_post_request,
- 	.set_ios	= mmci_set_ios,
--	.get_ro		= mmci_get_ro,
-+	.get_ro		= mmc_gpio_get_ro,
- 	.get_cd		= mmci_get_cd,
- 	.start_signal_voltage_switch = mmci_sig_volt_switch,
- };
-@@ -1494,10 +1469,6 @@ static int mmci_probe(struct amba_device *dev,
- 	host = mmc_priv(mmc);
- 	host->mmc = mmc;
- 
--	host->gpio_wp = -ENOSYS;
--	host->gpio_cd = -ENOSYS;
--	host->gpio_cd_irq = -1;
--
- 	host->hw_designer = amba_manf(dev);
- 	host->hw_revision = amba_rev(dev);
- 	dev_dbg(mmc_dev(mmc), "designer ID = 0x%02x\n", host->hw_designer);
-@@ -1568,6 +1539,9 @@ static int mmci_probe(struct amba_device *dev,
- 
- 	mmc->caps = plat->capabilities;
- 	mmc->caps2 = plat->capabilities2;
-+	if (!plat->cd_invert)
-+		mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-+	mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
- 
- 	if (variant->busy_detect) {
- 		mmci_ops.card_busy = mmci_card_busy;
-@@ -1621,49 +1595,23 @@ static int mmci_probe(struct amba_device *dev,
- 		goto err_gpio_cd;
- 	}
- 	if (gpio_is_valid(plat->gpio_cd)) {
--		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
--		if (ret == 0)
--			ret = gpio_direction_input(plat->gpio_cd);
--		if (ret == 0)
--			host->gpio_cd = plat->gpio_cd;
--		else if (ret != -ENOSYS)
-+		ret = mmc_gpio_request_cd(mmc, plat->gpio_cd, 0);
-+		if (ret)
- 			goto err_gpio_cd;
--
--		/*
--		 * A gpio pin that will detect cards when inserted and removed
--		 * will most likely want to trigger on the edges if it is
--		 * 0 when ejected and 1 when inserted (or mutatis mutandis
--		 * for the inverted case) so we request triggers on both
--		 * edges.
--		 */
--		ret = request_any_context_irq(gpio_to_irq(plat->gpio_cd),
--				mmci_cd_irq,
--				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
--				DRIVER_NAME " (cd)", host);
--		if (ret >= 0)
--			host->gpio_cd_irq = gpio_to_irq(plat->gpio_cd);
- 	}
- 	if (plat->gpio_wp == -EPROBE_DEFER) {
- 		ret = -EPROBE_DEFER;
--		goto err_gpio_wp;
-+		goto err_gpio_cd;
- 	}
- 	if (gpio_is_valid(plat->gpio_wp)) {
--		ret = gpio_request(plat->gpio_wp, DRIVER_NAME " (wp)");
--		if (ret == 0)
--			ret = gpio_direction_input(plat->gpio_wp);
--		if (ret == 0)
--			host->gpio_wp = plat->gpio_wp;
--		else if (ret != -ENOSYS)
--			goto err_gpio_wp;
-+		ret = mmc_gpio_request_ro(mmc, plat->gpio_wp);
-+		if (ret)
-+			goto err_gpio_cd;
- 	}
- 
--	if ((host->plat->status || host->gpio_cd != -ENOSYS)
--	    && host->gpio_cd_irq < 0)
--		mmc->caps |= MMC_CAP_NEEDS_POLL;
--
- 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
- 	if (ret)
--		goto unmap;
-+		goto err_gpio_cd;
- 
- 	if (!dev->irq[1])
- 		host->singleirq = true;
-@@ -1695,14 +1643,6 @@ static int mmci_probe(struct amba_device *dev,
- 
-  irq0_free:
- 	free_irq(dev->irq[0], host);
-- unmap:
--	if (host->gpio_wp != -ENOSYS)
--		gpio_free(host->gpio_wp);
-- err_gpio_wp:
--	if (host->gpio_cd_irq >= 0)
--		free_irq(host->gpio_cd_irq, host);
--	if (host->gpio_cd != -ENOSYS)
--		gpio_free(host->gpio_cd);
-  err_gpio_cd:
- 	iounmap(host->base);
-  clk_disable:
-@@ -1741,13 +1681,6 @@ static int mmci_remove(struct amba_device *dev)
- 		if (!host->singleirq)
- 			free_irq(dev->irq[1], host);
- 
--		if (host->gpio_wp != -ENOSYS)
--			gpio_free(host->gpio_wp);
--		if (host->gpio_cd_irq >= 0)
--			free_irq(host->gpio_cd_irq, host);
--		if (host->gpio_cd != -ENOSYS)
--			gpio_free(host->gpio_cd);
--
- 		iounmap(host->base);
- 		clk_disable_unprepare(host->clk);
- 
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 58b1b88..8fc5814 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -176,9 +176,6 @@ struct mmci_host {
- 	struct mmc_data		*data;
- 	struct mmc_host		*mmc;
- 	struct clk		*clk;
--	int			gpio_cd;
--	int			gpio_wp;
--	int			gpio_cd_irq;
- 	bool			singleirq;
- 
- 	spinlock_t		lock;
+> and to keep
+> relocating the kernel at compile time without a hack like ARM_PATCH_PHYS_VIRT
+> if at all possible.
+
+and the kernel running at a virtual alias at a higher position than the
+end of the mapped RAM? IIUC x86_64 does something similar.
+
+> > > > Secondly, vmemmap space is not enough to cover over about 585GB physical
+> > > > address space. Fortunately, this issue can be resolved as utilizing an extra
+> > > > vmemmap space (0xffffffbe00000000-0xffffffbffbbfffff) in [2]. However,
+> > > > it would not cover systems having a couple of terabytes DRAM.
+> > > 
+> > > This one can be trivially changed by taking more space out of the vmalloc
+> > > area, to go much higher if necessary. vmemmap space is always just a fraction
+> > > of the linear mapping size, so we can accommodate it by definition if we
+> > > find space to fit the physical memory.
+> > 
+> > vmemmap is the total range / page size * sizeof(struct page). So for 1TB
+> > range and 4K pages we would need 8GB (the current value, unless I
+> > miscalculated the above). Anyway, you can't cover 1TB range with
+> > 3-levels.
+> 
+> The size of 'struct page' depends on a couple of configuration variables.
+> If they are all enabled, you might need a bit more, even for configurations
+> that don't have that much address space.
+
+Yes. We could make vmemmap configurable at run-time or just go for a
+maximum value.
+
+> > > > Therefore, it would be needed to implement 4 level page table translations
+> > > > for 4KB pages on 40-bit physical address space platforms. Someone might
+> > > > suggest use of 64KB pages in this case, but I'm not sure about how to
+> > > > deal with internal memory fragmentation.
+> > > > 
+> > > > I would like to contribute 4 level page table translations to upstream,
+> > > > the target of which is 3.16 kernel, if there is no movement on it. I saw
+> > > > some related RFC patches a couple of months ago, but they didn't seem to 
+> > > > be merged into maintainer's tree.
+> > > 
+> > > I think you are answering the wrong question here. Four level page tables
+> > > should not be required to support >32GB of RAM, that would be very silly.
+> > 
+> > I agree, we should only enable 4-levels of page table if we have close
+> > to 512GB of RAM or the range is too sparse but I would actually push
+> > back on the hardware guys to keep it tighter.
+> 
+> But remember this part:
+> 
+> > > There are good reasons to use a 50 bit virtual address space in user
+> > > land, e.g. for supporting data base applications that mmap huge files.
+> 
+> You may actually need 4-level tables even if you have much less installed
+> memory, depending on how the application is written. Note that x86, powerpc
+> and s390 all chose to use 4-level tables for 64-bit kernels all the
+> time, even thought they can also use 3-level of 5-level in some cases.
+
+I don't mind 4-level tables by default but I would still keep a
+configuration option (or at least doing some benchmarks to assess the
+impact before switching permanently to 4-levels). There are mobile
+platforms that don't really need as much VA space (and people are even
+talking about ILP32).
+
+> > > If this is not the goal however, we should not pay for the overhead
+> > > of the extra page table in user space. I can see two other possible
+> > > solutions for the problem:
+> > > 
+> > > a) always use a four-level page table in kernel space, regardless of
+> > > whether we do it in user space. We can move the kernel mappings down
+> > > in address space either by one 512GB entry to 0xffffff0000000000, or
+> > > to match the 64k-page location at 0xfffffc0000000000, or all the way
+> > > to to 0xfffc000000000000. In any case, we can have all the dynamic
+> > > mappings within one 512GB area and pretend we have a three-level
+> > > page table for them, while the rest of DRAM is mapped statically at
+> > > early boot time using 512GB large pages.
+> > 
+> > That's a workaround but we end up with two (or more) kernel pgds - one
+> > for vmalloc, ioremap etc. and another (static) one for the kernel linear
+> > mapping. So far there isn't any memory mapping carved out but we have to
+> > be careful in the future.
+> > 
+> > However, kernel page table walking would be a bit slower with 4-levels.
+> 
+> Do we actually walk the kernel page tables that often? With what I suggested,
+> we can still pretend that it's 3-level for all practical purposes, since
+> you wouldn't walk the page tables for the linear mapping.
+
+I was referring to hardware page table walk (TLB miss). Again, we need
+some benchmarks (it gets worse in a guest as it needs to walk the stage
+2 for each stage 1 level miss; if you are really unlucky you can have up
+to 24 memory accesses for a TLB miss with two translation stages and 4
+levels each).
+
 -- 
-1.7.9.5
+Catalin
