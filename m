@@ -1,38 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Mar 2014 11:55:49 +0100
-Subject: [PATCH 58/75] ARM: l2c: omap2: remove cache size override
-In-Reply-To: <20140328222159.GB30388@atomide.com>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYZ1-0007Gn-3J@rmk-PC.arm.linux.org.uk>
- <20140328160358.GG24308@atomide.com>
- <20140328210945.GU7528@n2100.arm.linux.org.uk>
- <20140328222159.GB30388@atomide.com>
-Message-ID: <20140331105549.GF27282@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 31 Mar 2014 13:02:55 +0200
+Subject: [PATCH 1/2] ARM: sun7i/sun6i: dts: Fix IRQ number for sun6i NMI
+ controller
+In-Reply-To: <1395939759-11135-2-git-send-email-carlo@caione.org>
+References: <1395939759-11135-1-git-send-email-carlo@caione.org>
+ <1395939759-11135-2-git-send-email-carlo@caione.org>
+Message-ID: <20140331110255.GE26751@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 03:21:59PM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [140328 14:13]:
-> > On Fri, Mar 28, 2014 at 09:03:59AM -0700, Tony Lindgren wrote:
-> > > * Russell King <rmk+kernel@arm.linux.org.uk> [140328 08:22]:
-> > > 
-> > > Missing description?
-> > 
-> > No, I just got sick and tired of trying to write descriptions for these
-> > patches.  Many of these I regard as totally unnecessary patches that
-> > should never have been required had platform folk not invested in
-> > cargo cult programming.
-> > 
-> > Given the number of patches I'm presently dealing with in my tree right
-> > now, I don't actually have time to even follow the mailing lists at the
-> > moment.  If I were to properly describe all of these patches, I'd
-> > probably be at this for another few weeks.
+On Thu, Mar 27, 2014 at 06:02:38PM +0100, Carlo Caione wrote:
+> From: Hans de Goede <hdegoede@redhat.com>
 > 
-> Heh well I have a feeling you'll add some generic description anyways :)
+> The IRQ line used in sun6i-a31.dtsi for the NMI controller is wrong.
+> This causes a IRQ storm since the NMI controller is repeatedly fired.
+> This patch fixes this problem assigning the correct IRQ number to the
+> NMI controller.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
 
-If I end up merging each of these patches removingthe cache override
-together into one commit touching many of the SoCs, then yes.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140331/ce3c2f12/attachment-0001.sig>
