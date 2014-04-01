@@ -1,53 +1,53 @@
-From: michael.casadevall@linaro.org (Michael Casadevall)
-Date: Tue, 01 Apr 2014 05:57:29 -0400
-Subject: [RFC v2] ARM VM System Specification
-In-Reply-To: <1396345749.8667.74.camel@kazak.uk.xensource.com>
-References: <20140328184517.GA27219@cbox>	
- <CAOesGMh7AFfuq73SxOWiiLV0eJNLpA0M5hr0OwRo8=BLWueWwQ@mail.gmail.com>	
- <20140331172613.GA4756@lvm> <1396345749.8667.74.camel@kazak.uk.xensource.com>
-Message-ID: <533A8D89.9000500@linaro.org>
+From: sungjinn.chung@samsung.com (=?utf-8?B?7KCV7ISx7KeE?=)
+Date: Tue, 01 Apr 2014 19:13:27 +0900
+Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
+In-Reply-To: <20140401094648.GB20061@arm.com>
+References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
+ <76240593.SAyloCy7nR@wuerfel> <20140331113113.GE29871@arm.com>
+ <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
+ <000501cf4d43$90e618a0$b2b249e0$%chung@samsung.com>
+ <20140401094648.GB20061@arm.com>
+Message-ID: <000c01cf4d93$0863e750$192bb5f0$%chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-
-
-On 04/01/2014 05:49 AM, Ian Campbell wrote:
-> On Mon, 2014-03-31 at 10:26 -0700, Christoffer Dall wrote:
->> However, that may be a pain to update
+On Tuesday, April 01, 2014 6:47 PM, Catalin Marinas wrote:
+> On Tue, Apr 01, 2014 at 01:44:36AM +0100, ??? wrote:
+> > On Tuesday, April 01, 2014 12:27 AM Catalin Marinas wrote:
+> > > I don't mind 4-level tables by default but I would still keep a
+> > > configuration option (or at least doing some benchmarks to assess the
+> > > impact before switching permanently to 4-levels). There are mobile
+> > > platforms that don't really need as much VA space (and people are even
+> > > talking about ILP32).
+> >
+> > How about keep 3-level table by default and enable 4-level table with
+> > config option?
 > 
-> Very much, and there would be nothing worse than having multiple 
-> divergent copies of the spec.
+> We want single image, so the default should cover all platforms. If
+> someone wants to deploy a more specific kernel (e.g. for a mobile
+> platform), they could change the configuration to more suitable ones.
+Single image would have merit but I think one way should be default 
+Configuration and another should be specific kernel for smaller or lager 
+memory platform.
+Which one do you want as default configuration among 3 level and 4 level?
 > 
->> so the preferred method could be to host it in either its current
->> form (clear-text) or publish some versioned PDF somewhere and
->> simply point to it from the compliant software pieces.
+> > Asymmetry level for kernel and user land would make code complicated.
+> > And usually more memory means that user application tends to use more memory.
+> > So I suggest same virtual space for both.
 > 
-> I think that would be best.
+> I don't really get the "more memory means ..." above ;). It's more
+> virtual space, the user application would not extend to use all of it
+> (most likely won't even notice).
+The reason why we need 4 level page table is originally is that we need
+bigger physical memory and kernel does not have enough virtual space.
+Please consider this is not only for making virtual bigger.
+It's to make system use large physical memory for user application.
 > 
-> I'm at a loss to suggest a suitable neutral home though I'm
-> afraid.
+> Asymmetry wouldn't make things much more complicated. You can even
+> pretend you have 4 levels configured but used pgd_offset tricks to
+> effectively use 3 hardware levels.
+User application also might need much memory and 4 level page table
+in case it need 4 level page table for kernel.
 > 
-
-I agree with formal PDF (or TeX/plain text) releases + versioning;
-something I can print out and hit people with always works great for
-spec compliance.
-
-On the topic of hosting, if Linaro itself isn't neutral enough, what
-about under the Linux Foundation? They already host a bunch of
-standards like the FHS.
-Michael
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.14 (GNU/Linux)
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iQEcBAEBAgAGBQJTOo2JAAoJEGKVRgSEnX1Qu+gH/ja+aqOqc04gbpFvuarHtzeM
-nLtJ1ie4JKOJTVqqQz+lgPhx+r3H9PrMFZnGvzs8H6GYSaU66i/SHKU150J1Ig5M
-1w4DYqQj7DEClpoNmpPZVJJbevp70/wDH1wFSJZXJmxV9yOpMtrNZXwB60KANP2f
-MJDF+iDLIkv8vRPYQJEmuV4PMcJQs88X91eEb67jChX1ntMiiDAFSM6t2cRyfVG0
-la4Ujk/p/u+Kr43wbhQITOKXZpWCtI8gjp7wTuZc+EDIhmufd5uiQ2VyTZaMkPkV
-xuX9871Y8VHGxCkAmhHPODbp3Wd4VUP2ewOYnTRYR2IIRpa4gNNLUa+MSdrL/sU=
-=2ub7
------END PGP SIGNATURE-----
+> --
+> Catalin
