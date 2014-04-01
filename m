@@ -1,45 +1,46 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Apr 2014 16:23:49 +0300
-Subject: [PATCH v4 4/5] drivers: bus: omap_l3: Remove the platform driver's
- remove function
-In-Reply-To: <1396358630-32340-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1396358630-32340-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1396358630-32340-5-git-send-email-peter.ujfalusi@ti.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Tue,  1 Apr 2014 21:27:09 +0800
+Subject: [PATCH v5 0/3] add hisilicon hip04 ethernet driver
+Message-ID: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is NOP after the devm_* conversion.
+v5:
+no big change, fix typo
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- drivers/bus/omap_l3_noc.c | 6 ------
- 1 file changed, 6 deletions(-)
+v4:
+Modify accoringly to the suggetion from Arnd, Florian, Eric, David
+Use of_parse_phandle_with_fixed_args & syscon_node_to_regmap get ppe info
+Add skb_orphan() and tx_timer for reclaim since no tx_finished interrupt
+Update timeout, and move of_phy_connect to probe to reuse open/stop
 
-diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 25bcb60be880..0eff48585ae3 100644
---- a/drivers/bus/omap_l3_noc.c
-+++ b/drivers/bus/omap_l3_noc.c
-@@ -173,11 +173,6 @@ static int omap4_l3_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int omap4_l3_remove(struct platform_device *pdev)
--{
--	return 0;
--}
--
- #if defined(CONFIG_OF)
- static const struct of_device_id l3_noc_match[] = {
- 	{.compatible = "ti,omap4-l3-noc", },
-@@ -190,7 +185,6 @@ MODULE_DEVICE_TABLE(of, l3_noc_match);
- 
- static struct platform_driver omap4_l3_driver = {
- 	.probe		= omap4_l3_probe,
--	.remove		= omap4_l3_remove,
- 	.driver		= {
- 		.name		= "omap_l3_noc",
- 		.owner		= THIS_MODULE,
+v3:
+Suggest from Arnd, use syscon & regmap_write/read to replace static void __iomem *ppebase.
+Modify hisilicon-hip04-net.txt accrordingly to suggestion from Florian and Sergei.
+
+v2:
+Got many suggestions from Russell, Arnd, Florian, Mark and Sergei
+Remove memcpy, use dma_map/unmap_single, use dma_alloc_coherent rather than dma_pool, etc.
+Refer property in ethernet.txt, change ppe description, etc.
+
+Zhangfei Gao (3):
+  Documentation: add Device tree bindings for Hisilicon hip04 ethernet
+  net: hisilicon: new hip04 MDIO driver
+  net: hisilicon: new hip04 ethernet driver
+
+ .../bindings/net/hisilicon-hip04-net.txt           |   88 +++
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/hisilicon/Kconfig             |   32 +
+ drivers/net/ethernet/hisilicon/Makefile            |    5 +
+ drivers/net/ethernet/hisilicon/hip04_eth.c         |  771 ++++++++++++++++++++
+ drivers/net/ethernet/hisilicon/hip04_mdio.c        |  186 +++++
+ 7 files changed, 1084 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+ create mode 100644 drivers/net/ethernet/hisilicon/Kconfig
+ create mode 100644 drivers/net/ethernet/hisilicon/Makefile
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_mdio.c
+
 -- 
-1.9.1
+1.7.9.5
