@@ -1,33 +1,31 @@
 From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Tue,  1 Apr 2014 17:02:51 +0300
-Subject: [PATCHv3 0/5] net: rfkill: gpio: cleanup and a few new acpi ids
-Message-ID: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
+Date: Tue,  1 Apr 2014 17:02:54 +0300
+Subject: [PATCHv3 3/5] net: rfkill: gpio: add ACPI ID for GPS module on Lenovo
+ Miix2
+In-Reply-To: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
+References: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
+Message-ID: <1396360976-28657-4-git-send-email-heikki.krogerus@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Lenovo Miix 2 8", BCM4752 is renamed LNV4752.
 
-I hope this one is OK with everyone.
+Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+---
+ net/rfkill/rfkill-gpio.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since v2:
-- Instead of changing the driver to use only indexed gpios, just
-  hard-coding the names.
-
-Changes since v1:
-- Removed the gpio entries from arch/arm/mach-tegra/board-paz00.c
-
-
-Heikki Krogerus (5):
-  ARM: tegra: remove obsolete gpio entries
-  net: rfkill: gpio: remove unused and obsolete platform parameters
-  net: rfkill: gpio: add ACPI ID for GPS module on Lenovo Miix2
-  net: rfkill: gpio: add ACPI IDs for a Broadcom bluetooth chip
-  net: rfkill: gpio: hard-code the gpio names
-
- arch/arm/mach-tegra/board-paz00.c |  4 +---
- include/linux/rfkill-gpio.h       | 10 ----------
- net/rfkill/rfkill-gpio.c          | 40 +++++++++------------------------------
- 3 files changed, 10 insertions(+), 44 deletions(-)
-
+diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
+index 0adda44..fec3dbf 100644
+--- a/net/rfkill/rfkill-gpio.c
++++ b/net/rfkill/rfkill-gpio.c
+@@ -173,6 +173,7 @@ static int rfkill_gpio_remove(struct platform_device *pdev)
+ 
+ static const struct acpi_device_id rfkill_acpi_match[] = {
+ 	{ "BCM4752", RFKILL_TYPE_GPS },
++	{ "LNV4752", RFKILL_TYPE_GPS },
+ 	{ },
+ };
+ 
 -- 
 1.9.1
