@@ -1,32 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  1 Apr 2014 22:10:21 +0200
-Subject: [PATCH] pinctrl: capri: make Kconfig dependency more strict
-Message-ID: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  1 Apr 2014 14:13:15 -0600
+Subject: [PATCH 1/3] ARM: tegra: remove UART5/UARTE from tegra124.dtsi
+Message-ID: <1396383197-5979-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is only useful on BCM281xx, so let the driver depend on
-ARCH_BCM_MOBILE but allow compile coverage testing.
-The main benefit is that the driver isn't available to be selected for
-machines that don't have the matching hardware.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Tegra124 only has 4 UARTs. Parts of the documentation hint at a fifth
+UART, but this appears to be left-over from earlier SoC documentation.
+Remove the non-existent DT node for UART5.
+
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/pinctrl/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/tegra124.dtsi | 13 -------------
+ 1 file changed, 13 deletions(-)
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index e49324032611..072749816cb4 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -106,7 +106,7 @@ config PINCTRL_BCM2835
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index cf45a1a39483..6d540a025148 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -233,19 +233,6 @@
+ 		status = "disabled";
+ 	};
  
- config PINCTRL_CAPRI
- 	bool "Broadcom Capri pinctrl driver"
--	depends on OF
-+	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
- 	select PINMUX
- 	select PINCONF
- 	select GENERIC_PINCONF
+-	serial at 0,70006400 {
+-		compatible = "nvidia,tegra124-uart", "nvidia,tegra20-uart";
+-		reg = <0x0 0x70006400 0x0 0x40>;
+-		reg-shift = <2>;
+-		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car TEGRA124_CLK_UARTE>;
+-		resets = <&tegra_car 66>;
+-		reset-names = "serial";
+-		dmas = <&apbdma 20>, <&apbdma 20>;
+-		dma-names = "rx", "tx";
+-		status = "disabled";
+-	};
+-
+ 	pwm at 0,7000a000 {
+ 		compatible = "nvidia,tegra124-pwm", "nvidia,tegra20-pwm";
+ 		reg = <0x0 0x7000a000 0x0 0x100>;
 -- 
-1.9.1
+1.8.1.5
