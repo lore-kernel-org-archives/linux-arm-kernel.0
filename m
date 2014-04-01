@@ -1,97 +1,40 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 2 Apr 2014 00:19:13 +0200
-Subject: [PATCH 1/2] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <1396383101.20336.6.camel@dinh-ubuntu>
-References: <1396303627-29198-1-git-send-email-tthayer@altera.com>
- <1396303627-29198-2-git-send-email-tthayer@altera.com>
- <20140401052807.GN5052@pengutronix.de>
- <1396383101.20336.6.camel@dinh-ubuntu>
-Message-ID: <20140401221913.GR5052@pengutronix.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 1 Apr 2014 15:34:02 -0700
+Subject: [PATCH 2/2] ARM: mm: keep rodata non-executable
+In-Reply-To: <1395658064.3465.7.camel@linaro1.home>
+References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
+ <1392339850-18686-3-git-send-email-keescook@chromium.org>
+ <20140214162257.GB2331@e103592.cambridge.arm.com>
+ <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
+ <20140217123415.GA2182@e103592.cambridge.arm.com>
+ <532F2C48.6050509@codeaurora.org>
+ <CAGXu5jK_8adL=6DoF9gFBMWxKcxKUHw7238ighE2agFU7cqhWg@mail.gmail.com>
+ <1395658064.3465.7.camel@linaro1.home>
+Message-ID: <CAGXu5jLEA5u58yNe0k4BobWphAhEiREJ1ped30LVgDRPzOGy7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Mar 24, 2014 at 3:47 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Sun, 2014-03-23 at 16:21 -0600, Kees Cook wrote:
+>> For this stage, how about I make this "depends on KEXEC=n &&
+>> KPROBES=n"?
+>
+> There's also ftrace (CONFIG_DYNAMIC_FTRACE I believe) which modifies
+> kernel code with a call to probe_kernel_write(), which GDB uses as well.
+>
+> And grepping for the patch_text() function also shows
+> __arch_jump_label_transform() modifies kernel code. Not sure how and
+> when that gets used.
 
-On Tue, Apr 01, 2014 at 03:11:41PM -0500, Thor Thayer - Sendmail wrote:
-> On Tue, 2014-04-01 at 07:28 +0200, Steffen Trumtrar wrote:
-> > Hi!
-> > 
-> > On Mon, Mar 31, 2014 at 05:07:06PM -0500, tthayer at altera.com wrote:
-> > > From: Thor Thayer <tthayer@altera.com>
-> > > 
-> > > Addition of the Altera SDRAM controller bindings and device
-> > > tree changes to the Altera SoC project.
-> > >
-> 
-> <snip>
-> 
-> > > diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> > > new file mode 100644
-> > > index 0000000..351ab7b
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
-> > > @@ -0,0 +1,14 @@
-> > > +Altera SOCFPGA SDRAM Controller
-> > > +
-> > > +Required properties:
-> > > +- compatible : "altr,sdr-ctl", "syscon";
-> > > +                Note that syscon is invoked for this device to support the FPGA
-> > > +		bridge driver and possibly other devices in the future.  See
-> > > +		also Documentation/devicetree/bindings/mfd/syscon.txt
-> > 
-> > This note is really linux specific (and specific to some vendor kernel driver
-> > for that matter). I think you should remove that.
-> 
-> Hi Steffen. Are you asking for the path to syscon.txt to be removed or
-> the entire note? 
-> The note is explaining why the "syscon" tag is used for this Altera IP
-> block (registers shared between multiple drivers).
-> Thanks for the clarification.
-> 
+Right, so, I'm trying to fix ftrace now, and I've hit a wall. It is as
+if changes to the kernel text PMD aren't being noticed after the
+kernel is running. Does anyone know why this might be happening?
 
-I was referring to the note. I don't know what the current guideline is for
-this type of "devices", but I think referring to the syscon documentation
-is okay.
-The first part however describes a DT binding with things that might or might
-not happen in the future. What I want to say is, I would rather have this
-reworded, to have it just describe the SDRAM controller node as simple as it may
-be.
+Code and details here:
+https://lkml.org/lkml/2014/4/1/674
 
-> > 
-> > > +- reg : Should contain 1 register ranges(address and length)
-> > > +
-> > > +Example:
-> > > +	sdrctl at 0xffc25000 {
-> > > +		compatible = "altr,sdr-ctl", "syscon";
-> > > +		reg = <0xffc25000 0x1000>;
-> > > +	};
-> > > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > > index 9e78c1d..3634de7 100644
-> > > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > > @@ -528,6 +528,11 @@
-> > >  			reg-io-width = <4>;
-> > >  		};
-> > >  
-> > > +		sdrctl at 0xffc25000 {
-                       ^^
-Oh, and Dinh just mentioned in my patch, that the 0x shall be removed here.
-But I'm not so sure about that. Just FYI.
-
-> > > +			compatible = "altr,sdr-ctl", "syscon";
-> > > +			reg = <0xffc25000 0x1000>;
-> > > +		};
-> > > +
-> > >  		rstmgr at ffd05000 {
-> > >  			compatible = "altr,rst-mgr";
-> > >  			reg = <0xffd05000 0x1000>;
-
-Regards,
-Steffen
+-Kees
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Kees Cook
+Chrome OS Security
