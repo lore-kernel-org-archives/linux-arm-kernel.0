@@ -1,27 +1,88 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 01 Apr 2014 13:03:09 -0600
-Subject: [PATCH 73/75] ARM: l2c: move L2 cache register saving to a more
- sensible location
-In-Reply-To: <533B0BC1.6080608@wwwdotorg.org>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYaF-0007Hv-Nv@rmk-PC.arm.linux.org.uk> <533B0BC1.6080608@wwwdotorg.org>
-Message-ID: <533B0D6D.1080803@wwwdotorg.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 1 Apr 2014 14:32:20 -0500
+Subject: [PATCH 3/6] ARM: socfpga: dts: add i2c busses
+In-Reply-To: <1396280404-2041-3-git-send-email-s.trumtrar@pengutronix.de>
+References: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396280404-2041-3-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1396380740.27447.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2014 12:56 PM, Stephen Warren wrote:
-> On 03/28/2014 09:20 AM, Russell King wrote:
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, 2014-03-31 at 17:40 +0200, Steffen Trumtrar wrote:
+> Add all 4 i2c busses.
 > 
-> EXCEPT this one patch, the series,
-> Tested-by: Stephen Warren <swarren@nvidia.com>
-> (on Tegra20/Toshiba AC100 and Tegra30/Beaver)
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
 > 
-> And any part which touches Tegra code,
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-> 
-> However, this one patch causes boot failures on the Toshiba AC100,
-> Springbank/Seaboard, and I would assume any Tegra20 system. I haven't
-> investigated what the problem is; do you need me to and/or have any clues?
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 7867e7f..d0594c3 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -470,6 +470,50 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		i2c0: i2c at 0xffc04000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0xffc04000 0x1000>;
+> +			clock-frequency = <400000000>;
 
-Ah, disabling CONFIG_CPU_IDLE "fixes" this.
+"clock-frequency" is not needed as the driver can get the clock
+frequency from the clock driver.
+
+> +			clocks = <&l4_sp_clk>;
+> +			interrupts = <0 158 0x4>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c1: i2c at 0xffc05000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0xffc05000 0x1000>;
+> +			clock-frequency = <100000000>;
+
+Same..
+
+> +			clocks = <&l4_sp_clk>;
+> +			interrupts = <0 159 0x4>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c2: i2c at 0xffc06000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0xffc06000 0x1000>;
+> +			clock-frequency = <100000000>;
+
+Same...
+
+> +			clocks = <&l4_sp_clk>;
+> +			interrupts = <0 160 0x4>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c3: i2c at 0xffc07000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0xffc07000 0x1000>;
+> +			clock-frequency = <100000000>;
+
+Same..
+
+thanks,
+Dinh
+> +			clocks = <&l4_sp_clk>;
+> +			interrupts = <0 161 0x4>;
+> +			status = "disabled";
+> +		};
+> +
+>  		L2: l2-cache at fffef000 {
+>  			compatible = "arm,pl310-cache";
+>  			reg = <0xfffef000 0x1000>;
