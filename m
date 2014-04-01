@@ -1,89 +1,41 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue,  1 Apr 2014 16:03:50 +0800
-Subject: [PATCH v1 8/8] ARM: config: append hip04_defconfig
-In-Reply-To: <1396339430-21084-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1396339430-21084-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1396339430-21084-9-git-send-email-haojian.zhuang@linaro.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue,  1 Apr 2014 12:26:19 +0400
+Subject: [PATCH] ARM: bcm: Restrict ARCH_BCM selection to ARCH_MULTI_V6_V7
+Message-ID: <1396340779-20550-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select HiP04 SoC configuration by hip04_defconfig.
-
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/configs/hip04_defconfig | 64 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
- create mode 100644 arch/arm/configs/hip04_defconfig
+ arch/arm/mach-bcm/Kconfig | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/configs/hip04_defconfig b/arch/arm/configs/hip04_defconfig
-new file mode 100644
-index 0000000..5222547
---- /dev/null
-+++ b/arch/arm/configs/hip04_defconfig
-@@ -0,0 +1,64 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_RD_GZIP=y
-+CONFIG_ARCH_HISI=y
-+CONFIG_ARCH_HIP04=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=16
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-+CONFIG_HIGHMEM=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_BLK_DEV=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=16
-+CONFIG_BLK_DEV_RAM_SIZE=4096
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI_PLATFORM=y
-+CONFIG_NETDEVICES=y
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=2
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=2
-+CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_PINCTRL_SINGLE=y
-+CONFIG_GPIO_GENERIC_PLATFORM=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_DRM=y
-+CONFIG_FB_SIMPLE=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_EXT4_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_UART_8250=y
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_DEBUG_USER=y
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 21f97f7..1048ba1 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -1,13 +1,10 @@
+ config ARCH_BCM
+-	bool "Broadcom SoC Support"
+-	depends on ARCH_MULTIPLATFORM
++	bool "Broadcom SoC Support" if ARCH_MULTI_V6_V7
+ 	help
+-	  This enables support for Broadcom ARM based SoC
+-          chips
+-
+-if ARCH_BCM
++	  This enables support for Broadcom ARM based SoC chips
+ 
+ menu "Broadcom SoC Selection"
++	depends on ARCH_BCM
+ 
+ config ARCH_BCM_MOBILE
+ 	bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
+@@ -71,5 +68,3 @@ config ARCH_BCM_5301X
+ 	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+ 
+ endmenu
+-
+-endif
 -- 
 1.8.3.2
