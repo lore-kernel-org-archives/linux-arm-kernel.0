@@ -1,306 +1,49 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 1 Apr 2014 02:50:01 +0200
-Subject: [PATCH v3 1/2] i2c: Add driver for Cadence I2C controller
-In-Reply-To: <1394556613-11692-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1394556613-11692-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20140401005001.GA3590@katana>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 01 Apr 2014 10:18:46 +0900
+Subject: [PATCH] pata_samsung_cf: fix ata_host_activate() failure handling
+In-Reply-To: <6050762.sdUI3gZZlK@amdc1032>
+References: <6050762.sdUI3gZZlK@amdc1032>
+Message-ID: <000801cf4d48$54c45210$fe4cf630$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 11, 2014 at 09:50:12AM -0700, Soren Brinkmann wrote:
-> Add a driver for the Cadence I2C controller. This controller is for
-> example found in Xilinx Zynq.
+On Tuesday, April 01, 2014 2:53 AM, Tejun Heo wrote:
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Add missing clk_disable() call to ata_host_activate() failure path.
+> 
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-...
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
 
-> +static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
-> +{
-> +	unsigned int isr_status, avail_bytes;
-> +	unsigned int bytes_to_recv, bytes_to_send;
-> +	struct cdns_i2c *id = ptr;
-> +	/* Signal completion only after everything is updated */
-> +	int done_flag = 0;
-> +
-> +	isr_status = cdns_i2c_readreg(CDNS_I2C_ISR_OFFSET);
-> +
-> +	/* Handling nack and arbitration lost interrupt */
-> +	if (isr_status & (CDNS_I2C_IXR_NACK | CDNS_I2C_IXR_ARB_LOST))
-> +		done_flag = 1;
-> +
-> +	/* Handling Data interrupt */
-> +	if ((isr_status & CDNS_I2C_IXR_DATA) &&
-> +			(id->recv_count >= CDNS_I2C_DATA_INTR_DEPTH)) {
-> +		/* Always read data interrupt threshold bytes */
-> +		bytes_to_recv = CDNS_I2C_DATA_INTR_DEPTH;
-> +		id->recv_count = id->recv_count - CDNS_I2C_DATA_INTR_DEPTH;
+Best regards,
+Jingoo Han
 
-Use '-='
-
-...
-
-> +static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
-> +		struct i2c_adapter *adap)
-> +{
-> +	int ret;
-> +	u32 reg;
-> +	bool retry = false;
-> +	unsigned retries = adap->retries;
-> +
-> +	id->p_msg = msg;
-> +	do {
-> +		id->err_status = 0;
-> +		init_completion(&id->xfer_done);
-
-reinit_completion. And add init_completion in probe.
-
-> +
-> +		/* Check for the TEN Bit mode on each msg */
-> +		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
-> +		if (msg->flags & I2C_M_TEN) {
-> +			if (reg & CDNS_I2C_CR_NEA)
-> +				cdns_i2c_writereg(reg & ~CDNS_I2C_CR_NEA,
-> +						CDNS_I2C_CR_OFFSET);
-> +		} else {
-> +			if (!(reg & CDNS_I2C_CR_NEA))
-> +				cdns_i2c_writereg(reg | CDNS_I2C_CR_NEA,
-> +						CDNS_I2C_CR_OFFSET);
-> +		}
-> +
-> +		/* Check for the R/W flag on each msg */
-> +		if (msg->flags & I2C_M_RD)
-> +			cdns_i2c_mrecv(id);
-> +		else
-> +			cdns_i2c_msend(id);
-> +
-> +		/* Wait for the signal of completion */
-> +		ret = wait_for_completion_timeout(&id->xfer_done, HZ);
-> +		if (!ret) {
-> +			cdns_i2c_master_reset(adap);
-> +			dev_err(id->adap.dev.parent,
-> +					"timeout waiting on completion\n");
-> +			return -ETIMEDOUT;
-> +		}
-> +
-> +		cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK,
-> +				  CDNS_I2C_IDR_OFFSET);
-> +
-> +		/* If it is bus arbitration error, try again */
-> +		if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
-
-Just return -EAGAIN here...
-
-> +			dev_dbg(id->adap.dev.parent,
-> +				 "Lost ownership on bus, trying again\n");
-> +			if (retries--) {
-> +				mdelay(2);
-> +				retry = true;
-> +			} else {
-> +				dev_err(id->adap.dev.parent,
-> +					 "Retries completed, exit\n");
-> +				return -EREMOTEIO;
-> +			}
-> +		}
-
-... and you can skip this block since the core will do the retries.
-
-> +	} while (retry);
+> ---
+>  drivers/ata/pata_samsung_cf.c |   10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
+> 
+> Index: b/drivers/ata/pata_samsung_cf.c
+> ===================================================================
+> --- a/drivers/ata/pata_samsung_cf.c	2014-03-14 16:45:04.344724378 +0100
+> +++ b/drivers/ata/pata_samsung_cf.c	2014-03-31 18:31:58.083631437 +0200
+> @@ -594,9 +594,13 @@ static int __init pata_s3c_probe(struct
+> 
+>  	platform_set_drvdata(pdev, host);
+> 
+> -	return ata_host_activate(host, info->irq,
+> -			info->irq ? pata_s3c_irq : NULL,
+> -			0, &pata_s3c_sht);
+> +	ret = ata_host_activate(host, info->irq,
+> +				info->irq ? pata_s3c_irq : NULL,
+> +				0, &pata_s3c_sht);
+> +	if (ret)
+> +		goto stop_clk;
 > +
 > +	return 0;
-> +}
-> +
-> +/**
-> + * cdns_i2c_master_xfer - The main i2c transfer function
-> + * @adap:	pointer to the i2c adapter driver instance
-> + * @msgs:	pointer to the i2c message structure
-> + * @num:	the number of messages to transfer
-> + *
-> + * Return: number of msgs processed on success, negative error otherwise
-> + *
-> + * This function waits for the bus idle condition and updates the timeout if
-> + * modified by user. Then initiates the send/recv activity based on the
-> + * transfer message received.
-> + */
-> +static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
-> +				int num)
-> +{
-> +	struct cdns_i2c *id = adap->algo_data;
-> +	unsigned long timeout;
-> +	int ret, count;
-> +	u32 reg;
-> +
-> +	/* Waiting for bus-ready. If bus not ready, it returns after timeout */
-> +	timeout = jiffies + CDNS_I2C_TIMEOUT;
-> +	while (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) & CDNS_I2C_SR_BA) {
-> +		if (time_after(jiffies, timeout)) {
-> +			dev_warn(id->adap.dev.parent,
-> +					"timedout waiting for bus ready\n");
-> +			cdns_i2c_master_reset(adap);
-> +			return -ETIMEDOUT;
-> +		}
-> +		schedule_timeout(1);
-> +	}
-> +
-> +	/* The bus is free. Set the new timeout value if updated */
-> +	if (id->adap.timeout != id->cur_timeout) {
-> +		cdns_i2c_writereg(id->adap.timeout & CDNS_I2C_TIME_OUT_TO_MASK,
-> +					CDNS_I2C_TIME_OUT_OFFSET);
-> +		id->cur_timeout = id->adap.timeout;
-> +	}
-> +
-> +	/*
-> +	 * Set the flag to one when multiple messages are to be
-> +	 * processed with a repeated start.
-> +	 */
-> +	if (num > 1) {
-> +		id->bus_hold_flag = 1;
-> +		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
-> +		reg |= CDNS_I2C_CR_HOLD;
-> +		cdns_i2c_writereg(reg, CDNS_I2C_CR_OFFSET);
-> +	} else {
-> +		id->bus_hold_flag = 0;
-> +	}
-> +
-> +	/* Process the msg one by one */
-> +	for (count = 0; count < num; count++, msgs++) {
-> +		if (count == (num - 1))
-> +			id->bus_hold_flag = 0;
-> +
-> +		ret = cdns_i2c_process_msg(id, msgs, adap);
-> +		if (ret)
-> +			return ret;
-> +
-> +		/* Report the other error interrupts to application as EIO */
-> +		if (id->err_status & 0xE4) {
-
-Please replace this magic hex value with something readable.
-
-> +			cdns_i2c_master_reset(adap);
-> +			return -EIO;
-> +		}
-> +	}
-> +
-> +	return num;
-> +}
-> +
-
-...
-
-> +/**
-> + * cdns_i2c_probe - Platform registration call
-> + * @pdev:	Handle to the platform device structure
-> + *
-> + * Return: 0 on success, negative error otherwise
-> + *
-> + * This function does all the memory allocation and registration for the i2c
-> + * device. User can modify the address mode to 10 bit address mode using the
-> + * ioctl call with option I2C_TENBIT.
-> + */
-> +static int cdns_i2c_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *r_mem;
-> +	struct cdns_i2c *id;
-> +	int ret;
-> +
-> +	id = devm_kzalloc(&pdev->dev, sizeof(*id), GFP_KERNEL);
-> +	if (!id)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, id);
-> +
-> +	r_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	id->membase = devm_ioremap_resource(&pdev->dev, r_mem);
-> +	if (IS_ERR(id->membase))
-> +		return PTR_ERR(id->membase);
-> +
-> +	id->irq = platform_get_irq(pdev, 0);
-> +
-> +	id->adap.nr = pdev->id;
-
-Drop this line and use i2c_add_adapter() later to let the core handle
-the numbering. This will also take aliases into account.
-
-> +	id->adap.dev.of_node = pdev->dev.of_node;
-> +	id->adap.algo = &cdns_i2c_algo;
-> +	id->adap.timeout = 0x1F;	/* Default timeout value */
-
-This value is in jiffies, so you probably want to use msecs_to_jiffies
-or alike.
-
-> +	id->adap.retries = 3;		/* Default retry value. */
-> +	id->adap.algo_data = id;
-> +	id->adap.dev.parent = &pdev->dev;
-> +	snprintf(id->adap.name, sizeof(id->adap.name),
-> +		 "Cadence I2C at %08lx", (unsigned long)r_mem->start);
-> +
-> +	id->cur_timeout = id->adap.timeout;
-> +	id->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(id->clk)) {
-> +		dev_err(&pdev->dev, "input clock not found.\n");
-> +		return PTR_ERR(id->clk);
-> +	}
-> +	ret = clk_prepare_enable(id->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Unable to enable clock.\n");
-> +		return ret;
-> +	}
-> +	id->clk_rate_change_nb.notifier_call = cdns_i2c_clk_notifier_cb;
-> +	if (clk_notifier_register(id->clk, &id->clk_rate_change_nb))
-> +		dev_warn(&pdev->dev, "Unable to register clock notifier.\n");
-> +	id->input_clk = clk_get_rate(id->clk);
-> +
-> +	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
-> +			&id->i2c_clk);
-> +	if (ret || (id->i2c_clk > CDNS_I2C_SPEED_MAX))
-> +		id->i2c_clk = CDNS_I2C_SPEED_MAX;
-> +
-> +	cdns_i2c_writereg(0xE, CDNS_I2C_CR_OFFSET);
-
-Remove magic value. Please check the driver for more, in case I missed
-some.
-
-> +	cdns_i2c_writereg(id->adap.timeout, CDNS_I2C_TIME_OUT_OFFSET);
-> +
-> +	ret = cdns_i2c_setclk(id->input_clk, id);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "invalid SCL clock: %u Hz\n", id->i2c_clk);
-> +		ret = -EINVAL;
-> +		goto err_clk_dis;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, id->irq, cdns_i2c_isr, 0,
-> +				 DRIVER_NAME, id);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "cannot get irq %d\n", id->irq);
-> +		goto err_clk_dis;
-> +	}
-> +
-> +	ret = i2c_add_numbered_adapter(&id->adap);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "reg adap failed: %d\n", ret);
-> +		goto err_clk_dis;
-> +	}
-> +
-> +	dev_info(&pdev->dev, "%u kHz mmio %08lx irq %d\n",
-> +		 id->i2c_clk / 1000, (unsigned long)r_mem->start, id->irq);
-> +
-> +	return 0;
-> +
-> +err_clk_dis:
-> +	clk_disable_unprepare(id->clk);
-> +	return ret;
-> +}
-> +
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140401/b4fdc8ed/attachment.sig>
+> 
+>  stop_clk:
+>  	clk_disable(info->clk);
+> 
+> --
