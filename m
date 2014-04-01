@@ -1,72 +1,81 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 1 Apr 2014 07:33:43 +0200
-Subject: [PATCH 2/2] arm: socfpga: Add support for Altera SoC SDRAM
- controller
-In-Reply-To: <1396303627-29198-3-git-send-email-tthayer@altera.com>
-References: <1396303627-29198-1-git-send-email-tthayer@altera.com>
- <1396303627-29198-3-git-send-email-tthayer@altera.com>
-Message-ID: <20140401053343.GO5052@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 1 Apr 2014 08:23:06 +0200
+Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <5339A036.6090703@codethink.co.uk>
+References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+ <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
+ <5339A036.6090703@codethink.co.uk>
+Message-ID: <20140401062306.GS17250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 05:07:07PM -0500, tthayer at altera.com wrote:
-> From: Thor Thayer <tthayer@altera.com>
+On Mon, Mar 31, 2014 at 06:04:54PM +0100, Ben Dooks wrote:
+> On 31/03/14 17:41, Sylwester Nawrocki wrote:
+> >This function adds a helper function to configure clock parents and rates
+> >as specified in clock-parents, clock-rates DT properties for a consumer
+> >device and a call to it before driver is bound to a device.
 > 
-> Addition of the Altera SDRAM controller registers to the
-> Altera SoC project. These registers are shared by future
-> drivers such as ECC and the FPGA bridge.
+> [snip]
 > 
-> Signed-off-by: Thor Thayer <tthayer@altera.com>
-> To: Rob Herring <rob.herring@calxeda.com>
-> To: Pawel Moll <pawel.moll@arm.com>
-> To: Mark Rutland <mark.rutland@arm.com>
-> To: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> To: Kumar Gala <galak@codeaurora.org>
-> To: Rob Landley <rob@landley.net>
-> To: Russell King <linux@arm.linux.org.uk>
-> To: Dinh Nguyen <dinguyen@altera.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/mach-socfpga/socfpga.c |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+> tree/bindings/clock/clock-bindings.txt
+> b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >index 700e7aa..59fbb4e 100644
+> >--- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >+++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >@@ -132,3 +132,45 @@ clock signal, and a UART.
+> >    ("pll" and "pll-switched").
+> >  * The UART has its baud clock connected the external oscillator and its
+> >    register clock connected to the PLL clock (the "pll-switched" signal)
+> >+
+> >+==Assigned clock parents and rates==
+> >+
+> >+Some platforms require static initial configuration of parts of the clocks
+> >+controller. Such a configuration can be specified in a clock consumer node
+> >+through clock-parents and clock-rates DT properties. The former should
+> >+contain a list of parent clocks in form of phandle and clock specifier pairs,
+> >+the latter the list of assigned clock frequency values (one cell each).
+> >+
+> >+    uart at a000 {
+> >+        compatible = "fsl,imx-uart";
+> >+        reg = <0xa000 0x1000>;
+> >+        ...
+> >+        clocks = <&clkcon 0>, <&clkcon 3>;
+> >+        clock-names = "baud", "mux";
+> >+
+> >+        clock-parents = <0>, <&pll 1>;
+> >+        clock-rates = <460800>;
+> >+    };
+> >+
+> >+In this example the pll is set as parent of "mux" clock and frequency of "baud"
+> >+clock is specified as 460800 Hz.
+> >+
+> >+Configuring a clock parent and rate through the device node that uses
+> >+the clock can be done only for clocks that have a single user. Specifying
+> >+conflicting parent or rate configuration in multiple consumer nodes for
+> >+a shared clock is forbidden.
+> >+
+> >+Configuration of common clocks, which affect multiple consumer devices
+> >+can be specified in a dedicated 'assigned-clocks' subnode of a clock
+> >+provider node, e.g.:
+> >+
+> >+    clkcon {
+> >+        ...
+> >+        #clock-cells = <1>;
+> >+
+> >+        assigned-clocks {
+> >+            clocks = <&clkcon 16>, <&clkcon 17>;
+> >+            clock-parents = <0>, <&clkcon 1>;
+> >+            clock-rates = <200000>;
+> >+        };
+> >+    };
 > 
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index 21d6026..d514e8a 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -32,6 +32,7 @@
->  void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
->  void __iomem *sys_manager_base_addr;
->  void __iomem *rst_manager_base_addr;
-> +void __iomem *sdr_ctl_base_addr;
->  void __iomem *clk_mgr_base_addr;
->  unsigned long cpu1start_addr;
->  
+> How do you support not-setting a rate for a clock?
 
-Can't we get rid of all these global pointers instead of adding to them?
+Not setting a rate is supported by specifying the rate to 0. That should
+be documented of course.
 
-> @@ -150,6 +151,15 @@ void __init socfpga_sysmgr_init(void)
->  
->  	np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
->  	clk_mgr_base_addr = of_iomap(np, 0);
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "altr,sdr-ctl");
-> +	if (!np) {
-> +		pr_err("SOCFPGA: Unable to find sdr-ctl\n");
-> +		return;
-> +	}
-> +
-> +	sdr_ctl_base_addr = of_iomap(np, 0);
-> +	WARN_ON(!sdr_ctl_base_addr);
->  }
->  
->  static void __init socfpga_init_irq(void)
-> -- 
-> 1.7.9.5
-> 
+Sascha
 
 -- 
 Pengutronix e.K.                           |                             |
