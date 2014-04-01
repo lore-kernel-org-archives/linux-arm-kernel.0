@@ -1,14 +1,14 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  1 Apr 2014 15:47:37 +0200
-Subject: [PATCH v3 5/7] arm64/crypto: add voluntary preemption to Crypto
- Extensions SHA1
+Date: Tue,  1 Apr 2014 15:47:39 +0200
+Subject: [PATCH v3 7/7] arm64/crypto: add voluntary preemption to Crypto
+ Extensions GHASH
 In-Reply-To: <1396360059-31949-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1396360059-31949-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1396360059-31949-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1396360059-31949-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Crypto Extensions based SHA1 implementation uses the NEON register file,
+The Crypto Extensions based GHASH implementation uses the NEON register file,
 and hence runs with preemption disabled. This patch adds a TIF_NEED_RESCHED
 check to its inner loop so we at least give up the CPU voluntarily when if we
 are running in process context and have been tagged for preemption by the
@@ -16,150 +16,105 @@ scheduler.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/sha1-ce-core.S | 19 ++++++++--------
- arch/arm64/crypto/sha1-ce-glue.c | 49 +++++++++++++++++++++++++++++++---------
- 2 files changed, 48 insertions(+), 20 deletions(-)
+ arch/arm64/crypto/ghash-ce-core.S | 10 ++++++----
+ arch/arm64/crypto/ghash-ce-glue.c | 33 +++++++++++++++++++++++++--------
+ 2 files changed, 31 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/crypto/sha1-ce-core.S b/arch/arm64/crypto/sha1-ce-core.S
-index bd4af29f2722..831e332f9331 100644
---- a/arch/arm64/crypto/sha1-ce-core.S
-+++ b/arch/arm64/crypto/sha1-ce-core.S
-@@ -66,8 +66,8 @@
- 	.word		0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6
+diff --git a/arch/arm64/crypto/ghash-ce-core.S b/arch/arm64/crypto/ghash-ce-core.S
+index 1ca719ce9323..14240c6dc343 100644
+--- a/arch/arm64/crypto/ghash-ce-core.S
++++ b/arch/arm64/crypto/ghash-ce-core.S
+@@ -32,8 +32,9 @@
+ 	.align		3
  
  	/*
--	 * void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
--	 * 			  u8 *head, long bytes)
-+	 * int sha1_ce_transform(int blocks, u8 const *src, u32 *state,
-+	 * 			 u8 *head, long bytes, struct thread_info *ti)
+-	 * void pmull_ghash_update(int blocks, u64 dg[], const char *src,
+-	 *			   struct ghash_key const *k, const char *head)
++	 * int pmull_ghash_update(int blocks, u64 dg[], const char *src,
++	 *			  struct ghash_key const *k, const char *head,
++	 * 			  struct thread_info *ti)
  	 */
- ENTRY(sha1_ce_transform)
- 	/* load round constants */
-@@ -127,7 +127,13 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
- 	add		dgbv.2s, dgbv.2s, dg1v.2s
- 	add		dgav.4s, dgav.4s, dg0v.4s
+ ENTRY(pmull_ghash_update)
+ 	ld1		{DATA.16b}, [x1]
+@@ -89,8 +90,9 @@ CPU_LE(	rev64		IN1.16b, IN1.16b	)
+ 	eor		T1.16b, T1.16b, T2.16b
+ 	eor		DATA.16b, DATA.16b, T1.16b
  
 -	cbnz		w0, 0b
-+	cbz		w0, 4f
-+	b_if_no_resched	x5, x8, 0b
-+
-+	/* store new state */
-+3:	str		dga, [x2]
-+	str		dgb, [x2, #16]
-+	ret
++	cbz		w0, 2f
++	b_if_no_resched	x5, x7, 0b
  
- 	/*
- 	 * Final block: add padding and total bit count.
-@@ -135,7 +141,7 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
- 	 * size was not a round multiple of the block size, and the padding is
- 	 * handled by the C code.
- 	 */
--	cbz		x4, 3f
-+4:	cbz		x4, 3b
- 	movi		v9.2d, #0
- 	mov		x8, #0x80000000
- 	movi		v10.2d, #0
-@@ -145,9 +151,4 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
- 	mov		v11.d[0], xzr
- 	mov		v11.d[1], x7
- 	b		2b
--
--	/* store new state */
--3:	str		dga, [x2]
--	str		dgb, [x2, #16]
--	ret
- ENDPROC(sha1_ce_transform)
-diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
-index 6fe83f37a750..69850a163668 100644
---- a/arch/arm64/crypto/sha1-ce-glue.c
-+++ b/arch/arm64/crypto/sha1-ce-glue.c
-@@ -20,8 +20,8 @@ MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
- MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
- MODULE_LICENSE("GPL v2");
+-	st1		{DATA.16b}, [x1]
++2:	st1		{DATA.16b}, [x1]
+ 	ret
+ ENDPROC(pmull_ghash_update)
+diff --git a/arch/arm64/crypto/ghash-ce-glue.c b/arch/arm64/crypto/ghash-ce-glue.c
+index b92baf3f68c7..4df64832617d 100644
+--- a/arch/arm64/crypto/ghash-ce-glue.c
++++ b/arch/arm64/crypto/ghash-ce-glue.c
+@@ -33,8 +33,9 @@ struct ghash_desc_ctx {
+ 	u32 count;
+ };
  
--asmlinkage void sha1_ce_transform(int blocks, u8 const *src, u32 *state,
--				  u8 *head, long bytes);
-+asmlinkage int sha1_ce_transform(int blocks, u8 const *src, u32 *state,
-+				 u8 *head, long bytes, struct thread_info *ti);
+-asmlinkage void pmull_ghash_update(int blocks, u64 dg[], const char *src,
+-				   struct ghash_key const *k, const char *head);
++asmlinkage int pmull_ghash_update(int blocks, u64 dg[], const char *src,
++				  struct ghash_key const *k, const char *head,
++				  struct thread_info *ti);
  
- static int sha1_init(struct shash_desc *desc)
+ static int ghash_init(struct shash_desc *desc)
  {
-@@ -42,6 +42,7 @@ static int sha1_update(struct shash_desc *desc, const u8 *data,
- 	sctx->count += len;
+@@ -54,6 +55,7 @@ static int ghash_update(struct shash_desc *desc, const u8 *src,
  
- 	if ((partial + len) >= SHA1_BLOCK_SIZE) {
+ 	if ((partial + len) >= GHASH_BLOCK_SIZE) {
+ 		struct ghash_key *key = crypto_shash_ctx(desc->tfm);
 +		struct thread_info *ti = NULL;
  		int blocks;
  
  		if (partial) {
-@@ -52,16 +53,30 @@ static int sha1_update(struct shash_desc *desc, const u8 *data,
+@@ -64,14 +66,29 @@ static int ghash_update(struct shash_desc *desc, const u8 *src,
  			len -= p;
  		}
  
 +		/*
-+		 * Pass current's thread info pointer to sha1_ce_transform()
++		 * Pass current's thread info pointer to pmull_ghash_update()
 +		 * below if we want it to play nice under preemption.
 +		 */
 +		if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
 +		     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
 +			ti = current_thread_info();
 +
- 		blocks = len / SHA1_BLOCK_SIZE;
- 		len %= SHA1_BLOCK_SIZE;
+ 		blocks = len / GHASH_BLOCK_SIZE;
+ 		len %= GHASH_BLOCK_SIZE;
  
--		kernel_neon_begin_partial(16);
--		sha1_ce_transform(blocks, data, sctx->state,
--				  partial ? sctx->buffer : NULL, 0);
+-		kernel_neon_begin_partial(6);
+-		pmull_ghash_update(blocks, ctx->digest, src, key,
+-				   partial ? ctx->buf : NULL);
 -		kernel_neon_end();
+-		src += blocks * GHASH_BLOCK_SIZE;
 +		do {
 +			int rem;
 +
-+			kernel_neon_begin_partial(16);
-+			rem = sha1_ce_transform(blocks, data, sctx->state,
-+						partial ? sctx->buffer : NULL,
-+						0, ti);
++			kernel_neon_begin_partial(6);
++			rem = pmull_ghash_update(blocks, ctx->digest, src, key,
++						 partial ? ctx->buf : NULL, ti);
 +			kernel_neon_end();
- 
--		data += blocks * SHA1_BLOCK_SIZE;
--		partial = 0;
-+			data += (blocks - rem) * SHA1_BLOCK_SIZE;
++
++			src += (blocks - rem) * GHASH_BLOCK_SIZE;
 +			blocks = rem;
 +			partial = 0;
 +		} while (unlikely(ti && blocks > 0));
  	}
  	if (len)
- 		memcpy(sctx->buffer + partial, data, len);
-@@ -94,6 +109,7 @@ static int sha1_finup(struct shash_desc *desc, const u8 *data,
- 		      unsigned int len, u8 *out)
- {
- 	struct sha1_state *sctx = shash_desc_ctx(desc);
-+	struct thread_info *ti = NULL;
- 	__be32 *dst = (__be32 *)out;
- 	int blocks;
- 	int i;
-@@ -111,9 +127,20 @@ static int sha1_finup(struct shash_desc *desc, const u8 *data,
- 	 */
- 	blocks = len / SHA1_BLOCK_SIZE;
+ 		memcpy(ctx->buf + partial, src, len);
+@@ -89,7 +106,7 @@ static int ghash_final(struct shash_desc *desc, u8 *dst)
+ 		memset(ctx->buf + partial, 0, GHASH_BLOCK_SIZE - partial);
  
--	kernel_neon_begin_partial(16);
--	sha1_ce_transform(blocks, data, sctx->state, NULL, len);
--	kernel_neon_end();
-+	if ((IS_ENABLED(CONFIG_PREEMPT_VOLUNTARY) ||
-+	     IS_ENABLED(CONFIG_PREEMPT)) && !in_interrupt())
-+		ti = current_thread_info();
-+
-+	do {
-+		int rem;
-+
-+		kernel_neon_begin_partial(16);
-+		rem = sha1_ce_transform(blocks, data, sctx->state,
-+					NULL, len, ti);
-+		kernel_neon_end();
-+		data += (blocks - rem) * SHA1_BLOCK_SIZE;
-+		blocks = rem;
-+	} while (unlikely(ti && blocks > 0));
- 
- 	for (i = 0; i < SHA1_DIGEST_SIZE / sizeof(__be32); i++)
- 		put_unaligned_be32(sctx->state[i], dst++);
+ 		kernel_neon_begin_partial(6);
+-		pmull_ghash_update(1, ctx->digest, ctx->buf, key, NULL);
++		pmull_ghash_update(1, ctx->digest, ctx->buf, key, NULL, NULL);
+ 		kernel_neon_end();
+ 	}
+ 	put_unaligned_be64(ctx->digest[1], dst);
 -- 
 1.8.3.2
