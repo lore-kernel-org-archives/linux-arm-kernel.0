@@ -1,149 +1,91 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Tue, 1 Apr 2014 17:54:15 +0530
-Subject: [PATCH 5/5] arm: Enable IRQs before attempting to read user space
- in __und_usr
-In-Reply-To: <1394734552-4704-6-git-send-email-catalin.marinas@arm.com>
-References: <1394734552-4704-1-git-send-email-catalin.marinas@arm.com>
- <1394734552-4704-6-git-send-email-catalin.marinas@arm.com>
-Message-ID: <CAKZGPAP=9wvUd-oSEYKwBz6LKX6vXcRuiRVUpg2k47ui-=YgQw@mail.gmail.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Tue,  1 Apr 2014 17:57:03 +0530
+Subject: [PATCH v2 1/2] dma: Add Xilinx AXI DMA DT Binding Documentation
+Message-ID: <1396355224-20863-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Device-tree binding documentation of Xilinx DMA Engine
 
-On Thu, Mar 13, 2014 at 11:45 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> The Undef abort handler in the kernel reads the undefined instruction
-> from user space. If the page table was modified from another CPU, the
-> user access could fail and do_page_fault() will be executed with
-> interrupts disabled. This can potentially deadlock on ARM11MPCore or on
-> Cortex-A15 with erratum 798181 workaround enabled (both implying IPI for
-> TLB maintenance with page table lock held).
->
-> This patch enables the IRQs in __und_usr before attempting to read the
-> instruction from user space.
->
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> ---
->  arch/arm/kernel/entry-armv.S       | 11 +++++++----
->  arch/arm/kernel/iwmmxt.S           |  2 +-
->  arch/arm/mach-ep93xx/crunch-bits.S |  2 +-
->  arch/arm/vfp/entry.S               |  3 +--
->  4 files changed, 10 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 1879e8dd2acc..5fc897cf409b 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -413,6 +413,11 @@ __und_usr:
->         @
->         adr     r9, BSYM(ret_from_exception)
->
-> +       @ IRQs must be enabled before attempting to read the instruction from
-> +       @ user space since that could cause a page/translation fault if the
-> +       @ page table was modified by another CPU.
-> +       enable_irq
-> +
->         tst     r3, #PSR_T_BIT                  @ Thumb mode?
->         bne     __und_usr_thumb
->         sub     r4, r2, #4                      @ ARM instr at LR - 4
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+---
+Changes in v2:
+None
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |   65 ++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
 
-As the data abort is now handled in normal way, can we remove the
-fixup handler for ldrt?
-
-/*
- * The out of line fixup for the ldrt instructions above.
- */
-        .pushsection .fixup, "ax"
-        .align  2
-4:      mov     pc, r9
-        .popsection
-        .pushsection __ex_table,"a"
-        .long   1b, 4b
-#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
-        .long   2b, 4b
-        .long   3b, 4b
-#endif
-        .popsection
-
-
-Thanks,
-Arun
-
-> @@ -517,7 +522,7 @@ ENDPROC(__und_usr)
->   *  r9  = normal "successful" return address
->   *  r10 = this threads thread_info structure
->   *  lr  = unrecognised instruction return address
-> - * IRQs disabled, FIQs enabled.
-> + * IRQs enabled, FIQs enabled.
->   */
->         @
->         @ Fall-through from Thumb-2 __und_usr
-> @@ -624,7 +629,6 @@ call_fpe:
->  #endif
->
->  do_fpe:
-> -       enable_irq
->         ldr     r4, .LCfp
->         add     r10, r10, #TI_FPSTATE           @ r10 = workspace
->         ldr     pc, [r4]                        @ Call FP module USR entry point
-> @@ -652,8 +656,7 @@ __und_usr_fault_32:
->         b       1f
->  __und_usr_fault_16:
->         mov     r1, #2
-> -1:     enable_irq
-> -       mov     r0, sp
-> +1:     mov     r0, sp
->         adr     lr, BSYM(ret_from_exception)
->         b       __und_fault
->  ENDPROC(__und_usr_fault_32)
-> diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
-> index c52f3e225aeb..da3117054712 100644
-> --- a/arch/arm/kernel/iwmmxt.S
-> +++ b/arch/arm/kernel/iwmmxt.S
-> @@ -61,7 +61,7 @@
->   * r9  = ret_from_exception
->   * lr  = undefined instr exit
->   *
-> - * called from prefetch exception handler with interrupts disabled
-> + * called from prefetch exception handler with interrupts enabled
->   */
->
->  ENTRY(iwmmxt_task_enable)
-> diff --git a/arch/arm/mach-ep93xx/crunch-bits.S b/arch/arm/mach-ep93xx/crunch-bits.S
-> index 890c5df2b4fe..85e765534003 100644
-> --- a/arch/arm/mach-ep93xx/crunch-bits.S
-> +++ b/arch/arm/mach-ep93xx/crunch-bits.S
-> @@ -62,7 +62,7 @@
->   * r9  = ret_from_exception
->   * lr  = undefined instr exit
->   *
-> - * called from prefetch exception handler with interrupts disabled
-> + * called from prefetch exception handler with interrupts enabled
->   */
->  ENTRY(crunch_task_enable)
->         inc_preempt_count r10, r3
-> diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-> index f0759e70fb86..fe6ca574d093 100644
-> --- a/arch/arm/vfp/entry.S
-> +++ b/arch/arm/vfp/entry.S
-> @@ -22,11 +22,10 @@
->  @  r9  = normal "successful" return address
->  @  r10 = this threads thread_info structure
->  @  lr  = unrecognised instruction return address
-> -@  IRQs disabled.
-> +@  IRQs enabled.
->  @
->  ENTRY(do_vfp)
->         inc_preempt_count r10, r4
-> -       enable_irq
->         ldr     r4, .LCvfp
->         ldr     r11, [r10, #TI_CPU]     @ CPU number
->         add     r10, r10, #TI_VFPSTATE  @ r10 = workspace
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+new file mode 100644
+index 0000000..18e8bcc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -0,0 +1,65 @@
++Xilinx AXI DMA engine, it does transfers between memory and AXI4 stream
++target devices. It can be configured to have one channel or two channels.
++If configured as two channels, one is to transmit to the device and another
++is to receive from the device.
++
++Required properties:
++- compatible: Should be "xlnx,axi-dma-1.00.a"
++- #dma-cells: Should be <1>, see "dmas" property below
++- reg: Should contain DMA registers location and length.
++- dma-channel child node: Should have atleast one channel and can have upto
++	two channels per device. This node specifies the properties of each
++	DMA channel (see child node properties below).
++
++Optional properties:
++- xlnx,include-sg: Tells whether configured for Scatter-mode in
++	the hardware.
++
++Required child node properties:
++- compatible: It should be either "xlnx,axi-dma-mm2s-channel" or
++	"xlnx,axi-dma-s2mm-channel".
++- interrupts: Should contain per channel DMA interrupts.
++- xlnx,data-width: Should contain the stream data width, take values
++	{32,64...1024}.
++
++Option child node properties:
++- xlnx,include-dre: Tells whether hardware is configured for Data
++	Realignment Engine.
++
++Example:
++++++++++
++
++axi_dma_0: axidma at 40400000 {
++	compatible = "xlnx,axi-dma-1.00.a";
++	#dma_cells = <1>;
++	reg = < 0x40400000 0x10000 >;
++	dma-channel at 40400000 {
++		compatible = "xlnx,axi-dma-mm2s-channel";
++		interrupts = < 0 59 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++	dma-channel at 40400030 {
++		compatible = "xlnx,axi-dma-s2mm-channel";
++		interrupts = < 0 58 4 >;
++		xlnx,datawidth = <0x40>;
++	} ;
++} ;
++
++
++* DMA client
++
++Required properties:
++- dmas: a list of <[DMA device phandle] [Channel ID]> pairs,
++	where Channel ID is '0' for write/tx and '1' for read/rx
++	channel.
++- dma-names: a list of DMA channel names, one per "dmas" entry
++
++Example:
++++++++++
++
++dmatest_0: dmatest at 0 {
++	compatible ="xlnx,axi-dma-test-1.00.a";
++	dmas = <&axi_dma_0 0
++		&axi_dma_0 1>;
++	dma-names = "dma0", "dma1";
++} ;
+-- 
+1.7.9.5
