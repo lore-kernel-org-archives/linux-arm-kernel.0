@@ -1,48 +1,45 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 01 Apr 2014 15:54:42 -0700
-Subject: [PATCH 2/2] ARM: mm: keep rodata non-executable
-In-Reply-To: <CAGXu5jLEA5u58yNe0k4BobWphAhEiREJ1ped30LVgDRPzOGy7A@mail.gmail.com>
-References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
- <1392339850-18686-3-git-send-email-keescook@chromium.org>
- <20140214162257.GB2331@e103592.cambridge.arm.com>
- <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
- <20140217123415.GA2182@e103592.cambridge.arm.com>
- <532F2C48.6050509@codeaurora.org>
- <CAGXu5jK_8adL=6DoF9gFBMWxKcxKUHw7238ighE2agFU7cqhWg@mail.gmail.com>
- <1395658064.3465.7.camel@linaro1.home>
- <CAGXu5jLEA5u58yNe0k4BobWphAhEiREJ1ped30LVgDRPzOGy7A@mail.gmail.com>
-Message-ID: <533B43B2.1020805@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Apr 2014 23:59:19 +0100
+Subject: [PATCH 73/75] ARM: l2c: move L2 cache register saving to a
+ more sensible location
+In-Reply-To: <533B0BC1.6080608@wwwdotorg.org>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYaF-0007Hv-Nv@rmk-PC.arm.linux.org.uk> <533B0BC1.6080608@wwwdotorg.org>
+Message-ID: <20140401225919.GD7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/1/2014 3:34 PM, Kees Cook wrote:
-> On Mon, Mar 24, 2014 at 3:47 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->> On Sun, 2014-03-23 at 16:21 -0600, Kees Cook wrote:
->>> For this stage, how about I make this "depends on KEXEC=n &&
->>> KPROBES=n"?
->>
->> There's also ftrace (CONFIG_DYNAMIC_FTRACE I believe) which modifies
->> kernel code with a call to probe_kernel_write(), which GDB uses as well.
->>
->> And grepping for the patch_text() function also shows
->> __arch_jump_label_transform() modifies kernel code. Not sure how and
->> when that gets used.
+On Tue, Apr 01, 2014 at 12:56:01PM -0600, Stephen Warren wrote:
+> On 03/28/2014 09:20 AM, Russell King wrote:
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> Right, so, I'm trying to fix ftrace now, and I've hit a wall. It is as
-> if changes to the kernel text PMD aren't being noticed after the
-> kernel is running. Does anyone know why this might be happening?
+> EXCEPT this one patch, the series,
+> Tested-by: Stephen Warren <swarren@nvidia.com>
+> (on Tegra20/Toshiba AC100 and Tegra30/Beaver)
 > 
-> Code and details here:
-> https://lkml.org/lkml/2014/4/1/674
+> And any part which touches Tegra code,
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 > 
-> -Kees
-> 
+> However, this one patch causes boot failures on the Toshiba AC100,
+> Springbank/Seaboard, and I would assume any Tegra20 system. I haven't
+> investigated what the problem is; do you need me to and/or have any clues?
 
-We had a flush_tlb_kernel_page after the pmd_flush in our out of tree code
-which makes the text writeable in __patch_text.
+My first thought is... try reverting the
+"l2c: permit flush_all() on large flush_range()" commit and see what effect
+that may have - that isn't a perfected patch (hence the XXX in the
+summary line).
 
-Laura
+I'm hoping that we don't have people doing large dma_alloc_coherent() in
+interrupt context - if they are, that could lead to a silent deadlock
+(even with lockdep enabled.)  Large being defined by "size of your L2
+cache or larger".
+
+If we are going to hit that kind of sillyness, then we're just going to
+have to pay the price of invalidating large blocks of memory on a per-
+cache line basis across the full size - yes, this means it will suck,
+people allocating frame buffers using CMA will complain, but then we
+really should not be doing such large allocations from IRQ context.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
