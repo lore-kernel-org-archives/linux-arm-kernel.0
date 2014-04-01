@@ -1,31 +1,36 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 1 Apr 2014 18:10:59 +0100
-Subject: [PATCH] QEMU: ARM: boot: Load kernel at an Image friendly address
-In-Reply-To: <1395718484-20424-1-git-send-email-joelf@ti.com>
-References: <1395718484-20424-1-git-send-email-joelf@ti.com>
-Message-ID: <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Tue, 01 Apr 2014 19:28:33 +0200
+Subject: [PATCH v2 0/4] arm: mxs: dts: small fixes for I2SE's duckbills
+In-Reply-To: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
+References: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
+Message-ID: <533AF741.4080402@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 March 2014 03:34, Joel Fernandes <joelf@ti.com> wrote:
-> Loading kernel at offset 0x10000 works only for zImage, but not for Image,
-> because the kernel expect the start of decompressed kernel (.head.text) to be
-> at an address that's a distance that's 16MB aligned from  PAGE_OFFSET +
-> TEXT_OFFSET (see vmlinux.lds.S). This check is enfornced in __fixup_pv_table in
-> arch/arm/kernel/head.S TEXT_OFFSET is 0x00008000, so a 16MB alignment needs to
-> have a "0x8000" in the lower 16 bits so that they cancel out. Currently the
-> offset Qemu loads it at is 0x10000.
+Am 27.03.2014 23:51, schrieb Michael Heimpold:
+> This series fixes two issues with the DT file: first, it frees up
+> some GPIOs which are mis-used by MMC interface, and second, it
+> fixes the GPIO used to reset the ethernet phy.
 >
-> With zImage, this need is met because zImage loads the uncompressed Image
-> correctly, however when loading an Image and executing directly Qemu is
-> required it to load it at the correct location. Doing so, doesn't break Qemu's
-> zImage loading. With this patch, both zImage and Image work correctly.
+> While at it, use symbolic names for LED definitions.
 >
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> Changes in v2:
+>   - add missing patch for imx28.dtsi to include gpio.h
+>
+>
+> Michael Heimpold (4):
+>    arm: mxs: dt: imx28-duckbill: fix mmc settings
+>    arm: mxs: dt: imx28-duckbill: fix phy reset gpio
+>    arm: mxs: dt: imx28: include gpio.h to allow use of symbolic names
+>    arm: mxs: dt: imx28-duckbill: use symbolic names from gpio.h
+>
+>   arch/arm/boot/dts/imx28-duckbill.dts |   12 ++++++------
+>   arch/arm/boot/dts/imx28.dtsi         |    1 +
+>   2 files changed, 7 insertions(+), 6 deletions(-)
+>
 
-Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+They all look good to me.
 
-I'll put this in target-arm.next after 2.0 has released.
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-thanks
--- PMM
+BR Stefan Wahren
