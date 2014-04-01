@@ -1,97 +1,114 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Tue, 01 Apr 2014 11:11:46 -0700
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <20140401172933.GB7528@n2100.arm.linux.org.uk>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
- <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
- <20140326001135.GV7528@n2100.arm.linux.org.uk>
- <20140401092638.GA10224@n2100.arm.linux.org.uk>
- <533AC67D.2060906@boundarydevices.com>
- <20140401172933.GB7528@n2100.arm.linux.org.uk>
-Message-ID: <533B0162.9090305@boundarydevices.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 1 Apr 2014 11:36:48 -0700
+Subject: [PATCH] arm: don't allow CONFIG_DEBUG_SET_MODULE_RONX if
+ CONFIG_JUMP_LABEL is enabled
+In-Reply-To: <533AFF77.5030106@codeaurora.org>
+References: <1396346657-7166-1-git-send-email-holler@ahsoftware.de>
+ <533AFF77.5030106@codeaurora.org>
+Message-ID: <CAGXu5jKMF9n9svQBhyQFvCoUe86QhLycDTt-fWyiRfySbn=Fug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2014 10:29 AM, Russell King - ARM Linux wrote:
-> On Tue, Apr 01, 2014 at 07:00:29AM -0700, Eric Nelson wrote:
->> Hi Russell,
+On Tue, Apr 1, 2014 at 11:03 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> On 4/1/2014 3:04 AM, Alexander Holler wrote:
+>> CONFIG_DEBUG_SET_MODULE_RONX sounds like a nice security feature, but
+>> things might fail late (and unexpected) if module code is set to read-only
+>> while CONFIG_JUMP_LABEL is enabled (e.g. modprobe bridge).
+
+Isn't this a ordering problem? I thought jump labels got set up once,
+and then after that, the memory could be made RO?
+
 >>
->> What value do you have for pad control register
->> IOMUXC_SW_PAD_CTL_PAD_RGMII_TX_CTL (0x020E0388)?
+>> Avoid this.
+>>
+>> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+>> ---
+>>  arch/arm/Kconfig.debug | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 0531da8..6627b9e 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -1197,7 +1197,7 @@ config PID_IN_CONTEXTIDR
+>>
+>>  config DEBUG_SET_MODULE_RONX
+>>       bool "Set loadable kernel module data as NX and text as RO"
+>> -     depends on MODULES
+>> +     depends on MODULES && !JUMP_LABEL
+>>       ---help---
+>>         This option helps catch unintended modifications to loadable
+>>         kernel module's text and read-only data. It also prevents execution
+>>
 >
-> You're referring to the iMX6Q, the Hummingboard is iMX6S, so that's
-> 0x20e06bc.  I have value 0x1b030.
+> Kees Cook has something similar[1] for not-module space as well, we probably want
+> this there as well. A shame we keep finding reasons these features will be turned
+> off. Looks good to me otherwise.
 >
+> Laura
+>
+> [1]http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/232644.html
 
-Right. I missed that you were running on Solo.
+I've solidly stumbled over ftrace with my series now. I can't figure
+out why it doesn't work, though. I wrote code to flip the PMD flags
+back to writable (via set_kernel_text_rw), but it seems like the
+system is ignoring the changes, even though I call flush_pmd_entry.
 
->> I notice in some of the DTS files that this has a value of 0x100b0,
->> which seems wrong. Bit 16 seems to be a HYSteresis bit, and enabling
->> that seems wrong (also bit 7 seems wrong, as it's undefined in the RM).
->
-> Yes, bit 7 should not be set as it's reserved, but this is ignored.
-> Setting the hysteresis bit affects the input thresholds, and this signal
-> is only ever used as an output.  While selecting HYS mode for an output
-> may seem odd, that should not have any effect here.
->
-> In any case, TX_CTL doesn't have much to do with it.  I've fully proved
-> that the interface works fine under full duplex conditions, achieving
-> 500Mbps transmit and 570-600Mbps receive with TCP connections (which is
-> nicely beyond what freescale claim the hardware is capable of.)
->
-> The phy needs TX_CTL asserted in order to transmit anything, so as it
-> works in full duplex mode, this must be happening correctly.
->
-It appears I'm gender-challenged and confused TX_CTL and RX_CTL.
+struct section_perm section_perms[] = {
+       /* Make kernel code and rodata RX (set RO). */
+       [ARM_TEXT_SECTION] = {
+              .start       = (unsigned long)_stext,
+              .end       = (unsigned long)__init_begin,
+#ifdef CONFIG_ARM_LPAE
+              .mask       = ~PMD_SECT_RDONLY,
+              .prot       = PMD_SECT_RDONLY,
+#else
+              .mask       = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
+              .prot       = PMD_SECT_APX | PMD_SECT_AP_WRITE,
+              .clear       = PMD_SECT_AP_WRITE,
+#endif
+       },
 
-My thought (and question) was whether the pad setup for "transmit
-enable" to the i.MX is either being missed entirely, or arriving
-late because of an internal pullup/pull down or other pad
-misconfiguration.
+...
 
-The pad settings have every indication of being cut/pasted, which
-made me question them.
+static inline void section_update(unsigned long addr, pmdval_t mask,
+                              pmdval_t prot)
+{
+       pmd_t *pmd = pmd_off_k(addr);
 
-> The FEC needs RX_CTL asserted to indicate that valid data is being
-> received by the phy - if this was not being recognised by the FEC, full
-> duplex mode wouldn't work.
->
-> The last scenario is the error signals encoded onto TX_CTL/RX_CTL.  This
-> is one area I can't comment on yet - monitoring these signals is not
-> exactly easy (and requires two steady hands.)  However, I have briefly
-> monitored these signals when running at 100mbit half-duplex. With the
-> scope RX_CTL and triggering on it, I do see TX_CTL being raised by the
-> FEC.
->
-> Whether TX_CTL is raised by the FEC just before or after RX_CTL has been
-> asserted I can't say yet.
->
-> However, TX_CTL raised while RX_CTL is raised or toggling means that a
-> collision has occurred.  TX_CTL should never be raised while RX_CTL
-> indicates that there is a "carrier" present in half-duplex mode (and
-> therefore there is already another ethernet station transmitting on
-> the wire.)
->
-> Remember, I'm seeing late collisions.  The only way that happens is if
-> something starts transmitting after 64 bytes into an ethernet frame, and
-> it implies that something is not noticing that the link is busy before it
-> starts blurting out.
->
-I guess we can rule out slew rate.
+#ifdef CONFIG_ARM_LPAE
+       pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+#else
+       if (addr & SECTION_SIZE)
+              pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
+       else
+              pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+#endif
+       flush_pmd_entry(pmd);
+}
 
-> I know that my hubs are fine - the 10mbit hub has been used over _many_
-> years (it's more than 20 years old now) and has always been rock solid...
-> unlike the 10/100 hub with a dodgy switch between the two segments which
-> I can lock out the 10 mbit segment with enough 100mbit traffic.
->
-> Let's also not forget that these signals run at 125MHz at gigabit speeds,
-> and 2.5MHz at 10mbit...  if they were marginal at 10mbit, gigabit
-> certainly would not work.
->
+...
 
-Based on this, I don't see how a badly-configured pad could produce the
-symptoms you're seeing.
+void set_kernel_text_rw(void)
+{
+       unsigned long addr;
+
+       if (!arch_can_set_perms())
+              return;
+
+       for (addr = section_perms[ARM_TEXT_SECTION].start;
+            addr < section_perms[ARM_TEXT_SECTION].end;
+            addr += SECTION_SIZE)
+              section_update(addr, section_perms[ARM_TEXT_SECTION].mask,
+                            section_perms[ARM_TEXT_SECTION].clear);
+}
+
+Is there something "sticky" about PMD sections that I'm not aware of?
+Even after calling set_kernel_text_rw(), any writes to kernel memory
+fault. :(
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
