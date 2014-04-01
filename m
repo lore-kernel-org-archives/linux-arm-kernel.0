@@ -1,144 +1,306 @@
-From: sungjinn.chung@samsung.com (=?utf-8?B?7KCV7ISx7KeE?=)
-Date: Tue, 01 Apr 2014 09:44:36 +0900
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <20140331152719.GH29871@arm.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <76240593.SAyloCy7nR@wuerfel> <20140331113113.GE29871@arm.com>
- <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
-Message-ID: <000501cf4d43$90e618a0$b2b249e0$%chung@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 1 Apr 2014 02:50:01 +0200
+Subject: [PATCH v3 1/2] i2c: Add driver for Cadence I2C controller
+In-Reply-To: <1394556613-11692-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1394556613-11692-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20140401005001.GA3590@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 01, 2014 12:27 AM Catalin Marinas wrote:
-> On Mon, Mar 31, 2014 at 01:53:20PM +0100, Arnd Bergmann wrote:
-> > On Monday 31 March 2014 12:31:14 Catalin Marinas wrote:
-> > > On Mon, Mar 31, 2014 at 07:56:53AM +0100, Arnd Bergmann wrote:
-> > > > On Monday 31 March 2014 12:51:07 Jungseok Lee wrote:
-> > > > > Current ARM64 kernel cannot support 4KB pages for 40-bit physical address
-> > > > > space described in [1] due to one major issue + one minor issue.
-> > > > >
-> > > > > Firstly, kernel logical memory map (0xffffffc000000000-0xffffffffffffffff)
-> > > > > cannot cover DRAM region from 544GB to 1024GB in [1]. Specifically, ARM64
-> > > > > kernel fails to create mapping for this region in map_mem function
-> > > > > (arch/arm64/mm/mmu.c) since __phys_to_virt for this region reaches to
-> > > > > address overflow. I've used 3.14-rc8+Fast Models to validate the statement.
-> > > >
-> > > > It took me a while to understand what is going on, but it essentially comes
-> > > > down to the logical memory map (0xffffffc000000000-0xffffffffffffffff)
-> > > > being able to represent only RAM in the first 256GB of address space.
-> > > >
-> > > > More importantly, this means that any system following [1] will only be
-> > > > able to use 32GB of RAM, which is a much more severe restriction than
-> > > > what it sounds like at first.
-> > >
-> > > On a 64-bit platform, do we still need the alias at the bottom and the
-> > > 512-544GB hole (even for 32-bit DMA, top address bits can be wired to
-> > > 512GB)? Only the idmap would need 4 levels, but that's static, we don't
-> > > need to switch Linux to 4-levels. Otherwise the memory is too sparse.
-> >
-> > I think we should keep a static virtual-to-physical mapping,
+On Tue, Mar 11, 2014 at 09:50:12AM -0700, Soren Brinkmann wrote:
+> Add a driver for the Cadence I2C controller. This controller is for
+> example found in Xilinx Zynq.
 > 
-> Just so that I understand: with a PHYS_OFFSET of 0?
-> 
-> > and to keep
-> > relocating the kernel at compile time without a hack like ARM_PATCH_PHYS_VIRT
-> > if at all possible.
-> 
-> and the kernel running at a virtual alias at a higher position than the
-> end of the mapped RAM? IIUC x86_64 does something similar.
-> 
-> > > > > Secondly, vmemmap space is not enough to cover over about 585GB physical
-> > > > > address space. Fortunately, this issue can be resolved as utilizing an extra
-> > > > > vmemmap space (0xffffffbe00000000-0xffffffbffbbfffff) in [2]. However,
-> > > > > it would not cover systems having a couple of terabytes DRAM.
-> > > >
-> > > > This one can be trivially changed by taking more space out of the vmalloc
-> > > > area, to go much higher if necessary. vmemmap space is always just a fraction
-> > > > of the linear mapping size, so we can accommodate it by definition if we
-> > > > find space to fit the physical memory.
-> > >
-> > > vmemmap is the total range / page size * sizeof(struct page). So for 1TB
-> > > range and 4K pages we would need 8GB (the current value, unless I
-> > > miscalculated the above). Anyway, you can't cover 1TB range with
-> > > 3-levels.
-> >
-> > The size of 'struct page' depends on a couple of configuration variables.
-> > If they are all enabled, you might need a bit more, even for configurations
-> > that don't have that much address space.
-> 
-> Yes. We could make vmemmap configurable at run-time or just go for a
-> maximum value.
-> 
-> > > > > Therefore, it would be needed to implement 4 level page table translations
-> > > > > for 4KB pages on 40-bit physical address space platforms. Someone might
-> > > > > suggest use of 64KB pages in this case, but I'm not sure about how to
-> > > > > deal with internal memory fragmentation.
-> > > > >
-> > > > > I would like to contribute 4 level page table translations to upstream,
-> > > > > the target of which is 3.16 kernel, if there is no movement on it. I saw
-> > > > > some related RFC patches a couple of months ago, but they didn't seem to
-> > > > > be merged into maintainer's tree.
-> > > >
-> > > > I think you are answering the wrong question here. Four level page tables
-> > > > should not be required to support >32GB of RAM, that would be very silly.
-> > >
-> > > I agree, we should only enable 4-levels of page table if we have close
-> > > to 512GB of RAM or the range is too sparse but I would actually push
-> > > back on the hardware guys to keep it tighter.
-> >
-> > But remember this part:
-> >
-> > > > There are good reasons to use a 50 bit virtual address space in user
-> > > > land, e.g. for supporting data base applications that mmap huge files.
-> >
-> > You may actually need 4-level tables even if you have much less installed
-> > memory, depending on how the application is written. Note that x86, powerpc
-> > and s390 all chose to use 4-level tables for 64-bit kernels all the
-> > time, even thought they can also use 3-level of 5-level in some cases.
-> 
-> I don't mind 4-level tables by default but I would still keep a
-> configuration option (or at least doing some benchmarks to assess the
-> impact before switching permanently to 4-levels). There are mobile
-> platforms that don't really need as much VA space (and people are even
-> talking about ILP32).
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Hi,
-How about keep 3-level table by default and enable 4-level table with 
-config option?
-Asymmetry level for kernel and user land would make code complicated.
-And usually more memory means that user application tends to use more memory.
-So I suggest same virtual space for both.
+...
 
-> 
-> > > > If this is not the goal however, we should not pay for the overhead
-> > > > of the extra page table in user space. I can see two other possible
-> > > > solutions for the problem:
-> > > >
-> > > > a) always use a four-level page table in kernel space, regardless of
-> > > > whether we do it in user space. We can move the kernel mappings down
-> > > > in address space either by one 512GB entry to 0xffffff0000000000, or
-> > > > to match the 64k-page location at 0xfffffc0000000000, or all the way
-> > > > to to 0xfffc000000000000. In any case, we can have all the dynamic
-> > > > mappings within one 512GB area and pretend we have a three-level
-> > > > page table for them, while the rest of DRAM is mapped statically at
-> > > > early boot time using 512GB large pages.
-> > >
-> > > That's a workaround but we end up with two (or more) kernel pgds - one
-> > > for vmalloc, ioremap etc. and another (static) one for the kernel linear
-> > > mapping. So far there isn't any memory mapping carved out but we have to
-> > > be careful in the future.
-> > >
-> > > However, kernel page table walking would be a bit slower with 4-levels.
-> >
-> > Do we actually walk the kernel page tables that often? With what I suggested,
-> > we can still pretend that it's 3-level for all practical purposes, since
-> > you wouldn't walk the page tables for the linear mapping.
-> 
-> I was referring to hardware page table walk (TLB miss). Again, we need
-> some benchmarks (it gets worse in a guest as it needs to walk the stage
-> 2 for each stage 1 level miss; if you are really unlucky you can have up
-> to 24 memory accesses for a TLB miss with two translation stages and 4
-> levels each).
-> 
-> --
-> Catalin
+> +static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
+> +{
+> +	unsigned int isr_status, avail_bytes;
+> +	unsigned int bytes_to_recv, bytes_to_send;
+> +	struct cdns_i2c *id = ptr;
+> +	/* Signal completion only after everything is updated */
+> +	int done_flag = 0;
+> +
+> +	isr_status = cdns_i2c_readreg(CDNS_I2C_ISR_OFFSET);
+> +
+> +	/* Handling nack and arbitration lost interrupt */
+> +	if (isr_status & (CDNS_I2C_IXR_NACK | CDNS_I2C_IXR_ARB_LOST))
+> +		done_flag = 1;
+> +
+> +	/* Handling Data interrupt */
+> +	if ((isr_status & CDNS_I2C_IXR_DATA) &&
+> +			(id->recv_count >= CDNS_I2C_DATA_INTR_DEPTH)) {
+> +		/* Always read data interrupt threshold bytes */
+> +		bytes_to_recv = CDNS_I2C_DATA_INTR_DEPTH;
+> +		id->recv_count = id->recv_count - CDNS_I2C_DATA_INTR_DEPTH;
+
+Use '-='
+
+...
+
+> +static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+> +		struct i2c_adapter *adap)
+> +{
+> +	int ret;
+> +	u32 reg;
+> +	bool retry = false;
+> +	unsigned retries = adap->retries;
+> +
+> +	id->p_msg = msg;
+> +	do {
+> +		id->err_status = 0;
+> +		init_completion(&id->xfer_done);
+
+reinit_completion. And add init_completion in probe.
+
+> +
+> +		/* Check for the TEN Bit mode on each msg */
+> +		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
+> +		if (msg->flags & I2C_M_TEN) {
+> +			if (reg & CDNS_I2C_CR_NEA)
+> +				cdns_i2c_writereg(reg & ~CDNS_I2C_CR_NEA,
+> +						CDNS_I2C_CR_OFFSET);
+> +		} else {
+> +			if (!(reg & CDNS_I2C_CR_NEA))
+> +				cdns_i2c_writereg(reg | CDNS_I2C_CR_NEA,
+> +						CDNS_I2C_CR_OFFSET);
+> +		}
+> +
+> +		/* Check for the R/W flag on each msg */
+> +		if (msg->flags & I2C_M_RD)
+> +			cdns_i2c_mrecv(id);
+> +		else
+> +			cdns_i2c_msend(id);
+> +
+> +		/* Wait for the signal of completion */
+> +		ret = wait_for_completion_timeout(&id->xfer_done, HZ);
+> +		if (!ret) {
+> +			cdns_i2c_master_reset(adap);
+> +			dev_err(id->adap.dev.parent,
+> +					"timeout waiting on completion\n");
+> +			return -ETIMEDOUT;
+> +		}
+> +
+> +		cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK,
+> +				  CDNS_I2C_IDR_OFFSET);
+> +
+> +		/* If it is bus arbitration error, try again */
+> +		if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
+
+Just return -EAGAIN here...
+
+> +			dev_dbg(id->adap.dev.parent,
+> +				 "Lost ownership on bus, trying again\n");
+> +			if (retries--) {
+> +				mdelay(2);
+> +				retry = true;
+> +			} else {
+> +				dev_err(id->adap.dev.parent,
+> +					 "Retries completed, exit\n");
+> +				return -EREMOTEIO;
+> +			}
+> +		}
+
+... and you can skip this block since the core will do the retries.
+
+> +	} while (retry);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * cdns_i2c_master_xfer - The main i2c transfer function
+> + * @adap:	pointer to the i2c adapter driver instance
+> + * @msgs:	pointer to the i2c message structure
+> + * @num:	the number of messages to transfer
+> + *
+> + * Return: number of msgs processed on success, negative error otherwise
+> + *
+> + * This function waits for the bus idle condition and updates the timeout if
+> + * modified by user. Then initiates the send/recv activity based on the
+> + * transfer message received.
+> + */
+> +static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+> +				int num)
+> +{
+> +	struct cdns_i2c *id = adap->algo_data;
+> +	unsigned long timeout;
+> +	int ret, count;
+> +	u32 reg;
+> +
+> +	/* Waiting for bus-ready. If bus not ready, it returns after timeout */
+> +	timeout = jiffies + CDNS_I2C_TIMEOUT;
+> +	while (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) & CDNS_I2C_SR_BA) {
+> +		if (time_after(jiffies, timeout)) {
+> +			dev_warn(id->adap.dev.parent,
+> +					"timedout waiting for bus ready\n");
+> +			cdns_i2c_master_reset(adap);
+> +			return -ETIMEDOUT;
+> +		}
+> +		schedule_timeout(1);
+> +	}
+> +
+> +	/* The bus is free. Set the new timeout value if updated */
+> +	if (id->adap.timeout != id->cur_timeout) {
+> +		cdns_i2c_writereg(id->adap.timeout & CDNS_I2C_TIME_OUT_TO_MASK,
+> +					CDNS_I2C_TIME_OUT_OFFSET);
+> +		id->cur_timeout = id->adap.timeout;
+> +	}
+> +
+> +	/*
+> +	 * Set the flag to one when multiple messages are to be
+> +	 * processed with a repeated start.
+> +	 */
+> +	if (num > 1) {
+> +		id->bus_hold_flag = 1;
+> +		reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
+> +		reg |= CDNS_I2C_CR_HOLD;
+> +		cdns_i2c_writereg(reg, CDNS_I2C_CR_OFFSET);
+> +	} else {
+> +		id->bus_hold_flag = 0;
+> +	}
+> +
+> +	/* Process the msg one by one */
+> +	for (count = 0; count < num; count++, msgs++) {
+> +		if (count == (num - 1))
+> +			id->bus_hold_flag = 0;
+> +
+> +		ret = cdns_i2c_process_msg(id, msgs, adap);
+> +		if (ret)
+> +			return ret;
+> +
+> +		/* Report the other error interrupts to application as EIO */
+> +		if (id->err_status & 0xE4) {
+
+Please replace this magic hex value with something readable.
+
+> +			cdns_i2c_master_reset(adap);
+> +			return -EIO;
+> +		}
+> +	}
+> +
+> +	return num;
+> +}
+> +
+
+...
+
+> +/**
+> + * cdns_i2c_probe - Platform registration call
+> + * @pdev:	Handle to the platform device structure
+> + *
+> + * Return: 0 on success, negative error otherwise
+> + *
+> + * This function does all the memory allocation and registration for the i2c
+> + * device. User can modify the address mode to 10 bit address mode using the
+> + * ioctl call with option I2C_TENBIT.
+> + */
+> +static int cdns_i2c_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *r_mem;
+> +	struct cdns_i2c *id;
+> +	int ret;
+> +
+> +	id = devm_kzalloc(&pdev->dev, sizeof(*id), GFP_KERNEL);
+> +	if (!id)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, id);
+> +
+> +	r_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	id->membase = devm_ioremap_resource(&pdev->dev, r_mem);
+> +	if (IS_ERR(id->membase))
+> +		return PTR_ERR(id->membase);
+> +
+> +	id->irq = platform_get_irq(pdev, 0);
+> +
+> +	id->adap.nr = pdev->id;
+
+Drop this line and use i2c_add_adapter() later to let the core handle
+the numbering. This will also take aliases into account.
+
+> +	id->adap.dev.of_node = pdev->dev.of_node;
+> +	id->adap.algo = &cdns_i2c_algo;
+> +	id->adap.timeout = 0x1F;	/* Default timeout value */
+
+This value is in jiffies, so you probably want to use msecs_to_jiffies
+or alike.
+
+> +	id->adap.retries = 3;		/* Default retry value. */
+> +	id->adap.algo_data = id;
+> +	id->adap.dev.parent = &pdev->dev;
+> +	snprintf(id->adap.name, sizeof(id->adap.name),
+> +		 "Cadence I2C at %08lx", (unsigned long)r_mem->start);
+> +
+> +	id->cur_timeout = id->adap.timeout;
+> +	id->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(id->clk)) {
+> +		dev_err(&pdev->dev, "input clock not found.\n");
+> +		return PTR_ERR(id->clk);
+> +	}
+> +	ret = clk_prepare_enable(id->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Unable to enable clock.\n");
+> +		return ret;
+> +	}
+> +	id->clk_rate_change_nb.notifier_call = cdns_i2c_clk_notifier_cb;
+> +	if (clk_notifier_register(id->clk, &id->clk_rate_change_nb))
+> +		dev_warn(&pdev->dev, "Unable to register clock notifier.\n");
+> +	id->input_clk = clk_get_rate(id->clk);
+> +
+> +	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
+> +			&id->i2c_clk);
+> +	if (ret || (id->i2c_clk > CDNS_I2C_SPEED_MAX))
+> +		id->i2c_clk = CDNS_I2C_SPEED_MAX;
+> +
+> +	cdns_i2c_writereg(0xE, CDNS_I2C_CR_OFFSET);
+
+Remove magic value. Please check the driver for more, in case I missed
+some.
+
+> +	cdns_i2c_writereg(id->adap.timeout, CDNS_I2C_TIME_OUT_OFFSET);
+> +
+> +	ret = cdns_i2c_setclk(id->input_clk, id);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "invalid SCL clock: %u Hz\n", id->i2c_clk);
+> +		ret = -EINVAL;
+> +		goto err_clk_dis;
+> +	}
+> +
+> +	ret = devm_request_irq(&pdev->dev, id->irq, cdns_i2c_isr, 0,
+> +				 DRIVER_NAME, id);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "cannot get irq %d\n", id->irq);
+> +		goto err_clk_dis;
+> +	}
+> +
+> +	ret = i2c_add_numbered_adapter(&id->adap);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "reg adap failed: %d\n", ret);
+> +		goto err_clk_dis;
+> +	}
+> +
+> +	dev_info(&pdev->dev, "%u kHz mmio %08lx irq %d\n",
+> +		 id->i2c_clk / 1000, (unsigned long)r_mem->start, id->irq);
+> +
+> +	return 0;
+> +
+> +err_clk_dis:
+> +	clk_disable_unprepare(id->clk);
+> +	return ret;
+> +}
+> +
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140401/b4fdc8ed/attachment.sig>
