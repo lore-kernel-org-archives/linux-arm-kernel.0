@@ -1,57 +1,39 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Tue, 1 Apr 2014 21:17:03 +0800
-Subject: [PATCH] Input: w90p910_ts - depend on ARCH_W90X900
-In-Reply-To: <20140401142046.14d4bb8c@endymion.delvare>
-References: <20140401142046.14d4bb8c@endymion.delvare>
-Message-ID: <CAKT61h__8fuJDs94akU73grWns82+mk1vmSdQw5fwd1Cx-455g@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 01 Apr 2014 14:19:40 +0100
+Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <20140331200620.GA13881@kroah.com>
+References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+ <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
+ <20140331200620.GA13881@kroah.com>
+Message-ID: <533ABCEC.8040701@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----------- Forwarded message ----------
-From: Jean Delvare <jdelvare@suse.de>
-Date: 2014-04-01 20:20 GMT+08:00
-Subject: [PATCH] Input: w90p910_ts - depend on ARCH_W90X900
-To: linux-input at vger.kernel.org, linux-arm-kernel at lists.infradead.org
-??? Wan ZongShun <mcuos.com@gmail.com>, Dmitry Torokhov
-<dmitry.torokhov@gmail.com>
+On 31/03/14 21:06, Greg KH wrote:
+> On Mon, Mar 31, 2014 at 06:41:56PM +0200, Sylwester Nawrocki wrote:
+>> This function adds a helper function to configure clock parents and rates
+>> as specified in clock-parents, clock-rates DT properties for a consumer
+>> device and a call to it before driver is bound to a device.
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
+[snip]
 
-The w90p910_ts touchscreen driver is heavily architecture dependent,
-so there is no point in letting it be built on other architectures
-than it was written for.
+>
+> I don't understand why you need the driver core to initialize this one
+> type of thing?  That should be in a driver, or in a class, or at worse
+> case, the platform code.
+>
+> What makes clocks so "unique" here?
 
-All other W90P910/W90X900 drivers already have that dependency, so it
-makes things more consistent and configuration easier.
+I suppose the issue here is that a lot of drivers currently use
+clocks and a number of systems have badly setup default clock trees
+at start time.
 
-Signed-off-by: Jean Delvare <jdelvare@suse.de>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
- drivers/input/touchscreen/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- linux-3.14-rc8.orig/drivers/input/touchscreen/Kconfig
-2014-02-09 16:53:02.945634113 +0100
-+++ linux-3.14-rc8/drivers/input/touchscreen/Kconfig    2014-04-01
-14:10:08.936933702 +0200
-@@ -867,7 +867,7 @@ config TOUCHSCREEN_TSC2007
-
- config TOUCHSCREEN_W90X900
-        tristate "W90P910 touchscreen driver"
--       depends on HAVE_CLK
-+       depends on ARCH_W90X900
-        help
-          Say Y here if you have a W90P910 based touchscreen.
-
-Sure, your idea is reasonable.
-
-Acked-by Wan Zongshun <mcuos.com@gmail.com>
-
---
-Jean Delvare
-SUSE L3 Support
-
+Mark Brown and others have argued that the management of clocks which
+is common to all devices should not live in the driver.
 
 -- 
-Wan ZongShun.
-www.mcuos.com
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
