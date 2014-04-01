@@ -1,57 +1,49 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Apr 2014 16:06:01 +0300
-Subject: [PATCH v2 00/14] dma: edma: Fixes for cyclic (audio) operation
-Message-ID: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Tue, 1 Apr 2014 16:06:02 +0300
+Subject: [PATCH v2 01/14] platform_data: edma: Be precise with the paRAM struct
+In-Reply-To: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1396357575-30585-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The edmacc_param struct should follow the layout of the paRAM area in the
+HW. Be explicit on the size of the fields (u32) and also mark the struct
+as packed to avoid any padding on non 32bit architectures.
 
-This is basically a resend of the previous series:
-https://lkml.org/lkml/2014/3/13/119
-with removed ASoC patches (most of them are applied already).
-
-Changes since v1:
-- ASoC patches removed
-- Comments from Andriy Shevchenko addressed
-- patch added to fix cases when src/dst_maxburst is set to 0
-
-Adding support for DMA pause/resume
-Possibility to select non default event queue/TC for cyclic (audio) dma
-channels: all devices using the eDMA via dmaengine was assigned to the default
-EQ/TC (mmc, i2c, spi, etc, and audio). This is not optimal from system
-performance point of view since sharing the same EQ/TC can cause latency spikes
-for cyclic channels (long DMA transfers for MMC for example).
-
-While debugging the edma to get things sorted out I noticed that the debug was
-too verbose and the important information was hidden even when the we did not
-asked for verbose dmaengine debug.
-I have included some debug cleanups for the edma dmaengine driver also.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (14):
-  platform_data: edma: Be precise with the paRAM struct
-  dma: edma: Correct the handling of src/dst_maxburst == 0
-  dma: edma: Add support for DMA_PAUSE/RESUME operation
-  dma: edma: Set DMA_CYCLIC capability flag
-  arm: common: edma: Select event queue 1 as default when booted with DT
-  arm: common: edma: Save the number of event queues/TCs
-  arm: common: edma: API to request non default queue for a channel
-  DMA: edma: Use different eventq for cyclic channels
-  dma: edma: Implement device_slave_caps callback
-  dma: edma: Simplify direction configuration in edma_config_pset()
-  dma: edma: Reduce debug print verbosity for non verbose debugging
-  dma: edma: Prefix debug prints where the text were identical in prep
-    callbacks
-  dma: edma: Add channel number to debug prints
-  dma: edma: Print the direction value as well when it is not supported
+ include/linux/platform_data/edma.h | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
- arch/arm/common/edma.c             | 34 +++++++++++++-
- drivers/dma/edma.c                 | 96 +++++++++++++++++++++++++++++---------
- include/linux/platform_data/edma.h | 20 ++++----
- 3 files changed, 119 insertions(+), 31 deletions(-)
-
+diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+index f50821cb64be..923f8a3e4ce0 100644
+--- a/include/linux/platform_data/edma.h
++++ b/include/linux/platform_data/edma.h
+@@ -43,15 +43,15 @@
+ 
+ /* PaRAM slots are laid out like this */
+ struct edmacc_param {
+-	unsigned int opt;
+-	unsigned int src;
+-	unsigned int a_b_cnt;
+-	unsigned int dst;
+-	unsigned int src_dst_bidx;
+-	unsigned int link_bcntrld;
+-	unsigned int src_dst_cidx;
+-	unsigned int ccnt;
+-};
++	u32 opt;
++	u32 src;
++	u32 a_b_cnt;
++	u32 dst;
++	u32 src_dst_bidx;
++	u32 link_bcntrld;
++	u32 src_dst_cidx;
++	u32 ccnt;
++} __packed;
+ 
+ /* fields in edmacc_param.opt */
+ #define SAM		BIT(0)
 -- 
 1.9.1
