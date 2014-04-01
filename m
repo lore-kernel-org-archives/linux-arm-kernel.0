@@ -1,76 +1,46 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Tue,  1 Apr 2014 17:02:56 +0300
-Subject: [PATCHv3 5/5] net: rfkill: gpio: hard-code the gpio names
-In-Reply-To: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
-References: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <1396360976-28657-6-git-send-email-heikki.krogerus@linux.intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Apr 2014 15:04:01 +0100
+Subject: Recent 3.x kernels: Memory leak causing OOMs
+In-Reply-To: <20140401113851.GA15317@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
+ <20140216225000.GO30257@n2100.arm.linux.org.uk>
+ <1392670951.24429.10.camel@sakura.staff.proxad.net>
+ <20140217210954.GA21483@n2100.arm.linux.org.uk>
+ <20140315101952.GT21483@n2100.arm.linux.org.uk>
+ <20140317180748.644d30e2@notabene.brown> <20140317181813.GA24144@arm.com>
+ <20140317193316.GF21483@n2100.arm.linux.org.uk>
+ <20140401091959.GA10912@n2100.arm.linux.org.uk>
+ <20140401113851.GA15317@n2100.arm.linux.org.uk>
+Message-ID: <20140401140401.GZ7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to dynamically generate the names. This
-will fix a static checker warning..
+On Tue, Apr 01, 2014 at 12:38:51PM +0100, Russell King - ARM Linux wrote:
+> Consider what happens when bio_alloc_pages() fails.  j starts off as one
+> for non-recovery operations, and we enter the loop to allocate the pages.
+> j is post-decremented to zero.  So, bio = r1_bio->bios[0].
+> 
+> bio_alloc_pages(bio) fails, we jump to out_free_bio.  The first thing
+> that does is increment j, so we free from r1_bio->bios[1] up to the
+> number of raid disks, leaving r1_bio->bios[0] leaked as the r1_bio is
+> then freed.
 
-net/rfkill/rfkill-gpio.c:144 rfkill_gpio_probe()
-    warn: variable dereferenced before check 'rfkill->name'
+Neil,
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
----
- net/rfkill/rfkill-gpio.c | 19 ++-----------------
- 1 file changed, 2 insertions(+), 17 deletions(-)
+Can you please review commit a07876064a0b7 (block: Add bio_alloc_pages)
+which seems to have introduced this bug - it seems to have gone in during
+the v3.10 merge window, and looks like it was never reviewed from the
+attributations on the commit.
 
-diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
-index 436bffb..9c4a5eb 100644
---- a/net/rfkill/rfkill-gpio.c
-+++ b/net/rfkill/rfkill-gpio.c
-@@ -36,8 +36,6 @@ struct rfkill_gpio_data {
- 	struct gpio_desc	*shutdown_gpio;
- 
- 	struct rfkill		*rfkill_dev;
--	char			*reset_name;
--	char			*shutdown_name;
- 	struct clk		*clk;
- 
- 	bool			clk_enabled;
-@@ -89,7 +87,6 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
- 	struct rfkill_gpio_data *rfkill;
- 	struct gpio_desc *gpio;
- 	int ret;
--	int len;
- 
- 	rfkill = devm_kzalloc(&pdev->dev, sizeof(*rfkill), GFP_KERNEL);
- 	if (!rfkill)
-@@ -106,21 +103,9 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	len = strlen(rfkill->name);
--	rfkill->reset_name = devm_kzalloc(&pdev->dev, len + 7, GFP_KERNEL);
--	if (!rfkill->reset_name)
--		return -ENOMEM;
--
--	rfkill->shutdown_name = devm_kzalloc(&pdev->dev, len + 10, GFP_KERNEL);
--	if (!rfkill->shutdown_name)
--		return -ENOMEM;
--
--	snprintf(rfkill->reset_name, len + 6 , "%s_reset", rfkill->name);
--	snprintf(rfkill->shutdown_name, len + 9, "%s_shutdown", rfkill->name);
--
- 	rfkill->clk = devm_clk_get(&pdev->dev, NULL);
- 
--	gpio = devm_gpiod_get_index(&pdev->dev, rfkill->reset_name, 0);
-+	gpio = devm_gpiod_get_index(&pdev->dev, "reset", 0);
- 	if (!IS_ERR(gpio)) {
- 		ret = gpiod_direction_output(gpio, 0);
- 		if (ret)
-@@ -128,7 +113,7 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
- 		rfkill->reset_gpio = gpio;
- 	}
- 
--	gpio = devm_gpiod_get_index(&pdev->dev, rfkill->shutdown_name, 1);
-+	gpio = devm_gpiod_get_index(&pdev->dev, "shutdown", 1);
- 	if (!IS_ERR(gpio)) {
- 		ret = gpiod_direction_output(gpio, 0);
- 		if (ret)
+The commit message is brief, and inadequately describes the functional
+change that the patch has - we go from "get up to RESYNC_PAGES into the
+bio's io_vec" to "get all RESYNC_PAGES or fail completely".
+
+Not withstanding the breakage of the error cleanup paths, is this an
+acceptable change of behaviour here?
+
+Thanks.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
