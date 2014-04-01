@@ -1,99 +1,50 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 01 Apr 2014 17:10:57 +0100
-Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
- swiotlb" (was Re: [GIT PULL] arm64 patches for 3.15)
-In-Reply-To: <20140331175230.GA7480@arm.com>
-References: <20140331175230.GA7480@arm.com>
-Message-ID: <1396368657.3681.17.camel@linaro1.home>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 1 Apr 2014 18:22:16 +0200
+Subject: [PATCH v5] ARM: sun4i: spi: Allow transfers larger than FIFO size
+In-Reply-To: <1396318611-8997-1-git-send-email-mr.nuke.me@gmail.com>
+References: <20140331104522.GD26751@lukather>
+ <1396318611-8997-1-git-send-email-mr.nuke.me@gmail.com>
+Message-ID: <20140401162216.GN26751@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-03-31 at 18:52 +0100, Catalin Marinas wrote:
-> The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
+On Mon, Mar 31, 2014 at 09:16:51PM -0500, Alexandru Gagniuc wrote:
+> SPI transfers were limited to one FIFO depth, which is 64 bytes.
+> This was an artificial limitation, however, as the hardware can handle
+> much larger bursts. To accommodate this, we enable the interrupt when
+> the Rx FIFO is 3/4 full, and drain the FIFO within the interrupt
+> handler. The 3/4 ratio was chosen arbitrarily, with the intention to
+> reduce the potential number of interrupts.
 > 
->   Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
+> Since the SUN4I_CTL_TP bit is set, the hardware will pause
+> transmission whenever the FIFO is full, so there is no risk of losing
+> data if we can't service the interrupt in time.
 > 
-> are available in the git repository at:
+> For the Tx side, enable and use the Tx FIFO 3/4 empty interrupt to
+> replenish the FIFO on large SPI bursts. This requires more care in
+> when the interrupt is left enabled, as this interrupt will continually
+> trigger when the FIFO is less than 1/4 full, even though we
+> acknowledge it.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
-> 
-> for you to fetch changes up to 196adf2f3015eacac0567278ba538e3ffdd16d0e:
-> 
->   arm64: Remove pgprot_dmacoherent() (2014-03-24 10:35:35 +0000)
+> Signed-off-by: Alexandru Gagniuc <mr.nuke.me@gmail.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I may have spotted a bug in commit 7363590d2c46 (arm64: Implement
-coherent DMA API based on swiotlb), see my inline comment below...
+Hmmm, you forgot to Cc Mark Brown. Please resubmit it Ccing whoever
+shows up using get_maintainer, otherwise, your patch won't be applied.
 
-[...]
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index 1ea9f26..97fcef5 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -166,3 +166,81 @@ ENTRY(__flush_dcache_area)
->  	dsb	sy
->  	ret
->  ENDPROC(__flush_dcache_area)
-> +
-> +/*
-> + *	__dma_inv_range(start, end)
-> + *	- start   - virtual start address of region
-> + *	- end     - virtual end address of region
-> + */
-> +__dma_inv_range:
-> +	dcache_line_size x2, x3
-> +	sub	x3, x2, #1
-> +	bic	x0, x0, x3
-> +	bic	x1, x1, x3
+You also forgot the changes between this version and the previous one.
 
-Why is the 'end' value in x1 above rounded down to be cache aligned?
-This means the cache invalidate won't include the cache line containing
-the final bytes of the region, unless it happened to already be cache
-line aligned. This looks especially suspect as the other two cache
-operations added in the same patch (below) don't do that.
-
-> +1:	dc	ivac, x0			// invalidate D / U line
-> +	add	x0, x0, x2
-> +	cmp	x0, x1
-> +	b.lo	1b
-> +	dsb	sy
-> +	ret
-> +ENDPROC(__dma_inv_range)
-> +
-> +/*
-> + *	__dma_clean_range(start, end)
-> + *	- start   - virtual start address of region
-> + *	- end     - virtual end address of region
-> + */
-> +__dma_clean_range:
-> +	dcache_line_size x2, x3
-> +	sub	x3, x2, #1
-> +	bic	x0, x0, x3
-> +1:	dc	cvac, x0			// clean D / U line
-> +	add	x0, x0, x2
-> +	cmp	x0, x1
-> +	b.lo	1b
-> +	dsb	sy
-> +	ret
-> +ENDPROC(__dma_clean_range)
-> +
-> +/*
-> + *	__dma_flush_range(start, end)
-> + *	- start   - virtual start address of region
-> + *	- end     - virtual end address of region
-> + */
-> +ENTRY(__dma_flush_range)
-> +	dcache_line_size x2, x3
-> +	sub	x3, x2, #1
-> +	bic	x0, x0, x3
-> +1:	dc	civac, x0			// clean & invalidate D / U line
-> +	add	x0, x0, x2
-> +	cmp	x0, x1
-> +	b.lo	1b
-> +	dsb	sy
-> +	ret
-> +ENDPROC(__dma_flush_range)
-
-[...]
+Thanks!
+Maxime
 
 -- 
-Tixy
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140401/6d6755ec/attachment.sig>
