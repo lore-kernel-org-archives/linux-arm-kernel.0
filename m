@@ -1,88 +1,181 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 1 Apr 2014 18:29:39 +0100
-Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
- swiotlb" (was Re: [GIT PULL] arm64 patches for 3.15)
-In-Reply-To: <1396368657.3681.17.camel@linaro1.home>
-References: <20140331175230.GA7480@arm.com>
- <1396368657.3681.17.camel@linaro1.home>
-Message-ID: <20140401172939.GG20061@arm.com>
+From: mr.nuke.me@gmail.com (Alexandru Gagniuc)
+Date: Tue,  1 Apr 2014 12:26:45 -0500
+Subject: [PATCH RESEND v5] ARM: sun4i: spi: Allow transfers larger than FIFO
+ size
+In-Reply-To: <20140401162216.GN26751@lukather>
+References: <20140401162216.GN26751@lukather>
+Message-ID: <1396373205-19543-1-git-send-email-mr.nuke.me@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 05:10:57PM +0100, Jon Medhurst (Tixy) wrote:
-> On Mon, 2014-03-31 at 18:52 +0100, Catalin Marinas wrote:
-> > The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
-> > 
-> >   Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
-> > 
-> > for you to fetch changes up to 196adf2f3015eacac0567278ba538e3ffdd16d0e:
-> > 
-> >   arm64: Remove pgprot_dmacoherent() (2014-03-24 10:35:35 +0000)
-> 
-> I may have spotted a bug in commit 7363590d2c46 (arm64: Implement
-> coherent DMA API based on swiotlb), see my inline comment below...
-> 
-> [...]
-> > diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> > index 1ea9f26..97fcef5 100644
-> > --- a/arch/arm64/mm/cache.S
-> > +++ b/arch/arm64/mm/cache.S
-> > @@ -166,3 +166,81 @@ ENTRY(__flush_dcache_area)
-> >  	dsb	sy
-> >  	ret
-> >  ENDPROC(__flush_dcache_area)
-> > +
-> > +/*
-> > + *	__dma_inv_range(start, end)
-> > + *	- start   - virtual start address of region
-> > + *	- end     - virtual end address of region
-> > + */
-> > +__dma_inv_range:
-> > +	dcache_line_size x2, x3
-> > +	sub	x3, x2, #1
-> > +	bic	x0, x0, x3
-> > +	bic	x1, x1, x3
-> 
-> Why is the 'end' value in x1 above rounded down to be cache aligned?
-> This means the cache invalidate won't include the cache line containing
-> the final bytes of the region, unless it happened to already be cache
-> line aligned. This looks especially suspect as the other two cache
-> operations added in the same patch (below) don't do that.
+SPI transfers were limited to one FIFO depth, which is 64 bytes.
+This was an artificial limitation, however, as the hardware can handle
+much larger bursts. To accommodate this, we enable the interrupt when
+the Rx FIFO is 3/4 full, and drain the FIFO within the interrupt
+handler. The 3/4 ratio was chosen arbitrarily, with the intention to
+reduce the potential number of interrupts.
 
-Cache invalidation is destructive, so we want to make sure that it
-doesn't affect anything beyond x1. But you are right, if either end of
-the buffer is not cache line aligned it can get it wrong. The fix is to
-use clean+invalidate on the unaligned ends:
+Since the SUN4I_CTL_TP bit is set, the hardware will pause
+transmission whenever the FIFO is full, so there is no risk of losing
+data if we can't service the interrupt in time.
 
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index c46f48b33c14..6a26bf1965d3 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -175,10 +175,17 @@ ENDPROC(__flush_dcache_area)
- __dma_inv_range:
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
--	bic	x0, x0, x3
-+	tst	x1, x3				// end cache line aligned?
- 	bic	x1, x1, x3
--1:	dc	ivac, x0			// invalidate D / U line
--	add	x0, x0, x2
-+	b.eq	1f
-+	dc	civac, x1			// clean & invalidate D / U line
-+1:	tst	x0, x3				// start cache line aligned?
-+	bic	x0, x0, x3
-+	b.eq	2f
-+	dc	civac, x0			// clean & invalidate D / U line
-+	b	3f
-+2:	dc	ivac, x0			// invalidate D / U line
-+3:	add	x0, x0, x2
- 	cmp	x0, x1
- 	b.lo	1b
- 	dsb	sy
+For the Tx side, enable and use the Tx FIFO 3/4 empty interrupt to
+replenish the FIFO on large SPI bursts. This requires more care in
+when the interrupt is left enabled, as this interrupt will continually
+trigger when the FIFO is less than 1/4 full, even though we
+acknowledge it.
 
--- 
-Catalin
+Signed-off-by: Alexandru Gagniuc <mr.nuke.me@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+
+Changes from v4:
+ * use min3() instead of two if statements in sun4i_spi_fill_fifo()
+ * fix trivial whitespace issue in if statement in sun4i_spi_handler()
+ * use consistent style in assigning 'reg' in the added functions.
+
+ drivers/spi/spi-sun4i.c | 71 ++++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 62 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index 3f82705..d80ceba 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -47,6 +47,8 @@
+ #define SUN4I_CTL_TP				BIT(18)
+
+ #define SUN4I_INT_CTL_REG		0x0c
++#define SUN4I_INT_CTL_RF_F34			BIT(4)
++#define SUN4I_INT_CTL_TF_E34			BIT(12)
+ #define SUN4I_INT_CTL_TC			BIT(16)
+
+ #define SUN4I_INT_STA_REG		0x10
+@@ -62,11 +64,14 @@
+ #define SUN4I_CLK_CTL_CDR1(div)			(((div) & SUN4I_CLK_CTL_CDR1_MASK) << 8)
+ #define SUN4I_CLK_CTL_DRS			BIT(12)
+
++#define SUN4I_MAX_XFER_SIZE			0xffffff
++
+ #define SUN4I_BURST_CNT_REG		0x20
+-#define SUN4I_BURST_CNT(cnt)			((cnt) & 0xffffff)
++#define SUN4I_BURST_CNT(cnt)			((cnt) & SUN4I_MAX_XFER_SIZE)
+
+ #define SUN4I_XMIT_CNT_REG		0x24
+-#define SUN4I_XMIT_CNT(cnt)			((cnt) & 0xffffff)
++#define SUN4I_XMIT_CNT(cnt)			((cnt) & SUN4I_MAX_XFER_SIZE)
++
+
+ #define SUN4I_FIFO_STA_REG		0x28
+ #define SUN4I_FIFO_STA_RF_CNT_MASK		0x7f
+@@ -97,6 +102,27 @@ static inline void sun4i_spi_write(struct sun4i_spi *sspi, u32 reg, u32 value)
+ 	writel(value, sspi->base_addr + reg);
+ }
+
++static inline u32 sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
++{
++	u32 reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
++	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
++	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
++}
++
++static inline void sun4i_spi_enable_interrupt(struct sun4i_spi *sspi, u32 mask)
++{
++	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	reg |= mask;
++	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++}
++
++static inline void sun4i_spi_disable_interrupt(struct sun4i_spi *sspi, u32 mask)
++{
++	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	reg &= ~mask;
++	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++}
++
+ static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
+ {
+ 	u32 reg, cnt;
+@@ -119,10 +145,13 @@ static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
+
+ static inline void sun4i_spi_fill_fifo(struct sun4i_spi *sspi, int len)
+ {
++	u32 cnt;
+ 	u8 byte;
+
+-	if (len > sspi->len)
+-		len = sspi->len;
++	/* See how much data we can fit */
++	cnt = SUN4I_FIFO_DEPTH - sun4i_spi_get_tx_fifo_count(sspi);
++
++	len = min3(len, (int)cnt, sspi->len);
+
+ 	while (len--) {
+ 		byte = sspi->tx_buf ? *sspi->tx_buf++ : 0;
+@@ -175,8 +204,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	int ret = 0;
+ 	u32 reg;
+
+-	/* We don't support transfer larger than the FIFO */
+-	if (tfr->len > SUN4I_FIFO_DEPTH)
++	/* This is the maximum SPI burst size supported by the hardware */
++	if (tfr->len > SUN4I_MAX_XFER_SIZE)
+ 		return -EINVAL;
+
+ 	reinit_completion(&sspi->done);
+@@ -274,7 +303,10 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
+
+ 	/* Enable the interrupts */
+-	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
++	sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TC | SUN4I_INT_CTL_RF_F34);
++	/* Only enable Tx FIFO interrupt if we really need it */
++	if (tx_len > SUN4I_FIFO_DEPTH)
++		sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TF_E34);
+
+ 	/* Start the transfer */
+ 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+@@ -287,8 +319,6 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 		goto out;
+ 	}
+
+-	sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
+-
+ out:
+ 	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, 0);
+
+@@ -303,10 +333,33 @@ static irqreturn_t sun4i_spi_handler(int irq, void *dev_id)
+ 	/* Transfer complete */
+ 	if (status & SUN4I_INT_CTL_TC) {
+ 		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TC);
++		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
+ 		complete(&sspi->done);
+ 		return IRQ_HANDLED;
+ 	}
+
++	/* Receive FIFO 3/4 full */
++	if (status & SUN4I_INT_CTL_RF_F34) {
++		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
++		/* Only clear the interrupt _after_ draining the FIFO */
++		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_RF_F34);
++		return IRQ_HANDLED;
++	}
++
++	/* Transmit FIFO 3/4 empty */
++	if (status & SUN4I_INT_CTL_TF_E34) {
++		sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
++
++		if (!sspi->len)
++			/* nothing left to transmit */
++			sun4i_spi_disable_interrupt(sspi, SUN4I_INT_CTL_TF_E34);
++
++		/* Only clear the interrupt _after_ re-seeding the FIFO */
++		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TF_E34);
++
++		return IRQ_HANDLED;
++	}
++
+ 	return IRQ_NONE;
+ }
+
+--
+1.8.5.3
