@@ -1,52 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 1 Apr 2014 09:50:42 +0530
-Subject: [PATCH] pata_arasan_cf: fix ata_host_activate() failure handling
-In-Reply-To: <7093981.6c4k98qyGh@amdc1032>
-References: <7093981.6c4k98qyGh@amdc1032>
-Message-ID: <CAOh2x=n8PGuykczfpi0T1-WwVmakURyX+RuuOQiFVhpYPmrS6A@mail.gmail.com>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Tue, 1 Apr 2014 10:12:03 +0530
+Subject: [PATCH v2 3/7] clk: exynos5420: Rename clock IDs
+In-Reply-To: <20140327194959.GY3998@book.gsilab.sittig.org>
+References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
+ <1395918470-16374-4-git-send-email-shaik.ameer@samsung.com>
+ <20140327194959.GY3998@book.gsilab.sittig.org>
+Message-ID: <CAOD6ATqRGgz9MxWYBs6Bo_xh2+N6trVByywXE_dxv9N=tpkTDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 11:19 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Add missing cf_exit() and clk_put() calls to ata_host_activate()
-> failure path.
+On Fri, Mar 28, 2014 at 1:19 AM, Gerhard Sittig <gsi@denx.de> wrote:
+> On Thu, 2014-03-27 at 16:37 +0530, Shaik Ameer Basha wrote:
+>>
+>> From: Rahul Sharma <rahul.sharma@samsung.com>
+>>
+>> This patch renames the clock IDs used for the DT bindings as
+>> per Exynos5420 datasheet.
+>>
+>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5420.c   |  162 +++++++++++++++++---------------
+>>  include/dt-bindings/clock/exynos5420.h |  138 +++++++++++++--------------
+>>  2 files changed, 154 insertions(+), 146 deletions(-)
 >
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/ata/pata_arasan_cf.c |   10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
->
-> Index: b/drivers/ata/pata_arasan_cf.c
-> ===================================================================
-> --- a/drivers/ata/pata_arasan_cf.c      2014-03-31 16:57:47.443727785 +0200
-> +++ b/drivers/ata/pata_arasan_cf.c      2014-03-31 17:09:48.171715498 +0200
-> @@ -898,9 +898,15 @@ static int arasan_cf_probe(struct platfo
->
->         cf_card_detect(acdev, 0);
->
-> -       return ata_host_activate(host, acdev->irq, irq_handler, 0,
-> -                       &arasan_cf_sht);
-> +       ret = ata_host_activate(host, acdev->irq, irq_handler, 0,
-> +                               &arasan_cf_sht);
-> +       if (ret)
-> +               goto exit_cf;
->
-> +       return 0;
+> does this break bisection when you rename symbolic identifiers in
+> their declaration yet don't update references at the users?
 
-Probably this would be better:
+Hi Gerhard,
 
-if (!ret)
-    return 0
+Thanks for the review.
+You are right. Actually I check for bisect build when I rebased to
+linux-next and samsung-clk (of tomasz figa) branches.
 
-and then no need of a goto..
+I didn't check for bisect build after rebased to following patch.
+ARM: dts: use macros in clock bindings for exynos5420
 
-> +
-> +exit_cf:
-> +       cf_exit(acdev);
->  free_clk:
->         clk_put(acdev->clk);
->         return ret;
 >
+>
+> virtually yours
+> Gerhard Sittig
+> --
+> DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+> HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+> Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
