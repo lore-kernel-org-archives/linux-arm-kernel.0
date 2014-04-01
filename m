@@ -1,49 +1,66 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 01 Apr 2014 10:18:46 +0900
-Subject: [PATCH] pata_samsung_cf: fix ata_host_activate() failure handling
-In-Reply-To: <6050762.sdUI3gZZlK@amdc1032>
-References: <6050762.sdUI3gZZlK@amdc1032>
-Message-ID: <000801cf4d48$54c45210$fe4cf630$%han@samsung.com>
+From: sdu.liu@huawei.com (Liu hua)
+Date: Tue, 1 Apr 2014 11:29:05 +0800
+Subject: [PATCH 0/3] add LPAE support for kexec and kernel (Liu Hua)
+In-Reply-To: <1897155363.7224032.1396021473883.JavaMail.zimbra@redhat.com>
+References: <mailman.28599.1395907790.1059.kexec@lists.infradead.org>
+ <420609342.5318732.1395929059090.JavaMail.zimbra@redhat.com>
+ <53356590.3030005@huawei.com>
+ <1897155363.7224032.1396021473883.JavaMail.zimbra@redhat.com>
+Message-ID: <533A3281.6080907@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 01, 2014 2:53 AM, Tejun Heo wrote:
+? 2014/3/28 23:44, Dave Anderson ??:
 > 
-> Add missing clk_disable() call to ata_host_activate() failure path.
 > 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ----- Original Message -----
+>> On 2014/3/27 22:04, Dave Anderson wrote:
+>>>
+>>>
+>>> ----- Original Message -----
+>>>
+>>>> The patch series introduce LPAE support for user space
+>>>> utility kexec(the last) and ARM linux kernel(the others).
+>>>>
+>>>> I have tested the patch series in armA15 platform which have
+>>>> more than 4G memory.
+>>>
+>>> Hello Liu,
+>>>
+>>> I'm curious how you tested this?  The crash utility does not have
+>>> any specific support for LPAE on ARM, and a couple years ago I
+>>> asked on the crash-utility mailing list whether any of the ARM
+>>> developers were working on it.  But at that time none of them were
+>>> working with LPAE.  I see that you are on the crash-utility mailing
+>>> list -- are you planning to post follow-up patches to the crash-utility?
+>>>
+>>> Thanks,
+>>>   Dave
+>>
+>> Yes, you are very "sensitive"! our team has worked on it for a while. And
+>> we went through the whole kdump process for LPAE enabled ARM. Our changes
+>> include kexec-tools, makedumpfile, crash utility and the kernel.
+>>
+>> But we did that in a rather limited time. So some patches are silly and
+>> need to be reconstructed before submission. In addition, my job is quit
+>> full now. So I decide to post the patch series that are clear and
+>> independent of the others at first.
+>>
+>> But I got no response from the linux-arm and kexec mailinglist. What about
+>> your opinion about the feature of LPAE support for kdump related tools
+>> including crash utility and the kernel?
+> 
+> I can't speak for the linux-arm and kexec mailing lists, but certainly 
+> when you post your crash-related patches on the crash-utility mailing 
+> list, I'll review, respond, and get them in place as soon as possible.
+> 
+> Thanks,
+>   Dave
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+Hi Dave,
 
-Best regards,
-Jingoo Han
+That's great. I will post crash-related patches after finishing my
+work on hand, perhaps two weeks or longer. Thanks to your advice.
 
-> ---
->  drivers/ata/pata_samsung_cf.c |   10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
-> 
-> Index: b/drivers/ata/pata_samsung_cf.c
-> ===================================================================
-> --- a/drivers/ata/pata_samsung_cf.c	2014-03-14 16:45:04.344724378 +0100
-> +++ b/drivers/ata/pata_samsung_cf.c	2014-03-31 18:31:58.083631437 +0200
-> @@ -594,9 +594,13 @@ static int __init pata_s3c_probe(struct
-> 
->  	platform_set_drvdata(pdev, host);
-> 
-> -	return ata_host_activate(host, info->irq,
-> -			info->irq ? pata_s3c_irq : NULL,
-> -			0, &pata_s3c_sht);
-> +	ret = ata_host_activate(host, info->irq,
-> +				info->irq ? pata_s3c_irq : NULL,
-> +				0, &pata_s3c_sht);
-> +	if (ret)
-> +		goto stop_clk;
-> +
-> +	return 0;
-> 
->  stop_clk:
->  	clk_disable(info->clk);
-> 
-> --
+Thanks,
+Liu Hua
