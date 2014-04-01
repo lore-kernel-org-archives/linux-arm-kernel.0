@@ -1,74 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Apr 2014 10:13:25 -0700
-Subject: [PATCH 00/55]: ARM: OMAP2+: PRCM move to drivers
-In-Reply-To: <533A7A23.8020606@ti.com>
-References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
- <20140331220903.GA11328@atomide.com> <533A7A23.8020606@ti.com>
-Message-ID: <20140401171325.GA28041@atomide.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 1 Apr 2014 18:10:59 +0100
+Subject: [PATCH] QEMU: ARM: boot: Load kernel at an Image friendly address
+In-Reply-To: <1395718484-20424-1-git-send-email-joelf@ti.com>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+Message-ID: <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [140401 01:38]:
-> On 04/01/2014 01:09 AM, Tony Lindgren wrote:
-> >
-> >We don't want to make access to these registers available without
-> >proper frameworks as that will lead into misuse by various drivers.
-> >And cleaning up that mess later in is a huge pain.
-> 
-> Currently, only thing that requires access to the register offsets
-> is basically all the legacy clock data still in the kernel (when can
-> we get rid of this, I have posted patches for it already?) and also
-> the clockdomain / powerdomain data. I can work on getting
-> clockdomain + powerdomain data to DT format if this would be
-> preferred, then we can remove these data files also. Alternatively I
-> can just move all these defines to the C files which actually use
-> them.
+On 25 March 2014 03:34, Joel Fernandes <joelf@ti.com> wrote:
+> Loading kernel at offset 0x10000 works only for zImage, but not for Image,
+> because the kernel expect the start of decompressed kernel (.head.text) to be
+> at an address that's a distance that's 16MB aligned from  PAGE_OFFSET +
+> TEXT_OFFSET (see vmlinux.lds.S). This check is enfornced in __fixup_pv_table in
+> arch/arm/kernel/head.S TEXT_OFFSET is 0x00008000, so a 16MB alignment needs to
+> have a "0x8000" in the lower 16 bits so that they cancel out. Currently the
+> offset Qemu loads it at is 0x10000.
+>
+> With zImage, this need is met because zImage loads the uncompressed Image
+> correctly, however when loading an Image and executing directly Qemu is
+> required it to load it at the correct location. Doing so, doesn't break Qemu's
+> zImage loading. With this patch, both zImage and Image work correctly.
+>
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
 
-With display support getting merged hopefully we can retry
-dropping omap3 legacy booting as long as we get the missing
-boards working.
+Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
 
-I don't know how urgent of an issue the clock and power domains
-are for the data compared to clocks and muxes. But if it allows us
-to easily add support for new SoC variants, then yes it makes sense.
+I'll put this in target-arm.next after 2.0 has released.
 
-But in any case the defines should be private to the code claiming
-the PRCM register area.
-
-> So, basically you are proposing to add a regmap or regmap like API
-> for the PRCM, which would provide access to a subset of registers
-> only outside the PRCM driver? Some functions provided by PRCM spawn
-> to multiple registers (like clocks), and the ranges have holes, and
-> would require finetuning a register / bit level access map (some
-> registers may contain functions for several drivers.)
-
-Yeah something like that as that allows implementing the Linux
-generic frameworks where the code really should be. And does not
-require exporting tons of custom functions.
- 
-> >2. Have the core PRCM driver(s) claim some of the regmap ranges
-> >
-> >Some PRCM features can potentially be implemented using existing
-> >Linux generic frameworks where possible for clocks, regulators, reset
-> >drivers etc. That way you can keep the register defines for these
-> >ranges private to the core PRCM driver(s). Ideally with no need
-> >to add _any_ custom exported functions here.
-> 
-> There is separate work ongoing for reset driver, and for VC/VP,
-> there has been some regulator related work. But yes, mostly this
-> approach should be fine.
-
-OK cool.
- 
-> >3. Have the other drivers claim some regmap ranges
-> >
-> >The register ranges that are clearly owned by some driver should
-> >be claimed by those drivers. Then the defines for those registers
-> >can stay private to that driver. Some drivers that can probably
-> >own some PRCM ranges are clock drivers and voltage related drivers.
-> 
-> Yeah, this sounds reasonable.
-
-OK
-
-Tony
+thanks
+-- PMM
