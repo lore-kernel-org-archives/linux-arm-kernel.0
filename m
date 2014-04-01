@@ -1,44 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 01 Apr 2014 14:16:52 +0200
-Subject: exynos4: cpu hotplug + cpuidle/AFTR broken
-In-Reply-To: <533AA17A.1090405@samsung.com>
-References: <533A9849.1080402@linaro.org> <533AA17A.1090405@samsung.com>
-Message-ID: <533AAE34.20601@linaro.org>
+From: jdelvare@suse.de (Jean Delvare)
+Date: Tue, 1 Apr 2014 14:20:46 +0200
+Subject: [PATCH] Input: w90p910_ts - depend on ARCH_W90X900
+Message-ID: <20140401142046.14d4bb8c@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2014 01:22 PM, Tomasz Figa wrote:
-> Hi Daniel,
->
-> On 01.04.2014 12:43, Daniel Lezcano wrote:
->>
->> Hi all,
->>
->> I tried the v3.14 kernel and unplugged the cpu1. That leads to a kernel
->> hang without any trace.
->>
->> If I disable the cpuidle AFTR state through sysfs before unplugging
->> cpu1, it works well.
->>
->> I reproduced the issue on v3.14, v3.13, v3.12, v3.11
->>
->> v3.10 works fine.
->
-> Could you try to reproduce the same issue on linux-next? Some of PM
-> issues on Exynos should be patches there.
+The w90p910_ts touchscreen driver is heavily architecture dependent,
+so there is no point in letting it be built on other architectures
+than it was written for.
 
-Tested on linux-next. Works fine.
+All other W90P910/W90X900 drivers already have that dependency, so it
+makes things more consistent and configuration easier.
 
-Do you have an idea of the patch which have fixed the issue ? In order 
-to backport it the kernels mentioned above.
+Signed-off-by: Jean Delvare <jdelvare@suse.de>
+Cc: Wan ZongShun <mcuos.com@gmail.com>
+Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ drivers/input/touchscreen/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks
+--- linux-3.14-rc8.orig/drivers/input/touchscreen/Kconfig	2014-02-09 16:53:02.945634113 +0100
++++ linux-3.14-rc8/drivers/input/touchscreen/Kconfig	2014-04-01 14:10:08.936933702 +0200
+@@ -867,7 +867,7 @@ config TOUCHSCREEN_TSC2007
+ 
+ config TOUCHSCREEN_W90X900
+ 	tristate "W90P910 touchscreen driver"
+-	depends on HAVE_CLK
++	depends on ARCH_W90X900
+ 	help
+ 	  Say Y here if you have a W90P910 based touchscreen.
+ 
 
-   -- Daniel
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jean Delvare
+SUSE L3 Support
