@@ -1,40 +1,51 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 1 Apr 2014 15:12:43 +0800
-Subject: [PATCH] ARM: at91: fix spi cs on sama5d3 Xplained board
-Message-ID: <1396336363-13709-1-git-send-email-voice.shen@atmel.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  1 Apr 2014 09:42:20 +0200
+Subject: [PATCH] fixup! i2c: efm32: new bus driver
+In-Reply-To: <1395744526-3706-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1395744526-3706-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1396338140-22332-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PD16 is the CS3 for SPI0 while not SPI1.
+Fix dt compatible string in the binding document which was changed
+during review in the driver, but it seem I messed up to adapt the
+documentation accordingly.
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Also change status from "disabled" to "ok" which makes more sense for an
+example.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-This patch is based on v3.14-rc8
+ Documentation/devicetree/bindings/i2c/i2c-efm32.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index ce13755..4537259 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -34,7 +34,7 @@
- 			};
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-efm32.txt b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
+index ead4dd33ab66..fc15ac519437 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-efm32.txt
+@@ -3,7 +3,7 @@
+ Required properties :
  
- 			spi0: spi at f0004000 {
--				cs-gpios = <&pioD 13 0>;
-+				cs-gpios = <&pioD 13 0>, <0>, <0>, <&pioD 16 0>;
- 				status = "okay";
- 			};
+  - reg : Offset and length of the register set for the device
+- - compatible : should be "efm32,i2c"
++ - compatible : should be "energymicro,efm32-i2c"
+  - interrupts : the interrupt number
+  - clocks : reference to the module clock
  
-@@ -79,7 +79,7 @@
- 			};
+@@ -17,12 +17,12 @@ Example:
+ 	i2c0: i2c at 4000a000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "efm32,i2c";
++		compatible = "energymicro,efm32-i2c";
+ 		reg = <0x4000a000 0x400>;
+ 		interrupts = <9>;
+ 		clocks = <&cmu clk_HFPERCLKI2C0>;
+ 		clock-frequency = <100000>;
+-		status = "disabled";
++		status = "ok";
+ 		efm32,location = <3>;
  
- 			spi1: spi at f8008000 {
--				cs-gpios = <&pioC 25 0>, <0>, <0>, <&pioD 16 0>;
-+				cs-gpios = <&pioC 25 0>;
- 				status = "okay";
- 			};
- 
+ 		eeprom at 50 {
 -- 
-1.8.5.2
+1.9.1
