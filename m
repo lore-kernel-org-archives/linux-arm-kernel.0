@@ -1,40 +1,72 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 1 Apr 2014 15:34:02 -0700
-Subject: [PATCH 2/2] ARM: mm: keep rodata non-executable
-In-Reply-To: <1395658064.3465.7.camel@linaro1.home>
-References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
- <1392339850-18686-3-git-send-email-keescook@chromium.org>
- <20140214162257.GB2331@e103592.cambridge.arm.com>
- <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
- <20140217123415.GA2182@e103592.cambridge.arm.com>
- <532F2C48.6050509@codeaurora.org>
- <CAGXu5jK_8adL=6DoF9gFBMWxKcxKUHw7238ighE2agFU7cqhWg@mail.gmail.com>
- <1395658064.3465.7.camel@linaro1.home>
-Message-ID: <CAGXu5jLEA5u58yNe0k4BobWphAhEiREJ1ped30LVgDRPzOGy7A@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 1 Apr 2014 17:44:19 -0500
+Subject: [PATCH] irq: crossbar: improve allocate_free_irq() complexity
+Message-ID: <1396392259-27437-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 3:47 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Sun, 2014-03-23 at 16:21 -0600, Kees Cook wrote:
->> For this stage, how about I make this "depends on KEXEC=n &&
->> KPROBES=n"?
->
-> There's also ftrace (CONFIG_DYNAMIC_FTRACE I believe) which modifies
-> kernel code with a call to probe_kernel_write(), which GDB uses as well.
->
-> And grepping for the patch_text() function also shows
-> __arch_jump_label_transform() modifies kernel code. Not sure how and
-> when that gets used.
+current algorithm in allocate_free_irq() is O(n),
+by just keeping track of last allocated IRQ with a
+simple unsigned integer, we can find a free IRQ
+in O(1).
 
-Right, so, I'm trying to fix ftrace now, and I've hit a wall. It is as
-if changes to the kernel text PMD aren't being noticed after the
-kernel is running. Does anyone know why this might be happening?
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-Code and details here:
-https://lkml.org/lkml/2014/4/1/674
+compile-tested only as J6 DTS is currently missing crossbar
+altogether :-(
 
--Kees
+There's a drawback with this patch which I'm not sure if we
+should care a lot because I couldn't entirely grasp when is
+domain->xlate() called and if we will map/unmap IRQs in runtime
+or will this *always* be done only during boot.
 
+If we're talking about runtime IRQ remapping, then this, clearly,
+won't work. But if this will be done only during boot up, then we
+avoid iterating over the irq_map array each time we try to translate
+a new IRQ prior to mapping it.
+
+Comments are highly welcome as I'll probably learn something new
+about the IRQ subsystem ;-)
+
+ drivers/irqchip/irq-crossbar.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/irqchip/irq-crossbar.c b/drivers/irqchip/irq-crossbar.c
+index fc817d2..1c4da5a 100644
+--- a/drivers/irqchip/irq-crossbar.c
++++ b/drivers/irqchip/irq-crossbar.c
+@@ -31,6 +31,7 @@ struct crossbar_device {
+ 	void __iomem *crossbar_base;
+ 	int *register_offsets;
+ 	void (*write) (int, int);
++	unsigned int current_irq;
+ };
+ 
+ static struct crossbar_device *cb;
+@@ -52,16 +53,15 @@ static inline void crossbar_writeb(int irq_no, int cb_no)
+ 
+ static inline int allocate_free_irq(int cb_no)
+ {
+-	int i;
++	int current_irq;
+ 
+-	for (i = 0; i < cb->int_max; i++) {
+-		if (cb->irq_map[i] == IRQ_FREE) {
+-			cb->irq_map[i] = cb_no;
+-			return i;
+-		}
+-	}
++	if (cb->current_irq == cb->int_max)
++		return -ENODEV;
++
++	current_irq = cb->current_irq++;
++	cb->irq_map[current_irq++] = cb_no;
+ 
+-	return -ENODEV;
++	return current_irq;
+ }
+ 
+ static int crossbar_domain_map(struct irq_domain *d, unsigned int irq,
 -- 
-Kees Cook
-Chrome OS Security
+1.9.1.286.g5172cb3
