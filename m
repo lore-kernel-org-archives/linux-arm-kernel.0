@@ -1,42 +1,86 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 1 Mar 2014 12:53:39 +0900
-Subject: [PATCH 14/28] Remove MACH_SMDKC210
-In-Reply-To: <1393623789.4052.17.camel@x220>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-15-git-send-email-richard@nod.at>
- <20140210114154.GQ1757@sirena.org.uk>
- <1392039072.3585.15.camel@x220>
- <20140210141255.GI1757@sirena.org.uk>
- <1392046242.3585.41.camel@x220>
- <20140210163621.GA13533@sirena.org.uk>
- <1392070159.27939.34.camel@x220>
- <20140212160431.GB28112@sirena.org.uk>
- <1393623789.4052.17.camel@x220>
-Message-ID: <20140301035339.GK29849@sirena.org.uk>
+From: anup@brainfault.org (Anup Patel)
+Date: Tue, 1 Apr 2014 09:41:13 +0530
+Subject: [PATCH v6 02/12] ARM/ARM64: KVM: Add common header for PSCI
+ related defines
+In-Reply-To: <CAJ5Y-ebjR3zdYrDx2HReXeCG2wSYwVgBXBdezjoQFKFmOcj7YA@mail.gmail.com>
+References: <1396262773-7723-1-git-send-email-anup.patel@linaro.org>
+ <1396262773-7723-3-git-send-email-anup.patel@linaro.org>
+ <20140331180722.GD4756@lvm>
+ <CAJ5Y-eaGsM4Moz815P7QM=7qh87RyzU-MVyeLOT64CLEaR0HQA@mail.gmail.com>
+ <20140331183629.GF4756@lvm>
+ <CAJ5Y-eb=JFtHWgLpxxm+L8z0w92GjBcJyUo8hWj6ik6GoakrtQ@mail.gmail.com>
+ <CAJ5Y-ebjR3zdYrDx2HReXeCG2wSYwVgBXBdezjoQFKFmOcj7YA@mail.gmail.com>
+Message-ID: <CAAhSdy1W0ExSnu1ROtkiiJUgwavk+wG0w_C-yME1tas7dtbNhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 10:43:09PM +0100, Paul Bolle wrote:
+Hi Ashwin,
 
-> That commit is fine with me, of course. I now see no reason to continue
-> my, rather slowly progressing, search for the problem that you wanted to
-> get properly fixed. I suppose another commit already fixed it.
+On Tue, Apr 1, 2014 at 1:13 AM, Ashwin Chaugule
+<ashwin.chaugule@linaro.org> wrote:
+> On 31 March 2014 15:26, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
+>> Hi Christoffer,
+>>
+>> On 31 March 2014 14:36, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>>
+>>>>
+>>> I think Marc brought up the point previously that we may get to PSCI
+>>> spec v42.17 and the defines should perhaps encompass the version we are
+>>> defining things for right now...
+>>>
+>>> That being said, assuming new spec versions don't break backwards
+>>> compatibility in the numbering, the wording proposed by your patch does
+>>> look simpler.
+>>>
+>>> I do like the hardcoded IDs because that's how it's presented in the
+>>> spec itself.
+>>
+>> Cool. I'll just add the following line in kbuild to this patch and resend.
+>
+> by "this" patch, I  meant my version. Sorry if I caused any confusion. :)
+>
+>>
+>>  include/uapi/linux/Kbuild |    1 +
+>>
+>> +header-y += psci.h
+>>
+>> Meanwhile, if there are any strong preferences to using the uapi
+>> header in Anup's patch, then I can rebase later.
 
-No, but it's someone from Samsung (Sachin works with the Samsung landing
-team at Linaro) not caring about those drivers on these boards any more
-and mentioning the DT conversion which is rather different to someone
-doing mechanical cleanup with no mention of where the symbols went.
+Yes, the only difference between headers introduced by your patch
+and this patch would be styling.
 
-It should be fairly obvious that if the reason symbols are being removed
-due to DT conversion of the platforms then the default thing should be
-that the drivers be being converted to DT and appropriate DT entries
-being added to the board DTS files, but more generally the important
-thing is that some understanding is shown as to why the symbols vanished
-and why the mechanical fix suggested is OK.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140301/eb650b52/attachment.sig>
+I was thinking of quickly revising this patch with following changes
+pickedup from your patch:
+
++#define PSCI_POWER_STATE_ID_MASK 0xffff
++#define PSCI_POWER_STATE_ID_SHIFT 0
++#define PSCI_POWER_STATE_TYPE_MASK 0x1
++#define PSCI_POWER_STATE_TYPE_SHIFT 16
++#define PSCI_POWER_STATE_AFFL_MASK 0x3
++#define PSCI_POWER_STATE_AFFL_SHIFT 24
++
++#define PSCI_VER_MAJOR_MASK 0xffff0000
++#define PSCI_VER_MINOR_MASK 0x0000ffff
++#define PSCI_VER_MAJOR_SHIFT 16
++#define PSCI_VER_MAJOR(ver) \
++ ((ver & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT)
++#define PSCI_VER_MINOR(ver) (ver & PSCI_VER_MINOR_MASK)
+
+We also have another RFC v2 patchset for QEMU side changes (being
+tested currently) which uses the PSCI defines introduced by this patch.
+
+It would be very helpful if you could rebase your patch with v7 of this
+patch which will include some changes from your patch.
+(Does this sound OK to you?)
+
+Regards,
+Anup
+
+>>
+>> Thanks,
+>> Ashwin
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
