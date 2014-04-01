@@ -1,53 +1,33 @@
-From: sungjinn.chung@samsung.com (=?utf-8?B?7KCV7ISx7KeE?=)
-Date: Tue, 01 Apr 2014 19:13:27 +0900
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <20140401094648.GB20061@arm.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <76240593.SAyloCy7nR@wuerfel> <20140331113113.GE29871@arm.com>
- <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
- <000501cf4d43$90e618a0$b2b249e0$%chung@samsung.com>
- <20140401094648.GB20061@arm.com>
-Message-ID: <000c01cf4d93$0863e750$192bb5f0$%chung@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 1 Apr 2014 15:44:34 +0530
+Subject: [PATCH] ARM: OMAP2+: Fix config name for USB3 PHY
+Message-ID: <1396347274-32750-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 01, 2014 6:47 PM, Catalin Marinas wrote:
-> On Tue, Apr 01, 2014 at 01:44:36AM +0100, ??? wrote:
-> > On Tuesday, April 01, 2014 12:27 AM Catalin Marinas wrote:
-> > > I don't mind 4-level tables by default but I would still keep a
-> > > configuration option (or at least doing some benchmarks to assess the
-> > > impact before switching permanently to 4-levels). There are mobile
-> > > platforms that don't really need as much VA space (and people are even
-> > > talking about ILP32).
-> >
-> > How about keep 3-level table by default and enable 4-level table with
-> > config option?
-> 
-> We want single image, so the default should cover all platforms. If
-> someone wants to deploy a more specific kernel (e.g. for a mobile
-> platform), they could change the configuration to more suitable ones.
-Single image would have merit but I think one way should be default 
-Configuration and another should be specific kernel for smaller or lager 
-memory platform.
-Which one do you want as default configuration among 3 level and 4 level?
-> 
-> > Asymmetry level for kernel and user land would make code complicated.
-> > And usually more memory means that user application tends to use more memory.
-> > So I suggest same virtual space for both.
-> 
-> I don't really get the "more memory means ..." above ;). It's more
-> virtual space, the user application would not extend to use all of it
-> (most likely won't even notice).
-The reason why we need 4 level page table is originally is that we need
-bigger physical memory and kernel does not have enough virtual space.
-Please consider this is not only for making virtual bigger.
-It's to make system use large physical memory for user application.
-> 
-> Asymmetry wouldn't make things much more complicated. You can even
-> pretend you have 4 levels configured but used pgd_offset tricks to
-> effectively use 3 hardware levels.
-User application also might need much memory and 4 level page table
-in case it need 4 level page table for kernel.
-> 
-> --
-> Catalin
+commit a70143 (drivers: phy: usb3/pipe3: Adapt pipe3 driver to Generic PHY
+Framework) moved phy-omap-usb3 driver in drivers/usb/phy to drivers/phy and
+also renamed the file to phy-ti-pipe3. It also renamed the config from
+OMAP_USB3 to TI_PIPE3 in Kconfig. However the config name was not changed in
+omap2plus_defconfig. Fixed it here.
+
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index a966795..a4e8d01 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -226,7 +226,7 @@ CONFIG_USB_DWC3=m
+ CONFIG_USB_TEST=y
+ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_OMAP_USB2=y
+-CONFIG_OMAP_USB3=y
++CONFIG_TI_PIPE3=y
+ CONFIG_AM335X_PHY_USB=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_GADGET_DEBUG=y
+-- 
+1.7.9.5
