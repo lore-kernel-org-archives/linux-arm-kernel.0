@@ -1,33 +1,62 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 1 Apr 2014 15:44:34 +0530
-Subject: [PATCH] ARM: OMAP2+: Fix config name for USB3 PHY
-Message-ID: <1396347274-32750-1-git-send-email-kishon@ti.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 1 Apr 2014 11:16:15 +0100
+Subject: [RFC v2] ARM VM System Specification
+In-Reply-To: <533A8D89.9000500@linaro.org>
+References: <20140328184517.GA27219@cbox>
+ <CAOesGMh7AFfuq73SxOWiiLV0eJNLpA0M5hr0OwRo8=BLWueWwQ@mail.gmail.com>
+ <20140331172613.GA4756@lvm> <1396345749.8667.74.camel@kazak.uk.xensource.com>
+ <533A8D89.9000500@linaro.org>
+Message-ID: <CACxGe6sx3K69R_z7Y9yWOmsWw-Xj1NuEXyJkA25HmXzkUaRUiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit a70143 (drivers: phy: usb3/pipe3: Adapt pipe3 driver to Generic PHY
-Framework) moved phy-omap-usb3 driver in drivers/usb/phy to drivers/phy and
-also renamed the file to phy-ti-pipe3. It also renamed the config from
-OMAP_USB3 to TI_PIPE3 in Kconfig. However the config name was not changed in
-omap2plus_defconfig. Fixed it here.
+Start with Linaro publishing it. It can always be moved to another
+venue if someone dislikes Linaro having maintainership.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/configs/omap2plus_defconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+g.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index a966795..a4e8d01 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -226,7 +226,7 @@ CONFIG_USB_DWC3=m
- CONFIG_USB_TEST=y
- CONFIG_NOP_USB_XCEIV=y
- CONFIG_OMAP_USB2=y
--CONFIG_OMAP_USB3=y
-+CONFIG_TI_PIPE3=y
- CONFIG_AM335X_PHY_USB=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_GADGET_DEBUG=y
--- 
-1.7.9.5
+
+On Tue, Apr 1, 2014 at 10:57 AM, Michael Casadevall
+<michael.casadevall@linaro.org> wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+>
+>
+>
+> On 04/01/2014 05:49 AM, Ian Campbell wrote:
+>> On Mon, 2014-03-31 at 10:26 -0700, Christoffer Dall wrote:
+>>> However, that may be a pain to update
+>>
+>> Very much, and there would be nothing worse than having multiple
+>> divergent copies of the spec.
+>>
+>>> so the preferred method could be to host it in either its current
+>>> form (clear-text) or publish some versioned PDF somewhere and
+>>> simply point to it from the compliant software pieces.
+>>
+>> I think that would be best.
+>>
+>> I'm at a loss to suggest a suitable neutral home though I'm
+>> afraid.
+>>
+>
+> I agree with formal PDF (or TeX/plain text) releases + versioning;
+> something I can print out and hit people with always works great for
+> spec compliance.
+>
+> On the topic of hosting, if Linaro itself isn't neutral enough, what
+> about under the Linux Foundation? They already host a bunch of
+> standards like the FHS.
+> Michael
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.14 (GNU/Linux)
+> Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
+>
+> iQEcBAEBAgAGBQJTOo2JAAoJEGKVRgSEnX1Qu+gH/ja+aqOqc04gbpFvuarHtzeM
+> nLtJ1ie4JKOJTVqqQz+lgPhx+r3H9PrMFZnGvzs8H6GYSaU66i/SHKU150J1Ig5M
+> 1w4DYqQj7DEClpoNmpPZVJJbevp70/wDH1wFSJZXJmxV9yOpMtrNZXwB60KANP2f
+> MJDF+iDLIkv8vRPYQJEmuV4PMcJQs88X91eEb67jChX1ntMiiDAFSM6t2cRyfVG0
+> la4Ujk/p/u+Kr43wbhQITOKXZpWCtI8gjp7wTuZc+EDIhmufd5uiQ2VyTZaMkPkV
+> xuX9871Y8VHGxCkAmhHPODbp3Wd4VUP2ewOYnTRYR2IIRpa4gNNLUa+MSdrL/sU=
+> =2ub7
+> -----END PGP SIGNATURE-----
