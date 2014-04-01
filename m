@@ -1,59 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 1 Apr 2014 12:22:34 +0100
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <000c01cf4d93$0863e750$192bb5f0$%chung@samsung.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <76240593.SAyloCy7nR@wuerfel> <20140331113113.GE29871@arm.com>
- <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
- <000501cf4d43$90e618a0$b2b249e0$%chung@samsung.com>
- <20140401094648.GB20061@arm.com>
- <000c01cf4d93$0863e750$192bb5f0$%chung@samsung.com>
-Message-ID: <20140401112234.GC20061@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 1 Apr 2014 12:29:26 +0100
+Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
+In-Reply-To: <20140327102835.GA17779@lee--X1>
+References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
+ <20140325125050.GB665@arch.cereza> <20140325131139.GB24823@lee--X1>
+ <20140325220045.GA12185@arch.cereza>
+ <20140326072805.GB31517@norris-Latitude-E6410>
+ <20140327102835.GA17779@lee--X1>
+Message-ID: <20140401112926.GB24013@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 11:13:27AM +0100, ??? wrote:
-> On Tuesday, April 01, 2014 6:47 PM, Catalin Marinas wrote:
-> > On Tue, Apr 01, 2014 at 01:44:36AM +0100, ??? wrote:
-> > > On Tuesday, April 01, 2014 12:27 AM Catalin Marinas wrote:
-> > > > I don't mind 4-level tables by default but I would still keep a
-> > > > configuration option (or at least doing some benchmarks to assess the
-> > > > impact before switching permanently to 4-levels). There are mobile
-> > > > platforms that don't really need as much VA space (and people are even
-> > > > talking about ILP32).
-> > >
-> > > How about keep 3-level table by default and enable 4-level table with
-> > > config option?
+> > > The call to nand_scan_tail() would remove the need to export those NAND
+> > > core functions, and remove the need to scan and print the bad blocks.
+> > > I don't know if you have a real reason for not doing it this way, or
+> > > maybe it's the way this driver was originally written.
+> > > 
+> > > Care to review this and re-spin the driver? You'll have a more nicer
+> > > driver, and more framework-compliant.
 > > 
-> > We want single image, so the default should cover all platforms. If
-> > someone wants to deploy a more specific kernel (e.g. for a mobile
-> > platform), they could change the configuration to more suitable ones.
-> Single image would have merit but I think one way should be default 
-> Configuration and another should be specific kernel for smaller or lager 
-> memory platform.
-> Which one do you want as default configuration among 3 level and 4 level?
+> > A hearty +1 to this. You are avoiding much of the core of the NAND
+> > framework by avoiding the nand_chip callbacks and nand_scan_tail(), and
+> > by reimplementing the BBT. I will have to NAK to some of the patches
+> > that EXPORT the nand_base private core (e.g., nand_get_device()), and I
+> > will most likely NAK the custom BBT implementation (please improve
+> > nand_bbt.c as needed).
+> 
+> This is a good catch. I will attempt to reimplement the driver's
+> initialisation steps to utilise more of the core infrastructure in an
+> attempt to mitigate the requirement for exportation of private
+> routines.
+> 
+> The BBT requirements are somewhere more complex. To provide you with
+> the complete picture, a little knowledge of driver history is
+> required. When it was initially created the MTD core only supported
+> OOB BBTs, but the ST BCH Controller doesn't support OOB access, so
+> Angus wrote his on In-Band (IB) implementation. Unfortunately the IB
+> support which _is_ now present in the kernel doesn't match the
+> internal implementation. Normally this wouldn't be an issue in itself,
+> but ST's boot-stack and tooling (Primary Bootloader, U-Boot, various
+> Programmers, etc) are aware of the internal IB BTT and utilise it
+> in varying ways. Shifting over to the Mainline version in
+> one-foul-swoop _will_ cause lots of pain and will probably result in
+> the disownership of driver we're trying to Mainline today. Naturally
+> I'm keen to avoid this.
 
-The default should be 4 levels to cover all cases. You can tweak the
-config for your platform if you want to deploy a specific kernel image.
+Just looking into this now. Can I add support for a vendor specific
+signature extension? ST's flashers, bootloaders and tooling currently
+use the format:
 
-> > > Asymmetry level for kernel and user land would make code complicated.
-> > > And usually more memory means that user application tends to use more memory.
-> > > So I suggest same virtual space for both.
-> > 
-> > I don't really get the "more memory means ..." above ;). It's more
-> > virtual space, the user application would not extend to use all of it
-> > (most likely won't even notice).
-> The reason why we need 4 level page table is originally is that we need
-> bigger physical memory and kernel does not have enough virtual space.
+/* Extend IBBT header with some stm-nand-bch niceties */
+struct nand_ibbt_bch_header {
+	uint8_t signature[4];           /* "Bbt0" or "1tbB" signature */
+	uint8_t version;                /* BBT version ("age") */
+	uint8_t reserved[3];            /* padding */
+	uint8_t baseschema[4];          /* "base" schema (x4) */
+	uint8_t privschema[4];          /* "private" schema (x4) */
+	uint8_t ecc_size[4];            /* ECC bytes (0, 32, 54) (x4) */
+	char    author[64];             /* Arbitrary string for S/W to use */
+}; __attribute__((__packed__))
 
-So, you need more virtual space in the kernel to be able to linearly map
-the physical address space. That's fine.
-
-> Please consider this is not only for making virtual bigger.
-> It's to make system use large physical memory for user application.
-
-Do you want to use more than 512GB of physical memory for a user
-application?
+It would be great if we can support this with a descriptor option or
+suchlike, as it would a) save me a lot of aggravation and b) continue
+to support ST with their current use-case.
 
 -- 
-Catalin
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
