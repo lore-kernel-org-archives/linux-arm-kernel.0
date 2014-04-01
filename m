@@ -1,51 +1,114 @@
-From: luis.henriques@canonical.com (Luis Henriques)
-Date: Tue,  1 Apr 2014 12:15:18 +0100
-Subject: [PATCH 3.11 114/144] clocksource: vf_pit_timer: use complement for
- sched_clock reading
-In-Reply-To: <1396350948-29910-1-git-send-email-luis.henriques@canonical.com>
-References: <1396350948-29910-1-git-send-email-luis.henriques@canonical.com>
-Message-ID: <1396350948-29910-115-git-send-email-luis.henriques@canonical.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 1 Apr 2014 13:20:17 +0200
+Subject: [RFC 1/4] sched: extend the usage of cpu_power_orig
+In-Reply-To: <533A9768.6060006@linux.vnet.ibm.com>
+References: <1396012949-6227-1-git-send-email-vincent.guittot@linaro.org>
+ <1396012949-6227-2-git-send-email-vincent.guittot@linaro.org>
+ <533A9768.6060006@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtD7Qp4yUoZ+3jV-Me2Xn53zbi8cHRrWyO7X+COzwcy3Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.11.10.7 -stable review patch.  If anyone has any objections, please let me know.
+On 1 April 2014 12:39, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> Hi Vincent,
+>
+> On 03/28/2014 06:52 PM, Vincent Guittot wrote:
+>> cpu_power_orig is only changed for SMT system in order to reflect the lower
+>> capacity of CPUs. Heterogenous system also have to reflect an original
+>> capacity that is different from the default value.
+>
+> There is no parameter 'cpu_power_orig' till your fourth patch right?
+> Why is this term being used in this patch?
 
-------------------
+It looks like that i have mixed power_orig and cpu_power_orig in my
+commit messages
 
-From: Stefan Agner <stefan@agner.ch>
+>
+> Besides, both parameters power and power_orig are changed for SMT
+> systems to reflect the lower capacity of the CPUs.Why is there a mention
+> of only power_orig?
 
-commit 224aa3ed45c8735ae02bb2ecca002409fa6aa772 upstream.
+Only SMT system is able to change power_orig from default value
+whereas all systems can already change power field with
+arch_scale_freq_power function. The goal of this patch is to change
+the function name that is used to set power_orig value to a more
+generic one and to extend the possibility of setting power_orig for
+any kind of system. The behavior of the power field is not changed
+with this patchset.
 
-Vybrids PIT register is monitonic decreasing. However, sched_clock
-reading needs to be monitonic increasing. Use bitwise not to get
-the complement of the clock register. This fixes the clock going
-backward. Also, the clock now starts at 0 since we load the
-register with the maximum value at start.
+>
+> IMO, the subject of the patch is not clearly reflecting the main
+> intention of the patch. There is nothing done to change the way
+> cpu_power is used; rather you are changing the way the cpu_power is
+> being set to be flexible, thus allowing for the right power value to be
+> set on heterogeneous systems.
+>
+> 'Allow archs to set the cpu_power instead of falling to default value'
+> or something similar would be more appropriate. What do you think?
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: daniel.lezcano at linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux at arm.linux.org.uk
-Link: http://lkml.kernel.org/r/d25af915993aec1b486be653eb86f748ddef54fe.1394057313.git.stefan at agner.ch
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
----
- drivers/clocksource/vf_pit_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I can change with : "Allow all archs to set the power_orig"
 
-diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
-index 587e020..e559095 100644
---- a/drivers/clocksource/vf_pit_timer.c
-+++ b/drivers/clocksource/vf_pit_timer.c
-@@ -54,7 +54,7 @@ static inline void pit_irq_acknowledge(void)
- 
- static unsigned int pit_read_sched_clock(void)
- {
--	return __raw_readl(clksrc_base + PITCVAL);
-+	return ~__raw_readl(clksrc_base + PITCVAL);
- }
- 
- static int __init pit_clocksource_init(unsigned long rate)
--- 
-1.9.1
+Thanks
+
+>
+> Regards
+> Preeti U Murthy
+>>
+>> Create a more generic function arch_scale_cpu_power that can be also used by
+>> non SMT platform to set cpu_power_orig.
+>>
+>> The weak behavior of arch_scale_cpu_power is the previous SMT one in order to
+>> keep backward compatibility in the use of cpu_power_orig.
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>>  kernel/sched/fair.c | 24 ++++++++++++++++--------
+>>  1 file changed, 16 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index 7e9bd0b..ed42061 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -5559,6 +5559,20 @@ unsigned long __weak arch_scale_smt_power(struct sched_domain *sd, int cpu)
+>>       return default_scale_smt_power(sd, cpu);
+>>  }
+>>
+>> +unsigned long __weak arch_scale_cpu_power(struct sched_domain *sd, int cpu)
+>> +{
+>> +     unsigned long weight = sd->span_weight;
+>> +
+>> +     if ((sd->flags & SD_SHARE_CPUPOWER) && weight > 1) {
+>> +             if (sched_feat(ARCH_POWER))
+>> +                     return arch_scale_smt_power(sd, cpu);
+>> +             else
+>> +                     return default_scale_smt_power(sd, cpu);
+>> +     }
+>> +
+>> +     return SCHED_POWER_SCALE;
+>> +}
+>> +
+>>  static unsigned long scale_rt_power(int cpu)
+>>  {
+>>       struct rq *rq = cpu_rq(cpu);
+>> @@ -5590,18 +5604,12 @@ static unsigned long scale_rt_power(int cpu)
+>>
+>>  static void update_cpu_power(struct sched_domain *sd, int cpu)
+>>  {
+>> -     unsigned long weight = sd->span_weight;
+>>       unsigned long power = SCHED_POWER_SCALE;
+>>       struct sched_group *sdg = sd->groups;
+>>
+>> -     if ((sd->flags & SD_SHARE_CPUPOWER) && weight > 1) {
+>> -             if (sched_feat(ARCH_POWER))
+>> -                     power *= arch_scale_smt_power(sd, cpu);
+>> -             else
+>> -                     power *= default_scale_smt_power(sd, cpu);
+>> +     power *= arch_scale_cpu_power(sd, cpu);
+>>
+>> -             power >>= SCHED_POWER_SHIFT;
+>> -     }
+>> +     power >>= SCHED_POWER_SHIFT;
+>>
+>>       sdg->sgp->power_orig = power;
+>>
+>
