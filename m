@@ -1,176 +1,173 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Apr 2014 12:38:51 +0100
-Subject: Recent 3.x kernels: Memory leak causing OOMs
-In-Reply-To: <20140401091959.GA10912@n2100.arm.linux.org.uk>
-References: <20140216200503.GN30257@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
- <20140216225000.GO30257@n2100.arm.linux.org.uk>
- <1392670951.24429.10.camel@sakura.staff.proxad.net>
- <20140217210954.GA21483@n2100.arm.linux.org.uk>
- <20140315101952.GT21483@n2100.arm.linux.org.uk>
- <20140317180748.644d30e2@notabene.brown> <20140317181813.GA24144@arm.com>
- <20140317193316.GF21483@n2100.arm.linux.org.uk>
- <20140401091959.GA10912@n2100.arm.linux.org.uk>
-Message-ID: <20140401113851.GA15317@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 01 Apr 2014 13:51:12 +0200
+Subject: exynos4: cpu hotplug + cpuidle/AFTR broken
+In-Reply-To: <1396350258.4250.7.camel@AMDC1943>
+References: <533A9849.1080402@linaro.org> <1396350258.4250.7.camel@AMDC1943>
+Message-ID: <533AA830.3080908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 10:19:59AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Mar 17, 2014 at 07:33:16PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Mar 17, 2014 at 06:18:13PM +0000, Catalin Marinas wrote:
-> > > On Mon, Mar 17, 2014 at 06:07:48PM +1100, NeilBrown wrote:
-> > > > On Sat, 15 Mar 2014 10:19:52 +0000 Russell King - ARM Linux
-> > > > <linux@arm.linux.org.uk> wrote:
-> > > > > unreferenced object 0xc3c3f880 (size 256):
-> > > > >   comm "md2_resync", pid 4680, jiffies 638245 (age 8615.570s)
-> > > > >   hex dump (first 32 bytes):
-> > > > >     00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 f0  ................
-> > > > >     00 00 00 00 10 00 00 00 00 00 00 00 00 00 00 00  ................
-> > > > >   backtrace:
-> > > > >     [<c008d4f0>] __save_stack_trace+0x34/0x40
-> > > > >     [<c008d5f0>] create_object+0xf4/0x214
-> > > > >     [<c02da114>] kmemleak_alloc+0x3c/0x6c
-> > > > >     [<c008c0d4>] __kmalloc+0xd0/0x124
-> > > > >     [<c00bb124>] bio_alloc_bioset+0x4c/0x1a4
-> > > > >     [<c021206c>] r1buf_pool_alloc+0x40/0x148
-> > > > >     [<c0061160>] mempool_alloc+0x54/0xfc
-> > > > >     [<c0211938>] sync_request+0x168/0x85c
-> > > > >     [<c021addc>] md_do_sync+0x75c/0xbc0
-> > > > >     [<c021b594>] md_thread+0x138/0x154
-> > > > >     [<c0037b48>] kthread+0xb0/0xbc
-> > > > >     [<c0013190>] ret_from_fork+0x14/0x24
-> > > > >     [<ffffffff>] 0xffffffff
-> > > > > 
-> > > > > with 3077 of these in the debug file.  3075 are for "md2_resync" and
-> > > > > two are for "md4_resync".
-> > > > > 
-> > > > > /proc/slabinfo shows for this bucket:
-> > > > > kmalloc-256         3237   3450    256   15    1 : tunables  120   60    0 : slabdata    230    230      0
-> > > > > 
-> > > > > but this would only account for about 800kB of memory usage, which itself
-> > > > > is insignificant - so this is not the whole story.
-> > > > > 
-> > > > > It seems that this is the culpret for the allocations:
-> > > > >         for (j = pi->raid_disks ; j-- ; ) {
-> > > > >                 bio = bio_kmalloc(gfp_flags, RESYNC_PAGES);
-> > > > > 
-> > > > > Since RESYNC_PAGES will be 64K/4K=16, each struct bio_vec is 12 bytes
-> > > > > (12 * 16 = 192) plus the size of struct bio, which would fall into this
-> > > > > bucket.
-> > > > > 
-> > > > > I don't see anything obvious - it looks like it isn't every raid check
-> > > > > which loses bios.  Not quite sure what to make of this right now.
+On 04/01/2014 01:04 PM, Krzysztof Kozlowski wrote:
+>
+> On Tue, 2014-04-01 at 12:43 +0200, Daniel Lezcano wrote:
+>> Hi all,
+>>
+>> I tried the v3.14 kernel and unplugged the cpu1. That leads to a kernel
+>> hang without any trace.
+>>
+>> If I disable the cpuidle AFTR state through sysfs before unplugging
+>> cpu1, it works well.
+>
+> Hi,
+>
+> Can you describe the hardware (at least SoC)?
 
-I now see something very obvious, having had the problem again, dumped
-the physical memory to file, and inspected the full leaked struct bio.
-What I find is that the leaked struct bio's have a bi_cnt of one, which
-confirms that they were never freed - free'd struct bio's would have a
-bi_cnt of zero due to the atomic_dec_and_test() before bio_free() inside
-bio_put().
+Yes, Exynos 4210.
 
-When looking at the bi_inline_vecs, I see that there was a failure to
-allocate a page.  Now, let's look at what r1buf_pool_alloc() does:
+>
+> I encountered stalls after CPU hotplugging. In my case affected were
+> SOC-s s where MCT local timer interrupt is shared (SPI). It could be
+> reproduced easily by continuous hotplugging CPU1.
+>
+> Fix for one issue (CPU1 stall) in my case:
+> http://thread.gmane.org/gmane.linux.kernel.stable/85047
+> However I still encounter CPU0 stall in the same test case (hotplug
+> CPU1).
+>
+> Maybe these issues are similar?
 
-        for (j = pi->raid_disks ; j-- ; ) {
-                bio = bio_kmalloc(gfp_flags, RESYNC_PAGES);
-                if (!bio)
-                        goto out_free_bio;
-                r1_bio->bios[j] = bio;
-        }
+I don't think so. IMO, it is directly related to the AFTR state because 
+disabling this state (via sysfs) before unplugging the cpu1, does *not* 
+lead to a kernel hang and everything is working fine.
 
-        if (test_bit(MD_RECOVERY_REQUESTED, &pi->mddev->recovery))
-                j = pi->raid_disks;
-        else
-                j = 1;
-        while(j--) {
-                bio = r1_bio->bios[j];
-                bio->bi_vcnt = RESYNC_PAGES;
-
-                if (bio_alloc_pages(bio, gfp_flags))
-                        goto out_free_bio;
-        }
-
-out_free_bio:
-        while (++j < pi->raid_disks)
-                bio_put(r1_bio->bios[j]);
-        r1bio_pool_free(r1_bio, data);
-
-Consider what happens when bio_alloc_pages() fails.  j starts off as one
-for non-recovery operations, and we enter the loop to allocate the pages.
-j is post-decremented to zero.  So, bio = r1_bio->bios[0].
-
-bio_alloc_pages(bio) fails, we jump to out_free_bio.  The first thing
-that does is increment j, so we free from r1_bio->bios[1] up to the
-number of raid disks, leaving r1_bio->bios[0] leaked as the r1_bio is
-then freed.
-
-The obvious fix is to set j to -1 before jumping to out_free_bio on
-bio_alloc_pages() failure.  However, that's not the end of the story -
-there's more leaks here.
-
-bio_put() will not free the pages allocated by the previously successful
-bio_alloc_pages().  What's more is that I don't see any function in BIO
-which performs that function, which makes me wonder how many other places
-in the kernel dealing with BIOs end up leaking like this.
-
-Anyway, this is what I've come up with - it's not particularly nice,
-but hopefully it will plug this leak.  I'm now running with this patch
-in place, and time will tell.
-
- drivers/md/raid1.c | 30 ++++++++++++++++++++++++++----
- 1 file changed, 26 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/md/raid1.c b/drivers/md/raid1.c
-index aacf6bf352d8..604bad2fa442 100644
---- a/drivers/md/raid1.c
-+++ b/drivers/md/raid1.c
-@@ -123,8 +123,14 @@ static void * r1buf_pool_alloc(gfp_t gfp_flags, void *data)
- 		bio = r1_bio->bios[j];
- 		bio->bi_vcnt = RESYNC_PAGES;
- 
--		if (bio_alloc_pages(bio, gfp_flags))
--			goto out_free_bio;
-+		if (bio_alloc_pages(bio, gfp_flags)) {
-+			/*
-+			 * Mark this as having no pages - bio_alloc_pages
-+			 * removes any it allocated.
-+			 */
-+			bio->bi_vcnt = 0;
-+			goto out_free_all_bios;
-+		}
- 	}
- 	/* If not user-requests, copy the page pointers to all bios */
- 	if (!test_bit(MD_RECOVERY_REQUESTED, &pi->mddev->recovery)) {
-@@ -138,9 +144,25 @@ static void * r1buf_pool_alloc(gfp_t gfp_flags, void *data)
- 
- 	return r1_bio;
- 
-+out_free_all_bios:
-+	j = -1;
- out_free_bio:
--	while (++j < pi->raid_disks)
--		bio_put(r1_bio->bios[j]);
-+	while (++j < pi->raid_disks) {
-+		bio = r1_bio->bios[j];
-+		if (bio->bi_vcnt) {
-+			struct bio_vec *bv;
-+			int i;
-+			/*
-+			 * Annoyingly, BIO has no way to do this, so we have
-+			 * to do it manually.  Given the trouble here, and
-+			 * the lack of BIO support for cleaning up, I don't
-+			 * care about linux/bio.h's comment about this helper.
-+			 */
-+			bio_for_each_segment_all(bv, bio, i)
-+				__free_page(bv->bv_page);
-+		}
-+		bio_put(bio);
-+	}
- 	r1bio_pool_free(r1_bio, data);
- 	return NULL;
- }
+>> I reproduced the issue on v3.14, v3.13, v3.12, v3.11
+>>
+>> v3.10 works fine.
+>>
+>> I tried to git bisect but I finally gave up due to too much kernel
+>> hanging at boot.
+>>
+>> The git bisect log below.
+>>
+>> Thanks
+>>     -- Daniel
+>>
+>>
+>> git bisect start
+>> # bad: [6e4664525b1db28f8c4e1130957f70a94c19213e] Linux 3.11
+>> git bisect bad 6e4664525b1db28f8c4e1130957f70a94c19213e
+>> # good: [8bb495e3f02401ee6f76d1b1d77f3ac9f079e376] Linux 3.10
+>> git bisect good 8bb495e3f02401ee6f76d1b1d77f3ac9f079e376
+>> # good: [8b70a90cabafb6a6e1a0d3f838b38355fe48337e] Merge branch
+>> 'for-v3.11' of git://git.linaro.org/people/mszyprowski/linux-dma-mapping
+>> git bisect good 8b70a90cabafb6a6e1a0d3f838b38355fe48337e
+>> # bad: [b41e6a51d57e231d2ed237f17f002cc536c0987c] sh_eth: SH_ETH should
+>> depend on HAS_DMA
+>> git bisect bad b41e6a51d57e231d2ed237f17f002cc536c0987c
+>> # bad: [2e17c5a97e231f3cb426f4b7895eab5be5c5442e] Merge branch
+>> 'drm-next' of git://people.freedesktop.org/~airlied/linux
+>> git bisect bad 2e17c5a97e231f3cb426f4b7895eab5be5c5442e
+>> # good: [e631227f698f39969eb476d297f3ac65b43b51a5] drm/radeon: fix
+>> endian bug in radeon_atom_get_mclk_range_table()
+>> git bisect good e631227f698f39969eb476d297f3ac65b43b51a5
+>> # bad: [9a5889ae1ce41f376e6a5b56e17e0c5a755fda80] Merge branch
+>> 'for-linus' of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/sage/ceph-client
+>> git bisect bad 9a5889ae1ce41f376e6a5b56e17e0c5a755fda80
+>> # bad: [be0c5d8c0bb0023e11f5c6d38e90f7b0f24edb64] Merge tag
+>> 'nfs-for-3.11-1' of git://git.linux-nfs.org/projects/trondmy/linux-nfs
+>> git bisect bad be0c5d8c0bb0023e11f5c6d38e90f7b0f24edb64
+>> # bad: [d2b4a646717153a1a180b64d4a8464054dbd700e] Merge branch
+>> 'for-linus' of git://git.infradead.org/users/vkoul/slave-dma
+>> git bisect bad d2b4a646717153a1a180b64d4a8464054dbd700e
+>> # skip: [07bd1172902e782f288e4d44b1fde7dec0f08b6f] tick: Sanitize
+>> broadcast control logic
+>> git bisect skip 07bd1172902e782f288e4d44b1fde7dec0f08b6f
+>> # good: [757f4e51b74f7fb19251020e742a78111fdea194] MIPS: jz4740: Correct
+>> clock gate bit for DMA controller
+>> git bisect good 757f4e51b74f7fb19251020e742a78111fdea194
+>> # skip: [064706514ec3fea740c2656e03c4f01f6a551ac4] clocksource: Add
+>> generic dummy timer driver
+>> git bisect skip 064706514ec3fea740c2656e03c4f01f6a551ac4
+>> # skip: [55a68c23e0a675b2b8ac2656fd6edbf98b78e4c6] dw_apb_timer_of.c:
+>> Remove parts that were picoxcell-specific
+>> git bisect skip 55a68c23e0a675b2b8ac2656fd6edbf98b78e4c6
+>> # skip: [fc1f7d5606487ae28d6c84e95401952927d7379e] clocksource:
+>> apb_timer: Remove unsused function
+>> git bisect skip fc1f7d5606487ae28d6c84e95401952927d7379e
+>> # skip: [6cffe00f7d4e24679eae6b7aae4caaf915288256] alarmtimer: Add
+>> functions for timerfd support
+>> git bisect skip 6cffe00f7d4e24679eae6b7aae4caaf915288256
+>> # good: [e24f6628811e2d4531b443684b598f7050932012] modpost: remove all
+>> traces of cpuinit/cpuexit sections
+>> git bisect good e24f6628811e2d4531b443684b598f7050932012
+>> # skip: [629a6a2b7762a474177d08043bea094dd27e0a54] sched_clock: Add
+>> temporary asm/sched_clock.h
+>> git bisect skip 629a6a2b7762a474177d08043bea094dd27e0a54
+>> # skip: [5c83545f24ab3dd67e0ae0e2b795fea750f08c34] power: Add option to
+>> log time spent in suspend
+>> git bisect skip 5c83545f24ab3dd67e0ae0e2b795fea750f08c34
+>> # good: [2473f3e7a97ce8bc0fe7596cdb361b21221418eb] posix_cpu_timers:
+>> consolidate expired timers check
+>> git bisect good 2473f3e7a97ce8bc0fe7596cdb361b21221418eb
+>> # skip: [336ae1180df5f69b9e0fb6561bec01c5f64361cf] ARM: sched_clock:
+>> Load cycle count after epoch stabilizes
+>> git bisect skip 336ae1180df5f69b9e0fb6561bec01c5f64361cf
+>> # skip: [f5a2e34375a5e2b711aea488ac3ae50eeba6d57c] clocksource: Allow
+>> clocksource select to skip current clocksource
+>> git bisect skip f5a2e34375a5e2b711aea488ac3ae50eeba6d57c
+>> # skip: [ce0b098981544d9f4e910ea48f3af3e726ca6d6b] x86: Fix
+>> vrtc_get_time/set_mmss to use new timespec interface
+>> git bisect skip ce0b098981544d9f4e910ea48f3af3e726ca6d6b
+>> # skip: [d0951a23383d09276f7976ed34d8f1cede629b48] DMA: shdma:
+>> shdma_chan_filter() has to be in shdma-base.h
+>> git bisect skip d0951a23383d09276f7976ed34d8f1cede629b48
+>> # skip: [7c4c3a0f18ba57ea2a2985034532303d2929902a] hrtimers: Support
+>> resuming with two or more CPUs online (but stopped)
+>> git bisect skip 7c4c3a0f18ba57ea2a2985034532303d2929902a
+>> # skip: [a89c7edbe7d7aa80f507915f3dd801211b116b79] clocksource: Let
+>> clocksource_unregister() return success/error
+>> git bisect skip a89c7edbe7d7aa80f507915f3dd801211b116b79
+>> # skip: [2699339361a9bacb3fa663e6b8981a040cfca4ee] clocksource:
+>> vf_pit_timer: Use linux/sched_clock.h
+>> git bisect skip 2699339361a9bacb3fa663e6b8981a040cfca4ee
+>> # skip: [7172a286ced0c1f4f239a0fa09db54ed37d3ead2] clockevents: Get rid
+>> of the notifier chain
+>> git bisect skip 7172a286ced0c1f4f239a0fa09db54ed37d3ead2
+>> # skip: [762cf9695d714d312ef7369bed1b9f9467c9e64e] Merge branch
+>> 'timers/clockevents' of git://git.linaro.org/people/dlezcano/clockevents
+>> into timers/core
+>> git bisect skip 762cf9695d714d312ef7369bed1b9f9467c9e64e
+>> # bad: [21884a83b2192a00885d7244a1dda32debd2fbc7] Merge branch
+>> 'timers-core-for-linus' of
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
+>> git bisect bad 21884a83b2192a00885d7244a1dda32debd2fbc7
+>> # skip: [5a9b5855c248d0298eac4d5490c7bc11c2f1983b] ARM: sched_clock:
+>> Remove unused needs_suspend member
+>> git bisect skip 5a9b5855c248d0298eac4d5490c7bc11c2f1983b
+>> # skip: [45cb8e01b2ecef1c2afb18333e95793fa1a90281] clockevents: Split
+>> out selection logic
+>> git bisect skip 45cb8e01b2ecef1c2afb18333e95793fa1a90281
+>> # skip: [ffbfb5e316f0db486798ccf1db36a577ffe79637] ARM: sched_clock:
+>> Return suspended count earlier
+>> git bisect skip ffbfb5e316f0db486798ccf1db36a577ffe79637
+>> # skip: [04397fe94ad65289884b9862b6a0c722ececaadf] timekeeping: Pass
+>> flags instead of multiple bools to timekeeping_update()
+>> git bisect skip 04397fe94ad65289884b9862b6a0c722ececaadf
+>> # skip: [11682a41618f8094cb7a9330b4b6a12ffaef5774] alarmtimer: Export
+>> symbols of functions declared in linux/alarmtimer.h
+>> git bisect skip 11682a41618f8094cb7a9330b4b6a12ffaef5774
+>> # skip: [fc1f7d5606487ae28d6c84e95401952927d7379e] clocksource:
+>> apb_timer: Remove unsused function
+>> git bisect skip fc1f7d5606487ae28d6c84e95401952927d7379e
+>>
+>>
+>
 
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
