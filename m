@@ -1,50 +1,69 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 1 Apr 2014 16:41:42 +0100
-Subject: [PATCH 0/5] arm: Early IRQ enabling in the Undef user handler
-In-Reply-To: <CAKZGPAO4Fj=8cU3rYJBePBs_nbWdAW+5j5bO_F=jmqsxi7pYPg@mail.gmail.com>
-References: <1394734552-4704-1-git-send-email-catalin.marinas@arm.com>
- <CAKZGPAO4Fj=8cU3rYJBePBs_nbWdAW+5j5bO_F=jmqsxi7pYPg@mail.gmail.com>
-Message-ID: <20140401154142.GE20061@arm.com>
+Date: Tue, 1 Apr 2014 16:58:17 +0100
+Subject: Recent 3.x kernels: Memory leak causing OOMs
+In-Reply-To: <20140401113851.GA15317@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
+ <20140216225000.GO30257@n2100.arm.linux.org.uk>
+ <1392670951.24429.10.camel@sakura.staff.proxad.net>
+ <20140217210954.GA21483@n2100.arm.linux.org.uk>
+ <20140315101952.GT21483@n2100.arm.linux.org.uk>
+ <20140317180748.644d30e2@notabene.brown>
+ <20140317181813.GA24144@arm.com>
+ <20140317193316.GF21483@n2100.arm.linux.org.uk>
+ <20140401091959.GA10912@n2100.arm.linux.org.uk>
+ <20140401113851.GA15317@n2100.arm.linux.org.uk>
+Message-ID: <20140401155815.GF20061@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 01:03:04PM +0100, Arun KS wrote:
-> On Thu, Mar 13, 2014 at 11:45 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > I've had this series in my repo for a long time with some follow-ups on
-> > the list but without any conclusive ACK or NAK. If there are no
-> > objections, I plan to send it to the patch system.
-> >
-> > The only change is rebasing to 3.14-rc6 and adding some Cc for the
-> > crunch bits.
-> >
-> > The __und_usr handler accesses the user space to read the opcode of the
-> > faulting instruction. This is currently done with interrupts disabled
-> > but it could potentially cause a data abort of the page table was
-> > modified from another CPU. The data abort with interrupts disabled
-> > triggers a might_sleep() warning in do_page_fault() or, worse, deadlock
-> > on the pte lock when TLB ops broadcasting is enabled (ARM11MPCore or A15
-> > together with workaround for erratum 798181).
-> >
-> > Catalin Marinas (5):
-> >   arm: Move asm macro get_thread_info to asm/assembler.h
-> >   arm: Add {inc,dec}_preempt_count asm macros
-> >   arm: Disable preemption in iwmmxt_task_enable()
-> >   arm: Disable preemption in crunch_task_enable()
-> >   arm: Enable IRQs before attempting to read user space in __und_usr
-> >
-> >  arch/arm/include/asm/assembler.h   | 42 ++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/kernel/entry-armv.S       | 11 ++++++----
-> >  arch/arm/kernel/entry-header.S     | 11 ----------
-> >  arch/arm/kernel/iwmmxt.S           | 15 ++++++++++----
-> >  arch/arm/mach-ep93xx/crunch-bits.S | 13 +++++++++---
-> >  arch/arm/vfp/entry.S               | 28 ++++++++-----------------
-> >  arch/arm/vfp/vfphw.S               | 19 ++++++-----------
-> >  7 files changed, 84 insertions(+), 55 deletions(-)
-> 
-> Tested-by: Arun KS<getarunks@gmail.com>
+On Tue, Apr 01, 2014 at 12:38:51PM +0100, Russell King - ARM Linux wrote:
+> diff --git a/drivers/md/raid1.c b/drivers/md/raid1.c
+> index aacf6bf352d8..604bad2fa442 100644
+> --- a/drivers/md/raid1.c
+> +++ b/drivers/md/raid1.c
+> @@ -123,8 +123,14 @@ static void * r1buf_pool_alloc(gfp_t gfp_flags, void *data)
+>  		bio = r1_bio->bios[j];
+>  		bio->bi_vcnt = RESYNC_PAGES;
+>  
+> -		if (bio_alloc_pages(bio, gfp_flags))
+> -			goto out_free_bio;
+> +		if (bio_alloc_pages(bio, gfp_flags)) {
+> +			/*
+> +			 * Mark this as having no pages - bio_alloc_pages
+> +			 * removes any it allocated.
+> +			 */
+> +			bio->bi_vcnt = 0;
+> +			goto out_free_all_bios;
+> +		}
+>  	}
+>  	/* If not user-requests, copy the page pointers to all bios */
+>  	if (!test_bit(MD_RECOVERY_REQUESTED, &pi->mddev->recovery)) {
+> @@ -138,9 +144,25 @@ static void * r1buf_pool_alloc(gfp_t gfp_flags, void *data)
+>  
+>  	return r1_bio;
+>  
+> +out_free_all_bios:
+> +	j = -1;
+>  out_free_bio:
+> -	while (++j < pi->raid_disks)
+> -		bio_put(r1_bio->bios[j]);
+> +	while (++j < pi->raid_disks) {
+> +		bio = r1_bio->bios[j];
+> +		if (bio->bi_vcnt) {
+> +			struct bio_vec *bv;
+> +			int i;
+> +			/*
+> +			 * Annoyingly, BIO has no way to do this, so we have
+> +			 * to do it manually.  Given the trouble here, and
+> +			 * the lack of BIO support for cleaning up, I don't
+> +			 * care about linux/bio.h's comment about this helper.
+> +			 */
+> +			bio_for_each_segment_all(bv, bio, i)
+> +				__free_page(bv->bv_page);
+> +		}
 
-Thanks. I assume it's tested only with VFP (not crunch nor iwmmxt).
+Do you still need the 'if' block here? bio_for_each_segment_all() checks
+for bio->bi_vcnt which was set to 0 above.
 
 -- 
 Catalin
