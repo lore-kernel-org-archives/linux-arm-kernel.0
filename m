@@ -1,55 +1,74 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 1 Apr 2014 10:41:10 -0600
-Subject: Armada XP (mvebu) PCIe memory (BAR/window) re-allocation
-In-Reply-To: <CAFJTrDvb7gcLkv8-HqbJSLEj7V2Zg=5+pXFR2r3AZxG7waT6WA@mail.gmail.com>
-References: <CAFJTrDt7OrtE4B52419F2KGbmXeLR9NEcgF6yMTMUBe5vdKwfg@mail.gmail.com>
- <20140326180634.4ac266b2@skate>
- <20140326171828.GA31887@obsidianresearch.com>
- <CAFJTrDvb7gcLkv8-HqbJSLEj7V2Zg=5+pXFR2r3AZxG7waT6WA@mail.gmail.com>
-Message-ID: <20140401164110.GA26093@obsidianresearch.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 Apr 2014 10:13:25 -0700
+Subject: [PATCH 00/55]: ARM: OMAP2+: PRCM move to drivers
+In-Reply-To: <533A7A23.8020606@ti.com>
+References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+ <20140331220903.GA11328@atomide.com> <533A7A23.8020606@ti.com>
+Message-ID: <20140401171325.GA28041@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 03:17:24PM +0100, Matthew Minter wrote:
-> Just to give an update of what I have tried. I noticed that there was
-> a PCI quirk available for a similar PLX chip which forced the kernel
-> to see the slots as hot-plug slots (unfortunately some PLX chips
-> falsely report themselves to be non hotplug capable bridges from my
-> understanding). I tried extending this quirk to run on my chip also.
-> This significantly changed the results in that along with the use of
-> pci=hpmemsize=xM I managed to force the chip to pre-allocate some
-> memory for the hotplug slot. Specifically I added this line:
-> DECLARE_PCI_FIXUP_HEADER(0x10b5, 0x8617, quirk_hotplug_bridge);
-> to linux-3.14-rc7/drivers/pci/quirks.c
+* Tero Kristo <t-kristo@ti.com> [140401 01:38]:
+> On 04/01/2014 01:09 AM, Tony Lindgren wrote:
+> >
+> >We don't want to make access to these registers available without
+> >proper frameworks as that will lead into misuse by various drivers.
+> >And cleaning up that mess later in is a huge pain.
+> 
+> Currently, only thing that requires access to the register offsets
+> is basically all the legacy clock data still in the kernel (when can
+> we get rid of this, I have posted patches for it already?) and also
+> the clockdomain / powerdomain data. I can work on getting
+> clockdomain + powerdomain data to DT format if this would be
+> preferred, then we can remove these data files also. Alternatively I
+> can just move all these defines to the C files which actually use
+> them.
 
-This all sounds right to me, it is probably the proper approach,
-things could be refined a bit by adding a DT property to indicate hot
-plug, but that won't help your oops.
+With display support getting merged hopefully we can retry
+dropping omap3 legacy booting as long as we get the missing
+boards working.
 
-The oops kinda looks like something went wrong during a PCI memory
-read.
+I don't know how urgent of an issue the clock and power domains
+are for the data compared to clocks and muxes. But if it allows us
+to easily add support for new SoC variants, then yes it makes sense.
 
-> Internal error: : 1008 [#1] PREEMPT SMP ARM
+But in any case the defines should be private to the code claiming
+the PRCM register area.
 
-Which is a call to die, but the string that should tell us where is ""
-There are cases like that in the kernel, but all are prefixed by
-another line - did a line go missing (Unhandled Fault perhaps?)
+> So, basically you are proposing to add a regmap or regmap like API
+> for the PRCM, which would provide access to a subset of registers
+> only outside the PRCM driver? Some functions provided by PRCM spawn
+> to multiple registers (like clocks), and the ranges have holes, and
+> would require finetuning a register / bit level access map (some
+> registers may contain functions for several drivers.)
 
-First guess would be something went wrong when the mbus windows were
-created after the rescan. Some debugging prints from that part of the
-flow might be informative, as well as a dump from the mbus debugfs..
+Yeah something like that as that allows implementing the Linux
+generic frameworks where the code really should be. And does not
+require exporting tons of custom functions.
+ 
+> >2. Have the core PRCM driver(s) claim some of the regmap ranges
+> >
+> >Some PRCM features can potentially be implemented using existing
+> >Linux generic frameworks where possible for clocks, regulators, reset
+> >drivers etc. That way you can keep the register defines for these
+> >ranges private to the core PRCM driver(s). Ideally with no need
+> >to add _any_ custom exported functions here.
+> 
+> There is separate work ongoing for reset driver, and for VC/VP,
+> there has been some regulator related work. But yes, mostly this
+> approach should be fine.
 
-Second guess, something went wrong during the hot plug, and the PLX is
-not forwarding TLPs.. lpsci -v might give a clue.
+OK cool.
+ 
+> >3. Have the other drivers claim some regmap ranges
+> >
+> >The register ranges that are clearly owned by some driver should
+> >be claimed by those drivers. Then the defines for those registers
+> >can stay private to that driver. Some drivers that can probably
+> >own some PRCM ranges are clock drivers and voltage related drivers.
+> 
+> Yeah, this sounds reasonable.
 
-> I am currently working on a way to modify the scan order as Jason as
-> suggested, as soon as I have worked out exactly how the scan order is
-> determined I will try modifying the DT or any code needed to force the
-> port with the PLX chip to be scanned last. However I first need to
-> read some more of the code to understand what it orders on, eg: order
-> in DT, bus number, memory address.
+OK
 
-That suggestion was a hack, you have found the 'proper' way to do hot
-plug. If you can resolve this oops you should be golden :)
-
-Jason
+Tony
