@@ -1,80 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Apr 2014 18:29:33 +0100
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <533AC67D.2060906@boundarydevices.com>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
- <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
- <20140326001135.GV7528@n2100.arm.linux.org.uk>
- <20140401092638.GA10224@n2100.arm.linux.org.uk>
- <533AC67D.2060906@boundarydevices.com>
-Message-ID: <20140401172933.GB7528@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 1 Apr 2014 18:29:39 +0100
+Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
+ swiotlb" (was Re: [GIT PULL] arm64 patches for 3.15)
+In-Reply-To: <1396368657.3681.17.camel@linaro1.home>
+References: <20140331175230.GA7480@arm.com>
+ <1396368657.3681.17.camel@linaro1.home>
+Message-ID: <20140401172939.GG20061@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 07:00:29AM -0700, Eric Nelson wrote:
-> Hi Russell,
->
-> What value do you have for pad control register
-> IOMUXC_SW_PAD_CTL_PAD_RGMII_TX_CTL (0x020E0388)?
+On Tue, Apr 01, 2014 at 05:10:57PM +0100, Jon Medhurst (Tixy) wrote:
+> On Mon, 2014-03-31 at 18:52 +0100, Catalin Marinas wrote:
+> > The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
+> > 
+> >   Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-upstream
+> > 
+> > for you to fetch changes up to 196adf2f3015eacac0567278ba538e3ffdd16d0e:
+> > 
+> >   arm64: Remove pgprot_dmacoherent() (2014-03-24 10:35:35 +0000)
+> 
+> I may have spotted a bug in commit 7363590d2c46 (arm64: Implement
+> coherent DMA API based on swiotlb), see my inline comment below...
+> 
+> [...]
+> > diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> > index 1ea9f26..97fcef5 100644
+> > --- a/arch/arm64/mm/cache.S
+> > +++ b/arch/arm64/mm/cache.S
+> > @@ -166,3 +166,81 @@ ENTRY(__flush_dcache_area)
+> >  	dsb	sy
+> >  	ret
+> >  ENDPROC(__flush_dcache_area)
+> > +
+> > +/*
+> > + *	__dma_inv_range(start, end)
+> > + *	- start   - virtual start address of region
+> > + *	- end     - virtual end address of region
+> > + */
+> > +__dma_inv_range:
+> > +	dcache_line_size x2, x3
+> > +	sub	x3, x2, #1
+> > +	bic	x0, x0, x3
+> > +	bic	x1, x1, x3
+> 
+> Why is the 'end' value in x1 above rounded down to be cache aligned?
+> This means the cache invalidate won't include the cache line containing
+> the final bytes of the region, unless it happened to already be cache
+> line aligned. This looks especially suspect as the other two cache
+> operations added in the same patch (below) don't do that.
 
-You're referring to the iMX6Q, the Hummingboard is iMX6S, so that's
-0x20e06bc.  I have value 0x1b030.
+Cache invalidation is destructive, so we want to make sure that it
+doesn't affect anything beyond x1. But you are right, if either end of
+the buffer is not cache line aligned it can get it wrong. The fix is to
+use clean+invalidate on the unaligned ends:
 
-> I notice in some of the DTS files that this has a value of 0x100b0,
-> which seems wrong. Bit 16 seems to be a HYSteresis bit, and enabling
-> that seems wrong (also bit 7 seems wrong, as it's undefined in the RM).
-
-Yes, bit 7 should not be set as it's reserved, but this is ignored.
-Setting the hysteresis bit affects the input thresholds, and this signal
-is only ever used as an output.  While selecting HYS mode for an output
-may seem odd, that should not have any effect here.
-
-In any case, TX_CTL doesn't have much to do with it.  I've fully proved
-that the interface works fine under full duplex conditions, achieving
-500Mbps transmit and 570-600Mbps receive with TCP connections (which is
-nicely beyond what freescale claim the hardware is capable of.)
-
-The phy needs TX_CTL asserted in order to transmit anything, so as it
-works in full duplex mode, this must be happening correctly.
-
-The FEC needs RX_CTL asserted to indicate that valid data is being
-received by the phy - if this was not being recognised by the FEC, full
-duplex mode wouldn't work.
-
-The last scenario is the error signals encoded onto TX_CTL/RX_CTL.  This
-is one area I can't comment on yet - monitoring these signals is not
-exactly easy (and requires two steady hands.)  However, I have briefly
-monitored these signals when running at 100mbit half-duplex. With the
-scope RX_CTL and triggering on it, I do see TX_CTL being raised by the
-FEC.
-
-Whether TX_CTL is raised by the FEC just before or after RX_CTL has been
-asserted I can't say yet.
-
-However, TX_CTL raised while RX_CTL is raised or toggling means that a
-collision has occurred.  TX_CTL should never be raised while RX_CTL
-indicates that there is a "carrier" present in half-duplex mode (and
-therefore there is already another ethernet station transmitting on
-the wire.)
-
-Remember, I'm seeing late collisions.  The only way that happens is if
-something starts transmitting after 64 bytes into an ethernet frame, and
-it implies that something is not noticing that the link is busy before it
-starts blurting out.
-
-I know that my hubs are fine - the 10mbit hub has been used over _many_
-years (it's more than 20 years old now) and has always been rock solid...
-unlike the 10/100 hub with a dodgy switch between the two segments which
-I can lock out the 10 mbit segment with enough 100mbit traffic.
-
-Let's also not forget that these signals run at 125MHz at gigabit speeds,
-and 2.5MHz at 10mbit...  if they were marginal at 10mbit, gigabit
-certainly would not work.
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index c46f48b33c14..6a26bf1965d3 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -175,10 +175,17 @@ ENDPROC(__flush_dcache_area)
+ __dma_inv_range:
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+-	bic	x0, x0, x3
++	tst	x1, x3				// end cache line aligned?
+ 	bic	x1, x1, x3
+-1:	dc	ivac, x0			// invalidate D / U line
+-	add	x0, x0, x2
++	b.eq	1f
++	dc	civac, x1			// clean & invalidate D / U line
++1:	tst	x0, x3				// start cache line aligned?
++	bic	x0, x0, x3
++	b.eq	2f
++	dc	civac, x0			// clean & invalidate D / U line
++	b	3f
++2:	dc	ivac, x0			// invalidate D / U line
++3:	add	x0, x0, x2
+ 	cmp	x0, x1
+ 	b.lo	1b
+ 	dsb	sy
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Catalin
