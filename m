@@ -1,34 +1,46 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Tue, 1 Apr 2014 09:31:15 -0700
-Subject: [PATCH] ARM: bcm: Restrict ARCH_BCM selection to ARCH_MULTI_V6_V7
-In-Reply-To: <1396340779-20550-1-git-send-email-shc_work@mail.ru>
-References: <1396340779-20550-1-git-send-email-shc_work@mail.ru>
-Message-ID: <CAAYSxhprUUHi5BQQcpe4XVwMgUXLiAjA-mh+=EveOby0TuDDtQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 1 Apr 2014 09:35:00 -0700
+Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <533ABCEC.8040701@codethink.co.uk>
+References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+ <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
+ <20140331200620.GA13881@kroah.com>
+ <533ABCEC.8040701@codethink.co.uk>
+Message-ID: <20140401163500.GD3842@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 1, 2014 at 1:26 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+On Tue, Apr 01, 2014 at 02:19:40PM +0100, Ben Dooks wrote:
+> On 31/03/14 21:06, Greg KH wrote:
+> >On Mon, Mar 31, 2014 at 06:41:56PM +0200, Sylwester Nawrocki wrote:
+> >>This function adds a helper function to configure clock parents and rates
+> >>as specified in clock-parents, clock-rates DT properties for a consumer
+> >>device and a call to it before driver is bound to a device.
+> >>
+> >>Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> 
+> [snip]
+> 
+> >
+> >I don't understand why you need the driver core to initialize this one
+> >type of thing?  That should be in a driver, or in a class, or at worse
+> >case, the platform code.
+> >
+> >What makes clocks so "unique" here?
+> 
+> I suppose the issue here is that a lot of drivers currently use
+> clocks and a number of systems have badly setup default clock trees
+> at start time.
 
-> -if ARCH_BCM
-> +         This enables support for Broadcom ARM based SoC chips
->
->  menu "Broadcom SoC Selection"
-> +       depends on ARCH_BCM
->
->  config ARCH_BCM_MOBILE
->         bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
-> @@ -71,5 +68,3 @@ config ARCH_BCM_5301X
->           network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
->
->  endmenu
-> -
-> -endif
-> --
-> 1.8.3.2
+Then they should be fixed, why should _all_ Linux devices care about
+such broken devices/systems?
 
-If applied on top of for-next of arm-soc, this won't do the right thing.
+> Mark Brown and others have argued that the management of clocks which
+> is common to all devices should not live in the driver.
 
-The if ARCH_BCM block will soon include config ARCH_BCM2835 and config
-ARCH_BCM_5301X.
+Then put it in the bus that initializes the devices / drivers.
 
--Tim
+thanks,
+
+greg k-h
