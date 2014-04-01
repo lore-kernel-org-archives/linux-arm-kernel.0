@@ -1,36 +1,57 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Apr 2014 16:06:03 +0300
-Subject: [PATCH v2 02/14] dma: edma: Correct the handling of src/dst_maxburst
- == 0
-In-Reply-To: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1396357575-30585-3-git-send-email-peter.ujfalusi@ti.com>
+Date: Tue, 1 Apr 2014 16:06:01 +0300
+Subject: [PATCH v2 00/14] dma: edma: Fixes for cyclic (audio) operation
+Message-ID: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When clients asks for maxburst = 0 it is basically the same case as if they
-were asking for maxburst = 1 since in both case ASYNC need to be used and
-the eDMA is expected to write/read one word per DMA request.
+Hi,
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+This is basically a resend of the previous series:
+https://lkml.org/lkml/2014/3/13/119
+with removed ASoC patches (most of them are applied already).
+
+Changes since v1:
+- ASoC patches removed
+- Comments from Andriy Shevchenko addressed
+- patch added to fix cases when src/dst_maxburst is set to 0
+
+Adding support for DMA pause/resume
+Possibility to select non default event queue/TC for cyclic (audio) dma
+channels: all devices using the eDMA via dmaengine was assigned to the default
+EQ/TC (mmc, i2c, spi, etc, and audio). This is not optimal from system
+performance point of view since sharing the same EQ/TC can cause latency spikes
+for cyclic channels (long DMA transfers for MMC for example).
+
+While debugging the edma to get things sorted out I noticed that the debug was
+too verbose and the important information was hidden even when the we did not
+asked for verbose dmaengine debug.
+I have included some debug cleanups for the edma dmaengine driver also.
+
+Regards,
+Peter
 ---
- drivers/dma/edma.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Peter Ujfalusi (14):
+  platform_data: edma: Be precise with the paRAM struct
+  dma: edma: Correct the handling of src/dst_maxburst == 0
+  dma: edma: Add support for DMA_PAUSE/RESUME operation
+  dma: edma: Set DMA_CYCLIC capability flag
+  arm: common: edma: Select event queue 1 as default when booted with DT
+  arm: common: edma: Save the number of event queues/TCs
+  arm: common: edma: API to request non default queue for a channel
+  DMA: edma: Use different eventq for cyclic channels
+  dma: edma: Implement device_slave_caps callback
+  dma: edma: Simplify direction configuration in edma_config_pset()
+  dma: edma: Reduce debug print verbosity for non verbose debugging
+  dma: edma: Prefix debug prints where the text were identical in prep
+    callbacks
+  dma: edma: Add channel number to debug prints
+  dma: edma: Print the direction value as well when it is not supported
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index cd04eb7b182e..2742867fd1e6 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -285,6 +285,10 @@ static int edma_config_pset(struct dma_chan *chan, struct edmacc_param *pset,
- 	int absync;
- 
- 	acnt = dev_width;
-+
-+	/* src/dst_maxburst == 0 is the same case as src/dst_maxburst == 1 */
-+	if (!burst)
-+		burst = 1;
- 	/*
- 	 * If the maxburst is equal to the fifo width, use
- 	 * A-synced transfers. This allows for large contiguous
+ arch/arm/common/edma.c             | 34 +++++++++++++-
+ drivers/dma/edma.c                 | 96 +++++++++++++++++++++++++++++---------
+ include/linux/platform_data/edma.h | 20 ++++----
+ 3 files changed, 119 insertions(+), 31 deletions(-)
+
 -- 
 1.9.1
