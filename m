@@ -1,143 +1,82 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Apr 2014 10:19:59 +0100
-Subject: Recent 3.x kernels: Memory leak causing OOMs
-In-Reply-To: <20140317193316.GF21483@n2100.arm.linux.org.uk>
-References: <20140216200503.GN30257@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
- <20140216225000.GO30257@n2100.arm.linux.org.uk>
- <1392670951.24429.10.camel@sakura.staff.proxad.net>
- <20140217210954.GA21483@n2100.arm.linux.org.uk>
- <20140315101952.GT21483@n2100.arm.linux.org.uk>
- <20140317180748.644d30e2@notabene.brown> <20140317181813.GA24144@arm.com>
- <20140317193316.GF21483@n2100.arm.linux.org.uk>
-Message-ID: <20140401091959.GA10912@n2100.arm.linux.org.uk>
+Date: Tue, 1 Apr 2014 10:26:38 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <20140326001135.GV7528@n2100.arm.linux.org.uk>
+References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <20140321173252.GL7528@n2100.arm.linux.org.uk>
+ <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
+ <201403242121.58705.marex@denx.de>
+ <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
+ <20140324234443.GS7528@n2100.arm.linux.org.uk>
+ <20140326001135.GV7528@n2100.arm.linux.org.uk>
+Message-ID: <20140401092638.GA10224@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right, so the machine has died again this morning.
+On Wed, Mar 26, 2014 at 12:11:35AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 24, 2014 at 11:44:43PM +0000, Russell King - ARM Linux wrote:
+> > Now, you mention packet loss above.  Even on half-duplex networks, I
+> > would not expect there to be much packet loss because of the
+> > retransmissions after a collision, and 100Mbit networks handle this
+> > much better than 10Mbit.  It takes repeated collisions to cause a
+> > packet to actually be dropped (and a packet being dropped because
+> > of collisions should be logged by the transmitting host in its
+> > interface statistics.)
+> > 
+> > Another possibility is that the FEC isn't properly negotiating with
+> > the hub, and the two ends are ending up configured differently, or
+> > that it is negotiating properly but the FEC isn't being configured
+> > correctly.
+> > 
+> > Now that we know a little more about your setup, including that it
+> > seems to be one specific setup which is causing the problems, I'll
+> > do some more testing - I have an old Allied Telesys 10/100 hub here
+> > which I'll try putting the iMX6 on and re-run your tests.
+> 
+> PC --- 100Mbit hub --- iMX6S
+> 
+> iperf (2.0.5) -c PC -r reports:
+> 
+> iMX6 Tx: [  5]  0.0-10.0 sec  85.5 MBytes  71.5 Mbits/sec
+> iMX6 Rx: [  3]  0.0-10.0 sec   103 MBytes  86.2 Mbits/sec
+> 
+> However, there's a marked difference when the iMX6 sends - the
+> collision LED is almost permanently on at full brightness, whereas
+> when the PC is sending, it's almost always off.
+> 
+> I'm seeing lots of late collisions and CRC errors in the statistics
+> registers.
+> 
+> It looks to me like the iMX6's transmitter is blathering at any moment,
+> not taking any notice whether there's already a carrier on the RX side.
+> I'm not yet sure what to make of this yet.
 
-Excuse me if I ignore this merge window, I seem to have some debugging
-to do on my own because no one else is interested in my reports of this,
-and I need to get this fixed.  Modern Linux is totally unusable for me
-at the moment.
+Last night, I performed a different test:
 
-On Mon, Mar 17, 2014 at 07:33:16PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 17, 2014 at 06:18:13PM +0000, Catalin Marinas wrote:
-> > On Mon, Mar 17, 2014 at 06:07:48PM +1100, NeilBrown wrote:
-> > > On Sat, 15 Mar 2014 10:19:52 +0000 Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > > > unreferenced object 0xc3c3f880 (size 256):
-> > > >   comm "md2_resync", pid 4680, jiffies 638245 (age 8615.570s)
-> > > >   hex dump (first 32 bytes):
-> > > >     00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 f0  ................
-> > > >     00 00 00 00 10 00 00 00 00 00 00 00 00 00 00 00  ................
-> > > >   backtrace:
-> > > >     [<c008d4f0>] __save_stack_trace+0x34/0x40
-> > > >     [<c008d5f0>] create_object+0xf4/0x214
-> > > >     [<c02da114>] kmemleak_alloc+0x3c/0x6c
-> > > >     [<c008c0d4>] __kmalloc+0xd0/0x124
-> > > >     [<c00bb124>] bio_alloc_bioset+0x4c/0x1a4
-> > > >     [<c021206c>] r1buf_pool_alloc+0x40/0x148
-> > > >     [<c0061160>] mempool_alloc+0x54/0xfc
-> > > >     [<c0211938>] sync_request+0x168/0x85c
-> > > >     [<c021addc>] md_do_sync+0x75c/0xbc0
-> > > >     [<c021b594>] md_thread+0x138/0x154
-> > > >     [<c0037b48>] kthread+0xb0/0xbc
-> > > >     [<c0013190>] ret_from_fork+0x14/0x24
-> > > >     [<ffffffff>] 0xffffffff
-> > > > 
-> > > > with 3077 of these in the debug file.  3075 are for "md2_resync" and
-> > > > two are for "md4_resync".
-> > > > 
-> > > > /proc/slabinfo shows for this bucket:
-> > > > kmalloc-256         3237   3450    256   15    1 : tunables  120   60    0 : slabdata    230    230      0
-> > > > 
-> > > > but this would only account for about 800kB of memory usage, which itself
-> > > > is insignificant - so this is not the whole story.
-> > > > 
-> > > > It seems that this is the culpret for the allocations:
-> > > >         for (j = pi->raid_disks ; j-- ; ) {
-> > > >                 bio = bio_kmalloc(gfp_flags, RESYNC_PAGES);
-> > > > 
-> > > > Since RESYNC_PAGES will be 64K/4K=16, each struct bio_vec is 12 bytes
-> > > > (12 * 16 = 192) plus the size of struct bio, which would fall into this
-> > > > bucket.
-> > > > 
-> > > > I don't see anything obvious - it looks like it isn't every raid check
-> > > > which loses bios.  Not quite sure what to make of this right now.
-> > > 
-> > > I can't see anything obvious either.
-> > > 
-> > > The bios allocated there are stored in a r1_bio and those pointers are never
-> > > changed.
-> > > If the r1_bio wasn't freed then when the data-check finished, mempool_destroy
-> > > would complain that the pool wasn't completely freed.
-> > > And when the r1_bio is freed, all the bios are put as well.
-> > 
-> > It could be a false positive, there are areas that kmemleak doesn't scan
-> > like page allocations and the pointer reference graph it tries to build
-> > would fail.
-> > 
-> > What's interesting to see is the first few leaks reported as they are
-> > always reported in the order of allocation. In this case, the
-> > bio_kmalloc() returned pointer is stored in r1_bio. Is the r1_bio
-> > reported as a leak as well?
-> 
-> I'd assume that something else would likely have a different size.
-> All leaks are of 256 bytes.  Also...
-> 
-> $ grep kmemleak_alloc kmemleak-20140315 -A2 |sort | uniq -c |less
->    3081 --
->    3082     [<c008c0d4>] __kmalloc+0xd0/0x124
->    3082     [<c00bb124>] bio_alloc_bioset+0x4c/0x1a4
->    3082     [<c02da114>] kmemleak_alloc+0x3c/0x6c
-> 
-> seems pretty conclusive that it's just one spot.
-> 
-> > The sync_request() function eventually gets rid of the r1_bio as it is a
-> > variable on the stack. But it is stored in a bio->bi_private variable
-> > and that's where I lost track of where pointers are referenced from.
-> > 
-> > A simple way to check whether it's a false positive is to do a:
-> > 
-> > echo dump=<unref obj addr> > /sys/kernel/debug/kmemleak
-> > 
-> > If an object was reported as a leak but later on kmemleak doesn't know
-> > about it, it means that it was freed and hence a false positive (maybe I
-> > should add this as a warning in kmemleak if certain amount of leaked
-> > objects freeing is detected).
-> 
-> So doing that with the above leaked bio produces:
-> 
-> kmemleak: Object 0xc3c3f880 (size 256):
-> kmemleak:   comm "md2_resync", pid 4680, jiffies 638245
-> kmemleak:   min_count = 1
-> kmemleak:   count = 0
-> kmemleak:   flags = 0x3
-> kmemleak:   checksum = 1042746691
-> kmemleak:   backtrace:
->      [<c008d4f0>] __save_stack_trace+0x34/0x40
->      [<c008d5f0>] create_object+0xf4/0x214
->      [<c02da114>] kmemleak_alloc+0x3c/0x6c
->      [<c008c0d4>] __kmalloc+0xd0/0x124
->      [<c00bb124>] bio_alloc_bioset+0x4c/0x1a4
->      [<c021206c>] r1buf_pool_alloc+0x40/0x148
->      [<c0061160>] mempool_alloc+0x54/0xfc
->      [<c0211938>] sync_request+0x168/0x85c
->      [<c021addc>] md_do_sync+0x75c/0xbc0
->      [<c021b594>] md_thread+0x138/0x154
->      [<c0037b48>] kthread+0xb0/0xbc
->      [<c0013190>] ret_from_fork+0x14/0x24
->      [<ffffffff>] 0xffffffff
-> 
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+PC --- Gigabit switch --- 10/100Mbit hub --- 10Mbit hub --- iMX6S
+           |
+  (the rest of my network)
+
+This shows that all the (late) collisions occur in the 10Mbit domain,
+and very few in the 100Mbit domain, which puts the blame fairly
+squarely on the iMX6 side.
+
+I can see nothing wrong with the setup of the iMX6, nor of the AR8035
+phy which my board has.  Both the phy and the FEC appear to correctly
+indicate that they are configured for half-duplex with flow control
+disabled, and I've been through the iomux settings for the RGMII
+interface.
+
+So, I'm left with three possibilities:
+- the AR8035 doesn't work with half-duplex
+- there is something wrong with the signalling for carrier sense between
+  the AR8035 and the FEC.
+- the iMX6 FEC doesn't work with half-duplex
+
+It's not easy to monitor the TX_CTL and RX_CTL signals and make sense of
+them, so I can't really say what's at fault at the moment, but from what
+I can see, my hardware fails to work correctly with half-duplex
+connections.
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
