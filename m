@@ -1,33 +1,116 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 02 Apr 2014 16:20:00 +0100
-Subject: mach header files
-In-Reply-To: <416b29756557446199fa6e3b529cd4f0@HKXPR06MB168.apcprd06.prod.outlook.com>
-References: <416b29756557446199fa6e3b529cd4f0@HKXPR06MB168.apcprd06.prod.outlook.com>
-Message-ID: <533C2AA0.1040601@codethink.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Apr 2014 17:24:24 +0200
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <533BDDBA.1060800@linaro.org>
+References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
+ <9532591.5yuCbpL4pV@wuerfel> <533BDDBA.1060800@linaro.org>
+Message-ID: <4242558.6NaQec4f7j@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/14 16:11, Phil Edworthy wrote:
-> Hi,
->
-> I am porting the kernel to a new device, for which I've created a new arch/arm/mach-... directory, and I also a clock driver that lives under driver/clk. Everything is all working fine, though I am now cleaning up the code and have a question about mach specific header files.
->
-> The clock driver is completely specific to this device, but needs to read from a system register (just for external boot mode pins) to determine some PLL settings. This register is in a block of system registers which are also used by the mach code in arch/arm/mach-...
->
-> Since the clock driver is specific to the mach, is there any point in specifying the address of this reg in the corresponding dtsi? The format and functionality described by this register would not be the same on any other device.
->
-> If I don't specify the address of the register in the dtsi, I think it would be best to have a common header file for all of the system registers. I've seen some drivers, e.g.  exynos-cpufreq.c, doing this by including files from mach-exynos/include/mach. Is that the right way to do this?
->
-> Thanks
-> Phil
->
->
-> This message is intended only for the use of the addressee(s) and may contain confidential and/or legally privileged information. If you are not the intended recipient, you are hereby notified that any dissemination of this email (including any attachments thereto) is strictly prohibited. If you have received this email in error, please notify the sender immediately by telephone or email and permanently destroy the original without making any copy. Please note that any material and advice from this mail is provided free of charge and shall be used as an example for demonstration purposes only.
-> RENESAS MAKES NO WARRANTIES THAT THE USAGE OF INFORMATION OR ADVICE FROM THIS E-MAIL WILL NOT INFRINGE ANY INTELLECTUAL PROPERTY RIGHTS (E.G. PATENTS, COPYRIGHTS). RENESAS CANNOT GUARANTEE BUG FREE OPERATION AND THE RECIPIENT WILL USE AND/OR DISTRIBUTE IT ONLY AT HIS OWN RISK. IN NO EVENT SHALL RENESAS BE LIABLE FOR ANY DAMAGE. The communication with Renesas Electronics Europe Ltd does not amend any written agreement in place.
+On Wednesday 02 April 2014 17:51:54 zhangfei wrote:
+> Dear Arnd
+> 
+> On 04/02/2014 05:21 PM, Arnd Bergmann wrote:
+> > On Tuesday 01 April 2014 21:27:12 Zhangfei Gao wrote:
+> >> +static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+> >
+> > While it looks like there are no serious functionality bugs left, this
+> > function is rather inefficient, as has been pointed out before:
+> 
+> Yes, still need more performance tuning in the next step.
+> We need to enable the hardware feature of cache flush, under help of 
+> arm-smmu, as a result dma_map_single etc can be removed.
 
-This is my least favourite method of law-breaking.
+You cannot remove the dma_map_single call here, but the implementation
+of that function will be different when you use the iommu_coherent_ops:
+Instead of flushing the caches, it will create or remove an iommu entry
+and return the bus address.
 
+I remember you mentioned before that using the iommu on this particular
+SoC actually gives you cache-coherent DMA, so you may also be able
+to use arm_coherent_dma_ops if you can set up a static 1:1 mapping 
+between bus and phys addresses.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> >> +{
+> >> +       struct hip04_priv *priv = netdev_priv(ndev);
+> >> +       struct net_device_stats *stats = &ndev->stats;
+> >> +       unsigned int tx_head = priv->tx_head;
+> >> +       struct tx_desc *desc = &priv->tx_desc[tx_head];
+> >> +       dma_addr_t phys;
+> >> +
+> >> +       hip04_tx_reclaim(ndev, false);
+> >> +       mod_timer(&priv->txtimer, jiffies + RECLAIM_PERIOD);
+> >> +
+> >> +       if (priv->tx_count >= TX_DESC_NUM) {
+> >> +               netif_stop_queue(ndev);
+> >> +               return NETDEV_TX_BUSY;
+> >> +       }
+> >
+> > This is where you have two problems:
+> >
+> > - if the descriptor ring is full, you wait for RECLAIM_PERIOD,
+> >    which is far too long at 500ms, because during that time you
+> >    are not able to add further data to the stopped queue.
+> 
+> Understand
+> The idea here is not using the timer as much as possible.
+> As experiment shows, only xmit reclaim buffers, the best throughput can 
+> be achieved.
+
+I'm only talking about the case where that doesn't work: once you stop
+the queue, the xmit function won't get called again until the timer
+causes the reclaim be done and restart the queue.
+
+> > - As David Laight pointed out earlier, you must also ensure that
+> >    you don't have too much /data/ pending in the descriptor ring
+> >    when you stop the queue. For a 10mbit connection, you have already
+> >    tested (as we discussed on IRC) that 64 descriptors with 1500 byte
+> >    frames gives you a 68ms round-trip ping time, which is too much.
+> 
+> When iperf & ping running together and only ping, it is 0.7 ms.
+> 
+> >    Conversely, on 1gbit, having only 64 descriptors actually seems
+> >    a little low, and you may be able to get better throughput if
+> >    you extend the ring to e.g. 512 descriptors.
+> 
+> OK, Will check throughput of upgrade xmit descriptors.
+> But is it said not using too much descripors for xmit since no xmit 
+> interrupt?
+
+The important part is to limit the time that data spends in the queue,
+which is a function of the interface tx speed and the number of bytes
+in the queue.
+
+> >> +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
+> >> +       if (dma_mapping_error(&ndev->dev, phys)) {
+> >> +               dev_kfree_skb(skb);
+> >> +               return NETDEV_TX_OK;
+> >> +       }
+> >> +
+> >> +       priv->tx_skb[tx_head] = skb;
+> >> +       priv->tx_phys[tx_head] = phys;
+> >> +       desc->send_addr = cpu_to_be32(phys);
+> >> +       desc->send_size = cpu_to_be16(skb->len);
+> >> +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
+> >> +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
+> >> +       desc->wb_addr = cpu_to_be32(phys);
+> >
+> > One detail: since you don't have cache-coherent DMA, "desc" will
+> > reside in uncached memory, so you try to minimize the number of accesses.
+> > It's probably faster if you build the descriptor on the stack and
+> > then atomically copy it over, rather than assigning each member at
+> > a time.
+> 
+> I am sorry, not quite understand, could you clarify more?
+> The phys and size etc of skb->data is changing, so need to assign.
+> If member contents keep constant, it can be set when initializing.
+
+I meant you should use 64-bit accesses here instead of multiple 32 and
+16 bit accesses, but as David noted, it's actually not that much of
+a deal for the writes as it is for the reads from uncached memory.
+
+The important part is to avoid the line where you do 'if (desc->send_addr
+!= 0)' as much as possible.
+
+	Arnd
