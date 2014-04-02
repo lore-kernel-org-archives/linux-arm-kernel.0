@@ -1,31 +1,89 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 02 Apr 2014 15:45:00 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNIGkuTVg1MTogQWRkIERpZ2kgQ29ubmVjdENvcmUg?=
- =?UTF-8?B?ZGV2aWNldHJlZQ==?=
-In-Reply-To: <20140402113934.GH8753@dragon>
-References: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
- <1396075706-25384-2-git-send-email-shc_work@mail.ru>
- <20140402113934.GH8753@dragon>
-Message-ID: <1396439100.597907550@f167.i.mail.ru>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 02 Apr 2014 13:48:21 +0200
+Subject: [PATCH 06/10] ARM: EXYNOS: Add support for mapping PMU base
+ address via DT
+In-Reply-To: <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
+References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+ <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <533BF905.6070701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wed, 2 Apr 2014 19:39:35 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> On Sat, Mar 29, 2014 at 10:48:26AM +0400, Alexander Shiyan wrote:
-> > This patch adds support for Digi ConnectCore? i.MX51/Wi-i.MX51 SOM
-> > and basic support for the ConnectCore for i.MX51 JumpStart Kit.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-...
-> > +&weim {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_weim>;
-> > +	status = "okay";
-> > +
-> > +	lan9221: lan9221 at ce000000 {
+On 02/04/14 09:50, Pankaj Dubey wrote:
+> From: Young-Gun Jang <yg1004.jang@samsung.com>
 > 
-> How does 'ce000000' in the node name comes?
+> Add support for mapping Exynos Power Management Unit (PMU) base address
+> from device tree. Code will use existing samsung pmu binding information.
+> This patch also adds "get_exynos_pmubase" a helper function to return mapped base
+> address to various other files under "mach-exynos".
+> 
+> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.h |    2 ++
+>  arch/arm/mach-exynos/exynos.c |   44 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
+> 
+[...]
+>  #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index a5e1349..a5127fb 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -35,6 +35,8 @@
+>  #define L2_AUX_VAL 0x7C470001
+>  #define L2_AUX_MASK 0xC200ffff
+>  
+> +static void __iomem *exynos_pmu_base __initdata;
+> +
+>  static struct map_desc exynos4_iodesc[] __initdata = {
+>  	{
+>  		.virtual	= (unsigned long)S3C_VA_SYS,
+> @@ -245,6 +247,47 @@ void __init exynos_init_late(void)
+>  	exynos_pm_init();
+>  }
+>  
+> +static char const *exynos_dt_pmu_match[] __initconst = {
+> +	"samsung,exynos4210-pmu",
+> +	"samsung,exynos4212-pmu",
+> +	"samsung,exynos4412-pmu",
+> +	"samsung,exynos5250-pmu",
+> +	NULL
+> +};
+> +
+> +static int __init exynos_fdt_map_pmu(unsigned long node,
+> +		const char *uname, int depth, void *data)
+> +{
+> +	struct map_desc iodesc;
+> +	__be32 *reg;
+> +	unsigned long len;
+> +
+> +	if (of_flat_dt_match(node, exynos_dt_pmu_match)) {
+> +		phys_addr_t phys_addr;
+> +		reg = of_get_flat_dt_prop(node, "reg", &len);
+> +		if (reg == NULL || len != (sizeof(unsigned long) * 2))
+> +			return 0;
+> +
+> +		phys_addr = be32_to_cpu(reg[0]);
+> +		iodesc.pfn = __phys_to_pfn(phys_addr);
+> +		iodesc.length = be32_to_cpu(reg[1]) - 1;
+> +		iodesc.virtual = (unsigned long)S5P_VA_PMU;
+> +		iodesc.type = MT_DEVICE;
+> +		iotable_init(&iodesc, 1);
 
-This is a WEIM CS5 start address.
+Are you sure...you need this in addition to ioremap() below ?
+Can't you just use the Linux syscon API ?
+There were some patches posted for syscon to make it available in earlier
+system initialization stage: https://lkml.org/lkml/2014/2/19/218
 
----
+> +		exynos_pmu_base = ioremap(phys_addr, be32_to_cpu(reg[1]));
+> +		if (WARN_ON(!exynos_pmu_base))
+> +			return -EFAULT;
+> +	}
+> +
+> +	return 0;
+> +}
+
+--
+Thanks,
+Sylwester
