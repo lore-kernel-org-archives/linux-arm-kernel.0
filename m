@@ -1,50 +1,29 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu,  3 Apr 2014 00:10:19 +0200
-Subject: [PATCH] arm: ftrace: work with CONFIG_DEBUG_SET_MODULE_RONX
-Message-ID: <1396476619-15386-1-git-send-email-rabin@rab.in>
+From: joe.sylve@gmail.com (Joe Sylve)
+Date: Wed, 2 Apr 2014 17:10:22 -0500
+Subject: [PATCH 1/1] AArch64: TCR_TG1_64K incorrectly sets TCR_EL1 bits
+ [31:30]
+In-Reply-To: <1396475058.32040.10.camel@joe-AO722>
+References: <CAHWCVW+cH6MwhQj-JGWN63AqseFYuDPoftv+zGJU8UDfAgueEQ@mail.gmail.com>
+ <20140402123844.GE31892@arm.com> <20140402170747.GC24018@arm.com>
+ <1396475058.32040.10.camel@joe-AO722>
+Message-ID: <CAHWCVWKng7rwewi6f0Tf1=uZRGERe56W6vRUuyCVtLz-gSz-9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make ftrace work with CONFIG_DEBUG_SET_MODULE_RONX by making module text
-writable around the place where ftrace does its work, like it is done on
-x86 in the patch which introduced CONFIG_DEBUG_SET_MODULE_RONX,
-84e1c6bb38eb ("x86: Add RO/NX protection for loadable kernel modules").
+Should it?  The reference manual refers to the architecture as AArch64.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/kernel/ftrace.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 34e5664..70ce654 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -14,6 +14,7 @@
- 
- #include <linux/ftrace.h>
- #include <linux/uaccess.h>
-+#include <linux/module.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/opcodes.h>
-@@ -63,6 +64,18 @@ static unsigned long adjust_address(struct dyn_ftrace *rec, unsigned long addr)
- }
- #endif
- 
-+int ftrace_arch_code_modify_prepare(void)
-+{
-+	set_all_modules_text_rw();
-+	return 0;
-+}
-+
-+int ftrace_arch_code_modify_post_process(void)
-+{
-+	set_all_modules_text_ro();
-+	return 0;
-+}
-+
- static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
- {
- 	return arm_gen_branch_link(pc, addr);
--- 
-1.9.1
+On Wed, Apr 2, 2014 at 4:44 PM, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2014-04-02 at 18:07 +0100, Catalin Marinas wrote:
+>> On Wed, Apr 02, 2014 at 01:38:44PM +0100, Catalin Marinas wrote:
+>> > On Wed, Apr 02, 2014 at 05:00:38AM +0100, Joe Sylve wrote:
+>> > > Section D7.2.83 TCR_EL1, Translation Control Register (EL1) of the
+>> > > latest ARM Architecture Reference Manual, ARMv8, for ARMv8-A states
+>> > > that TCR_EL1 TG1 (bits [31:30]) should be set to 11 for a 64KB
+>> > > TTBR1_EL1 granule size. The mainline 3.14 kernel incorrectly sets
+>> > > those bits to 01 (which is a 16KB granule size).
+>
+> trivia:
+>
+> I think the subject title should be arm64
+>
+>
