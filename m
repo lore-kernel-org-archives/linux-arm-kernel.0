@@ -1,42 +1,31 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 02 Apr 2014 15:16:07 -0700
-Subject: [PATCH 1/1] AArch64: TCR_TG1_64K incorrectly sets TCR_EL1 bits
- [31:30]
-In-Reply-To: <CAHWCVWKng7rwewi6f0Tf1=uZRGERe56W6vRUuyCVtLz-gSz-9Q@mail.gmail.com>
-References: <CAHWCVW+cH6MwhQj-JGWN63AqseFYuDPoftv+zGJU8UDfAgueEQ@mail.gmail.com>
- <20140402123844.GE31892@arm.com> <20140402170747.GC24018@arm.com>
- <1396475058.32040.10.camel@joe-AO722>
- <CAHWCVWKng7rwewi6f0Tf1=uZRGERe56W6vRUuyCVtLz-gSz-9Q@mail.gmail.com>
-Message-ID: <1396476967.32040.13.camel@joe-AO722>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  2 Apr 2014 19:25:44 -0300
+Subject: [PATCH 1/3] ARM: dts: imx27-pdk: Pass the memory range
+Message-ID: <1396477546-11130-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-02 at 17:10 -0500, Joe Sylve wrote:
-> Should it?  The reference manual refers to the architecture as AArch64.
-> 
-> On Wed, Apr 2, 2014 at 4:44 PM, Joe Perches <joe@perches.com> wrote:
-> > On Wed, 2014-04-02 at 18:07 +0100, Catalin Marinas wrote:
-> >> On Wed, Apr 02, 2014 at 01:38:44PM +0100, Catalin Marinas wrote:
-> >> > On Wed, Apr 02, 2014 at 05:00:38AM +0100, Joe Sylve wrote:
-> >> > > Section D7.2.83 TCR_EL1, Translation Control Register (EL1) of the
-> >> > > latest ARM Architecture Reference Manual, ARMv8, for ARMv8-A states
-> >> > > that TCR_EL1 TG1 (bits [31:30]) should be set to 11 for a 64KB
-> >> > > TTBR1_EL1 granule size. The mainline 3.14 kernel incorrectly sets
-> >> > > those bits to 01 (which is a 16KB granule size).
-> >
-> > trivia:
-> >
-> > I think the subject title should be arm64
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-There was a fair amount of blowback about naming
-the arch aarch64 in linux.
+imx27-pdk has 128 MB of DRAM. Pass the memory range in dt.
 
-So for linux, the directory and arch name is arm64.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx27-pdk.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-from: https://lkml.org/lkml/2012/7/15/133
-
-From	Linus Torvalds <>
-Date	Sun, 15 Jul 2012 16:53:21 -0700
-
- - aarch64 is just another druggie name that the ARM people came up
-with after drinking too much of the spiked water in cambridge.
+diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
+index 5ce89aa..28c83bc 100644
+--- a/arch/arm/boot/dts/imx27-pdk.dts
++++ b/arch/arm/boot/dts/imx27-pdk.dts
+@@ -17,7 +17,7 @@
+ 	compatible = "fsl,imx27-pdk", "fsl,imx27";
+ 
+ 	memory {
+-		reg = <0x0 0x0>;
++		reg = <0xa0000000 0x08000000>;
+ 	};
+ };
+ 
+-- 
+1.8.3.2
