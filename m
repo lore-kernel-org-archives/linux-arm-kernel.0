@@ -1,16 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Apr 2014 09:33:31 -0700
+Date: Wed, 2 Apr 2014 09:35:21 -0700
 Subject: OMAP baseline test results for v3.14
-In-Reply-To: <20140402162154.GJ8504@saruman.home>
+In-Reply-To: <alpine.DEB.2.02.1404021631040.15928@utopia.booyaka.com>
 References: <alpine.DEB.2.02.1404021600320.15928@utopia.booyaka.com>
  <20140402162102.GB12234@atomide.com>
- <20140402162154.GJ8504@saruman.home>
-Message-ID: <20140402163331.GC12234@atomide.com>
+ <alpine.DEB.2.02.1404021631040.15928@utopia.booyaka.com>
+Message-ID: <20140402163521.GD12234@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140402 09:27]:
-> On Wed, Apr 02, 2014 at 09:21:03AM -0700, Tony Lindgren wrote:
+* Paul Walmsley <paul@pwsan.com> [140402 09:36]:
+> On Wed, 2 Apr 2014, Tony Lindgren wrote:
+> 
 > > * Paul Walmsley <paul@pwsan.com> [140402 09:07]:
 > > > 
 > > > Here are some basic OMAP test results for Linux v3.14.
@@ -24,10 +25,15 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > > Is this a new regression with MMC? Looks like your boot log for this
 > > ends with "Waiting for root device /dev/mmcblk0p1...".
 > 
-> Nishanth already posted about this a few days ago, see [1]
+> It's new since v3.14-rc1:
 > 
-> [1] http://marc.info/?l=linux-omap&m=139637044425644&w=2
+> http://www.spinics.net/lists/arm-kernel/msg306448.html
+> 
+> http://www.spinics.net/lists/arm-kernel/msg306454.html
+> 
+> http://www.spinics.net/lists/arm-kernel/msg306455.html
 
-OK thanks.
+OK looks like I never noticed that one before. Probably
+because of NFSroot.
 
 Tony
