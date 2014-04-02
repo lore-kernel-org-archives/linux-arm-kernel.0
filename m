@@ -1,68 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Apr 2014 11:46:45 +0100
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
- <20140326001135.GV7528@n2100.arm.linux.org.uk>
- <20140401092638.GA10224@n2100.arm.linux.org.uk>
- <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
- <20140401225149.GC7528@n2100.arm.linux.org.uk>
- <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140402085914.GG7528@n2100.arm.linux.org.uk>
- <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <20140402104644.GI7528@n2100.arm.linux.org.uk>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed,  2 Apr 2014 16:12:21 +0530
+Subject: [PATCH v7 06/12] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
+ header
+In-Reply-To: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
+References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1396435347-20056-7-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 09:40:53AM +0000, fugang.duan at freescale.com wrote:
-> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Data: Wednesday, April 02, 2014 4:59 PM
-> >I wonder whether you understand what is going on here, and why it is required.
-> >I doubt it somehow from your comments.  Maybe if you were to read about the
-> >operation of the store buffer in the PL310, it may open your eyes to why it
-> >would be necessary for reliable operation.
-> 
-> In kernel 3.0.35 internal BSP,  BD memory is non-cacheable, non-bufferable
-> (we add new api to support it: dma_alloc_noncacheable()),
+Currently, we don't have an exit reason to notify user space about
+a system-level event (for e.g. system reset or shutdown) triggered
+by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
+this purpose. We can also inform user space about the 'type' and
+architecture specific 'flags' of a system-level event using the
+kvm_run structure.
 
-As is the memory you get from dma_alloc_coherent().  So, why did you
-invent a new API which does something which the mainline kernel APIs
-already do?
+This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM ARM/ARM64
+in-kernel PSCI v0.2 support to reset/shutdown VMs.
 
-Maybe yours is doing something different but you haven't explained it
-in correct terminology.
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ Documentation/virtual/kvm/api.txt |   15 +++++++++++++++
+ include/uapi/linux/kvm.h          |    8 ++++++++
+ 2 files changed, 23 insertions(+)
 
-> So wmb() is not necessary.
-
-Even on non-cacheable normal memory, the wmb() is required.  Please read
-up in the ARM architecture reference manual about memory types and their
-various attributes, followed by the memory ordering chapters.
-
-> Yes, it don't impact imx6q since cpu loading is not bottleneck due
-> rx/tx bandwidth is slow and multi-cores.  But for imx6sx, enet rx can
-> reach at 940Mbps, tx can reach at 900Mbps, imx6sx is sigle core.
-
-What netdev features do you support to achieve that?
-
-> Enet IP don't support TSO feaure, cpu loading is the bottleneck. Wmb()
-> is very expensive which cause tx performance drop much.
-
-wmb() is very expensive because of the L2 cache code using a sledge hammer
-with it - particularly the spinlock, which has a large overhead if lockdep
-or spinlock debugging is enabled.
-
-> Yes, I agree. There have some arch/driver patches need to upstream to
-> align the performance with internal bsp.
-
-Well, post these patches so that people can test them.  If your patches
-are indeed the worlds best thing since sliced bread, I've just wasted
-over two months of solid work on the iMX6 ethernet driver.
-
-However, hacks like dma_alloc_noncacheable will not be acceptable for
-mainline.
-
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 0114d5b..e675ec2 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2721,6 +2721,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
+ external interrupt has just been delivered into the guest. User space
+ should put the acknowledged interrupt vector into the 'epr' field.
+ 
++		/* KVM_EXIT_SYSTEM_EVENT */
++		struct {
++#define KVM_SYSTEM_EVENT_SHUTDOWN       1
++#define KVM_SYSTEM_EVENT_RESET          2
++			__u32 type;
++			__u64 flags;
++		} system_event;
++
++If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
++a system-level event using some architecture specific mechanism (hypercall
++or some special instruction). In case of ARM/ARM64, this is triggered using
++HVC instruction based PSCI call from the vcpu. The 'type' field describes
++the system-level event type. The 'flags' field describes architecture
++specific flags for the system-level event.
++
+ 		/* Fix the size of the union. */
+ 		char padding[256];
+ 	};
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 260d3ae..0cf2882 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -171,6 +171,7 @@ struct kvm_pit_config {
+ #define KVM_EXIT_WATCHDOG         21
+ #define KVM_EXIT_S390_TSCH        22
+ #define KVM_EXIT_EPR              23
++#define KVM_EXIT_SYSTEM_EVENT     24
+ 
+ /* For KVM_EXIT_INTERNAL_ERROR */
+ /* Emulate instruction failed. */
+@@ -301,6 +302,13 @@ struct kvm_run {
+ 		struct {
+ 			__u32 epr;
+ 		} epr;
++		/* KVM_EXIT_SYSTEM_EVENT */
++		struct {
++#define KVM_SYSTEM_EVENT_SHUTDOWN       1
++#define KVM_SYSTEM_EVENT_RESET          2
++			__u32 type;
++			__u64 flags;
++		} system_event;
+ 		/* Fix the size of the union. */
+ 		char padding[256];
+ 	};
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
