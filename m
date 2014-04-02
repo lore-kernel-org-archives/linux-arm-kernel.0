@@ -1,51 +1,32 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Thu, 03 Apr 2014 07:41:12 +0900
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <20140402152455.GB24018@arm.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
- <7050133.LRSn2ENgQ4@wuerfel> <20140401132316.GD20061@arm.com>
- <004b01cf4e27$d47da990$7d78fcb0$@samsung.com> <20140402090136.GA31892@arm.com>
- <20140402152455.GB24018@arm.com>
-Message-ID: <000f01cf4ec4$a6301800$f2904800$@samsung.com>
+From: syin@broadcom.com (Sherman Yin)
+Date: Wed, 2 Apr 2014 15:40:39 -0700
+Subject: [PATCH v3 3/3] pinctrl: fix typo in bindings documentation
+In-Reply-To: <1396478439-16586-1-git-send-email-syin@broadcom.com>
+References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
+ <1396478439-16586-1-git-send-email-syin@broadcom.com>
+Message-ID: <1396478439-16586-4-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 03, 2014 12:25 AM, Catalin Marinas wrote:
-> On Wed, Apr 02, 2014 at 10:01:38AM +0100, Catalin Marinas wrote:
-> > On Wed, Apr 02, 2014 at 04:58:39AM +0100, Jungseok Lee wrote:
-> > > On Tuesday, April 01, 2014 10:23 PM, Catalin Marinas wrote:
-> > > > On some previous patches I've seen posted for 4-levels I asked that 64K
-> > > > and 4K page configurations are decoupled from the pgtable-?level.h
-> > > > macros so that if we ever need 3-levels with 64K it's easy to enable.
-> > >
-> > > Is your request to decouple page size from the number of page tables?
-> > > In other words, would you like to prepare 4 options, 1)4KB+3Level, 2)
-> > > 4KB+4Level, 3)64KB+2Level and 4)64KB+3Level, as combining page size
-> > > with page table levels in kernel configuration?
-> >
-> > We can still use two options to make things less confusing: one for the
-> > page size (4K/64K) and another for the size of the virtual address
-> > space. From those two we can infer the number levels required. We can
-> > limit the options to 39-bit, 42 (only fo 64K pages) and architecture
-> > current maximum of 48 (for both 4K and 64K).
-> 
-> Another reason to decouple the page size is that we have 16K pages
-> specified in the ARM ARM (and we'll get hardware implementations at some
-> point). As a simple formula for the max VA space we can cover (capped at
-> 48-bit):
-> VA_BITS = (PAGE_SHIFT - 3) * levels + PAGE_SHIFT
-> 
-> With 16K pages and 3 levels we can cover 47 bits. So we'll eventually
-> have the following VA bits options:
-> 
-> 39 if 4K (3 levels)
-> 42 if 64K (2 levels)
-> 47 if 16K (3 levels)
-> 48 if 4K || 16K || 64K (4/4/3 levels depending on page size)
-> 
-> The latter because of the architecture maximum.
+Fixed the missing comma in DT node example.
 
-Okay. Thanks for clarification.
+Signed-off-by: Sherman Yin <syin@broadcom.com>
+---
+ .../bindings/pinctrl/brcm,bcm11351-pinctrl.txt     |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Jungseok Lee
+diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
+index c119deb..67a5db9 100644
+--- a/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
+@@ -119,7 +119,7 @@ Optional Properties (for HDMI pins):
+ Example:
+ // pin controller node
+ pinctrl at 35004800 {
+-	compatible = "brcmbcm11351-pinctrl";
++	compatible = "brcm,bcm11351-pinctrl";
+ 	reg = <0x35004800 0x430>;
+ 
+ 	// pin configuration node
+-- 
+1.7.9.5
