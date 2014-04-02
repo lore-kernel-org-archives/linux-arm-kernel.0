@@ -1,129 +1,100 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed,  2 Apr 2014 22:57:17 +0200
-Subject: [PATCH] ARM: socfpga: dts: convert to preprocessor includes
-Message-ID: <1396472237-6341-1-git-send-email-s.trumtrar@pengutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Apr 2014 14:03:22 -0700
+Subject: [PATCH v7 11/12] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
+In-Reply-To: <1396435347-20056-12-git-send-email-anup.patel@linaro.org>
+References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
+ <1396435347-20056-12-git-send-email-anup.patel@linaro.org>
+Message-ID: <20140402210322.GO4756@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert all socfpga DT files to the dtc preprocessor include syntax.
-This allows to include header files in the devicetrees like other
-SoC-types already do.
+On Wed, Apr 02, 2014 at 04:12:26PM +0530, Anup Patel wrote:
+> This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
+> KVM ARM/ARM64. This is a CPU-level function call which can suspend
+> current CPU or current CPU cluster. We don't have VCPU clusters in
+> KVM so we only suspend the current VCPU.
+> 
+> The CPU_SUSPEND emulation is not tested much because currently there
+> is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
+> PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
+> Simple CPUIDLE driver which is not published due to unstable DT-bindings
+> for PSCI.
+> (For more info, http://lwn.net/Articles/574950/)
+> 
+> Even if we had stable DT-bindings for PSCI and CPUIDLE driver that
+> uses PSCI CPU_SUSPEND then still we need to define SUSPEND states
+> and WAKEUP events for KVM ARM/ARM64.
+> 
+> Due to above, we implement CPU_SUSPEND emulation similar to WFI
+> (Wait-for-interrupt) emulation and we also treat power-down request
+> to be same as stand-by request. This is also consistent with section
+> 5.4.1 and section 5.4.2 of PSCI v0.2 specification.
+> 
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  arch/arm/kvm/psci.c |   27 +++++++++++++++++++++++----
+>  1 file changed, 23 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index fdbd829..74fa4ad 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -52,6 +52,25 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
+>  	return affinity_mask;
+>  }
+>  
+> +static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
+> +{
+> +	/*
+> +	 * NOTE: Currently, we don't have any wakeup events for KVM
+> +	 * so for simplicity we make VCPU suspend emulation to be
+> +	 * same-as WFI (Wait-for-interrupt) emulation. This is also
+> +	 * consistent with intended use of StateID as described in
+> +	 * section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/boot/dts/socfpga.dtsi                  | 2 +-
- arch/arm/boot/dts/socfpga_arria5.dtsi           | 2 +-
- arch/arm/boot/dts/socfpga_arria5_socdk.dts      | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5.dtsi         | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts    | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts   | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 2 +-
- arch/arm/boot/dts/socfpga_vt.dts                | 2 +-
- 8 files changed, 8 insertions(+), 8 deletions(-)
+The WFI implementation wakes up on interrupts, so we are inherently
+defining that as a wakeup event for KVM with this patch, so the comment
+should be adjusted accordingly.
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index c8ced33..1f71e96 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -15,7 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--/include/ "skeleton.dtsi"
-+#include "skeleton.dtsi"
- 
- / {
- 	#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/socfpga_arria5.dtsi b/arch/arm/boot/dts/socfpga_arria5.dtsi
-index a85b404..43b921a 100644
---- a/arch/arm/boot/dts/socfpga_arria5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria5.dtsi
-@@ -15,7 +15,7 @@
-  */
- 
- /dts-v1/;
--/include/ "socfpga.dtsi"
-+#include "socfpga.dtsi"
- 
- / {
- 	soc {
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index 5beffb2..b3901a3 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -15,7 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--/include/ "socfpga_arria5.dtsi"
-+#include "socfpga_arria5.dtsi"
- 
- / {
- 	model = "Altera SOCFPGA Arria V SoC Development Kit";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dtsi b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-index a8716f6..d9dfc01 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dtsi
-@@ -16,7 +16,7 @@
-  */
- 
- /dts-v1/;
--/include/ "socfpga.dtsi"
-+#include "socfpga.dtsi"
- 
- / {
- 	soc {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 2ee52ab..593fbfe 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -15,7 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--/include/ "socfpga_cyclone5.dtsi"
-+#include "socfpga_cyclone5.dtsi"
- 
- / {
- 	model = "Altera SOCFPGA Cyclone V SoC Development Kit";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 50b99a2..6cb1283 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -15,7 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--/include/ "socfpga_cyclone5.dtsi"
-+#include "socfpga_cyclone5.dtsi"
- 
- / {
- 	model = "Terasic SoCkit";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-index f8d17dc..a1814b4 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-@@ -15,7 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--/include/ "socfpga_cyclone5.dtsi"
-+#include "socfpga_cyclone5.dtsi"
- 
- / {
- 	model = "EBV SOCrates";
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index d1ec0ca..70f0cb2d 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -16,7 +16,7 @@
-  */
- 
- /dts-v1/;
--/include/ "socfpga.dtsi"
-+#include "socfpga.dtsi"
- 
- / {
- 	model = "Altera SOCFPGA VT";
--- 
-1.9.1
+-Christoffer
+
+> +	 *
+> +	 * Further, we also treat power-down request to be same as
+> +	 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
+> +	 * specification (ARM DEN 0022A). This means all suspend states
+> +	 * for KVM PSCI emulation will preserve the register state.
+> +	 */
+> +	kvm_vcpu_block(vcpu);
+> +
+> +	return PSCI_RET_SUCCESS;
+> +}
+> +
+>  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+>  {
+>  	vcpu->arch.pause = true;
+> @@ -195,6 +214,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  		 */
+>  		val = 2;
+>  		break;
+> +	case PSCI_0_2_FN_CPU_SUSPEND:
+> +	case PSCI_0_2_FN64_CPU_SUSPEND:
+> +		val = kvm_psci_vcpu_suspend(vcpu);
+> +		break;
+>  	case PSCI_0_2_FN_CPU_OFF:
+>  		kvm_psci_vcpu_off(vcpu);
+>  		val = PSCI_RET_SUCCESS;
+> @@ -232,10 +255,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  		val = PSCI_RET_SUCCESS;
+>  		ret = 0;
+>  		break;
+> -	case PSCI_0_2_FN_CPU_SUSPEND:
+> -	case PSCI_0_2_FN64_CPU_SUSPEND:
+> -		val = PSCI_RET_NOT_SUPPORTED;
+> -		break;
+>  	default:
+>  		return -EINVAL;
+>  	}
+> -- 
+> 1.7.9.5
+> 
