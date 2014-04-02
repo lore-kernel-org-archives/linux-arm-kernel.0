@@ -1,126 +1,252 @@
-From: nitin.garg@freescale.com (Nitin Garg)
-Date: Wed, 2 Apr 2014 01:18:59 +0000
-Subject: [PATCH] ARM: errata: workaround Cortex-A9 errata 761320 and 794072
-In-Reply-To: <CAL_JsqK--G_7nO_UQ6jyomA1Sq6GUKtXVZpBF0dXjYA2iE047w@mail.gmail.com>
-References: <1396298072-13254-1-git-send-email-nitin.garg@freescale.com>
- <1396298072-13254-2-git-send-email-nitin.garg@freescale.com>
- <CAL_JsqK--G_7nO_UQ6jyomA1Sq6GUKtXVZpBF0dXjYA2iE047w@mail.gmail.com>
-Message-ID: <d687ddaf7b6e4eeca23b44bfdf26a55b@BLUPR03MB358.namprd03.prod.outlook.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 2 Apr 2014 12:55:57 +1100
+Subject: linux-next: manual merge of the staging tree with the arm-soc tree
+In-Reply-To: <20140225170944.d322d9868871bc2f669b92e5@canb.auug.org.au>
+References: <20140225170944.d322d9868871bc2f669b92e5@canb.auug.org.au>
+Message-ID: <20140402125557.2d2f48716b8ff79f7042f223@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi all,
 
-Thanks for reply. In that case, I wonder why there is already code which access the diagnostic register. Pls see:
-arch/arm/mm/proc-v7.S: __v7_setup
-CONFIG_ARM_ERRATA_742230
-CONFIG_ARM_ERRATA_742231
-CONFIG_ARM_ERRATA_743622
-CONFIG_ARM_ERRATA_751472
-
-Regards,
-Nitin Garg
-
-
------Original Message-----
-From: Rob Herring [mailto:robherring2 at gmail.com] 
-Sent: Tuesday, April 01, 2014 8:12 PM
-To: Garg Nitin-B37173
-Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] ARM: errata: workaround Cortex-A9 errata 761320 and 794072
-
-On Mon, Mar 31, 2014 at 3:34 PM, Nitin Garg <nitin.garg@freescale.com> wrote:
-> Add workaround for Cortex-A9 errata 761320 ([present on r0, r1, r2, 
-> r3) and 794072 (present on all revisions). These are Category B, 
-> present on SMP systems.
-
-These work-arounds don't work on non-secure systems which don't have access to the diagnostic register. There is no architectural way to determine secure vs. non-secure mode. It's been discussed before and decided that these types of work-arounds must go into the bootloader or firmware.
-
-Rob
-
+On Tue, 25 Feb 2014 17:09:44 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 >
-> Signed-off-by: Nitin Garg <nitin.garg@freescale.com>
+> Today's linux-next merge of the staging tree got a conflict in
+> arch/arm/boot/dts/imx53-qsb.dts between commit d5eb195f26fa ("ARM: dts:
+> i.MX53: move common QSB nodes to new file") from the arm-soc tree and
+> commit 17b5001b5143 ("imx-drm: convert to componentised device support")
+> from the staging tree.
+
+These merge fixups are now required when the arm-soc tree is merged with
+Linus' tree.
+
+> I fixed it up (see at bottom) and can carry the fix as necessary (no
+> action is required).  I also added the following fix up patch:
+> 
+> From: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date: Tue, 25 Feb 2014 17:07:01 +1100
+> Subject: [PATCH] ARM: dts: i.MX53: merge fix patch
+> 
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
 > ---
->  arch/arm/Kconfig          |   23 +++++++++++++++++++++++
->  arch/arm/mach-imx/Kconfig |    2 ++
->  arch/arm/mm/proc-v7.S     |   11 +++++++++++
->  3 files changed, 36 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index 
-> a48712e..f8464ff 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1301,6 +1301,29 @@ config ARM_ERRATA_751472
->           operation is received by a CPU before the ICIALLUIS has completed,
->           potentially leading to corrupted entries in the cache or TLB.
->
-> +config ARM_ERRATA_794072
-> +       bool "ARM errata: A short loop including a DMB instruction might cause a denial of service"
-> +       depends on CPU_V7 && SMP
-> +       help
-> +          This option enables the workaround for the 794072 Cortex-A9
-> +          (all revisions). A processor which continuously executes a short
-> +          loop containing a DMB instruction might prevent a CP15 operation
-> +          broadcast by another processor making further progress, causing
-> +          a denial of service. This erratum can be worked around by setting
-> +          bit[4] of the undocumented Diagnostic Control Register to 1.
-> +
-> +config ARM_ERRATA_761320
-> +       bool "Full cache line writes to the same memory region from at least two processors might deadlock processor"
-> +       depends on CPU_V7 && SMP
-> +       help
-> +         This option enables the workaround for the 761320 Cortex-A9 (r0..r3).
-> +         Under very rare circumstances, full cache line writes
-> +         from (at least) 2 processors on cache lines in hazard with
-> +         other requests may cause arbitration issues in the SCU,
-> +         leading to processor deadlock. This erratum can be
-> +         worked around by setting bit[21] of the undocumented
-> +         Diagnostic Control Register to 1.
-> +
->  config PL310_ERRATA_753970
->         bool "PL310 errata: cache sync operation may be faulty"
->         depends on CACHE_PL310
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig 
-> index 5740296d..19690c2 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -794,6 +794,8 @@ config SOC_IMX6
->  config SOC_IMX6Q
->         bool "i.MX6 Quad/DualLite support"
->         select ARM_ERRATA_764369 if SMP
-> +       select ARM_ERRATA_794072 if SMP
-> +       select ARM_ERRATA_761320 if SMP
->         select HAVE_ARM_SCU if SMP
->         select HAVE_ARM_TWD if SMP
->         select MIGHT_HAVE_PCI
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S index 
-> 195731d..b5e5386 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -337,6 +337,17 @@ __v7_setup:
->         mcrlt   p15, 0, r10, c15, c0, 1         @ write diagnostic register
->  1:
->  #endif
-> +#ifdef CONFIG_ARM_ERRATA_794072
-> +       mrc     p15, 0, r10, c15, c0, 1         @ read diagnostic register
-> +       orr     r10, r10, #1 << 4               @ set bit #4
-> +       mcr     p15, 0, r10, c15, c0, 1         @ write diagnostic register
-> +#endif
-> +#ifdef CONFIG_ARM_ERRATA_761320
-> +       cmp     r6, #0x40                       @ present prior to r4p0
-> +       mrclt   p15, 0, r10, c15, c0, 1         @ read diagnostic register
-> +       orrlt   r10, r10, #1 << 21              @ set bit #21
-> +       mcrlt   p15, 0, r10, c15, c0, 1         @ write diagnostic register
-> +#endif
->
->         /* Cortex-A15 Errata */
->  3:     ldr     r10, =0x00000c0f                @ Cortex-A15 primary part number
-> --
-> 1.7.4.1
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  arch/arm/boot/dts/imx53-qsb-common.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+> index 2dca98b79f48..5dd37c7c38b8 100644
+> --- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
+> +++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+> @@ -17,7 +17,7 @@
+>  		reg = <0x70000000 0x40000000>;
+>  	};
+>  
+> -	display at di0 {
+> +	display0: display at di0 {
+>  		compatible = "fsl,imx-parallel-display";
+>  		crtcs = <&ipu 0>;
+>  		interface-pix-fmt = "rgb565";
+> -- 
+> 1.9.0
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/boot/dts/imx53-qsb.dts
+> index dec4b073ceb1,3cb4f7791a91..000000000000
+> --- a/arch/arm/boot/dts/imx53-qsb.dts
+> +++ b/arch/arm/boot/dts/imx53-qsb.dts
+> @@@ -16,6 -16,182 +16,11 @@@
+>   / {
+>   	model = "Freescale i.MX53 Quick Start Board";
+>   	compatible = "fsl,imx53-qsb", "fsl,imx53";
+>  -
+>  -	memory {
+>  -		reg = <0x70000000 0x40000000>;
+>  -	};
+>  -
+>  -	display0: display at di0 {
+>  -		compatible = "fsl,imx-parallel-display";
+>  -		crtcs = <&ipu 0>;
+>  -		interface-pix-fmt = "rgb565";
+>  -		pinctrl-names = "default";
+>  -		pinctrl-0 = <&pinctrl_ipu_disp0_1>;
+>  -		status = "disabled";
+>  -		display-timings {
+>  -			claawvga {
+>  -				native-mode;
+>  -				clock-frequency = <27000000>;
+>  -				hactive = <800>;
+>  -				vactive = <480>;
+>  -				hback-porch = <40>;
+>  -				hfront-porch = <60>;
+>  -				vback-porch = <10>;
+>  -				vfront-porch = <10>;
+>  -				hsync-len = <20>;
+>  -				vsync-len = <10>;
+>  -				hsync-active = <0>;
+>  -				vsync-active = <0>;
+>  -				de-active = <1>;
+>  -				pixelclk-active = <0>;
+>  -			};
+>  -		};
+>  -	};
+>  -
+>  -	gpio-keys {
+>  -		compatible = "gpio-keys";
+>  -
+>  -		power {
+>  -			label = "Power Button";
+>  -			gpios = <&gpio1 8 0>;
+>  -			linux,code = <116>; /* KEY_POWER */
+>  -		};
+>  -
+>  -		volume-up {
+>  -			label = "Volume Up";
+>  -			gpios = <&gpio2 14 0>;
+>  -			linux,code = <115>; /* KEY_VOLUMEUP */
+>  -			gpio-key,wakeup;
+>  -		};
+>  -
+>  -		volume-down {
+>  -			label = "Volume Down";
+>  -			gpios = <&gpio2 15 0>;
+>  -			linux,code = <114>; /* KEY_VOLUMEDOWN */
+>  -			gpio-key,wakeup;
+>  -		};
+>  -	};
+>  -
+> + 	imx-drm {
+> + 		compatible = "fsl,imx-drm";
+> + 		crtcs = <&ipu 0>;
+> + 		connectors = <&display0>;
+> + 	};
+>  -
+>  -	leds {
+>  -		compatible = "gpio-leds";
+>  -		pinctrl-names = "default";
+>  -		pinctrl-0 = <&led_pin_gpio7_7>;
+>  -
+>  -		user {
+>  -			label = "Heartbeat";
+>  -			gpios = <&gpio7 7 0>;
+>  -			linux,default-trigger = "heartbeat";
+>  -		};
+>  -	};
+>  -
+>  -	regulators {
+>  -		compatible = "simple-bus";
+>  -
+>  -		reg_3p2v: 3p2v {
+>  -			compatible = "regulator-fixed";
+>  -			regulator-name = "3P2V";
+>  -			regulator-min-microvolt = <3200000>;
+>  -			regulator-max-microvolt = <3200000>;
+>  -			regulator-always-on;
+>  -		};
+>  -
+>  -		reg_usb_vbus: usb_vbus {
+>  -			compatible = "regulator-fixed";
+>  -			regulator-name = "usb_vbus";
+>  -			regulator-min-microvolt = <5000000>;
+>  -			regulator-max-microvolt = <5000000>;
+>  -			gpio = <&gpio7 8 0>;
+>  -			enable-active-high;
+>  -		};
+>  -	};
+>  -
+>  -	sound {
+>  -		compatible = "fsl,imx53-qsb-sgtl5000",
+>  -			     "fsl,imx-audio-sgtl5000";
+>  -		model = "imx53-qsb-sgtl5000";
+>  -		ssi-controller = <&ssi2>;
+>  -		audio-codec = <&sgtl5000>;
+>  -		audio-routing =
+>  -			"MIC_IN", "Mic Jack",
+>  -			"Mic Jack", "Mic Bias",
+>  -			"Headphone Jack", "HP_OUT";
+>  -		mux-int-port = <2>;
+>  -		mux-ext-port = <5>;
+>  -	};
+>  -};
+>  -
+>  -&esdhc1 {
+>  -	pinctrl-names = "default";
+>  -	pinctrl-0 = <&pinctrl_esdhc1_1>;
+>  -	status = "okay";
+>  -};
+>  -
+>  -&ssi2 {
+>  -	fsl,mode = "i2s-slave";
+>  -	status = "okay";
+>  -};
+>  -
+>  -&esdhc3 {
+>  -	pinctrl-names = "default";
+>  -	pinctrl-0 = <&pinctrl_esdhc3_1>;
+>  -	cd-gpios = <&gpio3 11 0>;
+>  -	wp-gpios = <&gpio3 12 0>;
+>  -	bus-width = <8>;
+>  -	status = "okay";
+>  -};
+>  -
+>  -&iomuxc {
+>  -	pinctrl-names = "default";
+>  -	pinctrl-0 = <&pinctrl_hog>;
+>  -
+>  -	hog {
+>  -		pinctrl_hog: hoggrp {
+>  -			fsl,pins = <
+>  -				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+>  -				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+>  -				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+>  -				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+>  -				MX53_PAD_EIM_DA11__GPIO3_11       0x80000000
+>  -				MX53_PAD_EIM_DA12__GPIO3_12       0x80000000
+>  -				MX53_PAD_PATA_DA_0__GPIO7_6       0x80000000
+>  -				MX53_PAD_PATA_DA_2__GPIO7_8	  0x80000000
+>  -				MX53_PAD_GPIO_16__GPIO7_11        0x80000000
+>  -			>;
+>  -		};
+>  -
+>  -		led_pin_gpio7_7: led_gpio7_7 at 0 {
+>  -			fsl,pins = <
+>  -				MX53_PAD_PATA_DA_1__GPIO7_7 0x80000000
+>  -			>;
+>  -		};
+>  -	};
+>  -
+>  -};
+>  -
+>  -&uart1 {
+>  -	pinctrl-names = "default";
+>  -	pinctrl-0 = <&pinctrl_uart1_1>;
+>  -	status = "okay";
+>  -};
+>  -
+>  -&i2c2 {
+>  -	pinctrl-names = "default";
+>  -	pinctrl-0 = <&pinctrl_i2c2_1>;
+>  -	status = "okay";
+>  -
+>  -	sgtl5000: codec at 0a {
+>  -		compatible = "fsl,sgtl5000";
+>  -		reg = <0x0a>;
+>  -		VDDA-supply = <&reg_3p2v>;
+>  -		VDDIO-supply = <&reg_3p2v>;
+>  -		clocks = <&clks 150>;
+>  -	};
+>   };
+>   
+>   &i2c1 {
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140402/3610c939/attachment-0001.sig>
