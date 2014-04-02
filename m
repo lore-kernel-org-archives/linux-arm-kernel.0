@@ -1,15 +1,15 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 2 Apr 2014 15:51:14 +0000 (UTC)
-Subject: OMAP baseline test results for v3.14-rc5
-Message-ID: <alpine.DEB.2.02.1404021549530.15928@utopia.booyaka.com>
+Date: Wed, 2 Apr 2014 15:52:44 +0000 (UTC)
+Subject: OMAP baseline test results for v3.14-rc6
+Message-ID: <alpine.DEB.2.02.1404021551160.15928@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Here are some basic OMAP test results for Linux v3.14-rc5.
+Here are some basic OMAP test results for Linux v3.14-rc6.
 Logs and other details at:
 
-    http://www.pwsan.com/omap/testlogs/test_v3.14-rc5/20140401152404/
+    http://www.pwsan.com/omap/testlogs/test_v3.14-rc6/20140401161621/
 
 
 Test summary
@@ -75,30 +75,37 @@ PM: chip off via dynamic idle:
 
 
 vmlinux object size
-(delta in bytes from test_v3.14-rc4 (cfbf8d4857c26a8a307fb7cd258074c9dcd8c691)):
+(delta in bytes from test_v3.14-rc5 (0414855fdc4a40da05221fc6062cccbc0c30f169)):
    text     data      bss    total  kernel
-   +415      -32        0     +383  omap1_defconfig
-   +415        0        0     +415  omap1_defconfig_1510innovator_only
-   +447        0        0     +447  omap1_defconfig_5912osk_only
-   +347      +16        0     +363  multi_v7_defconfig
-   +320        0        0     +320  omap2plus_defconfig
-   +296        0        0     +296  omap2plus_defconfig_2430sdp_only
-   +256        0        0     +256  omap2plus_defconfig_am33xx_only
-   +264        0        0     +264  omap2plus_defconfig_am43xx_only
-   +320        0        0     +320  omap2plus_defconfig_cpupm
-   +320        0        0     +320  omap2plus_defconfig_dra7xx_only
-    +48        0        0      +48  omap2plus_defconfig_n800_multi_omap2xxx
-    +48        0        0      +48  omap2plus_defconfig_n800_only_a
-   +320        0        0     +320  omap2plus_defconfig_no_pm
-   +320        0        0     +320  omap2plus_defconfig_omap2_4_only
-   +320        0        0     +320  omap2plus_defconfig_omap3_4_only
-   +320        0        0     +320  omap2plus_defconfig_omap5_only
-    +56        0        0      +56  rmk_omap3430_ldp_allnoconfig
-  +4447        0        0    +4447  rmk_omap3430_ldp_oldconfig
-    +24        0        0      +24  rmk_omap4430_sdp_allnoconfig
-   +319        0        0     +319  rmk_omap4430_sdp_oldconfig
+   +614      -24        0     +590  omap1_defconfig
+   +610      +16        0     +626  omap1_defconfig_1510innovator_only
+   +582       +8        0     +590  omap1_defconfig_5912osk_only
+  +1792     +248      -64    +1976  multi_v7_defconfig
+  +1984      +32        0    +2016  omap2plus_defconfig
+  +1068      +16        0    +1084  omap2plus_defconfig_2430sdp_only
+  +1452      +16        0    +1468  omap2plus_defconfig_am33xx_only
+  +5432      -16        0    +5416  omap2plus_defconfig_am43xx_only
+  +5952        0        0    +5952  omap2plus_defconfig_cpupm
+  +1800      +16        0    +1816  omap2plus_defconfig_dra7xx_only
+   +218      +16        0     +234  omap2plus_defconfig_n800_multi_omap2xxx
+   +218      +16        0     +234  omap2plus_defconfig_n800_only_a
+  +1984        0        0    +1984  omap2plus_defconfig_no_pm
+  +1852      -16        0    +1836  omap2plus_defconfig_omap2_4_only
+  +1920      +32        0    +1952  omap2plus_defconfig_omap3_4_only
+  +1800      -16        0    +1784  omap2plus_defconfig_omap5_only
+  +1052        0     -324     +728  rmk_omap3430_ldp_allnoconfig
+  +1512      +24     +256    +1792  rmk_omap3430_ldp_oldconfig
+   +752      +16     -156     +612  rmk_omap4430_sdp_allnoconfig
+  +2256      -16     +264    +2504  rmk_omap4430_sdp_oldconfig
 
 Boot-time memory difference
-(delta in bytes from test_v3.14-rc4 (cfbf8d4857c26a8a307fb7cd258074c9dcd8c691))
+(delta in bytes from test_v3.14-rc5 (0414855fdc4a40da05221fc6062cccbc0c30f169))
   avail  rsrvd   high  freed  board          kconfig
-    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
