@@ -1,46 +1,28 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 2 Apr 2014 16:13:15 -0700
-Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
- modem lines
-In-Reply-To: <533C280F.3060804@gmail.com>
-References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
- <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
- <20140317232359.GA8943@kroah.com> <533C280F.3060804@gmail.com>
-Message-ID: <20140402231315.GD24324@kroah.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 02 Apr 2014 16:26:00 -0700
+Subject: [PATCH 1/2] ARM: add cpu_is_pj4() to distinguish PJ4 core
+In-Reply-To: <533B1F27.9010504@wwwdotorg.org> (Stephen Warren's message of
+ "Tue, 01 Apr 2014 14:18:47 -0600")
+References: <1395385319-25386-1-git-send-email-chao.xie@marvell.com>
+ <533B1F27.9010504@wwwdotorg.org>
+Message-ID: <7hwqf71fg7.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 05:09:03PM +0200, Richard Genoud wrote:
-> On 18/03/2014 00:23, Greg Kroah-Hartman wrote:
-> > On Mon, Mar 10, 2014 at 05:45:49PM +0100, Richard Genoud wrote:
-> >> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
-> >> GPIO.
-> >> This will be useful for many boards which have a serial controller that
-> >> only handle CTS/RTS pins (or even just RX/TX).
-> >>
-> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> > 
-> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > 
-> > I can't take this series through my tty tree as the non-tty patches
-> > don't apply, so feel free to take them through whatever tree is needed.
-> > 
-> > greg k-h
-> > 
-> 
-> I guess this series won't make it for 3.15, as it doesn't apply on any tree.
-> However, I'd like to know if I did something wrong, or if there's no
-> solution when a series depends on several patches that are in different
-> trees ?
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-That's a hard problem, either wait a release cycle for everything to get
-merged properly (like should be done in time for 3.15-rc1 now) and then
-submit the code, or ask for different maintainers to either allow other
-trees to take the patches, put the patches in different trees at the
-same time, or have "topic branches" that different maintainers can pull
-from.
+> On 03/21/2014 01:01 AM, Chao Xie wrote:
+>> PJ4 is based on V7, but it has some changes. For example, some
+>> coprocessor settings.
+>
+> I don't see this patch in linux-next, yet I think the runtime problem
+> has gone away somehow. How did that happen?
 
-Care to send me the patches after 3.15-rc1 is out, as there should not
-be any dependancy issues then, right?
+The multi_v7 change that introduced the regression (addtion of
+MACH_DOVE) was reverted in arm-soc/for-next while waiting for the patch
+to be submitted to Russell's tracker.
 
-greg k-h
+Looks like they've now been submitted to the tracker, so hopefully
+Russell will get to them on his next pass.  They'll be needed for v3.15.
+
+Kevin
