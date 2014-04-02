@@ -1,29 +1,35 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 02 Apr 2014 11:04:21 -0400
-Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
- friendly address
-In-Reply-To: <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
-References: <1395718484-20424-1-git-send-email-joelf@ti.com>
- <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
- <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
- <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
-Message-ID: <533C26F5.30302@codeaurora.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 02 Apr 2014 17:09:03 +0200
+Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <20140317232359.GA8943@kroah.com>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+ <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
+ <20140317232359.GA8943@kroah.com>
+Message-ID: <533C280F.3060804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[On 04/02/2014 08:47 AM, Peter Maydell wrote:
-> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
->> Like others, I have been carrying this change locally. Good to see it up!
+On 18/03/2014 00:23, Greg Kroah-Hartman wrote:
+> On Mon, Mar 10, 2014 at 05:45:49PM +0100, Richard Genoud wrote:
+>> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+>> GPIO.
+>> This will be useful for many boards which have a serial controller that
+>> only handle CTS/RTS pins (or even just RX/TX).
+>>
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 > 
-> Why are you all booting raw Images anyway (just out of curiosity)? All my
-> test cases boot either a zImage or a uImage, or occasionally a full SD card
-> image, or I'd have noticed this earlier...
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> 
+> I can't take this series through my tty tree as the non-tty patches
+> don't apply, so feel free to take them through whatever tree is needed.
+> 
+> greg k-h
+> 
 
-I do it in part for uniformity with arm64 kernels.
+I guess this series won't make it for 3.15, as it doesn't apply on any tree.
+However, I'd like to know if I did something wrong, or if there's no
+solution when a series depends on several patches that are in different
+trees ?
 
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Richard.
