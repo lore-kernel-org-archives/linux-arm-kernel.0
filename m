@@ -1,37 +1,44 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 02 Apr 2014 09:48:58 +0200
-Subject: [PATCH] ARM: dts: stmpe-ts: fix wrong bindings
-In-Reply-To: <201312092132.29575.marex@denx.de>
-References: <1386620111-1413-1-git-send-email-stefan@agner.ch>
- <201312092132.29575.marex@denx.de>
-Message-ID: <2acd964e18e59b35996d042a3dd6e99b@agner.ch>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 2 Apr 2014 11:01:02 +0300
+Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <533ABCEC.8040701@codethink.co.uk>
+References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+ <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
+ <20140331200620.GA13881@kroah.com>
+ <533ABCEC.8040701@codethink.co.uk>
+Message-ID: <20140402080102.GK2931@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2013-12-09 21:32, schrieb Marek Vasut:
-> On Monday, December 09, 2013 at 09:15:11 PM, Stefan Agner wrote:
->> Fix bindings for STMPE touchscreen device to match the documented
->> bindings and the actual bindings used by the driver.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->> I don't have any of these hardware, but the error is obvious. The device
->> probably works anyway since the device/driver will use default values.
+On Tue, Apr 01, 2014 at 03:19:40PM +0200, Ben Dooks wrote:
+> On 31/03/14 21:06, Greg KH wrote:
+> > On Mon, Mar 31, 2014 at 06:41:56PM +0200, Sylwester Nawrocki wrote:
+> >> This function adds a helper function to configure clock parents and rates
+> >> as specified in clock-parents, clock-rates DT properties for a consumer
+> >> device and a call to it before driver is bound to a device.
+> >>
+> >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
-> Full agreement here.
+> [snip]
 > 
-> Reviewed-by: Marek Vasut <marex@denx.de>
+> >
+> > I don't understand why you need the driver core to initialize this one
+> > type of thing?  That should be in a driver, or in a class, or at worse
+> > case, the platform code.
+> >
+> > What makes clocks so "unique" here?
 > 
-> btw. I plan to rework the STMPE TS as it doesn't work nicely on my device at 
-> all. I am seriously lacking time, but I will try! ;-)
+> I suppose the issue here is that a lot of drivers currently use
+> clocks and a number of systems have badly setup default clock trees
+> at start time.
 > 
-> Best regards,
-> Marek Vasut
+> Mark Brown and others have argued that the management of clocks which
+> is common to all devices should not live in the driver.
 
-Hi Shawn,
+Exactly, this data should be part of the clock provider DT nodes, not
+of the device nodes. 
 
-Just noticed that I forgot to add you when sending this patch. I guess
-this should go through your tree...
+Cheers,
 
---
-Stefan
+Peter.
