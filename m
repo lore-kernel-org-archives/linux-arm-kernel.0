@@ -1,98 +1,73 @@
-From: robert.daniels@vantagecontrols.com (robert.daniels at vantagecontrols.com)
-Date: Tue, 1 Apr 2014 18:37:09 -0600
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <20140401225149.GC7528@n2100.arm.linux.org.uk>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
- <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
- <20140326001135.GV7528@n2100.arm.linux.org.uk>
- <20140401092638.GA10224@n2100.arm.linux.org.uk>
- <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
- <20140401225149.GC7528@n2100.arm.linux.org.uk>
-Message-ID: <OF90E12B9F.349292A2-ON87257CAD.0082FF27-87257CAE.00036711@grpleg.it>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 2 Apr 2014 11:47:15 +1100
+Subject: linux-next: manual merge of the tip tree with the arm-soc tree
+In-Reply-To: <20140320143603.a2f82d77be61c09a7852cfe9@canb.auug.org.au>
+References: <20140320143603.a2f82d77be61c09a7852cfe9@canb.auug.org.au>
+Message-ID: <20140402114715.471bcdb0962ef38c17120530@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 04/01/2014
-04:51:49 PM:
+On Thu, 20 Mar 2014 14:36:03 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> Today's linux-next merge of the tip tree got a conflict in
+> arch/arm/mach-imx/pm-imx6q.c between commit 9cdde7217e92 ("ARM: imx6:
+> rename pm-imx6q.c to pm-imx6.c") from the arm-soc tree and commit
+> 8435cf757632 ("arm: Replace various irq_desc accesses") from the tip tree.
+> 
+> I fixed it up (by applying the tip tree patch to the renamed file -
+> arch/arm/mach-imx/pm-imx6.c - see patch below) and can carry the fix as
+> necessary (no action is required).
 
-> At initial glance, this is coherent with my idea of the FEC skipping a
-> ring entry on the initial pass around.  Then when a new entry is loaded,
->
-> Let's say that the problem entry is number 12 that has been skipped.
-> When we get back around to entry 11, the FEC will transmit entries 11
-> and 12, as you rightly point out, and it will then look at entry 13
-> for the next packet.
->
-> However, the driver loads the next packet into entry 12, and hits the
-> FEC to transmit it.  The FEC re-reads entry 13, finds no packet, so
-> does nothing.
->
-> Then the next packet is submitted to the driver, and it enters it into
-> entry 13, again hitting the FEC.  The FEC now sees the entry at 13,
-> meanwhile the entry at 12 is still pending.
->
-> > I hope this additional information is useful, I don't know enough
-> > about these low-level networking details to contribute much but
-> > it's possible that what I've seen in the 2.6.35 kernel is actually
-> > the same issue that I'm seeing in the 3.14 kernel but handled
-> > better.
->
-> It confirms the theory, but doesn't really provide much clues for a
-> solution at the moment.
+The below merge fixup is now needed when the arm-soc tree is merged with
+Linus' tree (as well as removing arch/arm/mach-imx/pm-imx6q.c).
 
-So according to this theory, if we can detect this situation we should be
-able to skip entry 12 and then everything should get back into sink?  I did
-a little test where I marked '12' as needing to be skipped and then the
-next
-time it was to be used I skipped it... and I got an out of order packet but
-then things got back on track - that's the good news.
+> From: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date: Thu, 20 Mar 2014 14:33:26 +1100
+> Subject: [PATCH] arm: Replace various irq_desc accesses fix for file move
+> 
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> ---
+>  arch/arm/mach-imx/pm-imx6.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+> index 16f0d249f6a7..9392a8f4ef24 100644
+> --- a/arch/arm/mach-imx/pm-imx6.c
+> +++ b/arch/arm/mach-imx/pm-imx6.c
+> @@ -241,7 +241,7 @@ static void imx6q_enable_wb(bool enable)
+>  
+>  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+>  {
+> -	struct irq_desc *iomuxc_irq_desc;
+> +	struct irq_data *iomuxc_irq_data = irq_get_irq_data(32);
+>  	u32 val = readl_relaxed(ccm_base + CLPCR);
+>  
+>  	val &= ~BM_CLPCR_LPM;
+> @@ -288,10 +288,9 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
+>  	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode
+>  	 *    is set (set bits 0-1 of CCM_CLPCR).
+>  	 */
+> -	iomuxc_irq_desc = irq_to_desc(32);
+> -	imx_gpc_irq_unmask(&iomuxc_irq_desc->irq_data);
+> +	imx_gpc_irq_unmask(iomuxc_irq_data);
+>  	writel_relaxed(val, ccm_base + CLPCR);
+> -	imx_gpc_irq_mask(&iomuxc_irq_desc->irq_data);
+> +	imx_gpc_irq_mask(iomuxc_irq_data);
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.9.0
 
-Unfortunately, I think there must be something wrong with my hack because
-after running for a while longer ethernet stops working entirely.  Not sure
-why but I'll see if I can figure that out.  This was on my 2.6.35 kernel.
-
-> However, I've had something of a breakthrough with iMX6 and half-duplex.
-> I think much of the problem comes down to this ERR006358 workaround
-> implemented in the driver (this apparantly doesn't affect your device.)
-> The delayed work implementation, and my delayed timer implementation of
-> the same are fundamentally wrong to the erratum documentation - as is
-> the version implemented in the Freescale BSP.
->
-> Implementing what the erratum says as an acceptable workaround improves
-> things tremendously - I see iperf on a 10Mbit hub go from 1-2Mbps up to
-> 8Mbps, though still with loads of collisions.  That said, I'm not that
-> trusting of the error bits indicated from the FEC.
->
-> The reason I mention it here is that I wonder if less wacking of the
-> FEC_X_DES_ACTIVE register may help your problem.
->
-> In 3.14, in the fec_enet_start_xmit function, find the
-> "writel(0, fep->hwp + FEC_X_DES_ACTIVE);" and change it to:
->
->    wmb();
->
->         /* Trigger transmission start */
->         if (readl(fep->hwp + FEC_X_DES_ACTIVE) == 0)
->                 writel(0, fep->hwp + FEC_X_DES_ACTIVE);
->
-> and see whether that helps your problem(s).
-
-I tried less wacking and I still have the same tx transmit timeout issue.
-
-Thanks,
-
-Robert Daniels
-
-
-This email, and any document attached hereto, may contain
-confidential and/or privileged information.  If you are not the
-intended recipient (or have received this email in error) please
-notify the sender immediately and destroy this email.  Any
-unauthorized, direct or indirect, copying, disclosure, distribution
-or other use of the material or parts thereof is strictly
-forbidden.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140402/5ef5561e/attachment.sig>
