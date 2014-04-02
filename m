@@ -1,33 +1,19 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 2 Apr 2014 15:58:09 +0000 (UTC)
-Subject: OMAP baseline test results for v3.14-rc8
-Message-ID: <alpine.DEB.2.02.1404021556590.15928@utopia.booyaka.com>
+Date: Wed, 2 Apr 2014 16:03:48 +0000 (UTC)
+Subject: OMAP baseline test results for v3.14
+Message-ID: <alpine.DEB.2.02.1404021600320.15928@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Here are some basic OMAP test results for Linux v3.14-rc8.
+Here are some basic OMAP test results for Linux v3.14.
 Logs and other details at:
 
-    http://www.pwsan.com/omap/testlogs/test_v3.14-rc8/20140401224620/
+    http://www.pwsan.com/omap/testlogs/test_v3.14/20140402004448/
 
 
 Test summary
 ------------
-
-Build: zImage:
-    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
 
 Build: uImage:
     Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
@@ -43,6 +29,20 @@ Build: uImage+dtb:
 		  omap2plus_defconfig/omap3-beagle-xm,
 		  omap2plus_defconfig/omap3-evm-37xx,
 		  omap2plus_defconfig/omap4-var-som
+
+Build: zImage:
+    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
 
 Boot to userspace:
     FAIL ( 1/12): 2430sdp
@@ -75,30 +75,30 @@ PM: chip off via dynamic idle:
 
 
 vmlinux object size
-(delta in bytes from test_v3.14-rc7 (dcb99fd9b08cfe1afe426af4d8d3cbc429190f15)):
+(delta in bytes from test_v3.14-rc8 (b098d6726bbfb94c06d6e1097466187afddae61f)):
    text     data      bss    total  kernel
-   +616      +16        0     +632  omap1_defconfig
-   +648      -16        0     +632  omap1_defconfig_1510innovator_only
-   +616      -16        0     +600  omap1_defconfig_5912osk_only
-  +1112      -16        0    +1096  multi_v7_defconfig
-  -2466      -80     -128    -2674  omap2plus_defconfig
-  -2490      -56     -128    -2674  omap2plus_defconfig_2430sdp_only
-  -2206      -72     -128    -2406  omap2plus_defconfig_am33xx_only
-  -2522      -56     -128    -2706  omap2plus_defconfig_am43xx_only
-  -2462      -48     -128    -2638  omap2plus_defconfig_cpupm
-  -2402      -56     -128    -2586  omap2plus_defconfig_dra7xx_only
-   +456      -16        0     +440  omap2plus_defconfig_n800_multi_omap2xxx
-   +488      -16        0     +472  omap2plus_defconfig_n800_only_a
-  -2402      -56     -128    -2586  omap2plus_defconfig_no_pm
-  -2402      -56     -128    -2586  omap2plus_defconfig_omap2_4_only
-  -2402      -80     -128    -2610  omap2plus_defconfig_omap3_4_only
-  -2402      -48     -128    -2578  omap2plus_defconfig_omap5_only
-   +556      +16      -28     +544  rmk_omap3430_ldp_allnoconfig
-   +496      -16        0     +480  rmk_omap3430_ldp_oldconfig
-   +556      -16      -28     +512  rmk_omap4430_sdp_allnoconfig
-  +1012      +16        0    +1028  rmk_omap4430_sdp_oldconfig
+  +1160      +88       +8    +1256  omap1_defconfig
+  +1160      +88       +8    +1256  omap1_defconfig_1510innovator_only
+  +1128      +88       +8    +1224  omap1_defconfig_5912osk_only
+   +520     +136        0     +656  multi_v7_defconfig
+   +720      +64        0     +784  omap2plus_defconfig
+   +592      +96      +32     +720  omap2plus_defconfig_2430sdp_only
+   +676      +56        0     +732  omap2plus_defconfig_am33xx_only
+   +648      +72        0     +720  omap2plus_defconfig_am43xx_only
+   +720     +128        0     +848  omap2plus_defconfig_cpupm
+   +720      +64        0     +784  omap2plus_defconfig_dra7xx_only
+   +416      +88        0     +504  omap2plus_defconfig_n800_multi_omap2xxx
+   +384      +24        0     +408  omap2plus_defconfig_n800_only_a
+   +656      +72        0     +728  omap2plus_defconfig_no_pm
+   +656      +72        0     +728  omap2plus_defconfig_omap2_4_only
+   +720      +64        0     +784  omap2plus_defconfig_omap3_4_only
+   +656      +64        0     +720  omap2plus_defconfig_omap5_only
+   +424      +72     -100     +396  rmk_omap3430_ldp_allnoconfig
+   +480      +88        0     +568  rmk_omap3430_ldp_oldconfig
+   +464      +76     -108     +432  rmk_omap4430_sdp_allnoconfig
+   +480      +56        0     +536  rmk_omap4430_sdp_oldconfig
 
 Boot-time memory difference
-(delta in bytes from test_v3.14-rc7 (dcb99fd9b08cfe1afe426af4d8d3cbc429190f15))
+(delta in bytes from test_v3.14-rc8 (b098d6726bbfb94c06d6e1097466187afddae61f))
   avail  rsrvd   high  freed  board          kconfig
-     8k    -8k      .    -4k  am335xbone     omap2plus_defconfig_am33xx_only
+  (no differences)
