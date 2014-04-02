@@ -1,59 +1,54 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue,  1 Apr 2014 21:04:48 -0500
-Subject: [PATCH v3 0/7] clk: bcm281xx: updates for 3.15
-Message-ID: <1396404296-9390-1-git-send-email-elder@linaro.org>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Wed, 2 Apr 2014 02:26:38 +0000
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <20140401172933.GB7528@n2100.arm.linux.org.uk>
+References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
+ <20140321173252.GL7528@n2100.arm.linux.org.uk>
+ <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
+ <201403242121.58705.marex@denx.de>
+ <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
+ <20140324234443.GS7528@n2100.arm.linux.org.uk>
+ <20140326001135.GV7528@n2100.arm.linux.org.uk>
+ <20140401092638.GA10224@n2100.arm.linux.org.uk>
+ <533AC67D.2060906@boundarydevices.com>
+ <20140401172933.GB7528@n2100.arm.linux.org.uk>
+Message-ID: <12527025bd7f486792527897e5aeaafb@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes updates for the bcm281xx clock code for 3.15.
-It is dependent on the following code, already queued for 3.15:
-    https://github.com/broadcom/mach-bcm/
-    Branch armsoc/for-3.15/drivers
-	clk: bcm281xx: don't disable unused peripheral clocks
-	clk: bcm281xx: add initial clock framework support
-followed by (same repository):
-    Branch armsoc/for-3.15/dt
-	ARM: dts: bcm281xx: define real clocks
+On 04/02/2014 1:30 AM, Russell King - ARM Linux wrote:
+>On Tue, Apr 01, 2014 at 07:00:29AM -0700, Eric Nelson wrote:
+>> Hi Russell,
+>>
+>> What value do you have for pad control register
+>> IOMUXC_SW_PAD_CTL_PAD_RGMII_TX_CTL (0x020E0388)?
+>
+>You're referring to the iMX6Q, the Hummingboard is iMX6S, so that's 0x20e06bc.
+>I have value 0x1b030.
+>
+>> I notice in some of the DTS files that this has a value of 0x100b0,
+>> which seems wrong. Bit 16 seems to be a HYSteresis bit, and enabling
+>> that seems wrong (also bit 7 seems wrong, as it's undefined in the RM).
+>
+>Yes, bit 7 should not be set as it's reserved, but this is ignored.
+>Setting the hysteresis bit affects the input thresholds, and this signal is
+>only ever used as an output.  While selecting HYS mode for an output may seem
+>odd, that should not have any effect here.
+>
+>In any case, TX_CTL doesn't have much to do with it.  I've fully proved that
+>the interface works fine under full duplex conditions, achieving 500Mbps
+>transmit and 570-600Mbps receive with TCP connections (which is nicely beyond
+>what freescale claim the hardware is capable of.)
+>
+Hi, Russell,
 
-Previously Mike Turquette had some questions about the way
-prerequisite clock support was implemented.  I have removed that
-functionality as well as the bus clock that depended on it from
-this series.
+Since imx6q/dl/s sillicon enet have bandwidth issue, the bandwidth is 400 ~ 700 Mbps which is supplied by soc arichitecturer.
+So we claim our enet performance is 460Mbps.
+In fact, for our kernel 3.0.35 serial release,  kernel 3.10.17 release:
+TCP tx: 470Mbps (stable)
+TCP rx: 600Mbps (stable)
+ 
+[...]
 
-The patches in this series (including the three commits they depend
-on) are available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/bcm-clk-next-v3
-
-History:
-  - v3: Dropped prerequisite clock support so resolving how
-	best to handle that can be resolved separately.  As
-	a result, bus clock support is no longer included.
-  - v2: Removed one unrelated patch from the series.
-
-Alex Elder (7):
-  clk: bcm281xx: warn if ccu_wait_bit() fails
-  clk: bcm281xx: use init_data.name for clock name
-  clk: bcm281xx: change some symbol names
-       	Three small code improvements.
-
-  clk: bcm281xx: initialize CCU structures statically
-  clk: bcm281xx: define CCU clock data statically
-	Rearrange the way CCUs and the clocks they provide are
-	defined, so that they're defined statically to the extent
-	possible rather than allocating and initializing things at
-	runtime.
-
-  clk: bcm281xx: add clock policy support
-  clk: bcm281xx: add clock hysteresis support
-	Add two new features, ultimately for the eventual purpose of
-	adding support for another type of Kona clock.
-
- drivers/clk/bcm/clk-bcm281xx.c   |  243 +++++++++++++++++---------------------
- drivers/clk/bcm/clk-kona-setup.c |  229 +++++++++++++++++++++++++----------
- drivers/clk/bcm/clk-kona.c       |  212 +++++++++++++++++++++++++++++++--
- drivers/clk/bcm/clk-kona.h       |  160 ++++++++++++++++++++-----
- 4 files changed, 611 insertions(+), 233 deletions(-)
-
--- 
-1.7.9.5
+Thanks,
+Andy
