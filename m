@@ -1,21 +1,45 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 2 Apr 2014 13:47:33 +0100
-Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
- friendly address
-In-Reply-To: <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
-References: <1395718484-20424-1-git-send-email-joelf@ti.com>
- <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
- <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
-Message-ID: <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 Apr 2014 14:53:18 +0200
+Subject: [PATCH] ARM i.MX51: Add Digi ConnectCore devicetree
+In-Reply-To: <20140402113934.GH8753@dragon>
+References: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
+ <1396075706-25384-2-git-send-email-shc_work@mail.ru>
+ <20140402113934.GH8753@dragon>
+Message-ID: <20140402125318.GZ17250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
-> Like others, I have been carrying this change locally. Good to see it up!
+On Wed, Apr 02, 2014 at 07:39:35PM +0800, Shawn Guo wrote:
+> On Sat, Mar 29, 2014 at 10:48:26AM +0400, Alexander Shiyan wrote:
+> > +&nfc {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_nfc>;
+> > +	nand-bus-width = <8>;
+> > +	nand-ecc-mode = "hw";
+> > +	nand-on-flash-bbt;
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +	status = "okay";
+> > +
+> > +	partition at 0 {
+> > +		label = "boot";
+> > +		reg = <0x00000 0x80000>;
+> > +	};
+> > +
+> > +	partition at 1 {
+> > +		label = "env";
+> > +		reg = <0x80000 0x40000>;
+> > +	};
+> 
+> @Sascha, does the argument that we shouldn't have partition table in the
+> mainline dtb still stands?
 
-Why are you all booting raw Images anyway (just out of curiosity)? All my
-test cases boot either a zImage or a uImage, or occasionally a full SD card
-image, or I'd have noticed this earlier...
+Yes, I still think the partitions shouldn't be in the Linux dts files.
 
-thanks
--- PMM
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
