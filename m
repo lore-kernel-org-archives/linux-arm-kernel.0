@@ -1,37 +1,42 @@
 From: syin@broadcom.com (Sherman Yin)
-Date: Wed, 2 Apr 2014 15:40:38 -0700
-Subject: [PATCH v3 2/3] Update bcm_defconfig with new pinctrl CONFIG
-In-Reply-To: <1396478439-16586-1-git-send-email-syin@broadcom.com>
+Date: Wed, 2 Apr 2014 15:40:36 -0700
+Subject: [PATCH v3 0/3] pinctrl: Rename Broadcom Capri pinctrl driver
+In-Reply-To: <1390509887-19278-1-git-send-email-syin@broadcom.com>
 References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
- <1396478439-16586-1-git-send-email-syin@broadcom.com>
-Message-ID: <1396478439-16586-3-git-send-email-syin@broadcom.com>
+Message-ID: <1396478439-16586-1-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
 driver and its related CONFIG option are renamed to bcm281xx.
 
-This commit updates the defconfig that enables the pinctrl driver.
+Devicetree compatible string and binding documentation use
+"brcm,bcm11351-pinctrl" to match the machine binding here:
+Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+
+This driver supports pinctrl on BCM11130, BCM11140, BCM11351, BCM28145
+and BCM28155 SoCs.
 
 Signed-off-by: Sherman Yin <syin@broadcom.com>
 Reviewed-by: Matt Porter <mporter@linaro.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/configs/bcm_defconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v3: removed the device tree/compatible string portion of changes which
+    were already accepted in 3.14-rc6.  Fixed typo in documentation.
+v2: split single patch into 4 patches
 
-diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-index 2519d6d..b4d3013 100644
---- a/arch/arm/configs/bcm_defconfig
-+++ b/arch/arm/configs/bcm_defconfig
-@@ -125,7 +125,7 @@ CONFIG_CRC_ITU_T=y
- CONFIG_CRC7=y
- CONFIG_XZ_DEC=y
- CONFIG_AVERAGE=y
--CONFIG_PINCTRL_CAPRI=y
-+CONFIG_PINCTRL_BCM281XX=y
- CONFIG_WATCHDOG=y
- CONFIG_BCM_KONA_WDT=y
- CONFIG_BCM_KONA_WDT_DEBUG=y
+Sherman Yin (3):
+  pinctrl: Rename Broadcom Capri pinctrl driver
+  Update bcm_defconfig with new pinctrl CONFIG
+  pinctrl: fix typo in bindings documentation
+
+ .../bindings/pinctrl/brcm,bcm11351-pinctrl.txt     |    2 +-
+ arch/arm/configs/bcm_defconfig                     |    2 +-
+ drivers/pinctrl/Kconfig                            |    8 +-
+ drivers/pinctrl/Makefile                           |    2 +-
+ .../{pinctrl-capri.c => pinctrl-bcm281xx.c}        | 1519 ++++++++++----------
+ 5 files changed, 770 insertions(+), 763 deletions(-)
+ rename drivers/pinctrl/{pinctrl-capri.c => pinctrl-bcm281xx.c} (25%)
+
 -- 
 1.7.9.5
