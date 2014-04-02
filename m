@@ -1,74 +1,85 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 2 Apr 2014 17:07:56 +0530
-Subject: [PATCH 63/75] ARM: l2c: zynq: remove cache size override
-In-Reply-To: <533BC56D.4010600@monstr.eu>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYZQ-0007H7-L6@rmk-PC.arm.linux.org.uk> <533BC56D.4010600@monstr.eu>
-Message-ID: <533BF694.7030805@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Apr 2014 12:37:50 +0100
+Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
+ swiotlb"
+In-Reply-To: <1396435290.3554.52.camel@linaro1.home>
+References: <20140331175230.GA7480@arm.com>
+ <1396368657.3681.17.camel@linaro1.home>
+ <20140401172939.GG20061@arm.com>
+ <1396428722.3554.20.camel@linaro1.home>
+ <20140402092032.GB31892@arm.com>
+ <1396435290.3554.52.camel@linaro1.home>
+Message-ID: <20140402113750.GD31892@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 April 2014 01:38 PM, Michal Simek wrote:
-> Hi Russell,
+On Wed, Apr 02, 2014 at 11:41:30AM +0100, Jon Medhurst (Tixy) wrote:
+> On Wed, 2014-04-02 at 10:20 +0100, Catalin Marinas wrote:
+> > On Wed, Apr 02, 2014 at 09:52:02AM +0100, Jon Medhurst (Tixy) wrote:
+> > > But then that leaves a time period where a write can
+> > > happen between the clean and the invalidate, again leading to data
+> > > corruption. I hope all this means I've either got rather confused or
+> > > that that cache architectures are smart enough to automatically cope. 
+> > 
+> > You are right. I think having unaligned DMA buffers for inbound
+> > transfers is pointless. We can avoid losing data written by another CPU
+> > in the same cache line but, depending on the stage of the DMA transfer,
+> > it can corrupt the DMA data.
+> > 
+> > I wonder whether it's easier to define the cache_line_size() macro to
+> > read CWG
 > 
-> On 03/28/2014 04:19 PM, Russell King wrote:
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> ---
->>  arch/arm/mach-zynq/common.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
->> index 8c09a8393fb6..b58f17178006 100644
->> --- a/arch/arm/mach-zynq/common.c
->> +++ b/arch/arm/mach-zynq/common.c
->> @@ -67,7 +67,7 @@ static void __init zynq_init_machine(void)
->>  	/*
->>  	 * 64KB way size, 8-way associativity, parity disabled
->>  	 */
->> -	l2x0_of_init(0x02060000, 0xF0F0FFFF);
->> +	l2x0_of_init(0x02000000, 0xf0ffffff);
->>  
->>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->>  
+> That won't work, the stride of cache operations needs to be the
+> _minimum_ cache line size, otherwise we might skip over some cache lines
+> and not flush them. (We've been hit before by bugs caused by the fact
+> that big.LITTLE systems report different minimum i-cache line sizes
+> depend on whether you execute on the big or LITTLE cores [1], we need
+> the 'real' minimum otherwise things go horribly wrong.)
 > 
-> We have done one fix some days/weeks ago which is here.
-> https://github.com/Xilinx/linux-xlnx/commit/1a85939af40acca2bf963407b497cc31c303ff3e
-> (Feel free to ignore L2_PREFETCH config option)
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149950.html
+
+Yes, I remember this. CWG should also be the same in a big.LITTLE
+system.
+
+> >  and assume that the DMA buffers are always aligned,
 > 
-> There are 2 things there.
-> 1. Extending macros in cache-l2x0.h which I believe can go to the mainline
-> (when we align with changes you have done in 49/75)
-> 2. Set L2X0_AUX_CTRL_SHARE_OVERRIDE_EN_MASK bit  which is what vexpress did.
-> The reason was problem with gem driver with iperf testing.
+> We can't assume the region in any particular DMA transfer is cache
+> aligned, but I agree, that if multiple actors were operating on adjacent
+> memory locations in the same cache line, without implementing their own
+> coordination then there's nothing the low level DMA code can do to avoid
+> data corruption from cache cleaning.
+> 
+> We at least need to make sure that the memory allocation functions used
+> for DMA buffers return regions of whole CWG size, to avoid unrelated
+> buffers corrupting each other. If I have correctly read
+> __dma_alloc_noncoherent and the functions it calls, then it looks like
+> buffers are actually whole pages, so that's not a problem.
 
-So reading the original commit text from Catalin
-(1a8e41cd672f894bbd74874eac601e6cedf838fb):
+It's not about dma_alloc but the streaming DMA API like dma_map_sg().
 
-    ARM: 6395/1: VExpress: Set bit 22 in the PL310 (cache controller)
-AuxCtlr register
+> >  ignoring
+> > the invalidation of the unaligned boundaries. This wouldn't be much
+> > different from your scenario where the shared cache line is written
+> > (just less likely to trigger but still a bug, so I would rather notice
+> > this early).
+> > 
+> > The ARMv7 code has a similar issue, it performs clean&invalidate on the
+> > unaligned start but it doesn't move r0, so it goes into the main loop
+> > invalidating the same cache line again.
+> 
+> Yes, and as it's missing a dsb could also lead to the wrong behaviour if
+> the invalidate was reordered to execute prior to the clean+invalidate on
+> the same line. I just dug into git history to see if I could find a clue
+> as to how the v7 code came to look like it does, but I see that it's
+> been like that since the day it was submitted in 2007, by a certain
+> Catalin Marinas ;-)
 
-    Clearing bit 22 in the PL310 Auxiliary Control register (shared
-    attribute override enable) has the side effect of transforming Normal
-    Shared Non-cacheable reads into Cacheable no-allocate reads.
+I don't remember ;). But there are some rules about reordering of cache
+line operations by MVA with regards to memory accesses. I have to check
+whether they apply to other d-cache maintenance to the same address as
+well.
 
-    Coherent DMA buffers in Linux always have a Cacheable alias via the
-    kernel linear mapping and the processor can speculatively load cache
-    lines into the PL310 controller. With bit 22 cleared, Non-cacheable
-    reads would unexpectedly hit such cache lines leading to buffer
-    corruption.
+I'll try to come up with another patch using CWG.
 
-    Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-    Cc: <stable@kernel.org>
-    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-
-It looks like all Linux systems will have to use Sharable override to
-avoid corruption? I see OMAP4 had a similar commit to enable bit 22 of
-aux control register.
-
-If yes, how about doing it by default in cache-l2x0.c rather than
-leaving it to each platform?
-
-Thanks,
-Sekhar
+-- 
+Catalin
