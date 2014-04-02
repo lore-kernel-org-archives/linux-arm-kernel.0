@@ -1,40 +1,35 @@
-From: tim.kryger@linaro.org (Tim Kryger)
-Date: Wed, 2 Apr 2014 09:27:22 -0700
-Subject: [RESEND PATCH v5 3/5] ARM: dts: Declare the PWM for bcm11351
- (bcm281xx)
-In-Reply-To: <1396456044-19427-1-git-send-email-tim.kryger@linaro.org>
-References: <1396456044-19427-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1396456044-19427-4-git-send-email-tim.kryger@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 2 Apr 2014 16:32:58 +0000 (UTC)
+Subject: OMAP baseline test results for v3.14
+In-Reply-To: <20140402162102.GB12234@atomide.com>
+References: <alpine.DEB.2.02.1404021600320.15928@utopia.booyaka.com>
+ <20140402162102.GB12234@atomide.com>
+Message-ID: <alpine.DEB.2.02.1404021631040.15928@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree node for the PWM on bcm11351 SoCs.
+On Wed, 2 Apr 2014, Tony Lindgren wrote:
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+> * Paul Walmsley <paul@pwsan.com> [140402 09:07]:
+> > 
+> > Here are some basic OMAP test results for Linux v3.14.
+> > Logs and other details at:
+> > 
+> >     http://www.pwsan.com/omap/testlogs/test_v3.14/20140402004448/
+> > 
+> > Boot to userspace:
+> >     FAIL ( 1/12): 2430sdp
+> 
+> Is this a new regression with MMC? Looks like your boot log for this
+> ends with "Waiting for root device /dev/mmcblk0p1...".
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 64d069b..6b05ae6 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -193,6 +193,14 @@
- 		status = "disabled";
- 	};
- 
-+	pwm: pwm at 3e01a000 {
-+		compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
-+		reg = <0x3e01a000 0xcc>;
-+		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_PWM>;
-+		#pwm-cells = <3>;
-+		status = "disabled";
-+	};
-+
- 	clocks {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.7.9.5
+It's new since v3.14-rc1:
+
+http://www.spinics.net/lists/arm-kernel/msg306448.html
+
+http://www.spinics.net/lists/arm-kernel/msg306454.html
+
+http://www.spinics.net/lists/arm-kernel/msg306455.html
+
+
+- Paul
