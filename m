@@ -1,44 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 2 Apr 2014 17:00:41 +0800
-Subject: [PATCH v2 0/4] arm: mxs: dts: small fixes for I2SE's duckbills
-In-Reply-To: <20140402085225.GE8753@dragon>
-References: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
- <20140402085225.GE8753@dragon>
-Message-ID: <20140402090039.GA10283@dragon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Apr 2014 10:01:38 +0100
+Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
+In-Reply-To: <004b01cf4e27$d47da990$7d78fcb0$@samsung.com>
+References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
+ <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
+ <7050133.LRSn2ENgQ4@wuerfel> <20140401132316.GD20061@arm.com>
+ <004b01cf4e27$d47da990$7d78fcb0$@samsung.com>
+Message-ID: <20140402090136.GA31892@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 04:52:26PM +0800, Shawn Guo wrote:
-> On Thu, Mar 27, 2014 at 11:51:26PM +0100, Michael Heimpold wrote:
-> > This series fixes two issues with the DT file: first, it frees up
-> > some GPIOs which are mis-used by MMC interface, and second, it
-> > fixes the GPIO used to reset the ethernet phy.
-> > 
-> > While at it, use symbolic names for LED definitions.
-> > 
-> > Changes in v2:
-> >  - add missing patch for imx28.dtsi to include gpio.h
-> > 
-> > 
-> > Michael Heimpold (4):
-> >   arm: mxs: dt: imx28-duckbill: fix mmc settings
-> >   arm: mxs: dt: imx28-duckbill: fix phy reset gpio
-> >   arm: mxs: dt: imx28: include gpio.h to allow use of symbolic names
-> >   arm: mxs: dt: imx28-duckbill: use symbolic names from gpio.h
+On Wed, Apr 02, 2014 at 04:58:39AM +0100, Jungseok Lee wrote:
+> On Tuesday, April 01, 2014 10:23 PM, Catalin Marinas wrote:
+> > On some previous patches I've seen posted for 4-levels I asked that 64K
+> > and 4K page configurations are decoupled from the pgtable-?level.h
+> > macros so that if we ever need 3-levels with 64K it's easy to enable.
 > 
-> Changed patch prefix as below and applied all patches.
-> 
->   ARM: dts: imx28-duckbill: fix mmc settings
->   ARM: dts: imx28-duckbill: fix phy reset gpio
->   ARM: dts: imx28: include gpio.h to allow use of symbolic names
->   ARM: dts: imx28-duckbill: use symbolic names from gpio.h
+> Is your request to decouple page size from the number of page tables?
+> In other words, would you like to prepare 4 options, 1)4KB+3Level, 2)
+> 4KB+4Level, 3)64KB+2Level and 4)64KB+3Level, as combining page size
+> with page table levels in kernel configuration? 
 
-Forgot mentioning that the patches should be reordered as below, since
-the patch fixing phy reset gpio already uses GPIO symbolic name.
+We can still use two options to make things less confusing: one for the
+page size (4K/64K) and another for the size of the virtual address
+space. From those two we can infer the number levels required. We can
+limit the options to 39-bit, 42 (only fo 64K pages) and architecture
+current maximum of 48 (for both 4K and 64K).
 
-   ARM: dts: imx28-duckbill: fix mmc settings
-   ARM: dts: imx28: include gpio.h to allow use of symbolic names
-   ARM: dts: imx28-duckbill: fix phy reset gpio
-   ARM: dts: imx28-duckbill: use symbolic names from gpio.h
+As for some code refactoring, for example, PTRS_PER_PTE etc. correspond
+to the page size rather than the number of levels, so move them to
+pgtable-{4k,64k}-hwdef.h. From the VA_BITS option above you can
+calculate PTRS_PER_PGD (1 << (VA_BITS - PGDIR_SHIFT)). If this is too
+large, you need a bigger PGDIR_SHIFT (another level). Some #ifdef's in
+pgtable-hwdef.h and maybe create another pgtable-types.h. The
+asm/memory.h file already defines the offsets in terms of VA_BITS, so
+for the initial patches we should keep the same layout, make the
+4-levels patches easier to review.
 
-Shawn
+(and in the memory.txt doc I think we should make the end address
+exclusive as it's easier to follow and can be compared with the kernel
+virtual memory layout printed during boot)
+
+-- 
+Catalin
