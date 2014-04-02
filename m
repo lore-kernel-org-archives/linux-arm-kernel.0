@@ -1,49 +1,63 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Wed, 2 Apr 2014 09:27:20 -0700
-Subject: [RESEND PATCH v5 1/5] Documentation: dt: Add Kona PWM binding
-In-Reply-To: <1396456044-19427-1-git-send-email-tim.kryger@linaro.org>
-References: <1396456044-19427-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1396456044-19427-2-git-send-email-tim.kryger@linaro.org>
+Date: Wed, 2 Apr 2014 09:27:19 -0700
+Subject: [RESEND PATCH v5 0/5] Add Broadcom Kona PWM Support
+Message-ID: <1396456044-19427-1-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the binding description for the Kona PWM controller found on Broadcom's
-mobile SoCs.
+This series introduces the driver for the Kona PWM controller found in
+Broadcom mobile SoCs like bcm281xx and updates the device tree and the
+defconfig to enable use of this hardware on the bcm28155 AP board.
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
- .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |   21 ++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Changes since v4:
+  - Added in real polarity support
+  - Labeled trigger bits as such rather than use the name from hw docs
+  - Listed unsual hardware characteristics at the top of the file
+  - Removed default from Kconfig and update defconfig accordingly
+  - Always use unsigned int for temporary register values
+
+Changes since v3:
+  - Removed polarity support for now
+  - Cleaned up whitespace issues, shortened some variable names
+  - Use container_of instead of dev_get_drvdata to get private data
+  - Removed workaround for PWM framework bug
+  - Reworded some binding documentation
+
+Changes since v2:
+  - SoC DTS file updated to use real clock's phandle + specifier
+  - Toggle smooth mode off during apply so new settings take immediately
+
+Changes since v1:
+  - Fixed up macros to be clearer and more complete
+  - Corrected spelling and punctuation mistakes
+  - Added support for polarity
+  - Made peripheral clock use more efficient
+  - Made prescale and duty computation clearer
+  - Moved Makefile addition to keep alphabetical
+  - Split complex lines into multiple steps
+
+Dependencies:
+The "ARM: dts: Declare the PWM for bcm11351 (bcm281xx)" patch depends
+upon "ARM: dts: bcm281xx: define real clocks" which is queued up in
+for-next of arm-soc. See https://lkml.org/lkml/2014/2/14/451
+
+Tim Kryger (5):
+  Documentation: dt: Add Kona PWM binding
+  pwm: kona: Introduce Kona PWM controller support
+  ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
+  ARM: dts: Enable the PWM for bcm28155 AP board
+  ARM: bcm_defconfig: Enable PWM and Backlight
+
+ .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |   21 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |    8 +
+ arch/arm/boot/dts/bcm28155-ap.dts                  |    4 +
+ arch/arm/configs/bcm_defconfig                     |    3 +
+ drivers/pwm/Kconfig                                |    9 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-bcm-kona.c                         |  319 ++++++++++++++++++++
+ 7 files changed, 365 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+ create mode 100644 drivers/pwm/pwm-bcm-kona.c
 
-diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-new file mode 100644
-index 0000000..8eae9fe
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-@@ -0,0 +1,21 @@
-+Broadcom Kona PWM controller device tree bindings
-+
-+This controller has 6 channels.
-+
-+Required Properties :
-+- compatible: should contain "brcm,kona-pwm"
-+- reg: physical base address and length of the controller's registers
-+- clocks: phandle + clock specifier pair for the external clock
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a
-+  description of the cells format.
-+
-+Refer to clocks/clock-bindings.txt for generic clock consumer properties.
-+
-+Example:
-+
-+pwm: pwm at 3e01a000 {
-+	compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
-+	reg = <0x3e01a000 0xc4>;
-+	clocks = <&pwm_clk>;
-+	#pwm-cells = <3>;
-+};
 -- 
 1.7.9.5
