@@ -1,87 +1,107 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 02 Apr 2014 12:24:26 +0200
-Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <20140402053715.GV17250@pengutronix.de>
-References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
- <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
- <20140331200620.GA13881@kroah.com> <533ABCEC.8040701@codethink.co.uk>
- <533ACBD0.8030209@samsung.com> <20140401163744.GE3842@kroah.com>
- <20140402053715.GV17250@pengutronix.de>
-Message-ID: <533BE55A.80408@samsung.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 02 Apr 2014 11:41:30 +0100
+Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
+ swiotlb"
+In-Reply-To: <20140402092032.GB31892@arm.com>
+References: <20140331175230.GA7480@arm.com>
+ <1396368657.3681.17.camel@linaro1.home> <20140401172939.GG20061@arm.com>
+ <1396428722.3554.20.camel@linaro1.home> <20140402092032.GB31892@arm.com>
+Message-ID: <1396435290.3554.52.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/14 07:37, Sascha Hauer wrote:
-> On Tue, Apr 01, 2014 at 09:37:44AM -0700, Greg KH wrote:
->> On Tue, Apr 01, 2014 at 04:23:12PM +0200, Sylwester Nawrocki wrote:
->>> On 01/04/14 15:19, Ben Dooks wrote:
->>>> On 31/03/14 21:06, Greg KH wrote:
->>>>>> On Mon, Mar 31, 2014 at 06:41:56PM +0200, Sylwester Nawrocki wrote:
->>> [...]
->>>>>> I don't understand why you need the driver core to initialize this one
->>>>>> type of thing?  That should be in a driver, or in a class, or at worse
->>>>>> case, the platform code.
->>>>>>
->>>>>> What makes clocks so "unique" here?
->>>
->>> The reason I put it in the driver core was mainly to avoid having many
->>> drivers doing same call to this initialization function.
->>> I was considering moving it to the bus code, still there are several
->>> buses for which it would need to be repeated.
->>
->> "several" is how many?  2?  3?  10?
->>
->> Please fix it "correctly" and don't put it in the driver core just
->> because it seems easier that way.
->>
->>> Maybe really_probe() is not a best place to put this, nonetheless
->>> the requirements I could list were:
->>>
->>>  1. not involving individual drivers,
->>
->> Why not?
->>
->>>  2. have such an initialization call done for all devices, irrespective
->>>     of Linux bus or class type,
->>
->> Why?  Do _all_ devices that Linux supports have this issue to be
->> resolved?
->>
->>>  3. Handle errors properly, e.g. defer driver probing if a clock for
->>>    a device is not yet available.
->>
->> Then do it in the bus that controls that device, as it knows to defer
->> probing at that point in time.
+On Wed, 2014-04-02 at 10:20 +0100, Catalin Marinas wrote:
+> On Wed, Apr 02, 2014 at 09:52:02AM +0100, Jon Medhurst (Tixy) wrote:
+> > On Tue, 2014-04-01 at 18:29 +0100, Catalin Marinas wrote:
+> > > On Tue, Apr 01, 2014 at 05:10:57PM +0100, Jon Medhurst (Tixy) wrote:
+> > > > On Mon, 2014-03-31 at 18:52 +0100, Catalin Marinas wrote:
+> > > > > +__dma_inv_range:
+> > > > > +	dcache_line_size x2, x3
+> > > > > +	sub	x3, x2, #1
+> > > > > +	bic	x0, x0, x3
+> > > > > +	bic	x1, x1, x3
+> > > > 
+> > > > Why is the 'end' value in x1 above rounded down to be cache aligned?
+> > > > This means the cache invalidate won't include the cache line containing
+> > > > the final bytes of the region, unless it happened to already be cache
+> > > > line aligned. This looks especially suspect as the other two cache
+> > > > operations added in the same patch (below) don't do that.
+> > > 
+> > > Cache invalidation is destructive, so we want to make sure that it
+> > > doesn't affect anything beyond x1. But you are right, if either end of
+> > > the buffer is not cache line aligned it can get it wrong. The fix is to
+> > > use clean+invalidate on the unaligned ends:
+> > 
+> > Like the ARMv7 implementation does :-) However, I wonder, is it possible
+> > for the Cache Writeback Granule (CWG) to come into play? If the CWG of
+> > further out caches was bigger than closer (to CPU) caches then it would
+> > cause data corruption. So for these region ends, should we not be using
+> > the CWG size, not the minimum D cache line size? On second thoughts,
+> > that wouldn't be safe either in the converse case where the CWG of a
+> > closer cache was bigger. So we would need to first use minimum cache
+> > line size to clean a CWG sized region, then invalidate cache lines by
+> > the same method.
 > 
-> The issue this patch tries to solve is not about single devices, but
-> about the way these devices are connected with each other.
-> 
-> Clocks for different (sometimes completely unrelated) devices influence
-> each other. You can't control the clock from one device without
-> influencing other devices. Knowledge about these constraints can't be
-> encoded in the drivers, because the constraints differ per SoC,
-> sometimes even per board. Many SoCs share the same devices, but the
-> clock topology they are surrounded with is always different. With this I
-> don't mean the direct clock inputs, these are well abstracted with the
-> current clk_* API.  What I mean is situations like: "On this board use
-> the clock controller to output this particular clock on that pin,
-> because it happens to be the master clock of some audio codec connected
-> externally; also make the same clock input to the internal Audio system
-> to make sure both are in sync". These situations can be completely
-> different on the next board or on the next SoC which has the same
-> devices, but a different clock routing.
-> 
-> That said, I also think the driver core doesn't have to be bothered with
-> the clock setup. Putting the clock setup into the devicenode providing
-> the clocks (and thus parsing it from the clock controller driver) should
-> be sufficient.
+> CWG gives us the maximum size (of all cache levels in the system, even
+> on a different CPU for example in big.LITTLE configurations) that would
+> be evicted by the cache operation. So we need small loops of Dmin size
+> that go over the bigger CWG (and that's guaranteed to be at least Dmin).
 
-It would work but I don't really like such a DT binding. Rather than
-only having a long list of clocks in one node I would prefer to also
-have a possibility to list clock data specific to a device in its
-corresponding DT node. Similarly as it's done, e.g. with interrupts.
+Yes, that's what I was getting at.
+
+> 
+> > But then that leaves a time period where a write can
+> > happen between the clean and the invalidate, again leading to data
+> > corruption. I hope all this means I've either got rather confused or
+> > that that cache architectures are smart enough to automatically cope. 
+> 
+> You are right. I think having unaligned DMA buffers for inbound
+> transfers is pointless. We can avoid losing data written by another CPU
+> in the same cache line but, depending on the stage of the DMA transfer,
+> it can corrupt the DMA data.
+> 
+> I wonder whether it's easier to define the cache_line_size() macro to
+> read CWG
+
+That won't work, the stride of cache operations needs to be the
+_minimum_ cache line size, otherwise we might skip over some cache lines
+and not flush them. (We've been hit before by bugs caused by the fact
+that big.LITTLE systems report different minimum i-cache line sizes
+depend on whether you execute on the big or LITTLE cores [1], we need
+the 'real' minimum otherwise things go horribly wrong.)
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149950.html
+
+>  and assume that the DMA buffers are always aligned,
+
+We can't assume the region in any particular DMA transfer is cache
+aligned, but I agree, that if multiple actors were operating on adjacent
+memory locations in the same cache line, without implementing their own
+coordination then there's nothing the low level DMA code can do to avoid
+data corruption from cache cleaning.
+
+We at least need to make sure that the memory allocation functions used
+for DMA buffers return regions of whole CWG size, to avoid unrelated
+buffers corrupting each other. If I have correctly read
+__dma_alloc_noncoherent and the functions it calls, then it looks like
+buffers are actually whole pages, so that's not a problem.
+
+>  ignoring
+> the invalidation of the unaligned boundaries. This wouldn't be much
+> different from your scenario where the shared cache line is written
+> (just less likely to trigger but still a bug, so I would rather notice
+> this early).
+> 
+> The ARMv7 code has a similar issue, it performs clean&invalidate on the
+> unaligned start but it doesn't move r0, so it goes into the main loop
+> invalidating the same cache line again.
+
+Yes, and as it's missing a dsb could also lead to the wrong behaviour if
+the invalidate was reordered to execute prior to the clean+invalidate on
+the same line. I just dug into git history to see if I could find a clue
+as to how the v7 code came to look like it does, but I see that it's
+been like that since the day it was submitted in 2007, by a certain
+Catalin Marinas ;-)
 
 -- 
-Thanks,
-Sylwester
+Tixy
