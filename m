@@ -1,55 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Apr 2014 09:59:14 +0100
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
- <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
- <20140326001135.GV7528@n2100.arm.linux.org.uk>
- <20140401092638.GA10224@n2100.arm.linux.org.uk>
- <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
- <20140401225149.GC7528@n2100.arm.linux.org.uk>
- <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <20140402085914.GG7528@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 2 Apr 2014 17:00:41 +0800
+Subject: [PATCH v2 0/4] arm: mxs: dts: small fixes for I2SE's duckbills
+In-Reply-To: <20140402085225.GE8753@dragon>
+References: <1395960690-19531-1-git-send-email-mhei@heimpold.de>
+ <20140402085225.GE8753@dragon>
+Message-ID: <20140402090039.GA10283@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 03:19:58AM +0000, fugang.duan at freescale.com wrote:
-> >	wmb();
-> >
-> >        /* Trigger transmission start */
-> >        if (readl(fep->hwp + FEC_X_DES_ACTIVE) == 0)
-> >                writel(0, fep->hwp + FEC_X_DES_ACTIVE);
-> >
-> >and see whether that helps your problem(s).
-> >
-> So far, I don't see wmb() bring any effort on FEC.  Some years ago, we
-> want to add wmb() before set BD "Ready" bit, but we don't find any issue
-> without wmb(), on the contrary, it introduce more System overhead special
-> for Gbps networking.
+On Wed, Apr 02, 2014 at 04:52:26PM +0800, Shawn Guo wrote:
+> On Thu, Mar 27, 2014 at 11:51:26PM +0100, Michael Heimpold wrote:
+> > This series fixes two issues with the DT file: first, it frees up
+> > some GPIOs which are mis-used by MMC interface, and second, it
+> > fixes the GPIO used to reset the ethernet phy.
+> > 
+> > While at it, use symbolic names for LED definitions.
+> > 
+> > Changes in v2:
+> >  - add missing patch for imx28.dtsi to include gpio.h
+> > 
+> > 
+> > Michael Heimpold (4):
+> >   arm: mxs: dt: imx28-duckbill: fix mmc settings
+> >   arm: mxs: dt: imx28-duckbill: fix phy reset gpio
+> >   arm: mxs: dt: imx28: include gpio.h to allow use of symbolic names
+> >   arm: mxs: dt: imx28-duckbill: use symbolic names from gpio.h
+> 
+> Changed patch prefix as below and applied all patches.
+> 
+>   ARM: dts: imx28-duckbill: fix mmc settings
+>   ARM: dts: imx28-duckbill: fix phy reset gpio
+>   ARM: dts: imx28: include gpio.h to allow use of symbolic names
+>   ARM: dts: imx28-duckbill: use symbolic names from gpio.h
 
-I wonder whether you understand what is going on here, and why it is
-required.  I doubt it somehow from your comments.  Maybe if you were
-to read about the operation of the store buffer in the PL310, it may
-open your eyes to why it would be necessary for reliable operation.
+Forgot mentioning that the patches should be reordered as below, since
+the patch fixing phy reset gpio already uses GPIO symbolic name.
 
-> And now, imx6sx sillicon (sigle core), add wmb() cause tx performance
-> drop much since cpu loading is the bottleneck.
+   ARM: dts: imx28-duckbill: fix mmc settings
+   ARM: dts: imx28: include gpio.h to allow use of symbolic names
+   ARM: dts: imx28-duckbill: fix phy reset gpio
+   ARM: dts: imx28-duckbill: use symbolic names from gpio.h
 
-I don't find any measurable performance drop from adding it on either
-iMX6Q or iMX6S with the L2 cache code fixed up.
-
-The reality is, with the mainline ethernet driver with no changes, the
-best it can do is around 300Mbps transmit and 400Mbps receive.  With
-both my L2 and FEC changes, this has increased to 500Mbps transmit and
-570Mbps receive.  Plus it now works reasonably (though with lots of
-collisions) on half-duplex giving a 4 to 8 fold increase in speed there.
-
-I really don't care how your private BSP kernels perform.  It's not
-mainline, so it's not of any interest.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Shawn
