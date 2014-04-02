@@ -1,9 +1,9 @@
 From: stefan@agner.ch (stefan at agner.ch)
-Date: Wed,  2 Apr 2014 19:05:37 +0200
-Subject: [PATCH v2 1/2] ARM: dts: mx5: fix wrong stmpe-ts bindings
+Date: Wed,  2 Apr 2014 19:05:38 +0200
+Subject: [PATCH v2 2/2] ARM: dts: SPEAr: fix wrong stmpe-ts bindings
 In-Reply-To: <cover.1396457876.git.stefan@agner.ch>
 References: <cover.1396457876.git.stefan@agner.ch>
-Message-ID: <94a8b96fe30ce97ec89e49ef6470271888024256.1396457876.git.stefan@agner.ch>
+Message-ID: <d4a7f6bcdf6ec00970aabb9ff501c7d342f37bd7.1396457876.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,40 +15,100 @@ bindings and the actual bindings used by the driver.
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Marek Vasut <marex@denx.de>
 ---
- arch/arm/boot/dts/imx53-m53evk.dts | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/spear1310-evb.dts | 18 +++++++++---------
+ arch/arm/boot/dts/spear1340-evb.dts | 18 +++++++++---------
+ arch/arm/boot/dts/spear320-hmi.dts  | 20 ++++++++++----------
+ 3 files changed, 28 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 7d304d0..e97f298 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -165,17 +165,17 @@
- 		irq-trigger = <0x1>;
+diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
+index b56a801..fe2ece2 100644
+--- a/arch/arm/boot/dts/spear1310-evb.dts
++++ b/arch/arm/boot/dts/spear1310-evb.dts
+@@ -369,15 +369,15 @@
  
- 		stmpe_touchscreen {
--			compatible = "stmpe,ts";
-+			compatible = "st,stmpe-ts";
- 			reg = <0>;
--			ts,sample-time = <4>;
--			ts,mod-12b = <1>;
--			ts,ref-sel = <0>;
--			ts,adc-freq = <1>;
--			ts,ave-ctrl = <3>;
--			ts,touch-det-delay = <3>;
--			ts,settling = <4>;
--			ts,fraction-z = <7>;
--			ts,i-drive = <1>;
-+			st,sample-time = <4>;
-+			st,mod-12b = <1>;
-+			st,ref-sel = <0>;
-+			st,adc-freq = <1>;
-+			st,ave-ctrl = <3>;
-+			st,touch-det-delay = <3>;
-+			st,settling = <4>;
-+			st,fraction-z = <7>;
-+			st,i-drive = <1>;
- 		};
- 	};
+ 					stmpe_touchscreen {
+ 						compatible = "st,stmpe-ts";
+-						ts,sample-time = <4>;
+-						ts,mod-12b = <1>;
+-						ts,ref-sel = <0>;
+-						ts,adc-freq = <1>;
+-						ts,ave-ctrl = <1>;
+-						ts,touch-det-delay = <2>;
+-						ts,settling = <2>;
+-						ts,fraction-z = <7>;
+-						ts,i-drive = <1>;
++						st,sample-time = <4>;
++						st,mod-12b = <1>;
++						st,ref-sel = <0>;
++						st,adc-freq = <1>;
++						st,ave-ctrl = <1>;
++						st,touch-det-delay = <2>;
++						st,settling = <2>;
++						st,fraction-z = <7>;
++						st,i-drive = <1>;
+ 					};
+ 				};
  
+diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
+index d6c30ae..d3dcba9 100644
+--- a/arch/arm/boot/dts/spear1340-evb.dts
++++ b/arch/arm/boot/dts/spear1340-evb.dts
+@@ -480,15 +480,15 @@
+ 
+ 					stmpe_touchscreen {
+ 						compatible = "st,stmpe-ts";
+-						ts,sample-time = <4>;
+-						ts,mod-12b = <1>;
+-						ts,ref-sel = <0>;
+-						ts,adc-freq = <1>;
+-						ts,ave-ctrl = <1>;
+-						ts,touch-det-delay = <2>;
+-						ts,settling = <2>;
+-						ts,fraction-z = <7>;
+-						ts,i-drive = <1>;
++						st,sample-time = <4>;
++						st,mod-12b = <1>;
++						st,ref-sel = <0>;
++						st,adc-freq = <1>;
++						st,ave-ctrl = <1>;
++						st,touch-det-delay = <2>;
++						st,settling = <2>;
++						st,fraction-z = <7>;
++						st,i-drive = <1>;
+ 					};
+ 				};
+ 
+diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
+index 3075d2d..2a5d013 100644
+--- a/arch/arm/boot/dts/spear320-hmi.dts
++++ b/arch/arm/boot/dts/spear320-hmi.dts
+@@ -256,17 +256,17 @@
+ 					};
+ 
+ 					stmpe610-ts {
+-						compatible = "stmpe,ts";
++						compatible = "st,stmpe-ts";
+ 						reg = <0>;
+-						ts,sample-time = <4>;
+-						ts,mod-12b = <1>;
+-						ts,ref-sel = <0>;
+-						ts,adc-freq = <1>;
+-						ts,ave-ctrl = <1>;
+-						ts,touch-det-delay = <3>;
+-						ts,settling = <4>;
+-						ts,fraction-z = <7>;
+-						ts,i-drive = <1>;
++						st,sample-time = <4>;
++						st,mod-12b = <1>;
++						st,ref-sel = <0>;
++						st,adc-freq = <1>;
++						st,ave-ctrl = <1>;
++						st,touch-det-delay = <3>;
++						st,settling = <4>;
++						st,fraction-z = <7>;
++						st,i-drive = <1>;
+ 					};
+ 				};
+ 			};
 -- 
 1.9.1
