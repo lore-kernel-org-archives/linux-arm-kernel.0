@@ -1,75 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 2 Apr 2014 12:41:28 -0700
-Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
-In-Reply-To: <CAGVrzcbxmWE+1drcyNK7K1a4ta6Pp1-Kc4xv7x0vDSumZen1fg@mail.gmail.com>
-References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
- <CAGVrzcbxmWE+1drcyNK7K1a4ta6Pp1-Kc4xv7x0vDSumZen1fg@mail.gmail.com>
-Message-ID: <CAGVrzcb-xay4QCLwxWnzDhC+fvr5eJVEBmWbTC6XkKS0SQzwWg@mail.gmail.com>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Wed, 2 Apr 2014 22:01:25 +0200
+Subject: [PATCH] ARM: i.MX6: update KSZ9031 phy fixup
+In-Reply-To: <1395421687-12934-1-git-send-email-hchaumette@adeneo-embedded.com>
+References: <1395421687-12934-1-git-send-email-hchaumette@adeneo-embedded.com>
+Message-ID: <20140402220125.4e203cd2@crub>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, 21 Mar 2014 18:08:07 +0100
+Hubert Chaumette <hchaumette@adeneo-embedded.com> wrote:
 
-2014-03-11 10:10 GMT-07:00 Florian Fainelli <f.fainelli@gmail.com>:
-> 2014-03-06 9:45 GMT-08:00 Florian Fainelli <f.fainelli@gmail.com>:
->> Hi all,
->>
->> This patchset adds very minimal support for the BCM63138 SoC which is
->> a xDSL SoC using a dual Cortex A9 CPU complex.
->>
->> Future work will focus on:
->>
->> - clock device/driver/providers
->> - SMP support (already working)
->> - DT'fying drivers/tty/serial/bcm63xx_uart.c to be usable
->
-> Gentle ping, patch 2 should not be too controversial and could
-> probably be queued for a next 3.14-rc pull request?
+> Update KSZ9031RN phy fixup for Congatec conga-QEVAL and conga-QMX6 combo :
+> set RGMII GTX_CLK and RX_CLK pad skew to +0.96ns.
+> 
+> Signed-off-by: Hubert Chaumette <hchaumette@adeneo-embedded.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 76e5db4..db307c2 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -77,6 +77,9 @@ static int ksz9031rn_phy_fixup(struct phy_device *dev)
+>  	mmd_write_reg(dev, 2, 5, 0);
+>  	mmd_write_reg(dev, 2, 8, 0x003ff);
+>  
+> +	/* For Congatec conga-QMX6 board */
+> +	mmd_write_reg(dev, 0x02, 0x06, 0xffff);
 
-Thanks for merging patch 2, can I borrow some of your bandwidth to
-review the remainder of the patches?
+The patch sets TX Data Pad Skew TXD0-TXD3 but the commit message states
+that it sets GTX/RX CLK pad skew. The GTX/RX CLK pad skew is already
+set to +0.96ns by writing 0x003ff to the register 8.
 
-Thanks!
-
->
->>
->> Florian Fainelli (6):
->>   ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
->>   ARM: restrict BCM_KONA_UART to ARCH_BCM_MOBILE
->>   ARM: BCM63XX: add low-level UART debug support
->>   ARM: BCM63XX: add BCM63138 minimal Device Tree
->>   ARM: BCM63XX: add BCM963138DVT Reference platform DTS
->>   MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
->>
->>  .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
->>  MAINTAINERS                                        |  10 ++
->>  arch/arm/Kconfig.debug                             |  20 +++-
->>  arch/arm/boot/dts/Makefile                         |   1 +
->>  arch/arm/boot/dts/bcm63138.dtsi                    | 109 +++++++++++++++++++++
->>  arch/arm/boot/dts/bcm63138dvt.dts                  |  18 ++++
->>  arch/arm/include/debug/bcm63xxx.S                  |  33 +++++++
->>  arch/arm/mach-bcm/Kconfig                          |  20 ++++
->>  arch/arm/mach-bcm/Makefile                         |   2 +
->>  arch/arm/mach-bcm/bcm63xx.h                        |  29 ++++++
->>  arch/arm/mach-bcm/board_bcm63xx.c                  |  94 ++++++++++++++++++
->>  11 files changed, 342 insertions(+), 3 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
->>  create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
->>  create mode 100644 arch/arm/boot/dts/bcm63138dvt.dts
->>  create mode 100644 arch/arm/include/debug/bcm63xxx.S
->>  create mode 100644 arch/arm/mach-bcm/bcm63xx.h
->>  create mode 100644 arch/arm/mach-bcm/board_bcm63xx.c
->>
->> --
->> 1.8.3.2
->>
->
->
->
-> --
-> Florian
-
-
-
--- 
-Florian
+It would be better to configure the pad skews in the board specific
+way in the device tree. There is a binding for ksz9021 PHY in
+Documentation/devicetree/bindings/net/micrel-ksz9021.txt.
+I have a patch for setting ksz9031rn GTX/RX CLK pad skew in a similar
+way over device tree and plan to submit it when the net-next merge
+window for v3.16 opens.
