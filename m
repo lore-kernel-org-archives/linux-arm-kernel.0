@@ -1,118 +1,316 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Wed,  2 Apr 2014 16:12:17 +0530
-Subject: [PATCH v7 02/12] ARM/ARM64: KVM: Add common header for PSCI related
- defines
+Date: Wed,  2 Apr 2014 16:12:18 +0530
+Subject: [PATCH v7 03/12] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
 In-Reply-To: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
 References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1396435347-20056-3-git-send-email-anup.patel@linaro.org>
+Message-ID: <1396435347-20056-4-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need a common place to share PSCI related defines among ARM kernel,
-ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
+Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to
+VCPUs. This patch extends current in-kernel PSCI emulation to provide
+PSCI v0.2 interface to VCPUs.
 
-We introduce uapi/linux/psci.h for this purpose. This newly added
-header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
-and user space (i.e. QEMU or KVMTOOL).
+By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
+keeping the ABI backward-compatible.
+
+To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
+KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU
+init using KVM_ARM_VCPU_INIT ioctl.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/uapi/linux/Kbuild |    1 +
- include/uapi/linux/psci.h |   73 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 74 insertions(+)
- create mode 100644 include/uapi/linux/psci.h
+ arch/arm/include/asm/kvm_host.h   |    2 +-
+ arch/arm/include/asm/kvm_psci.h   |    4 ++
+ arch/arm/include/uapi/asm/kvm.h   |   19 ++++----
+ arch/arm/kvm/psci.c               |   93 ++++++++++++++++++++++++++++++-------
+ arch/arm64/include/asm/kvm_host.h |    2 +-
+ arch/arm64/include/asm/kvm_psci.h |    4 ++
+ arch/arm64/include/uapi/asm/kvm.h |   21 +++++----
+ 7 files changed, 108 insertions(+), 37 deletions(-)
 
-diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
-index 6929571..24e9033 100644
---- a/include/uapi/linux/Kbuild
-+++ b/include/uapi/linux/Kbuild
-@@ -317,6 +317,7 @@ header-y += ppp-ioctl.h
- header-y += ppp_defs.h
- header-y += pps.h
- header-y += prctl.h
-+header-y += psci.h
- header-y += ptp_clock.h
- header-y += ptrace.h
- header-y += qnx4_fs.h
-diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-new file mode 100644
-index 0000000..fbf8a81
---- /dev/null
-+++ b/include/uapi/linux/psci.h
-@@ -0,0 +1,73 @@
-+/*
-+ * ARM Power State and Coordination Interface (PSCI) header
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 09af149..193ceaf 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -36,7 +36,7 @@
+ #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+ #define KVM_HAVE_ONE_REG
+ 
+-#define KVM_VCPU_MAX_FEATURES 1
++#define KVM_VCPU_MAX_FEATURES 2
+ 
+ #include <kvm/arm_vgic.h>
+ 
+diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
+index 9a83d98..4c0e3e1 100644
+--- a/arch/arm/include/asm/kvm_psci.h
++++ b/arch/arm/include/asm/kvm_psci.h
+@@ -18,6 +18,10 @@
+ #ifndef __ARM_KVM_PSCI_H__
+ #define __ARM_KVM_PSCI_H__
+ 
++#define KVM_ARM_PSCI_0_1	1
++#define KVM_ARM_PSCI_0_2	2
++
++int kvm_psci_version(struct kvm_vcpu *vcpu);
+ bool kvm_psci_call(struct kvm_vcpu *vcpu);
+ 
+ #endif /* __ARM_KVM_PSCI_H__ */
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index ef0c878..6574ddf 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -20,6 +20,7 @@
+ #define __ARM_KVM_H__
+ 
+ #include <linux/types.h>
++#include <linux/psci.h>
+ #include <asm/ptrace.h>
+ 
+ #define __KVM_HAVE_GUEST_DEBUG
+@@ -83,6 +84,7 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
++#define KVM_ARM_VCPU_PSCI_0_2		1 /* CPU uses PSCI v0.2 */
+ 
+ struct kvm_vcpu_init {
+ 	__u32 target;
+@@ -194,16 +196,15 @@ struct kvm_arch_memory_slot {
+ 
+ /* PSCI interface */
+ #define KVM_PSCI_FN_BASE		0x95c1ba5e
+-#define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+ 
+-#define KVM_PSCI_FN_CPU_SUSPEND		KVM_PSCI_FN(0)
+-#define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
+-#define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
+-#define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
++#define KVM_PSCI_FN_CPU_SUSPEND		PSCI_FN(KVM_PSCI_FN_BASE, 0)
++#define KVM_PSCI_FN_CPU_OFF		PSCI_FN(KVM_PSCI_FN_BASE, 1)
++#define KVM_PSCI_FN_CPU_ON		PSCI_FN(KVM_PSCI_FN_BASE, 2)
++#define KVM_PSCI_FN_MIGRATE		PSCI_FN(KVM_PSCI_FN_BASE, 3)
+ 
+-#define KVM_PSCI_RET_SUCCESS		0
+-#define KVM_PSCI_RET_NI			((unsigned long)-1)
+-#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
+-#define KVM_PSCI_RET_DENIED		((unsigned long)-3)
++#define KVM_PSCI_RET_SUCCESS		PSCI_RET_SUCCESS
++#define KVM_PSCI_RET_NI			PSCI_RET_NOT_SUPPORTED
++#define KVM_PSCI_RET_INVAL		PSCI_RET_INVALID_PARAMS
++#define KVM_PSCI_RET_DENIED		PSCI_RET_DENIED
+ 
+ #endif /* __ARM_KVM_H__ */
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index 448f60e..8c42596c 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -59,7 +59,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	 * turned off.
+ 	 */
+ 	if (!vcpu || !vcpu->arch.pause)
+-		return KVM_PSCI_RET_INVAL;
++		return PSCI_RET_INVALID_PARAMS;
+ 
+ 	target_pc = *vcpu_reg(source_vcpu, 2);
+ 
+@@ -82,20 +82,60 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	wq = kvm_arch_vcpu_wq(vcpu);
+ 	wake_up_interruptible(wq);
+ 
+-	return KVM_PSCI_RET_SUCCESS;
++	return PSCI_RET_SUCCESS;
+ }
+ 
+-/**
+- * kvm_psci_call - handle PSCI call if r0 value is in range
+- * @vcpu: Pointer to the VCPU struct
+- *
+- * Handle PSCI calls from guests through traps from HVC instructions.
+- * The calling convention is similar to SMC calls to the secure world where
+- * the function number is placed in r0 and this function returns true if the
+- * function number specified in r0 is withing the PSCI range, and false
+- * otherwise.
+- */
+-bool kvm_psci_call(struct kvm_vcpu *vcpu)
++int kvm_psci_version(struct kvm_vcpu *vcpu)
++{
++	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
++		return KVM_ARM_PSCI_0_2;
++
++	return KVM_ARM_PSCI_0_1;
++}
++
++static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
++{
++	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
++	unsigned long val;
++
++	switch (psci_fn) {
++	case PSCI_0_2_FN_PSCI_VERSION:
++		/*
++		 * Bits[31:16] = Major Version = 0
++		 * Bits[15:0] = Minor Version = 2
++		 */
++		val = 2;
++		break;
++	case PSCI_0_2_FN_CPU_OFF:
++		kvm_psci_vcpu_off(vcpu);
++		val = PSCI_RET_SUCCESS;
++		break;
++	case PSCI_0_2_FN_CPU_ON:
++	case PSCI_0_2_FN64_CPU_ON:
++		val = kvm_psci_vcpu_on(vcpu);
++		break;
++	case PSCI_0_2_FN_CPU_SUSPEND:
++	case PSCI_0_2_FN_AFFINITY_INFO:
++	case PSCI_0_2_FN_MIGRATE:
++	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
++	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
++	case PSCI_0_2_FN_SYSTEM_OFF:
++	case PSCI_0_2_FN_SYSTEM_RESET:
++	case PSCI_0_2_FN64_CPU_SUSPEND:
++	case PSCI_0_2_FN64_AFFINITY_INFO:
++	case PSCI_0_2_FN64_MIGRATE:
++	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
++		val = PSCI_RET_NOT_SUPPORTED;
++		break;
++	default:
++		return false;
++	}
++
++	*vcpu_reg(vcpu, 0) = val;
++	return true;
++}
++
++static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+ {
+ 	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+ 	unsigned long val;
+@@ -103,16 +143,15 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+ 	switch (psci_fn) {
+ 	case KVM_PSCI_FN_CPU_OFF:
+ 		kvm_psci_vcpu_off(vcpu);
+-		val = KVM_PSCI_RET_SUCCESS;
++		val = PSCI_RET_SUCCESS;
+ 		break;
+ 	case KVM_PSCI_FN_CPU_ON:
+ 		val = kvm_psci_vcpu_on(vcpu);
+ 		break;
+ 	case KVM_PSCI_FN_CPU_SUSPEND:
+ 	case KVM_PSCI_FN_MIGRATE:
+-		val = KVM_PSCI_RET_NI;
++		val = PSCI_RET_NOT_SUPPORTED;
+ 		break;
+-
+ 	default:
+ 		return false;
+ 	}
+@@ -120,3 +159,25 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+ 	*vcpu_reg(vcpu, 0) = val;
+ 	return true;
+ }
++
++/**
++ * kvm_psci_call - handle PSCI call if r0 value is in range
++ * @vcpu: Pointer to the VCPU struct
 + *
-+ * This header holds common PSCI defines and macros shared
-+ * by: ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space.
-+ *
-+ * Copyright (C) 2014 Linaro Ltd.
-+ * Author: Anup Patel <anup.patel@linaro.org>
++ * Handle PSCI calls from guests through traps from HVC instructions.
++ * The calling convention is similar to SMC calls to the secure world where
++ * the function number is placed in r0 and this function returns true if the
++ * function number specified in r0 is withing the PSCI range, and false
++ * otherwise.
 + */
++bool kvm_psci_call(struct kvm_vcpu *vcpu)
++{
++	switch (kvm_psci_version(vcpu)) {
++	case KVM_ARM_PSCI_0_2:
++		return kvm_psci_0_2_call(vcpu);
++	case KVM_ARM_PSCI_0_1:
++		return kvm_psci_0_1_call(vcpu);
++	default:
++		return false;
++	};
++}
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 0a1d697..92242ce 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -39,7 +39,7 @@
+ #include <kvm/arm_vgic.h>
+ #include <kvm/arm_arch_timer.h>
+ 
+-#define KVM_VCPU_MAX_FEATURES 2
++#define KVM_VCPU_MAX_FEATURES 3
+ 
+ struct kvm_vcpu;
+ int kvm_target_cpu(void);
+diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+index e301a48..e25c658 100644
+--- a/arch/arm64/include/asm/kvm_psci.h
++++ b/arch/arm64/include/asm/kvm_psci.h
+@@ -18,6 +18,10 @@
+ #ifndef __ARM64_KVM_PSCI_H__
+ #define __ARM64_KVM_PSCI_H__
+ 
++#define KVM_ARM_PSCI_0_1	1
++#define KVM_ARM_PSCI_0_2	2
 +
-+#ifndef _UAPI_LINUX_PSCI_H
-+#define _UAPI_LINUX_PSCI_H
-+
++int kvm_psci_version(struct kvm_vcpu *vcpu);
+ bool kvm_psci_call(struct kvm_vcpu *vcpu);
+ 
+ #endif /* __ARM64_KVM_PSCI_H__ */
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index eaf54a3..9b67161 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -31,6 +31,7 @@
+ #define KVM_NR_SPSR	5
+ 
+ #ifndef __ASSEMBLY__
++#include <linux/psci.h>
+ #include <asm/types.h>
+ #include <asm/ptrace.h>
+ 
+@@ -77,6 +78,7 @@ struct kvm_regs {
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
++#define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+ 
+ struct kvm_vcpu_init {
+ 	__u32 target;
+@@ -177,19 +179,18 @@ struct kvm_arch_memory_slot {
+ /* Highest supported SPI, from VGIC_NR_IRQS */
+ #define KVM_ARM_IRQ_GIC_MAX		127
+ 
+-/* PSCI interface */
 +/* PSCI v0.1 interface */
-+#define PSCI_FN(base, n)			((base) + (n))
-+
-+#define PSCI_FN_CPU_SUSPEND(base)		PSCI_FN(base, 0)
-+#define PSCI_FN_CPU_OFF(base)			PSCI_FN(base, 1)
-+#define PSCI_FN_CPU_ON(base)			PSCI_FN(base, 2)
-+#define PSCI_FN_MIGRATE(base)			PSCI_FN(base, 3)
-+
-+/* PSCI v0.2 interface */
-+#define PSCI_0_2_FN_BASE			0x84000000
-+#define PSCI_0_2_FN(n)				(PSCI_0_2_FN_BASE + (n))
-+#define PSCI_0_2_64BIT				0x40000000
-+#define PSCI_0_2_FN64_BASE			\
-+					(PSCI_0_2_FN_BASE + PSCI_0_2_64BIT)
-+#define PSCI_0_2_FN64(n)			(PSCI_0_2_FN64_BASE + (n))
-+
-+#define PSCI_0_2_FN_PSCI_VERSION		PSCI_0_2_FN(0)
-+#define PSCI_0_2_FN_CPU_SUSPEND			PSCI_0_2_FN(1)
-+#define PSCI_0_2_FN_CPU_OFF			PSCI_0_2_FN(2)
-+#define PSCI_0_2_FN_CPU_ON			PSCI_0_2_FN(3)
-+#define PSCI_0_2_FN_AFFINITY_INFO		PSCI_0_2_FN(4)
-+#define PSCI_0_2_FN_MIGRATE			PSCI_0_2_FN(5)
-+#define PSCI_0_2_FN_MIGRATE_INFO_TYPE		PSCI_0_2_FN(6)
-+#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU		PSCI_0_2_FN(7)
-+#define PSCI_0_2_FN_SYSTEM_OFF			PSCI_0_2_FN(8)
-+#define PSCI_0_2_FN_SYSTEM_RESET		PSCI_0_2_FN(9)
-+
-+#define PSCI_0_2_FN64_CPU_SUSPEND		PSCI_0_2_FN64(1)
-+#define PSCI_0_2_FN64_CPU_ON			PSCI_0_2_FN64(3)
-+#define PSCI_0_2_FN64_AFFINITY_INFO		PSCI_0_2_FN64(4)
-+#define PSCI_0_2_FN64_MIGRATE			PSCI_0_2_FN64(5)
-+#define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU	PSCI_0_2_FN64(7)
-+
-+#define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
-+#define PSCI_0_2_POWER_STATE_ID_SHIFT		0
-+#define PSCI_0_2_POWER_STATE_TYPE_MASK		0x1
-+#define PSCI_0_2_POWER_STATE_TYPE_SHIFT		16
-+#define PSCI_0_2_POWER_STATE_AFFL_MASK		0x3
-+#define PSCI_0_2_POWER_STATE_AFFL_SHIFT		24
-+
-+/* PSCI version decoding (independent of PSCI version) */
-+#define PSCI_VERSION_MAJOR_MASK			0xffff0000
-+#define PSCI_VERSION_MINOR_MASK			0x0000ffff
-+#define PSCI_VERSION_MAJOR_SHIFT		16
-+#define PSCI_VERSION_MAJOR(ver)			\
-+		(((ver) & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT)
-+#define PSCI_VERSION_MINOR(ver)			((ver) & PSCI_VER_MINOR_MASK)
-+
-+/* PSCI return values (inclusive of all PSCI versions) */
-+#define PSCI_RET_SUCCESS			0
-+#define PSCI_RET_NOT_SUPPORTED			-1
-+#define PSCI_RET_INVALID_PARAMS			-2
-+#define PSCI_RET_DENIED				-3
-+#define PSCI_RET_ALREADY_ON			-4
-+#define PSCI_RET_ON_PENDING			-5
-+#define PSCI_RET_INTERNAL_FAILURE		-6
-+#define PSCI_RET_NOT_PRESENT			-7
-+#define PSCI_RET_DISABLED			-8
-+
-+#endif /* _UAPI_LINUX_PSCI_H */
+ #define KVM_PSCI_FN_BASE		0x95c1ba5e
+-#define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+ 
+-#define KVM_PSCI_FN_CPU_SUSPEND		KVM_PSCI_FN(0)
+-#define KVM_PSCI_FN_CPU_OFF		KVM_PSCI_FN(1)
+-#define KVM_PSCI_FN_CPU_ON		KVM_PSCI_FN(2)
+-#define KVM_PSCI_FN_MIGRATE		KVM_PSCI_FN(3)
++#define KVM_PSCI_FN_CPU_SUSPEND		PSCI_FN(KVM_PSCI_FN_BASE, 0)
++#define KVM_PSCI_FN_CPU_OFF		PSCI_FN(KVM_PSCI_FN_BASE, 1)
++#define KVM_PSCI_FN_CPU_ON		PSCI_FN(KVM_PSCI_FN_BASE, 2)
++#define KVM_PSCI_FN_MIGRATE		PSCI_FN(KVM_PSCI_FN_BASE, 3)
+ 
+-#define KVM_PSCI_RET_SUCCESS		0
+-#define KVM_PSCI_RET_NI			((unsigned long)-1)
+-#define KVM_PSCI_RET_INVAL		((unsigned long)-2)
+-#define KVM_PSCI_RET_DENIED		((unsigned long)-3)
++#define KVM_PSCI_RET_SUCCESS		PSCI_RET_SUCCESS
++#define KVM_PSCI_RET_NI			PSCI_RET_NOT_SUPPORTED
++#define KVM_PSCI_RET_INVAL		PSCI_RET_INVALID_PARAMS
++#define KVM_PSCI_RET_DENIED		PSCI_RET_DENIED
+ 
+ #endif
+ 
 -- 
 1.7.9.5
