@@ -1,42 +1,46 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Wed, 2 Apr 2014 16:19:58 -0700
-Subject: [PATCH] pinctrl: capri: make Kconfig dependency more strict
-In-Reply-To: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <533C9B1E.6020905@broadcom.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 2 Apr 2014 16:13:15 -0700
+Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <533C280F.3060804@gmail.com>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+ <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
+ <20140317232359.GA8943@kroah.com> <533C280F.3060804@gmail.com>
+Message-ID: <20140402231315.GD24324@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-04-01 01:10 PM, Uwe Kleine-K?nig wrote:
-> This driver is only useful on BCM281xx, so let the driver depend on
-> ARCH_BCM_MOBILE but allow compile coverage testing.
-> The main benefit is that the driver isn't available to be selected for
-> machines that don't have the matching hardware.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->   drivers/pinctrl/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> index e49324032611..072749816cb4 100644
-> --- a/drivers/pinctrl/Kconfig
-> +++ b/drivers/pinctrl/Kconfig
-> @@ -106,7 +106,7 @@ config PINCTRL_BCM2835
->
->   config PINCTRL_CAPRI
->   	bool "Broadcom Capri pinctrl driver"
-> -	depends on OF
-> +	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
->   	select PINMUX
->   	select PINCONF
->   	select GENERIC_PINCONF
->
+On Wed, Apr 02, 2014 at 05:09:03PM +0200, Richard Genoud wrote:
+> On 18/03/2014 00:23, Greg Kroah-Hartman wrote:
+> > On Mon, Mar 10, 2014 at 05:45:49PM +0100, Richard Genoud wrote:
+> >> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+> >> GPIO.
+> >> This will be useful for many boards which have a serial controller that
+> >> only handle CTS/RTS pins (or even just RX/TX).
+> >>
+> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> > 
+> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > 
+> > I can't take this series through my tty tree as the non-tty patches
+> > don't apply, so feel free to take them through whatever tree is needed.
+> > 
+> > greg k-h
+> > 
+> 
+> I guess this series won't make it for 3.15, as it doesn't apply on any tree.
+> However, I'd like to know if I did something wrong, or if there's no
+> solution when a series depends on several patches that are in different
+> trees ?
 
-Looks good. Just wondering how you've come across this driver (and 
-PINCTRL_MSM8X74)?
+That's a hard problem, either wait a release cycle for everything to get
+merged properly (like should be done in time for 3.15-rc1 now) and then
+submit the code, or ask for different maintainers to either allow other
+trees to take the patches, put the patches in different trees at the
+same time, or have "topic branches" that different maintainers can pull
+from.
 
-Reviewed-by: Sherman Yin <syin@broadcom.com>
+Care to send me the patches after 3.15-rc1 is out, as there should not
+be any dependancy issues then, right?
 
-Thanks,
-Sherman
+greg k-h
