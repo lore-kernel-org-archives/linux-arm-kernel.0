@@ -1,69 +1,90 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Wed,  2 Apr 2014 16:12:25 +0530
-Subject: [PATCH v7 10/12] ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI v0.2
+Date: Wed,  2 Apr 2014 16:12:26 +0530
+Subject: [PATCH v7 11/12] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
 In-Reply-To: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
 References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1396435347-20056-11-git-send-email-anup.patel@linaro.org>
+Message-ID: <1396435347-20056-12-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As-per PSCI v0.2, the source CPU provides physical address of
-"entry point" and "context id" for starting a target CPU. Also,
-if target CPU is already running then we should return ALREADY_ON.
+This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
+KVM ARM/ARM64. This is a CPU-level function call which can suspend
+current CPU or current CPU cluster. We don't have VCPU clusters in
+KVM so we only suspend the current VCPU.
 
-Current emulation of CPU_ON function does not consider physical
-address of "context id" and returns INVALID_PARAMETERS if target
-CPU is already running.
+The CPU_SUSPEND emulation is not tested much because currently there
+is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
+PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
+Simple CPUIDLE driver which is not published due to unstable DT-bindings
+for PSCI.
+(For more info, http://lwn.net/Articles/574950/)
 
-This patch updates kvm_psci_vcpu_on() such that it works for both
-PSCI v0.1 and PSCI v0.2.
+Even if we had stable DT-bindings for PSCI and CPUIDLE driver that
+uses PSCI CPU_SUSPEND then still we need to define SUSPEND states
+and WAKEUP events for KVM ARM/ARM64.
+
+Due to above, we implement CPU_SUSPEND emulation similar to WFI
+(Wait-for-interrupt) emulation and we also treat power-down request
+to be same as stand-by request. This is also consistent with section
+5.4.1 and section 5.4.2 of PSCI v0.2 specification.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/psci.c |   12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/kvm/psci.c |   27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index d8335da..fdbd829 100644
+index fdbd829..74fa4ad 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
-@@ -63,6 +63,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	struct kvm_vcpu *vcpu = NULL, *tmp;
- 	wait_queue_head_t *wq;
- 	unsigned long cpu_id;
-+	unsigned long context_id;
- 	unsigned long mpidr;
- 	phys_addr_t target_pc;
- 	int i;
-@@ -83,10 +84,17 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	 * Make sure the caller requested a valid CPU and that the CPU is
- 	 * turned off.
- 	 */
--	if (!vcpu || !vcpu->arch.pause)
-+	if (!vcpu)
- 		return PSCI_RET_INVALID_PARAMS;
-+	if (!vcpu->arch.pause) {
-+		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
-+			return PSCI_RET_ALREADY_ON;
-+		else
-+			return PSCI_RET_INVALID_PARAMS;
-+	}
+@@ -52,6 +52,25 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
+ 	return affinity_mask;
+ }
  
- 	target_pc = *vcpu_reg(source_vcpu, 2);
-+	context_id = *vcpu_reg(source_vcpu, 3);
- 
- 	kvm_reset_vcpu(vcpu);
- 
-@@ -101,6 +109,8 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 		kvm_vcpu_set_be(vcpu);
- 
- 	*vcpu_pc(vcpu) = target_pc;
-+	if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
-+		*vcpu_reg(vcpu, 0) = context_id;
- 	vcpu->arch.pause = false;
- 	smp_mb();		/* Make sure the above is visible */
- 
++static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
++{
++	/*
++	 * NOTE: Currently, we don't have any wakeup events for KVM
++	 * so for simplicity we make VCPU suspend emulation to be
++	 * same-as WFI (Wait-for-interrupt) emulation. This is also
++	 * consistent with intended use of StateID as described in
++	 * section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
++	 *
++	 * Further, we also treat power-down request to be same as
++	 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
++	 * specification (ARM DEN 0022A). This means all suspend states
++	 * for KVM PSCI emulation will preserve the register state.
++	 */
++	kvm_vcpu_block(vcpu);
++
++	return PSCI_RET_SUCCESS;
++}
++
+ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.pause = true;
+@@ -195,6 +214,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		 */
+ 		val = 2;
+ 		break;
++	case PSCI_0_2_FN_CPU_SUSPEND:
++	case PSCI_0_2_FN64_CPU_SUSPEND:
++		val = kvm_psci_vcpu_suspend(vcpu);
++		break;
+ 	case PSCI_0_2_FN_CPU_OFF:
+ 		kvm_psci_vcpu_off(vcpu);
+ 		val = PSCI_RET_SUCCESS;
+@@ -232,10 +255,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		val = PSCI_RET_SUCCESS;
+ 		ret = 0;
+ 		break;
+-	case PSCI_0_2_FN_CPU_SUSPEND:
+-	case PSCI_0_2_FN64_CPU_SUSPEND:
+-		val = PSCI_RET_NOT_SUPPORTED;
+-		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
 -- 
 1.7.9.5
