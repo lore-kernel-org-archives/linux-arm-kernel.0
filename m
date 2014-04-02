@@ -1,105 +1,44 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 02 Apr 2014 13:29:04 +0900
-Subject: [GIT PULL 2/2] Samsung 2nd DT updates for v3.15
-In-Reply-To: <201403290253.14497.arnd@arndb.de>
-References: <5328549D.1090008@samsung.com> <201403290253.14497.arnd@arndb.de>
-Message-ID: <012501cf4e2c$149943f0$3dcbcbd0$@samsung.com>
+Date: Wed, 02 Apr 2014 13:30:13 +0900
+Subject: [GIT PULL 1/2] Samsung 2nd cleanup for v3.15
+In-Reply-To: <201403290249.04949.arnd@arndb.de>
+References: <53285457.80900@samsung.com> <201403290249.04949.arnd@arndb.de>
+Message-ID: <012601cf4e2c$3d9c1340$b8d439c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd Bergmann wrote:
 > 
-
-[...]
-
+> On Tuesday 18 March 2014, Kukjin Kim wrote:
+> > The following changes since commit
+> d9671ca923445aa870ecc34df3db01dd602d87fc:
 > >
-> >   .../devicetree/bindings/ata/exynos-sata-phy.txt    | 14 ---------
-> >   .../devicetree/bindings/ata/exynos-sata.txt        | 25
-+++++++++------
-> >   .../devicetree/bindings/phy/samsung-phy.txt        | 36
-> > ++++++++++++++++++++++
+> >    ARM: EXYNOS: Remove uncompress.h (2014-02-24 09:39:18 +0900)
+> >
+> > are available in the git repository at:
+> >
+> >    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > tags/samsung-cleanup-2
+> >
+> > for you to fetch changes up to 19a964644f1e655c3f67d539c1e99a9fbcc4588c:
+> >
+> >    ARM: SAMSUNG: remove all custom uncompress.h (2014-03-11 22:05:18
+> +0900)
+> >
+> > ----------------------------------------------------------------
+> > Samsung cleanup-2 for v3.15
+> > - use generic uncompress.h and remove all custom
+> >    uncompress.h in mach-s3c24xx, s3c64xx, s5p64x0,
+> >    s5pc100, s5pv210 and plat-samsung directories.
+> >
+> > Note that based on previous tags/samsung-cleanup
 > 
-> Looking through the branch contents, I noticed that the examples in the
-> bindings contain mandatory properties that are not documented.
+> I've started a new next/cleanup3 branch for this one and the following
+> five samsung branches. I found one small issue with one of the branches,
+> if we all agree on a solution for that, I expect we can just send out
+> the cleanup3 branch together with cleanup2.
 > 
-Oops, sorry.
+OK, I'm fine.
 
-> I have merged your branch into next/cleanup3 of the arm-soc tree,
-> but I also applied a patch on top to document the missing strings
-> and properties. It is currently the top commit on the branch, so
-> if anyone spots a mistake, we can probably rectify it.
-> 
-Thanks a lot :-)
-
-> Please be more careful with binding documentation in the future.
-> Was this actually reviewed on the devicetree-discuss mailing list?
-> 
-Sure.
-
-- Kukjin
-
-> 	Arnd
-> 
-> 9<-----
-> From 9dfbff16b422a4bac7ad309847c7bc5d65653392 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Sat, 29 Mar 2014 02:15:43 +0100
-> Subject: [PATCH] devicetree: fix newly added exynos sata bindings
-> 
-> Commit ba0d7ed391b7b "ARM: dts: enable ahci sata and sata phy for
-> exynos5250" added a new binding document for the sata phy device,
-> and changed the sata controller binding. However, in both cases
-> significant aspects of the binding remained undocumented.
-> This attempts to reconstruct the actual binding from the usage.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> diff --git a/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> index b2adb1f..cb48448 100644
-> --- a/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> +++ b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-> @@ -8,8 +8,14 @@ Required properties:
->  - interrupts		: <interrupt mapping for SATA IRQ>
->  - reg			: <registers mapping>
->  - samsung,sata-freq	: <frequency in MHz>
-> -- phys			: as mentioned in phy-bindings.txt
-> -- phy-names		: as mentioned in phy-bindings.txt
-> +- phys			: Must contain exactly one entry as
-specified
-> +			  in phy-bindings.txt
-> +- phy-names		: Must be "sata-phy"
-> +
-> +Optional properties:
-> +- clocks		: Must contain an entry for each entry in
-clock-names.
-> +- clock-names		: Shall be "sata" for the external SATA bus
-> clock,
-> +			  and "sclk_sata" for the internal controller clock.
-> 
->  Example:
->  	sata at 122f0000 {
-> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> index a937f75..67d38b3 100644
-> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> @@ -30,7 +30,11 @@ Each SATA PHY controller should have its own node.
->  Required properties:
->  - compatible        : compatible list, contains "samsung,exynos5250-sata-
-> phy"
->  - reg : offset and length of the SATA PHY register set;
-> -- #phy-cells : from the generic phy bindings;
-> +- #phy-cells : must be zero
-> +- clocks : must be exactly one entry
-> +- clock-names : must be "sata_phyctrl"
-> +- samsung,exynos-sataphy-i2c-phandle : a phandle to the I2C device, no
-> arguments
-> +- samsung,syscon-phandle : a phandle to the PMU system controller, no
-> arguments
-> 
->  Example:
->  	sata_phy: sata-phy at 12170000 {
+Thanks,
+Kukjin
