@@ -1,104 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 2 Apr 2014 16:03:48 +0000 (UTC)
-Subject: OMAP baseline test results for v3.14
-Message-ID: <alpine.DEB.2.02.1404021600320.15928@utopia.booyaka.com>
+From: agnel.joel@gmail.com (Joel Fernandes)
+Date: Wed, 2 Apr 2014 11:06:33 -0500
+Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
+ friendly address
+In-Reply-To: <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+ <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+ <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
+ <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+Message-ID: <CAD=GYpa8hMuawtGjWMXDfJyCcSpL+n8qwOiMLaXmhJvFvpD=oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 2, 2014 at 7:47 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
+>> Like others, I have been carrying this change locally. Good to see it up!
+>
+> Why are you all booting raw Images anyway (just out of curiosity)? All my
+> test cases boot either a zImage or a uImage, or occasionally a full SD card
+> image, or I'd have noticed this earlier...
 
-Here are some basic OMAP test results for Linux v3.14.
-Logs and other details at:
+zImage fails for me on OMAP1, which I'm debugging, the errors have
+more to do with writing out of memory limits. But I was not sure if
+the problem was with decompression or something else, so I wanted to
+boot the basic case (Image) first.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.14/20140402004448/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som
-
-Build: zImage:
-    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
-
-Boot to userspace:
-    FAIL ( 1/12): 2430sdp
-    skip ( 2/12): 5912osk, cmt3517
-    Pass ( 9/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt,
-		  4460varsomom
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
-		  4430es2panda, 4460pandaes, 4460varsomom
-
-PM: chip off except CORE via suspend:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    FAIL ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-PM: chip off via dynamic idle:
-    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
-		  4460varsomom
-
-
-vmlinux object size
-(delta in bytes from test_v3.14-rc8 (b098d6726bbfb94c06d6e1097466187afddae61f)):
-   text     data      bss    total  kernel
-  +1160      +88       +8    +1256  omap1_defconfig
-  +1160      +88       +8    +1256  omap1_defconfig_1510innovator_only
-  +1128      +88       +8    +1224  omap1_defconfig_5912osk_only
-   +520     +136        0     +656  multi_v7_defconfig
-   +720      +64        0     +784  omap2plus_defconfig
-   +592      +96      +32     +720  omap2plus_defconfig_2430sdp_only
-   +676      +56        0     +732  omap2plus_defconfig_am33xx_only
-   +648      +72        0     +720  omap2plus_defconfig_am43xx_only
-   +720     +128        0     +848  omap2plus_defconfig_cpupm
-   +720      +64        0     +784  omap2plus_defconfig_dra7xx_only
-   +416      +88        0     +504  omap2plus_defconfig_n800_multi_omap2xxx
-   +384      +24        0     +408  omap2plus_defconfig_n800_only_a
-   +656      +72        0     +728  omap2plus_defconfig_no_pm
-   +656      +72        0     +728  omap2plus_defconfig_omap2_4_only
-   +720      +64        0     +784  omap2plus_defconfig_omap3_4_only
-   +656      +64        0     +720  omap2plus_defconfig_omap5_only
-   +424      +72     -100     +396  rmk_omap3430_ldp_allnoconfig
-   +480      +88        0     +568  rmk_omap3430_ldp_oldconfig
-   +464      +76     -108     +432  rmk_omap4430_sdp_allnoconfig
-   +480      +56        0     +536  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.14-rc8 (b098d6726bbfb94c06d6e1097466187afddae61f))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+Thanks,
+-Joel
