@@ -1,73 +1,109 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 2 Apr 2014 11:47:15 +1100
-Subject: linux-next: manual merge of the tip tree with the arm-soc tree
-In-Reply-To: <20140320143603.a2f82d77be61c09a7852cfe9@canb.auug.org.au>
-References: <20140320143603.a2f82d77be61c09a7852cfe9@canb.auug.org.au>
-Message-ID: <20140402114715.471bcdb0962ef38c17120530@canb.auug.org.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 1 Apr 2014 20:11:41 -0500
+Subject: [PATCH] ARM: errata: workaround Cortex-A9 errata 761320 and 794072
+In-Reply-To: <1396298072-13254-2-git-send-email-nitin.garg@freescale.com>
+References: <1396298072-13254-1-git-send-email-nitin.garg@freescale.com>
+ <1396298072-13254-2-git-send-email-nitin.garg@freescale.com>
+Message-ID: <CAL_JsqK--G_7nO_UQ6jyomA1Sq6GUKtXVZpBF0dXjYA2iE047w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Mar 31, 2014 at 3:34 PM, Nitin Garg <nitin.garg@freescale.com> wrote:
+> Add workaround for Cortex-A9 errata 761320 ([present on r0,
+> r1, r2, r3) and 794072 (present on all revisions). These are
+> Category B, present on SMP systems.
 
-On Thu, 20 Mar 2014 14:36:03 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+These work-arounds don't work on non-secure systems which don't have
+access to the diagnostic register. There is no architectural way to
+determine secure vs. non-secure mode. It's been discussed before and
+decided that these types of work-arounds must go into the bootloader
+or firmware.
+
+Rob
+
 >
-> Today's linux-next merge of the tip tree got a conflict in
-> arch/arm/mach-imx/pm-imx6q.c between commit 9cdde7217e92 ("ARM: imx6:
-> rename pm-imx6q.c to pm-imx6.c") from the arm-soc tree and commit
-> 8435cf757632 ("arm: Replace various irq_desc accesses") from the tip tree.
-> 
-> I fixed it up (by applying the tip tree patch to the renamed file -
-> arch/arm/mach-imx/pm-imx6.c - see patch below) and can carry the fix as
-> necessary (no action is required).
-
-The below merge fixup is now needed when the arm-soc tree is merged with
-Linus' tree (as well as removing arch/arm/mach-imx/pm-imx6q.c).
-
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Thu, 20 Mar 2014 14:33:26 +1100
-> Subject: [PATCH] arm: Replace various irq_desc accesses fix for file move
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Signed-off-by: Nitin Garg <nitin.garg@freescale.com>
 > ---
->  arch/arm/mach-imx/pm-imx6.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index 16f0d249f6a7..9392a8f4ef24 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -241,7 +241,7 @@ static void imx6q_enable_wb(bool enable)
->  
->  int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->  {
-> -	struct irq_desc *iomuxc_irq_desc;
-> +	struct irq_data *iomuxc_irq_data = irq_get_irq_data(32);
->  	u32 val = readl_relaxed(ccm_base + CLPCR);
->  
->  	val &= ~BM_CLPCR_LPM;
-> @@ -288,10 +288,9 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
->  	 * 3) Software should mask IRQ #32 right after CCM Low-Power mode
->  	 *    is set (set bits 0-1 of CCM_CLPCR).
->  	 */
-> -	iomuxc_irq_desc = irq_to_desc(32);
-> -	imx_gpc_irq_unmask(&iomuxc_irq_desc->irq_data);
-> +	imx_gpc_irq_unmask(iomuxc_irq_data);
->  	writel_relaxed(val, ccm_base + CLPCR);
-> -	imx_gpc_irq_mask(&iomuxc_irq_desc->irq_data);
-> +	imx_gpc_irq_mask(iomuxc_irq_data);
->  
->  	return 0;
->  }
-> -- 
-> 1.9.0
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140402/5ef5561e/attachment.sig>
+>  arch/arm/Kconfig          |   23 +++++++++++++++++++++++
+>  arch/arm/mach-imx/Kconfig |    2 ++
+>  arch/arm/mm/proc-v7.S     |   11 +++++++++++
+>  3 files changed, 36 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a48712e..f8464ff 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1301,6 +1301,29 @@ config ARM_ERRATA_751472
+>           operation is received by a CPU before the ICIALLUIS has completed,
+>           potentially leading to corrupted entries in the cache or TLB.
+>
+> +config ARM_ERRATA_794072
+> +       bool "ARM errata: A short loop including a DMB instruction might cause a denial of service"
+> +       depends on CPU_V7 && SMP
+> +       help
+> +          This option enables the workaround for the 794072 Cortex-A9
+> +          (all revisions). A processor which continuously executes a short
+> +          loop containing a DMB instruction might prevent a CP15 operation
+> +          broadcast by another processor making further progress, causing
+> +          a denial of service. This erratum can be worked around by setting
+> +          bit[4] of the undocumented Diagnostic Control Register to 1.
+> +
+> +config ARM_ERRATA_761320
+> +       bool "Full cache line writes to the same memory region from at least two processors might deadlock processor"
+> +       depends on CPU_V7 && SMP
+> +       help
+> +         This option enables the workaround for the 761320 Cortex-A9 (r0..r3).
+> +         Under very rare circumstances, full cache line writes
+> +         from (at least) 2 processors on cache lines in hazard with
+> +         other requests may cause arbitration issues in the SCU,
+> +         leading to processor deadlock. This erratum can be
+> +         worked around by setting bit[21] of the undocumented
+> +         Diagnostic Control Register to 1.
+> +
+>  config PL310_ERRATA_753970
+>         bool "PL310 errata: cache sync operation may be faulty"
+>         depends on CACHE_PL310
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 5740296d..19690c2 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -794,6 +794,8 @@ config SOC_IMX6
+>  config SOC_IMX6Q
+>         bool "i.MX6 Quad/DualLite support"
+>         select ARM_ERRATA_764369 if SMP
+> +       select ARM_ERRATA_794072 if SMP
+> +       select ARM_ERRATA_761320 if SMP
+>         select HAVE_ARM_SCU if SMP
+>         select HAVE_ARM_TWD if SMP
+>         select MIGHT_HAVE_PCI
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 195731d..b5e5386 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -337,6 +337,17 @@ __v7_setup:
+>         mcrlt   p15, 0, r10, c15, c0, 1         @ write diagnostic register
+>  1:
+>  #endif
+> +#ifdef CONFIG_ARM_ERRATA_794072
+> +       mrc     p15, 0, r10, c15, c0, 1         @ read diagnostic register
+> +       orr     r10, r10, #1 << 4               @ set bit #4
+> +       mcr     p15, 0, r10, c15, c0, 1         @ write diagnostic register
+> +#endif
+> +#ifdef CONFIG_ARM_ERRATA_761320
+> +       cmp     r6, #0x40                       @ present prior to r4p0
+> +       mrclt   p15, 0, r10, c15, c0, 1         @ read diagnostic register
+> +       orrlt   r10, r10, #1 << 21              @ set bit #21
+> +       mcrlt   p15, 0, r10, c15, c0, 1         @ write diagnostic register
+> +#endif
+>
+>         /* Cortex-A15 Errata */
+>  3:     ldr     r10, =0x00000c0f                @ Cortex-A15 primary part number
+> --
+> 1.7.4.1
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
