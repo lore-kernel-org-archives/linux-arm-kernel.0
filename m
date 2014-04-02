@@ -1,107 +1,91 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 02 Apr 2014 11:41:30 +0100
-Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
- swiotlb"
-In-Reply-To: <20140402092032.GB31892@arm.com>
-References: <20140331175230.GA7480@arm.com>
- <1396368657.3681.17.camel@linaro1.home> <20140401172939.GG20061@arm.com>
- <1396428722.3554.20.camel@linaro1.home> <20140402092032.GB31892@arm.com>
-Message-ID: <1396435290.3554.52.camel@linaro1.home>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed,  2 Apr 2014 16:12:15 +0530
+Subject: [PATCH v7 00/12] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
+Message-ID: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-02 at 10:20 +0100, Catalin Marinas wrote:
-> On Wed, Apr 02, 2014 at 09:52:02AM +0100, Jon Medhurst (Tixy) wrote:
-> > On Tue, 2014-04-01 at 18:29 +0100, Catalin Marinas wrote:
-> > > On Tue, Apr 01, 2014 at 05:10:57PM +0100, Jon Medhurst (Tixy) wrote:
-> > > > On Mon, 2014-03-31 at 18:52 +0100, Catalin Marinas wrote:
-> > > > > +__dma_inv_range:
-> > > > > +	dcache_line_size x2, x3
-> > > > > +	sub	x3, x2, #1
-> > > > > +	bic	x0, x0, x3
-> > > > > +	bic	x1, x1, x3
-> > > > 
-> > > > Why is the 'end' value in x1 above rounded down to be cache aligned?
-> > > > This means the cache invalidate won't include the cache line containing
-> > > > the final bytes of the region, unless it happened to already be cache
-> > > > line aligned. This looks especially suspect as the other two cache
-> > > > operations added in the same patch (below) don't do that.
-> > > 
-> > > Cache invalidation is destructive, so we want to make sure that it
-> > > doesn't affect anything beyond x1. But you are right, if either end of
-> > > the buffer is not cache line aligned it can get it wrong. The fix is to
-> > > use clean+invalidate on the unaligned ends:
-> > 
-> > Like the ARMv7 implementation does :-) However, I wonder, is it possible
-> > for the Cache Writeback Granule (CWG) to come into play? If the CWG of
-> > further out caches was bigger than closer (to CPU) caches then it would
-> > cause data corruption. So for these region ends, should we not be using
-> > the CWG size, not the minimum D cache line size? On second thoughts,
-> > that wouldn't be safe either in the converse case where the CWG of a
-> > closer cache was bigger. So we would need to first use minimum cache
-> > line size to clean a CWG sized region, then invalidate cache lines by
-> > the same method.
-> 
-> CWG gives us the maximum size (of all cache levels in the system, even
-> on a different CPU for example in big.LITTLE configurations) that would
-> be evicted by the cache operation. So we need small loops of Dmin size
-> that go over the bigger CWG (and that's guaranteed to be at least Dmin).
+Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
+and Coordination Interface (PSCI) v0.1.
 
-Yes, that's what I was getting at.
+This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
+such that it does not break current KVM ARM/ARM64 ABI.
 
-> 
-> > But then that leaves a time period where a write can
-> > happen between the clean and the invalidate, again leading to data
-> > corruption. I hope all this means I've either got rather confused or
-> > that that cache architectures are smart enough to automatically cope. 
-> 
-> You are right. I think having unaligned DMA buffers for inbound
-> transfers is pointless. We can avoid losing data written by another CPU
-> in the same cache line but, depending on the stage of the DMA transfer,
-> it can corrupt the DMA data.
-> 
-> I wonder whether it's easier to define the cache_line_size() macro to
-> read CWG
+The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
+KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
+PSCI v0.2 to VCPUs.
 
-That won't work, the stride of cache operations needs to be the
-_minimum_ cache line size, otherwise we might skip over some cache lines
-and not flush them. (We've been hit before by bugs caused by the fact
-that big.LITTLE systems report different minimum i-cache line sizes
-depend on whether you execute on the big or LITTLE cores [1], we need
-the 'real' minimum otherwise things go horribly wrong.)
+Changlog:
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149950.html
+V7:
+ - Make uapi/linux/psci.h inline with Ashwin's patch
+   http://www.spinics.net/lists/arm-kernel/msg319090.html
+ - Incorporate Rob's suggestions for uapi/linux/psci.h
+ - Treat CPU_SUSPEND power-down request to be same as standby
+   request. This further simplifies CPU_SUSPEND emulation.
 
->  and assume that the DMA buffers are always aligned,
+V6:
+ - Introduce uapi/linux/psci.h for sharing PSCI defines between
+   ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space
+ - Make CPU_SUSPEND emulation similar to WFI emulation
 
-We can't assume the region in any particular DMA transfer is cache
-aligned, but I agree, that if multiple actors were operating on adjacent
-memory locations in the same cache line, without implementing their own
-coordination then there's nothing the low level DMA code can do to avoid
-data corruption from cache cleaning.
+V5:
+ - Have separate last patch to advertise KVM_CAP_ARM_PSCI_0_2
+ - Use kvm_psci_version() in kvm_psci_vcpu_on()
+ - Return ALREADY_ON for PSCI v0.2 CPU_ON if VCPU is not paused
+ - Remove per-VCPU suspend context
+ - As-per PSCI v0.2 spec, only current CPU can suspend itself
 
-We at least need to make sure that the memory allocation functions used
-for DMA buffers return regions of whole CWG size, to avoid unrelated
-buffers corrupting each other. If I have correctly read
-__dma_alloc_noncoherent and the functions it calls, then it looks like
-buffers are actually whole pages, so that's not a problem.
+V4:
+ - Implement all mandatory functions required by PSCI v0.2
 
->  ignoring
-> the invalidation of the unaligned boundaries. This wouldn't be much
-> different from your scenario where the shared cache line is written
-> (just less likely to trigger but still a bug, so I would rather notice
-> this early).
-> 
-> The ARMv7 code has a similar issue, it performs clean&invalidate on the
-> unaligned start but it doesn't move r0, so it goes into the main loop
-> invalidating the same cache line again.
+V3:
+ - Make KVM_ARM_VCPU_PSCI_0_2 feature experiementatl for now so that
+   it fails for user space till all mandatory PSCI v0.2 functions are
+   emulated by KVM ARM/ARM64
+ - Have separate patch for making KVM_ARM_VCPU_PSCI_0_2 feature available
+   to user space. This patch can be defferred for now
 
-Yes, and as it's missing a dsb could also lead to the wrong behaviour if
-the invalidate was reordered to execute prior to the clean+invalidate on
-the same line. I just dug into git history to see if I could find a clue
-as to how the v7 code came to look like it does, but I see that it's
-been like that since the day it was submitted in 2007, by a certain
-Catalin Marinas ;-)
+V2:
+ - Don't rename PSCI return values KVM_PSCI_RET_NI and KVM_PSCI_RET_INVAL
+ - Added kvm_psci_version() to get PSCI version available to VCPU
+ - Fixed grammer in Documentation/virtual/kvm/api.txt
+
+V1:
+ - Initial RFC PATCH
+
+Anup Patel (12):
+  KVM: Add capability to advertise PSCI v0.2 support
+  ARM/ARM64: KVM: Add common header for PSCI related defines
+  ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+  KVM: Documentation: Add info regarding KVM_ARM_VCPU_PSCI_0_2 feature
+  ARM/ARM64: KVM: Make kvm_psci_call() return convention      more
+    flexible
+  KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API header
+  ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET
+  ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
+  ARM/ARM64: KVM: Emulate PSCI v0.2 MIGRATE_INFO_TYPE and related
+    functions
+  ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI v0.2
+  ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
+  ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to user space
+
+ Documentation/virtual/kvm/api.txt |   17 +++
+ arch/arm/include/asm/kvm_host.h   |    2 +-
+ arch/arm/include/asm/kvm_psci.h   |    6 +-
+ arch/arm/include/uapi/asm/kvm.h   |   19 +--
+ arch/arm/kvm/arm.c                |    1 +
+ arch/arm/kvm/handle_exit.c        |   10 +-
+ arch/arm/kvm/psci.c               |  231 ++++++++++++++++++++++++++++++++++---
+ arch/arm64/include/asm/kvm_host.h |    2 +-
+ arch/arm64/include/asm/kvm_psci.h |    6 +-
+ arch/arm64/include/uapi/asm/kvm.h |   21 ++--
+ arch/arm64/kvm/handle_exit.c      |   10 +-
+ include/uapi/linux/Kbuild         |    1 +
+ include/uapi/linux/kvm.h          |    9 ++
+ include/uapi/linux/psci.h         |   73 ++++++++++++
+ 14 files changed, 360 insertions(+), 48 deletions(-)
+ create mode 100644 include/uapi/linux/psci.h
 
 -- 
-Tixy
+1.7.9.5
