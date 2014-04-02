@@ -1,98 +1,144 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 2 Apr 2014 19:39:35 +0800
-Subject: [PATCH] ARM i.MX51: Add Digi ConnectCore devicetree
-In-Reply-To: <1396075706-25384-2-git-send-email-shc_work@mail.ru>
-References: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
- <1396075706-25384-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20140402113934.GH8753@dragon>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 02 Apr 2014 13:39:51 +0200
+Subject: [PATCH v7 1/2] dma: Add Xilinx Video DMA DT Binding Documentation
+In-Reply-To: <1396008222-7058-2-git-send-email-sthokal@xilinx.com>
+References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
+ <1396008222-7058-2-git-send-email-sthokal@xilinx.com>
+Message-ID: <533BF707.8030203@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 29, 2014 at 10:48:26AM +0400, Alexander Shiyan wrote:
-> This patch adds support for Digi ConnectCore? i.MX51/Wi-i.MX51 SOM
-> and basic support for the ConnectCore for i.MX51 JumpStart Kit.
+Hi,
+
+On 03/28/2014 01:03 PM, Srikanth Thokala wrote:
+> Device-tree binding documentation of Xilinx Video DMA Engine
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
 > ---
-
-...
-
-> +#include "imx51-digi-connectcore-som.dtsi"
+> Changes in v7:
+> None
+> 
+> Changes in v6:
+> None
+> 
+> Changes in v5:
+> None
+> 
+> Changes in v4:
+> None
+> 
+> Changes in v3:
+> None
+> 
+> Changes in v2:
+> - Removed device-id DT property, as suggested by Arnd Bergmann
+> - Properly documented DT bindings as suggested by Arnd Bergmann
+> ---
+>  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++++++++++++++++++++
+>  1 file changed, 75 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> new file mode 100644
+> index 0000000..ab8be1a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> @@ -0,0 +1,75 @@
+> +Xilinx AXI VDMA engine, it does transfers between memory and video devices.
+> +It can be configured to have one channel or two channels. If configured
+> +as two channels, one is to transmit to the video device and another is
+> +to receive from the video device.
 > +
-> +/ {
-> +	model = "Digi ConnectCore CC(W)-MX51 JSK";
-> +	compatible = "digi,connectcore-ccxmx51-jsk",
-> +		     "digi,connectcore-ccxmx51-som", "fsl,imx51";
-
-You may want to send another patch to DT maintainers to add 'digi' into
-Documentation/devicetree/bindings/vendor-prefixes.txt.
-
+> +Required properties:
+> +- compatible: Should be "xlnx,axi-vdma-1.00.a"
+> +- #dma-cells: Should be <1>, see "dmas" property below
+> +- reg: Should contain VDMA registers location and length.
+> +- xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
+> +- dma-channel child node: Should have atleast one channel and can have upto
+> +	two channels per device. This node specifies the properties of each
+> +	DMA channel (see child node properties below).
 > +
-> +	chosen {
-> +		linux,stdout-path = &uart1;
-> +	};
-> +};
-
-...
-
-> +&nfc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_nfc>;
-> +	nand-bus-width = <8>;
-> +	nand-ecc-mode = "hw";
-> +	nand-on-flash-bbt;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	status = "okay";
+> +Optional properties:
+> +- xlnx,include-sg: Tells whether configured for Scatter-mode in
+> +	the hardware.
+> +- xlnx,flush-fsync: Tells whether which channel to Flush on Frame sync.
+> +	It takes following values:
+> +	{1}, flush both channels
+> +	{2}, flush mm2s channel
+> +	{3}, flush s2mm channel
 > +
-> +	partition at 0 {
-> +		label = "boot";
-> +		reg = <0x00000 0x80000>;
-> +	};
+> +Required child node properties:
+> +- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
+> +	"xlnx,axi-vdma-s2mm-channel".
+> +- interrupts: Should contain per channel VDMA interrupts.
+> +- xlnx,data-width: Should contain the stream data width, take values
+> +	{32,64...1024}.
 > +
-> +	partition at 1 {
-> +		label = "env";
-> +		reg = <0x80000 0x40000>;
-> +	};
-
-@Sascha, does the argument that we shouldn't have partition table in the
-mainline dtb still stands?
-
-> +};
+> +Option child node properties:
+> +- xlnx,include-dre: Tells whether hardware is configured for Data
+> +	Realignment Engine.
+> +- xlnx,genlock-mode: Tells whether Genlock synchronization is
+> +	enabled/disabled in hardware.
 > +
-> +&usbotg {
-> +	phy_type = "utmi_wide";
-> +	disable-over-current;
-> +	/* Device role is not known, keep status disabled */
-> +};
+> +Example:
+> +++++++++
 > +
-> +&weim {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_weim>;
-> +	status = "okay";
+> +axi_vdma_0: axivdma at 40030000 {
+> +	compatible = "xlnx,axi-vdma-1.00.a";
+> +	#dma_cells = <1>;
+> +	reg = < 0x40030000 0x10000 >;
+> +	xlnx,num-fstores = <0x8>;
+> +	xlnx,flush-fsync = <0x1>;
+> +	dma-channel at 40030000 {
+> +		compatible = "xlnx,axi-vdma-mm2s-channel";
+> +		interrupts = < 0 54 4 >;
+> +		xlnx,datawidth = <0x40>;
+> +	} ;
+> +	dma-channel at 40030030 {
+> +		compatible = "xlnx,axi-vdma-s2mm-channel";
+> +		interrupts = < 0 53 4 >;
+> +		xlnx,datawidth = <0x40>;
+> +	} ;
+> +} ;
 > +
-> +	lan9221: lan9221 at ce000000 {
+> +
+> +* DMA client
+> +
+> +Required properties:
+> +- dmas: a list of <[Video DMA device phandle] [Channel ID]> pairs,
+> +	where Channel ID is '0' for write/tx and '1' for read/rx
+> +	channel.
+> +- dma-names: a list of DMA channel names, one per "dmas" entry
+> +
+> +Example:
+> +++++++++
+> +
+> +vdmatest_0: vdmatest at 0 {
+> +	compatible ="xlnx,axi-vdma-test-1.00.a";
+> +	dmas = <&axi_vdma_0 0
+> +		&axi_vdma_0 1>;
+> +	dma-names = "vdma0", "vdma1";
+> +} ;
+> 
 
-How does 'ce000000' in the node name comes?
+Rob, Mark: Any comment regarding binding?
 
-Shawn
+Thanks,
+Michal
 
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_lan9221>;
-> +		compatible = "smsc,lan9221", "smsc,lan9115";
-> +		reg = <5 0x00000000 0x1000>;
-> +		fsl,weim-cs-timing = <
-> +			0x00420081 0x00000000
-> +			0x32260000 0x00000000
-> +			0x72080f00 0x00000000
-> +		>;
-> +		clocks = <&clks IMX5_CLK_DUMMY>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
-> +		phy-mode = "mii";
-> +		reg-io-width = <2>;
-> +		smsc,irq-push-pull;
-> +		vdd33a-supply = <&gpo2_reg>;
-> +		vddvario-supply = <&gpo2_reg>;
-> +	};
-> +};
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140402/c0b382d4/attachment.sig>
