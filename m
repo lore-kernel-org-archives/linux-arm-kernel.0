@@ -1,32 +1,37 @@
 From: syin@broadcom.com (Sherman Yin)
-Date: Wed, 2 Apr 2014 15:40:39 -0700
-Subject: [PATCH v3 3/3] pinctrl: fix typo in bindings documentation
+Date: Wed, 2 Apr 2014 15:40:38 -0700
+Subject: [PATCH v3 2/3] Update bcm_defconfig with new pinctrl CONFIG
 In-Reply-To: <1396478439-16586-1-git-send-email-syin@broadcom.com>
 References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
  <1396478439-16586-1-git-send-email-syin@broadcom.com>
-Message-ID: <1396478439-16586-4-git-send-email-syin@broadcom.com>
+Message-ID: <1396478439-16586-3-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed the missing comma in DT node example.
+To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
+driver and its related CONFIG option are renamed to bcm281xx.
+
+This commit updates the defconfig that enables the pinctrl driver.
 
 Signed-off-by: Sherman Yin <syin@broadcom.com>
+Reviewed-by: Matt Porter <mporter@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../bindings/pinctrl/brcm,bcm11351-pinctrl.txt     |    2 +-
+ arch/arm/configs/bcm_defconfig |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
-index c119deb..67a5db9 100644
---- a/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/brcm,bcm11351-pinctrl.txt
-@@ -119,7 +119,7 @@ Optional Properties (for HDMI pins):
- Example:
- // pin controller node
- pinctrl at 35004800 {
--	compatible = "brcmbcm11351-pinctrl";
-+	compatible = "brcm,bcm11351-pinctrl";
- 	reg = <0x35004800 0x430>;
- 
- 	// pin configuration node
+diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+index 2519d6d..b4d3013 100644
+--- a/arch/arm/configs/bcm_defconfig
++++ b/arch/arm/configs/bcm_defconfig
+@@ -125,7 +125,7 @@ CONFIG_CRC_ITU_T=y
+ CONFIG_CRC7=y
+ CONFIG_XZ_DEC=y
+ CONFIG_AVERAGE=y
+-CONFIG_PINCTRL_CAPRI=y
++CONFIG_PINCTRL_BCM281XX=y
+ CONFIG_WATCHDOG=y
+ CONFIG_BCM_KONA_WDT=y
+ CONFIG_BCM_KONA_WDT_DEBUG=y
 -- 
 1.7.9.5
