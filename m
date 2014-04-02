@@ -1,56 +1,54 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 2 Apr 2014 13:59:19 +0200
-Subject: [PATCH] ARM: at91: fix spi cs on sama5d3 Xplained board
-In-Reply-To: <1396336363-13709-1-git-send-email-voice.shen@atmel.com>
-References: <1396336363-13709-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140402115919.GA14726@piout.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 02 Apr 2014 14:01:53 +0200
+Subject: [PATCH 02/10] ARM: EXYNOS: Correct file path in comment message
+In-Reply-To: <1396425058-4012-3-git-send-email-pankaj.dubey@samsung.com>
+References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+ <1396425058-4012-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <533BFC31.1080203@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2014 at 15:12:43 +0800, Bo Shen wrote :
-> The PD16 is the CS3 for SPI0 while not SPI1.
+On 04/02/2014 09:50 AM, Pankaj Dubey wrote:
+> This patch corrects file path mentioned in file comment message.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
-> This patch is based on v3.14-rc8
+>  arch/arm/mach-exynos/platsmp.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index 03e5e9f..d8d1555 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -1,4 +1,4 @@
+> -/* linux/arch/arm/mach-exynos4/platsmp.c
+> +/* linux/arch/arm/mach-exynos/platsmp.c
+>   *
+>   * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+>   *		http://www.samsung.com
 > 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index ce13755..4537259 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -34,7 +34,7 @@
->  			};
->  
->  			spi0: spi at f0004000 {
-> -				cs-gpios = <&pioD 13 0>;
-> +				cs-gpios = <&pioD 13 0>, <0>, <0>, <&pioD 16 0>;
->  				status = "okay";
->  			};
->  
-> @@ -79,7 +79,7 @@
->  			};
->  
->  			spi1: spi at f8008000 {
-> -				cs-gpios = <&pioC 25 0>, <0>, <0>, <&pioD 16 0>;
-> +				cs-gpios = <&pioC 25 0>;
->  				status = "okay";
->  			};
->  
-> -- 
-> 1.8.5.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Shouldn't you just remove it entirely?
+I had the same file names in the whole microblaze tree
+and some months/years later this was just broken everywhere.
+That's why it is just easier to remove it entirely.
+
+Thanks,
+Michal
+
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140402/4f7d22f3/attachment.sig>
