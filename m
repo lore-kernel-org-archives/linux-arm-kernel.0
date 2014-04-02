@@ -1,96 +1,94 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 2 Apr 2014 10:04:34 +0000
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <9532591.5yuCbpL4pV@wuerfel>
-References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
- <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
- <9532591.5yuCbpL4pV@wuerfel>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D0F6EE729@AcuExch.aculab.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 02 Apr 2014 12:18:37 +0200
+Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <20140401163744.GE3842@kroah.com>
+References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
+ <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
+ <20140331200620.GA13881@kroah.com> <533ABCEC.8040701@codethink.co.uk>
+ <533ACBD0.8030209@samsung.com> <20140401163744.GE3842@kroah.com>
+Message-ID: <533BE3FD.8070902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann
-> On Tuesday 01 April 2014 21:27:12 Zhangfei Gao wrote:
-> > +static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+On 01/04/14 18:37, Greg KH wrote:
+> On Tue, Apr 01, 2014 at 04:23:12PM +0200, Sylwester Nawrocki wrote:
+>> On 01/04/14 15:19, Ben Dooks wrote:
+>>> On 31/03/14 21:06, Greg KH wrote:
+>>>>> On Mon, Mar 31, 2014 at 06:41:56PM +0200, Sylwester Nawrocki wrote:
+>> [...]
+>>>>> I don't understand why you need the driver core to initialize this one
+>>>>> type of thing?  That should be in a driver, or in a class, or at worse
+>>>>> case, the platform code.
+>>>>>
+>>>>> What makes clocks so "unique" here?
+>>
+>> The reason I put it in the driver core was mainly to avoid having many
+>> drivers doing same call to this initialization function.
+>> I was considering moving it to the bus code, still there are several
+>> buses for which it would need to be repeated.
 > 
-> While it looks like there are no serious functionality bugs left, this
-> function is rather inefficient, as has been pointed out before:
+> "several" is how many?  2?  3?  10?
+
+It would be mostly the platform and amba bus, but this clock defaults
+could be useful also for i2c, spi. In general it's about not probable
+devices which may be specified in devicetree.
+
+> Please fix it "correctly" and don't put it in the driver core just
+> because it seems easier that way.
 > 
-> > +{
-> > +       struct hip04_priv *priv = netdev_priv(ndev);
-> > +       struct net_device_stats *stats = &ndev->stats;
-> > +       unsigned int tx_head = priv->tx_head;
-> > +       struct tx_desc *desc = &priv->tx_desc[tx_head];
-> > +       dma_addr_t phys;
-> > +
-> > +       hip04_tx_reclaim(ndev, false);
-> > +       mod_timer(&priv->txtimer, jiffies + RECLAIM_PERIOD);
-> > +
-> > +       if (priv->tx_count >= TX_DESC_NUM) {
-> > +               netif_stop_queue(ndev);
-> > +               return NETDEV_TX_BUSY;
-> > +       }
+>> Maybe really_probe() is not a best place to put this, nonetheless
+>> the requirements I could list were:
+>>
+>>  1. not involving individual drivers,
 > 
-> This is where you have two problems:
+> Why not?
+
+I'd say because this thing can be often considered a platform detail
+which would be better opaque to drivers. It's at the border of a device
+and its integration within a platform.
+
+>>  2. have such an initialization call done for all devices, irrespective
+>>     of Linux bus or class type,
 > 
-> - if the descriptor ring is full, you wait for RECLAIM_PERIOD,
->   which is far too long at 500ms, because during that time you
->   are not able to add further data to the stopped queue.
+> Why?  Do _all_ devices that Linux supports have this issue to be
+> resolved?
 
-Best to have some idea how long it will take for the ring to empty.
-IIRC you need a count of the bytes in the tx ring anyway.
-There isn't much point waking up until most of the queued
-transmits have had time to complete.
+Sorry, certainly not all devices. I think it's only related to the
+non-probable devices which can be specified in DT.
 
-> - As David Laight pointed out earlier, you must also ensure that
->   you don't have too much /data/ pending in the descriptor ring
->   when you stop the queue. For a 10mbit connection, you have already
->   tested (as we discussed on IRC) that 64 descriptors with 1500 byte
->   frames gives you a 68ms round-trip ping time, which is too much.
->   Conversely, on 1gbit, having only 64 descriptors actually seems
->   a little low, and you may be able to get better throughput if
->   you extend the ring to e.g. 512 descriptors.
-
-The descriptor count matters most for small packets.
-There are workloads (I've got one) that can send 1000s of small packets/sec
-on a single TCP connection (there will be receive traffic).
-
-> > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
-> > +       if (dma_mapping_error(&ndev->dev, phys)) {
-> > +               dev_kfree_skb(skb);
-> > +               return NETDEV_TX_OK;
-> > +       }
-> > +
-> > +       priv->tx_skb[tx_head] = skb;
-> > +       priv->tx_phys[tx_head] = phys;
-> > +       desc->send_addr = cpu_to_be32(phys);
-> > +       desc->send_size = cpu_to_be16(skb->len);
-> > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
-> > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
-> > +       desc->wb_addr = cpu_to_be32(phys);
+>>  3. Handle errors properly, e.g. defer driver probing if a clock for
+>>    a device is not yet available.
 > 
-> One detail: since you don't have cache-coherent DMA, "desc" will
-> reside in uncached memory, so you try to minimize the number of accesses.
-> It's probably faster if you build the descriptor on the stack and
-> then atomically copy it over, rather than assigning each member at
-> a time.
+> Then do it in the bus that controls that device, as it knows to defer
+> probing at that point in time.
 
-I'm not sure, the writes to uncached memory will probably be
-asynchronous, but you may avoid a stall by separating the
-cycles in time.
-What you need to avoid is reads from uncached memory.
-It may well beneficial for the tx reclaim code to first
-check whether all the transmits have completed (likely)
-instead of testing each descriptor in turn.
+All right, that would also work. I suspect doing it for platform and
+amba bus might be sufficient in the beginning.
 
-> The same would be true for the rx descriptors.
+>> One advantage I could see from making the call from within a device
+>> driver is that a device could keep using the common DT bindings and
+>> replace the common initialization function with a private one, if
+>> there is a need for some quirks handled for a device. With approach
+>> as in this patch it's difficult to override the default behaviour.
+>> However then there is a question whether we strive for the clocks
+>> management to be possibly kept away from device drivers.
+>>
+>>> I suppose the issue here is that a lot of drivers currently use
+>>> clocks and a number of systems have badly setup default clock trees
+>>> at start time.
+>>>
+>>> Mark Brown and others have argued that the management of clocks which
+>>> is common to all devices should not live in the driver.
+>>
+>> True, motivation behind this patch series was also replacing custom
+>> code in multiple drivers doing similar clock rate or parent setting
+>> by a common code, using standardized DT binding.
+> 
+> Then put it in the bus that controls these broken devices / platforms.
 
-Actually it is reasonably feasible to put the rx descriptors
-in cacheable memory and to flush the cache lines after adding
-new entries.
-You just need to add the entries one cache line full at a time
-(and ensure that the rx processing code doesn't dirty the line).
+OK, I'm going to put it in the bus code.
 
-Without cache-coherent memory cached tx descriptors are much harder work.
-
-	David
+-- 
+Thanks,
+Sylwester
