@@ -1,29 +1,35 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 02 Apr 2014 17:02:55 +0900
-Subject: [PATCH 0/3] Add PMU node for Exynos4210, Exynos4412, Exynos4212
-Message-ID: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Wed, 02 Apr 2014 17:02:56 +0900
+Subject: [PATCH 1/3] ARM: dts: Add PMU reg node to exynos4210
+In-Reply-To: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1396425778-4379-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates Exynos4210, Exynos4412 and Exynos4212 dtsi files
-for adding PMU (Power Management Unit) reg node. Also updated binding
-document for the same. 
-These patches required for using PMU base address via DT for these SoC.
-Patches for using PMU base address via DT are posted here-
+This patch adds pmu regnode to exynos4210 dtsi to handle
+PMU register access via DT.
 
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg27875.html
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/boot/dts/exynos4210.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Pankaj Dubey (3):
-  ARM: dts: Add PMU reg node to exynos4210
-  ARM: dts: Add PMU reg node to exynos4212 and exynos4412
-  Documentation: update samsung pmu binding information for
-    Exynos4210/4212/4412
-
- Documentation/devicetree/bindings/arm/samsung/pmu.txt |    3 +++
- arch/arm/boot/dts/exynos4210.dtsi                     |    5 +++++
- arch/arm/boot/dts/exynos4212.dtsi                     |    5 +++++
- arch/arm/boot/dts/exynos4412.dtsi                     |    5 +++++
- 4 files changed, 18 insertions(+)
-
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index cacf614..0a2c0fe 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -81,6 +81,11 @@
+ 		interrupts = <2 2>, <3 2>;
+ 	};
+ 
++	pmu_system_controller: system-controller at 10020000 {
++		compatible = "samsung,exynos4210-pmu", "syscon";
++		reg = <0x10020000 0x5000>;
++	};
++
+ 	pinctrl_0: pinctrl at 11400000 {
+ 		compatible = "samsung,exynos4210-pinctrl";
+ 		reg = <0x11400000 0x1000>;
 -- 
 1.7.10.4
