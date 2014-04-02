@@ -1,31 +1,46 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed,  2 Apr 2014 21:34:23 +0800
-Subject: [PATCH 2/2] ARM: dts: fix L2 address in Hi3620
-In-Reply-To: <1396445663-1357-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1396445663-1357-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1396445663-1357-2-git-send-email-haojian.zhuang@linaro.org>
+From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
+Date: Wed, 2 Apr 2014 15:38:55 +0200
+Subject: [PATCH] ARM: i.MX6: update KSZ9031 phy fixup
+In-Reply-To: <20140402131404.GE8558@dragon>
+References: <1395421687-12934-1-git-send-email-hchaumette@adeneo-embedded.com>
+ <20140321222320.14370739@e6520eb>
+ <1762157698.5689069.1395675049240.JavaMail.zimbra@adeneo-embedded.com>
+ <20140324164141.51b85f8c@e6520eb> <20140402131404.GE8558@dragon>
+Message-ID: <20140402153855.237e7a50@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the address of L2 controler register in hi3620 SoC.
+Hi Shawn,
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/boot/dts/hi3620.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Le Wed, 2 Apr 2014 21:14:08 +0800,
+Shawn Guo <shawn.guo@linaro.org> a ?crit :
 
-diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
-index ab1116d..83a5b86 100644
---- a/arch/arm/boot/dts/hi3620.dtsi
-+++ b/arch/arm/boot/dts/hi3620.dtsi
-@@ -73,7 +73,7 @@
- 
- 		L2: l2-cache {
- 			compatible = "arm,pl310-cache";
--			reg = <0xfc10000 0x100000>;
-+			reg = <0x100000 0x100000>;
- 			interrupts = <0 15 4>;
- 			cache-unified;
- 			cache-level = <2>;
--- 
-1.8.3.2
+> 
+> On Mon, Mar 24, 2014 at 04:41:41PM +0100, Eric B?nard wrote:
+> > Hi Hubert,
+> > 
+> > Le Mon, 24 Mar 2014 16:30:49 +0100 (CET),
+> > CHAUMETTE Hubert <hchaumette@adeneo-embedded.com> a ?crit :
+> > > > From: "Eric B?nard" <eric@eukrea.com>
+> > > > that's board specific (the needed delay depends on the routing delay on
+> > > > the PCB), so this should not go in a generic file.
+> > > > 
+> > > > Eric
+> > > > 
+> > > 
+> > > I admit it may need to be in a separate function, but this file already contains
+> > > board-specific fixups (for imx6q sabrelite, Data Modul eDM-QMX6).
+> > > 
+> > true but that's not a reason to add more ;-)
+> > 
+> > > Anyway, do you have any suggestion for the location I should put it ?
+> > > 
+> > no idea at the moment, I simply used your patch to bring this issue on
+> > the ML as we recently needed to patch the default values for testing
+> > mainline kernel on a custom boards.
+> 
+> Hmm, can such board-specific fixups be pushed down to bootloader?
+> 
+that won't work if the kernel reset the PHY.
+
+Eric
