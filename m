@@ -1,28 +1,14 @@
-From: nitin.garg@freescale.com (Nitin Garg)
-Date: Wed, 2 Apr 2014 02:39:38 +0000
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 1 Apr 2014 21:37:49 -0500
 Subject: [PATCH] ARM: errata: workaround Cortex-A9 errata 761320 and 794072
-In-Reply-To: <CAL_JsqLNMrRV0JXYSsJ-8J2aPpY+RaRxeD24jPNqs2qPkFj=GA@mail.gmail.com>
+In-Reply-To: <d687ddaf7b6e4eeca23b44bfdf26a55b@BLUPR03MB358.namprd03.prod.outlook.com>
 References: <1396298072-13254-1-git-send-email-nitin.garg@freescale.com>
  <1396298072-13254-2-git-send-email-nitin.garg@freescale.com>
  <CAL_JsqK--G_7nO_UQ6jyomA1Sq6GUKtXVZpBF0dXjYA2iE047w@mail.gmail.com>
  <d687ddaf7b6e4eeca23b44bfdf26a55b@BLUPR03MB358.namprd03.prod.outlook.com>
- <CAL_JsqLNMrRV0JXYSsJ-8J2aPpY+RaRxeD24jPNqs2qPkFj=GA@mail.gmail.com>
-Message-ID: <a96415b0b181497095e013901f32dd64@BLUPR03MB358.namprd03.prod.outlook.com>
+Message-ID: <CAL_JsqLNMrRV0JXYSsJ-8J2aPpY+RaRxeD24jPNqs2qPkFj=GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Got it, Thanks!
-
-Regards,
-Nitin Garg
-
-
------Original Message-----
-From: Rob Herring [mailto:robherring2 at gmail.com] 
-Sent: Tuesday, April 01, 2014 9:38 PM
-To: Garg Nitin-B37173
-Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org; Catalin Marinas; Arnd Bergmann
-Subject: Re: [PATCH] ARM: errata: workaround Cortex-A9 errata 761320 and 794072
 
 On Tue, Apr 1, 2014 at 8:18 PM, Nitin Garg <nitin.garg@freescale.com> wrote:
 > Hi Rob,
@@ -57,9 +43,13 @@ Date:   Fri Dec 21 22:42:40 2012 +0100
     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
 
-And one hint, the solution for you is not adding "depends on !CONFIG_ARCH_MULTIPLATFORM". Adding that for something new will not get accepted.
+And one hint, the solution for you is not adding "depends on
+!CONFIG_ARCH_MULTIPLATFORM". Adding that for something new will not
+get accepted.
 
-Once exynos is converted to multi-platform, we may be able to actually remove all these A9 errata as there may not be any more non multi-platform A9 or A15 based platforms.
+Once exynos is converted to multi-platform, we may be able to actually
+remove all these A9 errata as there may not be any more non
+multi-platform A9 or A15 based platforms.
 
 Rob
 
@@ -73,12 +63,11 @@ Rob
 > Sent: Tuesday, April 01, 2014 8:12 PM
 > To: Garg Nitin-B37173
 > Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM: errata: workaround Cortex-A9 errata 761320 
-> and 794072
+> Subject: Re: [PATCH] ARM: errata: workaround Cortex-A9 errata 761320 and 794072
 >
 > On Mon, Mar 31, 2014 at 3:34 PM, Nitin Garg <nitin.garg@freescale.com> wrote:
 >> Add workaround for Cortex-A9 errata 761320 ([present on r0, r1, r2,
->> r3) and 794072 (present on all revisions). These are Category B, 
+>> r3) and 794072 (present on all revisions). These are Category B,
 >> present on SMP systems.
 >
 > These work-arounds don't work on non-secure systems which don't have access to the diagnostic register. There is no architectural way to determine secure vs. non-secure mode. It's been discussed before and decided that these types of work-arounds must go into the bootloader or firmware.
@@ -93,7 +82,7 @@ Rob
 >>  arch/arm/mm/proc-v7.S     |   11 +++++++++++
 >>  3 files changed, 36 insertions(+), 0 deletions(-)
 >>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index 
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
 >> a48712e..f8464ff 100644
 >> --- a/arch/arm/Kconfig
 >> +++ b/arch/arm/Kconfig
@@ -127,7 +116,7 @@ Rob
 >>  config PL310_ERRATA_753970
 >>         bool "PL310 errata: cache sync operation may be faulty"
 >>         depends on CACHE_PL310
->> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig 
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
 >> index 5740296d..19690c2 100644
 >> --- a/arch/arm/mach-imx/Kconfig
 >> +++ b/arch/arm/mach-imx/Kconfig
