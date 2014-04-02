@@ -1,35 +1,68 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Wed,  2 Apr 2014 16:12:27 +0530
-Subject: [PATCH v7 12/12] ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to
- user space
-In-Reply-To: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1396435347-20056-13-git-send-email-anup.patel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Apr 2014 11:46:45 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
+References: <201403242121.58705.marex@denx.de>
+ <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
+ <20140324234443.GS7528@n2100.arm.linux.org.uk>
+ <20140326001135.GV7528@n2100.arm.linux.org.uk>
+ <20140401092638.GA10224@n2100.arm.linux.org.uk>
+ <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
+ <20140401225149.GC7528@n2100.arm.linux.org.uk>
+ <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402085914.GG7528@n2100.arm.linux.org.uk>
+ <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
+Message-ID: <20140402104644.GI7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have PSCI v0.2 emulation available in KVM ARM/ARM64
-hence advertise this to user space (i.e. QEMU or KVMTOOL)
-via KVM_CHECK_EXTENSION ioctl.
+On Wed, Apr 02, 2014 at 09:40:53AM +0000, fugang.duan at freescale.com wrote:
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Data: Wednesday, April 02, 2014 4:59 PM
+> >I wonder whether you understand what is going on here, and why it is required.
+> >I doubt it somehow from your comments.  Maybe if you were to read about the
+> >operation of the store buffer in the PL310, it may open your eyes to why it
+> >would be necessary for reliable operation.
+> 
+> In kernel 3.0.35 internal BSP,  BD memory is non-cacheable, non-bufferable
+> (we add new api to support it: dma_alloc_noncacheable()),
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c |    1 +
- 1 file changed, 1 insertion(+)
+As is the memory you get from dma_alloc_coherent().  So, why did you
+invent a new API which does something which the mainline kernel APIs
+already do?
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index bd18bb8..2076605 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -197,6 +197,7 @@ int kvm_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
- 	case KVM_CAP_ONE_REG:
- 	case KVM_CAP_ARM_PSCI:
-+	case KVM_CAP_ARM_PSCI_0_2:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
+Maybe yours is doing something different but you haven't explained it
+in correct terminology.
+
+> So wmb() is not necessary.
+
+Even on non-cacheable normal memory, the wmb() is required.  Please read
+up in the ARM architecture reference manual about memory types and their
+various attributes, followed by the memory ordering chapters.
+
+> Yes, it don't impact imx6q since cpu loading is not bottleneck due
+> rx/tx bandwidth is slow and multi-cores.  But for imx6sx, enet rx can
+> reach at 940Mbps, tx can reach at 900Mbps, imx6sx is sigle core.
+
+What netdev features do you support to achieve that?
+
+> Enet IP don't support TSO feaure, cpu loading is the bottleneck. Wmb()
+> is very expensive which cause tx performance drop much.
+
+wmb() is very expensive because of the L2 cache code using a sledge hammer
+with it - particularly the spinlock, which has a large overhead if lockdep
+or spinlock debugging is enabled.
+
+> Yes, I agree. There have some arch/driver patches need to upstream to
+> align the performance with internal bsp.
+
+Well, post these patches so that people can test them.  If your patches
+are indeed the worlds best thing since sliced bread, I've just wasted
+over two months of solid work on the iMX6 ethernet driver.
+
+However, hacks like dma_alloc_noncacheable will not be acceptable for
+mainline.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
