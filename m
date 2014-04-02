@@ -1,68 +1,38 @@
-From: Hong-Xing.Zhu@freescale.com (Hong-Xing.Zhu at freescale.com)
-Date: Wed, 2 Apr 2014 12:57:25 +0000
-Subject: [PATCH 1/8] ARM: imx6q-clk: parent lvds_gate from lvds_sel
-In-Reply-To: <1396025579-14344-2-git-send-email-l.stach@pengutronix.de>
-References: <1396025579-14344-1-git-send-email-l.stach@pengutronix.de>
- <1396025579-14344-2-git-send-email-l.stach@pengutronix.de>
-Message-ID: <2d4c3e19ef3f4579a2cbdea70176e7d3@BLUPR03MB136.namprd03.prod.outlook.com>
+From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
+Date: Wed, 2 Apr 2014 22:58:20 +1000
+Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
+ friendly address
+In-Reply-To: <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+ <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+ <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
+ <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+Message-ID: <CAEgOgz4gxyDd+LSC+TF2bi_kKsvA8Uo2+iGx3U-ygFS1rngfzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas:
-Thanks for your re-structure the management of the output on CLK1/2 pads.
+On Wed, Apr 2, 2014 at 10:47 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
+>> Like others, I have been carrying this change locally. Good to see it up!
+>
+> Why are you all booting raw Images anyway (just out of curiosity)? All my
+> test cases boot either a zImage or a uImage, or occasionally a full SD card
+> image, or I'd have noticed this earlier...
+>
 
+Simplicity more than anything. It is much easier to debug against
+head.S (esp. with the -d in_asm option), when you can see the head.s
+asm as the very first thing the CPU executes. Otherwise you gotta
+filter out the zImage stuffs. There have also been occasions where I
+have broken QEMU locally as part of some random work-in-progress
+development such that the zImage head doesnt work and i'd rather just
+move my debug efforts to kernel proper. None of them are fantastic
+reasons from a user perspective but it's just a little easier on
+developing.
 
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org]
-> On Behalf Of Lucas Stach
-> Sent: Saturday, March 29, 2014 12:53 AM
-> To: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
-> devicetree at vger.kernel.org; Sean Cross; Marek Vasut; Zhu Richard-R65037; Bjorn
-> Helgaas; Jingoo Han; Shawn Guo; Ian Campbell; Mark Rutland; Pawel Moll; Rob
-> Herring; Arnd Bergmann; Tim Harvey; kernel at pengutronix.de
-> Subject: [PATCH 1/8] ARM: imx6q-clk: parent lvds_gate from lvds_sel
-> 
-> Allows fror proper refcounting of the parent clocks when enabling the clock
-> output on CLK1/2 pads.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Regards,
+Peter
 
-Acked-by: Richard Zhu <r65037@freescale.com>
-
-> ---
->  arch/arm/mach-imx/clk-imx6q.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index af2e582d2b74..f98a6bb98145 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -208,8 +208,8 @@ static void __init imx6q_clocks_init(struct device_node
-> *ccm_node)
->  	 * the "output_enable" bit as a gate, even though it's really just
->  	 * enabling clock output.
->  	 */
-> -	clk[lvds1_gate] = imx_clk_gate("lvds1_gate", "dummy", base + 0x160, 10);
-> -	clk[lvds2_gate] = imx_clk_gate("lvds2_gate", "dummy", base + 0x160, 11);
-> +	clk[lvds1_gate] = imx_clk_gate("lvds1_gate", "lvds1_sel", base + 0x160,
-> 10);
-> +	clk[lvds2_gate] = imx_clk_gate("lvds2_gate", "lvds2_sel", base +
-> +0x160, 11);
-> 
->  	/*                                name              parent_name
-> reg       idx */
->  	clk[pll2_pfd0_352m] = imx_clk_pfd("pll2_pfd0_352m", "pll2_bus",     base
-> + 0x100, 0);
-> --
-> 1.9.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the
-> body of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
-> 
-
-
-Best Regards
-Richard Zhu
+> thanks
+> -- PMM
+>
