@@ -1,55 +1,49 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed,  2 Apr 2014 09:46:08 -0700
-Subject: [PATCH 1/1] arm64:dts: Add I2C DTS node entry for APM SoC X-Gene
- platform
-Message-ID: <1396457168-26024-1-git-send-email-fkan@apm.com>
+From: amurray@embedded-bits.co.uk (Andrew Murray)
+Date: Wed, 2 Apr 2014 17:47:04 +0100
+Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based on
+ designware core driver
+In-Reply-To: <533C300E.7070109@ti.com>
+References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
+ <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
+ <235376049.yyfljDtinu@wuerfel> <20140325103525.GA14789@ulmo>
+ <CAPcvp5Gy8uNW3UULi8jYk7GNbmgTd2B_qOEAXnP4H4Wq3v9BCw@mail.gmail.com>
+ <533C300E.7070109@ti.com>
+Message-ID: <CAPcvp5FEFbP_Fwc47V=LppiZnfbTgPqaAAm-A9K17dVEZWwHQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C DTS node entry for APM SoC X-Gene platform.
+On 2 April 2014 16:43, Murali Karicheri <m-karicheri2@ti.com> wrote:
 
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   27 +++++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
+> Keystone pcie driver is developed based on other dw based pcie drivers
+>
+> such as pci-exynos that uses subsys_initcall(). I am new to this list,
+>
+> probably Jingoo (copied) has some history on why we can't use module.
+> For now I will keep it as is and can be re-visited in the next revisions.
+> Also I will experiment with PCIE port driver as well.
+>
+>
+> BTW, PCIE driver currently uses Legacy or MSI IRQ. Keystone PCI has
+> a platform IRQ. Is DT based irq configuration is the appropriate way
+> to add this capability?
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index d37d736..f90d34c 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -176,6 +176,33 @@
- 				reg-names = "csr-reg";
- 				clock-output-names = "eth8clk";
- 			};
-+
-+			i2cclk: i2cclk at 17000000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				reg = <0x0 0x17000000 0x0 0x2000>;
-+				reg-names = "csr-reg";
-+				csr-offset = <0x0>;
-+				csr-mask = <0x2>;
-+				enable-offset = <0x10>;
-+				enable-mask = <0x4>;
-+				divider-offset = <0x168>;
-+				divider-width = <0x5>;
-+				divider-shift = <0x0>;
-+				clock-output-names = "i2cclk";
-+			};
-+		};
-+
-+		i2c0: i2c at 10512000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "snps,designware-i2c";
-+			reg = <0x0 0x10512000 0x0 0x1000>;
-+			interrupts = <0 0x44 0x4>;
-+			#clock-cells = <1>;
-+			clocks = <&i2cclk 0>;
-+			bus_num = <0>;
- 		};
- 
- 		serial0: serial at 1c020000 {
--- 
-1.7.6.1
+As far as I am aware - the PCI standards define a particular way for
+devices to describe which interrupt will be used for things like
+hotplug, AER and PME. These interrupts are always PCI interrupts (i.e.
+MSI/MSI-X/legacy). Thus the port services code in the kernel uses
+standard configuration space accesses to determine the interrupt to
+use. Also note that it's not just the host bridge that can provide
+these services but any PCIE device, I guess in this sense a host
+bridge is treated like any other device.
+
+If my understanding is correct I don't believe the current port
+services code allows exceptions to this, i.e. to say this host bridge
+actually uses a platform IRQ for AER rather than an MSI. Though this
+may be quite useful as I suspect many host bridges provide interrupts
+for things like PME through platform IRQs rather that PCI interrupts.
+
+Does the Keystone have platform IRQs for things like AER? Is that
+because the IP makes these events available through platform IRQs in
+addition to the standard PCI means?
+
+Andrew Murray
