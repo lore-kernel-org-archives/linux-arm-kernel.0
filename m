@@ -1,84 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Apr 2014 11:21:45 +0200
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
-References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
- <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <9532591.5yuCbpL4pV@wuerfel>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 02 Apr 2014 11:30:10 +0200
+Subject: [PATCH 06/75] ARM: outer cache: add documentation of outer cache
+ functions
+In-Reply-To: <E1WTYUc-0004WH-16@rmk-PC.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYUc-0004WH-16@rmk-PC.arm.linux.org.uk>
+Message-ID: <533BD8A2.5070808@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 April 2014 21:27:12 Zhangfei Gao wrote:
-> +static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+On 03/28/2014 04:14 PM, Russell King wrote:
+> Add some documentation to cover the outer cache functions so that their
+> requirements can be better understood.  Of particular note are the
+> flush_all() and disable() methods which must not be called except in
+> very specific circumstances.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/outercache.h | 48 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 47 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+> index 0e4420858990..bd80540fe8b9 100644
+> --- a/arch/arm/include/asm/outercache.h
+> +++ b/arch/arm/include/asm/outercache.h
+> @@ -39,35 +39,75 @@ struct outer_cache_fns {
+>  extern struct outer_cache_fns outer_cache;
+>  
+>  #ifdef CONFIG_OUTER_CACHE
+> -
+> +/**
+> + * outer_inv_range: invalidate range of outer cache lines
 
-While it looks like there are no serious functionality bugs left, this
-function is rather inefficient, as has been pointed out before:
+This is not proper kernel-doc format.
 
-> +{
-> +       struct hip04_priv *priv = netdev_priv(ndev);
-> +       struct net_device_stats *stats = &ndev->stats;
-> +       unsigned int tx_head = priv->tx_head;
-> +       struct tx_desc *desc = &priv->tx_desc[tx_head];
-> +       dma_addr_t phys;
-> +
-> +       hip04_tx_reclaim(ndev, false);
-> +       mod_timer(&priv->txtimer, jiffies + RECLAIM_PERIOD);
-> +
-> +       if (priv->tx_count >= TX_DESC_NUM) {
-> +               netif_stop_queue(ndev);
-> +               return NETDEV_TX_BUSY;
-> +       }
+It should be like this:
+ /**
+- * outer_inv_range: invalidate range of outer cache lines
++ * outer_inv_range - invalidate range of outer cache lines
 
-This is where you have two problems:
+The same change should be done below too.
 
-- if the descriptor ring is full, you wait for RECLAIM_PERIOD,
-  which is far too long at 500ms, because during that time you
-  are not able to add further data to the stopped queue.
+[linux]$ ./scripts/kernel-doc -man -v arch/arm/include/asm/outercache.h >/dev/null
+Warning(arch/arm/include/asm/outercache.h:43): missing initial short description on line:
+ * outer_inv_range: invalidate range of outer cache lines
+Info(arch/arm/include/asm/outercache.h:43): Scanning doc for outer_inv_range
+Warning(arch/arm/include/asm/outercache.h:54): missing initial short description on line:
+ * outer_clean_range: clean dirty outer cache lines
+Info(arch/arm/include/asm/outercache.h:54): Scanning doc for outer_clean_range
+Warning(arch/arm/include/asm/outercache.h:65): missing initial short description on line:
+ * outer_flush_range: clean and invalidate outer cache lines
+Info(arch/arm/include/asm/outercache.h:65): Scanning doc for outer_flush_range
+Warning(arch/arm/include/asm/outercache.h:76): missing initial short description on line:
+ * outer_flush_all: clean and invalidate all cache lines in the outer cache
+Info(arch/arm/include/asm/outercache.h:76): Scanning doc for outer_flush_all
+Warning(arch/arm/include/asm/outercache.h:93): missing initial short description on line:
+ * outer_disable: clean, invalidate and disable the outer cache
+Info(arch/arm/include/asm/outercache.h:93): Scanning doc for outer_disable
+Info(arch/arm/include/asm/outercache.h:106): Scanning doc for restore the cache configuration and re
+Warning(arch/arm/include/asm/outercache.h:133): missing initial short description on line:
+ * outer_sync: perform a sync point for outer cache
+Info(arch/arm/include/asm/outercache.h:133): Scanning doc for outer_sync
 
-- As David Laight pointed out earlier, you must also ensure that
-  you don't have too much /data/ pending in the descriptor ring
-  when you stop the queue. For a 10mbit connection, you have already
-  tested (as we discussed on IRC) that 64 descriptors with 1500 byte
-  frames gives you a 68ms round-trip ping time, which is too much.
-  Conversely, on 1gbit, having only 64 descriptors actually seems
-  a little low, and you may be able to get better throughput if
-  you extend the ring to e.g. 512 descriptors.
+Thanks,
+Michal
 
-> +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
-> +       if (dma_mapping_error(&ndev->dev, phys)) {
-> +               dev_kfree_skb(skb);
-> +               return NETDEV_TX_OK;
-> +       }
-> +
-> +       priv->tx_skb[tx_head] = skb;
-> +       priv->tx_phys[tx_head] = phys;
-> +       desc->send_addr = cpu_to_be32(phys);
-> +       desc->send_size = cpu_to_be16(skb->len);
-> +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
-> +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
-> +       desc->wb_addr = cpu_to_be32(phys);
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-One detail: since you don't have cache-coherent DMA, "desc" will
-reside in uncached memory, so you try to minimize the number of accesses.
-It's probably faster if you build the descriptor on the stack and
-then atomically copy it over, rather than assigning each member at
-a time.
 
-The same would be true for the rx descriptors.
-
-> +       skb_tx_timestamp(skb);
-> +
-> +       /* Don't wait up for transmitted skbs to be freed. */
-> +       skb_orphan(skb);
-> +
-> +       hip04_set_xmit_desc(priv, phys);
-> +       priv->tx_head = TX_NEXT(tx_head);
-> +
-> +       stats->tx_bytes += skb->len;
-> +       stats->tx_packets++;
-> +       priv->tx_count++;
-> +
-> +       return NETDEV_TX_OK;
-> +}
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140402/fd84ac0b/attachment.sig>
