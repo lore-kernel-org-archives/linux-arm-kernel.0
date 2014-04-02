@@ -1,47 +1,21 @@
-From: menon.nishanth@gmail.com (menon.nishanth at gmail.com)
-Date: Wed, 2 Apr 2014 11:59:30 -0500
-Subject: OMAP baseline test results for v3.14
-In-Reply-To: <20140402163521.GD12234@atomide.com>
-References: <alpine.DEB.2.02.1404021600320.15928@utopia.booyaka.com>
- <20140402162102.GB12234@atomide.com>
- <alpine.DEB.2.02.1404021631040.15928@utopia.booyaka.com>
- <20140402163521.GD12234@atomide.com>
-Message-ID: <CAGo_u6qJt5BRQHDvRjWe7Gjt+AfEBxaOPxCnq66QxMUdZew3Vg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Apr 2014 18:00:34 +0100
+Subject: [PATCH 1/2] ARM: hisi: enable L2 driver
+In-Reply-To: <1396445663-1357-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1396445663-1357-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140402170034.GK7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 2, 2014 at 11:35 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Paul Walmsley <paul@pwsan.com> [140402 09:36]:
->> On Wed, 2 Apr 2014, Tony Lindgren wrote:
->>
->> > * Paul Walmsley <paul@pwsan.com> [140402 09:07]:
->> > >
->> > > Here are some basic OMAP test results for Linux v3.14.
->> > > Logs and other details at:
->> > >
->> > >     http://www.pwsan.com/omap/testlogs/test_v3.14/20140402004448/
->> > >
->> > > Boot to userspace:
->> > >     FAIL ( 1/12): 2430sdp
->> >
->> > Is this a new regression with MMC? Looks like your boot log for this
->> > ends with "Waiting for root device /dev/mmcblk0p1...".
->>
->> It's new since v3.14-rc1:
->>
->> http://www.spinics.net/lists/arm-kernel/msg306448.html
->>
->> http://www.spinics.net/lists/arm-kernel/msg306454.html
->>
->> http://www.spinics.net/lists/arm-kernel/msg306455.html
->
-> OK looks like I never noticed that one before. Probably
-> because of NFSroot.
-Paul uses MMC filesystem, I use NFS. As Felipe Pointed out as well, I
-did rootcause MMC filesystem mount issue here:
-http://marc.info/?l=linux-omap&m=139637044425644&w=2
+On Wed, Apr 02, 2014 at 09:34:22PM +0800, Haojian Zhuang wrote:
+> +static void __init hi3xxx_init(void)
+> +{
+> +	l2x0_of_init(0, ~0UL);
 
-NFS does work for me on 3.14 tag  http://slexy.org/raw/s20plaLoaT (on SDP2430)
+	l2x0_of_init(0, ~0);
 
-Regards,
-Nishanth Menon
+please, no need for a UL suffix on it.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
