@@ -1,48 +1,37 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 02 Apr 2014 17:02:57 +0900
-Subject: [PATCH 2/3] ARM: dts: Add PMU reg node to exynos4212 and exynos4412
-In-Reply-To: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425778-4379-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1396425778-4379-3-git-send-email-pankaj.dubey@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 02 Apr 2014 09:48:58 +0200
+Subject: [PATCH] ARM: dts: stmpe-ts: fix wrong bindings
+In-Reply-To: <201312092132.29575.marex@denx.de>
+References: <1386620111-1413-1-git-send-email-stefan@agner.ch>
+ <201312092132.29575.marex@denx.de>
+Message-ID: <2acd964e18e59b35996d042a3dd6e99b@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pmu regnode to exynos4212 and exynos4412 dtsi to
-handle PMU register access via DT.
+Am 2013-12-09 21:32, schrieb Marek Vasut:
+> On Monday, December 09, 2013 at 09:15:11 PM, Stefan Agner wrote:
+>> Fix bindings for STMPE touchscreen device to match the documented
+>> bindings and the actual bindings used by the driver.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>> I don't have any of these hardware, but the error is obvious. The device
+>> probably works anyway since the device/driver will use default values.
+> 
+> Full agreement here.
+> 
+> Reviewed-by: Marek Vasut <marex@denx.de>
+> 
+> btw. I plan to rework the STMPE TS as it doesn't work nicely on my device at 
+> all. I am seriously lacking time, but I will try! ;-)
+> 
+> Best regards,
+> Marek Vasut
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/boot/dts/exynos4212.dtsi |    5 +++++
- arch/arm/boot/dts/exynos4412.dtsi |    5 +++++
- 2 files changed, 10 insertions(+)
+Hi Shawn,
 
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 3c00e6e..4661ffa 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -29,4 +29,9 @@
- 	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x8000>;
- 	};
-+
-+	pmu_system_controller: system-controller at 10020000 {
-+		compatible = "samsung,exynos4212-pmu", "syscon";
-+		reg = <0x10020000 0x5000>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 15d3c0a..6f4cb22 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -29,4 +29,9 @@
- 	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x4000>;
- 	};
-+
-+	pmu_system_controller: system-controller at 10020000 {
-+		compatible = "samsung,exynos4412-pmu", "syscon";
-+		reg = <0x10020000 0x5000>;
-+	};
- };
--- 
-1.7.10.4
+Just noticed that I forgot to add you when sending this patch. I guess
+this should go through your tree...
+
+--
+Stefan
