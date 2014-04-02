@@ -1,182 +1,95 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Wed,  2 Apr 2014 16:12:20 +0530
-Subject: [PATCH v7 05/12] ARM/ARM64: KVM: Make kvm_psci_call() return
- convention more flexible
+Date: Wed,  2 Apr 2014 16:12:22 +0530
+Subject: [PATCH v7 07/12] ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF and
+ SYSTEM_RESET
 In-Reply-To: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
 References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1396435347-20056-6-git-send-email-anup.patel@linaro.org>
+Message-ID: <1396435347-20056-8-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the kvm_psci_call() returns 'true' or 'false' based on whether
-the PSCI function call was handled successfully or not. This does not help
-us emulate system-level PSCI functions where the actual emulation work will
-be done by user space (QEMU or KVMTOOL). Examples of such system-level PSCI
-functions are: PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET.
+The PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET functions are system-level
+functions hence cannot be fully emulated by in-kernel PSCI emulation code.
 
-This patch updates kvm_psci_call() to return three types of values:
-1) > 0 (success)
-2) = 0 (success but exit to user space)
-3) < 0 (errors)
+To tackle this, we forward PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET function
+calls from vcpu to user space (i.e. QEMU or KVMTOOL) via kvm_run structure
+using KVM_EXIT_SYSTEM_EVENT exit reasons.
 
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_psci.h   |    2 +-
- arch/arm/kvm/handle_exit.c        |   10 +++++++---
- arch/arm/kvm/psci.c               |   28 ++++++++++++++++------------
- arch/arm64/include/asm/kvm_psci.h |    2 +-
- arch/arm64/kvm/handle_exit.c      |   10 +++++++---
- 5 files changed, 32 insertions(+), 20 deletions(-)
+ arch/arm/kvm/psci.c |   32 +++++++++++++++++++++++++++++---
+ 1 file changed, 29 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
-index 4c0e3e1..6bda945 100644
---- a/arch/arm/include/asm/kvm_psci.h
-+++ b/arch/arm/include/asm/kvm_psci.h
-@@ -22,6 +22,6 @@
- #define KVM_ARM_PSCI_0_2	2
- 
- int kvm_psci_version(struct kvm_vcpu *vcpu);
--bool kvm_psci_call(struct kvm_vcpu *vcpu);
-+int kvm_psci_call(struct kvm_vcpu *vcpu);
- 
- #endif /* __ARM_KVM_PSCI_H__ */
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 0de91fc..1270095 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -38,14 +38,18 @@ static int handle_svc_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
-+	int ret;
-+
- 	trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
- 		      kvm_vcpu_hvc_get_imm(vcpu));
- 
--	if (kvm_psci_call(vcpu))
-+	ret = kvm_psci_call(vcpu);
-+	if (ret == -EINVAL) {
-+		kvm_inject_undefined(vcpu);
- 		return 1;
-+	}
- 
--	kvm_inject_undefined(vcpu);
--	return 1;
-+	return ret;
- }
- 
- static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
 diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 8c42596c..14e6fa6 100644
+index 14e6fa6..b964aa4 100644
 --- a/arch/arm/kvm/psci.c
 +++ b/arch/arm/kvm/psci.c
-@@ -93,7 +93,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
- 	return KVM_ARM_PSCI_0_1;
+@@ -85,6 +85,23 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	return PSCI_RET_SUCCESS;
  }
  
--static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
-+static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- {
- 	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
- 	unsigned long val;
-@@ -128,14 +128,14 @@ static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		val = PSCI_RET_NOT_SUPPORTED;
- 		break;
- 	default:
--		return false;
-+		return -EINVAL;
- 	}
- 
- 	*vcpu_reg(vcpu, 0) = val;
--	return true;
-+	return 1;
- }
- 
--static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
-+static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- {
- 	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
- 	unsigned long val;
-@@ -153,11 +153,11 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- 		val = PSCI_RET_NOT_SUPPORTED;
- 		break;
- 	default:
--		return false;
-+		return -EINVAL;
- 	}
- 
- 	*vcpu_reg(vcpu, 0) = val;
--	return true;
-+	return 1;
- }
- 
- /**
-@@ -165,12 +165,16 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
-  * @vcpu: Pointer to the VCPU struct
-  *
-  * Handle PSCI calls from guests through traps from HVC instructions.
-- * The calling convention is similar to SMC calls to the secure world where
-- * the function number is placed in r0 and this function returns true if the
-- * function number specified in r0 is withing the PSCI range, and false
-- * otherwise.
-+ * The calling convention is similar to SMC calls to the secure world
-+ * where the function number is placed in r0.
-+ *
-+ * This function returns: > 0 (success), 0 (success but exit to user
-+ * space), and < 0 (errors)
-+ *
-+ * Errors:
-+ * -EINVAL: Unrecognized PSCI function
-  */
--bool kvm_psci_call(struct kvm_vcpu *vcpu)
-+int kvm_psci_call(struct kvm_vcpu *vcpu)
- {
- 	switch (kvm_psci_version(vcpu)) {
- 	case KVM_ARM_PSCI_0_2:
-@@ -178,6 +182,6 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
- 	case KVM_ARM_PSCI_0_1:
- 		return kvm_psci_0_1_call(vcpu);
- 	default:
--		return false;
-+		return -EINVAL;
- 	};
- }
-diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
-index e25c658..bc39e55 100644
---- a/arch/arm64/include/asm/kvm_psci.h
-+++ b/arch/arm64/include/asm/kvm_psci.h
-@@ -22,6 +22,6 @@
- #define KVM_ARM_PSCI_0_2	2
- 
- int kvm_psci_version(struct kvm_vcpu *vcpu);
--bool kvm_psci_call(struct kvm_vcpu *vcpu);
-+int kvm_psci_call(struct kvm_vcpu *vcpu);
- 
- #endif /* __ARM64_KVM_PSCI_H__ */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 7bc41ea..743a74d 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -30,11 +30,15 @@ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
- 
- static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	if (kvm_psci_call(vcpu))
-+	int ret;
++static inline void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
++{
++	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
++	vcpu->run->system_event.type = type;
++	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
++}
 +
-+	ret = kvm_psci_call(vcpu);
-+	if (ret == -EINVAL) {
-+		kvm_inject_undefined(vcpu);
- 		return 1;
-+	}
++static void kvm_psci_system_off(struct kvm_vcpu *vcpu)
++{
++	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_SHUTDOWN);
++}
++
++static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
++{
++	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
++}
++
+ int kvm_psci_version(struct kvm_vcpu *vcpu)
+ {
+ 	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+@@ -95,6 +112,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
  
--	kvm_inject_undefined(vcpu);
+ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ {
++	int ret = 1;
+ 	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+ 	unsigned long val;
+ 
+@@ -114,13 +132,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 	case PSCI_0_2_FN64_CPU_ON:
+ 		val = kvm_psci_vcpu_on(vcpu);
+ 		break;
++	case PSCI_0_2_FN_SYSTEM_OFF:
++		kvm_psci_system_off(vcpu);
++		val = PSCI_RET_SUCCESS;
++		ret = 0;
++		break;
++	case PSCI_0_2_FN_SYSTEM_RESET:
++		kvm_psci_system_reset(vcpu);
++		val = PSCI_RET_SUCCESS;
++		ret = 0;
++		break;
+ 	case PSCI_0_2_FN_CPU_SUSPEND:
+ 	case PSCI_0_2_FN_AFFINITY_INFO:
+ 	case PSCI_0_2_FN_MIGRATE:
+ 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+ 	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+-	case PSCI_0_2_FN_SYSTEM_OFF:
+-	case PSCI_0_2_FN_SYSTEM_RESET:
+ 	case PSCI_0_2_FN64_CPU_SUSPEND:
+ 	case PSCI_0_2_FN64_AFFINITY_INFO:
+ 	case PSCI_0_2_FN64_MIGRATE:
+@@ -132,7 +158,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	*vcpu_reg(vcpu, 0) = val;
 -	return 1;
 +	return ret;
  }
  
- static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
 -- 
 1.7.9.5
