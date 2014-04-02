@@ -1,38 +1,29 @@
-From: jwboyer@fedoraproject.org (Josh Boyer)
-Date: Wed, 2 Apr 2014 10:40:20 -0400
-Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
-In-Reply-To: <CAKohpok3gKyOWD0=pSv0yQLNqJcNPNZagRGFXNFHW+3J7E=mOg@mail.gmail.com>
-References: <CA+5PVA6awqaSHQboqdv9nynV9Xjp46VeqijDWxZX1v5wDK0NWQ@mail.gmail.com>
- <CAKohpok3gKyOWD0=pSv0yQLNqJcNPNZagRGFXNFHW+3J7E=mOg@mail.gmail.com>
-Message-ID: <20140402144020.GA20438@zod>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 02 Apr 2014 11:04:21 -0400
+Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
+ friendly address
+In-Reply-To: <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+ <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+ <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
+ <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+Message-ID: <533C26F5.30302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 74397174989e5f70 attempted to clean up the power management options
-for arm64, but when things were merged it didn't fully take effect.  Fix
-it again.
+[On 04/02/2014 08:47 AM, Peter Maydell wrote:
+> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
+>> Like others, I have been carrying this change locally. Good to see it up!
+> 
+> Why are you all booting raw Images anyway (just out of curiosity)? All my
+> test cases boot either a zImage or a uImage, or occasionally a full SD card
+> image, or I'd have noticed this earlier...
 
-Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
----
- arch/arm64/Kconfig | 6 ------
- 1 file changed, 6 deletions(-)
+I do it in part for uniformity with arm64 kernels.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 07aa3556952c..8033b9b8a2df 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -321,12 +321,6 @@ menu "CPU Power Management"
- 
- source "drivers/cpuidle/Kconfig"
- 
--source "drivers/cpufreq/Kconfig"
--
--endmenu
--
--menu "Power management options"
--
- source "kernel/power/Kconfig"
- 
- source "drivers/cpufreq/Kconfig"
+Christopher
+
 -- 
-1.8.5.3
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
