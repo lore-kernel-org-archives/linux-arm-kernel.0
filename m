@@ -1,100 +1,41 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 02 Apr 2014 14:15:37 +0200
-Subject: [PATCH 06/10] ARM: EXYNOS: Add support for mapping PMU base
- address via DT
-In-Reply-To: <533BF905.6070701@samsung.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
- <533BF905.6070701@samsung.com>
-Message-ID: <533BFF69.1060701@monstr.eu>
+From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
+Date: Wed, 2 Apr 2014 22:11:59 +1000
+Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
+ friendly address
+In-Reply-To: <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+ <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+Message-ID: <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2014 01:48 PM, Sylwester Nawrocki wrote:
-> On 02/04/14 09:50, Pankaj Dubey wrote:
->> From: Young-Gun Jang <yg1004.jang@samsung.com>
+On Wed, Apr 2, 2014 at 3:10 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 25 March 2014 03:34, Joel Fernandes <joelf@ti.com> wrote:
+>> Loading kernel at offset 0x10000 works only for zImage, but not for Image,
+>> because the kernel expect the start of decompressed kernel (.head.text) to be
+>> at an address that's a distance that's 16MB aligned from  PAGE_OFFSET +
+>> TEXT_OFFSET (see vmlinux.lds.S). This check is enfornced in __fixup_pv_table in
+>> arch/arm/kernel/head.S TEXT_OFFSET is 0x00008000, so a 16MB alignment needs to
+>> have a "0x8000" in the lower 16 bits so that they cancel out. Currently the
+>> offset Qemu loads it at is 0x10000.
 >>
->> Add support for mapping Exynos Power Management Unit (PMU) base address
->> from device tree. Code will use existing samsung pmu binding information.
->> This patch also adds "get_exynos_pmubase" a helper function to return mapped base
->> address to various other files under "mach-exynos".
+>> With zImage, this need is met because zImage loads the uncompressed Image
+>> correctly, however when loading an Image and executing directly Qemu is
+>> required it to load it at the correct location. Doing so, doesn't break Qemu's
+>> zImage loading. With this patch, both zImage and Image work correctly.
 >>
->> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-exynos/common.h |    2 ++
->>  arch/arm/mach-exynos/exynos.c |   44 +++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 46 insertions(+)
->>
-> [...]
->>  #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index a5e1349..a5127fb 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -35,6 +35,8 @@
->>  #define L2_AUX_VAL 0x7C470001
->>  #define L2_AUX_MASK 0xC200ffff
->>  
->> +static void __iomem *exynos_pmu_base __initdata;
->> +
->>  static struct map_desc exynos4_iodesc[] __initdata = {
->>  	{
->>  		.virtual	= (unsigned long)S3C_VA_SYS,
->> @@ -245,6 +247,47 @@ void __init exynos_init_late(void)
->>  	exynos_pm_init();
->>  }
->>  
->> +static char const *exynos_dt_pmu_match[] __initconst = {
->> +	"samsung,exynos4210-pmu",
->> +	"samsung,exynos4212-pmu",
->> +	"samsung,exynos4412-pmu",
->> +	"samsung,exynos5250-pmu",
->> +	NULL
->> +};
->> +
->> +static int __init exynos_fdt_map_pmu(unsigned long node,
->> +		const char *uname, int depth, void *data)
->> +{
->> +	struct map_desc iodesc;
->> +	__be32 *reg;
->> +	unsigned long len;
->> +
->> +	if (of_flat_dt_match(node, exynos_dt_pmu_match)) {
->> +		phys_addr_t phys_addr;
->> +		reg = of_get_flat_dt_prop(node, "reg", &len);
->> +		if (reg == NULL || len != (sizeof(unsigned long) * 2))
->> +			return 0;
->> +
->> +		phys_addr = be32_to_cpu(reg[0]);
->> +		iodesc.pfn = __phys_to_pfn(phys_addr);
->> +		iodesc.length = be32_to_cpu(reg[1]) - 1;
->> +		iodesc.virtual = (unsigned long)S5P_VA_PMU;
->> +		iodesc.type = MT_DEVICE;
->> +		iotable_init(&iodesc, 1);
-> 
-> Are you sure...you need this in addition to ioremap() below ?
-> Can't you just use the Linux syscon API ?
-> There were some patches posted for syscon to make it available in earlier
-> system initialization stage: https://lkml.org/lkml/2014/2/19/218
+>> Signed-off-by: Joel Fernandes <joelf@ti.com>
+>
+> Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+>
 
-I haven't finished this yet. I have to look at it again.
+Like others, I have been carrying this change locally. Good to see it up!
 
-Thanks,
-Michal
+Reviewed-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+Tested-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140402/cb3ab19d/attachment.sig>
+> I'll put this in target-arm.next after 2.0 has released.
+>
+> thanks
+> -- PMM
+>
