@@ -1,67 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Apr 2014 17:49:05 +0200
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D0F6EE729@AcuExch.aculab.com>
-References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
- <9532591.5yuCbpL4pV@wuerfel>
- <063D6719AE5E284EB5DD2968C1650D6D0F6EE729@AcuExch.aculab.com>
-Message-ID: <4698724.S4F2PxkdOH@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 2 Apr 2014 15:51:14 +0000 (UTC)
+Subject: OMAP baseline test results for v3.14-rc5
+Message-ID: <alpine.DEB.2.02.1404021549530.15928@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 April 2014 10:04:34 David Laight wrote:
-> From: Arnd Bergmann
-> > On Tuesday 01 April 2014 21:27:12 Zhangfei Gao wrote:
-> > > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
-> > > +       if (dma_mapping_error(&ndev->dev, phys)) {
-> > > +               dev_kfree_skb(skb);
-> > > +               return NETDEV_TX_OK;
-> > > +       }
-> > > +
-> > > +       priv->tx_skb[tx_head] = skb;
-> > > +       priv->tx_phys[tx_head] = phys;
-> > > +       desc->send_addr = cpu_to_be32(phys);
-> > > +       desc->send_size = cpu_to_be16(skb->len);
-> > > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
-> > > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
-> > > +       desc->wb_addr = cpu_to_be32(phys);
-> > 
-> > One detail: since you don't have cache-coherent DMA, "desc" will
-> > reside in uncached memory, so you try to minimize the number of accesses.
-> > It's probably faster if you build the descriptor on the stack and
-> > then atomically copy it over, rather than assigning each member at
-> > a time.
-> 
-> I'm not sure, the writes to uncached memory will probably be
-> asynchronous, but you may avoid a stall by separating the
-> cycles in time.
 
-Right.
+Here are some basic OMAP test results for Linux v3.14-rc5.
+Logs and other details at:
 
-> What you need to avoid is reads from uncached memory.
-> It may well beneficial for the tx reclaim code to first
-> check whether all the transmits have completed (likely)
-> instead of testing each descriptor in turn.
+    http://www.pwsan.com/omap/testlogs/test_v3.14-rc5/20140401152404/
 
-Good point, reading from noncached memory is actually the
-part that matters. For slow networks (e.g. 10mbit), checking if
-all of the descriptors have finished is not quite as likely to succeed
-as for fast (gbit), especially if the timeout is set to expire
-before all descriptors have completed.
 
-If it makes a lot of difference to performance, one could use
-a binary search over the outstanding descriptors rather than looking
-just at the last one.
+Test summary
+------------
 
-> > The same would be true for the rx descriptors.
-> 
-> Actually it is reasonably feasible to put the rx descriptors
-> in cacheable memory and to flush the cache lines after adding
-> new entries.
-> You just need to add the entries one cache line full at a time
-> (and ensure that the rx processing code doesn't dirty the line).
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-rx descriptors are already using the streaming mapping, so ignore
-what I said about them.
+Build: uImage+dtb:
+    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som
 
-	Arnd
+Build: zImage:
+    Pass (14/14): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Boot to userspace:
+    FAIL ( 1/12): 2430sdp
+    skip ( 2/12): 5912osk, cmt3517
+    Pass ( 9/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt,
+		  4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, 4460varsomom
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+PM: chip off via dynamic idle:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+
+vmlinux object size
+(delta in bytes from test_v3.14-rc4 (cfbf8d4857c26a8a307fb7cd258074c9dcd8c691)):
+   text     data      bss    total  kernel
+   +415      -32        0     +383  omap1_defconfig
+   +415        0        0     +415  omap1_defconfig_1510innovator_only
+   +447        0        0     +447  omap1_defconfig_5912osk_only
+   +347      +16        0     +363  multi_v7_defconfig
+   +320        0        0     +320  omap2plus_defconfig
+   +296        0        0     +296  omap2plus_defconfig_2430sdp_only
+   +256        0        0     +256  omap2plus_defconfig_am33xx_only
+   +264        0        0     +264  omap2plus_defconfig_am43xx_only
+   +320        0        0     +320  omap2plus_defconfig_cpupm
+   +320        0        0     +320  omap2plus_defconfig_dra7xx_only
+    +48        0        0      +48  omap2plus_defconfig_n800_multi_omap2xxx
+    +48        0        0      +48  omap2plus_defconfig_n800_only_a
+   +320        0        0     +320  omap2plus_defconfig_no_pm
+   +320        0        0     +320  omap2plus_defconfig_omap2_4_only
+   +320        0        0     +320  omap2plus_defconfig_omap3_4_only
+   +320        0        0     +320  omap2plus_defconfig_omap5_only
+    +56        0        0      +56  rmk_omap3430_ldp_allnoconfig
+  +4447        0        0    +4447  rmk_omap3430_ldp_oldconfig
+    +24        0        0      +24  rmk_omap4430_sdp_allnoconfig
+   +319        0        0     +319  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.14-rc4 (cfbf8d4857c26a8a307fb7cd258074c9dcd8c691))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
