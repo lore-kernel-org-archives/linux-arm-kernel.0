@@ -1,166 +1,86 @@
-From: stefan@agner.ch (stefan at agner.ch)
-Date: Wed,  2 Apr 2014 18:47:27 +0200
-Subject: [PATCH 2/2] ARM: dts: add initial Colibri VF61 board support
-In-Reply-To: <cover.1396456704.git.stefan@agner.ch>
-References: <cover.1396456704.git.stefan@agner.ch>
-Message-ID: <c8f2d3349233b70e5bd242480ff326b3b728cca3.1396456704.git.stefan@agner.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Apr 2014 17:51:13 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <ebffe60db89d45ce883b1b9aff121152@BLUPR03MB373.namprd03.prod.outlook.com>
+References: <20140324234443.GS7528@n2100.arm.linux.org.uk>
+ <20140326001135.GV7528@n2100.arm.linux.org.uk>
+ <20140401092638.GA10224@n2100.arm.linux.org.uk>
+ <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
+ <20140401225149.GC7528@n2100.arm.linux.org.uk>
+ <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402085914.GG7528@n2100.arm.linux.org.uk>
+ <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402104644.GI7528@n2100.arm.linux.org.uk>
+ <ebffe60db89d45ce883b1b9aff121152@BLUPR03MB373.namprd03.prod.outlook.com>
+Message-ID: <20140402165113.GJ7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
+On Wed, Apr 02, 2014 at 11:33:22AM +0000, fugang.duan at freescale.com wrote:
+> In kernel 3.0.35, there have no CMA memory allocate mechanism.
+> Below Kernel configs are enabled:
+> CONFIG_ARM_DMA_MEM_BUFFERABLE
+> CONFIG_SMP
+> 
+> If use dma_alloc_coherent() allocate memory, it must be non-cacheable,
+> but bufferable.  The new invented api "dma_alloc_noncacheable()"
+> allocate memory is non-cacheable, non-bufferable, the memory type is
+> Strongly ordered.
 
-Add initial Toradex Colibri VF61 board support. Ethernet, UART
-and SDHC cards are working. Cache latencies need to be a bit
-higher than vf610.dtsi suggests. Those values are validated
-by running multiple memory tests.
+Right, so what you've just said is that it's fine to violate the
+requirements of the architecture L1 memory model by setting up a
+strongly ordered memory mapping for the same physical addresses as
+an existing mapping which is mapped as normal memory.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/vf610-colibri.dts | 123 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 124 insertions(+)
- create mode 100644 arch/arm/boot/dts/vf610-colibri.dts
+Sorry, I'm not going to listen to you anymore, you just lost any kind
+of authority on this matter.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 23d7768..81b3885 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -190,6 +190,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6q-udoo.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6sl-evk.dtb \
-+	vf610-colibri.dtb \
- 	vf610-cosmic.dtb \
- 	vf610-twr.dtb
- dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
-diff --git a/arch/arm/boot/dts/vf610-colibri.dts b/arch/arm/boot/dts/vf610-colibri.dts
-new file mode 100644
-index 0000000..3ac34e6
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610-colibri.dts
-@@ -0,0 +1,123 @@
-+/*
-+ * Copyright 2014 Toradex AG
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+#include "vf610.dtsi"
-+
-+/ {
-+	model = "Toradex Colibri VF61 COM";
-+	compatible = "toradex,vf610-colibri", "fsl,vf610";
-+
-+	chosen {
-+		bootargs = "console=ttyLP0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x80000000 0x10000000>;
-+	};
-+
-+	clocks {
-+		enet_ext {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <50000000>;
-+		};
-+	};
-+
-+};
-+
-+&iomuxc {
-+	vf610-colibri {
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,fsl,pins = <
-+				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
-+				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
-+				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
-+				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
-+				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
-+				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
-+				VF610_PAD_PTB20__GPIO_42	0x219d
-+			>;
-+		};
-+
-+		pinctrl_fec1: fec1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
-+				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
-+				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-+				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
-+				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
-+				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
-+				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-+				VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
-+				VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
-+			>;
-+		};
-+
-+		pinctrl_uart0: uart0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB10__UART0_TX		0x21a2
-+				VF610_PAD_PTB11__UART0_RX		0x21a1
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				VF610_PAD_PTB4__UART1_TX		0x21a2
-+				VF610_PAD_PTB5__UART1_RX		0x21a1
-+			>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD0__UART2_TX		0x21a2
-+				VF610_PAD_PTD1__UART2_RX		0x21a1
-+				VF610_PAD_PTD2__UART2_RTS		0x21a2
-+				VF610_PAD_PTD3__UART2_CTS		0x21a1
-+			>;
-+		};
-+	};
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&fec1 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1>;
-+	status = "okay";
-+};
-+
-+&L2 {
-+	arm,data-latency = <2 1 2>;
-+	arm,tag-latency = <3 2 3>;
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart0>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
+> >> So wmb() is not necessary.
+> >
+> >Even on non-cacheable normal memory, the wmb() is required.  Please read up in
+> >the ARM architecture reference manual about memory types and their various
+> >attributes, followed by the memory ordering chapters.
+> >
+> >> Yes, it don't impact imx6q since cpu loading is not bottleneck due
+> >> rx/tx bandwidth is slow and multi-cores.  But for imx6sx, enet rx can
+> >> reach at 940Mbps, tx can reach at 900Mbps, imx6sx is sigle core.
+> >
+> >What netdev features do you support to achieve that?
+> >
+> Imx6sx enet accleration feature support crc checksum, interrupt coalescing.
+> So we enable the two features.
+
+Checksum and... presumably you're referring to NAPI don't get you to that
+kind of speed.  Even on x86, you can't get close to wire speed without
+GSO, which you need scatter-gather for, and you don't support that.  So
+I don't believe your 900Mbps figure.
+
+Plus, as you're memcpy'ing every packet received, I don't believe you can
+reach 940Mbps receive either.
+
+> >> Enet IP don't support TSO feaure, cpu loading is the bottleneck. Wmb()
+> >> is very expensive which cause tx performance drop much.
+> >
+> >wmb() is very expensive because of the L2 cache code using a sledge hammer with
+> >it - particularly the spinlock, which has a large overhead if lockdep or
+> >spinlock debugging is enabled.
+>
+> Yes, if add wmb() to xmit(), imx6sx enet performance will drop more
+> than 100Mbps.
+
+In any case, I suspect that isn't directly attributable to wmb() itself.
+What I've noticed is that even changing an unsigned short to an unsigned
+int *can* result in a substantial performance drop.  Although the
+unsigned int results in fewer instructions, it's lower performance because
+they're placed differently, and the efficiency of the instruction cache
+changes, resulting in different throughput.
+
+What this means is that even changing compiler versions can get you
+significantly different performance figures.  So I don't attribute very
+much creedence to "wmb() causes performance to drop 100Mbps".  It may
+very well go back up with some other changes which result in a slightly
+different placement of the instructions.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
