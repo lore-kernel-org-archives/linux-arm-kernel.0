@@ -1,50 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Apr 2014 16:24:55 +0100
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <20140402090136.GA31892@arm.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
- <7050133.LRSn2ENgQ4@wuerfel> <20140401132316.GD20061@arm.com>
- <004b01cf4e27$d47da990$7d78fcb0$@samsung.com>
- <20140402090136.GA31892@arm.com>
-Message-ID: <20140402152455.GB24018@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 Apr 2014 08:31:04 -0700
+Subject: [PATCH 0/4] ARM: OMAP: raw read and write endian fix
+In-Reply-To: <533BE311.7050900@linaro.org>
+References: <1387822234-11167-1-git-send-email-taras.kondratiuk@linaro.org>
+ <CAArO44vC4WKGHSqHX3+Mo5+jcNuyJLkh94+SPd4H+aZYAroYzw@mail.gmail.com>
+ <20140108003927.GJ5074@atomide.com> <5332AD89.8030802@linaro.org>
+ <533BE311.7050900@linaro.org>
+Message-ID: <20140402153104.GA12234@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 10:01:38AM +0100, Catalin Marinas wrote:
-> On Wed, Apr 02, 2014 at 04:58:39AM +0100, Jungseok Lee wrote:
-> > On Tuesday, April 01, 2014 10:23 PM, Catalin Marinas wrote:
-> > > On some previous patches I've seen posted for 4-levels I asked that 64K
-> > > and 4K page configurations are decoupled from the pgtable-?level.h
-> > > macros so that if we ever need 3-levels with 64K it's easy to enable.
+* Taras Kondratiuk <taras.kondratiuk@linaro.org> [140402 03:18]:
+> On 03/26/2014 12:35 PM, Taras Kondratiuk wrote:
+> > On 01/08/2014 02:39 AM, Tony Lindgren wrote:
+> >> * Taras Kondratiuk <taras.kondratiuk@linaro.org> [131223 10:20]:
+> >>> On 23 December 2013 20:10, Taras Kondratiuk <taras.kondratiuk@linaro.org> wrote:
+> >>>> This series does trivial replacement of __raw_xxx functions with xxx_relaxed
+> >>>> endian-neutral variants in 'mach-omap2' and 'plat-omap' directories.
+> >>>> Some code here most probably won't be used in BE mode (like debug-leds for
+> >>>> OMAP1 boards), but changes are made anyway to remove __raw_xxx() functions
+> >>>> completely and simplify future grep'ing for new __raw_xxx() entries.
+> >>
+> >> Sorry for the delay on these, applying into omap-for-v3.14/be.
+> >> These are trivial, and it's actually nice that you left out the
+> >> assembly related changes as those should be acked by the PM
+> >> people in case there are some issues dealing with the ROM code
+> >> etc.
 > > 
-> > Is your request to decouple page size from the number of page tables?
-> > In other words, would you like to prepare 4 options, 1)4KB+3Level, 2)
-> > 4KB+4Level, 3)64KB+2Level and 4)64KB+3Level, as combining page size
-> > with page table levels in kernel configuration? 
+> > Hi Tony,
+> > 
+> > It seems omap-for-v3.14/be didn't get into 3.14-rc8.
+> > Is there any issue with them?
 > 
-> We can still use two options to make things less confusing: one for the
-> page size (4K/64K) and another for the size of the virtual address
-> space. From those two we can infer the number levels required. We can
-> limit the options to 39-bit, 42 (only fo 64K pages) and architecture
-> current maximum of 48 (for both 4K and 64K).
+> This series conflicts now with clock changes which got into 3.14.
+> Resolution is trivial - just skip conflicting changes.
+> omap2_clk_{real,writel} already uses {readl,writel}_relaxed inside.
+> Do I need to push an updated series?
 
-Another reason to decouple the page size is that we have 16K pages
-specified in the ARM ARM (and we'll get hardware implementations at some
-point). As a simple formula for the max VA space we can cover (capped at
-48-bit):
+Sorry looks like I forgot to merge this branch. I think my plan
+was to wait for the clock changes to get merged first..
 
-VA_BITS = (PAGE_SHIFT - 3) * levels + PAGE_SHIFT
+So yeah, it's probably best that you repost the series after -rc1
+is out so we have the conflicting parts cleared. That way the
+changes are tested to work for your BE series :)
 
-With 16K pages and 3 levels we can cover 47 bits. So we'll eventually
-have the following VA bits options:
+Regards,
 
-39 if 4K (3 levels)
-42 if 64K (2 levels)
-47 if 16K (3 levels)
-48 if 4K || 16K || 64K (4/4/3 levels depending on page size)
-
-The latter because of the architecture maximum.
-
--- 
-Catalin
+Tony
