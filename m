@@ -1,64 +1,105 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 2 Apr 2014 08:54:44 +0200
-Subject: [PATCH 4/6] ARM: socfpga: dts: add can0+1
-In-Reply-To: <1396380890.27447.3.camel@linux-builds1>
+Date: Wed, 2 Apr 2014 08:57:44 +0200
+Subject: [PATCH 3/6] ARM: socfpga: dts: add i2c busses
+In-Reply-To: <1396380740.27447.1.camel@linux-builds1>
 References: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396280404-2041-4-git-send-email-s.trumtrar@pengutronix.de>
- <1396380890.27447.3.camel@linux-builds1>
-Message-ID: <20140402065444.GS5052@pengutronix.de>
+ <1396280404-2041-3-git-send-email-s.trumtrar@pengutronix.de>
+ <1396380740.27447.1.camel@linux-builds1>
+Message-ID: <20140402065744.GT5052@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh!
+Hi!
 
-On Tue, Apr 01, 2014 at 02:34:50PM -0500, Dinh Nguyen wrote:
+On Tue, Apr 01, 2014 at 02:32:20PM -0500, Dinh Nguyen wrote:
 > On Mon, 2014-03-31 at 17:40 +0200, Steffen Trumtrar wrote:
-> > Add both can controllers to the dtsi.
+> > Add all 4 i2c busses.
 > > 
 > > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > > ---
-> >  arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
+> >  arch/arm/boot/dts/socfpga.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 44 insertions(+)
 > > 
 > > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index d0594c3..51148b8 100644
+> > index 7867e7f..d0594c3 100644
 > > --- a/arch/arm/boot/dts/socfpga.dtsi
 > > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -470,6 +470,22 @@
+> > @@ -470,6 +470,50 @@
 > >  			status = "disabled";
 > >  		};
 > >  
-> > +		can0: can at 0xffc00000 {
+> > +		i2c0: i2c at 0xffc04000 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			compatible = "snps,designware-i2c";
+> > +			reg = <0xffc04000 0x1000>;
+> > +			clock-frequency = <400000000>;
 > 
-> I've seen a comment from Rob Herring to remove the 0x here.
+> "clock-frequency" is not needed as the driver can get the clock
+> frequency from the clock driver.
+> 
 
-Yep, you are right. I missed this as it looks weird to me without the 0x,
-but common practice is without...
+You are right of course. I will remove that.
+Although, I think I remember seeing patches that add this functionality
+to the driver. So you can change the speed setting. But even than you
+are right, as something like that wouldn't belong here in the dtsi.
 
-> > +			compatible = "bosch,d_can";
-> > +			reg = <0xffc00000 0x1000>;
-> > +			interrupts = <0 131 4>, <0 132 4>, <0 133 4>, <0 134 4>;
-> > +			clocks = <&can0_clk>;
+
+> > +			clocks = <&l4_sp_clk>;
+> > +			interrupts = <0 158 0x4>;
 > > +			status = "disabled";
 > > +		};
 > > +
-> > +		can1: can at 0xffc01000 {
+> > +		i2c1: i2c at 0xffc05000 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			compatible = "snps,designware-i2c";
+> > +			reg = <0xffc05000 0x1000>;
+> > +			clock-frequency = <100000000>;
+> 
+> Same..
+> 
+> > +			clocks = <&l4_sp_clk>;
+> > +			interrupts = <0 159 0x4>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		i2c2: i2c at 0xffc06000 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			compatible = "snps,designware-i2c";
+> > +			reg = <0xffc06000 0x1000>;
+> > +			clock-frequency = <100000000>;
 > 
 > Same...
 > 
-> > +			compatible = "bosch,d_can";
-> > +			reg = <0xffc01000 0x1000>;
-> > +			interrupts = <0 135 4>, <0 136 4>, <0 137 4>, <0 138 4>;
-> > +			clocks = <&can1_clk>;
+> > +			clocks = <&l4_sp_clk>;
+> > +			interrupts = <0 160 0x4>;
 > > +			status = "disabled";
 > > +		};
 > > +
-> >  		i2c0: i2c at 0xffc04000 {
+> > +		i2c3: i2c at 0xffc07000 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			compatible = "snps,designware-i2c";
+> > +			reg = <0xffc07000 0x1000>;
+> > +			clock-frequency = <100000000>;
 > 
-> Same comment here..but would apply to patch 3/6.
+> Same..
 > 
-
-I will fix all those.
+> thanks,
+> Dinh
+> > +			clocks = <&l4_sp_clk>;
+> > +			interrupts = <0 161 0x4>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> >  		L2: l2-cache at fffef000 {
+> >  			compatible = "arm,pl310-cache";
+> >  			reg = <0xfffef000 0x1000>;
+> 
+> 
+> 
 
 Thanks,
 Steffen
