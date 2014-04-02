@@ -1,63 +1,75 @@
-From: elder@linaro.org (Alex Elder)
-Date: Wed,  2 Apr 2014 14:29:56 -0500
-Subject: [PATCH RESEND 0/5] clk: bcm21664: add common clock support
-Message-ID: <1396467001-3551-1-git-send-email-elder@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 2 Apr 2014 12:41:28 -0700
+Subject: [PATCH 0/6] ARM: BCM63XX: add support for BCM63138 SoC
+In-Reply-To: <CAGVrzcbxmWE+1drcyNK7K1a4ta6Pp1-Kc4xv7x0vDSumZen1fg@mail.gmail.com>
+References: <1394127959-3159-1-git-send-email-f.fainelli@gmail.com>
+ <CAGVrzcbxmWE+1drcyNK7K1a4ta6Pp1-Kc4xv7x0vDSumZen1fg@mail.gmail.com>
+Message-ID: <CAGVrzcb-xay4QCLwxWnzDhC+fvr5eJVEBmWbTC6XkKS0SQzwWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series has been rebased but its content has not changed.
+Hi all,
 
-This is series has two parts.  The first two patches are changes
-to the existing Broadcom Kona family clock code to prepare for the
-addition of support for another SoC, bcm21664.
+2014-03-11 10:10 GMT-07:00 Florian Fainelli <f.fainelli@gmail.com>:
+> 2014-03-06 9:45 GMT-08:00 Florian Fainelli <f.fainelli@gmail.com>:
+>> Hi all,
+>>
+>> This patchset adds very minimal support for the BCM63138 SoC which is
+>> a xDSL SoC using a dual Cortex A9 CPU complex.
+>>
+>> Future work will focus on:
+>>
+>> - clock device/driver/providers
+>> - SMP support (already working)
+>> - DT'fying drivers/tty/serial/bcm63xx_uart.c to be usable
+>
+> Gentle ping, patch 2 should not be too controversial and could
+> probably be queued for a next 3.14-rc pull request?
 
-The remaining three define the binding and code for bcm21664, and
-replace the use of "fake" clocks in the device tree with the real
-ones.  This ends up being a fairly straightforward definition of
-the clocks on this SoC; the rest of the clock code is shared with
-other SoCs that use the Kona style clock system.
+Thanks for merging patch 2, can I borrow some of your bandwidth to
+review the remainder of the patches?
 
-This series depends on a number of other things that are
-currently queued for Linux 3.15 or have already been sent
-out for review:
-    - Clock support for bcm281xx and initial BCM21664 support,
-      all queued for 3.15:
-        https://github.com/broadcom/mach-bcm/
-	    armsoc/for-3.15/cleanup
-	    armsoc/for-3.15/drivers
-	    armsoc/for-3.15/dt
-	    armsoc/for-3.15/soc-3
-    - Additional clock fixes and features for bcm281xx (out for review)
-	https://lkml.org/lkml/2014/4/1/876
-This prerequisite code appears in the branch (below) as merges
-from other publicly-available git branches where available, or
-cherry-picks otherwise.
+Thanks!
 
-This code is available in the "review/bcm21664-clock-rebased" branch
-of the git repository here:
-    http://git.linaro.org/git/landing-teams/working/broadcom/kernel.git
+>
+>>
+>> Florian Fainelli (6):
+>>   ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
+>>   ARM: restrict BCM_KONA_UART to ARCH_BCM_MOBILE
+>>   ARM: BCM63XX: add low-level UART debug support
+>>   ARM: BCM63XX: add BCM63138 minimal Device Tree
+>>   ARM: BCM63XX: add BCM963138DVT Reference platform DTS
+>>   MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
+>>
+>>  .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
+>>  MAINTAINERS                                        |  10 ++
+>>  arch/arm/Kconfig.debug                             |  20 +++-
+>>  arch/arm/boot/dts/Makefile                         |   1 +
+>>  arch/arm/boot/dts/bcm63138.dtsi                    | 109 +++++++++++++++++++++
+>>  arch/arm/boot/dts/bcm63138dvt.dts                  |  18 ++++
+>>  arch/arm/include/debug/bcm63xxx.S                  |  33 +++++++
+>>  arch/arm/mach-bcm/Kconfig                          |  20 ++++
+>>  arch/arm/mach-bcm/Makefile                         |   2 +
+>>  arch/arm/mach-bcm/bcm63xx.h                        |  29 ++++++
+>>  arch/arm/mach-bcm/board_bcm63xx.c                  |  94 ++++++++++++++++++
+>>  11 files changed, 342 insertions(+), 3 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
+>>  create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
+>>  create mode 100644 arch/arm/boot/dts/bcm63138dvt.dts
+>>  create mode 100644 arch/arm/include/debug/bcm63xxx.S
+>>  create mode 100644 arch/arm/mach-bcm/bcm63xx.h
+>>  create mode 100644 arch/arm/mach-bcm/board_bcm63xx.c
+>>
+>> --
+>> 1.8.3.2
+>>
+>
+>
+>
+> --
+> Florian
 
 
-					-Alex
-
-Alex Elder (5):
-  clk: bcm281xx: move compatible string definitions
-  ARM: dts: revise kona clock binding document
-  ARM: dts: define clock binding for bcm21664
-  clk: bcm21664: use common clock framework
-  ARM: dts: use real clocks for bcm21664
-
- .../devicetree/bindings/clock/bcm-kona-clock.txt   |  116 +++++---
- arch/arm/boot/dts/bcm21664.dtsi                    |  190 ++++++++-----
- drivers/clk/bcm/Kconfig                            |    2 +-
- drivers/clk/bcm/Makefile                           |    1 +
- drivers/clk/bcm/clk-bcm21664.c                     |  290 ++++++++++++++++++++
- drivers/clk/bcm/clk-bcm281xx.c                     |   12 -
- include/dt-bindings/clock/bcm21664.h               |   62 +++++
- include/dt-bindings/clock/bcm281xx.h               |   12 +
- 8 files changed, 565 insertions(+), 120 deletions(-)
- create mode 100644 drivers/clk/bcm/clk-bcm21664.c
- create mode 100644 include/dt-bindings/clock/bcm21664.h
 
 -- 
-1.7.9.5
+Florian
