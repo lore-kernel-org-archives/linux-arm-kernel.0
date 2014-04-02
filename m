@@ -1,37 +1,57 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Wed, 2 Apr 2014 12:33:58 -0500
-Subject: [PATCH v2 1/6] ARM: socfpga: dts: fix pdma interrupt
-In-Reply-To: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1396460038.17141.1.camel@linux-builds1>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Wed, 2 Apr 2014 19:44:58 +0200
+Subject: [PATCH] ARM i.MX51: Add Digi ConnectCore devicetree
+In-Reply-To: <20140402125318.GZ17250@pengutronix.de>
+References: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
+ <1396075706-25384-2-git-send-email-shc_work@mail.ru>
+ <20140402113934.GH8753@dragon>
+ <20140402125318.GZ17250@pengutronix.de>
+Message-ID: <20140402174458.GC27994@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
+[adding Nicolas to Cc]
 
-On Wed, 2014-04-02 at 09:11 +0200, Steffen Trumtrar wrote:
-> The first interrupt is not at 180 but 104. Fix it.
+On Wed, Apr 02, 2014 at 02:53:18PM +0200, Sascha Hauer wrote:
+> On Wed, Apr 02, 2014 at 07:39:35PM +0800, Shawn Guo wrote:
+> > On Sat, Mar 29, 2014 at 10:48:26AM +0400, Alexander Shiyan wrote:
+> > > +&nfc {
+> > > +	pinctrl-names = "default";
+> > > +	pinctrl-0 = <&pinctrl_nfc>;
+> > > +	nand-bus-width = <8>;
+> > > +	nand-ecc-mode = "hw";
+> > > +	nand-on-flash-bbt;
+> > > +	#address-cells = <1>;
+> > > +	#size-cells = <1>;
+> > > +	status = "okay";
+> > > +
+> > > +	partition at 0 {
+> > > +		label = "boot";
+> > > +		reg = <0x00000 0x80000>;
+> > > +	};
+> > > +
+> > > +	partition at 1 {
+> > > +		label = "env";
+> > > +		reg = <0x80000 0x40000>;
+> > > +	};
+> > 
+> > @Sascha, does the argument that we shouldn't have partition table in the
+> > mainline dtb still stands?
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 537f1a5..0c3344f 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -75,7 +75,7 @@
->  			pdma: pdma at ffe01000 {
->  				compatible = "arm,pl330", "arm,primecell";
->  				reg = <0xffe01000 0x1000>;
-> -				interrupts = <0 180 4>;
-> +				interrupts = <0 104 4>;
->  				#dma-cells = <1>;
->  				#dma-channels = <8>;
->  				#dma-requests = <32>;
+> Yes, I still think the partitions shouldn't be in the Linux dts files.
 
-I applied this series to rocketboards  linux-socfpga-next/next-dt.
+The dtb files for the Atmel Xplained board also has a partition
+definition, so the same comment applies there, too.
 
-Thanks,
-Dinh
+Besides being no hardware description, this implies a certain way of
+using the system; for example, with the "kernel" plus "rootfs"
+partitions, it suggests that you can't have the kernel in the standard
+root filesystem (which is possible with barebox and the freedesktop.org
+bootloader specification).
+
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
