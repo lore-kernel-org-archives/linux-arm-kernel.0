@@ -1,40 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Apr 2014 13:38:44 +0100
-Subject: [PATCH 1/1] AArch64: TCR_TG1_64K incorrectly sets TCR_EL1 bits
- [31:30]
-In-Reply-To: <CAHWCVW+cH6MwhQj-JGWN63AqseFYuDPoftv+zGJU8UDfAgueEQ@mail.gmail.com>
-References: <CAHWCVW+cH6MwhQj-JGWN63AqseFYuDPoftv+zGJU8UDfAgueEQ@mail.gmail.com>
-Message-ID: <20140402123844.GE31892@arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 2 Apr 2014 20:47:11 +0800
+Subject: [PATCH] ARM i.MX51: Add Digi ConnectCore devicetree
+In-Reply-To: <1396440407.634334403@f167.i.mail.ru>
+References: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
+ <1396439100.597907550@f167.i.mail.ru>
+ <20140402115612.GI8753@dragon>
+ <1396440407.634334403@f167.i.mail.ru>
+Message-ID: <20140402124710.GC10283@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 05:00:38AM +0100, Joe Sylve wrote:
-> Section D7.2.83 TCR_EL1, Translation Control Register (EL1) of the
-> latest ARM Architecture Reference Manual, ARMv8, for ARMv8-A states
-> that TCR_EL1 TG1 (bits [31:30]) should be set to 11 for a 64KB
-> TTBR1_EL1 granule size. The mainline 3.14 kernel incorrectly sets
-> those bits to 01 (which is a 16KB granule size).
+On Wed, Apr 02, 2014 at 04:06:47PM +0400, Alexander Shiyan wrote:
+> > > > > +&weim {
+> > > > > +	pinctrl-names = "default";
+> > > > > +	pinctrl-0 = <&pinctrl_weim>;
+> > > > > +	status = "okay";
+> > > > > +
+> > > > > +	lan9221: lan9221 at ce000000 {
+> > > > 
+> > > > How does 'ce000000' in the node name comes?
+> > > 
+> > > This is a WEIM CS5 start address.
+> > 
+> > Hmm, shouldn't the unit-address come from the 'reg' property of the node
+> > somehow?
 > 
-> Signed-off-by: Joe Sylve <joe.sylve@gmail.com>
-> ---
+> I'm not sure. Here is the real physical address of the device, in the case of
+> using an address from the "reg", we get zero address.
 > 
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h 2014-04-01 22:13:22.619868978 -0500
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h 2014-04-01 22:13:58.071869886 -0500
-> @@ -121,7 +121,7 @@
->  #define TCR_ORGN_MASK ((UL(3) << 10) | (UL(3) << 26))
->  #define TCR_SHARED ((UL(3) << 12) | (UL(3) << 28))
->  #define TCR_TG0_64K (UL(1) << 14)
-> -#define TCR_TG1_64K (UL(1) << 30)
-> +#define TCR_TG1_64K (UL(3) << 30)
->  #define TCR_IPS_40BIT (UL(2) << 32)
->  #define TCR_ASID16 (UL(1) << 36)
->  #define TCR_TBI0 (UL(1) << 37)
+> Just imagine, that we have a second LAN chip on the start of CS4.
+> Two identical devices?
 
-According to the spec, 4K pages is also wrong. The strange thing is that
-it works fine on the model. I'll ask internally for clarification
-whether it's a typo in the manual or Linux needs fixing.
+The node name should be 'lan9221 at 5,0' and 'lan9221 at 4,0' respectively.
 
-Thanks.
-
--- 
-Catalin
+Shawn
