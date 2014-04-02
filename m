@@ -1,29 +1,38 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed,  2 Apr 2014 09:11:35 +0200
-Subject: [PATCH v2 1/6] ARM: socfpga: dts: fix pdma interrupt
-Message-ID: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+Date: Wed,  2 Apr 2014 09:11:40 +0200
+Subject: [PATCH v2 6/6] ARM: socfpga: dts: add rtc on i2c0 to socrates
+In-Reply-To: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1396422700-3962-6-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first interrupt is not at 180 but 104. Fix it.
+The SOCrates has an M41T82M RTC on i2c0. Add it.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 537f1a5..0c3344f 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -75,7 +75,7 @@
- 			pdma: pdma at ffe01000 {
- 				compatible = "arm,pl330", "arm,primecell";
- 				reg = <0xffe01000 0x1000>;
--				interrupts = <0 180 4>;
-+				interrupts = <0 104 4>;
- 				#dma-cells = <1>;
- 				#dma-channels = <8>;
- 				#dma-requests = <32>;
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+index 1e31f32..f8d17dc 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+@@ -36,6 +36,15 @@
+ 	status = "okay";
+ };
+ 
++&i2c0 {
++	status = "okay";
++
++	rtc: rtc at 68 {
++		compatible = "stm,m41t82";
++		reg = <0x68>;
++	};
++};
++
+ &mmc {
+ 	status = "okay";
+ };
 -- 
 1.9.1
