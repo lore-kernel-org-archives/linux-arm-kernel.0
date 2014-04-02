@@ -1,82 +1,34 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Wed,  2 Apr 2014 16:12:21 +0530
-Subject: [PATCH v7 06/12] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
- header
-In-Reply-To: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <1396435347-20056-7-git-send-email-anup.patel@linaro.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 02 Apr 2014 11:54:24 +0100
+Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
+ swiotlb" (was Re: [GIT PULL] arm64 patches for 3.15)
+In-Reply-To: <20140402092032.GB31892@arm.com>
+References: <20140331175230.GA7480@arm.com>
+ <1396368657.3681.17.camel@linaro1.home> <20140401172939.GG20061@arm.com>
+ <1396428722.3554.20.camel@linaro1.home> <20140402092032.GB31892@arm.com>
+Message-ID: <1396436064.3554.53.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we don't have an exit reason to notify user space about
-a system-level event (for e.g. system reset or shutdown) triggered
-by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
-this purpose. We can also inform user space about the 'type' and
-architecture specific 'flags' of a system-level event using the
-kvm_run structure.
+On Wed, 2014-04-02 at 10:20 +0100, Catalin Marinas wrote:
+> On Wed, Apr 02, 2014 at 09:52:02AM +0100, Jon Medhurst (Tixy) wrote:
+> > On Tue, 2014-04-01 at 18:29 +0100, Catalin Marinas wrote:
 
-This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM ARM/ARM64
-in-kernel PSCI v0.2 support to reset/shutdown VMs.
+> > > +1:	tst	x0, x3				// start cache line aligned?
+> > > +	bic	x0, x0, x3
+> > > +	b.eq	2f
+> > > +	dc	civac, x0			// clean & invalidate D / U line
+> > > +	b	3f
+> > > +2:	dc	ivac, x0			// invalidate D / U line
+> > > +3:	add	x0, x0, x2
+> > >  	cmp	x0, x1
+> > >  	b.lo	1b
+> > 
+> > The above obviously also needs changing to branch to 3b
+> 
+> Good point.
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- Documentation/virtual/kvm/api.txt |   15 +++++++++++++++
- include/uapi/linux/kvm.h          |    8 ++++++++
- 2 files changed, 23 insertions(+)
+Actually, it should be 2b :-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 0114d5b..e675ec2 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2721,6 +2721,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
- external interrupt has just been delivered into the guest. User space
- should put the acknowledged interrupt vector into the 'epr' field.
- 
-+		/* KVM_EXIT_SYSTEM_EVENT */
-+		struct {
-+#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-+#define KVM_SYSTEM_EVENT_RESET          2
-+			__u32 type;
-+			__u64 flags;
-+		} system_event;
-+
-+If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
-+a system-level event using some architecture specific mechanism (hypercall
-+or some special instruction). In case of ARM/ARM64, this is triggered using
-+HVC instruction based PSCI call from the vcpu. The 'type' field describes
-+the system-level event type. The 'flags' field describes architecture
-+specific flags for the system-level event.
-+
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 260d3ae..0cf2882 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -171,6 +171,7 @@ struct kvm_pit_config {
- #define KVM_EXIT_WATCHDOG         21
- #define KVM_EXIT_S390_TSCH        22
- #define KVM_EXIT_EPR              23
-+#define KVM_EXIT_SYSTEM_EVENT     24
- 
- /* For KVM_EXIT_INTERNAL_ERROR */
- /* Emulate instruction failed. */
-@@ -301,6 +302,13 @@ struct kvm_run {
- 		struct {
- 			__u32 epr;
- 		} epr;
-+		/* KVM_EXIT_SYSTEM_EVENT */
-+		struct {
-+#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-+#define KVM_SYSTEM_EVENT_RESET          2
-+			__u32 type;
-+			__u64 flags;
-+		} system_event;
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
 -- 
-1.7.9.5
+Tixy
