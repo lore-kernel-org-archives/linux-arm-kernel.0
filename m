@@ -1,40 +1,27 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 2 Apr 2014 22:02:01 +0530
-Subject: [PATCH 00/26] OMAP dma engine rework
-In-Reply-To: <20140329181306.GE27282@n2100.arm.linux.org.uk>
-References: <20140210155531.GB26684@n2100.arm.linux.org.uk>
- <20140318154845.GE1976@intel.com>
- <20140329181306.GE27282@n2100.arm.linux.org.uk>
-Message-ID: <20140402163201.GT1976@intel.com>
+From: stefan@agner.ch (stefan at agner.ch)
+Date: Wed,  2 Apr 2014 19:05:36 +0200
+Subject: [PATCH v2 0/2] ARM: dts: fix wrong stmpe-ts bindings
+Message-ID: <cover.1396457876.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 29, 2014 at 06:13:06PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Mar 18, 2014 at 09:18:45PM +0530, Vinod Koul wrote:
-> > On Mon, Feb 10, 2014 at 09:25:31PM +0530, Russell King - ARM Linux wrote:
-> > > This is the current set of patches for the OMAP DMA engine rework,
-> > > which should now work correctly on OMAP1 platforms thanks to Tony's
-> > > testing.
-> > > 
-> > > It would be good to get this validated by others across a range of
-> > > OMAP platforms, and queued up for the next merge window, so it can
-> > > be built upon.
-> > > 
-> > > Acks appreciated, and once sufficient have been added, I'll send a
-> > > pull request for this to Vinod.
-> > So is this series finalized. I havent seen the pull request for this or did i
-> > miss it!
-> 
-> Gah, missed this.
-> 
-> As nothing has changed with it since 18th February, which was to add
-> Tony's ack to the set.  I think it's as good as it's going to get for
-> the time being.  It's also been in linux-next all this time, and no
-> one has reported any problems.  I'll need to sort out a proper pull
-> request for it ASAP... or something.  An alternate solution would be
-> your blessing for this set.
-Okay in that case pls send with my ACK.
+From: Stefan Agner <stefan@agner.ch>
 
-Thanks
+I don't have any of these hardware, but the error is obvious. The device
+probably works anyway since the device/driver will use default values.
+
+Changes since v1:
+- Split patch in two for i.MX/SPEAr
+
+Stefan Agner (2):
+  ARM: dts: mx5: fix wrong stmpe-ts bindings
+  ARM: dts: SPEAr: fix wrong stmpe-ts bindings
+
+ arch/arm/boot/dts/imx53-m53evk.dts  | 20 ++++++++++----------
+ arch/arm/boot/dts/spear1310-evb.dts | 18 +++++++++---------
+ arch/arm/boot/dts/spear1340-evb.dts | 18 +++++++++---------
+ arch/arm/boot/dts/spear320-hmi.dts  | 20 ++++++++++----------
+ 4 files changed, 38 insertions(+), 38 deletions(-)
+
 -- 
-~Vinod
+1.9.1
