@@ -1,34 +1,61 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 02 Apr 2014 11:54:24 +0100
-Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
- swiotlb" (was Re: [GIT PULL] arm64 patches for 3.15)
-In-Reply-To: <20140402092032.GB31892@arm.com>
-References: <20140331175230.GA7480@arm.com>
- <1396368657.3681.17.camel@linaro1.home> <20140401172939.GG20061@arm.com>
- <1396428722.3554.20.camel@linaro1.home> <20140402092032.GB31892@arm.com>
-Message-ID: <1396436064.3554.53.camel@linaro1.home>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 2 Apr 2014 14:04:29 +0300
+Subject: [patch] clk: vt8500: several forever loops
+In-Reply-To: <20130826154908.GD12428@elgon.mountain>
+References: <20130826154908.GD12428@elgon.mountain>
+Message-ID: <20140402110429.GJ18506@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-02 at 10:20 +0100, Catalin Marinas wrote:
-> On Wed, Apr 02, 2014 at 09:52:02AM +0100, Jon Medhurst (Tixy) wrote:
-> > On Tue, 2014-04-01 at 18:29 +0100, Catalin Marinas wrote:
+This patch is still needed in linux-next.  It was Acked by Tony Prisk in
+a private email.
 
-> > > +1:	tst	x0, x3				// start cache line aligned?
-> > > +	bic	x0, x0, x3
-> > > +	b.eq	2f
-> > > +	dc	civac, x0			// clean & invalidate D / U line
-> > > +	b	3f
-> > > +2:	dc	ivac, x0			// invalidate D / U line
-> > > +3:	add	x0, x0, x2
-> > >  	cmp	x0, x1
-> > >  	b.lo	1b
-> > 
-> > The above obviously also needs changing to branch to 3b
+Acked-by: Tony Prisk <linux@prisktech.co.nz>
+
+regards,
+dan carpenter
+
+On Mon, Aug 26, 2013 at 07:02:33PM +0300, Dan Carpenter wrote:
+> This does a bunch of looping like this:
 > 
-> Good point.
-
-Actually, it should be 2b :-)
-
--- 
-Tixy
+> 	for (div2 = 7; div2 >= 0; div2--)
+> 
+> But unsigned values are always greater than or equal to zero so it just
+> loops and loops.  Really "mul", "div1" and "div2" should all be declared
+> as int for cleanliness sake.
+> 
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> ---
+> Static checker stuff.
+> 
+> diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+> index 82306f5..8d5b57c 100644
+> --- a/drivers/clk/clk-vt8500.c
+> +++ b/drivers/clk/clk-vt8500.c
+> @@ -363,7 +363,7 @@ static void vt8500_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+>  static void wm8650_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+>  				u32 *multiplier, u32 *divisor1, u32 *divisor2)
+>  {
+> -	u32 mul, div1, div2;
+> +	int mul, div1, div2;
+>  	u32 best_mul, best_div1, best_div2;
+>  	unsigned long tclk, rate_err, best_err;
+>  
+> @@ -431,7 +431,7 @@ static u32 wm8750_get_filter(u32 parent_rate, u32 divisor1)
+>  static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+>  				u32 *filter, u32 *multiplier, u32 *divisor1, u32 *divisor2)
+>  {
+> -	u32 mul, div1, div2;
+> +	int mul, div1, div2;
+>  	u32 best_mul, best_div1, best_div2;
+>  	unsigned long tclk, rate_err, best_err;
+>  
+> @@ -475,7 +475,7 @@ static void wm8750_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+>  static void wm8850_find_pll_bits(unsigned long rate, unsigned long parent_rate,
+>  				u32 *multiplier, u32 *divisor1, u32 *divisor2)
+>  {
+> -	u32 mul, div1, div2;
+> +	int mul, div1, div2;
+>  	u32 best_mul, best_div1, best_div2;
+>  	unsigned long tclk, rate_err, best_err;
+>  
