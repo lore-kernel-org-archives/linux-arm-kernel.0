@@ -1,9 +1,9 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue,  1 Apr 2014 21:04:55 -0500
-Subject: [PATCH v3 7/7] clk: bcm281xx: add clock hysteresis support
+Date: Tue,  1 Apr 2014 21:04:56 -0500
+Subject: [PATCH v3 10/10] clk: bcm281xx: add clock hysteresis support
 In-Reply-To: <1396404296-9390-1-git-send-email-elder@linaro.org>
 References: <1396404296-9390-1-git-send-email-elder@linaro.org>
-Message-ID: <1396404296-9390-8-git-send-email-elder@linaro.org>
+Message-ID: <1396404296-9390-9-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
