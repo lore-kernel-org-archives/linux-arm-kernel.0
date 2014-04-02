@@ -1,46 +1,29 @@
-From: eric@eukrea.com (Eric =?UTF-8?B?QsOpbmFyZA==?=)
-Date: Wed, 2 Apr 2014 15:38:55 +0200
-Subject: [PATCH] ARM: i.MX6: update KSZ9031 phy fixup
-In-Reply-To: <20140402131404.GE8558@dragon>
-References: <1395421687-12934-1-git-send-email-hchaumette@adeneo-embedded.com>
- <20140321222320.14370739@e6520eb>
- <1762157698.5689069.1395675049240.JavaMail.zimbra@adeneo-embedded.com>
- <20140324164141.51b85f8c@e6520eb> <20140402131404.GE8558@dragon>
-Message-ID: <20140402153855.237e7a50@e6520eb>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 2 Apr 2014 16:46:25 +0300
+Subject: [PATCH] ARM: DTS: dra7xx-clocks: Correct mcasp2_ahclkx_mux bit-shift
+Message-ID: <1396446385-20258-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The correct bit is 24 for AHCLKX.
 
-Le Wed, 2 Apr 2014 21:14:08 +0800,
-Shawn Guo <shawn.guo@linaro.org> a ?crit :
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> On Mon, Mar 24, 2014 at 04:41:41PM +0100, Eric B?nard wrote:
-> > Hi Hubert,
-> > 
-> > Le Mon, 24 Mar 2014 16:30:49 +0100 (CET),
-> > CHAUMETTE Hubert <hchaumette@adeneo-embedded.com> a ?crit :
-> > > > From: "Eric B?nard" <eric@eukrea.com>
-> > > > that's board specific (the needed delay depends on the routing delay on
-> > > > the PCB), so this should not go in a generic file.
-> > > > 
-> > > > Eric
-> > > > 
-> > > 
-> > > I admit it may need to be in a separate function, but this file already contains
-> > > board-specific fixups (for imx6q sabrelite, Data Modul eDM-QMX6).
-> > > 
-> > true but that's not a reason to add more ;-)
-> > 
-> > > Anyway, do you have any suggestion for the location I should put it ?
-> > > 
-> > no idea at the moment, I simply used your patch to bring this issue on
-> > the ML as we recently needed to patch the default values for testing
-> > mainline kernel on a custom boards.
-> 
-> Hmm, can such board-specific fixups be pushed down to bootloader?
-> 
-that won't work if the kernel reset the PHY.
-
-Eric
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index e96da9a898ad..cfb8fc753f50 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -1640,7 +1640,7 @@
+ 		#clock-cells = <0>;
+ 		compatible = "ti,mux-clock";
+ 		clocks = <&abe_24m_fclk>, <&abe_sys_clk_div>, <&func_24m_clk>, <&atlclkin3_ck>, <&atl_clkin2_ck>, <&atl_clkin1_ck>, <&atl_clkin0_ck>, <&sys_clkin2>, <&ref_clkin0_ck>, <&ref_clkin1_ck>, <&ref_clkin2_ck>, <&ref_clkin3_ck>, <&mlb_clk>, <&mlbp_clk>;
+-		ti,bit-shift = <28>;
++		ti,bit-shift = <24>;
+ 		reg = <0x1860>;
+ 	};
+ 
+-- 
+1.9.1
