@@ -1,44 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Apr 2014 10:40:45 +0100
-Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
- swiotlb" (was Re: [GIT PULL] arm64 patches for 3.15)
-In-Reply-To: <20140402092032.GB31892@arm.com>
-References: <20140331175230.GA7480@arm.com>
- <1396368657.3681.17.camel@linaro1.home> <20140401172939.GG20061@arm.com>
- <1396428722.3554.20.camel@linaro1.home> <20140402092032.GB31892@arm.com>
-Message-ID: <20140402094045.GH7528@n2100.arm.linux.org.uk>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 02 Apr 2014 17:51:54 +0800
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <9532591.5yuCbpL4pV@wuerfel>
+References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
+ <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
+ <9532591.5yuCbpL4pV@wuerfel>
+Message-ID: <533BDDBA.1060800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 10:20:32AM +0100, Catalin Marinas wrote:
-> You are right. I think having unaligned DMA buffers for inbound
-> transfers is pointless. We can avoid losing data written by another CPU
-> in the same cache line but, depending on the stage of the DMA transfer,
-> it can corrupt the DMA data.
-> 
-> I wonder whether it's easier to define the cache_line_size() macro to
-> read CWG and assume that the DMA buffers are always aligned, ignoring
-> the invalidation of the unaligned boundaries. This wouldn't be much
-> different from your scenario where the shared cache line is written
-> (just less likely to trigger but still a bug, so I would rather notice
-> this early).
-> 
-> The ARMv7 code has a similar issue, it performs clean&invalidate on the
-> unaligned start but it doesn't move r0, so it goes into the main loop
-> invalidating the same cache line again. If it was written by something
-> else, the information would be lost.
+Dear Arnd
 
-You can't make that a requirement.  People have shared stuff across a
-cache line for years in Linux, and people have brought it up and tried
-to fix it, but there's much resistance against it.  In particular is
-SCSI, which submits the sense buffer as part of a larger structure (the
-host.)  SCSI sort-of guarantees that the surrounding struct members
-won't be touched, but their data has to be preserved.
+On 04/02/2014 05:21 PM, Arnd Bergmann wrote:
+> On Tuesday 01 April 2014 21:27:12 Zhangfei Gao wrote:
+>> +static int hip04_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>
+> While it looks like there are no serious functionality bugs left, this
+> function is rather inefficient, as has been pointed out before:
 
-In any case, remember that there are strict rules about ownership of the
-DMA memory vs calls to the DMA API.  It is invalid to call the DMA
-streaming API functions while a DMA transfer is active.
+Yes, still need more performance tuning in the next step.
+We need to enable the hardware feature of cache flush, under help of 
+arm-smmu, as a result dma_map_single etc can be removed.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+>
+>> +{
+>> +       struct hip04_priv *priv = netdev_priv(ndev);
+>> +       struct net_device_stats *stats = &ndev->stats;
+>> +       unsigned int tx_head = priv->tx_head;
+>> +       struct tx_desc *desc = &priv->tx_desc[tx_head];
+>> +       dma_addr_t phys;
+>> +
+>> +       hip04_tx_reclaim(ndev, false);
+>> +       mod_timer(&priv->txtimer, jiffies + RECLAIM_PERIOD);
+>> +
+>> +       if (priv->tx_count >= TX_DESC_NUM) {
+>> +               netif_stop_queue(ndev);
+>> +               return NETDEV_TX_BUSY;
+>> +       }
+>
+> This is where you have two problems:
+>
+> - if the descriptor ring is full, you wait for RECLAIM_PERIOD,
+>    which is far too long at 500ms, because during that time you
+>    are not able to add further data to the stopped queue.
+
+Understand
+The idea here is not using the timer as much as possible.
+As experiment shows, only xmit reclaim buffers, the best throughput can 
+be achieved.
+
+>
+> - As David Laight pointed out earlier, you must also ensure that
+>    you don't have too much /data/ pending in the descriptor ring
+>    when you stop the queue. For a 10mbit connection, you have already
+>    tested (as we discussed on IRC) that 64 descriptors with 1500 byte
+>    frames gives you a 68ms round-trip ping time, which is too much.
+
+When iperf & ping running together and only ping, it is 0.7 ms.
+
+>    Conversely, on 1gbit, having only 64 descriptors actually seems
+>    a little low, and you may be able to get better throughput if
+>    you extend the ring to e.g. 512 descriptors.
+
+OK, Will check throughput of upgrade xmit descriptors.
+But is it said not using too much descripors for xmit since no xmit 
+interrupt?
+
+>
+>> +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
+>> +       if (dma_mapping_error(&ndev->dev, phys)) {
+>> +               dev_kfree_skb(skb);
+>> +               return NETDEV_TX_OK;
+>> +       }
+>> +
+>> +       priv->tx_skb[tx_head] = skb;
+>> +       priv->tx_phys[tx_head] = phys;
+>> +       desc->send_addr = cpu_to_be32(phys);
+>> +       desc->send_size = cpu_to_be16(skb->len);
+>> +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
+>> +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
+>> +       desc->wb_addr = cpu_to_be32(phys);
+>
+> One detail: since you don't have cache-coherent DMA, "desc" will
+> reside in uncached memory, so you try to minimize the number of accesses.
+> It's probably faster if you build the descriptor on the stack and
+> then atomically copy it over, rather than assigning each member at
+> a time.
+
+I am sorry, not quite understand, could you clarify more?
+The phys and size etc of skb->data is changing, so need to assign.
+If member contents keep constant, it can be set when initializing.
+
+>
+> The same would be true for the rx descriptors.
+>
+
+Thanks
