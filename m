@@ -1,63 +1,24 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  2 Apr 2014 19:25:46 -0300
-Subject: [PATCH 3/3] ARM: dts: imx27-pdk: Pass the FEC pin configuration
-In-Reply-To: <1396477546-11130-1-git-send-email-festevam@gmail.com>
-References: <1396477546-11130-1-git-send-email-festevam@gmail.com>
-Message-ID: <1396477546-11130-3-git-send-email-festevam@gmail.com>
+Date: Wed, 2 Apr 2014 19:32:24 -0300
+Subject: mx27 running too slow
+Message-ID: <CAOMZO5CC1NwP14H7uuygX7ZviFJLriG41hyczzvzxYWKHJu5DQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Alexander,
 
-Provide an entry for the FEC pin muxing.
+What is the BogoMIPs value you get on mx27 running 3.14?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx27-pdk.dts | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+I am running Shawn's for-next branch and it is terribly slow on a mx27pdk:
 
-diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-index 5e9a4bb..f10d4ea 100644
---- a/arch/arm/boot/dts/imx27-pdk.dts
-+++ b/arch/arm/boot/dts/imx27-pdk.dts
-@@ -22,12 +22,37 @@
- };
- 
- &fec {
-+	phy-mode = "mii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
- 	status = "okay";
- };
- 
--
- &iomuxc {
- 	imx27-pdk {
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <
-+				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
-+				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
-+				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
-+				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
-+				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
-+				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
-+				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
-+				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
-+				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
-+				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
-+				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
-+				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
-+				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
-+				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
-+				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
-+				MX27_PAD_ATA_DATA13__FEC_COL 0x0
-+				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
-+				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX27_PAD_UART1_TXD__UART1_TXD 0x0
--- 
-1.8.3.2
+sched_clock: 32 bits at 13MHz, resolution 75ns, wraps every 322929872820ns
+CPU identified as i.MX27, silicon rev 2.1
+Console: colour dummy device 80x30
+Calibrating delay loop (skipped), value calculated using timer
+frequency.. 26.60 BogoMIPS (lpj=133000)
+
+ARM9 running at 400MHz should give around 200 BogoMIPs.
+
+Regards,
+
+Fabio Estevam
