@@ -1,25 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 2 Apr 2014 08:28:51 -0500
-Subject: [PATCH v7 00/12] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
-In-Reply-To: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <CAL_Jsq+ZZbck7OnzS=ea1quUmkkToN8E==R4+DH2=VSCPMhBig@mail.gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed,  2 Apr 2014 21:34:22 +0800
+Subject: [PATCH 1/2] ARM: hisi: enable L2 driver
+Message-ID: <1396445663-1357-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 2, 2014 at 5:42 AM, Anup Patel <anup.patel@linaro.org> wrote:
-> Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
-> and Coordination Interface (PSCI) v0.1.
->
-> This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
-> such that it does not break current KVM ARM/ARM64 ABI.
->
-> The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
-> KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
-> PSCI v0.2 to VCPUs.
+l2x0_of_init() is necessary to enable PL310 L2 cache controller.
 
-Other than my few comments, for the series:
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/mach-hisi/hisilicon.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-Rob
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index 741faf3..3a6f244 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ 
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/proc-fns.h>
+ 
+ #include <asm/mach/arch.h>
+@@ -51,6 +52,12 @@ static void __init hi3620_map_io(void)
+ 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
+ }
+ 
++static void __init hi3xxx_init(void)
++{
++	l2x0_of_init(0, ~0UL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ static void hi3xxx_restart(enum reboot_mode mode, const char *cmd)
+ {
+ 	struct device_node *np;
+@@ -86,5 +93,6 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.map_io		= hi3620_map_io,
+ 	.dt_compat	= hi3xxx_compat,
+ 	.smp		= smp_ops(hi3xxx_smp_ops),
++	.init_machine	= hi3xxx_init,
+ 	.restart	= hi3xxx_restart,
+ MACHINE_END
+-- 
+1.8.3.2
