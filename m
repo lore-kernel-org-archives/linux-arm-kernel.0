@@ -1,110 +1,50 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 02 Apr 2014 16:50:56 +0900
-Subject: [PATCH 05/10] ARM: EXYNOS: Move "regs-pmu" header inclusion in
- common.h
-In-Reply-To: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1396425058-4012-6-git-send-email-pankaj.dubey@samsung.com>
+Date: Wed, 02 Apr 2014 16:50:51 +0900
+Subject: [PATCH 0/7] ARM: Exynos: PMU cleanup and refactoring for using DT
+Message-ID: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are many machine files under "mach-exynos" including "regs-pmu.h"
-as well as "common.h", so better we move this header inclusion in common.h.
+This patch series, does some minor cleanup and modifies Exynos PMU related
+code for mapping Exynos Power Management Unit (PMU) base address from device
+tree. Since PMU offsets are used across many files under mach-exynos, it
+introduces one helper function to get PMU base address in exynos.c.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/common.h  |    1 +
- arch/arm/mach-exynos/cpuidle.c |    1 -
- arch/arm/mach-exynos/exynos.c  |    1 -
- arch/arm/mach-exynos/hotplug.c |    1 -
- arch/arm/mach-exynos/platsmp.c |    1 -
- arch/arm/mach-exynos/pm.c      |    1 -
- arch/arm/mach-exynos/pmu.c     |    1 -
- 7 files changed, 1 insertion(+), 6 deletions(-)
+This patch series is preparation for moving PMU related code out of machine
+folder and converting into a driver.
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 277a83e..ff28334 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -14,6 +14,7 @@
- 
- #include <linux/reboot.h>
- #include <linux/of.h>
-+#include "regs-pmu.h"
- 
- void exynos_init_io(void);
- void exynos_restart(enum reboot_mode mode, const char *cmd);
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index b530231..b9dd8c3 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -29,7 +29,6 @@
- #include <mach/map.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- 
- #define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
- 			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 57bd1cd..a5e1349 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -30,7 +30,6 @@
- 
- #include "common.h"
- #include "mfc.h"
--#include "regs-pmu.h"
- #include "regs-sys.h"
- 
- #define L2_AUX_VAL 0x7C470001
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead53..33db6ee 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -22,7 +22,6 @@
- #include <plat/cpu.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- 
- static inline void cpu_enter_lowpower_a9(void)
- {
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index d8d1555..3ebb03f 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -29,7 +29,6 @@
- #include <plat/cpu.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- 
- extern void exynos4_secondary_startup(void);
- 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 723c988..875151f 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -34,7 +34,6 @@
- #include <mach/map.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- #include "regs-sys.h"
- 
- /**
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 05c7ce1..fb44352 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -16,7 +16,6 @@
- #include <plat/cpu.h>
- 
- #include "common.h"
--#include "regs-pmu.h"
- 
- static const struct exynos_pmu_conf *exynos_pmu_config;
- 
+This patch requires change in Exynos4210, Exynos4212 and Exynos4412 dtsi files,
+which I will post shortly as separate patch series.
+
+These patches are created on top of kgene for-next branch.
+We have tested these patches for System boot and PMU initialization of
+Exynos5250 and Exynos5260 (with some internal patches).
+For rest Exynos SoC it has been only compile tested.
+
+Pankaj Dubey (4):
+  ARM: EXYNOS: Cleanup  "mach-exynos/common.h" file
+  ARM: EXYNOS: Correct file path in comment message
+  ARM: EXYNOS: Move "regs-pmu" header inclusion in common.h
+  ARM: EXYNOS: Refactored code for PMU register mapping via DT
+
+Young-Gun Jang (3):
+  ARM: EXYNOS: Move SYSREG definition into sys-reg specific file
+  ARM: EXYNOS: Remove regs-pmu.h file dependency from pm_domain
+  ARM: EXYNOS: Add support for mapping PMU base address via DT
+
+ arch/arm/mach-exynos/common.h           |   10 +-
+ arch/arm/mach-exynos/cpuidle.c          |   29 +-
+ arch/arm/mach-exynos/exynos.c           |   58 +++-
+ arch/arm/mach-exynos/hotplug.c          |    5 +-
+ arch/arm/mach-exynos/include/mach/map.h |    3 -
+ arch/arm/mach-exynos/platsmp.c          |   15 +-
+ arch/arm/mach-exynos/pm.c               |   55 ++--
+ arch/arm/mach-exynos/pm_domains.c       |    2 +-
+ arch/arm/mach-exynos/pmu.c              |   35 +--
+ arch/arm/mach-exynos/regs-pmu.h         |  510 +++++++++++++++----------------
+ arch/arm/mach-exynos/regs-sys.h         |   22 ++
+ 11 files changed, 405 insertions(+), 339 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/regs-sys.h
+
 -- 
 1.7.10.4
