@@ -1,111 +1,80 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 2 Apr 2014 08:57:44 +0200
-Subject: [PATCH 3/6] ARM: socfpga: dts: add i2c busses
-In-Reply-To: <1396380740.27447.1.camel@linux-builds1>
-References: <1396280404-2041-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396280404-2041-3-git-send-email-s.trumtrar@pengutronix.de>
- <1396380740.27447.1.camel@linux-builds1>
-Message-ID: <20140402065744.GT5052@pengutronix.de>
+Date: Wed,  2 Apr 2014 09:11:39 +0200
+Subject: [PATCH v2 5/6] ARM: socfpga: dts: add support for EBV SOCrates
+In-Reply-To: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1396422700-3962-5-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The SOCrates is a SOCFpga-Cyclone5 based board from EBV.
+Add support for it.
 
-On Tue, Apr 01, 2014 at 02:32:20PM -0500, Dinh Nguyen wrote:
-> On Mon, 2014-03-31 at 17:40 +0200, Steffen Trumtrar wrote:
-> > Add all 4 i2c busses.
-> > 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/socfpga.dtsi | 44 ++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 44 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index 7867e7f..d0594c3 100644
-> > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -470,6 +470,50 @@
-> >  			status = "disabled";
-> >  		};
-> >  
-> > +		i2c0: i2c at 0xffc04000 {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			compatible = "snps,designware-i2c";
-> > +			reg = <0xffc04000 0x1000>;
-> > +			clock-frequency = <400000000>;
-> 
-> "clock-frequency" is not needed as the driver can get the clock
-> frequency from the clock driver.
-> 
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 41 +++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
 
-You are right of course. I will remove that.
-Although, I think I remember seeing patches that add this functionality
-to the driver. So you can change the speed setting. But even than you
-are right, as something like that wouldn't belong here in the dtsi.
-
-
-> > +			clocks = <&l4_sp_clk>;
-> > +			interrupts = <0 158 0x4>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		i2c1: i2c at 0xffc05000 {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			compatible = "snps,designware-i2c";
-> > +			reg = <0xffc05000 0x1000>;
-> > +			clock-frequency = <100000000>;
-> 
-> Same..
-> 
-> > +			clocks = <&l4_sp_clk>;
-> > +			interrupts = <0 159 0x4>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		i2c2: i2c at 0xffc06000 {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			compatible = "snps,designware-i2c";
-> > +			reg = <0xffc06000 0x1000>;
-> > +			clock-frequency = <100000000>;
-> 
-> Same...
-> 
-> > +			clocks = <&l4_sp_clk>;
-> > +			interrupts = <0 160 0x4>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		i2c3: i2c at 0xffc07000 {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			compatible = "snps,designware-i2c";
-> > +			reg = <0xffc07000 0x1000>;
-> > +			clock-frequency = <100000000>;
-> 
-> Same..
-> 
-> thanks,
-> Dinh
-> > +			clocks = <&l4_sp_clk>;
-> > +			interrupts = <0 161 0x4>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> >  		L2: l2-cache at fffef000 {
-> >  			compatible = "arm,pl310-cache";
-> >  			reg = <0xfffef000 0x1000>;
-> 
-> 
-> 
-
-Thanks,
-Steffen
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 0320303..4308695 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -267,6 +267,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
+ 	socfpga_cyclone5_sockit.dtb \
++	socfpga_cyclone5_socrates.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+new file mode 100644
+index 0000000..1e31f32
+--- /dev/null
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+@@ -0,0 +1,41 @@
++/*
++ *  Copyright (C) 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/include/ "socfpga_cyclone5.dtsi"
++
++/ {
++	model = "EBV SOCrates";
++	compatible = "ebv,socrates", "altr,socfpga-cyclone5", "altr,socfpga";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1GB */
++	};
++};
++
++&gmac1 {
++	status = "okay";
++};
++
++&mmc {
++	status = "okay";
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.1
