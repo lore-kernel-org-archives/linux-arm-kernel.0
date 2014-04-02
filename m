@@ -1,85 +1,98 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Apr 2014 12:37:50 +0100
-Subject: Bug(?) in patch "arm64: Implement coherent DMA API based on
- swiotlb"
-In-Reply-To: <1396435290.3554.52.camel@linaro1.home>
-References: <20140331175230.GA7480@arm.com>
- <1396368657.3681.17.camel@linaro1.home>
- <20140401172939.GG20061@arm.com>
- <1396428722.3554.20.camel@linaro1.home>
- <20140402092032.GB31892@arm.com>
- <1396435290.3554.52.camel@linaro1.home>
-Message-ID: <20140402113750.GD31892@arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 2 Apr 2014 19:39:35 +0800
+Subject: [PATCH] ARM i.MX51: Add Digi ConnectCore devicetree
+In-Reply-To: <1396075706-25384-2-git-send-email-shc_work@mail.ru>
+References: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
+ <1396075706-25384-2-git-send-email-shc_work@mail.ru>
+Message-ID: <20140402113934.GH8753@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 11:41:30AM +0100, Jon Medhurst (Tixy) wrote:
-> On Wed, 2014-04-02 at 10:20 +0100, Catalin Marinas wrote:
-> > On Wed, Apr 02, 2014 at 09:52:02AM +0100, Jon Medhurst (Tixy) wrote:
-> > > But then that leaves a time period where a write can
-> > > happen between the clean and the invalidate, again leading to data
-> > > corruption. I hope all this means I've either got rather confused or
-> > > that that cache architectures are smart enough to automatically cope. 
-> > 
-> > You are right. I think having unaligned DMA buffers for inbound
-> > transfers is pointless. We can avoid losing data written by another CPU
-> > in the same cache line but, depending on the stage of the DMA transfer,
-> > it can corrupt the DMA data.
-> > 
-> > I wonder whether it's easier to define the cache_line_size() macro to
-> > read CWG
+On Sat, Mar 29, 2014 at 10:48:26AM +0400, Alexander Shiyan wrote:
+> This patch adds support for Digi ConnectCore? i.MX51/Wi-i.MX51 SOM
+> and basic support for the ConnectCore for i.MX51 JumpStart Kit.
 > 
-> That won't work, the stride of cache operations needs to be the
-> _minimum_ cache line size, otherwise we might skip over some cache lines
-> and not flush them. (We've been hit before by bugs caused by the fact
-> that big.LITTLE systems report different minimum i-cache line sizes
-> depend on whether you execute on the big or LITTLE cores [1], we need
-> the 'real' minimum otherwise things go horribly wrong.)
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/149950.html
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
 
-Yes, I remember this. CWG should also be the same in a big.LITTLE
-system.
+...
 
-> >  and assume that the DMA buffers are always aligned,
-> 
-> We can't assume the region in any particular DMA transfer is cache
-> aligned, but I agree, that if multiple actors were operating on adjacent
-> memory locations in the same cache line, without implementing their own
-> coordination then there's nothing the low level DMA code can do to avoid
-> data corruption from cache cleaning.
-> 
-> We at least need to make sure that the memory allocation functions used
-> for DMA buffers return regions of whole CWG size, to avoid unrelated
-> buffers corrupting each other. If I have correctly read
-> __dma_alloc_noncoherent and the functions it calls, then it looks like
-> buffers are actually whole pages, so that's not a problem.
+> +#include "imx51-digi-connectcore-som.dtsi"
+> +
+> +/ {
+> +	model = "Digi ConnectCore CC(W)-MX51 JSK";
+> +	compatible = "digi,connectcore-ccxmx51-jsk",
+> +		     "digi,connectcore-ccxmx51-som", "fsl,imx51";
 
-It's not about dma_alloc but the streaming DMA API like dma_map_sg().
+You may want to send another patch to DT maintainers to add 'digi' into
+Documentation/devicetree/bindings/vendor-prefixes.txt.
 
-> >  ignoring
-> > the invalidation of the unaligned boundaries. This wouldn't be much
-> > different from your scenario where the shared cache line is written
-> > (just less likely to trigger but still a bug, so I would rather notice
-> > this early).
-> > 
-> > The ARMv7 code has a similar issue, it performs clean&invalidate on the
-> > unaligned start but it doesn't move r0, so it goes into the main loop
-> > invalidating the same cache line again.
-> 
-> Yes, and as it's missing a dsb could also lead to the wrong behaviour if
-> the invalidate was reordered to execute prior to the clean+invalidate on
-> the same line. I just dug into git history to see if I could find a clue
-> as to how the v7 code came to look like it does, but I see that it's
-> been like that since the day it was submitted in 2007, by a certain
-> Catalin Marinas ;-)
+> +
+> +	chosen {
+> +		linux,stdout-path = &uart1;
+> +	};
+> +};
 
-I don't remember ;). But there are some rules about reordering of cache
-line operations by MVA with regards to memory accesses. I have to check
-whether they apply to other d-cache maintenance to the same address as
-well.
+...
 
-I'll try to come up with another patch using CWG.
+> +&nfc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_nfc>;
+> +	nand-bus-width = <8>;
+> +	nand-ecc-mode = "hw";
+> +	nand-on-flash-bbt;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	status = "okay";
+> +
+> +	partition at 0 {
+> +		label = "boot";
+> +		reg = <0x00000 0x80000>;
+> +	};
+> +
+> +	partition at 1 {
+> +		label = "env";
+> +		reg = <0x80000 0x40000>;
+> +	};
 
--- 
-Catalin
+@Sascha, does the argument that we shouldn't have partition table in the
+mainline dtb still stands?
+
+> +};
+> +
+> +&usbotg {
+> +	phy_type = "utmi_wide";
+> +	disable-over-current;
+> +	/* Device role is not known, keep status disabled */
+> +};
+> +
+> +&weim {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_weim>;
+> +	status = "okay";
+> +
+> +	lan9221: lan9221 at ce000000 {
+
+How does 'ce000000' in the node name comes?
+
+Shawn
+
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_lan9221>;
+> +		compatible = "smsc,lan9221", "smsc,lan9115";
+> +		reg = <5 0x00000000 0x1000>;
+> +		fsl,weim-cs-timing = <
+> +			0x00420081 0x00000000
+> +			0x32260000 0x00000000
+> +			0x72080f00 0x00000000
+> +		>;
+> +		clocks = <&clks IMX5_CLK_DUMMY>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
+> +		phy-mode = "mii";
+> +		reg-io-width = <2>;
+> +		smsc,irq-push-pull;
+> +		vdd33a-supply = <&gpo2_reg>;
+> +		vddvario-supply = <&gpo2_reg>;
+> +	};
+> +};
