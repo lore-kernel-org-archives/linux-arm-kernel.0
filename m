@@ -1,58 +1,83 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 02 Apr 2014 15:02:15 +0200
-Subject: [PATCH RFC v4 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <20140402080102.GK2931@tbergstrom-lnx.Nvidia.com>
-References: <1396284116-19178-1-git-send-email-s.nawrocki@samsung.com>
- <1396284116-19178-3-git-send-email-s.nawrocki@samsung.com>
- <20140331200620.GA13881@kroah.com> <533ABCEC.8040701@codethink.co.uk>
- <20140402080102.GK2931@tbergstrom-lnx.Nvidia.com>
-Message-ID: <533C0A57.50102@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 2 Apr 2014 08:07:18 -0500
+Subject: [PATCH v7 09/12] ARM/ARM64: KVM: Emulate PSCI v0.2
+ MIGRATE_INFO_TYPE and related functions
+In-Reply-To: <1396435347-20056-10-git-send-email-anup.patel@linaro.org>
+References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
+ <1396435347-20056-10-git-send-email-anup.patel@linaro.org>
+Message-ID: <CAL_JsqJFB64_5dE_PG-42Yma+MiMpcmoXY5V7A2wE_RxRSuqow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/14 10:01, Peter De Schrijver wrote:
-> On Tue, Apr 01, 2014 at 03:19:40PM +0200, Ben Dooks wrote:
->> On 31/03/14 21:06, Greg KH wrote:
->>> On Mon, Mar 31, 2014 at 06:41:56PM +0200, Sylwester Nawrocki wrote:
->>>> This function adds a helper function to configure clock parents and rates
->>>> as specified in clock-parents, clock-rates DT properties for a consumer
->>>> device and a call to it before driver is bound to a device.
->>>>
->>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>
->> [snip]
->>
->>> I don't understand why you need the driver core to initialize this one
->>> type of thing?  That should be in a driver, or in a class, or at worse
->>> case, the platform code.
->>>
->>> What makes clocks so "unique" here?
->>
->> I suppose the issue here is that a lot of drivers currently use
->> clocks and a number of systems have badly setup default clock trees
->> at start time.
->>
->> Mark Brown and others have argued that the management of clocks which
->> is common to all devices should not live in the driver.
-> 
-> Exactly, this data should be part of the clock provider DT nodes, not
-> of the device nodes. 
+On Wed, Apr 2, 2014 at 5:42 AM, Anup Patel <anup.patel@linaro.org> wrote:
+> This patch adds emulation of PSCI v0.2 MIGRATE, MIGRATE_INFO_TYPE, and
+> MIGRATE_INFO_UP_CPU function calls for KVM ARM/ARM64.
+>
+> KVM ARM/ARM64 being a hypervisor (and not a Trusted OS), we cannot provide
+> this functions hence we emulate these functions in following way:
+> 1. MIGRATE - Returns "Not Supported"
+> 2. MIGRATE_INFO_TYPE - Return 2 i.e. Trusted OS is either not present
+>    or does not require migration
+> 3. MIGRATE_INFO_UP_CPU - Returns "Not Supported"
+>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Why not in the device nodes, when often this data is closely related
-to a device ? I'd prefer to keep the ability to also specify it at
-the consumer nodes. IMHO the DT binding would be more explicit and
-less error prone this way. E.g. clock-rates may refer directly to the
-consumer clocks, so why we should be specifying it for all devices in
-a single DT node ?
+One minor thing below, otherwise:
 
-Also I'm not sure if a fact that something shouldn't be handled in
-a device driver necessarily means that related data shouldn't be put
-in the device node.
+Acked-by: Rob Herring <robh@kernel.org>
 
-It would be nice to hear more opinions, it seems now there is
-roughly same number of proponents and opponents of each option.
+> ---
+>  arch/arm/kvm/psci.c |   20 +++++++++++++++-----
+>  1 file changed, 15 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 5fccf0b..d8335da 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -197,6 +197,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>         case PSCI_0_2_FN64_AFFINITY_INFO:
+>                 val = kvm_psci_vcpu_affinity_info(vcpu);
+>                 break;
+> +       case PSCI_0_2_FN_MIGRATE:
+> +       case PSCI_0_2_FN64_MIGRATE:
+> +               val = PSCI_RET_NOT_SUPPORTED;
+> +               break;
+> +       case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+> +               /*
+> +                * Trusted OS is either not present or
+> +                * does not require migration
+> +                */
+> +               val = 2;
 
---
-Thanks,
-Sylwester
+This value should be defined int psci.h along with other possible values.
+
+> +               break;
+> +       case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+> +       case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+> +               val = PSCI_RET_NOT_SUPPORTED;
+> +               break;
+>         case PSCI_0_2_FN_SYSTEM_OFF:
+>                 kvm_psci_system_off(vcpu);
+>                 val = PSCI_RET_SUCCESS;
+> @@ -208,12 +223,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>                 ret = 0;
+>                 break;
+>         case PSCI_0_2_FN_CPU_SUSPEND:
+> -       case PSCI_0_2_FN_MIGRATE:
+> -       case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+> -       case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+>         case PSCI_0_2_FN64_CPU_SUSPEND:
+> -       case PSCI_0_2_FN64_MIGRATE:
+> -       case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+>                 val = PSCI_RET_NOT_SUPPORTED;
+>                 break;
+>         default:
+> --
+> 1.7.9.5
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
