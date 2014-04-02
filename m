@@ -1,35 +1,56 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 2 Apr 2014 19:56:14 +0800
-Subject: [PATCH] ARM i.MX51: Add Digi ConnectCore devicetree
-In-Reply-To: <1396439100.597907550@f167.i.mail.ru>
-References: <1396075706-25384-1-git-send-email-shc_work@mail.ru>
- <1396075706-25384-2-git-send-email-shc_work@mail.ru>
- <20140402113934.GH8753@dragon>
- <1396439100.597907550@f167.i.mail.ru>
-Message-ID: <20140402115612.GI8753@dragon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 2 Apr 2014 13:59:19 +0200
+Subject: [PATCH] ARM: at91: fix spi cs on sama5d3 Xplained board
+In-Reply-To: <1396336363-13709-1-git-send-email-voice.shen@atmel.com>
+References: <1396336363-13709-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20140402115919.GA14726@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 03:45:00PM +0400, Alexander Shiyan wrote:
-> Wed, 2 Apr 2014 19:39:35 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> > On Sat, Mar 29, 2014 at 10:48:26AM +0400, Alexander Shiyan wrote:
-> > > This patch adds support for Digi ConnectCore? i.MX51/Wi-i.MX51 SOM
-> > > and basic support for the ConnectCore for i.MX51 JumpStart Kit.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ...
-> > > +&weim {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&pinctrl_weim>;
-> > > +	status = "okay";
-> > > +
-> > > +	lan9221: lan9221 at ce000000 {
-> > 
-> > How does 'ce000000' in the node name comes?
+On 01/04/2014 at 15:12:43 +0800, Bo Shen wrote :
+> The PD16 is the CS3 for SPI0 while not SPI1.
 > 
-> This is a WEIM CS5 start address.
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Hmm, shouldn't the unit-address come from the 'reg' property of the node
-somehow?
+> ---
+> This patch is based on v3.14-rc8
+> 
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> index ce13755..4537259 100644
+> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> @@ -34,7 +34,7 @@
+>  			};
+>  
+>  			spi0: spi at f0004000 {
+> -				cs-gpios = <&pioD 13 0>;
+> +				cs-gpios = <&pioD 13 0>, <0>, <0>, <&pioD 16 0>;
+>  				status = "okay";
+>  			};
+>  
+> @@ -79,7 +79,7 @@
+>  			};
+>  
+>  			spi1: spi at f8008000 {
+> -				cs-gpios = <&pioC 25 0>, <0>, <0>, <&pioD 16 0>;
+> +				cs-gpios = <&pioC 25 0>;
+>  				status = "okay";
+>  			};
+>  
+> -- 
+> 1.8.5.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Shawn
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
