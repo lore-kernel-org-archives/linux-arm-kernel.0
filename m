@@ -1,48 +1,52 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed,  2 Apr 2014 09:11:38 +0200
-Subject: [PATCH v2 4/6] ARM: socfpga: dts: add can0+1
-In-Reply-To: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1396422700-3962-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1396422700-3962-4-git-send-email-s.trumtrar@pengutronix.de>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 02 Apr 2014 16:50:55 +0900
+Subject: [PATCH 04/10] ARM: EXYNOS: Remove regs-pmu.h file dependency from
+ pm_domain
+In-Reply-To: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1396425058-4012-5-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add both can controllers to the dtsi.
+From: Young-Gun Jang <yg1004.jang@samsung.com>
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Current "pm_domain.c" file uses "S5P_INT_LOCAL_PWR_EN" definition from
+"regs-pmu.h" and hence needs to include this header file. As there is
+no other user of "S5P_INT_LOCAL_PWR_EN" definition other than pm_domain,
+to remove "regs-pmu.h" header file dependency from "pm_domain.c"  it's
+better we define this definition in "pm_domain.c" file itself and thus it
+will help in removing header file inclusion from "pm_domain.c".
+
+Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
 ---
-Changes since v1:
-	- correct node naming scheme
+ arch/arm/mach-exynos/pm_domains.c |    2 +-
+ arch/arm/mach-exynos/regs-pmu.h   |    1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
- arch/arm/boot/dts/socfpga.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 292c3b2..c8ced33 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -470,6 +470,22 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fe6570e..f676b0a 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -22,7 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/sched.h>
  
-+		can0: can at ffc00000 {
-+			compatible = "bosch,d_can";
-+			reg = <0xffc00000 0x1000>;
-+			interrupts = <0 131 4>, <0 132 4>, <0 133 4>, <0 134 4>;
-+			clocks = <&can0_clk>;
-+			status = "disabled";
-+		};
-+
-+		can1: can at ffc01000 {
-+			compatible = "bosch,d_can";
-+			reg = <0xffc01000 0x1000>;
-+			interrupts = <0 135 4>, <0 136 4>, <0 137 4>, <0 138 4>;
-+			clocks = <&can1_clk>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at ffc04000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+-#include "regs-pmu.h"
++#define S5P_INT_LOCAL_PWR_EN 0x7
+ 
+ /*
+  * Exynos specific wrapper around the generic power domain
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 4ee706d..bfebe84 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -116,7 +116,6 @@
+ #define S5P_PAD_RET_EBIB_OPTION			S5P_PMUREG(0x31A8)
+ 
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
+-#define S5P_INT_LOCAL_PWR_EN			0x7
+ 
+ #define S5P_CHECK_SLEEP				0x00000BAD
+ 
 -- 
-1.9.1
+1.7.10.4
