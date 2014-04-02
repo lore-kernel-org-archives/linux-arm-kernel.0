@@ -1,100 +1,23 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Apr 2014 14:03:22 -0700
-Subject: [PATCH v7 11/12] ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
-In-Reply-To: <1396435347-20056-12-git-send-email-anup.patel@linaro.org>
-References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
- <1396435347-20056-12-git-send-email-anup.patel@linaro.org>
-Message-ID: <20140402210322.GO4756@lvm>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 02 Apr 2014 14:44:18 -0700
+Subject: [PATCH 1/1] AArch64: TCR_TG1_64K incorrectly sets TCR_EL1 bits
+ [31:30]
+In-Reply-To: <20140402170747.GC24018@arm.com>
+References: <CAHWCVW+cH6MwhQj-JGWN63AqseFYuDPoftv+zGJU8UDfAgueEQ@mail.gmail.com>
+ <20140402123844.GE31892@arm.com> <20140402170747.GC24018@arm.com>
+Message-ID: <1396475058.32040.10.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 04:12:26PM +0530, Anup Patel wrote:
-> This patch adds emulation of PSCI v0.2 CPU_SUSPEND function call for
-> KVM ARM/ARM64. This is a CPU-level function call which can suspend
-> current CPU or current CPU cluster. We don't have VCPU clusters in
-> KVM so we only suspend the current VCPU.
-> 
-> The CPU_SUSPEND emulation is not tested much because currently there
-> is no CPUIDLE driver in Linux kernel that uses PSCI CPU_SUSPEND. The
-> PSCI CPU_SUSPEND implementation in ARM64 kernel was tested using a
-> Simple CPUIDLE driver which is not published due to unstable DT-bindings
-> for PSCI.
-> (For more info, http://lwn.net/Articles/574950/)
-> 
-> Even if we had stable DT-bindings for PSCI and CPUIDLE driver that
-> uses PSCI CPU_SUSPEND then still we need to define SUSPEND states
-> and WAKEUP events for KVM ARM/ARM64.
-> 
-> Due to above, we implement CPU_SUSPEND emulation similar to WFI
-> (Wait-for-interrupt) emulation and we also treat power-down request
-> to be same as stand-by request. This is also consistent with section
-> 5.4.1 and section 5.4.2 of PSCI v0.2 specification.
-> 
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm/kvm/psci.c |   27 +++++++++++++++++++++++----
->  1 file changed, 23 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index fdbd829..74fa4ad 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -52,6 +52,25 @@ static unsigned long psci_affinity_mask(unsigned long affinity_level)
->  	return affinity_mask;
->  }
->  
-> +static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
-> +{
-> +	/*
-> +	 * NOTE: Currently, we don't have any wakeup events for KVM
-> +	 * so for simplicity we make VCPU suspend emulation to be
-> +	 * same-as WFI (Wait-for-interrupt) emulation. This is also
-> +	 * consistent with intended use of StateID as described in
-> +	 * section 5.4.1 of PSCI v0.2 specification (ARM DEN 0022A).
+On Wed, 2014-04-02 at 18:07 +0100, Catalin Marinas wrote:
+> On Wed, Apr 02, 2014 at 01:38:44PM +0100, Catalin Marinas wrote:
+> > On Wed, Apr 02, 2014 at 05:00:38AM +0100, Joe Sylve wrote:
+> > > Section D7.2.83 TCR_EL1, Translation Control Register (EL1) of the
+> > > latest ARM Architecture Reference Manual, ARMv8, for ARMv8-A states
+> > > that TCR_EL1 TG1 (bits [31:30]) should be set to 11 for a 64KB
+> > > TTBR1_EL1 granule size. The mainline 3.14 kernel incorrectly sets
+> > > those bits to 01 (which is a 16KB granule size).
 
-The WFI implementation wakes up on interrupts, so we are inherently
-defining that as a wakeup event for KVM with this patch, so the comment
-should be adjusted accordingly.
+trivia:
 
--Christoffer
-
-> +	 *
-> +	 * Further, we also treat power-down request to be same as
-> +	 * stand-by request as-per section 5.4.2 clause 3 of PSCI v0.2
-> +	 * specification (ARM DEN 0022A). This means all suspend states
-> +	 * for KVM PSCI emulation will preserve the register state.
-> +	 */
-> +	kvm_vcpu_block(vcpu);
-> +
-> +	return PSCI_RET_SUCCESS;
-> +}
-> +
->  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->  {
->  	vcpu->arch.pause = true;
-> @@ -195,6 +214,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		 */
->  		val = 2;
->  		break;
-> +	case PSCI_0_2_FN_CPU_SUSPEND:
-> +	case PSCI_0_2_FN64_CPU_SUSPEND:
-> +		val = kvm_psci_vcpu_suspend(vcpu);
-> +		break;
->  	case PSCI_0_2_FN_CPU_OFF:
->  		kvm_psci_vcpu_off(vcpu);
->  		val = PSCI_RET_SUCCESS;
-> @@ -232,10 +255,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		val = PSCI_RET_SUCCESS;
->  		ret = 0;
->  		break;
-> -	case PSCI_0_2_FN_CPU_SUSPEND:
-> -	case PSCI_0_2_FN64_CPU_SUSPEND:
-> -		val = PSCI_RET_NOT_SUPPORTED;
-> -		break;
->  	default:
->  		return -EINVAL;
->  	}
-> -- 
-> 1.7.9.5
-> 
+I think the subject title should be arm64
