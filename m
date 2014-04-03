@@ -1,53 +1,111 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 3 Apr 2014 13:15:52 -0700
-Subject: [PATCH v4 1/3] i2c: cadence: Document device tree bindings
-In-Reply-To: <CAL_Jsq+vOHzca_wT9ADHRxhR9dT8FYGP-iTvd5=zKrRVBZz-cw@mail.gmail.com>
-References: <1396547967-19260-1-git-send-email-soren.brinkmann@xilinx.com>
- <CAL_Jsq+vOHzca_wT9ADHRxhR9dT8FYGP-iTvd5=zKrRVBZz-cw@mail.gmail.com>
-Message-ID: <19eac9d5-7c83-4fca-b3e8-fc225b6559bd@CH1EHSMHS033.ehs.local>
+From: elder@linaro.org (Alex Elder)
+Date: Thu,  3 Apr 2014 15:30:52 -0500
+Subject: [PATCH] mach-bcm: clean up config and build targets
+Message-ID: <1396557052-24029-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-04-03 at 02:51PM -0500, Rob Herring wrote:
-> On Thu, Apr 3, 2014 at 12:59 PM, Soren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> > Add device tree binding documentation for the Cadence I2C controller.
-> >
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >
-> > Changes in v4:
-> >  - moved adding DT docs into this dedicated patch
-> >
-> > Changes in v3: None
-> > Changes in v2: None
-> >
-> > ---
-> >  .../devicetree/bindings/i2c/i2c-cadence.txt         | 21 +++++++++++++++++++++
-> >  1 file changed, 21 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cadence.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-cadence.txt b/Documentation/devicetree/bindings/i2c/i2c-cadence.txt
-> > new file mode 100644
-> > index 000000000000..685adf513111
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-cadence.txt
-> > @@ -0,0 +1,21 @@
-> > +Binding for the Cadence I2C controller
-> > +
-> > +Required properties:
-> > +  compatible: Compatibility string. Must be 'cdns,i2c-r1p10'.
-> > +  clocks: From common clock bindings. Phandle to input clock.
-> > +
-> > +Optional properties:
-> > +  clock-frequency: Desired operating frequency, in Hz, of the bus (actual may
-> > +                  be lower). Defaults to 400000 if not specified.
-> 
-> Since not all devices support 400kHz, I would prefer that the default
-> be 100kHz. Also, it would be good if what speed the default is
-> consistent across i2c drivers.
+Currently CONFIG_ARCH_BCM_MOBILE is used to select all Broadcom
+mobile SoCs.  Instead, use that only as a config menu switch, and
+define specific symbols like CONFIG_ARCH_BCM_281XX to select a
+particular SoC family.  If ARCH_BCM_MOBILE is selected, all of the
+SoCs will be selected by default, but this way each can be disabled
+individually as well.
 
-Fine with me. I'll change this.
+This allows more precision in controlling what gets built under
+mach-bcm.  Another benefit to doing this is that it makes it obvious
+that the code that implements SMC calls to control L2 cache is only
+used for BCM281XX (for example).
 
-	Thanks,
-	S?ren
+Also use Kbuild's $(<modulename>-y) variable mechanism to build a
+single object file containing everything used for the bcm281xx board
+in arch/arm/mach-bcm.
+
+Note:  This patch is based on the current arm-soc/for-next branch:
+    e98cd72 arm-soc: document samsung merges
+
+The patch is available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/mach-bcm-cleanup
+
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ arch/arm/mach-bcm/Kconfig  |   28 ++++++++++++++++++++++++----
+ arch/arm/mach-bcm/Makefile |   16 ++++++++++++----
+ 2 files changed, 36 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 21f97f7..183fdef 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -10,7 +10,7 @@ if ARCH_BCM
+ menu "Broadcom SoC Selection"
+ 
+ config ARCH_BCM_MOBILE
+-	bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
++	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
+ 	depends on MMU
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_ERRATA_754322
+@@ -23,9 +23,29 @@ config ARCH_BCM_MOBILE
+ 	select PINCTRL
+ 	help
+ 	  This enables support for systems based on Broadcom mobile SoCs.
+-	  It currently supports the 'BCM281XX' family, which includes
+-	  BCM11130, BCM11140, BCM11351, BCM28145 and
+-	  BCM28155 variants.
++
++if ARCH_BCM_MOBILE
++
++menu "Broadcom Mobile SoC Selection"
++
++config ARCH_BCM_281XX
++	bool "Broadcom BCM281XX SoC family"
++	default y
++	help
++	  Enable support for the the BCM281XX family, which includes
++	  BCM11130, BCM11140, BCM11351, BCM28145 and BCM28155
++	  variants.
++
++config ARCH_BCM_21664
++	bool "Broadcom BCM21664 SoC family"
++	default y
++	help
++	  Enable support for the the BCM21664 family, which includes
++	  BCM21663 and BCM21664 variants.
++
++endmenu
++
++endif
+ 
+ 
+ config ARCH_BCM2835
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index a326b28..08e63c1 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -10,10 +10,18 @@
+ # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ # GNU General Public License for more details.
+ 
+-obj-$(CONFIG_ARCH_BCM_MOBILE)	:= board_bcm281xx.o board_bcm21664.o \
+-				bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
+-obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
+-
++# BCM281XX
++obj-$(CONFIG_ARCH_BCM_281XX)	+= bcm281xx.o
++bcm281xx-y			:= board_bcm281xx.o
++bcm281xx-y			+= bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
+ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
++
++# BCM21664
++obj-$(CONFIG_ARCH_BCM_21664)	+= board_bcm21664.o
++
++# BCM2835
++obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
++
++# BCM5301X
+ obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+-- 
+1.7.9.5
