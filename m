@@ -1,39 +1,40 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 02 Apr 2014 21:21:39 -0700
-Subject: [PATCH v7 2/3] clk: exynos5410: register clocks using common clock
- framework
-In-Reply-To: <1393213435-20863-3-git-send-email-t.dakhran@samsung.com>
-References: <1393213435-20863-1-git-send-email-t.dakhran@samsung.com>
- <1393213435-20863-3-git-send-email-t.dakhran@samsung.com>
-Message-ID: <20140403042139.5762.23354@quantum>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 3 Apr 2014 09:53:56 +0530
+Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
+In-Reply-To: <20140402144020.GA20438@zod>
+References: <CA+5PVA6awqaSHQboqdv9nynV9Xjp46VeqijDWxZX1v5wDK0NWQ@mail.gmail.com>
+ <CAKohpok3gKyOWD0=pSv0yQLNqJcNPNZagRGFXNFHW+3J7E=mOg@mail.gmail.com>
+ <20140402144020.GA20438@zod>
+Message-ID: <CAOh2x=nHX0_2v0WtBAh6xLqmkk1SVQSpNZX54jirByDCwtoSXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tarek Dakhran (2014-02-23 19:43:54)
-> +External clock:
-> +
-> +There is clock that is generated outside the SoC. It is expected
-> +that it is defined using standard clock bindings with following
-> +clock-output-name:
-> + - "fin_pll" - PLL input clock - required.
+On Wed, Apr 2, 2014 at 8:10 PM, Josh Boyer <jwboyer@fedoraproject.org> wrote:
+> Commit 74397174989e5f70 attempted to clean up the power management options
+> for arm64, but when things were merged it didn't fully take effect.  Fix
+> it again.
+>
+> Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
+> ---
+>  arch/arm64/Kconfig | 6 ------
+>  1 file changed, 6 deletions(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 07aa3556952c..8033b9b8a2df 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -321,12 +321,6 @@ menu "CPU Power Management"
+>
+>  source "drivers/cpuidle/Kconfig"
+>
+> -source "drivers/cpufreq/Kconfig"
+> -
+> -endmenu
+> -
+> -menu "Power management options"
+> -
+>  source "kernel/power/Kconfig"
+>
+>  source "drivers/cpufreq/Kconfig"
 
-<snip>
-
-> +Example 2: Required external clock.
-> +
-> +       fin_pll: clock-fin-pll {
-> +               compatible = "fixed-clock";
-> +               reg = <0>;
-> +               #clock-cells = <0>;
-> +               clock-frequency = <24000000>;
-> +               clock-output-names = "fin_pll";
-> +       };
-
-I guess this part is a little strange for a binding definition.
-Basically this is DTS data specific to 5410; not sure why it belongs in
-the DT binding definition.
-
-Rest of the clock driver appears OK to me.
-
-Regards,
-Mike
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
