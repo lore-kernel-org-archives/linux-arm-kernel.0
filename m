@@ -1,36 +1,151 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 3 Apr 2014 10:07:30 -0700
-Subject: [PATCH] ARM: KVM: Handle IPA unmapping on memory region deletion
-In-Reply-To: <533D7D8B.2030806@arm.com>
-References: <1396538266-13245-1-git-send-email-eric.auger@linaro.org>
- <533D7D8B.2030806@arm.com>
-Message-ID: <CAMJs5B-YP8dsiapL=wpue5zhH1DruKENvAPtzNnvvRbCvqU-HQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu,  3 Apr 2014 18:16:42 +0100
+Subject: [PATCH] arm64: Relax the kernel cache requirements for boot
+Message-ID: <1396545402-10274-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 April 2014 08:26, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Eric,
->
-> On 03/04/14 16:17, Eric Auger wrote:
->> Currently when a KVM region is removed using
->> kvm_vm_ioctl_set_memory_region (with memory region size equal to 0), the
->> corresponding intermediate physical memory is not unmapped.
->>
->> This patch unmaps the region's IPA range in
->> kvm_arch_commit_memory_region using unmap_stage2_range.
->>
->> The patch was tested on QEMU VFIO based use case where RAM memory region
->> creation/deletion frequently happens for IRQ handling.
->>
->> Notes:
->> - the KVM_MR_MOVE case shall request some similar addition but I cannot test
->>   this currently
->
-> I think you should try to handle it anyway. I'm sure you could hack QEMU
-> to do this test it, but even if you don't, better plug that hole right now.
->
-I don't think we want untested code in the kernel if we can avoid it,
-so I would say, either test it somehow (kvm-unit-tests ?) or print a
-warning...?
+With system caches for the host OS or architected caches for guest OS we
+cannot easily guarantee that there are no dirty or stale cache lines for
+the areas of memory written by the kernel during boot with the MMU off
+(therefore non-cacheable accesses).
 
--Christoffer
+This patch adds the necessary cache maintenance during boot and relaxes
+the booting requirements.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+
+This patch is required at least for EFI_STUB on platforms with a system
+cache (and I really hope it's one that handles standard cache ops by VA)
+and for guests running UEFI or some boot-loader (with or without system
+caches) that disable the MMU during boot. Later on, probably useful for
+kexec as well.
+
+In addition, commit 82b2f495fba3 (arm64: virt: ensure visibility of
+__boot_cpu_mode) will be reverted as it is no longer needed after this
+patch.
+
+ Documentation/arm64/booting.txt | 10 ++++++++--
+ arch/arm64/kernel/head.S        | 30 ++++++++++++++++++++++++++++--
+ arch/arm64/mm/cache.S           |  9 +++++++++
+ 3 files changed, 45 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index a9691cc48fe3..beb754e87c65 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -111,8 +111,14 @@ Before jumping into the kernel, the following conditions must be met:
+ - Caches, MMUs
+   The MMU must be off.
+   Instruction cache may be on or off.
+-  Data cache must be off and invalidated.
+-  External caches (if present) must be configured and disabled.
++  The address range corresponding to the loaded kernel image must be
++  cleaned to the PoC. In the presence of a system cache or other
++  coherent masters with caches enabled, this will typically require
++  cache maintenance by VA rather than set/way operations.
++  System caches which respect the architected cache maintenance by VA
++  operations must be configured and may be enabled.
++  System caches which do not respect architected cache maintenance by VA
++  operations (not recommended) must be configured and disabled.
+ 
+ - Architected timers
+   CNTFRQ must be programmed with the timer frequency and CNTVOFF must
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 61035d6814cb..26109682d2fa 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -26,6 +26,7 @@
+ #include <asm/assembler.h>
+ #include <asm/ptrace.h>
+ #include <asm/asm-offsets.h>
++#include <asm/cache.h>
+ #include <asm/cputype.h>
+ #include <asm/memory.h>
+ #include <asm/thread_info.h>
+@@ -229,7 +230,11 @@ ENTRY(set_cpu_boot_mode_flag)
+ 	cmp	w20, #BOOT_CPU_MODE_EL2
+ 	b.ne	1f
+ 	add	x1, x1, #4
+-1:	str	w20, [x1]			// This CPU has booted in EL1
++1:	dc	cvac, x1			// Clean potentially dirty cache line
++	dsb	sy
++	str	w20, [x1]			// This CPU has booted in EL1
++	dc	civac, x1			// Clean&invalidate potentially stale cache line
++	dsb	sy
+ 	ret
+ ENDPROC(set_cpu_boot_mode_flag)
+ 
+@@ -240,8 +245,9 @@ ENDPROC(set_cpu_boot_mode_flag)
+  * This is not in .bss, because we set it sufficiently early that the boot-time
+  * zeroing of .bss would clobber it.
+  */
+-	.pushsection	.data
++	.pushsection	.data..cacheline_aligned
+ ENTRY(__boot_cpu_mode)
++	.align	L1_CACHE_SHIFT
+ 	.long	BOOT_CPU_MODE_EL2
+ 	.long	0
+ 	.popsection
+@@ -408,6 +414,15 @@ ENDPROC(__calc_phys_offset)
+  */
+ __create_page_tables:
+ 	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
++	mov	x27, lr
++
++	/*
++	 * Invalidate the idmap and swapper page tables to avoid potential
++	 * dirty cache lines being evicted.
++	 */
++	mov	x0, x25
++	add	x1, x26, #SWAPPER_DIR_SIZE
++	bl	__inval_cache_range
+ 
+ 	/*
+ 	 * Clear the idmap and swapper page tables.
+@@ -470,6 +485,17 @@ __create_page_tables:
+ 	add	x0, x26, #2 * PAGE_SIZE		// section table address
+ 	create_pgd_entry x26, x0, x5, x6, x7
+ #endif
++
++	/*
++	 * Since the page tables have been populated with non-cacheable
++	 * accesses (MMU disabled), invalidate the idmap and swapper page
++	 * tables again to remove any speculatively loaded cache lines.
++	 */
++	mov	x0, x25
++	add	x1, x26, #SWAPPER_DIR_SIZE
++	bl	__inval_cache_range
++
++	mov	lr, x27
+ 	ret
+ ENDPROC(__create_page_tables)
+ 	.ltorg
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index c46f48b33c14..e803a62e0e45 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -168,6 +168,14 @@ ENTRY(__flush_dcache_area)
+ ENDPROC(__flush_dcache_area)
+ 
+ /*
++ *	__inval_cache_range(start, end)
++ *	- start   - start address of region
++ *	- end     - end address of region
++ */
++ENTRY(__inval_cache_range)
++	/* FALLTHROUGH */
++
++/*
+  *	__dma_inv_range(start, end)
+  *	- start   - virtual start address of region
+  *	- end     - virtual end address of region
+@@ -183,6 +191,7 @@ __dma_inv_range:
+ 	b.lo	1b
+ 	dsb	sy
+ 	ret
++ENDPROC(__inval_cache_range)
+ ENDPROC(__dma_inv_range)
+ 
+ /*
