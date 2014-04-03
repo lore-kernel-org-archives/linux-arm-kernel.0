@@ -1,20 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 3 Apr 2014 16:13:15 +0200
-Subject: [PATCH 0/2] pinctrl: rockchip: fix handling of first pinbank
-In-Reply-To: <1647754.qr1tAySXax@diego>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 03 Apr 2014 16:20:45 +0200
+Subject: [PATCH] pinctrl: rockchip: fix offset of mux registers for rk3188
+In-Reply-To: <CACRpkda9Lh19sfkxs3=dNWbg4FgkAtY2tJdMQik=TGs8wUkYfA@mail.gmail.com>
 References: <1395700561-3793-1-git-send-email-b.galvani@gmail.com>
- <2790002.5U2DHYmUbK@diego> <20140325194357.GA27520@gmail.com>
- <1647754.qr1tAySXax@diego>
-Message-ID: <CACRpkdZVhf0ewXtv4S+CFHAzBJ+tjKKChojbt52fb+dQLx2j7Q@mail.gmail.com>
+ <CACRpkda9Lh19sfkxs3=dNWbg4FgkAtY2tJdMQik=TGs8wUkYfA@mail.gmail.com>
+Message-ID: <1810753.STDdFhitt6@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 12:56 AM, Heiko St?bner <heiko@sntech.de> wrote:
+Am Donnerstag, 3. April 2014, 16:10:46 schrieb Linus Walleij:
+> On Mon, Mar 24, 2014 at 11:36 PM, Beniamino Galvani <b.galvani@gmail.com> 
+wrote:
+> > The correct value of .mux_offset for rk3188 seems to be 0x60
+> > instead of 0x68.
+> > 
+> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> 
+> Patch applied to fixes with Heiko's Review tag and also
+> copied some info from the conversation into the commit message.
 
-> Therefore I put together the following two patches to go on top of
-> your patch and also make rockchip_set_mux honor this situation.
+small protest note
 
-Both patches applied for fixes.
+"Heikki adds:" - sounds somehow finish or swedish, but who is this guy? ;-)
 
-Yours,
-Linus Walleij
+
+But it doesn't really matter, so no need to roll it back
+
+Heiko
