@@ -1,225 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  3 Apr 2014 11:33:09 +0200
-Subject: [PATCH] mmc: Add SDIO function devicetree subnode parsing
-Message-ID: <1396517589-31203-1-git-send-email-s.hauer@pengutronix.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 03 Apr 2014 17:27:28 +0800
+Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
+In-Reply-To: <20140403085120.GB17022@arm.com>
+References: <1395738060-18489-1-git-send-email-hanjun.guo@linaro.org>
+ <5334078A.9010408@arm.com> <53341ADF.2050904@linaro.org>
+ <2765234.k5FCzWzCDz@vostro.rjw.lan> <533D1D5E.20208@linaro.org>
+ <CAOh2x=nYWjB+Org6eNjQAT93ZX2DRHNYSJWgWTo8vS2AmdrAbA@mail.gmail.com>
+ <20140403085120.GB17022@arm.com>
+Message-ID: <533D2980.6000903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds SDIO devicetree subnode parsing to the mmc core. While
-SDIO devices are runtime probable they sometimes need nonprobable
-additional information on embedded systems, like an additional gpio
-interrupt or a clock. This patch makes it possible to supply this
-information from the devicetree. SDIO drivers will find a pointer
-to the devicenode in their devices of_node pointer.
+On 2014-4-3 16:51, Catalin Marinas wrote:
+> On Thu, Apr 03, 2014 at 09:41:57AM +0100, Viresh Kumar wrote:
+>> On Thu, Apr 3, 2014 at 2:05 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>> How about the following patch? if it is ok, I will resend it.
+>>
+>> http://www.spinics.net/lists/arm-kernel/msg319545.html
+> 
+> I can see commit 62d1a3ba5adc5653d43f6cd3a90758bb6ad5d5bd (arm64: Fix
+> duplicated Kconfig entries again) already in mainline, so problem
+> solved.
+> 
+> Thanks Josh ;)
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: linux-mmc at vger.kernel.org
-Cc: Chris Ball <chris@printf.net>
-Cc: linux-kernel at vger.kernel.org
-Cc: Luciano Coelho <coelho@ti.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
+Great, thanks Viresh to let me know this.
+Actually I also sent a patch named "arm64: Fix duplicated Kconfig entries
+again" about one week ago :)
 
-Motivation for this comes from the TI wilink WLAN driver which
-needs platform_data and currently specifies this via an awkward
-global data pointer, see drivers/net/wireless/ti/wilink_platform_data.c
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg612363.html
 
- Documentation/devicetree/bindings/mmc/mmc.txt | 30 +++++++++++++++++++++++++++
- drivers/mmc/core/bus.c                        | 14 +++++++++++++
- drivers/mmc/core/core.c                       | 25 ++++++++++++++++++++++
- drivers/mmc/core/core.h                       |  3 +++
- drivers/mmc/core/sdio_bus.c                   | 16 ++++++++++++++
- 5 files changed, 88 insertions(+)
+And I think there is still a problem after commit 62d1a3ba - multi-entries
+for source "kernel/power/Kconfig", so how about the following fix?
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-index 458b57f..6ccfae8 100644
---- a/Documentation/devicetree/bindings/mmc/mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-@@ -51,6 +51,15 @@ Optional SDIO properties:
- - keep-power-in-suspend: Preserves card power during a suspend/resume cycle
- - enable-sdio-wakeup: Enables wake up of host system on SDIO IRQ assertion
- 
-+Function subnodes:
-+On embedded systems the cards connected to a host may need additional properties.
-+These can be specified in subnodes to the host controller node. The subnodes are
-+identified by the standard 'reg' property.
-+Required properties:
-+- reg: Must contain the SDIO function number of the function this subnode describes.
-+       A value of 0 denotes the memory SD function, values from 1 to 7 denote the
-+       SDIO functions.
-+
- Example:
- 
- sdhci at ab000000 {
-@@ -65,3 +74,24 @@ sdhci at ab000000 {
- 	keep-power-in-suspend;
- 	enable-sdio-wakeup;
- }
-+
-+Example with SDIO subnode:
-+
-+sdhci at ab000000 {
-+	compatible = "sdhci";
-+	reg = <0xab000000 0x200>;
-+	interrupts = <23>;
-+	bus-width = <4>;
-+	cd-gpios = <&gpio 69 0>;
-+	cd-inverted;
-+	wp-gpios = <&gpio 70 0>;
-+	max-frequency = <50000000>;
-+	keep-power-in-suspend;
-+	enable-sdio-wakeup;
-+
-+	func at 2 {
-+		reg = <2>;
-+		reset-gpios = <&gpio 69 0>;
-+		clock-frequency = <26000000>;
-+	};
-+}
-diff --git a/drivers/mmc/core/bus.c b/drivers/mmc/core/bus.c
-index 64145a3..b63c9b9 100644
---- a/drivers/mmc/core/bus.c
-+++ b/drivers/mmc/core/bus.c
-@@ -16,6 +16,7 @@
- #include <linux/err.h>
- #include <linux/slab.h>
- #include <linux/stat.h>
-+#include <linux/of.h>
- #include <linux/pm_runtime.h>
- 
- #include <linux/mmc/card.h>
-@@ -297,6 +298,16 @@ struct mmc_card *mmc_alloc_card(struct mmc_host *host, struct device_type *type)
- 	return card;
- }
- 
-+static void mmc_set_of_node(struct mmc_card *card)
-+{
-+	struct mmc_host *host = card->host;
-+
-+	if (!host->parent->of_node)
-+		return;
-+
-+	card->dev.of_node = mmc_of_find_child_device(host->parent->of_node, 0);
-+}
-+
- /*
-  * Register a new MMC card with the driver model.
-  */
-@@ -367,6 +378,8 @@ int mmc_add_card(struct mmc_card *card)
- #endif
- 	mmc_init_context_info(card->host);
- 
-+	mmc_set_of_node(card);
-+
- 	ret = device_add(&card->dev);
- 	if (ret)
- 		return ret;
-@@ -395,6 +408,7 @@ void mmc_remove_card(struct mmc_card *card)
- 				mmc_hostname(card->host), card->rca);
- 		}
- 		device_del(&card->dev);
-+		of_node_put(card->dev.of_node);
- 	}
- 
- 	put_device(&card->dev);
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 098374b..9ca0ad2 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1216,6 +1216,31 @@ EXPORT_SYMBOL(mmc_of_parse_voltage);
- 
- #endif /* CONFIG_OF */
- 
-+static int mmc_of_get_func_num(struct device_node *node)
-+{
-+	u32 reg;
-+	int ret;
-+
-+	ret = of_property_read_u32(node, "reg", &reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	return reg;
-+}
-+
-+struct device_node *mmc_of_find_child_device(struct device_node *parent,
-+		unsigned func_num)
-+{
-+	struct device_node *node;
-+
-+	for_each_child_of_node(parent, node) {
-+		if (mmc_of_get_func_num(node) == func_num)
-+			return node;
-+	}
-+
-+	return NULL;
-+}
-+
- #ifdef CONFIG_REGULATOR
- 
- /**
-diff --git a/drivers/mmc/core/core.h b/drivers/mmc/core/core.h
-index 443a584..65615f3 100644
---- a/drivers/mmc/core/core.h
-+++ b/drivers/mmc/core/core.h
-@@ -32,6 +32,9 @@ struct mmc_bus_ops {
- void mmc_attach_bus(struct mmc_host *host, const struct mmc_bus_ops *ops);
- void mmc_detach_bus(struct mmc_host *host);
- 
-+struct device_node *mmc_of_find_child_device(struct device_node *parent,
-+		unsigned func_num);
-+
- void mmc_init_erase(struct mmc_card *card);
- 
- void mmc_set_chip_select(struct mmc_host *host, int mode);
-diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
-index 92d1ba8..0bff9e8 100644
---- a/drivers/mmc/core/sdio_bus.c
-+++ b/drivers/mmc/core/sdio_bus.c
-@@ -22,6 +22,7 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/sdio_func.h>
- 
-+#include "core.h"
- #include "sdio_cis.h"
- #include "sdio_bus.h"
- 
-@@ -314,6 +315,19 @@ static void sdio_acpi_set_handle(struct sdio_func *func)
- static inline void sdio_acpi_set_handle(struct sdio_func *func) {}
- #endif
- 
-+#include <linux/of.h>
-+
-+void sdio_set_of_node(struct sdio_func *func)
-+{
-+	struct mmc_host *host = func->card->host;
-+
-+	if (!host->parent->of_node)
-+		return;
-+
-+	func->dev.of_node = mmc_of_find_child_device(host->parent->of_node,
-+						    func->num);
-+}
-+
- /*
-  * Register a new SDIO function with the driver model.
-  */
-@@ -323,6 +337,7 @@ int sdio_add_func(struct sdio_func *func)
- 
- 	dev_set_name(&func->dev, "%s:%d", mmc_card_id(func->card), func->num);
- 
-+	sdio_set_of_node(func);
- 	sdio_acpi_set_handle(func);
- 	ret = device_add(&func->dev);
- 	if (ret == 0) {
-@@ -346,6 +361,7 @@ void sdio_remove_func(struct sdio_func *func)
- 
- 	acpi_dev_pm_detach(&func->dev, false);
- 	device_del(&func->dev);
-+	of_node_put(func->dev.of_node);
- 	put_device(&func->dev);
- }
- 
--- 
-1.9.1
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e6e4d37..6085dca 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -317,14 +317,8 @@ config ARCH_SUSPEND_POSSIBLE
+ config ARM64_CPU_SUSPEND
+        def_bool PM_SLEEP
+
+-endmenu
+-
+-menu "CPU Power Management"
+-
+ source "drivers/cpuidle/Kconfig"
+
+-source "kernel/power/Kconfig"
+-
+ source "drivers/cpufreq/Kconfig"
+
+ endmenu
+
+If it makes sense, I will send out a patch for it.
+
+Thanks
+Hanjun
