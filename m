@@ -1,52 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 3 Apr 2014 15:05:56 -0500
-Subject: [PATCH V2 04/19] mmc: mmci: Add DT bindings for signal direction
-In-Reply-To: <1396279100-2920-5-git-send-email-ulf.hansson@linaro.org>
-References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
- <1396279100-2920-5-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAL_JsqL1f+REzDaAztEU5ZCxf39Pu3GcKo5YO3PwCLgt85hxRQ@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 3 Apr 2014 13:15:52 -0700
+Subject: [PATCH v4 1/3] i2c: cadence: Document device tree bindings
+In-Reply-To: <CAL_Jsq+vOHzca_wT9ADHRxhR9dT8FYGP-iTvd5=zKrRVBZz-cw@mail.gmail.com>
+References: <1396547967-19260-1-git-send-email-soren.brinkmann@xilinx.com>
+ <CAL_Jsq+vOHzca_wT9ADHRxhR9dT8FYGP-iTvd5=zKrRVBZz-cw@mail.gmail.com>
+Message-ID: <19eac9d5-7c83-4fca-b3e8-fc225b6559bd@CH1EHSMHS033.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 10:18 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Some variants have support for indicating the bus signal directions,
-> which currently are configured through platform data.
->
-> Add corresponding DT bindings to enable us to move away from using the
-> platform data.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mmc/mmci.txt |   11 ++++++++++-
->  drivers/mmc/host/mmci.c                        |   11 +++++++++++
->  2 files changed, 21 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-> index ff233d1..9bd2ffa 100644
-> --- a/Documentation/devicetree/bindings/mmc/mmci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-> @@ -4,7 +4,8 @@ The ARM PrimeCell MMCI PL180 and PL181 provides an interface for
->  reading and writing to MultiMedia and SD cards alike.
->
->  This file documents differences between the core properties described
-> -by mmc.txt and the properties used by the mmci driver.
-> +by mmc.txt and the properties used by the mmci driver. Using "st" as
-> +the prefix for a property, indicates support by the ST Micro variant.
->
->  Required properties:
->  - compatible             : contains "arm,pl18x", "arm,primecell".
-> @@ -18,6 +19,11 @@ Optional properties:
->  - mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
->  - vqmmc-supply           : phandle to the regulator device tree node, mentioned
->                             as the VCCQ/VDD_IO supply in the eMMC/SD specs.
-> +- st,sig-dir-dat0        : bus signal direction pin used for DAT[0].
-> +- st,sig-dir-dat2        : bus signal direction pin used for DAT[2].
-> +- st,sig-dir-dat31       : bus signal direction pin used for DAT[3] and DAT[1].
-> +- st,sig-dir-dat74       : bus signal direction pin used for DAT[4] to DAT[7].
-> +- st,sig-dir-cmd         : cmd signal direction pin used for CMD.
+On Thu, 2014-04-03 at 02:51PM -0500, Rob Herring wrote:
+> On Thu, Apr 3, 2014 at 12:59 PM, Soren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
+> > Add device tree binding documentation for the Cadence I2C controller.
+> >
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >
+> > Changes in v4:
+> >  - moved adding DT docs into this dedicated patch
+> >
+> > Changes in v3: None
+> > Changes in v2: None
+> >
+> > ---
+> >  .../devicetree/bindings/i2c/i2c-cadence.txt         | 21 +++++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cadence.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-cadence.txt b/Documentation/devicetree/bindings/i2c/i2c-cadence.txt
+> > new file mode 100644
+> > index 000000000000..685adf513111
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/i2c/i2c-cadence.txt
+> > @@ -0,0 +1,21 @@
+> > +Binding for the Cadence I2C controller
+> > +
+> > +Required properties:
+> > +  compatible: Compatibility string. Must be 'cdns,i2c-r1p10'.
+> > +  clocks: From common clock bindings. Phandle to input clock.
+> > +
+> > +Optional properties:
+> > +  clock-frequency: Desired operating frequency, in Hz, of the bus (actual may
+> > +                  be lower). Defaults to 400000 if not specified.
+> 
+> Since not all devices support 400kHz, I would prefer that the default
+> be 100kHz. Also, it would be good if what speed the default is
+> consistent across i2c drivers.
 
-What I'm still not clear on is when you set these properties and when
-you don't. For example, is any combination valid and why wouldn't all
-data signals be configured the same way?
+Fine with me. I'll change this.
 
-Rob
+	Thanks,
+	S?ren
