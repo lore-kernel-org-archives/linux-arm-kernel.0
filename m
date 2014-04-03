@@ -1,32 +1,38 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 03 Apr 2014 17:02:30 +0200
-Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
-In-Reply-To: <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
-References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
- <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
-Message-ID: <533D7806.8070002@monstr.eu>
+Date: Thu, 03 Apr 2014 16:55:46 +0200
+Subject: [PATCH 00/75] l2c series
+In-Reply-To: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+Message-ID: <533D7672.4090003@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
+Hi Russell,
 
-On 03/02/2014 03:32 PM, Punnaiah Choudary Kalluri wrote:
-> Add support for ARM Pl310 L2 cache controller parity error
+On 03/28/2014 04:12 PM, Russell King - ARM Linux wrote:
+> This is another posting of the L2 cache controller series.  I'm not
+> planning for this for the upcoming merge window, but the one after,
+> as people need to test it and still need to feed back to me on
+> various issues.  Hence, this is not a finalised series.
 > 
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> ---
->  .../devicetree/bindings/edac/pl310_edac_l2.txt     |   19 ++
->  drivers/edac/Kconfig                               |    7 +
->  drivers/edac/Makefile                              |    1 +
->  drivers/edac/pl310_edac_l2.c                       |  236 ++++++++++++++++++++
->  4 files changed, 263 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
->  create mode 100644 drivers/edac/pl310_edac_l2.c
+> There are still various issues which I've raised, and have had no
+> feedback on.
+> 
+> This series is being posted with Cc's on the individual patches.
 
-Any comment about this driver?
+I just want to also point you that we have sent EDAC support for pl310
+which will be good to have it for L2.
+[RFC PATCH] EDAC support for ARM PL310 cache controller
+[RFC PATCH] edac: add support for ARM PL310 L2 cache parity
+http://lkml.org/lkml/2014/3/2/85
+http://lkml.org/lkml/2014/3/2/87
+
+None has reviewed it yet but will be good to add it when you do
+this huge L2 cleanup.
 
 Thanks,
 Michal
+
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -42,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/98f56fcb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/bcd5ee5b/attachment.sig>
