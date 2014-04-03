@@ -1,48 +1,53 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Thu, 3 Apr 2014 16:56:57 +0200
-Subject: [PATCH] ARM: i.MX6: update KSZ9031 phy fixup
-In-Reply-To: <1396533947.25686.22.camel@EMBLYSD005.adetelgroup.com>
-References: <1395421687-12934-1-git-send-email-hchaumette@adeneo-embedded.com>
- <20140402220125.4e203cd2@crub>
- <1396533947.25686.22.camel@EMBLYSD005.adetelgroup.com>
-Message-ID: <20140403165657.510b6493@crub>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 03 Apr 2014 17:00:29 +0200
+Subject: [RFC PATCH v2] edac: synopsys: Added EDAC support for zynq ddr
+ ecc controller
+In-Reply-To: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
+References: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
+Message-ID: <533D778D.8040002@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 03 Apr 2014 16:05:47 +0200
-Hubert Chaumette <hchaumette@adeneo-embedded.com> wrote:
-...
-> > It would be better to configure the pad skews in the board specific
-> > way in the device tree. There is a binding for ksz9021 PHY in
-> > Documentation/devicetree/bindings/net/micrel-ksz9021.txt.
+Hi Borislav,
+
+On 03/17/2014 06:23 AM, Punnaiah Choudary Kalluri wrote:
+> Added EDAC support for reporting the ecc errors of synopsys ddr controller.
+> The ddr ecc controller corrects single bit errors and detects double bit
+> errors
 > 
-> I wonder why it it's not used in arch/arm/boot/dts/imx6q-sabrelite.dts
-> instead of ksz9021rn_phy_fixup().
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> ---
+> Changes for v2:
+> - Updated the commit header and message
+> - Renamed the filenames to synopsys_edac
+> - Corrected the compatilble string, commnets
+> - Renamed the macros,fucntions and data structures
+> ---
+>  .../devicetree/bindings/edac/synopsys_edac.txt     |   18 +
+>  drivers/edac/Kconfig                               |    7 +
+>  drivers/edac/Makefile                              |    1 +
+>  drivers/edac/synopsys_edac.c                       |  614 ++++++++++++++++++++
+>  4 files changed, 640 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/edac/synopsys_edac.txt
+>  create mode 100644 drivers/edac/synopsys_edac.c
 
-Probably because nobody cared to use it.
+Do you have any comment about this driver?
 
-> > I have a patch for setting ksz9031rn GTX/RX CLK pad skew in a similar
-> > way over device tree and plan to submit it when the net-next merge
-> > window for v3.16 opens.
-> 
-> So, you have already implemented the ksz9031 binding ?
+Thanks,
+Michal
 
-Partially (for GTX/RX CLK). I'm attaching a patch that I currently have.
-For ksz9031rn in my DTS fec node I used:
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-	/* ksz9031rn: min 0, max 1860, step 60 */
-        rxc-skew-ps = <1620>;
-        txc-skew-ps = <1620>;
 
-Unfortunately I'm short on time and won't be able to implement other
-pad skew settings in the near future, so please fill free to extend
-and push the patch.
-
-Thanks!
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0001-ARM-imx6-configure-ksz90x1rn-PHY-pad-skew-settings-o.patch
-Type: text/x-patch
-Size: 6002 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/f898a40d/attachment.bin>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/23fc1abf/attachment-0001.sig>
