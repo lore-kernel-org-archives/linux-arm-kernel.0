@@ -1,151 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu,  3 Apr 2014 18:16:42 +0100
-Subject: [PATCH] arm64: Relax the kernel cache requirements for boot
-Message-ID: <1396545402-10274-1-git-send-email-catalin.marinas@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Apr 2014 19:57:53 +0200
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <20140403152746.GQ7528@n2100.arm.linux.org.uk>
+References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
+ <9532591.5yuCbpL4pV@wuerfel> <20140403152746.GQ7528@n2100.arm.linux.org.uk>
+Message-ID: <5153369.PcVDn1cGQl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With system caches for the host OS or architected caches for guest OS we
-cannot easily guarantee that there are no dirty or stale cache lines for
-the areas of memory written by the kernel during boot with the MMU off
-(therefore non-cacheable accesses).
+On Thursday 03 April 2014 16:27:46 Russell King - ARM Linux wrote:
+> On Wed, Apr 02, 2014 at 11:21:45AM +0200, Arnd Bergmann wrote:
+> > - As David Laight pointed out earlier, you must also ensure that
+> >   you don't have too much /data/ pending in the descriptor ring
+> >   when you stop the queue. For a 10mbit connection, you have already
+> >   tested (as we discussed on IRC) that 64 descriptors with 1500 byte
+> >   frames gives you a 68ms round-trip ping time, which is too much.
+> >   Conversely, on 1gbit, having only 64 descriptors actually seems
+> >   a little low, and you may be able to get better throughput if
+> >   you extend the ring to e.g. 512 descriptors.
+> 
+> You don't manage that by stopping the queue - there's separate interfaces
+> where you report how many bytes you've queued (netdev_sent_queue()) and
+> how many bytes/packets you've sent (netdev_tx_completed_queue()).  This
+> allows the netdev schedulers to limit how much data is held in the queue,
+> preserving interactivity while allowing the advantages of larger rings.
 
-This patch adds the necessary cache maintenance during boot and relaxes
-the booting requirements.
+Ah, I didn't know about these.  However, reading through the dql code,
+it seems that will not work if the tx reclaim is triggered by a timer,
+since it expects to get feedback from the actual hardware behavior. :(
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
+I guess this is (part of) what David Miller also meant by saying it won't
+ever work properly. 
 
-This patch is required at least for EFI_STUB on platforms with a system
-cache (and I really hope it's one that handles standard cache ops by VA)
-and for guests running UEFI or some boot-loader (with or without system
-caches) that disable the MMU during boot. Later on, probably useful for
-kexec as well.
+> > > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
+> > > +       if (dma_mapping_error(&ndev->dev, phys)) {
+> > > +               dev_kfree_skb(skb);
+> > > +               return NETDEV_TX_OK;
+> > > +       }
+> > > +
+> > > +       priv->tx_skb[tx_head] = skb;
+> > > +       priv->tx_phys[tx_head] = phys;
+> > > +       desc->send_addr = cpu_to_be32(phys);
+> > > +       desc->send_size = cpu_to_be16(skb->len);
+> > > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
+> > > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
+> > > +       desc->wb_addr = cpu_to_be32(phys);
+> > 
+> > One detail: since you don't have cache-coherent DMA, "desc" will
+> > reside in uncached memory, so you try to minimize the number of accesses.
+> > It's probably faster if you build the descriptor on the stack and
+> > then atomically copy it over, rather than assigning each member at
+> > a time.
+> 
+> DMA coherent memory is write combining, so multiple writes will be
+> coalesced.  This also means that barriers may be required to ensure the
+> descriptors are pushed out in a timely manner if something like writel()
+> is not used in the transmit-triggering path.
 
-In addition, commit 82b2f495fba3 (arm64: virt: ensure visibility of
-__boot_cpu_mode) will be reverted as it is no longer needed after this
-patch.
+Right, makes sense. There is a writel() right after this, so no need
+for extra barriers. We already concluded that the store operation on
+uncached memory isn't actually a problem, and Zhangfei Gao did some
+measurements to check the overhead of the one read from uncached
+memory that is in the tx path, which was lost in the noise.
 
- Documentation/arm64/booting.txt | 10 ++++++++--
- arch/arm64/kernel/head.S        | 30 ++++++++++++++++++++++++++++--
- arch/arm64/mm/cache.S           |  9 +++++++++
- 3 files changed, 45 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index a9691cc48fe3..beb754e87c65 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -111,8 +111,14 @@ Before jumping into the kernel, the following conditions must be met:
- - Caches, MMUs
-   The MMU must be off.
-   Instruction cache may be on or off.
--  Data cache must be off and invalidated.
--  External caches (if present) must be configured and disabled.
-+  The address range corresponding to the loaded kernel image must be
-+  cleaned to the PoC. In the presence of a system cache or other
-+  coherent masters with caches enabled, this will typically require
-+  cache maintenance by VA rather than set/way operations.
-+  System caches which respect the architected cache maintenance by VA
-+  operations must be configured and may be enabled.
-+  System caches which do not respect architected cache maintenance by VA
-+  operations (not recommended) must be configured and disabled.
- 
- - Architected timers
-   CNTFRQ must be programmed with the timer frequency and CNTVOFF must
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 61035d6814cb..26109682d2fa 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -26,6 +26,7 @@
- #include <asm/assembler.h>
- #include <asm/ptrace.h>
- #include <asm/asm-offsets.h>
-+#include <asm/cache.h>
- #include <asm/cputype.h>
- #include <asm/memory.h>
- #include <asm/thread_info.h>
-@@ -229,7 +230,11 @@ ENTRY(set_cpu_boot_mode_flag)
- 	cmp	w20, #BOOT_CPU_MODE_EL2
- 	b.ne	1f
- 	add	x1, x1, #4
--1:	str	w20, [x1]			// This CPU has booted in EL1
-+1:	dc	cvac, x1			// Clean potentially dirty cache line
-+	dsb	sy
-+	str	w20, [x1]			// This CPU has booted in EL1
-+	dc	civac, x1			// Clean&invalidate potentially stale cache line
-+	dsb	sy
- 	ret
- ENDPROC(set_cpu_boot_mode_flag)
- 
-@@ -240,8 +245,9 @@ ENDPROC(set_cpu_boot_mode_flag)
-  * This is not in .bss, because we set it sufficiently early that the boot-time
-  * zeroing of .bss would clobber it.
-  */
--	.pushsection	.data
-+	.pushsection	.data..cacheline_aligned
- ENTRY(__boot_cpu_mode)
-+	.align	L1_CACHE_SHIFT
- 	.long	BOOT_CPU_MODE_EL2
- 	.long	0
- 	.popsection
-@@ -408,6 +414,15 @@ ENDPROC(__calc_phys_offset)
-  */
- __create_page_tables:
- 	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
-+	mov	x27, lr
-+
-+	/*
-+	 * Invalidate the idmap and swapper page tables to avoid potential
-+	 * dirty cache lines being evicted.
-+	 */
-+	mov	x0, x25
-+	add	x1, x26, #SWAPPER_DIR_SIZE
-+	bl	__inval_cache_range
- 
- 	/*
- 	 * Clear the idmap and swapper page tables.
-@@ -470,6 +485,17 @@ __create_page_tables:
- 	add	x0, x26, #2 * PAGE_SIZE		// section table address
- 	create_pgd_entry x26, x0, x5, x6, x7
- #endif
-+
-+	/*
-+	 * Since the page tables have been populated with non-cacheable
-+	 * accesses (MMU disabled), invalidate the idmap and swapper page
-+	 * tables again to remove any speculatively loaded cache lines.
-+	 */
-+	mov	x0, x25
-+	add	x1, x26, #SWAPPER_DIR_SIZE
-+	bl	__inval_cache_range
-+
-+	mov	lr, x27
- 	ret
- ENDPROC(__create_page_tables)
- 	.ltorg
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index c46f48b33c14..e803a62e0e45 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -168,6 +168,14 @@ ENTRY(__flush_dcache_area)
- ENDPROC(__flush_dcache_area)
- 
- /*
-+ *	__inval_cache_range(start, end)
-+ *	- start   - start address of region
-+ *	- end     - end address of region
-+ */
-+ENTRY(__inval_cache_range)
-+	/* FALLTHROUGH */
-+
-+/*
-  *	__dma_inv_range(start, end)
-  *	- start   - virtual start address of region
-  *	- end     - virtual end address of region
-@@ -183,6 +191,7 @@ __dma_inv_range:
- 	b.lo	1b
- 	dsb	sy
- 	ret
-+ENDPROC(__inval_cache_range)
- ENDPROC(__dma_inv_range)
- 
- /*
+	Arnd
