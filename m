@@ -1,40 +1,40 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  3 Apr 2014 12:30:13 -0300
-Subject: [PATCH 1/2] ARM: mvebu: Enable nfsroot in the defconfig
-Message-ID: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Thu,  3 Apr 2014 12:30:14 -0300
+Subject: [PATCH 2/2] ARM: mvebu: enable fhandle in the defconfigs
+In-Reply-To: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1396539014-8673-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NFSroot is very frequently used by developers to boot, so let's make
-our lives simpler and enable it by default.
+CONFIG_FHANDLE is required by systemd >= 210 to spawn a serial TTY.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/configs/mvebu_v5_defconfig | 1 +
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index 36484a3..5d8ec15 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -1,4 +1,5 @@
+ CONFIG_SYSVIPC=y
++CONFIG_FHANDLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=19
 diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index a34713d..bfcc362 100644
+index bfcc362..b1e514e 100644
 --- a/arch/arm/configs/mvebu_v7_defconfig
 +++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -29,6 +29,9 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_VFP=y
- CONFIG_NET=y
- CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
- CONFIG_BT=y
- CONFIG_BT_MRVL=y
- CONFIG_BT_MRVL_SDIO=y
-@@ -103,6 +106,8 @@ CONFIG_UDF_FS=m
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_CODEPAGE_850=y
- CONFIG_NLS_ISO8859_1=y
+@@ -1,5 +1,6 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
++CONFIG_FHANDLE=y
+ CONFIG_IRQ_DOMAIN_DEBUG=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
 -- 
 1.9.1
