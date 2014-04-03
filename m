@@ -1,113 +1,34 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 03 Apr 2014 18:32:16 +0200
-Subject: [PATCH] ARM: KVM: Handle IPA unmapping on memory region deletion
-In-Reply-To: <533D7D8B.2030806@arm.com>
-References: <1396538266-13245-1-git-send-email-eric.auger@linaro.org>
- <533D7D8B.2030806@arm.com>
-Message-ID: <533D8D10.7070909@linaro.org>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 03 Apr 2014 19:42:20 +0300
+Subject: [Patch v9 2/2] dmaengine: add Qualcomm BAM dma driver
+In-Reply-To: <1394487622-1679-3-git-send-email-agross@codeaurora.org>
+References: <1394487622-1679-1-git-send-email-agross@codeaurora.org>
+ <1394487622-1679-3-git-send-email-agross@codeaurora.org>
+Message-ID: <533D8F6C.6000606@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2014 05:26 PM, Marc Zyngier wrote:
-> Hi Eric,
-> 
-> On 03/04/14 16:17, Eric Auger wrote:
->> Currently when a KVM region is removed using
->> kvm_vm_ioctl_set_memory_region (with memory region size equal to 0), the
->> corresponding intermediate physical memory is not unmapped.
->>
->> This patch unmaps the region's IPA range in
->> kvm_arch_commit_memory_region using unmap_stage2_range.
->>
->> The patch was tested on QEMU VFIO based use case where RAM memory region
->> creation/deletion frequently happens for IRQ handling.
->>
->> Notes:
->> - the KVM_MR_MOVE case shall request some similar addition but I cannot test
->>   this currently
-> 
-> I think you should try to handle it anyway. I'm sure you could hack QEMU
-> to do this test it, but even if you don't, better plug that hole right now.
+Hi Andy,
 
-Hi Marc,
+On 03/10/2014 11:40 PM, Andy Gross wrote:
+> Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
+> found in the MSM 8x74 platforms.
+> 
+> Each BAM DMA device is associated with a specific on-chip peripheral.  Each
+> channel provides a uni-directional data transfer engine that is capable of
+> transferring data between the peripheral and system memory (System mode), or
+> between two peripherals (BAM2BAM).
+> 
+> The initial release of this driver only supports slave transfers between
+> peripherals and system memory.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 
-OK I will proceed
+I tested this driver during wake up of the crypto driver. With your
+additions to bam_start_dma() in regards to EOT interrupts I successfully
+passed the crypto framework test vectors for the implemented algorithms.
 
-> 
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_mmu.h | 2 ++
->>  arch/arm/kvm/arm.c             | 8 ++++++++
->>  arch/arm/kvm/mmu.c             | 2 +-
->>  3 files changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index 2d122ad..a91c863 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -52,6 +52,8 @@ void kvm_free_stage2_pgd(struct kvm *kvm);
->>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
->>  			  phys_addr_t pa, unsigned long size);
->>  
->> +void unmap_stage2_range(struct kvm *kvm, phys_addr_t guest_ipa, u64 size);
->> +
->>  int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
->>  
->>  void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index bd18bb8..9a4bc10 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -241,6 +241,14 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
->>  				   const struct kvm_memory_slot *old,
->>  				   enum kvm_mr_change change)
->>  {
->> +	if (change == KVM_MR_DELETE) {
->> +		gpa_t gpa = old->base_gfn << PAGE_SHIFT;
->> +		u64 size = old->npages << PAGE_SHIFT;
->> +
->> +		spin_lock(&kvm->mmu_lock);
->> +		unmap_stage2_range(kvm, gpa, size);
->> +		spin_unlock(&kvm->mmu_lock);
->> +	}
->>  }
-> 
-> Just move the whole function to mmu.c, as it makes more sense to have it
-> there. And while you're at it, how about moving the other
-> memslot/memory_region stubs?
+Tested-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 
-OK I will move:
-kvm_arch_free_memslot,
-kvm_arch_create_memslot,
-kvm_arch_prepare_memory_region,
-kvm_arch_commit_memory_region,
-kvm_arch_shadow_all and
-kvm_arch_shadow_memslot then.
-
-Best Regards
-
-Eric
-
-> 
->>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 7789857..e8580e2 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -443,7 +443,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
->>   * destroying the VM), otherwise another faulting VCPU may come in and mess
->>   * with things behind our backs.
->>   */
->> -static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->> +void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->>  {
->>  	unmap_range(kvm, kvm->arch.pgd, start, size);
->>  }
->>
-> 
-> Looks sensible otherwise.
-> 
-> Thanks!
-> 
-> 	M.
-> 
+regards,
+Stan
