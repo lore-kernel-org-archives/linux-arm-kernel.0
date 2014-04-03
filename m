@@ -1,36 +1,24 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 3 Apr 2014 16:07:13 -0600
-Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
-In-Reply-To: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20140403220713.GA23545@google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 3 Apr 2014 23:11:43 +0100
+Subject: [PATCH v2 11/16] ASoC: fsl-ssi: Fix register values when disabling
+In-Reply-To: <1394887464-969-12-git-send-email-mpa@pengutronix.de>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <1394887464-969-12-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140403221143.GH14763@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 04:53:01PM +0000, Will Deacon wrote:
-> Hello,
-> 
-> This small set of patches brings PCI support to mach-virt based upon an
-> idealised host controller (see patch 2 for more details).
-> 
-> This has been tested with kvmtool, for which I have a corresponding set
-> of patches which you can find in my kvmtool/pci branch at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git
-> 
-> Once the arm64 PCI patches from Liviu have stabilised, I plan to port
-> this host controller to work there as well.
-> 
-> The main issue I can see with this code is how to describe configuration
-> space in the device-tree. I'm following the ePAPR PCI bindings (SS == 0)
-> , but this adds an ugly 'case 0:' line in the pci range parser, which
-> also exists in mainline for the pcie-designware.c driver.
+On Sat, Mar 15, 2014 at 01:44:19PM +0100, Markus Pargmann wrote:
+> The bits we have to clear when disabling are different when the other
+> stream is still active.
 
-There was a long discussion about this (especially 2/3), and I didn't
-follow it closely enough to get the resolution, and I don't think I
-picked up the patches.
-
-Can you post them again if they're still applicable?
-
-Thanks,
-  Bjorn
+If this is a bug fix I'd have expected to see it at the start of the
+series so we could merge it prior to the rest of the series (which is
+new development) - what practical issues does this bug cause?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/a2119fab/attachment-0001.sig>
