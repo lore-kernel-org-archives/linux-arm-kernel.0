@@ -1,93 +1,59 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Thu, 03 Apr 2014 16:10:23 +0530
-Subject: [RFC 1/4] sched: extend the usage of cpu_power_orig
-In-Reply-To: <CAKfTPtD7Qp4yUoZ+3jV-Me2Xn53zbi8cHRrWyO7X+COzwcy3Tg@mail.gmail.com>
-References: <1396012949-6227-1-git-send-email-vincent.guittot@linaro.org>
- <1396012949-6227-2-git-send-email-vincent.guittot@linaro.org>
- <533A9768.6060006@linux.vnet.ibm.com>
- <CAKfTPtD7Qp4yUoZ+3jV-Me2Xn53zbi8cHRrWyO7X+COzwcy3Tg@mail.gmail.com>
-Message-ID: <533D3A97.1030809@linux.vnet.ibm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 03 Apr 2014 19:01:46 +0800
+Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
+In-Reply-To: <CAKohpok5KCmR4UYG1ZkGL2TcXqqO7dPJnwGg49ahU-ceL1+wxA@mail.gmail.com>
+References: <1395738060-18489-1-git-send-email-hanjun.guo@linaro.org>	<5334078A.9010408@arm.com>	<53341ADF.2050904@linaro.org>	<2765234.k5FCzWzCDz@vostro.rjw.lan>	<533D1D5E.20208@linaro.org>	<CAOh2x=nYWjB+Org6eNjQAT93ZX2DRHNYSJWgWTo8vS2AmdrAbA@mail.gmail.com>	<20140403085120.GB17022@arm.com>	<533D2980.6000903@linaro.org>
+ <CAKohpok5KCmR4UYG1ZkGL2TcXqqO7dPJnwGg49ahU-ceL1+wxA@mail.gmail.com>
+Message-ID: <533D3F9A.5070001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2014 04:50 PM, Vincent Guittot wrote:
-> On 1 April 2014 12:39, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->> Hi Vincent,
+On 2014-4-3 17:38, Viresh Kumar wrote:
+> On 3 April 2014 14:57, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> Great, thanks Viresh to let me know this.
+>> Actually I also sent a patch named "arm64: Fix duplicated Kconfig entries
+>> again" about one week ago :)
 >>
->> On 03/28/2014 06:52 PM, Vincent Guittot wrote:
->>> cpu_power_orig is only changed for SMT system in order to reflect the lower
->>> capacity of CPUs. Heterogenous system also have to reflect an original
->>> capacity that is different from the default value.
+>> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg612363.html
 >>
->> There is no parameter 'cpu_power_orig' till your fourth patch right?
->> Why is this term being used in this patch?
+>> And I think there is still a problem after commit 62d1a3ba - multi-entries
+>> for source "kernel/power/Kconfig", so how about the following fix?
 > 
-> It looks like that i have mixed power_orig and cpu_power_orig in my
-> commit messages
+> I didn't notice that :)
 > 
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index e6e4d37..6085dca 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -317,14 +317,8 @@ config ARCH_SUSPEND_POSSIBLE
+>>  config ARM64_CPU_SUSPEND
+>>         def_bool PM_SLEEP
 >>
->> Besides, both parameters power and power_orig are changed for SMT
->> systems to reflect the lower capacity of the CPUs.Why is there a mention
->> of only power_orig?
-> 
-> Only SMT system is able to change power_orig from default value
-> whereas all systems can already change power field with
-> arch_scale_freq_power function. The goal of this patch is to change
-
-I am unable to understand this. arch_scale_freq_power() is not doing the
-same job as arch_scale_smt_power() right? While the former allows the
-arch to set a power value per cpu different from the default value, the
-latter allows arch to adjust the power for hyper threads.
-
-For example in big.LITTLE, the big cores would be required to have a
-higher cpu power than what is currently being used as default. This is
-done by arch_scale_freq_power(). Whereas for an SMT system, the power of
-a core could perhaps be the same as default value, but needs to be
-divided among the hyper threads. This is done by arch_scale_smt_power().
-They have different purposes right?
-
-So I do not understand why you mention "all systems can already change
-power field with arch_scale_freq_power()."
-
-Actually I was assuming this patch would introduce
-arch_scale_smt_power() and arch_scale_freq_power(), two functions that
-would *enable all archs and not just ARCH_POWER* as is found today, to
-adjust their smt power and non-smt power respectively.
-
-For the same reasons, I am also unclear as to why power_orig is not
-initialized *after* default/arch_scale_freq_power(). For big cores for
-instance you would want the power_orig to be set not to a default value
-but to what the arch says as the frequency of a core scaled over the
-default value.
-
-> the function name that is used to set power_orig value to a more
-> generic one and to extend the possibility of setting power_orig for
-> any kind of system. The behavior of the power field is not changed
-> with this patchset.
-> 
+>> -endmenu
+>> -
+>> -menu "CPU Power Management"
+>> -
+>>  source "drivers/cpuidle/Kconfig"
 >>
->> IMO, the subject of the patch is not clearly reflecting the main
->> intention of the patch. There is nothing done to change the way
->> cpu_power is used; rather you are changing the way the cpu_power is
->> being set to be flexible, thus allowing for the right power value to be
->> set on heterogeneous systems.
+>> -source "kernel/power/Kconfig"
+>> -
+>>  source "drivers/cpufreq/Kconfig"
 >>
->> 'Allow archs to set the cpu_power instead of falling to default value'
->> or something similar would be more appropriate. What do you think?
-> 
-> I can change with : "Allow all archs to set the power_orig"
-
-Ok, but for the reasons mentioned above I was thinking the power_orig
-should be avoided since archs should be able to scale both power and
-power_orig per thread and not just ARCH_POWER.
-
-Regards
-Preeti U Murthy
-
-
-> 
-> Thanks
-> 
+>>  endmenu
 >>
->> Regards
->> Preeti U Murthy
+>> If it makes sense, I will send out a patch for it.
+> 
+> We actually need to menu options here,
+> menu "Power management options"
+> menu "CPU Power Management"
+> 
+> And so probably you just need to do this:
+>> -source "kernel/power/Kconfig"
+>> -
+> 
+> from CPU Power Management options..
+
+Ok, will send out a patch later.
+
+Thanks
+Hanjun
