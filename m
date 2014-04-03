@@ -1,140 +1,91 @@
 From: anup.patel@linaro.org (Anup Patel)
-Date: Thu, 3 Apr 2014 10:24:49 +0530
-Subject: [PATCH v7 02/12] ARM/ARM64: KVM: Add common header for PSCI
- related defines
-In-Reply-To: <CAJ5Y-eavGA1Ei2Amj9vQsQ=WvFDXM1zDrVbkDSmXnQPjr4L1Rg@mail.gmail.com>
+Date: Thu, 3 Apr 2014 10:33:35 +0530
+Subject: [PATCH v7 09/12] ARM/ARM64: KVM: Emulate PSCI v0.2
+ MIGRATE_INFO_TYPE and related functions
+In-Reply-To: <CAL_JsqJFB64_5dE_PG-42Yma+MiMpcmoXY5V7A2wE_RxRSuqow@mail.gmail.com>
 References: <1396435347-20056-1-git-send-email-anup.patel@linaro.org>
- <1396435347-20056-3-git-send-email-anup.patel@linaro.org>
- <CAJ5Y-eavGA1Ei2Amj9vQsQ=WvFDXM1zDrVbkDSmXnQPjr4L1Rg@mail.gmail.com>
-Message-ID: <CALrVBku1eQc=bfbSaExkQRuijZX+mGQuUupHYumEF6n8Maw-qw@mail.gmail.com>
+ <1396435347-20056-10-git-send-email-anup.patel@linaro.org>
+ <CAL_JsqJFB64_5dE_PG-42Yma+MiMpcmoXY5V7A2wE_RxRSuqow@mail.gmail.com>
+Message-ID: <CALrVBktftSycu56H08VwX9yTV6Kd7z49E2qwaecbbuGoDRe9jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2014 22:59, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
-> On 2 April 2014 06:42, Anup Patel <anup.patel@linaro.org> wrote:
->> We need a common place to share PSCI related defines among ARM kernel,
->> ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
+On 2 April 2014 18:37, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Apr 2, 2014 at 5:42 AM, Anup Patel <anup.patel@linaro.org> wrote:
+>> This patch adds emulation of PSCI v0.2 MIGRATE, MIGRATE_INFO_TYPE, and
+>> MIGRATE_INFO_UP_CPU function calls for KVM ARM/ARM64.
 >>
->> We introduce uapi/linux/psci.h for this purpose. This newly added
->> header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
->> and user space (i.e. QEMU or KVMTOOL).
+>> KVM ARM/ARM64 being a hypervisor (and not a Trusted OS), we cannot provide
+>> this functions hence we emulate these functions in following way:
+>> 1. MIGRATE - Returns "Not Supported"
+>> 2. MIGRATE_INFO_TYPE - Return 2 i.e. Trusted OS is either not present
+>>    or does not require migration
+>> 3. MIGRATE_INFO_UP_CPU - Returns "Not Supported"
 >>
 >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> One minor thing below, otherwise:
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
 >> ---
->>  include/uapi/linux/Kbuild |    1 +
->>  include/uapi/linux/psci.h |   73 +++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 74 insertions(+)
->>  create mode 100644 include/uapi/linux/psci.h
+>>  arch/arm/kvm/psci.c |   20 +++++++++++++++-----
+>>  1 file changed, 15 insertions(+), 5 deletions(-)
 >>
->> diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
->> index 6929571..24e9033 100644
->> --- a/include/uapi/linux/Kbuild
->> +++ b/include/uapi/linux/Kbuild
->> @@ -317,6 +317,7 @@ header-y += ppp-ioctl.h
->>  header-y += ppp_defs.h
->>  header-y += pps.h
->>  header-y += prctl.h
->> +header-y += psci.h
->>  header-y += ptp_clock.h
->>  header-y += ptrace.h
->>  header-y += qnx4_fs.h
->> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
->> new file mode 100644
->> index 0000000..fbf8a81
->> --- /dev/null
->> +++ b/include/uapi/linux/psci.h
->> @@ -0,0 +1,73 @@
->> +/*
->> + * ARM Power State and Coordination Interface (PSCI) header
->> + *
->> + * This header holds common PSCI defines and macros shared
->> + * by: ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space.
->> + *
->> + * Copyright (C) 2014 Linaro Ltd.
->> + * Author: Anup Patel <anup.patel@linaro.org>
->> + */
->> +
->> +#ifndef _UAPI_LINUX_PSCI_H
->> +#define _UAPI_LINUX_PSCI_H
->> +
->> +/* PSCI v0.1 interface */
->> +#define PSCI_FN(base, n)                       ((base) + (n))
->> +
->> +#define PSCI_FN_CPU_SUSPEND(base)              PSCI_FN(base, 0)
->> +#define PSCI_FN_CPU_OFF(base)                  PSCI_FN(base, 1)
->> +#define PSCI_FN_CPU_ON(base)                   PSCI_FN(base, 2)
->> +#define PSCI_FN_MIGRATE(base)                  PSCI_FN(base, 3)
->> +
->> +/* PSCI v0.2 interface */
->> +#define PSCI_0_2_FN_BASE                       0x84000000
->> +#define PSCI_0_2_FN(n)                         (PSCI_0_2_FN_BASE + (n))
->> +#define PSCI_0_2_64BIT                         0x40000000
->> +#define PSCI_0_2_FN64_BASE                     \
->> +                                       (PSCI_0_2_FN_BASE + PSCI_0_2_64BIT)
->> +#define PSCI_0_2_FN64(n)                       (PSCI_0_2_FN64_BASE + (n))
->> +
->> +#define PSCI_0_2_FN_PSCI_VERSION               PSCI_0_2_FN(0)
->> +#define PSCI_0_2_FN_CPU_SUSPEND                        PSCI_0_2_FN(1)
->> +#define PSCI_0_2_FN_CPU_OFF                    PSCI_0_2_FN(2)
->> +#define PSCI_0_2_FN_CPU_ON                     PSCI_0_2_FN(3)
->> +#define PSCI_0_2_FN_AFFINITY_INFO              PSCI_0_2_FN(4)
->> +#define PSCI_0_2_FN_MIGRATE                    PSCI_0_2_FN(5)
->> +#define PSCI_0_2_FN_MIGRATE_INFO_TYPE          PSCI_0_2_FN(6)
->> +#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU                PSCI_0_2_FN(7)
->> +#define PSCI_0_2_FN_SYSTEM_OFF                 PSCI_0_2_FN(8)
->> +#define PSCI_0_2_FN_SYSTEM_RESET               PSCI_0_2_FN(9)
->> +
->> +#define PSCI_0_2_FN64_CPU_SUSPEND              PSCI_0_2_FN64(1)
->> +#define PSCI_0_2_FN64_CPU_ON                   PSCI_0_2_FN64(3)
->> +#define PSCI_0_2_FN64_AFFINITY_INFO            PSCI_0_2_FN64(4)
->> +#define PSCI_0_2_FN64_MIGRATE                  PSCI_0_2_FN64(5)
->> +#define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU      PSCI_0_2_FN64(7)
->> +
->> +#define PSCI_0_2_POWER_STATE_ID_MASK           0xffff
->> +#define PSCI_0_2_POWER_STATE_ID_SHIFT          0
->> +#define PSCI_0_2_POWER_STATE_TYPE_MASK         0x1
->> +#define PSCI_0_2_POWER_STATE_TYPE_SHIFT                16
->> +#define PSCI_0_2_POWER_STATE_AFFL_MASK         0x3
->> +#define PSCI_0_2_POWER_STATE_AFFL_SHIFT                24
->> +
->> +/* PSCI version decoding (independent of PSCI version) */
->> +#define PSCI_VERSION_MAJOR_MASK                        0xffff0000
->> +#define PSCI_VERSION_MINOR_MASK                        0x0000ffff
->> +#define PSCI_VERSION_MAJOR_SHIFT               16
->> +#define PSCI_VERSION_MAJOR(ver)                        \
->> +               (((ver) & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT)
->> +#define PSCI_VERSION_MINOR(ver)                        ((ver) & PSCI_VER_MINOR_MASK)
->> +
->> +/* PSCI return values (inclusive of all PSCI versions) */
->> +#define PSCI_RET_SUCCESS                       0
->> +#define PSCI_RET_NOT_SUPPORTED                 -1
->> +#define PSCI_RET_INVALID_PARAMS                        -2
->> +#define PSCI_RET_DENIED                                -3
->> +#define PSCI_RET_ALREADY_ON                    -4
->> +#define PSCI_RET_ON_PENDING                    -5
->> +#define PSCI_RET_INTERNAL_FAILURE              -6
->> +#define PSCI_RET_NOT_PRESENT                   -7
->> +#define PSCI_RET_DISABLED                      -8
->> +
->> +#endif /* _UAPI_LINUX_PSCI_H */
+>> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+>> index 5fccf0b..d8335da 100644
+>> --- a/arch/arm/kvm/psci.c
+>> +++ b/arch/arm/kvm/psci.c
+>> @@ -197,6 +197,21 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>>         case PSCI_0_2_FN64_AFFINITY_INFO:
+>>                 val = kvm_psci_vcpu_affinity_info(vcpu);
+>>                 break;
+>> +       case PSCI_0_2_FN_MIGRATE:
+>> +       case PSCI_0_2_FN64_MIGRATE:
+>> +               val = PSCI_RET_NOT_SUPPORTED;
+>> +               break;
+>> +       case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+>> +               /*
+>> +                * Trusted OS is either not present or
+>> +                * does not require migration
+>> +                */
+>> +               val = 2;
+>
+> This value should be defined int psci.h along with other possible values.
+
+OK, I will add #define for possible values in psci.h
+
+>
+>> +               break;
+>> +       case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+>> +       case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+>> +               val = PSCI_RET_NOT_SUPPORTED;
+>> +               break;
+>>         case PSCI_0_2_FN_SYSTEM_OFF:
+>>                 kvm_psci_system_off(vcpu);
+>>                 val = PSCI_RET_SUCCESS;
+>> @@ -208,12 +223,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>>                 ret = 0;
+>>                 break;
+>>         case PSCI_0_2_FN_CPU_SUSPEND:
+>> -       case PSCI_0_2_FN_MIGRATE:
+>> -       case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+>> -       case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+>>         case PSCI_0_2_FN64_CPU_SUSPEND:
+>> -       case PSCI_0_2_FN64_MIGRATE:
+>> -       case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+>>                 val = PSCI_RET_NOT_SUPPORTED;
+>>                 break;
+>>         default:
 >> --
 >> 1.7.9.5
 >>
->
-> Since this includes some #defines from my version [1], consider
-> whichever signature is more appropriate:
->
-> Acked-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
->
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg319220.html
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 
-Thanks, Ashwin.
-
-I will append
-Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-
-Regards,
+--
 Anup
