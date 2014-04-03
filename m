@@ -1,218 +1,122 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 03 Apr 2014 13:56:57 +0200
-Subject: [RFC PATCH 1/2] drivers: mfd: Add support of exynos-pmu driver
-In-Reply-To: <1396427085-4696-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1396427085-4696-1-git-send-email-pankaj.dubey@samsung.com>
- <1396427085-4696-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <4187440.t3CeqIPlpy@amdc1032>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 03 Apr 2014 14:30:50 +0200
+Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <CAPDyKFoxTAHyX7SQAMsvt=OttHs22oMSB8XrRUDDJ06qO0Fc2w@mail.gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>	<1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+ <CAPDyKFoxTAHyX7SQAMsvt=OttHs22oMSB8XrRUDDJ06qO0Fc2w@mail.gmail.com>
+Message-ID: <533D547A.7080900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulf,
 
-Hi,
+On 03.04.2014 14:16, Ulf Hansson wrote:
+> On 3 March 2014 17:02, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> This patch introduces generic code to perform power domain look-up using
+>> device tree and automatically bind devices to their power domains.
+>> Generic device tree binding is introduced to specify power domains of
+>> devices in their device tree nodes.
+>>
+>> Backwards compatibility with legacy Samsung-specific power domain
+>> bindings is provided, but for now the new code is not compiled when
+>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+>> will change as soon as Exynos power domain code gets converted to use
+>> the generic framework in further patch.
+>>
+>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+>> ---
+>>   .../devicetree/bindings/power/power_domain.txt     |  51 ++++
+>>   drivers/base/power/domain.c                        | 298 +++++++++++++++++++++
+>>   include/linux/pm_domain.h                          |  46 ++++
+>>   kernel/power/Kconfig                               |   4 +
+>>   4 files changed, 399 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>> new file mode 100644
+>> index 0000000..93be5d9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>> @@ -0,0 +1,51 @@
+>> +* Generic power domains
+>> +
+>> +System on chip designs are often divided into multiple power domains that
+>> +can be used for power gating of selected IP blocks for power saving by
+>> +reduced leakage current.
+>> +
+>> +This device tree binding can be used to bind power domain consumer devices
+>> +with their power domains provided by power domain providers. A power domain
+>> +provider can be represented by any node in the device tree and can provide
+>> +one or more power domains. A consumer node can refer to the provider by
+>> +a phandle and a set of phandle arguments (so called power domain specifier)
+>> +of length specified by #power-domain-cells property in the power domain
+>> +provider node.
+>> +
+>> +==Power domain providers==
+>> +
+>> +Required properties:
+>> + - #power-domain-cells : Number of cells in a power domain specifier;
+>> +   Typically 0 for nodes representing a single power domain and 1 for nodes
+>> +   providing multiple power domains (e.g. power controllers), but can be
+>> +   any value as specified by device tree binding documentation of particular
+>> +   provider.
+>
+> I am trying to understand if using a value > 1, ever would make sense.
+> Wouldn't that mean each consumer (device) would actually be a part of
+> more than one power domain? That won't work, right!?
 
-On Wednesday, April 02, 2014 05:24:44 PM Pankaj Dubey wrote:
-> From: Younggun Jang <yg1004.jang@samsung.com>
-> 
-> This driver is mainly used for setting misc bits of register from PMU IP
-> of Exynos SoC which will be required to configure before Suspend/Resume.
-> Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
-> moving ahead for ARM64 based SoC support, there is a need of DT based
-> implementation of PMU driver.
+Not exactly. Each phandle + #power-domain-cells cells are used just for 
+single power domain.
 
-PMU support for ARM32 EXYNOS SoCs is heavily SoC dependent and there
-is very little code shared between diffirent SoCs.  Unless PMU setup
-for Samsung ARM64 SoCs is similar to some existing ARM32 EXYNOS SoCs
-it may be better to just add a separate PMU driver for Samsung ARM64
-SoCs. IOW it would be best to show that this patch series is really
-useful before merging it.
+The cells here are used merely as the identifier used by power domain 
+driver to translate a power domain specifier from DT to a kernel 
+pointer. It's up to driver bindings to select the number of cells to 
+properly identify a power domain.
 
-When it comes to the current patches it would be better to do changes
-converting PMU support to be a platform driver first for the existing
-arch/arm/mach-exynos/pmu.c file and then move+rename this file in
-the separate patch.  Currently the code changes are done at the same
-time as the code movement which makes them difficult to review/verify.
+As an example (from different world, but showing the same mechanism), 
+let's see a common pattern of GPIO banks on some SoC:
 
-There are also some minor issues with the new code:
+GPA0
+GPA1
+GPB0
+GPB1
+GPC0
+GPC1
 
-[...]
+One might assign a single-cell ID to each bank ending with a namespace 
+of integers from 0 to 5 that would be used as follows:
 
-> diff --git a/drivers/mfd/exynos-pmu.c b/drivers/mfd/exynos-pmu.c
-> new file mode 100644
-> index 0000000..24abd9b
-> --- /dev/null
-> +++ b/drivers/mfd/exynos-pmu.c
-> @@ -0,0 +1,534 @@
-> +/*
-> + * Copyright (c) 2014-2015 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com/
+#define GPA0 0
+#define GPA1 1
+#define GPB0 2
+#define GPB1 3
+#define GPC0 4
+#define GPC1 5
 
-2015?
+reset-gpios = <&gpio GPA0 4>;
 
-[...]
+However one might also consider assigning one cell to bank set (e.g. 
+GPA) and one cell to identify the bank inside of a set, like on the 
+following example:
 
-> +static int __init exynos4210_pmu_init(void)
-> +{
-> +	exynos_pmu_config = exynos4210_pmu_config;
-> +	pmu_data->pmu_id = PMU_EXYNOS4210;
-> +	pr_info("EXYNOS4210 PMU Initialize\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init exynos4212_pmu_init(void)
-> +{
-> +	exynos_pmu_config = exynos4x12_pmu_config;
-> +	pmu_data->pmu_id = PMU_EXYNOS4212;
-> +	pr_info("EXYNOS4x12 PMU Initialize\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init exynos4412_pmu_init(void)
-> +{
-> +	exynos_pmu_config = exynos4x12_pmu_config;
-> +	pmu_data->pmu_id = PMU_EXYNOS4412;
-> +	pr_info("EXYNOS4412 PMU Initialize\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init exynos5250_pmu_init(void)
-> +{
-> +	unsigned int value;
-> +
-> +	/*
-> +	 * When SYS_WDTRESET is set, watchdog timer reset request
-> +	 * is ignored by power management unit.
-> +	 */
-> +	value = __raw_readl(pmu_data->regs + EXYNOS5_AUTO_WDTRESET_DISABLE);
-> +	value &= ~EXYNOS5_SYS_WDTRESET;
-> +	__raw_writel(value, pmu_data->regs + EXYNOS5_AUTO_WDTRESET_DISABLE);
-> +
-> +	value = __raw_readl(pmu_data->regs + EXYNOS5_MASK_WDTRESET_REQUEST);
-> +	value &= ~EXYNOS5_SYS_WDTRESET;
-> +	__raw_writel(value, pmu_data->regs + EXYNOS5_MASK_WDTRESET_REQUEST);
-> +
-> +	exynos_pmu_config = exynos5250_pmu_config;
-> +	pmu_data->pmu_id = PMU_EXYNOS5250;
-> +	pr_info("EXYNOS5250 PMU Initialize\n");
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * PMU platform driver and devicetree bindings.
-> + */
-> +static struct of_device_id exynos_pmu_of_device_ids[] = {
-> +	{
-> +		.compatible = "samsung,exynos4210-pmu",
-> +		.data = (void *)exynos4210_pmu_init
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos4212-pmu",
-> +		.data = (void *)exynos4212_pmu_init
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos4412-pmu",
-> +		.data = (void *)exynos4412_pmu_init
-> +	},
-> +	{
-> +		.compatible = "samsung,exynos5250-pmu",
-> +		.data = (void *)exynos5250_pmu_init
-> +	},
-> +	{},
-> +};
-> +
-> +static int exynos_pmu_probe(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *match;
-> +	exynos_pmu_init_t exynos_pmu_init;
-> +	struct resource *res;
-> +
-> +	pmu_data = devm_kzalloc(&pdev->dev,
-> +			sizeof(struct exynos_pmu_data), GFP_KERNEL);
-> +	if (!pmu_data) {
-> +		dev_err(&pdev->dev, "exynos_pmu driver probe failed\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	pmu_data->dev = &pdev->dev;
-> +
-> +	match = of_match_node(exynos_pmu_of_device_ids, pdev->dev.of_node);
-> +	exynos_pmu_init = match->data;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	pmu_data->regs = devm_ioremap_resource(&pdev->dev, res);
+#define GPA 0
+#define GPB 1
+#define GPC 2
 
-devm_ioremap_resouce() return value should be checked for errors with
+reset-gpios = <&gpio GPA 0 4>;
 
-if (IS_ERR(pmu_data->regs))
-	return PTR_ERR(pmu_data->regs);
+Good bindings should allow arbitrary identification schemes to let a 
+driver developer use the one that suits the hardware he's working on.
 
-> +
-> +	exynos_pmu_init();
+>
+> Additionally, there are no corresponding parsing method (like
+> of_genpd_xlate_onecell() ) that support more than one cell.
 
-exynos*_pmu_init() methods should be void as they always return 0 and
-the return value is ignored anyway.
-
-Also they cannot be marked with __init as the driver probe function
-itself is not marked with __init (it cannot be beacuse of possibility
-of doing unbind/bind through sysfs).
-
-> +
-> +	return 0;
-> +};
-> +
-> +static int exynos_pmu_remove(struct platform_device *pdev)
-> +{
-> +	exynos_pmu_config = NULL;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver exynos_pmu_driver = {
-> +	.driver  = {
-> +		.name   = "exynos-pmu",
-> +		.of_match_table = exynos_pmu_of_device_ids,
-> +	},
-> +	.probe = exynos_pmu_probe,
-> +	.remove = exynos_pmu_remove,
-> +};
-> +
-> +static int __init exynos_pmu_driver_init(void)
-> +{
-> +	return platform_driver_register(&exynos_pmu_driver);
-> +}
-> +arch_initcall(exynos_pmu_driver_init);
-> +
-> +MODULE_AUTHOR("Younggun Jang <yg1004.jang@samsung.com");
-> +MODULE_DESCRIPTION("Exynos PMU driver");
-> +MODULE_LICENSE("GPL v2");
-
-This driver can be build as module now but:
-- exynos_sys_powerdown_conf() is not exported
-- there is no exynos_pmu_driver_exit()
-
-Also it is not clear what happens if exynos_sys_powerdown_conf() is called
-while there are no platform devices binded to a driver but driver itself is
-loaded.
-
-[...]
-
-> diff --git a/include/linux/mfd/samsung/exynos-regs-pmu.h b/include/linux/mfd/samsung/exynos-regs-pmu.h
-> new file mode 100644
-> index 0000000..ed8259d
-> --- /dev/null
-> +++ b/include/linux/mfd/samsung/exynos-regs-pmu.h
-> @@ -0,0 +1,308 @@
-> +/*
-> + * Copyright (c) 2014-2015 Samsung Electronics Co., Ltd.
-
-2015?
+There are two generic xlate helpers provided for the most common cases 
+that are likely to be reused by most drivers. For more complex cases 
+it's up to the driver to implement its own mapping function. It can be 
+promoted to a generic one later if such need shows up.
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Tomasz
