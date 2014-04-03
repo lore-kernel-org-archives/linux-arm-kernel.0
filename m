@@ -1,58 +1,179 @@
-From: sungjinn.chung@samsung.com (Sungjinn Chung)
-Date: Thu, 03 Apr 2014 11:15:09 +0900
-Subject: [RFC] ARM64: 4 level page table translation for 4KB pages
-In-Reply-To: <20140402152455.GB24018@arm.com>
-References: <00cb01cf4c94$725a6030$570f2090$@samsung.com>
- <9531814.OxBzcO1V3J@wuerfel> <20140331152719.GH29871@arm.com>
- <7050133.LRSn2ENgQ4@wuerfel> <20140401132316.GD20061@arm.com>
- <004b01cf4e27$d47da990$7d78fcb0$@samsung.com> <20140402090136.GA31892@arm.com>
- <20140402152455.GB24018@arm.com>
-Message-ID: <001501cf4ee2$8b639b50$a22ad1f0$%chung@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 3 Apr 2014 10:32:27 +0800
+Subject: [PATCH 2/2] ARM: dts: add initial Colibri VF61 board support
+In-Reply-To: <c8f2d3349233b70e5bd242480ff326b3b728cca3.1396456704.git.stefan@agner.ch>
+References: <cover.1396456704.git.stefan@agner.ch>
+ <c8f2d3349233b70e5bd242480ff326b3b728cca3.1396456704.git.stefan@agner.ch>
+Message-ID: <20140403023224.GC2801@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 03, 2014 12:25 AM, Catalin Marinas wrote:
-> On Wed, Apr 02, 2014 at 10:01:38AM +0100, Catalin Marinas wrote:
-> > On Wed, Apr 02, 2014 at 04:58:39AM +0100, Jungseok Lee wrote:
-> > > On Tuesday, April 01, 2014 10:23 PM, Catalin Marinas wrote:
-> > > > On some previous patches I've seen posted for 4-levels I asked that 64K
-> > > > and 4K page configurations are decoupled from the pgtable-?level.h
-> > > > macros so that if we ever need 3-levels with 64K it's easy to enable.
-> > >
-> > > Is your request to decouple page size from the number of page tables?
-> > > In other words, would you like to prepare 4 options, 1)4KB+3Level, 2)
-> > > 4KB+4Level, 3)64KB+2Level and 4)64KB+3Level, as combining page size
-> > > with page table levels in kernel configuration?
-> >
-> > We can still use two options to make things less confusing: one for the
-> > page size (4K/64K) and another for the size of the virtual address
-> > space. From those two we can infer the number levels required. We can
-> > limit the options to 39-bit, 42 (only fo 64K pages) and architecture
-> > current maximum of 48 (for both 4K and 64K).
+On Wed, Apr 02, 2014 at 06:47:27PM +0200, stefan at agner.ch wrote:
+> From: Stefan Agner <stefan@agner.ch>
 > 
-> Another reason to decouple the page size is that we have 16K pages
-> specified in the ARM ARM (and we'll get hardware implementations at some
-> point). As a simple formula for the max VA space we can cover (capped at
-> 48-bit):
+> Add initial Toradex Colibri VF61 board support. Ethernet, UART
+> and SDHC cards are working. Cache latencies need to be a bit
+> higher than vf610.dtsi suggests. Those values are validated
+> by running multiple memory tests.
 > 
-> VA_BITS = (PAGE_SHIFT - 3) * levels + PAGE_SHIFT
-> 
-> With 16K pages and 3 levels we can cover 47 bits. So we'll eventually
-> have the following VA bits options:
-> 
-> 39 if 4K (3 levels)
-> 42 if 64K (2 levels)
-> 47 if 16K (3 levels)
-> 48 if 4K || 16K || 64K (4/4/3 levels depending on page size)
-Separation for page size and VA bits looks great to me.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-I think we can focus on only 4K and 64K at this point.
-I'm worried about validation issue for 64K.
-After we secure code for 4K and 64K with refactoring,
-16K might not big thing. Jungseok or somebody else can do it.
-How about your opinion?
+Looks good to me.  Only one minor comment below.
+
+> ---
+>  arch/arm/boot/dts/Makefile          |   1 +
+>  arch/arm/boot/dts/vf610-colibri.dts | 123 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 124 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/vf610-colibri.dts
 > 
-> The latter because of the architecture maximum.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 23d7768..81b3885 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -190,6 +190,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6q-udoo.dtb \
+>  	imx6q-wandboard.dtb \
+>  	imx6sl-evk.dtb \
+> +	vf610-colibri.dtb \
+>  	vf610-cosmic.dtb \
+>  	vf610-twr.dtb
+>  dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+> diff --git a/arch/arm/boot/dts/vf610-colibri.dts b/arch/arm/boot/dts/vf610-colibri.dts
+> new file mode 100644
+> index 0000000..3ac34e6
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/vf610-colibri.dts
+> @@ -0,0 +1,123 @@
+> +/*
+> + * Copyright 2014 Toradex AG
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +/dts-v1/;
+> +#include "vf610.dtsi"
+> +
+> +/ {
+> +	model = "Toradex Colibri VF61 COM";
+> +	compatible = "toradex,vf610-colibri", "fsl,vf610";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyLP0,115200";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x80000000 0x10000000>;
+> +	};
+> +
+> +	clocks {
+> +		enet_ext {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <50000000>;
+> +		};
+> +	};
+> +
+> +};
+> +
+> +&iomuxc {
+
+I would suggest to put this node at the bottom of the file, since it
+will have a lot more data than other nodes.  Doing so will make reading
+of the file a little easier.
+
+Shawn
+
+> +	vf610-colibri {
+> +		pinctrl_esdhc1: esdhc1grp {
+> +			fsl,fsl,pins = <
+> +				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
+> +				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
+> +				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
+> +				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
+> +				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
+> +				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
+> +				VF610_PAD_PTB20__GPIO_42	0x219d
+> +			>;
+> +		};
+> +
+> +		pinctrl_fec1: fec1grp {
+> +			fsl,pins = <
+> +				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
+> +				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
+> +				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
+> +				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
+> +				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
+> +				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
+> +				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
+> +				VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
+> +				VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart0: uart0grp {
+> +			fsl,pins = <
+> +				VF610_PAD_PTB10__UART0_TX		0x21a2
+> +				VF610_PAD_PTB11__UART0_RX		0x21a1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <
+> +				VF610_PAD_PTB4__UART1_TX		0x21a2
+> +				VF610_PAD_PTB5__UART1_RX		0x21a1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <
+> +				VF610_PAD_PTD0__UART2_TX		0x21a2
+> +				VF610_PAD_PTD1__UART2_RX		0x21a1
+> +				VF610_PAD_PTD2__UART2_RTS		0x21a2
+> +				VF610_PAD_PTD3__UART2_CTS		0x21a1
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&esdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_esdhc1>;
+> +	bus-width = <4>;
+> +	status = "okay";
+> +};
+> +
+> +&fec1 {
+> +	phy-mode = "rmii";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec1>;
+> +	status = "okay";
+> +};
+> +
+> +&L2 {
+> +	arm,data-latency = <2 1 2>;
+> +	arm,tag-latency = <3 2 3>;
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart0>;
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	status = "okay";
+> +};
+> -- 
+> 1.9.1
 > 
-> --
-> Catalin
