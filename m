@@ -1,46 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Apr 2014 10:02:47 +0100
-Subject: [PATCH 2/3] ARM: dts: document the berlin enable-method property
-In-Reply-To: <1396512496-8030-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1396512496-8030-1-git-send-email-antoine.tenart@free-electrons.com>
- <1396512496-8030-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140403090247.GM16420@e106331-lin.cambridge.arm.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Thu,  3 Apr 2014 14:35:38 +0530
+Subject: [PATCH v8 01/12] KVM: Add capability to advertise PSCI v0.2 support
+In-Reply-To: <1396515949-1459-1-git-send-email-anup.patel@linaro.org>
+References: <1396515949-1459-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1396515949-1459-2-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 03, 2014 at 09:08:15AM +0100, Antoine T?nart wrote:
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 333f4aea3029..a9e42a2dbc99 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
->  			    "qcom,gcc-msm8660"
->  			    "qcom,kpss-acc-v1"
->  			    "qcom,kpss-acc-v2"
-> +			    "marvell,88de31-smp" - cpu-core handling for Berlin
-> +					SoC from Marvell starting with 88de31
+User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
+ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
+define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
 
-It would probably be best to add an enable-method directory and document
-what each of these mean (what's expected of the platform, what steps an
-OS should make to bring up and/or tear down CPUs).
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ include/uapi/linux/kvm.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-While it's nice to factor this out of the kernel, I'd like this to be
-better-defined such that it's clear what the expectations of each
-enable-method are. That ways it iss possible for OSs other than Linux to
-make use of the enable-method information (as it won't be an opaque
-reference to Linux internals), and we can have a clear definition of
-each enable-method independent of any implementation details.
-
-Going forward I would like to see fewer implementation-specific
-protocols for bringing up secondaries, and a move to fewer more
-standardised mechanisms like PSCI. I realise that might not be possible
-in all cases, but it would be nice to avoid a proliferation of
-enable-methods with single users.
-
-Cheers,
-Mark.
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index a7518be..260d3ae 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -741,6 +741,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_EXT_EMUL_CPUID 95
+ #define KVM_CAP_HYPERV_TIME 96
+ #define KVM_CAP_IOAPIC_POLARITY_IGNORED 97
++#define KVM_CAP_ARM_PSCI_0_2 98
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+-- 
+1.7.9.5
