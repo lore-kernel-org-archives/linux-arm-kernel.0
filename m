@@ -1,52 +1,83 @@
-From: hchaumette@adeneo-embedded.com (Hubert Chaumette)
-Date: Thu, 03 Apr 2014 16:05:47 +0200
-Subject: [PATCH] ARM: i.MX6: update KSZ9031 phy fixup
-In-Reply-To: <20140402220125.4e203cd2@crub>
-References: <1395421687-12934-1-git-send-email-hchaumette@adeneo-embedded.com>
- <20140402220125.4e203cd2@crub>
-Message-ID: <1396533947.25686.22.camel@EMBLYSD005.adetelgroup.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 3 Apr 2014 16:07:27 +0200
+Subject: [PATCH 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+ deadlock
+In-Reply-To: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140403160727.17b3558b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 02 avril 2014 ? 22:01 +0200, Anatolij Gustschin a ?crit :
-> On Fri, 21 Mar 2014 18:08:07 +0100
-> Hubert Chaumette <hchaumette@adeneo-embedded.com> wrote:
+Russell, Will, Catalin,
+
+Any comments about the proposed patches? These are important for the
+recent Armada 375/38x platforms and I'm sure will require a bit of
+discussion. Moreover, one of the patch affects the L2 cache driver that
+Russell is currently working on, so it would be nice if we could get
+the discussion going soon.
+
+Thanks a lot!
+
+Thomas
+
+On Mon, 24 Mar 2014 17:17:49 +0100, Thomas Petazzoni wrote:
+> Russell, Will, Catalin,
 > 
-> > Update KSZ9031RN phy fixup for Congatec conga-QEVAL and conga-QMX6 combo :
-> > set RGMII GTX_CLK and RX_CLK pad skew to +0.96ns.
-> > 
-> > Signed-off-by: Hubert Chaumette <hchaumette@adeneo-embedded.com>
-> > ---
-> >  arch/arm/mach-imx/mach-imx6q.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> > index 76e5db4..db307c2 100644
-> > --- a/arch/arm/mach-imx/mach-imx6q.c
-> > +++ b/arch/arm/mach-imx/mach-imx6q.c
-> > @@ -77,6 +77,9 @@ static int ksz9031rn_phy_fixup(struct phy_device *dev)
-> >  	mmd_write_reg(dev, 2, 5, 0);
-> >  	mmd_write_reg(dev, 2, 8, 0x003ff);
-> >  
-> > +	/* For Congatec conga-QMX6 board */
-> > +	mmd_write_reg(dev, 0x02, 0x06, 0xffff);
+> This patch series adresses a problem that affects the newer Marvell
+> Armada 375 and 38x SOCs, based on Cortex-A9+PL310, combined with the
+> Marvell PCIe hardware unit. When the hardware I/O coherency is
+> enabled, the combination of Cortex-A9/PL310/Marvell PCIe hardware unit
+> will quickly cause a deadlock when the PCIe bus is stressed.
 > 
-> The patch sets TX Data Pad Skew TXD0-TXD3 but the commit message states
-> that it sets GTX/RX CLK pad skew. The GTX/RX CLK pad skew is already
-> set to +0.96ns by writing 0x003ff to the register 8.
+> The workaround for this problem has been suggested by ARM, and
+> consists in two things:
+> 
+>  (1) Map the PCIe regions as strongly-ordered
+> 
+>  (2) Disable the outer cache sync of the PL310 when hardware I/O
+>      coherency is used, since it is unneeded and causes the deadlock.
+> 
+> The following three patches address the problem in the following way:
+> 
+>  * PATCH 1/3 adds the necessary infrastructure to allow PCIe I/O
+>    regions to be mapped as strongly-ordered.
+> 
+>  * PATCH 2/3 extends the l2x0 cache driver to be able to pass the
+>    information on whether hardware I/O coherency is used or not, and
+>    in the former case, disable the outer_cache_sync operation.
+> 
+>  * PATCH 3/3 uses both of the added infrastructures, as well as the
+>    existing infrastructure to customize the behavior of ioremap() on a
+>    per-platform basis, to implement the workaround for the Armada 375
+>    and 38x SOCs.
+> 
+> Patches 1/3 and 2/3 apply on 3.14-rc1. Patch 3/3 applies on top of the
+> '[PATCH 00/10] ARM: mvebu: Hardware coherency support for Armada 375
+> and 38x' patch set. But for now, I'm mainly interested in hearing
+> about patches 1/3 and 2/3.
+> 
+> Please let me know what you think about the proposed solution.
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (3):
+>   ARM: mm: allow sub-architectures to override PCI I/O memory type
+>   ARM: mm: add support for HW coherent systems in PL310
+>   ARM: mvebu: implement L2/PCIe deadlock workaround
+> 
+>  arch/arm/include/asm/hardware/cache-l2x0.h |  1 +
+>  arch/arm/include/asm/io.h                  |  6 ++++++
+>  arch/arm/mach-mvebu/board-v7.c             | 31 +++++++++++++++++++++++++++++-
+>  arch/arm/mm/cache-l2x0.c                   | 22 ++++++++++++++++++++-
+>  arch/arm/mm/ioremap.c                      |  9 ++++++++-
+>  5 files changed, 66 insertions(+), 3 deletions(-)
+> 
 
-Indeed, the message should be "set RGMII TXD0 to TXD3 output pad skew to
-+0.48ns".
 
-> It would be better to configure the pad skews in the board specific
-> way in the device tree. There is a binding for ksz9021 PHY in
-> Documentation/devicetree/bindings/net/micrel-ksz9021.txt.
 
-I wonder why it it's not used in arch/arm/boot/dts/imx6q-sabrelite.dts
-instead of ksz9021rn_phy_fixup().
-
-> I have a patch for setting ksz9031rn GTX/RX CLK pad skew in a similar
-> way over device tree and plan to submit it when the net-next merge
-> window for v3.16 opens.
-
-So, you have already implemented the ksz9031 binding ?
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
