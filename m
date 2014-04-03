@@ -1,40 +1,34 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 03 Apr 2014 16:07:01 -0700
-Subject: [PATCH arm64 bootwrapper] Fix maintainer-clean make target
-Message-ID: <1396566421.4369.28.camel@smoke>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 4 Apr 2014 07:10:28 +0800
+Subject: [PATCH 75/75] ARM: l2c: imx: remove direct write to power
+ control register
+In-Reply-To: <20140403185316.GT7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYaQ-0007I4-0D@rmk-PC.arm.linux.org.uk>
+ <20140403063310.GG2801@dragon>
+ <20140403185316.GT7528@n2100.arm.linux.org.uk>
+Message-ID: <20140403231020.GA29782@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing MAINTAINERCLEANFILES to makefile.am.
+On Thu, Apr 03, 2014 at 07:53:16PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 03, 2014 at 02:33:12PM +0800, Shawn Guo wrote:
+> > On Fri, Mar 28, 2014 at 03:20:50PM +0000, Russell King wrote:
+> > > Now that we handle this in core code, we don't need platforms enabling
+> > > the low power modes directly.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > For patches that I'm on Cc:
+> > 
+> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Not a particularly helpful way to send an ack, because I don't have a
+> record other than the emails on the mailing list of which to add that
+> to...  I'll do my best, but I'm not going to make any guarantees of
+> getting that right.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
-Hi Catalin,
+Right, it should be much easier for me to find them out than you.  They
+are #5, #49, #68 and #75.
 
-Here's a minor fix for the arm64 bootwrapper to make
-'make maintainer-clean' work.  You can try it with
-something this:
-
-autoreconf -i
-./configure ...
-make maintainer-clean
-git ls-files -o
-
--Geoff
-
- Makefile.am | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/Makefile.am b/Makefile.am
-index 5791ad1..c911e51 100644
---- a/Makefile.am
-+++ b/Makefile.am
-@@ -88,3 +88,6 @@ fdt.dtb: $(KERNEL_DTB) Makefile gen-cpu-nodes.sh
- 
- # The filesystem archive might not exist if INITRD is not being used
- .PHONY: all clean $(FILESYSTEM)
-+
-+MAINTAINERCLEANFILES = aclocal.m4 compile config.* configure install-sh \
-+	Makefile.in missing
--- 
-1.9.1
+Shawn
