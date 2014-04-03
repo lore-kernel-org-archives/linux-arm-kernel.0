@@ -1,24 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 3 Apr 2014 17:48:02 +0200
-Subject: [PATCH V2 05/19] mmc: mmci: Add DT bindings for feedback clock pin
-In-Reply-To: <1396279100-2920-6-git-send-email-ulf.hansson@linaro.org>
-References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
- <1396279100-2920-6-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkdZtqY29bj=E89VqyOFZ8OXDGzfwWi3B5yhMB9hioUi_0g@mail.gmail.com>
+From: stefan@agner.ch (stefan at agner.ch)
+Date: Thu,  3 Apr 2014 17:47:08 +0200
+Subject: [PATCH v2 0/2] ARM: dts: add initial Colibri VF61 board support
+Message-ID: <cover.1396539657.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 5:18 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+From: Stefan Agner <stefan@agner.ch>
 
-> The ST Micro variant supports the option of using a feedback clock signal in
-> favor of the clockout pin when latching incoming signals on the data bus.
->
-> Since this is matter of how pins are being routed we need to provide a new DT
-> binding to be able to configure this through DT.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+This patches adds initial support for Toradex Colibri VF61
+computer-on-module.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Changes since v1:
+- Reorder DTS for better readability
+- Dumped my broken version of the alphabet and reorderd vendor prefixes
 
-Yours,
-Linus Walleij
+Stefan Agner (2):
+  of: add vendor prefix for Toradex AG
+  ARM: dts: add initial Colibri VF61 board support
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/vf610-colibri.dts                | 123 +++++++++++++++++++++
+ 3 files changed, 125 insertions(+)
+ create mode 100644 arch/arm/boot/dts/vf610-colibri.dts
+
+-- 
+1.9.1
