@@ -1,23 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 3 Apr 2014 17:50:16 +0200
-Subject: [PATCH V2 11/19] mmc: mmci: Mark the DT bindings for highspeed
- mode as deprecated
-In-Reply-To: <1396279100-2920-12-git-send-email-ulf.hansson@linaro.org>
-References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
- <1396279100-2920-12-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkdY+pgXOjxaLYH=m7v3-7xt1mzDvt=6tAyJz4smJ-2RoAg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Apr 2014 16:50:37 +0100
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D0F6EF663@AcuExch.aculab.com>
+References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
+ <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
+ <9532591.5yuCbpL4pV@wuerfel> <20140403152746.GQ7528@n2100.arm.linux.org.uk>
+ <063D6719AE5E284EB5DD2968C1650D6D0F6EF663@AcuExch.aculab.com>
+Message-ID: <20140403155037.GR7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 5:18 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On Thu, Apr 03, 2014 at 03:42:00PM +0000, David Laight wrote:
+> From: Russell King - ARM Linux
+> > DMA coherent memory is write combining, so multiple writes will be
+> > coalesced.  This also means that barriers may be required to ensure the
+> > descriptors are pushed out in a timely manner if something like writel()
+> > is not used in the transmit-triggering path.
+> 
+> You also have to ensure that the write that changes the 'owner'
+> bit is the one that happens last.
+> 
+> If (for example) a descriptor has two words, one containing the
+> buffer address and the other containing the length and flags,
+> then you have to absolutely ensure that the hardware will not
+> read the new 'flags' with the old 'buffer address'.
+> Any write to tell the hardware to look at the tx ring won't
+> help you - the hardware might be reading the descriptor anyway.
+> 
+> Even if the accesses are uncached, you need the appropriate
+> barrier (or volatiles) to stop gcc reordering the writes.
+> (I think accesses to volatiles can't be reordered - check.)
 
-> The common mmc DT parser supports bindings for highspeed mode, thus
-> there are no need for mmci to provide it's own versions for these. Mark
-> them as deprecated in the documentation.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Exactly... I wish Freescale were as thoughtful as you are on this point. :)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
