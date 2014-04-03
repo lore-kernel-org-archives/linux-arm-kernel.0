@@ -1,34 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 4 Apr 2014 07:10:28 +0800
-Subject: [PATCH 75/75] ARM: l2c: imx: remove direct write to power
- control register
-In-Reply-To: <20140403185316.GT7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYaQ-0007I4-0D@rmk-PC.arm.linux.org.uk>
- <20140403063310.GG2801@dragon>
- <20140403185316.GT7528@n2100.arm.linux.org.uk>
-Message-ID: <20140403231020.GA29782@dragon>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 3 Apr 2014 16:14:54 -0700
+Subject: [PATCH] arm: don't allow CONFIG_DEBUG_SET_MODULE_RONX if
+ CONFIG_JUMP_LABEL is enabled
+In-Reply-To: <CAH+eYFDkYczZXYF3be6tTRg7kkGhK2zyukDTo+N8mwEKcG89LA@mail.gmail.com>
+References: <1396346657-7166-1-git-send-email-holler@ahsoftware.de>
+ <533AFF77.5030106@codeaurora.org>
+ <CAGXu5jKMF9n9svQBhyQFvCoUe86QhLycDTt-fWyiRfySbn=Fug@mail.gmail.com>
+ <CAH+eYFDkYczZXYF3be6tTRg7kkGhK2zyukDTo+N8mwEKcG89LA@mail.gmail.com>
+Message-ID: <CAGXu5jKyzbRR4S0+0daygWcE2-BbFi1X6MFAkPqTNbGiT6huSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 03, 2014 at 07:53:16PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 03, 2014 at 02:33:12PM +0800, Shawn Guo wrote:
-> > On Fri, Mar 28, 2014 at 03:20:50PM +0000, Russell King wrote:
-> > > Now that we handle this in core code, we don't need platforms enabling
-> > > the low power modes directly.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > For patches that I'm on Cc:
-> > 
-> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Not a particularly helpful way to send an ack, because I don't have a
-> record other than the emails on the mailing list of which to add that
-> to...  I'll do my best, but I'm not going to make any guarantees of
-> getting that right.
+On Tue, Apr 1, 2014 at 4:08 PM, Rabin Vincent <rabin@rab.in> wrote:
+> 2014-04-01 20:36 GMT+02:00 Kees Cook <keescook@chromium.org>:
+>> Is there something "sticky" about PMD sections that I'm not aware of?
+>> Even after calling set_kernel_text_rw(), any writes to kernel memory
+>> fault. :(
+>
+> section_update() updates init_mm, but each mm has a copy of the first
+> level page tables.  So your updates to init_mm won't be visibile to
+> currently running processes.  (Have a look at arch/arm/mm/ioremap.c's
+> vmalloc_seq stuff for some background on how section support is
+> handled on non-SMP; the vmalloc code doesn't use sections on SMP.)
 
-Right, it should be much easier for me to find them out than you.  They
-are #5, #49, #68 and #75.
+Ah-ha! This is the missing piece of information for me. :)
 
-Shawn
+> Here's a patch (probably whitespace damaged, hence also attached) with
+> which dynamic ftrace works for me on top your other paches.  Tested on
+> a non-LPAE SMP.
+
+Thanks! I'll incorporate calls to set_all_modules_text_rw/ro and see
+what I can make work.
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
