@@ -1,49 +1,51 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Thu, 3 Apr 2014 07:48:17 +0000
-Subject: mach header files
-In-Reply-To: <5043068.EO8FAz7Gh2@wuerfel>
-References: <416b29756557446199fa6e3b529cd4f0@HKXPR06MB168.apcprd06.prod.outlook.com>
- <5043068.EO8FAz7Gh2@wuerfel>
-Message-ID: <fdf490c1173e482c8f82c250307c4853@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 Apr 2014 10:01:02 +0200
+Subject: [PATCH] pinctrl: capri: make Kconfig dependency more strict
+In-Reply-To: <533C9B1E.6020905@broadcom.com>
+References: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <533C9B1E.6020905@broadcom.com>
+Message-ID: <20140403080102.GE29751@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On: 02 April 2014 16:16, Arnd wrote:
-> On Wednesday 02 April 2014 15:11:48 Phil Edworthy wrote:
->
-> >
-> > This message is intended only for the use of the addressee(s) and may
-> contain confidential and/or legally privileged information. If you are not the
-> intended recipient, you are hereby notified that any dissemination of this
-> email (including any attachments thereto) is strictly prohibited. If you have
-> received this email in error, please notify the sender immediately by
-> telephone or email and permanently destroy the original without making any
-> copy. Please note that any material and advice from this mail is provided free
-> of charge and shall be used as an example for demonstration purposes only.
-> > RENESAS MAKES NO WARRANTIES THAT THE USAGE OF INFORMATION OR
-> ADVICE FROM THIS E-MAIL WILL NOT INFRINGE ANY INTELLECTUAL
-> PROPERTY RIGHTS (E.G. PATENTS, COPYRIGHTS). RENESAS CANNOT
-> GUARANTEE BUG FREE OPERATION AND THE RECIPIENT WILL USE AND/OR
-> DISTRIBUTE IT ONLY AT HIS OWN RISK. IN NO EVENT SHALL RENESAS BE
-> LIABLE FOR ANY DAMAGE. The communication with Renesas Electronics
-> Europe Ltd does not amend any written agreement in place.
-> >
-> > Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne
-> End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under
-> Registered No. 04586709.
-> >
->
-> I have an answer for you, but had to delete your mail since you asked me to.
-> Please send a new mail that I'm allowed to reply to on a public list.
-Oh great, a change in corporate mail client & this gets shoved on the end without my knowledge!
+Hello,
 
-I'll sort it out...
+On Wed, Apr 02, 2014 at 04:19:58PM -0700, Sherman Yin wrote:
+> On 14-04-01 01:10 PM, Uwe Kleine-K?nig wrote:
+> >This driver is only useful on BCM281xx, so let the driver depend on
+> >ARCH_BCM_MOBILE but allow compile coverage testing.
+> >The main benefit is that the driver isn't available to be selected for
+> >machines that don't have the matching hardware.
+> >
+> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >---
+> >  drivers/pinctrl/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> >index e49324032611..072749816cb4 100644
+> >--- a/drivers/pinctrl/Kconfig
+> >+++ b/drivers/pinctrl/Kconfig
+> >@@ -106,7 +106,7 @@ config PINCTRL_BCM2835
+> >
+> >  config PINCTRL_CAPRI
+> >  	bool "Broadcom Capri pinctrl driver"
+> >-	depends on OF
+> >+	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
+> >  	select PINMUX
+> >  	select PINCONF
+> >  	select GENERIC_PINCONF
+> >
+> 
+> Looks good. Just wondering how you've come across this driver (and
+> PINCTRL_MSM8X74)?
+Well, I was annoyed by being asked if I want to enable them for my efm32
+machine during make oldconfig after updating the kernel. :-)
 
+> Reviewed-by: Sherman Yin <syin@broadcom.com>
 Thanks
-Phil
+Uwe
 
-
-This message is intended only for the use of the addressee(s) and may contain confidential and/or legally privileged information. If you are not the intended recipient, you are hereby notified that any dissemination of this email (including any attachments thereto) is strictly prohibited. If you have received this email in error, please notify the sender immediately by telephone or email and permanently destroy the original without making any copy. Please note that any material and advice from this mail is provided free of charge and shall be used as an example for demonstration purposes only.
-RENESAS MAKES NO WARRANTIES THAT THE USAGE OF INFORMATION OR ADVICE FROM THIS E-MAIL WILL NOT INFRINGE ANY INTELLECTUAL PROPERTY RIGHTS (E.G. PATENTS, COPYRIGHTS). RENESAS CANNOT GUARANTEE BUG FREE OPERATION AND THE RECIPIENT WILL USE AND/OR DISTRIBUTE IT ONLY AT HIS OWN RISK. IN NO EVENT SHALL RENESAS BE LIABLE FOR ANY DAMAGE. The communication with Renesas Electronics Europe Ltd does not amend any written agreement in place.
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
