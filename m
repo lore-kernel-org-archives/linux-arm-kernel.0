@@ -1,21 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 3 Apr 2014 17:27:03 +0200
-Subject: [PATCH] pinctrl: rockchip: fix offset of mux registers for rk3188
-In-Reply-To: <1810753.STDdFhitt6@diego>
-References: <1395700561-3793-1-git-send-email-b.galvani@gmail.com>
- <CACRpkda9Lh19sfkxs3=dNWbg4FgkAtY2tJdMQik=TGs8wUkYfA@mail.gmail.com>
- <1810753.STDdFhitt6@diego>
-Message-ID: <CACRpkdZQPy=H+LEuC6SX8tSVD4fEWNnFgNOfv-=tYQ9NvgyOEA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Apr 2014 16:27:46 +0100
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <9532591.5yuCbpL4pV@wuerfel>
+References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
+ <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
+ <9532591.5yuCbpL4pV@wuerfel>
+Message-ID: <20140403152746.GQ7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 3, 2014 at 4:20 PM, Heiko St?bner <heiko@sntech.de> wrote:
+On Wed, Apr 02, 2014 at 11:21:45AM +0200, Arnd Bergmann wrote:
+> - As David Laight pointed out earlier, you must also ensure that
+>   you don't have too much /data/ pending in the descriptor ring
+>   when you stop the queue. For a 10mbit connection, you have already
+>   tested (as we discussed on IRC) that 64 descriptors with 1500 byte
+>   frames gives you a 68ms round-trip ping time, which is too much.
+>   Conversely, on 1gbit, having only 64 descriptors actually seems
+>   a little low, and you may be able to get better throughput if
+>   you extend the ring to e.g. 512 descriptors.
 
-> small protest note
->
-> "Heikki adds:" - sounds somehow finish or swedish, but who is this guy? ;-)
+You don't manage that by stopping the queue - there's separate interfaces
+where you report how many bytes you've queued (netdev_sent_queue()) and
+how many bytes/packets you've sent (netdev_tx_completed_queue()).  This
+allows the netdev schedulers to limit how much data is held in the queue,
+preserving interactivity while allowing the advantages of larger rings.
 
-Haha sorry Heiko, I'll fix.
+> > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
+> > +       if (dma_mapping_error(&ndev->dev, phys)) {
+> > +               dev_kfree_skb(skb);
+> > +               return NETDEV_TX_OK;
+> > +       }
+> > +
+> > +       priv->tx_skb[tx_head] = skb;
+> > +       priv->tx_phys[tx_head] = phys;
+> > +       desc->send_addr = cpu_to_be32(phys);
+> > +       desc->send_size = cpu_to_be16(skb->len);
+> > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
+> > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
+> > +       desc->wb_addr = cpu_to_be32(phys);
+> 
+> One detail: since you don't have cache-coherent DMA, "desc" will
+> reside in uncached memory, so you try to minimize the number of accesses.
+> It's probably faster if you build the descriptor on the stack and
+> then atomically copy it over, rather than assigning each member at
+> a time.
 
-Yours,
-Linus Walleij
+DMA coherent memory is write combining, so multiple writes will be
+coalesced.  This also means that barriers may be required to ensure the
+descriptors are pushed out in a timely manner if something like writel()
+is not used in the transmit-triggering path.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
