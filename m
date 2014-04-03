@@ -1,35 +1,54 @@
 From: lho@apm.com (Loc Ho)
-Date: Thu,  3 Apr 2014 00:17:50 -0600
-Subject: [PATCH v3 0/3] rtc: Add APM X-Gene SoC RTC driver
-Message-ID: <1396505873-5507-1-git-send-email-lho@apm.com>
+Date: Thu,  3 Apr 2014 00:17:51 -0600
+Subject: [PATCH v3 1/3] Documentation: Add documentation for the APM X-Gene
+ SoC RTC DTS binding
+In-Reply-To: <1396505873-5507-1-git-send-email-lho@apm.com>
+References: <1396505873-5507-1-git-send-email-lho@apm.com>
+Message-ID: <1396505873-5507-2-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the APM X-Gene SoC RTC driver.
-
-v3
-* Remove #clock-cell from binding documentation
-
-v2
-* Change function xgene_rtc_read_time to return rtc_valid_tm(tm) instead 0
-
-v1
-* Initial version
+This patch adds documentation for the APM X-Gene SoC RTC DTS binding.
 
 Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
-Loc Ho (3):
-  Documentation: Add documentation for the APM X-Gene SoC RTC DTS
-    binding
-  rtc: Add APM X-Gene SoC RTC driver
-  arm64: Add APM X-Gene SoC RTC DTS entry
-
- .../devicetree/bindings/rtc/xgene-rtc.txt          |   27 ++
- arch/arm64/boot/dts/apm-storm.dtsi                 |   21 ++
- drivers/rtc/Kconfig                                |    9 +
- drivers/rtc/Makefile                               |    1 +
- drivers/rtc/rtc-xgene.c                            |  278 ++++++++++++++++++++
- 5 files changed, 336 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/rtc/xgene-rtc.txt          |   27 ++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/rtc/xgene-rtc.txt
- create mode 100644 drivers/rtc/rtc-xgene.c
+
+diff --git a/Documentation/devicetree/bindings/rtc/xgene-rtc.txt b/Documentation/devicetree/bindings/rtc/xgene-rtc.txt
+new file mode 100644
+index 0000000..2e9c503
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/xgene-rtc.txt
+@@ -0,0 +1,27 @@
++* APM X-Gene Real Time Clock
++
++RTC controller for the APM X-Gene Real Time Clock
++
++Required properties:
++- compatible : Should be "apm,xgene-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: IRQ line for the RTC.
++- clocks: Reference to the clock entry.
++
++Example:
++
++rtcclk: rtcclk {
++	compatible = "fixed-clock";
++	#clock-cells = <1>;
++	clock-frequency = <100000000>;
++	clock-output-names = "rtcclk";
++};
++
++rtc: rtc at 10510000 {
++	compatible = "apm,xgene-rtc";
++	reg = <0x0 0x10510000 0x0 0x400>;
++	interrupts = <0x0 0x46 0x4>;
++	#clock-cells = <1>;
++	clocks = <&rtcclk 0>;
++};
+-- 
+1.5.5
