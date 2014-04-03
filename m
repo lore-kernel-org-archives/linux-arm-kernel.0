@@ -1,47 +1,151 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Thu, 3 Apr 2014 15:32:37 +0200
-Subject: OMAP baseline test results for v3.14
-In-Reply-To: <20140402171513.GE12234@atomide.com>
-References: <alpine.DEB.2.02.1404021600320.15928@utopia.booyaka.com>
- <20140402162102.GB12234@atomide.com>
- <alpine.DEB.2.02.1404021631040.15928@utopia.booyaka.com>
- <20140402163521.GD12234@atomide.com>
- <CAGo_u6qJt5BRQHDvRjWe7Gjt+AfEBxaOPxCnq66QxMUdZew3Vg@mail.gmail.com>
- <20140402171513.GE12234@atomide.com>
-Message-ID: <20140403133237.GA6019@luxor.wired.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 3 Apr 2014 15:32:48 +0200
+Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
+ look-up
+In-Reply-To: <533D547A.7080900@gmail.com>
+References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
+ <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
+ <CAPDyKFoxTAHyX7SQAMsvt=OttHs22oMSB8XrRUDDJ06qO0Fc2w@mail.gmail.com>
+ <533D547A.7080900@gmail.com>
+Message-ID: <CAPDyKFp-5A+7CZmzZbkLRyBS5zB7gc2cLgV0wuwwQtGAOaGZhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 10:15:13AM -0700, Tony Lindgren wrote:
-> > Paul uses MMC filesystem, I use NFS. As Felipe Pointed out as well, I
-> > did rootcause MMC filesystem mount issue here:
-> > http://marc.info/?l=linux-omap&m=139637044425644&w=2
-> 
-> Balaji, care to take a look at the issue for MMC? It may
-> be already fixed in next with the PBIAS handling?
+On 3 April 2014 14:30, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Ulf,
+>
+>
+> On 03.04.2014 14:16, Ulf Hansson wrote:
+>>
+>> On 3 March 2014 17:02, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>>
+>>> This patch introduces generic code to perform power domain look-up using
+>>> device tree and automatically bind devices to their power domains.
+>>> Generic device tree binding is introduced to specify power domains of
+>>> devices in their device tree nodes.
+>>>
+>>> Backwards compatibility with legacy Samsung-specific power domain
+>>> bindings is provided, but for now the new code is not compiled when
+>>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
+>>> will change as soon as Exynos power domain code gets converted to use
+>>> the generic framework in further patch.
+>>>
+>>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+>>> ---
+>>>   .../devicetree/bindings/power/power_domain.txt     |  51 ++++
+>>>   drivers/base/power/domain.c                        | 298
+>>> +++++++++++++++++++++
+>>>   include/linux/pm_domain.h                          |  46 ++++
+>>>   kernel/power/Kconfig                               |   4 +
+>>>   4 files changed, 399 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/power/power_domain.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt
+>>> b/Documentation/devicetree/bindings/power/power_domain.txt
+>>> new file mode 100644
+>>> index 0000000..93be5d9
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>>> @@ -0,0 +1,51 @@
+>>> +* Generic power domains
+>>> +
+>>> +System on chip designs are often divided into multiple power domains
+>>> that
+>>> +can be used for power gating of selected IP blocks for power saving by
+>>> +reduced leakage current.
+>>> +
+>>> +This device tree binding can be used to bind power domain consumer
+>>> devices
+>>> +with their power domains provided by power domain providers. A power
+>>> domain
+>>> +provider can be represented by any node in the device tree and can
+>>> provide
+>>> +one or more power domains. A consumer node can refer to the provider by
+>>> +a phandle and a set of phandle arguments (so called power domain
+>>> specifier)
+>>> +of length specified by #power-domain-cells property in the power domain
+>>> +provider node.
+>>> +
+>>> +==Power domain providers==
+>>> +
+>>> +Required properties:
+>>> + - #power-domain-cells : Number of cells in a power domain specifier;
+>>> +   Typically 0 for nodes representing a single power domain and 1 for
+>>> nodes
+>>> +   providing multiple power domains (e.g. power controllers), but can be
+>>> +   any value as specified by device tree binding documentation of
+>>> particular
+>>> +   provider.
+>>
+>>
+>> I am trying to understand if using a value > 1, ever would make sense.
+>> Wouldn't that mean each consumer (device) would actually be a part of
+>> more than one power domain? That won't work, right!?
+>
+>
+> Not exactly. Each phandle + #power-domain-cells cells are used just for
+> single power domain.
+>
+> The cells here are used merely as the identifier used by power domain driver
+> to translate a power domain specifier from DT to a kernel pointer. It's up
+> to driver bindings to select the number of cells to properly identify a
+> power domain.
+>
+> As an example (from different world, but showing the same mechanism), let's
+> see a common pattern of GPIO banks on some SoC:
+>
+> GPA0
+> GPA1
+> GPB0
+> GPB1
+> GPC0
+> GPC1
+>
+> One might assign a single-cell ID to each bank ending with a namespace of
+> integers from 0 to 5 that would be used as follows:
+>
+> #define GPA0 0
+> #define GPA1 1
+> #define GPB0 2
+> #define GPB1 3
+> #define GPC0 4
+> #define GPC1 5
+>
+> reset-gpios = <&gpio GPA0 4>;
+>
+> However one might also consider assigning one cell to bank set (e.g. GPA)
+> and one cell to identify the bank inside of a set, like on the following
+> example:
+>
+> #define GPA 0
+> #define GPB 1
+> #define GPC 2
+>
+> reset-gpios = <&gpio GPA 0 4>;
+>
+> Good bindings should allow arbitrary identification schemes to let a driver
+> developer use the one that suits the hardware he's working on.
+>
+>
+>>
+>> Additionally, there are no corresponding parsing method (like
+>> of_genpd_xlate_onecell() ) that support more than one cell.
+>
+>
+> There are two generic xlate helpers provided for the most common cases that
+> are likely to be reused by most drivers. For more complex cases it's up to
+> the driver to implement its own mapping function. It can be promoted to a
+> generic one later if such need shows up.
+>
+> Best regards,
+> Tomasz
 
-it may be related (or not), but i'm experiencing reboot issues with 3.13/.14 on
-omap4 (panda), and after a bisection i found out that reverting 
+Tomasz, thanks for the clarification! I still have more to learn about DT. :-)
 
-commit e002264f7e45d7661b237045577052fd0b40f89c
-Author: Balaji T K <balajitk <at> ti.com>
-Date:   Mon Oct 21 00:25:18 2013 +0530
+Not sure if some additional comments would make this more clear though
+- or if it's juts my untrained eye that had a few problems
+understanding.
 
-    mmc: omap_hsmmc: Fix pbias_disable for omap4
-
-    pbias_disable is set to protect the mmc pbias i/o cells in DT boot
-    by preventing voltage switch. Currently pbias_disable is enabled only
-    for omap3 and not for omap4 due to reg_offset difference of 0x100.
-    Enable pbias_disable for omap4+ too by using res->start
-    which does not include the reg_offset.
-
-    Signed-off-by: Balaji T K <balajitk <at> ti.com>
-    Signed-off-by: Chris Ball <cjb <at> laptop.org>
-
-made it go away: can you point me to those pbias handling patches (i guess
-something about dt-booting handling pbias correctly now)?
-
-Root on mmc in my case.
--- 
-bye,
-p.
+Kind regards
+Ulf Hansson
