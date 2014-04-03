@@ -1,37 +1,29 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 03 Apr 2014 17:00:29 +0200
-Subject: [RFC PATCH v2] edac: synopsys: Added EDAC support for zynq ddr
- ecc controller
-In-Reply-To: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
-References: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
-Message-ID: <533D778D.8040002@monstr.eu>
+Date: Thu, 03 Apr 2014 17:02:30 +0200
+Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
+In-Reply-To: <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
+References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
+ <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
+Message-ID: <533D7806.8070002@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Borislav,
 
-On 03/17/2014 06:23 AM, Punnaiah Choudary Kalluri wrote:
-> Added EDAC support for reporting the ecc errors of synopsys ddr controller.
-> The ddr ecc controller corrects single bit errors and detects double bit
-> errors
+On 03/02/2014 03:32 PM, Punnaiah Choudary Kalluri wrote:
+> Add support for ARM Pl310 L2 cache controller parity error
 > 
 > Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
 > ---
-> Changes for v2:
-> - Updated the commit header and message
-> - Renamed the filenames to synopsys_edac
-> - Corrected the compatilble string, commnets
-> - Renamed the macros,fucntions and data structures
-> ---
->  .../devicetree/bindings/edac/synopsys_edac.txt     |   18 +
+>  .../devicetree/bindings/edac/pl310_edac_l2.txt     |   19 ++
 >  drivers/edac/Kconfig                               |    7 +
 >  drivers/edac/Makefile                              |    1 +
->  drivers/edac/synopsys_edac.c                       |  614 ++++++++++++++++++++
->  4 files changed, 640 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/edac/synopsys_edac.txt
->  create mode 100644 drivers/edac/synopsys_edac.c
+>  drivers/edac/pl310_edac_l2.c                       |  236 ++++++++++++++++++++
+>  4 files changed, 263 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
+>  create mode 100644 drivers/edac/pl310_edac_l2.c
 
-Do you have any comment about this driver?
+Any comment about this driver?
 
 Thanks,
 Michal
@@ -50,4 +42,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/23fc1abf/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/98f56fcb/attachment.sig>
