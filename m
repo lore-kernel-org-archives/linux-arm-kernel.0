@@ -1,93 +1,39 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  3 Apr 2014 17:16:43 -0500
-Subject: [PATCH 00/20] FDT clean-ups and libfdt support
-Message-ID: <1396563423-30893-1-git-send-email-robherring2@gmail.com>
+Date: Thu,  3 Apr 2014 17:16:48 -0500
+Subject: [PATCH 05/20] ARM: dt: use default early_init_dt_alloc_memory_arch
+In-Reply-To: <1396563423-30893-1-git-send-email-robherring2@gmail.com>
+References: <1396563423-30893-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1396563423-30893-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-This is a series of clean-ups of architecture FDT code and converts the
-core FDT code over to using libfdt functions. This is in preparation
-to add FDT based address translation parsing functions for early
-console support. 
+Now that ARM is using memblock instead of bootmem, the default version
+of early_init_dt_alloc_memory_arch can be used.
 
-The current MIPS lantiq and xlp DT code is buggy as built-in DTBs need
-to be copied out of init section. Patches 2 and 3 should be applied to
-3.15.
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/kernel/devtree.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-A branch is available here[1]. Please test! I've compiled on arm,
-arm64, mips, microblaze, and powerpc and booted on arm and arm64.
-
-Rob
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git libfdt
-
-Rob Herring (20):
-  mips: octeon: convert to use unflatten_and_copy_device_tree
-  mips: lantiq: copy built-in DTB out of init section
-  mips: xlp: copy built-in DTB out of init section
-  mips: ralink: convert to use unflatten_and_copy_device_tree
-  ARM: dt: use default early_init_dt_alloc_memory_arch
-  c6x: convert fdt pointers to opaque pointers
-  mips: convert fdt pointers to opaque pointers
-  of/fdt: consolidate built-in dtb section variables
-  of/fdt: create common debugfs
-  of/fdt: remove some unneeded includes
-  of/fdt: remove unused of_scan_flat_dt_by_path
-  of/fdt: update of_get_flat_dt_prop in prep for libfdt
-  of/fdt: Convert FDT functions to use libfdt
-  of/fdt: use libfdt accessors for header data
-  of/fdt: move memreserve and dtb memory reservations into core
-  build: add libfdt include path globally
-  powerpc: use libfdt accessors for header data
-  x86: use libfdt accessors for header data
-  of/fdt: convert initial_boot_params to opaque pointer
-  of: push struct boot_param_header and defines into powerpc
-
- Makefile                                    |   5 +
- arch/arc/include/asm/sections.h             |   1 -
- arch/arc/kernel/devtree.c                   |   2 +-
- arch/arm/include/asm/prom.h                 |   2 -
- arch/arm/kernel/devtree.c                   |  34 +--
- arch/arm/mach-exynos/exynos.c               |   2 +-
- arch/arm/mach-vexpress/platsmp.c            |   2 +-
- arch/arm/mm/init.c                          |   1 -
- arch/arm/plat-samsung/s5p-dev-mfc.c         |   4 +-
- arch/arm64/mm/init.c                        |  21 --
- arch/c6x/kernel/setup.c                     |   4 +-
- arch/metag/kernel/setup.c                   |   4 -
- arch/microblaze/kernel/prom.c               |  37 +--
- arch/mips/cavium-octeon/Makefile            |   3 -
- arch/mips/cavium-octeon/setup.c             |  18 +-
- arch/mips/include/asm/mips-boards/generic.h |   4 -
- arch/mips/include/asm/prom.h                |   6 +-
- arch/mips/kernel/prom.c                     |   2 +-
- arch/mips/lantiq/prom.c                     |  15 +-
- arch/mips/lantiq/prom.h                     |   2 -
- arch/mips/mti-sead3/Makefile                |   2 -
- arch/mips/mti-sead3/sead3-setup.c           |   8 +-
- arch/mips/netlogic/xlp/dt.c                 |  17 +-
- arch/mips/ralink/of.c                       |  29 +--
- arch/openrisc/kernel/vmlinux.h              |   2 -
- arch/powerpc/include/asm/prom.h             |  39 +++
- arch/powerpc/kernel/epapr_paravirt.c        |   2 +-
- arch/powerpc/kernel/fadump.c                |   4 +-
- arch/powerpc/kernel/prom.c                  |  77 ++----
- arch/powerpc/kernel/rtas.c                  |   2 +-
- arch/powerpc/mm/hash_utils_64.c             |  22 +-
- arch/powerpc/platforms/52xx/efika.c         |   4 +-
- arch/powerpc/platforms/chrp/setup.c         |   4 +-
- arch/powerpc/platforms/powernv/opal.c       |  12 +-
- arch/powerpc/platforms/pseries/setup.c      |   4 +-
- arch/x86/kernel/devicetree.c                |   7 +-
- arch/xtensa/kernel/setup.c                  |   3 +-
- drivers/of/Kconfig                          |   1 +
- drivers/of/fdt.c                            | 379 +++++++++-------------------
- drivers/of/of_reserved_mem.c                |   4 +-
- include/linux/of_fdt.h                      |  64 +----
- lib/Makefile                                |   2 -
- 42 files changed, 261 insertions(+), 596 deletions(-)
-
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index c7419a5..dff9cc0 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -32,11 +32,6 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+ 	arm_add_memory(base, size);
+ }
+ 
+-void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
+-{
+-	return memblock_virt_alloc(size, align);
+-}
+-
+ void __init arm_dt_memblock_reserve(void)
+ {
+ 	u64 *reserve_map, base, size;
 -- 
 1.8.3.2
