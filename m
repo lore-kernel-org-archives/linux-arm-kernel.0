@@ -1,53 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 2 Apr 2014 22:16:33 -0700
-Subject: [ARM ATTEND] DeviceTree status
-In-Reply-To: <CAL_JsqLe0s6iw_BuZg4B8RwByKSbVABLfTP9hiYhTfzvaaQp_A@mail.gmail.com>
-References: <CAL_JsqLe0s6iw_BuZg4B8RwByKSbVABLfTP9hiYhTfzvaaQp_A@mail.gmail.com>
-Message-ID: <CAOesGMjLzoxZXuc6qANe1DyVtPiw8q=hpJm8t34GNW3rqE6=0g@mail.gmail.com>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Thu, 03 Apr 2014 10:47:55 +0530
+Subject: [PATCH v6 1/3] ARM: EXYNOS: initial board support for exynos5260 SoC
+In-Reply-To: <1396502277-19588-1-git-send-email-rahul.sharma@samsung.com>
+References: <1396502277-19588-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1396502277-19588-2-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Doing a generic reply on an old post, there's been many about DT though:
+This patch add basic arch side support for exynos5260 SoC.
 
-On Mon, Mar 24, 2014 at 7:55 AM, Rob Herring <robherring2@gmail.com> wrote:
-> I will be attending ELC. I think I may be the only DT maintainer
-> attending (the rest were too scared).
->
-> For the ARM summit, I can give a summary of what's happened in DT land
-> since the last ARM summit. There's been some good progress although
-> probably not as much as anyone would like. Given the last summit, I'm
-> sure there is more to discuss. If not, I'm available for beers to
-> celebrate solving all the issues. ;)
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/Kconfig           |    4 ++++
+ arch/arm/mach-exynos/mach-exynos5-dt.c |    1 +
+ 2 files changed, 5 insertions(+)
 
-I'm actually not excited about more discussion. There was a _ton_ of
-it in Edinburgh, with many decisions done. Unless people have gone off
-to actually try to implement some of the things we agreed need to be
-implemented, and now need to come back with "it didn't work, we need
-to change everything", then we shouldn't have to meet and spend
-another mind-numbing day discussing DT. Or do we?
-
-> A key question to discuss is: are DT binding reviews improving?
-
-Hm. Do we need to meet in a room to talk about that, or can we discuss
-it over email?
-
-I would say that they have improved, in particular because we've
-started seeing more DT changes go in (and more bindings). There are
-some areas that are still difficult, and I think the answer for those
-is to find the right people and sit down and hash it out. ELC is
-probably a good venue for some of that, but doing it in a room full of
-ARM kernel maintainers might not be.
-
-> I also think the process for handling stable vs. unstable bindings
-> needs more discussion. We also need to discuss how to deprecate
-> existing "stable" bindings in order to have a way to stop new usage of
-> poorly designed bindings we want to phase out.
-
-Do you have a proposal and a process in mind? Having something
-specific to start a discussion off of is more useful than opening it
-up for round table talks.
-
-
--Olof
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 54162ef..69c00ca 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -29,6 +29,7 @@ config ARCH_EXYNOS5
+ 	bool "SAMSUNG EXYNOS5"
+ 	default y
+ 	select SOC_EXYNOS5250
++	select SOC_EXYNOS5260
+ 	select SOC_EXYNOS5420
+ 	select USB_ARCH_HAS_XHCI
+ 	help
+@@ -65,6 +66,9 @@ config SOC_EXYNOS4412
+ config SOC_EXYNOS5250
+ 	bool
+ 
++config SOC_EXYNOS5260
++	bool
++
+ config SOC_EXYNOS5420
+ 	bool
+ 
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index 37ea261..790009e 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -51,6 +51,7 @@ static void __init exynos5_dt_machine_init(void)
+ 
+ static char const *exynos5_dt_compat[] __initdata = {
+ 	"samsung,exynos5250",
++	"samsung,exynos5260",
+ 	"samsung,exynos5420",
+ 	"samsung,exynos5440",
+ 	NULL
+-- 
+1.7.9.5
