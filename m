@@ -1,37 +1,94 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 03 Apr 2014 17:25:07 +0200
-Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
-In-Reply-To: <20140403152425.GH9616@pd.tnic>
-References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
- <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
- <533D7806.8070002@monstr.eu> <20140403152425.GH9616@pd.tnic>
-Message-ID: <533D7D53.80301@monstr.eu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Apr 2014 16:26:03 +0100
+Subject: [PATCH] ARM: KVM: Handle IPA unmapping on memory region deletion
+In-Reply-To: <1396538266-13245-1-git-send-email-eric.auger@linaro.org>
+References: <1396538266-13245-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <533D7D8B.2030806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2014 05:24 PM, Borislav Petkov wrote:
-> On Thu, Apr 03, 2014 at 05:02:30PM +0200, Michal Simek wrote:
->> Any comment about this driver?
+Hi Eric,
+
+On 03/04/14 16:17, Eric Auger wrote:
+> Currently when a KVM region is removed using
+> kvm_vm_ioctl_set_memory_region (with memory region size equal to 0), the
+> corresponding intermediate physical memory is not unmapped.
 > 
-> It is all on the TODO list. I'll take a look after the merge window
-> closes.
+> This patch unmaps the region's IPA range in
+> kvm_arch_commit_memory_region using unmap_stage2_range.
+> 
+> The patch was tested on QEMU VFIO based use case where RAM memory region
+> creation/deletion frequently happens for IRQ handling.
+> 
+> Notes:
+> - the KVM_MR_MOVE case shall request some similar addition but I cannot test
+>   this currently
 
-Ok. Thank you,
-Michal
+I think you should try to handle it anyway. I'm sure you could hack QEMU
+to do this test it, but even if you don't, better plug that hole right now.
 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h | 2 ++
+>  arch/arm/kvm/arm.c             | 8 ++++++++
+>  arch/arm/kvm/mmu.c             | 2 +-
+>  3 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 2d122ad..a91c863 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -52,6 +52,8 @@ void kvm_free_stage2_pgd(struct kvm *kvm);
+>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>  			  phys_addr_t pa, unsigned long size);
+>  
+> +void unmap_stage2_range(struct kvm *kvm, phys_addr_t guest_ipa, u64 size);
+> +
+>  int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>  
+>  void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index bd18bb8..9a4bc10 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -241,6 +241,14 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>  				   const struct kvm_memory_slot *old,
+>  				   enum kvm_mr_change change)
+>  {
+> +	if (change == KVM_MR_DELETE) {
+> +		gpa_t gpa = old->base_gfn << PAGE_SHIFT;
+> +		u64 size = old->npages << PAGE_SHIFT;
+> +
+> +		spin_lock(&kvm->mmu_lock);
+> +		unmap_stage2_range(kvm, gpa, size);
+> +		spin_unlock(&kvm->mmu_lock);
+> +	}
+>  }
 
+Just move the whole function to mmu.c, as it makes more sense to have it
+there. And while you're at it, how about moving the other
+memslot/memory_region stubs?
+
+>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 7789857..e8580e2 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -443,7 +443,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>   * destroying the VM), otherwise another faulting VCPU may come in and mess
+>   * with things behind our backs.
+>   */
+> -static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+> +void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>  {
+>  	unmap_range(kvm, kvm->arch.pgd, start, size);
+>  }
+> 
+
+Looks sensible otherwise.
+
+Thanks!
+
+	M.
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/b5c33707/attachment.sig>
+Jazz is not dead. It just smells funny...
