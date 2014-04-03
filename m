@@ -1,37 +1,54 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 3 Apr 2014 10:29:03 +0200
-Subject: [PATCH 2/3] ARM: dts: document the berlin enable-method property
-In-Reply-To: <1396512496-8030-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1396512496-8030-1-git-send-email-antoine.tenart@free-electrons.com>
- <1396512496-8030-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140403082903.GA4883@piout.net>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 03 Apr 2014 10:32:06 +0200
+Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based
+ on designware core driver
+In-Reply-To: <533C460D.1030608@ti.com>
+References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
+ <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
+ <235376049.yyfljDtinu@wuerfel> <533C460D.1030608@ti.com>
+Message-ID: <1396513926.5057.12.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 at 10:08:15 +0200, Antoine T?nart wrote :
-
-Please write a quick commit message.
-
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
->  1 file changed, 2 insertions(+)
+Am Mittwoch, den 02.04.2014, 13:17 -0400 schrieb Murali Karicheri:
+> Arnd,
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 333f4aea3029..a9e42a2dbc99 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -185,6 +185,8 @@ nodes to be present and contain the properties described below.
->  			    "qcom,gcc-msm8660"
->  			    "qcom,kpss-acc-v1"
->  			    "qcom,kpss-acc-v2"
-> +			    "marvell,88de31-smp" - cpu-core handling for Berlin
-> +					SoC from Marvell starting with 88de31
+> Thanks for reviewing the RFC patch. Please see below my response.
+> 
+> On 3/25/2014 3:44 AM, Arnd Bergmann wrote:
+> > On Monday 24 March 2014 20:35:26 Murali Karicheri wrote:
+[...]
+> 
+> >> +	ks_pcie->clk = devm_clk_get(&pdev->dev, "pcie");
+> >> +	if (IS_ERR(ks_pcie->clk)) {
+> >> +		dev_err(&pdev->dev, "Failed to get pcie rc clock\n");
+> >> +		return PTR_ERR(ks_pcie->clk);
+> >> +	}
+> >> +	ret = clk_prepare_enable(ks_pcie->clk);
+> >> +	if (ret)
+> >> +		return ret;
+> > Could you move the clock handling into the generic dw-pcie code?
+> 
+> Could be. But currently only pci-exynos.c is using a clock name 
+> "pcie".pci-imx6.c uses pcie_axi" and
+> will have to be fixed so that we can move this code to the generic 
+> dw-pcie code.  Sean Cross is the
+> author for pci-imx6.c.
+> 
+> Sean,
+> 
+> Is "pcie_axi" is the pcie hw clock? If so, can you rename this to "pcie" 
+> so that  my patch can move the
+> clock handling code to pcie designware code?
+> 
+My series "i.MX6 PCIe binding change and MSI support" already changes
+the clock name. So we could consolidate the clock handling once this is
+in. Only difference is that the i.MX6 needs an additional PHY clock.
 
-I would also go for something else, marvell,88de31xx-smp or marvell,berlin-smp.
-
-
+Regards,
+Lucas
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
