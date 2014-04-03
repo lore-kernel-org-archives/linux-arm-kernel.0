@@ -1,60 +1,56 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 03 Apr 2014 09:40:42 +0000
-Subject: [PATCH 2/3] ARM: dts: document the berlin enable-method property
-In-Reply-To: <533D268E.7070502@free-electrons.com>
-References: <1396512496-8030-1-git-send-email-antoine.tenart@free-electrons.com>	<1396512496-8030-3-git-send-email-antoine.tenart@free-electrons.com>
- <20140403162202.79b63729@xhacker> <533D21AF.2070508@free-electrons.com>
- <533D268E.7070502@free-electrons.com>
-Message-ID: <533D2C9A.6010302@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 3 Apr 2014 15:08:37 +0530
+Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
+In-Reply-To: <533D2980.6000903@linaro.org>
+References: <1395738060-18489-1-git-send-email-hanjun.guo@linaro.org>
+ <5334078A.9010408@arm.com> <53341ADF.2050904@linaro.org>
+ <2765234.k5FCzWzCDz@vostro.rjw.lan> <533D1D5E.20208@linaro.org>
+ <CAOh2x=nYWjB+Org6eNjQAT93ZX2DRHNYSJWgWTo8vS2AmdrAbA@mail.gmail.com>
+ <20140403085120.GB17022@arm.com> <533D2980.6000903@linaro.org>
+Message-ID: <CAKohpok5KCmR4UYG1ZkGL2TcXqqO7dPJnwGg49ahU-ceL1+wxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2014 09:14 AM, Antoine T?nart wrote:
-> On 03/04/2014 10:54, Antoine T?nart wrote:
->> On 03/04/2014 10:22, Jisheng Zhang wrote:
->>> On Thu, 3 Apr 2014 01:08:15 -0700
->>> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
->>>
->>>> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
->>>> ---
->>>>   Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
->>>>   1 file changed, 2 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt
->>>> b/Documentation/devicetree/bindings/arm/cpus.txt index
->>>> 333f4aea3029..a9e42a2dbc99 100644 ---
->>>> a/Documentation/devicetree/bindings/arm/cpus.txt +++
->>>> b/Documentation/devicetree/bindings/arm/cpus.txt @@ -185,6 +185,8 @@
->>>> nodes
->>>> to be present and contain the properties described below.
->>>> "qcom,gcc-msm8660"
->>>>                   "qcom,kpss-acc-v1"
->>>>                   "qcom,kpss-acc-v2"
->>>> +                "marvell,88de31-smp" - cpu-core handling for
->>>
->>> why not "marvell,berlin-smp"?
->>
->> We have SMP on the BG2 and the BG2Q currently. Future boards may not be
->> compatible with this method (BG3 ?), I think "marvell,berlin-smp" is too
->> generic.
->>
->> We could use "marvell,88de31xx-smp" as Alexandre suggested.
+On 3 April 2014 14:57, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Great, thanks Viresh to let me know this.
+> Actually I also sent a patch named "arm64: Fix duplicated Kconfig entries
+> again" about one week ago :)
 >
-> "marvell,88de31xx-smp" is not a good choice too, since futur SoC may
-> match the "xx" and not use this method. A better way should be to use
-> the first SoC implementing the feature, so "marvell,88de3100".
+> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg612363.html
+>
+> And I think there is still a problem after commit 62d1a3ba - multi-entries
+> for source "kernel/power/Kconfig", so how about the following fix?
 
-Never introduce the SoC numbers, we have chosen to stick with
-berlin2{,cd,q} so use that.
+I didn't notice that :)
 
-Given the comment from Mark Rutland and Russell King here[1], I'd rather
-concentrate on a proper SMP implementation. Unfortunately, I haven't
-found a good documentation about the requirements nor call sequence -
-but I haven't looked hard.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index e6e4d37..6085dca 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -317,14 +317,8 @@ config ARCH_SUSPEND_POSSIBLE
+>  config ARM64_CPU_SUSPEND
+>         def_bool PM_SLEEP
+>
+> -endmenu
+> -
+> -menu "CPU Power Management"
+> -
+>  source "drivers/cpuidle/Kconfig"
+>
+> -source "kernel/power/Kconfig"
+> -
+>  source "drivers/cpufreq/Kconfig"
+>
+>  endmenu
+>
+> If it makes sense, I will send out a patch for it.
 
-Having said that, can we postpone the DT enable method patches until
-we agreed on a better SMP implementation?
+We actually need to menu options here,
+menu "Power management options"
+menu "CPU Power Management"
 
-Sebastian
+And so probably you just need to do this:
+> -source "kernel/power/Kconfig"
+> -
 
-[1] http://www.spinics.net/lists/arm-kernel/msg318585.html
+from CPU Power Management options..
