@@ -1,51 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Apr 2014 10:01:02 +0200
-Subject: [PATCH] pinctrl: capri: make Kconfig dependency more strict
-In-Reply-To: <533C9B1E.6020905@broadcom.com>
-References: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <533C9B1E.6020905@broadcom.com>
-Message-ID: <20140403080102.GE29751@pengutronix.de>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Thu,  3 Apr 2014 10:08:13 +0200
+Subject: [PATCH 0/3] ARM: berlin: convert smp to CPU_METHOD_OF_DECLARE
+Message-ID: <1396512496-8030-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The newly introduced CPU_METHOD_OF_DECLARE (6c3ff8b11a16) [1] allows to
+get rid of the board file reference to smp ops. This serie converts the
+Berlin SoC smp to use this and allows to set the enable-method in the
+device tree.
 
-On Wed, Apr 02, 2014 at 04:19:58PM -0700, Sherman Yin wrote:
-> On 14-04-01 01:10 PM, Uwe Kleine-K?nig wrote:
-> >This driver is only useful on BCM281xx, so let the driver depend on
-> >ARCH_BCM_MOBILE but allow compile coverage testing.
-> >The main benefit is that the driver isn't available to be selected for
-> >machines that don't have the matching hardware.
-> >
-> >Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >---
-> >  drivers/pinctrl/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> >diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-> >index e49324032611..072749816cb4 100644
-> >--- a/drivers/pinctrl/Kconfig
-> >+++ b/drivers/pinctrl/Kconfig
-> >@@ -106,7 +106,7 @@ config PINCTRL_BCM2835
-> >
-> >  config PINCTRL_CAPRI
-> >  	bool "Broadcom Capri pinctrl driver"
-> >-	depends on OF
-> >+	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
-> >  	select PINMUX
-> >  	select PINCONF
-> >  	select GENERIC_PINCONF
-> >
-> 
-> Looks good. Just wondering how you've come across this driver (and
-> PINCTRL_MSM8X74)?
-Well, I was annoyed by being asked if I want to enable them for my efm32
-machine during make oldconfig after updating the kernel. :-)
+This serie applies on top of Sebastian's topic/smp-bg3-bg2q branch [2]
+rebased on top of linux-next.
 
-> Reviewed-by: Sherman Yin <syin@broadcom.com>
-Thanks
-Uwe
+Tested on the Berlin BG2Q.
+
+[1] https://patchwork.kernel.org/patch/3399311/
+[2] https://github.com/shesselba/linux-berlin/tree/topic/smp-bg2-bg2q
+
+Antoine T?nart (3):
+  ARM: berlin: use CPU_METHOD_OF_DECLARE for smp
+  ARM: dts: document the berlin enable-method property
+  ARM: dts: berlin: add enable-method property in cpus node for smp
+
+ Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
+ arch/arm/boot/dts/berlin2.dtsi                 | 1 +
+ arch/arm/boot/dts/berlin2q.dtsi                | 1 +
+ arch/arm/mach-berlin/berlin.c                  | 1 -
+ arch/arm/mach-berlin/common.h                  | 2 --
+ arch/arm/mach-berlin/platsmp.c                 | 3 ++-
+ 6 files changed, 6 insertions(+), 4 deletions(-)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.3.2
