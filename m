@@ -1,109 +1,36 @@
-From: elder@linaro.org (Alex Elder)
-Date: Thu,  3 Apr 2014 16:55:04 -0500
-Subject: [PATCH v2] mach-bcm: clean up config and build targets
-Message-ID: <1396562104-2457-1-git-send-email-elder@linaro.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 3 Apr 2014 16:07:13 -0600
+Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
+In-Reply-To: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20140403220713.GA23545@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently CONFIG_ARCH_BCM_MOBILE is used to select all Broadcom
-mobile SoCs.  Instead, use that only as a config menu switch, and
-define specific symbols like CONFIG_ARCH_BCM_281XX to select
-a particular SoC family.  If ARCH_BCM_MOBILE is selected, all
-of the SoCs will be selected by default, but this way each can be
-disabled individually as well.
+On Tue, Feb 04, 2014 at 04:53:01PM +0000, Will Deacon wrote:
+> Hello,
+> 
+> This small set of patches brings PCI support to mach-virt based upon an
+> idealised host controller (see patch 2 for more details).
+> 
+> This has been tested with kvmtool, for which I have a corresponding set
+> of patches which you can find in my kvmtool/pci branch at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git
+> 
+> Once the arm64 PCI patches from Liviu have stabilised, I plan to port
+> this host controller to work there as well.
+> 
+> The main issue I can see with this code is how to describe configuration
+> space in the device-tree. I'm following the ePAPR PCI bindings (SS == 0)
+> , but this adds an ugly 'case 0:' line in the pci range parser, which
+> also exists in mainline for the pcie-designware.c driver.
 
-This allows more precision in controlling what gets built under
-mach-bcm.  Another benefit to doing this is that it makes it obvious
-that the code that implements SMC calls to control L2 cache is only
-used for BCM281XX (for example).
+There was a long discussion about this (especially 2/3), and I didn't
+follow it closely enough to get the resolution, and I don't think I
+picked up the patches.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
-v2:  No longer uses Kbuild's $(<modulename>-y) variable mechanism.
+Can you post them again if they're still applicable?
 
-Note:
-This patch is based on the current arm-soc/for-next branch:
-    e98cd72 arm-soc: document samsung merges
-
-The patch is available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/mach-bcm-cleanup-v2
-
- arch/arm/mach-bcm/Kconfig  |   28 ++++++++++++++++++++++++----
- arch/arm/mach-bcm/Makefile |   15 +++++++++++----
- 2 files changed, 35 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 21f97f7..183fdef 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -10,7 +10,7 @@ if ARCH_BCM
- menu "Broadcom SoC Selection"
- 
- config ARCH_BCM_MOBILE
--	bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
-+	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
- 	depends on MMU
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_754322
-@@ -23,9 +23,29 @@ config ARCH_BCM_MOBILE
- 	select PINCTRL
- 	help
- 	  This enables support for systems based on Broadcom mobile SoCs.
--	  It currently supports the 'BCM281XX' family, which includes
--	  BCM11130, BCM11140, BCM11351, BCM28145 and
--	  BCM28155 variants.
-+
-+if ARCH_BCM_MOBILE
-+
-+menu "Broadcom Mobile SoC Selection"
-+
-+config ARCH_BCM_281XX
-+	bool "Broadcom BCM281XX SoC family"
-+	default y
-+	help
-+	  Enable support for the the BCM281XX family, which includes
-+	  BCM11130, BCM11140, BCM11351, BCM28145 and BCM28155
-+	  variants.
-+
-+config ARCH_BCM_21664
-+	bool "Broadcom BCM21664 SoC family"
-+	default y
-+	help
-+	  Enable support for the the BCM21664 family, which includes
-+	  BCM21663 and BCM21664 variants.
-+
-+endmenu
-+
-+endif
- 
- 
- config ARCH_BCM2835
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index a326b28..ac1f5cc 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -10,10 +10,17 @@
- # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU General Public License for more details.
- 
--obj-$(CONFIG_ARCH_BCM_MOBILE)	:= board_bcm281xx.o board_bcm21664.o \
--				bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
--obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
--
-+# BCM281XX
-+obj-$(CONFIG_ARCH_BCM_281XX)	:= board_bcm281xx.o
-+obj-$(CONFIG_ARCH_BCM_281XX)	+= bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
-+
-+# BCM21664
-+obj-$(CONFIG_ARCH_BCM_21664)	+= board_bcm21664.o
-+
-+# BCM2835
-+obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-+
-+# BCM5301X
- obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
--- 
-1.7.9.5
+Thanks,
+  Bjorn
