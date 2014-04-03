@@ -1,55 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Apr 2014 16:27:46 +0100
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <9532591.5yuCbpL4pV@wuerfel>
-References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
- <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
- <9532591.5yuCbpL4pV@wuerfel>
-Message-ID: <20140403152746.GQ7528@n2100.arm.linux.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu,  3 Apr 2014 12:30:13 -0300
+Subject: [PATCH 1/2] ARM: mvebu: Enable nfsroot in the defconfig
+Message-ID: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 11:21:45AM +0200, Arnd Bergmann wrote:
-> - As David Laight pointed out earlier, you must also ensure that
->   you don't have too much /data/ pending in the descriptor ring
->   when you stop the queue. For a 10mbit connection, you have already
->   tested (as we discussed on IRC) that 64 descriptors with 1500 byte
->   frames gives you a 68ms round-trip ping time, which is too much.
->   Conversely, on 1gbit, having only 64 descriptors actually seems
->   a little low, and you may be able to get better throughput if
->   you extend the ring to e.g. 512 descriptors.
+NFSroot is very frequently used by developers to boot, so let's make
+our lives simpler and enable it by default.
 
-You don't manage that by stopping the queue - there's separate interfaces
-where you report how many bytes you've queued (netdev_sent_queue()) and
-how many bytes/packets you've sent (netdev_tx_completed_queue()).  This
-allows the netdev schedulers to limit how much data is held in the queue,
-preserving interactivity while allowing the advantages of larger rings.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/configs/mvebu_v7_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
-> > +       if (dma_mapping_error(&ndev->dev, phys)) {
-> > +               dev_kfree_skb(skb);
-> > +               return NETDEV_TX_OK;
-> > +       }
-> > +
-> > +       priv->tx_skb[tx_head] = skb;
-> > +       priv->tx_phys[tx_head] = phys;
-> > +       desc->send_addr = cpu_to_be32(phys);
-> > +       desc->send_size = cpu_to_be16(skb->len);
-> > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
-> > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
-> > +       desc->wb_addr = cpu_to_be32(phys);
-> 
-> One detail: since you don't have cache-coherent DMA, "desc" will
-> reside in uncached memory, so you try to minimize the number of accesses.
-> It's probably faster if you build the descriptor on the stack and
-> then atomically copy it over, rather than assigning each member at
-> a time.
-
-DMA coherent memory is write combining, so multiple writes will be
-coalesced.  This also means that barriers may be required to ensure the
-descriptors are pushed out in a timely manner if something like writel()
-is not used in the transmit-triggering path.
-
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index a34713d..bfcc362 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -29,6 +29,9 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_VFP=y
+ CONFIG_NET=y
+ CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
+ CONFIG_BT=y
+ CONFIG_BT_MRVL=y
+ CONFIG_BT_MRVL_SDIO=y
+@@ -103,6 +106,8 @@ CONFIG_UDF_FS=m
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_NLS_ISO8859_1=y
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.1
