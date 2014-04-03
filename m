@@ -1,20 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 3 Apr 2014 17:47:28 +0200
-Subject: [PATCH V2 04/19] mmc: mmci: Add DT bindings for signal direction
-In-Reply-To: <1396279100-2920-5-git-send-email-ulf.hansson@linaro.org>
+Date: Thu, 3 Apr 2014 17:48:02 +0200
+Subject: [PATCH V2 05/19] mmc: mmci: Add DT bindings for feedback clock pin
+In-Reply-To: <1396279100-2920-6-git-send-email-ulf.hansson@linaro.org>
 References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
- <1396279100-2920-5-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkdbmhvEfN11OuReoBPzetf4OA50rMRRXxO0pH-s0h1jksw@mail.gmail.com>
+ <1396279100-2920-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdZtqY29bj=E89VqyOFZ8OXDGzfwWi3B5yhMB9hioUi_0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Mar 31, 2014 at 5:18 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-> Some variants have support for indicating the bus signal directions,
-> which currently are configured through platform data.
+> The ST Micro variant supports the option of using a feedback clock signal in
+> favor of the clockout pin when latching incoming signals on the data bus.
 >
-> Add corresponding DT bindings to enable us to move away from using the
-> platform data.
+> Since this is matter of how pins are being routed we need to provide a new DT
+> binding to be able to configure this through DT.
 >
 > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
