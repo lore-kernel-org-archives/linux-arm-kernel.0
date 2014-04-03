@@ -1,117 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Apr 2014 11:32:06 +0100
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <f5dfa7eca60346e884768bf821594d06@BY2PR03MB377.namprd03.prod.outlook.com>
-References: <20140401225149.GC7528@n2100.arm.linux.org.uk>
- <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140402085914.GG7528@n2100.arm.linux.org.uk>
- <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140402104644.GI7528@n2100.arm.linux.org.uk>
- <ebffe60db89d45ce883b1b9aff121152@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140402165113.GJ7528@n2100.arm.linux.org.uk>
- <a52a4e6119c143799220667a25781844@BLUPR03MB373.namprd03.prod.outlook.com>
- <20140403085636.GL7528@n2100.arm.linux.org.uk>
- <f5dfa7eca60346e884768bf821594d06@BY2PR03MB377.namprd03.prod.outlook.com>
-Message-ID: <20140403103206.GN7528@n2100.arm.linux.org.uk>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Thu, 03 Apr 2014 16:10:23 +0530
+Subject: [RFC 1/4] sched: extend the usage of cpu_power_orig
+In-Reply-To: <CAKfTPtD7Qp4yUoZ+3jV-Me2Xn53zbi8cHRrWyO7X+COzwcy3Tg@mail.gmail.com>
+References: <1396012949-6227-1-git-send-email-vincent.guittot@linaro.org>
+ <1396012949-6227-2-git-send-email-vincent.guittot@linaro.org>
+ <533A9768.6060006@linux.vnet.ibm.com>
+ <CAKfTPtD7Qp4yUoZ+3jV-Me2Xn53zbi8cHRrWyO7X+COzwcy3Tg@mail.gmail.com>
+Message-ID: <533D3A97.1030809@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 03, 2014 at 09:55:06AM +0000, fugang.duan at freescale.com wrote:
-> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Data: Thursday, April 03, 2014 4:57 PM
+On 04/01/2014 04:50 PM, Vincent Guittot wrote:
+> On 1 April 2014 12:39, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>> Hi Vincent,
+>>
+>> On 03/28/2014 06:52 PM, Vincent Guittot wrote:
+>>> cpu_power_orig is only changed for SMT system in order to reflect the lower
+>>> capacity of CPUs. Heterogenous system also have to reflect an original
+>>> capacity that is different from the default value.
+>>
+>> There is no parameter 'cpu_power_orig' till your fourth patch right?
+>> Why is this term being used in this patch?
 > 
-> >To: Duan Fugang-B38611
-> >Cc: robert.daniels at vantagecontrols.com; Marek Vasut; Detlev Zundel; Troy Kisky;
-> >Grant Likely; Bernd Faust; Fabio Estevam; linux-arm-kernel at lists.infradead.org
-> >Subject: Re: FEC ethernet issues [Was: PL310 errata workarounds]
-> >
-> >On Thu, Apr 03, 2014 at 02:41:46AM +0000, fugang.duan at freescale.com wrote:
-> >> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> >> Data: Thursday, April 03, 2014 12:51 AM
-> >>
-> >> >Checksum and... presumably you're referring to NAPI don't get you to
-> >> >that kind of speed.  Even on x86, you can't get close to wire speed
-> >> >without GSO, which you need scatter-gather for, and you don't support
-> >> >that.  So I don't believe your 900Mbps figure.
-> >> >
-> >> >Plus, as you're memcpy'ing every packet received, I don't believe you
-> >> >can reach 940Mbps receive either.
-> >> >
-> >> Since Imx6sx enet still don't support TSO and Jumbo packet,
-> >> scatter-gather cannot improve ethernet performance in Most cases
-> >> special for iperf test.
-> >
-> >Again, you are losing credibility every time you deny stuff like this.
-> >I'm now at the point of just not listening to you anymore because you're
-> >contradicting what I know to be solid fact through my own measurements.
-> >
-> >This seems to be Freescale's overall attitude - as I've read on Freescale's
-> >forums.  Your customers/users are always wrong, you're always right.  Eg, any
-> >performance issues are not the fault of Freescale stuff, it's tarnished
-> >connectors or similar.
-> >
-> Hi, Russell,
+> It looks like that i have mixed power_orig and cpu_power_orig in my
+> commit messages
 > 
-> I don't contradict your thinking/solution and measurements.  You are
-> expert on arm/modules, we keep study attitude to dicuss with you.
-> For imx6sx, we indeed get the result. For imx6q/dl linux upstream, you
-> did great job on performance tuning, and the test result is similar
-> To our internal test result. Your suggestion for the optimiztion is
-> meaningful. Pls understand my thinking.  
+>>
+>> Besides, both parameters power and power_orig are changed for SMT
+>> systems to reflect the lower capacity of the CPUs.Why is there a mention
+>> of only power_orig?
+> 
+> Only SMT system is able to change power_orig from default value
+> whereas all systems can already change power field with
+> arch_scale_freq_power function. The goal of this patch is to change
 
-The reason I said what I said is because I'm not talking about TSO.  I'm
-talking about GSO.  They're similar features, but are done in totally
-different ways.
+I am unable to understand this. arch_scale_freq_power() is not doing the
+same job as arch_scale_smt_power() right? While the former allows the
+arch to set a power value per cpu different from the default value, the
+latter allows arch to adjust the power for hyper threads.
 
-TSO requires either hardware support, or driver cooperation to segment
-the data.  GSO does not.
+For example in big.LITTLE, the big cores would be required to have a
+higher cpu power than what is currently being used as default. This is
+done by arch_scale_freq_power(). Whereas for an SMT system, the power of
+a core could perhaps be the same as default value, but needs to be
+divided among the hyper threads. This is done by arch_scale_smt_power().
+They have different purposes right?
 
-There's several points here which make me discount your figures:
+So I do not understand why you mention "all systems can already change
+power field with arch_scale_freq_power()."
 
-1. The overhead of routing packets is not insigificant.
+Actually I was assuming this patch would introduce
+arch_scale_smt_power() and arch_scale_freq_power(), two functions that
+would *enable all archs and not just ARCH_POWER* as is found today, to
+adjust their smt power and non-smt power respectively.
 
-   GSO is a feature where the higher levels (such as TCP) can submit
-   large socket buffers to the lower levels, all the way through to
-   packet queues to just before the device.
+For the same reasons, I am also unclear as to why power_orig is not
+initialized *after* default/arch_scale_freq_power(). For big cores for
+instance you would want the power_orig to be set not to a default value
+but to what the arch says as the frequency of a core scaled over the
+default value.
 
-   At the very last moment, just before the buffer is handed over to
-   the driver's start_xmit function, the buffer is carved into
-   appropriately sized chunks, and new skbuffs allocated.  Each skbuff
-   "head" contains the protocol headers, and the associated fragments
-   contain pointers/lengths into the large buffer.  (This is why SG is
-   required for GSO.)
+> the function name that is used to set power_orig value to a more
+> generic one and to extend the possibility of setting power_orig for
+> any kind of system. The behavior of the power field is not changed
+> with this patchset.
+> 
+>>
+>> IMO, the subject of the patch is not clearly reflecting the main
+>> intention of the patch. There is nothing done to change the way
+>> cpu_power is used; rather you are changing the way the cpu_power is
+>> being set to be flexible, thus allowing for the right power value to be
+>> set on heterogeneous systems.
+>>
+>> 'Allow archs to set the cpu_power instead of falling to default value'
+>> or something similar would be more appropriate. What do you think?
+> 
+> I can change with : "Allow all archs to set the power_orig"
 
-   What this means is that all the overhead from the layers such as
-   TCP / IP / routing / packet queuing are all reduced because rather
-   than those code paths having to be run for every single 1500 byte
-   packet, they're run once for maybe 16 to 32K of data to be sent.
-   This avoids the overhead from a lot of code.
+Ok, but for the reasons mentioned above I was thinking the power_orig
+should be avoided since archs should be able to scale both power and
+power_orig per thread and not just ARCH_POWER.
 
-   I have monitored the RGMII TX_CTL signal while performing iperf
-   tests without GSO, and I can see from that the gap between packets,
-   it is very rare that it gets to the point of transmitting two
-   packets back to back.
+Regards
+Preeti U Murthy
 
-2. At 500Mbps transmit on the iMX6S, performance testing shows the
-   majority of CPU time is spent in the cache cleaning/flushing code.
-   This overhead is necessary and can't be removed without risking
-   data corruption.
 
-3. I discount your receive figure because even with all my work, if
-   I set my x86 box to perform a UDP iperf test with x86 sending to
-   iMX6S, the result remains extremely poor, with 95% (modified) to 99%
-   (unmodified) of UDP packets lost.  This is not entirely the fault
-   of the FEC.  Around 70% of the packet loss is in the UDP receive
-   path - iperf seems to be unable to read the packets from UDP fast
-   enough.  (This confirmed by checking the statistics in /proc/net/snmp.)
-   This means 30% of packet loss is due to the FEC not keeping up with
-   the on-wire packet rate (which is around 810Mbps.)
-
-   Therefore, I place the maximum receive packet rate of the FEC with
-   the current packet-copy strategy in the receive path and 128 entry
-   receive ring size at around 550Mbps, and again, much of the overhead
-   comes from the cache handling code according to perf.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> 
+> Thanks
+> 
+>>
+>> Regards
+>> Preeti U Murthy
