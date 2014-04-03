@@ -1,59 +1,64 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 03 Apr 2014 17:27:28 +0800
-Subject: [PATCH] arm64: Fix duplicated Kconfig entries again
-In-Reply-To: <20140403085120.GB17022@arm.com>
-References: <1395738060-18489-1-git-send-email-hanjun.guo@linaro.org>
- <5334078A.9010408@arm.com> <53341ADF.2050904@linaro.org>
- <2765234.k5FCzWzCDz@vostro.rjw.lan> <533D1D5E.20208@linaro.org>
- <CAOh2x=nYWjB+Org6eNjQAT93ZX2DRHNYSJWgWTo8vS2AmdrAbA@mail.gmail.com>
- <20140403085120.GB17022@arm.com>
-Message-ID: <533D2980.6000903@linaro.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 3 Apr 2014 11:35:01 +0200
+Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <20140402231315.GD24324@kroah.com>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+ <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
+ <20140317232359.GA8943@kroah.com> <533C280F.3060804@gmail.com>
+ <20140402231315.GD24324@kroah.com>
+Message-ID: <CACQ1gAipPmbnHSZScFxdt=GisBaVV_hmGNcec-ZyyypmM3O4+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-4-3 16:51, Catalin Marinas wrote:
-> On Thu, Apr 03, 2014 at 09:41:57AM +0100, Viresh Kumar wrote:
->> On Thu, Apr 3, 2014 at 2:05 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->>> How about the following patch? if it is ok, I will resend it.
+2014-04-03 1:13 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> On Wed, Apr 02, 2014 at 05:09:03PM +0200, Richard Genoud wrote:
+>> On 18/03/2014 00:23, Greg Kroah-Hartman wrote:
+>> > On Mon, Mar 10, 2014 at 05:45:49PM +0100, Richard Genoud wrote:
+>> >> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+>> >> GPIO.
+>> >> This will be useful for many boards which have a serial controller that
+>> >> only handle CTS/RTS pins (or even just RX/TX).
+>> >>
+>> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>> >
+>> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> >
+>> > I can't take this series through my tty tree as the non-tty patches
+>> > don't apply, so feel free to take them through whatever tree is needed.
+>> >
+>> > greg k-h
+>> >
 >>
->> http://www.spinics.net/lists/arm-kernel/msg319545.html
-> 
-> I can see commit 62d1a3ba5adc5653d43f6cd3a90758bb6ad5d5bd (arm64: Fix
-> duplicated Kconfig entries again) already in mainline, so problem
-> solved.
-> 
-> Thanks Josh ;)
+>> I guess this series won't make it for 3.15, as it doesn't apply on any tree.
+>> However, I'd like to know if I did something wrong, or if there's no
+>> solution when a series depends on several patches that are in different
+>> trees ?
+>
+> That's a hard problem, either wait a release cycle for everything to get
+> merged properly (like should be done in time for 3.15-rc1 now) and then
+> submit the code, or ask for different maintainers to either allow other
+> trees to take the patches, put the patches in different trees at the
+> same time, or have "topic branches" that different maintainers can pull
+> from.
+>
+> Care to send me the patches after 3.15-rc1 is out, as there should not
+> be any dependancy issues then, right?
+>
+> greg k-h
 
-Great, thanks Viresh to let me know this.
-Actually I also sent a patch named "arm64: Fix duplicated Kconfig entries
-again" about one week ago :)
+Ok, I'll do that.
+Thanks for the explanation !
 
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg612363.html
+I will just send a little patch for 3.15rc1 or rc2 to prevent a DTS
+ABI change in 3.16.
+Something like this in Documentation/devicetree/bindings/serial/atmel-usart.txt
+-rts-gpios = <&pioD 15 0>;
++rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+I guess it could go in AT91 tree
+I'll send it soon.
 
-And I think there is still a problem after commit 62d1a3ba - multi-entries
-for source "kernel/power/Kconfig", so how about the following fix?
+Thanks !
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e6e4d37..6085dca 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -317,14 +317,8 @@ config ARCH_SUSPEND_POSSIBLE
- config ARM64_CPU_SUSPEND
-        def_bool PM_SLEEP
 
--endmenu
--
--menu "CPU Power Management"
--
- source "drivers/cpuidle/Kconfig"
-
--source "kernel/power/Kconfig"
--
- source "drivers/cpufreq/Kconfig"
-
- endmenu
-
-If it makes sense, I will send out a patch for it.
-
-Thanks
-Hanjun
+Richard.
