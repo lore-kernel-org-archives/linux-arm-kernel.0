@@ -1,54 +1,54 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 03 Apr 2014 10:32:06 +0200
-Subject: [RESEND: RFC PATCH 3/3] pcie: keystone: add pcie driver based
- on designware core driver
-In-Reply-To: <533C460D.1030608@ti.com>
-References: <1395707726-20437-1-git-send-email-m-karicheri2@ti.com>
- <1395707726-20437-4-git-send-email-m-karicheri2@ti.com>
- <235376049.yyfljDtinu@wuerfel> <533C460D.1030608@ti.com>
-Message-ID: <1396513926.5057.12.camel@weser.hi.pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Apr 2014 10:35:11 +0200
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <CAMj5BkgfwE1hHpVeqH9WRitwCB30x3c4w0qw7sXT3PiOV-QcPQ@mail.gmail.com>
+References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
+ <4698724.S4F2PxkdOH@wuerfel>
+ <CAMj5BkgfwE1hHpVeqH9WRitwCB30x3c4w0qw7sXT3PiOV-QcPQ@mail.gmail.com>
+Message-ID: <7201300.YltrNpx6X5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 02.04.2014, 13:17 -0400 schrieb Murali Karicheri:
-> Arnd,
+On Thursday 03 April 2014 14:24:25 Zhangfei Gao wrote:
+> On Wed, Apr 2, 2014 at 11:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 02 April 2014 10:04:34 David Laight wrote:
+> >> What you need to avoid is reads from uncached memory.
+> >> It may well beneficial for the tx reclaim code to first
+> >> check whether all the transmits have completed (likely)
+> >> instead of testing each descriptor in turn.
+> >
+> > Good point, reading from noncached memory is actually the
+> > part that matters. For slow networks (e.g. 10mbit), checking if
+> > all of the descriptors have finished is not quite as likely to succeed
+> > as for fast (gbit), especially if the timeout is set to expire
+> > before all descriptors have completed.
+> >
+> > If it makes a lot of difference to performance, one could use
+> > a binary search over the outstanding descriptors rather than looking
+> > just at the last one.
+> >
 > 
-> Thanks for reviewing the RFC patch. Please see below my response.
-> 
-> On 3/25/2014 3:44 AM, Arnd Bergmann wrote:
-> > On Monday 24 March 2014 20:35:26 Murali Karicheri wrote:
-[...]
-> 
-> >> +	ks_pcie->clk = devm_clk_get(&pdev->dev, "pcie");
-> >> +	if (IS_ERR(ks_pcie->clk)) {
-> >> +		dev_err(&pdev->dev, "Failed to get pcie rc clock\n");
-> >> +		return PTR_ERR(ks_pcie->clk);
-> >> +	}
-> >> +	ret = clk_prepare_enable(ks_pcie->clk);
-> >> +	if (ret)
-> >> +		return ret;
-> > Could you move the clock handling into the generic dw-pcie code?
-> 
-> Could be. But currently only pci-exynos.c is using a clock name 
-> "pcie".pci-imx6.c uses pcie_axi" and
-> will have to be fixed so that we can move this code to the generic 
-> dw-pcie code.  Sean Cross is the
-> author for pci-imx6.c.
-> 
-> Sean,
-> 
-> Is "pcie_axi" is the pcie hw clock? If so, can you rename this to "pcie" 
-> so that  my patch can move the
-> clock handling code to pcie designware code?
-> 
-My series "i.MX6 PCIe binding change and MSI support" already changes
-the clock name. So we could consolidate the clock handling once this is
-in. Only difference is that the i.MX6 needs an additional PHY clock.
+> I am afraid, there may no simple way to check whether all transmits completed.
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Why can't you do the trivial change that David suggested above? It
+sounds like a three line change to your current code. No need to do
+the binary change at first, just see what difference it makes.
+
+> Still want enable the cache coherent feature first.
+> Then two benefits:
+> 1. dma buffer cacheable.
+> 2. descriptor can directly use cacheable memory, so the performance
+> concern here may be solved accordingly.
+> 
+> So how about using this version as first version, while tuning the
+> performance in the next step.
+> Currently, the gbit interface can reach 420M bits/s in iperf, and the
+> 100M interface can reach 94M bits/s.
+
+It sounds like a very simple thing to try and you'd know immediately
+if it helps or not.
+
+Besides, you still have to change the other two issues I mentioned
+regarding the tx reclaim, so you can do all three at once.
+
+	Arnd
