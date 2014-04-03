@@ -1,72 +1,85 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Thu, 3 Apr 2014 14:24:25 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <4698724.S4F2PxkdOH@wuerfel>
-References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
- <9532591.5yuCbpL4pV@wuerfel>
- <063D6719AE5E284EB5DD2968C1650D6D0F6EE729@AcuExch.aculab.com>
- <4698724.S4F2PxkdOH@wuerfel>
-Message-ID: <CAMj5BkgfwE1hHpVeqH9WRitwCB30x3c4w0qw7sXT3PiOV-QcPQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 2 Apr 2014 23:23:37 -0700
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC DT Updates for
+ v3.15
+In-Reply-To: <CANqRtoSg8g2vODYaxx7U4BzQxb9piM4Cf_2uBk8O874eopJZsg@mail.gmail.com>
+References: <cover.1394080829.git.horms+renesas@verge.net.au>
+ <20140317074611.GH21917@quad.lixom.net>
+ <CANqRtoSg8g2vODYaxx7U4BzQxb9piM4Cf_2uBk8O874eopJZsg@mail.gmail.com>
+Message-ID: <CAOesGMh9HAxbm8gLaAcFWOX12TjVXpOpUw1aDrOiiO5Uj_Y6Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 2, 2014 at 11:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 02 April 2014 10:04:34 David Laight wrote:
->> From: Arnd Bergmann
->> > On Tuesday 01 April 2014 21:27:12 Zhangfei Gao wrote:
->> > > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
->> > > +       if (dma_mapping_error(&ndev->dev, phys)) {
->> > > +               dev_kfree_skb(skb);
->> > > +               return NETDEV_TX_OK;
->> > > +       }
->> > > +
->> > > +       priv->tx_skb[tx_head] = skb;
->> > > +       priv->tx_phys[tx_head] = phys;
->> > > +       desc->send_addr = cpu_to_be32(phys);
->> > > +       desc->send_size = cpu_to_be16(skb->len);
->> > > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
->> > > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
->> > > +       desc->wb_addr = cpu_to_be32(phys);
->> >
->> > One detail: since you don't have cache-coherent DMA, "desc" will
->> > reside in uncached memory, so you try to minimize the number of accesses.
->> > It's probably faster if you build the descriptor on the stack and
->> > then atomically copy it over, rather than assigning each member at
->> > a time.
+Hi Magnus,
+
+On Wed, Apr 2, 2014 at 11:16 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> On Mon, Mar 17, 2014 at 4:46 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Thu, Mar 06, 2014 at 01:44:28PM +0900, Simon Horman wrote:
+>>> Hi Olof, Hi Kevin, Hi Arnd,
+>>>
+>>> Please consider this fourth round of Renesas ARM based SoC DT updates for v3.15.
+>>>
+>>> This pull request is based on the previous round of
+>>> such requests, tagged as renesas-dt3-for-v3.15,
+>>> which I have already sent a pull-request for.
+>>>
+>>>
+>>> The following changes since commit 367aaaea1d6c6496695ffd06b49590b8cfcb8aa5:
+>>>
+>>>   ARM: shmobile: genmai: adapt dts to use native i2c driver (2014-02-18 11:35:30 +0900)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt4-for-v3.15
 >>
->> I'm not sure, the writes to uncached memory will probably be
->> asynchronous, but you may avoid a stall by separating the
->> cycles in time.
+>> Hi,
+>>
+>> I've merged this into next/dt. However, a general comment on these patches:
+>>
+>>> Sergei Shtylyov (4):
+>>>       ARM: shmobile: r8a7790: add Ether DT support
+>>>       ARM: shmobile: lager: add Ether DT support
+>>>       ARM: shmobile: r8a7791: add Ether DT support
+>>>       ARM: shmobile: koelsch: add Ether DT support
+>>
+>> I think you should consider doing a generic binding for the ethernet
+>> controller, that specifies the data that the driver needs as part of the device
+>> tree contents. that way you don't have to add a new _data structure for every
+>> new SoC that implements things -- from taking a brief look at the driver there
+>> seems to be a bit of boiler plate and/or several parts that share common
+>> feature sets already.
+>>
+>> Anyway, given the way the binding is written, this can be done later by adding
+>> a generic compatible string that expects more properties, etc -- so it's not
+>> something that needs to be done now. But I do recommend that as you add new
+>> SoCs in the future (if you do).
 >
-> Right.
+> Hi Olof,
 >
->> What you need to avoid is reads from uncached memory.
->> It may well beneficial for the tx reclaim code to first
->> check whether all the transmits have completed (likely)
->> instead of testing each descriptor in turn.
+> Thanks for your suggestion. If I understand your proposal correctly
+> then you recommend us to make the driver more generic and
+> configuration driven based on configuration from DT. In general I
+> agree about this direction, but in the case of sh-eth this seems
+> difficult due to huge differences between different IP variants. And
+> to make it worse, the documentation is often of poor quality with no
+> real IP version information. Because of this we keep knowledge in the
+> driver and adjust behavior using the SoC number as suffix in the
+> compatible string. The SoC number is the only "stable id" we have that
+> is suitable for DT ABI unfortunately.
 >
-> Good point, reading from noncached memory is actually the
-> part that matters. For slow networks (e.g. 10mbit), checking if
-> all of the descriptors have finished is not quite as likely to succeed
-> as for fast (gbit), especially if the timeout is set to expire
-> before all descriptors have completed.
->
-> If it makes a lot of difference to performance, one could use
-> a binary search over the outstanding descriptors rather than looking
-> just at the last one.
->
+> Of course I welcome further data sharing, cleanups and bug fixes for
+> this driver. If you can think of anything in particular please let me
+> or one of the sh-eth developers know. I will do my best to help you.
 
-I am afraid, there may no simple way to check whether all transmits completed.
 
-Still want enable the cache coherent feature first.
-Then two benefits:
-1. dma buffer cacheable.
-2. descriptor can directly use cacheable memory, so the performance
-concern here may be solved accordingly.
+My observation was mostly based on the fact that while there are a
+number of tunables in the platform data, there seems to mostly be a
+few different main collections of settings used. I.e. several of them
+seem to share several of the tunables.
 
-So how about using this version as first version, while tuning the
-performance in the next step.
-Currently, the gbit interface can reach 420M bits/s in iperf, and the
-100M interface can reach 94M bits/s.
+Maybe that's mostly coincidental, or maybe it's an indication that
+most "similar-timeframe" SoCs used similar settings -- I don't know
+enough to tell. Which is why I brought it up.
 
-Thanks
+
+-Olof
