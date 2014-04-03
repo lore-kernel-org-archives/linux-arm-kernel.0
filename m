@@ -1,32 +1,39 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 2 Apr 2014 21:52:07 -0500
-Subject: [PATCH] dt-bindings: add vendor-prefix for Newhaven Display
-Message-ID: <1396493527-26170-1-git-send-email-dinguyen@altera.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 02 Apr 2014 21:21:39 -0700
+Subject: [PATCH v7 2/3] clk: exynos5410: register clocks using common clock
+ framework
+In-Reply-To: <1393213435-20863-3-git-send-email-t.dakhran@samsung.com>
+References: <1393213435-20863-1-git-send-email-t.dakhran@samsung.com>
+ <1393213435-20863-3-git-send-email-t.dakhran@samsung.com>
+Message-ID: <20140403042139.5762.23354@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+Quoting Tarek Dakhran (2014-02-23 19:43:54)
+> +External clock:
+> +
+> +There is clock that is generated outside the SoC. It is expected
+> +that it is defined using standard clock bindings with following
+> +clock-output-name:
+> + - "fin_pll" - PLL input clock - required.
 
-Newhaven Display provides the worldwide marketplace with cost
-effective high quality display devices ranging from OLED and LCD
-Displays to VFD Displays.
+<snip>
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- 1 file changed, 1 insertion(+)
+> +Example 2: Required external clock.
+> +
+> +       fin_pll: clock-fin-pll {
+> +               compatible = "fixed-clock";
+> +               reg = <0>;
+> +               #clock-cells = <0>;
+> +               clock-frequency = <24000000>;
+> +               clock-output-names = "fin_pll";
+> +       };
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 4685ec3..7037990 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -60,6 +60,7 @@ microchip	Microchip Technology Inc.
- mosaixtech	Mosaix Technologies, Inc.
- national	National Semiconductor
- neonode		Neonode Inc.
-+newhaven	Newhaven Display International
- nintendo	Nintendo
- nvidia	NVIDIA
- nxp	NXP Semiconductors
--- 
-1.7.9.5
+I guess this part is a little strange for a binding definition.
+Basically this is DTS data specific to 5410; not sure why it belongs in
+the DT binding definition.
+
+Rest of the clock driver appears OK to me.
+
+Regards,
+Mike
