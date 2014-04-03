@@ -1,46 +1,41 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 03 Apr 2014 15:56:49 +0200
-Subject: [PATCH RFC 3/3] nand: pl353: Add driver for arm pl353 smc nand
- interface
-In-Reply-To: <04cb5d02-db4c-4a4c-ba3c-3a5958e42324@VA3EHSMHS036.ehs.local>
-References: <1395944467-26291-1-git-send-email-punnaia@xilinx.com>
- <04cb5d02-db4c-4a4c-ba3c-3a5958e42324@VA3EHSMHS036.ehs.local>
-Message-ID: <533D68A1.6070102@monstr.eu>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 3 Apr 2014 22:00:00 +0800
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <20140403134510.GO7528@n2100.arm.linux.org.uk>
+References: <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402104644.GI7528@n2100.arm.linux.org.uk>
+ <ebffe60db89d45ce883b1b9aff121152@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402165113.GJ7528@n2100.arm.linux.org.uk>
+ <a52a4e6119c143799220667a25781844@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140403085636.GL7528@n2100.arm.linux.org.uk>
+ <f5dfa7eca60346e884768bf821594d06@BY2PR03MB377.namprd03.prod.outlook.com>
+ <20140403103206.GN7528@n2100.arm.linux.org.uk>
+ <20140403133637.GB1784@dragon>
+ <20140403134510.GO7528@n2100.arm.linux.org.uk>
+Message-ID: <20140403135957.GE2786@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
-
-On 03/27/2014 07:21 PM, Punnaiah Choudary Kalluri wrote:
-> Add driver for arm pl353 static memory controller nand interface.
-> This controller is used in xilinx zynq soc for interfacing the nand
-> flash memory.
+On Thu, Apr 03, 2014 at 02:45:10PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 03, 2014 at 09:36:41PM +0800, Shawn Guo wrote:
+> > Russell,
+> > 
+> > In case there is a confusion.  The 900Mbps figure that Fugang said is
+> > not on any of i.MX6 SoCs that are publicly available - i.MX6SoloLite
+> > (imx6sl), i.MX6Solo/DualLite (imx6dl), i.MX6Dual/Quad (imx6q), but on
+> > a new member of i.MX6 family - i.MX6SoloX (imx6sx).  This new SoC hasn't
+> > been announced by Freescale yet.  One major improvement of this new SoC
+> > over its ancestors is the FEC throughput.  It claims 1Gbps throughput
+> > support.  So it's really a hardware optimization instead of anything
+> > that software can do.
 > 
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> ---
->  drivers/mtd/nand/Kconfig      |    8 +
->  drivers/mtd/nand/Makefile     |    1 +
->  drivers/mtd/nand/pl353_nand.c | 1122 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1131 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/mtd/nand/pl353_nand.c
+> That means it's irrelevant to this discussion because it's different
+> hardware, with who knows what changes to the memory subsystem and
+> CPU/cache implementation.  Hence, it can't be compared in any way to
+> the performance I see on iMX6Q and iMX6S.
 
-Any comment regarding this nand driver?
+Exactly.  I don't think that Fugang should bring i.MX6SX figure into the
+discussion either, and I see that's where the confusion comes, from what
+I read the thread today.
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/0231a62c/attachment.sig>
+Shawn
