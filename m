@@ -1,64 +1,42 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 3 Apr 2014 11:35:01 +0200
-Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
- modem lines
-In-Reply-To: <20140402231315.GD24324@kroah.com>
-References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
- <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
- <20140317232359.GA8943@kroah.com> <533C280F.3060804@gmail.com>
- <20140402231315.GD24324@kroah.com>
-Message-ID: <CACQ1gAipPmbnHSZScFxdt=GisBaVV_hmGNcec-ZyyypmM3O4+Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 3 Apr 2014 11:36:52 +0200
+Subject: [PATCH 2/2] net: mvneta: fix usage as a module on RGMII
+ configurations
+In-Reply-To: <533C1B75.2020803@free-electrons.com>
+References: <1395789942-20764-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1395789942-20764-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <533C1B75.2020803@free-electrons.com>
+Message-ID: <20140403113652.33f11413@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-03 1:13 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> On Wed, Apr 02, 2014 at 05:09:03PM +0200, Richard Genoud wrote:
->> On 18/03/2014 00:23, Greg Kroah-Hartman wrote:
->> > On Mon, Mar 10, 2014 at 05:45:49PM +0100, Richard Genoud wrote:
->> >> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
->> >> GPIO.
->> >> This will be useful for many boards which have a serial controller that
->> >> only handle CTS/RTS pins (or even just RX/TX).
->> >>
->> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->> >
->> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> >
->> > I can't take this series through my tty tree as the non-tty patches
->> > don't apply, so feel free to take them through whatever tree is needed.
->> >
->> > greg k-h
->> >
->>
->> I guess this series won't make it for 3.15, as it doesn't apply on any tree.
->> However, I'd like to know if I did something wrong, or if there's no
->> solution when a series depends on several patches that are in different
->> trees ?
->
-> That's a hard problem, either wait a release cycle for everything to get
-> merged properly (like should be done in time for 3.15-rc1 now) and then
-> submit the code, or ask for different maintainers to either allow other
-> trees to take the patches, put the patches in different trees at the
-> same time, or have "topic branches" that different maintainers can pull
-> from.
->
-> Care to send me the patches after 3.15-rc1 is out, as there should not
-> be any dependancy issues then, right?
->
-> greg k-h
+Dear Gregory CLEMENT,
 
-Ok, I'll do that.
-Thanks for the explanation !
+On Wed, 02 Apr 2014 16:15:17 +0200, Gregory CLEMENT wrote:
 
-I will just send a little patch for 3.15rc1 or rc2 to prevent a DTS
-ABI change in 3.16.
-Something like this in Documentation/devicetree/bindings/serial/atmel-usart.txt
--rts-gpios = <&pioD 15 0>;
-+rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
-I guess it could go in AT91 tree
-I'll send it soon.
+> > This commit was successfully tested with mvneta compiled as a module,
+> > on both the OpenBlocks AX3 (SGMII configuration) and the Armada XP GP
+> > (RGMII configuration).
+> 
+> Unfortunately with this patch, mvneta doesn't work anymore on the
+> Mirabox (Armada 370 based board) on 3.14.I didn't managed to do a
+> simple ping.
+> 
+> Once I removed this commit then the driver worked again.
 
-Thanks !
+Problem reproduced. It turns out that some RGMII platforms need the
+PCS_ENABLE bit to be set (e.g: Armada XP GP), while some other
+platforms need the PCS_ENABLE bit to be cleared (e.g: Armada 370
+Mirabox). I've verified that on both platforms.
 
+I've asked for more details about this bit to understand in which
+situation it should be set or cleared. I'll get back to you with an
+updated patch once I have enough information to write a fix.
 
-Richard.
+Thanks for the report,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
