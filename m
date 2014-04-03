@@ -1,53 +1,113 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 3 Apr 2014 17:26:48 +0100
-Subject: [rtc-linux] [PATCH v3 2/3] rtc: Add APM X-Gene SoC RTC driver
-In-Reply-To: <1396505873-5507-3-git-send-email-lho@apm.com>
-References: <1396505873-5507-1-git-send-email-lho@apm.com>
- <1396505873-5507-2-git-send-email-lho@apm.com>
- <1396505873-5507-3-git-send-email-lho@apm.com>
-Message-ID: <20140403162648.GW14763@sirena.org.uk>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 03 Apr 2014 18:32:16 +0200
+Subject: [PATCH] ARM: KVM: Handle IPA unmapping on memory region deletion
+In-Reply-To: <533D7D8B.2030806@arm.com>
+References: <1396538266-13245-1-git-send-email-eric.auger@linaro.org>
+ <533D7D8B.2030806@arm.com>
+Message-ID: <533D8D10.7070909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 03, 2014 at 12:17:52AM -0600, Loc Ho wrote:
+On 04/03/2014 05:26 PM, Marc Zyngier wrote:
+> Hi Eric,
+> 
+> On 03/04/14 16:17, Eric Auger wrote:
+>> Currently when a KVM region is removed using
+>> kvm_vm_ioctl_set_memory_region (with memory region size equal to 0), the
+>> corresponding intermediate physical memory is not unmapped.
+>>
+>> This patch unmaps the region's IPA range in
+>> kvm_arch_commit_memory_region using unmap_stage2_range.
+>>
+>> The patch was tested on QEMU VFIO based use case where RAM memory region
+>> creation/deletion frequently happens for IRQ handling.
+>>
+>> Notes:
+>> - the KVM_MR_MOVE case shall request some similar addition but I cannot test
+>>   this currently
+> 
+> I think you should try to handle it anyway. I'm sure you could hack QEMU
+> to do this test it, but even if you don't, better plug that hole right now.
 
-> +static int xgene_rtc_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct xgene_rtc_dev *pdata = platform_get_drvdata(pdev);
-> +	int irq;
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (device_may_wakeup(&pdev->dev)) {
-> +		if (!enable_irq_wake(irq))
-> +			pdata->irq_wake = 1;
-> +	} else {
-> +		xgene_rtc_alarm_irq_enable(dev, 0);
-> +		clk_disable(pdata->clk);
-> +	}
+Hi Marc,
 
-Why does the driver only disable the clock over suspend rather than also
-unpreparing it?
+OK I will proceed
 
-> +	if (device_may_wakeup(&pdev->dev)) {
-> +		if (pdata->irq_wake) {
-> +			disable_irq_wake(irq);
-> +			pdata->irq_wake = 0;
-> +		}
-> +	} else {
-> +		clk_enable(pdata->clk);
+> 
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  arch/arm/include/asm/kvm_mmu.h | 2 ++
+>>  arch/arm/kvm/arm.c             | 8 ++++++++
+>>  arch/arm/kvm/mmu.c             | 2 +-
+>>  3 files changed, 11 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index 2d122ad..a91c863 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -52,6 +52,8 @@ void kvm_free_stage2_pgd(struct kvm *kvm);
+>>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>>  			  phys_addr_t pa, unsigned long size);
+>>  
+>> +void unmap_stage2_range(struct kvm *kvm, phys_addr_t guest_ipa, u64 size);
+>> +
+>>  int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  
+>>  void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index bd18bb8..9a4bc10 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -241,6 +241,14 @@ void kvm_arch_commit_memory_region(struct kvm *kvm,
+>>  				   const struct kvm_memory_slot *old,
+>>  				   enum kvm_mr_change change)
+>>  {
+>> +	if (change == KVM_MR_DELETE) {
+>> +		gpa_t gpa = old->base_gfn << PAGE_SHIFT;
+>> +		u64 size = old->npages << PAGE_SHIFT;
+>> +
+>> +		spin_lock(&kvm->mmu_lock);
+>> +		unmap_stage2_range(kvm, gpa, size);
+>> +		spin_unlock(&kvm->mmu_lock);
+>> +	}
+>>  }
+> 
+> Just move the whole function to mmu.c, as it makes more sense to have it
+> there. And while you're at it, how about moving the other
+> memslot/memory_region stubs?
 
-It's also not checking for errors here.
+OK I will move:
+kvm_arch_free_memslot,
+kvm_arch_create_memslot,
+kvm_arch_prepare_memory_region,
+kvm_arch_commit_memory_region,
+kvm_arch_shadow_all and
+kvm_arch_shadow_memslot then.
 
-> +		xgene_rtc_alarm_irq_enable(dev, 1);
-> +	}
+Best Regards
 
-Won't this unconditionally enable the interrupt regardless of what the
-setting was prior to suspend?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140403/031f94a7/attachment.sig>
+Eric
+
+> 
+>>  void kvm_arch_flush_shadow_all(struct kvm *kvm)
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 7789857..e8580e2 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -443,7 +443,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>>   * destroying the VM), otherwise another faulting VCPU may come in and mess
+>>   * with things behind our backs.
+>>   */
+>> -static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>> +void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>>  {
+>>  	unmap_range(kvm, kvm->arch.pgd, start, size);
+>>  }
+>>
+> 
+> Looks sensible otherwise.
+> 
+> Thanks!
+> 
+> 	M.
+> 
