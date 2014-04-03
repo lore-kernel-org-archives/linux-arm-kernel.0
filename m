@@ -1,62 +1,67 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Thu, 3 Apr 2014 19:14:15 +0530
-Subject: OMAP baseline test results for v3.14
-In-Reply-To: <20140403133237.GA6019@luxor.wired.org>
-References: <alpine.DEB.2.02.1404021600320.15928@utopia.booyaka.com>
- <20140402162102.GB12234@atomide.com>
- <alpine.DEB.2.02.1404021631040.15928@utopia.booyaka.com>
- <20140402163521.GD12234@atomide.com>
- <CAGo_u6qJt5BRQHDvRjWe7Gjt+AfEBxaOPxCnq66QxMUdZew3Vg@mail.gmail.com>
- <20140402171513.GE12234@atomide.com> <20140403133237.GA6019@luxor.wired.org>
-Message-ID: <533D65AF.1060303@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Apr 2014 14:45:10 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <20140403133637.GB1784@dragon>
+References: <20140402085914.GG7528@n2100.arm.linux.org.uk>
+ <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402104644.GI7528@n2100.arm.linux.org.uk>
+ <ebffe60db89d45ce883b1b9aff121152@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402165113.GJ7528@n2100.arm.linux.org.uk>
+ <a52a4e6119c143799220667a25781844@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140403085636.GL7528@n2100.arm.linux.org.uk>
+ <f5dfa7eca60346e884768bf821594d06@BY2PR03MB377.namprd03.prod.outlook.com>
+ <20140403103206.GN7528@n2100.arm.linux.org.uk> <20140403133637.GB1784@dragon>
+Message-ID: <20140403134510.GO7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 April 2014 07:02 PM, Paolo Pisati wrote:
-> On Wed, Apr 02, 2014 at 10:15:13AM -0700, Tony Lindgren wrote:
->>> Paul uses MMC filesystem, I use NFS. As Felipe Pointed out as well, I
->>> did rootcause MMC filesystem mount issue here:
->>> http://marc.info/?l=linux-omap&m=139637044425644&w=2
->>
->> Balaji, care to take a look at the issue for MMC? It may
->> be already fixed in next with the PBIAS handling?
+On Thu, Apr 03, 2014 at 09:36:41PM +0800, Shawn Guo wrote:
+> On Thu, Apr 03, 2014 at 11:32:06AM +0100, Russell King - ARM Linux wrote:
+> > > Hi, Russell,
+> > > 
+> > > I don't contradict your thinking/solution and measurements.  You are
+> > > expert on arm/modules, we keep study attitude to dicuss with you.
+> > > For imx6sx, we indeed get the result. For imx6q/dl linux upstream, you
+> > > did great job on performance tuning, and the test result is similar
+> > > To our internal test result. Your suggestion for the optimiztion is
+> > > meaningful. Pls understand my thinking.  
+> > 
+> > The reason I said what I said is because I'm not talking about TSO.  I'm
+> > talking about GSO.  They're similar features, but are done in totally
+> > different ways.
+> > 
+> > TSO requires either hardware support, or driver cooperation to segment
+> > the data.  GSO does not.
+> > 
+> > There's several points here which make me discount your figures:
 > 
-> it may be related (or not), but i'm experiencing reboot issues with 3.13/.14 on
-> omap4 (panda), and after a bisection i found out that reverting
+> Russell,
 > 
+> In case there is a confusion.  The 900Mbps figure that Fugang said is
+> not on any of i.MX6 SoCs that are publicly available - i.MX6SoloLite
+> (imx6sl), i.MX6Solo/DualLite (imx6dl), i.MX6Dual/Quad (imx6q), but on
+> a new member of i.MX6 family - i.MX6SoloX (imx6sx).  This new SoC hasn't
+> been announced by Freescale yet.  One major improvement of this new SoC
+> over its ancestors is the FEC throughput.  It claims 1Gbps throughput
+> support.  So it's really a hardware optimization instead of anything
+> that software can do.
 
-Do you have any logs for it ?
+That means it's irrelevant to this discussion because it's different
+hardware, with who knows what changes to the memory subsystem and
+CPU/cache implementation.  Hence, it can't be compared in any way to
+the performance I see on iMX6Q and iMX6S.
 
-> commit e002264f7e45d7661b237045577052fd0b40f89c
-> Author: Balaji T K <balajitk <at> ti.com>
-> Date:   Mon Oct 21 00:25:18 2013 +0530
-> 
->      mmc: omap_hsmmc: Fix pbias_disable for omap4
-> 
->      pbias_disable is set to protect the mmc pbias i/o cells in DT boot
->      by preventing voltage switch. Currently pbias_disable is enabled only
->      for omap3 and not for omap4 due to reg_offset difference of 0x100.
->      Enable pbias_disable for omap4+ too by using res->start
->      which does not include the reg_offset.
-> 
->      Signed-off-by: Balaji T K <balajitk <at> ti.com>
->      Signed-off-by: Chris Ball <cjb <at> laptop.org>
-> 
-> made it go away: can you point me to those pbias handling patches (i guess
-> something about dt-booting handling pbias correctly now)?
+What matters for here is fixing the issues with the mainline driver on
+hardware that people have today - not only the bugs and instability
+that people are seeing, but also the low performance.
 
-It is avaliable in linux-next /mmc-next [1]
+If some of that involves doing stuff "The Right Way" by using memory
+barriers rather than violating the architecture specification and
+introducing new kernel APIs in order to do so, we're going to do it
+the right way, even if that means that those changes may not be in the
+best interest of this unreleased part.  There is no room for compromise
+on that.
 
-[1]
-http://git.kernel.org/cgit/linux/kernel/git/cjb/mmc.git/log/?id=refs/heads/mmc-next
-
-mmc: omap_hsmmc: remove pbias workaround
-ARM: OMAP: enable SYSCON and REGULATOR_PBIAS in omap2plus_defconfig
-ARM: dts: add pbias dt node
-mmc: omap_hsmmc: adapt hsmmc to use pbias regulator
-regulator: add pbias regulator support
-mmc: omap_hsmmc: handle vcc and vcc_aux independently
-mmc: omap_hsmmc: use devm_regulator API
-
-Thanks and Regards,
-Balaji T K
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
