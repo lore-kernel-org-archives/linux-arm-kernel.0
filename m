@@ -1,47 +1,85 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?B?QW50b2luZSBUw6luYXJ0?=)
-Date: Thu, 03 Apr 2014 10:54:07 +0200
-Subject: [PATCH 2/3] ARM: dts: document the berlin enable-method property
-In-Reply-To: <20140403162202.79b63729@xhacker>
-References: <1396512496-8030-1-git-send-email-antoine.tenart@free-electrons.com>	<1396512496-8030-3-git-send-email-antoine.tenart@free-electrons.com>
- <20140403162202.79b63729@xhacker>
-Message-ID: <533D21AF.2070508@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Apr 2014 09:56:36 +0100
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <a52a4e6119c143799220667a25781844@BLUPR03MB373.namprd03.prod.outlook.com>
+References: <20140401092638.GA10224@n2100.arm.linux.org.uk>
+ <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
+ <20140401225149.GC7528@n2100.arm.linux.org.uk>
+ <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402085914.GG7528@n2100.arm.linux.org.uk>
+ <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402104644.GI7528@n2100.arm.linux.org.uk>
+ <ebffe60db89d45ce883b1b9aff121152@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402165113.GJ7528@n2100.arm.linux.org.uk>
+ <a52a4e6119c143799220667a25781844@BLUPR03MB373.namprd03.prod.outlook.com>
+Message-ID: <20140403085636.GL7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jisheng,
+On Thu, Apr 03, 2014 at 02:41:46AM +0000, fugang.duan at freescale.com wrote:
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Data: Thursday, April 03, 2014 12:51 AM
+> 
+> >To: Duan Fugang-B38611
+> >Cc: robert.daniels at vantagecontrols.com; Marek Vasut; Detlev Zundel; Troy Kisky;
+> >Grant Likely; Bernd Faust; Fabio Estevam; linux-arm-kernel at lists.infradead.org
+> >Subject: Re: FEC ethernet issues [Was: PL310 errata workarounds]
+> >
+> >On Wed, Apr 02, 2014 at 11:33:22AM +0000, fugang.duan at freescale.com wrote:
+> >> In kernel 3.0.35, there have no CMA memory allocate mechanism.
+> >> Below Kernel configs are enabled:
+> >> CONFIG_ARM_DMA_MEM_BUFFERABLE
+> >> CONFIG_SMP
+> >>
+> >> If use dma_alloc_coherent() allocate memory, it must be non-cacheable,
+> >> but bufferable.  The new invented api "dma_alloc_noncacheable()"
+> >> allocate memory is non-cacheable, non-bufferable, the memory type is
+> >> Strongly ordered.
+> >
+> >Right, so what you've just said is that it's fine to violate the requirements
+> >of the architecture L1 memory model by setting up a strongly ordered memory
+> >mapping for the same physical addresses as an existing mapping which is mapped
+> >as normal memory.
+> >
+> >Sorry, I'm not going to listen to you anymore, you just lost any kind of
+> >authority on this matter.
+> >
+> >> >> So wmb() is not necessary.
+> >> >
+> >> >Even on non-cacheable normal memory, the wmb() is required.  Please
+> >> >read up in the ARM architecture reference manual about memory types
+> >> >and their various attributes, followed by the memory ordering chapters.
+> >> >
+> >> >> Yes, it don't impact imx6q since cpu loading is not bottleneck due
+> >> >> rx/tx bandwidth is slow and multi-cores.  But for imx6sx, enet rx
+> >> >> can reach at 940Mbps, tx can reach at 900Mbps, imx6sx is sigle core.
+> >> >
+> >> >What netdev features do you support to achieve that?
+> >> >
+> >> Imx6sx enet accleration feature support crc checksum, interrupt coalescing.
+> >> So we enable the two features.
+> >
+> >Checksum and... presumably you're referring to NAPI don't get you to that kind
+> >of speed.  Even on x86, you can't get close to wire speed without GSO, which
+> >you need scatter-gather for, and you don't support that.  So I don't believe
+> >your 900Mbps figure.
+> >
+> >Plus, as you're memcpy'ing every packet received, I don't believe you can reach
+> >940Mbps receive either.
+> >
+> Since Imx6sx enet still don't support TSO and Jumbo packet, scatter-gather
+> cannot improve ethernet performance in
+> Most cases special for iperf test. 
 
-On 03/04/2014 10:22, Jisheng Zhang wrote:
-> Hi,
->
-> On Thu, 3 Apr 2014 01:08:15 -0700
-> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
->
->> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
->> ---
->>   Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt
->> b/Documentation/devicetree/bindings/arm/cpus.txt index
->> 333f4aea3029..a9e42a2dbc99 100644 ---
->> a/Documentation/devicetree/bindings/arm/cpus.txt +++
->> b/Documentation/devicetree/bindings/arm/cpus.txt @@ -185,6 +185,8 @@ nodes
->> to be present and contain the properties described below. "qcom,gcc-msm8660"
->>   			    "qcom,kpss-acc-v1"
->>   			    "qcom,kpss-acc-v2"
->> +			    "marvell,88de31-smp" - cpu-core handling for
->
-> why not "marvell,berlin-smp"?
+Again, you are losing credibility every time you deny stuff like this.
+I'm now at the point of just not listening to you anymore because you're
+contradicting what I know to be solid fact through my own measurements.
 
-We have SMP on the BG2 and the BG2Q currently. Future boards may not be 
-compatible with this method (BG3 ?), I think "marvell,berlin-smp" is too 
-generic.
-
-We could use "marvell,88de31xx-smp" as Alexandre suggested.
-
-Antoine
+This seems to be Freescale's overall attitude - as I've read on
+Freescale's forums.  Your customers/users are always wrong, you're always
+right.  Eg, any performance issues are not the fault of Freescale stuff,
+it's tarnished connectors or similar.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
