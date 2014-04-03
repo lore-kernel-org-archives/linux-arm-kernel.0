@@ -1,151 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 3 Apr 2014 15:32:48 +0200
-Subject: [PATCH v2 01/11] base: power: Add generic OF-based power domain
- look-up
-In-Reply-To: <533D547A.7080900@gmail.com>
-References: <1393862536-9842-1-git-send-email-tomasz.figa@gmail.com>
- <1393862536-9842-2-git-send-email-tomasz.figa@gmail.com>
- <CAPDyKFoxTAHyX7SQAMsvt=OttHs22oMSB8XrRUDDJ06qO0Fc2w@mail.gmail.com>
- <533D547A.7080900@gmail.com>
-Message-ID: <CAPDyKFp-5A+7CZmzZbkLRyBS5zB7gc2cLgV0wuwwQtGAOaGZhQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 3 Apr 2014 21:36:41 +0800
+Subject: FEC ethernet issues [Was: PL310 errata workarounds]
+In-Reply-To: <20140403103206.GN7528@n2100.arm.linux.org.uk>
+References: <b974be3a995f41029b54cfcc10c732ef@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402085914.GG7528@n2100.arm.linux.org.uk>
+ <deb03b2af59a4fe7a46bc66278335826@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402104644.GI7528@n2100.arm.linux.org.uk>
+ <ebffe60db89d45ce883b1b9aff121152@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140402165113.GJ7528@n2100.arm.linux.org.uk>
+ <a52a4e6119c143799220667a25781844@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140403085636.GL7528@n2100.arm.linux.org.uk>
+ <f5dfa7eca60346e884768bf821594d06@BY2PR03MB377.namprd03.prod.outlook.com>
+ <20140403103206.GN7528@n2100.arm.linux.org.uk>
+Message-ID: <20140403133637.GB1784@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 April 2014 14:30, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Ulf,
->
->
-> On 03.04.2014 14:16, Ulf Hansson wrote:
->>
->> On 3 March 2014 17:02, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>>
->>> This patch introduces generic code to perform power domain look-up using
->>> device tree and automatically bind devices to their power domains.
->>> Generic device tree binding is introduced to specify power domains of
->>> devices in their device tree nodes.
->>>
->>> Backwards compatibility with legacy Samsung-specific power domain
->>> bindings is provided, but for now the new code is not compiled when
->>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code. This
->>> will change as soon as Exynos power domain code gets converted to use
->>> the generic framework in further patch.
->>>
->>> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
->>> ---
->>>   .../devicetree/bindings/power/power_domain.txt     |  51 ++++
->>>   drivers/base/power/domain.c                        | 298
->>> +++++++++++++++++++++
->>>   include/linux/pm_domain.h                          |  46 ++++
->>>   kernel/power/Kconfig                               |   4 +
->>>   4 files changed, 399 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/power/power_domain.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt
->>> b/Documentation/devicetree/bindings/power/power_domain.txt
->>> new file mode 100644
->>> index 0000000..93be5d9
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
->>> @@ -0,0 +1,51 @@
->>> +* Generic power domains
->>> +
->>> +System on chip designs are often divided into multiple power domains
->>> that
->>> +can be used for power gating of selected IP blocks for power saving by
->>> +reduced leakage current.
->>> +
->>> +This device tree binding can be used to bind power domain consumer
->>> devices
->>> +with their power domains provided by power domain providers. A power
->>> domain
->>> +provider can be represented by any node in the device tree and can
->>> provide
->>> +one or more power domains. A consumer node can refer to the provider by
->>> +a phandle and a set of phandle arguments (so called power domain
->>> specifier)
->>> +of length specified by #power-domain-cells property in the power domain
->>> +provider node.
->>> +
->>> +==Power domain providers==
->>> +
->>> +Required properties:
->>> + - #power-domain-cells : Number of cells in a power domain specifier;
->>> +   Typically 0 for nodes representing a single power domain and 1 for
->>> nodes
->>> +   providing multiple power domains (e.g. power controllers), but can be
->>> +   any value as specified by device tree binding documentation of
->>> particular
->>> +   provider.
->>
->>
->> I am trying to understand if using a value > 1, ever would make sense.
->> Wouldn't that mean each consumer (device) would actually be a part of
->> more than one power domain? That won't work, right!?
->
->
-> Not exactly. Each phandle + #power-domain-cells cells are used just for
-> single power domain.
->
-> The cells here are used merely as the identifier used by power domain driver
-> to translate a power domain specifier from DT to a kernel pointer. It's up
-> to driver bindings to select the number of cells to properly identify a
-> power domain.
->
-> As an example (from different world, but showing the same mechanism), let's
-> see a common pattern of GPIO banks on some SoC:
->
-> GPA0
-> GPA1
-> GPB0
-> GPB1
-> GPC0
-> GPC1
->
-> One might assign a single-cell ID to each bank ending with a namespace of
-> integers from 0 to 5 that would be used as follows:
->
-> #define GPA0 0
-> #define GPA1 1
-> #define GPB0 2
-> #define GPB1 3
-> #define GPC0 4
-> #define GPC1 5
->
-> reset-gpios = <&gpio GPA0 4>;
->
-> However one might also consider assigning one cell to bank set (e.g. GPA)
-> and one cell to identify the bank inside of a set, like on the following
-> example:
->
-> #define GPA 0
-> #define GPB 1
-> #define GPC 2
->
-> reset-gpios = <&gpio GPA 0 4>;
->
-> Good bindings should allow arbitrary identification schemes to let a driver
-> developer use the one that suits the hardware he's working on.
->
->
->>
->> Additionally, there are no corresponding parsing method (like
->> of_genpd_xlate_onecell() ) that support more than one cell.
->
->
-> There are two generic xlate helpers provided for the most common cases that
-> are likely to be reused by most drivers. For more complex cases it's up to
-> the driver to implement its own mapping function. It can be promoted to a
-> generic one later if such need shows up.
->
-> Best regards,
-> Tomasz
+On Thu, Apr 03, 2014 at 11:32:06AM +0100, Russell King - ARM Linux wrote:
+> > Hi, Russell,
+> > 
+> > I don't contradict your thinking/solution and measurements.  You are
+> > expert on arm/modules, we keep study attitude to dicuss with you.
+> > For imx6sx, we indeed get the result. For imx6q/dl linux upstream, you
+> > did great job on performance tuning, and the test result is similar
+> > To our internal test result. Your suggestion for the optimiztion is
+> > meaningful. Pls understand my thinking.  
+> 
+> The reason I said what I said is because I'm not talking about TSO.  I'm
+> talking about GSO.  They're similar features, but are done in totally
+> different ways.
+> 
+> TSO requires either hardware support, or driver cooperation to segment
+> the data.  GSO does not.
+> 
+> There's several points here which make me discount your figures:
 
-Tomasz, thanks for the clarification! I still have more to learn about DT. :-)
+Russell,
 
-Not sure if some additional comments would make this more clear though
-- or if it's juts my untrained eye that had a few problems
-understanding.
+In case there is a confusion.  The 900Mbps figure that Fugang said is
+not on any of i.MX6 SoCs that are publicly available - i.MX6SoloLite
+(imx6sl), i.MX6Solo/DualLite (imx6dl), i.MX6Dual/Quad (imx6q), but on
+a new member of i.MX6 family - i.MX6SoloX (imx6sx).  This new SoC hasn't
+been announced by Freescale yet.  One major improvement of this new SoC
+over its ancestors is the FEC throughput.  It claims 1Gbps throughput
+support.  So it's really a hardware optimization instead of anything
+that software can do.
 
-Kind regards
-Ulf Hansson
+Shawn
