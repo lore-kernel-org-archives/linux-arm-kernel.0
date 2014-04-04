@@ -1,63 +1,58 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri,  4 Apr 2014 14:27:54 -0700
-Subject: [PATCH v5 1/3] i2c: cadence: Document device tree bindings
-Message-ID: <1396646876-27336-1-git-send-email-soren.brinkmann@xilinx.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri,  4 Apr 2014 23:27:49 +0200
+Subject: [PATCH 1/2] arm: fixmap: implement __set_fixmap()
+Message-ID: <1396646870-29695-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for the Cadence I2C controller.
+This is used from set_fixmap() and clear_fixmap() via
+asm-generic/fixmap.h.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
+Needs "arm: use generic fixmap.h", available in linux-next.
 
-Changes in v5:
- - Document all properties
- - list clock-names as optional property (driver doesn't use it, though)
- - use lower case hex digits in 'reg' property
- - reword description of 'clocks' property
- - remove implementation specific notes regarding default speed
- - use #defines for interrupt specifier
+ arch/arm/include/asm/fixmap.h | 2 ++
+ arch/arm/mm/mmu.c             | 7 +++++++
+ 2 files changed, 9 insertions(+)
 
-Changes in v4:
- - moved adding DT docs into this dedicated patch
-
-Changes in v3: None
-Changes in v2: None
-
----
- .../devicetree/bindings/i2c/i2c-cadence.txt        | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cadence.txt
-
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-cadence.txt b/Documentation/devicetree/bindings/i2c/i2c-cadence.txt
-new file mode 100644
-index 000000000000..7cb0b5608f49
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-cadence.txt
-@@ -0,0 +1,24 @@
-+Binding for the Cadence I2C controller
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 68ea615..55ed076 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -23,6 +23,8 @@ enum fixed_addresses {
+ 	__end_of_fixed_addresses
+ };
+ 
++void __set_fixmap(enum fixed_addresses idx, unsigned long phys, pgprot_t prot);
 +
-+Required properties:
-+  - reg: Physical base address and size of the controller's register area.
-+  - compatible: Compatibility string. Must be 'cdns,i2c-r1p10'.
-+  - clocks: Input clock specifier. Refer to common clock bindings.
-+  - interrupts: Interrupt specifier. Refer to interrupt bindings.
-+  - #address-cells: Should be 1.
-+  - #size-cells: Should be 0.
+ #include <asm-generic/fixmap.h>
+ 
+ #endif
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 3e16307..61bdfb1 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -22,6 +22,7 @@
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
++#include <asm/fixmap.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+ #include <asm/smp_plat.h>
+@@ -388,6 +389,12 @@ SET_MEMORY_FN(rw, pte_set_rw)
+ SET_MEMORY_FN(x, pte_set_x)
+ SET_MEMORY_FN(nx, pte_set_nx)
+ 
++void __set_fixmap(enum fixed_addresses idx, unsigned long phys, pgprot_t prot)
++{
++	BUG_ON(idx >= __end_of_fixed_addresses);
++	set_top_pte(__fix_to_virt(idx), pfn_pte(__phys_to_pfn(phys), prot));
++}
 +
-+Optional properties:
-+  - clock-frequency: Desired operating frequency, in Hz, of the bus.
-+  - clock-names: Input clock name, should be 'pclk'.
-+
-+Example:
-+	i2c at e0004000 {
-+		compatible = "cdns,i2c-r1p10";
-+		clocks = <&clkc 38>;
-+		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+		reg = <0xe0004000 0x1000>;
-+		clock-frequency = <400000>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
+ /*
+  * Adjust the PMD section entries according to the CPU in use.
+  */
 -- 
-1.9.1.1.gbb9f595
+1.9.1
