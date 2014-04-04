@@ -1,20 +1,18 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Apr 2014 17:29:08 +0200
-Subject: [PATCH V2 05/17] ARM: exynos: cpuidle: Move some code inside the
- idle_finisher
-In-Reply-To: <1396618989-2897-6-git-send-email-daniel.lezcano@linaro.org>
+Date: Fri, 04 Apr 2014 17:29:23 +0200
+Subject: [PATCH V2 06/17] ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
+In-Reply-To: <1396618989-2897-7-git-send-email-daniel.lezcano@linaro.org>
 References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
- <1396618989-2897-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <5398599.7JJndGtXvQ@amdc1032>
+ <1396618989-2897-7-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <2096980.m4SU8Yq1z8@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 04, 2014 03:42:57 PM Daniel Lezcano wrote:
-> Move the code around to differentiate different section of code and prepare it
-> to be factored out in the next patches.
+On Friday, April 04, 2014 03:42:58 PM Daniel Lezcano wrote:
+> This function should be called only when the powerdown sequence fails.
 > 
-> The call order changed but hat doesn't have a side effect because they are
-> independent. The important call is cpu_do_idle() which must be done the last.
+> Even if the current code does not hurt, by moving this line, we have the same
+> code than the one in pm.c.
 > 
 > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
