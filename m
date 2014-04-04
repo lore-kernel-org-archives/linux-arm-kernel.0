@@ -1,55 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Apr 2014 13:39:33 +0200
-Subject: [PATCH] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
-References: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <8799740.0uZJLUBGY1@wuerfel>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Fri, 04 Apr 2014 12:41:41 +0100
+Subject: [PATCH] Xen: do hv callback accounting only on x86
+In-Reply-To: <12121341.4lKFpaRMcO@wuerfel>
+References: <5057041.71iuvlcH4G@wuerfel> <12121341.4lKFpaRMcO@wuerfel>
+Message-ID: <533E9A75.4050102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 April 2014 12:17:49 Daniel Thompson wrote:
-> When building a multi_v7_defconfig kernel it is not possible to configure
-> DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-> accurately and worse, it is possible to configure a different serial
-> device but KConfig does not honour this request.
+Hi,
+
+(Adding Ian and Stefano).
+
+On 03/25/2014 04:00 PM, Arnd Bergmann wrote:
+> On Tuesday 25 March 2014 16:52:25 Arnd Bergmann wrote:
+>> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
+>> index 5dd2ddf..8b91c256 100644
+>> --- a/drivers/xen/events/events_base.c
+>> +++ b/drivers/xen/events/events_base.c
+>> @@ -1235,6 +1235,7 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
+>>  #ifdef CONFIG_X86
+>>         exit_idle();
+>>  #endif
+>> +       inc_irq_stat(irq_hv_callback_count);
+>>
+>>         __xen_evtchn_do_upcall();
+>>
+>> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
+>> index d5a3de8..dfa12a4 100644
+>> --- a/drivers/xen/events/events_base.c
+>> +++ b/drivers/xen/events/events_base.c
+>> @@ -1248,8 +1248,8 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
+>>         irq_enter();
+>>  #ifdef CONFIG_X86
+>>         exit_idle();
+>> -#endif
+>>         inc_irq_stat(irq_hv_callback_count);
+>> +#endif
+>>  
+>>         __xen_evtchn_do_upcall();
 > 
-> The happens because the multi-platform mode may include ARCH_SPEAR13XX
-> and this forcibly engages DEBUG_UART_PL01X to provide some kind of
-> compatibility with single platform builds (SPEAr supports both single and
-> multi-platform). This in turn causes DEBUG_LL_INCLUDE to wedge at
-> debug/pl01x.S.
-> 
-> Problem is fixed by only deploying the compatibility options for SPEAr
-> when ARCH_MULTIPLATFORM is not set.
+> That was unintended: the first half of this email is actually the patch
+> that introduced the bug, while the second half is my workaround.
+> The way it's formatted, you won't be able to apply it without removing
+> the first half again. I'll wait if the approach is ok first and then
+> resend it properly if needed.
 
-The assumption is actually wrong: SPEAr does not support single
-platform builds any more. The PLAT_SPEAR_SINGLE symbol in Kconfig
-is a leftover from an earlier patch I did that never got merged,
-and we should just remove that.
+Linus has merged xen/tip yesterday and building ARM with CONFIG_XEN=y is
+now broken.
 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  arch/arm/Kconfig.debug | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 0531da8..f10c784 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -991,9 +991,9 @@ config DEBUG_LL_INCLUDE
->  config DEBUG_UART_PL01X
->         def_bool ARCH_EP93XX || \
->                 ARCH_INTEGRATOR || \
-> -               ARCH_SPEAR3XX || \
-> -               ARCH_SPEAR6XX || \
-> -               ARCH_SPEAR13XX || \
-> +               (ARCH_SPEAR3XX && !ARCH_MULTIPLATFORM) || \
-> +               (ARCH_SPEAR6XX && !ARCH_MULTIPLATFORM) || \
-> +               (ARCH_SPEAR13XX && !ARCH_MULTIPLATFORM) || \
->                 ARCH_VERSATILE
+Is there any plan to push this patch (without the first half of course
+:)) or reverting the following commit:
+commit 99c8b79d3c165f8e2a6247c14bfa1429e7efe51f
+Author: Thomas Gleixner <tglx@linutronix.de>
+Date:   Sun Feb 23 21:40:21 2014 +0000
 
-Removing the SPEAR lines seems correct here, but the lines
-you add don't make any sense.
+    xen: Add proper irq accounting for HYPERCALL vector
 
-	Arnd
+Sincerely yours,
+
+-- 
+Julien Grall
