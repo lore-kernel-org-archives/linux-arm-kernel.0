@@ -1,57 +1,68 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 4 Apr 2014 15:20:41 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Apr 2014 15:24:06 +0200
 Subject: mach header files
-In-Reply-To: <645d041db09d4cf883ba178c695fe504@HKXPR06MB168.apcprd06.prod.outlook.com>
+In-Reply-To: <CACxGe6sV7WpQeiGxjnmaatnCCzRBqU=O6qyuQXJd+RYt4QUXgg@mail.gmail.com>
 References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
  <CACxGe6sV7WpQeiGxjnmaatnCCzRBqU=O6qyuQXJd+RYt4QUXgg@mail.gmail.com>
- <2be18849c59e4e6686a5b038659279d4@HKXPR06MB168.apcprd06.prod.outlook.com>
- <CACxGe6u0_iMjoCWSw2x=ndEwwYCAaCqFO6OCGHvvuvVnBr2pjg@mail.gmail.com>
- <645d041db09d4cf883ba178c695fe504@HKXPR06MB168.apcprd06.prod.outlook.com>
-Message-ID: <20140404152041.6b06bd85@skate>
+Message-ID: <4379667.784l7DtcMU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Phil Edworthy,
+On Friday 04 April 2014 03:29:54 Grant Likely wrote:
+> On Fri, Apr 4, 2014 at 1:19 AM, Phil Edworthy <phil.edworthy@renesas.com> wrote:
+> > Resent, hopefully without the automatic corporate signature appended this time...
+> >
+> > I am porting the kernel to a new device, for which I've created a new
+> > arch/arm/mach-... directory, and I also a clock driver that lives under
+> > driver/clk. Everything is all working fine, though I am now cleaning up
+> > the code and have a question about mach specific header files.
 
-On Fri, 4 Apr 2014 13:14:44 +0000, Phil Edworthy wrote:
+I'm glad you are asking while you are still in the process of cleaning
+up your code, because you need to know the rules for new platforms.
+Basically at this point we expect zero code in arch/arm/mach-* for a new
+platform. You are absolutely required to have DT based probing and
+multiplatform support, and the latter also means that there are no
+mach/*.h header files that are visible to device drivers.
 
-> > If it is used only by one driver, then it should go directly into
-> > that driver without a #include. For SoC defines, you'll need to
-> > check with the arm-soc maintainers. I *think* we're trying to get
-> > away from separate arch/arm/mach-* directories, but I'm slightly
-> > out of touch. You certainly should not do anything that breaks
-> > multiplatform builds.
+We still make the occasional exception for adding code in the mach-*
+directory, but we are getting pretty close to the state where this
+is not needed for new platforms, and all the existing uses are for
+things that can eventually get cleaned up.
+If you think you need an exception here, please explain what you
+are doing, and we can see if there is a better way to do that already.
+
+> > The clock driver is completely specific to this device, but needs to read
+> > from a system register (just for external boot mode pins) to determine some
+> > PLL settings. This register is in a block of system registers which are
+> > also used by the mach code in arch/arm/mach-...
+> >
+> > Since the clock driver is specific to the mach, is there any point in
+> > specifying the address of this reg in the corresponding dtsi? The format
+> > and functionality described by this register would not be the same on any other device.
 > 
-> This is where it gets tricky. The clock driver only wants to know
-> about one reg in a block of general system control registers. There
-> is very little input to the clock driver... the SoC code needs to
-> access other registers in the system control block.
-> 
-> I think you are right about trying to avoid separate arch/arm/mach-*
-> directories, which is what prompted my question. So, how best to
-> handle this?
+> Why would you not? The dts is a central place where the entire memory
+> map layout of the device can be specified. If I were working on the
+> board support, I would create a node for the register block and have
+> the driver retrieve that node.
 
-I believe there are two solutions here:
+Right. More specifically, this case is often handled using the drivers/mfd/syscon.c
+driver, which exports a "regmap" pointer that can be used by drivers to access
+those registers. The driver will need to look up the regmap through a phandle
+in DT, and it can either use a hardcoded offset into the regmap to get
+to the specific register it needs, or it can look up the offset from DT
+as well. Which of the two you pick depends on the particular needs of the
+device.
 
- * Have a driver in arch/arm/mach-foo/ for your "system control block"
-   that exposes a small API used by your clock driver in drivers/clk/.
-   The issue is of course always: where to put the header files for
-   this small API.
+> > If I don't specify the address of the register in the dtsi, I think it
+> > would be best to have a common header file for all of the system registers.
+> > I've seen some drivers, e.g.  exynos-cpufreq.c, doing this by including files
+> > from mach-exynos/include/mach. Is that the right way to do this?
 
- * Have both your clock driver and your system control block driver map
-   the registers they need, even if some of those registers are the
-   same. Then you can use atomic_io_modify() from both drivers to
-   atomically make changes to these registers. This is typically OK if
-   you don't have any performance sensitive usage of those registers
-   (atomic_io_modify accesses are protected by a global spinlock). This
-   is the solution we've used between the Armada watchdog and Armada
-   clocksource drivers, which require accessing a shared register, even
-   though those two drivers are completely unrelated.
+You have managed to pick the perfect example: The exynos cpufreq driver is the
+one that is currently blocking support for multiplatform exynos builds because
+it uses header files from the platform code. Because of this, we are actually
+planning to throw out that driver entirely in the next merge window.
 
-Best regards,
+In short, definitely the wrong way.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
