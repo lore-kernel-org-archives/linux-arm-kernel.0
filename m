@@ -1,21 +1,37 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 04 Apr 2014 11:43:04 -0400 (EDT)
-Subject: [PATCH 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <533ED268.9090502@linaro.org>
-References: <1396624597-390-3-git-send-email-zhangfei.gao@linaro.org>
- <20140404.113010.1212333214715849484.davem@davemloft.net>
- <533ED268.9090502@linaro.org>
-Message-ID: <20140404.114304.1006318624302104151.davem@davemloft.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  4 Apr 2014 17:42:03 +0200
+Subject: [PATCH 0/2] ARM: mvebu: enable SDHCI interface on Armada 38x
+Message-ID: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zhangfei <zhangfei.gao@linaro.org>
-Date: Fri, 04 Apr 2014 23:40:24 +0800
+Jason, Gregory, Andrew, Sebastian,
 
-> Thanks Daivd, could I update following this thread first.
+Here is a small set of two patches that enable the SDHCI interface on
+Armada 38x. The first one adds the DT details, the second one adjusts
+the appropriate defconfigs to include the relevant driver.
 
-You will need to address my feedback, as well as that which anyone
-else reviewing this series gives to you.
+The sdhci-pxav3 driver change has been taken by the MMC maintainer
+Chris Ball, and is already in linux-next, so I presume it will be part
+of 3.15. Regarding those proposed patches, they are obviously aimed at
+3.16.
 
-It is not acceptable, ever, to "just fix it later".  You must fix
-all issues pointed out to you before your code will be integrated.
+These patches are based on linux-next, but I can resend them if needed
+once 3.15-rc1 is released.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (2):
+  ARM: mvebu: enable the SDHCI interface on Armada 385
+  ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the relevant defconfigs
+
+ arch/arm/boot/dts/armada-385-db.dts | 8 ++++++++
+ arch/arm/boot/dts/armada-38x.dtsi   | 9 +++++++++
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 4 files changed, 19 insertions(+)
+
+-- 
+1.8.3.2
