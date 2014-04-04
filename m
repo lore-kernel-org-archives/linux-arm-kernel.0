@@ -1,68 +1,98 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  4 Apr 2014 15:42:54 +0200
-Subject: [PATCH V2 02/17] ARM: exynos: cpuidle: use cpuidle_register
+Date: Fri,  4 Apr 2014 15:42:55 +0200
+Subject: [PATCH V2 03/17] ARM: exynos: cpuidle: change function name prefix
 In-Reply-To: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396618989-2897-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396618989-2897-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the cpuidle generic function 'cpuidle_register'. That saves us from some
-extra lines of code and unneeded variables.
+The driver was initially written for exynos4 but the driver is used also for
+exynos5.
+
+Change the function prefix name exynos4 -> exynos
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |   18 ++----------------
- 1 file changed, 2 insertions(+), 16 deletions(-)
+ arch/arm/mach-exynos/cpuidle.c |   20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 9623a05..b7cd75b 100644
+index b7cd75b..16e3325 100644
 --- a/arch/arm/mach-exynos/cpuidle.c
 +++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -59,8 +59,6 @@
- #define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
+@@ -60,7 +60,7 @@
  #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
  
--static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
--
  /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
- static void exynos4_set_wakeupmask(void)
+-static void exynos4_set_wakeupmask(void)
++static void exynos_set_wakeupmask(void)
  {
-@@ -211,8 +209,7 @@ static struct cpuidle_driver exynos4_idle_driver = {
+ 	__raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
+ }
+@@ -91,13 +91,13 @@ static int idle_finisher(unsigned long flags)
+ 	return 1;
+ }
  
- static int exynos_cpuidle_probe(struct platform_device *pdev)
+-static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
++static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
  {
--	int cpu_id, ret;
--	struct cpuidle_device *device;
-+	int ret;
+ 	unsigned long tmp;
  
- 	if (soc_is_exynos5250())
+-	exynos4_set_wakeupmask();
++	exynos_set_wakeupmask();
+ 
+ 	/* Set value of power down register for aftr mode */
+ 	exynos_sys_powerdown_conf(SYS_AFTR);
+@@ -141,7 +141,7 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+ 	return index;
+ }
+ 
+-static int exynos4_enter_lowpower(struct cpuidle_device *dev,
++static int exynos_enter_lowpower(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+ {
+@@ -154,7 +154,7 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+ 	if (new_index == 0)
+ 		return arm_cpuidle_simple_enter(dev, drv, new_index);
+ 	else
+-		return exynos4_enter_core0_aftr(dev, drv, new_index);
++		return exynos_enter_core0_aftr(dev, drv, new_index);
+ }
+ 
+ static void __init exynos5_core_down_clk(void)
+@@ -189,13 +189,13 @@ static void __init exynos5_core_down_clk(void)
+ 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+ }
+ 
+-static struct cpuidle_driver exynos4_idle_driver = {
+-	.name			= "exynos4_idle",
++static struct cpuidle_driver exynos_idle_driver = {
++	.name			= "exynos_idle",
+ 	.owner			= THIS_MODULE,
+ 	.states = {
+ 		[0] = ARM_CPUIDLE_WFI_STATE,
+ 		[1] = {
+-			.enter			= exynos4_enter_lowpower,
++			.enter			= exynos_enter_lowpower,
+ 			.exit_latency		= 300,
+ 			.target_residency	= 100000,
+ 			.flags			= CPUIDLE_FLAG_TIME_VALID,
+@@ -215,9 +215,9 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
  		exynos5_core_down_clk();
-@@ -220,23 +217,12 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
- 	if (soc_is_exynos5440())
- 		exynos4_idle_driver.state_count = 1;
  
--	ret = cpuidle_register_driver(&exynos4_idle_driver);
-+	ret = cpuidle_register(&exynos4_idle_driver, NULL);
+ 	if (soc_is_exynos5440())
+-		exynos4_idle_driver.state_count = 1;
++		exynos_idle_driver.state_count = 1;
+ 
+-	ret = cpuidle_register(&exynos4_idle_driver, NULL);
++	ret = cpuidle_register(&exynos_idle_driver, NULL);
  	if (ret) {
  		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
  		return ret;
- 	}
- 
--	for_each_online_cpu(cpu_id) {
--		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
--		device->cpu = cpu_id;
--
--		ret = cpuidle_register_device(device);
--		if (ret) {
--			dev_err(&pdev->dev, "failed to register cpuidle device\n");
--			return ret;
--		}
--	}
--
- 	return 0;
- }
- 
 -- 
 1.7.9.5
