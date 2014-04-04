@@ -1,47 +1,66 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 04 Apr 2014 15:02:40 +0100
-Subject: [PATCH] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <8799740.0uZJLUBGY1@wuerfel>
-References: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
- <8799740.0uZJLUBGY1@wuerfel>
-Message-ID: <533EBB80.4080307@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  4 Apr 2014 16:04:38 +0200
+Subject: [PATCH] pinctrl: st: switch IRQ locking to resource callbacks
+Message-ID: <1396620278-18107-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/14 12:39, Arnd Bergmann wrote:
->> Problem is fixed by only deploying the compatibility options for SPEAr
->> when ARCH_MULTIPLATFORM is not set.
-> 
-> The assumption is actually wrong: SPEAr does not support single
-> platform builds any more. The PLAT_SPEAR_SINGLE symbol in Kconfig
-> is a leftover from an earlier patch I did that never got merged,
-> and we should just remove that.
+In the mass-conversion to the new irqchip callbacks, this
+in-transit IRQ support was missed. Fix it.
 
-Thanks. I did make a wrong conclusion based on that symbol.
+Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Cc: Maxime COQUELIN <maxime.coquelin@st.com>
+Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-st.c | 16 +++++++---------
+ 1 file changed, 7 insertions(+), 9 deletions(-)
 
-
->> ---
->>  arch/arm/Kconfig.debug | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 0531da8..f10c784 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -991,9 +991,9 @@ config DEBUG_LL_INCLUDE
->>  config DEBUG_UART_PL01X
->>         def_bool ARCH_EP93XX || \
->>                 ARCH_INTEGRATOR || \
->> -               ARCH_SPEAR3XX || \
->> -               ARCH_SPEAR6XX || \
->> -               ARCH_SPEAR13XX || \
->> +               (ARCH_SPEAR3XX && !ARCH_MULTIPLATFORM) || \
->> +               (ARCH_SPEAR6XX && !ARCH_MULTIPLATFORM) || \
->> +               (ARCH_SPEAR13XX && !ARCH_MULTIPLATFORM) || \
->>                 ARCH_VERSATILE
-> 
-> Removing the SPEAR lines seems correct here, but the lines
-> you add don't make any sense.
-
-Will fix.
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index bd725b0a4341..639af4a9a2e4 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1312,25 +1312,23 @@ static void st_gpio_irq_unmask(struct irq_data *d)
+ 	writel(BIT(d->hwirq), bank->base + REG_PIO_SET_PMASK);
+ }
+ 
+-static unsigned int st_gpio_irq_startup(struct irq_data *d)
++static int st_gpio_irq_reqres(struct irq_data *d)
+ {
+ 	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
+ 
+-	if (gpio_lock_as_irq(&bank->gpio_chip, d->hwirq))
++	if (gpio_lock_as_irq(&bank->gpio_chip, d->hwirq)) {
+ 		dev_err(bank->gpio_chip.dev,
+ 			"unable to lock HW IRQ %lu for IRQ\n",
+ 			d->hwirq);
+-
+-	st_gpio_irq_unmask(d);
+-
++		return -EINVAL;
++	}
+ 	return 0;
+ }
+ 
+-static void st_gpio_irq_shutdown(struct irq_data *d)
++static void st_gpio_irq_relres(struct irq_data *d)
+ {
+ 	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
+ 
+-	st_gpio_irq_mask(d);
+ 	gpio_unlock_as_irq(&bank->gpio_chip, d->hwirq);
+ }
+ 
+@@ -1491,8 +1489,8 @@ static struct irq_chip st_gpio_irqchip = {
+ 	.irq_mask	= st_gpio_irq_mask,
+ 	.irq_unmask	= st_gpio_irq_unmask,
+ 	.irq_set_type	= st_gpio_irq_set_type,
+-	.irq_startup	= st_gpio_irq_startup,
+-	.irq_shutdown	= st_gpio_irq_shutdown,
++	.irq_request_resources = st_gpio_irq_reqres,
++	.irq_release_resources = st_gpio_irq_relres,
+ };
+ 
+ static int st_gpio_irq_domain_map(struct irq_domain *h,
+-- 
+1.9.0
