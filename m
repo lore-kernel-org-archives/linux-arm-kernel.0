@@ -1,53 +1,50 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 4 Apr 2014 11:10:24 +0530
-Subject: [PATCH 63/75] ARM: l2c: zynq: remove cache size override
-In-Reply-To: <20140403191341.GX7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYZQ-0007H7-L6@rmk-PC.arm.linux.org.uk> <533BC56D.4010600@monstr.eu>
- <533BF694.7030805@ti.com> <20140403191341.GX7528@n2100.arm.linux.org.uk>
-Message-ID: <533E45C8.8060305@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 4 Apr 2014 08:49:32 +0200
+Subject: [PATCH v2 00/16] ASoC: fsl-ssi: Driver cleanup
+In-Reply-To: <20140403221406.GI14763@sirena.org.uk>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <20140403221406.GI14763@sirena.org.uk>
+Message-ID: <20140404064932.GC20621@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 April 2014 12:43 AM, Russell King - ARM Linux wrote:
-> On Wed, Apr 02, 2014 at 05:07:56PM +0530, Sekhar Nori wrote:
->> So reading the original commit text from Catalin
->> (1a8e41cd672f894bbd74874eac601e6cedf838fb):
->>
->>     ARM: 6395/1: VExpress: Set bit 22 in the PL310 (cache controller)
->> AuxCtlr register
->>
->>     Clearing bit 22 in the PL310 Auxiliary Control register (shared
->>     attribute override enable) has the side effect of transforming Normal
->>     Shared Non-cacheable reads into Cacheable no-allocate reads.
->>
->>     Coherent DMA buffers in Linux always have a Cacheable alias via the
->>     kernel linear mapping and the processor can speculatively load cache
->>     lines into the PL310 controller. With bit 22 cleared, Non-cacheable
->>     reads would unexpectedly hit such cache lines leading to buffer
->>     corruption.
->>
->>     Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->>     Cc: <stable@kernel.org>
->>     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>
->>
->> It looks like all Linux systems will have to use Sharable override to
->> avoid corruption? I see OMAP4 had a similar commit to enable bit 22 of
->> aux control register.
->>
->> If yes, how about doing it by default in cache-l2x0.c rather than
->> leaving it to each platform?
-> 
-> The comments in the commit are no longer true with CMA, which finally
-> fixes the multiple mapping problem.  The sharable override bit should
-> not need to be set for systems using CMA as their backing store for
-> DMA coherent memory.
+Hi,
 
-Thanks for the explanation. Note to myself: some platforms are using
-arm_memblock_steal() or memblock_remove() for reserving coherent memory
-which should also be safe as the memory is not mapped in kernel page tables.
+On Thu, Apr 03, 2014 at 11:14:06PM +0100, Mark Brown wrote:
+> On Sat, Mar 15, 2014 at 01:44:08PM +0100, Markus Pargmann wrote:
+> > Hi,
+> > 
+> > This new version of the cleanup is mainly a reordering of the patches. It moves
+> > the regmap patch to the end of the series so none of the other patches depend
+> > on it. This also fixes a bug I introduced in "Remove fsl_ssi_setup" which also
+> > removed the switching between network and normal mode depending on the number
+> > of channels. I reversed this code removal. Another new patch was added "Fix
+> > i2s_mode variable setup" which fixes the i2s_mode assignment in set_dai_fmt().
+> 
+> It's been nearly three weeks with no response to this except for the
+> last patch - I've got ahead and applied since it all looks sane (modulo
+> the bugfix question), we can see if problems occur in -next after the
+> merge window.  Thanks!
+
+Thanks for applying this series, but could you please drop it for the
+moment? We found some issues with the baud clock setup for i2s master
+mode and have some fixed patches for the series. So it would be nice to
+get this in without fixups if that's still possible? I could send a v3
+next week.
 
 Thanks,
-Sekhar
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/a0830567/attachment.sig>
