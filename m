@@ -1,38 +1,31 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 04 Apr 2014 11:55:05 +0200
-Subject: [PATCH 00/17] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle
-In-Reply-To: <CAK9yfHyqysyXMWURUAScXWgVoXUYJqtYH2Z7_jkqYO4W0z+siw@mail.gmail.com>
-References: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
- <CAK9yfHyqysyXMWURUAScXWgVoXUYJqtYH2Z7_jkqYO4W0z+siw@mail.gmail.com>
-Message-ID: <533E8179.3090105@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 4 Apr 2014 11:03:51 +0100
+Subject: [PATCH v2 00/16] ASoC: fsl-ssi: Driver cleanup
+In-Reply-To: <20140404064932.GC20621@pengutronix.de>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <20140403221406.GI14763@sirena.org.uk>
+ <20140404064932.GC20621@pengutronix.de>
+Message-ID: <20140404100351.GM14763@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2014 11:00 AM, Sachin Kamat wrote:
-> Hi Daniel,
->
-> On 4 April 2014 13:17, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->> This patchset relies on the cpm_pm notifier to initiate the powerdown sequence
->> operations from pm.c instead cpuidle.c. Thus the cpuidle driver is no longer
->> dependent from arch specific code as everything is called from the pm.c file.
->>
->> The patchset applies on top of v3.14.
->
-> It would be good to have this patch series based on Kukjin's for-next
-> which has several
-> changes like code refactoring and consolidation including Tomasz
-> Figa's PM consolidation
-> patches applied and would be merged in 3.15-rc1 release.
+On Fri, Apr 04, 2014 at 08:49:32AM +0200, Markus Pargmann wrote:
 
-Ok, thanks for the heads up.
+> Thanks for applying this series, but could you please drop it for the
+> moment? We found some issues with the baud clock setup for i2s master
+> mode and have some fixed patches for the series. So it would be nice to
+> get this in without fixups if that's still possible? I could send a v3
+> next week.
 
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I've dropped everything after "fsl-ssi: Move debugging to a separate
+file" since that didn't compile anyway (though I'll add the binding
+document update as a fix).  In future please don't wait until after your
+patches have been applied before saying things like this, it's not good
+to rebase branches normally.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/63779cba/attachment.sig>
