@@ -1,35 +1,75 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 4 Apr 2014 11:49:42 -0400
-Subject: [PATCH 2/2] ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the
- relevant defconfigs
-In-Reply-To: <1396626125-8631-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1396626125-8631-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140404154942.GD28334@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Apr 2014 17:50:56 +0200
+Subject: mach header files
+In-Reply-To: <9970caa86d5c454d840c489901d3ca91@SIXPR06MB173.apcprd06.prod.outlook.com>
+References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <5297747.kWEjnPz8MW@wuerfel>
+ <9970caa86d5c454d840c489901d3ca91@SIXPR06MB173.apcprd06.prod.outlook.com>
+Message-ID: <6837506.Q7cFQWf1xJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-My, you've been busy. :)
-
-On Fri, Apr 04, 2014 at 05:42:05PM +0200, Thomas Petazzoni wrote:
-> The Marvell Armada 38x platform has a SDHCI interface managed by the
-> sdhci-pxav3 MMC host driver. It therefore makes sense to enable this
-> driver in both mvebu_v7_defconfig and multi_v7_defconfig, which are
-> both capable of building Marvell Armada 38x support.
+On Friday 04 April 2014 15:42:37 Phil Edworthy wrote:
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
+> On 04 April 2014 16:31, Arnd wrote:
+> > On Friday 04 April 2014 13:52:53 Phil Edworthy wrote:
+> > > On 04 April 2014 14:24, Arnd wrote:
+> > > > We still make the occasional exception for adding code in the mach-*
+> > > > directory, but we are getting pretty close to the state where this
+> > > > is not needed for new platforms, and all the existing uses are for
+> > > > things that can eventually get cleaned up.
+> > > > If you think you need an exception here, please explain what you
+> > > > are doing, and we can see if there is a better way to do that already.
+> > >
+> > > Ok, that's what I suspected about the mach header files.
+> > >
+> > > I didn't realise about the expectation that there is no
+> > > arch/arm/mach-* for new platforms. At the moment I have only a
+> > > small amount of platform code:
+> > > 1. SMP holding pen code (as there is no power control for the second
+> > > core), though I have recently seen patches to provide a generic solution
+> > > for this.
+> > 
+> > Proper platforms should not be using the holding pen, that is only
+> > done on systems that don't have real hardware support for CPU
+> > power management. Ideally you should be implementing PSCI in the
+> > firmware, and then you won't need any code for SMP.
+> > 
+> > > 2. Firmware calls (via struct firmware_ops) for set_cpu_boot_addr
+> > >  and cpu_boot. This falls back to directly accessing registers in
+> > > the system control block, if the firmware fails. This is useful when
+> > > developing the system when no firmware exists yet.
+> > 
+> > Same thing.
+> Ok, something to look into. How the hardware will work is complicated
+> by the fact that we don't have silicon for this device yet, just a
+> simulator.  As for the firmware, I am not sure I will see that. Our
+> customer is implementing it and responsible for creating the firmware 
+> calls from Linux, hence the fall backs.
 
-Please make this a separate patch when you rebase against v3.15-rc1.
-arm-soc will take it directly since multi_v7_defconfig is so
-conflict-prone.
+In that case, I would recommend that you just rely on PSCI in the
+kernel and leave it up to your customer to either implement that
+in their firmware, or provide kernel support for the interfaces
+they want. If they have a good reason to need a different interface,
+they can also send patches for that and argue for inclusion, but
+that is not part of the base platform support you do.
+ 
+> > > 3. A write to a system control register to switch the pl011 uart
+> > > from DMA single requests, to DMA burst requests.
+> > 
+> > Do you need to do this at run-time, or is it something that could
+> > be done in the bootloader before Linux starts up?
+>
+> I might be able to get it into the boot loader, but this is
+> implemented by the customer. One question is whether it should
+> be in the boot loader. The behaviour is specify to the Linux port,
+> whereas the boot loader can be used for a number of different OS.
 
->  arch/arm/configs/mvebu_v7_defconfig | 1 +
->  2 files changed, 2 insertions(+)
+What is the impact for single-request vs burst request? Is it just
+performance? You can add a DT property in the pl011 node to let
+the device driver know which of the two modes was set up by the
+boot loader, and implement both in the driver. Then anybody who
+wants burst mode can set it in the boot loader and every OS will
+be able to find out the mode from DT.
 
-thx,
-
-Jason.
+	Arnd 
