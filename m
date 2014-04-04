@@ -1,203 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 4 Apr 2014 16:56:27 +0100
-Subject: [PATCH RFC v5 3/3] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <1395142132-20788-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1395142132-20788-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1395142132-20788-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20140404155622.GA4061@e102568-lin.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 4 Apr 2014 18:00:13 +0200
+Subject: [PATCH 1/2] ARM: mvebu: enable the SDHCI interface on Armada 385
+In-Reply-To: <1396626125-8631-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1396626125-8631-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140404160013.GK2798@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[replying to self, since I have a query]
-
-[...]
-
-> +===========================================
-> +4 - Examples
-> +===========================================
+On Fri, Apr 04, 2014 at 05:42:04PM +0200, Thomas Petazzoni wrote:
+> In commit "mmc: sdhci-pxav3: add support for the Armada 38x SDHCI
+> controller", the sdhci-pxav3 driver has been extended to also be
+> usable on Armada 38x platforms.
+> 
+> Therefore, this commit adds the necessary Device Tree informations to
+> declare this SDHCI interface in the Armada 38x SoC, and also in the
+> Armada 385 Development Board.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-385-db.dts | 8 ++++++++
+>  arch/arm/boot/dts/armada-38x.dtsi   | 9 +++++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+> index 6828d77..959aeed 100644
+> --- a/arch/arm/boot/dts/armada-385-db.dts
+> +++ b/arch/arm/boot/dts/armada-385-db.dts
+> @@ -101,6 +101,14 @@
+>  					reg = <0x1000000 0x3f000000>;
+>  				};
+>  			};
 > +
-> +Example 1 (ARM 64-bit, 16-cpu system):
+> +			sdhci at d8000 {
+> +				clock-frequency = <200000000>;
+> +				broken-cd;
+> +				wp-inverted;
+> +				bus-width = <8>;
+> +				status = "okay";
+> +			};
+>  		};
+>  
+>  		pcie-controller {
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index a064f59..2c1ff30 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -355,6 +355,15 @@
+>  				clocks = <&coredivclk 0>;
+>  				status = "disabled";
+>  			};
 > +
-> +pd_clusters: power-domain-clusters at 80002000 {
-> +       compatible = "arm,power-controller";
-> +       reg = <0x0 0x80002000 0x0 0x1000>;
-> +       #power-domain-cells = <1>;
-> +       #address-cells = <2>;
-> +       #size-cells = <2>;
-> +
-> +       pd_cores: power-domain-cores at 80000000 {
-> +               compatible = "arm,power-controller";
-> +               reg = <0x0 0x80000000 0x0 0x1000>;
-> +               #power-domain-cells = <1>;
-> +       };
-> +};
-> +
-> +cpus {
-> +       #size-cells = <0>;
-> +       #address-cells = <2>;
-> +
-> +       idle-states {
-> +               entry-method = "arm,psci-cpu-suspend";
-> +
-> +               CLUSTER_RETENTION_0: cluster-retention-0 {
-> +                       compatible = "arm,idle-state";
-> +                       index = <2>;
-> +                       logic-state-retained;
-> +                       cache-state-retained;
-> +                       entry-method-param = <0x1010000>;
-> +                       entry-latency-us = <50>;
-> +                       exit-latency-us = <100>;
-> +                       min-residency-us = <250>;
-> +                       power-domains = <&pd_clusters 0>;
-> +                       CPU_RETENTION_0_0: cpu-retention-0 {
-> +                               compatible = "arm,idle-state";
-> +                               index = <0>;
-> +                               cache-state-retained;
-> +                               entry-method-param = <0x0010000>;
-> +                               entry-latency-us = <20>;
-> +                               exit-latency-us = <40>;
-> +                               min-residency-us = <30>;
-> +                               power-domains = <&pd_cores 0>,
-> +                                               <&pd_cores 1>,
-> +                                               <&pd_cores 2>,
-> +                                               <&pd_cores 3>,
-> +                                               <&pd_cores 4>,
-> +                                               <&pd_cores 5>,
-> +                                               <&pd_cores 6>,
-> +                                               <&pd_cores 7>;
-> +                       };
-> +               };
-> +
-> +               CLUSTER_SLEEP_0: cluster-sleep-0 {
-> +                       compatible = "arm,idle-state";
-> +                       index = <3>;
-> +                       entry-method-param = <0x1010000>;
-> +                       entry-latency-us = <600>;
-> +                       exit-latency-us = <1100>;
-> +                       min-residency-us = <2700>;
-> +                       power-domains = <&pd_clusters 0>;
-> +                       CPU_SLEEP_0_0: cpu-sleep-0 {
-> +                               /* cpu sleep */
-> +                               compatible = "arm,idle-state";
-> +                               index = <1>;
-> +                               entry-method-param = <0x0010000>;
-> +                               entry-latency-us = <250>;
-> +                               exit-latency-us = <500>;
-> +                               min-residency-us = <350>;
-> +                               power-domains = <&pd_cores 0>,
-> +                                               <&pd_cores 1>,
-> +                                               <&pd_cores 2>,
-> +                                               <&pd_cores 3>,
-> +                                               <&pd_cores 4>,
-> +                                               <&pd_cores 5>,
-> +                                               <&pd_cores 6>,
-> +                                               <&pd_cores 7>;
-> +                       };
-> +               };
+> +			sdhci at d8000 {
+> +				compatible = "marvell,armada-380-sdhci";
+> +				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
+> +				interrupts = <0 25 0x4>;
+> +				clocks = <&gateclk 17>;
+> +				mrvl,clk-delay-cycles = <0x1F>;
 
-I noticed while developing the CPUidle generic driver, that by using this
-representation I might end up requiring duplicated states.
+Hi Thomas
 
-For instance, a cluster-retention state and a cluster-sleep state might
-want to have cpu-sleep state as substate, and this would require an
-idle state node duplication.
+Maybe this has been discussed as part of the previous patchset. Why
+the mrvl prefix, not marvell? marvell is in vendor-prefixes.txt, but
+mrvl does not appear to be listed.
 
-I think it is better to have a single flat (and ordered...that would
-kill two birds with one stone) list of nodes in the idle-states node and
-every state might have a list of phandles to subnodes (substates), something
-like the following example.
-
-This simplifies parsing  and I think it solves the last issue I
-came across (the need for duplicate states - in the bindings below,
-CPU_SLEEP_0 is a substate of both CLUSTER_RETENTION_0 and
-CLUSTER_SLEEP_0, through phandles).
-
-Thoughts very appreciated, thanks.
-
-Lorenzo
-
-idle-states {
-       entry-method = "arm,psci-cpu-suspend";
-
-	CPU_RETENTION_0: cpu-retention-0 {
-		       compatible = "arm,idle-state";
-		       cache-state-retained;
-		       entry-method-param = <0x0010000>;
-		       entry-latency-us = <20>;
-		       exit-latency-us = <40>;
-		       min-residency-us = <30>;
-		       power-domains = <&pd_cores 0>,
-				       <&pd_cores 1>,
-				       <&pd_cores 2>,
-				       <&pd_cores 3>,
-	};
-
-	CPU_SLEEP_0: cpu-sleep-0 {
-		       /* cpu sleep */
-		       compatible = "arm,idle-state";
-		       entry-method-param = <0x0010000>;
-		       entry-latency-us = <250>;
-		       exit-latency-us = <500>;
-		       min-residency-us = <350>;
-		       power-domains = <&pd_cores 0>,
-				       <&pd_cores 1>,
-				       <&pd_cores 2>,
-				       <&pd_cores 3>,
-	};
-
-	CPU_SLEEP_1: cpu-sleep-1 {
-		       /* cpu sleep */
-		       compatible = "arm,idle-state";
-		       entry-method-param = <0x0010000>;
-		       entry-latency-us = <250>;
-		       exit-latency-us = <500>;
-		       min-residency-us = <350>;
-				       <&pd_cores 4>,
-				       <&pd_cores 5>,
-				       <&pd_cores 6>,
-				       <&pd_cores 7>;
-	};
-
-	CLUSTER_RETENTION_0: cluster-retention-0 {
-	       compatible = "arm,idle-state";
-	       logic-state-retained;
-	       cache-state-retained;
-	       entry-method-param = <0x1010000>;
-	       entry-latency-us = <50>;
-	       exit-latency-us = <800>;
-	       min-residency-us = <2400>;
-	       power-domains = <&pd_clusters 0>;
-	       substates = <&CPU_SLEEP_0>;
-	};
-
-	CLUSTER_SLEEP_0: cluster-sleep-0 {
-	       compatible = "arm,idle-state";
-	       entry-method-param = <0x1010000>;
-	       entry-latency-us = <600>;
-	       exit-latency-us = <1100>;
-	       min-residency-us = <2700>;
-	       power-domains = <&pd_clusters 0>;
-	       substates = <&CPU_SLEEP_0>;
-	};
-
-	CLUSTER_SLEEP_1: cluster-sleep-1 {
-	       compatible = "arm,idle-state";
-	       entry-method-param = <0x1010000>;
-	       entry-latency-us = <600>;
-	       exit-latency-us = <1100>;
-	       min-residency-us = <2700>;
-	       power-domains = <&pd_clusters 1>;
-	       substates = <&CPU_SLEEP_1>;
-	};
-
-	SYSTEM_SLEEP_0: system-sleep-0 {
-	       compatible = "arm,idle-state";
-	       entry-method-param = <0x2010000>;
-	       entry-latency-us = <6000>;
-	       exit-latency-us = <10000>;
-	       min-residency-us = <30000>;
-	       power-domains = <&pd_system 0>;
-	       substates = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
-	};
-};
+     Andrew
