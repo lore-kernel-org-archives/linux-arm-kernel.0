@@ -1,88 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Apr 2014 14:39:37 +0100
-Subject: New section mismatch warnings
-Message-ID: <20140404133937.GB7528@n2100.arm.linux.org.uk>
+From: baohua@kernel.org (Barry Song)
+Date: Fri, 4 Apr 2014 21:40:31 +0800
+Subject: [PATCH 59/75] ARM: l2c: prima2: remove cache size override
+In-Reply-To: <E1WTYZ6-0007Gr-6r@rmk-PC.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYZ6-0007Gr-6r@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAGsJ_4yUNET5mWEUH-KEtA1ei49Fo2aC20Wmb-jXhs0vF7HSYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have the usual build test quality...  This isn't hard to catch, you
-just have to build with CONFIG_DEBUG_SECTION_MISMATCH enabled.  You can
-even provide that on the make command line to enable the feature for
-any configuration you're building, so it really isn't hard to check.
-Yet still we have stuff like this creeping in.
+2014-03-28 23:19 GMT+08:00 Russell King <rmk+kernel@arm.linux.org.uk>:
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/boot/dts/marco.dtsi  |  2 +-
+>  arch/arm/boot/dts/prima2.dtsi |  2 +-
+>  arch/arm/mach-prima2/l2x0.c   | 34 +---------------------------------
+>  3 files changed, 3 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/marco.dtsi b/arch/arm/boot/dts/marco.dtsi
+> index 1579c3491ccd..247879aa1224 100644
+> --- a/arch/arm/boot/dts/marco.dtsi
+> +++ b/arch/arm/boot/dts/marco.dtsi
+> @@ -36,7 +36,7 @@
+>                 ranges = <0x40000000 0x40000000 0xa0000000>;
+>
+>                 l2-cache-controller at c0030000 {
+> -                       compatible = "sirf,marco-pl310-cache", "arm,pl310-cache";
+> +                       compatible = "arm,pl310-cache";
+>                         reg = <0xc0030000 0x1000>;
+>                         interrupts = <0 59 0>;
+>                         arm,tag-latency = <1 1 1>;
+> diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+> index 0e219932d7cc..29b578727b0a 100644
+> --- a/arch/arm/boot/dts/prima2.dtsi
+> +++ b/arch/arm/boot/dts/prima2.dtsi
+> @@ -48,7 +48,7 @@
+>                 ranges = <0x40000000 0x40000000 0x80000000>;
+>
+>                 l2-cache-controller at 80040000 {
+> -                       compatible = "arm,pl310-cache", "sirf,prima2-pl310-cache";
+> +                       compatible = "arm,pl310-cache";
+>                         reg = <0x80040000 0x1000>;
+>                         interrupts = <59>;
+>                         arm,tag-latency = <1 1 1>;
+> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+> index 3a4eda45171e..09f68f046830 100644
+> --- a/arch/arm/mach-prima2/l2x0.c
+> +++ b/arch/arm/mach-prima2/l2x0.c
+> @@ -8,42 +8,10 @@
+>
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+> -#include <linux/of.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>
+> -struct l2x0_aux
+> -{
+> -       u32 val;
+> -       u32 mask;
+> -};
+> -
+> -static struct l2x0_aux prima2_l2x0_aux __initconst = {
+> -       .val = L2C_AUX_CTRL_WAY_SIZE(2),
+> -       .mask = 0,
+> -};
+> -
+> -static struct l2x0_aux marco_l2x0_aux __initconst = {
+> -       .val = L2C_AUX_CTRL_WAY_SIZE(2) | L310_AUX_CTRL_ASSOCIATIVITY_16,
+> -       .mask = L2X0_AUX_CTRL_MASK,
+> -};
+> -
+> -static struct of_device_id sirf_l2x0_ids[] __initconst = {
+> -       { .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
+> -       { .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
+> -       {},
+> -};
+> -
+>  static int __init sirfsoc_l2x0_init(void)
+>  {
+> -       struct device_node *np;
+> -       const struct l2x0_aux *aux;
+> -
+> -       np = of_find_matching_node(NULL, sirf_l2x0_ids);
+> -       if (np) {
+> -               aux = of_match_node(sirf_l2x0_ids, np)->data;
+> -               return l2x0_of_init(aux->val, aux->mask);
+> -       }
+> -
+> -       return 0;
+> +       return l2x0_of_init(0, ~0);
 
-WARNING: drivers/of/built-in.o(.text.unlikely+0x18): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
+Russell, as i mailed you before, pre-set L2 has disabled
+write_combined, here we can make the bit restored.
 
-WARNING: drivers/of/built-in.o(.text.unlikely+0x48): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
+>  }
+>  early_initcall(sirfsoc_l2x0_init);
+> --
+> 1.8.3.1
+>
 
-WARNING: drivers/of/built-in.o(.text.unlikely+0x74): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
-
-WARNING: drivers/of/built-in.o(.text.unlikely+0x9c): Section mismatch in reference from the function __reserved_mem_check_root() to the (unknown reference) .init.data:(unknown)
-The function __reserved_mem_check_root() references
-the (unknown reference) __initdata (unknown).
-This is often because __reserved_mem_check_root lacks a __initdata 
-annotation or the annotation of (unknown) is wrong.
-
-WARNING: drivers/built-in.o(.text.unlikely+0x109c): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
-
-WARNING: drivers/built-in.o(.text.unlikely+0x10cc): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
-
-WARNING: drivers/built-in.o(.text.unlikely+0x10f8): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
-
-WARNING: drivers/built-in.o(.text.unlikely+0x1120): Section mismatch in reference from the function __reserved_mem_check_root() to the (unknown reference) .init.data:(unknown)
-The function __reserved_mem_check_root() references
-the (unknown reference) __initdata (unknown).
-This is often because __reserved_mem_check_root lacks a __initdata 
-annotation or the annotation of (unknown) is wrong.
-
-WARNING: vmlinux.o(.text.unlikely+0x83cc): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
-
-WARNING: vmlinux.o(.text.unlikely+0x83fc): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
-
-WARNING: vmlinux.o(.text.unlikely+0x8428): Section mismatch in reference from the function __reserved_mem_check_root() to the function .init.text:of_get_flat_dt_prop()
-The function __reserved_mem_check_root() references
-the function __init of_get_flat_dt_prop().
-This is often because __reserved_mem_check_root lacks a __init 
-annotation or the annotation of of_get_flat_dt_prop is wrong.
-
-WARNING: vmlinux.o(.text.unlikely+0x8450): Section mismatch in reference from the function __reserved_mem_check_root() to the (unknown reference) .init.data:(unknown)
-The function __reserved_mem_check_root() references
-the (unknown reference) __initdata (unknown).
-This is often because __reserved_mem_check_root lacks a __initdata 
-annotation or the annotation of (unknown) is wrong.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+-barry
