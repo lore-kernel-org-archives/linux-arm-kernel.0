@@ -1,46 +1,36 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 4 Apr 2014 16:38:25 +0000
-Subject: mach header files
-In-Reply-To: <20140404162217.GE7528@n2100.arm.linux.org.uk>
-References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
- <5297747.kWEjnPz8MW@wuerfel>
- <9970caa86d5c454d840c489901d3ca91@SIXPR06MB173.apcprd06.prod.outlook.com>
- <6837506.Q7cFQWf1xJ@wuerfel>
- <730e7ebfabf7489bbfee808cd0247411@SIXPR06MB173.apcprd06.prod.outlook.com>
- <20140404162217.GE7528@n2100.arm.linux.org.uk>
-Message-ID: <cc8d077175e342ceb45e3dedf54a5595@SIXPR06MB173.apcprd06.prod.outlook.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 4 Apr 2014 18:44:47 +0200
+Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to
+ kernel warning
+In-Reply-To: <20140404142656.GA16383@dragon>
+References: <53345C93.9040005@i2se.com> <533EB9AC.6040708@i2se.com>
+ <20140404142656.GA16383@dragon>
+Message-ID: <20140404164446.GI4883@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On 04 April 2014 17:22, Russell wrote:
-> On Fri, Apr 04, 2014 at 04:02:58PM +0000, Phil Edworthy wrote:
-> > Unfortunately, it's not a performance toggle. Functionally, the pl011
-> > will only work with a DMAC if we use the DMA burst request. That's not
-> > completely true though as whether it will work depends on the pl011
-> > driver. With the upstream pl011 linux driver, it's true.
-> >
-> > BTW, the register to control this has nothing to do with the pl011
-> > hardware. The standard pl011 hardware, afaik, outputs both the DMA
-> > single request and DMA burst request signals, and which one is wired
-> > up to the DMAC depends on who designed the SoC. For this hardware,
-> > the hardware people played safe and provided a register that can be
-> > used to switch between the single and burst request signals.
+On 04/04/2014 at 22:26:58 +0800, Shawn Guo wrote :
+> On Fri, Apr 04, 2014 at 03:54:52PM +0200, Stefan Wahren wrote:
+> > the problem is still reproducable in Mainline 3.14.0 and gives the same
+> > warning message.
+> > Also i add linux-leds in CC.
+> > 
+> > Are there any advices to narrow down the problem?
+> > 
+> > Is this problem specific to i.MX28 PWM (i don't have other kind of
+> > hardware)?
 > 
-> That's not how it's supposed to be used.
+> I don't think it's specific to i.MX28 PWM.  Since the .config hook of
+> pwm_ops will be called from interrupt context in this case, any pwm
+> drivers that do sleeping calls in the hook will have this problem, e.g.
+> the clk APIs that hold mutex like clk_prepare() and clk_get_rate() etc.
 > 
-> The idea behind the two requests is that the peripheral signals to the
-> DMA controller whether it has enough entries in the FIFO for the DMA
-> controller to do a burst transfer, or whether it should do a series of
-> single transfers.
-> 
-> It sounds to me like someone hasn't taken the time to read the PL011
-> documentation and thought about this.  As such, it's probably not worth
-> bothering trying to get DMA working.
 
-DMA with the pl011 works just fine, thanks - we've integrated our DMAC & pl011 hardware onto a Xilinx Zynq device.
-The only software change required is to modify the burst threshold in the pl011 driver to 3/4 full. The DMA burst size is left to 1/2 the FIFO size to ensure there is data left in the FIFO after the DMAC has performed it's burst. This allows the pl011 to fire of the rx timeout irq when no further data has been received.
+Yeah, I'm wondering whether we should set pwm->chip->can_sleep then.
 
-Thanks
-Phil
+Thierry, do you have an opinion ?
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
