@@ -1,50 +1,75 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 4 Apr 2014 08:49:32 +0200
-Subject: [PATCH v2 00/16] ASoC: fsl-ssi: Driver cleanup
-In-Reply-To: <20140403221406.GI14763@sirena.org.uk>
-References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
- <20140403221406.GI14763@sirena.org.uk>
-Message-ID: <20140404064932.GC20621@pengutronix.de>
+From: zhangfei.gao@gmail.com (Zhangfei Gao)
+Date: Fri, 4 Apr 2014 14:52:08 +0800
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <20140403152746.GQ7528@n2100.arm.linux.org.uk>
+References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
+ <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
+ <9532591.5yuCbpL4pV@wuerfel>
+ <20140403152746.GQ7528@n2100.arm.linux.org.uk>
+Message-ID: <CAMj5BkgMxDtTe0iQVVddcMbYYhVasmHzURHOMtANVbMNU_Z-Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Russell
 
-On Thu, Apr 03, 2014 at 11:14:06PM +0100, Mark Brown wrote:
-> On Sat, Mar 15, 2014 at 01:44:08PM +0100, Markus Pargmann wrote:
-> > Hi,
-> > 
-> > This new version of the cleanup is mainly a reordering of the patches. It moves
-> > the regmap patch to the end of the series so none of the other patches depend
-> > on it. This also fixes a bug I introduced in "Remove fsl_ssi_setup" which also
-> > removed the switching between network and normal mode depending on the number
-> > of channels. I reversed this code removal. Another new patch was added "Fix
-> > i2s_mode variable setup" which fixes the i2s_mode assignment in set_dai_fmt().
-> 
-> It's been nearly three weeks with no response to this except for the
-> last patch - I've got ahead and applied since it all looks sane (modulo
-> the bugfix question), we can see if problems occur in -next after the
-> merge window.  Thanks!
+On Thu, Apr 3, 2014 at 11:27 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Apr 02, 2014 at 11:21:45AM +0200, Arnd Bergmann wrote:
+>> - As David Laight pointed out earlier, you must also ensure that
+>>   you don't have too much /data/ pending in the descriptor ring
+>>   when you stop the queue. For a 10mbit connection, you have already
+>>   tested (as we discussed on IRC) that 64 descriptors with 1500 byte
+>>   frames gives you a 68ms round-trip ping time, which is too much.
+>>   Conversely, on 1gbit, having only 64 descriptors actually seems
+>>   a little low, and you may be able to get better throughput if
+>>   you extend the ring to e.g. 512 descriptors.
+>
+> You don't manage that by stopping the queue - there's separate interfaces
+> where you report how many bytes you've queued (netdev_sent_queue()) and
+> how many bytes/packets you've sent (netdev_tx_completed_queue()).  This
+> allows the netdev schedulers to limit how much data is held in the queue,
+> preserving interactivity while allowing the advantages of larger rings.
 
-Thanks for applying this series, but could you please drop it for the
-moment? We found some issues with the baud clock setup for i2s master
-mode and have some fixed patches for the series. So it would be nice to
-get this in without fixups if that's still possible? I could send a v3
-next week.
+My god, it's awesome.
+The latency can be solved via adding netdev_sent_queue in xmit, and
+netdev_completed_queue in reclaim.
+In the experiment,
+iperf -P 3 could get 930M, and ping could get response within 0.4 ms
+in the meantime.
 
-Thanks,
+Is that mean the timer -> reclaim should be removed at all?
+The background are.
+1. No xmit_complete interrupt.
+2. Only xmit call reclaim used buffer can achieve best throughput.
+Adding timer in case no next xmit for reclaim.
 
-Markus
+>
+>> > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
+>> > +       if (dma_mapping_error(&ndev->dev, phys)) {
+>> > +               dev_kfree_skb(skb);
+>> > +               return NETDEV_TX_OK;
+>> > +       }
+>> > +
+>> > +       priv->tx_skb[tx_head] = skb;
+>> > +       priv->tx_phys[tx_head] = phys;
+>> > +       desc->send_addr = cpu_to_be32(phys);
+>> > +       desc->send_size = cpu_to_be16(skb->len);
+>> > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
+>> > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
+>> > +       desc->wb_addr = cpu_to_be32(phys);
+>>
+>> One detail: since you don't have cache-coherent DMA, "desc" will
+>> reside in uncached memory, so you try to minimize the number of accesses.
+>> It's probably faster if you build the descriptor on the stack and
+>> then atomically copy it over, rather than assigning each member at
+>> a time.
+>
+> DMA coherent memory is write combining, so multiple writes will be
+> coalesced.  This also means that barriers may be required to ensure the
+> descriptors are pushed out in a timely manner if something like writel()
+> is not used in the transmit-triggering path.
+>
+Currently writel is used in xmit.
+And regmap_write -> writel is used in poll.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/a0830567/attachment.sig>
+Thanks
