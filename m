@@ -1,75 +1,203 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Apr 2014 17:50:56 +0200
-Subject: mach header files
-In-Reply-To: <9970caa86d5c454d840c489901d3ca91@SIXPR06MB173.apcprd06.prod.outlook.com>
-References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
- <5297747.kWEjnPz8MW@wuerfel>
- <9970caa86d5c454d840c489901d3ca91@SIXPR06MB173.apcprd06.prod.outlook.com>
-Message-ID: <6837506.Q7cFQWf1xJ@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 4 Apr 2014 16:56:27 +0100
+Subject: [PATCH RFC v5 3/3] Documentation: arm: define DT idle states
+ bindings
+In-Reply-To: <1395142132-20788-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1395142132-20788-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1395142132-20788-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20140404155622.GA4061@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 April 2014 15:42:37 Phil Edworthy wrote:
-> 
-> On 04 April 2014 16:31, Arnd wrote:
-> > On Friday 04 April 2014 13:52:53 Phil Edworthy wrote:
-> > > On 04 April 2014 14:24, Arnd wrote:
-> > > > We still make the occasional exception for adding code in the mach-*
-> > > > directory, but we are getting pretty close to the state where this
-> > > > is not needed for new platforms, and all the existing uses are for
-> > > > things that can eventually get cleaned up.
-> > > > If you think you need an exception here, please explain what you
-> > > > are doing, and we can see if there is a better way to do that already.
-> > >
-> > > Ok, that's what I suspected about the mach header files.
-> > >
-> > > I didn't realise about the expectation that there is no
-> > > arch/arm/mach-* for new platforms. At the moment I have only a
-> > > small amount of platform code:
-> > > 1. SMP holding pen code (as there is no power control for the second
-> > > core), though I have recently seen patches to provide a generic solution
-> > > for this.
-> > 
-> > Proper platforms should not be using the holding pen, that is only
-> > done on systems that don't have real hardware support for CPU
-> > power management. Ideally you should be implementing PSCI in the
-> > firmware, and then you won't need any code for SMP.
-> > 
-> > > 2. Firmware calls (via struct firmware_ops) for set_cpu_boot_addr
-> > >  and cpu_boot. This falls back to directly accessing registers in
-> > > the system control block, if the firmware fails. This is useful when
-> > > developing the system when no firmware exists yet.
-> > 
-> > Same thing.
-> Ok, something to look into. How the hardware will work is complicated
-> by the fact that we don't have silicon for this device yet, just a
-> simulator.  As for the firmware, I am not sure I will see that. Our
-> customer is implementing it and responsible for creating the firmware 
-> calls from Linux, hence the fall backs.
+[replying to self, since I have a query]
 
-In that case, I would recommend that you just rely on PSCI in the
-kernel and leave it up to your customer to either implement that
-in their firmware, or provide kernel support for the interfaces
-they want. If they have a good reason to need a different interface,
-they can also send patches for that and argue for inclusion, but
-that is not part of the base platform support you do.
- 
-> > > 3. A write to a system control register to switch the pl011 uart
-> > > from DMA single requests, to DMA burst requests.
-> > 
-> > Do you need to do this at run-time, or is it something that could
-> > be done in the bootloader before Linux starts up?
->
-> I might be able to get it into the boot loader, but this is
-> implemented by the customer. One question is whether it should
-> be in the boot loader. The behaviour is specify to the Linux port,
-> whereas the boot loader can be used for a number of different OS.
+[...]
 
-What is the impact for single-request vs burst request? Is it just
-performance? You can add a DT property in the pl011 node to let
-the device driver know which of the two modes was set up by the
-boot loader, and implement both in the driver. Then anybody who
-wants burst mode can set it in the boot loader and every OS will
-be able to find out the mode from DT.
+> +===========================================
+> +4 - Examples
+> +===========================================
+> +
+> +Example 1 (ARM 64-bit, 16-cpu system):
+> +
+> +pd_clusters: power-domain-clusters at 80002000 {
+> +       compatible = "arm,power-controller";
+> +       reg = <0x0 0x80002000 0x0 0x1000>;
+> +       #power-domain-cells = <1>;
+> +       #address-cells = <2>;
+> +       #size-cells = <2>;
+> +
+> +       pd_cores: power-domain-cores at 80000000 {
+> +               compatible = "arm,power-controller";
+> +               reg = <0x0 0x80000000 0x0 0x1000>;
+> +               #power-domain-cells = <1>;
+> +       };
+> +};
+> +
+> +cpus {
+> +       #size-cells = <0>;
+> +       #address-cells = <2>;
+> +
+> +       idle-states {
+> +               entry-method = "arm,psci-cpu-suspend";
+> +
+> +               CLUSTER_RETENTION_0: cluster-retention-0 {
+> +                       compatible = "arm,idle-state";
+> +                       index = <2>;
+> +                       logic-state-retained;
+> +                       cache-state-retained;
+> +                       entry-method-param = <0x1010000>;
+> +                       entry-latency-us = <50>;
+> +                       exit-latency-us = <100>;
+> +                       min-residency-us = <250>;
+> +                       power-domains = <&pd_clusters 0>;
+> +                       CPU_RETENTION_0_0: cpu-retention-0 {
+> +                               compatible = "arm,idle-state";
+> +                               index = <0>;
+> +                               cache-state-retained;
+> +                               entry-method-param = <0x0010000>;
+> +                               entry-latency-us = <20>;
+> +                               exit-latency-us = <40>;
+> +                               min-residency-us = <30>;
+> +                               power-domains = <&pd_cores 0>,
+> +                                               <&pd_cores 1>,
+> +                                               <&pd_cores 2>,
+> +                                               <&pd_cores 3>,
+> +                                               <&pd_cores 4>,
+> +                                               <&pd_cores 5>,
+> +                                               <&pd_cores 6>,
+> +                                               <&pd_cores 7>;
+> +                       };
+> +               };
+> +
+> +               CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +                       compatible = "arm,idle-state";
+> +                       index = <3>;
+> +                       entry-method-param = <0x1010000>;
+> +                       entry-latency-us = <600>;
+> +                       exit-latency-us = <1100>;
+> +                       min-residency-us = <2700>;
+> +                       power-domains = <&pd_clusters 0>;
+> +                       CPU_SLEEP_0_0: cpu-sleep-0 {
+> +                               /* cpu sleep */
+> +                               compatible = "arm,idle-state";
+> +                               index = <1>;
+> +                               entry-method-param = <0x0010000>;
+> +                               entry-latency-us = <250>;
+> +                               exit-latency-us = <500>;
+> +                               min-residency-us = <350>;
+> +                               power-domains = <&pd_cores 0>,
+> +                                               <&pd_cores 1>,
+> +                                               <&pd_cores 2>,
+> +                                               <&pd_cores 3>,
+> +                                               <&pd_cores 4>,
+> +                                               <&pd_cores 5>,
+> +                                               <&pd_cores 6>,
+> +                                               <&pd_cores 7>;
+> +                       };
+> +               };
 
-	Arnd 
+I noticed while developing the CPUidle generic driver, that by using this
+representation I might end up requiring duplicated states.
+
+For instance, a cluster-retention state and a cluster-sleep state might
+want to have cpu-sleep state as substate, and this would require an
+idle state node duplication.
+
+I think it is better to have a single flat (and ordered...that would
+kill two birds with one stone) list of nodes in the idle-states node and
+every state might have a list of phandles to subnodes (substates), something
+like the following example.
+
+This simplifies parsing  and I think it solves the last issue I
+came across (the need for duplicate states - in the bindings below,
+CPU_SLEEP_0 is a substate of both CLUSTER_RETENTION_0 and
+CLUSTER_SLEEP_0, through phandles).
+
+Thoughts very appreciated, thanks.
+
+Lorenzo
+
+idle-states {
+       entry-method = "arm,psci-cpu-suspend";
+
+	CPU_RETENTION_0: cpu-retention-0 {
+		       compatible = "arm,idle-state";
+		       cache-state-retained;
+		       entry-method-param = <0x0010000>;
+		       entry-latency-us = <20>;
+		       exit-latency-us = <40>;
+		       min-residency-us = <30>;
+		       power-domains = <&pd_cores 0>,
+				       <&pd_cores 1>,
+				       <&pd_cores 2>,
+				       <&pd_cores 3>,
+	};
+
+	CPU_SLEEP_0: cpu-sleep-0 {
+		       /* cpu sleep */
+		       compatible = "arm,idle-state";
+		       entry-method-param = <0x0010000>;
+		       entry-latency-us = <250>;
+		       exit-latency-us = <500>;
+		       min-residency-us = <350>;
+		       power-domains = <&pd_cores 0>,
+				       <&pd_cores 1>,
+				       <&pd_cores 2>,
+				       <&pd_cores 3>,
+	};
+
+	CPU_SLEEP_1: cpu-sleep-1 {
+		       /* cpu sleep */
+		       compatible = "arm,idle-state";
+		       entry-method-param = <0x0010000>;
+		       entry-latency-us = <250>;
+		       exit-latency-us = <500>;
+		       min-residency-us = <350>;
+				       <&pd_cores 4>,
+				       <&pd_cores 5>,
+				       <&pd_cores 6>,
+				       <&pd_cores 7>;
+	};
+
+	CLUSTER_RETENTION_0: cluster-retention-0 {
+	       compatible = "arm,idle-state";
+	       logic-state-retained;
+	       cache-state-retained;
+	       entry-method-param = <0x1010000>;
+	       entry-latency-us = <50>;
+	       exit-latency-us = <800>;
+	       min-residency-us = <2400>;
+	       power-domains = <&pd_clusters 0>;
+	       substates = <&CPU_SLEEP_0>;
+	};
+
+	CLUSTER_SLEEP_0: cluster-sleep-0 {
+	       compatible = "arm,idle-state";
+	       entry-method-param = <0x1010000>;
+	       entry-latency-us = <600>;
+	       exit-latency-us = <1100>;
+	       min-residency-us = <2700>;
+	       power-domains = <&pd_clusters 0>;
+	       substates = <&CPU_SLEEP_0>;
+	};
+
+	CLUSTER_SLEEP_1: cluster-sleep-1 {
+	       compatible = "arm,idle-state";
+	       entry-method-param = <0x1010000>;
+	       entry-latency-us = <600>;
+	       exit-latency-us = <1100>;
+	       min-residency-us = <2700>;
+	       power-domains = <&pd_clusters 1>;
+	       substates = <&CPU_SLEEP_1>;
+	};
+
+	SYSTEM_SLEEP_0: system-sleep-0 {
+	       compatible = "arm,idle-state";
+	       entry-method-param = <0x2010000>;
+	       entry-latency-us = <6000>;
+	       exit-latency-us = <10000>;
+	       min-residency-us = <30000>;
+	       power-domains = <&pd_system 0>;
+	       substates = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
+	};
+};
