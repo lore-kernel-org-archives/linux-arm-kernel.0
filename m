@@ -1,47 +1,75 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Fri,  4 Apr 2014 19:45:04 +0100
-Subject: [PATCH v3 01/10] lib: add fdt_empty_tree.c
-In-Reply-To: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
-References: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1396637113-22790-2-git-send-email-leif.lindholm@linaro.org>
+From: elder@linaro.org (Alex Elder)
+Date: Fri, 04 Apr 2014 13:56:54 -0500
+Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
+In-Reply-To: <CAAYSxhqOh4F=vSDJYUwFE85og-Tgc9Hi8c79biEZYYjb8z1Qkg@mail.gmail.com>
+References: <1396577891-2713-1-git-send-email-elder@linaro.org>	<1396577891-2713-3-git-send-email-elder@linaro.org>
+ <CAAYSxhqOh4F=vSDJYUwFE85og-Tgc9Hi8c79biEZYYjb8z1Qkg@mail.gmail.com>
+Message-ID: <533F0076.4090407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+On 04/04/2014 10:30 AM, Tim Kryger wrote:
+> On Thu, Apr 3, 2014 at 7:18 PM, Alex Elder <elder@linaro.org> wrote:
+> 
+>> diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
+>> new file mode 100644
+>> index 0000000..46a64f2
+>> --- /dev/null
+>> +++ b/arch/arm/mach-bcm/platsmp.c
+> 
+>> +/* Size of mapped Cortex A9 SCU address space */
+>> +#define SCU_SIZE               0x58
+> 
+>> +/*
+>> + * Enable the Cortex A9 Snoop Control Unit
+>> + *
+>> + * By the time this is called we already know there are multiple
+>> + * cores present.  We assume we're running on a Cortex A9 processor,
+>> + * so any trouble getting the base address register or getting the
+>> + * SCU base is a problem.
+>> + *
+>> + * Return 0 if successful or an error code otherwise.
+>> + */
+>> +static int __init scu_a9_enable(void)
+>> +{
+>> +       unsigned long config_base;
+>> +       void __iomem *scu_base;
+>> +
+>> +       if (!scu_a9_has_base()) {
+>> +               pr_err("no configuration base address register!\n");
+>> +               return -ENXIO;
+>> +       }
+>> +
+>> +       /* Config base address register value is zero for uniprocessor */
+>> +       config_base = scu_a9_get_base();
+>> +       if (!config_base) {
+>> +               pr_err("hardware reports only one core; disabling SMP\n");
+>> +               return -ENOENT;
+>> +       }
+>> +
+>> +       scu_base = ioremap((phys_addr_t)config_base, SCU_SIZE);
+>> +       if (!scu_base) {
+>> +               pr_err("failed to remap config base (%lu/%u) for SCU\n",
+>> +                       config_base, SCU_SIZE);
+>> +               return -ENOMEM;
+>> +       }
+>> +
+>> +       scu_enable(scu_base);
+>> +
+>> +       iounmap(scu_base);      /* That's the last we'll need of this */
+>> +
+>> +       return 0;
+>> +}
+> 
+> This function seems useful for Cortex A9 MPCore in general.
+> 
+> While you gave it a generic name, you put it in a Broadcom file.
+> 
+> Is there a better location for this code?
 
-CONFIG_LIBFDT support does not include fdt_empty_tree.c which is
-needed by arm64 EFI stub. Add it to libfdt_files.
+I think it belongs in arch/arm/kernel/smp_scu.c.  I was thinking
+it might be generally useful when I wrote it (hence the more
+complete header comment, for example).  And I'll gladly move
+it there, I just didn't want anybody to get hung up on that.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Andrew Morton <akpm@linux-foundation.org>
----
- lib/Makefile         |    3 ++-
- lib/fdt_empty_tree.c |    2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
- create mode 100644 lib/fdt_empty_tree.c
-
-diff --git a/lib/Makefile b/lib/Makefile
-index 02da5b6..5f5b6a2 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -149,7 +149,8 @@ obj-$(CONFIG_GENERIC_NET_UTILS) += net_utils.o
- 
- obj-$(CONFIG_STMP_DEVICE) += stmp_device.o
- 
--libfdt_files = fdt.o fdt_ro.o fdt_wip.o fdt_rw.o fdt_sw.o fdt_strerror.o
-+libfdt_files = fdt.o fdt_ro.o fdt_wip.o fdt_rw.o fdt_sw.o fdt_strerror.o \
-+	       fdt_empty_tree.o
- $(foreach file, $(libfdt_files), \
- 	$(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
- lib-$(CONFIG_LIBFDT) += $(libfdt_files)
-diff --git a/lib/fdt_empty_tree.c b/lib/fdt_empty_tree.c
-new file mode 100644
-index 0000000..5d30c58
---- /dev/null
-+++ b/lib/fdt_empty_tree.c
-@@ -0,0 +1,2 @@
-+#include <linux/libfdt_env.h>
-+#include "../scripts/dtc/libfdt/fdt_empty_tree.c"
--- 
-1.7.10.4
+					-Alex
