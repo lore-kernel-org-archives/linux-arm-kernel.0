@@ -1,68 +1,25 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 04 Apr 2014 10:35:54 -0700
-Subject: [PATCH] watchdog: sunxi: Fix compilation with C=2
-In-Reply-To: <1396632265-16124-1-git-send-email-emilio@elopez.com.ar>
-References: <1396632265-16124-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <533EED7A.20307@roeck-us.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 4 Apr 2014 19:40:11 +0200
+Subject: [PATCH v4 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <aab78696ac364d9c832993c08915bad3@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1396579272-19542-1-git-send-email-yao.yuan@freescale.com>
+ <1396579272-19542-2-git-send-email-yao.yuan@freescale.com>
+ <201404041628.55471.marex@denx.de>
+ <aab78696ac364d9c832993c08915bad3@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <20140404174011.GA8489@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2014 10:24 AM, Emilio L?pez wrote:
-> When compiling sunxi_defconfig while using C=2, the following error
-> causes the compilation to fail:
->
->      drivers/watchdog/sunxi_wdt.c:60:15: error: constant 0b0001 is not a valid number
->
-> Fix it by using hex notation instead of the non-standard binary one
->
+> The ugly is my work or even the ability but not the attitude, I think.
 
-What defines "non-standard" here ? Isn't this a sparse problem that should possibly
-be fixed in sparse instead ?
+Explaining which tests were done is what I wanted to request more often
+from submitters anyhow. Your leftover (yes, this can happen) just
+reminded me to actually do that :)
 
-[ I don't mind changing it as the 0bXXXX notation doesn't seem to be used much
-   in the kernel, but we should not claim something to be non-standard if it is
-   just not widely used. As normal compilation doesn't seem to have a problem,
-   we should be sure that it is non-standard if we claim it to be non-standard. ]
-
-Thanks,
-Guenter
-
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> ---
->   drivers/watchdog/sunxi_wdt.c | 22 +++++++++++-----------
->   1 file changed, 11 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-> index cd00a78..693b9d2 100644
-> --- a/drivers/watchdog/sunxi_wdt.c
-> +++ b/drivers/watchdog/sunxi_wdt.c
-> @@ -57,17 +57,17 @@ struct sunxi_wdt_dev {
->    */
->
->   static const int wdt_timeout_map[] = {
-> -	[1] = 0b0001,  /* 1s  */
-> -	[2] = 0b0010,  /* 2s  */
-> -	[3] = 0b0011,  /* 3s  */
-> -	[4] = 0b0100,  /* 4s  */
-> -	[5] = 0b0101,  /* 5s  */
-> -	[6] = 0b0110,  /* 6s  */
-> -	[8] = 0b0111,  /* 8s  */
-> -	[10] = 0b1000, /* 10s */
-> -	[12] = 0b1001, /* 12s */
-> -	[14] = 0b1010, /* 14s */
-> -	[16] = 0b1011, /* 16s */
-> +	[1] = 0x1,  /* 1s  */
-> +	[2] = 0x2,  /* 2s  */
-> +	[3] = 0x3,  /* 3s  */
-> +	[4] = 0x4,  /* 4s  */
-> +	[5] = 0x5,  /* 5s  */
-> +	[6] = 0x6,  /* 6s  */
-> +	[8] = 0x7,  /* 8s  */
-> +	[10] = 0x8, /* 10s */
-> +	[12] = 0x9, /* 12s */
-> +	[14] = 0xA, /* 14s */
-> +	[16] = 0xB, /* 16s */
->   };
->
->   static int sunxi_wdt_ping(struct watchdog_device *wdt_dev)
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/0cac4c18/attachment.sig>
