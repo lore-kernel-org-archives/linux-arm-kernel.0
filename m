@@ -1,104 +1,99 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 15:53:14 +0200
-Subject: [PATCH v2 02/10] ARM: mvebu: add a coherency_available() call
-In-Reply-To: <1396619602-4510-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1396619602-4510-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396619602-4510-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  4 Apr 2014 15:53:12 +0200
+Subject: [PATCH v2 00/10] ARM: mvebu: Hardware coherency support for Armada
+ 375 and 38x
+Message-ID: <1396619602-4510-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extends the coherency fabric code to provide a
-coherency_available()function that the SoC code can call to be told
-whether coherency support is available or not. On Armada 370/XP,
-coherency support is available as soon as the relevant DT node is
-present. On some upcoming SoCs, the DT node needs to be present *and*
-the system running with CONFIG_SMP enabled.
+Jason, Gregory, Andrew, Sebastian,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c | 30 ++++++++++++++++++++++--------
- arch/arm/mach-mvebu/coherency.h |  1 +
- 2 files changed, 23 insertions(+), 8 deletions(-)
+This set of patches add hardware coherency support for the new Armada
+375 and Armada 38x SoCs.
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 434cf5f..296cf14 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -39,6 +39,7 @@ static void __iomem *coherency_cpu_base;
- #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
- 
- enum {
-+	COHERENCY_FABRIC_TYPE_NONE,
- 	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
- };
- 
-@@ -144,7 +145,7 @@ static void __init armada_370_coherency_init(struct device_node *np)
- 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
- }
- 
--int __init coherency_init(void)
-+static int coherency_type(void)
- {
- 	struct device_node *np;
- 
-@@ -155,27 +156,40 @@ int __init coherency_init(void)
- 		int type;
- 
- 		type = (int) match->data;
--		pr_info("Initializing Coherency fabric\n");
- 
-+		/* Armada 370/XP coherency works in both UP and SMP */
- 		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
--			armada_370_coherency_init(np);
-+			return type;
- 
- 		of_node_put(np);
- 	}
- 
--	return 0;
-+	return COHERENCY_FABRIC_TYPE_NONE;
- }
- 
--static int __init coherency_late_init(void)
-+int coherency_available(void)
- {
-+	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
-+}
-+
-+int __init coherency_init(void)
-+{
-+	int type = coherency_type();
- 	struct device_node *np;
- 
- 	np = of_find_matching_node(NULL, of_coherency_table);
--	if (np) {
-+
-+	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
-+		armada_370_coherency_init(np);
-+
-+	return 0;
-+}
-+
-+static int __init coherency_late_init(void)
-+{
-+	if (coherency_available())
- 		bus_register_notifier(&platform_bus_type,
- 				      &mvebu_hwcc_platform_nb);
--		of_node_put(np);
--	}
- 	return 0;
- }
- 
-diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
-index 760226c..02f7ec3 100644
---- a/arch/arm/mach-mvebu/coherency.h
-+++ b/arch/arm/mach-mvebu/coherency.h
-@@ -18,5 +18,6 @@ extern unsigned long coherency_phys_base;
- 
- int set_cpu_coherent(unsigned int cpu_id, int smp_group_id);
- int coherency_init(void);
-+int coherency_available(void);
- 
- #endif	/* __MACH_370_XP_COHERENCY_H */
+Changes since v1:
+
+ * Rebased on top of current linux-next, and therefore updated to take
+   into account the changes in mach-mvebu, such as Kirkwood/Dove
+   integration. A new version will be sent as soon as 3.15-rc1 is
+   released.
+
+ * Removed a debugging message from coherency_type() which was being
+   displayed every time this function was called, to say "Initializing
+   coherency fabric", which was incorrect.
+
+ * Delay the initialization of the XOR-based coherency workaround for
+   Armada 375 into the postcore_initcall(), before the bus notifier
+   gets registered. This solves two problems: 1/ the
+   of_update_property() cannot be done as early as it could be done in
+   earlier kernels, and 2/ it avoids having to initialize the MBus
+   driver before the coherency fabric.
+
+ * Added a warning message when the XOR-based coherency workaround for
+   Armada 375 is enabled, so that the user at least has a trace in the
+   kernel logs explaining why a XOR engine is not available.
+
+The patches can also be grabbed from:
+
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/3.15-next-mvebu/coherency
+
+The patch set can be divided in three sections:
+
+ * Patches 1, 2, 3 and 4 prepare the introduction of the support for
+   new SoC in the existing coherency code.
+
+   The main change is that the mvebu-mbus driver no longer pokes into
+   the Device Tree to find whether hardware I/O coherency is available
+   or not: this information is passed as argument to the mvebu-mbus
+   initialization function. This avoids changing the mvebu-mbus driver
+   to add the compatible strings of all possible coherency fabrics,
+   and also avoids encoding specific conditions in the mvebu-mbus
+   driver: on Armada 375 and 38x, the hardware I/O coherency can only
+   be enabled in SMP mode.
+
+   These preparation patches had already been sent in the past
+   (http://permalink.gmane.org/gmane.linux.ports.arm.kernel/290780). This
+   round has taken into account the comments I had received on this
+   early version.
+
+ * Patches 5, 6, 7 and 8 add the coherency support itself. Patch 4
+   enables the SCU, patch 5 adds I/O coherency support for 375, patch
+   6 adds a major workaround to make coherency support actually work
+   on early 375 SOCs and patch 7 adds I/O coherency support for 38x.
+
+ * Patches 9 and 10 add the necessary Device Tree informations to
+   enable the coherency.
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (10):
+  ARM: mvebu: prepare coherency code to support more SOCs
+  ARM: mvebu: add a coherency_available() call
+  bus: mvebu: pass the coherency availability information at init time
+  ARM: mvebu: ARM: mvebu: use of_find_matching_node_and_match() in
+    coherency.c
+  ARM: mvebu: enable the ARM SCU on Armada 375 and Armada 38x
+  ARM: mvebu: add Armada 375 support to the coherency code
+  ARM: mvebu: implement Armada 375 coherency workaround
+  ARM: mvebu: add Armada 38x support to the coherency code
+  ARM: mvebu: enable the coherency fabric on Armada 375
+  ARM: mvebu: enable the coherency fabric on Armada 38x
+
+ .../devicetree/bindings/arm/coherency-fabric.txt   |  32 ++-
+ arch/arm/boot/dts/armada-375.dtsi                  |  10 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |  10 +
+ arch/arm/mach-kirkwood/board-dt.c                  |   2 +-
+ arch/arm/mach-mvebu/Kconfig                        |   2 +
+ arch/arm/mach-mvebu/board-v7.c                     |  21 +-
+ arch/arm/mach-mvebu/coherency.c                    | 262 +++++++++++++++++++--
+ arch/arm/mach-mvebu/coherency.h                    |   1 +
+ arch/arm/mach-mvebu/dove.c                         |   2 +-
+ arch/arm/mach-mvebu/kirkwood.c                     |   2 +-
+ drivers/bus/mvebu-mbus.c                           |  11 +-
+ include/linux/mbus.h                               |   2 +-
+ 12 files changed, 315 insertions(+), 42 deletions(-)
+
 -- 
 1.8.3.2
