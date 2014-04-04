@@ -1,67 +1,84 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 4 Apr 2014 18:00:13 +0200
-Subject: [PATCH 1/2] ARM: mvebu: enable the SDHCI interface on Armada 385
-In-Reply-To: <1396626125-8631-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1396626125-8631-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140404160013.GK2798@lunn.ch>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Fri, 4 Apr 2014 16:02:58 +0000
+Subject: mach header files
+In-Reply-To: <6837506.Q7cFQWf1xJ@wuerfel>
+References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <5297747.kWEjnPz8MW@wuerfel>
+ <9970caa86d5c454d840c489901d3ca91@SIXPR06MB173.apcprd06.prod.outlook.com>
+ <6837506.Q7cFQWf1xJ@wuerfel>
+Message-ID: <730e7ebfabf7489bbfee808cd0247411@SIXPR06MB173.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 05:42:04PM +0200, Thomas Petazzoni wrote:
-> In commit "mmc: sdhci-pxav3: add support for the Armada 38x SDHCI
-> controller", the sdhci-pxav3 driver has been extended to also be
-> usable on Armada 38x platforms.
+On 04 April 2014 16:51, Arnd wrote:
+> On Friday 04 April 2014 15:42:37 Phil Edworthy wrote:
+> >
+> > On 04 April 2014 16:31, Arnd wrote:
+> > > On Friday 04 April 2014 13:52:53 Phil Edworthy wrote:
+> > > > On 04 April 2014 14:24, Arnd wrote:
+> > > > > We still make the occasional exception for adding code in the mach-*
+> > > > > directory, but we are getting pretty close to the state where this
+> > > > > is not needed for new platforms, and all the existing uses are for
+> > > > > things that can eventually get cleaned up.
+> > > > > If you think you need an exception here, please explain what you
+> > > > > are doing, and we can see if there is a better way to do that already.
+> > > >
+> > > > Ok, that's what I suspected about the mach header files.
+> > > >
+> > > > I didn't realise about the expectation that there is no
+> > > > arch/arm/mach-* for new platforms. At the moment I have only a
+> > > > small amount of platform code:
+> > > > 1. SMP holding pen code (as there is no power control for the second
+> > > > core), though I have recently seen patches to provide a generic solution
+> > > > for this.
+> > >
+> > > Proper platforms should not be using the holding pen, that is only
+> > > done on systems that don't have real hardware support for CPU
+> > > power management. Ideally you should be implementing PSCI in the
+> > > firmware, and then you won't need any code for SMP.
+> > >
+> > > > 2. Firmware calls (via struct firmware_ops) for set_cpu_boot_addr
+> > > >  and cpu_boot. This falls back to directly accessing registers in
+> > > > the system control block, if the firmware fails. This is useful when
+> > > > developing the system when no firmware exists yet.
+> > >
+> > > Same thing.
+> > Ok, something to look into. How the hardware will work is complicated
+> > by the fact that we don't have silicon for this device yet, just a
+> > simulator.  As for the firmware, I am not sure I will see that. Our
+> > customer is implementing it and responsible for creating the firmware
+> > calls from Linux, hence the fall backs.
 > 
-> Therefore, this commit adds the necessary Device Tree informations to
-> declare this SDHCI interface in the Armada 38x SoC, and also in the
-> Armada 385 Development Board.
+> In that case, I would recommend that you just rely on PSCI in the
+> kernel and leave it up to your customer to either implement that
+> in their firmware, or provide kernel support for the interfaces
+> they want. If they have a good reason to need a different interface,
+> they can also send patches for that and argue for inclusion, but
+> that is not part of the base platform support you do.
+
+Makes sense, I'll see if I can push it that way!
+
+ 
+> > > > 3. A write to a system control register to switch the pl011 uart
+> > > > from DMA single requests, to DMA burst requests.
+> > >
+> > > Do you need to do this at run-time, or is it something that could
+> > > be done in the bootloader before Linux starts up?
+> >
+> > I might be able to get it into the boot loader, but this is
+> > implemented by the customer. One question is whether it should
+> > be in the boot loader. The behaviour is specify to the Linux port,
+> > whereas the boot loader can be used for a number of different OS.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-385-db.dts | 8 ++++++++
->  arch/arm/boot/dts/armada-38x.dtsi   | 9 +++++++++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-> index 6828d77..959aeed 100644
-> --- a/arch/arm/boot/dts/armada-385-db.dts
-> +++ b/arch/arm/boot/dts/armada-385-db.dts
-> @@ -101,6 +101,14 @@
->  					reg = <0x1000000 0x3f000000>;
->  				};
->  			};
-> +
-> +			sdhci at d8000 {
-> +				clock-frequency = <200000000>;
-> +				broken-cd;
-> +				wp-inverted;
-> +				bus-width = <8>;
-> +				status = "okay";
-> +			};
->  		};
->  
->  		pcie-controller {
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index a064f59..2c1ff30 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -355,6 +355,15 @@
->  				clocks = <&coredivclk 0>;
->  				status = "disabled";
->  			};
-> +
-> +			sdhci at d8000 {
-> +				compatible = "marvell,armada-380-sdhci";
-> +				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-> +				interrupts = <0 25 0x4>;
-> +				clocks = <&gateclk 17>;
-> +				mrvl,clk-delay-cycles = <0x1F>;
+> What is the impact for single-request vs burst request? Is it just
+> performance? You can add a DT property in the pl011 node to let
+> the device driver know which of the two modes was set up by the
+> boot loader, and implement both in the driver. Then anybody who
+> wants burst mode can set it in the boot loader and every OS will
+> be able to find out the mode from DT.
+Unfortunately, it's not a performance toggle. Functionally, the pl011 will only work with a DMAC if we use the DMA burst request. That's not completely true though as whether it will work depends on the pl011 driver. With the upstream pl011 linux driver, it's true.
 
-Hi Thomas
+BTW, the register to control this has nothing to do with the pl011 hardware. The standard pl011 hardware, afaik, outputs both the DMA single request and DMA burst request signals, and which one is wired up to the DMAC depends on who designed the SoC. For this hardware, the hardware people played safe and provided a register that can be used to switch between the single and burst request signals.
 
-Maybe this has been discussed as part of the previous patchset. Why
-the mrvl prefix, not marvell? marvell is in vendor-prefixes.txt, but
-mrvl does not appear to be listed.
-
-     Andrew
+Thanks
+Phil
