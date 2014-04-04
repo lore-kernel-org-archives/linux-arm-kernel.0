@@ -1,38 +1,87 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Fri, 4 Apr 2014 12:35:27 +0200
-Subject: [PATCH] dt-bindings: add vendor-prefix for Newhaven Display
-In-Reply-To: <1396493527-26170-1-git-send-email-dinguyen@altera.com>
-References: <1396493527-26170-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20140404103527.GC9242@amd.pavel.ucw.cz>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 04 Apr 2014 12:40:46 +0200
+Subject: [PATCH V2 02/19] mmc: mmci: Convert to devm functions
+In-Reply-To: <1396279100-2920-3-git-send-email-ulf.hansson@linaro.org>
+References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
+ <1396279100-2920-3-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <533E8C2E.9040400@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2014-04-02 21:52:07, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On 03/31/2014 05:18 PM, Ulf Hansson wrote:
+> Converting to devm functions to simplify error handling in ->probe() and
+> to cleanup ->remove().
 > 
-> Newhaven Display provides the worldwide marketplace with cost
-> effective high quality display devices ranging from OLED and LCD
-> Displays to VFD Displays.
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/mmc/host/mmci.c |   51 ++++++++++++++++++-----------------------------
+>  1 file changed, 19 insertions(+), 32 deletions(-)
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index b0b81ac..d6f20ba 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/init.h>
+>  #include <linux/ioport.h>
+>  #include <linux/device.h>
+> +#include <linux/io.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/kernel.h>
+>  #include <linux/slab.h>
+> @@ -1456,15 +1457,13 @@ static int mmci_probe(struct amba_device *dev,
+>  	if (np)
+>  		mmci_dt_populate_generic_pdata(np, plat);
+>  
+> -	ret = amba_request_regions(dev, DRIVER_NAME);
+> -	if (ret)
+> -		goto out;
+> +	if (!devm_request_mem_region(&dev->dev, dev->res.start,
+> +				resource_size(&dev->res), DRIVER_NAME))
+> +		return -ENOMEM;
 
-Commit log should not be a place for advertising? :-)
+here. Look below.
 
-Reviewed-by: Pavel Machek <pavel@denx.de>
+>  
+>  	mmc = mmc_alloc_host(sizeof(struct mmci_host), &dev->dev);
+> -	if (!mmc) {
+> -		ret = -ENOMEM;
+> -		goto rel_regions;
+> -	}
+> +	if (!mmc)
+> +		return -ENOMEM;
+>  
+>  	host = mmc_priv(mmc);
+>  	host->mmc = mmc;
+> @@ -1500,8 +1499,10 @@ static int mmci_probe(struct amba_device *dev,
+>  		dev_dbg(mmc_dev(mmc), "eventual mclk rate: %u Hz\n",
+>  			host->mclk);
+>  	}
+> +
+>  	host->phybase = dev->res.start;
+> -	host->base = ioremap(dev->res.start, resource_size(&dev->res));
+> +	host->base = devm_ioremap(&dev->dev, host->phybase,
+> +				resource_size(&dev->res));
 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 4685ec3..7037990 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -60,6 +60,7 @@ microchip	Microchip Technology Inc.
->  mosaixtech	Mosaix Technologies, Inc.
->  national	National Semiconductor
->  neonode		Neonode Inc.
-> +newhaven	Newhaven Display International
->  nintendo	Nintendo
->  nvidia	NVIDIA
->  nxp	NXP Semiconductors
+Isn't it better to use devm_ioremap_resource directly?
+You will get correct error return values too.
+
+Thanks,
+Michal
+
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/45aa4b2b/attachment.sig>
