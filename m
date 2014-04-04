@@ -1,178 +1,78 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri,  4 Apr 2014 23:27:50 +0200
-Subject: [PATCH 2/2] arm: use fixmap for text patching when text is RO
-In-Reply-To: <1396646870-29695-1-git-send-email-rabin@rab.in>
-References: <1396646870-29695-1-git-send-email-rabin@rab.in>
-Message-ID: <1396646870-29695-2-git-send-email-rabin@rab.in>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri,  4 Apr 2014 15:00:30 -0700
+Subject: [PATCH 1/2] ARM: zynq: dt: Convert to preprocessor includes
+Message-ID: <1396648831-7570-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use fixmaps for text patching when the kernel text is read-only,
-inspired by x86.  This makes jump labels and kprobes work with the
-currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
-CONFIG_DEBUG_RODATA options.
+Convert all Zynq DT files to the dtc preprocessor include syntax.
+This allows to include header files in the devicetrees like other
+SoC-types already do.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
+Inspired-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+(http://www.spinics.net/lists/arm-kernel/msg319832.html)
+
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- arch/arm/include/asm/fixmap.h |  3 ++
- arch/arm/kernel/jump_label.c  |  2 +-
- arch/arm/kernel/patch.c       | 66 ++++++++++++++++++++++++++++++++++++++-----
- arch/arm/kernel/patch.h       | 12 +++++++-
- 4 files changed, 74 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 55ed076..79c1719 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -18,6 +18,9 @@
- #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+ arch/arm/boot/dts/zynq-7000.dtsi | 3 ++-
+ arch/arm/boot/dts/zynq-zc702.dts | 2 +-
+ arch/arm/boot/dts/zynq-zc706.dts | 2 +-
+ arch/arm/boot/dts/zynq-zed.dts   | 2 +-
+ 4 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 789d0bacc110..b028278b7f49 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -10,7 +10,8 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-/include/ "skeleton.dtsi"
++
++#include "skeleton.dtsi"
  
- enum fixed_addresses {
-+	FIX_TEXT_POKE0,
-+	FIX_TEXT_POKE1,
-+
- 	FIX_KMAP_BEGIN,
- 	FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
- 	__end_of_fixed_addresses
-diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
-index 4ce4f78..afeeb9e 100644
---- a/arch/arm/kernel/jump_label.c
-+++ b/arch/arm/kernel/jump_label.c
-@@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
- 		insn = arm_gen_nop();
+ / {
+ 	compatible = "xlnx,zynq-7000";
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index c913f77a21eb..07713d3c716a 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -12,7 +12,7 @@
+  * GNU General Public License for more details.
+  */
+ /dts-v1/;
+-/include/ "zynq-7000.dtsi"
++#include "zynq-7000.dtsi"
  
- 	if (is_static)
--		__patch_text(addr, insn);
-+		__patch_text_early(addr, insn);
- 	else
- 		patch_text(addr, insn);
- }
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 07314af..761c5b6 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -1,8 +1,11 @@
- #include <linux/kernel.h>
-+#include <linux/spinlock.h>
- #include <linux/kprobes.h>
-+#include <linux/mm.h>
- #include <linux/stop_machine.h>
+ / {
+ 	model = "Zynq ZC702 Development Board";
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index 88f62c50382e..cf6566cdb02a 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -13,7 +13,7 @@
+  * GNU General Public License for more details.
+  */
+ /dts-v1/;
+-/include/ "zynq-7000.dtsi"
++#include "zynq-7000.dtsi"
  
- #include <asm/cacheflush.h>
-+#include <asm/fixmap.h>
- #include <asm/smp_plat.h>
- #include <asm/opcodes.h>
+ / {
+ 	model = "Zynq ZC706 Development Board";
+diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+index 82d7ef1a9a9c..1541716e2cfb 100644
+--- a/arch/arm/boot/dts/zynq-zed.dts
++++ b/arch/arm/boot/dts/zynq-zed.dts
+@@ -13,7 +13,7 @@
+  * GNU General Public License for more details.
+  */
+ /dts-v1/;
+-/include/ "zynq-7000.dtsi"
++#include "zynq-7000.dtsi"
  
-@@ -13,21 +16,67 @@ struct patch {
- 	unsigned int insn;
- };
- 
--void __kprobes __patch_text(void *addr, unsigned int insn)
-+static DEFINE_SPINLOCK(patch_lock);
-+
-+static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-+{
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool module = !core_kernel_text(uintaddr);
-+	struct page *page;
-+
-+	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
-+		page = vmalloc_to_page(addr);
-+	} else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
-+		page = virt_to_page(addr);
-+	} else {
-+		return addr;
-+	}
-+
-+	if (flags)
-+		spin_lock_irqsave(&patch_lock, *flags);
-+
-+	set_fixmap(fixmap, page_to_phys(page));
-+
-+	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-+}
-+
-+static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
-+{
-+	clear_fixmap(fixmap);
-+
-+	if (flags)
-+		spin_unlock_irqrestore(&patch_lock, *flags);
-+}
-+
-+void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- {
- 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	unsigned long flags;
-+	void *waddr = addr;
- 	int size;
- 
-+	if (remap)
-+		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-+
- 	if (thumb2 && __opcode_is_thumb16(insn)) {
--		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
-+		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
- 		size = sizeof(u16);
--	} else if (thumb2 && ((uintptr_t)addr & 2)) {
-+	} else if (thumb2 && (uintaddr & 2)) {
-+		bool twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
- 		u16 first = __opcode_thumb32_first(insn);
- 		u16 second = __opcode_thumb32_second(insn);
--		u16 *addrh = addr;
-+		u16 *addrh0 = waddr;
-+		u16 *addrh1 = waddr + 2;
-+
-+		if (remap && twopage)
-+			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
- 
--		addrh[0] = __opcode_to_mem_thumb16(first);
--		addrh[1] = __opcode_to_mem_thumb16(second);
-+		*addrh0 = __opcode_to_mem_thumb16(first);
-+		*addrh1 = __opcode_to_mem_thumb16(second);
-+
-+		if (twopage && addrh1 != addr + 2)
-+			patch_unmap(FIX_TEXT_POKE1, NULL);
- 
- 		size = sizeof(u32);
- 	} else {
-@@ -36,10 +85,13 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
- 		else
- 			insn = __opcode_to_mem_arm(insn);
- 
--		*(u32 *)addr = insn;
-+		*(u32 *)waddr = insn;
- 		size = sizeof(u32);
- 	}
- 
-+	if (waddr != addr)
-+		patch_unmap(FIX_TEXT_POKE0, &flags);
-+
- 	flush_icache_range((uintptr_t)(addr),
- 			   (uintptr_t)(addr) + size);
- }
-diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
-index b4731f2..77e054c 100644
---- a/arch/arm/kernel/patch.h
-+++ b/arch/arm/kernel/patch.h
-@@ -2,6 +2,16 @@
- #define _ARM_KERNEL_PATCH_H
- 
- void patch_text(void *addr, unsigned int insn);
--void __patch_text(void *addr, unsigned int insn);
-+void __patch_text_real(void *addr, unsigned int insn, bool remap);
-+
-+static inline void __patch_text(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, true);
-+}
-+
-+static inline void __patch_text_early(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, false);
-+}
- 
- #endif
+ / {
+ 	model = "Zynq Zed Development Board";
 -- 
-1.9.1
+1.9.1.1.gbb9f595
