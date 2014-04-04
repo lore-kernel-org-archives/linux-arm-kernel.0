@@ -1,65 +1,92 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  4 Apr 2014 15:43:08 +0200
-Subject: [PATCH V2 16/17] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle directory
-In-Reply-To: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396618989-2897-17-git-send-email-daniel.lezcano@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 4 Apr 2014 06:44:54 -0700
+Subject: mach header files
+In-Reply-To: <645d041db09d4cf883ba178c695fe504@HKXPR06MB168.apcprd06.prod.outlook.com>
+References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <CACxGe6sV7WpQeiGxjnmaatnCCzRBqU=O6qyuQXJd+RYt4QUXgg@mail.gmail.com>
+ <2be18849c59e4e6686a5b038659279d4@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <CACxGe6u0_iMjoCWSw2x=ndEwwYCAaCqFO6OCGHvvuvVnBr2pjg@mail.gmail.com>
+ <645d041db09d4cf883ba178c695fe504@HKXPR06MB168.apcprd06.prod.outlook.com>
+Message-ID: <CACxGe6u=vxVRinimmryopwWO96Gz01tGb=muTT-64knZ99oj-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-exynos/Makefile                      |    1 -
- drivers/cpuidle/Kconfig.arm                        |    7 +++++++
- drivers/cpuidle/Makefile                           |    1 +
- .../cpuidle.c => drivers/cpuidle/cpuidle-exynos.c  |    0
- 4 files changed, 8 insertions(+), 1 deletion(-)
- rename arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/cpuidle-exynos.c (100%)
+On Fri, Apr 4, 2014 at 6:14 AM, Phil Edworthy <phil.edworthy@renesas.com> wrote:
+> Hi Grant,
+>
+> On: 04 April 2014 13:23, Grant wrote:
+>> On Fri, Apr 4, 2014 at 5:16 AM, Phil Edworthy <phil.edworthy@renesas.com>
+>> wrote:
+>> > Hi Grant,
+>> >
+>> > On: 04 April 2014 11:30, Grant wrote:
+>> >> On Fri, Apr 4, 2014 at 1:19 AM, Phil Edworthy
+>> <phil.edworthy@renesas.com>
+>> >> wrote:
+>> >> > Resent, hopefully without the automatic corporate signature appended
+>> >> this time...
+>> >> >
+>> >> > Hi,
+>> >> >
+>> >> > I am porting the kernel to a new device, for which I've created a new
+>> >> arch/arm/mach-... directory, and I also a clock driver that lives under
+>> >> driver/clk. Everything is all working fine, though I am now cleaning up the
+>> >> code and have a question about mach specific header files.
+>> >> >
+>> >> > The clock driver is completely specific to this device, but needs to read
+>> from
+>> >> a system register (just for external boot mode pins) to determine some
+>> PLL
+>> >> settings. This register is in a block of system registers which are also used
+>> by
+>> >> the mach code in arch/arm/mach-...
+>> >> >
+>> >> > Since the clock driver is specific to the mach, is there any point in
+>> specifying
+>> >> the address of this reg in the corresponding dtsi? The format and
+>> >> functionality described by this register would not be the same on any
+>> other
+>> >> device.
+>> >>
+>> >> Why would you not? The dts is a central place where the entire memory
+>> map
+>> >> layout of the device can be specified. If I were working on the board
+>> support,
+>> >> I would create a node for the register block and have the driver retrieve
+>> that
+>> >> node.
+>> >
+>> > Ok, that's a slightly different view to the one I had. I had thought that the
+>> dts would only contain information that could be changed from one platform
+>> to another.
+>> >
+>> >> > If I don't specify the address of the register in the dtsi, I think it would
+>> be
+>> >> best to have a common header file for all of the system registers. I've
+>> seen
+>> >> some drivers, e.g.  exynos-cpufreq.c, doing this by including files from
+>> mach-
+>> >> exynos/include/mach. Is that the right way to do this?
+>> >>
+>> >> You'd still want to have a header file for each of the register offsets within
+>> >> the block. You wouldn't want to itemize register offsets in the device tree
+>> >> node.
+>> >
+>> > You would put that include file in a mach-.../include/mach/ dir, right?
+>>
+>> If it is used only by one driver, then it should go directly into that
+>> driver without a #include. For SoC defines, you'll need to check with
+>> the arm-soc maintainers. I *think* we're trying to get away from
+>> separate arch/arm/mach-* directories, but I'm slightly out of touch.
+>> You certainly should not do anything that breaks multiplatform builds.
+>
+> This is where it gets tricky. The clock driver only wants to know about one reg in a block of general system control registers. There is very little input to the clock driver... the SoC code needs to access other registers in the system control block.
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index a656dbe..21bd364 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -16,7 +16,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o
- 
- obj-$(CONFIG_PM_SLEEP)		+= pm.o sleep.o
- obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
--obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- 
- obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
- 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index d988948..92f0c12 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -44,3 +44,10 @@ config ARM_AT91_CPUIDLE
- 	depends on ARCH_AT91
- 	help
- 	  Select this to enable cpuidle for AT91 processors
-+
-+config ARM_EXYNOS_CPUIDLE
-+	bool "Cpu Idle Driver for the Exynos processors"
-+	default y
-+	depends on ARCH_EXYNOS
-+	help
-+	  Select this to enable cpuidle for Exynos processors
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index f71ae1b..0d1540a 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
- obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
-+obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
- 
- ###############################################################################
- # POWERPC drivers
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/drivers/cpuidle/cpuidle-exynos.c
-similarity index 100%
-rename from arch/arm/mach-exynos/cpuidle.c
-rename to drivers/cpuidle/cpuidle-exynos.c
--- 
-1.7.9.5
+As long as it can find the registers and if the clock driver is only
+reading the registers then there is no problem. You don't need to
+worry about locking and the driver can access the registers directly.
+
+If the driver needs to coordinate with other drivers, then you should
+have a little block of code to manage the system register block.
+
+g.
