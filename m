@@ -1,86 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 15:55:49 +0200
-Subject: [PATCH v2 5/6] ARM: mvebu: switch to the new PMSU binding in Armada
- 370/XP Device Tree
-In-Reply-To: <1396619750-4790-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1396619750-4790-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396619750-4790-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri, 4 Apr 2014 19:27:36 +0530
+Subject: [PATCH] usb: ohci-exynos: Remove locks for 'ohci' in suspend
+ callback
+In-Reply-To: <1396618417-9560-1-git-send-email-gautam.vivek@samsung.com>
+References: <1396618417-9560-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAFp+6iGwMhQT=atd_u0-qA-cEnnwPMHkOEB=9ooqtPOj8QOcvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Fri, Apr 4, 2014 at 7:03 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
+> Patch : 14982e3 USB: OHCI: Properly handle ohci-exynos suspend
+> has already removed 'ohci_hcd' settings from exynos glue layer
+> as a part of streamlining the ohci controller's suspend.
+> So we don't need the locks for 'ohci_hcd' anymore.
+>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Manjunath Goudar <csmanjuvijay@gmail.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> ---
 
-Following the introduction of the new PMSU Device Tree binding, as
-well as the separate CPU reset binding, this commit switches the
-Armada 370 and Armada XP Device Trees to use them.
+Please ignore this patch, WIP, got sent by mistake :-(
+Sorry for spamming.
 
-The PMSU node is moved from the Armada XP specific armada-xp.dtsi to
-the common Armada 370/XP armada-370-xp.dtsi because the PMSU is in
-fact available at the same location on both SOCs.
+>  drivers/usb/host/ohci-exynos.c |    4 ----
+>  1 file changed, 4 deletions(-)
+>
+> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> index 68588d8..7f5e779 100644
+> --- a/drivers/usb/host/ohci-exynos.c
+> +++ b/drivers/usb/host/ohci-exynos.c
+> @@ -199,8 +199,6 @@ static int exynos_ohci_suspend(struct device *dev)
+>         if (rc)
+>                 return rc;
+>
+> -       spin_lock_irqsave(&ohci->lock, flags);
+> -
+>         if (exynos_ohci->otg)
+>                 exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+>
+> @@ -208,8 +206,6 @@ static int exynos_ohci_suspend(struct device *dev)
+>
+>         clk_disable_unprepare(exynos_ohci->clk);
+>
+> -       spin_unlock_irqrestore(&ohci->lock, flags);
+> -
+>         return 0;
+>  }
+>
+> --
+> 1.7.10.4
+>
 
-The CPU reset node is then added on both Armada 370 and Armada XP,
-with a different compatible string. On Armada 370, the CPU reset
-driver is not really needed as Armada 370 is single core and the only
-use of the CPU reset driver is to boot secondary processors, but it
-still makes sense to have this CPU reset register described in the
-Device Tree.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++++
- arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
- arch/arm/boot/dts/armada-xp.dtsi     | 6 +++---
- 3 files changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index bbb40f6..10d7786 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -203,6 +203,11 @@
- 				reg = <0x20300 0x34>, <0x20704 0x4>;
- 			};
- 
-+			pmsu at 22000 {
-+				compatible = "marvell,armada-370-pmsu";
-+				reg = <0x22000 0x1000>;
-+			};
-+
- 			usb at 50000 {
- 				compatible = "marvell,orion-ehci";
- 				reg = <0x50000 0x500>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index af1f11e..21b588b 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -220,6 +220,11 @@
- 				clocks = <&coreclk 2>;
- 			};
- 
-+			cpurst at 20800 {
-+				compatible = "marvell,armada-370-cpu-reset";
-+				reg = <0x20800 0x8>;
-+			};
-+
- 			audio_controller: audio-controller at 30000 {
- 				compatible = "marvell,armada370-audio";
- 				reg = <0x30000 0x4000>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index abb9f9d..0a7dff6 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -117,9 +117,9 @@
- 				clock-names = "nbclk", "fixed";
- 			};
- 
--			armada-370-xp-pmsu at 22000 {
--				compatible = "marvell,armada-370-xp-pmsu";
--				reg = <0x22100 0x400>, <0x20800 0x20>;
-+			cpurst at 20800 {
-+				compatible = "marvell,armada-370-cpu-reset";
-+				reg = <0x20800 0x20>;
- 			};
- 
- 			eth2: ethernet at 30000 {
 -- 
-1.8.3.2
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
