@@ -1,101 +1,80 @@
-From: baohua@kernel.org (Barry Song)
-Date: Fri, 4 Apr 2014 21:40:31 +0800
-Subject: [PATCH 59/75] ARM: l2c: prima2: remove cache size override
-In-Reply-To: <E1WTYZ6-0007Gr-6r@rmk-PC.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYZ6-0007Gr-6r@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAGsJ_4yUNET5mWEUH-KEtA1ei49Fo2aC20Wmb-jXhs0vF7HSYw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri,  4 Apr 2014 15:42:53 +0200
+Subject: [PATCH V2 01/17] ARM: exynos: cpuidle: Prevent forward declaration
+In-Reply-To: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396618989-2897-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-03-28 23:19 GMT+08:00 Russell King <rmk+kernel@arm.linux.org.uk>:
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/boot/dts/marco.dtsi  |  2 +-
->  arch/arm/boot/dts/prima2.dtsi |  2 +-
->  arch/arm/mach-prima2/l2x0.c   | 34 +---------------------------------
->  3 files changed, 3 insertions(+), 35 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/marco.dtsi b/arch/arm/boot/dts/marco.dtsi
-> index 1579c3491ccd..247879aa1224 100644
-> --- a/arch/arm/boot/dts/marco.dtsi
-> +++ b/arch/arm/boot/dts/marco.dtsi
-> @@ -36,7 +36,7 @@
->                 ranges = <0x40000000 0x40000000 0xa0000000>;
->
->                 l2-cache-controller at c0030000 {
-> -                       compatible = "sirf,marco-pl310-cache", "arm,pl310-cache";
-> +                       compatible = "arm,pl310-cache";
->                         reg = <0xc0030000 0x1000>;
->                         interrupts = <0 59 0>;
->                         arm,tag-latency = <1 1 1>;
-> diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-> index 0e219932d7cc..29b578727b0a 100644
-> --- a/arch/arm/boot/dts/prima2.dtsi
-> +++ b/arch/arm/boot/dts/prima2.dtsi
-> @@ -48,7 +48,7 @@
->                 ranges = <0x40000000 0x40000000 0x80000000>;
->
->                 l2-cache-controller at 80040000 {
-> -                       compatible = "arm,pl310-cache", "sirf,prima2-pl310-cache";
-> +                       compatible = "arm,pl310-cache";
->                         reg = <0x80040000 0x1000>;
->                         interrupts = <59>;
->                         arm,tag-latency = <1 1 1>;
-> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-> index 3a4eda45171e..09f68f046830 100644
-> --- a/arch/arm/mach-prima2/l2x0.c
-> +++ b/arch/arm/mach-prima2/l2x0.c
-> @@ -8,42 +8,10 @@
->
->  #include <linux/init.h>
->  #include <linux/kernel.h>
-> -#include <linux/of.h>
->  #include <asm/hardware/cache-l2x0.h>
->
-> -struct l2x0_aux
-> -{
-> -       u32 val;
-> -       u32 mask;
-> -};
-> -
-> -static struct l2x0_aux prima2_l2x0_aux __initconst = {
-> -       .val = L2C_AUX_CTRL_WAY_SIZE(2),
-> -       .mask = 0,
-> -};
-> -
-> -static struct l2x0_aux marco_l2x0_aux __initconst = {
-> -       .val = L2C_AUX_CTRL_WAY_SIZE(2) | L310_AUX_CTRL_ASSOCIATIVITY_16,
-> -       .mask = L2X0_AUX_CTRL_MASK,
-> -};
-> -
-> -static struct of_device_id sirf_l2x0_ids[] __initconst = {
-> -       { .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
-> -       { .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
-> -       {},
-> -};
-> -
->  static int __init sirfsoc_l2x0_init(void)
->  {
-> -       struct device_node *np;
-> -       const struct l2x0_aux *aux;
-> -
-> -       np = of_find_matching_node(NULL, sirf_l2x0_ids);
-> -       if (np) {
-> -               aux = of_match_node(sirf_l2x0_ids, np)->data;
-> -               return l2x0_of_init(aux->val, aux->mask);
-> -       }
-> -
-> -       return 0;
-> +       return l2x0_of_init(0, ~0);
+Move the structure below the 'exynos4_enter_lowpower' function so no more
+need of forward declaration.
 
-Russell, as i mailed you before, pre-set L2 has disabled
-write_combined, here we can make the bit restored.
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-exynos/cpuidle.c |   40 ++++++++++++++++++----------------------
+ 1 file changed, 18 insertions(+), 22 deletions(-)
 
->  }
->  early_initcall(sirfsoc_l2x0_init);
-> --
-> 1.8.3.1
->
-
--barry
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index b530231..9623a05 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -59,30 +59,8 @@
+ #define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
+ #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
+ 
+-static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index);
+-
+ static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+ 
+-static struct cpuidle_driver exynos4_idle_driver = {
+-	.name			= "exynos4_idle",
+-	.owner			= THIS_MODULE,
+-	.states = {
+-		[0] = ARM_CPUIDLE_WFI_STATE,
+-		[1] = {
+-			.enter			= exynos4_enter_lowpower,
+-			.exit_latency		= 300,
+-			.target_residency	= 100000,
+-			.flags			= CPUIDLE_FLAG_TIME_VALID,
+-			.name			= "C1",
+-			.desc			= "ARM power down",
+-		},
+-	},
+-	.state_count = 2,
+-	.safe_state_index = 0,
+-};
+-
+ /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+ static void exynos4_set_wakeupmask(void)
+ {
+@@ -213,6 +191,24 @@ static void __init exynos5_core_down_clk(void)
+ 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+ }
+ 
++static struct cpuidle_driver exynos4_idle_driver = {
++	.name			= "exynos4_idle",
++	.owner			= THIS_MODULE,
++	.states = {
++		[0] = ARM_CPUIDLE_WFI_STATE,
++		[1] = {
++			.enter			= exynos4_enter_lowpower,
++			.exit_latency		= 300,
++			.target_residency	= 100000,
++			.flags			= CPUIDLE_FLAG_TIME_VALID,
++			.name			= "C1",
++			.desc			= "ARM power down",
++		},
++	},
++	.state_count = 2,
++	.safe_state_index = 0,
++};
++
+ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ {
+ 	int cpu_id, ret;
+-- 
+1.7.9.5
