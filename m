@@ -1,51 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Apr 2014 17:43:41 +0200
-Subject: [PATCH v1 6/8] ARM: hisi: add hip04 SoC support
-In-Reply-To: <7hd2gxywf3.fsf@paris.lan>
-References: <1396339430-21084-1-git-send-email-haojian.zhuang@linaro.org>
- <1396339430-21084-7-git-send-email-haojian.zhuang@linaro.org>
- <7hd2gxywf3.fsf@paris.lan>
-Message-ID: <8340307.jkTP7h04Ur@wuerfel>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Fri, 4 Apr 2014 15:45:15 +0000
+Subject: [PATCH v4 1/2] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201404041628.55471.marex@denx.de>
+References: <1396579272-19542-1-git-send-email-yao.yuan@freescale.com>
+ <1396579272-19542-2-git-send-email-yao.yuan@freescale.com>,
+ <201404041628.55471.marex@denx.de>
+Message-ID: <aab78696ac364d9c832993c08915bad3@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 April 2014 07:57:36 Kevin Hilman wrote:
-> Haojian Zhuang <haojian.zhuang@linaro.org> writes:
-> 
-> > Hisilicon Hi3xxx is based on Cortex A9 Core. Now HiP04 SoC is based on
-> > Cortex A15 Core. And HiP04 supports LPAE to support large memory.
+On Friday, April 04, 2014 at 22:29:32 PM, Marek Vasut wrote:
+> On Friday, April 04, 2014 at 04:41:11 AM, Yuan Yao wrote:
+> > Add dma support for i2c. This function depend on DMA driver.
+> > You can turn on it by write both the dmas and dma-name properties in dts
+> > node.
 > >
-> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> 
-> [...]
-> 
-> > diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-> > index da16efd..707abfe 100644
-> > --- a/arch/arm/mach-hisi/Kconfig
-> > +++ b/arch/arm/mach-hisi/Kconfig
-> > @@ -19,6 +19,16 @@ config ARCH_HI3xxx
-> >       help
-> >         Support for Hisilicon Hi36xx/Hi37xx processor family
-> >  
-> > +config ARCH_HIP04
-> > +     bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7
-> > +     select ARM_LPAE
-> 
-> Presumably this SoC can support non-LPAE also, correct?  If so, LPAE
-> should't be selected here, or else it will force LPAE on in a multi_v7
-> build also.
+> > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
 
-Actually even if it doesn't support non-LPAE, using "select" is still
-wrong for the same reason.
+[...]
 
-I think we should actually extend the CPU selection phase for multiplatform,
-so we have separate symbols for ARCH_MULTI_V7 (non-LPAE) and
-ARCH_MULTI_V7_LPAE. These would still be selectable at the same time,
-but you should only be able to turn on CONFIG_LPAE if ARCH_MULTI_V7
-is disabled.
+> Since you will be fixing that superfluous return 0; (I actually wonder, did you
+> really test the driver at all before submitting it?) ...
 
-A platform that cannot run without LPAE conversely would have to depend
-on (ARCH_MULTI_V7_LPAE && !ARCH_MULTI_V7 && !ARCH_MULTI_V6). Once it
-does this, it can 'select LPAE' without breaking other platforms.
+I'm sorry for the leftover. It's a serious bug. The support by DMA will be disabled always.
+Thanks for your consideration. But subjective assume may not suitable. Testing is a essential link . 
+But the bug can't be found by normal test . The testing may not be  imperfect, it's my 
+serious fault, but please don't doubt my work attitude.
+The ugly is my work or even the ability but not the attitude, I think.
 
-	Arnd
+At last, Thank you for giving me a lot of help, it's very important for me.
+
+> > +static int i2c_imx_dma_xfer(struct imx_i2c_struct *i2c_imx,
+> > +                                     struct i2c_msg *msgs)
+> > +{
+> > +     struct imx_i2c_dma *dma = i2c_imx->dma;
+> > +     struct dma_async_tx_descriptor *txdesc;
+> > +     struct device *dev = &i2c_imx->adapter.dev;
+> +
+> +     dma->dma_buf = dma_map_single(dma->chan_using->device->dev, msgs->buf,
+[...]
+
+>  Reviewed-by: Marek Vasut <marex@denx.de>
