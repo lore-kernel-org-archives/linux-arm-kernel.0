@@ -1,13 +1,15 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 4 Apr 2014 15:41:52 -0700
-Subject: [PATCH 1/2] ARM: zynq: dt: Convert to preprocessor includes
-In-Reply-To: <1396648831-7570-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1396648831-7570-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <9700480d-fe16-4842-bc2e-78267776fb21@CH1EHSMHS026.ehs.local>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Apr 2014 23:44:07 +0100
+Subject: [PATCH] ARM: Better virt_to_page() handling
+In-Reply-To: <E1WWCee-0003FW-7j@rmk-PC.arm.linux.org.uk>
+References: <20140328152831.GK7528@n2100.arm.linux.org.uk>
+ <E1WWCee-0003FW-7j@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140404224407.GH7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry this accidentally went out too early. I meant to include patches
-to convert the clocks as well. I'll send a v2 to include those patches.
+Ignore this :)
 
-	S?ren
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
