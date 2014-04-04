@@ -1,85 +1,106 @@
-From: robert.daniels@vantagecontrols.com (robert.daniels at vantagecontrols.com)
-Date: Fri, 4 Apr 2014 14:21:55 -0600
-Subject: FEC ethernet issues [Was: PL310 errata workarounds]
-In-Reply-To: <20140401225149.GC7528@n2100.arm.linux.org.uk>
-References: <20140319225137.GM7528@n2100.arm.linux.org.uk>
- <20140321173252.GL7528@n2100.arm.linux.org.uk>
- <OF42C103CA.1A3B5524-ON87257CA5.005C7764-87257CA5.0062A13A@grpleg.it>
- <201403242121.58705.marex@denx.de>
- <OF5A7B7FA4.2FEB0248-ON87257CA5.007AE2AE-87257CA5.007C44DB@grpleg.it>
- <20140324234443.GS7528@n2100.arm.linux.org.uk>
- <20140326001135.GV7528@n2100.arm.linux.org.uk>
- <20140401092638.GA10224@n2100.arm.linux.org.uk>
- <OF15BAA4F9.E675BBEF-ON87257CAD.006812E9-87257CAD.006BE81E@grpleg.it>
- <20140401225149.GC7528@n2100.arm.linux.org.uk>
-Message-ID: <OF62048746.594D7A9E-ON87257CB0.006DF18B-87257CB0.006FDEED@grpleg.it>
+From: elder@ieee.org (Alex Elder)
+Date: Fri, 04 Apr 2014 15:38:47 -0500
+Subject: [RFC PATCH 0/7] ARM: SMP: common "pen" secondary release method
+In-Reply-To: <1396041180-29897-1-git-send-email-elder@linaro.org>
+References: <1396041180-29897-1-git-send-email-elder@linaro.org>
+Message-ID: <533F1857.1020604@ieee.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 04/01/2014
-04:51:49 PM:
+On 03/28/2014 04:12 PM, Alex Elder wrote:
+> This series proposes creating a single implementation of the "pen
+> release" (or spin-table) mechanism for starting secondary CPUs on
+> ARM SMP systems.  This mechanism is currently implemented at least 5
+> times in the kernel, each essentially identical to the other.  There
+> are other machines that use this method, but slight differences make
+> it necessary to incorporate further work in order to accomodate them
+> with a single set of functions.
 
-> At initial glance, this is coherent with my idea of the FEC skipping a
-> ring entry on the initial pass around.  Then when a new entry is loaded,
->
-> Let's say that the problem entry is number 12 that has been skipped.
-> When we get back around to entry 11, the FEC will transmit entries 11
-> and 12, as you rightly point out, and it will then look at entry 13
-> for the next packet.
->
-> However, the driver loads the next packet into entry 12, and hits the
-> FEC to transmit it.  The FEC re-reads entry 13, finds no packet, so
-> does nothing.
->
-> Then the next packet is submitted to the driver, and it enters it into
-> entry 13, again hitting the FEC.  The FEC now sees the entry at 13,
-> meanwhile the entry at 12 is still pending.
+Given Russell King's reluctance to include this sort of
+thing in common code I'm withdrawing this series from
+consideration.
 
-I've explored the option of providing a work around for this observed
-problem.
-In the 2.6.35 kernel, I've used the BD_ENET_TX_INTR flag which is marked as
-TO2 in the RM and which was being set but never used by the software to
-help
-detect the skip.  In the interrupt handler I clear this bit which allows me
-to use it to know when the bd goes from ready -> clean.  In the error
-situation
-above, you would end up with 12 marked with both READY and INTR and at some
-point
-you would have bd 13 marked as INTR only (as it would have been transmitted
-but
-not cleaned up.)  This allows me to clean up bd 12 despite not actually
-being
-transmitted.  This gets the driver back in sync with the FEC and things
-continue
-on normally... until it happens again.
+					-Alex
 
-Of course, this results in the occasional dropped packet but I feel like
-for now
-(until Freescale figures out what's going on) this is better than nothing.
-At
-least the driver is able to recover somewhat from the situation.
-
-I'm not sure if the mainline driver could benefit from a strategy like this
-or not,
-especially since it manifested this problem differently (tx transmit
-timeout).
-Also, in my opinion this is an undesirable hack to make things work
-acceptably.
-There could also be some inherent problem with this strategy that I'm
-unaware of,
-since dealing with linux kernel ethernet drivers is not exactly my area of
-expertise.
-
-Any thoughts or new insights?
-
-Thanks,
-
-Robert Daniels
-
-This email, and any document attached hereto, may contain
-confidential and/or privileged information.  If you are not the
-intended recipient (or have received this email in error) please
-notify the sender immediately and destroy this email.  Any
-unauthorized, direct or indirect, copying, disclosure, distribution
-or other use of the material or parts thereof is strictly
-forbidden.
+> 
+> This work began with integrating SMP support for a Broadcom SoC.
+> The code I started was another copy of the "pen release" code.
+> Looking at how existing systems handled this, the duplication of
+> code was obvious, but the fact that implementations were identical
+> was less so.  In addition, the arm64 (though not 32-bit arm) code
+> supports the ability to define an "enable-method" property for CPUs
+> in a machine's device tree (one of which is "spin-table"), allowing
+> the secondary startup mechanism to be specified abstractly.
+> 
+> My broader goal then was to set up the SMP support for the Broadcom
+> SoC such that it could be defined in its device tree using a central
+> "spin-table" enable method for secondary CPUs.  The first step was
+> to create a central spin-table implementation.  I've tried to do
+> this generally so it's usable by as many other platforms as
+> possible.  (An alternative would be to define a custom enable method
+> for this platform, but I'd prefer to avoid that if I can.)
+> 
+> I already have some code for the second step--which supports
+> specifying the "spin-table" CPU enable method in device tree files.
+> But before presenting that I wanted to post this series to get
+> feedback on the approach.
+> 
+> I've provided a little more information for each patch below.
+> 
+> This code is available in the "review/common-spin-code" branch of
+> the git repository here:
+>     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+> 
+> 
+> 					-Alex
+> 
+> Alex Elder (7):
+>   ARM: allow <asm/cputype.h> inclusion from assembly
+>     This patch is done specifically so the next one can use the
+>     value of MPIDR_HWID_BITMASK in secondary_holding_pen(), which is
+>     defined in asssembly.
+>   ARM: SMP: generic SMP spin-table method routines
+>     Define the common code (based on any of the others, but
+>     reportedly they all derive from ARM Realview.)  Names are
+>     changed to be more like arch/arm64/kernel/smp_spin_table.c.
+> 
+>   ARM: realview: use central SMP spin-table routines
+>   ARM: vexpress: use central SMP spin-table routines
+>   ARM: versatile: kill off SMP support code
+>   	The SMP code for realview and vexpress both use SMP code
+> 	defined under mach-versatile, so these three go together.
+> 
+>   ARM: ux500: use generic SMP spin-table routines
+>     This one is a pretty straightforward switch to using
+>     the common code.
+>   	
+>   ARM: spear: use central SMP spin-table routines
+>     This is straightforward as well, but it depends on the
+>     two prerequisite patches mentioned above (which together
+>     make this code roughly identical to the rest).
+> 
+>  arch/arm/include/asm/cputype.h                 |    4 ++
+>  arch/arm/include/asm/smp.h                     |    5 ++
+>  arch/arm/kernel/head.S                         |   33 +++++++++
+>  arch/arm/kernel/smp.c                          |   77 ++++++++++++++++++++
+>  arch/arm/mach-realview/platsmp.c               |    8 +--
+>  arch/arm/mach-spear/Makefile                   |    2 +-
+>  arch/arm/mach-spear/generic.h                  |    1 -
+>  arch/arm/mach-spear/headsmp.S                  |   47 ------------
+>  arch/arm/mach-spear/platsmp.c                  |   75 +------------------
+>  arch/arm/mach-ux500/Makefile                   |    2 +-
+>  arch/arm/mach-ux500/headsmp.S                  |   37 ----------
+>  arch/arm/mach-ux500/platsmp.c                  |   72 +------------------
+>  arch/arm/mach-vexpress/platsmp.c               |    8 +--
+>  arch/arm/mach-vexpress/v2m.c                   |    1 -
+>  arch/arm/plat-versatile/Makefile               |    1 -
+>  arch/arm/plat-versatile/headsmp.S              |   41 -----------
+>  arch/arm/plat-versatile/include/plat/platsmp.h |   14 ----
+>  arch/arm/plat-versatile/platsmp.c              |   91 ------------------------
+>  18 files changed, 133 insertions(+), 386 deletions(-)
+>  delete mode 100644 arch/arm/mach-spear/headsmp.S
+>  delete mode 100644 arch/arm/mach-ux500/headsmp.S
+>  delete mode 100644 arch/arm/plat-versatile/headsmp.S
+>  delete mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
+>  delete mode 100644 arch/arm/plat-versatile/platsmp.c
+> 
