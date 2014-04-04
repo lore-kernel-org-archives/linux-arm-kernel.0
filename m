@@ -1,36 +1,39 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 4 Apr 2014 18:44:47 +0200
-Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to
- kernel warning
-In-Reply-To: <20140404142656.GA16383@dragon>
-References: <53345C93.9040005@i2se.com> <533EB9AC.6040708@i2se.com>
- <20140404142656.GA16383@dragon>
-Message-ID: <20140404164446.GI4883@piout.net>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 4 Apr 2014 09:53:29 -0700
+Subject: [PATCH 74/75] ARM: l2c: always enable low power modes
+In-Reply-To: <20140328155127.GL7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYaK-0007I0-Sm@rmk-PC.arm.linux.org.uk>
+ <CAL_Jsq+vja-BeNfiVnOicFAa+E6jigDfnb5KWWpxZCZ3eGkJiA@mail.gmail.com>
+ <20140328155127.GL7528@n2100.arm.linux.org.uk>
+Message-ID: <b3b6dd79-5646-4c9f-8e62-ed9c4a5596e3@VA3EHSMHS040.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2014 at 22:26:58 +0800, Shawn Guo wrote :
-> On Fri, Apr 04, 2014 at 03:54:52PM +0200, Stefan Wahren wrote:
-> > the problem is still reproducable in Mainline 3.14.0 and gives the same
-> > warning message.
-> > Also i add linux-leds in CC.
+On Fri, 2014-03-28 at 03:51PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 28, 2014 at 10:42:54AM -0500, Rob Herring wrote:
+> > On Fri, Mar 28, 2014 at 10:20 AM, Russell King
+> > <rmk+kernel@arm.linux.org.uk> wrote:
+> > > Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
 > > 
-> > Are there any advices to narrow down the problem?
-> > 
-> > Is this problem specific to i.MX28 PWM (i don't have other kind of
-> > hardware)?
+> > I assume you want to squash this with patch 68/75? Or you are still
+> > debating whether we want to do this or not? Given that it is r3px
+> > only, that should greatly reduce any chance of breakage to newer
+> > platforms.
 > 
-> I don't think it's specific to i.MX28 PWM.  Since the .config hook of
-> pwm_ops will be called from interrupt context in this case, any pwm
-> drivers that do sleeping calls in the hook will have this problem, e.g.
-> the clk APIs that hold mutex like clk_prepare() and clk_get_rate() etc.
-> 
+> I will eventually - I've kept it separate for the time being to give
+> more options.  Let's see how people get on with it - it'll be running
+> through Olof's builder later today, and there's some other people
+> wanting to take it for a spin.
 
-Yeah, I'm wondering whether we should set pwm->chip->can_sleep then.
+A while back I suggested altering those bits, but that was turned down:
+https://lkml.org/lkml/2013/3/1/350
 
-Thierry, do you have an opinion ?
+Are there any numbers available on how enabling these features impacts
+the system? I'm a little bit concerned of always enabling them
+unconditionally, in case it increases latency for some use cases. I
+think I'd prefer the DT approach, unless the impact is reported to be
+negligible - which it likely is, I guess.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Thanks,
+	S?ren
