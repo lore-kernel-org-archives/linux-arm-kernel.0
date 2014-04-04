@@ -1,69 +1,44 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Fri,  4 Apr 2014 16:54:01 +0200
-Subject: [PATCH] watchdog: imx2_wdt: handle enabled watchdog properly
-Message-ID: <1396623242-15234-1-git-send-email-agust@denx.de>
+From: t.stanislaws@samsung.com (Tomasz Stanislawski)
+Date: Fri, 04 Apr 2014 16:53:20 +0200
+Subject: [PATCH 3/4] clk: exynos4: enable clk_set_parent() propagation for
+ sclk_hdmi and sclk_mixer clocks
+In-Reply-To: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
+References: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
+Message-ID: <1396623201-26000-4-git-send-email-t.stanislaws@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the watchdog is already enabled (e.g. started by the boot loader),
-we need to handle this case properly and start reloading the watchdog
-time-out counter as frequently as needed.
+This patch enables clk_set_parent() propagation for clocks used
+by s5p-tv and exynos-drm drivers.
 
-Signed-off-by: Anatolij Gustschin <agust@denx.de>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
+Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
 ---
- drivers/watchdog/imx2_wdt.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/clk/samsung/clk-exynos4.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index dd51d95..bef9a9f 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -54,6 +54,7 @@
- #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
- 
- #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
-+#define WDOG_COUNT_TO_SEC(c)	((((c) >> 8) + 1) / 2)
- 
- #define IMX2_WDT_STATUS_OPEN	0
- #define IMX2_WDT_STATUS_STARTED	1
-@@ -120,6 +121,27 @@ static void imx2_wdt_timer_ping(unsigned long arg)
- 	mod_timer(&imx2_wdt.timer, jiffies + imx2_wdt.timeout * HZ / 2);
- }
- 
-+static inline void imx2_wdt_ping_if_active(void)
-+{
-+	u16 val = __raw_readw(imx2_wdt.base + IMX2_WDT_WCR);
-+
-+	if (val & IMX2_WDT_WCR_WDE) {
-+		/* Must enable the clock, wdog service doesn't work otherwise */
-+		clk_prepare_enable(imx2_wdt.clk);
-+
-+		set_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status);
-+		imx2_wdt.timeout = WDOG_COUNT_TO_SEC(val);
-+		if (imx2_wdt.timeout < 2) {
-+			imx2_wdt.timeout = 2;
-+			/* Set new watchdog time-out value */
-+			val &= ~IMX2_WDT_WCR_WT;
-+			val |= WDOG_SEC_TO_COUNT(imx2_wdt.timeout);
-+			__raw_writew(val, imx2_wdt.base + IMX2_WDT_WCR);
-+		}
-+		imx2_wdt_timer_ping(0);
-+	}
-+}
-+
- static void imx2_wdt_start(void)
- {
- 	if (!test_and_set_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
-@@ -283,6 +305,8 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto fail;
- 
-+	imx2_wdt_ping_if_active();
-+
- 	dev_info(&pdev->dev,
- 		"IMX2+ Watchdog Timer enabled. timeout=%ds (nowayout=%d)\n",
- 						imx2_wdt.timeout, nowayout);
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 528f8eb..87b8264 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -680,7 +680,8 @@ static struct samsung_gate_clock exynos4_gate_clks[] __initdata = {
+ 	 * the device name and clock alias names specified below for some
+ 	 * of the clocks can be removed.
+ 	 */
+-	GATE(CLK_SCLK_HDMI, "sclk_hdmi", "mout_hdmi", SRC_MASK_TV, 0, 0, 0),
++	GATE(CLK_SCLK_HDMI, "sclk_hdmi", "mout_hdmi", SRC_MASK_TV, 0,
++		CLK_SET_PARENT_PARENT, 0),
+ 	GATE(CLK_SCLK_SPDIF, "sclk_spdif", "mout_spdif", SRC_MASK_PERIL1, 8, 0,
+ 		0),
+ 	GATE(CLK_JPEG, "jpeg", "aclk160", GATE_IP_CAM, 6, 0, 0),
+@@ -880,7 +881,8 @@ static struct samsung_gate_clock exynos4210_gate_clks[] __initdata = {
+ 			E4210_SRC_MASK_LCD1, 12, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_SATA, "sclk_sata", "div_sata",
+ 			SRC_MASK_FSYS, 24, CLK_SET_RATE_PARENT, 0),
+-	GATE(CLK_SCLK_MIXER, "sclk_mixer", "mout_mixer", SRC_MASK_TV, 4, 0, 0),
++	GATE(CLK_SCLK_MIXER, "sclk_mixer", "mout_mixer", SRC_MASK_TV, 4,
++			CLK_SET_PARENT_PARENT, 0),
+ 	GATE(CLK_SCLK_DAC, "sclk_dac", "mout_dac", SRC_MASK_TV, 8, 0, 0),
+ 	GATE(CLK_TSADC, "tsadc", "aclk100", GATE_IP_PERIL, 15,
+ 			0, 0),
 -- 
 1.7.9.5
