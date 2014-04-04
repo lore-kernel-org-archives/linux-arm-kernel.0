@@ -1,40 +1,65 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Apr 2014 20:17:33 +0100
-Subject: [PATCH 74/75] ARM: l2c: always enable low power modes
-In-Reply-To: <b3b6dd79-5646-4c9f-8e62-ed9c4a5596e3@VA3EHSMHS040.ehs.local>
+Date: Fri, 4 Apr 2014 20:28:24 +0100
+Subject: [PATCH 00/75] l2c series
+In-Reply-To: <533E5B71.20406@monstr.eu>
 References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYaK-0007I0-Sm@rmk-PC.arm.linux.org.uk>
- <CAL_Jsq+vja-BeNfiVnOicFAa+E6jigDfnb5KWWpxZCZ3eGkJiA@mail.gmail.com>
- <20140328155127.GL7528@n2100.arm.linux.org.uk>
- <b3b6dd79-5646-4c9f-8e62-ed9c4a5596e3@VA3EHSMHS040.ehs.local>
-Message-ID: <20140404191732.GF7528@n2100.arm.linux.org.uk>
+ <533D7672.4090003@monstr.eu> <20140403193328.GY7528@n2100.arm.linux.org.uk>
+ <533E5B71.20406@monstr.eu>
+Message-ID: <20140404192824.GG7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 09:53:29AM -0700, S?ren Brinkmann wrote:
-> On Fri, 2014-03-28 at 03:51PM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Mar 28, 2014 at 10:42:54AM -0500, Rob Herring wrote:
-> > > On Fri, Mar 28, 2014 at 10:20 AM, Russell King
-> > > <rmk+kernel@arm.linux.org.uk> wrote:
-> > > > Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
-> > > 
-> > > I assume you want to squash this with patch 68/75? Or you are still
-> > > debating whether we want to do this or not? Given that it is r3px
-> > > only, that should greatly reduce any chance of breakage to newer
-> > > platforms.
+On Fri, Apr 04, 2014 at 09:12:49AM +0200, Michal Simek wrote:
+> On 04/03/2014 09:33 PM, Russell King - ARM Linux wrote:
+> > On Thu, Apr 03, 2014 at 04:55:46PM +0200, Michal Simek wrote:
+> >> Hi Russell,
+> >>
+> >> On 03/28/2014 04:12 PM, Russell King - ARM Linux wrote:
+> >>> This is another posting of the L2 cache controller series.  I'm not
+> >>> planning for this for the upcoming merge window, but the one after,
+> >>> as people need to test it and still need to feed back to me on
+> >>> various issues.  Hence, this is not a finalised series.
+> >>>
+> >>> There are still various issues which I've raised, and have had no
+> >>> feedback on.
+> >>>
+> >>> This series is being posted with Cc's on the individual patches.
+> >>
+> >> I just want to also point you that we have sent EDAC support for pl310
+> >> which will be good to have it for L2.
+> >> [RFC PATCH] EDAC support for ARM PL310 cache controller
+> >> [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
+> >> http://lkml.org/lkml/2014/3/2/85
+> >> http://lkml.org/lkml/2014/3/2/87
 > > 
-> > I will eventually - I've kept it separate for the time being to give
-> > more options.  Let's see how people get on with it - it'll be running
-> > through Olof's builder later today, and there's some other people
-> > wanting to take it for a spin.
+> > As seems to be the norm, lkml.org is broken... please find a different
+> > archive instead. :)
+> > 
 > 
-> A while back I suggested altering those bits, but that was turned down:
-> https://lkml.org/lkml/2013/3/1/350
+> Here it is:
+> http://lkml.iu.edu/hypermail/linux/kernel/1403.0/00250.html
+> http://lkml.iu.edu/hypermail/linux/kernel/1403.0/00251.html
 
-As I said yesterday, please use a different archive website, preferably
-one which works.  lkml.org has been broken in various ways for a couple
-of days now, and quoting unreachable URLs isn't useful for discussion
-purposes.
+A number of comments immediately spring to mind:
+
+- the use of writel/readl rather than their ARM specific _relaxed
+  versions is not a good idea: using the standard macros will result
+  in another write due to the barrier.
+
+- a driver coupled to the arm,pl310-cache compatible for this which is
+  distinctly separate from the main "driver" is probably a bad idea.
+  what if we want our existing l2 stuff to couple into the driver model
+  to expose some properties at a later date (eg, maybe to deal with
+  stuff like the power management settings?)  For example, it may be
+  that we want to expose the prefetch offset so that people can easily
+  play with the value to determine the correct tuning for their workload.
+
+- casting to void * is unnecessary for devm_request_irq()
+
+- you really ought to check whether the interrupt registers are accessible
+  in non-secure mode - and I guess if we're going to have this driver, we
+  should have the L2 cache enabling code always try to set the NS access
+  bit for the interrupt registers.
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
