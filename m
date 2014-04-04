@@ -1,26 +1,67 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Apr 2014 17:29:23 +0200
-Subject: [PATCH V2 06/17] ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
-In-Reply-To: <1396618989-2897-7-git-send-email-daniel.lezcano@linaro.org>
-References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
- <1396618989-2897-7-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <2096980.m4SU8Yq1z8@amdc1032>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 4 Apr 2014 08:30:16 -0700
+Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
+In-Reply-To: <1396577891-2713-3-git-send-email-elder@linaro.org>
+References: <1396577891-2713-1-git-send-email-elder@linaro.org>
+ <1396577891-2713-3-git-send-email-elder@linaro.org>
+Message-ID: <CAAYSxhqOh4F=vSDJYUwFE85og-Tgc9Hi8c79biEZYYjb8z1Qkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 04, 2014 03:42:58 PM Daniel Lezcano wrote:
-> This function should be called only when the powerdown sequence fails.
-> 
-> Even if the current code does not hurt, by moving this line, we have the same
-> code than the one in pm.c.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Thu, Apr 3, 2014 at 7:18 PM, Alex Elder <elder@linaro.org> wrote:
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
+> new file mode 100644
+> index 0000000..46a64f2
+> --- /dev/null
+> +++ b/arch/arm/mach-bcm/platsmp.c
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> +/* Size of mapped Cortex A9 SCU address space */
+> +#define SCU_SIZE               0x58
+
+> +/*
+> + * Enable the Cortex A9 Snoop Control Unit
+> + *
+> + * By the time this is called we already know there are multiple
+> + * cores present.  We assume we're running on a Cortex A9 processor,
+> + * so any trouble getting the base address register or getting the
+> + * SCU base is a problem.
+> + *
+> + * Return 0 if successful or an error code otherwise.
+> + */
+> +static int __init scu_a9_enable(void)
+> +{
+> +       unsigned long config_base;
+> +       void __iomem *scu_base;
+> +
+> +       if (!scu_a9_has_base()) {
+> +               pr_err("no configuration base address register!\n");
+> +               return -ENXIO;
+> +       }
+> +
+> +       /* Config base address register value is zero for uniprocessor */
+> +       config_base = scu_a9_get_base();
+> +       if (!config_base) {
+> +               pr_err("hardware reports only one core; disabling SMP\n");
+> +               return -ENOENT;
+> +       }
+> +
+> +       scu_base = ioremap((phys_addr_t)config_base, SCU_SIZE);
+> +       if (!scu_base) {
+> +               pr_err("failed to remap config base (%lu/%u) for SCU\n",
+> +                       config_base, SCU_SIZE);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       scu_enable(scu_base);
+> +
+> +       iounmap(scu_base);      /* That's the last we'll need of this */
+> +
+> +       return 0;
+> +}
+
+This function seems useful for Cortex A9 MPCore in general.
+
+While you gave it a generic name, you put it in a Broadcom file.
+
+Is there a better location for this code?
