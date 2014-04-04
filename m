@@ -1,46 +1,104 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 15:53:16 +0200
-Subject: [PATCH v2 04/10] ARM: mvebu: ARM: mvebu: use
- of_find_matching_node_and_match() in coherency.c
+Date: Fri,  4 Apr 2014 15:53:14 +0200
+Subject: [PATCH v2 02/10] ARM: mvebu: add a coherency_available() call
 In-Reply-To: <1396619602-4510-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1396619602-4510-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396619602-4510-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396619602-4510-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the mach-mvebu coherency code, instead of using
-of_find_matching_node() and then of_match_node(), directly use the
-of_find_matching_node_and_match() which does both at once.
-
-We take this opportunity to also simplify the initialization of the
-"type" variable.
+This commit extends the coherency fabric code to provide a
+coherency_available()function that the SoC code can call to be told
+whether coherency support is available or not. On Armada 370/XP,
+coherency support is available as soon as the relevant DT node is
+present. On some upcoming SoCs, the DT node needs to be present *and*
+the system running with CONFIG_SMP enabled.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 30 ++++++++++++++++++++++--------
+ arch/arm/mach-mvebu/coherency.h |  1 +
+ 2 files changed, 23 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 296cf14..862100f 100644
+index 434cf5f..296cf14 100644
 --- a/arch/arm/mach-mvebu/coherency.c
 +++ b/arch/arm/mach-mvebu/coherency.c
-@@ -148,14 +148,11 @@ static void __init armada_370_coherency_init(struct device_node *np)
- static int coherency_type(void)
+@@ -39,6 +39,7 @@ static void __iomem *coherency_cpu_base;
+ #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
+ 
+ enum {
++	COHERENCY_FABRIC_TYPE_NONE,
+ 	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
+ };
+ 
+@@ -144,7 +145,7 @@ static void __init armada_370_coherency_init(struct device_node *np)
+ 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+ }
+ 
+-int __init coherency_init(void)
++static int coherency_type(void)
  {
  	struct device_node *np;
-+	const struct of_device_id *match;
  
--	np = of_find_matching_node(NULL, of_coherency_table);
-+	np = of_find_matching_node_and_match(NULL, of_coherency_table, &match);
- 	if (np) {
--		const struct of_device_id *match =
--			of_match_node(of_coherency_table, np);
--		int type;
--
--		type = (int) match->data;
-+		int type = (int) match->data;
+@@ -155,27 +156,40 @@ int __init coherency_init(void)
+ 		int type;
  
- 		/* Armada 370/XP coherency works in both UP and SMP */
+ 		type = (int) match->data;
+-		pr_info("Initializing Coherency fabric\n");
+ 
++		/* Armada 370/XP coherency works in both UP and SMP */
  		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+-			armada_370_coherency_init(np);
++			return type;
+ 
+ 		of_node_put(np);
+ 	}
+ 
+-	return 0;
++	return COHERENCY_FABRIC_TYPE_NONE;
+ }
+ 
+-static int __init coherency_late_init(void)
++int coherency_available(void)
+ {
++	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
++}
++
++int __init coherency_init(void)
++{
++	int type = coherency_type();
+ 	struct device_node *np;
+ 
+ 	np = of_find_matching_node(NULL, of_coherency_table);
+-	if (np) {
++
++	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
++		armada_370_coherency_init(np);
++
++	return 0;
++}
++
++static int __init coherency_late_init(void)
++{
++	if (coherency_available())
+ 		bus_register_notifier(&platform_bus_type,
+ 				      &mvebu_hwcc_platform_nb);
+-		of_node_put(np);
+-	}
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+index 760226c..02f7ec3 100644
+--- a/arch/arm/mach-mvebu/coherency.h
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -18,5 +18,6 @@ extern unsigned long coherency_phys_base;
+ 
+ int set_cpu_coherent(unsigned int cpu_id, int smp_group_id);
+ int coherency_init(void);
++int coherency_available(void);
+ 
+ #endif	/* __MACH_370_XP_COHERENCY_H */
 -- 
 1.8.3.2
