@@ -1,47 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 04 Apr 2014 10:55:40 -0700
-Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
-In-Reply-To: <1396577891-2713-3-git-send-email-elder@linaro.org>
-References: <1396577891-2713-1-git-send-email-elder@linaro.org>
- <1396577891-2713-3-git-send-email-elder@linaro.org>
-Message-ID: <533EF21C.6000909@codeaurora.org>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Fri, 04 Apr 2014 14:57:04 -0300
+Subject: [PATCH] watchdog: sunxi: Fix compilation with C=2
+In-Reply-To: <533EED7A.20307@roeck-us.net>
+References: <1396632265-16124-1-git-send-email-emilio@elopez.com.ar>
+ <533EED7A.20307@roeck-us.net>
+Message-ID: <533EF270.9090308@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/14 19:18, Alex Elder wrote:
-> +
-> +/*
-> + * Secondary startup method setup routine to extract the location of
-> + * the secondary boot register from a "cpu" or "cpus" device tree
-> + * node.  Only the first seen secondary boot register value is used;
-> + * any others are ignored.  The secondary boot register value must be
-> + * non-zero.
-> + *
-> + * Returns 0 if successful or an error code otherwise.
-> + */
-> +static int __init of_enable_method_setup(struct device_node *node)
-> +{
-> +	int ret;
-> +
-> +	/* Ignore all but the first one specified */
-> +	if (secondary_boot)
-> +		return 0;
-> +
-> +	ret = of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot);
-> +	if (ret)
-> +		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
-> +			node->name);
-> +
-> +	return ret;
-> +}
+Hi,
 
-I don't understand why we need this. Why can't we get the secondary boot
-address from the /cpus node in the smp_prepare_cpus op. It isn't that
-hard to get access to the cpus node there via of_find_node_by_path().
-Then we don't need patch 1 at all. If it turns out to be common stuff,
-we can always have the common function live in arm common code or maybe
-even be a devicetree API.
+El 04/04/14 14:35, Guenter Roeck escribi?:
+> On 04/04/2014 10:24 AM, Emilio L?pez wrote:
+>> When compiling sunxi_defconfig while using C=2, the following error
+>> causes the compilation to fail:
+>>
+>>      drivers/watchdog/sunxi_wdt.c:60:15: error: constant 0b0001 is not
+>> a valid number
+>>
+>> Fix it by using hex notation instead of the non-standard binary one
+>>
+>
+> What defines "non-standard" here ?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+non-standard as not part of the C standard. Binary constant notation is 
+a GCC extension as far as I'm aware:
+
+http://gcc.gnu.org/bugzilla/show_bug.cgi?id=23479
+http://gcc.gnu.org/onlinedocs/gcc/Binary-constants.html (Note the "C 
+Extensions" section)
+
+> Isn't this a sparse problem that
+> should possibly
+> be fixed in sparse instead ?
+
+It could be fixed in sparse as well, I don't really mind either way. The 
+binary notation doesn't seem to be used much, if at all, on the kernel 
+though; most of the matches I saw when quickly grepping were comments.
+
+Cheers,
+
+Emilio
