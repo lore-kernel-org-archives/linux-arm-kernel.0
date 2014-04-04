@@ -1,44 +1,84 @@
 From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 4 Apr 2014 13:47:57 -0700
-Subject: [PATCH 74/75] ARM: l2c: always enable low power modes
-In-Reply-To: <20140404191732.GF7528@n2100.arm.linux.org.uk>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <E1WTYaK-0007I0-Sm@rmk-PC.arm.linux.org.uk>
- <CAL_Jsq+vja-BeNfiVnOicFAa+E6jigDfnb5KWWpxZCZ3eGkJiA@mail.gmail.com>
- <20140328155127.GL7528@n2100.arm.linux.org.uk>
- <b3b6dd79-5646-4c9f-8e62-ed9c4a5596e3@VA3EHSMHS040.ehs.local>
- <20140404191732.GF7528@n2100.arm.linux.org.uk>
-Message-ID: <5fa8a528-2f01-4c55-8a27-b23c83b1adfa@CH1EHSMHS002.ehs.local>
+Date: Fri, 4 Apr 2014 13:57:44 -0700
+Subject: [PATCH v4 1/3] i2c: cadence: Document device tree bindings
+In-Reply-To: <20140404191757.GR11339@book.gsilab.sittig.org>
+References: <1396547967-19260-1-git-send-email-soren.brinkmann@xilinx.com>
+ <20140404191757.GR11339@book.gsilab.sittig.org>
+Message-ID: <27b560ed-5b34-4b1a-b741-0e5bf6cbb992@VA3EHSMHS010.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-04-04 at 08:17PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 04, 2014 at 09:53:29AM -0700, S?ren Brinkmann wrote:
-> > On Fri, 2014-03-28 at 03:51PM +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Mar 28, 2014 at 10:42:54AM -0500, Rob Herring wrote:
-> > > > On Fri, Mar 28, 2014 at 10:20 AM, Russell King
-> > > > <rmk+kernel@arm.linux.org.uk> wrote:
-> > > > > Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
-> > > > 
-> > > > I assume you want to squash this with patch 68/75? Or you are still
-> > > > debating whether we want to do this or not? Given that it is r3px
-> > > > only, that should greatly reduce any chance of breakage to newer
-> > > > platforms.
-> > > 
-> > > I will eventually - I've kept it separate for the time being to give
-> > > more options.  Let's see how people get on with it - it'll be running
-> > > through Olof's builder later today, and there's some other people
-> > > wanting to take it for a spin.
+On Fri, 2014-04-04 at 09:17PM +0200, Gerhard Sittig wrote:
+> On Thu, 2014-04-03 at 10:59 -0700, Soren Brinkmann wrote:
 > > 
-> > A while back I suggested altering those bits, but that was turned down:
-> > https://lkml.org/lkml/2013/3/1/350
+> > Add device tree binding documentation for the Cadence I2C controller.
+> > 
+> > [ ... ]
+> > 
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/i2c/i2c-cadence.txt
+> > @@ -0,0 +1,21 @@
+> > +Binding for the Cadence I2C controller
+> > +
+> > +Required properties:
+> > +  compatible: Compatibility string. Must be 'cdns,i2c-r1p10'.
+> > +  clocks: From common clock bindings. Phandle to input clock.
 > 
-> As I said yesterday, please use a different archive website, preferably
-> one which works.  lkml.org has been broken in various ways for a couple
-> of days now, and quoting unreachable URLs isn't useful for discussion
-> purposes.
+> the usual complaint:  'clocks' items are not just phandles (your
+> example even suggests this); either adjust the description to
+> something correct, or just refer to the common clock bindings to
+> not duplicate their description
 
-It worked when I pulled the link. Anyway, the thread at gmane:
-http://thread.gmane.org/gmane.linux.kernel/1449544/focus=1450475
+I'll figure out something.
+
+> 
+> but I guess the I2C controller's binding should explicitly state
+> which clocks are required, and you might want to consider
+> 'clock-names', too
+
+There is only one clock input. There is no need to overcomplicate things
+by adding clock-names.
+
+> 
+> > +
+> > +Optional properties:
+> > +  clock-frequency: Desired operating frequency, in Hz, of the bus (actual may
+> > +		   be lower). Defaults to 400000 if not specified.
+> 
+> is the value default a feature of the Linux implementation, or
+> consciously designed to be in the binding spec?  and I agree that
+> the default should be the standard I2C speed instead of fast mode
+
+I remove the note regarding the default. It's implementation.
+
+> 
+> > +
+> > +Example:
+> > +
+> > +	i2c at e0004000 {
+> > +		compatible = "cdns,i2c-r1p10";
+> > +		clocks = <&clkc 38>;
+> > +		interrupts = <0 25 4>;
+> > +		reg = <0xE0004000 0x1000>;
+> > +		clock-frequency = <400000>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +	};
+> 
+> use lower case hex digits, consider symbolic identifiers for
+> clocks and interrupt flags
+
+I don't care about the case of those hex digits, but where does it say
+that they have to be lower case? Will somebody complain about usage of
+lower case chars next?
+
+> 
+> the example has many more properties than the binding describes,
+> the additional items aren't even optional -- you might want to
+> refer to a few more common or general bindings
+
+Well, this is common across binding documentation. Can we please get
+consistency in this? I see plenty of binding docs that are documented
+this way, not mentioning much regarding such common properties.
 
 	S?ren
