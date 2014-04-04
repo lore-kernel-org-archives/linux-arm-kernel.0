@@ -1,31 +1,24 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 4 Apr 2014 17:20:12 +0200
-Subject: [PATCH] watchdog: imx2_wdt: handle enabled watchdog properly
-In-Reply-To: <1396623242-15234-1-git-send-email-agust@denx.de>
-References: <1396623242-15234-1-git-send-email-agust@denx.de>
-Message-ID: <20140404152011.GC5529@katana>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 04 Apr 2014 17:24:35 +0200
+Subject: [PATCH V2 01/17] ARM: exynos: cpuidle: Prevent forward declaration
+In-Reply-To: <1396618989-2897-2-git-send-email-daniel.lezcano@linaro.org>
+References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
+ <1396618989-2897-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <3652764.DHfZbIadZt@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 04:54:01PM +0200, Anatolij Gustschin wrote:
-> If the watchdog is already enabled (e.g. started by the boot loader),
-> we need to handle this case properly and start reloading the watchdog
-> time-out counter as frequently as needed.
+On Friday, April 04, 2014 03:42:53 PM Daniel Lezcano wrote:
+> Move the structure below the 'exynos4_enter_lowpower' function so no more
+> need of forward declaration.
 > 
-> Signed-off-by: Anatolij Gustschin <agust@denx.de>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Uh, this driver has not been converted to use the watchdog framework
-yet? I'd suggest this should be the first step.
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-@Wim: Does the watchdog core already handle the case that the wdt might
-have been started by the bootloader?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/e7bcaf92/attachment.sig>
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
