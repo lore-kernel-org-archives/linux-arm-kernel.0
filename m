@@ -1,64 +1,62 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 4 Apr 2014 12:59:10 +0200
-Subject: [alsa-devel] [PATCH v2 00/16] ASoC: fsl-ssi: Driver cleanup
-In-Reply-To: <CAOf5uwkDdsDzRAMHV0e2ideR-R8Tztis1HxqosQAxefVQDE3oA@mail.gmail.com>
-References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
- <20140403221406.GI14763@sirena.org.uk>
- <20140404064932.GC20621@pengutronix.de>
- <CAOf5uwkDdsDzRAMHV0e2ideR-R8Tztis1HxqosQAxefVQDE3oA@mail.gmail.com>
-Message-ID: <20140404105910.GF20621@pengutronix.de>
+From: naresh.kamboju@linaro.org (Naresh Kamboju)
+Date: Fri, 4 Apr 2014 16:30:31 +0530
+Subject: [LTP] How to get the Linux kernel coverage data on ARM arch when
+ I run LTP test?
+In-Reply-To: <CAHTX3dLrfW_Hbqx_-vEfcHGCh7c4n=Hs1OATfvjJ9UEaxJTCaQ@mail.gmail.com>
+References: <CA+G9fYuT4TSs=3j6K9zztsTgFNVp2YG6JT-2Q_L==1P5G+SBew@mail.gmail.com>
+ <52FDE52A.4070002@linux.vnet.ibm.com>
+ <CA+G9fYv9+Fhyz=nVZQZXxLU0YMTJadfr1XVVVb9P=inEfUaDuA@mail.gmail.com>
+ <CAHTX3dLrfW_Hbqx_-vEfcHGCh7c4n=Hs1OATfvjJ9UEaxJTCaQ@mail.gmail.com>
+Message-ID: <CA+G9fYtFOPf6MYBKiOyHwSwZx5bHZWt3=Hzwsjrh5pvSarT+fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On 3 March 2014 20:51, Michal Simek <monstr@monstr.eu> wrote:
+> HI,
+>
+>
+> 2014-02-18 15:30 GMT+01:00 Naresh Kamboju <naresh.kamboju@linaro.org>:
+>
+>> On 14 February 2014 15:13, Peter Oberparleiter
+>> <oberpar@linux.vnet.ibm.com> wrote:
+>> > On 14.02.2014 10:02, Naresh Kamboju wrote:
+>> >> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01# gcov
+>> >> kernel/gcov/base.c -o
+>> >>  /sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/gcov/
+>> >> File 'kernel/gcov/base.c'
+>> >> Lines executed:43.18% of 44
+>> >> Creating 'base.c.gcov'
+>> >>
+>> >> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01#
+>> >>
+>> >> The above experiment gives coverage of a single file base.c when i run
+>> >> gcov manually.
+>> >> Is there any way to get Linux kernel coverage of all files after
+>> >> running LTP test cases ?
+>> >
+>> > 1. Reset coverage data: lcov -z
+>> > 2. Run LTP (or any other test case)
+>> > 3. Capture coverage data: lcov -c -o coverage.info
+>> > 4. Generate HTML output: genhtml coverage.info -o out
+>> > 5. View HTML output: <browser> out/index.html
+>>
+>> It is working !!!
+>> LTP executed on linux-linaro build on vexpress-tc2 target.
+>> Please find results obtained
+>> http://people.linaro.org/~naresh.kamboju/linux-linaro-coverage-by-ltp/
+>>
+>> The plan is to run all linaro test suite and to get coverage date.
+>
+>
+> Have you already run it? Are these test cases available?
 
-On Fri, Apr 04, 2014 at 09:58:03AM +0200, Michael Trimarchi wrote:
-> Hi Markus
-> 
-> On Fri, Apr 4, 2014 at 8:49 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > Hi,
-> >
-> > On Thu, Apr 03, 2014 at 11:14:06PM +0100, Mark Brown wrote:
-> >> On Sat, Mar 15, 2014 at 01:44:08PM +0100, Markus Pargmann wrote:
-> >> > Hi,
-> >> >
-> >> > This new version of the cleanup is mainly a reordering of the patches. It moves
-> >> > the regmap patch to the end of the series so none of the other patches depend
-> >> > on it. This also fixes a bug I introduced in "Remove fsl_ssi_setup" which also
-> >> > removed the switching between network and normal mode depending on the number
-> >> > of channels. I reversed this code removal. Another new patch was added "Fix
-> >> > i2s_mode variable setup" which fixes the i2s_mode assignment in set_dai_fmt().
-> >>
-> >> It's been nearly three weeks with no response to this except for the
-> >> last patch - I've got ahead and applied since it all looks sane (modulo
-> >> the bugfix question), we can see if problems occur in -next after the
-> >> merge window.  Thanks!
-> >
-> > Thanks for applying this series, but could you please drop it for the
-> > moment? We found some issues with the baud clock setup for i2s master
-> > mode and have some fixed patches for the series. So it would be nice to
-> > get this in without fixups if that's still possible? I could send a v3
-> > next week.
-> 
-> We have tested a bit them on Wandboard and rebase our patches.
-> I was busy in the last 2 weeks but they are fine so far.
 
-Thank you for testing. Can I add a Tested-by tag to the commits that
-didn't change for the next version of this series?
+I have tested LTP on vexpress-tc2. I did not try all test suites.
+We ( In Linaro) Linaro Test Suites is a package that contains test
+suites that can be run in LAVA.
+http://releases.linaro.org/14.03/components/platform/linaro-test-suites
 
-Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/71f3f998/attachment.sig>
+>
+> Thanks,
+> Michal
+>
