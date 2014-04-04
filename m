@@ -1,106 +1,44 @@
-From: elder@ieee.org (Alex Elder)
-Date: Fri, 04 Apr 2014 15:38:47 -0500
-Subject: [RFC PATCH 0/7] ARM: SMP: common "pen" secondary release method
-In-Reply-To: <1396041180-29897-1-git-send-email-elder@linaro.org>
-References: <1396041180-29897-1-git-send-email-elder@linaro.org>
-Message-ID: <533F1857.1020604@ieee.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 4 Apr 2014 13:47:57 -0700
+Subject: [PATCH 74/75] ARM: l2c: always enable low power modes
+In-Reply-To: <20140404191732.GF7528@n2100.arm.linux.org.uk>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYaK-0007I0-Sm@rmk-PC.arm.linux.org.uk>
+ <CAL_Jsq+vja-BeNfiVnOicFAa+E6jigDfnb5KWWpxZCZ3eGkJiA@mail.gmail.com>
+ <20140328155127.GL7528@n2100.arm.linux.org.uk>
+ <b3b6dd79-5646-4c9f-8e62-ed9c4a5596e3@VA3EHSMHS040.ehs.local>
+ <20140404191732.GF7528@n2100.arm.linux.org.uk>
+Message-ID: <5fa8a528-2f01-4c55-8a27-b23c83b1adfa@CH1EHSMHS002.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2014 04:12 PM, Alex Elder wrote:
-> This series proposes creating a single implementation of the "pen
-> release" (or spin-table) mechanism for starting secondary CPUs on
-> ARM SMP systems.  This mechanism is currently implemented at least 5
-> times in the kernel, each essentially identical to the other.  There
-> are other machines that use this method, but slight differences make
-> it necessary to incorporate further work in order to accomodate them
-> with a single set of functions.
+On Fri, 2014-04-04 at 08:17PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 04, 2014 at 09:53:29AM -0700, S?ren Brinkmann wrote:
+> > On Fri, 2014-03-28 at 03:51PM +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Mar 28, 2014 at 10:42:54AM -0500, Rob Herring wrote:
+> > > > On Fri, Mar 28, 2014 at 10:20 AM, Russell King
+> > > > <rmk+kernel@arm.linux.org.uk> wrote:
+> > > > > Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
+> > > > 
+> > > > I assume you want to squash this with patch 68/75? Or you are still
+> > > > debating whether we want to do this or not? Given that it is r3px
+> > > > only, that should greatly reduce any chance of breakage to newer
+> > > > platforms.
+> > > 
+> > > I will eventually - I've kept it separate for the time being to give
+> > > more options.  Let's see how people get on with it - it'll be running
+> > > through Olof's builder later today, and there's some other people
+> > > wanting to take it for a spin.
+> > 
+> > A while back I suggested altering those bits, but that was turned down:
+> > https://lkml.org/lkml/2013/3/1/350
+> 
+> As I said yesterday, please use a different archive website, preferably
+> one which works.  lkml.org has been broken in various ways for a couple
+> of days now, and quoting unreachable URLs isn't useful for discussion
+> purposes.
 
-Given Russell King's reluctance to include this sort of
-thing in common code I'm withdrawing this series from
-consideration.
+It worked when I pulled the link. Anyway, the thread at gmane:
+http://thread.gmane.org/gmane.linux.kernel/1449544/focus=1450475
 
-					-Alex
-
-> 
-> This work began with integrating SMP support for a Broadcom SoC.
-> The code I started was another copy of the "pen release" code.
-> Looking at how existing systems handled this, the duplication of
-> code was obvious, but the fact that implementations were identical
-> was less so.  In addition, the arm64 (though not 32-bit arm) code
-> supports the ability to define an "enable-method" property for CPUs
-> in a machine's device tree (one of which is "spin-table"), allowing
-> the secondary startup mechanism to be specified abstractly.
-> 
-> My broader goal then was to set up the SMP support for the Broadcom
-> SoC such that it could be defined in its device tree using a central
-> "spin-table" enable method for secondary CPUs.  The first step was
-> to create a central spin-table implementation.  I've tried to do
-> this generally so it's usable by as many other platforms as
-> possible.  (An alternative would be to define a custom enable method
-> for this platform, but I'd prefer to avoid that if I can.)
-> 
-> I already have some code for the second step--which supports
-> specifying the "spin-table" CPU enable method in device tree files.
-> But before presenting that I wanted to post this series to get
-> feedback on the approach.
-> 
-> I've provided a little more information for each patch below.
-> 
-> This code is available in the "review/common-spin-code" branch of
-> the git repository here:
->     http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-> 
-> 
-> 					-Alex
-> 
-> Alex Elder (7):
->   ARM: allow <asm/cputype.h> inclusion from assembly
->     This patch is done specifically so the next one can use the
->     value of MPIDR_HWID_BITMASK in secondary_holding_pen(), which is
->     defined in asssembly.
->   ARM: SMP: generic SMP spin-table method routines
->     Define the common code (based on any of the others, but
->     reportedly they all derive from ARM Realview.)  Names are
->     changed to be more like arch/arm64/kernel/smp_spin_table.c.
-> 
->   ARM: realview: use central SMP spin-table routines
->   ARM: vexpress: use central SMP spin-table routines
->   ARM: versatile: kill off SMP support code
->   	The SMP code for realview and vexpress both use SMP code
-> 	defined under mach-versatile, so these three go together.
-> 
->   ARM: ux500: use generic SMP spin-table routines
->     This one is a pretty straightforward switch to using
->     the common code.
->   	
->   ARM: spear: use central SMP spin-table routines
->     This is straightforward as well, but it depends on the
->     two prerequisite patches mentioned above (which together
->     make this code roughly identical to the rest).
-> 
->  arch/arm/include/asm/cputype.h                 |    4 ++
->  arch/arm/include/asm/smp.h                     |    5 ++
->  arch/arm/kernel/head.S                         |   33 +++++++++
->  arch/arm/kernel/smp.c                          |   77 ++++++++++++++++++++
->  arch/arm/mach-realview/platsmp.c               |    8 +--
->  arch/arm/mach-spear/Makefile                   |    2 +-
->  arch/arm/mach-spear/generic.h                  |    1 -
->  arch/arm/mach-spear/headsmp.S                  |   47 ------------
->  arch/arm/mach-spear/platsmp.c                  |   75 +------------------
->  arch/arm/mach-ux500/Makefile                   |    2 +-
->  arch/arm/mach-ux500/headsmp.S                  |   37 ----------
->  arch/arm/mach-ux500/platsmp.c                  |   72 +------------------
->  arch/arm/mach-vexpress/platsmp.c               |    8 +--
->  arch/arm/mach-vexpress/v2m.c                   |    1 -
->  arch/arm/plat-versatile/Makefile               |    1 -
->  arch/arm/plat-versatile/headsmp.S              |   41 -----------
->  arch/arm/plat-versatile/include/plat/platsmp.h |   14 ----
->  arch/arm/plat-versatile/platsmp.c              |   91 ------------------------
->  18 files changed, 133 insertions(+), 386 deletions(-)
->  delete mode 100644 arch/arm/mach-spear/headsmp.S
->  delete mode 100644 arch/arm/mach-ux500/headsmp.S
->  delete mode 100644 arch/arm/plat-versatile/headsmp.S
->  delete mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
->  delete mode 100644 arch/arm/plat-versatile/platsmp.c
-> 
+	S?ren
