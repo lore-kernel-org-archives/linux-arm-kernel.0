@@ -1,56 +1,42 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  4 Apr 2014 09:47:54 +0200
-Subject: [PATCH 08/17] ARM: exynos: cpuidle: Move scu_enable in the cpu_pm
- notifier
+Date: Fri,  4 Apr 2014 09:47:55 +0200
+Subject: [PATCH 09/17] ARM: exynos: cpuidle: Remove ifdef for scu_enable
 In-Reply-To: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396597683-6969-9-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396597683-6969-10-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We make the cpuidle code less arch dependent.
+The scu_enable function is already a noop in the scu's header file is
+CONFIG_SMP=n, so no need to use these macros in the code.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |    6 ------
- arch/arm/mach-exynos/pm.c      |    3 +++
- 2 files changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/mach-exynos/pm.c |    5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 4b090cf..c63ad05 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -18,7 +18,6 @@
- #include <linux/platform_device.h>
- 
- #include <asm/proc-fns.h>
--#include <asm/smp_scu.h>
- #include <asm/suspend.h>
- #include <asm/unified.h>
- #include <asm/cpuidle.h>
-@@ -94,11 +93,6 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
- 
- 	cpu_pm_enter();
- 	cpu_suspend(0, idle_finisher);
--
--#ifdef CONFIG_SMP
--	if (!soc_is_exynos5250())
--		scu_enable(S5P_VA_SCU);
--#endif
- 	cpu_pm_exit();
- 
- 	/*
 diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index b2a075e..f43a004 100644
+index f43a004..c0d8640 100644
 --- a/arch/arm/mach-exynos/pm.c
 +++ b/arch/arm/mach-exynos/pm.c
-@@ -386,6 +386,9 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+@@ -363,10 +363,7 @@ static void exynos_pm_resume(void)
+ 
+ 	if (!soc_is_exynos5250()) {
+ 		exynos4_restore_pll();
+-
+-#ifdef CONFIG_SMP
+ 		scu_enable(S5P_VA_SCU);
+-#endif
+ 	}
+ 
+ early_wakeup:
+@@ -386,9 +383,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
  		break;
  
  	case CPU_PM_EXIT:
-+#ifdef CONFIG_SMP
-+		scu_enable(S5P_VA_SCU);
-+#endif
+-#ifdef CONFIG_SMP
+ 		scu_enable(S5P_VA_SCU);
+-#endif
  		exynos_cpu_restore_register();
  		break;
  	}
