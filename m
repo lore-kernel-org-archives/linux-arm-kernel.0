@@ -1,39 +1,60 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  4 Apr 2014 12:57:26 -0700
-Subject: [PATCH v6 1/5] genirq: export percpu irq functions for module usage
-In-Reply-To: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
-References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1396641450-12854-2-git-send-email-sboyd@codeaurora.org>
+Date: Fri,  4 Apr 2014 12:57:25 -0700
+Subject: [PATCH v6 0/5] Krait L1/L2 EDAC driver
+Message-ID: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the near future we're going to use these percpu irq functions
-in the Krait CPU EDAC driver. Export them so that the EDAC driver
-can be compiled as a module.
+This patchset adds support for the Krait L1/L2 cache error detection
+hardware. The second patch adds the Krait L2 indirection
+register code. This patch is in need of an ACK from ARM folks.
+The next two patches add the driver and the binding and 
+the final patch fixes up the DT nodes to match the binding (this last
+one should go through the arm-soc tree).
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- kernel/irq/manage.c | 2 ++
- 1 file changed, 2 insertions(+)
+NOTE: the DT binding patches rely on Lorenzo's cache DT binding document[1]
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 2486a4c1a710..7955580e634f 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1705,6 +1705,7 @@ void free_percpu_irq(unsigned int irq, void __percpu *dev_id)
- 	kfree(__free_percpu_irq(irq, dev_id));
- 	chip_bus_sync_unlock(desc);
- }
-+EXPORT_SYMBOL_GPL(free_percpu_irq);
- 
- /**
-  *	setup_percpu_irq - setup a per-cpu interrupt
-@@ -1775,3 +1776,4 @@ int request_percpu_irq(unsigned int irq, irq_handler_t handler,
- 
- 	return retval;
- }
-+EXPORT_SYMBOL_GPL(request_percpu_irq);
+Changes since v5:
+ * Don't rely on platform device being created from cpus node
+ * Get interrupts from L1 cache node
+ * Rework binding to be in cache document
+
+Changes since v4:
+ * Prefixed l2 accessors functions with krait_
+ * Dropped first two patches as Boris says he picked them up
+
+Changes since v3:
+ * Fixed l1_irq handler to properly dereference dev_id
+
+Changes since v2:
+ * Picked up acks
+ * s/an/a/ in DT binding
+
+Stephen Boyd (5):
+  genirq: export percpu irq functions for module usage
+  ARM: Add Krait L2 register accessor functions
+  devicetree: bindings: Document Krait cache error interrupts
+  edac: Add support for Krait CPU cache error detection
+  ARM: dts: msm: Fix Krait CPU/L2 nodes
+
+ Documentation/devicetree/bindings/arm/cache.txt |  48 ++-
+ arch/arm/boot/dts/qcom-msm8960.dtsi             |  29 +-
+ arch/arm/boot/dts/qcom-msm8974.dtsi             |  49 +++-
+ arch/arm/common/Kconfig                         |   3 +
+ arch/arm/common/Makefile                        |   1 +
+ arch/arm/common/krait-l2-accessors.c            |  58 ++++
+ arch/arm/include/asm/krait-l2-accessors.h       |  20 ++
+ drivers/edac/Kconfig                            |   8 +
+ drivers/edac/Makefile                           |   2 +
+ drivers/edac/krait_edac.c                       | 370 ++++++++++++++++++++++++
+ kernel/irq/manage.c                             |   2 +
+ 11 files changed, 568 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
+ create mode 100644 drivers/edac/krait_edac.c
+
+[1] http://www.spinics.net/lists/arm-kernel/msg308540.html
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
