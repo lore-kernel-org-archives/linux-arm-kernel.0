@@ -1,36 +1,31 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 04 Apr 2014 16:18:12 +0100
-Subject: [PATCH] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <20140404144108.GD7528@n2100.arm.linux.org.uk>
-References: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
- <20140404144108.GD7528@n2100.arm.linux.org.uk>
-Message-ID: <533ECD34.5030502@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 4 Apr 2014 17:20:12 +0200
+Subject: [PATCH] watchdog: imx2_wdt: handle enabled watchdog properly
+In-Reply-To: <1396623242-15234-1-git-send-email-agust@denx.de>
+References: <1396623242-15234-1-git-send-email-agust@denx.de>
+Message-ID: <20140404152011.GC5529@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/14 15:41, Russell King - ARM Linux wrote:
->> The happens because the multi-platform mode may include ARCH_SPEAR13XX
->> and this forcibly engages DEBUG_UART_PL01X to provide some kind of
->> compatibility with single platform builds (SPEAr supports both single and
->> multi-platform). This in turn causes DEBUG_LL_INCLUDE to wedge at
->> debug/pl01x.S.
->>
->> Problem is fixed by only deploying the compatibility options for SPEAr
->> when ARCH_MULTIPLATFORM is not set.
+On Fri, Apr 04, 2014 at 04:54:01PM +0200, Anatolij Gustschin wrote:
+> If the watchdog is already enabled (e.g. started by the boot loader),
+> we need to handle this case properly and start reloading the watchdog
+> time-out counter as frequently as needed.
 > 
-> I think it's probably about time we killed the def_bool and just made
-> this a plain 'bool'.  The affected platforms should be using
-> DEBUG_LL_UART_PL01X by now.
+> Signed-off-by: Anatolij Gustschin <agust@denx.de>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
 
-Ok.
+Uh, this driver has not been converted to use the watchdog framework
+yet? I'd suggest this should be the first step.
 
-Looking closely I think this will actually be better even for the single
-platforms since today KConfig will not honour targeting DEBUG_LL at
-EmbeddedICE or semihosting on the platforms that remain in the list.
+@Wim: Does the watchdog core already handle the case that the wdt might
+have been started by the bootloader?
 
-Expect a v3...
-
-
-
-Daniel.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/e7bcaf92/attachment.sig>
