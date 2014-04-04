@@ -1,21 +1,183 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 4 Apr 2014 08:19:20 +0000
-Subject: mach header files
-Message-ID: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 04 Apr 2014 10:20:37 +0200
+Subject: [PATCH v6 10/11] cpuidle: mvebu: Add initial CPU idle support
+ for Armada 370/XP SoC
+In-Reply-To: <533D18F8.3040102@linaro.org>
+References: <1396005211-15573-1-git-send-email-gregory.clement@free-electrons.com>
+ <1396005211-15573-11-git-send-email-gregory.clement@free-electrons.com>
+ <533D18F8.3040102@linaro.org>
+Message-ID: <533E6B55.4020406@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resent, hopefully without the automatic corporate signature appended this time...
+On 03/04/2014 10:16, Daniel Lezcano wrote:
+> On 03/28/2014 12:13 PM, Gregory CLEMENT wrote:
+>> Add the wfi, cpu idle and cpu deep idle power states support for the
+>> Armada XP SoCs.
+>>
+>> All the latencies and the power consumption values used at the
+>> "armada_370_xp_idle_driver" structure are preliminary and will be
+>> modified in the future after running some measurements and analysis.
+>>
+>> Based on the work of Nadav Haklai.
+>>
+>> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Hi,
+Thanks!
 
-I am porting the kernel to a new device, for which I've created a new arch/arm/mach-... directory, and I also a clock driver that lives under driver/clk. Everything is all working fine, though I am now cleaning up the code and have a question about mach specific header files.
+I will update the copyright years and will add your acked-by, when I will
+send this series rebased on 3.15-rc1.
 
-The clock driver is completely specific to this device, but needs to read from a system register (just for external boot mode pins) to determine some PLL settings. This register is in a block of system registers which are also used by the mach code in arch/arm/mach-...
+Gregory
 
-Since the clock driver is specific to the mach, is there any point in specifying the address of this reg in the corresponding dtsi? The format and functionality described by this register would not be the same on any other device.
+> 
+>> ---
+>>   drivers/cpuidle/Kconfig.arm             |  5 ++
+>>   drivers/cpuidle/Makefile                |  1 +
+>>   drivers/cpuidle/cpuidle-armada-370-xp.c | 93 +++++++++++++++++++++++++++++++++
+>>   3 files changed, 99 insertions(+)
+>>   create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
+>>
+>> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+>> index 97ccc31dbdd8..5bb94780d377 100644
+>> --- a/drivers/cpuidle/Kconfig.arm
+>> +++ b/drivers/cpuidle/Kconfig.arm
+>> @@ -1,6 +1,11 @@
+>>   #
+>>   # ARM CPU Idle drivers
+>>   #
+>> +config ARM_ARMADA_370_XP_CPUIDLE
+>> +	bool "CPU Idle Driver for Armada 370/XP family processors"
+>> +	depends on ARCH_MVEBU
+>> +	help
+>> +	  Select this to enable cpuidle on Armada 370/XP processors.
+>>
+>>   config ARM_BIG_LITTLE_CPUIDLE
+>>   	bool "Support for ARM big.LITTLE processors"
+>> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+>> index f71ae1b373c5..9902d052bd87 100644
+>> --- a/drivers/cpuidle/Makefile
+>> +++ b/drivers/cpuidle/Makefile
+>> @@ -7,6 +7,7 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>>
+>>   ##################################################################################
+>>   # ARM SoC drivers
+>> +obj-$(CONFIG_ARM_ARMADA_370_XP_CPUIDLE) += cpuidle-armada-370-xp.o
+>>   obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
+>>   obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
+>>   obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
+>> diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
+>> new file mode 100644
+>> index 000000000000..6b98608c222e
+>> --- /dev/null
+>> +++ b/drivers/cpuidle/cpuidle-armada-370-xp.c
+>> @@ -0,0 +1,93 @@
+>> +/*
+>> + * Marvell Armada 370 and Armada XP SoC cpuidle driver
+>> + *
+>> + * Copyright (C) 2013 Marvell
+> 
+> 2014 ?
+> 
+>> + *
+>> + * Nadav Haklai <nadavh@marvell.com>
+>> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + *
+>> + * Maintainer: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> + */
+>> +
+>> +#include <linux/cpu_pm.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/suspend.h>
+>> +#include <linux/platform_device.h>
+>> +#include <asm/cpuidle.h>
+>> +
+>> +#define ARMADA_370_XP_MAX_STATES	3
+>> +#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
+>> +
+>> +static int (*armada_370_xp_cpu_suspend)(int);
+>> +
+>> +static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
+>> +				struct cpuidle_driver *drv,
+>> +				int index)
+>> +{
+>> +	int ret;
+>> +	bool deepidle = false;
+>> +	cpu_pm_enter();
+>> +
+>> +	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
+>> +		deepidle = true;
+>> +
+>> +	ret = armada_370_xp_cpu_suspend(deepidle);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	cpu_pm_exit();
+>> +
+>> +	return index;
+>> +}
+>> +
+>> +static struct cpuidle_driver armada_370_xp_idle_driver = {
+>> +	.name			= "armada_370_xp_idle",
+>> +	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+>> +	.states[1]		= {
+>> +		.enter			= armada_370_xp_enter_idle,
+>> +		.exit_latency		= 10,
+>> +		.power_usage		= 50,
+>> +		.target_residency	= 100,
+>> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
+>> +		.name			= "MV CPU IDLE",
+>> +		.desc			= "CPU power down",
+>> +	},
+>> +	.states[2]		= {
+>> +		.enter			= armada_370_xp_enter_idle,
+>> +		.exit_latency		= 100,
+>> +		.power_usage		= 5,
+>> +		.target_residency	= 1000,
+>> +		.flags			= CPUIDLE_FLAG_TIME_VALID |
+>> +						ARMADA_370_XP_FLAG_DEEP_IDLE,
+>> +		.name			= "MV CPU DEEP IDLE",
+>> +		.desc			= "CPU and L2 Fabric power down",
+>> +	},
+>> +	.state_count = ARMADA_370_XP_MAX_STATES,
+>> +};
+>> +
+>> +static int armada_370_xp_cpuidle_probe(struct platform_device *pdev)
+>> +{
+>> +
+>> +	armada_370_xp_cpu_suspend = (void *)(pdev->dev.platform_data);
+>> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
+>> +}
+>> +
+>> +static struct platform_driver armada_370_xp_cpuidle_plat_driver = {
+>> +	.driver = {
+>> +		.name = "cpuidle-armada-370-xp",
+>> +		.owner = THIS_MODULE,
+>> +	},
+>> +	.probe = armada_370_xp_cpuidle_probe,
+>> +};
+>> +
+>> +module_platform_driver(armada_370_xp_cpuidle_plat_driver);
+>> +
+>> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
+>> +MODULE_DESCRIPTION("Armada 370/XP cpu idle driver");
+>> +MODULE_LICENSE("GPL");
+>>
+> 
+> 
 
-If I don't specify the address of the register in the dtsi, I think it would be best to have a common header file for all of the system registers. I've seen some drivers, e.g.  exynos-cpufreq.c, doing this by including files from mach-exynos/include/mach. Is that the right way to do this?
 
-Thanks
-Phil
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
