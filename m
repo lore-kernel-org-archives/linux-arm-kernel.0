@@ -1,45 +1,84 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri,  4 Apr 2014 12:17:49 +0100
-Subject: [PATCH] arm: Fix DEBUG_LL for multi-platform kernels (without PL01X)
-Message-ID: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Apr 2014 12:22:54 +0100
+Subject: The Alphabet (or, the sorting of Kconfig symbols)
+In-Reply-To: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
+References: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
+Message-ID: <20140404112254.GA7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request.
+I think I'm going to give up trying to merge arm-soc for my build tree,
+the conflicts are far too numerous to properly fix up without spending
+a /lot/ of time on this.  So from tonight, my builds will *not* include
+arm-soc in any shape or form.
 
-The happens because the multi-platform mode may include ARCH_SPEAR13XX
-and this forcibly engages DEBUG_UART_PL01X to provide some kind of
-compatibility with single platform builds (SPEAr supports both single and
-multi-platform). This in turn causes DEBUG_LL_INCLUDE to wedge at
-debug/pl01x.S.
+You can all help to avoid that by managing your files better so that
+these kinds of conflicts don't happen.
 
-Problem is fixed by only deploying the compatibility options for SPEAr
-when ARCH_MULTIPLATFORM is not set.
+On Fri, Apr 04, 2014 at 12:16:47PM +0100, Russell King - ARM Linux wrote:
+> For those who don't know it, the order of letters in the alphabet is:
+> 
+> A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+> 
+> and we use this order to determine the position of "select" entries in
+> Kconfig files.  We do that so that we can reduce conflicts.  Conflicts
+> such as these kinds of rubbish:
+> 
+> diff --cc arch/arm/mach-shmobile/Kconfig
+> index 3b8c87461d67,5249ff0511a8..000000000000
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@@ -133,7 -116,7 +126,11 @@@ config ARCH_R8A779
+>         select MIGHT_HAVE_PCI
+>         select SH_CLK_CPG
+>         select RENESAS_IRQC
+> ++<<<<<<< HEAD
+>  +      select SYS_SUPPORTS_SH_CMT
+> ++=======
+> +       select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+> ++>>>>>>> arm-soc/for-next
+> ...
+> diff --cc arch/arm/mach-zynq/Kconfig
+> index f03e75bd0b2b,cd2d55ab834a..000000000000
+> --- a/arch/arm/mach-zynq/Kconfig
+> +++ b/arch/arm/mach-zynq/Kconfig
+> @@@ -2,19 -2,11 +2,23 @@@ config ARCH_ZYN
+>         select ARM_AMBA
+>         select ARM_GIC
+> ++<<<<<<< HEAD
+>  +      select ARCH_HAS_CPUFREQ
+>  +      select ARCH_HAS_OPP
+>  +      select COMMON_CLK
+>  +      select CPU_V7
+>  +      select GENERIC_CLOCKEVENTS
+> ++=======
+> ++>>>>>>> arm-soc/for-next
+>         select HAVE_ARM_SCU if SMP
+>         select HAVE_ARM_TWD if SMP
+>         select ICST
+> -       select MIGHT_HAVE_CACHE_L2X0
+> -       select USE_OF
+> -       select HAVE_SMP
+> -       select SPARSE_IRQ
+>         select CADENCE_TTC_TIMER
+> ++<<<<<<< HEAD
+>  +      select ARM_GLOBAL_TIMER if !CPU_FREQ
+> ++=======
+> +       select ARM_GLOBAL_TIMER
+> +       select MFD_SYSCON
+> ++>>>>>>> arm-soc/for-next
+> 
+> Please note down the above sequence of letters for future reference. :)
+> 
+> -- 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/Kconfig.debug | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0531da8..f10c784 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -991,9 +991,9 @@ config DEBUG_LL_INCLUDE
- config DEBUG_UART_PL01X
- 	def_bool ARCH_EP93XX || \
- 		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
-+		(ARCH_SPEAR3XX && !ARCH_MULTIPLATFORM) || \
-+		(ARCH_SPEAR6XX && !ARCH_MULTIPLATFORM) || \
-+		(ARCH_SPEAR13XX && !ARCH_MULTIPLATFORM) || \
- 		ARCH_VERSATILE
- 
- # Compatibility options for 8250
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
