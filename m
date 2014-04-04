@@ -1,66 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 4 Apr 2014 19:23:08 +0200
-Subject: [PATCH 1/2] ARM: mvebu: enable the SDHCI interface on Armada 385
-In-Reply-To: <20140404181508.010a6559@skate>
-References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1396626125-8631-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140404160013.GK2798@lunn.ch> <20140404181508.010a6559@skate>
-Message-ID: <20140404172308.GL2798@lunn.ch>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Fri,  4 Apr 2014 14:24:25 -0300
+Subject: [PATCH] watchdog: sunxi: Fix compilation with C=2
+Message-ID: <1396632265-16124-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 06:15:08PM +0200, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Fri, 4 Apr 2014 18:00:13 +0200, Andrew Lunn wrote:
-> 
-> > > diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> > > index a064f59..2c1ff30 100644
-> > > --- a/arch/arm/boot/dts/armada-38x.dtsi
-> > > +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> > > @@ -355,6 +355,15 @@
-> > >  				clocks = <&coredivclk 0>;
-> > >  				status = "disabled";
-> > >  			};
-> > > +
-> > > +			sdhci at d8000 {
-> > > +				compatible = "marvell,armada-380-sdhci";
-> > > +				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-> > > +				interrupts = <0 25 0x4>;
-> > > +				clocks = <&gateclk 17>;
-> > > +				mrvl,clk-delay-cycles = <0x1F>;
-> > 
-> > Hi Thomas
-> > 
-> > Maybe this has been discussed as part of the previous patchset. Why
-> > the mrvl prefix, not marvell? marvell is in vendor-prefixes.txt, but
-> > mrvl does not appear to be listed.
-> 
-> Because I'm not the one who introduced this part of the driver DT
-> binding. It has been added two years ago by:
-> 
-> commit b650352dd3df36164e3427bff3f33bc06ac47642
-> Author: Chris Ball <cjb@laptop.org>
-> Date:   Tue Apr 10 22:34:33 2012 -0400
-> 
->     mmc: sdhci-pxa: Add device tree support
->     
->     Tested on an OLPC XO-1.75.  (MMP2, sdhci-pxav3, CONFIG_MACH_MMP2_DT=y)
->     
->     Signed-off-by: Chris Ball <cjb@laptop.org>
->     Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> 
-> So I'm just merely using the existing DT binding for the driver. Of
-> course, since I'm introducing a new compatible string, I could also
-> change the driver to support the same property prefixed by "marvell,",
-> but it would also have to support the old DT property forever, so is it
-> really useful?
+When compiling sunxi_defconfig while using C=2, the following error
+causes the compilation to fail:
 
-Hi Thomas
+    drivers/watchdog/sunxi_wdt.c:60:15: error: constant 0b0001 is not a valid number
 
-Thanks for the explanation.
+Fix it by using hex notation instead of the non-standard binary one
 
-Changing it makes no sense. We should just document this other vendor
-prefix in vendor-prefixes.txt
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ drivers/watchdog/sunxi_wdt.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-	Andrew
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index cd00a78..693b9d2 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -57,17 +57,17 @@ struct sunxi_wdt_dev {
+  */
+ 
+ static const int wdt_timeout_map[] = {
+-	[1] = 0b0001,  /* 1s  */
+-	[2] = 0b0010,  /* 2s  */
+-	[3] = 0b0011,  /* 3s  */
+-	[4] = 0b0100,  /* 4s  */
+-	[5] = 0b0101,  /* 5s  */
+-	[6] = 0b0110,  /* 6s  */
+-	[8] = 0b0111,  /* 8s  */
+-	[10] = 0b1000, /* 10s */
+-	[12] = 0b1001, /* 12s */
+-	[14] = 0b1010, /* 14s */
+-	[16] = 0b1011, /* 16s */
++	[1] = 0x1,  /* 1s  */
++	[2] = 0x2,  /* 2s  */
++	[3] = 0x3,  /* 3s  */
++	[4] = 0x4,  /* 4s  */
++	[5] = 0x5,  /* 5s  */
++	[6] = 0x6,  /* 6s  */
++	[8] = 0x7,  /* 8s  */
++	[10] = 0x8, /* 10s */
++	[12] = 0x9, /* 12s */
++	[14] = 0xA, /* 14s */
++	[16] = 0xB, /* 16s */
+ };
+ 
+ static int sunxi_wdt_ping(struct watchdog_device *wdt_dev)
+-- 
+1.9.1
