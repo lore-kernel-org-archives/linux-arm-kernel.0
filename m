@@ -1,40 +1,37 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 04 Apr 2014 07:57:36 -0700
-Subject: [PATCH v1 6/8] ARM: hisi: add hip04 SoC support
-In-Reply-To: <1396339430-21084-7-git-send-email-haojian.zhuang@linaro.org>
- (Haojian Zhuang's message of "Tue, 1 Apr 2014 16:03:48 +0800")
-References: <1396339430-21084-1-git-send-email-haojian.zhuang@linaro.org>
- <1396339430-21084-7-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <7hd2gxywf3.fsf@paris.lan>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 4 Apr 2014 23:09:59 +0800
+Subject: Inconsistent lock state introduced by ipv6/addrconf change
+In-Reply-To: <20140404114848.GD13354@order.stressinduktion.org>
+References: <20140404073455.GB29778@dragon>
+ <20140404114848.GD13354@order.stressinduktion.org>
+Message-ID: <20140404150958.GB16383@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@linaro.org> writes:
+On Fri, Apr 04, 2014 at 01:48:48PM +0200, Hannes Frederic Sowa wrote:
+> Hello!
+> 
+> On Fri, Apr 04, 2014 at 03:34:56PM +0800, Shawn Guo wrote:
+> > I'm running into an inconsistent lock state warning on the final v3.14
+> > kernel (-rc8 is good) on Freescale i.MX6 platform with fec driver
+> > (drivers/net/ethernet/freescale/fec_main.c).  The git bisect points
+> > the finger to commit c15b1cc (ipv6: move DAD and addrconf_verify
+> > processing to workqueue).  Reverting the commit does fix the problem
+> > for me.  The image is built from arch/arm/configs/imx_v6_v7_defconfig.
+> > 
+> > The interesting part is the same warning shows up on mainline tree until
+> > net-next gets merged with commit cd6362b.  That's why Olof's autobooter
+> > keeps reporting failure on hummingboard and wandboard (both i.MX6 based)
+> > since v3.14 release [1], but reports success after commit cd6362b.
+> > 
+> > We're less concerned by the mainline tree, since the problem disappeared
+> > now (nice to know why though).  But we do still want to fix it for 3.14
+> > stable kernel.
+> 
+> The patch which fixes this is already queued up for -stable:
+> 
+> http://patchwork.ozlabs.org/patch/335536/
 
-> Hisilicon Hi3xxx is based on Cortex A9 Core. Now HiP04 SoC is based on
-> Cortex A15 Core. And HiP04 supports LPAE to support large memory.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Thanks for the pointer.
 
-[...]
-
-> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-> index da16efd..707abfe 100644
-> --- a/arch/arm/mach-hisi/Kconfig
-> +++ b/arch/arm/mach-hisi/Kconfig
-> @@ -19,6 +19,16 @@ config ARCH_HI3xxx
->  	help
->  	  Support for Hisilicon Hi36xx/Hi37xx processor family
->  
-> +config ARCH_HIP04
-> +	bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7
-> +	select ARM_LPAE
-
-Presumably this SoC can support non-LPAE also, correct?  If so, LPAE
-should't be selected here, or else it will force LPAE on in a multi_v7
-build also.
-
-Also, please run this patch through scripts/checkpatch.pl and fix the
-issues reported there.
-
-Kevin
+Shawn
