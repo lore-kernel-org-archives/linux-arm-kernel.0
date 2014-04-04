@@ -1,223 +1,46 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri,  4 Apr 2014 11:33:34 -0500
-Subject: [PATCH] ARM: qcom: Add initial APQ8064 SoC and IFC6410 board device
- trees
-Message-ID: <1396629214-7466-1-git-send-email-galak@codeaurora.org>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Fri, 4 Apr 2014 16:38:25 +0000
+Subject: mach header files
+In-Reply-To: <20140404162217.GE7528@n2100.arm.linux.org.uk>
+References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <5297747.kWEjnPz8MW@wuerfel>
+ <9970caa86d5c454d840c489901d3ca91@SIXPR06MB173.apcprd06.prod.outlook.com>
+ <6837506.Q7cFQWf1xJ@wuerfel>
+ <730e7ebfabf7489bbfee808cd0247411@SIXPR06MB173.apcprd06.prod.outlook.com>
+ <20140404162217.GE7528@n2100.arm.linux.org.uk>
+Message-ID: <cc8d077175e342ceb45e3dedf54a5595@SIXPR06MB173.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic APQ8064 SoC include device tree and support for basic booting on
-the IFC6410 board.
+Hi Russell,
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  12 +++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 151 +++++++++++++++++++++++++++++
- arch/arm/mach-qcom/board.c                 |   1 +
- 4 files changed, 165 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
- create mode 100644 arch/arm/boot/dts/qcom-apq8064.dtsi
+On 04 April 2014 17:22, Russell wrote:
+> On Fri, Apr 04, 2014 at 04:02:58PM +0000, Phil Edworthy wrote:
+> > Unfortunately, it's not a performance toggle. Functionally, the pl011
+> > will only work with a DMAC if we use the DMA burst request. That's not
+> > completely true though as whether it will work depends on the pl011
+> > driver. With the upstream pl011 linux driver, it's true.
+> >
+> > BTW, the register to control this has nothing to do with the pl011
+> > hardware. The standard pl011 hardware, afaik, outputs both the DMA
+> > single request and DMA burst request signals, and which one is wired
+> > up to the DMAC depends on who designed the SoC. For this hardware,
+> > the hardware people played safe and provided a register that can be
+> > used to switch between the single and burst request signals.
+> 
+> That's not how it's supposed to be used.
+> 
+> The idea behind the two requests is that the peripheral signals to the
+> DMA controller whether it has enough entries in the FIFO for the DMA
+> controller to do a burst transfer, or whether it should do a series of
+> single transfers.
+> 
+> It sounds to me like someone hasn't taken the time to read the PL011
+> documentation and thought about this.  As such, it's probably not worth
+> bothering trying to get DMA working.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0591ed0..1223fa89 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -232,6 +232,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
-+	qcom-apq8064-ifc6410.dtb \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-new file mode 100644
-index 0000000..c5fda40
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -0,0 +1,12 @@
-+#include "qcom-apq8064.dtsi"
-+
-+/ {
-+	model = "Qualcomm APQ8064/IFC6410";
-+	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
-+
-+	soc {
-+		serial at 16640000 {
-+			status = "ok";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-new file mode 100644
-index 0000000..60b89e5
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -0,0 +1,151 @@
-+/dts-v1/;
-+
-+/include/ "skeleton.dtsi"
-+
-+#include <dt-bindings/clock/qcom,gcc-msm8960.h>
-+
-+/ {
-+	model = "Qualcomm APQ8064";
-+	compatible = "qcom,apq8064";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <1 14 0x304>;
-+		compatible = "qcom,krait";
-+		enable-method = "qcom,kpss-acc-v1";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc0>;
-+			qcom,saw = <&saw0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc1>;
-+			qcom,saw = <&saw1>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			reg = <2>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc2>;
-+			qcom,saw = <&saw2>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			reg = <3>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc3>;
-+			qcom,saw = <&saw3>;
-+		};
-+
-+		L2: l2-cache {
-+			compatible = "cache";
-+			cache-level = <2>;
-+			interrupts = <0 2 0x4>;
-+		};
-+	};
-+
-+	soc: soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		compatible = "simple-bus";
-+
-+
-+		intc: interrupt-controller at 2000000 {
-+			compatible = "qcom,msm-qgic2";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = < 0x02000000 0x1000 >,
-+			      < 0x02002000 0x1000 >;
-+		};
-+
-+		timer at 200a000 {
-+			compatible = "qcom,kpss-timer", "qcom,msm-timer";
-+			interrupts = <1 1 0x301>,
-+				     <1 2 0x301>,
-+				     <1 3 0x301>;
-+			reg = <0x0200a000 0x100>;
-+			clock-frequency = <27000000>,
-+					  <32768>;
-+			cpu-offset = <0x80000>;
-+		};
-+
-+		acc0: clock-controller at 2088000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		acc1: clock-controller at 2098000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		acc2: clock-controller at 20a8000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x020a8000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		acc3: clock-controller at 20b8000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x020b8000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		saw0: regulator at 2089000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x02089000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		saw1: regulator at 2099000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		saw2: regulator at 20a9000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x020a9000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		saw3: regulator at 20b9000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x020b9000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		serial at 16640000 {
-+			compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+			reg = <0x16640000 0x1000>,
-+			      <0x16600000 0x1000>;
-+			interrupts = <0 158 0x0>;
-+			clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
-+
-+		qcom,ssbi at 500000 {
-+			compatible = "qcom,ssbi";
-+			reg = <0x00500000 0x1000>;
-+			qcom,controller-type = "pmic-arbiter";
-+		};
-+
-+		gcc: clock-controller at 900000 {
-+			compatible = "qcom,gcc-apq8064";
-+			reg = <0x00900000 0x4000>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-index cb3c07c..333dced5 100644
---- a/arch/arm/mach-qcom/board.c
-+++ b/arch/arm/mach-qcom/board.c
-@@ -15,6 +15,7 @@
- #include <asm/mach/arch.h>
- 
- static const char * const qcom_dt_match[] __initconst = {
-+	"qcom,apq8064",
- 	"qcom,apq8074-dragonboard",
- 	"qcom,ipq8062",
- 	"qcom,ipq8064",
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+DMA with the pl011 works just fine, thanks - we've integrated our DMAC & pl011 hardware onto a Xilinx Zynq device.
+The only software change required is to modify the burst threshold in the pl011 driver to 3/4 full. The DMA burst size is left to 1/2 the FIFO size to ensure there is data left in the FIFO after the DMAC has performed it's burst. This allows the pl011 to fire of the rx timeout irq when no further data has been received.
+
+Thanks
+Phil
