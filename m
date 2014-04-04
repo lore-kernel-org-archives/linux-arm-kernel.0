@@ -1,84 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Apr 2014 12:22:54 +0100
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 4 Apr 2014 04:24:27 -0700
 Subject: The Alphabet (or, the sorting of Kconfig symbols)
 In-Reply-To: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
 References: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
-Message-ID: <20140404112254.GA7528@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6uoB6CkuV7HCg8wdyu2Tm471YaAz0sDA3W2C0MPAYYY+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think I'm going to give up trying to merge arm-soc for my build tree,
-the conflicts are far too numerous to properly fix up without spending
-a /lot/ of time on this.  So from tonight, my builds will *not* include
-arm-soc in any shape or form.
-
-You can all help to avoid that by managing your files better so that
-these kinds of conflicts don't happen.
-
-On Fri, Apr 04, 2014 at 12:16:47PM +0100, Russell King - ARM Linux wrote:
+On Fri, Apr 4, 2014 at 4:16 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 > For those who don't know it, the order of letters in the alphabet is:
-> 
+>
 > A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
-> 
+>
 > and we use this order to determine the position of "select" entries in
 > Kconfig files.  We do that so that we can reduce conflicts.  Conflicts
 > such as these kinds of rubbish:
-> 
-> diff --cc arch/arm/mach-shmobile/Kconfig
-> index 3b8c87461d67,5249ff0511a8..000000000000
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@@ -133,7 -116,7 +126,11 @@@ config ARCH_R8A779
->         select MIGHT_HAVE_PCI
->         select SH_CLK_CPG
->         select RENESAS_IRQC
-> ++<<<<<<< HEAD
->  +      select SYS_SUPPORTS_SH_CMT
-> ++=======
-> +       select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
-> ++>>>>>>> arm-soc/for-next
-> ...
-> diff --cc arch/arm/mach-zynq/Kconfig
-> index f03e75bd0b2b,cd2d55ab834a..000000000000
-> --- a/arch/arm/mach-zynq/Kconfig
-> +++ b/arch/arm/mach-zynq/Kconfig
-> @@@ -2,19 -2,11 +2,23 @@@ config ARCH_ZYN
->         select ARM_AMBA
->         select ARM_GIC
-> ++<<<<<<< HEAD
->  +      select ARCH_HAS_CPUFREQ
->  +      select ARCH_HAS_OPP
->  +      select COMMON_CLK
->  +      select CPU_V7
->  +      select GENERIC_CLOCKEVENTS
-> ++=======
-> ++>>>>>>> arm-soc/for-next
->         select HAVE_ARM_SCU if SMP
->         select HAVE_ARM_TWD if SMP
->         select ICST
-> -       select MIGHT_HAVE_CACHE_L2X0
-> -       select USE_OF
-> -       select HAVE_SMP
-> -       select SPARSE_IRQ
->         select CADENCE_TTC_TIMER
-> ++<<<<<<< HEAD
->  +      select ARM_GLOBAL_TIMER if !CPU_FREQ
-> ++=======
-> +       select ARM_GLOBAL_TIMER
-> +       select MFD_SYSCON
-> ++>>>>>>> arm-soc/for-next
-> 
-> Please note down the above sequence of letters for future reference. :)
-> 
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Equally applies to #include ordering.
+
+g.
