@@ -1,39 +1,43 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 4 Apr 2014 21:32:33 +0800
-Subject: mach header files
-In-Reply-To: <4379667.784l7DtcMU@wuerfel>
-References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
- <CACxGe6sV7WpQeiGxjnmaatnCCzRBqU=O6qyuQXJd+RYt4QUXgg@mail.gmail.com>
- <4379667.784l7DtcMU@wuerfel>
-Message-ID: <CAGsJ_4yd4a+Mkb2G2Xx-qT0bks2QBf-=NxipX0es_X9NJfB+4Q@mail.gmail.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri,  4 Apr 2014 19:03:37 +0530
+Subject: [PATCH] usb: ohci-exynos: Remove locks for 'ohci' in suspend callback
+Message-ID: <1396618417-9560-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-04 21:24 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 04 April 2014 03:29:54 Grant Likely wrote:
->> On Fri, Apr 4, 2014 at 1:19 AM, Phil Edworthy <phil.edworthy@renesas.com> wrote:
->> > Resent, hopefully without the automatic corporate signature appended this time...
->> >
->> > I am porting the kernel to a new device, for which I've created a new
->> > arch/arm/mach-... directory, and I also a clock driver that lives under
->> > driver/clk. Everything is all working fine, though I am now cleaning up
->> > the code and have a question about mach specific header files.
->
-> I'm glad you are asking while you are still in the process of cleaning
-> up your code, because you need to know the rules for new platforms.
-> Basically at this point we expect zero code in arch/arm/mach-* for a new
-> platform. You are absolutely required to have DT based probing and
-> multiplatform support, and the latter also means that there are no
-> mach/*.h header files that are visible to device drivers.
->
-> We still make the occasional exception for adding code in the mach-*
-> directory, but we are getting pretty close to the state where this
-> is not needed for new platforms, and all the existing uses are for
-> things that can eventually get cleaned up.
-> If you think you need an exception here, please explain what you
-> are doing, and we can see if there is a better way to do that already.
+Patch : 14982e3 USB: OHCI: Properly handle ohci-exynos suspend
+has already removed 'ohci_hcd' settings from exynos glue layer
+as a part of streamlining the ohci controller's suspend.
+So we don't need the locks for 'ohci_hcd' anymore.
 
-Arnd, my question is that mach-prima2/common.c has supported prima2,
-atlas6, marco, what if i add an atlas7 support in it?
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Manjunath Goudar <csmanjuvijay@gmail.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+---
+ drivers/usb/host/ohci-exynos.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
--barry
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index 68588d8..7f5e779 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -199,8 +199,6 @@ static int exynos_ohci_suspend(struct device *dev)
+ 	if (rc)
+ 		return rc;
+ 
+-	spin_lock_irqsave(&ohci->lock, flags);
+-
+ 	if (exynos_ohci->otg)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+@@ -208,8 +206,6 @@ static int exynos_ohci_suspend(struct device *dev)
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
+-	spin_unlock_irqrestore(&ohci->lock, flags);
+-
+ 	return 0;
+ }
+ 
+-- 
+1.7.10.4
