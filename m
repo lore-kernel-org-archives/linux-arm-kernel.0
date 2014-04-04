@@ -1,111 +1,89 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 16:09:37 +0200
-Subject: [PATCH v2 09/11] ARM: mvebu: add workaround for SMP support for
- Armada 375 stepping Z1
+Date: Fri,  4 Apr 2014 16:09:34 +0200
+Subject: [PATCH v2 06/11] ARM: mvebu: add function to set the resume boot
+ address for Armada 375
 In-Reply-To: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396620579-15230-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396620579-15230-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Due to internal bootrom issue, CPU[1] initial jump code (four
-instructions) should be placed in SRAM memory of the SoC. In order to
-achieve this, we have to unmap the BootROM and at some specific
-location where the BootROM was place, create a specific MBus window
-for the SRAM. This SRAM is initialized with a few instructions of code
-that allows to jump into the real secondary CPU boot address.
+In order to boot the secondary CPUs on Armada 375, we need to set the
+boot address of these CPUs, through a register part of the System
+Controller (this deviates from the Armada XP design, where the boot
+address was defined using a register part of the PMSU unit).
 
-This workaround will most likely be disabled when newer steppings of
-the Armada 375 will be made available, in which case a dynamic test
-based on mvebu-soc-id will be added.
+Therefore, this commit adds a new helper function in the System
+Controller driver to set the secondary CPU boot address.
+
+Moreover, it moves the System Controller initialization as an
+early_initcall(), since arch_initcall() is too late for an SMP-related
+initialization.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/headsmp-a9.S | 12 ++++++++++++
- arch/arm/mach-mvebu/platsmp-a9.c | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+ arch/arm/mach-mvebu/common.h            |  1 +
+ arch/arm/mach-mvebu/system-controller.c | 15 ++++++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/headsmp-a9.S b/arch/arm/mach-mvebu/headsmp-a9.S
-index 78e66c9..5925366 100644
---- a/arch/arm/mach-mvebu/headsmp-a9.S
-+++ b/arch/arm/mach-mvebu/headsmp-a9.S
-@@ -16,6 +16,18 @@
- #include <linux/init.h>
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 2b88eb0..b67fb7a 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -20,6 +20,7 @@
+ void mvebu_restart(enum reboot_mode mode, const char *cmd);
+ int mvebu_cpu_reset_deassert(int cpu);
+ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
++void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
  
- 	__CPUINIT
-+#define CPU_RESUME_ADDR_REG 0xf10182d4
-+
-+.global armada_375_smp_cpu1_enable_code_start
-+.global armada_375_smp_cpu1_enable_code_end
-+
-+armada_375_smp_cpu1_enable_code_start:
-+	ldr     r0, [pc, #4]
-+	ldr     r1, [r0]
-+	mov     pc, r1
-+	.word   CPU_RESUME_ADDR_REG
-+armada_375_smp_cpu1_enable_code_end:
-+
- ENTRY(mvebu_cortex_a9_secondary_startup)
- 	bl      v7_invalidate_l1
- 	b	secondary_startup
-diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
-index 27dacfc..04d0b18 100644
---- a/arch/arm/mach-mvebu/platsmp-a9.c
-+++ b/arch/arm/mach-mvebu/platsmp-a9.c
-@@ -16,11 +16,36 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/smp.h>
-+#include <linux/mbus.h>
- #include <asm/smp_scu.h>
- #include <asm/smp_plat.h>
- #include "common.h"
- #include "pmsu.h"
+ void armada_xp_cpu_die(unsigned int cpu);
  
-+#define CRYPT0_ENG_ID   41
-+#define CRYPT0_ENG_ATTR 0x1
-+#define SRAM_PHYS_BASE  0xFFFF0000
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+index 614ba68..0c5524a 100644
+--- a/arch/arm/mach-mvebu/system-controller.c
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -37,6 +37,8 @@ struct mvebu_system_controller {
+ 
+ 	u32 rstoutn_mask_reset_out_en;
+ 	u32 system_soft_reset;
 +
-+#define BOOTROM_BASE    0xFFF00000
-+#define BOOTROM_SIZE    0x100000
-+
-+extern unsigned char armada_375_smp_cpu1_enable_code_end;
-+extern unsigned char armada_375_smp_cpu1_enable_code_start;
-+
-+void armada_375_smp_cpu1_enable_wa(void)
++	u32 resume_boot_addr;
+ };
+ static struct mvebu_system_controller *mvebu_sc;
+ 
+@@ -52,6 +54,7 @@ static const struct mvebu_system_controller armada_375_system_controller = {
+ 	.system_soft_reset_offset = 0x58,
+ 	.rstoutn_mask_reset_out_en = 0x1,
+ 	.system_soft_reset = 0x1,
++	.resume_boot_addr = 0xd4,
+ };
+ 
+ static const struct mvebu_system_controller orion_system_controller = {
+@@ -98,6 +101,16 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd)
+ 		;
+ }
+ 
++#ifdef CONFIG_SMP
++void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
 +{
-+	void __iomem *sram_virt_base;
-+
-+	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
-+	mvebu_mbus_add_window_by_id(CRYPT0_ENG_ID, CRYPT0_ENG_ATTR,
-+				SRAM_PHYS_BASE, SZ_64K);
-+	sram_virt_base = ioremap(SRAM_PHYS_BASE, SZ_64K);
-+
-+	memcpy(sram_virt_base, &armada_375_smp_cpu1_enable_code_start,
-+	       &armada_375_smp_cpu1_enable_code_end
-+	       - &armada_375_smp_cpu1_enable_code_start);
++	BUG_ON(system_controller_base == NULL);
++	BUG_ON(mvebu_sc->resume_boot_addr == 0);
++	writel(virt_to_phys(boot_addr), system_controller_base +
++	       mvebu_sc->resume_boot_addr);
 +}
++#endif
 +
- extern void mvebu_cortex_a9_secondary_startup(void);
- 
- static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
-@@ -55,7 +80,14 @@ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
+ static int __init mvebu_system_controller_init(void)
+ {
+ 	const struct of_device_id *match;
+@@ -114,4 +127,4 @@ static int __init mvebu_system_controller_init(void)
  	return 0;
  }
  
-+static void __init mvebu_cortex_a9_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	if (of_machine_is_compatible("marvell,armada375"))
-+		armada_375_smp_cpu1_enable_wa();
-+}
-+
- static struct smp_operations mvebu_cortex_a9_smp_ops __initdata = {
-+	.smp_prepare_cpus	= mvebu_cortex_a9_smp_prepare_cpus,
- 	.smp_boot_secondary	= mvebu_cortex_a9_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= armada_xp_cpu_die,
+-arch_initcall(mvebu_system_controller_init);
++early_initcall(mvebu_system_controller_init);
 -- 
 1.8.3.2
