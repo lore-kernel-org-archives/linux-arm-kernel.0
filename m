@@ -1,13 +1,13 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri,  4 Apr 2014 16:14:15 -0700
-Subject: [PATCH v2 4/5] dt-bindings: clock: Add Zynq-7000 header
+Date: Fri,  4 Apr 2014 16:14:16 -0700
+Subject: [PATCH v2 5/5] ARM: zynq: dt: Use #defines for clock specifiers
 In-Reply-To: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1396653256-28397-5-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1396653256-28397-6-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add header file with symbolic names for Zynq's clocks.
+Use symbolic names instead of bare numbers to specify clocks.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
@@ -16,79 +16,137 @@ Changes in v2:
  - this patch has been added
 
 ---
- include/dt-bindings/clock/zynq-7000.h | 64 +++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
- create mode 100644 include/dt-bindings/clock/zynq-7000.h
+ arch/arm/boot/dts/zynq-7000.dtsi | 33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/include/dt-bindings/clock/zynq-7000.h b/include/dt-bindings/clock/zynq-7000.h
-new file mode 100644
-index 000000000000..851f5cffe481
---- /dev/null
-+++ b/include/dt-bindings/clock/zynq-7000.h
-@@ -0,0 +1,64 @@
-+/*
-+ * Copyright (c) 2014 Xilinx Inc.
-+ * Author: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Device Tree binding constants for Zynq 7000 clock controller.
-+*/
-+
-+#ifndef _DT_BINDINGS_CLOCK_ZYNQ_7000_H
-+#define _DT_BINDINGS_CLOCK_ZYNQ_7000_H
-+
-+#define ZYNQ_CLK_ARMPLL		0
-+#define ZYNQ_CLK_DDRPLL		1
-+#define ZYNQ_CLK_IOPLL		2
-+#define ZYNQ_CLK_CPU_6OR4X	3
-+#define ZYNQ_CLK_CPU_3OR2X	4
-+#define ZYNQ_CLK_CPU_2X		5
-+#define ZYNQ_CLK_CPU_1X		6
-+#define ZYNQ_CLK_DDR2X		7
-+#define ZYNQ_CLK_DDR3X		8
-+#define ZYNQ_CLK_DCI		9
-+#define ZYNQ_CLK_LQSPI		10
-+#define ZYNQ_CLK_SMC		11
-+#define ZYNQ_CLK_PCAP		12
-+#define ZYNQ_CLK_GEM0		13
-+#define ZYNQ_CLK_GEM1		14
-+#define ZYNQ_CLK_FCLK0		15
-+#define ZYNQ_CLK_FCLK1		16
-+#define ZYNQ_CLK_FCLK2		17
-+#define ZYNQ_CLK_FCLK3		18
-+#define ZYNQ_CLK_CAN0		19
-+#define ZYNQ_CLK_CAN1		20
-+#define ZYNQ_CLK_SDIO0		21
-+#define ZYNQ_CLK_SDIO1		22
-+#define ZYNQ_CLK_UART0		23
-+#define ZYNQ_CLK_UART1		24
-+#define ZYNQ_CLK_SPI0		25
-+#define ZYNQ_CLK_SPI1		26
-+#define ZYNQ_CLK_DMA		27
-+#define ZYNQ_CLK_USB0_APER	28
-+#define ZYNQ_CLK_USB1_APER	29
-+#define ZYNQ_CLK_GEM0_APER	30
-+#define ZYNQ_CLK_GEM1_APER	31
-+#define ZYNQ_CLK_SDIO0_APER	32
-+#define ZYNQ_CLK_SDIO1_APER	33
-+#define ZYNQ_CLK_SPI0_APER	34
-+#define ZYNQ_CLK_SPI1_APER	35
-+#define ZYNQ_CLK_CAN0_APER	36
-+#define ZYNQ_CLK_CAN1_APER	37
-+#define ZYNQ_CLK_I2C0_APER	38
-+#define ZYNQ_CLK_I2C1_APER	39
-+#define ZYNQ_CLK_UART0_APER	40
-+#define ZYNQ_CLK_UART1_APER	41
-+#define ZYNQ_CLK_GPIO_APER	42
-+#define ZYNQ_CLK_LQSPI_APER	43
-+#define ZYNQ_CLK_SMC_APER	44
-+#define ZYNQ_CLK_SWDT		45
-+#define ZYNQ_CLK_DBG_TRC	46
-+#define ZYNQ_CLK_DBG_APB	47
-+
-+#endif /* _DT_BINDINGS_CLOCK_ZYNQ_7000_H */
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 36a34ffa30af..9a54b49d0fd2 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -13,6 +13,7 @@
+ 
+ #include "skeleton.dtsi"
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/zynq-7000.h>
+ 
+ / {
+ 	compatible = "xlnx,zynq-7000";
+@@ -25,8 +26,8 @@
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			reg = <0>;
+-			clocks = <&clkc 3>;
+ 			clock-latency = <1000>;
++			clocks = <&clkc ZYNQ_CLK_CPU_6OR4X>;
+ 			operating-points = <
+ 				/* kHz    uV */
+ 				666667  1000000
+@@ -39,7 +40,7 @@
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			reg = <1>;
+-			clocks = <&clkc 3>;
++			clocks = <&clkc ZYNQ_CLK_CPU_6OR4X>;
+ 		};
+ 	};
+ 
+@@ -78,7 +79,8 @@
+ 		uart0: uart at e0000000 {
+ 			compatible = "xlnx,xuartps";
+ 			status = "disabled";
+-			clocks = <&clkc 23>, <&clkc 40>;
++			clocks = <&clkc ZYNQ_CLK_UART0>,
++				 <&clkc ZYNQ_CLK_UART0_APER>;
+ 			clock-names = "ref_clk", "aper_clk";
+ 			reg = <0xE0000000 0x1000>;
+ 			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+@@ -87,7 +89,8 @@
+ 		uart1: uart at e0001000 {
+ 			compatible = "xlnx,xuartps";
+ 			status = "disabled";
+-			clocks = <&clkc 24>, <&clkc 41>;
++			clocks = <&clkc ZYNQ_CLK_UART1>,
++				 <&clkc ZYNQ_CLK_UART1_APER>;
+ 			clock-names = "ref_clk", "aper_clk";
+ 			reg = <0xE0001000 0x1000>;
+ 			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+@@ -98,7 +101,9 @@
+ 			reg = <0xe000b000 0x4000>;
+ 			status = "disabled";
+ 			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&clkc 30>, <&clkc 30>, <&clkc 13>;
++			clocks = <&clkc ZYNQ_CLK_GEM0_APER>,
++				 <&clkc ZYNQ_CLK_GEM0_APER>,
++				 <&clkc ZYNQ_CLK_GEM0>;
+ 			clock-names = "pclk", "hclk", "tx_clk";
+ 		};
+ 
+@@ -107,7 +112,9 @@
+ 			reg = <0xe000c000 0x4000>;
+ 			status = "disabled";
+ 			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&clkc 31>, <&clkc 31>, <&clkc 14>;
++			clocks = <&clkc ZYNQ_CLK_GEM1_APER>,
++				 <&clkc ZYNQ_CLK_GEM1_APER>,
++				 <&clkc ZYNQ_CLK_GEM1>;
+ 			clock-names = "pclk", "hclk", "tx_clk";
+ 		};
+ 
+@@ -115,7 +122,8 @@
+ 			compatible = "arasan,sdhci-8.9a";
+ 			status = "disabled";
+ 			clock-names = "clk_xin", "clk_ahb";
+-			clocks = <&clkc 21>, <&clkc 32>;
++			clocks = <&clkc ZYNQ_CLK_SDIO0>,
++				 <&clkc ZYNQ_CLK_SDIO0_APER>;
+ 			interrupt-parent = <&intc>;
+ 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xe0100000 0x1000>;
+@@ -125,7 +133,8 @@
+ 			compatible = "arasan,sdhci-8.9a";
+ 			status = "disabled";
+ 			clock-names = "clk_xin", "clk_ahb";
+-			clocks = <&clkc 22>, <&clkc 33>;
++			clocks = <&clkc ZYNQ_CLK_SDIO1>,
++				 <&clkc ZYNQ_CLK_SDIO1_APER>;
+ 			interrupt-parent = <&intc>;
+ 			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xe0101000 0x1000>;
+@@ -163,7 +172,7 @@
+ 			reg = <0xf8f00200 0x20>;
+ 			interrupts = <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_EDGE_RISING)>;
+ 			interrupt-parent = <&intc>;
+-			clocks = <&clkc 4>;
++			clocks = <&clkc ZYNQ_CLK_CPU_3OR2X>;
+ 		};
+ 
+ 		ttc0: ttc0 at f8001000 {
+@@ -172,7 +181,7 @@
+ 				     <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+ 			compatible = "cdns,ttc";
+-			clocks = <&clkc 6>;
++			clocks = <&clkc ZYNQ_CLK_CPU_1X>;
+ 			reg = <0xF8001000 0x1000>;
+ 		};
+ 
+@@ -182,7 +191,7 @@
+ 				     <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+ 			compatible = "cdns,ttc";
+-			clocks = <&clkc 6>;
++			clocks = <&clkc ZYNQ_CLK_CPU_1X>;
+ 			reg = <0xF8002000 0x1000>;
+ 		};
+ 		scutimer: scutimer at f8f00600 {
+@@ -190,7 +199,7 @@
+ 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_EDGE_RISING)>;
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = < 0xf8f00600 0x20 >;
+-			clocks = <&clkc 4>;
++			clocks = <&clkc ZYNQ_CLK_CPU_3OR2X>;
+ 		} ;
+ 	};
+ };
 -- 
 1.9.1.1.gbb9f595
