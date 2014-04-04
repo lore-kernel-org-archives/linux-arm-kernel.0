@@ -1,48 +1,91 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 4 Apr 2014 12:51:11 +0200
-Subject: [PATCH v2 00/16] ASoC: fsl-ssi: Driver cleanup
-In-Reply-To: <20140404100351.GM14763@sirena.org.uk>
-References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
- <20140403221406.GI14763@sirena.org.uk>
- <20140404064932.GC20621@pengutronix.de>
- <20140404100351.GM14763@sirena.org.uk>
-Message-ID: <20140404105111.GE20621@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 4 Apr 2014 12:57:48 +0200
+Subject: [PATCH V2 02/19] mmc: mmci: Convert to devm functions
+In-Reply-To: <533E8C2E.9040400@monstr.eu>
+References: <1396279100-2920-1-git-send-email-ulf.hansson@linaro.org>
+ <1396279100-2920-3-git-send-email-ulf.hansson@linaro.org>
+ <533E8C2E.9040400@monstr.eu>
+Message-ID: <CAPDyKFqQ8ik2vz-E7A11T9tpk-+=KjwQxAJpqWh3UmehH7EDEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 11:03:51AM +0100, Mark Brown wrote:
-> On Fri, Apr 04, 2014 at 08:49:32AM +0200, Markus Pargmann wrote:
-> 
-> > Thanks for applying this series, but could you please drop it for the
-> > moment? We found some issues with the baud clock setup for i2s master
-> > mode and have some fixed patches for the series. So it would be nice to
-> > get this in without fixups if that's still possible? I could send a v3
-> > next week.
-> 
-> I've dropped everything after "fsl-ssi: Move debugging to a separate
-> file" since that didn't compile anyway (though I'll add the binding
-> document update as a fix).  In future please don't wait until after your
-> patches have been applied before saying things like this, it's not good
-> to rebase branches normally.
+On 4 April 2014 12:40, Michal Simek <monstr@monstr.eu> wrote:
+> On 03/31/2014 05:18 PM, Ulf Hansson wrote:
+>> Converting to devm functions to simplify error handling in ->probe() and
+>> to cleanup ->remove().
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/mmc/host/mmci.c |   51 ++++++++++++++++++-----------------------------
+>>  1 file changed, 19 insertions(+), 32 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+>> index b0b81ac..d6f20ba 100644
+>> --- a/drivers/mmc/host/mmci.c
+>> +++ b/drivers/mmc/host/mmci.c
+>> @@ -13,6 +13,7 @@
+>>  #include <linux/init.h>
+>>  #include <linux/ioport.h>
+>>  #include <linux/device.h>
+>> +#include <linux/io.h>
+>>  #include <linux/interrupt.h>
+>>  #include <linux/kernel.h>
+>>  #include <linux/slab.h>
+>> @@ -1456,15 +1457,13 @@ static int mmci_probe(struct amba_device *dev,
+>>       if (np)
+>>               mmci_dt_populate_generic_pdata(np, plat);
+>>
+>> -     ret = amba_request_regions(dev, DRIVER_NAME);
+>> -     if (ret)
+>> -             goto out;
+>> +     if (!devm_request_mem_region(&dev->dev, dev->res.start,
+>> +                             resource_size(&dev->res), DRIVER_NAME))
+>> +             return -ENOMEM;
+>
+> here. Look below.
+>
+>>
+>>       mmc = mmc_alloc_host(sizeof(struct mmci_host), &dev->dev);
+>> -     if (!mmc) {
+>> -             ret = -ENOMEM;
+>> -             goto rel_regions;
+>> -     }
+>> +     if (!mmc)
+>> +             return -ENOMEM;
+>>
+>>       host = mmc_priv(mmc);
+>>       host->mmc = mmc;
+>> @@ -1500,8 +1499,10 @@ static int mmci_probe(struct amba_device *dev,
+>>               dev_dbg(mmc_dev(mmc), "eventual mclk rate: %u Hz\n",
+>>                       host->mclk);
+>>       }
+>> +
+>>       host->phybase = dev->res.start;
+>> -     host->base = ioremap(dev->res.start, resource_size(&dev->res));
+>> +     host->base = devm_ioremap(&dev->dev, host->phybase,
+>> +                             resource_size(&dev->res));
+>
 
-Thank you. Sorry for the extra work and rebase. I will send the new
-version next week.
+Hi Michal,
 
-Regards,
+Appreciate your review - you are right! I will convert to
+devm_ioremap_resource().
 
-Markus
+Kind regards
+Ulf Hansson
 
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/de3eb9bb/attachment.sig>
+> Isn't it better to use devm_ioremap_resource directly?
+> You will get correct error return values too.
+>
+> Thanks,
+> Michal
+>
+>
+> --
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+>
+>
