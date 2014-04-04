@@ -1,125 +1,35 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri,  4 Apr 2014 11:31:29 -0500
-Subject: [PATCH] clk: qcom: Add basic support for APQ8064 global clock
- controller clocks
-Message-ID: <1396629089-7358-1-git-send-email-galak@codeaurora.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri,  4 Apr 2014 18:31:24 +0200
+Subject: [PATCH 0/3] reset: add socfpga reset-controller
+Message-ID: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The APQ8064 and MSM8960 share a significant amount of clock data and
-code between the two SoCs.  Rather than duplicating the data we just add
-support for a unqiue APQ8064 clock table into the MSM8960 code.
+Hi!
 
-For now add just enough clocks to get a basic serial port going on an
-APQ8064 device.
+This series converts the current rst-mgr entry in the socfpga.dtsi to
+a driver that registers with the reset-controller framework.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
+1/3 adds the driver,
+2/3 updates the binding to reflect this
+3/3 updates the socfpga.dtsi and adds the DT-header file
 
-This patch is based on Stephen's qcom common clk init conslidation patch
+Regards,
+Steffen
 
- .../devicetree/bindings/clock/qcom,gcc.txt         |  1 +
- drivers/clk/qcom/Kconfig                           |  4 +--
- drivers/clk/qcom/gcc-msm8960.c                     | 30 +++++++++++++++++++---
- 3 files changed, 30 insertions(+), 5 deletions(-)
+Steffen Trumtrar (3):
+  reset: add driver for socfpga
+  Documentation: dt: socfpga: add reset-cells property
+  ARM: socfpga: dts: add reset-controller
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-index 74974d6..25ae79c 100644
---- a/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-+++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
-@@ -4,6 +4,7 @@ Qualcomm Global Clock & Reset Controller Binding
- Required properties :
- - compatible : shall contain only one of the following:
- 
-+			"qcom,gcc-apq8064"
- 			"qcom,gcc-ipq8064"
- 			"qcom,gcc-msm8660"
- 			"qcom,gcc-msm8960"
-diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index 5d81f7d..4b1f2d7 100644
---- a/drivers/clk/qcom/Kconfig
-+++ b/drivers/clk/qcom/Kconfig
-@@ -21,10 +21,10 @@ config MSM_GCC_8660
- 	  i2c, USB, SD/eMMC, etc.
- 
- config MSM_GCC_8960
--	tristate "MSM8960 Global Clock Controller"
-+	tristate "APQ8064/MSM8960 Global Clock Controller"
- 	depends on COMMON_CLK_QCOM
- 	help
--	  Support for the global clock controller on msm8960 devices.
-+	  Support for the global clock controller on apq8064/msm8960 devices.
- 	  Say Y if you want to use peripheral devices such as UART, SPI,
- 	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
- 
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index 633b019..8e2b6dd 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -2868,6 +2868,16 @@ static const struct qcom_reset_map gcc_msm8960_resets[] = {
- 	[RIVA_RESET] = { 0x35e0 },
- };
- 
-+static struct clk_regmap *gcc_apq8064_clks[] = {
-+	[PLL8] = &pll8.clkr,
-+	[PLL8_VOTE] = &pll8_vote,
-+	[GSBI7_UART_SRC] = &gsbi7_uart_src.clkr,
-+	[GSBI7_UART_CLK] = &gsbi7_uart_clk.clkr,
-+	[GSBI7_QUP_SRC] = &gsbi7_qup_src.clkr,
-+	[GSBI7_QUP_CLK] = &gsbi7_qup_clk.clkr,
-+	[GSBI7_H_CLK] = &gsbi7_h_clk.clkr,
-+};
-+
- static const struct regmap_config gcc_msm8960_regmap_config = {
- 	.reg_bits	= 32,
- 	.reg_stride	= 4,
-@@ -2884,8 +2894,17 @@ static const struct qcom_cc_desc gcc_msm8960_desc = {
- 	.num_resets = ARRAY_SIZE(gcc_msm8960_resets),
- };
- 
-+static const struct qcom_cc_desc gcc_apq8064_desc = {
-+	.config = &gcc_msm8960_regmap_config,
-+	.clks = gcc_apq8064_clks,
-+	.num_clks = ARRAY_SIZE(gcc_apq8064_clks),
-+	.resets = gcc_msm8960_resets,
-+	.num_resets = ARRAY_SIZE(gcc_msm8960_resets),
-+};
-+
- static const struct of_device_id gcc_msm8960_match_table[] = {
--	{ .compatible = "qcom,gcc-msm8960" },
-+	{ .compatible = "qcom,gcc-msm8960", .data = &gcc_msm8960_desc },
-+	{ .compatible = "qcom,gcc-apq8064", .data = &gcc_apq8064_desc },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, gcc_msm8960_match_table);
-@@ -2894,6 +2913,11 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- {
- 	struct clk *clk;
- 	struct device *dev = &pdev->dev;
-+	const struct of_device_id *match;
-+
-+	match = of_match_device(gcc_msm8960_match_table, &pdev->dev);
-+	if (!match)
-+		return -EINVAL;
- 
- 	/* Temporary until RPM clocks supported */
- 	clk = clk_register_fixed_rate(dev, "cxo", NULL, CLK_IS_ROOT, 19200000);
-@@ -2904,7 +2928,7 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
- 
--	return qcom_cc_probe(pdev, &gcc_msm8960_desc);
-+	return qcom_cc_probe(pdev, match->data);
- }
- 
- static int gcc_msm8960_remove(struct platform_device *pdev)
+ .../bindings/arm/altera/socfpga-reset.txt          |   2 +
+ arch/arm/boot/dts/socfpga.dtsi                     |   8 +-
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-socfpga.c                      | 149 +++++++++++++++++++++
+ include/dt-bindings/reset/altr,rst-mgr.h           |  90 +++++++++++++
+ 5 files changed, 249 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/reset/reset-socfpga.c
+ create mode 100644 include/dt-bindings/reset/altr,rst-mgr.h
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
