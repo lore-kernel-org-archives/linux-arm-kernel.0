@@ -1,68 +1,132 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  4 Apr 2014 15:43:02 +0200
-Subject: [PATCH V2 10/17] ARM: exynos: cpuidle: Move exynos_set_wakeupmask in
- the cpu_pm notifier
+Date: Fri,  4 Apr 2014 15:43:03 +0200
+Subject: [PATCH V2 11/17] ARM: exynos: cpuidle: Move the power sequence call
+ in the cpu_pm notifier
 In-Reply-To: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396618989-2897-11-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396618989-2897-12-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's encapsulate more the PM code inside the PM file by moving the
-'exynos_set_wakeupmask' function inside the pm.c and the call in the cpu_pm
-notifier.
+The code to initiate and exit the powerdown sequence is the same in pm.c and
+cpuidle.c.
+
+Let's split the common part in the pm.c and reuse it from the cpu_pm notifier.
+
+That is one more step forward to make the cpuidle driver arch indenpendant.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |    7 -------
- arch/arm/mach-exynos/pm.c      |    7 +++++++
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-exynos/cpuidle.c |   21 ---------------------
+ arch/arm/mach-exynos/pm.c      |   22 ++++++++++++++++++----
+ 2 files changed, 18 insertions(+), 25 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index ce31004..01444ed 100644
+index 01444ed..81d7197 100644
 --- a/arch/arm/mach-exynos/cpuidle.c
 +++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -58,15 +58,8 @@
- #define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
- #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
- 
--/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
--static void exynos_set_wakeupmask(void)
--{
--	__raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
--}
--
- static int idle_finisher(unsigned long flags)
+@@ -76,31 +76,10 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
  {
--	exynos_set_wakeupmask();
+-	unsigned long tmp;
+-
+-	/* Setting Central Sequence Register for power down mode */
+-	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+-	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-
+ 	cpu_pm_enter();
+ 	cpu_suspend(0, idle_finisher);
+ 	cpu_pm_exit();
  
- 	__raw_writel(virt_to_phys(s3c_cpu_resume), REG_DIRECTGO_ADDR);
- 	__raw_writel(S5P_CHECK_AFTR, REG_DIRECTGO_FLAG);
+-	/*
+-	 * If PMU failed while entering sleep mode, WFI will be
+-	 * ignored by PMU and then exiting cpu_do_idle().
+-	 * S5P_CENTRAL_LOWPWR_CFG bit will not be set automatically
+-	 * in this situation.
+-	 */
+-	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+-		tmp |= S5P_CENTRAL_LOWPWR_CFG;
+-		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-		/* Clear wakeup state register */
+-		__raw_writel(0x0, S5P_WAKEUP_STAT);
+-	}
+-
+ 	return index;
+ }
+ 
 diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 9773a00..c8b3dc4 100644
+index c8b3dc4..0e73591 100644
 --- a/arch/arm/mach-exynos/pm.c
 +++ b/arch/arm/mach-exynos/pm.c
-@@ -322,6 +322,12 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
- 	.valid		= suspend_valid_only_mem,
- };
+@@ -184,15 +184,19 @@ static void exynos_pm_prepare(void)
+ 	__raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+ }
  
-+/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
-+static void exynos_set_wakeupmask(void)
-+{
-+	__raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
+-static int exynos_pm_suspend(void)
++static void exynos_pm_central_suspend(void)
+ {
+ 	unsigned long tmp;
+ 
+ 	/* Setting Central Sequence Register for power down mode */
+-
+ 	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+ 	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+ 	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
 +}
 +
- static int exynos_cpu_pm_notifier(struct notifier_block *self,
- 				  unsigned long cmd, void *v)
++static int exynos_pm_suspend(void)
++{
++	unsigned long tmp;
+ 
+ 	/* Setting SEQ_OPTION register */
+ 
+@@ -205,7 +209,7 @@ static int exynos_pm_suspend(void)
+ 	return 0;
+ }
+ 
+-static void exynos_pm_resume(void)
++static int exynos_pm_central_resume(void)
  {
-@@ -331,6 +337,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 	unsigned long tmp;
+ 
+@@ -222,9 +226,17 @@ static void exynos_pm_resume(void)
+ 		/* clear the wakeup state register */
+ 		__raw_writel(0x0, S5P_WAKEUP_STAT);
+ 		/* No need to perform below restore code */
+-		goto early_wakeup;
++		return -1;
+ 	}
+ 
++	return 0;
++}
++
++static void exynos_pm_resume(void)
++{
++	if (exynos_pm_central_resume())
++		goto early_wakeup;
++
+ 	if (!soc_is_exynos5250())
+ 		exynos_cpu_restore_register();
+ 
+@@ -336,6 +348,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 	switch (cmd) {
  	case CPU_PM_ENTER:
  		if (cpu == 0) {
++			exynos_pm_central_suspend();
  			exynos_cpu_save_register();
-+			exynos_set_wakeupmask();
+ 			exynos_set_wakeupmask();
+ 		}
+@@ -346,6 +359,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 			if (!soc_is_exynos5250())
+ 				scu_enable(S5P_VA_SCU);
+ 			exynos_cpu_restore_register();
++			exynos_pm_central_resume();
  		}
  		break;
- 
+ 	}
 -- 
 1.7.9.5
