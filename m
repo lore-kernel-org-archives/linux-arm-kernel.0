@@ -1,69 +1,64 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Apr 2014 18:09:53 +0200
-Subject: [PATCH V2 17/17] ARM: exynos: config: Enable cpuidle
-In-Reply-To: <1396618989-2897-18-git-send-email-daniel.lezcano@linaro.org>
-References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
- <1396618989-2897-18-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <5825506.2ErDt1UQ5r@amdc1032>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 4 Apr 2014 18:15:08 +0200
+Subject: [PATCH 1/2] ARM: mvebu: enable the SDHCI interface on Armada 385
+In-Reply-To: <20140404160013.GK2798@lunn.ch>
+References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1396626125-8631-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140404160013.GK2798@lunn.ch>
+Message-ID: <20140404181508.010a6559@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Andrew Lunn,
 
-On Friday, April 04, 2014 03:43:09 PM Daniel Lezcano wrote:
-> The cpuidle driver is broken since v3.11 and now we are at v3.14.
+On Fri, 4 Apr 2014 18:00:13 +0200, Andrew Lunn wrote:
+
+> > diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> > index a064f59..2c1ff30 100644
+> > --- a/arch/arm/boot/dts/armada-38x.dtsi
+> > +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> > @@ -355,6 +355,15 @@
+> >  				clocks = <&coredivclk 0>;
+> >  				status = "disabled";
+> >  			};
+> > +
+> > +			sdhci at d8000 {
+> > +				compatible = "marvell,armada-380-sdhci";
+> > +				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
+> > +				interrupts = <0 25 0x4>;
+> > +				clocks = <&gateclk 17>;
+> > +				mrvl,clk-delay-cycles = <0x1F>;
 > 
-> Default the cpuidle driver to favorize a better detection next time.
+> Hi Thomas
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/configs/exynos_defconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 4ce7b70..6ed4b34 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -132,3 +132,4 @@ CONFIG_DEBUG_INFO=y
->  CONFIG_DEBUG_USER=y
->  CONFIG_CRYPTO_SHA256=y
->  CONFIG_CRC_CCITT=y
-> +CONFIG_CPU_IDLE=y
+> Maybe this has been discussed as part of the previous patchset. Why
+> the mrvl prefix, not marvell? marvell is in vendor-prefixes.txt, but
+> mrvl does not appear to be listed.
 
-Sorry but I have to NAK this change.  There are three issues with AFTR
-mode that should be resolved first before this patch can be merged:
+Because I'm not the one who introduced this part of the driver DT
+binding. It has been added two years ago by:
 
-* The upstream Exynos cpuidle code lacks support for secure firmware and
-  it is used on i.e. Trats2 boards (Exynos4412).  Attempts to use AFTR on
-  such hardware results in oops + lockup.
+commit b650352dd3df36164e3427bff3f33bc06ac47642
+Author: Chris Ball <cjb@laptop.org>
+Date:   Tue Apr 10 22:34:33 2012 -0400
 
-  I have patches adding secure firmware support to Exynos cpuidle driver
-  but they depend on Tomasz Figa's PM changes which are not yet upstream.
+    mmc: sdhci-pxa: Add device tree support
+    
+    Tested on an OLPC XO-1.75.  (MMP2, sdhci-pxav3, CONFIG_MACH_MMP2_DT=y)
+    
+    Signed-off-by: Chris Ball <cjb@laptop.org>
+    Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-* Somebody needs to verify that the current Exynos cpuidle driver works
-  in the AFTR mode on Exynos5420 for which support has been added recently
-  (I really doubt it looking at some internal trees).
-
-* Some of our u-boot bootloader versions are incompatible with AFTR.  We
-  have observed the problem happening on Trats board (Exynos4210) on which
-  it can be fixed by using the upstream u-boot version and Universal C210
-  board (Exynos4210 with broken SMP support) on which there is no upstream
-  u-boot available (IIRC) and because of the broken SMP support enabling
-  cpuidle results in attempt to enter AFTR during boot + immediate lockup.
-
-  I know that this is mainly our problem but the issue is widespread on
-  our targets and I believe that adding some workaround for it in cpuidle
-  core would be beneficial for the whole cpuidle subsystem.  Namely there
-  should be some way of telling cpuidle subsystem to either disable
-  particular state(s) or limit the max available state.  I think that this
-  can be also useful for testing and development of other cpuidle drivers.
-
-For now please change this patch to add CONFIG_CPU_IDLE=n instead (since
-the config option is "default y" it will be auto-enabled if there is no
-entry in the defconfig)..
+So I'm just merely using the existing DT binding for the driver. Of
+course, since I'm introducing a new compatible string, I could also
+change the driver to support the same property prefixed by "marvell,",
+but it would also have to support the old DT property forever, so is it
+really useful?
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
