@@ -1,54 +1,97 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  4 Apr 2014 09:47:46 +0200
-Subject: [PATCH 00/17] ARM: exynos: cpuidle: Move the driver to drivers/cpuidle
-Message-ID: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
+Date: Fri,  4 Apr 2014 09:47:49 +0200
+Subject: [PATCH 03/17] ARM: exynos: cpuidle: change function name prefix
+In-Reply-To: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396597683-6969-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset relies on the cpm_pm notifier to initiate the powerdown sequence
-operations from pm.c instead cpuidle.c. Thus the cpuidle driver is no longer
-dependent from arch specific code as everything is called from the pm.c file.
+The driver was initially written for exynos4 but the driver is used also for
+exynos5.
 
-The patchset applies on top of v3.14.
+Change the function prefix name exynos4 -> exynos
 
-Tested on exynos4: 4210
-Tested on exynos5: 5250
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-exynos/cpuidle.c |   20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-Daniel Lezcano (17):
-  ARM: exynos: cpuidle: Prevent forward declaration
-  ARM: exynos: cpuidle: use cpuidle_register
-  ARM: exynos: cpuidle: change function name prefix
-  ARM: exynos: cpuidle: encapsulate register access inside a function
-  ARM: exynos: cpuidle: Move some code inside the idle_finisher
-  ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
-  ARM: exynos: cpuidle: Use the cpu_pm notifier
-  ARM: exynos: cpuidle: Move scu_enable in the cpu_pm notifier
-  ARM: exynos: cpuidle: Remove ifdef for scu_enable
-  ARM: exynos: cpuidle: Move exynos_set_wakeupmask in the cpu_pm
-    notifier
-  ARM: exynos: cpuidle: Move the power sequence call in the cpu_pm
-    notifier
-  ARM: exynos: cpuidle: Move S5P_CHECK_AFTR in a header
-  ARM: exynos: cpuidle: Move clock setup to pm.c
-  ARM: exynos: cpuidle: Move the boot vector in pm.c
-  ARM: exynos: cpuidle: Pass the AFTR callback to the platform_data
-  ARM: exynos: cpuidle: Move the driver to drivers/cpuidle directory
-  ARM: exynos: config: Enable cpuidle
-
- arch/arm/configs/exynos_defconfig |    1 +
- arch/arm/mach-exynos/Makefile     |    1 -
- arch/arm/mach-exynos/common.c     |    5 +-
- arch/arm/mach-exynos/common.h     |    1 +
- arch/arm/mach-exynos/cpuidle.c    |  256 -------------------------------------
- arch/arm/mach-exynos/pm.c         |  191 ++++++++++++++++++++++-----
- arch/arm/mach-exynos/pmu.c        |    6 +
- arch/arm/mach-exynos/regs-pmu.h   |    1 +
- drivers/cpuidle/Kconfig.arm       |    7 +
- drivers/cpuidle/Makefile          |    1 +
- drivers/cpuidle/cpuidle-exynos.c  |  102 +++++++++++++++
- 11 files changed, 281 insertions(+), 291 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/cpuidle.c
- create mode 100644 drivers/cpuidle/cpuidle-exynos.c
-
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index b9e9a90..18f6aba 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -61,7 +61,7 @@
+ #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
+ 
+ /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+-static void exynos4_set_wakeupmask(void)
++static void exynos_set_wakeupmask(void)
+ {
+ 	__raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
+ }
+@@ -92,13 +92,13 @@ static int idle_finisher(unsigned long flags)
+ 	return 1;
+ }
+ 
+-static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
++static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+ {
+ 	unsigned long tmp;
+ 
+-	exynos4_set_wakeupmask();
++	exynos_set_wakeupmask();
+ 
+ 	/* Set value of power down register for aftr mode */
+ 	exynos_sys_powerdown_conf(SYS_AFTR);
+@@ -142,7 +142,7 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+ 	return index;
+ }
+ 
+-static int exynos4_enter_lowpower(struct cpuidle_device *dev,
++static int exynos_enter_lowpower(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
+ {
+@@ -155,7 +155,7 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+ 	if (new_index == 0)
+ 		return arm_cpuidle_simple_enter(dev, drv, new_index);
+ 	else
+-		return exynos4_enter_core0_aftr(dev, drv, new_index);
++		return exynos_enter_core0_aftr(dev, drv, new_index);
+ }
+ 
+ static void __init exynos5_core_down_clk(void)
+@@ -190,13 +190,13 @@ static void __init exynos5_core_down_clk(void)
+ 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+ }
+ 
+-static struct cpuidle_driver exynos4_idle_driver = {
+-	.name			= "exynos4_idle",
++static struct cpuidle_driver exynos_idle_driver = {
++	.name			= "exynos_idle",
+ 	.owner			= THIS_MODULE,
+ 	.states = {
+ 		[0] = ARM_CPUIDLE_WFI_STATE,
+ 		[1] = {
+-			.enter			= exynos4_enter_lowpower,
++			.enter			= exynos_enter_lowpower,
+ 			.exit_latency		= 300,
+ 			.target_residency	= 100000,
+ 			.flags			= CPUIDLE_FLAG_TIME_VALID,
+@@ -216,9 +216,9 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ 		exynos5_core_down_clk();
+ 
+ 	if (soc_is_exynos5440())
+-		exynos4_idle_driver.state_count = 1;
++		exynos_idle_driver.state_count = 1;
+ 
+-	ret = cpuidle_register(&exynos4_idle_driver, NULL);
++	ret = cpuidle_register(&exynos_idle_driver, NULL);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
+ 		return ret;
 -- 
 1.7.9.5
