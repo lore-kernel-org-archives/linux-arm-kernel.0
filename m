@@ -1,66 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  4 Apr 2014 16:04:38 +0200
-Subject: [PATCH] pinctrl: st: switch IRQ locking to resource callbacks
-Message-ID: <1396620278-18107-1-git-send-email-linus.walleij@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri,  4 Apr 2014 16:09:31 +0200
+Subject: [PATCH v2 03/11] ARM: mvebu: add enable-method property for CPUs
+In-Reply-To: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396620579-15230-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the mass-conversion to the new irqchip callbacks, this
-in-transit IRQ support was missed. Fix it.
+This commit updates the Armada XP Device Trees (for the three variants
+of Armada XP) to declare the "enable-method" property for the CPUs,
+which helps operating systems find the appropriate logic to manage the
+CPUs, especially to boot secondary CPUs.
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Cc: Maxime COQUELIN <maxime.coquelin@st.com>
-Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pinctrl/pinctrl-st.c | 16 +++++++---------
- 1 file changed, 7 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi | 1 +
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi | 1 +
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 1 +
+ 3 files changed, 3 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index bd725b0a4341..639af4a9a2e4 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -1312,25 +1312,23 @@ static void st_gpio_irq_unmask(struct irq_data *d)
- 	writel(BIT(d->hwirq), bank->base + REG_PIO_SET_PMASK);
- }
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index 98335fb..1257ff1 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -27,6 +27,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "marvell,armada-xp-smp";
  
--static unsigned int st_gpio_irq_startup(struct irq_data *d)
-+static int st_gpio_irq_reqres(struct irq_data *d)
- {
- 	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
+ 		cpu at 0 {
+ 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 9480cf8..3396b25 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -29,6 +29,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "marvell,armada-xp-smp";
  
--	if (gpio_lock_as_irq(&bank->gpio_chip, d->hwirq))
-+	if (gpio_lock_as_irq(&bank->gpio_chip, d->hwirq)) {
- 		dev_err(bank->gpio_chip.dev,
- 			"unable to lock HW IRQ %lu for IRQ\n",
- 			d->hwirq);
--
--	st_gpio_irq_unmask(d);
--
-+		return -EINVAL;
-+	}
- 	return 0;
- }
+ 		cpu at 0 {
+ 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 31ba6d8..6da84bf 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -30,6 +30,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "marvell,armada-xp-smp";
  
--static void st_gpio_irq_shutdown(struct irq_data *d)
-+static void st_gpio_irq_relres(struct irq_data *d)
- {
- 	struct st_gpio_bank *bank = irq_data_get_irq_chip_data(d);
- 
--	st_gpio_irq_mask(d);
- 	gpio_unlock_as_irq(&bank->gpio_chip, d->hwirq);
- }
- 
-@@ -1491,8 +1489,8 @@ static struct irq_chip st_gpio_irqchip = {
- 	.irq_mask	= st_gpio_irq_mask,
- 	.irq_unmask	= st_gpio_irq_unmask,
- 	.irq_set_type	= st_gpio_irq_set_type,
--	.irq_startup	= st_gpio_irq_startup,
--	.irq_shutdown	= st_gpio_irq_shutdown,
-+	.irq_request_resources = st_gpio_irq_reqres,
-+	.irq_release_resources = st_gpio_irq_relres,
- };
- 
- static int st_gpio_irq_domain_map(struct irq_domain *h,
+ 		cpu at 0 {
+ 			device_type = "cpu";
 -- 
-1.9.0
+1.8.3.2
