@@ -1,112 +1,55 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Fri, 4 Apr 2014 16:59:04 +0530
-Subject: [PATCH 5/5] arm: Enable IRQs before attempting to read user space
- in __und_usr
-In-Reply-To: <20140401144815.GA7528@n2100.arm.linux.org.uk>
-References: <1394734552-4704-1-git-send-email-catalin.marinas@arm.com>
- <1394734552-4704-6-git-send-email-catalin.marinas@arm.com>
- <CAKZGPAP=9wvUd-oSEYKwBz6LKX6vXcRuiRVUpg2k47ui-=YgQw@mail.gmail.com>
- <20140401144815.GA7528@n2100.arm.linux.org.uk>
-Message-ID: <CAKZGPAOLeg1vP+4eHHAkbz0M6th8dhscUaNHUiqHFdK2_-Qhyg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Apr 2014 13:39:33 +0200
+Subject: [PATCH] arm: Fix DEBUG_LL for multi-platform kernels (without
+ PL01X)
+In-Reply-To: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
+References: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <8799740.0uZJLUBGY1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 1, 2014 at 8:18 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Apr 01, 2014 at 05:54:15PM +0530, Arun KS wrote:
->> As the data abort is now handled in normal way, can we remove the
->> fixup handler for ldrt?
->
-> No, because all instructions which access userspace, and therefore may
-> fault, must be given a fixup handler so the kernel knows what to do
-> should it not be able to supply the page.
->
-> Omitting that marking means the only other option in that case is for
-> the kernel to oops.
+On Friday 04 April 2014 12:17:49 Daniel Thompson wrote:
+> When building a multi_v7_defconfig kernel it is not possible to configure
+> DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
+> accurately and worse, it is possible to configure a different serial
+> device but KConfig does not honour this request.
+> 
+> The happens because the multi-platform mode may include ARCH_SPEAR13XX
+> and this forcibly engages DEBUG_UART_PL01X to provide some kind of
+> compatibility with single platform builds (SPEAr supports both single and
+> multi-platform). This in turn causes DEBUG_LL_INCLUDE to wedge at
+> debug/pl01x.S.
+> 
+> Problem is fixed by only deploying the compatibility options for SPEAr
+> when ARCH_MULTIPLATFORM is not set.
 
-Hi Catalin/Russell,
+The assumption is actually wrong: SPEAr does not support single
+platform builds any more. The PLAT_SPEAR_SINGLE symbol in Kconfig
+is a leftover from an earlier patch I did that never got merged,
+and we should just remove that.
 
-I have a concern regarding the fixup handler.
-Fixup handler returns to the next instruction which has caused the
-undef execption, rather than going to the same instruction.
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+>  arch/arm/Kconfig.debug | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 0531da8..f10c784 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -991,9 +991,9 @@ config DEBUG_LL_INCLUDE
+>  config DEBUG_UART_PL01X
+>         def_bool ARCH_EP93XX || \
+>                 ARCH_INTEGRATOR || \
+> -               ARCH_SPEAR3XX || \
+> -               ARCH_SPEAR6XX || \
+> -               ARCH_SPEAR13XX || \
+> +               (ARCH_SPEAR3XX && !ARCH_MULTIPLATFORM) || \
+> +               (ARCH_SPEAR6XX && !ARCH_MULTIPLATFORM) || \
+> +               (ARCH_SPEAR13XX && !ARCH_MULTIPLATFORM) || \
+>                 ARCH_VERSATILE
 
-ARM ARM says that after undefined exception, the pc will be pointing
-to the next instruction.
-ie +4 offset in case of ARM and +2 in case of Thumb.
+Removing the SPEAR lines seems correct here, but the lines
+you add don't make any sense.
 
-And there is no correction offset passed to vector_stub in case of
-undef exception.
-
-File: arch/arm/kernel/entry-armv.S +1085
-vector_stub     und, UND_MODE
-
-During an undefined exception, in normal scenario(ie when ldrt
-instruction does not cause an abort) after resorting the context in
-VFP hardware, the PC is modified as show below before jumping to
-ret_from_exception which is in r9.
-
-File: arch/arm/vfp/vfphw.S +169
-@ The context stored in the VFP hardware is up to date with this thread
-vfp_hw_state_valid:
-        tst     r1, #FPEXC_EX
-        bne     process_exception       @ might as well handle the pending
-                                        @ exception before retrying branch
-                                        @ out before setting an FPEXC that
-                                        @ stops us reading stuff
-        VFPFMXR FPEXC, r1               @ Restore FPEXC last
-        sub     r2, r2, #4              @ Retry current instruction - if Thumb
-        str     r2, [sp, #S_PC]         @ mode it's two 16-bit instructions,
-                                        @ else it's one 32-bit instruction, so
-                                        @ always subtract 4 from the following
-                                        @ instruction address.
-
-But if ldrt results in an abort, we reach the fixup handler and return
-to ret_from_execption without correcting the pc.
-
-File: arch/arm/kernel/entry-armv.S + 482
-/*
- * The out of line fixup for the ldrt instructions above.
- */
-        .pushsection .fixup, "ax"
-        .align  2
-4:      mov     pc, r9
-        .popsection
-
-Below patch fixes this,
-
->From d72e15d92c1016ce3b1c7c7da01ca60cf21340d5 Mon Sep 17 00:00:00 2001
-From: Arun KS <getarunks@gmail.com>
-Date: Fri, 4 Apr 2014 16:42:58 +0530
-Subject: Modify fixup handler to re-execute the original instruction
-
-Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
-Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
----
- arch/arm/kernel/entry-armv.S |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 1879e8d..e801c7d 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -484,7 +484,8 @@ ENDPROC(__und_usr)
-  */
-        .pushsection .fixup, "ax"
-        .align  2
--4:     mov     pc, r9
-+4:     str     r4, [sp, #S_PC]
-+       mov     pc, r9
-        .popsection
-        .pushsection __ex_table,"a"
-        .long   1b, 4b
---
-1.7.6
-
-Thanks,
-Arun
-
-
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+	Arnd
