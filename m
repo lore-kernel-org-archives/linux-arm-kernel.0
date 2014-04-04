@@ -1,64 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 17:42:04 +0200
-Subject: [PATCH 1/2] ARM: mvebu: enable the SDHCI interface on Armada 385
-In-Reply-To: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396626125-8631-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri,  4 Apr 2014 16:41:42 +0100
+Subject: [PATCH v3] arm: Fix DEBUG_LL for multi-platform kernels (without
+ PL01X)
+In-Reply-To: <1396622847-12718-1-git-send-email-daniel.thompson@linaro.org>
+References: <1396622847-12718-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1396626102-13991-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit "mmc: sdhci-pxav3: add support for the Armada 38x SDHCI
-controller", the sdhci-pxav3 driver has been extended to also be
-usable on Armada 38x platforms.
+When building a multi_v7_defconfig kernel it is not possible to configure
+DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
+accurately and worse, it is possible to configure a different serial
+device but KConfig does not honour this request. In fact this also
+overrides the user selection for some of the single platform kernels, for
+example I don't think DEBUG_LL can be targetted at ICE or semihosted
+supervisor for ARCH_VERSATILE.
 
-Therefore, this commit adds the necessary Device Tree informations to
-declare this SDHCI interface in the Armada 38x SoC, and also in the
-Armada 385 Development Board.
+This happens because DEBUG_UART_PL01X is automatically enabled by
+some architectures and this means user decisions made regarding
+the DEBUG_LL backend will be overriden. Problem is fixed by removing the
+automatic enabling of this option.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm/boot/dts/armada-385-db.dts | 8 ++++++++
- arch/arm/boot/dts/armada-38x.dtsi   | 9 +++++++++
- 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-index 6828d77..959aeed 100644
---- a/arch/arm/boot/dts/armada-385-db.dts
-+++ b/arch/arm/boot/dts/armada-385-db.dts
-@@ -101,6 +101,14 @@
- 					reg = <0x1000000 0x3f000000>;
- 				};
- 			};
-+
-+			sdhci at d8000 {
-+				clock-frequency = <200000000>;
-+				broken-cd;
-+				wp-inverted;
-+				bus-width = <8>;
-+				status = "okay";
-+			};
- 		};
+Notes:
+    v3: Switch from def_bool to bool (thanks Russell King)
+    v2: Remove pointless single platform support (thanks Arnd Bergmann)
+
+ arch/arm/Kconfig.debug | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 0531da8..7e19c94 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -989,12 +989,7 @@ config DEBUG_LL_INCLUDE
  
- 		pcie-controller {
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index a064f59..2c1ff30 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -355,6 +355,15 @@
- 				clocks = <&coredivclk 0>;
- 				status = "disabled";
- 			};
-+
-+			sdhci at d8000 {
-+				compatible = "marvell,armada-380-sdhci";
-+				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-+				interrupts = <0 25 0x4>;
-+				clocks = <&gateclk 17>;
-+				mrvl,clk-delay-cycles = <0x1F>;
-+				status = "disabled";
-+			};
- 		};
- 	};
+ # Compatibility options for PL01x
+ config DEBUG_UART_PL01X
+-	def_bool ARCH_EP93XX || \
+-		ARCH_INTEGRATOR || \
+-		ARCH_SPEAR3XX || \
+-		ARCH_SPEAR6XX || \
+-		ARCH_SPEAR13XX || \
+-		ARCH_VERSATILE
++	bool
  
+ # Compatibility options for 8250
+ config DEBUG_UART_8250
 -- 
-1.8.3.2
+1.9.0
