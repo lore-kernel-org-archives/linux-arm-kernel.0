@@ -1,57 +1,76 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 16:09:35 +0200
-Subject: [PATCH v2 07/11] ARM: mvebu: add Armada 38x compatible string to pmsu
+Date: Fri,  4 Apr 2014 16:09:39 +0200
+Subject: [PATCH v2 11/11] ARM: mvebu: add SMP support in the Armada 38x device
+ tree
 In-Reply-To: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396620579-15230-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396620579-15230-12-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the Armada 38x PMSU registers are slightly different than the
-Armada 370/XP PMSU ones, we introduce a new compatible string
-"armada-380-pmsu" in the PMSU driver. These differences are not
-visible for the current usage of the PMSU, but they might become
-visible in the future.
+This commit improves the Armada 38x Device Tree to add the CPU reset
+and PMSU Device Tree nodes as well as the declaration of the enabling
+method for the CPUs. These are needed to get SMP working on Armada 38x
+platforms.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt | 9 ++++++---
- arch/arm/mach-mvebu/pmsu.c                                   | 1 +
- 2 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-380.dtsi |  2 ++
+ arch/arm/boot/dts/armada-385.dtsi |  2 ++
+ arch/arm/boot/dts/armada-38x.dtsi | 10 ++++++++++
+ 3 files changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-index 9761887..26799ef 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-@@ -1,11 +1,14 @@
- Power Management Service Unit(PMSU)
- -----------------------------------
--Available on Marvell SOCs: Armada 370 and Armada XP
-+Available on Marvell SOCs: Armada 370, Armada 38x and Armada XP
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index 068031f..aa71718 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
+@@ -21,6 +21,8 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "marvell,armada-380-smp";
++
+ 		cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
+index e2919f0..2c7990d 100644
+--- a/arch/arm/boot/dts/armada-385.dtsi
++++ b/arch/arm/boot/dts/armada-385.dtsi
+@@ -21,6 +21,8 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "marvell,armada-380-smp";
++
+ 		cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index d28fbc2..4742915 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -272,11 +272,21 @@
+ 				clock-names = "nbclk", "fixed";
+ 			};
  
- Required properties:
++			cpurst at 20800 {
++				compatible = "marvell,armada-370-cpu-reset";
++				reg = <0x20800 0x10>;
++			};
++
+ 			coherency-fabric at 21010 {
+ 				compatible = "marvell,armada-380-coherency-fabric";
+ 				reg = <0x21010 0x1c>;
+ 			};
  
--- compatible: should be "marvell,armada-370-pmsu", whereas
--  "marvell,armada-370-xp-pmsu" is deprecated and will be removed
-+- compatible: should be one of:
-+  - "marvell,armada-370-pmsu" for Armada 370 or Armada XP
-+  - "marvell,armada-380-pmsu" for Armada 38x
-+  - "marvell,armada-370-xp-pmsu" was used for Armada 370/XP but is now
-+    deprecated and will be removed
- 
- - reg: Should contain PMSU registers location and length.
- 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index a1508de..a8796b8 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -38,6 +38,7 @@ static void __iomem *pmsu_mp_base;
- static struct of_device_id of_pmsu_table[] = {
- 	{ .compatible = "marvell,armada-370-pmsu", },
- 	{ .compatible = "marvell,armada-370-xp-pmsu", },
-+	{ .compatible = "marvell,armada-380-pmsu", },
- 	{ /* end of list */ },
- };
- 
++			pmsu at 22000 {
++				compatible = "marvell,armada-380-pmsu";
++				reg = <0x22000 0x1000>;
++			};
++
+ 			eth1: ethernet at 30000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x30000 0x4000>;
 -- 
 1.8.3.2
