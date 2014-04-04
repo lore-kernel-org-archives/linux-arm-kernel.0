@@ -1,75 +1,42 @@
-From: zhangfei.gao@gmail.com (Zhangfei Gao)
-Date: Fri, 4 Apr 2014 14:52:08 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <20140403152746.GQ7528@n2100.arm.linux.org.uk>
-References: <1396358832-15828-1-git-send-email-zhangfei.gao@linaro.org>
- <1396358832-15828-4-git-send-email-zhangfei.gao@linaro.org>
- <9532591.5yuCbpL4pV@wuerfel>
- <20140403152746.GQ7528@n2100.arm.linux.org.uk>
-Message-ID: <CAMj5BkgMxDtTe0iQVVddcMbYYhVasmHzURHOMtANVbMNU_Z-Yg@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 4 Apr 2014 08:52:36 +0200
+Subject: [PATCH v2 11/16] ASoC: fsl-ssi: Fix register values when disabling
+In-Reply-To: <20140403221143.GH14763@sirena.org.uk>
+References: <1394887464-969-1-git-send-email-mpa@pengutronix.de>
+ <1394887464-969-12-git-send-email-mpa@pengutronix.de>
+ <20140403221143.GH14763@sirena.org.uk>
+Message-ID: <20140404065236.GD20621@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell
+Hi,
 
-On Thu, Apr 3, 2014 at 11:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 02, 2014 at 11:21:45AM +0200, Arnd Bergmann wrote:
->> - As David Laight pointed out earlier, you must also ensure that
->>   you don't have too much /data/ pending in the descriptor ring
->>   when you stop the queue. For a 10mbit connection, you have already
->>   tested (as we discussed on IRC) that 64 descriptors with 1500 byte
->>   frames gives you a 68ms round-trip ping time, which is too much.
->>   Conversely, on 1gbit, having only 64 descriptors actually seems
->>   a little low, and you may be able to get better throughput if
->>   you extend the ring to e.g. 512 descriptors.
->
-> You don't manage that by stopping the queue - there's separate interfaces
-> where you report how many bytes you've queued (netdev_sent_queue()) and
-> how many bytes/packets you've sent (netdev_tx_completed_queue()).  This
-> allows the netdev schedulers to limit how much data is held in the queue,
-> preserving interactivity while allowing the advantages of larger rings.
+On Thu, Apr 03, 2014 at 11:11:43PM +0100, Mark Brown wrote:
+> On Sat, Mar 15, 2014 at 01:44:19PM +0100, Markus Pargmann wrote:
+> > The bits we have to clear when disabling are different when the other
+> > stream is still active.
+> 
+> If this is a bug fix I'd have expected to see it at the start of the
+> series so we could merge it prior to the rest of the series (which is
+> new development) - what practical issues does this bug cause?
 
-My god, it's awesome.
-The latency can be solved via adding netdev_sent_queue in xmit, and
-netdev_completed_queue in reclaim.
-In the experiment,
-iperf -P 3 could get 930M, and ping could get response within 0.4 ms
-in the meantime.
+I can put it to the beginning of the series. The only 'bug' I could
+observe was a enabled SSI unit although all streams were stopped. But I
+could not observe any malfunctions through that.
 
-Is that mean the timer -> reclaim should be removed at all?
-The background are.
-1. No xmit_complete interrupt.
-2. Only xmit call reclaim used buffer can achieve best throughput.
-Adding timer in case no next xmit for reclaim.
+Regards,
 
->
->> > +       phys = dma_map_single(&ndev->dev, skb->data, skb->len, DMA_TO_DEVICE);
->> > +       if (dma_mapping_error(&ndev->dev, phys)) {
->> > +               dev_kfree_skb(skb);
->> > +               return NETDEV_TX_OK;
->> > +       }
->> > +
->> > +       priv->tx_skb[tx_head] = skb;
->> > +       priv->tx_phys[tx_head] = phys;
->> > +       desc->send_addr = cpu_to_be32(phys);
->> > +       desc->send_size = cpu_to_be16(skb->len);
->> > +       desc->cfg = cpu_to_be32(DESC_DEF_CFG);
->> > +       phys = priv->tx_desc_dma + tx_head * sizeof(struct tx_desc);
->> > +       desc->wb_addr = cpu_to_be32(phys);
->>
->> One detail: since you don't have cache-coherent DMA, "desc" will
->> reside in uncached memory, so you try to minimize the number of accesses.
->> It's probably faster if you build the descriptor on the stack and
->> then atomically copy it over, rather than assigning each member at
->> a time.
->
-> DMA coherent memory is write combining, so multiple writes will be
-> coalesced.  This also means that barriers may be required to ensure the
-> descriptors are pushed out in a timely manner if something like writel()
-> is not used in the transmit-triggering path.
->
-Currently writel is used in xmit.
-And regmap_write -> writel is used in poll.
+Markus
 
-Thanks
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140404/45df2dc2/attachment.sig>
