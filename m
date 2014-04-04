@@ -1,54 +1,47 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Fri,  4 Apr 2014 19:24:48 +0530
-Subject: [PATCH] usb: ohci-exynos: Remove locks for 'ohci' in suspend callback
-In-Reply-To: <1396618417-9560-1-git-send-email-gautam.vivek@samsung.com>
-References: <1396618417-9560-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1396619688-26857-1-git-send-email-gautam.vivek@samsung.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 04 Apr 2014 15:02:40 +0100
+Subject: [PATCH] arm: Fix DEBUG_LL for multi-platform kernels (without
+ PL01X)
+In-Reply-To: <8799740.0uZJLUBGY1@wuerfel>
+References: <1396610269-11580-1-git-send-email-daniel.thompson@linaro.org>
+ <8799740.0uZJLUBGY1@wuerfel>
+Message-ID: <533EBB80.4080307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch : 14982e3 USB: OHCI: Properly handle ohci-exynos suspend
-has already removed 'ohci_hcd' settings from exynos glue layer
-as a part of streamlining the ohci controller's suspend.
-So we don't need the locks for 'ohci_hcd' anymore.
+On 04/04/14 12:39, Arnd Bergmann wrote:
+>> Problem is fixed by only deploying the compatibility options for SPEAr
+>> when ARCH_MULTIPLATFORM is not set.
+> 
+> The assumption is actually wrong: SPEAr does not support single
+> platform builds any more. The PLAT_SPEAR_SINGLE symbol in Kconfig
+> is a leftover from an earlier patch I did that never got merged,
+> and we should just remove that.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Cc: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ohci-exynos.c |    6 ------
- 1 file changed, 6 deletions(-)
+Thanks. I did make a wrong conclusion based on that symbol.
 
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index 68588d8..9cf80cb 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -190,17 +190,13 @@ static int exynos_ohci_suspend(struct device *dev)
- {
- 	struct usb_hcd *hcd = dev_get_drvdata(dev);
- 	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
--	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
- 	struct platform_device *pdev = to_platform_device(dev);
- 	bool do_wakeup = device_may_wakeup(dev);
--	unsigned long flags;
- 	int rc = ohci_suspend(hcd, do_wakeup);
- 
- 	if (rc)
- 		return rc;
- 
--	spin_lock_irqsave(&ohci->lock, flags);
--
- 	if (exynos_ohci->otg)
- 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
- 
-@@ -208,8 +204,6 @@ static int exynos_ohci_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
--	spin_unlock_irqrestore(&ohci->lock, flags);
--
- 	return 0;
- }
- 
--- 
-1.7.10.4
+
+>> ---
+>>  arch/arm/Kconfig.debug | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 0531da8..f10c784 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -991,9 +991,9 @@ config DEBUG_LL_INCLUDE
+>>  config DEBUG_UART_PL01X
+>>         def_bool ARCH_EP93XX || \
+>>                 ARCH_INTEGRATOR || \
+>> -               ARCH_SPEAR3XX || \
+>> -               ARCH_SPEAR6XX || \
+>> -               ARCH_SPEAR13XX || \
+>> +               (ARCH_SPEAR3XX && !ARCH_MULTIPLATFORM) || \
+>> +               (ARCH_SPEAR6XX && !ARCH_MULTIPLATFORM) || \
+>> +               (ARCH_SPEAR13XX && !ARCH_MULTIPLATFORM) || \
+>>                 ARCH_VERSATILE
+> 
+> Removing the SPEAR lines seems correct here, but the lines
+> you add don't make any sense.
+
+Will fix.
