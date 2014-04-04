@@ -1,75 +1,29 @@
-From: elder@linaro.org (Alex Elder)
-Date: Fri, 04 Apr 2014 13:56:54 -0500
-Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
-In-Reply-To: <CAAYSxhqOh4F=vSDJYUwFE85og-Tgc9Hi8c79biEZYYjb8z1Qkg@mail.gmail.com>
-References: <1396577891-2713-1-git-send-email-elder@linaro.org>	<1396577891-2713-3-git-send-email-elder@linaro.org>
- <CAAYSxhqOh4F=vSDJYUwFE85og-Tgc9Hi8c79biEZYYjb8z1Qkg@mail.gmail.com>
-Message-ID: <533F0076.4090407@linaro.org>
+From: kentborg@borg.org (Kent Borg)
+Date: Fri, 04 Apr 2014 15:01:01 -0400
+Subject: mach header files
+In-Reply-To: <5208350.A2oo5ltmuY@wuerfel>
+References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <4379667.784l7DtcMU@wuerfel> <533EF387.9080702@borg.org>
+ <5208350.A2oo5ltmuY@wuerfel>
+Message-ID: <533F016D.9050700@borg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2014 10:30 AM, Tim Kryger wrote:
-> On Thu, Apr 3, 2014 at 7:18 PM, Alex Elder <elder@linaro.org> wrote:
-> 
->> diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
->> new file mode 100644
->> index 0000000..46a64f2
->> --- /dev/null
->> +++ b/arch/arm/mach-bcm/platsmp.c
-> 
->> +/* Size of mapped Cortex A9 SCU address space */
->> +#define SCU_SIZE               0x58
-> 
->> +/*
->> + * Enable the Cortex A9 Snoop Control Unit
->> + *
->> + * By the time this is called we already know there are multiple
->> + * cores present.  We assume we're running on a Cortex A9 processor,
->> + * so any trouble getting the base address register or getting the
->> + * SCU base is a problem.
->> + *
->> + * Return 0 if successful or an error code otherwise.
->> + */
->> +static int __init scu_a9_enable(void)
->> +{
->> +       unsigned long config_base;
->> +       void __iomem *scu_base;
->> +
->> +       if (!scu_a9_has_base()) {
->> +               pr_err("no configuration base address register!\n");
->> +               return -ENXIO;
->> +       }
->> +
->> +       /* Config base address register value is zero for uniprocessor */
->> +       config_base = scu_a9_get_base();
->> +       if (!config_base) {
->> +               pr_err("hardware reports only one core; disabling SMP\n");
->> +               return -ENOENT;
->> +       }
->> +
->> +       scu_base = ioremap((phys_addr_t)config_base, SCU_SIZE);
->> +       if (!scu_base) {
->> +               pr_err("failed to remap config base (%lu/%u) for SCU\n",
->> +                       config_base, SCU_SIZE);
->> +               return -ENOMEM;
->> +       }
->> +
->> +       scu_enable(scu_base);
->> +
->> +       iounmap(scu_base);      /* That's the last we'll need of this */
->> +
->> +       return 0;
->> +}
-> 
-> This function seems useful for Cortex A9 MPCore in general.
-> 
-> While you gave it a generic name, you put it in a Broadcom file.
-> 
-> Is there a better location for this code?
+On 04/04/2014 02:49 PM, Arnd Bergmann wrote:
+> The trouble with examples here is that the good ones are those without 
+> any code, which is harder to copy than the bad ones ;-) 
 
-I think it belongs in arch/arm/kernel/smp_scu.c.  I was thinking
-it might be generally useful when I wrote it (hence the more
-complete header comment, for example).  And I'll gladly move
-it there, I just didn't want anybody to get hung up on that.
+Indeed.
 
-					-Alex
+> mach-sunxi is a rather good example, [...] An ideal example is 
+> mach-moxart, which has zero code. 
+
+Cool.
+
+> Can you say what platform you are working on?
+
+Doesn't exist yet, as I said I am running an emulation, trying to get 
+Linux up, but also part of verifying design. Pretty sure no marketing 
+announcements have been made; I don't think I can blab before the suits do.
+
+-kb
