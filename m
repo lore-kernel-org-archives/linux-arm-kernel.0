@@ -1,182 +1,180 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 15:55:46 +0200
-Subject: [PATCH v2 2/6] ARM: mvebu: start using the CPU reset driver
+Date: Fri,  4 Apr 2014 15:55:45 +0200
+Subject: [PATCH v2 1/6] ARM: mvebu: introduce CPU reset code
 In-Reply-To: <1396619750-4790-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1396619750-4790-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396619750-4790-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396619750-4790-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit changes the PMSU driver to no longer map itself the CPU
-reset registers, and instead call into the CPU reset driver to
-deassert the secondary CPUs for SMP booting.
+The Armada 370 and Armada XP have registers that allow to reset the
+CPUs, which is particularly useful to take the secondary CPUs out of
+reset in the context of the SMP support.
 
-In order to provide Device Tree backward compatibility, the CPU reset
-driver is extended to not only support its official compatible string
-"marvell,armada-370-cpu-reset", but to also look at the PMSU
-compatible string "marvell,armada-370-xp-pmsu" to find the CPU reset
-registers address. This allows old Device Tree to work correctly with
-newer kernel versions. Therefore, the CPU reset driver implements the
-following logic:
+Unfortunately, an implementation mistake was originally made and the
+support for these registers was integrated into the PMSU driver, which
+is in fact completely unrelated. And it turns out that the Armada 375
+has the same CPU reset registers, but does not have the PMSU
+registers.
 
- * If one of the normal compatible strings
-   "marvell,armada-370-cpu-reset" is found, then we map its first
-   memory resource as the CPU reset registers.
+Therefore, this commit creates a small CPU reset driver. All it does
+is provide a simple mvebu_cpu_reset_deassert() function that the SMP
+support code can call to take secondary CPUs out of reset. As of this
+commit, the driver isn't being used, it will be used through changes
+in the following commits.
 
- * Otherwise, if none of the normal compatible strings have been
-   found, we look for the "marvell,armada-370-xp-pmsu" compatible
-   string, and we map the second memory as the CPU reset registers.
+Note that we initially planned to use the 'reset controller'
+framework, but it requires the addition of "resets" properties in the
+Device Tree, which are causing too many problems if we want to keep
+the Device Tree backward compatibility. Moreover, the 'reset
+controller' framework is mainly useful when a device driver needs to
+request a reset of its device from a separate reset controller. In our
+case, the CPU reset handling and the SMP core code are both located in
+arch/arm/mach-mvebu/ and are tightly linked together, so there's no
+real benefit in going through a separate framework.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/cpu-reset.c | 53 ++++++++++++++++++++++++++++-------------
- arch/arm/mach-mvebu/pmsu.c      | 20 ++++++++--------
- 2 files changed, 47 insertions(+), 26 deletions(-)
+ .../devicetree/bindings/arm/armada-cpu-reset.txt   | 14 ++++
+ arch/arm/mach-mvebu/Makefile                       |  2 +-
+ arch/arm/mach-mvebu/common.h                       |  1 +
+ arch/arm/mach-mvebu/cpu-reset.c                    | 82 ++++++++++++++++++++++
+ 4 files changed, 98 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+ create mode 100644 arch/arm/mach-mvebu/cpu-reset.c
 
+diff --git a/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt b/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+new file mode 100644
+index 0000000..b63a7b6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/armada-cpu-reset.txt
+@@ -0,0 +1,14 @@
++Marvell Armada CPU reset controller
++===================================
++
++Required properties:
++
++- compatible: Should be "marvell,armada-370-cpu-reset".
++
++- reg: should be register base and length as documented in the
++  datasheet for the CPU reset registers
++
++cpurst: cpurst at 20800 {
++       compatible = "marvell,armada-370-cpu-reset";
++       reg = <0x20800 0x20>;
++};
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index a63e43b..f9cfab0 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -3,7 +3,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 
+ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+ 
+-obj-y				 += system-controller.o mvebu-soc-id.o
++obj-y				 += system-controller.o mvebu-soc-id.o cpu-reset.o
+ obj-$(CONFIG_MACH_MVEBU_V7)      += board-v7.o
+ obj-$(CONFIG_MACH_DOVE)		 += dove.o
+ obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 55449c4..cfb129b 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -18,6 +18,7 @@
+ #include <linux/reboot.h>
+ 
+ void mvebu_restart(enum reboot_mode mode, const char *cmd);
++int mvebu_cpu_reset_deassert(int cpu);
+ 
+ void armada_xp_cpu_die(unsigned int cpu);
+ 
 diff --git a/arch/arm/mach-mvebu/cpu-reset.c b/arch/arm/mach-mvebu/cpu-reset.c
-index 4ff4ce7..4a8f9ee 100644
---- a/arch/arm/mach-mvebu/cpu-reset.c
+new file mode 100644
+index 0000000..4ff4ce7
+--- /dev/null
 +++ b/arch/arm/mach-mvebu/cpu-reset.c
-@@ -40,42 +40,63 @@ int mvebu_cpu_reset_deassert(int cpu)
- 	return 0;
- }
- 
--static int __init mvebu_cpu_reset_init(void)
-+static int mvebu_cpu_reset_map(struct device_node *np, int res_idx)
- {
--	struct device_node *np;
- 	struct resource res;
--	int ret = 0;
--
--	np = of_find_compatible_node(NULL, NULL,
--				     "marvell,armada-370-cpu-reset");
--	if (!np)
--		return 0;
- 
--	if (of_address_to_resource(np, 0, &res)) {
-+	if (of_address_to_resource(np, res_idx, &res)) {
- 		pr_err("unable to get resource\n");
--		ret = -ENOENT;
--		goto out;
-+		return -ENOENT;
- 	}
- 
- 	if (!request_mem_region(res.start, resource_size(&res),
- 				np->full_name)) {
- 		pr_err("unable to request region\n");
--		ret = -EBUSY;
--		goto out;
-+		return -EBUSY;
- 	}
- 
- 	cpu_reset_base = ioremap(res.start, resource_size(&res));
- 	if (!cpu_reset_base) {
- 		pr_err("unable to map registers\n");
- 		release_mem_region(res.start, resource_size(&res));
--		ret = -ENOMEM;
--		goto out;
-+		return -ENOMEM;
- 	}
- 
- 	cpu_reset_size = resource_size(&res);
- 
--out:
+@@ -0,0 +1,82 @@
++/*
++ * Copyright (C) 2014 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#define pr_fmt(fmt) "mvebu-cpureset: " fmt
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/resource.h>
++#include "armada-370-xp.h"
++
++static void __iomem *cpu_reset_base;
++static size_t cpu_reset_size;
++
++#define CPU_RESET_OFFSET(cpu) (cpu * 0x8)
++#define CPU_RESET_ASSERT      BIT(0)
++
++int mvebu_cpu_reset_deassert(int cpu)
++{
++	u32 reg;
++
++	if (!cpu_reset_base)
++		return -ENODEV;
++
++	if (CPU_RESET_OFFSET(cpu) >= cpu_reset_size)
++		return -EINVAL;
++
++	reg = readl(cpu_reset_base + CPU_RESET_OFFSET(cpu));
++	reg &= ~CPU_RESET_ASSERT;
++	writel(reg, cpu_reset_base + CPU_RESET_OFFSET(cpu));
++
 +	return 0;
 +}
 +
-+int __init mvebu_cpu_reset_init(void)
++static int __init mvebu_cpu_reset_init(void)
 +{
 +	struct device_node *np;
-+	int res_idx;
-+	int ret;
++	struct resource res;
++	int ret = 0;
 +
 +	np = of_find_compatible_node(NULL, NULL,
 +				     "marvell,armada-370-cpu-reset");
-+	if (np) {
-+		res_idx = 0;
-+	} else {
-+		/*
-+		 * This code is kept for backward compatibility with
-+		 * old Device Trees.
-+		 */
-+		np = of_find_compatible_node(NULL, NULL,
-+					     "marvell,armada-370-xp-pmsu");
-+		if (np) {
-+			pr_warn(FW_WARN "deprecated pmsu binding\n");
-+			res_idx = 1;
-+		}
-+	}
-+
-+	/* No reset node found */
 +	if (!np)
-+		return -ENODEV;
++		return 0;
 +
-+	ret = mvebu_cpu_reset_map(np, res_idx);
- 	of_node_put(np);
-+
- 	return ret;
- }
- 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index d71ef53..1807639 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -21,14 +21,14 @@
- #include <linux/of_address.h>
- #include <linux/io.h>
- #include <linux/smp.h>
-+#include <linux/resource.h>
- #include <asm/smp_plat.h>
-+#include "common.h"
- #include "pmsu.h"
- 
- static void __iomem *pmsu_mp_base;
--static void __iomem *pmsu_reset_base;
- 
- #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
--#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
- 
- static struct of_device_id of_pmsu_table[] = {
- 	{.compatible = "marvell,armada-370-xp-pmsu"},
-@@ -38,11 +38,11 @@ static struct of_device_id of_pmsu_table[] = {
- #ifdef CONFIG_SMP
- int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- {
--	int reg, hw_cpu;
-+	int hw_cpu, ret;
- 
--	if (!pmsu_mp_base || !pmsu_reset_base) {
-+	if (!pmsu_mp_base) {
- 		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
--		return 1;
-+		return -ENODEV;
- 	}
- 
- 	hw_cpu = cpu_logical_map(cpu_id);
-@@ -50,10 +50,11 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
- 			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
- 
--	/* Release CPU from reset by clearing reset bit*/
--	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
--	reg &= (~0x1);
--	writel(reg, pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-+	ret = mvebu_cpu_reset_deassert(hw_cpu);
-+	if (ret) {
-+		pr_warn("unable to boot CPU: %d\n", ret);
-+		return ret;
++	if (of_address_to_resource(np, 0, &res)) {
++		pr_err("unable to get resource\n");
++		ret = -ENOENT;
++		goto out;
 +	}
- 
- 	return 0;
- }
-@@ -67,7 +68,6 @@ static int __init armada_370_xp_pmsu_init(void)
- 	if (np) {
- 		pr_info("Initializing Power Management Service Unit\n");
- 		pmsu_mp_base = of_iomap(np, 0);
--		pmsu_reset_base = of_iomap(np, 1);
- 		of_node_put(np);
- 	}
- 
++
++	if (!request_mem_region(res.start, resource_size(&res),
++				np->full_name)) {
++		pr_err("unable to request region\n");
++		ret = -EBUSY;
++		goto out;
++	}
++
++	cpu_reset_base = ioremap(res.start, resource_size(&res));
++	if (!cpu_reset_base) {
++		pr_err("unable to map registers\n");
++		release_mem_region(res.start, resource_size(&res));
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	cpu_reset_size = resource_size(&res);
++
++out:
++	of_node_put(np);
++	return ret;
++}
++
++early_initcall(mvebu_cpu_reset_init);
 -- 
 1.8.3.2
