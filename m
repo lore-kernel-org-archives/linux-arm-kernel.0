@@ -1,59 +1,47 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 16:09:31 +0200
-Subject: [PATCH v2 03/11] ARM: mvebu: add enable-method property for CPUs
+Date: Fri,  4 Apr 2014 16:09:30 +0200
+Subject: [PATCH v2 02/11] ARM: mvebu: use CPU_METHOD_OF_DECLARE for SMP on
+ Armada XP
 In-Reply-To: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1396620579-15230-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1396620579-15230-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396620579-15230-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit updates the Armada XP Device Trees (for the three variants
-of Armada XP) to declare the "enable-method" property for the CPUs,
-which helps operating systems find the appropriate logic to manage the
-CPUs, especially to boot secondary CPUs.
+This commit adds the CPU_METHOD_OF_DECLARE declaration for the Armada
+XP SMP operations. Note that the .smp_ops field of Armada XP
+DT_MACHINE structure is kept, in order to ensure we remain compatible
+with older Device Trees that do not include the "enable-method"
+property for the CPUs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 1 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 1 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 1 +
- 3 files changed, 3 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ arch/arm/mach-mvebu/platsmp.c                  | 3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 98335fb..1257ff1 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -27,6 +27,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "marvell,armada-xp-smp";
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 333f4ae..0dc59c3 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -185,6 +185,7 @@ nodes to be present and contain the properties described below.
+ 			    "qcom,gcc-msm8660"
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
++			    "marvell,armada-xp-smp"
  
- 		cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 9480cf8..3396b25 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -29,6 +29,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "marvell,armada-xp-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 31ba6d8..6da84bf 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -30,6 +30,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "marvell,armada-xp-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
+ 	- cpu-release-addr
+ 		Usage: required for systems that have an "enable-method"
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index e98075f..e01ae51 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -138,3 +138,6 @@ struct smp_operations armada_xp_smp_ops __initdata = {
+ 	.cpu_die		= armada_xp_cpu_die,
+ #endif
+ };
++
++CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
++		      &armada_xp_smp_ops);
 -- 
 1.8.3.2
