@@ -1,102 +1,24 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 04 Apr 2014 11:08:12 +0200
-Subject: [PATCH v7 05/10] dt-bindings: pci: rcar pcie device tree bindings
-In-Reply-To: <1396261856-22465-6-git-send-email-phil.edworthy@renesas.com>
-References: <1396261856-22465-1-git-send-email-phil.edworthy@renesas.com>
- <1396261856-22465-6-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <1396602492.5625.4.camel@weser.hi.pengutronix.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 4 Apr 2014 14:39:56 +0530
+Subject: [PATCH 15/17] ARM: exynos: cpuidle: Pass the AFTR callback to the
+ platform_data
+In-Reply-To: <1396597683-6969-16-git-send-email-daniel.lezcano@linaro.org>
+References: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
+ <1396597683-6969-16-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CAKohpon0ti43Rt8wTp4xi2zR_9ryK9oSq5KKHc-8gkEkZc0pQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 31.03.2014, 11:30 +0100 schrieb Phil Edworthy:
-> This patch adds the bindings for the R-Car PCIe driver. The driver
-> resides under drivers/pci/host/pcie-rcar.c
-> 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-
-Another nitpick below, otherwise:
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
-If you decide to roll another version with just this changed, feel free
-to carry over the my tag.
-> 
-> v7:
->  - Change binding description of clocks to 'clock specifiers'
-> 
-> v6:
->  - Correct DT bindings description for reg and clocks
-> 
-> v5:
->  - Add PCIe bus clock reference
->  - Add additional interrupt bindings
->  - Use dma-ranges property to specify inbound memory regions
+On 4 April 2014 13:18, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> No more dependency on the arch code. The platform_data field is used to set the
+> PM callback as the other cpuidle driver.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
->  Documentation/devicetree/bindings/pci/rcar-pci.txt | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/rcar-pci.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/rcar-pci.txt b/Documentation/devicetree/bindings/pci/rcar-pci.txt
-> new file mode 100644
-> index 0000000..789bd46
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/rcar-pci.txt
-> @@ -0,0 +1,45 @@
-> +* Renesas RCar PCIe interface
-> +
-> +Required properties:
-> +- compatible: should contain one of the following
-> +	"renesas,pcie-r8a7779", "renesas,pcie-r8a7790", "renesas,pcie-r8a7791"
-> +- reg: base address and length of the pcie controller registers.
-> +- #address-cells: set to <3>
-> +- #size-cells: set to <2>
-> +- device_type: set to "pci"
-> +- ranges: ranges for the PCI memory and I/O regions.
-> +- dma-ranges: ranges for the inbound memory regions.
-> +- interrupts: two interrupt sources for MSI interrupts, followed by interrupt
-> +	source for hardware related interrupts (e.g. link speed change).
-> +- #interrupt-cells: set to <1>
-> +- interrupt-map-mask and interrupt-map: standard PCI properties
-> +	to define the mapping of the PCIe interface to interrupt
-> +	numbers.
-> +- clocks: from common clock binding: clock specifiers for the PCIe controller
-> +	and PCIe bus clocks.
-> +- clock-names: from common clock binding: should be "pcie" and "pcie_bus".
-> +
-> +Example:
-> +
-> +SoC specific DT Entry:
-> +
-> +	pcie: pcie at fe000000 {
-> +		compatible = "renesas,pcie-r8a7791";
-> +		reg = <0 0xfe000000 0 0x80000>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
-> +			  0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
-> +			  0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
-> +			  0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
-> +		dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x40000000
-> +			      0x42000000 2 0x00000000 2 0x00000000 0 0x40000000>;
-> +		interrupts = <0 116 4 0 117 4 0 118 4>;
+>  arch/arm/mach-exynos/common.c  |    5 +++--
+>  arch/arm/mach-exynos/common.h  |    1 +
+>  arch/arm/mach-exynos/cpuidle.c |    8 ++++----
+>  arch/arm/mach-exynos/pmu.c     |    6 ++++++
+>  4 files changed, 14 insertions(+), 6 deletions(-)
 
-I think this is confusing, I would rather like to see them in separate
-cells, like
-	interrupts = <0 116 4>, <0 117 4>, <0 118 4>;
-
-Same would be true for the ranges properties, but there it isn't as
-confusing, so I don't really care.
-
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0 0 0>;
-> +		interrupt-map = <0 0 0 0 &gic 0 116 4>;
-> +		clocks = <&mstp3_clks R8A7791_CLK_PCIE>, <&pcie_bus_clk>;
-> +		clock-names = "pcie", "pcie_bus";
-> +		status = "disabled";
-> +	};
-
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
