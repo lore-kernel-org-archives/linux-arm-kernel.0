@@ -1,71 +1,61 @@
 From: t.stanislaws@samsung.com (Tomasz Stanislawski)
-Date: Fri, 04 Apr 2014 16:53:17 +0200
-Subject: [PATCH 0/4] Update to Exynos clocks
-Message-ID: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
+Date: Fri, 04 Apr 2014 16:53:18 +0200
+Subject: [PATCH 1/4] clk: propagate parent change up one level
+In-Reply-To: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
+References: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
+Message-ID: <1396623201-26000-2-git-send-email-t.stanislaws@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds some updates to clocks for Exynos4 platform and to the clock
-core.  The patches are rebased on linux/next.
+This patch adds support for propagation of setup of clock's parent one level
+up.
 
-An interesting part might be 'propagation of clk_set_parent()'.  This feature
-simplifies configuration of complex topologyof clocks by drivers.  Such a
-situation happens for Exynos HDMI driver.
+This feature is helpful when a driver changes topology of its clocks using
+clk_set_parent().  The problem occurs when on one platform/SoC driver's clock
+is located at MUX output but on the other platform/SoC there is a gated proxy
+clock between the MUX and driver's clock.  In such a case, driver's code has to
+be modified to use one clock for enabling and the other clock for setup of a
+parent.
 
-The HDMI device is clocked by sclk_hdmi clock. In older versions of SoC and its
-driver, the clock had two parent clocks: sclk_hdmiphy and sclk_pixel.
-The sclk_hdmi was a gated clock.
+The code updates are avoided by propagating setup of a parent up one level.
 
-In the recent version of Exynos clock provider this topology was slightly
-changed. A new clock named mout_hdmi was introduced.  This new clock represents
-the output of multiplexer that selects between sclk_hdmiphy and sclk_pixel.
+Additionally, this patch adds CLK_SET_PARENT_PARENT (sorry for naming) flag to
+inform clk-core that clk_set_parent() should be propagated.
 
-After the change the sclk_hdmi is still gated but has a single parent -
-mout_hdmi.
+Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+---
+ drivers/clk/clk.c            |    6 ++++++
+ include/linux/clk-provider.h |    1 +
+ 2 files changed, 7 insertions(+)
 
-This change caused interesting situation in Exynos HDMI driver because this
-driver used only sclk_hdmi.  Now clk_set_parent(sclk_hdmi, ...) fails because
-sclk_hdmi has a single parent now.  Using mout_hdmi instead of sclk_hdmi will
-not work because clk_enable(mout_hdmi) is not propagated to sclk_hdmi.
-
-To solve this problem, the setup of mout_hdmi was added to Exynos HDMI in the
-patch: "drm/exynos: add mout_hdmi clock in hdmi driver to change parent"
-
-IMO, this change breaks abstraction of clock API reveling too detailed
-information about clock topology to the driver.
-
-Moreover, the driver no longer works with old DT bindings because they provide
-no mout_hdmi clock.
-
-The clock set_parent propagation can be used to fix this.  The clk_set_parent()
-is propagated to a parent as long as the current clock has a single parent and
-has the flag CLK_SET_PARENT_PARENT set.
-
-Now Exynos HDMI can use only sclk_hdmi clock. The clk_enable() gates this clock
-directly and clk_set_parent() is propagated to mout_hdmi.
-
-This new behaviour does not break DT bindings because mout_hdmi would be simply
-ignored.
-
-After this change the 'add mout_hdmi clock' is no longer needed.
-
-Regards,
-Tomasz Stanislawski
-
-Tomasz Stanislawski (4):
-  clk: propagate parent change up one level
-  clk: exynos4: export sclk_hdmiphy clock
-  clk: exynos4: enable clk_set_parent() propagation for sclk_hdmi and
-    sclk_mixer clocks
-  Revert "drm/exynos: add mout_hdmi clock in hdmi driver to change
-    parent"
-
- drivers/clk/clk.c                    |    6 ++++++
- drivers/clk/samsung/clk-exynos4.c    |    8 +++++---
- drivers/gpu/drm/exynos/exynos_hdmi.c |   14 ++++----------
- include/dt-bindings/clock/exynos4.h  |    1 +
- include/linux/clk-provider.h         |    1 +
- 5 files changed, 17 insertions(+), 13 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index dff0373..53bbfda 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1737,6 +1737,12 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ 
+ 	/* try finding the new parent index */
+ 	if (parent) {
++		if ((clk->flags & CLK_SET_PARENT_PARENT)
++		    && clk->num_parents == 1) {
++			ret = clk_set_parent(clk->parent, parent);
++			goto out;
++		}
++
+ 		p_index = clk_fetch_parent_index(clk, parent);
+ 		p_rate = parent->rate;
+ 		if (p_index < 0) {
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5119174..daa0b03 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -30,6 +30,7 @@
+ #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+ #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
++#define CLK_SET_PARENT_PARENT	BIT(9) /* propagate parent change up one level */
+ 
+ struct clk_hw;
+ struct dentry;
 -- 
 1.7.9.5
