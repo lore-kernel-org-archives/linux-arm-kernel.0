@@ -1,22 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Apr 2014 21:19:57 +0200
-Subject: mach header files
-In-Reply-To: <533F016D.9050700@borg.org>
-References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
- <5208350.A2oo5ltmuY@wuerfel> <533F016D.9050700@borg.org>
-Message-ID: <9073437.EV8csICnAa@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Apr 2014 20:17:33 +0100
+Subject: [PATCH 74/75] ARM: l2c: always enable low power modes
+In-Reply-To: <b3b6dd79-5646-4c9f-8e62-ed9c4a5596e3@VA3EHSMHS040.ehs.local>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <E1WTYaK-0007I0-Sm@rmk-PC.arm.linux.org.uk>
+ <CAL_Jsq+vja-BeNfiVnOicFAa+E6jigDfnb5KWWpxZCZ3eGkJiA@mail.gmail.com>
+ <20140328155127.GL7528@n2100.arm.linux.org.uk>
+ <b3b6dd79-5646-4c9f-8e62-ed9c4a5596e3@VA3EHSMHS040.ehs.local>
+Message-ID: <20140404191732.GF7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 April 2014 15:01:01 Kent Borg wrote:
-> On 04/04/2014 02:49 PM, Arnd Bergmann wrote:
-> > Can you say what platform you are working on?
+On Fri, Apr 04, 2014 at 09:53:29AM -0700, S?ren Brinkmann wrote:
+> On Fri, 2014-03-28 at 03:51PM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Mar 28, 2014 at 10:42:54AM -0500, Rob Herring wrote:
+> > > On Fri, Mar 28, 2014 at 10:20 AM, Russell King
+> > > <rmk+kernel@arm.linux.org.uk> wrote:
+> > > > Always enable the L2C low power modes on L2C-310 R3P0 and newer parts.
+> > > 
+> > > I assume you want to squash this with patch 68/75? Or you are still
+> > > debating whether we want to do this or not? Given that it is r3px
+> > > only, that should greatly reduce any chance of breakage to newer
+> > > platforms.
+> > 
+> > I will eventually - I've kept it separate for the time being to give
+> > more options.  Let's see how people get on with it - it'll be running
+> > through Olof's builder later today, and there's some other people
+> > wanting to take it for a spin.
 > 
-> Doesn't exist yet, as I said I am running an emulation, trying to get 
-> Linux up, but also part of verifying design. Pretty sure no marketing 
-> announcements have been made; I don't think I can blab before the suits do.
+> A while back I suggested altering those bits, but that was turned down:
+> https://lkml.org/lkml/2013/3/1/350
 
-Ok, fair enough. At least that means you are at a stage where you
-can ensure that the platform is able to use PSCI to do SMP.
+As I said yesterday, please use a different archive website, preferably
+one which works.  lkml.org has been broken in various ways for a couple
+of days now, and quoting unreachable URLs isn't useful for discussion
+purposes.
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
