@@ -1,66 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Apr 2014 20:28:24 +0100
-Subject: [PATCH 00/75] l2c series
-In-Reply-To: <533E5B71.20406@monstr.eu>
-References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
- <533D7672.4090003@monstr.eu> <20140403193328.GY7528@n2100.arm.linux.org.uk>
- <533E5B71.20406@monstr.eu>
-Message-ID: <20140404192824.GG7528@n2100.arm.linux.org.uk>
+From: elder@linaro.org (Alex Elder)
+Date: Fri, 04 Apr 2014 14:30:15 -0500
+Subject: [PATCH 2/5] ARM: add SMP support for Broadcom mobile SoCs
+In-Reply-To: <533EF21C.6000909@codeaurora.org>
+References: <1396577891-2713-1-git-send-email-elder@linaro.org>
+ <1396577891-2713-3-git-send-email-elder@linaro.org>
+ <533EF21C.6000909@codeaurora.org>
+Message-ID: <533F0847.6050909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 09:12:49AM +0200, Michal Simek wrote:
-> On 04/03/2014 09:33 PM, Russell King - ARM Linux wrote:
-> > On Thu, Apr 03, 2014 at 04:55:46PM +0200, Michal Simek wrote:
-> >> Hi Russell,
-> >>
-> >> On 03/28/2014 04:12 PM, Russell King - ARM Linux wrote:
-> >>> This is another posting of the L2 cache controller series.  I'm not
-> >>> planning for this for the upcoming merge window, but the one after,
-> >>> as people need to test it and still need to feed back to me on
-> >>> various issues.  Hence, this is not a finalised series.
-> >>>
-> >>> There are still various issues which I've raised, and have had no
-> >>> feedback on.
-> >>>
-> >>> This series is being posted with Cc's on the individual patches.
-> >>
-> >> I just want to also point you that we have sent EDAC support for pl310
-> >> which will be good to have it for L2.
-> >> [RFC PATCH] EDAC support for ARM PL310 cache controller
-> >> [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
-> >> http://lkml.org/lkml/2014/3/2/85
-> >> http://lkml.org/lkml/2014/3/2/87
-> > 
-> > As seems to be the norm, lkml.org is broken... please find a different
-> > archive instead. :)
-> > 
+On 04/04/2014 12:55 PM, Stephen Boyd wrote:
+> On 04/03/14 19:18, Alex Elder wrote:
+>> +
+>> +/*
+>> + * Secondary startup method setup routine to extract the location of
+>> + * the secondary boot register from a "cpu" or "cpus" device tree
+>> + * node.  Only the first seen secondary boot register value is used;
+>> + * any others are ignored.  The secondary boot register value must be
+>> + * non-zero.
+>> + *
+>> + * Returns 0 if successful or an error code otherwise.
+>> + */
+>> +static int __init of_enable_method_setup(struct device_node *node)
+>> +{
+>> +	int ret;
+>> +
+>> +	/* Ignore all but the first one specified */
+>> +	if (secondary_boot)
+>> +		return 0;
+>> +
+>> +	ret = of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot);
+>> +	if (ret)
+>> +		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
+>> +			node->name);
+>> +
+>> +	return ret;
+>> +}
 > 
-> Here it is:
-> http://lkml.iu.edu/hypermail/linux/kernel/1403.0/00250.html
-> http://lkml.iu.edu/hypermail/linux/kernel/1403.0/00251.html
+> I don't understand why we need this. Why can't we get the secondary boot
+> address from the /cpus node in the smp_prepare_cpus op. It isn't that
+> hard to get access to the cpus node there via of_find_node_by_path().
+> Then we don't need patch 1 at all. If it turns out to be common stuff,
+> we can always have the common function live in arm common code or maybe
+> even be a devicetree API.
 
-A number of comments immediately spring to mind:
+You're right, that is one of several ways this could have
+also been done.
 
-- the use of writel/readl rather than their ARM specific _relaxed
-  versions is not a good idea: using the standard macros will result
-  in another write due to the barrier.
+Part of my thinking about this was affected by seeing how
+arm_dt_init_cpu_maps() works.  (Well, at least how it's
+structured.)  It looks for an enable method in each "cpu"
+node, then falls back to looking for one in the "cpus" node
+if none was seen.  It doesn't assume the extra properties
+are in the "cpus" node (or a "cpu" node for that matter).
+It directly supplies a node that's known to have a matching
+"enable-method" property--at the time that match is found--to
+make it possible to extract other relevant information from
+that matching node.
 
-- a driver coupled to the arm,pl310-cache compatible for this which is
-  distinctly separate from the main "driver" is probably a bad idea.
-  what if we want our existing l2 stuff to couple into the driver model
-  to expose some properties at a later date (eg, maybe to deal with
-  stuff like the power management settings?)  For example, it may be
-  that we want to expose the prefetch offset so that people can easily
-  play with the value to determine the correct tuning for their workload.
+(As an aside, the documentation doesn't mention that "cpus"
+nodes will contain "enable-method" properties, even though
+it seems that's more a function of "cpus" than each individual
+"cpu".)
 
-- casting to void * is unnecessary for devm_request_irq()
+I think it offers useful flexibility to do it this way,
+and I like that it is unambiguous which node should be
+searched for the additional information.
 
-- you really ought to check whether the interrupt registers are accessible
-  in non-secure mode - and I guess if we're going to have this driver, we
-  should have the L2 cache enabling code always try to set the NS access
-  bit for the interrupt registers.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+					-Alex
