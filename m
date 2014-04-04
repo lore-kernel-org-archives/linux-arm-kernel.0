@@ -1,91 +1,81 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 4 Apr 2014 08:30:06 +0000
-Subject: [PATCH v7 00/10] R-Car Gen2 PCIe host driver
-In-Reply-To: <1396261856-22465-1-git-send-email-phil.edworthy@renesas.com>
-References: <1396261856-22465-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <3954d4483da94b2baafc9c96812510dc@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 4 Apr 2014 14:12:09 +0530
+Subject: [PATCH 01/17] ARM: exynos: cpuidle: Prevent forward declaration
+In-Reply-To: <1396597683-6969-2-git-send-email-daniel.lezcano@linaro.org>
+References: <1396597683-6969-1-git-send-email-daniel.lezcano@linaro.org>
+ <1396597683-6969-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CAKohpomrQK=6pjuVNnZempTeNep859LPzRRbc2OPrJ-Ctx7V4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 4 April 2014 13:17, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> Move the structure below the 'exynos4_enter_lowpower' function so no more
+> need of forward declaration.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-exynos/cpuidle.c |   40 ++++++++++++++++++----------------------
+>  1 file changed, 18 insertions(+), 22 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index f57cb91..bd2142a 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -60,30 +60,8 @@
+>  #define PWR_CTRL2_CORE2_UP_RATIO               (1 << 4)
+>  #define PWR_CTRL2_CORE1_UP_RATIO               (1 << 0)
+>
+> -static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> -                               struct cpuidle_driver *drv,
+> -                               int index);
+> -
+>  static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+>
+> -static struct cpuidle_driver exynos4_idle_driver = {
+> -       .name                   = "exynos4_idle",
+> -       .owner                  = THIS_MODULE,
+> -       .states = {
+> -               [0] = ARM_CPUIDLE_WFI_STATE,
+> -               [1] = {
+> -                       .enter                  = exynos4_enter_lowpower,
+> -                       .exit_latency           = 300,
+> -                       .target_residency       = 100000,
+> -                       .flags                  = CPUIDLE_FLAG_TIME_VALID,
+> -                       .name                   = "C1",
+> -                       .desc                   = "ARM power down",
+> -               },
+> -       },
+> -       .state_count = 2,
+> -       .safe_state_index = 0,
+> -};
+> -
+>  /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+>  static void exynos4_set_wakeupmask(void)
+>  {
+> @@ -214,6 +192,24 @@ static void __init exynos5_core_down_clk(void)
+>         __raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+>  }
+>
+> +static struct cpuidle_driver exynos4_idle_driver = {
+> +       .name                   = "exynos4_idle",
+> +       .owner                  = THIS_MODULE,
+> +       .states = {
+> +               [0] = ARM_CPUIDLE_WFI_STATE,
+> +               [1] = {
+> +                       .enter                  = exynos4_enter_lowpower,
+> +                       .exit_latency           = 300,
+> +                       .target_residency       = 100000,
+> +                       .flags                  = CPUIDLE_FLAG_TIME_VALID,
+> +                       .name                   = "C1",
+> +                       .desc                   = "ARM power down",
+> +               },
+> +       },
+> +       .state_count = 2,
+> +       .safe_state_index = 0,
+> +};
+> +
+>  static int exynos_cpuidle_probe(struct platform_device *pdev)
+>  {
+>         int cpu_id, ret;
 
-I assume that you'll take the PCI driver patches (0001, 0002 & 0005) through your tree and that the rest are platform specific patches that will go via Simon Horman. Would you like me to split this into two separate patch sets?
-
-Thanks
-Phil
-
-> -----Original Message-----
-> From: linux-sh-owner at vger.kernel.org [mailto:linux-sh-
-> owner at vger.kernel.org] On Behalf Of Phil Edworthy
-> Sent: 31 March 2014 11:31
-> To: linux-pci at vger.kernel.org
-> Cc: linux-sh at vger.kernel.org; LAKML; Bjorn Helgaas; Valentine Barshak;
-> Simon Horman; Magnus Damm; Ben Dooks; Phil Edworthy
-> Subject: [PATCH v7 00/10] R-Car Gen2 PCIe host driver
-> 
-> This is version 7 of a PCIe Host driver for the R-Car Gen2 devices, i.e. R-Car H2
-> (r8a7790) and R-Car M2 (r8a7791).
-> 
-> v7:
->  - Change binding description of clocks to 'clock specifiers'
-> 
-> v6:
->  - Correct DT bindings description for reg and clocks
->  - Split device and board DT changes
->  - Add shmobile to subject for shmobile DT patches
->  - Don't check MSI irq number is valid, as upper level checks this
->  - Change "Unexpected MSI" msg to debug level
->  - Reword "Unexpected MSI" comment so that it's one line
->  - Remove patch that adds HAVE_ARM_ARCH_TIMER to koelsch defconfig as
-> not needed
-> 
-> v5:
->  - Use module_platform_driver instead of subsys_initcall
->  - Use the of_device_id data field for HW init function
->  - Init hw_pci struct in declaration
->  - Renesas SoC compatible string has peripheral before device name
->  - Add PCIe bus clock reference
->  - Use dma-ranges property to specify inbound memory regions
->  - Support multiple IO windows and correct resources
->  - Return IRQ_NONE from MSI isr when there is no pending MSI
->  - Add additional interrupt bindings
-> 
-> v4:
->  - Use runtime PM properly
-> 
-> Phil Edworthy (10):
->   PCI: host: rcar: Add Renesas R-Car PCIe driver
->   PCI: host: rcar: Add MSI support
->   ARM: shmobile: r8a7790: Add PCIe clock device tree nodes
->   ARM: shmobile: r8a7791: Add PCIe clock device tree nodes
->   dt-bindings: pci: rcar pcie device tree bindings
->   ARM: shmobile: r8a7790: Add PCIe device nodes
->   ARM: shmobile: lager: Add PCIe device nodes
->   ARM: shmobile: r8a7791: Add PCIe device nodes
->   ARM: shmobile: koelsch: Add PCIe device nodes
->   ARM: shmobile: koelsch: Add PCIe to defconfig
-> 
->  Documentation/devicetree/bindings/pci/rcar-pci.txt |  45 +
->  arch/arm/boot/dts/r8a7790-lager.dts                |  10 +
->  arch/arm/boot/dts/r8a7790.dtsi                     |  31 +-
->  arch/arm/boot/dts/r8a7791-koelsch.dts              |  14 +
->  arch/arm/boot/dts/r8a7791.dtsi                     |  31 +-
->  arch/arm/configs/koelsch_defconfig                 |   3 +
->  drivers/pci/host/Kconfig                           |   6 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pcie-rcar.c                       | 929 +++++++++++++++++++++
->  drivers/pci/host/pcie-rcar.h                       |  87 ++
->  include/dt-bindings/clock/r8a7790-clock.h          |   1 +
->  include/dt-bindings/clock/r8a7791-clock.h          |   1 +
->  12 files changed, 1154 insertions(+), 5 deletions(-)  create mode 100644
-> Documentation/devicetree/bindings/pci/rcar-pci.txt
->  create mode 100644 drivers/pci/host/pcie-rcar.c  create mode 100644
-> drivers/pci/host/pcie-rcar.h
-> 
-> --
-> 1.9.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in the body
-> of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
