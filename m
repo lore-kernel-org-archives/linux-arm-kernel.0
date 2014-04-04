@@ -1,62 +1,64 @@
-From: naresh.kamboju@linaro.org (Naresh Kamboju)
-Date: Fri, 4 Apr 2014 16:30:31 +0530
-Subject: [LTP] How to get the Linux kernel coverage data on ARM arch when
- I run LTP test?
-In-Reply-To: <CAHTX3dLrfW_Hbqx_-vEfcHGCh7c4n=Hs1OATfvjJ9UEaxJTCaQ@mail.gmail.com>
-References: <CA+G9fYuT4TSs=3j6K9zztsTgFNVp2YG6JT-2Q_L==1P5G+SBew@mail.gmail.com>
- <52FDE52A.4070002@linux.vnet.ibm.com>
- <CA+G9fYv9+Fhyz=nVZQZXxLU0YMTJadfr1XVVVb9P=inEfUaDuA@mail.gmail.com>
- <CAHTX3dLrfW_Hbqx_-vEfcHGCh7c4n=Hs1OATfvjJ9UEaxJTCaQ@mail.gmail.com>
-Message-ID: <CA+G9fYtFOPf6MYBKiOyHwSwZx5bHZWt3=Hzwsjrh5pvSarT+fw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Apr 2014 12:16:47 +0100
+Subject: The Alphabet (or, the sorting of Kconfig symbols)
+Message-ID: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2014 20:51, Michal Simek <monstr@monstr.eu> wrote:
-> HI,
->
->
-> 2014-02-18 15:30 GMT+01:00 Naresh Kamboju <naresh.kamboju@linaro.org>:
->
->> On 14 February 2014 15:13, Peter Oberparleiter
->> <oberpar@linux.vnet.ibm.com> wrote:
->> > On 14.02.2014 10:02, Naresh Kamboju wrote:
->> >> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01# gcov
->> >> kernel/gcov/base.c -o
->> >>  /sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/gcov/
->> >> File 'kernel/gcov/base.c'
->> >> Lines executed:43.18% of 44
->> >> Creating 'base.c.gcov'
->> >>
->> >> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01#
->> >>
->> >> The above experiment gives coverage of a single file base.c when i run
->> >> gcov manually.
->> >> Is there any way to get Linux kernel coverage of all files after
->> >> running LTP test cases ?
->> >
->> > 1. Reset coverage data: lcov -z
->> > 2. Run LTP (or any other test case)
->> > 3. Capture coverage data: lcov -c -o coverage.info
->> > 4. Generate HTML output: genhtml coverage.info -o out
->> > 5. View HTML output: <browser> out/index.html
->>
->> It is working !!!
->> LTP executed on linux-linaro build on vexpress-tc2 target.
->> Please find results obtained
->> http://people.linaro.org/~naresh.kamboju/linux-linaro-coverage-by-ltp/
->>
->> The plan is to run all linaro test suite and to get coverage date.
->
->
-> Have you already run it? Are these test cases available?
+For those who don't know it, the order of letters in the alphabet is:
 
+A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
 
-I have tested LTP on vexpress-tc2. I did not try all test suites.
-We ( In Linaro) Linaro Test Suites is a package that contains test
-suites that can be run in LAVA.
-http://releases.linaro.org/14.03/components/platform/linaro-test-suites
+and we use this order to determine the position of "select" entries in
+Kconfig files.  We do that so that we can reduce conflicts.  Conflicts
+such as these kinds of rubbish:
 
->
-> Thanks,
-> Michal
->
+diff --cc arch/arm/mach-shmobile/Kconfig
+index 3b8c87461d67,5249ff0511a8..000000000000
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@@ -133,7 -116,7 +126,11 @@@ config ARCH_R8A779
+        select MIGHT_HAVE_PCI
+        select SH_CLK_CPG
+        select RENESAS_IRQC
+++<<<<<<< HEAD
+ +      select SYS_SUPPORTS_SH_CMT
+++=======
++       select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+++>>>>>>> arm-soc/for-next
+...
+diff --cc arch/arm/mach-zynq/Kconfig
+index f03e75bd0b2b,cd2d55ab834a..000000000000
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@@ -2,19 -2,11 +2,23 @@@ config ARCH_ZYN
+        select ARM_AMBA
+        select ARM_GIC
+++<<<<<<< HEAD
+ +      select ARCH_HAS_CPUFREQ
+ +      select ARCH_HAS_OPP
+ +      select COMMON_CLK
+ +      select CPU_V7
+ +      select GENERIC_CLOCKEVENTS
+++=======
+++>>>>>>> arm-soc/for-next
+        select HAVE_ARM_SCU if SMP
+        select HAVE_ARM_TWD if SMP
+        select ICST
+-       select MIGHT_HAVE_CACHE_L2X0
+-       select USE_OF
+-       select HAVE_SMP
+-       select SPARSE_IRQ
+        select CADENCE_TTC_TIMER
+++<<<<<<< HEAD
+ +      select ARM_GLOBAL_TIMER if !CPU_FREQ
+++=======
++       select ARM_GLOBAL_TIMER
++       select MFD_SYSCON
+++>>>>>>> arm-soc/for-next
+
+Please note down the above sequence of letters for future reference. :)
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
