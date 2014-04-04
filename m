@@ -1,20 +1,21 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 4 Apr 2014 14:11:10 +0200
-Subject: The Alphabet (or, the sorting of Kconfig symbols)
-In-Reply-To: <CACxGe6uoB6CkuV7HCg8wdyu2Tm471YaAz0sDA3W2C0MPAYYY+Q@mail.gmail.com>
-References: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
- <CACxGe6uoB6CkuV7HCg8wdyu2Tm471YaAz0sDA3W2C0MPAYYY+Q@mail.gmail.com>
-Message-ID: <20140404121109.GA17091@netboy>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 4 Apr 2014 13:15:12 +0100
+Subject: [PATCH] Xen: do hv callback accounting only on x86
+In-Reply-To: <533E9A75.4050102@linaro.org>
+References: <5057041.71iuvlcH4G@wuerfel> <12121341.4lKFpaRMcO@wuerfel>
+ <533E9A75.4050102@linaro.org>
+Message-ID: <533EA250.90709@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 04:24:27AM -0700, Grant Likely wrote:
+On 04/04/14 12:41, Julien Grall wrote:
 > 
-> Equally applies to #include ordering.
+> Linus has merged xen/tip yesterday and building ARM with CONFIG_XEN=y is
+> now broken.
 
-Yes.
+Sorry, I couldn't add this patch to the xen tree at the time since the
+change was on a different tree and then I forgot about it.
 
-Can we add this rule into Documentation/CodingStyle?
+Now applied to devel/for-linus-3.15.
 
-Thanks,
-Richard
+David
