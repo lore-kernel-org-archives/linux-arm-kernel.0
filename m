@@ -1,75 +1,126 @@
 From: treding@nvidia.com (Thierry Reding)
-Date: Fri, 4 Apr 2014 16:49:25 +0200
-Subject: [RFC 1/5] PCI: tegra: Overhaul regulator usage
+Date: Fri, 4 Apr 2014 16:49:26 +0200
+Subject: [RFC 2/5] ARM: tegra: Add new PCIe regulator properties
 In-Reply-To: <1396622969-17837-1-git-send-email-treding@nvidia.com>
 References: <1396622969-17837-1-git-send-email-treding@nvidia.com>
-Message-ID: <1396622969-17837-2-git-send-email-treding@nvidia.com>
+Message-ID: <1396622969-17837-3-git-send-email-treding@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current usage of regulators for the Tegra PCIe block is wrong. It
-doesn't accurately reflect the actual supply inputs of the IP block and
-therefore isn't as flexible as it should be. Rectify this by describing
-all possible supply inputs in the device tree binding documentation and
-deprecate the old supply properties.
+These new properties more accurately reflect the real connections of the
+boards and therefore make it easier to match them up with schematics.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- .../bindings/pci/nvidia,tegra20-pcie.txt           | 35 ++++++++++++++++++++--
- 1 file changed, 32 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/tegra20-harmony.dts   | 10 +++++++++-
+ arch/arm/boot/dts/tegra20-tamonten.dtsi |  7 +++++++
+ arch/arm/boot/dts/tegra20-trimslice.dts |  8 ++++++++
+ arch/arm/boot/dts/tegra30-beaver.dts    | 11 +++++++++++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi   | 10 ++++++++++
+ 5 files changed, 45 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-index c300391e8d3e..66e8aca4aef0 100644
---- a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-@@ -14,9 +14,6 @@ Required properties:
- - interrupt-names: Must include the following entries:
-   "intr": The Tegra interrupt that is asserted for controller interrupts
-   "msi": The Tegra interrupt that is asserted when an MSI is received
--- pex-clk-supply: Supply voltage for internal reference clock
--- vdd-supply: Power supply for controller (1.05V)
--- avdd-supply: Power supply for controller (1.05V) (not required for Tegra20)
- - bus-range: Range of bus numbers associated with this controller
- - #address-cells: Address representation for root ports (must be 3)
-   - cell 0 specifies the bus and device numbers of the root port:
-@@ -60,6 +57,38 @@ Required properties:
-   - afi
-   - pcie_x
+diff --git a/arch/arm/boot/dts/tegra20-harmony.dts b/arch/arm/boot/dts/tegra20-harmony.dts
+index 3fb1f50f6d46..7d5d0aa1778a 100644
+--- a/arch/arm/boot/dts/tegra20-harmony.dts
++++ b/arch/arm/boot/dts/tegra20-harmony.dts
+@@ -561,9 +561,17 @@
+ 	};
  
-+Power supplies for Tegra20:
-+- avdd-pex-supply: Power supply for analog PCIe logic. Must supply 1.05 V.
-+- vdd-pex-supply: Power supply for digital PCIe I/O. Must supply 1.05 V.
-+- avdd-pex-pll-supply: Power supply for dedicated (internal) PCIe PLL. Must
-+  supply 1.05 V.
-+- avdd-plle-supply: Power supply for PLLE, which is shared with SATA. Must
-+  supply 1.05 V.
-+- vddio-pex-clk-supply: Power supply for PCIe clock. Must supply 3.3 V.
+ 	pcie-controller at 80003000 {
++		status = "okay";
 +
-+Power supplies for Tegra30:
-+- Required:
-+  - avdd-pex-pll-supply: Power supply for dedicated (internal) PCIe PLL. Must
-+    supply 1.05 V.
-+  - avdd-plle-supply: Power supply for PLLE, which is shared with SATA. Must
-+    supply 1.05 V.
-+  - vddio-pex-ctl-supply: Power supply for PCIe control I/O partition. Must
-+    supply 1.8 V.
-+  - hvdd-pex-supply: High-voltage supply for PCIe I/O and PCIe output clocks.
-+    Must supply 3.3 V.
-+- Optional:
-+  - If port 0 is enabled:
-+    - avdd-pexa-supply: Power supply for analog PCIe logic. Must supply 1.05 V.
-+    - vdd-pexa-supply: Power supply for digital PCIe I/O. Must supply 1.05 V.
-+  - If at least one of ports 1 and 2 is enabled:
-+    - avdd-pexb-supply: Power supply for analog PCIe logic. Must supply 1.05 V.
-+    - vdd-pexb-supply: Power supply for digital PCIe I/O. Must supply 1.05 V.
++		avdd-pex-supply = <&pci_vdd_reg>;
++		vdd-pex-supply = <&pci_vdd_reg>;
++		avdd-pex-pll-supply = <&pci_vdd_reg>;
++		avdd-plle-supply = <&pci_vdd_reg>;
++		vddio-pex-clk-supply = <&pci_clk_reg>;
 +
-+Deprecated supplies:
-+- pex-clk-supply: Supply voltage for internal reference clock
-+- vdd-supply: Power supply for controller (1.05V)
-+- avdd-supply: Power supply for controller (1.05V) (not required for Tegra20)
-+
- Root ports are defined as subnodes of the PCIe controller node.
++		/* deprecated */
+ 		pex-clk-supply = <&pci_clk_reg>;
+ 		vdd-supply = <&pci_vdd_reg>;
+-		status = "okay";
  
- Required properties:
+ 		pci at 1,0 {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/tegra20-tamonten.dtsi b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+index a1b0d965757f..0e33577750ae 100644
+--- a/arch/arm/boot/dts/tegra20-tamonten.dtsi
++++ b/arch/arm/boot/dts/tegra20-tamonten.dtsi
+@@ -473,6 +473,13 @@
+ 	};
+ 
+ 	pcie-controller at 80003000 {
++		avdd-pex-supply = <&pci_vdd_reg>;
++		vdd-pex-supply = <&pci_vdd_reg>;
++		avdd-pex-pll-supply = <&pci_vdd_reg>;
++		avdd-plle-supply = <&pci_vdd_reg>;
++		vddio-pex-clk-supply = <&pci_clk_reg>;
++
++		/* deprecated */
+ 		pex-clk-supply = <&pci_clk_reg>;
+ 		vdd-supply = <&pci_vdd_reg>;
+ 	};
+diff --git a/arch/arm/boot/dts/tegra20-trimslice.dts b/arch/arm/boot/dts/tegra20-trimslice.dts
+index 216fa6d50c65..401b32e44369 100644
+--- a/arch/arm/boot/dts/tegra20-trimslice.dts
++++ b/arch/arm/boot/dts/tegra20-trimslice.dts
+@@ -318,6 +318,14 @@
+ 
+ 	pcie-controller at 80003000 {
+ 		status = "okay";
++
++		avdd-pex-supply = <&pci_vdd_reg>;
++		vdd-pex-supply = <&pci_vdd_reg>;
++		avdd-pex-pll-supply = <&pci_vdd_reg>;
++		avdd-plle-supply = <&pci_vdd_reg>;
++		vddio-pex-clk-supply = <&pci_clk_reg>;
++
++		/* deprecated */
+ 		pex-clk-supply = <&pci_clk_reg>;
+ 		vdd-supply = <&pci_vdd_reg>;
+ 
+diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+index e93fe45b7803..b434ec1f278a 100644
+--- a/arch/arm/boot/dts/tegra30-beaver.dts
++++ b/arch/arm/boot/dts/tegra30-beaver.dts
+@@ -17,6 +17,17 @@
+ 
+ 	pcie-controller at 00003000 {
+ 		status = "okay";
++
++		avdd-pexa-supply = <&ldo1_reg>;
++		vdd-pexa-supply = <&ldo1_reg>;
++		avdd-pexb-supply = <&ldo1_reg>;
++		vdd-pexb-supply = <&ldo1_reg>;
++		avdd-pex-pll-supply = <&ldo1_reg>;
++		avdd-plle-supply = <&ldo1_reg>;
++		vddio-pex-ctl-supply = <&sys_3v3_reg>;
++		hvdd-pex-supply = <&sys_3v3_pexs_reg>;
++
++		/* deprecated */
+ 		pex-clk-supply = <&sys_3v3_pexs_reg>;
+ 		vdd-supply = <&ldo1_reg>;
+ 		avdd-supply = <&ldo2_reg>;
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 0cf0848a82d8..55051a808ced 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -38,6 +38,16 @@
+ 
+ 	pcie-controller at 00003000 {
+ 		status = "okay";
++
++		/* AVDD_PEXA and VDD_PEXA are grounded on Cardhu. */
++		avdd-pexb-supply = <&ldo1_reg>;
++		vdd-pexb-supply = <&ldo1_reg>;
++		avdd-pex-pll-supply = <&ldo1_reg>;
++		hvdd-pex-supply = <&pex_hvdd_3v3_reg>;
++		vddio-pex-ctl-supply = <&sys_3v3_reg>;
++		avdd-plle-supply = <&ldo2_reg>;
++
++		/* deprecated */
+ 		pex-clk-supply = <&pex_hvdd_3v3_reg>;
+ 		vdd-supply = <&ldo1_reg>;
+ 		avdd-supply = <&ldo2_reg>;
 -- 
 1.9.1
