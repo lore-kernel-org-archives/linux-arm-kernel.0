@@ -1,161 +1,150 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  4 Apr 2014 12:57:30 -0700
-Subject: [PATCH v6 5/5] ARM: dts: msm: Fix Krait CPU/L2 nodes
+Date: Fri,  4 Apr 2014 12:57:27 -0700
+Subject: [PATCH v6 2/5] ARM: Add Krait L2 register accessor functions
 In-Reply-To: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
 References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1396641450-12854-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1396641450-12854-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The error interrupt binding wasn't properly accepted when this
-was originally written. Fix the dts to match the binding.
+Krait CPUs have a handful of L2 cache controller registers that
+live behind a cp15 based indirection register. First you program
+the indirection register (l2cpselr) to point the L2 'window'
+register (l2cpdr) at what you want to read/write.  Then you
+read/write the 'window' register to do what you want. The
+l2cpselr register is not banked per-cpu so we must lock around
+accesses to it to prevent other CPUs from re-pointing l2cpdr
+underneath us.
 
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Courtney Cavin <courtney.cavin@sonymobile.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8960.dtsi | 29 +++++++++++++++-------
- arch/arm/boot/dts/qcom-msm8974.dtsi | 49 ++++++++++++++++++++++++++++---------
- 2 files changed, 57 insertions(+), 21 deletions(-)
+ arch/arm/common/Kconfig                   |  3 ++
+ arch/arm/common/Makefile                  |  1 +
+ arch/arm/common/krait-l2-accessors.c      | 58 +++++++++++++++++++++++++++++++
+ arch/arm/include/asm/krait-l2-accessors.h | 20 +++++++++++
+ 4 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
 
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index 997b7b94e117..66a6e8c4fdcf 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -12,30 +12,41 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		interrupts = <1 14 0x304>;
--		compatible = "qcom,krait";
- 		enable-method = "qcom,kpss-acc-v1";
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index c3a4e9ceba34..9da52dc6260b 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -9,6 +9,9 @@ config DMABOUNCE
+ 	bool
+ 	select ZONE_DMA
  
- 		cpu at 0 {
-+			compatible = "qcom,krait";
- 			device_type = "cpu";
- 			reg = <0>;
--			next-level-cache = <&L2>;
-+			next-level-cache = <&L1_0>;
- 			qcom,acc = <&acc0>;
- 			qcom,saw = <&saw0>;
++config KRAIT_L2_ACCESSORS
++	bool
 +
-+			L1_0: l1-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <1 14 0x104>;
-+				next-level-cache = <&L2>;
-+			};
+ config SHARP_LOCOMO
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 70b1eff477b3..6b2cddf6e8d0 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -7,6 +7,7 @@ obj-y				+= firmware.o
+ obj-$(CONFIG_ICST)		+= icst.o
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
++obj-$(CONFIG_KRAIT_L2_ACCESSORS) += krait-l2-accessors.o
+ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
+new file mode 100644
+index 000000000000..5d514bbc88a6
+--- /dev/null
++++ b/arch/arm/common/krait-l2-accessors.c
+@@ -0,0 +1,58 @@
++/*
++ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+			L2: l2-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <0 2 0x4>;
-+			};
- 		};
- 
- 		cpu at 1 {
-+			compatible = "qcom,krait";
- 			device_type = "cpu";
- 			reg = <1>;
--			next-level-cache = <&L2>;
-+			next-level-cache = <&L1_1>;
- 			qcom,acc = <&acc1>;
- 			qcom,saw = <&saw1>;
--		};
- 
--		L2: l2-cache {
--			compatible = "cache";
--			cache-level = <2>;
--			interrupts = <0 2 0x4>;
-+			L1_1: l1-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <1 14 0x104>;
-+				next-level-cache = <&L2>;
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index f68723918b3f..b4ac497b7d76 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -12,43 +12,68 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		interrupts = <1 9 0xf04>;
--		compatible = "qcom,krait";
- 		enable-method = "qcom,kpss-acc-v2";
- 
- 		cpu at 0 {
-+			compatible = "qcom,krait";
- 			device_type = "cpu";
- 			reg = <0>;
--			next-level-cache = <&L2>;
-+			next-level-cache = <&L1_0>;
- 			qcom,acc = <&acc0>;
++#include <linux/spinlock.h>
++#include <linux/export.h>
 +
-+			L1_0: l1-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <1 9 0x104>;
-+				next-level-cache = <&L2>;
-+			};
++#include <asm/barrier.h>
++#include <asm/krait-l2-accessors.h>
 +
-+			L2: l2-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <0 2 0x4>;
-+				qcom,saw = <&saw_l2>;
-+			};
- 		};
- 
- 		cpu at 1 {
-+			compatible = "qcom,krait";
- 			device_type = "cpu";
- 			reg = <1>;
--			next-level-cache = <&L2>;
-+			next-level-cache = <&L1_1>;
- 			qcom,acc = <&acc1>;
++static DEFINE_RAW_SPINLOCK(krait_l2_lock);
 +
-+			L1_1: l1-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <1 9 0x204>;
-+				next-level-cache = <&L2>;
-+			};
- 		};
- 
- 		cpu at 2 {
-+			compatible = "qcom,krait";
- 			device_type = "cpu";
- 			reg = <2>;
--			next-level-cache = <&L2>;
-+			next-level-cache = <&L1_2>;
- 			qcom,acc = <&acc2>;
++void krait_set_l2_indirect_reg(u32 addr, u32 val)
++{
++	unsigned long flags;
 +
-+			L1_2: l1-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <1 9 0x404>;
-+				next-level-cache = <&L2>;
-+			};
- 		};
- 
- 		cpu at 3 {
-+			compatible = "qcom,krait";
- 			device_type = "cpu";
- 			reg = <3>;
--			next-level-cache = <&L2>;
-+			next-level-cache = <&L1_3>;
- 			qcom,acc = <&acc3>;
--		};
- 
--		L2: l2-cache {
--			compatible = "cache";
--			cache-level = <2>;
--			interrupts = <0 2 0x4>;
--			qcom,saw = <&saw_l2>;
-+			L1_3: l1-cache {
-+				compatible = "qcom,arch-cache";
-+				interrupts = <1 9 0x804>;
-+				next-level-cache = <&L2>;
-+			};
- 		};
- 	};
- 
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then write to the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mcr p15, 3, %0, c15, c0, 7 @ l2cpdr" : : "r" (val));
++	isb();
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++}
++EXPORT_SYMBOL(krait_set_l2_indirect_reg);
++
++u32 krait_get_l2_indirect_reg(u32 addr)
++{
++	u32 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then read from the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mrc p15, 3, %0, c15, c0, 7 @ l2cpdr" : "=r" (val));
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(krait_get_l2_indirect_reg);
+diff --git a/arch/arm/include/asm/krait-l2-accessors.h b/arch/arm/include/asm/krait-l2-accessors.h
+new file mode 100644
+index 000000000000..48fe5527bc01
+--- /dev/null
++++ b/arch/arm/include/asm/krait-l2-accessors.h
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ASMARM_KRAIT_L2_ACCESSORS_H
++#define __ASMARM_KRAIT_L2_ACCESSORS_H
++
++extern void krait_set_l2_indirect_reg(u32 addr, u32 val);
++extern u32 krait_get_l2_indirect_reg(u32 addr);
++
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
