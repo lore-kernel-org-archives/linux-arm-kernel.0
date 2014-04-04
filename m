@@ -1,22 +1,31 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Apr 2014 17:36:10 +0200
-Subject: [PATCH V2 16/17] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle directory
-In-Reply-To: <1396618989-2897-17-git-send-email-daniel.lezcano@linaro.org>
-References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
- <1396618989-2897-17-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <2015757.oD7pvGvWuY@amdc1032>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 04 Apr 2014 23:40:24 +0800
+Subject: [PATCH 2/3] net: hisilicon: new hip04 MDIO driver
+In-Reply-To: <20140404.113010.1212333214715849484.davem@davemloft.net>
+References: <1396624597-390-1-git-send-email-zhangfei.gao@linaro.org>	<1396624597-390-3-git-send-email-zhangfei.gao@linaro.org>
+ <20140404.113010.1212333214715849484.davem@davemloft.net>
+Message-ID: <533ED268.9090502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 04, 2014 03:43:08 PM Daniel Lezcano wrote:
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+On 04/04/2014 11:30 PM, David Miller wrote:
+> From: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Date: Fri,  4 Apr 2014 23:16:36 +0800
+>
+>> +config HIP04_ETH
+>> +	tristate "HISILICON P04 Ethernet support"
+>> +	select NET_CORE
+>> +	select PHYLIB
+>> +	select MARVELL_PHY
+>> +	select MFD_SYSCON
+>> +	---help---
+>> +	  If you wish to compile a kernel for a hardware with hisilicon p04 SoC and
+>> +	  want to use the internal ethernet then you should answer Y to this.
+>
+> Selecting NET_CORE makes no sense, if it's not set this driver's
+> Kconfig file won't even be considered.
+>
+
+Thanks Daivd, could I update following this thread first.
