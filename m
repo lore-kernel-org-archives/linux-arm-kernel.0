@@ -1,33 +1,35 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 04 Apr 2014 08:41:34 -0700
-Subject: [PATCH] watchdog: imx2_wdt: handle enabled watchdog properly
-In-Reply-To: <20140404152011.GC5529@katana>
-References: <1396623242-15234-1-git-send-email-agust@denx.de>
- <20140404152011.GC5529@katana>
-Message-ID: <533ED2AE.9010006@roeck-us.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 4 Apr 2014 11:49:42 -0400
+Subject: [PATCH 2/2] ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the
+ relevant defconfigs
+In-Reply-To: <1396626125-8631-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1396626125-8631-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140404154942.GD28334@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2014 08:20 AM, Wolfram Sang wrote:
-> On Fri, Apr 04, 2014 at 04:54:01PM +0200, Anatolij Gustschin wrote:
->> If the watchdog is already enabled (e.g. started by the boot loader),
->> we need to handle this case properly and start reloading the watchdog
->> time-out counter as frequently as needed.
->>
->> Signed-off-by: Anatolij Gustschin <agust@denx.de>
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->> Cc: Wim Van Sebroeck <wim@iguana.be>
->
-> Uh, this driver has not been converted to use the watchdog framework
-> yet? I'd suggest this should be the first step.
->
+Thomas,
 
-Yes, that would make sense at this time, especially given the amount
-of work going into it. There is also a separate patch set pending,
-converting the driver to use regmap [1]; I am copying the author.
-Maybe one of the people working with the driver would be willing
-to do the conversion.
+My, you've been busy. :)
 
-Guenter
+On Fri, Apr 04, 2014 at 05:42:05PM +0200, Thomas Petazzoni wrote:
+> The Marvell Armada 38x platform has a SDHCI interface managed by the
+> sdhci-pxav3 MMC host driver. It therefore makes sense to enable this
+> driver in both mvebu_v7_defconfig and multi_v7_defconfig, which are
+> both capable of building Marvell Armada 38x support.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
 
-[1] http://comments.gmane.org/gmane.linux.kernel/1677735
+Please make this a separate patch when you rebase against v3.15-rc1.
+arm-soc will take it directly since multi_v7_defconfig is so
+conflict-prone.
+
+>  arch/arm/configs/mvebu_v7_defconfig | 1 +
+>  2 files changed, 2 insertions(+)
+
+thx,
+
+Jason.
