@@ -1,37 +1,47 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Apr 2014 17:42:03 +0200
-Subject: [PATCH 0/2] ARM: mvebu: enable SDHCI interface on Armada 38x
-Message-ID: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  4 Apr 2014 17:42:05 +0200
+Subject: [PATCH 2/2] ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the relevant
+ defconfigs
+In-Reply-To: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396626125-8631-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1396626125-8631-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Gregory, Andrew, Sebastian,
+The Marvell Armada 38x platform has a SDHCI interface managed by the
+sdhci-pxav3 MMC host driver. It therefore makes sense to enable this
+driver in both mvebu_v7_defconfig and multi_v7_defconfig, which are
+both capable of building Marvell Armada 38x support.
 
-Here is a small set of two patches that enable the SDHCI interface on
-Armada 38x. The first one adds the DT details, the second one adjusts
-the appropriate defconfigs to include the relevant driver.
-
-The sdhci-pxav3 driver change has been taken by the MMC maintainer
-Chris Ball, and is already in linux-next, so I presume it will be part
-of 3.15. Regarding those proposed patches, they are obviously aimed at
-3.16.
-
-These patches are based on linux-next, but I can resend them if needed
-once 3.15-rc1 is released.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (2):
-  ARM: mvebu: enable the SDHCI interface on Armada 385
-  ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the relevant defconfigs
-
- arch/arm/boot/dts/armada-385-db.dts | 8 ++++++++
- arch/arm/boot/dts/armada-38x.dtsi   | 9 +++++++++
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
  arch/arm/configs/multi_v7_defconfig | 1 +
  arch/arm/configs/mvebu_v7_defconfig | 1 +
- 4 files changed, 19 insertions(+)
+ 2 files changed, 2 insertions(+)
 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index de52231..db44b74 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -270,6 +270,7 @@ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
++CONFIG_MMC_SDHCI_PXAV3=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index a34713d..26be7ff 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -79,6 +79,7 @@ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_MMC=y
++CONFIG_MMC_SDHCI_PXAV3=y
+ CONFIG_MMC_MVSDIO=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_GPIO=y
 -- 
 1.8.3.2
