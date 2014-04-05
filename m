@@ -1,34 +1,226 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 05 Apr 2014 21:01:33 +0200
-Subject: [PATCH v2 1/7] drm/exynos: add super device support
-In-Reply-To: <20140405185249.GM7528@n2100.arm.linux.org.uk>
-References: <1396355882-17010-1-git-send-email-inki.dae@samsung.com>
- <1396355882-17010-2-git-send-email-inki.dae@samsung.com>
- <533EB9C6.80302@samsung.com>
- <CAAQKjZPbzb+qvJA5y+Kco9BRv4j3iVatM_0bd+ugyuVZUbfFFg@mail.gmail.com>
- <53403E42.1010403@gmail.com> <20140405182423.GL7528@n2100.arm.linux.org.uk>
- <53404BF3.2010409@gmail.com> <20140405185249.GM7528@n2100.arm.linux.org.uk>
-Message-ID: <5340530D.5080707@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 5 Apr 2014 20:02:25 +0100
+Subject: [GIT PULL 1/8] ARM: SoC non-critical bug fixes for 3.15
+In-Reply-To: <201404052101.19381.arnd@arndb.de>
+References: <201404052101.19381.arnd@arndb.de>
+Message-ID: <201404052102.26018.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.04.2014 20:52, Russell King - ARM Linux wrote:
-> On Sat, Apr 05, 2014 at 08:31:15PM +0200, Tomasz Figa wrote:
->> Maybe my words have been misinterpreted, but all I'm suggesting here is
->> that there is no need to add any new data to DT to solve the same issue
->> to the same extent as componentized subsystem framework, at least in
->> Exynos case.
->
-> Right, so we seem to have agreement that what exynos is currently doing
-> is fundamentally broken.
->
-> So the next question is, how is it going to get fixed?
->
+The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
 
-I believe this is a separate issue from what is being discussed in this 
-thread, but anyway, I'd wait with this until Monday, so we could discuss 
-this with Inki and Andrzej, who is the person responsible for Exynos DRM 
-in my team. I was just passing by. ;)
+  Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
 
-Best regards,
-Tomasz
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-non-critical-3.15
+
+for you to fetch changes up to cb46a256a78225817945cd52068d61d5126c236e:
+
+  ARM: at91: fix a typo (2014-04-03 21:52:26 +0200)
+
+----------------------------------------------------------------
+ARM: SoC non-critical bug fixes for 3.15
+
+Lots of isolated bug fixes that were not found to be important
+enough to be submitted before the merge window or backported
+into stable kernels.
+The vast majority of these came out of Arnd's randconfig testing
+and just prevents running into build-time bugs in configurations
+that we do not care about in practice.
+
+----------------------------------------------------------------
+Alexander Shiyan (3):
+      ARM: clps711x: autcpu12: Fix incorrect NAND CLE GPIO
+      MAINTAINERS: ARM: clps711x: Use regex patterns to involve all CLPS711X drivers
+      ARM: nspire: Fix compiler warning
+
+Arnd Bergmann (57):
+      Merge tag 'omap-for-v3.15/fixes-for-merge-window' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
+      ARM: mmp: allow platform devices with modular USB
+      Merge tag 'samsung-fixes' of git://git.kernel.org/.../kgene/linux-samsung into next/fixes-non-critical
+      ARM: at91: split out at91x40 into a top-level option
+      ARM: at91: don't provide dt init code for at91x40
+      ARM: at91: export sam9_smc interfaces
+      ARM: at91: fix broken "if () else" statement
+      ARM: at91: sama5 always uses DT
+      ARM: davinci: make dm644x-evm phy fixup conditional
+      ARM: davinci: fix Kconfig for DA850_EVM
+      ARM: efm32: select AUTO_ZRELADDR
+      ARM: ep93xx: export ep93xx_chip_revision
+      ARM: hisi: fix building without CONFIG_HOTPLUG_CPU
+      ARM: ixp4xx/omixp: always include linux/leds.h
+      ARM: ixp4xx: avoid use of PCIBIOS_MIN_MEM in io.h
+      ARM: ixp4xx: fix gpio rework
+      ARM: ks8695/og: make PCI setup conditional
+      ARM: lpc32xx: export lpc32xx_return_iram_size
+      ARM: msm: add missing include of linux/module.h
+      ARM: msm: avoid calling debug_ll_addr on !MMU
+      ARM: msm: export legacy DMA interfaces
+      ARM: omap1: don't rely on tps65010
+      ARM: mvebu: add missing header
+      ARM: orion5x: make dns323 independent of PHY support
+      ARM: pxa: don't "select" SMC91X on MACH_XCEP
+      ARM: pxa: enable pxafb unconditionally for some boards
+      ARM: pxa: fix colibri build
+      ARM: pxa: fix pxa_ssp_* declarations
+      ARM: pxa: remove broken balloon3_gpio_vbus reference
+      ARM: pxa: select I2C_GPIO only if I2C is on
+      ARM: pxa: trizeps4 and trizeps4wl use the same file
+      ARM: rpc: autoselect CPU_SA110
+      ARM: footbridge: don't build floppy code for addin mode
+      ARM: footbridge: fix build with PCI disabled
+      ARM: footbridge: make screen_info setup conditional
+      ARM: realview: fix sparsemem build
+      ARM: integrator: only select pl01x if TTY is enabled
+      ARM: s3c24xx: MINI2440 needs I2C for EEPROM_AT24
+      ARM: s3c24xx: fix gta02 build error
+      ARM: s3c24xx: osiris dvs needs tps65010
+      ARM: s3c64xx: MACH_SMDK6400 needs HSMMC1
+      ARM: s3c64xx: select power domains only when used
+      ARM: s5p64x0: fix building with only one soc type
+      ARM: s5pv210: enable IDE support in MACH_TORBRECK
+      ARM: samsung: allow serial driver to be disabled
+      ARM: samsung: fix SAMSUNG_PM_DEBUG Kconfig logic
+      ARM: samsung: select ATAGS where necessary
+      ARM: samsung: select CRC32 for SAMSUNG_PM_CHECK
+      ARM: exynos: fix l2x0 saved regs handling
+      ARM: exynos: add missing include of linux/module.h
+      ARM: sunxi: fix build for THUMB2_KERNEL
+      ARM: tegra: make debug_ll code build for ARMv6
+      Merge branch 'randconfig-fixes' into next/fixes-non-critical
+      Revert "ARM: ixp4xx: fix gpio rework"
+      Revert "ARM: ixp4xx: Make dma_set_coherent_mask common, correct implementation"
+      ARM: moxart: fix CPU selection
+      ARM: at91: fix a typo
+
+Felipe Balbi (1):
+      ARM: omap1: fix build when !CONFIG_OMAP_32K_TIMER
+
+Florian Vaussard (2):
+      CLK: TI: OMAP4/5/DRA7: Remove gpmc_fck from dummy clocks
+      ARM: dts: omap4/5: Use l3_ick for the gpmc node
+
+Krzysztof Halasa (2):
+      IXP4xx: Fix Goramo Multilink GPIO conversion.
+      IXP4xx: Fix DMA masks.
+
+Krzysztof Ha?asa (2):
+      CNS3xxx: Fix a WARN() related to IRQ allocation.
+      CNS3xxx: Fix PCIe early iotable_init().
+
+Mugunthan V N (1):
+      ARM: dts: am33xx: correcting dt node unit address for usb
+
+Nishanth Menon (1):
+      ARM: OMAP4: Fix definition of IS_PM44XX_ERRATUM
+
+Paul Bolle (1):
+      ARM: S3C24XX: Fix typo CONFIG_CPUS_3C2443
+
+Paul Gortmaker (1):
+      ARM: S3C64XX: mach-crag6410-module.c is not modular
+
+Simon K?gstr?m (1):
+      ARM: ixp4xx: Make dma_set_coherent_mask common, correct implementation
+
+Stefan S?rensen (1):
+      ARM: OMAP2+: INTC: Acknowledge stuck active interrupts
+
+Stephen Warren (1):
+      ARM: tegra: fix board DT pinmux setup
+
+Suman Anna (1):
+      ARM: OMAP4: hwmod data: correct the idlemodes for spinlock
+
+Tomasz Figa (1):
+      ARM: dts: Keep G3D regulator always on for exynos5250-arndale
+
+Tushar Behera (1):
+      ARM: exynos_defconfig: Update EHCI config entry
+
+Will Deacon (1):
+      irqchip: gic: use dmb ishst instead of dsb when raising a softirq
+
+ MAINTAINERS                                  |   2 +-
+ arch/arm/Kconfig                             |  15 +++-
+ arch/arm/boot/dts/am33xx.dtsi                |   4 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts     |   1 +
+ arch/arm/boot/dts/omap4.dtsi                 |   2 +
+ arch/arm/boot/dts/omap5.dtsi                 |   2 +
+ arch/arm/boot/dts/tegra114-dalmore.dts       |   2 -
+ arch/arm/boot/dts/tegra124-venice2.dts       |  11 +--
+ arch/arm/configs/davinci_all_defconfig       |   2 +
+ arch/arm/configs/exynos_defconfig            |   2 +-
+ arch/arm/include/asm/smp.h                   |   1 +
+ arch/arm/include/debug/tegra.S               |  18 ++---
+ arch/arm/mach-at91/Kconfig                   |  23 +++++-
+ arch/arm/mach-at91/Kconfig.non_dt            |   8 +-
+ arch/arm/mach-at91/at91sam9260_devices.c     |   6 +-
+ arch/arm/mach-at91/sam9_smc.c                |   3 +
+ arch/arm/mach-at91/setup.c                   |   2 +-
+ arch/arm/mach-clps711x/board-autcpu12.c      |   2 +-
+ arch/arm/mach-cns3xxx/cns3420vb.c            |   1 -
+ arch/arm/mach-cns3xxx/core.c                 |  33 ++++++++-
+ arch/arm/mach-cns3xxx/pcie.c                 | 105 ++++++++-------------------
+ arch/arm/mach-davinci/Kconfig                |   5 --
+ arch/arm/mach-davinci/board-dm644x-evm.c     |  11 +--
+ arch/arm/mach-ep93xx/core.c                  |   1 +
+ arch/arm/mach-exynos/common.c                |   6 +-
+ arch/arm/mach-exynos/cpuidle.c               |   1 +
+ arch/arm/mach-footbridge/Kconfig             |   2 +-
+ arch/arm/mach-footbridge/Makefile            |   3 +-
+ arch/arm/mach-footbridge/cats-hw.c           |   2 +
+ arch/arm/mach-hisi/Makefile                  |   3 +-
+ arch/arm/mach-hisi/hotplug.c                 |   2 +
+ arch/arm/mach-integrator/Kconfig             |   8 +-
+ arch/arm/mach-ixp4xx/common-pci.c            |  39 ----------
+ arch/arm/mach-ixp4xx/common.c                |  61 ++++++++++++++--
+ arch/arm/mach-ixp4xx/goramo_mlr.c            |  43 ++++++-----
+ arch/arm/mach-ixp4xx/include/mach/io.h       |   3 +-
+ arch/arm/mach-ixp4xx/omixp-setup.c           |   2 -
+ arch/arm/mach-ks8695/board-og.c              |   3 +-
+ arch/arm/mach-lpc32xx/common.c               |   1 +
+ arch/arm/mach-mmp/aspenite.c                 |   4 +-
+ arch/arm/mach-mmp/devices.c                  |  14 ++--
+ arch/arm/mach-mmp/ttc_dkb.c                  |  18 ++---
+ arch/arm/mach-moxart/Kconfig                 |   2 +-
+ arch/arm/mach-msm/dma.c                      |   3 +
+ arch/arm/mach-msm/io.c                       |   2 +
+ arch/arm/mach-mvebu/armada-370-xp.c          |   1 +
+ arch/arm/mach-nspire/nspire.c                |   2 +-
+ arch/arm/mach-omap1/board-h2.c               |   3 +
+ arch/arm/mach-omap1/board-osk.c              |   3 +
+ arch/arm/mach-omap1/pm.c                     |   6 +-
+ arch/arm/mach-omap2/irq.c                    |   8 ++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   3 +-
+ arch/arm/mach-omap2/pm.h                     |   2 +-
+ arch/arm/mach-orion5x/Kconfig                |   1 -
+ arch/arm/mach-orion5x/dns323-setup.c         |   2 +
+ arch/arm/mach-pxa/Kconfig                    |   9 ++-
+ arch/arm/mach-pxa/balloon3.c                 |   1 -
+ arch/arm/mach-pxa/colibri-evalboard.c        |   1 +
+ arch/arm/mach-realview/include/mach/memory.h |   2 +
+ arch/arm/mach-s3c24xx/Kconfig                |   4 +-
+ arch/arm/mach-s3c24xx/common.c               |   2 +-
+ arch/arm/mach-s3c24xx/mach-gta02.c           |   2 +-
+ arch/arm/mach-s3c64xx/Kconfig                |   3 +-
+ arch/arm/mach-s3c64xx/irq-pm.c               |  12 ++-
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |   2 +-
+ arch/arm/mach-s5p64x0/common.c               |  18 ++++-
+ arch/arm/mach-s5p64x0/common.h               |   5 +-
+ arch/arm/mach-s5p64x0/irq-pm.c               |   6 ++
+ arch/arm/mach-s5pv210/Kconfig                |   1 +
+ arch/arm/mach-sunxi/Makefile                 |   2 +-
+ arch/arm/mach-sunxi/headsmp.S                |   9 ---
+ arch/arm/mach-sunxi/platsmp.c                |   2 +-
+ arch/arm/mm/Kconfig                          |   2 +-
+ arch/arm/plat-samsung/Kconfig                |   6 +-
+ arch/arm/plat-samsung/init.c                 |   4 +
+ drivers/clk/ti/clk-44xx.c                    |   1 -
+ drivers/clk/ti/clk-54xx.c                    |   1 -
+ drivers/clk/ti/clk-7xx.c                     |   1 -
+ drivers/irqchip/irq-gic.c                    |   4 +-
+ include/linux/pxa2xx_ssp.h                   |   2 +-
+ 80 files changed, 347 insertions(+), 270 deletions(-)
+ delete mode 100644 arch/arm/mach-sunxi/headsmp.S
