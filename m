@@ -1,156 +1,85 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 4 Apr 2014 17:07:52 -0700
-Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
-In-Reply-To: <20140404195818.GA21028@debian>
-References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
- <1396577719-14786-3-git-send-email-keescook@chromium.org>
- <20140404195818.GA21028@debian>
-Message-ID: <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 4 Apr 2014 18:19:53 -0600
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <1394811272-1547-2-git-send-email-Liviu.Dudau@arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140405001953.GE15806@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 4, 2014 at 12:58 PM, Rabin Vincent <rabin@rab.in> wrote:
-> On Thu, Apr 03, 2014 at 07:15:19PM -0700, Kees Cook wrote:
->> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
->> index 34e56647dcee..4ae343c1e2a3 100644
->> --- a/arch/arm/kernel/ftrace.c
->> +++ b/arch/arm/kernel/ftrace.c
->> @@ -14,6 +14,7 @@
->>
->>  #include <linux/ftrace.h>
->>  #include <linux/uaccess.h>
->> +#include <linux/stop_machine.h>
->>
->>  #include <asm/cacheflush.h>
->>  #include <asm/opcodes.h>
->> @@ -34,6 +35,22 @@
->>
->>  #define      OLD_NOP         0xe1a00000      /* mov r0, r0 */
->>
->> +static int __ftrace_modify_code(void *data)
->
-> This is in the CONFIG_OLD_MCOUNT ifdef, but should be in the outer ifdef
-> (CONFIG_DYNAMIC_FTRACE) instead, otherwise it will not get enabled for
-> for example Thumb-2 kernels.  This was wrong in my example patch too.
+On Fri, Mar 14, 2014 at 03:34:27PM +0000, Liviu Dudau wrote:
+> Some architectures do not share x86 simple view of the PCI I/O space
+> and instead use a range of addresses that map to bus addresses. For
+> some architectures these ranges will be expressed by OF bindings
+> in a device tree file.
 
-Ah! Yes, good point. I've moved this now.
+It's true that the current Linux "x86 view of PCI I/O space" is pretty
+simple and limited.  But I don't think that's a fundamental x86 limitation
+(other than the fact that the actual INB/OUTB/etc. CPU instructions
+themselves are limited to a single 64K I/O port space).
 
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index 8539eb2a01ad..3baac4ad165f 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -681,30 +716,52 @@ static inline bool arch_has_strict_perms(void)
->>       return true;
->>  }
->>
->> +#define set_section_perms(perms, field)      {                               \
->> +     size_t i;                                                       \
->> +     unsigned long addr;                                             \
->> +                                                                     \
->> +     if (!arch_has_strict_perms())                                   \
->> +             return;                                                 \
->> +                                                                     \
->> +     for (i = 0; i < ARRAY_SIZE(perms); i++) {                       \
->> +             if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||        \
->> +                 !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {          \
->> +                     pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
->> +                             perms[i].start, perms[i].end,           \
->> +                             SECTION_SIZE);                          \
->> +                     continue;                                       \
->> +             }                                                       \
->> +                                                                     \
->> +             for (addr = perms[i].start;                             \
->> +                  addr < perms[i].end;                               \
->> +                  addr += SECTION_SIZE)                              \
->> +                     section_update(addr, perms[i].mask,             \
->> +                                    perms[i].field);                 \
->> +     }                                                               \
->> +}
->> +
->>  static inline void fix_kernmem_perms(void)
->>  {
->> -     unsigned long addr;
->> -     unsigned int i;
->> +     set_section_perms(nx_perms, prot);
->> +}
->>
->> -     if (!arch_has_strict_perms())
->> -             return;
->> +#ifdef CONFIG_DEBUG_RODATA
->> +void mark_rodata_ro(void)
->> +{
->> +     set_section_perms(ro_perms, prot);
->> +}
->>
->> -     for (i = 0; i < ARRAY_SIZE(section_perms); i++) {
->> -             if (!IS_ALIGNED(section_perms[i].start, SECTION_SIZE) ||
->> -                 !IS_ALIGNED(section_perms[i].end, SECTION_SIZE)) {
->> -                     pr_err("BUG: section %lx-%lx not aligned to %lx\n",
->> -                             section_perms[i].start, section_perms[i].end,
->> -                             SECTION_SIZE);
->> -                     continue;
->> -             }
->> +void set_kernel_text_rw(void)
->> +{
->> +     set_section_perms(ro_perms, clear);
->> +}
->
-> You need a TLB flush.  I had a flush_tlb_all() in my example patch,
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244335.html,
-> but the following is probably nicer (on top of this patch):
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 9bea524..a92c45a 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -741,6 +741,8 @@ static inline bool arch_has_strict_perms(void)
->                      addr += SECTION_SIZE)                              \
->                         section_update(addr, perms[i].mask,             \
->                                        perms[i].field);                 \
-> +                                                                       \
-> +               flush_tlb_kernel_range(perms[i].start, perms[i].end);   \
->         }                                                               \
+Host bridges on x86 could have MMIO apertures that turn CPU memory accesses
+into PCI port accesses.  We could implement any number of I/O port spaces
+this way, by making the kernel inb()/outb()/etc. interfaces smart enough to
+use the memory-mapped space instead of (or in addition to) the
+INB/OUTB/etc. instructions.
+
+ia64 does this (see arch/ia64/include/asm/io.h for a little description)
+and I think maybe one or two other arches have something similar.
+
+> Introduce a pci_register_io_range() helper function that can be used
+> by the architecture code to keep track of the I/O ranges described by the
+> PCI bindings. If the PCI_IOBASE macro is not defined that signals
+> lack of support for PCI and we return an error.
+
+I don't quite see how you intend to use this, because this series doesn't
+include any non-stub implementation of pci_register_io_range().
+
+Is this anything like the ia64 strategy I mentioned above?  If so, it would
+be really nice to unify some of this stuff.
+
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/of/address.c       | 9 +++++++++
+>  include/linux/of_address.h | 1 +
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 1a54f1f..be958ed 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -619,6 +619,15 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
 >  }
->
-
-When I do this, I hang the system, and get a WARN due to the tlb call
-attempting to flush on all CPUs, I think:
-
-[   34.246034] WARNING: at
-/mnt/host/source/src/third_party/kernel-next/kernel/smp.c:466
-smp_call_function_many+0xac/0x26c()
-...
-[   34.246617] Backtrace:
-[   34.246697] [<c010d3b8>] (unwind_backtrace+0x0/0x118) from
-[<c060b9d8>] (dump_stack+0x28/0x30)
-[   34.246765] [<c060b9d8>] (dump_stack+0x28/0x30) from [<c0123044>]
-(warn_slowpath_null+0x44/0x5c)
-[   34.246824] [<c0123044>] (warn_slowpath_null+0x44/0x5c) from
-[<c017426c>] (smp_call_function_many+0xac/0x26c)
-[   34.246881] [<c017426c>] (smp_call_function_many+0xac/0x26c) from
-[<c0174468>] (smp_call_function+0x3c/0x48)
-[   34.246937] [<c0174468>] (smp_call_function+0x3c/0x48) from
-[<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c)
-[   34.246994] [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c) from
-[<c010c590>] (flush_tlb_kernel_range+0x74/0xa0)
-[   34.247046] [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0) from
-[<c011403c>] (set_kernel_text_rw+0xd8/0xec)
-[   34.247099] [<c011403c>] (set_kernel_text_rw+0xd8/0xec) from
-[<c010c878>] (__ftrace_modify_code+0x14/0x28)
-[   34.247156] [<c010c878>] (__ftrace_modify_code+0x14/0x28) from
-[<c0184318>] (stop_machine_cpu_stop+0xc0/0x114)
-[   34.247212] [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114) from
-[<c01841cc>] (cpu_stopper_thread+0xd8/0x164)
-[   34.247266] [<c01841cc>] (cpu_stopper_thread+0xd8/0x164) from
-[<c0145c14>] (kthread+0xc8/0xd8)
-[   34.247323] [<c0145c14>] (kthread+0xc8/0xd8) from [<c0106118>]
-(ret_from_fork+0x14/0x20)
-
-Using local_flush_tlb_kernel_range() fixed it though. Thank you for
-your help on this! :)
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+>  EXPORT_SYMBOL(of_get_address);
+>  
+> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> +{
+> +#ifndef PCI_IOBASE
+> +	return -EINVAL;
+> +#else
+> +	return 0;
+> +#endif
+> +}
+> +
+>  unsigned long __weak pci_address_to_pio(phys_addr_t address)
+>  {
+>  	if (address > IO_SPACE_LIMIT)
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index 5f6ed6b..40c418d 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -56,6 +56,7 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
+>  extern const __be32 *of_get_address(struct device_node *dev, int index,
+>  			   u64 *size, unsigned int *flags);
+>  
+> +extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+>  extern unsigned long pci_address_to_pio(phys_addr_t addr);
+>  
+>  extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+> -- 
+> 1.9.0
+> 
