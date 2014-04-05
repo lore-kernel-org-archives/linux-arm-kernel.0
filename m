@@ -1,43 +1,76 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri,  4 Apr 2014 17:30:50 -0700
-Subject: [PATCH] arm64: Add missing Kconfig for CONFIG_STRICT_DEVMEM
-Message-ID: <1396657850-14252-1-git-send-email-lauraa@codeaurora.org>
+From: arunks.linux@gmail.com (arunks.linux at gmail.com)
+Date: Sat,  5 Apr 2014 08:57:35 +0530
+Subject: [PATCH v1] ARM: Modify ldrt fixup handler to re-execute the userspace
+ instruction
+Message-ID: <1396668455-11535-1-git-send-email-arunks.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig for CONFIG_STRICT_DEVMEM is missing despite being
-used in mmap.c. Add it.
+From: Arun KS <arunks.list@gmail.com>
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+We will reach fixup handler when one thread(say cpu0) caused an undefined
+exception, while another thread(say cpu1) is unmmaping the page.
+
+Fixup handler returns to the next userspace instruction which has caused the
+undef execption, rather than going to the same instruction.
+
+ARM ARM says that after undefined exception, the PC will be pointing
+to the next instruction.
+ie +4 offset in case of ARM and +2 in case of Thumb
+
+And there is no correction offset passed to vector_stub in case of
+undef exception.
+
+File: arch/arm/kernel/entry-armv.S +1085
+vector_stub     und, UND_MODE
+
+During an undefined exception, in normal scenario(ie when ldrt
+instruction does not cause an abort) after resorting the context in
+VFP hardware, the PC is modified as show below before jumping to
+ret_from_exception which is in r9.
+
+File: arch/arm/vfp/vfphw.S +169
+@ The context stored in the VFP hardware is up to date with this thread
+vfp_hw_state_valid:
+        tst     r1, #FPEXC_EX
+        bne     process_exception       @ might as well handle the pending
+                                        @ exception before retrying branch
+                                        @ out before setting an FPEXC that
+                                        @ stops us reading stuff
+        VFPFMXR FPEXC, r1               @ Restore FPEXC last
+        sub     r2, r2, #4              @ Retry current instruction - if Thumb
+        str     r2, [sp, #S_PC]         @ mode it's two 16-bit instructions,
+                                        @ else it's one 32-bit instruction, so
+                                        @ always subtract 4 from the following
+                                        @ instruction address.
+
+But if ldrt results in an abort, we reach the fixup handler and return
+to ret_from_execption without correcting the pc.
+
+This patch modifes the fixup handler to re-execute the same instruction which caused
+undefined execption.
+
+Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
+Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
+Signed-off-by: Arun KS <getarunks@gmail.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Kconfig.debug | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/kernel/entry-armv.S |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 835c559..4be4336 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -6,6 +6,20 @@ config FRAME_POINTER
- 	bool
- 	default y
- 
-+config STRICT_DEVMEM
-+	bool "Filter access to /dev/mem"
-+	depends on MMU
-+        help
-+	  If this option is disabled, you allow userspace (root) access to all
-+	  of memory, including kernel and userspace memory. Accidental
-+	  access to this is obviously disastrous, but specific access can
-+	  be used by people debugging the kernel.
-+
-+	  If this option is switched on, the /dev/mem file only allows
-+	  userspace access to memory mapped peripherals.
-+
-+	  If in doubt, say Y.
-+
- config EARLY_PRINTK
- 	bool "Early printk support"
- 	default y
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 1879e8d..3fa745f 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -484,7 +484,8 @@ ENDPROC(__und_usr)
+  */
+ 	.pushsection .fixup, "ax"
+ 	.align	2
+-4:	mov	pc, r9
++4:	str     r4, [sp, #S_PC]			@ retry current instruction
++	mov	pc, r9
+ 	.popsection
+ 	.pushsection __ex_table,"a"
+ 	.long	1b, 4b
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
