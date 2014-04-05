@@ -1,30 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Apr 2014 10:43:13 +0100
-Subject: Help for doubt about why update SCTLR by cr_alignment every
- syscall,IRQ,exception ?
-In-Reply-To: <CAEjEV8DLk5fhQHMomrrO3h+_9=yo3pMiEvjXG7nOydJOWdf7zg@mail.gmail.com>
-References: <CAEjEV8DLk5fhQHMomrrO3h+_9=yo3pMiEvjXG7nOydJOWdf7zg@mail.gmail.com>
-Message-ID: <20140405094313.GI7528@n2100.arm.linux.org.uk>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Sat, 05 Apr 2014 19:53:53 +0900
+Subject: [PATCH 06/10] ARM: EXYNOS: Add support for mapping PMU base
+ address via DT
+In-Reply-To: <533BF905.6070701@samsung.com>
+References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+ <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
+ <533BF905.6070701@samsung.com>
+Message-ID: <533FE0C1.6070207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 05, 2014 at 01:41:17PM +0800, qixuan wu wrote:
-> Dear King, all,
-> 
-> If we enable CONFIG_ALIGNMENT_TRAP:
+On 04/02/2014 08:48 PM, Sylwester Nawrocki wrote:
+> On 02/04/14 09:50, Pankaj Dubey wrote:
+>> From: Young-Gun Jang <yg1004.jang@samsung.com>
+>>
+>> Add support for mapping Exynos Power Management Unit (PMU) base address
+>> from device tree. Code will use existing samsung pmu binding information.
+>> This patch also adds "get_exynos_pmubase" a helper function to return mapped base
+>> address to various other files under "mach-exynos".
+>>
+>> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/common.h |    2 ++
+>>   arch/arm/mach-exynos/exynos.c |   44 +++++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 46 insertions(+)
+>>
+> [...]
+>>   #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index a5e1349..a5127fb 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -35,6 +35,8 @@
+>>   #define L2_AUX_VAL 0x7C470001
+>>   #define L2_AUX_MASK 0xC200ffff
+>>   
+>> +static void __iomem *exynos_pmu_base __initdata;
+>> +
+>>   static struct map_desc exynos4_iodesc[] __initdata = {
+>>   	{
+>>   		.virtual	= (unsigned long)S3C_VA_SYS,
+>> @@ -245,6 +247,47 @@ void __init exynos_init_late(void)
+>>   	exynos_pm_init();
+>>   }
+>>   
+>> +static char const *exynos_dt_pmu_match[] __initconst = {
+>> +	"samsung,exynos4210-pmu",
+>> +	"samsung,exynos4212-pmu",
+>> +	"samsung,exynos4412-pmu",
+>> +	"samsung,exynos5250-pmu",
+>> +	NULL
+>> +};
+>> +
+>> +static int __init exynos_fdt_map_pmu(unsigned long node,
+>> +		const char *uname, int depth, void *data)
+>> +{
+>> +	struct map_desc iodesc;
+>> +	__be32 *reg;
+>> +	unsigned long len;
+>> +
+>> +	if (of_flat_dt_match(node, exynos_dt_pmu_match)) {
+>> +		phys_addr_t phys_addr;
+>> +		reg = of_get_flat_dt_prop(node, "reg", &len);
+>> +		if (reg == NULL || len != (sizeof(unsigned long) * 2))
+>> +			return 0;
+>> +
+>> +		phys_addr = be32_to_cpu(reg[0]);
+>> +		iodesc.pfn = __phys_to_pfn(phys_addr);
+>> +		iodesc.length = be32_to_cpu(reg[1]) - 1;
+>> +		iodesc.virtual = (unsigned long)S5P_VA_PMU;
+>> +		iodesc.type = MT_DEVICE;
+>> +		iotable_init(&iodesc, 1);
+> Are you sure...you need this in addition to ioremap() below ?
+> Can't you just use the Linux syscon API ?
+> There were some patches posted for syscon to make it available in earlier
+> system initialization stage: https://lkml.org/lkml/2014/2/19/218
+Thanks for review and suggestion.
 
-This code in arch/arm/kernel/head-common.S:
+We need ioremap() in addition to iotable_init to get virtual address,
+which will be used by other files also for read/write PMU registers.
 
-        bicne   r4, r0, #CR_A                   @ Clear 'A' bit
-        stmneia r7, {r0, r4}                    @ Save control register values
+Regarding syscon early initialization, since I was not aware of any such
+patch earlier I have not used it. But after you suggested I tried it and
+modified this implementation to use syscon API and regmap API and it's
+working fine.
+I will wait for review of other patches in this series and status of above
+mentioned syscon API based on that I will update this in next revision.
 
-saves different values to cr_alignment and cr_no_alignment.  One always
-has the A bit cleared, the other may have the A bit set.
+>> +		exynos_pmu_base = ioremap(phys_addr, be32_to_cpu(reg[1]));
+>> +		if (WARN_ON(!exynos_pmu_base))
+>> +			return -EFAULT;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+> --
+> Thanks,
+> Sylwester
+>
 
-For ARMv5 and older, we must have the A bit set while in the kernel so
-misaligned loads are aborted, so that they can be fixed up.  This
-behaviour is relied upon by the networking code amongst other places.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Best Regards,
+Pankaj Dubey
