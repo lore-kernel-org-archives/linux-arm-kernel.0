@@ -1,76 +1,54 @@
-From: arunks.linux@gmail.com (arunks.linux at gmail.com)
-Date: Sat,  5 Apr 2014 08:57:35 +0530
-Subject: [PATCH v1] ARM: Modify ldrt fixup handler to re-execute the userspace
- instruction
-Message-ID: <1396668455-11535-1-git-send-email-arunks.linux@gmail.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Sat,  5 Apr 2014 12:35:03 +0800
+Subject: [PATCH v7 0/3] add hisilicon hip04 ethernet driver
+Message-ID: <1396672506-9296-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arun KS <arunks.list@gmail.com>
+v7:
+Remove select NET_CORE in 0002
 
-We will reach fixup handler when one thread(say cpu0) caused an undefined
-exception, while another thread(say cpu1) is unmmaping the page.
+v6:
+Suggest by Russell: Use netdev_sent_queue & netdev_completed_queue to solve latency issue 
+Also shorten the period of timer, which is used to wakeup the queue since no
+tx completed interrupt.
 
-Fixup handler returns to the next userspace instruction which has caused the
-undef execption, rather than going to the same instruction.
+v5:
+no big change, fix typo
 
-ARM ARM says that after undefined exception, the PC will be pointing
-to the next instruction.
-ie +4 offset in case of ARM and +2 in case of Thumb
+v4:
+Modify accoringly to the suggetion from Arnd, Florian, Eric, David
+Use of_parse_phandle_with_fixed_args & syscon_node_to_regmap get ppe info
+Add skb_orphan() and tx_timer for reclaim since no tx_finished interrupt
+Update timeout, and move of_phy_connect to probe to reuse open/stop
 
-And there is no correction offset passed to vector_stub in case of
-undef exception.
+v3:
+Suggest from Arnd, use syscon & regmap_write/read to replace static void __iomem *ppebase.
+Modify hisilicon-hip04-net.txt accrordingly to suggestion from Florian and Sergei.
 
-File: arch/arm/kernel/entry-armv.S +1085
-vector_stub     und, UND_MODE
+v2:
+Got many suggestions from Russell, Arnd, Florian, Mark and Sergei
+Remove memcpy, use dma_map/unmap_single, use dma_alloc_coherent rather than dma_pool, etc.
+Refer property in ethernet.txt, change ppe description, etc.
 
-During an undefined exception, in normal scenario(ie when ldrt
-instruction does not cause an abort) after resorting the context in
-VFP hardware, the PC is modified as show below before jumping to
-ret_from_exception which is in r9.
+Zhangfei Gao (3):
+  Documentation: add Device tree bindings for Hisilicon hip04 ethernet
+  net: hisilicon: new hip04 MDIO driver
+  net: hisilicon: new hip04 ethernet driver
 
-File: arch/arm/vfp/vfphw.S +169
-@ The context stored in the VFP hardware is up to date with this thread
-vfp_hw_state_valid:
-        tst     r1, #FPEXC_EX
-        bne     process_exception       @ might as well handle the pending
-                                        @ exception before retrying branch
-                                        @ out before setting an FPEXC that
-                                        @ stops us reading stuff
-        VFPFMXR FPEXC, r1               @ Restore FPEXC last
-        sub     r2, r2, #4              @ Retry current instruction - if Thumb
-        str     r2, [sp, #S_PC]         @ mode it's two 16-bit instructions,
-                                        @ else it's one 32-bit instruction, so
-                                        @ always subtract 4 from the following
-                                        @ instruction address.
+ .../bindings/net/hisilicon-hip04-net.txt           |   88 +++
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/hisilicon/Kconfig             |   31 +
+ drivers/net/ethernet/hisilicon/Makefile            |    5 +
+ drivers/net/ethernet/hisilicon/hip04_eth.c         |  777 ++++++++++++++++++++
+ drivers/net/ethernet/hisilicon/hip04_mdio.c        |  186 +++++
+ 7 files changed, 1089 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+ create mode 100644 drivers/net/ethernet/hisilicon/Kconfig
+ create mode 100644 drivers/net/ethernet/hisilicon/Makefile
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_eth.c
+ create mode 100644 drivers/net/ethernet/hisilicon/hip04_mdio.c
 
-But if ldrt results in an abort, we reach the fixup handler and return
-to ret_from_execption without correcting the pc.
-
-This patch modifes the fixup handler to re-execute the same instruction which caused
-undefined execption.
-
-Signed-off-by: Danesh Petigara <dpetigara@broadcom.com>
-Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
-Signed-off-by: Arun KS <getarunks@gmail.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/kernel/entry-armv.S |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 1879e8d..3fa745f 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -484,7 +484,8 @@ ENDPROC(__und_usr)
-  */
- 	.pushsection .fixup, "ax"
- 	.align	2
--4:	mov	pc, r9
-+4:	str     r4, [sp, #S_PC]			@ retry current instruction
-+	mov	pc, r9
- 	.popsection
- 	.pushsection __ex_table,"a"
- 	.long	1b, 4b
 -- 
 1.7.9.5
