@@ -1,44 +1,78 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sat, 5 Apr 2014 20:04:16 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140405193435.50d8dd81@skate>
-References: <20140325223510.GD14718@obsidianresearch.com>
- <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
- <20140326201243.GA1536@obsidianresearch.com>
- <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
- <20140326214259.GA12330@obsidianresearch.com>
- <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140405193435.50d8dd81@skate>
-Message-ID: <20140405180416.GB29787@1wt.eu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Apr 2014 19:24:23 +0100
+Subject: [PATCH v2 1/7] drm/exynos: add super device support
+In-Reply-To: <53403E42.1010403@gmail.com>
+References: <1396355882-17010-1-git-send-email-inki.dae@samsung.com>
+ <1396355882-17010-2-git-send-email-inki.dae@samsung.com>
+ <533EB9C6.80302@samsung.com>
+ <CAAQKjZPbzb+qvJA5y+Kco9BRv4j3iVatM_0bd+ugyuVZUbfFFg@mail.gmail.com>
+ <53403E42.1010403@gmail.com>
+Message-ID: <20140405182423.GL7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Sat, Apr 05, 2014 at 07:32:50PM +0200, Tomasz Figa wrote:
+> Not exactly. The approach we found does mostly the same as componentized  
+> subsystem framework but without _any_ extra data in Device Tree. Just  
+> based on the list of subsystem sub-drivers that is already available to  
+> the master driver.
 
-On Sat, Apr 05, 2014 at 07:34:35PM +0200, Thomas Petazzoni wrote:
-> Also, can you detail how you tested with just one port?
+The existing approach is fundamentally broken.  Yes, your solution may
+work for the probing case, but have you tried unbinding any of your
+sub-drivers?
 
-OK I just found this ugly method, I'm not sure it's the best one but it
-does the job :-) It simply refuses to configure any controller but the
-first one on the chip.
+>From what I can see, that causes a kernel oops for one very simple reason -
+you destroy stuff while it's still in use.  Let's look at an example:
 
-diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
-index 46d31a4..88bf1d5 100644
---- a/drivers/net/ethernet/intel/igb/igb_main.c
-+++ b/drivers/net/ethernet/intel/igb/igb_main.c
-@@ -2208,6 +2208,9 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 		return -EINVAL;
- 	}
- 
-+	if (PCI_FUNC(pdev->devfn) != 0)
-+		return -ENODEV;
-+
- 	err = pci_enable_device_mem(pdev);
- 	if (err)
- 		return err;
+struct platform_driver ipp_driver = {
+        .probe          = ipp_probe,
+        .remove         = ipp_remove,
+        .driver         = {
+                .name   = "exynos-drm-ipp",
+                .owner  = THIS_MODULE,
+                .pm     = &ipp_pm_ops,
+        },
+};
 
-Best regards,
-Willy
+static int ipp_remove(struct platform_device *pdev)
+{
+        struct ipp_context *ctx = platform_get_drvdata(pdev);
+
+        /* unregister sub driver */
+        exynos_drm_subdrv_unregister(&ctx->subdrv);
+
+        /* remove,destroy ipp idr */
+        idr_destroy(&ctx->ipp_idr);
+        idr_destroy(&ctx->prop_idr);
+
+        mutex_destroy(&ctx->ipp_lock);
+        mutex_destroy(&ctx->prop_lock);
+
+        /* destroy command, event work queue */
+        destroy_workqueue(ctx->cmd_workq);
+        destroy_workqueue(ctx->event_workq);
+
+        return 0;
+}
+
+int exynos_drm_subdrv_unregister(struct exynos_drm_subdrv *subdrv)
+{
+        if (!subdrv)
+                return -EINVAL;
+
+        list_del(&subdrv->list);
+
+        return 0;
+}
+
+Oh dear, that destroys a whole pile of resources which could already
+be in use without telling anything that it's about to do that.
+
+I'm sure if I continue looking at the exynos stuff, it'll show similar
+crap all over the place.
+
+What you have now in mainline is not a solution.  It's a crappy bodge.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
