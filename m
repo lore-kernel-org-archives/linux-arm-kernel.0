@@ -1,115 +1,81 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Sat,  5 Apr 2014 12:35:04 +0800
-Subject: [PATCH 1/3] Documentation: add Device tree bindings for Hisilicon
- hip04 ethernet
-In-Reply-To: <1396672506-9296-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1396672506-9296-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1396672506-9296-2-git-send-email-zhangfei.gao@linaro.org>
+From: wuqixuan@gmail.com (qixuan wu)
+Date: Sat, 5 Apr 2014 13:41:17 +0800
+Subject: Help for doubt about why update SCTLR by cr_alignment every
+ syscall,IRQ,exception ?
+Message-ID: <CAEjEV8DLk5fhQHMomrrO3h+_9=yo3pMiEvjXG7nOydJOWdf7zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Device Tree bindings for the Hisilicon hip04
-Ethernet controller, including 100M / 1000M controller.
+Dear King, all,
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- .../bindings/net/hisilicon-hip04-net.txt           |   88 ++++++++++++++++++++
- 1 file changed, 88 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
+If we enable CONFIG_ALIGNMENT_TRAP:
 
-diff --git a/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
-new file mode 100644
-index 0000000..988fc69
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/hisilicon-hip04-net.txt
-@@ -0,0 +1,88 @@
-+Hisilicon hip04 Ethernet Controller
-+
-+* Ethernet controller node
-+
-+Required properties:
-+- compatible: should be "hisilicon,hip04-mac".
-+- reg: address and length of the register set for the device.
-+- interrupts: interrupt for the device.
-+- port-handle: <phandle port channel>
-+	phandle, specifies a reference to the syscon ppe node
-+	port, port number connected to the controller
-+	channel, recv channel start from channel * number (RX_DESC_NUM)
-+- phy-mode: see ethernet.txt [1].
-+
-+Optional properties:
-+- phy-handle: see ethernet.txt [1].
-+
-+[1] Documentation/devicetree/bindings/net/ethernet.txt
-+
-+
-+* Ethernet ppe node:
-+Control rx & tx fifos of all ethernet controllers.
-+Have 2048 recv channels shared by all ethernet controllers, only if no overlap.
-+Each controller's recv channel start from channel * number (RX_DESC_NUM).
-+
-+Required properties:
-+- compatible: "hisilicon,hip04-ppe", "syscon".
-+- reg: address and length of the register set for the device.
-+
-+
-+* MDIO bus node:
-+
-+Required properties:
-+
-+- compatible: should be "hisilicon,hip04-mdio".
-+- Inherits from MDIO bus node binding [2]
-+[2] Documentation/devicetree/bindings/net/phy.txt
-+
-+Example:
-+	mdio {
-+		compatible = "hisilicon,hip04-mdio";
-+		reg = <0x28f1000 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		phy0: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <0>;
-+			marvell,reg-init = <18 0x14 0 0x8001>;
-+		};
-+
-+		phy1: ethernet-phy at 1 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <1>;
-+			marvell,reg-init = <18 0x14 0 0x8001>;
-+		};
-+	};
-+
-+	ppe: ppe at 28c0000 {
-+		compatible = "hisilicon,hip04-ppe", "syscon";
-+		reg = <0x28c0000 0x10000>;
-+	};
-+
-+	fe: ethernet at 28b0000 {
-+		compatible = "hisilicon,hip04-mac";
-+		reg = <0x28b0000 0x10000>;
-+		interrupts = <0 413 4>;
-+		phy-mode = "mii";
-+		port-handle = <&ppe 31 0>;
-+	};
-+
-+	ge0: ethernet at 2800000 {
-+		compatible = "hisilicon,hip04-mac";
-+		reg = <0x2800000 0x10000>;
-+		interrupts = <0 402 4>;
-+		phy-mode = "sgmii";
-+		port-handle = <&ppe 0 1>;
-+		phy-handle = <&phy0>;
-+	};
-+
-+	ge8: ethernet at 2880000 {
-+		compatible = "hisilicon,hip04-mac";
-+		reg = <0x2880000 0x10000>;
-+		interrupts = <0 410 4>;
-+		phy-mode = "sgmii";
-+		port-handle = <&ppe 8 2>;
-+		phy-handle = <&phy1>;
-+	};
--- 
-1.7.9.5
+1. I don't know why each syscall and user_entry for IRQ or exception,
+need update SCTLR using cr_alignment.
+(below code is from kernel 3.10.18 for ARM SMP)
+
+1) First scenario, each syscall will reset the SCTLR
+   using cr_alignment.
+
+ENTRY(vector_swi)
+  ....
+
+#ifdef CONFIG_ALIGNMENT_TRAP
+    ldr    ip, __cr_alignment
+    ldr    ip, [ip]
+    mcr    p15, 0, ip, c1, c0      @ update SCTLR
+#endif
+  ....
+ENDPROC(vector_swi)
+
+2) Second scenario, each IRQ or exception to the user space,
+   will reset the SCTLR using cr_alignment.
+
+    .macro    usr_entry
+  ....
+    @ Enable the alignment trap while in kernel mode
+    alignment_trap r0    @ ******** Here is a macro which will update
+SCTLR *********
+  ....
+    .endm
+
+2. Actually, I search in the code, SCTLR is initialized during
+system init in some place, after that only do_alignment()
+will change the value to cr_no_alignment, but cr_no_alignment
+seems like always be same as cr_alignment.
+
+static int __init alignment_init(void) {
+...
+        cr_alignment &= ~CR_A;
+        cr_no_alignment &= ~CR_A;
+        set_cr(cr_alignment);
+...
+}
+
+In some case:
+static int __init early_cachepolicy(char *p){
+....
+    cr_alignment &= ~cache_policies[i].cr_mask;
+    cr_no_alignment &= ~cache_policies[i].cr_mask;
+....
+    set_cr(cr_alignment);
+}
+
+do_alignment(){
+...
+    set_cr(cr_no_alignment);
+...
+}
+
+3. That means after system init, SCTLR will not be changed.
+
+So is there anyone who has idea about:
+
+1) Why need update SCTLR on above two scenarios?
+2) If I remove the updation on above two scenarios, is there
+any risk ?
+
+Any comments is welcome and helpful.
+
+Regards and Thanks a lot,
+Wuqixuan.
