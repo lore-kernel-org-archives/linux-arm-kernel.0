@@ -1,63 +1,198 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Apr 2014 16:19:26 +0100
-Subject: [PATCH] serial: amba-pl011: fix regression, causing an Oops on
- rmmod
-In-Reply-To: <Pine.LNX.4.64.1404051629050.3518@axis700.grange>
-References: <Pine.LNX.4.64.1404051629050.3518@axis700.grange>
-Message-ID: <20140405151926.GK7528@n2100.arm.linux.org.uk>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Sat,  5 Apr 2014 17:57:45 +0200
+Subject: [PATCH] arm/imx: factor device tree timer initialization
+Message-ID: <1396713465-1391-1-git-send-email-gilles.chanteperdrix@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ROTFL.  What did I say about this solution... seems I was right all
-along.
 
-On Sat, Apr 05, 2014 at 04:31:08PM +0200, Guennadi Liakhovetski wrote:
-> A recent commit ef2889f7ffee67f0aed49e854c72be63f1466759 "serial: pl011:
-> Move uart_register_driver call to device probe" introduced a regression,
-> causing the pl011 driver to Oops if more than 1 port have been probed. Fix
-> the Oops by only calling uart_unregister_driver() once after the last port
-> has been removed.
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  drivers/tty/serial/amba-pl011.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index d4eda24..07325f2 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2176,6 +2176,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->  static int pl011_remove(struct amba_device *dev)
->  {
->  	struct uart_amba_port *uap = amba_get_drvdata(dev);
-> +	bool busy = false;
->  	int i;
->  
->  	uart_remove_one_port(&amba_reg, &uap->port);
-> @@ -2183,9 +2184,12 @@ static int pl011_remove(struct amba_device *dev)
->  	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
->  		if (amba_ports[i] == uap)
->  			amba_ports[i] = NULL;
-> +		else if (amba_ports[i])
-> +			busy = true;
->  
->  	pl011_dma_remove(uap);
-> -	uart_unregister_driver(&amba_reg);
-> +	if (!busy)
-> +		uart_unregister_driver(&amba_reg);
->  	return 0;
->  }
->  
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
+---
+ arch/arm/mach-imx/clk-imx25.c       |    9 +--------
+ arch/arm/mach-imx/clk-imx51-imx53.c |   18 ++++--------------
+ arch/arm/mach-imx/clk-imx6q.c       |    8 ++------
+ arch/arm/mach-imx/clk-imx6sl.c      |    6 +-----
+ arch/arm/mach-imx/common.h          |    2 ++
+ arch/arm/mach-imx/time.c            |   17 +++++++++++++++++
+ 6 files changed, 27 insertions(+), 33 deletions(-)
 
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 69858c7..a2b85dc 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -312,8 +312,6 @@ int __init mx25_clocks_init(void)
+ int __init mx25_clocks_init_dt(void)
+ {
+ 	struct device_node *np;
+-	void __iomem *base;
+-	int irq;
+ 	unsigned long osc_rate = 24000000;
+ 
+ 	/* retrieve the freqency of fixed clocks from device tree */
+@@ -333,12 +331,7 @@ int __init mx25_clocks_init_dt(void)
+ 
+ 	__mx25_clocks_init(osc_rate);
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt");
+-	base = of_iomap(np, 0);
+-	WARN_ON(!base);
+-	irq = irq_of_parse_and_map(np, 0);
+-
+-	mxc_timer_init(base, irq);
++	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt"));
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index 19fca1f..f505a89 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -324,9 +324,8 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
+ 
+ static void __init mx50_clocks_init(struct device_node *np)
+ {
+-	void __iomem *base;
+ 	unsigned long r;
+-	int i, irq;
++	int i;
+ 
+ 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
+ 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
+@@ -374,11 +373,7 @@ static void __init mx50_clocks_init(struct device_node *np)
+ 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
+ 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt");
+-	base = of_iomap(np, 0);
+-	WARN_ON(!base);
+-	irq = irq_of_parse_and_map(np, 0);
+-	mxc_timer_init(base, irq);
++	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt"));
+ }
+ CLK_OF_DECLARE(imx50_ccm, "fsl,imx50-ccm", mx50_clocks_init);
+ 
+@@ -494,9 +489,8 @@ CLK_OF_DECLARE(imx51_ccm, "fsl,imx51-ccm", mx51_clocks_init_dt);
+ 
+ static void __init mx53_clocks_init(struct device_node *np)
+ {
+-	int i, irq;
++	int i;
+ 	unsigned long r;
+-	void __iomem *base;
+ 
+ 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
+ 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
+@@ -594,10 +588,6 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
+ 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt");
+-	base = of_iomap(np, 0);
+-	WARN_ON(!base);
+-	irq = irq_of_parse_and_map(np, 0);
+-	mxc_timer_init(base, irq);
++	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt"));
+ }
+ CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4d677f4..824107c 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -144,7 +144,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ {
+ 	struct device_node *np;
+ 	void __iomem *base;
+-	int i, irq;
++	int i;
+ 	int ret;
+ 
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+@@ -485,10 +485,6 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	/* Set initial power mode */
+ 	imx6q_set_lpm(WAIT_CLOCKED);
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
+-	base = of_iomap(np, 0);
+-	WARN_ON(!base);
+-	irq = irq_of_parse_and_map(np, 0);
+-	mxc_timer_init(base, irq);
++	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt"));
+ }
+ CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index 4c86f30..f00489e 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -70,7 +70,6 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ {
+ 	struct device_node *np;
+ 	void __iomem *base;
+-	int irq;
+ 	int i;
+ 
+ 	clks[IMX6SL_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
+@@ -270,9 +269,6 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	imx6q_set_lpm(WAIT_CLOCKED);
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-gpt");
+-	base = of_iomap(np, 0);
+-	WARN_ON(!base);
+-	irq = irq_of_parse_and_map(np, 0);
+-	mxc_timer_init(base, irq);
++	mxc_timer_init_dt(np);
+ }
+ CLK_OF_DECLARE(imx6sl, "fsl,imx6sl-ccm", imx6sl_clocks_init);
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index baf439d..7b62fa3 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -17,6 +17,7 @@ struct irq_data;
+ struct platform_device;
+ struct pt_regs;
+ struct clk;
++struct device_node;
+ enum mxc_cpu_pwr_mode;
+ 
+ void mx1_map_io(void);
+@@ -56,6 +57,7 @@ void imx51_init_late(void);
+ void imx53_init_late(void);
+ void epit_timer_init(void __iomem *base, int irq);
+ void mxc_timer_init(void __iomem *, int);
++void mxc_timer_init_dt(struct device_node *);
+ int mx1_clocks_init(unsigned long fref);
+ int mx21_clocks_init(unsigned long lref, unsigned long fref);
+ int mx25_clocks_init(void);
+diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+index 1a3a5f6..2ca1387 100644
+--- a/arch/arm/mach-imx/time.c
++++ b/arch/arm/mach-imx/time.c
+@@ -27,6 +27,9 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/sched_clock.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ #include <asm/mach/time.h>
+ 
+@@ -316,3 +319,17 @@ void __init mxc_timer_init(void __iomem *base, int irq)
+ 	/* Make irqs happen */
+ 	setup_irq(irq, &mxc_timer_irq);
+ }
++
++#ifdef CONFIG_OF
++void __init mxc_timer_init_dt(struct device_node *np)
++{
++	void __iomem *base;
++	int irq;
++
++	base = of_iomap(np, 0);
++	WARN_ON(!base);
++	irq = irq_of_parse_and_map(np, 0);
++
++	mxc_timer_init(base, irq);
++}
++#endif
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.10.4
