@@ -1,198 +1,67 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Sat,  5 Apr 2014 17:57:45 +0200
-Subject: [PATCH] arm/imx: factor device tree timer initialization
-Message-ID: <1396713465-1391-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sat, 5 Apr 2014 19:32:20 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+References: <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+ <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+Message-ID: <20140405173220.GA29787@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Neil,
 
-Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
----
- arch/arm/mach-imx/clk-imx25.c       |    9 +--------
- arch/arm/mach-imx/clk-imx51-imx53.c |   18 ++++--------------
- arch/arm/mach-imx/clk-imx6q.c       |    8 ++------
- arch/arm/mach-imx/clk-imx6sl.c      |    6 +-----
- arch/arm/mach-imx/common.h          |    2 ++
- arch/arm/mach-imx/time.c            |   17 +++++++++++++++++
- 6 files changed, 27 insertions(+), 33 deletions(-)
+On Fri, Apr 04, 2014 at 02:19:44PM +0100, Neil Greatorex wrote:
+> Thomas,
+> 
+> After managing to get the card detected on my mirabox, I have been looking 
+> into getting the thing actually working. With the information from Willy 
+> and my own investigations I knew there was some issue in the setting up of 
+> the MSIs for the card. Through adding a copious amount of printk()s I was 
+> able to determine that the initialisation for the igb driver allocates, 
+> frees and re-allocates 3 MSIs for the card.
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index 69858c7..a2b85dc 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -312,8 +312,6 @@ int __init mx25_clocks_init(void)
- int __init mx25_clocks_init_dt(void)
- {
- 	struct device_node *np;
--	void __iomem *base;
--	int irq;
- 	unsigned long osc_rate = 24000000;
- 
- 	/* retrieve the freqency of fixed clocks from device tree */
-@@ -333,12 +331,7 @@ int __init mx25_clocks_init_dt(void)
- 
- 	__mx25_clocks_init(osc_rate);
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt");
--	base = of_iomap(np, 0);
--	WARN_ON(!base);
--	irq = irq_of_parse_and_map(np, 0);
--
--	mxc_timer_init(base, irq);
-+	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx25-gpt"));
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 19fca1f..f505a89 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -324,9 +324,8 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 
- static void __init mx50_clocks_init(struct device_node *np)
- {
--	void __iomem *base;
- 	unsigned long r;
--	int i, irq;
-+	int i;
- 
- 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
- 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
-@@ -374,11 +373,7 @@ static void __init mx50_clocks_init(struct device_node *np)
- 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
- 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt");
--	base = of_iomap(np, 0);
--	WARN_ON(!base);
--	irq = irq_of_parse_and_map(np, 0);
--	mxc_timer_init(base, irq);
-+	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt"));
- }
- CLK_OF_DECLARE(imx50_ccm, "fsl,imx50-ccm", mx50_clocks_init);
- 
-@@ -494,9 +489,8 @@ CLK_OF_DECLARE(imx51_ccm, "fsl,imx51-ccm", mx51_clocks_init_dt);
- 
- static void __init mx53_clocks_init(struct device_node *np)
- {
--	int i, irq;
-+	int i;
- 	unsigned long r;
--	void __iomem *base;
- 
- 	clk[IMX5_CLK_PLL1_SW]		= imx_clk_pllv2("pll1_sw", "osc", MX53_DPLL1_BASE);
- 	clk[IMX5_CLK_PLL2_SW]		= imx_clk_pllv2("pll2_sw", "osc", MX53_DPLL2_BASE);
-@@ -594,10 +588,6 @@ static void __init mx53_clocks_init(struct device_node *np)
- 	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
- 	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt");
--	base = of_iomap(np, 0);
--	WARN_ON(!base);
--	irq = irq_of_parse_and_map(np, 0);
--	mxc_timer_init(base, irq);
-+	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt"));
- }
- CLK_OF_DECLARE(imx53_ccm, "fsl,imx53-ccm", mx53_clocks_init);
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 4d677f4..824107c 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -144,7 +144,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
- 	void __iomem *base;
--	int i, irq;
-+	int i;
- 	int ret;
- 
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
-@@ -485,10 +485,6 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	/* Set initial power mode */
- 	imx6q_set_lpm(WAIT_CLOCKED);
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
--	base = of_iomap(np, 0);
--	WARN_ON(!base);
--	irq = irq_of_parse_and_map(np, 0);
--	mxc_timer_init(base, irq);
-+	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt"));
- }
- CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 4c86f30..f00489e 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -70,7 +70,6 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
- 	void __iomem *base;
--	int irq;
- 	int i;
- 
- 	clks[IMX6SL_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
-@@ -270,9 +269,6 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	imx6q_set_lpm(WAIT_CLOCKED);
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-gpt");
--	base = of_iomap(np, 0);
--	WARN_ON(!base);
--	irq = irq_of_parse_and_map(np, 0);
--	mxc_timer_init(base, irq);
-+	mxc_timer_init_dt(np);
- }
- CLK_OF_DECLARE(imx6sl, "fsl,imx6sl-ccm", imx6sl_clocks_init);
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index baf439d..7b62fa3 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -17,6 +17,7 @@ struct irq_data;
- struct platform_device;
- struct pt_regs;
- struct clk;
-+struct device_node;
- enum mxc_cpu_pwr_mode;
- 
- void mx1_map_io(void);
-@@ -56,6 +57,7 @@ void imx51_init_late(void);
- void imx53_init_late(void);
- void epit_timer_init(void __iomem *base, int irq);
- void mxc_timer_init(void __iomem *, int);
-+void mxc_timer_init_dt(struct device_node *);
- int mx1_clocks_init(unsigned long fref);
- int mx21_clocks_init(unsigned long lref, unsigned long fref);
- int mx25_clocks_init(void);
-diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index 1a3a5f6..2ca1387 100644
---- a/arch/arm/mach-imx/time.c
-+++ b/arch/arm/mach-imx/time.c
-@@ -27,6 +27,9 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/sched_clock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- 
- #include <asm/mach/time.h>
- 
-@@ -316,3 +319,17 @@ void __init mxc_timer_init(void __iomem *base, int irq)
- 	/* Make irqs happen */
- 	setup_irq(irq, &mxc_timer_irq);
- }
-+
-+#ifdef CONFIG_OF
-+void __init mxc_timer_init_dt(struct device_node *np)
-+{
-+	void __iomem *base;
-+	int irq;
-+
-+	base = of_iomap(np, 0);
-+	WARN_ON(!base);
-+	irq = irq_of_parse_and_map(np, 0);
-+
-+	mxc_timer_init(base, irq);
-+}
-+#endif
--- 
-1.7.10.4
+That sequence matches the memories I have about it indeed.
+
+> I noticed that in doing this 
+> there was a problem whereby any call to free an MSI was trying to free 
+> MSI#0. I was able to track this down to the fact that the mapping for the 
+> IRQ was being disposed before the MSI was actually freed. The below patch 
+> fixes this problem.
+> 
+> With this patch, I can get one port on the card working. With both ports 
+> enabled, I still get an OOPS, so some further work is needed.
+> 
+> I would appreciate it if you could test this patch and let me know if you 
+> find any problems.
+
+I don't know how to disable one port on my card (except by fiddling directly
+with its eeprom but I don't want to do this anymore, there's a high risk of
+bricking it). So I got the same panic as before with the two ports enabled.
+However I tried to revert the prefetchable memory patch that makes the NIC
+work for me and I noticed that your fix indeed improves things. After the
+oops, I no longer get :
+
+---[ end trace f6c1769398756b02 ]---
+trying to free unused MSI#0
+trying to free unused MSI#0
+trying to free unused MSI#0
+trying to free unused MSI#0
+trying to free unused MSI#0
+trying to free unused MSI#0
+
+as I used to see with the revert alone. So yes I think it's a nice step forward!
+
+Note that this was 3.13.9 on the XP-GP board (quad-core XP).
+
+Feel free to add my Tested-by if you like.
+
+Cheers,
+Willy
