@@ -1,71 +1,34 @@
-From: neil@fatboyfat.co.uk (Neil Greatorex)
-Date: Sat, 5 Apr 2014 20:00:19 +0100
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada
- 370)
-In-Reply-To: <20140405193435.50d8dd81@skate>
-References: <20140325202249.GA10378@obsidianresearch.com>
- <20140325213638.5aba54b6@skate>
- <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
- <20140325222404.GC14718@obsidianresearch.com>
- <20140325223510.GD14718@obsidianresearch.com>
- <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
- <20140326201243.GA1536@obsidianresearch.com>
- <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
- <20140326214259.GA12330@obsidianresearch.com>
- <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140405193435.50d8dd81@skate>
-Message-ID: <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 05 Apr 2014 21:01:33 +0200
+Subject: [PATCH v2 1/7] drm/exynos: add super device support
+In-Reply-To: <20140405185249.GM7528@n2100.arm.linux.org.uk>
+References: <1396355882-17010-1-git-send-email-inki.dae@samsung.com>
+ <1396355882-17010-2-git-send-email-inki.dae@samsung.com>
+ <533EB9C6.80302@samsung.com>
+ <CAAQKjZPbzb+qvJA5y+Kco9BRv4j3iVatM_0bd+ugyuVZUbfFFg@mail.gmail.com>
+ <53403E42.1010403@gmail.com> <20140405182423.GL7528@n2100.arm.linux.org.uk>
+ <53404BF3.2010409@gmail.com> <20140405185249.GM7528@n2100.arm.linux.org.uk>
+Message-ID: <5340530D.5080707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas, 
+On 05.04.2014 20:52, Russell King - ARM Linux wrote:
+> On Sat, Apr 05, 2014 at 08:31:15PM +0200, Tomasz Figa wrote:
+>> Maybe my words have been misinterpreted, but all I'm suggesting here is
+>> that there is no need to add any new data to DT to solve the same issue
+>> to the same extent as componentized subsystem framework, at least in
+>> Exynos case.
+>
+> Right, so we seem to have agreement that what exynos is currently doing
+> is fundamentally broken.
+>
+> So the next question is, how is it going to get fixed?
+>
 
+I believe this is a separate issue from what is being discussed in this 
+thread, but anyway, I'd wait with this until Monday, so we could discuss 
+this with Inki and Andrzej, who is the person responsible for Exynos DRM 
+in my team. I was just passing by. ;)
 
-On Saturday, 5 April 2014 at 6:34pm, Thomas Petazzoni wrote:
-
-> Dear Neil Greatorex,
-> 
-> On Fri, 4 Apr 2014 14:19:44 +0100 (BST), Neil Greatorex wrote:
-> 
-> > From 50aa11018059704229dd43ca1016defdda04f90c Mon Sep 17 00:00:00 2001
-> > From: Neil Greatorex <neil at fatboyfat.co.uk (mailto:neil@fatboyfat.co.uk)>
-> > Date: Fri, 4 Apr 2014 13:47:09 +0100
-> > Subject: [PATCH] irqchip: armada-370-xp: Fix releasing of MSIs
-> > 
-> > This patch moves the call to irq_dispose_mapping() to after the call to
-> > armada_370_xp_free_msi(). Without this patch, the armada_370_xp_free_msi
-> > function would always free MSI#0, no matter what was passed to it.
-> > 
-> > Signed-off-by: <neil at fatboyfat.co.uk (mailto:neil@fatboyfat.co.uk)>
-> > ---
-> > drivers/irqchip/irq-armada-370-xp.c | 2 +-
-> > 1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> > index 5409564..f5e129e 100644
-> > --- a/drivers/irqchip/irq-armada-370-xp.c
-> > +++ b/drivers/irqchip/irq-armada-370-xp.c
-> > @@ -157,8 +157,8 @@ static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
-> > unsigned int irq)
-> > {
-> > struct irq_data *d = irq_get_irq_data(irq);
-> > - irq_dispose_mapping(irq);
-> > armada_370_xp_free_msi(d->hwirq);
-> > + irq_dispose_mapping(irq);
-> > }
-> > 
-> > static struct irq_chip armada_370_xp_msi_irq_chip = {
-> 
-> I want to give it some test, but as it is, I'd prefer to have the
-> irq_dispose_mapping() done before, and use a local variable to store
-> d->hwirq to that armada_370_xp_free_msi() can be called after
-> irq_dispose_mapping(). This is to ensure the sequence is symmetrical
-> with the MSI setup sequence.
-
-I will redo the patch with a local variable tomorrow and resend it. 
- 
-Cheers, 
-Neil
+Best regards,
+Tomasz
