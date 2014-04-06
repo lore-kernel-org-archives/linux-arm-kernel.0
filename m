@@ -1,23 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 6 Apr 2014 20:19:46 +0800
-Subject: L2 cache suspend/resume
-In-Reply-To: <20140406114652.GQ7528@n2100.arm.linux.org.uk>
-References: <20140405112700.GJ7528@n2100.arm.linux.org.uk>
- <20140406114033.GC24260@dragon>
- <20140406114652.GQ7528@n2100.arm.linux.org.uk>
-Message-ID: <20140406121944.GE24260@dragon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 6 Apr 2014 15:12:58 +0100
+Subject: leds-pwm - does anyone care for it?
+Message-ID: <20140406141257.GR7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 06, 2014 at 12:46:52PM +0100, Russell King - ARM Linux wrote:
-> > For imx, the L2 power and therefore the memory array is retained in
-> > suspend.  We do not want to call outer_disable() to have these data
-> > flushed, and need to restore L2 controller before MMU is enabled.
-> 
-> Okay, any objection then to separating out the L2 resume code into an
-> early L2 resume helper in arch/arm/mm ?
+So during the last three months, I've sent a patch twice for leds-pwm,
+and both times it's been completely ignored.
 
-Move platform code into core is always a nice thing for platform
-maintainers, so no objection from me :)
+Today, I find that OMAP4430 SDP fails to boot due to an oops caused by
+this driver in the workqueue code - it frees structures which contain
+queued workqueues if we're booting with DT and it can't find the PWM
+device.
 
-Shawn
+If I look closer at this driver, I find that it doesn't of_node_put()
+the OF node in the case of devm_of_pwm_get() failure... I'm sure these
+aren't the only problems.
+
+Then there's the three entirely separately coded cleanup paths - the
+removal function, the cleanup for failure in the OF code, and the
+cleanup for failure in the non-OF case.  This is where the oops stems
+from because the author of the patch adding the work queue only fixed
+up two of these sites - the ones which applied to his case and never
+bothered with the third.
+
+I'm going to fix this latest failure in the driver, and send a patch
+later today, and I will hope for a timely response.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
