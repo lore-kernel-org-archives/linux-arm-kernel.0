@@ -1,65 +1,36 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sun,  6 Apr 2014 16:58:13 +0200
-Subject: [PATCH 1/5] gpio: omap: convert to use irq_domain_add_simple()
+Date: Sun,  6 Apr 2014 16:58:17 +0200
+Subject: [PATCH 5/5] MAINTAINERS: update GPIO OMAP driver entry
 In-Reply-To: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1396796297-13002-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1396796297-13002-6-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO OMAP driver supports different OMAP SoC families and
-not all of them have the needed support to use the linear IRQ
-domain mapping like OMAP1 that use the legacy domain mapping.
+I've been maintaining this driver by fixing all issues
+found while migrating OMAP2+ towards Device Tree based
+booting and keeping it up-to-date by using the latest
+infraestructure that is provided by the GPIO subsystem.
 
-But this special check is not necessary since the simple IRQ
-domain mapping is able to handle both cases. Having a zero
-IRQ offset will be interpreted as a linear domain case while
-a non-zero value will be interpreted as a legacy domain case.
+It would be nice if people know that I care about this
+driver and put me in copy when sending patches for it.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- drivers/gpio/gpio-omap.c | 15 ++++-----------
- 1 file changed, 4 insertions(+), 11 deletions(-)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 19b886c..3ee9b8d 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1138,9 +1138,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 	const struct omap_gpio_platform_data *pdata;
- 	struct resource *res;
- 	struct gpio_bank *bank;
--#ifdef CONFIG_ARCH_OMAP1
--	int irq_base;
--#endif
-+	int irq_base = 0;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f728ac2..fc0972e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6374,6 +6374,7 @@ F:	drivers/usb/*/*omap*
+ F:	arch/arm/*omap*/usb*
  
- 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
- 
-@@ -1185,21 +1183,16 @@ static int omap_gpio_probe(struct platform_device *pdev)
- #ifdef CONFIG_ARCH_OMAP1
- 	/*
- 	 * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
--	 * irq_alloc_descs() and irq_domain_add_legacy() and just use a
--	 * linear IRQ domain mapping for all OMAP platforms.
-+	 * irq_alloc_descs() since a base IRQ offset will no longer be needed.
- 	 */
- 	irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
- 	if (irq_base < 0) {
- 		dev_err(dev, "Couldn't allocate IRQ numbers\n");
- 		return -ENODEV;
- 	}
--
--	bank->domain = irq_domain_add_legacy(node, bank->width, irq_base,
--					     0, &irq_domain_simple_ops, NULL);
--#else
--	bank->domain = irq_domain_add_linear(node, bank->width,
--					     &irq_domain_simple_ops, NULL);
- #endif
-+	bank->domain = irq_domain_add_simple(node, bank->width, irq_base,
-+					     &irq_domain_simple_ops, NULL);
- 	if (!bank->domain) {
- 		dev_err(dev, "Couldn't register an IRQ domain\n");
- 		return -ENODEV;
+ OMAP GPIO DRIVER
++M:	Javier Martinez Canillas <javier@dowhile0.org>
+ M:	Santosh Shilimkar <santosh.shilimkar@ti.com>
+ M:	Kevin Hilman <khilman@deeprootsystems.com>
+ L:	linux-omap at vger.kernel.org
 -- 
 1.9.0
