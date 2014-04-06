@@ -1,32 +1,45 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 06 Apr 2014 11:57:05 +0200
-Subject: [PATCH] ARM: msm: Remove MSM_SCM
-Message-ID: <1396778225.30640.12.camel@x220>
+Date: Sun, 06 Apr 2014 12:12:42 +0200
+Subject: [PATCH] ARM: SAMSUNG: remove two unused S3C boot options
+Message-ID: <1396779162.30640.14.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8fc1b0f87d9f ("ARM: qcom: Split Qualcomm support into legacy and
-multiplatform") removed all users of Kconfig symbol MSM_SCM. Remove that
-symbol too.
+Commit 19a964644f1e ("ARM: SAMSUNG: remove all custom uncompress.h")
+removed the only users of S3C_BOOT_ERROR_RESET and
+S3C_BOOT_UART_FORCE_FIFO. Remove their Kconfig entries too.
 
 Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
-Tested only by grepping the tree.
+Untested.
 
- arch/arm/mach-msm/Kconfig | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/plat-samsung/Kconfig | 14 --------------
+ 1 file changed, 14 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index a7f959e58c3d..be8413abfa4f 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -109,7 +109,4 @@ config MSM_GPIOMUX
- 	help
- 	  Support for MSM V1 TLMM GPIOMUX architecture.
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index b57e922f1614..f615c0e7b226 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -40,20 +40,6 @@ if PLAT_SAMSUNG
  
--config MSM_SCM
--	bool
+ comment "Boot options"
+ 
+-config S3C_BOOT_ERROR_RESET
+-	bool "S3C Reboot on decompression error"
+-	help
+-	  Say y here to use the watchdog to reset the system if the
+-	  kernel decompressor detects an error during decompression.
 -
- endif
+-config S3C_BOOT_UART_FORCE_FIFO
+-       bool "Force UART FIFO on during boot process"
+-       default y
+-       help
+-         Say Y here to force the UART FIFOs on during the kernel
+-	 uncompressor
+-
+-
+ config S3C_LOWLEVEL_UART_PORT
+ 	int "S3C UART to use for low-level messages"
+ 	default 0
 -- 
 1.9.0
