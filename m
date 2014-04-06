@@ -1,35 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 6 Apr 2014 23:27:39 +0100
-Subject: [PATCH] arm64: fix !CONFIG_COMPAT build failures
-In-Reply-To: <1396707949-397-1-git-send-email-msalter@redhat.com>
-References: <1396707949-397-1-git-send-email-msalter@redhat.com>
-Message-ID: <20140406222737.GA26274@arm.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sun, 06 Apr 2014 23:32:25 +0100
+Subject: [PATCH] ARM: dt: microsom: don't set bit 7 for ethernet mux settings
+Message-ID: <E1WWvc1-0004DM-62@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 05, 2014 at 03:25:49PM +0100, Mark Salter wrote:
-> Recent arm64 builds using CONFIG_ARM64_64K_PAGES are failing with:
-> 
->   arch/arm64/kernel/perf_regs.c: In function ?perf_reg_abi?:
->   arch/arm64/kernel/perf_regs.c:41:2: error: implicit declaration of function ?is_compat_thread?
-> 
->   arch/arm64/kernel/perf_event.c:1398:2: error: unknown type name ?compat_uptr_t?
-> 
-> This is due to some recent arm64 perf commits with compat support:
-> 
->   commit 23c7d70d55c6d9:
->     ARM64: perf: add support for frame pointer unwinding in compat mode
-> 
->   commit 2ee0d7fd36a3f8:
->     ARM64: perf: add support for perf registers API
-> 
-> Those patches make the arm64 kernel unbuildable if CONFIG_COMPAT is not
-> defined and CONFIG_ARM64_64K_PAGES depends on !CONFIG_COMPAT. This patch
-> allows the arm64 kernel to build with and without CONFIG_COMPAT.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
+Bit 6,7 are marked as reserved for the ethernet RGMII pins, so avoid
+setting these bits.
 
-Thanks. Applied.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+index a3cb2fff8f61..d16066608e21 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+@@ -26,25 +26,25 @@
+ 				/* GPIO16 -> AR8035 25MHz */
+ 				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000
+ 				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
+-				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
+-				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
++				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
++				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
++				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
++				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
++				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
+ 				/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
+ 				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
+ 				/* AR8035 pin strapping: IO voltage: pull up */
+-				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
++				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
+ 				/* AR8035 pin strapping: PHYADDR#0: pull down */
+-				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0
++				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x13030
+ 				/* AR8035 pin strapping: PHYADDR#1: pull down */
+-				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0
++				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x13030
+ 				/* AR8035 pin strapping: MODE#1: pull up */
+-				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
++				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
+ 				/* AR8035 pin strapping: MODE#3: pull up */
+-				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
++				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
+ 				/* AR8035 pin strapping: MODE#0: pull down */
+-				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0
++				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x13030
+ 
+ 				/*
+ 				 * As the RMII pins are also connected to RGMII
 -- 
-Catalin
+1.8.3.1
