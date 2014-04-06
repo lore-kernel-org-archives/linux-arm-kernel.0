@@ -1,23 +1,36 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 6 Apr 2014 17:50:58 +0200
-Subject: [PATCH v5 1/3] i2c: cadence: Document device tree bindings
-In-Reply-To: <1396646876-27336-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1396646876-27336-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20140406155058.GC2609@katana>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Sun,  6 Apr 2014 18:32:18 +0200
+Subject: [PATCH] arm/igep0020: fix IGEPv2 boot
+Message-ID: <1396801938-24788-1-git-send-email-gilles.chanteperdrix@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 02:27:54PM -0700, Soren Brinkmann wrote:
-> Add device tree binding documentation for the Cadence I2C controller.
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Booting Linux 3.14 compiled with omap2plus_defconfig on IGEPv2 board
+currrently results in the same issue as reported here:
 
-Applied to for-next, thanks!
+https://www.mail-archive.com/linux-media at vger.kernel.org/msg69556.html
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140406/b66a5b5f/attachment.sig>
+The following change avoids this.
+
+Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
+---
+ arch/arm/boot/dts/omap3-igep.dtsi |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index c1700932..c15c3ef 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -207,6 +207,10 @@
+        pinctrl-0 = <&uart3_pins>;
+ };
+ 
++&uart4 {
++       status = "disabled";
++};
++
+ &twl_gpio {
+ 	ti,use-leds;
+ };
+-- 
+1.7.10.4
