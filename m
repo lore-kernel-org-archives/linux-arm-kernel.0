@@ -1,32 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 6 Apr 2014 15:12:58 +0100
-Subject: leds-pwm - does anyone care for it?
-Message-ID: <20140406141257.GR7528@n2100.arm.linux.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sun,  6 Apr 2014 16:58:14 +0200
+Subject: [PATCH 2/5] gpio: omap: check gpiochip_add() return value
+In-Reply-To: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1396796297-13002-3-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So during the last three months, I've sent a patch twice for leds-pwm,
-and both times it's been completely ignored.
+The gpiochip_add() function can fail if the chip cannot
+be registered so the return value has to be checked and
+the error propagated in case it happens.
 
-Today, I find that OMAP4430 SDP fails to boot due to an oops caused by
-this driver in the workqueue code - it frees structures which contain
-queued workqueues if we're booting with DT and it can't find the PWM
-device.
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ drivers/gpio/gpio-omap.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-If I look closer at this driver, I find that it doesn't of_node_put()
-the OF node in the case of devm_of_pwm_get() failure... I'm sure these
-aren't the only problems.
-
-Then there's the three entirely separately coded cleanup paths - the
-removal function, the cleanup for failure in the OF code, and the
-cleanup for failure in the non-OF case.  This is where the oops stems
-from because the author of the patch adding the work queue only fixed
-up two of these sites - the ones which applied to his case and never
-bothered with the third.
-
-I'm going to fix this latest failure in the driver, and send a patch
-later today, and I will hope for a timely response.
-
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 3ee9b8d..e717888 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1081,10 +1081,11 @@ omap_mpuio_alloc_gc(struct gpio_bank *bank, unsigned int irq_start,
+ 			       IRQ_NOREQUEST | IRQ_NOPROBE, 0);
+ }
+ 
+-static void omap_gpio_chip_init(struct gpio_bank *bank)
++static int omap_gpio_chip_init(struct gpio_bank *bank)
+ {
+ 	int j;
+ 	static int gpio;
++	int ret;
+ 
+ 	/*
+ 	 * REVISIT eventually switch from OMAP-specific gpio structs
+@@ -1110,7 +1111,11 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+ 	}
+ 	bank->chip.ngpio = bank->width;
+ 
+-	gpiochip_add(&bank->chip);
++	ret = gpiochip_add(&bank->chip);
++	if (ret) {
++		dev_err(bank->dev, "Could not register gpio chip\n", ret);
++		return ret;
++	}
+ 
+ 	for (j = 0; j < bank->width; j++) {
+ 		int irq = irq_create_mapping(bank->domain, j);
+@@ -1139,6 +1144,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct gpio_bank *bank;
+ 	int irq_base = 0;
++	int ret;
+ 
+ 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
+ 
+@@ -1223,7 +1229,11 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 		mpuio_init(bank);
+ 
+ 	omap_gpio_mod_init(bank);
+-	omap_gpio_chip_init(bank);
++
++	ret = omap_gpio_chip_init(bank);
++	if (ret)
++		return ret;
++
+ 	omap_gpio_show_rev(bank);
+ 
+ 	pm_runtime_put(bank->dev);
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.0
