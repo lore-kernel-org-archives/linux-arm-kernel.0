@@ -1,79 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 06 Apr 2014 20:27:37 +0200
-Subject: [PATCH v1 6/8] ARM: hisi: add hip04 SoC support
-In-Reply-To: <CAOesGMiKeSvHL8ccjQuANggkA5yg+XyQppQEN0qS=XB=1O+e6w@mail.gmail.com>
-References: <1396339430-21084-1-git-send-email-haojian.zhuang@linaro.org>
- <8340307.jkTP7h04Ur@wuerfel>
- <CAOesGMiKeSvHL8ccjQuANggkA5yg+XyQppQEN0qS=XB=1O+e6w@mail.gmail.com>
-Message-ID: <5010360.d9VTMQPr6c@wuerfel>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sun, 6 Apr 2014 20:58:33 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+References: <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+ <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+Message-ID: <20140406185833.GI29787@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 April 2014 19:01:16 Olof Johansson wrote:
-> On Fri, Apr 4, 2014 at 8:43 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Neil,
 
-> > I think we should actually extend the CPU selection phase for multiplatform,
-> > so we have separate symbols for ARCH_MULTI_V7 (non-LPAE) and
-> > ARCH_MULTI_V7_LPAE. These would still be selectable at the same time,
-> > but you should only be able to turn on CONFIG_LPAE if ARCH_MULTI_V7
-> > is disabled.
-> >
-> > A platform that cannot run without LPAE conversely would have to depend
-> > on (ARCH_MULTI_V7_LPAE && !ARCH_MULTI_V7 && !ARCH_MULTI_V6). Once it
-> > does this, it can 'select LPAE' without breaking other platforms.
-> 
-> Why not just have it depend on ARCH_MULTI_V7 && LPAE? LPAE shouldn't
-> be possible to enable if MULTI_V6 is enabled.
->
-> So, you'd have:
-> 
-> MULTI_V6
-> MULTI_V6 + V7
-> MULTI_V7 + LPAE
-> 
-> as valid options.
-> 
-> We'd need to annotate existing non-LPAE platforms with depends on
-> !LPAE, but that shouldn't be a big deal.
+On Fri, Apr 04, 2014 at 02:19:44PM +0100, Neil Greatorex wrote:
+> With this patch, I can get one port on the card working. With both ports 
+> enabled, I still get an OOPS, so some further work is needed.
 
-That would work, too. It really depends on how we treat global
-options like MMU, SMP, LPAE, SPARSEMEM, etc in combination with
-multiplatform kernels. At the moment we are rather inconsistent,
-and so far I have always thought we should have them ordered in
-the Kconfig menu in the same way as the dependency flow:
+Concerning this point, here's an update on my side. I found where the crash
+happens, but I don't exactly understand why, I suspect that an area is not
+correctly mapped :
 
-1. Pick a platform type (normally ARCH_MULTIPLATFORM)
-2. (if ARCH_MULTIPLATFORM), pick architecture level(s): V4, V4T, V5, V6,
-   V6K, V6K+SMP, V7, V7+LPAE, V7-M. We may decide to skip some of these.
-3. Pick global features that are allowed based on 1. and 2.:
-   MMU, SMP, LPAE, SPARSEMEM
-4. (again, if MULTIPLATFORM) Pick SoC families, based on 1. and 2.
-5. (if necessary) Pick boards.   
+root at xpgp:~# insmod /tmp/igb.ko 
+igb: Intel(R) Gigabit Ethernet Network Driver - version 5.0.5-k
+igb: Copyright (c) 2007-2013 Intel Corporation.
+PCI: enabling device 0000:00:09.0 (0140 -> 0143)
+PCI: enabling device 0000:02:00.0 (0140 -> 0142)
+request_region(pdev=edb21000, 00000049)
+hw_addr = pci_iomap(pdev=edb21000, 0, 0) = f0300000
+mem_start=e0000000 mem_end=e007ffff
+hw_addr = f0300000
+hw_addr=f0300000
+igb 0000:02:00.0: added PHC on eth4
+igb 0000:02:00.0: Intel(R) Gigabit Ethernet Network Connection
+igb 0000:02:00.0: eth4: (PCIe:5.0Gb/s:Width x1) 00:30:18:a6:6c:6a
+igb 0000:02:00.0: eth4: PBA No: FFFFFF-0FF
+igb 0000:02:00.0: Using MSI-X interrupts. 4 rx queue(s), 4 tx queue(s)
+PCI: enabling device 0000:02:00.1 (0140 -> 0142)
+request_region(pdev=ed99d800, 00000049)
+hw_addr = pci_iomap(pdev=ed99d800, 0, 0) = f0400000
+mem_start=e0100000 mem_end=e017ffff
+hw_addr = f0400000
+hw_addr=f0400000
+Unhandled fault: external abort on non-linefetch (0x1008) at 0xf0400018
+Internal error: : 1008 [#1] SMP THUMB2
 
-I'd like to keep steps 3 and 4 independent of one another, possibly
-doing them in the opposite order.
+in e1000_82575.o:igb_get_invariants_82575() :
+    123c:       f884 33b4       strb.w  r3, [r4, #948]
+    1240:       f884 33b9       strb.w  r3, [r4, #953]
+    1244:       f8c4 6300       str.w   r6, [r4, #768]
+    1248:       6863            ldr     r3, [r4, #4]
+=>  124a:       f8d3 8018       ldr.w   r8, [r3, #24]
 
-An idea I just had was to essentially always imply compatibility
-to later architectures where possible, e.g. selecting v4 would always
-enable v4t and v5, and selecting v6k would always enable support for
-v6+smp, v7 and v7+lpae, but not to v6. If we do this, the matrix
-of possible combinations becomes much simpler, and for all I can tell
-we only lose the ones that are not interesting anyway. The cost
-of enabling support for a later architecture level is usually much
-lower than the cost for enabling an earlier level.
+in e1000_82575.c:igb_get_invariants_82575() :
+        hw->phy.media_type = e1000_media_type_copper;
+        dev_spec->sgmii_active = false;
+        dev_spec->module_plugged = false;
 
-The architecture level selection at that point becomes a simple
-'choice' statement, rather than the complex logic I introduced
-for multiplatform initially. It would also simplify adding new
-levels for v7-m and v7-r.
+here=>  ctrl_ext = rd32(E1000_CTRL_EXT);
 
-> And, we should probably change the multi defconfigs to be:
-> 
-> multi_v6_v7_defconfig which contains what v7_defconfig does today,
-> plus the v6 platforms
-> multi_lpae_defconfig which contains only v7+lpae platforms (and would
-> enable kvm, etc).
+according to e1000_hw.h:
 
-I like this part.
+  #define E1000_CTRL_EXT 0x00018      /* Extended Device Control - RW */
 
-	Arnd
+according to e1000_regs.h:
+
+  #define rd32(reg) (readl(hw->hw_addr + reg))
+
+===> ctrl_ext = readl((hw->hw_addr = 0xf0400000) + (reg = 0x18))
+
+As you can see, the sequence is exactly the same for both ports. The
+first one has no problem performing the readl(), but the second one
+cannot. Both of them got the memory address returned by a call to
+pci_iomap(dev, 0, 0). I could verify that the pci_resource_len() for
+both is 524288 (0x80000).
+
+The last "hwaddr=f0400000" is printed just before calling rd32() and
+shows that it was still OK there. Since the resource flags are 0x40200,
+we only have IORESOURCE_MEM so pci_iomap() calls ioremap_nocache().
+
+Thus I suspect something is not behaving correctly in the code which
+configures the emulated bridge and/or the memory areas, resulting in
+the second port not being correctly mapped, thus causing the crash.
+
+But that's the deepest I can go unfortunately, I got lost after that.
+
+Regards,
+Willy
