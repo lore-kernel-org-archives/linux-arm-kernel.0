@@ -1,34 +1,79 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 06 Apr 2014 23:30:31 +0100
-Subject: [PATCH] ARM: add missing system_misc.h include to process.c
-Message-ID: <E1WWvaB-0004Bc-QL@rmk-PC.arm.linux.org.uk>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 7 Apr 2014 01:45:35 +0200
+Subject: [PATCH] arm/igep0020: fix IGEPv2 boot
+In-Reply-To: <5341C351.5060406@xenomai.org>
+References: <1396801938-24788-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+ <CABxcv=k3nrhVtMPw1BqO6Cz07VEtGA9ZBMvkXBJuLrcCSoXpwg@mail.gmail.com>
+ <5341C351.5060406@xenomai.org>
+Message-ID: <CABxcv=nYt_9x3m9siCVyXTE=bRNPPRoPhxW8oByweV6MrmZ+pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_pm_restart(), arm_pm_idle() and soft_restart() are all declared in
-system_misc.h, but this file is not included in process.c.  Add this
-missing include.  Found via sparse:
+Hello,
 
-arch/arm/kernel/process.c:98:6: warning: symbol 'soft_restart' was not declared. Should it be static?
-arch/arm/kernel/process.c:127:6: warning: symbol 'arm_pm_restart' was not declared. Should it be static?
-arch/arm/kernel/process.c:134:6: warning: symbol 'arm_pm_idle' was not declared. Should it be static?
+On Sun, Apr 6, 2014 at 11:12 PM, Gilles Chanteperdrix
+<gilles.chanteperdrix@xenomai.org> wrote:
+> On 04/06/2014 10:04 PM, Javier Martinez Canillas wrote:
+>> Hello Giles,
+>
+> Hi,
+>
+>> It looks suspiciously similar to an issue we had due some DT clock
+>> changes were the IGEPv2 (or any board that used the "ti,omap3"
+>> compatible string) were initialized as omap3430 instead of omap3630
+>> thus using omap3430 clock data which left the UART4 uninitialized.
+>>
+>> I fixed that particular issue on commit fb0cfec ("ARM: dts:
+>> omap3-igep: fix boot fail due wrong compatible match") which was
+>> merged on v3.14-rc6 so it should be on your v3.14 kernel so maybe is a
+>> different issue.
+>>
+>> I wonder why you are having this issue though since I didn't have that
+>> problem with 3.14 as far as I can remember.
+>>
+>> Can you provide me the exact commit id of your HEAD? or is just the
+>> tagged v3.14 commit?
+>
+> It is the tagged v3.14 commit, with omap2plus_defconfig configuration
+> My IGEPv2 does not have an omap3630, but a 3530.
+>
+> The boot logs say:
+> [    0.000000] OMAP3430/3530 ES3.1 (l2cache iva sgx neon isp )
+>
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/process.c | 1 +
- 1 file changed, 1 insertion(+)
+Then in your case is the exact opposite, that commit seems to broke
+your board since now it is initialized as an omap3630 instead of an
+omap3430. So you need to change the compatible string:
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 204f7d273319..b5444731dbb4 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -39,6 +39,7 @@
- #include <asm/processor.h>
- #include <asm/thread_notify.h>
- #include <asm/stacktrace.h>
-+#include <asm/system_misc.h>
- #include <asm/mach/time.h>
- #include <asm/tls.h>
- 
--- 
-1.8.3.1
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -14,7 +14,7 @@
+
+ / {
+        model = "IGEPv2 (TI OMAP AM/DM37x)";
+-       compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
++       compatible = "isee,omap3-igep0020", "ti,omap3";
+
+        leds {
+                pinctrl-names = "default";
+
+The problem is that there are too many IGEP boards revisions that use
+use different SoC (DM3730 or OMAP3530), flash memory type (OneNAND or
+NAND), memory sizes and connectivity (with or without wifi chip).
+
+So to support all different combinations with DeviceTree mean that an
+exponential number of dts/dtsi is needed to describe each variation so
+I decided to only support the most common versions:
+
+- IGEPv2 with DM3730, NAND, wifi and 512MB of RAM.
+- IGEP COM Module with DM3730, NAND, wifi and 512MB of RAM.
+
+And companies using IGEP boards and mainline could use it as a
+reference and adapt the DTS to match their board revision.
+
+Honestly I didn't know that there were mainline users using the old
+omap3530 IGEPv2 so I'll prepare some patches to support both DM3730
+and OMAP3530 versions.
+
+Thanks a lot and best regards,
+Javier
