@@ -1,75 +1,47 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Sun, 6 Apr 2014 18:38:03 +0900
-Subject: [PATCH v2 1/7] drm/exynos: add super device support
-In-Reply-To: <20140406084729.GO7528@n2100.arm.linux.org.uk>
-References: <1396355882-17010-1-git-send-email-inki.dae@samsung.com>
- <1396355882-17010-2-git-send-email-inki.dae@samsung.com>
- <533EB9C6.80302@samsung.com>
- <CAAQKjZPbzb+qvJA5y+Kco9BRv4j3iVatM_0bd+ugyuVZUbfFFg@mail.gmail.com>
- <53403E42.1010403@gmail.com>
- <20140405182423.GL7528@n2100.arm.linux.org.uk>
- <53404BF3.2010409@gmail.com>
- <CAAQKjZMSkN-ACOGKD2OecsZ6YQyafiR5F36_XnBwYC-wZj8NPA@mail.gmail.com>
- <20140406084729.GO7528@n2100.arm.linux.org.uk>
-Message-ID: <CAAQKjZOAPx6oofJaeOWKzMFTzUZnHMwm1BnJ4jXqnBQ4NEpXmg@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Sun, 06 Apr 2014 19:49:53 +1000
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <20140405001953.GE15806@google.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-2-git-send-email-Liviu.Dudau@arm.com>
+ <20140405001953.GE15806@google.com>
+Message-ID: <1396777793.3671.15.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, 2014-04-04 at 18:19 -0600, Bjorn Helgaas wrote:
+> > Introduce a pci_register_io_range() helper function that can be used
+> > by the architecture code to keep track of the I/O ranges described by the
+> > PCI bindings. If the PCI_IOBASE macro is not defined that signals
+> > lack of support for PCI and we return an error.
+> 
+> I don't quite see how you intend to use this, because this series doesn't
+> include any non-stub implementation of pci_register_io_range().
+> 
+> Is this anything like the ia64 strategy I mentioned above?  If so, it would
+> be really nice to unify some of this stuff.
 
-2014-04-06 17:47 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sun, Apr 06, 2014 at 01:21:24PM +0900, Inki Dae wrote:
->> As you may know, there is exynos chip that has two display
->> controllers. So it is possible to compose display pipe lines at same
->> time like below,
->>
->> fimd0-----bridges..------Panel
->> fimd1-----maybe bridges..-----CPU Panel
->>
->> How we can care such pipelines without component? Of course, it would
->> be possible somehow but I'm not sure there could be better and more
->> generic way than super device.
->>
->> And super device will make existing dtb broken but this time it might
->> be good opportunity to more generic way before more users use existing
->> dt.
->
-> There has been a discussion ongoing about how to best represent display
-> (and capture) stuff in DT using graphs, which you may wish to consider
+We also use two different strategies on ppc32 and ppc64
 
-Right, there was my wrong comments. Actually, I had made a discussion
-about it. For this, you can refer to below link,
-http://www.spinics.net/lists/dri-devel/msg55555.html
+ - On ppc32, inb/outb turn into an MMIO access to _IO_BASE + port
 
-My intension there was that let's use super device approach to resolve
-the probe order issue of drm drivers for embedded system, and the
-graphs to compose their display pipelines. And for this, we need
-generic common structure to handle various bridge devices that could
-be controlled by crtc and encoder/connector drivers.
+That _IO_BASE is a variable which is initialized to the ioremapped address
+of the IO space MMIO aperture of the first bridge we discover. Then port
+numbers are "fixed up" on all other bridges so that the addition _IO_BASE + port
+fits the ioremapped address of the IO space on that bridge. A bit messy... and breaks
+whenever drivers copy port numbers into variables of the wrong type such as shorts.
 
-I'd be happy to get your opinions about it.
+ - On ppc64, we have more virtual space, so instead we reserve a range
+of address space (fixed) for IO space, it's always the same. Bridges IO spaces
+are then mapped into that range, so we always have a positive offset from _IO_BASE
+which makes things a bit more robust and less "surprising" than ppc32. Additionally,
+the first 64k are reserved. They are only mapped if we see an ISA bridge (which some
+older machines have). Otherwise it's left unmapped, so crappy drivers trying to
+hard code x86 IO ports will blow up immediately which I deem better than silently
+whacking the wrong hardware. In addition, we have a mechanism we use on powernv to
+re-route accesses to that first 64k to the power8 built-in LPC bus which can
+have some legacy IOs on it such as a UART or a RTC.
 
-> looking at.  That discussion never reached any kind of conclusion before
-> the merge window, but it does need to reach a conclusion for the next
-> window.
-
-Yes. I still think the super device approach is a best solution, and I
-think the only problem here is backward compatibility.  I have a feel
-that we might resolve that issue easier then we think. I think all we
-have to do for it is to implement some codes for backward
-compatibility on top of super device approach.
-
-This way, we could have a better design for the future drm drivers
-without being tied to the backward compatibility.
-
-Thanks,
-Inki Dae
-
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+Cheers,
+Ben.
