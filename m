@@ -1,391 +1,89 @@
-From: linux@baker-net.org.uk (Adam Baker)
-Date: Sun,  6 Apr 2014 22:42:49 +0100
-Subject: [PATCH 3/3] ARM: kirkwood: rename kirwood-nsa310-common to 3x0-common
-In-Reply-To: <1396820569-3841-1-git-send-email-linux@baker-net.org.uk>
-References: <5341C91D.4060007@baker-net.org.uk>
- <1396820569-3841-1-git-send-email-linux@baker-net.org.uk>
-Message-ID: <1396820569-3841-3-git-send-email-linux@baker-net.org.uk>
+From: neil@fatboyfat.co.uk (Neil Greatorex)
+Date: Sun, 6 Apr 2014 22:57:40 +0100 (BST)
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada
+ 370)
+In-Reply-To: <20140406185833.GI29787@1wt.eu>
+References: <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+ <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140406185833.GI29787@1wt.eu>
+Message-ID: <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Rename the include file kirkwood-nsa310-common.dtsi as
- it is now also used for NSA320. There is also an NSA325
- but that appears not to be as similar so is unlikely to
- want to share an include file.
+Willy,
 
-Signed-off-by: Adam Baker <linux@baker-net.org.uk>
----
- arch/arm/boot/dts/kirkwood-nsa310-common.dtsi |  157 -------------------------
- arch/arm/boot/dts/kirkwood-nsa310.dts         |    2 +-
- arch/arm/boot/dts/kirkwood-nsa310a.dts        |    2 +-
- arch/arm/boot/dts/kirkwood-nsa320.dts         |    2 +-
- arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi |  157 +++++++++++++++++++++++++
- 5 files changed, 160 insertions(+), 160 deletions(-)
- delete mode 100644 arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
- create mode 100644 arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
+On Sun, 6 Apr 2014, Willy Tarreau wrote:
 
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
-deleted file mode 100644
-index 843b8b5..0000000
---- a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
-+++ /dev/null
-@@ -1,157 +0,0 @@
--#include "kirkwood.dtsi"
--#include "kirkwood-6281.dtsi"
--
--/ {
--	model = "ZyXEL NSA310";
--
--	ocp at f1000000 {
--		pinctrl: pinctrl at 10000 {
--
--			pmx_usb_power: pmx-usb-power {
--				marvell,pins = "mpp21";
--				marvell,function = "gpio";
--			};
--
--			pmx_pwr_off: pmx-pwr-off {
--				marvell,pins = "mpp48";
--				marvell,function = "gpio";
--			};
--
--			pmx_btn_reset: pmx-btn-reset {
--				marvell,pins = "mpp36";
--				marvell,function = "gpio";
--			};
--
--			pmx_btn_copy: pmx-btn-copy {
--				marvell,pins = "mpp37";
--				marvell,function = "gpio";
--			};
--
--			pmx_btn_power: pmx-btn-power {
--				marvell,pins = "mpp46";
--				marvell,function = "gpio";
--			};
--
--			pmx_led_copy_green: pmx-led-copy-green {
--				marvell,pins = "mpp39";
--				marvell,function = "gpio";
--			};
--
--			pmx_led_copy_red: pmx-led-copy-red {
--				marvell,pins = "mpp40";
--				marvell,function = "gpio";
--			};
--		};
--
--		serial at 12000 {
--			status = "ok";
--		};
--
--		sata at 80000 {
--			status = "okay";
--			nr-ports = <2>;
--		};
--
--		pcie-controller {
--			status = "okay";
--
--			pcie at 1,0 {
--				status = "okay";
--			};
--		};
--	};
--
--	gpio_poweroff {
--		compatible = "gpio-poweroff";
--		pinctrl-0 = <&pmx_pwr_off>;
--		pinctrl-names = "default";
--		gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
--	};
--
--	gpio_keys {
--		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
--		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
--		pinctrl-names = "default";
--
--		button at 1 {
--			label = "Power Button";
--			linux,code = <KEY_POWER>;
--			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
--		};
--		button at 2 {
--			label = "Copy Button";
--			linux,code = <KEY_COPY>;
--			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
--		};
--		button at 3 {
--			label = "Reset Button";
--			linux,code = <KEY_RESTART>;
--			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
--		};
--	};
--
--
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--		pinctrl-0 = <&pmx_usb_power>;
--		pinctrl-names = "default";
--
--		usb0_power: regulator at 1 {
--			compatible = "regulator-fixed";
--			reg = <1>;
--			regulator-name = "USB Power";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			regulator-always-on;
--			regulator-boot-on;
--			gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
--		};
--	};
--};
--
--&nand {
--	status = "okay";
--	chip-delay = <35>;
--
--	partition at 0 {
--		label = "uboot";
--		reg = <0x0000000 0x0100000>;
--		read-only;
--	};
--	partition at 100000 {
--		label = "uboot_env";
--		reg = <0x0100000 0x0080000>;
--	};
--	partition at 180000 {
--		label = "key_store";
--		reg = <0x0180000 0x0080000>;
--	};
--	partition at 200000 {
--		label = "info";
--		reg = <0x0200000 0x0080000>;
--	};
--	partition at 280000 {
--		label = "etc";
--		reg = <0x0280000 0x0a00000>;
--	};
--	partition at c80000 {
--		label = "kernel_1";
--		reg = <0x0c80000 0x0a00000>;
--	};
--	partition at 1680000 {
--		label = "rootfs1";
--		reg = <0x1680000 0x2fc0000>;
--	};
--	partition at 4640000 {
--		label = "kernel_2";
--		reg = <0x4640000 0x0a00000>;
--	};
--	partition at 5040000 {
--		label = "rootfs2";
--		reg = <0x5040000 0x2fc0000>;
--	};
--};
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index 372f701..989846a 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--#include "kirkwood-nsa310-common.dtsi"
-+#include "kirkwood-nsa3x0-common.dtsi"
- 
- / {
- 	compatible = "zyxel,nsa310", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310a.dts b/arch/arm/boot/dts/kirkwood-nsa310a.dts
-index ead7a36..d0a6025 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310a.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310a.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--#include "kirkwood-nsa310-common.dtsi"
-+#include "kirkwood-nsa3x0-common.dtsi"
- 
- /*
-  * There are at least two different NSA310 designs. This variant does
-diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
-index 6c8f692..fc20baf 100644
---- a/arch/arm/boot/dts/kirkwood-nsa320.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
-@@ -11,7 +11,7 @@
- 
- /dts-v1/;
- 
--#include "kirkwood-nsa310-common.dtsi"
-+#include "kirkwood-nsa3x0-common.dtsi"
- 
- / {
- 	model = "Zyxel NSA320";
-diff --git a/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-new file mode 100644
-index 0000000..843b8b5
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-@@ -0,0 +1,157 @@
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+
-+/ {
-+	model = "ZyXEL NSA310";
-+
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+
-+			pmx_usb_power: pmx-usb-power {
-+				marvell,pins = "mpp21";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_pwr_off: pmx-pwr-off {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_reset: pmx-btn-reset {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_copy: pmx-btn-copy {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_btn_power: pmx-btn-power {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_green: pmx-led-copy-green {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_copy_red: pmx-led-copy-red {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		serial at 12000 {
-+			status = "ok";
-+		};
-+
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&pmx_pwr_off>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 2 {
-+			label = "Copy Button";
-+			linux,code = <KEY_COPY>;
-+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
-+		};
-+		button at 3 {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_usb_power>;
-+		pinctrl-names = "default";
-+
-+		usb0_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&nand {
-+	status = "okay";
-+	chip-delay = <35>;
-+
-+	partition at 0 {
-+		label = "uboot";
-+		reg = <0x0000000 0x0100000>;
-+		read-only;
-+	};
-+	partition at 100000 {
-+		label = "uboot_env";
-+		reg = <0x0100000 0x0080000>;
-+	};
-+	partition at 180000 {
-+		label = "key_store";
-+		reg = <0x0180000 0x0080000>;
-+	};
-+	partition at 200000 {
-+		label = "info";
-+		reg = <0x0200000 0x0080000>;
-+	};
-+	partition at 280000 {
-+		label = "etc";
-+		reg = <0x0280000 0x0a00000>;
-+	};
-+	partition at c80000 {
-+		label = "kernel_1";
-+		reg = <0x0c80000 0x0a00000>;
-+	};
-+	partition at 1680000 {
-+		label = "rootfs1";
-+		reg = <0x1680000 0x2fc0000>;
-+	};
-+	partition at 4640000 {
-+		label = "kernel_2";
-+		reg = <0x4640000 0x0a00000>;
-+	};
-+	partition at 5040000 {
-+		label = "rootfs2";
-+		reg = <0x5040000 0x2fc0000>;
-+	};
-+};
--- 
-1.7.10.4
+> As you can see, the sequence is exactly the same for both ports. The
+> first one has no problem performing the readl(), but the second one
+> cannot. Both of them got the memory address returned by a call to
+> pci_iomap(dev, 0, 0). I could verify that the pci_resource_len() for
+> both is 524288 (0x80000).
+>
+> The last "hwaddr=f0400000" is printed just before calling rd32() and
+> shows that it was still OK there. Since the resource flags are 0x40200,
+> we only have IORESOURCE_MEM so pci_iomap() calls ioremap_nocache().
+>
+
+Good work - I've been doing similar things myself! I can confirm that I 
+see exactly the same thing with similar printks:
+
+First port:
+[ 1809.452878] igb 0000:01:00.0: enabling bus mastering
+[ 1809.453098] igb 0000:01:00.0 (unregistered net_device): hw_addr is 
+f1000000, start=e0000000, len=80000, flags=40200
+[ 1809.453109] igb 0000:01:00.0 (unregistered net_device): About to read 
+from offset 18
+[ 1809.453120] igb 0000:01:00.0 (unregistered net_device): Read from 18 
+returned 1400c0
+
+Second port:
+[ 1809.459445] igb 0000:01:00.1: enabling bus mastering
+[ 1809.459563] igb 0000:01:00.1 (unregistered net_device): hw_addr is
+f1100000, start=e0100000, len=80000, flags=40200
+[ 1809.459573] igb 0000:01:00.1 (unregistered net_device): About to read
+from offset 18
+[ 1809.459581] Unhandled fault: external abort on non-linefetch (0x1008) 
+at 0xf1100018
+
+In the output above, the start= part shows the physical address and 
+hw_addr shows the mapped address.
+
+The physical addresses match those given in the lspci -vvv output (see 
+https://gist.github.com/ngreatorex/9772195). I don't know enough about 
+PCIe, the SoC *or* the Intel card to know if these addresses look correct 
+or even sane! I did wonder if there was some issue due to the fact that 
+the resources for 01:00.0 and 01:00.1 overlap, but I would guess(!?) that 
+it's common in hardware that presents multiple devices.
+
+It is perhaps noteworthy that this is the first access to the hardware for 
+the 2nd port - i.e. there are no successful accesses, other than to enable 
+the hardware, which AFAICT is simply accessing registers on the PCIe 
+controller.
+
+> Thus I suspect something is not behaving correctly in the code which
+> configures the emulated bridge and/or the memory areas, resulting in
+> the second port not being correctly mapped, thus causing the crash.
+>
+> But that's the deepest I can go unfortunately, I got lost after that.
+>
+
+Same here. I've tried playing around with a few things but not discovered 
+anything even close to useful. Hopefully Thomas will be able to debug 
+further when he gets the time.
+
+> Regards,
+> Willy
+>
+>
+
+Cheers,
+Neil
