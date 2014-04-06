@@ -1,61 +1,289 @@
 From: linux@baker-net.org.uk (Adam Baker)
-Date: Sun,  6 Apr 2014 22:42:48 +0100
-Subject: [PATCH 2/3] ARM: kirkwood: Add DTS file for NSA320
+Date: Sun,  6 Apr 2014 22:42:49 +0100
+Subject: [PATCH 3/3] ARM: kirkwood: rename kirwood-nsa310-common to 3x0-common
 In-Reply-To: <1396820569-3841-1-git-send-email-linux@baker-net.org.uk>
 References: <5341C91D.4060007@baker-net.org.uk>
  <1396820569-3841-1-git-send-email-linux@baker-net.org.uk>
-Message-ID: <1396820569-3841-2-git-send-email-linux@baker-net.org.uk>
+Message-ID: <1396820569-3841-3-git-send-email-linux@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Add a new DTS file to support the Zyxel NSA320 dual bay
- NAS Drive. This DTS just describes the features that
- work with the current kernel drivers. New drivers still
- need writing to support the temperature sensor, the
- power on behaviour control and the buzzer.
+ Rename the include file kirkwood-nsa310-common.dtsi as
+ it is now also used for NSA320. There is also an NSA325
+ but that appears not to be as similar so is unlikely to
+ want to share an include file.
 
 Signed-off-by: Adam Baker <linux@baker-net.org.uk>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-nsa320.dts |  214 +++++++++++++++++++++++++++++++++
- 1 file changed, 214 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-nsa320.dts
+ arch/arm/boot/dts/kirkwood-nsa310-common.dtsi |  157 -------------------------
+ arch/arm/boot/dts/kirkwood-nsa310.dts         |    2 +-
+ arch/arm/boot/dts/kirkwood-nsa310a.dts        |    2 +-
+ arch/arm/boot/dts/kirkwood-nsa320.dts         |    2 +-
+ arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi |  157 +++++++++++++++++++++++++
+ 5 files changed, 160 insertions(+), 160 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
 
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
+deleted file mode 100644
+index 843b8b5..0000000
+--- a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
++++ /dev/null
+@@ -1,157 +0,0 @@
+-#include "kirkwood.dtsi"
+-#include "kirkwood-6281.dtsi"
+-
+-/ {
+-	model = "ZyXEL NSA310";
+-
+-	ocp at f1000000 {
+-		pinctrl: pinctrl at 10000 {
+-
+-			pmx_usb_power: pmx-usb-power {
+-				marvell,pins = "mpp21";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_pwr_off: pmx-pwr-off {
+-				marvell,pins = "mpp48";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_btn_reset: pmx-btn-reset {
+-				marvell,pins = "mpp36";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_btn_copy: pmx-btn-copy {
+-				marvell,pins = "mpp37";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_btn_power: pmx-btn-power {
+-				marvell,pins = "mpp46";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_led_copy_green: pmx-led-copy-green {
+-				marvell,pins = "mpp39";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_led_copy_red: pmx-led-copy-red {
+-				marvell,pins = "mpp40";
+-				marvell,function = "gpio";
+-			};
+-		};
+-
+-		serial at 12000 {
+-			status = "ok";
+-		};
+-
+-		sata at 80000 {
+-			status = "okay";
+-			nr-ports = <2>;
+-		};
+-
+-		pcie-controller {
+-			status = "okay";
+-
+-			pcie at 1,0 {
+-				status = "okay";
+-			};
+-		};
+-	};
+-
+-	gpio_poweroff {
+-		compatible = "gpio-poweroff";
+-		pinctrl-0 = <&pmx_pwr_off>;
+-		pinctrl-names = "default";
+-		gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
+-	};
+-
+-	gpio_keys {
+-		compatible = "gpio-keys";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
+-		pinctrl-names = "default";
+-
+-		button at 1 {
+-			label = "Power Button";
+-			linux,code = <KEY_POWER>;
+-			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+-		};
+-		button at 2 {
+-			label = "Copy Button";
+-			linux,code = <KEY_COPY>;
+-			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+-		};
+-		button at 3 {
+-			label = "Reset Button";
+-			linux,code = <KEY_RESTART>;
+-			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+-		};
+-	};
+-
+-
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		pinctrl-0 = <&pmx_usb_power>;
+-		pinctrl-names = "default";
+-
+-		usb0_power: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "USB Power";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			regulator-always-on;
+-			regulator-boot-on;
+-			gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+-		};
+-	};
+-};
+-
+-&nand {
+-	status = "okay";
+-	chip-delay = <35>;
+-
+-	partition at 0 {
+-		label = "uboot";
+-		reg = <0x0000000 0x0100000>;
+-		read-only;
+-	};
+-	partition at 100000 {
+-		label = "uboot_env";
+-		reg = <0x0100000 0x0080000>;
+-	};
+-	partition at 180000 {
+-		label = "key_store";
+-		reg = <0x0180000 0x0080000>;
+-	};
+-	partition at 200000 {
+-		label = "info";
+-		reg = <0x0200000 0x0080000>;
+-	};
+-	partition at 280000 {
+-		label = "etc";
+-		reg = <0x0280000 0x0a00000>;
+-	};
+-	partition at c80000 {
+-		label = "kernel_1";
+-		reg = <0x0c80000 0x0a00000>;
+-	};
+-	partition at 1680000 {
+-		label = "rootfs1";
+-		reg = <0x1680000 0x2fc0000>;
+-	};
+-	partition at 4640000 {
+-		label = "kernel_2";
+-		reg = <0x4640000 0x0a00000>;
+-	};
+-	partition at 5040000 {
+-		label = "rootfs2";
+-		reg = <0x5040000 0x2fc0000>;
+-	};
+-};
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index 372f701..989846a 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-#include "kirkwood-nsa310-common.dtsi"
++#include "kirkwood-nsa3x0-common.dtsi"
+ 
+ / {
+ 	compatible = "zyxel,nsa310", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310a.dts b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+index ead7a36..d0a6025 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310a.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-#include "kirkwood-nsa310-common.dtsi"
++#include "kirkwood-nsa3x0-common.dtsi"
+ 
+ /*
+  * There are at least two different NSA310 designs. This variant does
 diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
-new file mode 100644
-index 0000000..6c8f692
---- /dev/null
+index 6c8f692..fc20baf 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa320.dts
 +++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
-@@ -0,0 +1,214 @@
-+/* Device tree file for the Zyxel NSA 320 NAS box.
-+ *
-+ * Copyright (c) 2014, Adam Baker <linux@baker-net.org.uk>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ *
-+ * Based upon the board setup file created by Peter Schildmann */
-+
-+/dts-v1/;
-+
-+#include "kirkwood-nsa310-common.dtsi"
+@@ -11,7 +11,7 @@
+ 
+ /dts-v1/;
+ 
+-#include "kirkwood-nsa310-common.dtsi"
++#include "kirkwood-nsa3x0-common.dtsi"
+ 
+ / {
+ 	model = "Zyxel NSA320";
+diff --git a/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
+new file mode 100644
+index 0000000..843b8b5
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
+@@ -0,0 +1,157 @@
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
 +
 +/ {
-+	model = "Zyxel NSA320";
-+	compatible = "zyxel,nsa320", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++	model = "ZyXEL NSA310";
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
++	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
 +
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
++			pmx_usb_power: pmx-usb-power {
++				marvell,pins = "mpp21";
++				marvell,function = "gpio";
++			};
 +
-+	mbus {
++			pmx_pwr_off: pmx-pwr-off {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_reset: pmx-btn-reset {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_copy: pmx-btn-copy {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++
++			pmx_btn_power: pmx-btn-power {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_copy_green: pmx-led-copy-green {
++				marvell,pins = "mpp39";
++				marvell,function = "gpio";
++			};
++
++			pmx_led_copy_red: pmx-led-copy-red {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++		};
++
++		serial at 12000 {
++			status = "ok";
++		};
++
++		sata at 80000 {
++			status = "okay";
++			nr-ports = <2>;
++		};
++
 +		pcie-controller {
 +			status = "okay";
 +
@@ -65,180 +293,98 @@ index 0000000..6c8f692
 +		};
 +	};
 +
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pinctrl-names = "default";
-+
-+			/* SATA Activity and Present pins are not connected */
-+			pmx_sata0: pmx-sata0 {
-+				marvell,pins ;
-+				marvell,function = "sata0";
-+			};
-+
-+			pmx_sata1: pmx-sata1 {
-+				marvell,pins ;
-+				marvell,function = "sata1";
-+			};
-+
-+			pmx_led_hdd2_green: pmx-led-hdd2-green {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd2_red: pmx-led-hdd2-red {
-+				marvell,pins = "mpp13";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_mcu_data: pmx-mcu-data {
-+				marvell,pins = "mpp14";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_usb_green: pmx-led-usb-green {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_mcu_clk: pmx-mcu-clk {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_mcu_act: pmx-mcu-act {
-+				marvell,pins = "mpp17";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_green: pmx-led-sys-green {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_sys_orange: pmx-led-sys-orange {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd1_green: pmx-led-hdd1-green {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led_hdd1_red: pmx-led-hdd1-red {
-+				marvell,pins = "mpp42";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_htp: pmx-htp {
-+				marvell,pins = "mpp43";
-+				marvell,function = "gpio";
-+			};
-+
-+			/* Buzzer needs to be switched at around 1kHz so is
-+			   not compatible with the gpio-beeper driver. */
-+			pmx_buzzer: pmx-buzzer {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_vid_b1: pmx-vid-b1 {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_power_resume_data: pmx-power-resume-data {
-+				marvell,pins = "mpp47";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_power_resume_clk: pmx-power-resume-clk {
-+				marvell,pins = "mpp49";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+
-+			pcf8563: pcf8563 at 51 {
-+				compatible = "nxp,pcf8563";
-+				reg = <0x51>;
-+			};
-+		};
++	gpio_poweroff {
++		compatible = "gpio-poweroff";
++		pinctrl-0 = <&pmx_pwr_off>;
++		pinctrl-names = "default";
++		gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
 +	};
 +
-+	regulators {
-+		usb0_power: regulator at 1 {
-+			enable-active-high;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_hdd2_green &pmx_led_hdd2_red
-+			     &pmx_led_usb_green
-+			     &pmx_led_sys_green &pmx_led_sys_orange
-+			     &pmx_led_copy_green &pmx_led_copy_red
-+			     &pmx_led_hdd1_green &pmx_led_hdd1_red>;
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
 +		pinctrl-names = "default";
 +
-+		green-sys {
-+			label = "nsa320:green:sys";
-+			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
++		button at 1 {
++			label = "Power Button";
++			linux,code = <KEY_POWER>;
++			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
 +		};
-+		orange-sys {
-+			label = "nsa320:orange:sys";
-+			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
++		button at 2 {
++			label = "Copy Button";
++			linux,code = <KEY_COPY>;
++			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
 +		};
-+		green-hdd1 {
-+			label = "nsa320:green:hdd1";
-+			gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd1 {
-+			label = "nsa320:red:hdd1";
-+			gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-hdd2 {
-+			label = "nsa320:green:hdd2";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd2 {
-+			label = "nsa320:red:hdd2";
-+			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-usb {
-+			label = "nsa320:green:usb";
-+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-copy {
-+			label = "nsa320:green:copy";
-+			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-copy {
-+			label = "nsa320:red:copy";
-+			gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
++		button at 3 {
++			label = "Reset Button";
++			linux,code = <KEY_RESTART>;
++			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
 +		};
 +	};
 +
-+	/* The following pins are currently not assigned to a driver,
-+	   some of them should be configured as inputs.
-+	pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act
-+		     &pmx_htp &pmx_vid_b1
-+		     &pmx_power_resume_data &pmx_power_resume_clk>; */
-+};
 +
-+&mdio {
-+	status = "okay";
-+	ethphy0: ethernet-phy at 1 {
-+		reg = <1>;
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_usb_power>;
++		pinctrl-names = "default";
++
++		usb0_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
++		};
 +	};
 +};
 +
-+&eth0 {
++&nand {
 +	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
++	chip-delay = <35>;
++
++	partition at 0 {
++		label = "uboot";
++		reg = <0x0000000 0x0100000>;
++		read-only;
++	};
++	partition at 100000 {
++		label = "uboot_env";
++		reg = <0x0100000 0x0080000>;
++	};
++	partition at 180000 {
++		label = "key_store";
++		reg = <0x0180000 0x0080000>;
++	};
++	partition at 200000 {
++		label = "info";
++		reg = <0x0200000 0x0080000>;
++	};
++	partition at 280000 {
++		label = "etc";
++		reg = <0x0280000 0x0a00000>;
++	};
++	partition at c80000 {
++		label = "kernel_1";
++		reg = <0x0c80000 0x0a00000>;
++	};
++	partition at 1680000 {
++		label = "rootfs1";
++		reg = <0x1680000 0x2fc0000>;
++	};
++	partition at 4640000 {
++		label = "kernel_2";
++		reg = <0x4640000 0x0a00000>;
++	};
++	partition at 5040000 {
++		label = "rootfs2";
++		reg = <0x5040000 0x2fc0000>;
 +	};
 +};
 -- 
