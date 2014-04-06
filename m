@@ -1,71 +1,54 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sun,  6 Apr 2014 16:58:14 +0200
-Subject: [PATCH 2/5] gpio: omap: check gpiochip_add() return value
-In-Reply-To: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1396796297-13002-3-git-send-email-javier.martinez@collabora.co.uk>
+Date: Sun,  6 Apr 2014 16:58:12 +0200
+Subject: [PATCH 0/5] GPIO OMAP driver changes for v3.16
+Message-ID: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpiochip_add() function can fail if the chip cannot
-be registered so the return value has to be checked and
-the error propagated in case it happens.
+Hi Linus,
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- drivers/gpio/gpio-omap.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+Now that you have sent your changes for v3.15 to Torvalds, here are some
+changes for the OMAP GPIO driver targeted to v3.16. Mostly improvements
+so nothing here is -rc material.
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 3ee9b8d..e717888 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1081,10 +1081,11 @@ omap_mpuio_alloc_gc(struct gpio_bank *bank, unsigned int irq_start,
- 			       IRQ_NOREQUEST | IRQ_NOPROBE, 0);
- }
- 
--static void omap_gpio_chip_init(struct gpio_bank *bank)
-+static int omap_gpio_chip_init(struct gpio_bank *bank)
- {
- 	int j;
- 	static int gpio;
-+	int ret;
- 
- 	/*
- 	 * REVISIT eventually switch from OMAP-specific gpio structs
-@@ -1110,7 +1111,11 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
- 	}
- 	bank->chip.ngpio = bank->width;
- 
--	gpiochip_add(&bank->chip);
-+	ret = gpiochip_add(&bank->chip);
-+	if (ret) {
-+		dev_err(bank->dev, "Could not register gpio chip\n", ret);
-+		return ret;
-+	}
- 
- 	for (j = 0; j < bank->width; j++) {
- 		int irq = irq_create_mapping(bank->domain, j);
-@@ -1139,6 +1144,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct gpio_bank *bank;
- 	int irq_base = 0;
-+	int ret;
- 
- 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
- 
-@@ -1223,7 +1229,11 @@ static int omap_gpio_probe(struct platform_device *pdev)
- 		mpuio_init(bank);
- 
- 	omap_gpio_mod_init(bank);
--	omap_gpio_chip_init(bank);
-+
-+	ret = omap_gpio_chip_init(bank);
-+	if (ret)
-+		return ret;
-+
- 	omap_gpio_show_rev(bank);
- 
- 	pm_runtime_put(bank->dev);
+The biggest change is Patch 4 that converts the driver to use the newly
+introduced generic irqchip helpers in the gpiolib core which allows to
+remove some driver specific logic that should really be generic.
+
+Aaro and Paul,
+
+I've just build tested using omap1_defconfig since I don't have any OMAP1
+board to test. It would be nice if you could test using any of your boards
+to see if this patch-set does not introduce a regression. Specially on those
+using MPUIO interrupt generation since I'm not familiar with it and I could
+get something wrong while studying the code.
+
+I prefer this set to not be merged until we have some testing on OMAP1 SoCs.
+
+Santosh and Kevin,
+
+If you agree I would like to be added to the list of maintainers for this
+driver since that is what I've been doing lately anyways and that way tools
+like get_maintainer.pl will hint people posting patches that I'm interested
+in being cc'ed for this driver.
+
+The patch-set is composed of the following patches: 
+
+Javier Martinez Canillas (5):
+  gpio: omap: convert to use irq_domain_add_simple()
+  gpio: omap: check gpiochip_add() return value
+  gpio: omap: add a GPIO_OMAP option instead of using ARCH_OMAP
+  gpio: omap: convert driver to use gpiolib irqchip
+  MAINTAINERS: update GPIO OMAP driver entry
+
+ MAINTAINERS              |   1 +
+ drivers/gpio/Kconfig     |   8 +++
+ drivers/gpio/Makefile    |   2 +-
+ drivers/gpio/gpio-omap.c | 128 +++++++++++++++++++++++------------------------
+ 4 files changed, 73 insertions(+), 66 deletions(-)
+
+Thanks a lot and best regards,
+Javier
+
 -- 
 1.9.0
