@@ -1,30 +1,36 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 06 Apr 2014 19:28:35 +0200
-Subject: Kconfig ARM_ERRATA_753970?
-In-Reply-To: <53418889.2050002@free-electrons.com>
-References: <201404052101.19381.arnd@arndb.de>
- <201404052104.11363.arnd@arndb.de> <1396777049.30640.9.camel@x220>
- <53418889.2050002@free-electrons.com>
-Message-ID: <1396805315.7723.8.camel@x220>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sun, 6 Apr 2014 19:43:34 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+References: <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140405193435.50d8dd81@skate>
+ <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
+ <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+Message-ID: <20140406174334.GH29787@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-04-06 at 19:02 +0200, Gregory CLEMENT wrote:
-> Yes it is correct. ARM_ERRATA_753970 was renamed to PL310_ERRATA_753970
-> in kernel 3.2. 
+Hi Neil,
 
-Thanks! That was commit fa0ce4035d48 ("ARM: 7162/1: errata: tidy up
-Kconfig options for PL310 errata workarounds"), by the way. I hadn't
-checked the history of the tree. Had I bothered to do so this all would
-have been less mysterious.
-
-> I had just carry on the symbol name without noticed that
-> it have changed.
+On Sun, Apr 06, 2014 at 04:34:08PM +0100, Neil Greatorex wrote:
+> Thomas,
 > 
-> Do you want to send a fix, or do you prefer I take care of it?
+> On Sat, 5 Apr 2014, Neil Greatorex wrote:
+> 
+> >I will redo the patch with a local variable tomorrow and resend it.
+> >
+> 
+> As promised, here is the updated patch. As before, I would appreciate 
+> comments and/or Tested-bys...
 
-It is a trivial fix, but it might need some testing, which I can't do.
-So I guess it's easiest if you take care of it.
+OK still works on XP-GP.
 
+   Tested-by: Willy Tarreau <w@1wt.eu>
 
-Paul Bolle
+Willy
