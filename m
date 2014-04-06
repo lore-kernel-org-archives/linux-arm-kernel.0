@@ -1,118 +1,35 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun,  6 Apr 2014 23:19:05 +0100
-Subject: [PATCH 2/3] arm64: Remove the aux_context structure
-In-Reply-To: <1396822746-26241-1-git-send-email-catalin.marinas@arm.com>
-References: <1396822746-26241-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1396822746-26241-3-git-send-email-catalin.marinas@arm.com>
+Date: Sun, 6 Apr 2014 23:27:39 +0100
+Subject: [PATCH] arm64: fix !CONFIG_COMPAT build failures
+In-Reply-To: <1396707949-397-1-git-send-email-msalter@redhat.com>
+References: <1396707949-397-1-git-send-email-msalter@redhat.com>
+Message-ID: <20140406222737.GA26274@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the aux_context structure (and the containing file)
-to allow the placement of the _aarch64_ctx end magic based on the
-context stored on the signal stack.
+On Sat, Apr 05, 2014 at 03:25:49PM +0100, Mark Salter wrote:
+> Recent arm64 builds using CONFIG_ARM64_64K_PAGES are failing with:
+> 
+>   arch/arm64/kernel/perf_regs.c: In function ?perf_reg_abi?:
+>   arch/arm64/kernel/perf_regs.c:41:2: error: implicit declaration of function ?is_compat_thread?
+> 
+>   arch/arm64/kernel/perf_event.c:1398:2: error: unknown type name ?compat_uptr_t?
+> 
+> This is due to some recent arm64 perf commits with compat support:
+> 
+>   commit 23c7d70d55c6d9:
+>     ARM64: perf: add support for frame pointer unwinding in compat mode
+> 
+>   commit 2ee0d7fd36a3f8:
+>     ARM64: perf: add support for perf registers API
+> 
+> Those patches make the arm64 kernel unbuildable if CONFIG_COMPAT is not
+> defined and CONFIG_ARM64_64K_PAGES depends on !CONFIG_COMPAT. This patch
+> allows the arm64 kernel to build with and without CONFIG_COMPAT.
+> 
+> Signed-off-by: Mark Salter <msalter@redhat.com>
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/sigcontext.h | 31 -------------------------------
- arch/arm64/kernel/signal.c          | 27 +++++++++++++++++----------
- 2 files changed, 17 insertions(+), 41 deletions(-)
- delete mode 100644 arch/arm64/include/asm/sigcontext.h
+Thanks. Applied.
 
-diff --git a/arch/arm64/include/asm/sigcontext.h b/arch/arm64/include/asm/sigcontext.h
-deleted file mode 100644
-index dca1094acc74..000000000000
---- a/arch/arm64/include/asm/sigcontext.h
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#ifndef __ASM_SIGCONTEXT_H
--#define __ASM_SIGCONTEXT_H
--
--#include <uapi/asm/sigcontext.h>
--
--/*
-- * Auxiliary context saved in the sigcontext.__reserved array. Not exported to
-- * user space as it will change with the addition of new context. User space
-- * should check the magic/size information.
-- */
--struct aux_context {
--	struct fpsimd_context fpsimd;
--	/* additional context to be added before "end" */
--	struct _aarch64_ctx end;
--};
--#endif
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 890a591f75dd..7ff2eee96c6b 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -100,8 +100,7 @@ static int restore_sigframe(struct pt_regs *regs,
- {
- 	sigset_t set;
- 	int i, err;
--	struct aux_context __user *aux =
--		(struct aux_context __user *)sf->uc.uc_mcontext.__reserved;
-+	void *aux = sf->uc.uc_mcontext.__reserved;
- 
- 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
- 	if (err == 0)
-@@ -121,8 +120,11 @@ static int restore_sigframe(struct pt_regs *regs,
- 
- 	err |= !valid_user_regs(&regs->user_regs);
- 
--	if (err == 0)
--		err |= restore_fpsimd_context(&aux->fpsimd);
-+	if (err == 0) {
-+		struct fpsimd_context *fpsimd_ctx =
-+			container_of(aux, struct fpsimd_context, head);
-+		err |= restore_fpsimd_context(fpsimd_ctx);
-+	}
- 
- 	return err;
- }
-@@ -167,8 +169,8 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
- 			  struct pt_regs *regs, sigset_t *set)
- {
- 	int i, err = 0;
--	struct aux_context __user *aux =
--		(struct aux_context __user *)sf->uc.uc_mcontext.__reserved;
-+	void *aux = sf->uc.uc_mcontext.__reserved;
-+	struct _aarch64_ctx *end;
- 
- 	/* set up the stack frame for unwinding */
- 	__put_user_error(regs->regs[29], &sf->fp, err);
-@@ -185,12 +187,17 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
- 
- 	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
- 
--	if (err == 0)
--		err |= preserve_fpsimd_context(&aux->fpsimd);
-+	if (err == 0) {
-+		struct fpsimd_context *fpsimd_ctx =
-+			container_of(aux, struct fpsimd_context, head);
-+		err |= preserve_fpsimd_context(fpsimd_ctx);
-+		aux += sizeof(*fpsimd_ctx);
-+	}
- 
- 	/* set the "end" magic */
--	__put_user_error(0, &aux->end.magic, err);
--	__put_user_error(0, &aux->end.size, err);
-+	end = aux;
-+	__put_user_error(0, &end->magic, err);
-+	__put_user_error(0, &end->size, err);
- 
- 	return err;
- }
+-- 
+Catalin
