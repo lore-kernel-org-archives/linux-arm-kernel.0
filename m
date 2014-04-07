@@ -1,22 +1,28 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 07 Apr 2014 15:16:28 +0400
-Subject: [PATCH] ARM: shmobile: r8a7791: Add EHCI MSTP clock
-In-Reply-To: <20140407060421.25826.64819.sendpatchset@w520>
-References: <20140407060421.25826.64819.sendpatchset@w520>
-Message-ID: <5342890C.8090703@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 07 Apr 2014 13:16:56 +0200
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <1396862008.3671.39.camel@pasglop>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140407083550.GF17163@e106497-lin.cambridge.arm.com>
+ <1396862008.3671.39.camel@pasglop>
+Message-ID: <4164782.o9VMXFGud6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Monday 07 April 2014 19:13:28 Benjamin Herrenschmidt wrote:
+> On Mon, 2014-04-07 at 09:35 +0100, Liviu Dudau wrote:
+> > Thanks for the summary, is really useful as I was recently looking
+> > into code in that
+> > area. One thing I was trying to understand is why ppc needs _IO_BASE
+> > at all rather
+> > than using the generic PCI_IOBASE? 
+> 
+> Perhaps because our code predates it ?  I haven't looked much into
+> the semantics of PCI_IOBASE yet...
 
-On 07-04-2014 10:04, Magnus Damm wrote:
+Yes, I'm pretty sure that's all there is to it. PCI_IOBASE just
+happened to be an identifier we picked for asm-generic, but the
+use on PowerPC is much older than the generic file.
 
-> From: Magnus Damm <damm@opensource.se>
-
-> Add support for EHCI clock gating via the MSTP703 bit on r8a7791.
-
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-
-    I have already posted such patch at end of the last week.
-
-WBR, Sergei
+	Arnd
