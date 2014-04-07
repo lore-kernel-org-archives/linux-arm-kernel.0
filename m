@@ -1,36 +1,18 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 7 Apr 2014 18:16:24 +0100
-Subject: disabling MMU of ARMv7-A
-In-Reply-To: <20140407103312.GA7528@n2100.arm.linux.org.uk>
-References: <015e01cf4a55$7f43a950$7dcafbf0$@samsung.com>
- <20140328104349.GG21330@arm.com>
- <20140407095629.GA3951@e103592.cambridge.arm.com>
- <20140407103312.GA7528@n2100.arm.linux.org.uk>
-Message-ID: <20140407171624.GB3951@e103592.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Apr 2014 18:25:51 +0100
+Subject: [PATCH arm64 bootwrapper] Fix maintainer-clean make target
+In-Reply-To: <1396566421.4369.28.camel@smoke>
+References: <1396566421.4369.28.camel@smoke>
+Message-ID: <20140407172551.GE8479@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 11:33:12AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 07, 2014 at 10:56:36AM +0100, Dave Martin wrote:
-> > Agreed -- CONFIG_MMU=n does not need to imply that the MMU is turned off:
-> > everything must be indentity-mapped (VA = PA), but it is still desirable
-> > to define attributes.  For SMP, it's *necessary* to define attributes,
-> > otherwise we can't guarantee working spinlocks etc.
+On Fri, Apr 04, 2014 at 12:07:01AM +0100, Geoff Levand wrote:
+> Add the missing MAINTAINERCLEANFILES to makefile.am.
 > 
-> It's also necessary for UP as well, as the load-exclusive and
-> store-exclusive must still work.  Remember these instructions get used
-> for more than just spinlocks.
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
 
-Agreed.
+Thanks. Applied.
 
-Nothing in head-nommu.S seems to create any initial page tables or
-turn on the MMU, although we do set up an MPU instead if there is one,
-
-Is !MMU known to work with v6 and later?  I'm starting to have doubts.
-
-My understanding of the ARM ARM is that a system may generate an abort
-if ldrex/strex is attempted with the MMU off, though there are at least
-some platforms that don't do that.
-
-Cheers
----Dave
+-- 
+Catalin
