@@ -1,60 +1,197 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 07 Apr 2014 19:44:45 +0200
-Subject: [PATCH V2 17/17] ARM: exynos: config: Enable cpuidle
-In-Reply-To: <CAOesGMgkbfUX=cJ4rMf+-26Sq_fYUNW8m6unNiCXHKwj83dLbw@mail.gmail.com>
-References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
- <5825506.2ErDt1UQ5r@amdc1032>
- <CAOesGMgkbfUX=cJ4rMf+-26Sq_fYUNW8m6unNiCXHKwj83dLbw@mail.gmail.com>
-Message-ID: <3344539.A0GIVp3yPt@amdc1032>
+Date: Mon, 07 Apr 2014 19:50:06 +0200
+Subject: [PATCH 1/4] ata: ahci_mvebu: new driver for Marvell Armada 380
+ AHCI interfaces
+In-Reply-To: <1396882664-19297-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1396882664-19297-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1396882664-19297-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <2819007.7Vym3v6BRo@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi,
 
-On Monday, April 07, 2014 09:28:39 AM Olof Johansson wrote:
-> On Fri, Apr 4, 2014 at 9:09 AM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
+On Monday, April 07, 2014 04:57:41 PM Thomas Petazzoni wrote:
+> The Marvell Armada 380 SoC includes two AHCI compatible
+> interfaces. However, like all DMA-capable Marvell interface, they
+> require special handling to configure MBus windows. Therefore, this
+> commit adds a new ahci_mvebu driver, which relies on the
+> libahci_platform.c code recently introduced.
 > 
-> [...]
-> >   I know that this is mainly our problem but the issue is widespread on
-> >   our targets and I believe that adding some workaround for it in cpuidle
-> >   core would be beneficial for the whole cpuidle subsystem.
-
-On the second look at the cpuidle code there is a "cpuidle.off" kernel
-parameter which should be sufficient to workaround this particular issue
-for now.
-
-> Yes, we need to find a way forward without you guys holding the whole
-> platform hostage with out-of-tree code (here and in general, since I
-> think there are more areas in which this applies).
-
-Please explain this more because I really don't know what you're meaning
-here (at least in case of SRPOL I feel that there are no such issues).
-
-In this particular case we have a problem with a modified uboot bootloader
-versions being broken and incompatible with the advanced AFTR cpuidle mode.
-This is not the only / main issue preventing AFTR mode and thus EXYNOS
-cpuidle driver from being used by default so I really think that the your
-comment was unfair.
-
-> >  Namely there
-> >   should be some way of telling cpuidle subsystem to either disable
-> >   particular state(s) or limit the max available state.  I think that this
-> >   can be also useful for testing and development of other cpuidle drivers.
-> >
-> > For now please change this patch to add CONFIG_CPU_IDLE=n instead (since
-> > the config option is "default y" it will be auto-enabled if there is no
-> > entry in the defconfig)..
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/ata/ahci-platform.txt      |   3 +-
+>  drivers/ata/Kconfig                                |   9 ++
+>  drivers/ata/Makefile                               |   1 +
+>  drivers/ata/ahci_mvebu.c                           | 105 +++++++++++++++++++++
+>  4 files changed, 117 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/ata/ahci_mvebu.c
 > 
-> Can the code be refactored such that even if CPU_IDLE is on, it won't
-> actually do anything useful on the platforms that have problems above?
-> I.e. determined at runtime, not build time?
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> index 48b285f..271746d 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> @@ -7,7 +7,8 @@ Required properties:
+>  - compatible        : compatible list, one of "snps,spear-ahci",
+>                        "snps,exynos5440-ahci", "ibm,476gtr-ahci",
+>                        "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
+> -                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
+> +                      "fsl,imx6q-ahci", "snps,dwc-ahci" or
+> +                      "marvell,armada-380-ahci"
+>  - interrupts        : <interrupt mapping for SATA IRQ>
+>  - reg               : <registers mapping>
+>  
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 2e4da3b..cb987e9 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -123,6 +123,15 @@ config AHCI_IMX
+>  
+>  	  If unsure, say N.
+>  
+> +config AHCI_MVEBU
+> +	tristate "Marvell EBU AHCI SATA support"
+> +	depends on ARCH_MVEBU
+> +	help
+> +	  This option enables support for the Marvebu EBU SoC's
+> +	  onboard AHCI SATA.
+> +
+> +	  If unsure, say N.
+> +
+>  config AHCI_SUNXI
+>  	tristate "Allwinner sunxi AHCI SATA support"
+>  	depends on ARCH_SUNXI
+> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+> index 44c8016..5a02aee 100644
+> --- a/drivers/ata/Makefile
+> +++ b/drivers/ata/Makefile
+> @@ -12,6 +12,7 @@ obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
+>  obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+>  obj-$(CONFIG_AHCI_DA850)	+= ahci_da850.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
+> +obj-$(CONFIG_AHCI_MVEBU)	+= ahci_mvebu.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_ST)		+= ahci_st.o libahci.o libahci_platform.o
+>  obj-$(CONFIG_AHCI_XGENE)	+= ahci_xgene.o libahci.o libahci_platform.o
+> diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
+> new file mode 100644
+> index 0000000..ca90b18
+> --- /dev/null
+> +++ b/drivers/ata/ahci_mvebu.c
+> @@ -0,0 +1,105 @@
+> +/*
+> + * AHCI glue platform driver for Marvell EBU SOCs
+> + *
+> + * Copyright (C) 2014 Marvell
+> + *
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + * Marcin Wojtas <mw@semihalf.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/ahci_platform.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mbus.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include "ahci.h"
+> +
+> +#define AHCI_WINDOW_CTRL(win)	(0x60 + ((win) << 4))
+> +#define AHCI_WINDOW_BASE(win)	(0x64 + ((win) << 4))
+> +#define AHCI_WINDOW_SIZE(win)	(0x68 + ((win) << 4))
+> +
+> +static void ahci_mvebu_mbus_config(struct ahci_host_priv *hpriv,
+> +				   const struct mbus_dram_target_info *dram)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < 4; i++) {
+> +		writel(0, hpriv->mmio + AHCI_WINDOW_CTRL(i));
+> +		writel(0, hpriv->mmio + AHCI_WINDOW_BASE(i));
+> +		writel(0, hpriv->mmio + AHCI_WINDOW_SIZE(i));
+> +	}
+> +
+> +	for (i = 0; i < dram->num_cs; i++) {
+> +		const struct mbus_dram_window *cs = dram->cs + i;
+> +
+> +		writel((cs->mbus_attr << 8) |
+> +		       (dram->mbus_dram_target_id << 4) | 1,
+> +		       hpriv->mmio + AHCI_WINDOW_CTRL(i));
+> +		writel(cs->base, hpriv->mmio + AHCI_WINDOW_BASE(i));
+> +		writel(((cs->size - 1) & 0xffff0000),
+> +		       hpriv->mmio + AHCI_WINDOW_SIZE(i));
+> +	}
+> +}
+> +
+> +static const struct ata_port_info ahci_mvebu_port_info = {
+> +	.flags	   = AHCI_FLAG_COMMON,
+> +	.pio_mask  = ATA_PIO4,
+> +	.udma_mask = ATA_UDMA6,
+> +	.port_ops  = &ahci_platform_ops,
+> +};
+> +
+> +static int ahci_mvebu_probe(struct platform_device *pdev)
+> +{
+> +	struct ahci_host_priv *hpriv;
+> +	const struct mbus_dram_target_info *dram;
+> +	int rc;
+> +
+> +	hpriv = ahci_platform_get_resources(pdev);
+> +	if (IS_ERR(hpriv))
+> +		return PTR_ERR(hpriv);
+> +
+> +	rc = ahci_platform_enable_resources(hpriv);
+> +	if (rc)
+> +		return rc;
+> +
+> +	dram = mv_mbus_dram_info();
+> +	if (dram)
+> +		ahci_mvebu_mbus_config(hpriv, dram);
+> +
+> +	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info, 0, 0);
+> +	if (rc)
+> +		goto disable_resources;
+> +
+> +	return 0;
+> +
+> +disable_resources:
+> +	ahci_platform_disable_resources(hpriv);
+> +	return rc;
+> +}
+> +
+> +static const struct of_device_id ahci_mvebu_of_match[] = {
+> +	{ .compatible = "marvell,armada-380-ahci", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
+> +
+> +static struct platform_driver ahci_mvebu_driver = {
+> +	.probe = ahci_mvebu_probe,
+> +	.remove = ata_platform_remove_one,
+> +	.driver = {
+> +		.name = "ahci-mvebu",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = ahci_mvebu_of_match,
 
-We can disable AFTR mode by default on EXYNOS4x12 SoCs with secure mode
-enabled and EXYNOS5420 SoCs (I would like somebody with the hardware to
-verify that AFTR mode is not working first so we have 100% certainty
-that we don't regress here).
+Why is the Power Management support missing from this driver?
+
+> +	},
+> +};
+> +module_platform_driver(ahci_mvebu_driver);
+> +
+> +MODULE_DESCRIPTION("Marvell EBU AHCI SATA driver");
+> +MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>, Marcin Wojtas <mw@semihalf.com>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_ALIAS("platform:ahci_mv");
+
+platform:ahci_mvebu ?
+
+Otherwise it looks good.
 
 Best regards,
 --
