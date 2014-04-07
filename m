@@ -1,33 +1,18 @@
-From: elder@linaro.org (Alex Elder)
-Date: Mon, 07 Apr 2014 08:25:33 -0500
-Subject: drivers/clk/bcm/clk-bcm281xx.c breaks on GCC 4.6.4 (and earlier)
-In-Reply-To: <20140407092609.GY7528@n2100.arm.linux.org.uk>
-References: <20140407092609.GY7528@n2100.arm.linux.org.uk>
-Message-ID: <5342A74D.4030303@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 7 Apr 2014 21:40:13 +0800
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <20140407090927.GW7528@n2100.arm.linux.org.uk>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <20140311034607.GA26502@S2101-09.ap.freescale.net>
+ <20140407042334.GA28025@dragon>
+ <20140407090927.GW7528@n2100.arm.linux.org.uk>
+Message-ID: <20140407134010.GA2438@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2014 04:26 AM, Russell King - ARM Linux wrote:
-> So this greeted me this morning...
+On Mon, Apr 07, 2014 at 10:09:27AM +0100, Russell King - ARM Linux wrote:
+> So no EDID.  Did you update the "ddc" property to "ddc-i2c-bus" ?
 
-Russell, can you try the attached patch to verify it resolves
-your errors?  If so I'll send it to Linus as an urgent update.
+Ah, right.  This is exactly the cause.  Thanks, Russell.
 
-					-Alex
-
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'frac_width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'scaled_div' specified in initializer
-
-. . .
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-clk-bcm281xx-don-t-use-unnamed-structs-or-unions.patch
-Type: text/x-patch
-Size: 14869 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/28e91706/attachment.bin>
+Shawn
