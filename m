@@ -1,42 +1,37 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Mon,  7 Apr 2014 14:44:51 +0200
-Subject: [PATCH v12][ 12/12] ARM: imx_v6_v7_defconfig: Add more drm drivers.
-In-Reply-To: <1396874691-27954-1-git-send-email-denis@eukrea.com>
-References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
-Message-ID: <1396874691-27954-12-git-send-email-denis@eukrea.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 07 Apr 2014 13:48:12 +0100
+Subject: [PATCH v3] arm: Fix DEBUG_LL for multi-platform kernels (without
+ PL01X)
+In-Reply-To: <1396626102-13991-1-git-send-email-daniel.thompson@linaro.org>
+References: <1396622847-12718-1-git-send-email-daniel.thompson@linaro.org>
+ <1396626102-13991-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <53429E8C.3000403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DRM_PANEL_SIMPLE is needed by the eukrea
-mbimxsd51's displays.
+On 04/04/14 16:41, Daniel Thompson wrote:
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 0531da8..7e19c94 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -989,12 +989,7 @@ config DEBUG_LL_INCLUDE
+>  
+>  # Compatibility options for PL01x
+>  config DEBUG_UART_PL01X
+> -	def_bool ARCH_EP93XX || \
+> -		ARCH_INTEGRATOR || \
+> -		ARCH_SPEAR3XX || \
+> -		ARCH_SPEAR6XX || \
+> -		ARCH_SPEAR13XX || \
+> -		ARCH_VERSATILE
+> +	bool
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v10->v11:
-- New patch, splitting it would be overkill.
----
- arch/arm/configs/imx_v6_v7_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+NACK!
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 09e9743..0316926 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -183,6 +183,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_CODA=y
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_DRM=y
-+CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
-@@ -245,6 +246,7 @@ CONFIG_DRM_IMX_TVE=y
- CONFIG_DRM_IMX_LDB=y
- CONFIG_DRM_IMX_IPUV3_CORE=y
- CONFIG_DRM_IMX_IPUV3=y
-+CONFIG_DRM_IMX_HDMI=y
- CONFIG_COMMON_CLK_DEBUG=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_PWM=y
--- 
-1.7.9.5
+Sorry. I've got my posting-a-patch and my testing in the wrong order!
+
+This patch regresses the build for (at least) the versatile. Expect v4
+in due course (after I have improved my build automation).
+
+
+Daniel.
