@@ -1,223 +1,69 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 7 Apr 2014 14:25:17 +0200
-Subject: [PATCH RFC v5 3/3] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <20140404155622.GA4061@e102568-lin.cambridge.arm.com>
-References: <1395142132-20788-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1395142132-20788-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20140404155622.GA4061@e102568-lin.cambridge.arm.com>
-Message-ID: <CAKfTPtB=94pA__3pgO0G+=RZucwgGJ7rW0+HoAJLpWOtCo7g4Q@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon,  7 Apr 2014 14:28:46 +0200
+Subject: [PATCH] ARM: OMAP2+: Add support for RNG on DT booted N900
+Message-ID: <1396873726-4657-1-git-send-email-sre@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2014 17:56, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> [replying to self, since I have a query]
->
-> [...]
->
->> +===========================================
->> +4 - Examples
->> +===========================================
->> +
->> +Example 1 (ARM 64-bit, 16-cpu system):
->> +
->> +pd_clusters: power-domain-clusters at 80002000 {
->> +       compatible = "arm,power-controller";
->> +       reg = <0x0 0x80002000 0x0 0x1000>;
->> +       #power-domain-cells = <1>;
->> +       #address-cells = <2>;
->> +       #size-cells = <2>;
->> +
->> +       pd_cores: power-domain-cores at 80000000 {
->> +               compatible = "arm,power-controller";
->> +               reg = <0x0 0x80000000 0x0 0x1000>;
->> +               #power-domain-cells = <1>;
->> +       };
->> +};
->> +
->> +cpus {
->> +       #size-cells = <0>;
->> +       #address-cells = <2>;
->> +
->> +       idle-states {
->> +               entry-method = "arm,psci-cpu-suspend";
->> +
->> +               CLUSTER_RETENTION_0: cluster-retention-0 {
->> +                       compatible = "arm,idle-state";
->> +                       index = <2>;
->> +                       logic-state-retained;
->> +                       cache-state-retained;
->> +                       entry-method-param = <0x1010000>;
->> +                       entry-latency-us = <50>;
->> +                       exit-latency-us = <100>;
->> +                       min-residency-us = <250>;
->> +                       power-domains = <&pd_clusters 0>;
->> +                       CPU_RETENTION_0_0: cpu-retention-0 {
->> +                               compatible = "arm,idle-state";
->> +                               index = <0>;
->> +                               cache-state-retained;
->> +                               entry-method-param = <0x0010000>;
->> +                               entry-latency-us = <20>;
->> +                               exit-latency-us = <40>;
->> +                               min-residency-us = <30>;
->> +                               power-domains = <&pd_cores 0>,
->> +                                               <&pd_cores 1>,
->> +                                               <&pd_cores 2>,
->> +                                               <&pd_cores 3>,
->> +                                               <&pd_cores 4>,
->> +                                               <&pd_cores 5>,
->> +                                               <&pd_cores 6>,
->> +                                               <&pd_cores 7>;
->> +                       };
->> +               };
->> +
->> +               CLUSTER_SLEEP_0: cluster-sleep-0 {
->> +                       compatible = "arm,idle-state";
->> +                       index = <3>;
->> +                       entry-method-param = <0x1010000>;
->> +                       entry-latency-us = <600>;
->> +                       exit-latency-us = <1100>;
->> +                       min-residency-us = <2700>;
->> +                       power-domains = <&pd_clusters 0>;
->> +                       CPU_SLEEP_0_0: cpu-sleep-0 {
->> +                               /* cpu sleep */
->> +                               compatible = "arm,idle-state";
->> +                               index = <1>;
->> +                               entry-method-param = <0x0010000>;
->> +                               entry-latency-us = <250>;
->> +                               exit-latency-us = <500>;
->> +                               min-residency-us = <350>;
->> +                               power-domains = <&pd_cores 0>,
->> +                                               <&pd_cores 1>,
->> +                                               <&pd_cores 2>,
->> +                                               <&pd_cores 3>,
->> +                                               <&pd_cores 4>,
->> +                                               <&pd_cores 5>,
->> +                                               <&pd_cores 6>,
->> +                                               <&pd_cores 7>;
->> +                       };
->> +               };
->
-> I noticed while developing the CPUidle generic driver, that by using this
-> representation I might end up requiring duplicated states.
->
-> For instance, a cluster-retention state and a cluster-sleep state might
-> want to have cpu-sleep state as substate, and this would require an
-> idle state node duplication.
->
-> I think it is better to have a single flat (and ordered...that would
-> kill two birds with one stone) list of nodes in the idle-states node and
-> every state might have a list of phandles to subnodes (substates), something
-> like the following example.
->
-> This simplifies parsing  and I think it solves the last issue I
-> came across (the need for duplicate states - in the bindings below,
-> CPU_SLEEP_0 is a substate of both CLUSTER_RETENTION_0 and
-> CLUSTER_SLEEP_0, through phandles).
+Add support for OMAP3 ROM Random Number Generator via
+pdata-quirks.
 
-Hi Lorenzo,
+Signed-off-by: Sebastian Reichel <sre@kernel.org>
+---
+Hi Tony,
 
-You explanation above has triggered a question. You writes:
-CPU_SLEEP_0 is a substate of CLUSTER_RETENTION_0 but i would have say
-that both CPU_SLEEP_0 and CPU_RETENTION_0 are substates of
-CLUSTER_RETENTION_0. I mean that if cpus are either in retention mode
-OR in  sleep mode, you can enter the CLUSTER_RETENTION_0 state (you
-can have some in sleep mode and other in retention of course)
-I'm wondering how this OR  will be described.
+I currently see no clean way to add DTS based support for the
+random number generator in the N900, so this patch initializes
+it using pdata-quirks.
 
-Then, IMHO, the flat description below is clearer and remove the
-duplicated description that you mention previously
+I think its worth adding this for now, since its one of the few
+things missing to get N900 DT based boot to the same level as
+platform data based boot.
 
-Regards,
-Vincent
+I've prepared a table tracking the patch status for my N900 DT
+patches targeting 3.16 at [0]. If I'm not mistaken all of the
+N900's hardware supported via platform data is also supported
+via DT after these patches are merged. The overall status (incl.
+hardware, which is also not supported by platform data) can
+be seen on [1].
 
->
-> Thoughts very appreciated, thanks.
->
-> Lorenzo
->
-> idle-states {
->        entry-method = "arm,psci-cpu-suspend";
->
->         CPU_RETENTION_0: cpu-retention-0 {
->                        compatible = "arm,idle-state";
->                        cache-state-retained;
->                        entry-method-param = <0x0010000>;
->                        entry-latency-us = <20>;
->                        exit-latency-us = <40>;
->                        min-residency-us = <30>;
->                        power-domains = <&pd_cores 0>,
->                                        <&pd_cores 1>,
->                                        <&pd_cores 2>,
->                                        <&pd_cores 3>,
->         };
->
->         CPU_SLEEP_0: cpu-sleep-0 {
->                        /* cpu sleep */
->                        compatible = "arm,idle-state";
->                        entry-method-param = <0x0010000>;
->                        entry-latency-us = <250>;
->                        exit-latency-us = <500>;
->                        min-residency-us = <350>;
->                        power-domains = <&pd_cores 0>,
->                                        <&pd_cores 1>,
->                                        <&pd_cores 2>,
->                                        <&pd_cores 3>,
->         };
->
->         CPU_SLEEP_1: cpu-sleep-1 {
->                        /* cpu sleep */
->                        compatible = "arm,idle-state";
->                        entry-method-param = <0x0010000>;
->                        entry-latency-us = <250>;
->                        exit-latency-us = <500>;
->                        min-residency-us = <350>;
->                                        <&pd_cores 4>,
->                                        <&pd_cores 5>,
->                                        <&pd_cores 6>,
->                                        <&pd_cores 7>;
->         };
->
->         CLUSTER_RETENTION_0: cluster-retention-0 {
->                compatible = "arm,idle-state";
->                logic-state-retained;
->                cache-state-retained;
->                entry-method-param = <0x1010000>;
->                entry-latency-us = <50>;
->                exit-latency-us = <800>;
->                min-residency-us = <2400>;
->                power-domains = <&pd_clusters 0>;
->                substates = <&CPU_SLEEP_0>;
->         };
->
->         CLUSTER_SLEEP_0: cluster-sleep-0 {
->                compatible = "arm,idle-state";
->                entry-method-param = <0x1010000>;
->                entry-latency-us = <600>;
->                exit-latency-us = <1100>;
->                min-residency-us = <2700>;
->                power-domains = <&pd_clusters 0>;
->                substates = <&CPU_SLEEP_0>;
->         };
->
->         CLUSTER_SLEEP_1: cluster-sleep-1 {
->                compatible = "arm,idle-state";
->                entry-method-param = <0x1010000>;
->                entry-latency-us = <600>;
->                exit-latency-us = <1100>;
->                min-residency-us = <2700>;
->                power-domains = <&pd_clusters 1>;
->                substates = <&CPU_SLEEP_1>;
->         };
->
->         SYSTEM_SLEEP_0: system-sleep-0 {
->                compatible = "arm,idle-state";
->                entry-method-param = <0x2010000>;
->                entry-latency-us = <6000>;
->                exit-latency-us = <10000>;
->                min-residency-us = <30000>;
->                power-domains = <&pd_system 0>;
->                substates = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
->         };
-> };
->
+[0] http://elinux.org/N900/Changelog#Kernel_3.16_.28planned.29
+[1] http://elinux.org/N900#Kernel_Status
+
+-- Sebastian
+---
+ arch/arm/mach-omap2/pdata-quirks.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index b04c5f0..5baad1e 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -227,6 +227,14 @@ static void __init am3517_evm_legacy_init(void)
+ 	am35xx_emac_reset();
+ }
+ 
++static struct platform_device omap3_rom_rng_device = {
++	.name		= "omap3-rom-rng",
++	.id		= -1,
++	.dev	= {
++		.platform_data	= rx51_secure_rng_call,
++	},
++};
++
+ static void __init nokia_n900_legacy_init(void)
+ {
+ 	hsmmc2_internal_input_clk();
+@@ -240,6 +248,10 @@ static void __init nokia_n900_legacy_init(void)
+ 			pr_warning("RX-51: Not enabling ARM errata 430973 workaround\n");
+ 			pr_warning("Thumb binaries may crash randomly without this workaround\n");
+ 		}
++
++		pr_info("RX-51: Registring OMAP3 HWRNG device\n");
++		platform_device_register(&omap3_rom_rng_device);
++
+ 	}
+ }
+ #endif /* CONFIG_ARCH_OMAP3 */
+-- 
+1.9.1
