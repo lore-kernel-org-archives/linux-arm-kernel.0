@@ -1,27 +1,27 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 7 Apr 2014 14:10:15 +0530
-Subject: [PATCH v7 3/3] ARM: dts: add dts files for xyref5260 board
-In-Reply-To: <1396519224-18712-4-git-send-email-rahul.sharma@samsung.com>
-References: <1396519224-18712-1-git-send-email-rahul.sharma@samsung.com>
- <1396519224-18712-4-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAK9yfHwWh9sFivsg-P9wT6DXM2J3nYuHqzgfwuo_Go7S-vriVA@mail.gmail.com>
+Date: Mon, 7 Apr 2014 14:14:16 +0530
+Subject: [PATCH v6 2/3] ARM: dts: add dts files for exynos5260 SoC
+In-Reply-To: <1396502277-19588-3-git-send-email-rahul.sharma@samsung.com>
+References: <1396502277-19588-1-git-send-email-rahul.sharma@samsung.com>
+ <1396502277-19588-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CAK9yfHzBH9rTjJXPMM_OZhnVgpSY1Pj1Ne7Jy-v6zbp8g91zkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 April 2014 15:30, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> The patch adds the dts files for xyref5260 board which
-> is based on Exynos5260 Evt0 sample.
+On 3 April 2014 10:47, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> The patch adds the dts files for exynos5260.
 >
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 > ---
+<snip>
 
 > +/ {
-> +       model = "SAMSUNG XYREF5260 EVT0 board based on EXYNOS5260";
-> +       compatible = "samsung,xyref5260", "samsung,exynos5260";
+> +       compatible = "samsung,exynos5260";
 
-"samsung,exynos5260" is OK here for future compatibility (if soc
-specific quirk is required).
-Please also add "samsung,exynos5" to compatible list.
+Add "samsung,exynos5260" to the above list.
 
 -- 
 With warm regards,
