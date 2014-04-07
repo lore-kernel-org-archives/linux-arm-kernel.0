@@ -1,69 +1,39 @@
-From: tthayer@altera.com (tthayer at altera.com)
-Date: Mon, 7 Apr 2014 16:54:08 -0500
-Subject: [PATCH 2/3] dts: socfpga: Add bindings for Altera SoC SDRAM EDAC
-In-Reply-To: <1396907649-20212-1-git-send-email-tthayer@altera.com>
-References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
-Message-ID: <1396907649-20212-3-git-send-email-tthayer@altera.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 7 Apr 2014 14:56:49 -0700
+Subject: [PATCH v6 2/5] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <20140407201838.GC20822@pd.tnic>
+References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
+ <1396641450-12854-3-git-send-email-sboyd@codeaurora.org>
+ <20140407201838.GC20822@pd.tnic>
+Message-ID: <20140407215649.GH9985@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@altera.com>
+On 04/07, Borislav Petkov wrote:
+> On Fri, Apr 04, 2014 at 12:57:27PM -0700, Stephen Boyd wrote:
+> > diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
+> > new file mode 100644
+> > index 000000000000..5d514bbc88a6
+> > --- /dev/null
+> > +++ b/arch/arm/common/krait-l2-accessors.c
+> > @@ -0,0 +1,58 @@
+> > +/*
+> > + * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> 
+> Can we refer to COPYING here instead of adding that boilerplate to every
+> file?
 
-Addition of the Altera SDRAM EDAC bindings and device
-tree changes to the Altera SoC project.
+No. This is the template I'm told to use.
 
-Signed-off-by: Thor Thayer <tthayer@altera.com>
-To: Rob Herring <robherring2@gmail.com>
-To: Pawel Moll <pawel.moll@arm.com>
-To: Mark Rutland <mark.rutland@arm.com>
-To: Ian Campbell <ijc+devicetree@hellion.org.uk>
-To: Kumar Gala <galak@codeaurora.org>
-To: Rob Landley <rob@landley.net>
-To: Russell King <linux@arm.linux.org.uk>
-To: Dinh Nguyen <dinguyen@altera.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- .../bindings/arm/altera/socfpga-sdram-edac.txt     |   12 ++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
- 2 files changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-new file mode 100644
-index 0000000..9348c53
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-@@ -0,0 +1,12 @@
-+Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
-+
-+Required properties:
-+- compatible : should contain "altr,sdr-edac";
-+- interrupts : Should contain the SDRAM ECC IRQ in the
-+	appropriate format for the IRQ controller.
-+
-+Example:
-+	sdramedac at 0 {
-+		compatible = "altr,sdram-edac";
-+		interrupts = <0 39 4>;
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 6ce912e..a0ea69b 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -681,6 +681,11 @@
- 			reg = <0xffc25000 0x1000>;
- 		};
- 
-+		sdramedac at 0 {
-+			compatible = "altr,sdram-edac";
-+			interrupts = <0 39 4>;
-+		};
-+
- 		rstmgr at ffd05000 {
- 			compatible = "altr,rst-mgr";
- 			reg = <0xffd05000 0x1000>;
 -- 
-1.7.9.5
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
