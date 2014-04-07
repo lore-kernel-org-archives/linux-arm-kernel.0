@@ -1,25 +1,75 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 7 Apr 2014 08:56:52 +0200
-Subject: [PATCH] i2c: cadence: fix Kconfig dependency
-In-Reply-To: <5342481B.6020600@monstr.eu>
-References: <1396811227-8851-1-git-send-email-wsa@the-dreams.de>
- <20140407063100.GN29751@pengutronix.de>
- <5342481B.6020600@monstr.eu>
-Message-ID: <20140407065651.GA2609@katana>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 07 Apr 2014 08:56:50 +0200
+Subject: [PATCH v7 1/2] can: xilinx CAN controller support
+In-Reply-To: <3e750ec3-9d47-4b4e-8173-56698ab19786@CH1EHSMHS029.ehs.local>
+References: <3e750ec3-9d47-4b4e-8173-56698ab19786@CH1EHSMHS029.ehs.local>
+Message-ID: <53424C32.7090000@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/02/2014 03:13 PM, Kedareswara rao Appana wrote:
+> This patch adds xilinx CAN controller support.
+> This driver supports both ZYNQ CANPS and Soft IP
+> AXI CAN controller.
+> 
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v7:
+> - Updated the driver with review comments.
+> - Moved the driver bindings doc as a separte patch.
+> Changes for v6:
+> - Updated the driver with review comments.
+> - Used the clock names specified in the data sheet.
+> - Updated the devicetree bindings doc as per Rob suggestion.
+> Changes for v5:
+> - Updated the driver with the review comments.
+> - Remove the check for the tx fifo full interrupt condition
+>   form Tx interrupt routine as we are checking it in the _xmit
+>   routine.
+> - Clearing the txok interrupt in the tx interrupt routine for
+>   every Tx can frame.
+> Changes for v4:
+> - Added check for the tx fifo full interrupt condition in
+> Tx interrupt routine.
+> - Added be iohelper functions.
+> - Moved the clock enable/disable to probe/remove because of
+>   Added big endian support for AXI CAN controller case(reading
+>   a register during probe for that we need to enable clock).
+> Changes for v3:
+> - Updated the driver with the review comments.
+> - Modified the tranmit logic as per Marc suggestion.
+> - Enabling the clock when the interface is up to reduce the
+>   Power consumption.
+> Changes for v2:
+> - Updated with the review comments.
+> - Removed the unnecessary debug prints.
+> - include tx,rx fifo depths in ZYNQ CANPS case also
+> ---
+>  drivers/net/can/Kconfig      |    7 +
+>  drivers/net/can/Makefile     |    1 +
+>  drivers/net/can/xilinx_can.c | 1176 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1184 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/net/can/xilinx_can.c
 
-> I would suggest to add relaxed IO helper function to asm-generic/io.h
-> to be available for all archs. Then we can avoid this type of errors.
+Mark: Any update on this one?
+BTW: When you apply these patches you should apply 2/2 before 1/2. There is
+new checking for binding.
 
-I favour this, too. For the cadence driver, I needed a quick solution
-before linux-next breaks, though.
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/b36acb98/attachment.sig>
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/86cd59b5/attachment-0001.sig>
