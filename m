@@ -1,56 +1,54 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Apr 2014 17:50:54 +0200
-Subject: [PATCH 1/4] ata: ahci_mvebu: new driver for Marvell Armada 380
- AHCI interfaces
-In-Reply-To: <20140407151823.GG18785@lunn.ch>
-References: <1396882664-19297-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1396882664-19297-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140407151823.GG18785@lunn.ch>
-Message-ID: <20140407175054.3f57265b@skate>
+From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
+Date: Mon, 7 Apr 2014 15:52:08 +0000
+Subject: [PATCH 00/75] l2c series
+In-Reply-To: <53426BE8.5090405@monstr.eu>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <533D7672.4090003@monstr.eu> <20140403193328.GY7528@n2100.arm.linux.org.uk>
+ <533E5B71.20406@monstr.eu> <20140404192824.GG7528@n2100.arm.linux.org.uk>
+ <5342440E.2020301@monstr.eu> <20140407090002.GU7528@n2100.arm.linux.org.uk>
+ <53426BE8.5090405@monstr.eu>
+Message-ID: <1bd898f9-5fb8-4d9a-968c-711b607eb961@VA3EHSMHS031.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
 
-On Mon, 7 Apr 2014 17:18:23 +0200, Andrew Lunn wrote:
 
-> > diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> > index 48b285f..271746d 100644
-> > --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> > +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> > @@ -7,7 +7,8 @@ Required properties:
-> >  - compatible        : compatible list, one of "snps,spear-ahci",
-> >                        "snps,exynos5440-ahci", "ibm,476gtr-ahci",
-> >                        "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
-> > -                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
-> > +                      "fsl,imx6q-ahci", "snps,dwc-ahci" or
-> > +                      "marvell,armada-380-ahci"
-> 
-> Hi Thomas
-> 
-> Since this list is growing, maybe now would be a good time to sort it
-> alphabetically?
+>On 04/07/2014 11:00 AM, Russell King - ARM Linux wrote:
+>> On Mon, Apr 07, 2014 at 08:22:06AM +0200, Michal Simek wrote:
+>>> On 04/04/2014 09:28 PM, Russell King - ARM Linux wrote:
+>>>> On Fri, Apr 04, 2014 at 09:12:49AM +0200, Michal Simek wrote:
+>>>>> On 04/03/2014 09:33 PM, Russell King - ARM Linux wrote:
+>>>>>> On Thu, Apr 03, 2014 at 04:55:46PM +0200, Michal Simek wrote:
+>>>>>>> Hi Russell,
+>>>>>>>
+>>>>>>> On 03/28/2014 04:12 PM, Russell King - ARM Linux wrote:
+>>>>>>>> This is another posting of the L2 cache controller series.  I'm not
+>>>>>>>> planning for this for the upcoming merge window, but the one after,
+>>>>>>>> as people need to test it and still need to feed back to me on
+>>>>>>>> various issues.  Hence, this is not a finalised series.
+>>>>>>>>
+>>>> - a driver coupled to the arm,pl310-cache compatible for this which is
+>>>>   distinctly separate from the main "driver" is probably a bad idea.
+>>>>   what if we want our existing l2 stuff to couple into the driver model
+>>>>   to expose some properties at a later date (eg, maybe to deal with
+>>>>   stuff like the power management settings?)  For example, it may be
+>>>>   that we want to expose the prefetch offset so that people can easily
+>>>>   play with the value to determine the correct tuning for their workload.
+>>>
+>>> We choose that name for starting to discuss this how to do it better.
+>>> We could use zynq-edac-l2 or zynq-edac-r3p2, etc version.
+>>
+>> I'm not talking about the compatible name.  I'm certainly not suggesting
+>> that you should describe the L2 as two separate devices in DT.  I'm saying
+>> that this should appear as one _single_ driver for the entire device.
+>
+>great.
+>
+It means there are two drivers, one for l2 cache edac and one for l2 cache configuration
+ and management in a single file. Please correct me if I am wrong.
 
-Ok. I guess this would have to be a separate patch, preliminary to the
-introduction of the ahci_mvebu driver.
+Thanks.
+Punnaiah
 
-> > +	dram = mv_mbus_dram_info();
-> > +	if (dram)
-> > +		ahci_mvebu_mbus_config(hpriv, dram);
-> 
-> I know this is a common model for mv_sata, which has to deal with
-> devices without dram, but can 38x also work without dram? Or should
-> missing dram be considered fatal to the probe?
 
-Indeed in the current situation, dram should never be NULL, so the code
-could even be:
-
-	ahci_mvebu_mbus_config(hpriv, mv_mbus_dram_info());
-
-Will fix for v2.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
