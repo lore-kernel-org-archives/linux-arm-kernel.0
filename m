@@ -1,42 +1,40 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 07 Apr 2014 09:00:01 +0200
-Subject: [PATCH] i2c: cadence: fix Kconfig dependency
-In-Reply-To: <20140407065651.GA2609@katana>
-References: <1396811227-8851-1-git-send-email-wsa@the-dreams.de>
- <20140407063100.GN29751@pengutronix.de> <5342481B.6020600@monstr.eu>
- <20140407065651.GA2609@katana>
-Message-ID: <53424CF1.2040503@monstr.eu>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Mon, 7 Apr 2014 10:04:28 +0200
+Subject: [PATCH] arm64: fix !CONFIG_COMPAT build failures
+In-Reply-To: <20140406222737.GA26274@arm.com>
+References: <1396707949-397-1-git-send-email-msalter@redhat.com>
+ <20140406222737.GA26274@arm.com>
+Message-ID: <CAFrcx1kn+dMwMVrU1avLqe+PzQ6FvLSdVb7cf_uZF5_Pqw1yug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2014 08:56 AM, Wolfram Sang wrote:
-> 
->> I would suggest to add relaxed IO helper function to asm-generic/io.h
->> to be available for all archs. Then we can avoid this type of errors.
-> 
-> I favour this, too. For the cadence driver, I needed a quick solution
-> before linux-next breaks, though.
+On 7 April 2014 00:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Sat, Apr 05, 2014 at 03:25:49PM +0100, Mark Salter wrote:
+>> Recent arm64 builds using CONFIG_ARM64_64K_PAGES are failing with:
+>>
+>>   arch/arm64/kernel/perf_regs.c: In function 'perf_reg_abi':
+>>   arch/arm64/kernel/perf_regs.c:41:2: error: implicit declaration of function 'is_compat_thread'
+>>
+>>   arch/arm64/kernel/perf_event.c:1398:2: error: unknown type name 'compat_uptr_t'
+>>
+>> This is due to some recent arm64 perf commits with compat support:
+>>
+>>   commit 23c7d70d55c6d9:
+>>     ARM64: perf: add support for frame pointer unwinding in compat mode
+>>
+>>   commit 2ee0d7fd36a3f8:
+>>     ARM64: perf: add support for perf registers API
+>>
+>> Those patches make the arm64 kernel unbuildable if CONFIG_COMPAT is not
+>> defined and CONFIG_ARM64_64K_PAGES depends on !CONFIG_COMPAT. This patch
+>> allows the arm64 kernel to build with and without CONFIG_COMPAT.
+>>
+>> Signed-off-by: Mark Salter <msalter@redhat.com>
+>
+> Thanks. Applied.
+Thanks for tracking the problem!
 
-Sure. That's understandable.
-
-Before my comment I have sent this to Russell too.
-http://www.spinics.net/lists/arm-kernel/msg320285.html
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/9bcfaa59/attachment.sig>
+Jean
+>
+> --
+> Catalin
