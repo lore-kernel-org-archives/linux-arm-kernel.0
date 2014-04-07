@@ -1,70 +1,32 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 7 Apr 2014 09:35:50 +0100
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <1396777793.3671.15.camel@pasglop>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-2-git-send-email-Liviu.Dudau@arm.com>
- <20140405001953.GE15806@google.com>
- <1396777793.3671.15.camel@pasglop>
-Message-ID: <20140407083550.GF17163@e106497-lin.cambridge.arm.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 7 Apr 2014 14:08:17 +0530
+Subject: [PATCH v7 1/3] ARM: EXYNOS: initial board support for exynos5260
+ SoC
+In-Reply-To: <1396519224-18712-2-git-send-email-rahul.sharma@samsung.com>
+References: <1396519224-18712-1-git-send-email-rahul.sharma@samsung.com>
+ <1396519224-18712-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CAK9yfHzuVZh-RhfT+0tEehnF+aWnYHG=X2cv_E6uvzq2aS7UQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 06, 2014 at 10:49:53AM +0100, Benjamin Herrenschmidt wrote:
-> On Fri, 2014-04-04 at 18:19 -0600, Bjorn Helgaas wrote:
-> > > Introduce a pci_register_io_range() helper function that can be used
-> > > by the architecture code to keep track of the I/O ranges described by the
-> > > PCI bindings. If the PCI_IOBASE macro is not defined that signals
-> > > lack of support for PCI and we return an error.
-> > 
-> > I don't quite see how you intend to use this, because this series doesn't
-> > include any non-stub implementation of pci_register_io_range().
-> > 
-> > Is this anything like the ia64 strategy I mentioned above?  If so, it would
-> > be really nice to unify some of this stuff.
-> 
-> We also use two different strategies on ppc32 and ppc64
-> 
->  - On ppc32, inb/outb turn into an MMIO access to _IO_BASE + port
-> 
-> That _IO_BASE is a variable which is initialized to the ioremapped address
-> of the IO space MMIO aperture of the first bridge we discover. Then port
-> numbers are "fixed up" on all other bridges so that the addition _IO_BASE + port
-> fits the ioremapped address of the IO space on that bridge. A bit messy... and breaks
-> whenever drivers copy port numbers into variables of the wrong type such as shorts.
-> 
->  - On ppc64, we have more virtual space, so instead we reserve a range
-> of address space (fixed) for IO space, it's always the same. Bridges IO spaces
-> are then mapped into that range, so we always have a positive offset from _IO_BASE
-> which makes things a bit more robust and less "surprising" than ppc32. Additionally,
-> the first 64k are reserved. They are only mapped if we see an ISA bridge (which some
-> older machines have). Otherwise it's left unmapped, so crappy drivers trying to
-> hard code x86 IO ports will blow up immediately which I deem better than silently
-> whacking the wrong hardware. In addition, we have a mechanism we use on powernv to
-> re-route accesses to that first 64k to the power8 built-in LPC bus which can
-> have some legacy IOs on it such as a UART or a RTC.
-> 
-> Cheers,
-> Ben.
-> 
+Hi Rahul,
 
-Hi Benjamin,
+On 3 April 2014 15:30, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> This patch add basic arch side support for exynos5260 SoC.
+<snip>
 
-Thanks for the summary, is really useful as I was recently looking into code in that
-area. One thing I was trying to understand is why ppc needs _IO_BASE at all rather
-than using the generic PCI_IOBASE? 
+> @@ -374,6 +374,7 @@ static char const *exynos_dt_compat[] __initconst = {
+>         "samsung,exynos4412",
+>         "samsung,exynos5",
+>         "samsung,exynos5250",
+> +       "samsung,exynos5260",
 
-Best regards,
-Liviu
- 
+I don't think we should be adding this as we do not yet have any soc
+specific quirk.
+Compatibility to generic string, "samsung,exynos5"  should be sufficient.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+With warm regards,
+Sachin
