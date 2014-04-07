@@ -1,44 +1,96 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 07 Apr 2014 13:53:56 +0200
-Subject: [PATCH V2 16/17] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle directory
-In-Reply-To: <CAK9yfHzXk6ErtmNuT0Z-kMfUGT=GMmFugPR8J=-3SvPMagp6ZA@mail.gmail.com>
-References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>	<1396618989-2897-17-git-send-email-daniel.lezcano@linaro.org>
- <CAK9yfHzXk6ErtmNuT0Z-kMfUGT=GMmFugPR8J=-3SvPMagp6ZA@mail.gmail.com>
-Message-ID: <534291D4.1010803@linaro.org>
+From: elder@linaro.org (Alex Elder)
+Date: Mon, 07 Apr 2014 06:58:42 -0500
+Subject: drivers/clk/bcm/clk-bcm281xx.c breaks on GCC 4.6.4 (and earlier)
+In-Reply-To: <20140407092609.GY7528@n2100.arm.linux.org.uk>
+References: <20140407092609.GY7528@n2100.arm.linux.org.uk>
+Message-ID: <534292F2.1040803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2014 11:51 AM, Sachin Kamat wrote:
-> Hi Daniel,
->
-> On 4 April 2014 19:13, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
->> ---
->>   arch/arm/mach-exynos/Makefile                      |    1 -
->>   drivers/cpuidle/Kconfig.arm                        |    7 +++++++
->>   drivers/cpuidle/Makefile                           |    1 +
->>   .../cpuidle.c => drivers/cpuidle/cpuidle-exynos.c  |    0
->>   4 files changed, 8 insertions(+), 1 deletion(-)
->>   rename arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/cpuidle-exynos.c (100%)
->
-> This driver now references platform header file (plat/cpu.h) for some
-> Exynos5440 specific check
-> which is not good considering multiplatform support. Any plan to get
-> rid of this?
+On 04/07/2014 04:26 AM, Russell King - ARM Linux wrote:
+> So this greeted me this morning...
 
-Yes. Prevent to register the platform device for this board and remove 
-these lines in the driver.
+That sucks.
 
-What is the benefit of having a single state WFI cpuidle driver ? That 
-pulls all the governor computation and decision for nothing.
+I don't see that, and I'm running 4.6.3.  (And I'm obviously
+not testing with different versions of the compiler.)
+
+I'll be investigating.
+
+					-Alex
 
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'frac_width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:128:2: error: unknown field 'fixed' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:140:2: error: unknown field 'fixed' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:151:2: error: unknown field 'fixed' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'frac_width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'frac_width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'frac_width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'frac_width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'scaled_div' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'offset' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'shift' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'width' specified in initializer
+> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'scaled_div' specified in initializer
+> make[4]: *** [drivers/clk/bcm/clk-bcm281xx.o] Error 1
+> make[4]: Target `__build' not remade because of errors.
+> make[3]: *** [drivers/clk/bcm] Error 2
+> make[3]: Target `__build' not remade because of errors.
+> make[2]: *** [drivers/clk] Error 2
+> 
