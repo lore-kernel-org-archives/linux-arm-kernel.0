@@ -1,52 +1,44 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 7 Apr 2014 10:56:36 +0100
-Subject: disabling MMU of ARMv7-A
-In-Reply-To: <20140328104349.GG21330@arm.com>
-References: <015e01cf4a55$7f43a950$7dcafbf0$@samsung.com>
- <20140328104349.GG21330@arm.com>
-Message-ID: <20140407095629.GA3951@e103592.cambridge.arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 07 Apr 2014 12:05:35 +0200
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <20140407042334.GA28025@dragon>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <20140311034607.GA26502@S2101-09.ap.freescale.net>
+ <20140407042334.GA28025@dragon>
+Message-ID: <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 10:43:49AM +0000, Catalin Marinas wrote:
-> On Fri, Mar 28, 2014 at 07:15:28AM +0000, Chanho Park wrote:
-> > I want to know is there anyone who tried disabling MMU of ARMv7-A likes
-> > cortex-a9.
-> > Yes. I know this is a silly question :)
-> > I turned off CONFIG_MMU option of my exynos4 board and specified
-> > CONFIG_DRAM_BASE/SIZE and REMAP_VECTORS_TO_RAM.
-> > The problem is occurred in here there is no way to specify the vector table
-> > address.
-> > As I know the cortex-M3/4 has VTOR(Vector table offset register) to specify
-> > the vector table address.
-> > However, ARMv7-A/R doesn't have such register. They can only control whether
-> > use _HIGH_ vector or not.
-> > In this situation, can I find a way to boot successfully with
-> > nommu+cortex-a9?
+Hi Shawn,
+
+Am Montag, den 07.04.2014, 12:23 +0800 schrieb Shawn Guo:
+> On Tue, Mar 11, 2014 at 11:46:11AM +0800, Shawn Guo wrote:
+> > I just came across a couple problems when testing the series on
+> > my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
+> > using Russell's branch below, which I believe has all the pieces put
+> > together.
+> > 
+> >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
+> > 
+> > - When I enable HDMI and LVDS support in both kernel build and device
+> >   tree, HDMI seems working fine but LVDS color is corrupted quite badly.
 > 
-> There is no way to set a random vectors address on A9. But even if you
+> Philipp,
+> 
+> Did you get any chance to reproduce this dual display issue?  Now it
+> shows on mainline kernel.
 
-Picking up an old thread here, but just to clarify:
+I have not yet reproduced, but I've sent a patch today ("imx-drm:
+imx-drm-core: Fix imx_drm_encoder_get_mux_id") that might fix this.
 
-I think the vectors can be moved on A9 using the VBAR.  All v6K and
-later processors with the Security Extensions (including v7-A, v8-R)
-have this.  However, Linux still needs to work on CPUs that don't have
-this feature.  This may include a lot of platforms capable of running
-nommu kernels.
+> And I see another HDMI regression with my testing on mainline kernel.  I
+> can have my HDMI work at 1920x1080 with v3.14 kernel, but it can only
+> probes 1024x768 with the mainline today.  The Xorg.0.log are attached
+> below.  The hardware and user space are same, so I guess this is another
+> issue introduced by the recently kernel driver changes?
 
-> want a !MMU kernel, I would not recommend disabling the MMU entirely
-> because your memory accesses are strongly ordered (and slow and
-> unaligned accesses will not work). It's better to create some flat
-> mapping, possibly before starting the kernel and keep the MMU enabled.
-> Such mapping would contain a vectors page as well (low or high).
+Hmm, not sure. Have you updated to the i2c-ddc-bus phandle property as
+described in Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt?
 
-Agreed -- CONFIG_MMU=n does not need to imply that the MMU is turned off:
-everything must be indentity-mapped (VA = PA), but it is still desirable
-to define attributes.  For SMP, it's *necessary* to define attributes,
-otherwise we can't guarantee working spinlocks etc.
-
-I don't actually know whether nommu works with SMP on v7+-A today.  Maybe
-someone else can comment on that.
-
-Cheers
----Dave
+regards
+Philipp
