@@ -1,33 +1,33 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 07 Apr 2014 07:46:30 +0200
-Subject: [PATCH v2 1/5] ARM: zynq: DT: Add 'clock-latency' property
-In-Reply-To: <1396653256-28397-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
- <1396653256-28397-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <53423BB6.7010508@monstr.eu>
+Date: Mon, 07 Apr 2014 07:47:56 +0200
+Subject: [PATCH v5 3/3] ARM: zynq: dt: Add I2C nodes to Zynq device tree
+In-Reply-To: <1396646876-27336-3-git-send-email-soren.brinkmann@xilinx.com>
+References: <1396646876-27336-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396646876-27336-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <53423C0C.6050308@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2014 01:14 AM, Soren Brinkmann wrote:
-> Specify the 'clock-latency' property to avoid certain cpufreq governors
-> from refusing to work with the following error:
->   ondemand governor failed, too long transition latency of HW, fallback to performance governor
-> 
-> Reported-by: Mike Looijmans <mike.looijmans@topic.nl>
+On 04/04/2014 11:27 PM, Soren Brinkmann wrote:
 > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Tested-by: Mike Looijmans <mike.looijmans@topic.nl>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Tested-by: Michal Simek <michal.simek@xilinx.com>
 > ---
-> This is a fix from our vendor tree
 > 
+> Changes in v5:
+>  - use lower case hex digits in 'reg' property
+> 
+> Changes in v4: None
+> Changes in v3: None
 > Changes in v2:
->  - This patch has been added
+>  - replace 'pmbus' with 'ti' in compatibility strings of UCD devices
 > 
 > ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/zynq-7000.dtsi | 22 ++++++++++++
+>  arch/arm/boot/dts/zynq-zc702.dts | 76 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/zynq-zc706.dts | 68 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 166 insertions(+)
 
-Applied to zynq-dt.
+Applied to zynq-dt branch.
 
 Thanks,
 Michal
@@ -47,4 +47,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/c727c966/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/9b3cf52a/attachment.sig>
