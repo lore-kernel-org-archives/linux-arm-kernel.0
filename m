@@ -1,34 +1,118 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 7 Apr 2014 21:43:04 +0800
-Subject: [PATCH v5 00/11] imx-drm dt bindings
-In-Reply-To: <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <20140311034607.GA26502@S2101-09.ap.freescale.net>
- <20140407042334.GA28025@dragon>
- <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140407134302.GB2438@dragon>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 07 Apr 2014 14:57:51 +0100
+Subject: [PATCH 2/2] arm: use fixmap for text patching when text is RO
+In-Reply-To: <1396646870-29695-2-git-send-email-rabin@rab.in>
+References: <1396646870-29695-1-git-send-email-rabin@rab.in>
+ <1396646870-29695-2-git-send-email-rabin@rab.in>
+Message-ID: <1396879071.3654.43.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 12:05:35PM +0200, Philipp Zabel wrote:
-> > Did you get any chance to reproduce this dual display issue?  Now it
-> > shows on mainline kernel.
+On Fri, 2014-04-04 at 23:27 +0200, Rabin Vincent wrote:
+> Use fixmaps for text patching when the kernel text is read-only,
+> inspired by x86.  This makes jump labels and kprobes work with the
+> currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
+> CONFIG_DEBUG_RODATA options.
 > 
-> I have not yet reproduced, but I've sent a patch today ("imx-drm:
-> imx-drm-core: Fix imx_drm_encoder_get_mux_id") that might fix this.
-
-Yes, it fixes my issue.
-
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/include/asm/fixmap.h |  3 ++
+>  arch/arm/kernel/jump_label.c  |  2 +-
+>  arch/arm/kernel/patch.c       | 66 ++++++++++++++++++++++++++++++++++++++-----
+>  arch/arm/kernel/patch.h       | 12 +++++++-
+>  4 files changed, 74 insertions(+), 9 deletions(-)
 > 
-> > And I see another HDMI regression with my testing on mainline kernel.  I
-> > can have my HDMI work at 1920x1080 with v3.14 kernel, but it can only
-> > probes 1024x768 with the mainline today.  The Xorg.0.log are attached
-> > below.  The hardware and user space are same, so I guess this is another
-> > issue introduced by the recently kernel driver changes?
-> 
-> Hmm, not sure. Have you updated to the i2c-ddc-bus phandle property as
-> described in Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt?
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 55ed076..79c1719 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -18,6 +18,9 @@
+>  #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+>  
+>  enum fixed_addresses {
+> +	FIX_TEXT_POKE0,
+> +	FIX_TEXT_POKE1,
+> +
+>  	FIX_KMAP_BEGIN,
+>  	FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
+>  	__end_of_fixed_addresses
+> diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
+> index 4ce4f78..afeeb9e 100644
+> --- a/arch/arm/kernel/jump_label.c
+> +++ b/arch/arm/kernel/jump_label.c
+> @@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+>  		insn = arm_gen_nop();
+>  
+>  	if (is_static)
+> -		__patch_text(addr, insn);
+> +		__patch_text_early(addr, insn);
+>  	else
+>  		patch_text(addr, insn);
+>  }
+> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+> index 07314af..761c5b6 100644
+> --- a/arch/arm/kernel/patch.c
+> +++ b/arch/arm/kernel/patch.c
+> @@ -1,8 +1,11 @@
+>  #include <linux/kernel.h>
+> +#include <linux/spinlock.h>
+>  #include <linux/kprobes.h>
+> +#include <linux/mm.h>
+>  #include <linux/stop_machine.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/fixmap.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/opcodes.h>
+>  
+> @@ -13,21 +16,67 @@ struct patch {
+>  	unsigned int insn;
+>  };
+>  
+> -void __kprobes __patch_text(void *addr, unsigned int insn)
+> +static DEFINE_SPINLOCK(patch_lock);
+> +
+> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+> +{
+> +	unsigned int uintaddr = (uintptr_t) addr;
+> +	bool module = !core_kernel_text(uintaddr);
+> +	struct page *page;
+> +
+> +	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
+> +		page = vmalloc_to_page(addr);
+> +	} else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
+> +		page = virt_to_page(addr);
+> +	} else {
+> +		return addr;
+> +	}
 
-That's indeed the cause of my problem.  Thanks, Philipp.
+I can't help but think that it'd be more maintainable to just always use
+fixmap, though that would obviously have some performance impact (not
+sure that particularly matters for text patching) and it would expose
+possible fixmap bugginess to more kernels (see my next comment...)
 
-Shawn
+> +
+> +	if (flags)
+> +		spin_lock_irqsave(&patch_lock, *flags);
+> +
+> +	set_fixmap(fixmap, page_to_phys(page));
+> +
+> +	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+
+How does fixmap cope with cache colouring? Looking at the implementation
+it looks like it doesn't and so fixmap use on ARM is possibly buggy.
+
+For the text patching case where we know there are no writeable mappings
+[1] this should be OK if we used set_fixmap_nocache here, so long as we
+also invalidated the dcache later for the proper virtual address.
+
+[1] Can we know there are no writeable mappings though, the ftrace code
+modifying patches from Kees Cook have there own way of modifying text
+code permissions.
+
+[...]
+
+Rest of patch trimmed
+
+-- 
+Tixy
