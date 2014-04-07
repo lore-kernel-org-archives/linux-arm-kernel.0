@@ -1,61 +1,74 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 07 Apr 2014 15:35:36 -0700
-Subject: [GIT PULL] clk: bcm281xx: urgent fix for older compilers
-In-Reply-To: <5342F1E8.10803@linaro.org>
-References: <5342F1E8.10803@linaro.org>
-Message-ID: <20140407223536.17625.68694@quantum>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 8 Apr 2014 02:37:44 +0400
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: add internal PCI bridge nodes
+In-Reply-To: <201404080235.22151.sergei.shtylyov@cogentembedded.com>
+References: <201404080235.22151.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201404080237.45734.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alex Elder (2014-04-07 11:43:52)
-> Mike, I learned this morning that my clock code (now in
-> Linus Torvald's master branch) uses a feature that is not
-> supported in older versions of gcc.  Specifically, the
-> code made use of unnamed struct and union fields, e.g.:
-> 
->     struct foo {
->         u64     bar;
->         union {
->             u32     baz;
->             bool    quux;
->         };
->     };
-> 
-> I've prepared a patch that resolves this.  Would you please
-> pull this critical fix for 3.15-rc1 and get it to Linus as
-> soon as possible?  Thank you.
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Taken into clk-fixes.
+Add device nodes for the R8A7790 internal PCI bridge devices.
 
-Regards,
-Mike
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> 
->                                         -Alex
-> 
-> The following changes since commit 18a1a7a1d862ae0794a0179473d08a414dd49234:
-> 
->   Merge
-> git://git.kernel.org/pub/scm/linux/kernel/git/cmetcalf/linux-tile
-> (2014-04-06 08:11:57 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.linaro.org/landing-teams/working/broadcom/kernel.git
-> pull/urgent-for-mturquette
-> 
-> for you to fetch changes up to a7a7eba0eeff8f839cde4b327b56dc057a1a48d7:
-> 
->   clk: bcm281xx: don't use unnamed structs or unions (2014-04-07
-> 13:29:34 -0500)
-> 
-> ----------------------------------------------------------------
-> Alex Elder (1):
->       clk: bcm281xx: don't use unnamed structs or unions
-> 
->  drivers/clk/bcm/clk-kona-setup.c |   33 ++++++++++----------
->  drivers/clk/bcm/clk-kona.c       |   64
-> ++++++++++++++++++++------------------
->  drivers/clk/bcm/clk-kona.h       |   28 ++++++++---------
->  3 files changed, 64 insertions(+), 61 deletions(-)
+---
+Changes in version 2:
+- reworded summary (fixing typo) and changelog;
+- removed extra spaces before {;
+- refreshed the patch.
+
+ arch/arm/boot/dts/r8a7790.dtsi |   39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -820,4 +820,43 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
++
++	pci0: pci at ee090000 {
++		compatible = "renesas,pci-r8a7790";
++		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
++		reg = <0x0 0xee090000 0x0 0xc00>,
++		      <0x0 0xee080000 0x0 0x1100>;
++		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++
++		bus-range = <0 0>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++	};
++
++	pci1: pci at ee0b0000 {
++		compatible = "renesas,pci-r8a7790";
++		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
++		reg = <0x0 0xee0b0000 0x0 0xc00>,
++		      <0x0 0xee0a0000 0x0 0x1100>;
++		interrupts = <0 112 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++
++		bus-range = <1 1>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++	};
++
++	pci2: pci at ee0d0000 {
++		compatible = "renesas,pci-r8a7790";
++		clocks = <&mstp7_clks R8A7790_CLK_EHCI>;
++		reg = <0x0 0xee0d0000 0x0 0xc00>,
++		      <0x0 0xee0c0000 0x0 0x1100>;
++		interrupts = <0 113 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++
++		bus-range = <2 2>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++	};
+ };
