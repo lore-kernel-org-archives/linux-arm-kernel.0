@@ -1,107 +1,85 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 7 Apr 2014 09:18:10 -0700
-Subject: [PATCH] i2c: cadence: fix Kconfig dependency
-In-Reply-To: <1396854155.872298456@f287.i.mail.ru>
-References: <1396811227-8851-1-git-send-email-wsa@the-dreams.de>
- <1396852656.682914397@f273.i.mail.ru>
- <20140407065657.GO29751@pengutronix.de>
- <1396854155.872298456@f287.i.mail.ru>
-Message-ID: <4c4d2ba5-f5f6-4589-8a48-6a88d1c16098@VA3EHSMHS046.ehs.local>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 07 Apr 2014 18:19:24 +0200
+Subject: [PATCH V2 17/17] ARM: exynos: config: Enable cpuidle
+In-Reply-To: <53427353.2020303@linaro.org>
+References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
+ <5825506.2ErDt1UQ5r@amdc1032> <53427353.2020303@linaro.org>
+Message-ID: <6917975.3JZyGKGoxO@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-04-07 at 11:02AM +0400, Alexander Shiyan wrote:
-> Mon, 7 Apr 2014 08:56:57 +0200 ?? Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > Hello,
-> ...
-> > > > On Sun, Apr 06, 2014 at 09:07:07PM +0200, Wolfram Sang wrote:
-> > > > > During development, the driver first really needed to depend on
-> > > > > COMMON_CLK only. Later, it was switched to writel_relaxed, but it was
-> > > > > forgotten to update the dependencies, so build errors occured:
-> > > > > 
-> > > > > config: make ARCH=i386 allyesconfig
-> > > > > 
-> > > > > All error/warnings:
-> > > > > 
-> > > > >    drivers/i2c/busses/i2c-cadence.c: In function 'cdns_i2c_clear_bus_hold':
-> > > > > >> drivers/i2c/busses/i2c-cadence.c:168:3: error: implicit declaration
-> > > > > >> of function 'writel_relaxed' [-Werror=implicit-function-declaration]
-> > > > > 
-> > > > > Use a very safe dependency for now.
-> > > > > 
-> > > > > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> > > > > ---
-> > > > >  drivers/i2c/busses/Kconfig | 2 +-
-> > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > > 
-> > > > > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> > > > > index 93165ff453ab..3d3b9b3577c5 100644
-> > > > > --- a/drivers/i2c/busses/Kconfig
-> > > > > +++ b/drivers/i2c/busses/Kconfig
-> > > > > @@ -378,7 +378,7 @@ config I2C_BLACKFIN_TWI_CLK_KHZ
-> > > > >  
-> > > > >  config I2C_CADENCE
-> > > > >  	tristate "Cadence I2C Controller"
-> > > > > -	depends on COMMON_CLK
-> > > > > +	depends on ARCH_ZYNQ
-> > > > I'd suggest:
-> > > > 
-> > > > 	depends on ARM && (ARCH_ZYNC || COMPILE_TEST)
-> > > 
-> > > ARCH_ZYNC || (ARM && COMPILE_TEST)
-> > > 
-> > > Same, but more clear.
-> > "more clear" might be subjective, at least for me I don't see a benefit
-> > from one over the other.
-> > 
-> > hmm, considering a (hypothetical) driver that depends on I2C and is
-> > available on Zync but compiles on ARM, it would need either: 
+On Monday, April 07, 2014 11:43:47 AM Daniel Lezcano wrote:
+> On 04/04/2014 06:09 PM, Bartlomiej Zolnierkiewicz wrote:
+> >
+> > On Friday, April 04, 2014 03:43:09 PM Daniel Lezcano wrote:
+> >> The cpuidle driver is broken since v3.11 and now we are at v3.14.
+> >>
+> >> Default the cpuidle driver to favorize a better detection next time.
+> >>
+> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >> ---
+> >>   arch/arm/configs/exynos_defconfig |    1 +
+> >>   1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> >> index 4ce7b70..6ed4b34 100644
+> >> --- a/arch/arm/configs/exynos_defconfig
+> >> +++ b/arch/arm/configs/exynos_defconfig
+> >> @@ -132,3 +132,4 @@ CONFIG_DEBUG_INFO=y
+> >>   CONFIG_DEBUG_USER=y
+> >>   CONFIG_CRYPTO_SHA256=y
+> >>   CONFIG_CRC_CCITT=y
+> >> +CONFIG_CPU_IDLE=y
+> >
+> > Sorry but I have to NAK this change.  There are three issues with AFTR
+> > mode that should be resolved first before this patch can be merged:
+> >
+> > * The upstream Exynos cpuidle code lacks support for secure firmware and
+> >    it is used on i.e. Trats2 boards (Exynos4412).  Attempts to use AFTR on
+> >    such hardware results in oops + lockup.
+> >    I have patches adding secure firmware support to Exynos cpuidle driver
+> >    but they depend on Tomasz Figa's PM changes which are not yet upstream.
 > 
-> No. Look at drivers/i2c/Kconfig:
+> Ok.
+> 
+> > * Somebody needs to verify that the current Exynos cpuidle driver works
+> >    in the AFTR mode on Exynos5420 for which support has been added recently
+> >    (I really doubt it looking at some internal trees).
+> 
+> Rajeshwari (cc'ed) is working on creating a big.Little driver for this 
+> board, so it will be a separate cpuidle driver.
+> 
+> > * Some of our u-boot bootloader versions are incompatible with AFTR.  We
+> >    have observed the problem happening on Trats board (Exynos4210) on which
+> >    it can be fixed by using the upstream u-boot version and Universal C210
+> >    board (Exynos4210 with broken SMP support) on which there is no upstream
+> >    u-boot available (IIRC) and because of the broken SMP support enabling
+> >    cpuidle results in attempt to enter AFTR during boot + immediate lockup.
+> >
+> >    I know that this is mainly our problem but the issue is widespread on
+> >    our targets and I believe that adding some workaround for it in cpuidle
+> >    core would be beneficial for the whole cpuidle subsystem.  Namely there
+> >    should be some way of telling cpuidle subsystem to either disable
+> >    particular state(s) or limit the max available state.  I think that this
+> >    can be also useful for testing and development of other cpuidle drivers.
+> >
+> > For now please change this patch to add CONFIG_CPU_IDLE=n instead (since
+> > the config option is "default y" it will be auto-enabled if there is no
+> > entry in the defconfig)..
+> 
+> Ok.
+> 
+> Kukjin, is it possible you merge patches 1->16 ?
 
-I'd propose the below fix. The relaxed IO helpers are currently
-available on ARM only and the clock notifier used, depends on
-COMMON_CLK. I2C-related dependencies should be okay due to the location in
-Kconfig of this option.
+It is OK given that patch #17 is fixed and merged at the same time
+(preferably it should go before patches #1-16 to preserve bisectability).
+Alternatively 'default y' should be removed from patch #16 before
+the merge.  We really don't want to have EXYNOS cpuidle driver enabled
+by default yet.
 
-	Thanks,
-	S?ren
-
----------------8<---------------8<----------------8<-----------------8<-----------8<-------
-Date: Sun, 6 Apr 2014 15:19:34 -0700
-Subject: [PATCH] i2c: cadence: Add dependency on ARM
-
-Due to switching to the (read|write)l_relaxed IO helpers, building this
-driver fails on non-ARM architectures, which don't provide these helpers
-with the following error:
-  All error/warnings:
-
-     drivers/i2c/busses/i2c-cadence.c: In function 'cdns_i2c_clear_bus_hold':
-  >> drivers/i2c/busses/i2c-cadence.c:168:3: error: implicit declaration of function 'writel_relaxed' [-Werror=implicit-function-declaration]
-        cdns_i2c_writereg(reg & ~CDNS_I2C_CR_HOLD, CDNS_I2C_CR_OFFSET);
-        ^
-     cc1: some warnings being treated as errors
-
-Make the driver additionally depend on CONFIG_ARM to fix this.
-
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/i2c/busses/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 66e68e48218f..9f546eecd322 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -377,7 +377,7 @@ config I2C_BLACKFIN_TWI_CLK_KHZ
- 
- config I2C_CADENCE
- 	tristate "Cadence I2C Controller"
--	depends on COMMON_CLK
-+	depends on ARM && COMMON_CLK
- 	help
- 	  Say yes here to select Cadence I2C Host Controller. This controller is
- 	  e.g. used by Xilinx Zynq.
--- 
-1.9.1.1.gbb9f595
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
