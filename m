@@ -1,48 +1,108 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 07 Apr 2014 14:34:15 +0200
-Subject: [PATCH v5 00/11] imx-drm dt bindings
-In-Reply-To: <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <20140311034607.GA26502@S2101-09.ap.freescale.net>
- <20140407042334.GA28025@dragon>
- <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
-Message-ID: <1396874055.3811.19.camel@paszta.hi.pengutronix.de>
+From: denis@eukrea.com (Denis Carikli)
+Date: Mon,  7 Apr 2014 14:44:41 +0200
+Subject: [PATCH v12][ 02/12] imx-drm: Add RGB666 support for parallel display.
+In-Reply-To: <1396874691-27954-1-git-send-email-denis@eukrea.com>
+References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
+Message-ID: <1396874691-27954-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 07.04.2014, 12:05 +0200 schrieb Philipp Zabel:
-> Hi Shawn,
-> 
-> Am Montag, den 07.04.2014, 12:23 +0800 schrieb Shawn Guo:
-> > On Tue, Mar 11, 2014 at 11:46:11AM +0800, Shawn Guo wrote:
-> > > I just came across a couple problems when testing the series on
-> > > my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
-> > > using Russell's branch below, which I believe has all the pieces put
-> > > together.
-> > > 
-> > >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
-> > > 
-> > > - When I enable HDMI and LVDS support in both kernel build and device
-> > >   tree, HDMI seems working fine but LVDS color is corrupted quite badly.
-> > 
-> > Philipp,
-> > 
-> > Did you get any chance to reproduce this dual display issue?  Now it
-> > shows on mainline kernel.
-> 
-> I have not yet reproduced, but I've sent a patch today ("imx-drm:
-> imx-drm-core: Fix imx_drm_encoder_get_mux_id") that might fix this.
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ChangeLog v8->v9:
+- Rebased.
+- Added Philipp Zabel's ack.
+- Shortened the patch title.
 
-Tested on imx6q-phytec-pbab01 with LVDS panel and DVI monitor.
+ChangeLog v8->v9:
+- Removed the Cc. They are now set in git-send-email directly.
+- Rebased.
 
-> > And I see another HDMI regression with my testing on mainline kernel.  I
-> > can have my HDMI work at 1920x1080 with v3.14 kernel, but it can only
-> > probes 1024x768 with the mainline today.  The Xorg.0.log are attached
-> > below.  The hardware and user space are same, so I guess this is another
-> > issue introduced by the recently kernel driver changes?
-> 
-> Hmm, not sure. Have you updated to the i2c-ddc-bus phandle property as
-> described in Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt?
+ChangeLog v7->v8:
+- Shrinked even more the Cc list.
 
-regards
-Philipp
+ChangeLog v6->v7:
+- Shrinked even more the Cc list.
+
+ChangeLog v5->v6:
+- Remove people not concerned by this patch from the Cc list.
+
+ChangeLog v3->v5:
+- Use the correct RGB order.
+
+ChangeLog v2->v3:
+- Added some interested people in the Cc list.
+- Removed the commit message long desciption that was just a copy of the short
+  description.
+- Rebased the patch.
+- Fixed a copy-paste error in the ipu_dc_map_clear parameter.
+---
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    3 ++-
+ drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
+ drivers/staging/imx-drm/parallel-display.c         |    2 ++
+ 3 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index 3be5ce7..83137ef 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -60,7 +60,8 @@ Required properties:
+ - compatible: Should be "fsl,imx-parallel-display"
+ Optional properties:
+ - interface_pix_fmt: How this display is connected to the
+-  display interface. Currently supported types: "rgb24", "rgb565", "bgr666"
++  display interface. Currently supported types: "rgb24", "rgb565", "bgr666",
++  "rgb666"
+ - edid: verbatim EDID data block describing attached display.
+ - ddc: phandle describing the i2c bus handling the display data
+   channel
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+index d5de8bb..6f9abe8 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+@@ -92,6 +92,7 @@ enum ipu_dc_map {
+ 	IPU_DC_MAP_GBR24, /* TVEv2 */
+ 	IPU_DC_MAP_BGR666,
+ 	IPU_DC_MAP_BGR24,
++	IPU_DC_MAP_RGB666,
+ };
+ 
+ struct ipu_dc {
+@@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
+ 		return IPU_DC_MAP_BGR666;
+ 	case V4L2_PIX_FMT_BGR24:
+ 		return IPU_DC_MAP_BGR24;
++	case V4L2_PIX_FMT_RGB666:
++		return IPU_DC_MAP_RGB666;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -404,6 +407,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
+ 
++	/* rgb666 */
++	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+index c60b6c6..01b7ce5 100644
+--- a/drivers/staging/imx-drm/parallel-display.c
++++ b/drivers/staging/imx-drm/parallel-display.c
+@@ -219,6 +219,8 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
+ 		else if (!strcmp(fmt, "bgr666"))
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
++		else if (!strcmp(fmt, "rgb666"))
++			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
+ 	}
+ 
+ 	panel_node = of_parse_phandle(np, "fsl,panel", 0);
+-- 
+1.7.9.5
