@@ -1,86 +1,228 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Apr 2014 10:26:09 +0100
-Subject: drivers/clk/bcm/clk-bcm281xx.c breaks on GCC 4.6.4 (and earlier)
-Message-ID: <20140407092609.GY7528@n2100.arm.linux.org.uk>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 7 Apr 2014 11:28:23 +0200
+Subject: [PATCH 1/3] reset: add driver for socfpga
+In-Reply-To: <1396860408.3811.10.camel@paszta.hi.pengutronix.de>
+References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396629087-23727-2-git-send-email-s.trumtrar@pengutronix.de>
+ <1396860408.3811.10.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140407092823.GL12170@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So this greeted me this morning...
+Hi!
 
-drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'frac_width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:128:2: error: unknown field 'fixed' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:140:2: error: unknown field 'fixed' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:151:2: error: unknown field 'fixed' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'frac_width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'frac_width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'frac_width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'frac_width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'scaled_div' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'offset' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'shift' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'width' specified in initializer
-drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'scaled_div' specified in initializer
-make[4]: *** [drivers/clk/bcm/clk-bcm281xx.o] Error 1
-make[4]: Target `__build' not remade because of errors.
-make[3]: *** [drivers/clk/bcm] Error 2
-make[3]: Target `__build' not remade because of errors.
-make[2]: *** [drivers/clk] Error 2
+On Mon, Apr 07, 2014 at 10:46:48AM +0200, Philipp Zabel wrote:
+> Hi Steffen,
+> 
+> a few minor issues below:
+> 
+> Am Freitag, den 04.04.2014, 18:31 +0200 schrieb Steffen Trumtrar:
+> > Add a reset-controller driver for the socfpga platform.
+> > The reset-controller has four banks with up to 32 entries all encapsulated in
+> > one module block.
+> > 
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> >  drivers/reset/Makefile        |   1 +
+> >  drivers/reset/reset-socfpga.c | 149 ++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 150 insertions(+)
+> >  create mode 100644 drivers/reset/reset-socfpga.c
+> > 
+> > diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> > index cc29832..ab64077 100644
+> > --- a/drivers/reset/Makefile
+> > +++ b/drivers/reset/Makefile
+> > @@ -1,2 +1,3 @@
+> >  obj-$(CONFIG_RESET_CONTROLLER) += core.o
+> >  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+> > +obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+> > diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
+> > new file mode 100644
+> > index 0000000..b21e4e4
+> > --- /dev/null
+> > +++ b/drivers/reset/reset-socfpga.c
+> > @@ -0,0 +1,149 @@
+> > +/*
+> > + * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > + *
+> > + * based on
+> > + * Allwinner SoCs Reset Controller driver
+> > + *
+> > + * Copyright 2013 Maxime Ripard
+> > + *
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/err.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/reset-controller.h>
+> > +#include <linux/spinlock.h>
+> > +#include <linux/types.h>
+> > +
+> > +#define NR_BANKS		4
+> > +#define MAX_BANK_WIDTH		32
+> 
+> Since you are using BITS_PER_LONG for bank and offset calculation, why
+> not just drop MAX_BANK_WIDTH and use BITS_PER_LONG directly? (Or use
+> MAX_BANK_WIDTH everywhere.)
+>
+
+Hm, yeah. I will change that to BITS_PER_LONG everywhere.
+
+> > +#define OFFSET_MODRST		0x10
+> > +
+> > +struct socfpga_reset_data {
+> > +	spinlock_t			lock;
+> > +	void __iomem			*membase;
+> > +	struct reset_controller_dev	rcdev;
+> > +};
+> > +
+> > +static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
+> > +				unsigned long id)
+> > +{
+> > +	struct socfpga_reset_data *data = container_of(rcdev,
+> > +						     struct socfpga_reset_data,
+> > +						     rcdev);
+> > +	int bank = id / BITS_PER_LONG;
+> > +	int offset = id % BITS_PER_LONG;
+> > +	unsigned long flags;
+> > +	u32 reg;
+> > +
+> > +	spin_lock_irqsave(&data->lock, flags);
+> > +
+> > +	reg = readl(data->membase + OFFSET_MODRST + (bank * NR_BANKS));
+> > +	writel(reg | BIT(offset), data->membase + OFFSET_MODRST +
+> > +				 (bank * NR_BANKS));
+> > +	spin_unlock_irqrestore(&data->lock, flags);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
+> > +				  unsigned long id)
+> > +{
+> > +	struct socfpga_reset_data *data = container_of(rcdev,
+> > +						     struct socfpga_reset_data,
+> > +						     rcdev);
+> > +
+> > +	int bank = id / BITS_PER_LONG;
+> > +	int offset = id % BITS_PER_LONG;
+> > +	unsigned long flags;
+> > +	u32 reg;
+> > +
+> > +	spin_lock_irqsave(&data->lock, flags);
+> > +
+> > +	reg = readl(data->membase + OFFSET_MODRST + (bank * NR_BANKS));
+> > +	writel(reg & ~BIT(offset), data->membase + OFFSET_MODRST +
+> > +				  (bank * NR_BANKS));
+> > +
+> > +	spin_unlock_irqrestore(&data->lock, flags);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct reset_control_ops socfpga_reset_ops = {
+> > +	.assert		= socfpga_reset_assert,
+> > +	.deassert	= socfpga_reset_deassert,
+> > +};
+> > +
+> > +static int socfpga_reset_probe(struct platform_device *pdev)
+> > +{
+> > +	struct socfpga_reset_data *data;
+> > +	struct resource *res;
+> > +	int ret;
+> > +
+> > +	/*
+> > +	 * The binding was mainlined without the required property.
+> > +	 * Do not continue, when we encounter an old DT.
+> > +	 */
+> > +	if (!of_find_property(pdev->dev.of_node, "#reset-cells", NULL)) {
+> > +		dev_err(&pdev->dev, "dt missing #reset-cells property\n");
+> 
+> Maybe also print pdev->dev.of_node->full_name here?
+> 
+
+Okay.
+
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> > +	if (!data)
+> > +		return -ENOMEM;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	data->membase = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (!data->membase) {
+> > +		ret = -ENOMEM;
+> > +		return ret;
+> 
+> This should be:
+> 	if (IS_ERR(data->membase))
+> 		return PTR_ERR(data->membase);
+> 
+
+Ah, of course. Somehow didn't think about that here.
+
+> > +	}
+> > +
+> > +	spin_lock_init(&data->lock);
+> > +
+> > +	data->rcdev.owner = THIS_MODULE;
+> > +	data->rcdev.nr_resets = NR_BANKS * MAX_BANK_WIDTH;
+> 
+> See above.
+> 
+> > +	data->rcdev.ops = &socfpga_reset_ops;
+> > +	data->rcdev.of_node = pdev->dev.of_node;
+> > +	reset_controller_register(&data->rcdev);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int socfpga_reset_remove(struct platform_device *pdev)
+> > +{
+> > +	struct socfpga_reset_data *data = platform_get_drvdata(pdev);
+> > +
+> > +	reset_controller_unregister(&data->rcdev);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id socfpga_reset_dt_ids[] = {
+> > +	{ .compatible = "altr,rst-mgr", },
+> > +	{ /* sentinel */ },
+> > +};
+> > +
+> > +static struct platform_driver socfpga_reset_driver = {
+> > +	.probe	= socfpga_reset_probe,
+> > +	.remove	= socfpga_reset_remove,
+> > +	.driver = {
+> > +		.name		= "socfpga-reset",
+> > +		.owner		= THIS_MODULE,
+> > +		.of_match_table	= socfpga_reset_dt_ids,
+> > +	},
+> > +};
+> > +module_platform_driver(socfpga_reset_driver);
+> > +
+> > +MODULE_AUTHOR("Steffen Trumtrar <s.trumtrar@pengutronix.de");
+> > +MODULE_DESCRIPTION("Socfpga Reset Controller Driver");
+> > +MODULE_LICENSE("GPL");
+> 
+
+Thanks,
+Steffen
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
