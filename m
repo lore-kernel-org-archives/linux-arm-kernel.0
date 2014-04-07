@@ -1,91 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon,  7 Apr 2014 18:43:54 +0100
-Subject: [PATCH] arm64: Remove boot thread synchronisation for spin-table
- release method
-Message-ID: <1396892634-2461-1-git-send-email-catalin.marinas@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 07 Apr 2014 19:44:45 +0200
+Subject: [PATCH V2 17/17] ARM: exynos: config: Enable cpuidle
+In-Reply-To: <CAOesGMgkbfUX=cJ4rMf+-26Sq_fYUNW8m6unNiCXHKwj83dLbw@mail.gmail.com>
+References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
+ <5825506.2ErDt1UQ5r@amdc1032>
+ <CAOesGMgkbfUX=cJ4rMf+-26Sq_fYUNW8m6unNiCXHKwj83dLbw@mail.gmail.com>
+Message-ID: <3344539.A0GIVp3yPt@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The synchronisation with the boot thread already happens in __cpu_up()
-via wait_for_completion_timeout(). In addition, __cpu_up() calls are
-protected by the cpu_add_remove_lock mutex and already serialised.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
+Hi,
 
-I can't see a reason why we still need the boot_lock synchronisation but
-happy to be proven wrong. Similarly for arch/arm, I think it can be
-removed in most (all?) cases.
+On Monday, April 07, 2014 09:28:39 AM Olof Johansson wrote:
+> On Fri, Apr 4, 2014 at 9:09 AM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> 
+> [...]
+> >   I know that this is mainly our problem but the issue is widespread on
+> >   our targets and I believe that adding some workaround for it in cpuidle
+> >   core would be beneficial for the whole cpuidle subsystem.
 
- arch/arm64/kernel/smp_spin_table.c | 39 +-------------------------------------
- 1 file changed, 1 insertion(+), 38 deletions(-)
+On the second look at the cpuidle code there is a "cpuidle.off" kernel
+parameter which should be sufficient to workaround this particular issue
+for now.
 
-diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-index 7a530d2cc807..0347d38eea29 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -30,7 +30,6 @@ extern void secondary_holding_pen(void);
- volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
- 
- static phys_addr_t cpu_release_addr[NR_CPUS];
--static DEFINE_RAW_SPINLOCK(boot_lock);
- 
- /*
-  * Write secondary_holding_pen_release in a way that is guaranteed to be
-@@ -94,14 +93,6 @@ static int smp_spin_table_cpu_prepare(unsigned int cpu)
- 
- static int smp_spin_table_cpu_boot(unsigned int cpu)
- {
--	unsigned long timeout;
--
--	/*
--	 * Set synchronisation state between this boot processor
--	 * and the secondary one
--	 */
--	raw_spin_lock(&boot_lock);
--
- 	/*
- 	 * Update the pen release flag.
- 	 */
-@@ -112,34 +103,7 @@ static int smp_spin_table_cpu_boot(unsigned int cpu)
- 	 */
- 	sev();
- 
--	timeout = jiffies + (1 * HZ);
--	while (time_before(jiffies, timeout)) {
--		if (secondary_holding_pen_release == INVALID_HWID)
--			break;
--		udelay(10);
--	}
--
--	/*
--	 * Now the secondary core is starting up let it run its
--	 * calibrations, then wait for it to finish
--	 */
--	raw_spin_unlock(&boot_lock);
--
--	return secondary_holding_pen_release != INVALID_HWID ? -ENOSYS : 0;
--}
--
--static void smp_spin_table_cpu_postboot(void)
--{
--	/*
--	 * Let the primary processor know we're out of the pen.
--	 */
--	write_pen_release(INVALID_HWID);
--
--	/*
--	 * Synchronise with the boot thread.
--	 */
--	raw_spin_lock(&boot_lock);
--	raw_spin_unlock(&boot_lock);
-+	return 0;
- }
- 
- const struct cpu_operations smp_spin_table_ops = {
-@@ -147,5 +111,4 @@ const struct cpu_operations smp_spin_table_ops = {
- 	.cpu_init	= smp_spin_table_cpu_init,
- 	.cpu_prepare	= smp_spin_table_cpu_prepare,
- 	.cpu_boot	= smp_spin_table_cpu_boot,
--	.cpu_postboot	= smp_spin_table_cpu_postboot,
- };
+> Yes, we need to find a way forward without you guys holding the whole
+> platform hostage with out-of-tree code (here and in general, since I
+> think there are more areas in which this applies).
+
+Please explain this more because I really don't know what you're meaning
+here (at least in case of SRPOL I feel that there are no such issues).
+
+In this particular case we have a problem with a modified uboot bootloader
+versions being broken and incompatible with the advanced AFTR cpuidle mode.
+This is not the only / main issue preventing AFTR mode and thus EXYNOS
+cpuidle driver from being used by default so I really think that the your
+comment was unfair.
+
+> >  Namely there
+> >   should be some way of telling cpuidle subsystem to either disable
+> >   particular state(s) or limit the max available state.  I think that this
+> >   can be also useful for testing and development of other cpuidle drivers.
+> >
+> > For now please change this patch to add CONFIG_CPU_IDLE=n instead (since
+> > the config option is "default y" it will be auto-enabled if there is no
+> > entry in the defconfig)..
+> 
+> Can the code be refactored such that even if CPU_IDLE is on, it won't
+> actually do anything useful on the platforms that have problems above?
+> I.e. determined at runtime, not build time?
+
+We can disable AFTR mode by default on EXYNOS4x12 SoCs with secure mode
+enabled and EXYNOS5420 SoCs (I would like somebody with the hardware to
+verify that AFTR mode is not working first so we have 100% certainty
+that we don't regress here).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
