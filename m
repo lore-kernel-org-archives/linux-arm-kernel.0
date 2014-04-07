@@ -1,69 +1,48 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon,  7 Apr 2014 14:28:46 +0200
-Subject: [PATCH] ARM: OMAP2+: Add support for RNG on DT booted N900
-Message-ID: <1396873726-4657-1-git-send-email-sre@kernel.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 07 Apr 2014 14:34:15 +0200
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <20140311034607.GA26502@S2101-09.ap.freescale.net>
+ <20140407042334.GA28025@dragon>
+ <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
+Message-ID: <1396874055.3811.19.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for OMAP3 ROM Random Number Generator via
-pdata-quirks.
+Am Montag, den 07.04.2014, 12:05 +0200 schrieb Philipp Zabel:
+> Hi Shawn,
+> 
+> Am Montag, den 07.04.2014, 12:23 +0800 schrieb Shawn Guo:
+> > On Tue, Mar 11, 2014 at 11:46:11AM +0800, Shawn Guo wrote:
+> > > I just came across a couple problems when testing the series on
+> > > my imx6dl-sabresd board in dual display case - HDMI + LVDS.  I tested it
+> > > using Russell's branch below, which I believe has all the pieces put
+> > > together.
+> > > 
+> > >   git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
+> > > 
+> > > - When I enable HDMI and LVDS support in both kernel build and device
+> > >   tree, HDMI seems working fine but LVDS color is corrupted quite badly.
+> > 
+> > Philipp,
+> > 
+> > Did you get any chance to reproduce this dual display issue?  Now it
+> > shows on mainline kernel.
+> 
+> I have not yet reproduced, but I've sent a patch today ("imx-drm:
+> imx-drm-core: Fix imx_drm_encoder_get_mux_id") that might fix this.
 
-Signed-off-by: Sebastian Reichel <sre@kernel.org>
----
-Hi Tony,
+Tested on imx6q-phytec-pbab01 with LVDS panel and DVI monitor.
 
-I currently see no clean way to add DTS based support for the
-random number generator in the N900, so this patch initializes
-it using pdata-quirks.
+> > And I see another HDMI regression with my testing on mainline kernel.  I
+> > can have my HDMI work at 1920x1080 with v3.14 kernel, but it can only
+> > probes 1024x768 with the mainline today.  The Xorg.0.log are attached
+> > below.  The hardware and user space are same, so I guess this is another
+> > issue introduced by the recently kernel driver changes?
+> 
+> Hmm, not sure. Have you updated to the i2c-ddc-bus phandle property as
+> described in Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt?
 
-I think its worth adding this for now, since its one of the few
-things missing to get N900 DT based boot to the same level as
-platform data based boot.
-
-I've prepared a table tracking the patch status for my N900 DT
-patches targeting 3.16 at [0]. If I'm not mistaken all of the
-N900's hardware supported via platform data is also supported
-via DT after these patches are merged. The overall status (incl.
-hardware, which is also not supported by platform data) can
-be seen on [1].
-
-[0] http://elinux.org/N900/Changelog#Kernel_3.16_.28planned.29
-[1] http://elinux.org/N900#Kernel_Status
-
--- Sebastian
----
- arch/arm/mach-omap2/pdata-quirks.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index b04c5f0..5baad1e 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -227,6 +227,14 @@ static void __init am3517_evm_legacy_init(void)
- 	am35xx_emac_reset();
- }
- 
-+static struct platform_device omap3_rom_rng_device = {
-+	.name		= "omap3-rom-rng",
-+	.id		= -1,
-+	.dev	= {
-+		.platform_data	= rx51_secure_rng_call,
-+	},
-+};
-+
- static void __init nokia_n900_legacy_init(void)
- {
- 	hsmmc2_internal_input_clk();
-@@ -240,6 +248,10 @@ static void __init nokia_n900_legacy_init(void)
- 			pr_warning("RX-51: Not enabling ARM errata 430973 workaround\n");
- 			pr_warning("Thumb binaries may crash randomly without this workaround\n");
- 		}
-+
-+		pr_info("RX-51: Registring OMAP3 HWRNG device\n");
-+		platform_device_register(&omap3_rom_rng_device);
-+
- 	}
- }
- #endif /* CONFIG_ARCH_OMAP3 */
--- 
-1.9.1
+regards
+Philipp
