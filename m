@@ -1,56 +1,67 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Apr 2014 11:10:02 +0200
-Subject: [PATCH 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
- deadlock
-In-Reply-To: <20140403141533.GP7528@n2100.arm.linux.org.uk>
-References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140403160727.17b3558b@skate>
- <20140403141533.GP7528@n2100.arm.linux.org.uk>
-Message-ID: <20140407111002.36488aed@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 7 Apr 2014 10:11:10 +0100
+Subject: [PATCH v6 01/36] mtd: st_spi_fsm: Allocate resources and
+ register with MTD framework
+In-Reply-To: <1396858351.8506.8.camel@x220>
+References: <1395307268-12721-1-git-send-email-lee.jones@linaro.org>
+ <1395307268-12721-2-git-send-email-lee.jones@linaro.org>
+ <1396858351.8506.8.camel@x220>
+Message-ID: <20140407091110.GB8888@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
-
-On Thu, 3 Apr 2014 15:15:33 +0100, Russell King - ARM Linux wrote:
-
-> > Any comments about the proposed patches? These are important for the
-> > recent Armada 375/38x platforms and I'm sure will require a bit of
-> > discussion. Moreover, one of the patch affects the L2 cache driver that
-> > Russell is currently working on, so it would be nice if we could get
-> > the discussion going soon.
+> > This is a new driver. It's used to communicate with a special type of
+> > optimised Serial Flash Controller called the FSM. The FSM uses a subset
+> > of the SPI protocol to communicate with supported NOR-Flash devices.
+> > 
+> > Acked-by Angus Clark <angus.clark@st.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Will is away for another week and a half.
-
-Ok. However I believe Will and Catalin are the best placed to give all
-the fine details about this problem.
-
-> There is an important point to be made about the L2 cache though - it is
-> not possible to disable the "sync" at the L2 cache - any register write
-> automatically invokes a sync before it is actioned, so avoiding the
-> explicit sync doesn't stop them from happening, it just reduces the
-> number which occur.
+> This patch seems to be commit d90db4a07429 ("mtd: st_spi_fsm: Allocate
+> resources and register with MTD framework") in current linux-next. 
 > 
-> Is it possible that you are hitting one of the PL310 errata?
+> > ---
+> >  drivers/mtd/devices/Kconfig      |   8 +++
+> >  drivers/mtd/devices/Makefile     |   1 +
+> >  drivers/mtd/devices/st_spi_fsm.c | 106 +++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 115 insertions(+)
+> >  create mode 100644 drivers/mtd/devices/st_spi_fsm.c
+> > 
+> > diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
+> > index 0128138..1210bc2 100644
+> > --- a/drivers/mtd/devices/Kconfig
+> > +++ b/drivers/mtd/devices/Kconfig
+> > @@ -210,6 +210,14 @@ config MTD_DOCG3
+> >  	  M-Systems and now Sandisk. The support is very experimental,
+> >  	  and doesn't give access to any write operations.
+> >  
+> > +config MTD_ST_SPI_FSM
+> > +	tristate "ST Microelectronics SPI FSM Serial Flash Controller"
+> > +	depends on ARM || SH
+> 
+> That should probably be
+>           depends on ARM || SUPERH
 
-As far as I'm aware, there is no PL310 errata registered for this
-problem: at least I asked Will and Catalin about this, and they never
-came up with a PL310 errata. My understanding is that the problem here
-is not a deficiency of the PL310 itself, but rather an unfortunate
-interaction between the PL310 behavior, the hardware I/O coherency and
-the PCIe transactions.
+Actually it should be ARCH_STI, but thanks for the prompt.
 
-The suggested fix to disable explicit outer cache sync, and map PCIe
-regions are strongly ordered was proposed by ARM as a solution to the
-deadlocks, and it was tested successfully.
+> > +	help
+> > +	  This provides an MTD device driver for the ST Microelectronics
+> > +	  SPI Fast Sequence Mode (FSM) Serial Flash Controller and support
+> > +	  for a subset of connected Serial Flash devices.
+> > +
+> >  if MTD_DOCG3
+> >  config BCH_CONST_M
+> >  	default 14
+> 
+> Can this still be fixed in a future version of this series or should I
+> send a trivial patch?
 
-I am hoping that Catalin and Will will enter the discussion and give
-the details you need to fully understand the problem.
+Do you mean the SH thing, or are you now referencing something else?
 
-Thanks,
+If the former then I'm happy to send a fixup patch.
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
