@@ -1,228 +1,51 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 7 Apr 2014 11:28:23 +0200
-Subject: [PATCH 1/3] reset: add driver for socfpga
-In-Reply-To: <1396860408.3811.10.camel@paszta.hi.pengutronix.de>
-References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396629087-23727-2-git-send-email-s.trumtrar@pengutronix.de>
- <1396860408.3811.10.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140407092823.GL12170@pengutronix.de>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon,  7 Apr 2014 11:30:20 +0200
+Subject: [PATCH v2 rebased] PCI: rcar: use new OF interrupt mapping when
+ possible
+In-Reply-To: <20140404170103.GF9007@google.com>
+References: <20140404170103.GF9007@google.com>
+Message-ID: <1396863020-21880-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This is the recommended method of doing the IRQ
+mapping. Still fall back to the old method in order
+to not break the just submitted board files.
 
-On Mon, Apr 07, 2014 at 10:46:48AM +0200, Philipp Zabel wrote:
-> Hi Steffen,
-> 
-> a few minor issues below:
-> 
-> Am Freitag, den 04.04.2014, 18:31 +0200 schrieb Steffen Trumtrar:
-> > Add a reset-controller driver for the socfpga platform.
-> > The reset-controller has four banks with up to 32 entries all encapsulated in
-> > one module block.
-> > 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > ---
-> >  drivers/reset/Makefile        |   1 +
-> >  drivers/reset/reset-socfpga.c | 149 ++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 150 insertions(+)
-> >  create mode 100644 drivers/reset/reset-socfpga.c
-> > 
-> > diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> > index cc29832..ab64077 100644
-> > --- a/drivers/reset/Makefile
-> > +++ b/drivers/reset/Makefile
-> > @@ -1,2 +1,3 @@
-> >  obj-$(CONFIG_RESET_CONTROLLER) += core.o
-> >  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
-> > +obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
-> > diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
-> > new file mode 100644
-> > index 0000000..b21e4e4
-> > --- /dev/null
-> > +++ b/drivers/reset/reset-socfpga.c
-> > @@ -0,0 +1,149 @@
-> > +/*
-> > + * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > + *
-> > + * based on
-> > + * Allwinner SoCs Reset Controller driver
-> > + *
-> > + * Copyright 2013 Maxime Ripard
-> > + *
-> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#include <linux/err.h>
-> > +#include <linux/io.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/reset-controller.h>
-> > +#include <linux/spinlock.h>
-> > +#include <linux/types.h>
-> > +
-> > +#define NR_BANKS		4
-> > +#define MAX_BANK_WIDTH		32
-> 
-> Since you are using BITS_PER_LONG for bank and offset calculation, why
-> not just drop MAX_BANK_WIDTH and use BITS_PER_LONG directly? (Or use
-> MAX_BANK_WIDTH everywhere.)
->
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+v2: pass in parent device to pci_common_init(), to
+    make DT parsing work.
+---
+ drivers/pci/host/pci-rcar-gen2.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Hm, yeah. I will change that to BITS_PER_LONG everywhere.
-
-> > +#define OFFSET_MODRST		0x10
-> > +
-> > +struct socfpga_reset_data {
-> > +	spinlock_t			lock;
-> > +	void __iomem			*membase;
-> > +	struct reset_controller_dev	rcdev;
-> > +};
-> > +
-> > +static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
-> > +				unsigned long id)
-> > +{
-> > +	struct socfpga_reset_data *data = container_of(rcdev,
-> > +						     struct socfpga_reset_data,
-> > +						     rcdev);
-> > +	int bank = id / BITS_PER_LONG;
-> > +	int offset = id % BITS_PER_LONG;
-> > +	unsigned long flags;
-> > +	u32 reg;
-> > +
-> > +	spin_lock_irqsave(&data->lock, flags);
-> > +
-> > +	reg = readl(data->membase + OFFSET_MODRST + (bank * NR_BANKS));
-> > +	writel(reg | BIT(offset), data->membase + OFFSET_MODRST +
-> > +				 (bank * NR_BANKS));
-> > +	spin_unlock_irqrestore(&data->lock, flags);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
-> > +				  unsigned long id)
-> > +{
-> > +	struct socfpga_reset_data *data = container_of(rcdev,
-> > +						     struct socfpga_reset_data,
-> > +						     rcdev);
-> > +
-> > +	int bank = id / BITS_PER_LONG;
-> > +	int offset = id % BITS_PER_LONG;
-> > +	unsigned long flags;
-> > +	u32 reg;
-> > +
-> > +	spin_lock_irqsave(&data->lock, flags);
-> > +
-> > +	reg = readl(data->membase + OFFSET_MODRST + (bank * NR_BANKS));
-> > +	writel(reg & ~BIT(offset), data->membase + OFFSET_MODRST +
-> > +				  (bank * NR_BANKS));
-> > +
-> > +	spin_unlock_irqrestore(&data->lock, flags);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct reset_control_ops socfpga_reset_ops = {
-> > +	.assert		= socfpga_reset_assert,
-> > +	.deassert	= socfpga_reset_deassert,
-> > +};
-> > +
-> > +static int socfpga_reset_probe(struct platform_device *pdev)
-> > +{
-> > +	struct socfpga_reset_data *data;
-> > +	struct resource *res;
-> > +	int ret;
-> > +
-> > +	/*
-> > +	 * The binding was mainlined without the required property.
-> > +	 * Do not continue, when we encounter an old DT.
-> > +	 */
-> > +	if (!of_find_property(pdev->dev.of_node, "#reset-cells", NULL)) {
-> > +		dev_err(&pdev->dev, "dt missing #reset-cells property\n");
-> 
-> Maybe also print pdev->dev.of_node->full_name here?
-> 
-
-Okay.
-
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> > +	if (!data)
-> > +		return -ENOMEM;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	data->membase = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (!data->membase) {
-> > +		ret = -ENOMEM;
-> > +		return ret;
-> 
-> This should be:
-> 	if (IS_ERR(data->membase))
-> 		return PTR_ERR(data->membase);
-> 
-
-Ah, of course. Somehow didn't think about that here.
-
-> > +	}
-> > +
-> > +	spin_lock_init(&data->lock);
-> > +
-> > +	data->rcdev.owner = THIS_MODULE;
-> > +	data->rcdev.nr_resets = NR_BANKS * MAX_BANK_WIDTH;
-> 
-> See above.
-> 
-> > +	data->rcdev.ops = &socfpga_reset_ops;
-> > +	data->rcdev.of_node = pdev->dev.of_node;
-> > +	reset_controller_register(&data->rcdev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int socfpga_reset_remove(struct platform_device *pdev)
-> > +{
-> > +	struct socfpga_reset_data *data = platform_get_drvdata(pdev);
-> > +
-> > +	reset_controller_unregister(&data->rcdev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id socfpga_reset_dt_ids[] = {
-> > +	{ .compatible = "altr,rst-mgr", },
-> > +	{ /* sentinel */ },
-> > +};
-> > +
-> > +static struct platform_driver socfpga_reset_driver = {
-> > +	.probe	= socfpga_reset_probe,
-> > +	.remove	= socfpga_reset_remove,
-> > +	.driver = {
-> > +		.name		= "socfpga-reset",
-> > +		.owner		= THIS_MODULE,
-> > +		.of_match_table	= socfpga_reset_dt_ids,
-> > +	},
-> > +};
-> > +module_platform_driver(socfpga_reset_driver);
-> > +
-> > +MODULE_AUTHOR("Steffen Trumtrar <s.trumtrar@pengutronix.de");
-> > +MODULE_DESCRIPTION("Socfpga Reset Controller Driver");
-> > +MODULE_LICENSE("GPL");
-> 
-
-Thanks,
-Steffen
-
+diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+index fd3e3ab56509..4fe349dcaf59 100644
+--- a/drivers/pci/host/pci-rcar-gen2.c
++++ b/drivers/pci/host/pci-rcar-gen2.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of_pci.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -180,8 +181,13 @@ static int rcar_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ {
+ 	struct pci_sys_data *sys = dev->bus->sysdata;
+ 	struct rcar_pci_priv *priv = sys->private_data;
++	int irq;
++
++	irq = of_irq_parse_and_map_pci(dev, slot, pin);
++	if (!irq)
++		irq = priv->irq;
+ 
+-	return priv->irq;
++	return irq;
+ }
+ 
+ #ifdef CONFIG_PCI_DEBUG
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.1
