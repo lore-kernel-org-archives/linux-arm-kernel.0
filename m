@@ -1,108 +1,105 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Mon,  7 Apr 2014 14:44:40 +0200
-Subject: [PATCH v12][ 01/12] [media] v4l2: add new V4L2_PIX_FMT_RGB666 pixel
- format.
-Message-ID: <1396874691-27954-1-git-send-email-denis@eukrea.com>
+Date: Mon,  7 Apr 2014 14:44:42 +0200
+Subject: =?UTF-8?q?=5BPATCH=20v12=5D=5B=2003/12=5D=20imx-drm=3A=20Correct=20BGR666=20and=20the=20board=27s=20dts=20that=20use=20them=2E?=
+In-Reply-To: <1396874691-27954-1-git-send-email-denis@eukrea.com>
+References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
+Message-ID: <1396874691-27954-3-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That new macro is needed by the imx_drm staging driver
-  for supporting the QVGA display of the eukrea-cpuimx51 board.
+The current BGR666 is not consistent with the other color mapings like BGR24.
+BGR666 should be in the same byte order than BGR24.
 
 Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
 ChangeLog v9->v10:
-- Rebased on top of:
-  "211e7f2 [media] DocBook media: drop the old incorrect packed RGB table"
+- Rebased.
 - Added Philipp Zabel's Ack.
+- Included Lothar Wa?mann's suggestion about imx-ldb.c.
+- Shortened the patch title
 
 ChangeLog v8->v9:
 - Removed the Cc. They are now set in git-send-email directly.
 
 ChangeLog v7->v8:
-- Added Mauro Carvalho Chehab back to the list of Cc
+- Shrinked even more the Cc list.
 
 ChangeLog v6->v7:
 - Shrinked even more the Cc list.
+
 ChangeLog v5->v6:
 - Remove people not concerned by this patch from the Cc list.
+- Added a better explanation of the change.
 
-ChangeLog v3->v4:
-- Added Laurent Pinchart's Ack.
-
-ChangeLog v2->v3:
-- Added some interested people in the Cc list.
-- Added Mauro Carvalho Chehab's Ack.
-- Added documentation.
+ChangeLog v5:
+- New patch.
 ---
- .../DocBook/media/v4l/pixfmt-packed-rgb.xml        |   39 ++++++++++++++++++++
- include/uapi/linux/videodev2.h                     |    1 +
- 2 files changed, 40 insertions(+)
+ arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
+ arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
+ drivers/staging/imx-drm/imx-ldb.c       |    4 ++--
+ drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-index e1c4f8b..88a7fe1 100644
---- a/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-+++ b/Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml
-@@ -279,6 +279,45 @@ colorspace <constant>V4L2_COLORSPACE_SRGB</constant>.</para>
- 	    <entry></entry>
- 	    <entry></entry>
- 	  </row>
-+	  <row id="V4L2-PIX-FMT-RGB666">
-+	    <entry><constant>V4L2_PIX_FMT_RGB666</constant></entry>
-+	    <entry>'RGBH'</entry>
-+	    <entry></entry>
-+	    <entry>r<subscript>5</subscript></entry>
-+	    <entry>r<subscript>4</subscript></entry>
-+	    <entry>r<subscript>3</subscript></entry>
-+	    <entry>r<subscript>2</subscript></entry>
-+	    <entry>r<subscript>1</subscript></entry>
-+	    <entry>r<subscript>0</subscript></entry>
-+	    <entry>g<subscript>5</subscript></entry>
-+	    <entry>g<subscript>4</subscript></entry>
-+	    <entry></entry>
-+	    <entry>g<subscript>3</subscript></entry>
-+	    <entry>g<subscript>2</subscript></entry>
-+	    <entry>g<subscript>1</subscript></entry>
-+	    <entry>g<subscript>0</subscript></entry>
-+	    <entry>b<subscript>5</subscript></entry>
-+	    <entry>b<subscript>4</subscript></entry>
-+	    <entry>b<subscript>3</subscript></entry>
-+	    <entry>b<subscript>2</subscript></entry>
-+	    <entry></entry>
-+	    <entry>b<subscript>1</subscript></entry>
-+	    <entry>b<subscript>0</subscript></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	    <entry></entry>
-+	  </row>
- 	  <row id="V4L2-PIX-FMT-BGR24">
- 	    <entry><constant>V4L2_PIX_FMT_BGR24</constant></entry>
- 	    <entry>'BGR3'</entry>
-diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-index ea468ee..d5d818a 100644
---- a/include/uapi/linux/videodev2.h
-+++ b/include/uapi/linux/videodev2.h
-@@ -299,6 +299,7 @@ struct v4l2_pix_format {
- #define V4L2_PIX_FMT_RGB555X v4l2_fourcc('R', 'G', 'B', 'Q') /* 16  RGB-5-5-5 BE  */
- #define V4L2_PIX_FMT_RGB565X v4l2_fourcc('R', 'G', 'B', 'R') /* 16  RGB-5-6-5 BE  */
- #define V4L2_PIX_FMT_BGR666  v4l2_fourcc('B', 'G', 'R', 'H') /* 18  BGR-6-6-6	  */
-+#define V4L2_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', 'H') /* 18  RGB-6-6-6	  */
- #define V4L2_PIX_FMT_BGR24   v4l2_fourcc('B', 'G', 'R', '3') /* 24  BGR-8-8-8     */
- #define V4L2_PIX_FMT_RGB24   v4l2_fourcc('R', 'G', 'B', '3') /* 24  RGB-8-8-8     */
- #define V4L2_PIX_FMT_BGR32   v4l2_fourcc('B', 'G', 'R', '4') /* 32  BGR-8-8-8-8   */
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index c5a9a24..7b3851d 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -18,7 +18,7 @@
+ 
+ 	display at di1 {
+ 		compatible = "fsl,imx-parallel-display";
+-		interface-pix-fmt = "bgr666";
++		interface-pix-fmt = "rgb666";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp1>;
+ 
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index d5d146a..4b036b4 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -24,7 +24,7 @@
+ 	soc {
+ 		display1: display at di1 {
+ 			compatible = "fsl,imx-parallel-display";
+-			interface-pix-fmt = "bgr666";
++			interface-pix-fmt = "rgb666";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_ipu_disp1>;
+ 
+diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+index fe4c1ef..9141293 100644
+--- a/drivers/staging/imx-drm/imx-ldb.c
++++ b/drivers/staging/imx-drm/imx-ldb.c
+@@ -188,11 +188,11 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+ 	switch (imx_ldb_ch->chno) {
+ 	case 0:
+ 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
+-			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
+ 		break;
+ 	case 1:
+ 		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
+-			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_RGB666;
+ 		break;
+ 	default:
+ 		dev_err(ldb->dev, "unable to config di%d panel format\n",
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+index 6f9abe8..154d293 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+@@ -397,9 +397,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 
+ 	/* bgr666 */
+ 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
+-	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
+-	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
++	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
+ 
+ 	/* bgr24 */
+ 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
 -- 
 1.7.9.5
