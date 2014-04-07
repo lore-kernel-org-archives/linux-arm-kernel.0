@@ -1,27 +1,86 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 07 Apr 2014 19:14:18 +1000
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <20140405000007.GD15806@google.com>
- <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
-Message-ID: <1396862058.3671.40.camel@pasglop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Apr 2014 10:26:09 +0100
+Subject: drivers/clk/bcm/clk-bcm281xx.c breaks on GCC 4.6.4 (and earlier)
+Message-ID: <20140407092609.GY7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-04-07 at 09:46 +0100, Liviu Dudau wrote:
-> 
-> *My* strategy is to get rid of pci_domain_nr(). I don't see why we need
-> to have arch specific way of providing the number, specially after looking
-> at the existing implementations that return a value from a variable that
-> is never touched or incremented. My guess is that pci_domain_nr() was
-> created to work around the fact that there was no domain_nr maintainance in
-> the generic code.
+So this greeted me this morning...
 
-Well, there was no generic host bridge structure. There is one now, it should
-go there.
+drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'frac_width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:128:2: error: unknown field 'fixed' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:140:2: error: unknown field 'fixed' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:151:2: error: unknown field 'fixed' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'frac_width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'frac_width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'frac_width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'frac_width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'scaled_div' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'offset' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'shift' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'width' specified in initializer
+drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'scaled_div' specified in initializer
+make[4]: *** [drivers/clk/bcm/clk-bcm281xx.o] Error 1
+make[4]: Target `__build' not remade because of errors.
+make[3]: *** [drivers/clk/bcm] Error 2
+make[3]: Target `__build' not remade because of errors.
+make[2]: *** [drivers/clk] Error 2
 
-Cheers,
-Ben.
- 
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
