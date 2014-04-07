@@ -1,52 +1,71 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 7 Apr 2014 23:43:36 +0200
-Subject: [PATCH 1/4] ata: ahci_mvebu: new driver for Marvell Armada 380
- AHCI interfaces
-In-Reply-To: <2819007.7Vym3v6BRo@amdc1032>
-References: <1396882664-19297-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1396882664-19297-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <2819007.7Vym3v6BRo@amdc1032>
-Message-ID: <20140407234336.6305681b@skate>
+From: tthayer@altera.com (tthayer at altera.com)
+Date: Mon, 7 Apr 2014 16:54:07 -0500
+Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM controller
+In-Reply-To: <1396907649-20212-1-git-send-email-tthayer@altera.com>
+References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
+Message-ID: <1396907649-20212-2-git-send-email-tthayer@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bartlomiej Zolnierkiewicz,
+From: Thor Thayer <tthayer@altera.com>
 
-On Mon, 07 Apr 2014 19:50:06 +0200, Bartlomiej Zolnierkiewicz wrote:
+Addition of the Altera SDRAM controller bindings and device
+tree changes to the Altera SoC project.
 
-> > +static struct platform_driver ahci_mvebu_driver = {
-> > +	.probe = ahci_mvebu_probe,
-> > +	.remove = ata_platform_remove_one,
-> > +	.driver = {
-> > +		.name = "ahci-mvebu",
-> > +		.owner = THIS_MODULE,
-> > +		.of_match_table = ahci_mvebu_of_match,
-> 
-> Why is the Power Management support missing from this driver?
+Signed-off-by: Thor Thayer <tthayer@altera.com>
+To: Rob Herring <robherring2@gmail.com>
+To: Pawel Moll <pawel.moll@arm.com>
+To: Mark Rutland <mark.rutland@arm.com>
+To: Ian Campbell <ijc+devicetree@hellion.org.uk>
+To: Kumar Gala <galak@codeaurora.org>
+To: Rob Landley <rob@landley.net>
+To: Russell King <linux@arm.linux.org.uk>
+To: Dinh Nguyen <dinguyen@altera.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ .../bindings/arm/altera/socfpga-sdram.txt          |   14 ++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
 
-Because as of today, the only platform that can use this driver is the
-Armada 38x, and we don't yet have suspend/resume support for this
-platform: we haven't written yet the suspend to RAM code for it. And I
-wanted to avoid adding suspend/resume code that I'm not able to test.
-
-So my plan is to get back to PM support once we have working suspend to
-RAM support on Armada 38x.
-
-> > +MODULE_DESCRIPTION("Marvell EBU AHCI SATA driver");
-> > +MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>, Marcin Wojtas <mw@semihalf.com>");
-> > +MODULE_LICENSE("GPL");
-> > +MODULE_ALIAS("platform:ahci_mv");
-> 
-> platform:ahci_mvebu ?
-
-Indeed, thanks for spotting.
-
-> Otherwise it looks good.
-
-Thanks for the review!
-
-Thomas
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+new file mode 100644
+index 0000000..525cb76
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+@@ -0,0 +1,14 @@
++Altera SOCFPGA SDRAM Controller
++
++Required properties:
++- compatible : "altr,sdr-ctl", "syscon";
++                Note that syscon is invoked for this device to support the FPGA
++		bridge driver, EDAC driver and other devices that share the
++		registers.
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++	sdrctl at ffc25000 {
++		compatible = "altr,sdr-ctl", "syscon";
++		reg = <0xffc25000 0x1000>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index df43702..6ce912e 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -676,6 +676,11 @@
+ 			clocks = <&l4_sp_clk>;
+ 		};
+ 
++		sdrctl at ffc25000 {
++			compatible = "altr,sdr-ctl", "syscon";
++			reg = <0xffc25000 0x1000>;
++		};
++
+ 		rstmgr at ffd05000 {
+ 			compatible = "altr,rst-mgr";
+ 			reg = <0xffd05000 0x1000>;
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
