@@ -1,28 +1,82 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 7 Apr 2014 10:21:02 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the  tree
-Message-ID: <20140407102102.97ad7dcaab69324efa8d897a@canb.auug.org.au>
+From: neil@fatboyfat.co.uk (Neil Greatorex)
+Date: Mon, 7 Apr 2014 01:50:18 +0100
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <20140407001602.5b3aa425@skate>
+References: <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+ <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140406185833.GI29787@1wt.eu>
+ <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
+ <20140407001602.5b3aa425@skate>
+Message-ID: <CAAfodu3fAKT6W1tTh1PJarB=N0X0CRN5eG0udQok8eu2918RYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Thomas,
 
-Today's linux-next merge of the arm-soc tree got conflicts in
-arch/arm/boot/dts/qcom-msm8960.dtsi, arch/arm/boot/dts/qcom-msm8974.dtsi,
-arch/arm/mach-omap2/pdata-quirks.c, arch/arm/mach-zynq/Kconfig,
-drivers/watchdog/Kconfig and sound/soc/kirkwood/Kconfig between various
-merge commits from Linus' tree and various merge commits from the arm-soc
-tree.
+On Sun, Apr 6, 2014 at 11:16 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Neil Greatorex,
+>
+> On Sun, 6 Apr 2014 22:57:40 +0100 (BST), Neil Greatorex wrote:
+>
+>> Second port:
+>> [ 1809.459445] igb 0000:01:00.1: enabling bus mastering
+>> [ 1809.459563] igb 0000:01:00.1 (unregistered net_device): hw_addr is
+>> f1100000, start=e0100000, len=80000, flags=40200
+>> [ 1809.459573] igb 0000:01:00.1 (unregistered net_device): About to read
+>> from offset 18
+>> [ 1809.459581] Unhandled fault: external abort on non-linefetch (0x1008)
+>> at 0xf1100018
+>
+> This address is a virtual address, so there's not much we can do with
+> it, as it is.
+>
 
-I used the versions from Linus' tree.
+The address in the fault message is, but the physical address can be
+worked out from the 2 lines above. "start=e0100000" and "offset 18".
+Adding those together we get the physical address 0xe100018.
 
--- 
+>> The physical addresses match those given in the lspci -vvv output (see
+>> https://gist.github.com/ngreatorex/9772195). I don't know enough about
+>> PCIe, the SoC *or* the Intel card to know if these addresses look correct
+>> or even sane! I did wonder if there was some issue due to the fact that
+>> the resources for 01:00.0 and 01:00.1 overlap, but I would guess(!?) that
+>> it's common in hardware that presents multiple devices.
+>>
+>> It is perhaps noteworthy that this is the first access to the hardware for
+>> the 2nd port - i.e. there are no successful accesses, other than to enable
+>> the hardware, which AFAICT is simply accessing registers on the PCIe
+>> controller.
+>
+> It really looks like the MBus window has not been sized correctly, or
+> there is a missing MBus window. Probably a deficiency in the PCI bridge
+> emulation layer in pci-mvebu.
+>
+
+OK well that gives me another direction to point my debugging
+attempts. If I discover anything interesting I'll let you know.
+
+> Tomorrow, I have a bit of work on AHCI on Armada 38x, but I'm hoping to
+> get to this after that.
+
+Excellent news.
+
+>
+> Thanks again for all the investigation. All your research is clearly
+> going to make the debugging a *lot* easier.
+
+No problem. I'm always interested in trying to learn more about the
+hardware I have and how it all works. Of course it would be much
+easier if Marvell would publicly release the datasheet but we can't
+have everything!
+
 Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/31b71923/attachment.sig>
+Neil
