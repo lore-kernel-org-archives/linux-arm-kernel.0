@@ -1,95 +1,87 @@
-From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
-Date: Mon, 07 Apr 2014 22:39:37 +0200
-Subject: [PATCH] arm/igep0020: fix IGEPv2 boot
-In-Reply-To: <CABxcv=nYt_9x3m9siCVyXTE=bRNPPRoPhxW8oByweV6MrmZ+pg@mail.gmail.com>
-References: <1396801938-24788-1-git-send-email-gilles.chanteperdrix@xenomai.org>
- <CABxcv=k3nrhVtMPw1BqO6Cz07VEtGA9ZBMvkXBJuLrcCSoXpwg@mail.gmail.com>
- <5341C351.5060406@xenomai.org>
- <CABxcv=nYt_9x3m9siCVyXTE=bRNPPRoPhxW8oByweV6MrmZ+pg@mail.gmail.com>
-Message-ID: <53430D09.3060706@xenomai.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 7 Apr 2014 14:48:17 -0600
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
+References: <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140406185833.GI29787@1wt.eu>
+ <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
+ <20140407174106.GD9952@obsidianresearch.com>
+ <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
+Message-ID: <20140407204817.GB20736@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2014 01:45 AM, Javier Martinez Canillas wrote:
-> Hello,
+On Mon, Apr 07, 2014 at 08:41:52PM +0100, Neil Greatorex wrote:
+> > To be very clear, PCI BARs, should never overlap.
 > 
-> On Sun, Apr 6, 2014 at 11:12 PM, Gilles Chanteperdrix
-> <gilles.chanteperdrix@xenomai.org> wrote:
->> On 04/06/2014 10:04 PM, Javier Martinez Canillas wrote:
->>> Hello Giles,
->>
->> Hi,
->>
->>> It looks suspiciously similar to an issue we had due some DT clock
->>> changes were the IGEPv2 (or any board that used the "ti,omap3"
->>> compatible string) were initialized as omap3430 instead of omap3630
->>> thus using omap3430 clock data which left the UART4 uninitialized.
->>>
->>> I fixed that particular issue on commit fb0cfec ("ARM: dts:
->>> omap3-igep: fix boot fail due wrong compatible match") which was
->>> merged on v3.14-rc6 so it should be on your v3.14 kernel so maybe is a
->>> different issue.
->>>
->>> I wonder why you are having this issue though since I didn't have that
->>> problem with 3.14 as far as I can remember.
->>>
->>> Can you provide me the exact commit id of your HEAD? or is just the
->>> tagged v3.14 commit?
->>
->> It is the tagged v3.14 commit, with omap2plus_defconfig configuration
->> My IGEPv2 does not have an omap3630, but a 3530.
->>
->> The boot logs say:
->> [    0.000000] OMAP3430/3530 ES3.1 (l2cache iva sgx neon isp )
->>
+> I realise that overlap was probably the wrong word. I meant that the
+> resources for 01:00.0 and 01:00.1 are not contiguous but are mixed
+> together. If you sort by address you get:
 > 
-> Then in your case is the exact opposite, that commit seems to broke
-> your board since now it is initialized as an omap3630 instead of an
-> omap3430. So you need to change the compatible string:
-> 
-> --- a/arch/arm/boot/dts/omap3-igep0020.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
-> @@ -14,7 +14,7 @@
-> 
->  / {
->         model = "IGEPv2 (TI OMAP AM/DM37x)";
-> -       compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
-> +       compatible = "isee,omap3-igep0020", "ti,omap3";
-> 
->         leds {
->                 pinctrl-names = "default";
-> 
+> e0000000-e007ffff : 0000:01:00.0
+> e0080000-e00fffff : 0000:01:00.0
+> e0100000-e017ffff : 0000:01:00.1
+> e0180000-e01fffff : 0000:01:00.1
+> e0200000-e0203fff : 0000:01:00.0
+> e0204000-e0223fff : 0000:01:00.0
+> e0224000-e0243fff : 0000:01:00.0
+> e0244000-e0247fff : 0000:01:00.1
+> e0248000-e0267fff : 0000:01:00.1
+> e0268000-e0287fff : 0000:01:00.1
 
-That is not sufficient. In order to avoid the kernel oops, I have to
-include omap34xx-hs.dtsi instead of omap36xx.dtsi in omap3-igep.dtsi. As
-far as I understand, omap36xx.dtsi gets the uart4 declared, and this is
-what is causing the oops.
+Yes, that is fine. It is just a quirk of the allocator.
+They are all within the downstream bridge window. 
+ 
+> > HOWEVER, looking now very closely:
+> >
+> > 00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01) (prog-if 00 [Normal decode])
+> >    Memory behind bridge: e0000000-e02fffff
+> > 00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01) (prog-if 00 [Normal decode])
+> >    Memory behind bridge: e0300000-e03fffff
+> >
+> > This is certainly wrong, MBUS requires special alignment and sizing.
+> > 0x300000 is not a size which is a power of two, and the next window
+> > starts right after.
 
-> The problem is that there are too many IGEP boards revisions that use
-> use different SoC (DM3730 or OMAP3530), flash memory type (OneNAND or
-> NAND), memory sizes and connectivity (with or without wifi chip).
+> Interesting. Does the PCI code provide a way to specify that the sizes
+> much be a power of 2? I don't fully understand the implications but
+> would it be possible to assign just one MBUS window for the whole of
+> the PCIe memory instead?
+
+I know this has come up before, but I don't recall where things
+settled out.. mvebu_pcie_align_resource is the function to look at,
+the size at that point needs to be rounded up to a power of two and
+communicated back to the caller.
+
+Alternately, I belive Thomas once discussed using multiple mbus
+windows for these non-aligned requests.
+
+> > Just to confirm, what does something like the below say for you guys?
 > 
-> So to support all different combinations with DeviceTree mean that an
-> exponential number of dts/dtsi is needed to describe each variation so
-> I decided to only support the most common versions:
-> 
-> - IGEPv2 with DM3730, NAND, wifi and 512MB of RAM.
-> - IGEP COM Module with DM3730, NAND, wifi and 512MB of RAM.
-> 
-> And companies using IGEP boards and mainline could use it as a
-> reference and adapt the DTS to match their board revision.
+> See https://gist.github.com/ngreatorex/10025253 for the dmesg output.
+> I have also included the contents of
+> /sys/kernel/debug/mvebu-mbus/devices both before and after the
+> modprobe / oops. As you can see I get a total of 3 WARNINGs - one at
+> boot for the xHCI controller, and two when inserting igb.ko. Note that
+> this time I did this with both ports enabled.
 
-I have done that, I created omap3-igep0020-3430.dts, and it works fine.
+Yep, that is certainly the root problem - most likely for
+everyone. This also explains why Will saw success when he reverted
+that unrelated patch. That change altered the allocation pattern of
+the BARs and it just so happened to make things fall out properly.
 
-> 
-> Honestly I didn't know that there were mainline users using the old
-> omap3530 IGEPv2 so I'll prepare some patches to support both DM3730
-> and OMAP3530 versions.
+We should also fix mvebu_mbus_read_window, so debugfs reports the
+actual HW function. Instead of this:
+        *size = (ctrlreg | ~WIN_CTRL_SIZE_MASK) + 1;
 
-It still works, no need to change it ;-)
+Something with ffs is required, perhaps (untested):
+        *size = 2 << ffs(~(ctrlreg | ~WIN_CTRL_SIZE_MASK));
 
-Regards.
+Thomas: Do you think the WARN_ON should head into mainline?
 
-
--- 
-                                                                Gilles.
+Jason
