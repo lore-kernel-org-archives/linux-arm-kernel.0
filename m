@@ -1,44 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Apr 2014 10:09:27 +0100
-Subject: [PATCH v5 00/11] imx-drm dt bindings
-In-Reply-To: <20140407042334.GA28025@dragon>
-References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
- <20140311034607.GA26502@S2101-09.ap.freescale.net>
- <20140407042334.GA28025@dragon>
-Message-ID: <20140407090927.GW7528@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 7 Apr 2014 11:10:02 +0200
+Subject: [PATCH 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+ deadlock
+In-Reply-To: <20140403141533.GP7528@n2100.arm.linux.org.uk>
+References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140403160727.17b3558b@skate>
+ <20140403141533.GP7528@n2100.arm.linux.org.uk>
+Message-ID: <20140407111002.36488aed@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 12:23:37PM +0800, Shawn Guo wrote:
-> And I see another HDMI regression with my testing on mainline kernel.  I
-> can have my HDMI work at 1920x1080 with v3.14 kernel, but it can only
-> probes 1024x768 with the mainline today.
+Dear Russell King - ARM Linux,
 
-Works for me here.
+On Thu, 3 Apr 2014 15:15:33 +0100, Russell King - ARM Linux wrote:
 
-> [    20.606] (II) LoadModule: "modesetting"
-> [    20.607] (II) Loading /usr/lib/xorg/modules/drivers/modesetting_drv.so
-> [    20.609] (II) Module modesetting: vendor="X.Org Foundation"
-> [    20.609] 	compiled for 1.12.1.902, module version = 0.3.0
-> [    20.610] 	Module class: X.Org Video Driver
-> [    20.610] 	ABI class: X.Org Video Driver, version 12.0
-> [    20.610] (II) modesetting: Driver for Modesetting Kernel Drivers: kms
-> [    20.610] (++) using VT number 7
+> > Any comments about the proposed patches? These are important for the
+> > recent Armada 375/38x platforms and I'm sure will require a bit of
+> > discussion. Moreover, one of the patch affects the L2 cache driver that
+> > Russell is currently working on, so it would be nice if we could get
+> > the discussion going soon.
 > 
-> [    20.624] (WW) Falling back to old probe method for modesetting
-> [    20.624] (II) modesetting(0): using default device
-> [    20.627] (II) modesetting(0): Creating default Display subsection in Screen section
-> 	"Default Screen Section" for depth/fbbpp 24/32
-> [    20.627] (==) modesetting(0): Depth 24, (==) framebuffer bpp 32
-> [    20.628] (==) modesetting(0): RGB weight 888
-> [    20.628] (==) modesetting(0): Default visual is TrueColor
-> [    20.628] (II) modesetting(0): ShadowFB: preferred NO, enabled NO
-> [    20.628] (II) modesetting(0): Output HDMI-0 has no monitor section
-> [    20.629] (II) modesetting(0): EDID for output HDMI-0
-> [    20.629] (II) modesetting(0): Printing probed modes for output HDMI-0
+> Will is away for another week and a half.
 
-So no EDID.  Did you update the "ddc" property to "ddc-i2c-bus" ?
+Ok. However I believe Will and Catalin are the best placed to give all
+the fine details about this problem.
 
+> There is an important point to be made about the L2 cache though - it is
+> not possible to disable the "sync" at the L2 cache - any register write
+> automatically invokes a sync before it is actioned, so avoiding the
+> explicit sync doesn't stop them from happening, it just reduces the
+> number which occur.
+> 
+> Is it possible that you are hitting one of the PL310 errata?
+
+As far as I'm aware, there is no PL310 errata registered for this
+problem: at least I asked Will and Catalin about this, and they never
+came up with a PL310 errata. My understanding is that the problem here
+is not a deficiency of the PL310 itself, but rather an unfortunate
+interaction between the PL310 behavior, the hardware I/O coherency and
+the PCIe transactions.
+
+The suggested fix to disable explicit outer cache sync, and map PCIe
+regions are strongly ordered was proposed by ARM as a solution to the
+deadlocks, and it was tested successfully.
+
+I am hoping that Catalin and Will will enter the discussion and give
+the details you need to fully understand the problem.
+
+Thanks,
+
+Thomas
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
