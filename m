@@ -1,83 +1,34 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 7 Apr 2014 14:42:50 +0100
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <5183143.FxBNM0xTAV@wuerfel>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <20140405001953.GE15806@google.com>
- <20140407083120.GE17163@e106497-lin.cambridge.arm.com>
- <5183143.FxBNM0xTAV@wuerfel>
-Message-ID: <20140407134250.GL17163@e106497-lin.cambridge.arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 7 Apr 2014 21:43:04 +0800
+Subject: [PATCH v5 00/11] imx-drm dt bindings
+In-Reply-To: <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
+References: <1394011262-16849-1-git-send-email-p.zabel@pengutronix.de>
+ <20140311034607.GA26502@S2101-09.ap.freescale.net>
+ <20140407042334.GA28025@dragon>
+ <1396865135.3811.13.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140407134302.GB2438@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 12:36:15PM +0100, Arnd Bergmann wrote:
-> On Monday 07 April 2014 09:31:20 Liviu Dudau wrote:
-> > On Sat, Apr 05, 2014 at 01:19:53AM +0100, Bjorn Helgaas wrote:
-> >
-> > > Host bridges on x86 could have MMIO apertures that turn CPU memory accesses
-> > > into PCI port accesses.  We could implement any number of I/O port spaces
-> > > this way, by making the kernel inb()/outb()/etc. interfaces smart enough to
-> > > use the memory-mapped space instead of (or in addition to) the
-> > > INB/OUTB/etc. instructions.
+On Mon, Apr 07, 2014 at 12:05:35PM +0200, Philipp Zabel wrote:
+> > Did you get any chance to reproduce this dual display issue?  Now it
+> > shows on mainline kernel.
 > 
-> PowerPC actually has this already, as CONFIG_PPC_INDIRECT_PIO meaning that
-> access to PIO registers is bus specific, and there is also CONFIG_PPC_INDIRECT_MMIO
-> for the case where MMIO access is not native.
->  
-> > Right, sorry for my ignorance then: how does *currently* the device driver do
-> > the I/O transfer transparent of the implementation mechanism? Or they have
-> > intimate knowledge of wether the device is behind a host bridge and can do MMIO
-> > or is on an ISA or CF bus and then it needs INB/OUTB ? And if we make inb/outb
-> > smarter, does that mean that we need to change the drivers?
-> 
-> The idea of that would be to not change drivers.
-> 
-> My preference here would be to only have a generic function for those
-> architectures that have the simple MMIO access all the time.
-> 
-> > > ia64 does this (see arch/ia64/include/asm/io.h for a little description)
-> > > and I think maybe one or two other arches have something similar.
-> > > 
-> > > > Introduce a pci_register_io_range() helper function that can be used
-> > > > by the architecture code to keep track of the I/O ranges described by the
-> > > > PCI bindings. If the PCI_IOBASE macro is not defined that signals
-> > > > lack of support for PCI and we return an error.
-> > > 
-> > > I don't quite see how you intend to use this, because this series doesn't
-> > > include any non-stub implementation of pci_register_io_range().
-> > > 
-> > > Is this anything like the ia64 strategy I mentioned above?  If so, it would
-> > > be really nice to unify some of this stuff.
-> > 
-> > After discussions with Arnd and Catalin I know have a new series that moves
-> > some of the code from arm64 series into this one. I am putting it through
-> > testing right know as I am going to have to depend on another series that
-> > makes PCI_IOBASE defined only for architectures that do MMIO in order to
-> > choose the correct default implementation for these functions. My hope is
-> > that I will be able to send the series this week.
-> 
-> I think migrating other architectures to use the same code should be
-> a separate effort from adding a generic implementation that can be
-> used by arm64. It's probably a good idea to have patches to convert
-> arm32 and/or microblaze.
+> I have not yet reproduced, but I've sent a patch today ("imx-drm:
+> imx-drm-core: Fix imx_drm_encoder_get_mux_id") that might fix this.
 
-Agree. My updated series only moves the arm64 code into framework to make the
-arm64 part a noop.
-
-Liviu
+Yes, it fixes my issue.
 
 > 
-> 	Arnd
+> > And I see another HDMI regression with my testing on mainline kernel.  I
+> > can have my HDMI work at 1920x1080 with v3.14 kernel, but it can only
+> > probes 1024x768 with the mainline today.  The Xorg.0.log are attached
+> > below.  The hardware and user space are same, so I guess this is another
+> > issue introduced by the recently kernel driver changes?
 > 
-> 
+> Hmm, not sure. Have you updated to the i2c-ddc-bus phandle property as
+> described in Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt?
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+That's indeed the cause of my problem.  Thanks, Philipp.
+
+Shawn
