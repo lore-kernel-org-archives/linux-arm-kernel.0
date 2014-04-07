@@ -1,51 +1,31 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 07 Apr 2014 14:21:31 +0200
-Subject: [PATCH] ACPI: Update the ownership and developers for ACPI in
- Kconfig
-In-Reply-To: <1396528650-7402-1-git-send-email-hanjun.guo@linaro.org>
-References: <1396528650-7402-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1487377.07icAKoM8K@vostro.rjw.lan>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 07 Apr 2014 13:11:41 +0100
+Subject: drivers/clk/bcm/clk-bcm281xx.c breaks on GCC 4.6.4 (and earlier)
+In-Reply-To: <534292F2.1040803@linaro.org> (Alex Elder's message of "Mon, 07
+ Apr 2014 06:58:42 -0500")
+References: <20140407092609.GY7528@n2100.arm.linux.org.uk>
+ <534292F2.1040803@linaro.org>
+Message-ID: <yw1xob0dgwzm.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 03, 2014 08:37:30 PM Hanjun Guo wrote:
-> The UEFI Forum included the ACPI spec in its portfolio in October 2013
-> and will host future spec iterations, following the ACPI v5.0a release.
-> 
-> A UEFI Forum working group named ACPI Specification Working Group (ASWG)
-> has been established to handle future ACPI developments, any UEFI member
-> can join the group and contribute to ACPI specification.
-> 
-> So update the ownership and developers for ACPI in Kconfig accordingly,
-> and update the website link to ACPI specification too.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/Kconfig |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index c205653..831e541 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -32,9 +32,10 @@ menuconfig ACPI
->  	  <http://acpica.org/>
->  
->  	  ACPI is an open industry specification co-developed by
-> -	  Hewlett-Packard, Intel, Microsoft, Phoenix, and Toshiba.
-> +	  ACPI Specification Working Group (ASWG) under UEFI Forum, any
-> +	  UEFI member can join ASWG and contribute to ACPI specification.
->  	  The specification is available at:
-> -	  <http://www.acpi.info>
+Alex Elder <elder@linaro.org> writes:
 
-The spec is still available from here, so why are you removing this link?
+> On 04/07/2014 04:26 AM, Russell King - ARM Linux wrote:
+>> So this greeted me this morning...
+>
+> That sucks.
+>
+> I don't see that, and I'm running 4.6.3.  (And I'm obviously
+> not testing with different versions of the compiler.)
+>
+> I'll be investigating.
 
-> +	  <http://www.uefi.org/acpi/specs>
->  
->  if ACPI
->  
-> 
+Could it have something to do with the unnamed struct member in struct
+bcm_clk_div which appears to be the fields these errors refer to?
+
+It would of course help if Russel specified what tree he was building.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+M?ns Rullg?rd
+mans at mansr.com
