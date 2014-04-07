@@ -1,49 +1,28 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon,  7 Apr 2014 16:54:16 +0100
-Subject: [PATCH v4 5/5] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <1396886056-18132-1-git-send-email-daniel.thompson@linaro.org>
-References: <1396626102-13991-1-git-send-email-daniel.thompson@linaro.org>
- <1396886056-18132-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1396886056-18132-6-git-send-email-daniel.thompson@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Apr 2014 16:58:09 +0100
+Subject: [PATCH 00/75] l2c series
+In-Reply-To: <1bd898f9-5fb8-4d9a-968c-711b607eb961@VA3EHSMHS031.ehs.local>
+References: <20140328151249.GJ7528@n2100.arm.linux.org.uk>
+ <533D7672.4090003@monstr.eu> <20140403193328.GY7528@n2100.arm.linux.org.uk>
+ <533E5B71.20406@monstr.eu> <20140404192824.GG7528@n2100.arm.linux.org.uk>
+ <5342440E.2020301@monstr.eu> <20140407090002.GU7528@n2100.arm.linux.org.uk>
+ <53426BE8.5090405@monstr.eu>
+ <1bd898f9-5fb8-4d9a-968c-711b607eb961@VA3EHSMHS031.ehs.local>
+Message-ID: <20140407155808.GG7528@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targetted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
+On Mon, Apr 07, 2014 at 03:52:08PM +0000, Punnaiah Choudary Kalluri wrote:
+> It means there are two drivers, one for l2 cache edac and one for l2
+> cache configuration and management in a single file. Please correct me
+> if I am wrong.
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overriden. Problem is fixed by removing the
-automatic enabling of this option.
+Correct - just because you have one piece of hardware which needs to
+register with two subsystems isn't always a reason to create two
+separate drivers, and then have to deal with the problem of two
+separate drivers needing access to the same registers, possibly with
+register access synchronisation issues.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 50fdc86..0a4ebf0 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1000,12 +1000,7 @@ config DEBUG_LL_INCLUDE
- 
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- # Compatibility options for 8250
- config DEBUG_UART_8250
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
