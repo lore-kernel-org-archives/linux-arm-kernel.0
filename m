@@ -1,127 +1,103 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 7 Apr 2014 11:04:06 -0700
-Subject: [PATCH 2/2] arm: use fixmap for text patching when text is RO
-In-Reply-To: <1396879071.3654.43.camel@linaro1.home>
-References: <1396646870-29695-1-git-send-email-rabin@rab.in>
- <1396646870-29695-2-git-send-email-rabin@rab.in>
- <1396879071.3654.43.camel@linaro1.home>
-Message-ID: <CAGXu5j+pWbLW6xkgqzh0ittvaqsbxbW6UuXa7ciqi+XAN0d6NQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 7 Apr 2014 19:25:53 +0100
+Subject: [RFC] Extend zImage format to support notes
+In-Reply-To: <5342E02C.4010004@linaro.org>
+References: <5342AF59.3030405@linaro.org>
+ <20140407160452.GB14062@e106331-lin.cambridge.arm.com>
+ <5342E02C.4010004@linaro.org>
+Message-ID: <20140407182553.GD14062@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 7, 2014 at 6:57 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Fri, 2014-04-04 at 23:27 +0200, Rabin Vincent wrote:
->> Use fixmaps for text patching when the kernel text is read-only,
->> inspired by x86.  This makes jump labels and kprobes work with the
->> currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
->> CONFIG_DEBUG_RODATA options.
->>
->> Signed-off-by: Rabin Vincent <rabin@rab.in>
->> ---
->>  arch/arm/include/asm/fixmap.h |  3 ++
->>  arch/arm/kernel/jump_label.c  |  2 +-
->>  arch/arm/kernel/patch.c       | 66 ++++++++++++++++++++++++++++++++++++++-----
->>  arch/arm/kernel/patch.h       | 12 +++++++-
->>  4 files changed, 74 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index 55ed076..79c1719 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -18,6 +18,9 @@
->>  #define FIXADDR_TOP          (FIXADDR_END - PAGE_SIZE)
->>
->>  enum fixed_addresses {
->> +     FIX_TEXT_POKE0,
->> +     FIX_TEXT_POKE1,
->> +
->>       FIX_KMAP_BEGIN,
->>       FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
->>       __end_of_fixed_addresses
->> diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
->> index 4ce4f78..afeeb9e 100644
->> --- a/arch/arm/kernel/jump_label.c
->> +++ b/arch/arm/kernel/jump_label.c
->> @@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
->>               insn = arm_gen_nop();
->>
->>       if (is_static)
->> -             __patch_text(addr, insn);
->> +             __patch_text_early(addr, insn);
->>       else
->>               patch_text(addr, insn);
->>  }
->> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
->> index 07314af..761c5b6 100644
->> --- a/arch/arm/kernel/patch.c
->> +++ b/arch/arm/kernel/patch.c
->> @@ -1,8 +1,11 @@
->>  #include <linux/kernel.h>
->> +#include <linux/spinlock.h>
->>  #include <linux/kprobes.h>
->> +#include <linux/mm.h>
->>  #include <linux/stop_machine.h>
->>
->>  #include <asm/cacheflush.h>
->> +#include <asm/fixmap.h>
->>  #include <asm/smp_plat.h>
->>  #include <asm/opcodes.h>
->>
->> @@ -13,21 +16,67 @@ struct patch {
->>       unsigned int insn;
->>  };
->>
->> -void __kprobes __patch_text(void *addr, unsigned int insn)
->> +static DEFINE_SPINLOCK(patch_lock);
->> +
->> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
->> +{
->> +     unsigned int uintaddr = (uintptr_t) addr;
->> +     bool module = !core_kernel_text(uintaddr);
->> +     struct page *page;
->> +
->> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
->> +             page = vmalloc_to_page(addr);
->> +     } else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
+On Mon, Apr 07, 2014 at 06:28:12PM +0100, Julien Grall wrote:
+> On 04/07/2014 05:04 PM, Mark Rutland wrote:
+> > On Mon, Apr 07, 2014 at 02:59:53PM +0100, Julien Grall wrote:
+> > Hi Julien,
+> 
+> Hello Mark,
+> 
+> >> Currently ELF is supporting notes (see include/linux/elfnote.h) which
+> >> is used by Xen to know the feature supported by the kernel.
+> > 
+> > What kind of features do you intend for Xen discover through this
+> > mechanism on ARM?
+> 
+> tl;dr: To know if DOM0 Linux will correctly work when IOMMU is enabled
+> by Xen.
+> 
+> Actually Xen doesn't support IOMMU. To allow DMA-capable devices
+> correctly work, we use an hybrid approach:
+>    - 1:1 mapping for DOM0 memory
+>    - Use swiotlb for DMA on a foreign page (i.e. page which belongs to
+> another domain).
+> 
+> For the latter, the swiotlb will return a physical address rather than
+> an IPA.
+> 
+> I'm actually working to add SMMU support in Xen for ARM. Once Xen will
+> enable the IOMMU, Linux will have to program DMA with IPA.
 
-I think this should probably be CONFIG_DEBUG_RODATA now that I've
-moved RO exclusively into that config.
+I'm probably being thick here, but is there anything preventing those
+foreign pages from being idmapped into DOM0 (at least for the duration
+of the DMA access) such that there is a 1-1 PA<->IPA mapping?
 
->> +             page = virt_to_page(addr);
->> +     } else {
->> +             return addr;
->> +     }
->
-> I can't help but think that it'd be more maintainable to just always use
-> fixmap, though that would obviously have some performance impact (not
-> sure that particularly matters for text patching) and it would expose
-> possible fixmap bugginess to more kernels (see my next comment...)
->
->> +
->> +     if (flags)
->> +             spin_lock_irqsave(&patch_lock, *flags);
->> +
->> +     set_fixmap(fixmap, page_to_phys(page));
->> +
->> +     return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
->
-> How does fixmap cope with cache colouring? Looking at the implementation
-> it looks like it doesn't and so fixmap use on ARM is possibly buggy.
->
-> For the text patching case where we know there are no writeable mappings
-> [1] this should be OK if we used set_fixmap_nocache here, so long as we
-> also invalidated the dcache later for the proper virtual address.
->
-> [1] Can we know there are no writeable mappings though, the ftrace code
-> modifying patches from Kees Cook have there own way of modifying text
-> code permissions.
+That would mean that from the point of view of Linux, there's nothing to
+care about, as every address it knows it can deal with is a valid IPA.
+Existing kernels would function with the IOMMU(s) on.
 
-I think performance becomes an issue for massive updates like ftrace
-seems to do, so I got the sense it was good to have the "bulk" way to
-do it, and then this tiny poking way to do it.
+I assume I'm missing something fairly obvious :)
 
--Kees
+> As the swiotlb is returning physical address, Linux will have to know
+> whether the device is protected by IOMMU or not. For the former case,
+> Linux shouldn't use swiotlb for this device (see
+> https://lkml.org/lkml/2014/2/20/351).
 
--- 
-Kees Cook
-Chrome OS Security
+For some reason I can only see the cover letter and not the patches when
+following that link.
+
+> Since the Xen ABI is stable for ARM (since Linux 3.13 and Xen 4.4), we
+> want to be able to boot Linux 3.13 on newer version of Xen. For this
+> version and onward (i.e. as long as swiotlb is used by default in DOM0),
+> Xen has to boot with IOMMU disabled.
+
+A mentioned above, I think I'm missing some part of the reasoning as to
+why Linux needs to know the difference.
+
+> With the zImage format extension, we will be able to add a note saying:
+> "I don't use swiotlb by default, you can turn on the IOMMU" once it's case.
+> 
+> > Can support for these not be negotiated at run-time (how does this work
+> > with other OSs under Xen)?
+> 
+> We though about runtime approach (see the whole discussion here
+> https://patches.linaro.org/26034/), but it's not as extensible as notes.
+> In fact, we might need more notes in the future when new feature will be
+> added and requires a DOM0/guest side support.
+
+I can certainly see the usefulness of notes.
+
+> 
+> On x86 world, the dom0/guest features is discovered via ELF notes.
+> I think we should use the same way on ARM when zImage is used to boot DOM0.
+> 
+> > On arm64 we seem to have a notes section but no pointer to it in the
+> > Image header. I assume you'd consider a notes section useful for 64-bit
+> > too?
+> 
+> Yes, we will need to same section on arm64.
+
+If it makes sense for this case then I can see why we would want it on
+arm64.
+
+> > I have some patches extending the header for arm64 which I intend to
+> > post shortly; if we're going to clash there and this is needed, perhaps
+> > I can fold in a similar update.
+> 
+> I didn't start to work on arm64 format extension. I wanted to wait for
+> feedback on the zImage format extension for arm32.
+
+Certainly. I just wanted to make sure we weren't going to end up
+stepping on each others' toes whenever we try to get our patches merged.
+
+Cheers,
+Mark.
