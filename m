@@ -1,96 +1,51 @@
-From: elder@linaro.org (Alex Elder)
-Date: Mon, 07 Apr 2014 06:58:42 -0500
-Subject: drivers/clk/bcm/clk-bcm281xx.c breaks on GCC 4.6.4 (and earlier)
-In-Reply-To: <20140407092609.GY7528@n2100.arm.linux.org.uk>
-References: <20140407092609.GY7528@n2100.arm.linux.org.uk>
-Message-ID: <534292F2.1040803@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 07 Apr 2014 14:21:31 +0200
+Subject: [PATCH] ACPI: Update the ownership and developers for ACPI in
+ Kconfig
+In-Reply-To: <1396528650-7402-1-git-send-email-hanjun.guo@linaro.org>
+References: <1396528650-7402-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1487377.07icAKoM8K@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2014 04:26 AM, Russell King - ARM Linux wrote:
-> So this greeted me this morning...
-
-That sucks.
-
-I don't see that, and I'm running 4.6.3.  (And I'm obviously
-not testing with different versions of the compiler.)
-
-I'll be investigating.
-
-					-Alex
-
-
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'frac_width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:30:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:51:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:59:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:83:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:95:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:107:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:119:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:128:2: error: unknown field 'fixed' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:140:2: error: unknown field 'fixed' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:147:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:151:2: error: unknown field 'fixed' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'frac_width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:164:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'frac_width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:174:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'frac_width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:184:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'frac_width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:194:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:206:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:218:2: error: unknown field 'scaled_div' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'offset' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'shift' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'width' specified in initializer
-> drivers/clk/bcm/clk-bcm281xx.c:260:2: error: unknown field 'scaled_div' specified in initializer
-> make[4]: *** [drivers/clk/bcm/clk-bcm281xx.o] Error 1
-> make[4]: Target `__build' not remade because of errors.
-> make[3]: *** [drivers/clk/bcm] Error 2
-> make[3]: Target `__build' not remade because of errors.
-> make[2]: *** [drivers/clk] Error 2
+On Thursday, April 03, 2014 08:37:30 PM Hanjun Guo wrote:
+> The UEFI Forum included the ACPI spec in its portfolio in October 2013
+> and will host future spec iterations, following the ACPI v5.0a release.
 > 
+> A UEFI Forum working group named ACPI Specification Working Group (ASWG)
+> has been established to handle future ACPI developments, any UEFI member
+> can join the group and contribute to ACPI specification.
+> 
+> So update the ownership and developers for ACPI in Kconfig accordingly,
+> and update the website link to ACPI specification too.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/acpi/Kconfig |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index c205653..831e541 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -32,9 +32,10 @@ menuconfig ACPI
+>  	  <http://acpica.org/>
+>  
+>  	  ACPI is an open industry specification co-developed by
+> -	  Hewlett-Packard, Intel, Microsoft, Phoenix, and Toshiba.
+> +	  ACPI Specification Working Group (ASWG) under UEFI Forum, any
+> +	  UEFI member can join ASWG and contribute to ACPI specification.
+>  	  The specification is available at:
+> -	  <http://www.acpi.info>
+
+The spec is still available from here, so why are you removing this link?
+
+> +	  <http://www.uefi.org/acpi/specs>
+>  
+>  if ACPI
+>  
+> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
