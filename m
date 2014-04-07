@@ -1,49 +1,55 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 07 Apr 2014 08:02:23 +0200
-Subject: [PATCH 06/10] ARM: EXYNOS: Add support for mapping PMU base
- address via DT
-In-Reply-To: <533FE1BC.7050300@samsung.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425058-4012-7-git-send-email-pankaj.dubey@samsung.com>
- <533BF905.6070701@samsung.com> <533BFF69.1060701@monstr.eu>
- <533D24D6.2030103@samsung.com> <533FE1BC.7050300@samsung.com>
-Message-ID: <53423F6F.5010504@monstr.eu>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 07 Apr 2014 15:04:21 +0900
+Subject: [PATCH] ARM: shmobile: r8a7791: Add EHCI MSTP clock
+Message-ID: <20140407060421.25826.64819.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2014 12:58 PM, Pankaj Dubey wrote:
-> On 04/03/2014 06:07 PM, Sylwester Nawrocki wrote:
->> On 02/04/14 14:15, Michal Simek wrote:
->>>> There were some patches posted for syscon to make it available in earlier
->>>> system initialization stage: https://lkml.org/lkml/2014/2/19/218
->>> I haven't finished this yet. I have to look at it again.
->> Thanks for the information, I assume this would be also useful
->> on the Exynos SoC series, so I'd be happy to see continuation
->> of those works.
-> 
-> It is useful for Exynos SoC series and I have modified this patch series to use early syscon
-> initialization API and I can see it's working.
-> I have some observation for early initialization of syscon API which I will
-> update in corresponding message thread.
+From: Magnus Damm <damm@opensource.se>
 
-Great. Please update that thread we should finish this implementation
-to be useful for everybody.
+Add support for EHCI clock gating via the MSTP703 bit on r8a7791.
 
-Thanks,
-Michal
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+ Written against renesas-devel-v3.14-20140403
 
+ arch/arm/boot/dts/r8a7791.dtsi            |    6 +++---
+ include/dt-bindings/clock/r8a7791-clock.h |    1 +
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/5cd1bdf7/attachment.sig>
+--- 0001/arch/arm/boot/dts/r8a7791.dtsi
++++ work/arch/arm/boot/dts/r8a7791.dtsi	2014-04-07 14:49:43.000000000 +0900
+@@ -774,19 +774,19 @@
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+-			clocks = <&mp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
++			clocks = <&mp_clk>,  <&mp_clk>, <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
+ 				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
+ 				 <&zx_clk>, <&zx_clk>, <&zx_clk>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+-				R8A7791_CLK_HSUSB R8A7791_CLK_HSCIF2 R8A7791_CLK_SCIF5
++				R8A7791_CLK_EHCI R8A7791_CLK_HSUSB R8A7791_CLK_HSCIF2 R8A7791_CLK_SCIF5
+ 				R8A7791_CLK_SCIF4 R8A7791_CLK_HSCIF1 R8A7791_CLK_HSCIF0
+ 				R8A7791_CLK_SCIF3 R8A7791_CLK_SCIF2 R8A7791_CLK_SCIF1
+ 				R8A7791_CLK_SCIF0 R8A7791_CLK_DU1 R8A7791_CLK_DU0
+ 				R8A7791_CLK_LVDS0
+ 			>;
+ 			clock-output-names =
+-				"hsusb", "hscif2", "scif5", "scif4", "hscif1", "hscif0",
++				"ehci", "hsusb", "hscif2", "scif5", "scif4", "hscif1", "hscif0",
+ 				"scif3", "scif2", "scif1", "scif0", "du1", "du0", "lvds0";
+ 		};
+ 		mstp8_clks: mstp8_clks at e6150990 {
+--- 0001/include/dt-bindings/clock/r8a7791-clock.h
++++ work/include/dt-bindings/clock/r8a7791-clock.h	2014-04-07 14:49:43.000000000 +0900
+@@ -63,6 +63,7 @@
+ #define R8A7791_CLK_PWM			23
+ 
+ /* MSTP7 */
++#define R8A7791_CLK_EHCI		3
+ #define R8A7791_CLK_HSUSB		4
+ #define R8A7791_CLK_HSCIF2		13
+ #define R8A7791_CLK_SCIF5		14
