@@ -1,42 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 7 Apr 2014 13:00:42 -0400
-Subject: [PATCH 0/2] ARM: mvebu: add a clock for mdio nodes on Armada
- 370/38x/XP
-In-Reply-To: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1395790439-21332-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140407170042.GI28334@titan.lakedaemon.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 7 Apr 2014 11:10:12 -0600
+Subject: [PATCH v2 2/5] ARM: zynq: dt: Convert to preprocessor includes
+In-Reply-To: <534298E7.2020409@monstr.eu>
+References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
+ <53423E75.3020008@monstr.eu> <53429754.8080105@topic.nl>
+ <534298E7.2020409@monstr.eu>
+Message-ID: <20140407171012.GC9952@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 12:33:57AM +0100, Thomas Petazzoni wrote:
-> Jason, Andrew, Gregory, Sebastian,
-> 
-> Here is a set of two patches that add a clock specification to the
-> mdio node on Armada 370/XP and Armada 38x. This allows the mvmdio
-> driver to work properly when loaded as a module, before mvneta is
-> loaded.
-> 
-> I've separated the Armada 370/XP and Armada 38x fixes in two patches,
-> because the Armada 370/XP fix should be pushed to stable, while the
-> Armada 38x does not need to be pushed to stable since Armada 38x
-> support only appears in 3.15.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (2):
->   ARM: mvebu: ensure the mdio node has a clock reference on Armada
->     370/XP
->   ARM: mvebu: ensure the mdio node has a clock reference on Armada 38x
-> 
->  arch/arm/boot/dts/armada-370-xp.dtsi | 1 +
->  arch/arm/boot/dts/armada-38x.dtsi    | 1 +
->  2 files changed, 2 insertions(+)
+On Mon, Apr 07, 2014 at 02:24:07PM +0200, Michal Simek wrote:
 
-Applied both to mvebu/dt-fixes-non-critical for v3.15.  Updated for-next
-as well.  If all goes well, I'll send a pull request later in the week.
+> Device-tree BSP and in 2014.01 there will be new BSP which just
+> generate them directly from the Vivado tools which just target your
+> reference design.  You can connect your custom IP (or Xilinx or 3rd
+> party) directly to the GIC which using different IRQ sensitivity
+> with whatever register addresses and make no sense to write it by
+> hand.
 
-thx,
+On our Zynq design here we ended up being unwilling to use platform
+generation from Vivado. Basically all our IP was custom, so there was
+no win at all to invoking the complexity of the automatic tools.
 
-Jason.
+Thus we write the DT by hand, and our DT is complex, integrating
+peripherals that span two FPGAs.
+
+I think the in-kernel DT should use the kernel conventions, which
+means using #include and the binding constants over magic values.
+
+Jason
