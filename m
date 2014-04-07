@@ -1,37 +1,35 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 07 Apr 2014 07:47:56 +0200
-Subject: [PATCH v5 3/3] ARM: zynq: dt: Add I2C nodes to Zynq device tree
-In-Reply-To: <1396646876-27336-3-git-send-email-soren.brinkmann@xilinx.com>
-References: <1396646876-27336-1-git-send-email-soren.brinkmann@xilinx.com>
- <1396646876-27336-3-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <53423C0C.6050308@monstr.eu>
+Date: Mon, 07 Apr 2014 07:58:13 +0200
+Subject: [PATCH v2 2/5] ARM: zynq: dt: Convert to preprocessor includes
+In-Reply-To: <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
+References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <53423E75.3020008@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2014 11:27 PM, Soren Brinkmann wrote:
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Tested-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
-> Changes in v5:
->  - use lower case hex digits in 'reg' property
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2:
->  - replace 'pmbus' with 'ti' in compatibility strings of UCD devices
-> 
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 22 ++++++++++++
->  arch/arm/boot/dts/zynq-zc702.dts | 76 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/zynq-zc706.dts | 68 +++++++++++++++++++++++++++++++++++
->  3 files changed, 166 insertions(+)
+Hi Soren,
 
-Applied to zynq-dt branch.
+On 04/05/2014 01:14 AM, Soren Brinkmann wrote:
+> Convert all Zynq DT files to the dtc preprocessor include syntax.
+> This allows to include header files in the devicetrees like other
+> SoC-types already do.
+> 
+> Inspired-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> (http://www.spinics.net/lists/arm-kernel/msg319832.html)
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+
+These 4 patches needs more wider discussion if this is helpful or
+not. Currently I can't see any value in it because everything
+is just generated and fixed. I think I had the same discussion
+with Laurent some weeks ago regarding this.
+IRC the origin idea to use this was especially for people who
+writing these DTS by hand which is not our case - at least
+for majority of our customers.
 
 Thanks,
 Michal
-
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -47,4 +45,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/9b3cf52a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/678e4dff/attachment.sig>
