@@ -1,45 +1,56 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 7 Apr 2014 13:16:40 +0200
-Subject: [PATCH 08/16] backlight: pwm_bl: set pwm polarity when using
- platform data
-In-Reply-To: <1395234209-15546-9-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Mon, 7 Apr 2014 13:28:23 +0200
+Subject: [PATCH 09/16] avr32/at32ap: switch to the generic PWM framework
+In-Reply-To: <20140319141820.GA20872@samfundet.no>
 References: <1395234209-15546-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395234209-15546-9-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140407111639.GB26985@ulmo>
+ <1395234209-15546-10-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140319141820.GA20872@samfundet.no>
+Message-ID: <20140407112821.GC26985@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 19, 2014 at 02:03:21PM +0100, Alexandre Belloni wrote:
-> Set inversed polarity when .pwm_active_low is set in the platform_data. With
-> device tree, this is taken care of by of_pwm_xlate_with_flags(), called from
-> of_pwm_get().
+On Wed, Mar 19, 2014 at 03:18:20PM +0100, Hans-Christian Egtvedt wrote:
+> Around Wed 19 Mar 2014 14:03:22 +0100 or thereabout, Alexandre Belloni wrote:
+> > Switch to the pwm/pwm-atmel driver instead of misc/atmel_pwm
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/video/backlight/pwm_bl.c | 8 ++++++++
->  include/linux/pwm_backlight.h    | 1 +
->  2 files changed, 9 insertions(+)
+> Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 > 
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index b75201ff46f6..ffdd3b2b2742 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -309,6 +309,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	if (data->pwm_period_ns > 0)
->  		pwm_set_period(pb->pwm, data->pwm_period_ns);
->  
-> +	/*
-> +	 * The DT case is taking care of polarity in of_pwm_get(). For the
-> +	 * non-DT case, set the polarity from platform data.
-> +	 */
-> +	if (data->pwm_active_low)
-> +		if (pwm_set_polarity(pb->pwm, PWM_POLARITY_INVERSED))
-> +			dev_err(&pdev->dev, "impossible to invert polarity\n");
+> > ---
+> >  arch/avr32/mach-at32ap/at32ap700x.c | 7 ++-----
+> >  1 file changed, 2 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
+> > index a1f4d1e91b52..db85b5ec3351 100644
+> > --- a/arch/avr32/mach-at32ap/at32ap700x.c
+> > +++ b/arch/avr32/mach-at32ap/at32ap700x.c
+> > @@ -1553,7 +1553,7 @@ static struct resource atmel_pwm0_resource[] __initdata = {
+> >  	IRQ(24),
+> >  };
+> >  static struct clk atmel_pwm0_mck = {
+> > -	.name		= "pwm_clk",
+> > +	.name		= "at91sam9rl-pwm",
+> 
+> I found this a tiny bit weird, but found the matching instance in
+> drivers/pwm/pwm-atmel.c
+> 
+> IMHO it would initially have been better to call it atpwm_v1 or something
+> similar, more generic. But I guess that is too late to change at this point.
 
-Could this perhaps be solved by adding a field to the PWM lookup table
-that's used for non-DT cases? The idea being that we can use the same
-interfaces for DT and non-DT cases, so we should try to move both
-towards the same representation.
+Generally when you call clk_get(dev, NULL), you'll pass in the consumer
+device as "dev". Now the avr32 clock implementation compares that to the
+device associated with the clock, which for the case of the PWM pwm0_mck
+is the PWM controller (at32_add_device_pwm() for reference). So it seems
+to be set up properly (the PWM controller is the consumer).
+
+Also since the consumer ID isn't specified to the clk_get() call, the
+name of the clock (what's being changed in the above hunk) shouldn't
+matter because it won't match anyway.
+
+Now that I look at it more closely, I wonder how clk_get(dev, NULL) can
+even work on avr32, since there's no check for id == NULL and therefore
+NULL will be blindly passed into strcmp() and then crash.
 
 Thierry
 -------------- next part --------------
@@ -48,4 +59,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/6b3bd058/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/9c14c4d0/attachment.sig>
