@@ -1,44 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 7 Apr 2014 15:19:18 +0100
-Subject: Porting plat-pxa to the MMP PDMA driver
-In-Reply-To: <5342B20C.4070608@zonque.org>
-References: <5342A73F.8010907@zonque.org>
- <20140407140256.GA13237@sirena.org.uk>
- <5342B20C.4070608@zonque.org>
-Message-ID: <20140407141918.GH14763@sirena.org.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 7 Apr 2014 15:20:45 +0100
+Subject: [PATCH v7 5/6] pci: Export find_pci_host_bridge() function.
+In-Reply-To: <20140404233948.GC15806@google.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-6-git-send-email-Liviu.Dudau@arm.com>
+ <20140404233948.GC15806@google.com>
+Message-ID: <20140407142045.GO17163@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 04:11:24PM +0200, Daniel Mack wrote:
-> On 04/07/2014 04:02 PM, Mark Brown wrote:
+On Sat, Apr 05, 2014 at 12:39:48AM +0100, Bjorn Helgaas wrote:
+> On Fri, Mar 14, 2014 at 03:34:31PM +0000, Liviu Dudau wrote:
+> > This is a useful function and we should make it visible outside the
+> > generic PCI code. Export it as a GPL symbol.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> > ---
+> >  drivers/pci/host-bridge.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> > index 06ace62..8708b652 100644
+> > --- a/drivers/pci/host-bridge.c
+> > +++ b/drivers/pci/host-bridge.c
+> > @@ -17,12 +17,13 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+> >  	return bus;
+> >  }
+> >  
+> > -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> > +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> >  {
+> >  	struct pci_bus *root_bus = find_pci_root_bus(bus);
+> >  
+> >  	return to_pci_host_bridge(root_bus->bridge);
+> >  }
+> > +EXPORT_SYMBOL_GPL(find_pci_host_bridge);
+> 
+> Do you have a place where you actually need to use find_pci_host_bridge()?
+> I'd rather not export it, even as _GPL, unless we have a user.
 
-> > Is it not possible to do what we're doing with the Samsung
-> > platforms and have both platform and generic DMA code in the
-> > source, selected via a Kconfig symbol?  That way you don't have to
-> > have a flag day.
+The code in arm64 series is using it to implement pci_domain_nr().
 
-> Not sure whether I'm following, but on PXA, the DMA controller can
-> either be used by the old framework or the new driver, and so users
-> can't choose which one to use. I thought about a macro hack to make
-> the transition easier, but that seems impossible to do.
+> 
+> If we *do* export it, I'd like it to have a more conventional name, e.g.,
+> something starting with "pci_".
 
-That's exactly what Samsung have too - an old API and dmaengine as
-either/or options.
+Understood. pci_find_host_bridge() ?
 
-> Sure, we could keep implementations for both environments around, but
-> chances are that we'll never get rid of the old cruft at all then.
-> Also, for most drivers that means lots of code duplication.
+Best regards,
+Liviu
 
-At least with Samsung the transition has mostly happened, it's been
-taking a long time but there's progress and it means that platforms that
-are actively being worked on get to use the new stuff.  The code
-duplication is a pain point but it's less painful than having to
-transition the entire platform at once when it's difficult to get people
-to care.  It makes it easier to maintian forward motion.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140407/20c91c88/attachment.sig>
+> 
+> >  
+> >  void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+> >  				 void (*release_fn)(struct pci_host_bridge *),
+> > -- 
+> > 1.9.0
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
