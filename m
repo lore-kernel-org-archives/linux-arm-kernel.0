@@ -1,76 +1,19 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 8 Apr 2014 02:40:12 +0400
-Subject: [PATCH v2 2/2] ARM: shmobile: lager: enable internal PCI
-In-Reply-To: <201404080235.22151.sergei.shtylyov@cogentembedded.com>
-References: <201404080235.22151.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201404080240.13639.sergei.shtylyov@cogentembedded.com>
+Date: Tue, 8 Apr 2014 02:48:13 +0400
+Subject: [PATCH 0/2] Add PCI USB DT support for R8A7791/Koelsch reference board
+Message-ID: <201404080248.14139.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+Hello.
 
-Enable internal AHB-PCI bridges for the USB EHCI/OHCI controllers attached to
-them.
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-v3.14-20140403' tag and R8A7791 EHCI clock device tree support
+patch. Here we add the PCI USB device tree support on the R8A7791/Koelsch
+reference board. The patchset requires the 'pci-rcar-gen2' driver device tree
+support (just re-posted) in order to work.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-Reviewed-by: Ian Molton <ian.molton@codethink.co.uk>
-[Sergei: enabled PCI0]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+[1/2] ARM: shmobile: r8a7791: add internal PCI bridge nodes
+[2/2] ARM: shmobile: koelsch: enable internal PCI
 
----
-Changes in version 2:
-- enabled PCI0 device;
-- reworded summary and changelog;
-- refreshed the patch.
-
- arch/arm/boot/dts/r8a7790-lager.dts |   33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
-+++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -199,6 +199,21 @@
- 				 "msiof1_tx";
- 		renesas,function = "msiof1";
- 	};
-+
-+	usb0_pins: usb0 {
-+		renesas,groups = "usb0";
-+		renesas,function = "usb0";
-+	};
-+
-+	usb1_pins: usb1 {
-+		renesas,groups = "usb1";
-+		renesas,function = "usb1";
-+	};
-+
-+	usb2_pins: usb2 {
-+		renesas,groups = "usb2";
-+		renesas,function = "usb2";
-+	};
- };
- 
- &ether {
-@@ -297,3 +312,21 @@
- 	cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
-+
-+&pci0 {
-+	status = "okay";
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci1 {
-+	status = "okay";
-+	pinctrl-0 = <&usb1_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&pci2 {
-+	status = "okay";
-+	pinctrl-0 = <&usb2_pins>;
-+	pinctrl-names = "default";
-+};
+WBR, Sergei
