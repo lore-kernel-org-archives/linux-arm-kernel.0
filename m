@@ -1,58 +1,43 @@
 From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 7 Apr 2014 08:37:28 -0700
-Subject: [PATCH] i2c: cadence: fix Kconfig dependency
-In-Reply-To: <5342481B.6020600@monstr.eu>
-References: <1396811227-8851-1-git-send-email-wsa@the-dreams.de>
- <20140407063100.GN29751@pengutronix.de>
- <5342481B.6020600@monstr.eu>
-Message-ID: <ee442030-88af-4cad-ab5c-fa7ec2b51ac2@TX2EHSMHS037.ehs.local>
+Date: Mon, 7 Apr 2014 08:39:34 -0700
+Subject: [PATCH v2 2/5] ARM: zynq: dt: Convert to preprocessor includes
+In-Reply-To: <53429754.8080105@topic.nl>
+References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
+ <53423E75.3020008@monstr.eu> <53429754.8080105@topic.nl>
+Message-ID: <8db0b480-2c27-4f97-8712-e16fd39d4159@CH1EHSMHS038.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-04-07 at 08:39AM +0200, Michal Simek wrote:
-> On 04/07/2014 08:31 AM, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Sun, Apr 06, 2014 at 09:07:07PM +0200, Wolfram Sang wrote:
-> >> During development, the driver first really needed to depend on
-> >> COMMON_CLK only. Later, it was switched to writel_relaxed, but it was
-> >> forgotten to update the dependencies, so build errors occured:
+On Mon, 2014-04-07 at 02:17PM +0200, Mike Looijmans wrote:
+> On 04/07/2014 07:58 AM, Michal Simek wrote:
+> >Hi Soren,
+> >
+> >On 04/05/2014 01:14 AM, Soren Brinkmann wrote:
+> >>Convert all Zynq DT files to the dtc preprocessor include syntax.
+> >>This allows to include header files in the devicetrees like other
+> >>SoC-types already do.
 > >>
-> >> config: make ARCH=i386 allyesconfig
+> >>Inspired-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> >>(http://www.spinics.net/lists/arm-kernel/msg319832.html)
 > >>
-> >> All error/warnings:
-> >>
-> >>    drivers/i2c/busses/i2c-cadence.c: In function 'cdns_i2c_clear_bus_hold':
-> >>>> drivers/i2c/busses/i2c-cadence.c:168:3: error: implicit declaration
-> >>>> of function 'writel_relaxed' [-Werror=implicit-function-declaration]
-> >>
-> >> Use a very safe dependency for now.
-> >>
-> >> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> >> ---
-> >>  drivers/i2c/busses/Kconfig | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> >> index 93165ff453ab..3d3b9b3577c5 100644
-> >> --- a/drivers/i2c/busses/Kconfig
-> >> +++ b/drivers/i2c/busses/Kconfig
-> >> @@ -378,7 +378,7 @@ config I2C_BLACKFIN_TWI_CLK_KHZ
-> >>  
-> >>  config I2C_CADENCE
-> >>  	tristate "Cadence I2C Controller"
-> >> -	depends on COMMON_CLK
-> >> +	depends on ARCH_ZYNQ
-> > I'd suggest:
-> > 
-> > 	depends on ARM && (ARCH_ZYNC || COMPILE_TEST)
-> > 
-> > This way it's available for compile testing but still it doesn't appear
-> > when configuring a kernel for a real machine.
+> >>Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> >
+> >These 4 patches needs more wider discussion if this is helpful or
+> >not. Currently I can't see any value in it because everything
+> >is just generated and fixed. I think I had the same discussion
+> >with Laurent some weeks ago regarding this.
 > 
-> I would suggest to add relaxed IO helper function to asm-generic/io.h
-> to be available for all archs. Then we can avoid this type of errors.
+> I would be kinda neutral here. I'd consider it helpful, it improves
+> readability (regardless of whether they are generated or hand
+> crafted). That's convenient for things like interrupt sensitivity, I
+> can't remember whether 4 is level or edge type. On the other hand,
+> the clock indices are just as much magic numbers as the memory
+> addresses. If I suspect an error in that area, I'd start by lokking
+> in /sys/kernel/debug/clk but wouldn't start in the DT.
 
-ACK
+I agree. Readability is better this way. And whether our generator spits
+out magic numbers of these symbolic names should not be a big
+difference, is it?
 
 	S?ren
