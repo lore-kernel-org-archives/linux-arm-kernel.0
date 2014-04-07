@@ -1,42 +1,67 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 8 Apr 2014 00:41:10 +0200
-Subject: [PATCH 3/3] ARM: socfpga: dts: add reset-controller
-In-Reply-To: <1396905121.25236.2.camel@linux-builds1>
-References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396629087-23727-4-git-send-email-s.trumtrar@pengutronix.de>
- <1396905121.25236.2.camel@linux-builds1>
-Message-ID: <20140407224110.GA28399@pengutronix.de>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 7 Apr 2014 16:44:51 -0600
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
+ <20140405000007.GD15806@google.com>
+ <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
+ <1396862058.3671.40.camel@pasglop>
+ <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
+Message-ID: <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 04:12:01PM -0500, Dinh Nguyen wrote:
-> On Fri, 2014-04-04 at 18:31 +0200, Steffen Trumtrar wrote:
-> > Add the necessary #reset-cells property to the rst-mgr node and
-> > provide a header-file with all possible resets specified.
-> > 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/socfpga.dtsi           |  8 ++-
-> >  include/dt-bindings/reset/altr,rst-mgr.h | 90 ++++++++++++++++++++++++++++++++
-> 
-> Does this file belong under dt-bindings/reset/ or
-> dt-bindings/reset-controller/?
-> 
+On Mon, Apr 7, 2014 at 4:07 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Mon, Apr 07, 2014 at 10:14:18AM +0100, Benjamin Herrenschmidt wrote:
+>> On Mon, 2014-04-07 at 09:46 +0100, Liviu Dudau wrote:
+>> >
+>> > *My* strategy is to get rid of pci_domain_nr(). I don't see why we need
+>> > to have arch specific way of providing the number, specially after looking
+>> > at the existing implementations that return a value from a variable that
+>> > is never touched or incremented. My guess is that pci_domain_nr() was
+>> > created to work around the fact that there was no domain_nr maintainance in
+>> > the generic code.
+>>
+>> Well, there was no generic host bridge structure. There is one now, it should
+>> go there.
+>
+> Exactly! Hence my patch. After it gets accepted I will go through architectures
+> and remove their version of pci_domain_nr().
 
-ATM there is no such directory, or is there ?
-So, reset seems appropriate I think.
+Currently the arch has to supply pci_domain_nr() because that's the
+only way for the generic code to learn the domain.  After you add
+pci_create_root_bus_in_domain(), the arch can supply the domain that
+way, and we won't need the arch-specific pci_domain_nr().  Right?
+That makes more sense to me; thanks for the explanation.
 
-But this reminds me, that I wanted to move the binding documentation from
-Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt ->
-Documentation/devicetree/bindings/reset/socfpga-reset.txt
+Let me try to explain my concern about the
+pci_create_root_bus_in_domain() interface.  We currently have these
+interfaces:
 
-I will have to add a patch for that to the series in v2.
+  pci_scan_root_bus()
+  pci_scan_bus()
+  pci_scan_bus_parented()
+  pci_create_root_bus()
 
-Thanks,
-Steffen
+pci_scan_root_bus() is a higher-level interface than
+pci_create_root_bus(), so I'm trying to migrate toward it because it
+lets us remove a little code from the arch, e.g., pci_scan_child_bus()
+and pci_bus_add_devices().
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think we can only remove the arch-specific pci_domain_nr() if that
+arch uses pci_create_root_bus_in_domain().  When we convert an arch
+from using scan_bus interfaces to using
+pci_create_root_bus_in_domain(), we will have to move the rest of the
+scan_bus code (pci_scan_child_bus(), pci_bus_add_devices()) back into
+the arch code.
+
+One alternative is to add an _in_domain() variant of each of these
+interfaces, but that doesn't seem very convenient either.  My idea of
+passing in a structure would also require adding variants, so there's
+not really an advantage there, but I am thinking of the next
+unification effort, e.g., for NUMA node info.  I don't really want to
+have to change all the _in_domain() interfaces to also take yet
+another parameter for the node number.
+
+Bjorn
