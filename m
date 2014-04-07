@@ -1,32 +1,46 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Mon, 7 Apr 2014 14:08:17 +0530
-Subject: [PATCH v7 1/3] ARM: EXYNOS: initial board support for exynos5260
- SoC
-In-Reply-To: <1396519224-18712-2-git-send-email-rahul.sharma@samsung.com>
-References: <1396519224-18712-1-git-send-email-rahul.sharma@samsung.com>
- <1396519224-18712-2-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <CAK9yfHzuVZh-RhfT+0tEehnF+aWnYHG=X2cv_E6uvzq2aS7UQg@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 07 Apr 2014 10:38:49 +0200
+Subject: [PATCH v2 6/6] PCI: designware: use new OF interrupt mapping
+ when possible
+In-Reply-To: <20140404170517.GH9007@google.com>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-7-git-send-email-l.stach@pengutronix.de>
+ <20140305184219.GA29903@obsidianresearch.com>
+ <20140404170341.GG9007@google.com> <20140404170517.GH9007@google.com>
+Message-ID: <1396859929.4553.2.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+Hi Bjorn,
 
-On 3 April 2014 15:30, Rahul Sharma <rahul.sharma@samsung.com> wrote:
-> From: Pankaj Dubey <pankaj.dubey@samsung.com>
->
-> This patch add basic arch side support for exynos5260 SoC.
-<snip>
+Am Freitag, den 04.04.2014, 11:05 -0600 schrieb Bjorn Helgaas:
+> On Fri, Apr 04, 2014 at 11:03:41AM -0600, Bjorn Helgaas wrote:
+> > On Wed, Mar 05, 2014 at 11:42:19AM -0700, Jason Gunthorpe wrote:
+> > > On Wed, Mar 05, 2014 at 02:25:51PM +0100, Lucas Stach wrote:
+> > > > -	return pp->irq;
+> > > > +	irq = of_irq_parse_and_map_pci(dev, slot, pin);
+> > > > +	if (!irq)
+> > > > +		irq = pp->irq;
+> > > 
+> > > In light of the two bugs that Tim found, it might be wise to throw a
+> > > 'dev_warn(FW_BUG "Missing DT interrupt mapping")' in the fall back
+> > > path, so it doesn't continue to silently cover up errors on the OF/DT
+> > > side..
+> > 
+> > This sounds like a reasonable thing to do, but I didn't see a response to
+> > this comment.  Should I merge it as-is, or do you want to add the message?
+> 
+> Oh, and I suppose the same question applies to the other host drivers in
+> this series (tegra, rcar)?
 
-> @@ -374,6 +374,7 @@ static char const *exynos_dt_compat[] __initconst = {
->         "samsung,exynos4412",
->         "samsung,exynos5",
->         "samsung,exynos5250",
-> +       "samsung,exynos5260",
+Please apply as-is. of_irq_parse_and_map_pci() already prints an error
+message if it isn't able to establish the mapping, thus right before we
+fall into the fallback path. So any the warning would be redundant.
 
-I don't think we should be adding this as we do not yet have any soc
-specific quirk.
-Compatibility to generic string, "samsung,exynos5"  should be sufficient.
-
+Regards,
+Lucas
 -- 
-With warm regards,
-Sachin
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
