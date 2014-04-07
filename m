@@ -1,32 +1,36 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 7 Apr 2014 11:10:12 -0600
-Subject: [PATCH v2 2/5] ARM: zynq: dt: Convert to preprocessor includes
-In-Reply-To: <534298E7.2020409@monstr.eu>
-References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
- <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
- <53423E75.3020008@monstr.eu> <53429754.8080105@topic.nl>
- <534298E7.2020409@monstr.eu>
-Message-ID: <20140407171012.GC9952@obsidianresearch.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 7 Apr 2014 18:16:24 +0100
+Subject: disabling MMU of ARMv7-A
+In-Reply-To: <20140407103312.GA7528@n2100.arm.linux.org.uk>
+References: <015e01cf4a55$7f43a950$7dcafbf0$@samsung.com>
+ <20140328104349.GG21330@arm.com>
+ <20140407095629.GA3951@e103592.cambridge.arm.com>
+ <20140407103312.GA7528@n2100.arm.linux.org.uk>
+Message-ID: <20140407171624.GB3951@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 02:24:07PM +0200, Michal Simek wrote:
+On Mon, Apr 07, 2014 at 11:33:12AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Apr 07, 2014 at 10:56:36AM +0100, Dave Martin wrote:
+> > Agreed -- CONFIG_MMU=n does not need to imply that the MMU is turned off:
+> > everything must be indentity-mapped (VA = PA), but it is still desirable
+> > to define attributes.  For SMP, it's *necessary* to define attributes,
+> > otherwise we can't guarantee working spinlocks etc.
+> 
+> It's also necessary for UP as well, as the load-exclusive and
+> store-exclusive must still work.  Remember these instructions get used
+> for more than just spinlocks.
 
-> Device-tree BSP and in 2014.01 there will be new BSP which just
-> generate them directly from the Vivado tools which just target your
-> reference design.  You can connect your custom IP (or Xilinx or 3rd
-> party) directly to the GIC which using different IRQ sensitivity
-> with whatever register addresses and make no sense to write it by
-> hand.
+Agreed.
 
-On our Zynq design here we ended up being unwilling to use platform
-generation from Vivado. Basically all our IP was custom, so there was
-no win at all to invoking the complexity of the automatic tools.
+Nothing in head-nommu.S seems to create any initial page tables or
+turn on the MMU, although we do set up an MPU instead if there is one,
 
-Thus we write the DT by hand, and our DT is complex, integrating
-peripherals that span two FPGAs.
+Is !MMU known to work with v6 and later?  I'm starting to have doubts.
 
-I think the in-kernel DT should use the kernel conventions, which
-means using #include and the binding constants over magic values.
+My understanding of the ARM ARM is that a system may generate an abort
+if ldrex/strex is attempted with the MMU off, though there are at least
+some platforms that don't do that.
 
-Jason
+Cheers
+---Dave
