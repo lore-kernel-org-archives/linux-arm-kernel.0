@@ -1,104 +1,93 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Mon,  7 Apr 2014 20:04:20 -0700
-Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
-In-Reply-To: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
-References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 8 Apr 2014 08:40:03 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
+References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140406185833.GI29787@1wt.eu>
+ <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
+ <20140407174106.GD9952@obsidianresearch.com>
+ <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
+ <20140407204817.GB20736@obsidianresearch.com>
+ <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
+Message-ID: <20140408064003.GU29787@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After instruction write into xol area, on ARM V7
-architecture code need to flush icache to sync up dcache
-and icache. Having just 'flush_dcache_page(page)' call is
-not enough - it is possible to have stale instruction
-sitting in icache for given xol area slot address.
+Oh and BTW, it also fixed another issue I had loading myri10ge on this
+board :
 
-Introduce arch_uprobe_xol_sync_dcache_icache weak function
-that by default calls 'flush_dcache_page(page)' and on
-ARM define one that calls __cpuc_coherent_user_range.
+Before the patch :
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
----
- arch/arm/kernel/uprobes.c |  6 ++++++
- include/linux/uprobes.h   |  3 +++
- kernel/events/uprobes.c   | 20 +++++++++++++++-----
- 3 files changed, 24 insertions(+), 5 deletions(-)
+root at xpgp:~# lspci -vvnn |egrep -i '^0|memory'
+00:01.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
+        Prefetchable memory behind bridge: 00000000-000fffff
+00:09.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
+        Prefetchable memory behind bridge: 00000000-000fffff
+00:0a.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
+        Memory behind bridge: e0000000-e17fffff
+        Prefetchable memory behind bridge: 00000000-000fffff
+03:00.0 Ethernet controller [0200]: MYRICOM Inc. Myri-10G Dual-Protocol NIC [14c1:0008]
+        Region 0: Memory at e0000000 (64-bit, prefetchable) [size=16M]
+        Region 2: Memory at e1000000 (64-bit, non-prefetchable) [size=1M]
 
-diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-index f9bacee..841750b 100644
---- a/arch/arm/kernel/uprobes.c
-+++ b/arch/arm/kernel/uprobes.c
-@@ -113,6 +113,12 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 	return 0;
- }
- 
-+void arch_uprobe_xol_sync_dcache_icache(struct page *page,
-+					unsigned long addr, unsigned long size)
-+{
-+	__cpuc_coherent_user_range(addr, size);
-+}
-+
- int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
- {
- 	struct uprobe_task *utask = current->utask;
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index edff2b9..2fe3dfd 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -32,6 +32,7 @@ struct vm_area_struct;
- struct mm_struct;
- struct inode;
- struct notifier_block;
-+struct page;
- 
- #define UPROBE_HANDLER_REMOVE		1
- #define UPROBE_HANDLER_MASK		1
-@@ -127,6 +128,8 @@ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned l
- extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
- extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern void __weak arch_uprobe_xol_sync_dcache_icache(struct page *page,
-+						      unsigned long addr, unsigned long size);
- #else /* !CONFIG_UPROBES */
- struct uprobes_state {
- };
-diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 04709b6..0027883 100644
---- a/kernel/events/uprobes.c
-+++ b/kernel/events/uprobes.c
-@@ -1299,11 +1299,9 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
- 	/* Initialize the slot */
- 	copy_to_page(area->page, xol_vaddr,
- 			&uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
--	/*
--	 * We probably need flush_icache_user_range() but it needs vma.
--	 * This should work on supported architectures too.
--	 */
--	flush_dcache_page(area->page);
-+
-+	arch_uprobe_xol_sync_dcache_icache(area->page,
-+					   xol_vaddr, sizeof(uprobe->arch.ixol));
- 
- 	return xol_vaddr;
- }
-@@ -1346,6 +1344,18 @@ static void xol_free_insn_slot(struct task_struct *tsk)
- 	}
- }
- 
-+void __weak arch_uprobe_xol_sync_dcache_icache(struct page *page,
-+					       unsigned long addr, unsigned long len)
-+{
-+	/*
-+	 * We probably need flush_icache_user_range() but it needs vma.
-+	 * This should work on most of architectures by default. If
-+	 * architecture needs to do something different it can define
-+	 * its own version of the function.
-+	 */
-+	flush_dcache_page(page);
-+}
-+
- /**
-  * uprobe_get_swbp_addr - compute address of swbp given post-swbp regs
-  * @regs: Reflects the saved state of the task after it has hit a breakpoint
--- 
-1.8.1.4
+root at xpgp:~# modprobe myri10ge
+myri10ge: Version 1.5.3-1.534
+PCI: enabling device 0000:00:0a.0 (0140 -> 0143)
+myri10ge 0000:03:00.0: PCIE x4 Link
+myri10ge 0000:03:00.0: Direct firmware load failed with error -2
+myri10ge 0000:03:00.0: Falling back to user helper
+myri10ge 0000:03:00.0: Unable to load myri10ge_eth_z8e.dat firmware image via hotplug
+myri10ge 0000:03:00.0: hotplug firmware loading failed
+myri10ge 0000:03:00.0: Successfully adopted running firmware
+myri10ge 0000:03:00.0: Using firmware currently running on NIC.  For optimal
+myri10ge 0000:03:00.0: performance consider loading optimized firmware
+myri10ge 0000:03:00.0: via hotplug
+myri10ge 0000:03:00.0: dummy rdma enable failed
+myri10ge 0000:03:00.0: command 44 timed out, result = -1
+myri10ge 0000:03:00.0: command 12 timed out, result = -1
+myri10ge 0000:03:00.0: failed MXGEFW_CMD_GET_RX_RING_SIZE
+myri10ge 0000:03:00.0: failed to load firmware
+myri10ge 0000:03:00.0: myri10ge_probe() failed: MAC=00:60:dd:47:63:e1, SN=320225
+
+After the patch, the lspci output is *exactly* the same but it works
+much better :
+
+root at xpgp:~# lspci -vvnn |egrep -i '^0|memory'
+00:01.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
+        Prefetchable memory behind bridge: 00000000-000fffff
+00:09.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
+        Prefetchable memory behind bridge: 00000000-000fffff
+00:0a.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
+        Memory behind bridge: e0000000-e17fffff
+        Prefetchable memory behind bridge: 00000000-000fffff
+03:00.0 Ethernet controller [0200]: MYRICOM Inc. Myri-10G Dual-Protocol NIC [14c1:0008]
+        Region 0: Memory at e0000000 (64-bit, prefetchable) [size=16M]
+        Region 2: Memory at e1000000 (64-bit, non-prefetchable) [size=1M]
+
+root at xpgp:~# modprobe myri10ge
+myri10ge: Version 1.5.3-1.534
+PCI: enabling device 0000:00:0a.0 (0140 -> 0143)
+myri10ge 0000:03:00.0: PCIE x1 Link
+myri10ge 0000:03:00.0: Direct firmware load failed with error -2
+myri10ge 0000:03:00.0: Falling back to user helper
+myri10ge 0000:03:00.0: Unable to load myri10ge_eth_z8e.dat firmware image via hotplug
+myri10ge 0000:03:00.0: hotplug firmware loading failed
+myri10ge 0000:03:00.0: Successfully adopted running firmware
+myri10ge 0000:03:00.0: Using firmware currently running on NIC.  For optimal
+myri10ge 0000:03:00.0: performance consider loading optimized firmware
+myri10ge 0000:03:00.0: via hotplug
+myri10ge 0000:03:00.0: MSI IRQ 112, tx bndry 2048, fw adopted, WC Disabled
+root at xpgp:~#
+
+Thus I guess that the timeout I was seeing above during the modprobe was
+caused by the incorrect mbus window.
+
+So +1 on this part of the patch here :
+
+        port->memwin_size = roundup_pow_of_two(port->memwin_size);
+
+Cheers,
+Willy
