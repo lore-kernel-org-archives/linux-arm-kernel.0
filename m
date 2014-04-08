@@ -1,101 +1,49 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 08 Apr 2014 18:53:43 +0200
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-In-Reply-To: <20140408141832.GA8861@piout.net>
-References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
- <5343FDD3.3070308@i2se.com> <20140408141832.GA8861@piout.net>
-Message-ID: <53442997.70209@i2se.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 8 Apr 2014 10:54:01 -0600
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <4778371.oH3kIlbD0f@wuerfel>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
+ <20140408095038.GT17163@e106497-lin.cambridge.arm.com>
+ <4778371.oH3kIlbD0f@wuerfel>
+Message-ID: <CAErSpo4RtEovyRXw=UXxBSz_hD4kfayBOkaKH_4Qk_s+hsEAxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-Am 08.04.2014 16:18, schrieb Alexandre Belloni:
-> On 08/04/2014 at 15:46:59 +0200, Stefan Wahren wrote :
->> Hi Shawn,
->>
->> Am 08.04.2014 13:29, schrieb Shawn Guo:
->>> The .config() calls clk_get_rate() which might sleep, so we need to set
->>> pwm_chip can_sleep flag.  Otherwise, we see the following warning when
->>> using pwm driven heartbeat led.
->>>
->>> WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
->>> DEBUG_LOCKS_WARN_ON(in_interrupt())
->>> Modules linked in:
->>> CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
->>> [<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
->>> [<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
->>> [<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
->>> [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
->>> [<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
->>> [<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
->>> [<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
->>> [<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
->>> [<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
->>> [<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
->>> [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
->>> [<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
->>> [<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
->>> [<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
->>> [<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
->>> [<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
->>> [<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
->>> [<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
->>> [<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
->>>
->>> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
->>> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
->>> ---
->>>  drivers/pwm/pwm-mxs.c | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
->>> index 9475bc7..4f1bb4e 100644
->>> --- a/drivers/pwm/pwm-mxs.c
->>> +++ b/drivers/pwm/pwm-mxs.c
->>> @@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
->>>  	mxs->chip.dev = &pdev->dev;
->>>  	mxs->chip.ops = &mxs_pwm_ops;
->>>  	mxs->chip.base = -1;
->>> +	mxs->chip.can_sleep = true;
->>>  	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
->>>  	if (ret < 0) {
->>>  		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
->> thanks for the patch. I've tested it with our i.MX28 board and the
->> warning above never came. So it works.
->> Unfortunately the led still don't behave as expected. If i set the led
->> trigger to heartbeat the led goes on and stays in this state.
->>
->> May be this has something to do with the following discussion
->>
->> http://comments.gmane.org/gmane.linux.leds/208
->>
-> This may be but the solution is not correct we want to keep disabling
-> the pwm when brightness is 0. Can you try the latest series from
-> Russell:
+On Tue, Apr 8, 2014 at 4:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 April 2014 10:50:39 Liviu Dudau wrote:
+>> On Mon, Apr 07, 2014 at 06:58:24PM +0100, Bjorn Helgaas wrote:
+>> > On Mon, Apr 7, 2014 at 5:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >
+>> > > I think migrating other architectures to use the same code should be
+>> > > a separate effort from adding a generic implementation that can be
+>> > > used by arm64. It's probably a good idea to have patches to convert
+>> > > arm32 and/or microblaze.
+>> >
+>> > Let me reiterate that I am 100% in favor of replacing arch-specific
+>> > code with more generic implementations.
+>> >
+>> > However, I am not 100% in favor of doing it as separate efforts
+>> > (although maybe I could be convinced).  The reasons I hesitate are
+>> > that (1) if only one architecture uses a new "generic" implementation,
+>> > we really don't know whether it is generic enough, (2) until I see the
+>> > patches to convert other architectures, I have to assume that I'm the
+>> > one who will write them, and (3) as soon as we add the code to
+>> > drivers/pci, it becomes partly my headache to maintain it, even if
+>> > only one arch benefits from it.
 >
-> http://thread.gmane.org/gmane.linux.leds/579 and set active_low but keep
-> the pwm polarity normal.
+> Fair enough.
 >
-> Regards,
->
+> My approach to the asm-generic infrastruction has mostly been to ensure
+> that whoever adds a new architecture has to make things easier for the
+> next person.
 
-i applied these 5 patches, but it doesn't fix the problem.
+That's a good rule.  But if we add a generic implementation used only
+by one architecture, the overall complexity has increased (we added
+new unshared code), so the next person has to look at N+1 existing
+implementations.  If we even convert one existing arch, that seems
+like an improvement: we have N implementations with one being used by
+at least two arches.
 
-Here are my results for the pwm driver led on i.MX28:
-
-version                  | trigger: none          | trigger: heartbeat
------------------------------------------------------------------------------
-3.14                     | OK                     | NOT OK (WARNING, LED
-permanent on)
-  + shawn's patch        | OK                     | NOT OK (LED
-permanent on)
-    + russell's patches  | OK                     | NOT OK (LED
-permanent on)
-      + active-low       | NOT OK (inverse logic) | NOT OK (LED
-permanent on)
-
-Russell's patches work as expected, but have not influence on the heartbeat.
-
-Regards,
-Stefan
+Bjorn
