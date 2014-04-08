@@ -1,105 +1,116 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue,  8 Apr 2014 21:45:37 +0530
-Subject: [PATCH] arm: exynos: generalize power register address calculation
-Message-ID: <1396973737-18693-1-git-send-email-chander.kashyap@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Apr 2014 17:19:11 +0100
+Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
+In-Reply-To: <CAA3XUr1Bj4CD2fhZkWAHx+9W8eGz755OvnE+-3sxaAcQNV6Q-Q@mail.gmail.com>
+References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
+ <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
+ <20140408082444.GA3598@e103592.cambridge.arm.com>
+ <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
+ <20140408133039.GH16119@n2100.arm.linux.org.uk>
+ <CAA3XUr2kxKXpPwy8vqF1+CjcRsu86tGir-NuC7AXYiJVi4TuGw@mail.gmail.com>
+ <CAA3XUr1Bj4CD2fhZkWAHx+9W8eGz755OvnE+-3sxaAcQNV6Q-Q@mail.gmail.com>
+Message-ID: <20140408161910.GJ16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently status/configuration power register values are hard-coded for cpu1.
+On Tue, Apr 08, 2014 at 08:35:01AM -0700, Victor Kamensky wrote:
+> Looking at flush_ptrace_access more closely. Now I am not sure that
+> ptrace write code could easily reused.
+> 
+> 1) flush_ptrace_access seems to handle both data and text segments
+> write. In case of xol write we always know that it is code write
 
-Make it generic so that it is useful for SoC's with more than two cpus.
+Of course it has to, but writing code is the harder of the two
+problems.  With writes to data segments, the only thing that has to
+be dealt with is the data cache.  With code, not only do you need to
+deal with the data cache, but you also need to deal with the instruction
+cache too.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
----
- arch/arm/mach-exynos/hotplug.c  |   10 +++++++---
- arch/arm/mach-exynos/platsmp.c  |   13 ++++++++-----
- arch/arm/mach-exynos/regs-pmu.h |    9 +++++++--
- 3 files changed, 22 insertions(+), 10 deletions(-)
+> 2) as I pointed before flush_ptrace_access handles smp case whereas
+> xol write does not need to do that
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead53..460aec0 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -92,11 +92,15 @@ static inline void cpu_leave_lowpower(void)
- 
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- {
-+	unsigned long phys_cpu = cpu_logical_map(cpu);
-+	unsigned int cpunr;
-+
-+	cpunr = phys_cpu & 0xF00 ? (4 + phys_cpu & 0xFF) : phys_cpu & 0xFF;
- 	for (;;) {
- 
--		/* make cpu1 to be turned off at next WFI command */
--		if (cpu == 1)
--			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
-+		/* make cpu to be turned off at next WFI command */
-+		if (cpu)
-+			__raw_writel(0, S5P_ARM_CORE_CONFIGURATION(cpunr));
- 
- 		/*
- 		 * here's the WFI
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 8ea02f6..e694bdf 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -92,6 +92,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	unsigned long timeout;
- 	unsigned long phys_cpu = cpu_logical_map(cpu);
-+	unsigned int cpunr;
- 
- 	/*
- 	 * Set synchronisation state between this boot processor
-@@ -109,14 +110,16 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 */
- 	write_pen_release(phys_cpu);
- 
--	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-+	cpunr = phys_cpu & 0xF00 ? (4 + phys_cpu & 0xFF) : phys_cpu & 0xFF;
-+	if (!(__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
-+		& S5P_CORE_LOCAL_PWR_EN)) {
- 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--			     S5P_ARM_CORE1_CONFIGURATION);
-+			     S5P_ARM_CORE_CONFIGURATION(cpunr));
- 
- 		timeout = 10;
- 
--		/* wait max 10 ms until cpu1 is on */
--		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
-+		/* wait max 10 ms until secondary cpu is on */
-+		while ((__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
- 			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
- 			if (timeout-- == 0)
- 				break;
-@@ -125,7 +128,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		}
- 
- 		if (timeout == 0) {
--			printk(KERN_ERR "cpu1 power enable failed");
-+			pr_err("cpu%x power enable failed", cpu);
- 			spin_unlock(&boot_lock);
- 			return -ETIMEDOUT;
- 		}
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 7c029ce..16e17e4 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -104,8 +104,13 @@
- #define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
- #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
- 
--#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
--#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
-+#define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
-+#define S5P_ARM_CORE0_STATUS			S5P_PMUREG(0x2004)
-+
-+#define S5P_ARM_CORE_CONFIGURATION(_cpunr)	\
-+		(S5P_ARM_CORE0_CONFIGURATION + 0x80 * _cpunr)
-+#define S5P_ARM_CORE_STATUS(_cpunr)		\
-+		(S5P_ARM_CORE0_STATUS + 0x80 * _cpunr)
- 
- #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
- #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
+Are you sure about that?
+
+If I'm reading the code correctly, uprobes inserts a trapping instruction
+into the userspace program.  When that instruction is hit, it checks
+whether the thread is the desired one, and may request a slot in this
+magic page, which is when the write happens.
+
+The uprobes special page is shared across all threads which share the
+mm_struct, so in the case of a multi-threaded program running on a SMP
+machine, this page is visible to multiple CPUs.
+
+Is it possible for uprobes to be active on more than one thread at a
+time?  If so, because that page is shared, you could end up writing
+to a partial cache line from two threads.  From what I can see, ixol[]
+is two words, and there's normally 8 works per cache line on ARM, or
+occasionally 16.
+
+So, the question now is: is it possible to have uprobes active on more
+than one thread, and for two threads to hit the uprobes processing, both
+needing a slot in the page, hitting the same cache line?
+
+Now, what happens if thread 1 on CPU1 gets there first with its write.
+Then thread 2 on CPU2 gets there, causing the cache line to migrate to
+CPU2.  Then CPU1 does it's (non-broadcasted) flush, meanwhile CPU2 then
+gets preempted and goes off and does something else.
+
+Please tell me that can't happen. :)
+
+> 3) flush_ptrace_access needs vma, which uprobe code does not have on
+> layer where xol is installed. That is probably most critical issue that
+> could stop suggested code sharing. And note that vma in
+> flush_ptrace_access is needed only for cases cases 1) and 2) above,
+> about which xol write does not really care. If we take only required
+> pieces from flush_ptrace_access would not xol cache flush look like
+> this:
+> 
+> void arch_uprobe_xol_sync_dcache_icache(struct page *page,
+>                     unsigned long addr, unsigned long size)
+> {
+>     if (icache_is_vipt_aliasing())
+>         flush_icache_alias(page_to_pfn(page), addr, size);
+>     else
+>         __cpuc_coherent_user_range(addr, size);
+> }
+
+And this is only half the story.
+
+What you're saying above is:
+
+- if the *instruction* cache is an aliasing VIPT cache, then we can
+  map the user page at the same colour and flush the data and instruction
+  caches according to that colour.
+	Problem: if you have a VIPT aliasing data cache, and you wrote
+		to the page via a mapping which had a different colour
+		(which is highly likely given you're using kmap_atomic())
+		then you are not flushing the new instructions out of
+		the data cache.
+- if the *instruction* cache is not an aliasing VIPT cache, then we
+  flush using the userspace mapping directly.
+	Problem: what if the data cache is aliasing... same problem
+		as the above case.
+
+This is why we have the check for cache_is_vipt_aliasing() in there -
+that's not _just_ to deal with ptrace data modification, it's there for
+text modification as well.
+
+> Note on the side: flush_ptrace_access works with user-land memory
+> but it still uses __cpuc_coherent_kern_range. I think it should use
+> __cpuc_coherent_user_range.
+
+No, because __cpuc_coherent_kern_range() there is used on the *kernel*
+mapping of the page, not on the *user* mapping (which may fault).  The
+kernel mapping will never fault.
+
+> It looks like implementation wise it is
+> the same but user variant seems more appropriate in given situation.
+> Or am I missing something here?
+
+They do seem to be the same for both cases, so we could probably remove
+the distinction.  It's unlikely we'll ever see an implementation needing
+a difference between the two now.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
