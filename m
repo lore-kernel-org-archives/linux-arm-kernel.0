@@ -1,42 +1,31 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue,  8 Apr 2014 17:31:28 -0500
-Subject: [RFC PATCH RESEND] ARM: spear: send SGI to trigger secondary CPU start
-Message-ID: <1396996288-32020-1-git-send-email-elder@linaro.org>
+Date: Tue,  8 Apr 2014 17:34:45 -0500
+Subject: [PATCH RESEND] ARM: spear: add __init to spear_clocksource_init()
+Message-ID: <1396996485-632-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM spear machine uses the "holding pen" mechanism for starting
-secondary CPUs.  Most implementations indicate it's a secondary
-core's time to start by writing its CPU id into a location and
-then signaling the core with a software-generated interrupt.
-
-The spear code does not send the signal.  Comments elsewhere
-in the code seem to indicate it should:
-    The BootMonitor waits until it receives a soft interrupt, and
-    then the secondary CPU branches to this address.
-
-I suspect this is an oversight, and this patch proposes a remedy.
-
-  *** I need the attention of a maintainer to verify this
-  *** because I am unable to test this proposed change.
+I get a build warning because spear_clocksource_init() calls
+clocksource_mmio_init(), but it doesn't have an __init annotation.
+Fix that.
 
 Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- arch/arm/mach-spear/platsmp.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-spear/time.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
-index 5c4a198..c9064fe 100644
---- a/arch/arm/mach-spear/platsmp.c
-+++ b/arch/arm/mach-spear/platsmp.c
-@@ -62,6 +62,8 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	flush_cache_all();
- 	outer_flush_all();
+diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+index 218ba5b..c4d0931 100644
+--- a/arch/arm/mach-spear/time.c
++++ b/arch/arm/mach-spear/time.c
+@@ -71,7 +71,7 @@ static void clockevent_set_mode(enum clock_event_mode mode,
+ static int clockevent_next_event(unsigned long evt,
+ 				 struct clock_event_device *clk_event_dev);
  
-+	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
- 		smp_rmb();
+-static void spear_clocksource_init(void)
++static void __init spear_clocksource_init(void)
+ {
+ 	u32 tick_rate;
+ 	u16 val;
 -- 
 1.7.9.5
