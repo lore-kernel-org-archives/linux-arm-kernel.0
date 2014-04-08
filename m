@@ -1,51 +1,46 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 8 Apr 2014 21:48:15 +0200
-Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
-In-Reply-To: <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
-References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
- <1396577719-14786-3-git-send-email-keescook@chromium.org>
- <20140404195818.GA21028@debian>
- <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
- <1396960898.3567.55.camel@linaro1.home>
- <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
- <1396973561.14809.26.camel@linaro1.home>
- <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
-Message-ID: <20140408194815.GA6188@debian>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 8 Apr 2014 21:52:41 +0200
+Subject: [RFC 1/5] PCI: tegra: Overhaul regulator usage
+In-Reply-To: <53444AE3.6030603@wwwdotorg.org>
+References: <1396622969-17837-1-git-send-email-treding@nvidia.com>
+ <1396622969-17837-2-git-send-email-treding@nvidia.com>
+ <53444AE3.6030603@wwwdotorg.org>
+Message-ID: <20140408195240.GA21978@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 09:59:07AM -0700, Kees Cook wrote:
-> On Tue, Apr 8, 2014 at 9:12 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> > And is the page table being modified unique to the current CPU? I
-> > thought a common set of page tables was shared across all of them. If
-> > that is the case then one CPU can modify the PTE to be writeable,
-> > another CPU take a TLB miss and pull in that writeable entry, which will
-> > stay there until it drops out the TLB at some indefinite point in the
-> > future. That's the scenario I was getting at with my previous comment.
+On Tue, Apr 08, 2014 at 09:15:47PM +0200, Stephen Warren wrote:
+> On 04/04/2014 08:49 AM, Thierry Reding wrote:
+> > The current usage of regulators for the Tegra PCIe block is wrong. It
+> > doesn't accurately reflect the actual supply inputs of the IP block and
+> > therefore isn't as flexible as it should be. Rectify this by describing
+> > all possible supply inputs in the device tree binding documentation and
+> > deprecate the old supply properties.
 > 
-> As I understood it, this would be true for small PTEs, but sections
-> are fully duplicated on each CPU so we don't run that risk. This was
-> the whole source of my problem with this patch series: even a full
-> all-CPU TLB flush wasn't working -- the section permissions were
-> unique to the CPU since the entries were duplicated.
+> > diff --git a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
+> 
+> > +Power supplies for Tegra30:
+> ...
+> > +- Optional:
+> > +  - If port 0 is enabled:
+> > +    - avdd-pexa-supply: Power supply for analog PCIe logic. Must supply 1.05 V.
+> > +    - vdd-pexa-supply: Power supply for digital PCIe I/O. Must supply 1.05 V.
+> > +  - If at least one of ports 1 and 2 is enabled:
+> > +    - avdd-pexb-supply: Power supply for analog PCIe logic. Must supply 1.05 V.
+> > +    - vdd-pexb-supply: Power supply for digital PCIe I/O. Must supply 1.05 V.
+> 
+> Did you get confirmation from HW/... that the mapping from pexa/b to
+> PCIe ports you document above is correct? IIRC the two supplies might be
+> related to lanes rather than ports?
 
-The PGD is per-mm_struct.  mm_structs can be shared between processes.
-So the PGD is not per CPU.
+Not yet, which is the primary reason this is still RFC. Just wanted to
+get early feedback on the general direction of the series.
 
-This set_kernel_text_rw() is called from ftrace in stop_machine() on one
-CPU.  All other CPUs will be spinning in kernel threads inside the loop
-in multi_cpu_stop(), with interrupts disabled.  Since kernel threads use
-the last process' mm, it is possible for the other CPU(s) to be
-currently using the same mm as the modifying CPU.
-
-For any other CPU to pull in the writable entry it would have to get a
-TLB miss inside the loop in multi_cpu_stop(), after the state transition
-to MULTI_STOP_RUN and before the state transition to MULTI_STOP_EXIT.
-This is unlikely, but theoretically possible, for example if
-multi_cpu_stop() straddles sections.
-
-To prevent any stale entries being used indefinitely, perhaps the all
-CPU TLB flush can be inserted into
-ftrace_arch_code_modify_post_process(), which is called after the
-stop_machine() and which is where x86 for example makes the entries
-read-only again.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140408/03e93392/attachment-0001.sig>
