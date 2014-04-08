@@ -1,59 +1,66 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 8 Apr 2014 17:27:35 +0200
-Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
-In-Reply-To: <20140408133039.GH16119@n2100.arm.linux.org.uk>
-References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
- <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
- <20140408082444.GA3598@e103592.cambridge.arm.com>
- <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
- <20140408133039.GH16119@n2100.arm.linux.org.uk>
-Message-ID: <20140408152735.GA30076@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Apr 2014 08:29:15 -0700
+Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
+In-Reply-To: <53438B45.2090209@ti.com>
+References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
+ <1390301833-24944-20-git-send-email-tomi.valkeinen@ti.com>
+ <20140408001339.GA15842@atomide.com> <53438B45.2090209@ti.com>
+Message-ID: <20140408152914.GA11110@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I din't read the whole thread yet...
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [140407 22:42]:
+> On 08/04/14 03:13, Tony Lindgren wrote:
+> > Tomi,
+> > 
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [140121 03:01]:
+> >> Add DT support for panel-dpi.
+> > 
+> > Looks like this patch did not get merged or am I missing
+> > something?
+> 
+> Yes, I dropped it. None of the boards that I converted used panel-dpi.
+> There was so much discussions about the display bindings, so I thought
+> it's better to leave out all but the needed patches.
 
-On 04/08, Russell King - ARM Linux wrote:
-> On Tue, Apr 08, 2014 at 09:05:49AM -0400, David Long wrote:
-> > Unfortunately copy_to_user_page() also needs a pointer to a vma struct
-> > so, while it presumably provides the model to follow, it can't simply be
-> > dropped in.
->
-> Well, isn't this code doing the same thing as ptrace?  It seems to want
-> to modify a page in userspace of another process to change instructions
-> that are going to be executed. That's what ptrace does, and ptrace
-> already copes with all the issues there.
-
-Yes, but it does get_user_pages(&vma) and thus it knows vma.
-
-> Given that we've already solved that problem, wouldn't it be a good idea
-> if the tracing code would stop trying to reinvent broken solutions to
-> problems we have already solved?
-
-But uprobes can't do this. Of course, I am not saying this is impossible,
-but it would be nice to avoid mmap_sem/find_vma/etc.
-
-Almost nobody (iirc only sparc?) actually uses this "vma" arguments. And
-at least the supported architectures do not (at least this is what I think
-after the quick grep).
-
-Perhaps we can rolerate the hack below?
-
-Oleg.
-
---- x/kernel/events/uprobes.c
-+++ x/kernel/events/uprobes.c
-@@ -1295,10 +1295,10 @@ static unsigned long xol_get_insn_slot(s
- 	copy_to_page(area->page, xol_vaddr,
- 			&uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
- 	/*
--	 * We probably need flush_icache_user_range() but it needs vma.
--	 * This should work on supported architectures too.
-+	 * The architectures we currently support do not really use vma.
- 	 */
--	flush_dcache_page(area->page);
-+	flush_icache_user_range(NULL /* vma */, area->page,
-+				xol_vaddr, sizeof(uprobe->arch.ixol));
+OK
  
- 	return xol_vaddr;
- }
+> > As you probably are aware, we have at least these boards
+> > needing it before we can remove the omap3 legacy support:
+> > 
+> > board-am3517evm.c
+> > board-cm-t35.c
+> > board-devkit8000.c
+> > board-ldp.c
+> > board-overo.c
+> > 
+> > We could probably set the display timings based on the
+> > compatible flag in the driver if that's an issue?
+> 
+> The timings shouldn't be an issue. But there's the backlight GPIO,
+> currently handled by panel-dpi, which should be removed from the panel.
+> We should use gpio-backlight for that one.
+
+Using gpio-backlight makes sense for sure.
+
+FYI, in the case of the LDP there are four GPIOs to configure to
+get things going:
+
+gpio55		LCD RESET		panel-dpi?
+gpio56		LCD QVGA		panel-dpi?
+twl gpio7	LCD power		panel-dpi
+twl gpio15	LCD backlight		gpio-backlight
+ 
+> > And then board-omap3pandora.c also needs support for
+> > panel_tpo_td043mtea1_platform_data.
+> 
+> Yep, there's still much to do for DSS DT support. Hopefully it will be
+> easier now that the core support is there. I'll continue working on the
+> remaining boards and panels. However, I don't have any of the remaining
+> boards, so help is of course appreciated.
+
+Yeah I can test at least the LDP here.
+
+Regards,
+
+Tony
