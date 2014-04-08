@@ -1,59 +1,101 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 8 Apr 2014 10:48:18 -0600
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <6228807.4v9ZRtib77@wuerfel>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
- <20140408094933.GS17163@e106497-lin.cambridge.arm.com>
- <6228807.4v9ZRtib77@wuerfel>
-Message-ID: <CAErSpo4nZiEcTth5W6ZhcRSne80T8VWTWR2zm0yN7ogFR0Norw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 08 Apr 2014 18:53:43 +0200
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <20140408141832.GA8861@piout.net>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com> <20140408141832.GA8861@piout.net>
+Message-ID: <53442997.70209@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 8, 2014 at 4:11 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Alexandre,
 
-> There is a wide range of implementations across architectures:
+Am 08.04.2014 16:18, schrieb Alexandre Belloni:
+> On 08/04/2014 at 15:46:59 +0200, Stefan Wahren wrote :
+>> Hi Shawn,
+>>
+>> Am 08.04.2014 13:29, schrieb Shawn Guo:
+>>> The .config() calls clk_get_rate() which might sleep, so we need to set
+>>> pwm_chip can_sleep flag.  Otherwise, we see the following warning when
+>>> using pwm driven heartbeat led.
+>>>
+>>> WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
+>>> DEBUG_LOCKS_WARN_ON(in_interrupt())
+>>> Modules linked in:
+>>> CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
+>>> [<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
+>>> [<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
+>>> [<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
+>>> [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
+>>> [<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
+>>> [<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
+>>> [<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
+>>> [<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
+>>> [<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
+>>> [<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
+>>> [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
+>>> [<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
+>>> [<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
+>>> [<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
+>>> [<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
+>>> [<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
+>>> [<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
+>>> [<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
+>>> [<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
+>>>
+>>> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+>>> ---
+>>>  drivers/pwm/pwm-mxs.c | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
+>>> index 9475bc7..4f1bb4e 100644
+>>> --- a/drivers/pwm/pwm-mxs.c
+>>> +++ b/drivers/pwm/pwm-mxs.c
+>>> @@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
+>>>  	mxs->chip.dev = &pdev->dev;
+>>>  	mxs->chip.ops = &mxs_pwm_ops;
+>>>  	mxs->chip.base = -1;
+>>> +	mxs->chip.can_sleep = true;
+>>>  	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
+>>>  	if (ret < 0) {
+>>>  		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
+>> thanks for the patch. I've tested it with our i.MX28 board and the
+>> warning above never came. So it works.
+>> Unfortunately the led still don't behave as expected. If i set the led
+>> trigger to heartbeat the led goes on and stays in this state.
+>>
+>> May be this has something to do with the following discussion
+>>
+>> http://comments.gmane.org/gmane.linux.leds/208
+>>
+> This may be but the solution is not correct we want to keep disabling
+> the pwm when brightness is 0. Can you try the latest series from
+> Russell:
 >
-> a) no access to I/O ports at all (tile, s390, ...)
-> b) access to I/O ports only through special instructions (x86, ...)
-> c) all MMIO is mapped virtual contiguous to PCI_IOBASE or _IO_BASE
->    (most ppc64, arm32 with MMU, arm64, ...)
-> d) only one PCI host can have an I/O space (mips, microblaze, ...)
-> e) each host controller can have its own method (ppc64 with indirect pio)
-> f) PIO token equals virtual address plus offset (some legacy ARM platforms,
->    probably some other architectures), or physical address (sparc)
-> g) PIO token encodes address space number plus offset (ia64)
+> http://thread.gmane.org/gmane.linux.leds/579 and set active_low but keep
+> the pwm polarity normal.
 >
-> a) and b) are trivially handled by any implementation that falls
-> back to 'return -EINVAL'.
-> I believe that c) is the most appropriate solution and we should be
-> able to adopt it by most of the architectures that have an MMU and
-> make it the default implementation.
-> d) seems like a good fallback for noMMU architectures: While we do
-> need to support I/O spaces, we need to support multiple PCI domains,
-> and we need to support noMMU, the combination of all three should
-> be extremely rare, and I'd leave it up to the architecture to support
-> that if there is a real use case, rather than trying to put that into
-> common code.
-> Anything that currently requires e), f) or g) I think should keep
-> doing that and not try to use the generic implementation.
+> Regards,
+>
 
-Thanks for the nice summary.  That's way more than I had figured out myself.
+i applied these 5 patches, but it doesn't fix the problem.
 
-I don't know whether it'd be worth it, especially for something that's
-so close to obsolete, but it seems like it should be *possible* to
-generalize and unify this somewhat.  I would argue that g) (which I
-wrote, so I know it better than the others) could fairly easily
-subsume c), d), and f), since it maps an ioport number to a virtual
-address for an MMIO access, but it doesn't assume that all the MMIO
-spaces are contiguous.
+Here are my results for the pwm driver led on i.MX28:
 
-b), e), and maybe a) could be handled with an exception, e.g., inside
-inb(), look up the struct io_space (e.g., similar to what ia64 does in
-__ia64_mk_io_addr()), and if that struct contains a non-zero ops
-pointer, use that instead of doing the MMIO access.  The ops pointer
-functions could use the x86 INB instruction or do the indirect PIO
-thing or whatever.
+version                  | trigger: none          | trigger: heartbeat
+-----------------------------------------------------------------------------
+3.14                     | OK                     | NOT OK (WARNING, LED
+permanent on)
+  + shawn's patch        | OK                     | NOT OK (LED
+permanent on)
+    + russell's patches  | OK                     | NOT OK (LED
+permanent on)
+      + active-low       | NOT OK (inverse logic) | NOT OK (LED
+permanent on)
 
-Bjorn
+Russell's patches work as expected, but have not influence on the heartbeat.
+
+Regards,
+Stefan
