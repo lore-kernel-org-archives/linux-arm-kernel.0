@@ -1,54 +1,78 @@
-From: matthew_minter@xyratex.com (Matthew Minter)
-Date: Tue, 8 Apr 2014 21:17:47 +0100
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408192141.GH32490@obsidianresearch.com>
-References: <20140405193435.50d8dd81@skate>
- <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
- <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
- <20140408171309.09bbf968@skate> <20140408174034.79df403e@skate>
- <20140408175545.1b4d55a5@skate> <20140408171417.GB27776@obsidianresearch.com>
- <20140408175324.GH11052@1wt.eu> <20140408180828.GC32490@obsidianresearch.com>
- <20140408191514.GJ11052@1wt.eu> <20140408192141.GH32490@obsidianresearch.com>
-Message-ID: <2FF5F2FD-2DAC-4E51-87A0-90DBAFE6AA01@xyratex.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 8 Apr 2014 13:19:01 -0700
+Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
+In-Reply-To: <20140408194815.GA6188@debian>
+References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
+ <1396577719-14786-3-git-send-email-keescook@chromium.org>
+ <20140404195818.GA21028@debian>
+ <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+ <1396960898.3567.55.camel@linaro1.home>
+ <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
+ <1396973561.14809.26.camel@linaro1.home>
+ <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
+ <20140408194815.GA6188@debian>
+Message-ID: <CAGXu5jLkc2oFouYq3ZT1sUvgjjJY32_uEcuLLE4wHX-N0cFiFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is just a guess but perhaps the best we could do would be to round up but also add logic to fail completely if adding a PCI device would cause a window to overlap?
+On Tue, Apr 8, 2014 at 12:48 PM, Rabin Vincent <rabin@rab.in> wrote:
+> On Tue, Apr 08, 2014 at 09:59:07AM -0700, Kees Cook wrote:
+>> On Tue, Apr 8, 2014 at 9:12 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+>> > And is the page table being modified unique to the current CPU? I
+>> > thought a common set of page tables was shared across all of them. If
+>> > that is the case then one CPU can modify the PTE to be writeable,
+>> > another CPU take a TLB miss and pull in that writeable entry, which will
+>> > stay there until it drops out the TLB at some indefinite point in the
+>> > future. That's the scenario I was getting at with my previous comment.
+>>
+>> As I understood it, this would be true for small PTEs, but sections
+>> are fully duplicated on each CPU so we don't run that risk. This was
+>> the whole source of my problem with this patch series: even a full
+>> all-CPU TLB flush wasn't working -- the section permissions were
+>> unique to the CPU since the entries were duplicated.
+>
+> The PGD is per-mm_struct.  mm_structs can be shared between processes.
+> So the PGD is not per CPU.
+>
+> This set_kernel_text_rw() is called from ftrace in stop_machine() on one
+> CPU.  All other CPUs will be spinning in kernel threads inside the loop
+> in multi_cpu_stop(), with interrupts disabled.  Since kernel threads use
+> the last process' mm, it is possible for the other CPU(s) to be
+> currently using the same mm as the modifying CPU.
+>
+> For any other CPU to pull in the writable entry it would have to get a
+> TLB miss inside the loop in multi_cpu_stop(), after the state transition
+> to MULTI_STOP_RUN and before the state transition to MULTI_STOP_EXIT.
+> This is unlikely, but theoretically possible, for example if
+> multi_cpu_stop() straddles sections.
 
- This would mean situations will be fixed where we can without design changes and situations that cannot be fixed will fail with clear errors?
+Ah! Now I understand. Thanks for the clarification.
 
-On 8 Apr 2014, at 20:21, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
+> To prevent any stale entries being used indefinitely, perhaps the all
+> CPU TLB flush can be inserted into
+> ftrace_arch_code_modify_post_process(), which is called after the
+> stop_machine() and which is where x86 for example makes the entries
+> read-only again.
 
-> On Tue, Apr 08, 2014 at 09:15:14PM +0200, Willy Tarreau wrote:
-> 
->> OK that's what I understood, but I mean why rounding down instead of up
->> in order to correctly cover the window the device expects ? And we all
->> found that rounding up fixed our respective devices (3 igb NICs, one
->> myri10ge NIC, one SATA controller I believe).
->> 
->> By rounding up you'd have had 1ffffff instead, which at least covers the
->> window the device expects.
-> 
-> It is also an error to configure the mbus to have overlaping windows
-> and the code checks for overlaps with the base/size given. If we round
-> up then it might create an overlap.
-> 
-> You guys were OK with the round up in the PCI code only because your
-> systems have a single used PEX so the rounding didn't create an
-> overlaping situation..
-> 
-> The generic code should either round down, or compeltely bail, as
-> Thomas suggested.
-> 
-> Fundementally we shouldn't get to the WARN_ON, so what happens after
-> is just an attempt to salvage something from the situation.
-> 
-> Jason
+Do you mean something like this?
+
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index ea446ae09c89..b8c75e45a950 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -90,6 +90,8 @@ int ftrace_arch_code_modify_prepare(void)
+ int ftrace_arch_code_modify_post_process(void)
+ {
+        set_all_modules_text_ro();
++       /* Make sure any TLB misses during machine stop are cleared. */
++       flush_tlb_all();
+        return 0;
+ }
+
+Thanks!
+
+-Kees
 
 -- 
-
-
-------------------------------
-For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
-
-------------------------------
+Kees Cook
+Chrome OS Security
