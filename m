@@ -1,37 +1,61 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 08 Apr 2014 18:27:02 +0200
-Subject: mx27 running too slow
-In-Reply-To: <CAOMZO5Ax9zymvSdts0=VTk05P7h6BxzO4MmEZ615h1npe=QY9A@mail.gmail.com>
-References: <CAOMZO5CC1NwP14H7uuygX7ZviFJLriG41hyczzvzxYWKHJu5DQ@mail.gmail.com>	<CAOMZO5AUemi9r_NqXXpnYZUqbqHhYnSvrnmu11voM_MZsVUa6Q@mail.gmail.com>	<CAOMZO5CCst0HHWa5JO-8-T3AHiw68FUvKRgCiVvFBu=9JdJzjw@mail.gmail.com>	<1396967505.692277642@f295.i.mail.ru>
- <CAOMZO5Ax9zymvSdts0=VTk05P7h6BxzO4MmEZ615h1npe=QY9A@mail.gmail.com>
-Message-ID: <53442356.5040604@linutronix.de>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 8 Apr 2014 10:28:39 -0600
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <20140408102043.GV17163@e106497-lin.cambridge.arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
+ <20140405000007.GD15806@google.com>
+ <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
+ <1396862058.3671.40.camel@pasglop>
+ <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
+ <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
+ <20140408102043.GV17163@e106497-lin.cambridge.arm.com>
+Message-ID: <CAErSpo4anYBmaRbJEFE9kAXSmnvfqud=w1QA=mSSsTUamM4kSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2014 06:22 PM, Fabio Estevam wrote:
->> Calibrating delay loop (skipped), value calculated using timer frequency.. 29.55 BogoMIPS (lpj=147777)
+On Tue, Apr 8, 2014 at 4:20 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Mon, Apr 07, 2014 at 11:44:51PM +0100, Bjorn Helgaas wrote:
+
+>> Let me try to explain my concern about the
+>> pci_create_root_bus_in_domain() interface.  We currently have these
+>> interfaces:
 >>
->> Can you inspect code with "git-bisect"?
-> 
-> This is the result:
-> 
-> $ git bisect bad
-> 1119c84aa3053bd415ba731ada1ecef24c8f82a2 is the first bad commit
-> commit 1119c84aa3053bd415ba731ada1ecef24c8f82a2
-> Author: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Date:   Wed Jan 22 12:35:44 2014 +0100
-> 
->     ARM: imx: enable delaytimer on the imx timer
-> 
->     The imx can support timer-based delays, so implement this.
->     Skips past jiffy calibration.
-> 
->     Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
+>>   pci_scan_root_bus()
+>>   pci_scan_bus()
+>>   pci_scan_bus_parented()
+>>   pci_create_root_bus()
+>> ...
 
-The BogoMIPS output is different and based on the timer clock. The
-delay loop now check the timer instead of counting cycles / loops.
-The different output is not a bug.
+>> One alternative is to add an _in_domain() variant of each of these
+>> interfaces, but that doesn't seem very convenient either.  My idea of
+>> passing in a structure would also require adding variants, so there's
+>> not really an advantage there, but I am thinking of the next
+>> unification effort, e.g., for NUMA node info.  I don't really want to
+>> have to change all the _in_domain() interfaces to also take yet
+>> another parameter for the node number.
+>
+> OK, what about this: all the functions that you have mentioned take a
+> void *sysdata parameter. Should we convert this opaque pointer into a
+> specific structure that holds the domain_nr and (in future) the NUMA
+> node info?
 
-Sebastian
+I doubt if we can make sysdata itself generic because I suspect we
+need a way to have *some* arch-specific data.  But maybe the arch
+could supply a structure containing a struct device *, domain, struct
+pci_ops *, list of resources, aperture info, etc.  I wonder if struct
+pci_host_bridge would be a reasonable place to put this stuff, e.g.,
+something like this:
+
+  struct pci_host_bridge {
+    int domain;
+    int node;
+    struct device *dev;
+    struct pci_ops *ops;
+    struct list_head resources;
+    void *sysdata;
+    struct pci_bus *bus;  /* filled in by core, not by arch */
+    ... /* other existing contents managed by core */
+  };
+
+  struct pci_bus *pci_scan_host_bridge(struct pci_host_bridge *bridge);
