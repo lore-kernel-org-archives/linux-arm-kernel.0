@@ -1,31 +1,74 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue,  8 Apr 2014 17:34:45 -0500
-Subject: [PATCH RESEND] ARM: spear: add __init to spear_clocksource_init()
-Message-ID: <1396996485-632-1-git-send-email-elder@linaro.org>
+From: adam@baker-net.org.uk (Adam Baker)
+Date: Tue, 08 Apr 2014 23:34:32 +0100
+Subject: [PATCH v2 3/3] ARM: kirkwood: rename kirwood-nsa310-common to
+ 3x0-common
+In-Reply-To: <53446D6E.7070909@baker-net.org.uk>
+References: <5341C91D.4060007@baker-net.org.uk>
+ <1396820569-3841-1-git-send-email-linux@baker-net.org.uk>
+ <1396820569-3841-3-git-send-email-linux@baker-net.org.uk>
+ <20140408192625.GD29372@lunn.ch> <53446D6E.7070909@baker-net.org.uk>
+Message-ID: <53447978.2020206@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I get a build warning because spear_clocksource_init() calls
-clocksource_mmio_init(), but it doesn't have an __init annotation.
-Fix that.
+ Rename the include file kirkwood-nsa310-common.dtsi as
+ it is now also used for NSA320. There is also an NSA325
+ but that appears not to be as similar so is unlikely to
+ want to share an include file.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
+Signed-off-by: Adam Baker <linux@baker-net.org.uk>
 ---
- arch/arm/mach-spear/time.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I've discovered that if I don't change the git repository but pass the -M option
+to git format-patch it generates a patch that describes the rename rather than
+deleting and re-adding the entire file.
+---
+ arch/arm/boot/dts/kirkwood-nsa310.dts                                |    2 +-
+ arch/arm/boot/dts/kirkwood-nsa310a.dts                               |    2 +-
+ arch/arm/boot/dts/kirkwood-nsa320.dts                                |    2 +-
+ .../dts/{kirkwood-nsa310-common.dtsi => kirkwood-nsa3x0-common.dtsi} |    0
+ 4 files changed, 3 insertions(+), 3 deletions(-)
+ rename arch/arm/boot/dts/{kirkwood-nsa310-common.dtsi => kirkwood-nsa3x0-common.dtsi} (100%)
 
-diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
-index 218ba5b..c4d0931 100644
---- a/arch/arm/mach-spear/time.c
-+++ b/arch/arm/mach-spear/time.c
-@@ -71,7 +71,7 @@ static void clockevent_set_mode(enum clock_event_mode mode,
- static int clockevent_next_event(unsigned long evt,
- 				 struct clock_event_device *clk_event_dev);
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index 372f701..989846a 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
  
--static void spear_clocksource_init(void)
-+static void __init spear_clocksource_init(void)
- {
- 	u32 tick_rate;
- 	u16 val;
+-#include "kirkwood-nsa310-common.dtsi"
++#include "kirkwood-nsa3x0-common.dtsi"
+ 
+ / {
+ 	compatible = "zyxel,nsa310", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310a.dts b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+index ead7a36..d0a6025 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310a.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310a.dts
+@@ -1,6 +1,6 @@
+ /dts-v1/;
+ 
+-#include "kirkwood-nsa310-common.dtsi"
++#include "kirkwood-nsa3x0-common.dtsi"
+ 
+ /*
+  * There are at least two different NSA310 designs. This variant does
+diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
+index 6c8f692..fc20baf 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa320.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
+@@ -11,7 +11,7 @@
+ 
+ /dts-v1/;
+ 
+-#include "kirkwood-nsa310-common.dtsi"
++#include "kirkwood-nsa3x0-common.dtsi"
+ 
+ / {
+ 	model = "Zyxel NSA320";
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
+similarity index 100%
+rename from arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
+rename to arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
 -- 
-1.7.9.5
+1.7.10.4
