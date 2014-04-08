@@ -1,41 +1,81 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Tue, 8 Apr 2014 14:29:35 +0200
-Subject: ARM: SA1100: collie broken (and fixes pending)
-Message-ID: <CAAQYJAvBwf4ohnBajvKwSYRWr-9QxD4=Mrrzyu2=9DvHUSh3ow@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue,  8 Apr 2014 14:19:23 +0200
+Subject: [PATCH V3 01/17] ARM: exynos: cpuidle: Prevent forward declaration
+In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396959579-18268-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Move the structure below the 'exynos4_enter_lowpower' function so no more
+need of forward declaration.
 
-there are two patchsets pending for collie/sa1110:
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/mach-exynos/cpuidle.c |   40 ++++++++++++++++++----------------------
+ 1 file changed, 18 insertions(+), 22 deletions(-)
 
-http://archive.arm.linux.org.uk/lurker/message/20131116.220725.42397482.en.html
-http://archive.arm.linux.org.uk/lurker/message/20131215.042807.213f9035.en.html
-
->From the first patchset we need at least the first 3:
-      arm: sa1100: add cpu clock
-      fbdev: sa1100fb: make use of device clock
-      pcmcia: sa1100: make use of device clock
-
-The second has been tested as well by Linus Walleij.
-
-Unfortunately there is now a conflict about clk_get_rate() introduced
-with commit # 0ad04fb "ARM: SA1100: Create dummy clk_get_rate() to
-avoid build failures".
-
-To add more fun, there is a second issue:
-
-MODPOST 247 modules
-ERROR: "clk_set_rate" [drivers/usb/phy/phy-generic.ko] undefined!
-
-so to build 3.14 I had to revert 0ad04fb and to add a dummy clk_set_rate() [1].
-Please verify that.
-
-I think it is urgent that we sort this out to avoid more differences in future.
-
-Thanks in advance
-
-Andrea
-
-[1]
-http://cgit.openembedded.org/meta-handheld/tree/recipes-kernel/linux/linux-yocto-3.14/collie/arm-sa1100-dummy-clk_set_rate.patch
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index b530231..9623a05 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -59,30 +59,8 @@
+ #define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
+ #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
+ 
+-static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index);
+-
+ static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+ 
+-static struct cpuidle_driver exynos4_idle_driver = {
+-	.name			= "exynos4_idle",
+-	.owner			= THIS_MODULE,
+-	.states = {
+-		[0] = ARM_CPUIDLE_WFI_STATE,
+-		[1] = {
+-			.enter			= exynos4_enter_lowpower,
+-			.exit_latency		= 300,
+-			.target_residency	= 100000,
+-			.flags			= CPUIDLE_FLAG_TIME_VALID,
+-			.name			= "C1",
+-			.desc			= "ARM power down",
+-		},
+-	},
+-	.state_count = 2,
+-	.safe_state_index = 0,
+-};
+-
+ /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+ static void exynos4_set_wakeupmask(void)
+ {
+@@ -213,6 +191,24 @@ static void __init exynos5_core_down_clk(void)
+ 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+ }
+ 
++static struct cpuidle_driver exynos4_idle_driver = {
++	.name			= "exynos4_idle",
++	.owner			= THIS_MODULE,
++	.states = {
++		[0] = ARM_CPUIDLE_WFI_STATE,
++		[1] = {
++			.enter			= exynos4_enter_lowpower,
++			.exit_latency		= 300,
++			.target_residency	= 100000,
++			.flags			= CPUIDLE_FLAG_TIME_VALID,
++			.name			= "C1",
++			.desc			= "ARM power down",
++		},
++	},
++	.state_count = 2,
++	.safe_state_index = 0,
++};
++
+ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ {
+ 	int cpu_id, ret;
+-- 
+1.7.9.5
