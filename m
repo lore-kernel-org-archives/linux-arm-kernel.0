@@ -1,63 +1,92 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Apr 2014 12:22:13 +0200
+Date: Tue, 08 Apr 2014 12:11:07 +0200
 Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
  function.
-In-Reply-To: <20140408095038.GT17163@e106497-lin.cambridge.arm.com>
+In-Reply-To: <20140408094933.GS17163@e106497-lin.cambridge.arm.com>
 References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
- <20140408095038.GT17163@e106497-lin.cambridge.arm.com>
-Message-ID: <4778371.oH3kIlbD0f@wuerfel>
+ <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
+ <20140408094933.GS17163@e106497-lin.cambridge.arm.com>
+Message-ID: <6228807.4v9ZRtib77@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 April 2014 10:50:39 Liviu Dudau wrote:
-> On Mon, Apr 07, 2014 at 06:58:24PM +0100, Bjorn Helgaas wrote:
-> > On Mon, Apr 7, 2014 at 5:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tuesday 08 April 2014 10:49:33 Liviu Dudau wrote:
+> On Tue, Apr 08, 2014 at 12:21:51AM +0100, Bjorn Helgaas wrote:
+> > On Fri, Mar 14, 2014 at 9:34 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > > Some architectures do not share x86 simple view of the PCI I/O space
+> > > and instead use a range of addresses that map to bus addresses. For
+> > > some architectures these ranges will be expressed by OF bindings
+> > > in a device tree file.
+> > >
+> > > Introduce a pci_register_io_range() helper function that can be used
+> > > by the architecture code to keep track of the I/O ranges described by the
+> > > PCI bindings. If the PCI_IOBASE macro is not defined that signals
+> > > lack of support for PCI and we return an error.
+> > >
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > Acked-by: Grant Likely <grant.likely@linaro.org>
+> > > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> > > ---
+> > >  drivers/of/address.c       | 9 +++++++++
+> > >  include/linux/of_address.h | 1 +
+> > >  2 files changed, 10 insertions(+)
+> > >
+> > > diff --git a/drivers/of/address.c b/drivers/of/address.c
+> > > index 1a54f1f..be958ed 100644
+> > > --- a/drivers/of/address.c
+> > > +++ b/drivers/of/address.c
+> > > @@ -619,6 +619,15 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+> > >  }
+> > >  EXPORT_SYMBOL(of_get_address);
+> > >
+> > > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> > > +{
+> > > +#ifndef PCI_IOBASE
+> > > +       return -EINVAL;
+> > > +#else
+> > > +       return 0;
+> > > +#endif
+> > > +}
 > > 
-> > > I think migrating other architectures to use the same code should be
-> > > a separate effort from adding a generic implementation that can be
-> > > used by arm64. It's probably a good idea to have patches to convert
-> > > arm32 and/or microblaze.
-> > 
-> > Let me reiterate that I am 100% in favor of replacing arch-specific
-> > code with more generic implementations.
-> > 
-> > However, I am not 100% in favor of doing it as separate efforts
-> > (although maybe I could be convinced).  The reasons I hesitate are
-> > that (1) if only one architecture uses a new "generic" implementation,
-> > we really don't know whether it is generic enough, (2) until I see the
-> > patches to convert other architectures, I have to assume that I'm the
-> > one who will write them, and (3) as soon as we add the code to
-> > drivers/pci, it becomes partly my headache to maintain it, even if
-> > only one arch benefits from it.
-
-Fair enough.
-
-My approach to the asm-generic infrastruction has mostly been to ensure
-that whoever adds a new architecture has to make things easier for the
-next person. For the PCI code it's clearly your call to pick whatever
-works best for you.
-
-> > Please don't think I'm questioning anyone's intent or good will.  It's
-> > just that I understand the business pressures, and I know how hard it
-> > can be to justify this sort of work to one's management, especially
-> > after the immediate problem has been solved.
+> > This isn't PCI code, so I'm fine with it in that sense, but I'm not
+> > sure the idea of a PCI_IOBASE #define is really what we need.  It's
+> > not really determined by the processor architecture, it's determined
+> > by the platform.  And a single address isn't enough in general,
+> > either, because if there are multiple host bridges, there's no reason
+> > the apertures that generate PCI I/O transactions need to be contiguous
+> > on the CPU side.
 > 
-> I understand your concern. I guess the only way to prove my good intentions
-> is to shut up and show the code.
+> It should not be only platform's choice if the architecture doesn't support it.
+> To my mind PCI_IOBASE means "I support MMIO operations and this is the
+> start of the virtual address where my I/O ranges are mapped." It's the
+> same as ppc's _IO_BASE. And pci_address_to_pio() will take care to give
+> you the correct io_offset in the presence of multiple host bridges,
+> while keeping the io resource in the range [0 .. host_bridge_io_range_size - 1]
 
-I'd suggest looking at architectures in this order then:
+There is a wide range of implementations across architectures:
 
-* microblaze (this one is easy and wants to share code with us)
-* arm32-multiplatform (obviously interesting, but not as easy as microblaze)
-* powerpc64 (they are keen on sharing, code is similar to what you have)
-* mips (this is really platform specific, some want to share drivers with
-  arm32, others should keep their current code. Note that platform selection
-  on mips is compile-time only, they don't have to do it all the same way)
-* powerpc32 (their code is currently different, might not be worth it)
+a) no access to I/O ports at all (tile, s390, ...)
+b) access to I/O ports only through special instructions (x86, ...)
+c) all MMIO is mapped virtual contiguous to PCI_IOBASE or _IO_BASE
+   (most ppc64, arm32 with MMU, arm64, ...)
+d) only one PCI host can have an I/O space (mips, microblaze, ...)
+e) each host controller can have its own method (ppc64 with indirect pio)
+f) PIO token equals virtual address plus offset (some legacy ARM platforms,
+   probably some other architectures), or physical address (sparc)
+g) PIO token encodes address space number plus offset (ia64)
 
-My preference would be to have only the first two done initially and leave
-the other ones up to architecture maintainers, but Bjorn should say
-how much he wants to see get done.
+a) and b) are trivially handled by any implementation that falls
+back to 'return -EINVAL'.
+I believe that c) is the most appropriate solution and we should be
+able to adopt it by most of the architectures that have an MMU and
+make it the default implementation.
+d) seems like a good fallback for noMMU architectures: While we do
+need to support I/O spaces, we need to support multiple PCI domains,
+and we need to support noMMU, the combination of all three should
+be extremely rare, and I'd leave it up to the architecture to support
+that if there is a real use case, rather than trying to put that into
+common code.
+Anything that currently requires e), f) or g) I think should keep
+doing that and not try to use the generic implementation.
 
 	Arnd
