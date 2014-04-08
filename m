@@ -1,115 +1,87 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Apr 2014 20:12:12 +0200
-Subject: [PATCH 2/3] ARM: mm: add support for HW coherent systems in PL310
-In-Reply-To: <20140408172424.GE16373@arm.com>
-References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395677872-32741-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140408172424.GE16373@arm.com>
-Message-ID: <20140408201212.067d526d@skate>
+Date: Tue, 8 Apr 2014 20:15:47 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <20140408180828.GC32490@obsidianresearch.com>
+References: <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140405193435.50d8dd81@skate>
+ <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
+ <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+ <20140408171309.09bbf968@skate> <20140408174034.79df403e@skate>
+ <20140408175545.1b4d55a5@skate>
+ <20140408171417.GB27776@obsidianresearch.com>
+ <20140408175324.GH11052@1wt.eu>
+ <20140408180828.GC32490@obsidianresearch.com>
+Message-ID: <20140408201547.7bf37e2a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Catalin Marinas,
+Dear Jason Gunthorpe,
 
-On Tue, 8 Apr 2014 18:24:25 +0100, Catalin Marinas wrote:
+On Tue, 8 Apr 2014 12:08:28 -0600, Jason Gunthorpe wrote:
 
-> >  	of_init = true;
-> >  	memcpy(&outer_cache, &data->outer_cache, sizeof(outer_cache));
-> > +
-> > +	/*
-> > +	 * PL310 doesn't need an outer cache sync operation when the
-> > +	 * system is operating with hardware coherency enabled, as it
-> > +	 * is done directly in hardware.
-> > +	 */
-> > +	if (of_device_is_compatible(np, "arm,pl310-cache") && is_coherent)
-> > +		outer_cache.sync = NULL;
-> > +
+> > BTW I can try your patch with the myricom NIC which started to work
+> > when rounding up, I'll quickly see if that fixes the issue as well,
+> > but I'm now a little bit confused.
 > 
-> For this particular case, you can add a specific l2x0_of_data structure
-> with the right compatible string for your platform where
-> outer_cache.sync is NULL,
+> This patch won't fix anything, it just fixes the mbus driver to always
+> program the hardware with valid values, even if the upper layer
+> requests something invalid. Basically, we spent a few weeks tracking
+> this behavior down, the patch would ensure that time doesn't get spent
+> again.
 
-In fact, I'm not sure using a separate compatible string is possible,
-because there are situations where the hardware platform may be I/O
-coherent, and some situations where it is not the case. For example, in
-the current kernel, the platform is I/O coherent when CONFIG_SMP is
-enabled, but not I/O coherent when CONFIG_SMP is disabled. And it's the
-same hardware platform, so same Device Tree in both cases.
+Agreed.
 
-So using a different compatible string doesn't work here: we would have
-to adjust the compatible string depending on whether CONFIG_SMP
-or !CONFIG_SMP is used. Of course, this is doable at run time before
-probing the L2 cache driver, using a small quirk, but that doesn't
-sound really nice.
-
-> assuming that dma_alloc_coherent() returns
-> Cacheable memory (e.g. your platform uses arm_coherent_dma_ops).
-
-We don't use arm_coherent_dma_ops, we have our own DMA operations, see
-arch/arm/mach-mvebu/coherency.c (in mainline, only the support for the
-PJ4B based Armada 370/XP is there, but the support for the Cortex-A9
-based Armada 375/38x has been posted at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244916.html).
-
-> The
-> only use of outer_sync() is for non-SMP barriers in relation to Normal
-> NonCacheable buffers.
+> The goal now is to avoid the WARN_ON in the patch from firing.
 > 
-> Even if the platform has coherent I/O, you still need the range L2 cache
-> ops to be available for secondary CPU booting. Unless this platform can
-> be configured in a way similar to the "marvell,aurora-system-cache" case
-> and you can make all the outer_cache ops NULL.
-
-Hum, I am not sure about that one. Maybe Tawfik or Nadav can comment on
-this question?
-
-> >  	l2x0_init(l2x0_base, aux_val, aux_mask);
-> >  
-> >  	return 0;
-> >  }
-> > +
-> > +int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
-> > +{
-> > +	return l2x0_of_init_common(aux_val, aux_mask, false);
-> > +}
-> > +
-> > +int __init l2x0_of_init_coherent(u32 aux_val, u32 aux_mask)
-> > +{
-> > +	return l2x0_of_init_common(aux_val, aux_mask, true);
-> > +}
+> For a proper fix, something like this to create multiple aligned
+> windows is a simple option (untested, need the inverse on the
+> de-register, loop should probably live in mbus code):
 > 
-> This could be a bit misleading. I would rather have a generic
-> pl310_data_dma_coherent structure (though even on coherent systems you
-> could still have drivers that prefer writecombine/NormalNC memory to
-> avoid thrashing the cache).
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 789cdb2..7312c82 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -382,6 +382,9 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+>  
+>  static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>  {
+> +       phys_addr_t base;
+> +       unsigned int mapped_size;
+> +
+>         /* Are the new membase/memlimit values invalid? */
+>         if (port->bridge.memlimit < port->bridge.membase ||
+>             !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+> @@ -408,8 +411,16 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>                 (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+>                 port->memwin_base;
+>  
+> -       mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+> -                                   port->memwin_base, port->memwin_size);
+> +       base = port->memwin_base;
+> +       mapped_size = 0;
+> +       while (mapped_size < port->memwin_size) {
+> +               unsigned int size =
+> +                   rounddown_pow_of_two(port->memwin_size - mapped_size);
+> +               mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+> +                                           base, size);
+> +               base += size;
+> +               mapped_size += size;
+> +       }
+>  }
 
-I'm not sure to follow your suggestion here. What structure type would
-pl310_data_dma_coherent be? A "struct l2x0_of_data" like this:
+The problem I have with this approach is the consumption of windows. We
+have a limited number of them, and this approach could easily consume
+quite a few windows for one single bridge BAR, depending on its size.
+Like a bridge BAR of 120 MB would consume four windows (one 64 MB, one
+32 MB, one 16 MB and one 8 MB).
 
-static const struct l2x0_of_data pl310_dma_coherent_data = {
-        .setup = pl310_of_setup,
-        .save  = pl310_save,
-        .outer_cache = {
-                .resume      = pl310_resume,
-                .inv_range   = l2x0_inv_range,
-                .clean_range = l2x0_clean_range,
-                .flush_range = l2x0_flush_range,
-                .sync        = NULL,
-                .flush_all   = l2x0_flush_all,
-                .inv_all     = l2x0_inv_all,
-                .disable     = l2x0_disable,
-        },
-};
-
-static const struct of_device_id l2x0_ids[] __initconst = {
-	[...]
-        { .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
-        { .compatible = "arm,pl310-cache-dma-coherent", .data = (void *)&pl310_dma_coherent_data },
-	[...]
-};
-
-Is this what you have in mind? This looks ok to me, if we have a
-solution for the CONFIG_SMP vs. !CONFIG_SMP problem.
+Instead, I would really like to see the PCI core being told about this
+constraint, so that it can oversize the bridge BAR (to 128 MB in the
+above example of a 120 MB bridge BAR). Of course, it would be better if
+the PCI core would not blindly apply this logic: if there is a 129 MB
+bridge BAR, we'd prefer to have two windows (one 128 MB and one 1 MB),
+so as to not loose too much physical address space.
 
 Thomas
 -- 
