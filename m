@@ -1,113 +1,67 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 08 Apr 2014 22:47:25 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D0F6F1434@AcuExch.aculab.com>
-References: <1396672506-9296-1-git-send-email-zhangfei.gao@linaro.org>	<1396672506-9296-4-git-send-email-zhangfei.gao@linaro.org>
- <20140407.145356.928382660541891827.davem@davemloft.net>
- <5343AE45.4020308@linaro.org>
- <063D6719AE5E284EB5DD2968C1650D6D0F6F1434@AcuExch.aculab.com>
-Message-ID: <53440BFD.3000805@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 08 Apr 2014 20:57:54 +0800
+Subject: [PATCH v7 6/6] pci: Add support for creating a generic host_bridge
+ from device tree
+In-Reply-To: <1394811272-1547-7-git-send-email-Liviu.Dudau@arm.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-7-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <5343F252.2050708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David,
+Hi Liviu,
 
-On 04/08/2014 04:30 PM, David Laight wrote:
-> From: zhangfei [mailto:zhangfei.gao at linaro.org]
->> On 04/08/2014 02:53 AM, David Miller wrote:
->>> From: Zhangfei Gao <zhangfei.gao@linaro.org>
->>> Date: Sat,  5 Apr 2014 12:35:06 +0800
->>>
->>>> +struct tx_desc {
->>>> +	u32 send_addr;
->>>> +	u16 reserved_16;
->>>> +	u16 send_size;
->
-> The above doesn't look right for endianness independence.
-> I'd guess the hardware spec shows a 32bit word with the 'send size'
-> in one half - that is what you need to define.
->
-> Since this is a tx descriptor (and written by the host) you
-> can't have 'reserved' field - the host has to write it.
-> probably these are 'must be zero' fields.
+On 2014-3-14 23:34, Liviu Dudau wrote:
+> Several platforms use a rather generic version of parsing
+> the device tree to find the host bridge ranges. Move the common code
+> into the generic PCI code and use it to create a pci_host_bridge
+> structure that can be used by arch code.
+> 
+> Based on early attempts by Andrew Murray to unify the code.
+> Used powerpc and microblaze PCI code as starting point.
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host-bridge.c | 158 ++++++++++++++++++++++++++++++++++++
+>  include/linux/pci.h       |  13 +++
+>  2 files changed, 171 insertions(+)
+> 
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index 8708b652..7cda90b 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -6,9 +6,14 @@
+>  #include <linux/init.h>
+>  #include <linux/pci.h>
+>  #include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/slab.h>
+>  
+>  #include "pci.h"
+>  
+> +static atomic_t domain_nr = ATOMIC_INIT(-1);
 
-Yes, it is not endianness independence.
-In fact, we have switched the layout since it is u16 for doing the 
-switch endianness.
+domain_nr will only be used inside the #ifdef CONFIG_OF,
+and this will lead to compile warning which complains that
+'domain_nr' defined but not used when CONFIG_OF=n (for example
+on x86).
 
-The reserved_16 is the part not used.
-So it is simpler to define u32 here.
-If upper 16 bits also need to be set, usually we still use the u32, and 
-organize dynamically, right?
+How about moving the definition to --->
 
->
->>>> +	u32 reserved_32;
->>>> +	u32 cfg;
->>>> +	u32 wb_addr;
->>>> +} ____cacheline_aligned;
->>>
->>> I do not think that ____cacheline_aligned is appropriate at all here.
->>>
->>> First of all, this is a hardware descriptor, so it has a fixed layout
->>> and therefore size.
->
-> The structure also isn't even a multiple of a power of two.
-> So there will be implicit padding at the end.
->
-> Since there isn't a 'pointer to next' I presume the hardware accesses
-> the descriptors from adjacent physical addresses.
-> So you need to explicitly pad to that size.
-> If the cache line size were 128 byte the above wouldn't work at all.
-Yes, __aligned(64) can be used here, when I though directly use 64 is 
-not good.
-The requirement is desc address should be align to 0x40, since desc phys 
-is send to register whose [31:6] is used.
+> +
+>  static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+>  {
+>  	while (bus->parent)
+> @@ -92,3 +97,156 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+>  	res->end = region->end + offset;
+>  }
+>  EXPORT_SYMBOL(pcibios_bus_to_resource);
+> +
+> +#ifdef CONFIG_OF
 
->
->>>
->>> Secondly, unless you declare this object statically in the data section
->>> of the object file, the alignment doesn't matter.  These descriptors
->>> are always dynamically allocated, rather than instantiated in the
->>> kernel/driver image.
->>
->> The ____cacheline_aligned used here is only for the requirement of
->> alignment, and use dma_alloc_coherent, while at first dma_pool is used
->> for the requirement of alignment.
->> Otherwise desc[1] is not aligned and can not be used directly, the
->> structure is smaller.
->
-> It sounds like you should be explicitly padding the structure
-> to 32 bytes - whether or not that is the cache line size.
-Got it, understand now.
-
->
-> ...
->> I am sorry, but unfortunately this series really does NOT have TX done
->> interrupt after checked with hardware guy many times.
->> And next series will add TX done interrupt according to the feedback.
->>
->> There are two reasons of removing the TX done interrupt when the chip is
->> designed.
->> 1. The specific product does not care the latency, only care the throughput.
->> 2. When doing many experiment, the tx done interrupt will impact the
->> throughput, as a result reclaim is moved to xmit as one of
->> optimizations, then finally tx done interrupt is removed at all.
->>
->> Is it acceptable of removing timer as well as latency handling, or any
->> other work around of this kind of hardware?
->
-> If you don't have a global 'TX done' interrupt, you need a per
-> descriptor one.
-> Otherwise you cannot send at maximum rate in the absence of
-> receive traffic.
->
-
-Global 'TX done' interrupt means interrupt for desc chain (several desc 
-link together), right?
-There is no interrupt for either desc chain or single desc.
-
-By the way, if single desc interrupt, is it can be optimized like napi, 
-disable the interrupt and re-enable the interrupt until all buffers are 
-reclaimed?
+here?
 
 Thanks
+Hanjun
