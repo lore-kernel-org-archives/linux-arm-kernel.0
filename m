@@ -1,55 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 8 Apr 2014 19:29:57 +0800
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-Message-ID: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 08 Apr 2014 10:16:47 +0800
+Subject: [PATCH] ACPI: Update the ownership and developers for ACPI in
+ Kconfig
+In-Reply-To: <1487377.07icAKoM8K@vostro.rjw.lan>
+References: <1396528650-7402-1-git-send-email-hanjun.guo@linaro.org>
+ <1487377.07icAKoM8K@vostro.rjw.lan>
+Message-ID: <53435C0F.3090908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .config() calls clk_get_rate() which might sleep, so we need to set
-pwm_chip can_sleep flag.  Otherwise, we see the following warning when
-using pwm driven heartbeat led.
+On 2014-4-7 20:21, Rafael J. Wysocki wrote:
+> On Thursday, April 03, 2014 08:37:30 PM Hanjun Guo wrote:
+>> The UEFI Forum included the ACPI spec in its portfolio in October 2013
+>> and will host future spec iterations, following the ACPI v5.0a release.
+>>
+>> A UEFI Forum working group named ACPI Specification Working Group (ASWG)
+>> has been established to handle future ACPI developments, any UEFI member
+>> can join the group and contribute to ACPI specification.
+>>
+>> So update the ownership and developers for ACPI in Kconfig accordingly,
+>> and update the website link to ACPI specification too.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  drivers/acpi/Kconfig |    5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index c205653..831e541 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -32,9 +32,10 @@ menuconfig ACPI
+>>  	  <http://acpica.org/>
+>>  
+>>  	  ACPI is an open industry specification co-developed by
+>> -	  Hewlett-Packard, Intel, Microsoft, Phoenix, and Toshiba.
+>> +	  ACPI Specification Working Group (ASWG) under UEFI Forum, any
+>> +	  UEFI member can join ASWG and contribute to ACPI specification.
+>>  	  The specification is available at:
+>> -	  <http://www.acpi.info>
+> 
+> The spec is still available from here, so why are you removing this link?
 
-WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
-DEBUG_LOCKS_WARN_ON(in_interrupt())
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
-[<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
-[<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
-[<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
-[<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
-[<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
-[<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
-[<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
-[<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
-[<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
-[<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
-[<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
-[<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
-[<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
-[<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
-[<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
-[<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
-[<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
-[<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
-[<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
+My bad, I thought the link below is the replacement for the above one.
 
-Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- drivers/pwm/pwm-mxs.c | 1 +
- 1 file changed, 1 insertion(+)
+> 
+>> +	  <http://www.uefi.org/acpi/specs>
 
-diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
-index 9475bc7..4f1bb4e 100644
---- a/drivers/pwm/pwm-mxs.c
-+++ b/drivers/pwm/pwm-mxs.c
-@@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
- 	mxs->chip.dev = &pdev->dev;
- 	mxs->chip.ops = &mxs_pwm_ops;
- 	mxs->chip.base = -1;
-+	mxs->chip.can_sleep = true;
- 	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
--- 
-1.8.3.2
+How about the replacement below?
+
+-	  <http://www.acpi.info>
++	  <http://www.acpi.info>, or:
++	  <http://www.uefi.org/acpi/specs>
+
+Thanks
+Hanjun
