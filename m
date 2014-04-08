@@ -1,20 +1,22 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 8 Apr 2014 16:18:49 +0800
-Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to
- kernel warning
-In-Reply-To: <20140408075916.GA30127@piout.net>
-References: <53345C93.9040005@i2se.com> <533EB9AC.6040708@i2se.com>
- <20140404142656.GA16383@dragon> <20140404164446.GI4883@piout.net>
- <20140408073402.GC2438@dragon> <20140408075916.GA30127@piout.net>
-Message-ID: <20140408081848.GH2438@dragon>
+Date: Tue, 8 Apr 2014 16:14:42 +0800
+Subject: [PATCH] ARM: dt: microsom: don't set bit 7 for ethernet mux
+ settings
+In-Reply-To: <E1WWvc1-0004DM-62@rmk-PC.arm.linux.org.uk>
+References: <E1WWvc1-0004DM-62@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140408081440.GG2438@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 09:59:16AM +0200, Alexandre Belloni wrote:
-> The driver using the PWM should test the flag, have a look at:
-> http://lxr.free-electrons.com/source/drivers/leds/leds-pwm.c#L183
+On Sun, Apr 06, 2014 at 11:32:25PM +0100, Russell King wrote:
+> Bit 6,7 are marked as reserved for the ethernet RGMII pins, so avoid
+> setting these bits.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Ah, right, that' how the flag works.  Thanks, Alexandre.  I send a patch
-to set the flag for pwm-mxs driver shortly.
+Applied, thanks.
+
+I'm wondering if this is an error found by code/doc inspection, or it
+fixes a real problem?
 
 Shawn
