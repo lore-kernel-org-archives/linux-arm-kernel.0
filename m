@@ -1,65 +1,108 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue,  8 Apr 2014 14:19:39 +0200
-Subject: [PATCH V3 17/17] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle directory
+Date: Tue,  8 Apr 2014 14:19:36 +0200
+Subject: [PATCH V3 14/17] ARM: exynos: cpuidle: Move the boot vector in pm.c
 In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396959579-18268-18-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396959579-18268-15-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+As usual, move the boot vector setting in the pm.c file and use the cpu_pm
+notifier to set it up.
+
+Remove the unused headers.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/mach-exynos/Makefile                      |    1 -
- drivers/cpuidle/Kconfig.arm                        |    6 ++++++
- drivers/cpuidle/Makefile                           |    1 +
- .../cpuidle.c => drivers/cpuidle/cpuidle-exynos.c  |    0
- 4 files changed, 7 insertions(+), 1 deletion(-)
- rename arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/cpuidle-exynos.c (100%)
+ arch/arm/mach-exynos/cpuidle.c |   23 -----------------------
+ arch/arm/mach-exynos/pm.c      |   15 +++++++++++++++
+ 2 files changed, 15 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index a656dbe..21bd364 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -16,7 +16,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index 44d169b..4b94181 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -8,46 +8,23 @@
+  * published by the Free Software Foundation.
+ */
  
- obj-$(CONFIG_PM_SLEEP)		+= pm.o sleep.o
- obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
--obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+ #include <linux/cpuidle.h>
+ #include <linux/cpu_pm.h>
+-#include <linux/io.h>
+-#include <linux/export.h>
+-#include <linux/time.h>
+ #include <linux/platform_device.h>
  
- obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
+ #include <asm/proc-fns.h>
+ #include <asm/suspend.h>
+-#include <asm/unified.h>
+ #include <asm/cpuidle.h>
  
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index d988948..364c984 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -44,3 +44,9 @@ config ARM_AT91_CPUIDLE
- 	depends on ARCH_AT91
- 	help
- 	  Select this to enable cpuidle for AT91 processors
+ #include <plat/cpu.h>
+-#include <plat/pm.h>
+-
+-#include <mach/map.h>
+ 
+ #include "common.h"
+-#include "regs-pmu.h"
+-
+-#define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+-			(S5P_VA_SYSRAM + 0x24) : S5P_INFORM0))
+-#define REG_DIRECTGO_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
+-			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+-			(S5P_VA_SYSRAM + 0x20) : S5P_INFORM1))
+ 
+ static int idle_finisher(unsigned long flags)
+ {
+-
+-	__raw_writel(virt_to_phys(s3c_cpu_resume), REG_DIRECTGO_ADDR);
+-	__raw_writel(S5P_CHECK_AFTR, REG_DIRECTGO_FLAG);
+-
+ 	/* Set value of power down register for aftr mode */
+ 	exynos_sys_powerdown_conf(SYS_AFTR);
+-
+ 	cpu_do_idle();
+-
+ 	return 1;
+ }
+ 
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 90fb692..e4ecd8c 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -172,6 +172,20 @@ static void __init exynos5_core_down_clk(void)
+ 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+ }
+ 
++#define EXYNOS_BOOT_VECTOR_ADDR (samsung_rev() == EXYNOS4210_REV_1_1 ? \
++			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
++			(S5P_VA_SYSRAM + 0x24) : S5P_INFORM0))
 +
-+config ARM_EXYNOS_CPUIDLE
-+	bool "Cpu Idle Driver for the Exynos processors"
-+	depends on ARCH_EXYNOS
-+	help
-+	  Select this to enable cpuidle for Exynos processors
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index f71ae1b..0d1540a 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
- obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
-+obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
++#define EXYNOS_BOOT_VECTOR_FLAG (samsung_rev() == EXYNOS4210_REV_1_1 ? \
++			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
++			(S5P_VA_SYSRAM + 0x20) : S5P_INFORM1))
++
++static void exynos_cpu_set_boot_vector(void)
++{
++	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
++	__raw_writel(S5P_CHECK_AFTR, EXYNOS_BOOT_VECTOR_FLAG);
++}
++
+ static int exynos_cpu_suspend(unsigned long arg)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+@@ -387,6 +401,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 			exynos_cpu_save_register();
+ 			exynos_set_wakeupmask();
+ 		}
++		exynos_cpu_set_boot_vector();
+ 		break;
  
- ###############################################################################
- # POWERPC drivers
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/drivers/cpuidle/cpuidle-exynos.c
-similarity index 100%
-rename from arch/arm/mach-exynos/cpuidle.c
-rename to drivers/cpuidle/cpuidle-exynos.c
+ 	case CPU_PM_EXIT:
 -- 
 1.7.9.5
