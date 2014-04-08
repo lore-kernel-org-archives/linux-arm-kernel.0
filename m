@@ -1,56 +1,45 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Tue,  8 Apr 2014 11:20:17 +0200
-Subject: [PATCH] ARM: dts: OMAP2+: remove uses of obsolete gpmc,device-nand
-Message-ID: <1396948817-29362-1-git-send-email-jhovold@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 8 Apr 2014 11:04:43 +0200
+Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to
+ kernel warning
+In-Reply-To: <20140408084951.GI2438@dragon>
+References: <53345C93.9040005@i2se.com> <533EB9AC.6040708@i2se.com>
+ <20140404142656.GA16383@dragon> <20140404164446.GI4883@piout.net>
+ <20140408073402.GC2438@dragon> <20140408075916.GA30127@piout.net>
+ <20140408081848.GH2438@dragon> <20140408084150.GC30127@piout.net>
+ <20140408084951.GI2438@dragon>
+Message-ID: <20140408090443.GD30127@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all remaining uses of gpmc,device-nand that have been added since
-the property was removed by commit f40739faba8e ("ARM: dts: OMAP2+:
-Simplify NAND support").
+On 08/04/2014 at 16:49:52 +0800, Shawn Guo wrote :
+> On Tue, Apr 08, 2014 at 10:41:50AM +0200, Alexandre Belloni wrote:
+> > On 08/04/2014 at 16:18:49 +0800, Shawn Guo wrote :
+> > > On Tue, Apr 08, 2014 at 09:59:16AM +0200, Alexandre Belloni wrote:
+> > > > The driver using the PWM should test the flag, have a look at:
+> > > > http://lxr.free-electrons.com/source/drivers/leds/leds-pwm.c#L183
+> > > 
+> > > Ah, right, that' how the flag works.  Thanks, Alexandre.  I send a patch
+> > > to set the flag for pwm-mxs driver shortly.
+> > > 
+> > 
+> > Actually, I had a closer look and I believe using clk_prepare_enable()
+> > in .config is wrong. Let me prepare a patch.
+> 
+> Yes, we can split clk_prepare_enable() into clk_prepare() and
+> clk_enable(), call the former in .probe() and only the later in .config
+> hook.
+> 
+> But it only fixes the problem partially.  If you look at Stefan's report
+> closely, you can see the warning actually comes from the clk_get_rate()
+> call which holds a mutex too.
+> 
 
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
----
- arch/arm/boot/dts/am335x-igep0033.dtsi  | 1 -
- arch/arm/boot/dts/omap3-devkit8000.dts  | 1 -
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi | 1 -
- 3 files changed, 3 deletions(-)
+Right, I missed that one. I would say it is still worth doing that
+change anyway as using test_bit(PWMF_ENABLED, &pwm->flags) is
+unnecessary because clk_enable()/clk_disable() maintain a usage count.
 
-diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-index 7063311a58d9..06c822a48b71 100644
---- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-@@ -118,7 +118,6 @@
- 		reg = <0 0 0>; /* CS0, offset 0 */
- 		nand-bus-width = <8>;
- 		ti,nand-ecc-opt = "bch8";
--		gpmc,device-nand = "true";
- 		gpmc,device-width = <1>;
- 		gpmc,sync-clk-ps = <0>;
- 		gpmc,cs-on-ns = <0>;
-diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-index bf5a515a3247..da402f0fdab4 100644
---- a/arch/arm/boot/dts/omap3-devkit8000.dts
-+++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-@@ -112,7 +112,6 @@
- 		reg = <0 0 0>; /* CS0, offset 0 */
- 		nand-bus-width = <16>;
- 
--		gpmc,device-nand;
- 		gpmc,sync-clk-ps = <0>;
- 		gpmc,cs-on-ns = <0>;
- 		gpmc,cs-rd-off-ns = <44>;
-diff --git a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-index 6369d9f43ca2..cc1dce6978f5 100644
---- a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-+++ b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-@@ -368,7 +368,6 @@
- 		/* no elm on omap3 */
- 
- 		gpmc,mux-add-data = <0>;
--		gpmc,device-nand;
- 		gpmc,device-width = <2>;
- 		gpmc,wait-pin = <0>;
- 		gpmc,wait-monitoring-ns = <0>;
 -- 
-1.8.3.2
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
