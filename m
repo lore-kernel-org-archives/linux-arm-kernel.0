@@ -1,256 +1,76 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon,  7 Apr 2014 20:15:09 -0700
-Subject: [PATCH v2 1/2] ARM: mm: allow non-text sections to be non-executable
-In-Reply-To: <1396926910-11227-1-git-send-email-keescook@chromium.org>
-References: <1396926910-11227-1-git-send-email-keescook@chromium.org>
-Message-ID: <1396926910-11227-2-git-send-email-keescook@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Apr 2014 09:12:50 +0200
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-2-git-send-email-Liviu.Dudau@arm.com>
+ <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
+Message-ID: <4845032.VeNZmbvuW3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
-into section-sized areas that can have different permisions. Performs
-the NX permission changes during free_initmem, so that init memory can be
-reclaimed.
+On Monday 07 April 2014 17:21:51 Bjorn Helgaas wrote:
+> On Fri, Mar 14, 2014 at 9:34 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > Some architectures do not share x86 simple view of the PCI I/O space
+> > and instead use a range of addresses that map to bus addresses. For
+> > some architectures these ranges will be expressed by OF bindings
+> > in a device tree file.
+> >
+> > Introduce a pci_register_io_range() helper function that can be used
+> > by the architecture code to keep track of the I/O ranges described by the
+> > PCI bindings. If the PCI_IOBASE macro is not defined that signals
+> > lack of support for PCI and we return an error.
+> >
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Acked-by: Grant Likely <grant.likely@linaro.org>
+> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> > ---
+> >  drivers/of/address.c       | 9 +++++++++
+> >  include/linux/of_address.h | 1 +
+> >  2 files changed, 10 insertions(+)
+> >
+> > diff --git a/drivers/of/address.c b/drivers/of/address.c
+> > index 1a54f1f..be958ed 100644
+> > --- a/drivers/of/address.c
+> > +++ b/drivers/of/address.c
+> > @@ -619,6 +619,15 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+> >  }
+> >  EXPORT_SYMBOL(of_get_address);
+> >
+> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> > +{
+> > +#ifndef PCI_IOBASE
+> > +       return -EINVAL;
+> > +#else
+> > +       return 0;
+> > +#endif
+> > +}
+> 
+> This isn't PCI code, so I'm fine with it in that sense, but I'm not
+> sure the idea of a PCI_IOBASE #define is really what we need.  It's
+> not really determined by the processor architecture, it's determined
+> by the platform.  And a single address isn't enough in general,
+> either, because if there are multiple host bridges, there's no reason
+> the apertures that generate PCI I/O transactions need to be contiguous
+> on the CPU side.
+> 
+> That's just a long way of saying that if we ever came up with a more
+> generic way to handle I/O port spaces, PCI_IOBASE might go away.  And
+> I guess part of that rework could be changing this use of it along
+> with the others.
 
-This uses section size instead of PMD size to reduce memory lost to
-padding on non-LPAE systems.
+I'd rather not add a generic implementation of this at all, but
+keep it all within the host resource scanning code.
 
-Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
+If we do add a generic implementation, my preference would be
+to use the version introduced for arm64, with a fallback of
+returning -EINVAL if the architecture doesn't implement it.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm/kernel/vmlinux.lds.S |   17 +++++++
- arch/arm/mm/Kconfig           |    9 ++++
- arch/arm/mm/init.c            |  106 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/mmu.c             |   13 ++++-
- 4 files changed, 144 insertions(+), 1 deletion(-)
+There is no way ever that returning '0' makes sense here: Either
+the architecture supports memory mapped I/O spaces and then we
+should be able to find an appropriate io_offset for it, or it
+doesn't support memory mapped I/O spaces and we should never
+even call this function.
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 7bcee5c9b604..08fa667ef2f1 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -8,6 +8,9 @@
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#include <asm/pgtable.h>
-+#endif
- 	
- #define PROC_INFO							\
- 	. = ALIGN(4);							\
-@@ -90,6 +93,11 @@ SECTIONS
- 		_text = .;
- 		HEAD_TEXT
- 	}
-+
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+#endif
-+
- 	.text : {			/* Real text segment		*/
- 		_stext = .;		/* Text and read-only data	*/
- 			__exception_text_start = .;
-@@ -145,7 +153,11 @@ SECTIONS
- 	_etext = .;			/* End of text and rodata section */
- 
- #ifndef CONFIG_XIP_KERNEL
-+# ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+# else
- 	. = ALIGN(PAGE_SIZE);
-+# endif
- 	__init_begin = .;
- #endif
- 	/*
-@@ -220,7 +232,12 @@ SECTIONS
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #else
- 	__init_end = .;
-+
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+#else
- 	. = ALIGN(THREAD_SIZE);
-+#endif
- 	__data_loc = .;
- #endif
- 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index f5ad9ee70426..b484fb04cf6f 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -957,3 +957,12 @@ config ARCH_SUPPORTS_BIG_ENDIAN
- 	help
- 	  This option specifies the architecture can support big endian
- 	  operation.
-+
-+config ARM_KERNMEM_PERMS
-+	bool "Restrict kernel memory permissions"
-+	help
-+	  If this is set, kernel memory other than kernel text (and rodata)
-+	  will be made non-executable. The tradeoff is that each region is
-+	  padded to section-size (1MiB) boundaries (because their permissions
-+	  are different and splitting the 1M pages into 4K ones causes TLB
-+	  performance problems), wasting memory.
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 2a77ba8796ae..66a7283583cd 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -31,6 +31,11 @@
- #include <asm/tlb.h>
- #include <asm/fixmap.h>
- 
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#include <asm/system_info.h>
-+#include <asm/cp15.h>
-+#endif
-+
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
-@@ -623,11 +628,112 @@ void __init mem_init(void)
- 	}
- }
- 
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+struct section_perm {
-+	unsigned long start;
-+	unsigned long end;
-+	pmdval_t mask;
-+	pmdval_t prot;
-+};
-+
-+struct section_perm nx_perms[] = {
-+	/* Make pages tables, etc before _stext RW (set NX). */
-+	{
-+		.start	= PAGE_OFFSET,
-+		.end	= (unsigned long)_stext,
-+		.mask	= ~PMD_SECT_XN,
-+		.prot	= PMD_SECT_XN,
-+	},
-+	/* Make init RW (set NX). */
-+	{
-+		.start	= (unsigned long)__init_begin,
-+		.end	= (unsigned long)_sdata,
-+		.mask	= ~PMD_SECT_XN,
-+		.prot	= PMD_SECT_XN,
-+	},
-+};
-+
-+/*
-+ * Updates section permissions only for the current mm (sections are
-+ * copied into each mm). During startup, this is the init_mm.
-+ */
-+static inline void section_update(unsigned long addr, pmdval_t mask,
-+				  pmdval_t prot)
-+{
-+	struct mm_struct *mm;
-+	pmd_t *pmd;
-+
-+	mm = current->active_mm;
-+	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
-+
-+#ifdef CONFIG_ARM_LPAE
-+	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
-+#else
-+	if (addr & SECTION_SIZE)
-+		pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
-+	else
-+		pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
-+#endif
-+	flush_pmd_entry(pmd);
-+	local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
-+}
-+
-+/* Make sure extended page tables are in use. */
-+static inline bool arch_has_strict_perms(void)
-+{
-+	unsigned int cr;
-+
-+	if (cpu_architecture() < CPU_ARCH_ARMv6)
-+		return false;
-+
-+	cr = get_cr();
-+	if (!(cr & CR_XP))
-+		return false;
-+
-+	return true;
-+}
-+
-+#define set_section_perms(perms, field)	{				\
-+	size_t i;							\
-+	unsigned long addr;						\
-+									\
-+	if (!arch_has_strict_perms())					\
-+		return;							\
-+									\
-+	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
-+		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
-+		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
-+			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
-+				perms[i].start, perms[i].end,		\
-+				SECTION_SIZE);				\
-+			continue;					\
-+		}							\
-+									\
-+		for (addr = perms[i].start;				\
-+		     addr < perms[i].end;				\
-+		     addr += SECTION_SIZE)				\
-+			section_update(addr, perms[i].mask,		\
-+				       perms[i].field);			\
-+	}								\
-+}
-+
-+static inline void fix_kernmem_perms(void)
-+{
-+	set_section_perms(nx_perms, prot);
-+}
-+#else
-+static inline void fix_kernmem_perms(void) { }
-+#endif /* CONFIG_ARM_KERNMEM_PERMS */
-+
- void free_initmem(void)
- {
- #ifdef CONFIG_HAVE_TCM
- 	extern char __tcm_start, __tcm_end;
-+#endif
-+
-+	fix_kernmem_perms();
- 
-+#ifdef CONFIG_HAVE_TCM
- 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
- 	free_reserved_area(&__tcm_start, &__tcm_end, -1, "TCM link");
- #endif
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index b68c6b22e1c8..3e163071bdcb 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1379,13 +1379,24 @@ static void __init map_lowmem(void)
- 		if (start >= end)
- 			break;
- 
--		if (end < kernel_x_start || start >= kernel_x_end) {
-+		if (end < kernel_x_start) {
- 			map.pfn = __phys_to_pfn(start);
- 			map.virtual = __phys_to_virt(start);
- 			map.length = end - start;
- 			map.type = MT_MEMORY_RWX;
- 
- 			create_mapping(&map);
-+		} else if (start >= kernel_x_end) {
-+			map.pfn = __phys_to_pfn(start);
-+			map.virtual = __phys_to_virt(start);
-+			map.length = end - start;
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+			map.type = MT_MEMORY_RW;
-+#else
-+			map.type = MT_MEMORY_RWX;
-+#endif
-+
-+			create_mapping(&map);
- 		} else {
- 			/* This better cover the entire kernel */
- 			if (start < kernel_x_start) {
--- 
-1.7.9.5
+	Arnd
