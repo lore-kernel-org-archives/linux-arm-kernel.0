@@ -1,74 +1,41 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 08 Apr 2014 13:41:38 +0100
-Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
-In-Reply-To: <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
-References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
- <1396577719-14786-3-git-send-email-keescook@chromium.org>
- <20140404195818.GA21028@debian>
- <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
-Message-ID: <1396960898.3567.55.camel@linaro1.home>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Tue, 8 Apr 2014 14:29:35 +0200
+Subject: ARM: SA1100: collie broken (and fixes pending)
+Message-ID: <CAAQYJAvBwf4ohnBajvKwSYRWr-9QxD4=Mrrzyu2=9DvHUSh3ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-04-04 at 17:07 -0700, Kees Cook wrote:
-> On Fri, Apr 4, 2014 at 12:58 PM, Rabin Vincent <rabin@rab.in> wrote:
-[...]
-> > You need a TLB flush.  I had a flush_tlb_all() in my example patch,
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244335.html,
-> > but the following is probably nicer (on top of this patch):
-> >
-> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> > index 9bea524..a92c45a 100644
-> > --- a/arch/arm/mm/init.c
-> > +++ b/arch/arm/mm/init.c
-> > @@ -741,6 +741,8 @@ static inline bool arch_has_strict_perms(void)
-> >                      addr += SECTION_SIZE)                              \
-> >                         section_update(addr, perms[i].mask,             \
-> >                                        perms[i].field);                 \
-> > +                                                                       \
-> > +               flush_tlb_kernel_range(perms[i].start, perms[i].end);   \
-> >         }                                                               \
-> >  }
-> >
-> 
-> When I do this, I hang the system, and get a WARN due to the tlb call
-> attempting to flush on all CPUs, I think:
-> 
-> [   34.246034] WARNING: at
-> /mnt/host/source/src/third_party/kernel-next/kernel/smp.c:466
-> smp_call_function_many+0xac/0x26c()
-> ...
-> [   34.246617] Backtrace:
-> [   34.246697] [<c010d3b8>] (unwind_backtrace+0x0/0x118) from
-> [<c060b9d8>] (dump_stack+0x28/0x30)
-> [   34.246765] [<c060b9d8>] (dump_stack+0x28/0x30) from [<c0123044>]
-> (warn_slowpath_null+0x44/0x5c)
-> [   34.246824] [<c0123044>] (warn_slowpath_null+0x44/0x5c) from
-> [<c017426c>] (smp_call_function_many+0xac/0x26c)
-> [   34.246881] [<c017426c>] (smp_call_function_many+0xac/0x26c) from
-> [<c0174468>] (smp_call_function+0x3c/0x48)
-> [   34.246937] [<c0174468>] (smp_call_function+0x3c/0x48) from
-> [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c)
-> [   34.246994] [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c) from
-> [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0)
-> [   34.247046] [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0) from
-> [<c011403c>] (set_kernel_text_rw+0xd8/0xec)
-> [   34.247099] [<c011403c>] (set_kernel_text_rw+0xd8/0xec) from
-> [<c010c878>] (__ftrace_modify_code+0x14/0x28)
-> [   34.247156] [<c010c878>] (__ftrace_modify_code+0x14/0x28) from
-> [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114)
-> [   34.247212] [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114) from
-> [<c01841cc>] (cpu_stopper_thread+0xd8/0x164)
-> [   34.247266] [<c01841cc>] (cpu_stopper_thread+0xd8/0x164) from
-> [<c0145c14>] (kthread+0xc8/0xd8)
-> [   34.247323] [<c0145c14>] (kthread+0xc8/0xd8) from [<c0106118>]
-> (ret_from_fork+0x14/0x20)
-> 
-> Using local_flush_tlb_kernel_range() fixed it though.
+Russell,
 
-What about if another CPU had a TLB entry with the old permissions in?
-Or do you consider that the likelihood and consequences of that aren't
-significant?
+there are two patchsets pending for collie/sa1110:
 
--- 
-Tixy
+http://archive.arm.linux.org.uk/lurker/message/20131116.220725.42397482.en.html
+http://archive.arm.linux.org.uk/lurker/message/20131215.042807.213f9035.en.html
+
+>From the first patchset we need at least the first 3:
+      arm: sa1100: add cpu clock
+      fbdev: sa1100fb: make use of device clock
+      pcmcia: sa1100: make use of device clock
+
+The second has been tested as well by Linus Walleij.
+
+Unfortunately there is now a conflict about clk_get_rate() introduced
+with commit # 0ad04fb "ARM: SA1100: Create dummy clk_get_rate() to
+avoid build failures".
+
+To add more fun, there is a second issue:
+
+MODPOST 247 modules
+ERROR: "clk_set_rate" [drivers/usb/phy/phy-generic.ko] undefined!
+
+so to build 3.14 I had to revert 0ad04fb and to add a dummy clk_set_rate() [1].
+Please verify that.
+
+I think it is urgent that we sort this out to avoid more differences in future.
+
+Thanks in advance
+
+Andrea
+
+[1]
+http://cgit.openembedded.org/meta-handheld/tree/recipes-kernel/linux/linux-yocto-3.14/collie/arm-sa1100-dummy-clk_set_rate.patch
