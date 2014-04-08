@@ -1,83 +1,84 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 8 Apr 2014 16:33:27 +0200
-Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <1396967390.23349.15.camel@dinh-ubuntu>
-References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
- <1396907649-20212-2-git-send-email-tthayer@altera.com>
- <20140408133818.GB16054@pengutronix.de>
- <1396967390.23349.15.camel@dinh-ubuntu>
-Message-ID: <20140408143327.GC16054@pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 8 Apr 2014 16:18:33 +0200
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <5343FDD3.3070308@i2se.com>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com>
+Message-ID: <20140408141832.GA8861@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 09:29:50AM -0500, Thor Thayer wrote:
-> On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
-> > Hi!
-> > 
-> > On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
-> > > From: Thor Thayer <tthayer@altera.com>
-> > > 
-> > > Addition of the Altera SDRAM controller bindings and device
-> > > tree changes to the Altera SoC project.
-> > > 
-> [snip]
-> > > +
-> > > +Required properties:
-> > > +- compatible : "altr,sdr-ctl", "syscon";
-> > > +                Note that syscon is invoked for this device to support the FPGA
-> > > +		bridge driver, EDAC driver and other devices that share the
-> > > +		registers.
-> > > +- reg : Should contain 1 register ranges(address and length)
-> > 
-> > I haven't really thought this through, but why would the FPGA bridge driver
-> > access the sdram controller? For releasing the resets in fpgaportrst ? Or is
-> > there more?
+On 08/04/2014 at 15:46:59 +0200, Stefan Wahren wrote :
+> Hi Shawn,
 > 
-> Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
-> path. Our SDRAM controller allows FPGA master access to the SDRAM.
->
-
-Yes. But what you have to do to enable the path is let the FPGA port you use
-out of reset. And that is it as far as I can see. The rest happens in the
-bitstream. Or is there more to enable the path?
-The FPGA2SDRAM bridge is the one I didn't use as of yet, so if I miss something
-please elaborate.
-
-> > Wouldn't it be more appropriate to represent those bits as a reset-controller to
-> > some hypothetical IP core driver?
-> > Then you could have something like
-> > 
-> > 	hps2fpga at c0000000 {
-> > 		ipcore at 0 {
-> > 			resets = <&sdr 1>;
-> > 			reset-names = "foo";
-> > 			resets = <&rst 96>;
-> > 			reset-names = "bar";
-> > 			(...)
-> > 		};
-> > 
-> > 		ipcore at 1000 {
-> > 			resets = <&rst 96>;
-> > 			reset-names = "baz";
-> > 			(...)
-> > 		};
-> > 	};
-> > 
-> > And you would always have the correct bridges released out of reset for your
-> > IP core. Does the FPGA bridge driver do more? I think that is basically it.
-> > Where we maybe could run into problems though is the early_init stuff.
-> > 
-> > I think syscon is nice for some things, but we should try not to overuse it.
+> Am 08.04.2014 13:29, schrieb Shawn Guo:
+> > The .config() calls clk_get_rate() which might sleep, so we need to set
+> > pwm_chip can_sleep flag.  Otherwise, we see the following warning when
+> > using pwm driven heartbeat led.
+> >
+> > WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
+> > DEBUG_LOCKS_WARN_ON(in_interrupt())
+> > Modules linked in:
+> > CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
+> > [<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
+> > [<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
+> > [<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
+> > [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
+> > [<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
+> > [<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
+> > [<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
+> > [<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
+> > [<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
+> > [<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
+> > [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
+> > [<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
+> > [<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
+> > [<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
+> > [<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
+> > [<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
+> > [<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
+> > [<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
+> > [<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
+> >
+> > Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  drivers/pwm/pwm-mxs.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
+> > index 9475bc7..4f1bb4e 100644
+> > --- a/drivers/pwm/pwm-mxs.c
+> > +++ b/drivers/pwm/pwm-mxs.c
+> > @@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
+> >  	mxs->chip.dev = &pdev->dev;
+> >  	mxs->chip.ops = &mxs_pwm_ops;
+> >  	mxs->chip.base = -1;
+> > +	mxs->chip.can_sleep = true;
+> >  	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
+> >  	if (ret < 0) {
+> >  		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
 > 
-> Understood. In this case, syscon seems to be appropriate.
+> thanks for the patch. I've tested it with our i.MX28 board and the
+> warning above never came. So it works.
+> Unfortunately the led still don't behave as expected. If i set the led
+> trigger to heartbeat the led goes on and stays in this state.
+> 
+> May be this has something to do with the following discussion
+> 
+> http://comments.gmane.org/gmane.linux.leds/208
+> 
 
-I'm not convinced yet.
+This may be but the solution is not correct we want to keep disabling
+the pwm when brightness is 0. Can you try the latest series from
+Russell:
 
-Steffen
+http://thread.gmane.org/gmane.linux.leds/579 and set active_low but keep
+the pwm polarity normal.
+
+Regards,
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
