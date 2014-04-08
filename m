@@ -1,101 +1,45 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 Apr 2014 11:20:43 +0100
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <20140405000007.GD15806@google.com>
- <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
- <1396862058.3671.40.camel@pasglop>
- <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
- <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
-Message-ID: <20140408102043.GV17163@e106497-lin.cambridge.arm.com>
+From: jdelvare@suse.de (Jean Delvare)
+Date: Tue, 8 Apr 2014 12:00:56 +0200
+Subject: [PATCH] video: exynos: Add a dependency to the menu
+Message-ID: <20140408120056.57556a00@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 11:44:51PM +0100, Bjorn Helgaas wrote:
-> On Mon, Apr 7, 2014 at 4:07 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Mon, Apr 07, 2014 at 10:14:18AM +0100, Benjamin Herrenschmidt wrote:
-> >> On Mon, 2014-04-07 at 09:46 +0100, Liviu Dudau wrote:
-> >> >
-> >> > *My* strategy is to get rid of pci_domain_nr(). I don't see why we need
-> >> > to have arch specific way of providing the number, specially after looking
-> >> > at the existing implementations that return a value from a variable that
-> >> > is never touched or incremented. My guess is that pci_domain_nr() was
-> >> > created to work around the fact that there was no domain_nr maintainance in
-> >> > the generic code.
-> >>
-> >> Well, there was no generic host bridge structure. There is one now, it should
-> >> go there.
-> >
-> > Exactly! Hence my patch. After it gets accepted I will go through architectures
-> > and remove their version of pci_domain_nr().
-> 
-> Currently the arch has to supply pci_domain_nr() because that's the
-> only way for the generic code to learn the domain.  After you add
-> pci_create_root_bus_in_domain(), the arch can supply the domain that
-> way, and we won't need the arch-specific pci_domain_nr().  Right?
-> That makes more sense to me; thanks for the explanation.
+All drivers under menu EXYNOS_VIDEO depend on either ARCH_S5PV210 or
+ARCH_EXYNOS, so add these as dependencies to the menu itself. This
+avoids presenting an empty and useless menu on other architectures.
 
-Right.
+Then drivers under the menu only need a dependency if they depend on
+one of the supported architectures specifically.
 
-> 
-> Let me try to explain my concern about the
-> pci_create_root_bus_in_domain() interface.  We currently have these
-> interfaces:
-> 
->   pci_scan_root_bus()
->   pci_scan_bus()
->   pci_scan_bus_parented()
->   pci_create_root_bus()
-> 
-> pci_scan_root_bus() is a higher-level interface than
-> pci_create_root_bus(), so I'm trying to migrate toward it because it
-> lets us remove a little code from the arch, e.g., pci_scan_child_bus()
-> and pci_bus_add_devices().
-> 
-> I think we can only remove the arch-specific pci_domain_nr() if that
-> arch uses pci_create_root_bus_in_domain().  When we convert an arch
-> from using scan_bus interfaces to using
-> pci_create_root_bus_in_domain(), we will have to move the rest of the
-> scan_bus code (pci_scan_child_bus(), pci_bus_add_devices()) back into
-> the arch code.
-> 
-> One alternative is to add an _in_domain() variant of each of these
-> interfaces, but that doesn't seem very convenient either.  My idea of
-> passing in a structure would also require adding variants, so there's
-> not really an advantage there, but I am thinking of the next
-> unification effort, e.g., for NUMA node info.  I don't really want to
-> have to change all the _in_domain() interfaces to also take yet
-> another parameter for the node number.
+Signed-off-by: Jean Delvare <jdelvare@suse.de>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/video/exynos/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-OK, what about this: all the functions that you have mentioned take a
-void *sysdata parameter. Should we convert this opaque pointer into a
-specific structure that holds the domain_nr and (in future) the NUMA
-node info?
+--- linux-3.15-rc0.orig/drivers/video/exynos/Kconfig	2014-04-07 10:23:07.316226676 +0200
++++ linux-3.15-rc0/drivers/video/exynos/Kconfig	2014-04-08 11:50:17.406723187 +0200
+@@ -4,6 +4,7 @@
+ 
+ menuconfig EXYNOS_VIDEO
+ 	bool "Exynos Video driver support"
++	depends on ARCH_S5PV210 || ARCH_EXYNOS
+ 	help
+ 	  This enables support for EXYNOS Video device.
+ 
+@@ -15,7 +16,6 @@ if EXYNOS_VIDEO
+ 
+ config EXYNOS_MIPI_DSI
+ 	bool "EXYNOS MIPI DSI driver support."
+-	depends on ARCH_S5PV210 || ARCH_EXYNOS
+ 	select GENERIC_PHY
+ 	help
+ 	  This enables support for MIPI-DSI device.
 
-Converting all the architectures is going to be a long winded job as
-everyone loved to add their own stuff in the structure pointed by sysdata,
-breaking that will lead to frustrations, but maybe the framework should
-take back ownership of it.
-
-Best regards,
-Liviu
-
-> 
-> Bjorn
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Jean Delvare
+SUSE L3 Support
