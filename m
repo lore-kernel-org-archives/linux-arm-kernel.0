@@ -1,101 +1,93 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 8 Apr 2014 09:59:07 -0700
-Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
-In-Reply-To: <1396973561.14809.26.camel@linaro1.home>
-References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
- <1396577719-14786-3-git-send-email-keescook@chromium.org>
- <20140404195818.GA21028@debian>
- <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
- <1396960898.3567.55.camel@linaro1.home>
- <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
- <1396973561.14809.26.camel@linaro1.home>
-Message-ID: <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 8 Apr 2014 11:14:17 -0600
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <20140408175545.1b4d55a5@skate>
+References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140405193435.50d8dd81@skate>
+ <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
+ <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+ <20140408171309.09bbf968@skate> <20140408174034.79df403e@skate>
+ <20140408175545.1b4d55a5@skate>
+Message-ID: <20140408171417.GB27776@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 8, 2014 at 9:12 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Tue, 2014-04-08 at 09:01 -0700, Kees Cook wrote:
->> On Tue, Apr 8, 2014 at 5:41 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->> > On Fri, 2014-04-04 at 17:07 -0700, Kees Cook wrote:
->> >> On Fri, Apr 4, 2014 at 12:58 PM, Rabin Vincent <rabin@rab.in> wrote:
->> > [...]
->> >> > You need a TLB flush.  I had a flush_tlb_all() in my example patch,
->> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244335.html,
->> >> > but the following is probably nicer (on top of this patch):
->> >> >
->> >> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> >> > index 9bea524..a92c45a 100644
->> >> > --- a/arch/arm/mm/init.c
->> >> > +++ b/arch/arm/mm/init.c
->> >> > @@ -741,6 +741,8 @@ static inline bool arch_has_strict_perms(void)
->> >> >                      addr += SECTION_SIZE)                              \
->> >> >                         section_update(addr, perms[i].mask,             \
->> >> >                                        perms[i].field);                 \
->> >> > +                                                                       \
->> >> > +               flush_tlb_kernel_range(perms[i].start, perms[i].end);   \
->> >> >         }                                                               \
->> >> >  }
->> >> >
->> >>
->> >> When I do this, I hang the system, and get a WARN due to the tlb call
->> >> attempting to flush on all CPUs, I think:
->> >>
->> >> [   34.246034] WARNING: at
->> >> /mnt/host/source/src/third_party/kernel-next/kernel/smp.c:466
->> >> smp_call_function_many+0xac/0x26c()
->> >> ...
->> >> [   34.246617] Backtrace:
->> >> [   34.246697] [<c010d3b8>] (unwind_backtrace+0x0/0x118) from
->> >> [<c060b9d8>] (dump_stack+0x28/0x30)
->> >> [   34.246765] [<c060b9d8>] (dump_stack+0x28/0x30) from [<c0123044>]
->> >> (warn_slowpath_null+0x44/0x5c)
->> >> [   34.246824] [<c0123044>] (warn_slowpath_null+0x44/0x5c) from
->> >> [<c017426c>] (smp_call_function_many+0xac/0x26c)
->> >> [   34.246881] [<c017426c>] (smp_call_function_many+0xac/0x26c) from
->> >> [<c0174468>] (smp_call_function+0x3c/0x48)
->> >> [   34.246937] [<c0174468>] (smp_call_function+0x3c/0x48) from
->> >> [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c)
->> >> [   34.246994] [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c) from
->> >> [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0)
->> >> [   34.247046] [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0) from
->> >> [<c011403c>] (set_kernel_text_rw+0xd8/0xec)
->> >> [   34.247099] [<c011403c>] (set_kernel_text_rw+0xd8/0xec) from
->> >> [<c010c878>] (__ftrace_modify_code+0x14/0x28)
->> >> [   34.247156] [<c010c878>] (__ftrace_modify_code+0x14/0x28) from
->> >> [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114)
->> >> [   34.247212] [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114) from
->> >> [<c01841cc>] (cpu_stopper_thread+0xd8/0x164)
->> >> [   34.247266] [<c01841cc>] (cpu_stopper_thread+0xd8/0x164) from
->> >> [<c0145c14>] (kthread+0xc8/0xd8)
->> >> [   34.247323] [<c0145c14>] (kthread+0xc8/0xd8) from [<c0106118>]
->> >> (ret_from_fork+0x14/0x20)
->> >>
->> >> Using local_flush_tlb_kernel_range() fixed it though.
->> >
->> > What about if another CPU had a TLB entry with the old permissions in?
->> > Or do you consider that the likelihood and consequences of that aren't
->> > significant?
->>
->> The purpose of the function is to temporarily make text writable, do
->> the write, and then restore read-only. Since only the writer needs to
->> care about TLB state, this works fine. It's actually nice that only
->> the current CPU can make text writes.
->
-> And is the page table being modified unique to the current CPU? I
-> thought a common set of page tables was shared across all of them. If
-> that is the case then one CPU can modify the PTE to be writeable,
-> another CPU take a TLB miss and pull in that writeable entry, which will
-> stay there until it drops out the TLB at some indefinite point in the
-> future. That's the scenario I was getting at with my previous comment.
+On Tue, Apr 08, 2014 at 05:55:45PM +0200, Thomas Petazzoni wrote:
 
-As I understood it, this would be true for small PTEs, but sections
-are fully duplicated on each CPU so we don't run that risk. This was
-the whole source of my problem with this patch series: even a full
-all-CPU TLB flush wasn't working -- the section permissions were
-unique to the CPU since the entries were duplicated.
+> mvebu-mbus/devices output:
+> 
+> # cat /sys/kernel/debug/mvebu-mbus/devices 
+> [10] 00000000e0000000 - 00000000e0900000 : 0004:00e8
 
--Kees
+> I'm not sure why I don't have the non-power-of-two problem for the MBus
+> windows.
 
+Well, you do, 0x900000 is not aligned. It converts to size=0b10001111,
+which is undefined behavior for mbus. 
+
+It looks like you are lucky, for your system the undefined behavior
+creates a window that hits all the BARs, but the others were not so
+lucky.
+
+What do you think about this:
+
+>From 235b0bf637242a50ec45c8766d18a942bff601cf Mon Sep 17 00:00:00 2001
+From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Date: Tue, 8 Apr 2014 11:12:41 -0600
+Subject: [PATCH] bus: mvebu-mbus: Avoid setting an undefined window size
+
+The mbus hardware requires a power of two size, if a non-power
+of two is passed in to the low level routines they configure the
+register in a way that results in undefined behaviour.
+
+- WARN_ON to make this invalid usage really obvious
+- Round down to the nearest power of two so we only stuff a valid
+  size into the HW
+- When reading interpret undefined values in a conservative way,
+  the value is assumed to be the lowest power of two. This avoids
+  the debugfs output showing a value that looks 'correct'
+
+All together this makes the recent problems with silent failure
+of PCI very obvious, noisy and debuggable.
+
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ drivers/bus/mvebu-mbus.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 2ac754e..d26f63c 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -56,6 +56,7 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/debugfs.h>
++#include <linux/log2.h>
+ 
+ /*
+  * DDR target is the same on all platforms.
+@@ -147,7 +148,7 @@ static void mvebu_mbus_read_window(struct mvebu_mbus_state *mbus,
+ 	*enabled = 1;
+ 	*base = ((u64)basereg & WIN_BASE_HIGH) << 32;
+ 	*base |= (basereg & WIN_BASE_LOW);
+-	*size = (ctrlreg | ~WIN_CTRL_SIZE_MASK) + 1;
++	*size = 1 << (ffs(~(ctrlreg | ~WIN_CTRL_SIZE_MASK)) - 1);
+ 
+ 	if (target)
+ 		*target = (ctrlreg & WIN_CTRL_TGT_MASK) >> WIN_CTRL_TGT_SHIFT;
+@@ -266,6 +267,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
+ 		mbus->soc->win_cfg_offset(win);
+ 	u32 ctrl, remap_addr;
+ 
++	WARN_ON(!is_power_of_2(size));
++	size = rounddown_pow_of_two(size);
++
+ 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
+ 		(attr << WIN_CTRL_ATTR_SHIFT)    |
+ 		(target << WIN_CTRL_TGT_SHIFT)   |
 -- 
-Kees Cook
-Chrome OS Security
+1.8.1.2
