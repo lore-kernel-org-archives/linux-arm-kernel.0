@@ -1,75 +1,31 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 08 Apr 2014 03:46:31 +0200
-Subject: Porting plat-pxa to the MMP PDMA driver
-In-Reply-To: <5342A73F.8010907@zonque.org>
-References: <3296408.nMPs78xkYH@avalon> <5342A73F.8010907@zonque.org>
-Message-ID: <3148172.RPi1IXJYtD@avalon>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue,  8 Apr 2014 16:00:50 +0800
+Subject: [PATCH v2 10/12] ARM: config: select ARCH_HISI in hi3xxx_defconfig
+In-Reply-To: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1396944052-9887-11-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Since ARCH_HISI is added as common configuration of both ARCH_HI3xxx and
+ARCH_HIP04, update it into hi3xxx_defconfig.
 
-On Monday 07 April 2014 15:25:19 Daniel Mack wrote:
-> Hi Laurent,
-> 
-> (copying some more people)
-> 
-> On 04/07/2014 03:12 PM, Laurent Pinchart wrote:
-> > The MMP DMA (drivers/dma/mmap_pdma.c) driver supports the DMA engine found
-> > in PXA chips. However, PXA platforms still use a mix of custom platform
-> > code (arch/arm/plat-pxa/dma.c) and direct DMA controller access in
-> > various drivers (pata_pxa, spi-pxa2xx, pxa3xx_nand, pxaficp_ir, pxamci,
-> > smc91x, smc911x and pxa_camera).
-> > 
-> > I'd like to use the MMP PDMA driver through the DMA engine API in a new
-> > driver I'm writing instead of the legacy PXA DMA code. However, this
-> > requires porting the platform to the MMP PDMA driver first, which
-> > involves porting all the above drivers to the DMA engine API. The
-> > spi-pxa2xx driver has already been ported and currently supports both the
-> > legacy PXA DMA API and the DMA engine API. All the other drivers seem to
-> > require the legacy PXA DMA API.
-> > 
-> > I was wondering if any effort had been started in that direction. I could
-> > possibly help with the pxamci driver, but not with the other drivers as
-> > the corresponding peripherals are not used on my test platform (a custom
-> > PXA27x board).
-> 
-> Yes, I've started working on this a long time ago, but got stuck because
-> of the lack of support from users, as I don't have hardware with all
-> possible DMA-capable components in use. Have a look here, the tree
-> should be easily rebasable onto newer versions:
-> 
->   https://github.com/zonque/linux/tree/pxa-dma-v3
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/configs/hi3xxx_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thank you, that's helpful.
-
-> * I ported some drivers blindly, and Marek Vasut reported success on the
-> pxa-pata driver.
-> 
-> * The spi-driver just works thanks to previous preparations.
-> 
-> * The mmc driver seems to work, but people reported significant
-> performance loss in comparison to the current code.
-
-I'll try to test it.
-
-> * I ported over the ASoC drivers so the dma framework can be used as
-> drop-in replacement. One patch for mmp-pdma residue reporting is pending
-> though, I need to get back to Vinod on that.
-> 
-> * One thing that was especially tricky to port was the camera driver,
-> and Robert wasn't sure whether the type of DMA hot-linking which his
-> driver does was at all doable with the DMA framework as it stands.
-> 
-> 
-> Which PXA based hardware can you get your hands on for testing? It would
-> be good to get some movement into this topic again :)
-
-I only have access to a custom pxa27x board. I'm working on a driver for an 
-FPGA-based device that requires DMA in fly-by mode, so I'll need to implement 
-support for that in the mmp_pdma driver.
-
+diff --git a/arch/arm/configs/hi3xxx_defconfig b/arch/arm/configs/hi3xxx_defconfig
+index f186bdf..f8c78ac 100644
+--- a/arch/arm/configs/hi3xxx_defconfig
++++ b/arch/arm/configs/hi3xxx_defconfig
+@@ -3,6 +3,7 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_RD_LZMA=y
++CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_HI3xxx=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.3.2
