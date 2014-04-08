@@ -1,81 +1,68 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue,  8 Apr 2014 14:19:23 +0200
-Subject: [PATCH V3 01/17] ARM: exynos: cpuidle: Prevent forward declaration
-In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396959579-18268-2-git-send-email-daniel.lezcano@linaro.org>
+Date: Tue,  8 Apr 2014 14:19:22 +0200
+Subject: [PATCH V3 00/17] ARM: exynos: cpuidle: Move the driver to
+ drivers/cpuidle
+Message-ID: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the structure below the 'exynos4_enter_lowpower' function so no more
-need of forward declaration.
+Changelog:
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-exynos/cpuidle.c |   40 ++++++++++++++++++----------------------
- 1 file changed, 18 insertions(+), 22 deletions(-)
+V3:
+	* Added patch   : "ARM: exynos: cpuidle: Disable cpuidle for 5440"
+	* Removed patch : "ARM: exynos: config: Enable cpuidle"
+	* Removed default ARM_EXYNOS4210_CPUIDLE=y
+	* Added comment about bug fix side effect 'for_each_possible_cpu'
+V2: 
+	* Added comment in changelog for calls order (5/17)
+	* Call the powerdown only for cpu0 in the pm notifier
+	* Set the pm notifier for all boards
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index b530231..9623a05 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -59,30 +59,8 @@
- #define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
- #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
- 
--static int exynos4_enter_lowpower(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--				int index);
--
- static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
- 
--static struct cpuidle_driver exynos4_idle_driver = {
--	.name			= "exynos4_idle",
--	.owner			= THIS_MODULE,
--	.states = {
--		[0] = ARM_CPUIDLE_WFI_STATE,
--		[1] = {
--			.enter			= exynos4_enter_lowpower,
--			.exit_latency		= 300,
--			.target_residency	= 100000,
--			.flags			= CPUIDLE_FLAG_TIME_VALID,
--			.name			= "C1",
--			.desc			= "ARM power down",
--		},
--	},
--	.state_count = 2,
--	.safe_state_index = 0,
--};
--
- /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
- static void exynos4_set_wakeupmask(void)
- {
-@@ -213,6 +191,24 @@ static void __init exynos5_core_down_clk(void)
- 	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
- }
- 
-+static struct cpuidle_driver exynos4_idle_driver = {
-+	.name			= "exynos4_idle",
-+	.owner			= THIS_MODULE,
-+	.states = {
-+		[0] = ARM_CPUIDLE_WFI_STATE,
-+		[1] = {
-+			.enter			= exynos4_enter_lowpower,
-+			.exit_latency		= 300,
-+			.target_residency	= 100000,
-+			.flags			= CPUIDLE_FLAG_TIME_VALID,
-+			.name			= "C1",
-+			.desc			= "ARM power down",
-+		},
-+	},
-+	.state_count = 2,
-+	.safe_state_index = 0,
-+};
-+
- static int exynos_cpuidle_probe(struct platform_device *pdev)
- {
- 	int cpu_id, ret;
+V1: initial post
+
+This patchset relies on the cpm_pm notifier to initiate the powerdown sequence
+operations from pm.c instead cpuidle.c. Thus the cpuidle driver is no longer
+dependent from arch specific code as everything is called from the pm.c file.
+
+The patchset applies on top of linux-samsung/for-next.
+
+Tested on exynos4: 4210
+Tested on exynos5: 5250 (without AFTR)
+
+Daniel Lezcano (17):
+  ARM: exynos: cpuidle: Prevent forward declaration
+  ARM: exynos: cpuidle: use cpuidle_register
+  ARM: exynos: cpuidle: change function name prefix
+  ARM: exynos: cpuidle: encapsulate register access inside a function
+  ARM: exynos: cpuidle: Move some code inside the idle_finisher
+  ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
+  ARM: exynos: cpuidle: Use the cpu_pm notifier
+  ARM: exynos: cpuidle: Move scu_enable in the cpu_pm notifier
+  ARM: exynos: cpuidle: Remove ifdef for scu_enable
+  ARM: exynos: cpuidle: Move exynos_set_wakeupmask in the cpu_pm
+    notifier
+  ARM: exynos: cpuidle: Move the power sequence call in the cpu_pm
+    notifier
+  ARM: exynos: cpuidle: Move S5P_CHECK_AFTR in a header
+  ARM: exynos: cpuidle: Move clock setup to pm.c
+  ARM: exynos: cpuidle: Move the boot vector in pm.c
+  ARM: exynos: cpuidle: Disable cpuidle for 5440
+  ARM: exynos: cpuidle: Pass the AFTR callback to the platform_data
+  ARM: exynos: cpuidle: Move the driver to drivers/cpuidle directory
+
+ arch/arm/mach-exynos/Makefile    |    1 -
+ arch/arm/mach-exynos/common.h    |    1 +
+ arch/arm/mach-exynos/cpuidle.c   |  255 --------------------------------------
+ arch/arm/mach-exynos/exynos.c    |    8 +-
+ arch/arm/mach-exynos/pm.c        |  177 +++++++++++++++++++++-----
+ arch/arm/mach-exynos/pmu.c       |    6 +
+ arch/arm/mach-exynos/regs-pmu.h  |   20 +++
+ drivers/cpuidle/Kconfig.arm      |    6 +
+ drivers/cpuidle/Makefile         |    1 +
+ drivers/cpuidle/cpuidle-exynos.c |   97 +++++++++++++++
+ 10 files changed, 285 insertions(+), 287 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/cpuidle.c
+ create mode 100644 drivers/cpuidle/cpuidle-exynos.c
+
 -- 
 1.7.9.5
