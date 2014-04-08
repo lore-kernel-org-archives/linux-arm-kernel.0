@@ -1,47 +1,74 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 8 Apr 2014 20:23:39 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <20140404101808.GG27282@n2100.arm.linux.org.uk>
-References: <cover.1396605300.git.nsekhar@ti.com>
- <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk>
-Message-ID: <53440D73.6060504@ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 08 Apr 2014 13:41:38 +0100
+Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
+In-Reply-To: <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
+ <1396577719-14786-3-git-send-email-keescook@chromium.org>
+ <20140404195818.GA21028@debian>
+ <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+Message-ID: <1396960898.3567.55.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
-> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
->> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->> index f8b8dac..6b2a056 100644
->> --- a/arch/arm/mach-omap2/omap4-common.c
->> +++ b/arch/arm/mach-omap2/omap4-common.c
->> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
->>  
->>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
->>  }
->> +
->> +int __init am43xx_l2_cache_init(void)
->> +{
->> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
->> +		       L310_AUX_CTRL_INSTR_PREFETCH;
+On Fri, 2014-04-04 at 17:07 -0700, Kees Cook wrote:
+> On Fri, Apr 4, 2014 at 12:58 PM, Rabin Vincent <rabin@rab.in> wrote:
+[...]
+> > You need a TLB flush.  I had a flush_tlb_all() in my example patch,
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244335.html,
+> > but the following is probably nicer (on top of this patch):
+> >
+> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> > index 9bea524..a92c45a 100644
+> > --- a/arch/arm/mm/init.c
+> > +++ b/arch/arm/mm/init.c
+> > @@ -741,6 +741,8 @@ static inline bool arch_has_strict_perms(void)
+> >                      addr += SECTION_SIZE)                              \
+> >                         section_update(addr, perms[i].mask,             \
+> >                                        perms[i].field);                 \
+> > +                                                                       \
+> > +               flush_tlb_kernel_range(perms[i].start, perms[i].end);   \
+> >         }                                                               \
+> >  }
+> >
 > 
-> It would be good to documenting the difference between this and OMAP4,
-> and why you have chosen different values.
+> When I do this, I hang the system, and get a WARN due to the tlb call
+> attempting to flush on all CPUs, I think:
+> 
+> [   34.246034] WARNING: at
+> /mnt/host/source/src/third_party/kernel-next/kernel/smp.c:466
+> smp_call_function_many+0xac/0x26c()
+> ...
+> [   34.246617] Backtrace:
+> [   34.246697] [<c010d3b8>] (unwind_backtrace+0x0/0x118) from
+> [<c060b9d8>] (dump_stack+0x28/0x30)
+> [   34.246765] [<c060b9d8>] (dump_stack+0x28/0x30) from [<c0123044>]
+> (warn_slowpath_null+0x44/0x5c)
+> [   34.246824] [<c0123044>] (warn_slowpath_null+0x44/0x5c) from
+> [<c017426c>] (smp_call_function_many+0xac/0x26c)
+> [   34.246881] [<c017426c>] (smp_call_function_many+0xac/0x26c) from
+> [<c0174468>] (smp_call_function+0x3c/0x48)
+> [   34.246937] [<c0174468>] (smp_call_function+0x3c/0x48) from
+> [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c)
+> [   34.246994] [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c) from
+> [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0)
+> [   34.247046] [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0) from
+> [<c011403c>] (set_kernel_text_rw+0xd8/0xec)
+> [   34.247099] [<c011403c>] (set_kernel_text_rw+0xd8/0xec) from
+> [<c010c878>] (__ftrace_modify_code+0x14/0x28)
+> [   34.247156] [<c010c878>] (__ftrace_modify_code+0x14/0x28) from
+> [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114)
+> [   34.247212] [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114) from
+> [<c01841cc>] (cpu_stopper_thread+0xd8/0x164)
+> [   34.247266] [<c01841cc>] (cpu_stopper_thread+0xd8/0x164) from
+> [<c0145c14>] (kthread+0xc8/0xd8)
+> [   34.247323] [<c0145c14>] (kthread+0xc8/0xd8) from [<c0106118>]
+> (ret_from_fork+0x14/0x20)
+> 
+> Using local_flush_tlb_kernel_range() fixed it though.
 
-There are two main differences:
+What about if another CPU had a TLB entry with the old permissions in?
+Or do you consider that the likelihood and consequences of that aren't
+significant?
 
-1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
-not needed even in OMAP4 with latest kernel, but I am not sure if I can
-do this safely without breaking any usecase currently working with OMAP4.
-
-2) OMAP4 sets NS lockdown and NS interrupt access control bits. I
-searched through the commit history of L2 cache support on OMAP4 but
-there is no mention of why this was needed on OMAP4. I am checking
-internally on the history behind this.
-
-3) OMAP4 sets cache replacement policy to RR which is not a big deal
-since thats the default anyway. We can probably drop this setting even
-from OMAP4.
-
-Thanks,
-Sekhar
+-- 
+Tixy
