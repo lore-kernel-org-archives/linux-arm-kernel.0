@@ -1,35 +1,72 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Tue,  8 Apr 2014 17:21:49 +0200
-Subject: [PATCH 2/2] pinctrl: st: Use ARRAY_SIZE for STiH415 data
-In-Reply-To: <1396970509-28009-1-git-send-email-maxime.coquelin@st.com>
-References: <1396970509-28009-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1396970509-28009-3-git-send-email-maxime.coquelin@st.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 08 Apr 2014 17:45:15 +0200
+Subject: [PATCH 1/4] clk: propagate parent change up one level
+In-Reply-To: <1396623201-26000-2-git-send-email-t.stanislaws@samsung.com>
+References: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
+ <1396623201-26000-2-git-send-email-t.stanislaws@samsung.com>
+Message-ID: <5344198B.2030604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch completes the one that used ARRAY_SIZE for STiH407 and STiH416
-for setting ninput_delays and noutput_delays fields.
+Hi,
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- drivers/pinctrl/pinctrl-st.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 04.04.2014 16:53, Tomasz Stanislawski wrote:
+> This patch adds support for propagation of setup of clock's parent one level
+> up.
+>
+> This feature is helpful when a driver changes topology of its clocks using
+> clk_set_parent().  The problem occurs when on one platform/SoC driver's clock
+> is located at MUX output but on the other platform/SoC there is a gated proxy
+> clock between the MUX and driver's clock.  In such a case, driver's code has to
+> be modified to use one clock for enabling and the other clock for setup of a
+> parent.
+>
+> The code updates are avoided by propagating setup of a parent up one level.
+>
+> Additionally, this patch adds CLK_SET_PARENT_PARENT (sorry for naming) flag to
+> inform clk-core that clk_set_parent() should be propagated.
+>
+> Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+> ---
+>   drivers/clk/clk.c            |    6 ++++++
+>   include/linux/clk-provider.h |    1 +
+>   2 files changed, 7 insertions(+)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index dff0373..53bbfda 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1737,6 +1737,12 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+>
+>   	/* try finding the new parent index */
+>   	if (parent) {
+> +		if ((clk->flags & CLK_SET_PARENT_PARENT)
+> +		    && clk->num_parents == 1) {
+> +			ret = clk_set_parent(clk->parent, parent);
+> +			goto out;
+> +		}
+> +
+>   		p_index = clk_fetch_parent_index(clk, parent);
+>   		p_rate = parent->rate;
+>   		if (p_index < 0) {
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 5119174..daa0b03 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -30,6 +30,7 @@
+>   #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+>   #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+>   #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+> +#define CLK_SET_PARENT_PARENT	BIT(9) /* propagate parent change up one level */
+>
+>   struct clk_hw;
+>   struct dentry;
+>
 
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 868f10f..6e65cfd 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -348,9 +348,9 @@ static const unsigned int stih415_output_delays[] = {0, 1000, 2000, 3000};
- #define STIH415_PCTRL_COMMON_DATA				\
- 	.rt_style	= st_retime_style_packed,		\
- 	.input_delays	= stih415_input_delays,			\
--	.ninput_delays	= 4,					\
-+	.ninput_delays	= ARRAY_SIZE(stih415_input_delays),	\
- 	.output_delays = stih415_output_delays,			\
--	.noutput_delays = 4
-+	.noutput_delays = ARRAY_SIZE(stih415_output_delays)
- 
- static const struct st_pctl_data  stih415_sbc_data = {
- 	STIH415_PCTRL_COMMON_DATA,
--- 
-1.9.0
+This would be very useful, at least on Exynos platforms, with 
+mux-div-gate clock paths. PARENT_PARENT sounds a bit funny, though.
+
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
