@@ -1,242 +1,28 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue,  8 Apr 2014 10:53:11 -0500
-Subject: [PATCH v2] ARM: qcom: Add initial APQ8064 SoC and IFC6410 board
- device trees
-Message-ID: <1396972391-11759-1-git-send-email-galak@codeaurora.org>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 8 Apr 2014 17:53:45 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <20140408171309.09bbf968@skate>
+References: <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140405193435.50d8dd81@skate>
+ <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
+ <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+ <20140408171309.09bbf968@skate>
+Message-ID: <20140408155345.GC11052@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic APQ8064 SoC include device tree and support for basic booting on
-the IFC6410 board.
+On Tue, Apr 08, 2014 at 05:13:09PM +0200, Thomas Petazzoni wrote:
+> Unfortunately here your patch is not sufficient to solve the problem
+> apparently. I've fixed another problem where the return value of
+> armada_370_xp_alloc_msi() (which is signed) is casted into an unsigned
+> irq_hw_number_t in armada_370_xp_setup_msi_irq(), but I'm still seeing
+> many MSIs allocated, then some freed, and finally a kernel panic.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
-v2:
-* created a v2.0 apq8064.dtsi to handle differences in Si rev in future
-* changed /include/ to #include
-* added PMU node
-* dropped interrupts from cpus node, not currently part of binding
+I thought we already fixed that one months ago ?
 
-
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  12 +++
- arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi   |   1 +
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 154 +++++++++++++++++++++++++++++
- arch/arm/mach-qcom/board.c                 |   1 +
- 5 files changed, 169 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi
- create mode 100644 arch/arm/boot/dts/qcom-apq8064.dtsi
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0591ed0..1223fa89 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -232,6 +232,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
-+	qcom-apq8064-ifc6410.dtb \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-new file mode 100644
-index 0000000..83933dc
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -0,0 +1,12 @@
-+#include "qcom-apq8064-v2.0.dtsi"
-+
-+/ {
-+	model = "Qualcomm APQ8064/IFC6410";
-+	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
-+
-+	soc {
-+		serial at 16640000 {
-+			status = "ok";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi b/arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi
-new file mode 100644
-index 0000000..935c394
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi
-@@ -0,0 +1 @@
-+#include "qcom-apq8064.dtsi"
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-new file mode 100644
-index 0000000..e336c09
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -0,0 +1,154 @@
-+/dts-v1/;
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/clock/qcom,gcc-msm8960.h>
-+
-+/ {
-+	model = "Qualcomm APQ8064";
-+	compatible = "qcom,apq8064";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "qcom,krait";
-+		enable-method = "qcom,kpss-acc-v1";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc0>;
-+			qcom,saw = <&saw0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc1>;
-+			qcom,saw = <&saw1>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			reg = <2>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc2>;
-+			qcom,saw = <&saw2>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			reg = <3>;
-+			next-level-cache = <&L2>;
-+			qcom,acc = <&acc3>;
-+			qcom,saw = <&saw3>;
-+		};
-+
-+		L2: l2-cache {
-+			compatible = "cache";
-+			cache-level = <2>;
-+			interrupts = <0 2 0x4>;
-+		};
-+	};
-+
-+	cpu-pmu {
-+		compatible = "qcom,krait-pmu";
-+		interrupts = <1 10 0x304>;
-+	};
-+
-+	soc: soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		compatible = "simple-bus";
-+
-+
-+		intc: interrupt-controller at 2000000 {
-+			compatible = "qcom,msm-qgic2";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = < 0x02000000 0x1000 >,
-+			      < 0x02002000 0x1000 >;
-+		};
-+
-+		timer at 200a000 {
-+			compatible = "qcom,kpss-timer", "qcom,msm-timer";
-+			interrupts = <1 1 0x301>,
-+				     <1 2 0x301>,
-+				     <1 3 0x301>;
-+			reg = <0x0200a000 0x100>;
-+			clock-frequency = <27000000>,
-+					  <32768>;
-+			cpu-offset = <0x80000>;
-+		};
-+
-+		acc0: clock-controller at 2088000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		acc1: clock-controller at 2098000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		acc2: clock-controller at 20a8000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x020a8000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		acc3: clock-controller at 20b8000 {
-+			compatible = "qcom,kpss-acc-v1";
-+			reg = <0x020b8000 0x1000>, <0x02008000 0x1000>;
-+		};
-+
-+		saw0: regulator at 2089000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x02089000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		saw1: regulator at 2099000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		saw2: regulator at 20a9000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x020a9000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		saw3: regulator at 20b9000 {
-+			compatible = "qcom,saw2";
-+			reg = <0x020b9000 0x1000>, <0x02009000 0x1000>;
-+			regulator;
-+		};
-+
-+		serial at 16640000 {
-+			compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+			reg = <0x16640000 0x1000>,
-+			      <0x16600000 0x1000>;
-+			interrupts = <0 158 0x0>;
-+			clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
-+
-+		qcom,ssbi at 500000 {
-+			compatible = "qcom,ssbi";
-+			reg = <0x00500000 0x1000>;
-+			qcom,controller-type = "pmic-arbiter";
-+		};
-+
-+		gcc: clock-controller at 900000 {
-+			compatible = "qcom,gcc-apq8064";
-+			reg = <0x00900000 0x4000>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
-index cb3c07c..333dced5 100644
---- a/arch/arm/mach-qcom/board.c
-+++ b/arch/arm/mach-qcom/board.c
-@@ -15,6 +15,7 @@
- #include <asm/mach/arch.h>
- 
- static const char * const qcom_dt_match[] __initconst = {
-+	"qcom,apq8064",
- 	"qcom,apq8074-dragonboard",
- 	"qcom,ipq8062",
- 	"qcom,ipq8064",
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Willy
