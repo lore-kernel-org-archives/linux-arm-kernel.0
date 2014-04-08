@@ -1,45 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 8 Apr 2014 15:30:08 -0400 (EDT)
-Subject: [PATCH V3 15/17] ARM: exynos: cpuidle: Disable cpuidle for
- 5440
-In-Reply-To: <5343F7E9.3010304@linaro.org>
-References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
- <1396959579-18268-16-git-send-email-daniel.lezcano@linaro.org>
- <CAP245DUmBVeZqBYDc3mopvs_h5AkcTgjG2eO7z5VAQnUDJJogQ@mail.gmail.com>
- <5343F7E9.3010304@linaro.org>
-Message-ID: <alpine.LFD.2.11.1404081527290.1571@knanqh.ubzr>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 8 Apr 2014 21:48:15 +0200
+Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
+In-Reply-To: <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
+References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
+ <1396577719-14786-3-git-send-email-keescook@chromium.org>
+ <20140404195818.GA21028@debian>
+ <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+ <1396960898.3567.55.camel@linaro1.home>
+ <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
+ <1396973561.14809.26.camel@linaro1.home>
+ <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
+Message-ID: <20140408194815.GA6188@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Apr 2014, Daniel Lezcano wrote:
-
-> On 04/08/2014 02:51 PM, Amit Kucheria wrote:
-> > On Tue, Apr 8, 2014 at 5:49 PM, Daniel Lezcano
-> > <daniel.lezcano at linaro.org <mailto:daniel.lezcano@linaro.org>> wrote:
-> >
-> >     There is no point to register the cpuidle driver for the 5440 as it
-> >     has only
-> >     one WFI state which is the default idle function when the cpuidle
-> >     driver is
-> >     disabled.
-> >
-> >     By disabling cpuidle we prevent to enter to the governor computation for
-> >     nothing, thus saving a lot of processing time.
-> >
-> >     The only drawback is the statistic via sysfs on this state which is
-> >     lost but
-> >     it is meaningless and it could be retrieved from the ftrace easily.
-> >
-> >
-> > So for the future, you'll only merge platform drivers that enable
-> > something more than WFI?
+On Tue, Apr 08, 2014 at 09:59:07AM -0700, Kees Cook wrote:
+> On Tue, Apr 8, 2014 at 9:12 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> > And is the page table being modified unique to the current CPU? I
+> > thought a common set of page tables was shared across all of them. If
+> > that is the case then one CPU can modify the PTE to be writeable,
+> > another CPU take a TLB miss and pull in that writeable entry, which will
+> > stay there until it drops out the TLB at some indefinite point in the
+> > future. That's the scenario I was getting at with my previous comment.
 > 
-> Well, I already picked up a driver with only WFI because I knew the next idle
-> states were in preparation. But adding a cpuidle driver just for WFI is no
-> sense and if, for a reason I missed, it is really needed, I guess a generic
-> WFI cpuidle driver for all platforms would be make much more sense.
+> As I understood it, this would be true for small PTEs, but sections
+> are fully duplicated on each CPU so we don't run that risk. This was
+> the whole source of my problem with this patch series: even a full
+> all-CPU TLB flush wasn't working -- the section permissions were
+> unique to the CPU since the entries were duplicated.
 
-Better relegate WFI-only configurations to arch_cpu_idle().
+The PGD is per-mm_struct.  mm_structs can be shared between processes.
+So the PGD is not per CPU.
 
+This set_kernel_text_rw() is called from ftrace in stop_machine() on one
+CPU.  All other CPUs will be spinning in kernel threads inside the loop
+in multi_cpu_stop(), with interrupts disabled.  Since kernel threads use
+the last process' mm, it is possible for the other CPU(s) to be
+currently using the same mm as the modifying CPU.
 
-Nicolas
+For any other CPU to pull in the writable entry it would have to get a
+TLB miss inside the loop in multi_cpu_stop(), after the state transition
+to MULTI_STOP_RUN and before the state transition to MULTI_STOP_EXIT.
+This is unlikely, but theoretically possible, for example if
+multi_cpu_stop() straddles sections.
+
+To prevent any stale entries being used indefinitely, perhaps the all
+CPU TLB flush can be inserted into
+ftrace_arch_code_modify_post_process(), which is called after the
+stop_machine() and which is where x86 for example makes the entries
+read-only again.
