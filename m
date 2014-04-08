@@ -1,116 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Apr 2014 17:19:11 +0100
-Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
-In-Reply-To: <CAA3XUr1Bj4CD2fhZkWAHx+9W8eGz755OvnE+-3sxaAcQNV6Q-Q@mail.gmail.com>
-References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
- <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
- <20140408082444.GA3598@e103592.cambridge.arm.com>
- <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
- <20140408133039.GH16119@n2100.arm.linux.org.uk>
- <CAA3XUr2kxKXpPwy8vqF1+CjcRsu86tGir-NuC7AXYiJVi4TuGw@mail.gmail.com>
- <CAA3XUr1Bj4CD2fhZkWAHx+9W8eGz755OvnE+-3sxaAcQNV6Q-Q@mail.gmail.com>
-Message-ID: <20140408161910.GJ16119@n2100.arm.linux.org.uk>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Tue, 8 Apr 2014 17:19:29 +0100
+Subject: [PATCH v6 2/5] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <20140408151056.GH30077@pd.tnic>
+References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
+ <1396641450-12854-3-git-send-email-sboyd@codeaurora.org>
+ <20140407201838.GC20822@pd.tnic>
+ <20140407215649.GH9985@codeaurora.org>
+ <20140408064328.GB30077@pd.tnic> <534406BD.8000702@codeaurora.org>
+ <20140408151056.GH30077@pd.tnic>
+Message-ID: <20140408171929.68f328a9@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 08:35:01AM -0700, Victor Kamensky wrote:
-> Looking at flush_ptrace_access more closely. Now I am not sure that
-> ptrace write code could easily reused.
+On Tue, 8 Apr 2014 17:10:56 +0200
+Borislav Petkov <bp@alien8.de> wrote:
+
+> On Tue, Apr 08, 2014 at 10:25:01AM -0400, Christopher Covington wrote:
+> > As I understand it, the license authors. They find it important to maintain
+> > clarity even when files get copied into other projects.
+> > 
+> > http://www.gnu.org/licenses/gpl-howto.html
+> > 
+> > http://www.gnu.org/licenses/gpl-faq.html#NoticeInSourceFile
 > 
-> 1) flush_ptrace_access seems to handle both data and text segments
-> write. In case of xol write we always know that it is code write
-
-Of course it has to, but writing code is the harder of the two
-problems.  With writes to data segments, the only thing that has to
-be dealt with is the data cache.  With code, not only do you need to
-deal with the data cache, but you also need to deal with the instruction
-cache too.
-
-> 2) as I pointed before flush_ptrace_access handles smp case whereas
-> xol write does not need to do that
-
-Are you sure about that?
-
-If I'm reading the code correctly, uprobes inserts a trapping instruction
-into the userspace program.  When that instruction is hit, it checks
-whether the thread is the desired one, and may request a slot in this
-magic page, which is when the write happens.
-
-The uprobes special page is shared across all threads which share the
-mm_struct, so in the case of a multi-threaded program running on a SMP
-machine, this page is visible to multiple CPUs.
-
-Is it possible for uprobes to be active on more than one thread at a
-time?  If so, because that page is shared, you could end up writing
-to a partial cache line from two threads.  From what I can see, ixol[]
-is two words, and there's normally 8 works per cache line on ARM, or
-occasionally 16.
-
-So, the question now is: is it possible to have uprobes active on more
-than one thread, and for two threads to hit the uprobes processing, both
-needing a slot in the page, hitting the same cache line?
-
-Now, what happens if thread 1 on CPU1 gets there first with its write.
-Then thread 2 on CPU2 gets there, causing the cache line to migrate to
-CPU2.  Then CPU1 does it's (non-broadcasted) flush, meanwhile CPU2 then
-gets preempted and goes off and does something else.
-
-Please tell me that can't happen. :)
-
-> 3) flush_ptrace_access needs vma, which uprobe code does not have on
-> layer where xol is installed. That is probably most critical issue that
-> could stop suggested code sharing. And note that vma in
-> flush_ptrace_access is needed only for cases cases 1) and 2) above,
-> about which xol write does not really care. If we take only required
-> pieces from flush_ptrace_access would not xol cache flush look like
-> this:
+> Right, so what is wrong with stating the same thing in two lines:
 > 
-> void arch_uprobe_xol_sync_dcache_icache(struct page *page,
->                     unsigned long addr, unsigned long size)
-> {
->     if (icache_is_vipt_aliasing())
->         flush_icache_alias(page_to_pfn(page), addr, size);
->     else
->         __cpuc_coherent_user_range(addr, size);
-> }
+> "Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+> 
+> This file is licensed under GNU GPLv2. See COPYING for full license text.
 
-And this is only half the story.
+The COPYING file may not be present. There may be cases where the absence
+of the warranty statement in the header is problematic etc etc.
 
-What you're saying above is:
+Corporate legals have their own policies on this and there is no point
+fighting them because
 
-- if the *instruction* cache is an aliasing VIPT cache, then we can
-  map the user page at the same colour and flush the data and instruction
-  caches according to that colour.
-	Problem: if you have a VIPT aliasing data cache, and you wrote
-		to the page via a mapping which had a different colour
-		(which is highly likely given you're using kmap_atomic())
-		then you are not flushing the new instructions out of
-		the data cache.
-- if the *instruction* cache is not an aliasing VIPT cache, then we
-  flush using the userspace mapping directly.
-	Problem: what if the data cache is aliasing... same problem
-		as the above case.
+- they are the ones qualified to make the decision
 
-This is why we have the check for cache_is_vipt_aliasing() in there -
-that's not _just_ to deal with ptrace data modification, it's there for
-text modification as well.
+- the corporate legal angle is often "do this or don't release it"
 
-> Note on the side: flush_ptrace_access works with user-land memory
-> but it still uses __cpuc_coherent_kern_range. I think it should use
-> __cpuc_coherent_user_range.
+- we have huge numbers of files using that same no warranty in every
+  file, and major companies who specify it must be present in their code
+  releases
 
-No, because __cpuc_coherent_kern_range() there is used on the *kernel*
-mapping of the page, not on the *user* mapping (which may fault).  The
-kernel mapping will never fault.
 
-> It looks like implementation wise it is
-> the same but user variant seems more appropriate in given situation.
-> Or am I missing something here?
+Including the without warranty is standard practice at a lot of
+companies. It's not even wasting space - it'll compress beautifully as
+there are already lots of similar headers all over the tree.
 
-They do seem to be the same for both cases, so we could probably remove
-the distinction.  It's unlikely we'll ever see an implementation needing
-a difference between the two now.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Alan
