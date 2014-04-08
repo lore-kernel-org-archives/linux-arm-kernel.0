@@ -1,62 +1,77 @@
-From: svarbanov@mm-sol.com (Stanimir Vabanov)
-Date: Wed, 09 Apr 2014 00:36:28 +0300
-Subject: [PATCH v2] ARM: qcom: Add initial IPQ8064 SoC and AP148 device
- trees
-In-Reply-To: <1396972276-11549-1-git-send-email-galak@codeaurora.org>
-References: <1396972276-11549-1-git-send-email-galak@codeaurora.org>
-Message-ID: <53446BDC.2050609@mm-sol.com>
+From: elder@linaro.org (Alex Elder)
+Date: Tue,  8 Apr 2014 16:43:41 -0500
+Subject: [PATCH v4 3/7] clk: bcm281xx: change some symbol names
+In-Reply-To: <1396993425-30683-1-git-send-email-elder@linaro.org>
+References: <1396993425-30683-1-git-send-email-elder@linaro.org>
+Message-ID: <1396993425-30683-4-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kumar,
+As I developed the bcm281xx clock code I understood there were
+restrictions on device tree "compatible" strings names, and as a
+result "bcm11351" was used in places despite the part family being
+more properly called "bcm281xx".  This can be a little confusing.
 
-<snip>
+In some cases I went to far and things using "bcm11351" when that
+was not necessary.
 
-> diff --git a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-> new file mode 100644
-> index 0000000..5e6f456
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-> @@ -0,0 +1,12 @@
-> +#include "qcom-ipq8064-v1.0.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm IPQ8064/DB149";
-> +	compatible = "qcom,ipq8064-db149", "qcom,ipq8064";
+This patch remedies this.  It renames the symbol used to define the
+"compatible" string (but not its value) so it uses "BCM281XX".
+Similarly, the name names provided to the CLK_OF_DECLARE() macro
+are changed, hoping to minimize the number of places that the
+confusing "11351" string is used.
 
-The patch subject saying AP148, and here AP149. Which is the wrong one?
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ drivers/clk/bcm/clk-bcm281xx.c |   27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
 
-> +
-> +	soc {
-> +		serial at 16340000 {
-> +			status = "ok";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/qcom-ipq8064-v1.0.dtsi b/arch/arm/boot/dts/qcom-ipq8064-v1.0.dtsi
-> new file mode 100644
-> index 0000000..7093b07
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq8064-v1.0.dtsi
-> @@ -0,0 +1 @@
-> +#include "qcom-ipq8064.dtsi"
-> diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-> new file mode 100644
-> index 0000000..8ca3b51
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-
-<snip>
-
-> +
-> +		intc: interrupt-controller at 2000000 {
-> +			compatible = "qcom,msm-qgic2";
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			reg = < 0x02000000 0x1000 >,
-> +			      < 0x02002000 0x1000 >;
-
-extra spaces around these numbers
-
-regards,
-Stan
+diff --git a/drivers/clk/bcm/clk-bcm281xx.c b/drivers/clk/bcm/clk-bcm281xx.c
+index 3c66de6..bb947af 100644
+--- a/drivers/clk/bcm/clk-bcm281xx.c
++++ b/drivers/clk/bcm/clk-bcm281xx.c
+@@ -15,12 +15,17 @@
+ #include "clk-kona.h"
+ #include "dt-bindings/clock/bcm281xx.h"
+ 
+-/* bcm11351 CCU device tree "compatible" strings */
+-#define BCM11351_DT_ROOT_CCU_COMPAT	"brcm,bcm11351-root-ccu"
+-#define BCM11351_DT_AON_CCU_COMPAT	"brcm,bcm11351-aon-ccu"
+-#define BCM11351_DT_HUB_CCU_COMPAT	"brcm,bcm11351-hub-ccu"
+-#define BCM11351_DT_MASTER_CCU_COMPAT	"brcm,bcm11351-master-ccu"
+-#define BCM11351_DT_SLAVE_CCU_COMPAT	"brcm,bcm11351-slave-ccu"
++/*
++ * These are the bcm281xx CCU device tree "compatible" strings.
++ * We're stuck with using "bcm11351" in the string because wild
++ * cards aren't allowed, and that name was the first one defined
++ * in this family of devices.
++ */
++#define BCM281XX_DT_ROOT_CCU_COMPAT	"brcm,bcm11351-root-ccu"
++#define BCM281XX_DT_AON_CCU_COMPAT	"brcm,bcm11351-aon-ccu"
++#define BCM281XX_DT_HUB_CCU_COMPAT	"brcm,bcm11351-hub-ccu"
++#define BCM281XX_DT_MASTER_CCU_COMPAT	"brcm,bcm11351-master-ccu"
++#define BCM281XX_DT_SLAVE_CCU_COMPAT	"brcm,bcm11351-slave-ccu"
+ 
+ /* Root CCU clocks */
+ 
+@@ -404,13 +409,13 @@ static void __init kona_dt_slave_ccu_setup(struct device_node *node)
+ 	kona_dt_ccu_setup(node, bcm281xx_slave_ccu_clks_setup);
+ }
+ 
+-CLK_OF_DECLARE(bcm11351_root_ccu, BCM11351_DT_ROOT_CCU_COMPAT,
++CLK_OF_DECLARE(bcm281xx_root_ccu, BCM281XX_DT_ROOT_CCU_COMPAT,
+ 			kona_dt_root_ccu_setup);
+-CLK_OF_DECLARE(bcm11351_aon_ccu, BCM11351_DT_AON_CCU_COMPAT,
++CLK_OF_DECLARE(bcm281xx_aon_ccu, BCM281XX_DT_AON_CCU_COMPAT,
+ 			kona_dt_aon_ccu_setup);
+-CLK_OF_DECLARE(bcm11351_hub_ccu, BCM11351_DT_HUB_CCU_COMPAT,
++CLK_OF_DECLARE(bcm281xx_hub_ccu, BCM281XX_DT_HUB_CCU_COMPAT,
+ 			kona_dt_hub_ccu_setup);
+-CLK_OF_DECLARE(bcm11351_master_ccu, BCM11351_DT_MASTER_CCU_COMPAT,
++CLK_OF_DECLARE(bcm281xx_master_ccu, BCM281XX_DT_MASTER_CCU_COMPAT,
+ 			kona_dt_master_ccu_setup);
+-CLK_OF_DECLARE(bcm11351_slave_ccu, BCM11351_DT_SLAVE_CCU_COMPAT,
++CLK_OF_DECLARE(bcm281xx_slave_ccu, BCM281XX_DT_SLAVE_CCU_COMPAT,
+ 			kona_dt_slave_ccu_setup);
+-- 
+1.7.9.5
