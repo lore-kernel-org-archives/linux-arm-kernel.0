@@ -1,28 +1,87 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 8 Apr 2014 17:53:45 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408171309.09bbf968@skate>
-References: <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
- <20140326214259.GA12330@obsidianresearch.com>
- <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140405193435.50d8dd81@skate>
- <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
- <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
- <20140408171309.09bbf968@skate>
-Message-ID: <20140408155345.GC11052@1wt.eu>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue,  8 Apr 2014 19:54:43 +0400
+Subject: [PATCH] ARM: dts: i.MX: Use single naming style for i.MX WEIM devices
+Message-ID: <1396972483-2342-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 05:13:09PM +0200, Thomas Petazzoni wrote:
-> Unfortunately here your patch is not sufficient to solve the problem
-> apparently. I've fixed another problem where the return value of
-> armada_370_xp_alloc_msi() (which is signed) is casted into an unsigned
-> irq_hw_number_t in armada_370_xp_setup_msi_irq(), but I'm still seeing
-> many MSIs allocated, then some freed, and finally a kernel panic.
+This patch converts all i.MX WEIM users to use single naming style
+for devices.
 
-I thought we already fixed that one months ago ?
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ Documentation/devicetree/bindings/bus/imx-weim.txt | 4 ++--
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     | 2 +-
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    | 4 ++--
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           | 4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
 
-Willy
+diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+index 6630d84..73aa2f3 100644
+--- a/Documentation/devicetree/bindings/bus/imx-weim.txt
++++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+@@ -70,9 +70,9 @@ Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
+ 		ranges = <0 0 0x08000000 0x08000000>;
+ 		fsl,weim-cs-gpr = <&gpr>;
+ 
+-		nor at 0,0 {
++		nor at 0,00000000 {
+ 			compatible = "cfi-flash";
+-			reg = <0 0 0x02000000>;
++			reg = <0 0x00000000 0x02000000>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			bank-width = <2>;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index 9117a3c..e501aa9 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -280,7 +280,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_weim>;
+ 
+-	can at d4000000 {
++	can at 4,00000000 {
+ 		compatible = "nxp,sja1000";
+ 		reg = <4 0x00000000 0x00000100>;
+ 		interrupt-parent = <&gpio5>;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index 8e10aef..758612a 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -311,7 +311,7 @@
+ &weim {
+ 	status = "okay";
+ 
+-	nor: nor at c0000000 {
++	nor: nor at 0,00000000 {
+ 		compatible = "cfi-flash";
+ 		reg = <0 0x00000000 0x02000000>;
+ 		bank-width = <2>;
+@@ -321,7 +321,7 @@
+ 		#size-cells = <1>;
+ 	};
+ 
+-	sram: sram at c8000000 {
++	sram: sram at 1,00000000 {
+ 		compatible = "mtd-ram";
+ 		reg = <1 0x00000000 0x00800000>;
+ 		bank-width = <2>;
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 009abd6..fde8b31 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -446,9 +446,9 @@
+ 	ranges = <0 0 0x08000000 0x08000000>;
+ 	status = "disabled"; /* pin conflict with SPI NOR */
+ 
+-	nor at 0,0 {
++	nor at 0,00000000 {
+ 		compatible = "cfi-flash";
+-		reg = <0 0 0x02000000>;
++		reg = <0 0x00000000 0x02000000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		bank-width = <2>;
+-- 
+1.8.3.2
