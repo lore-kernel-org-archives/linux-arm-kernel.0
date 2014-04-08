@@ -1,59 +1,46 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 08 Apr 2014 19:26:12 +0200
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-In-Reply-To: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
-References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <53443134.9020505@i2se.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 8 Apr 2014 11:27:52 -0600
+Subject: [PATCH v2 2/5] ARM: zynq: dt: Convert to preprocessor includes
+In-Reply-To: <53439F3F.2030801@monstr.eu>
+References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
+ <53423E75.3020008@monstr.eu> <53429754.8080105@topic.nl>
+ <534298E7.2020409@monstr.eu>
+ <20140407171012.GC9952@obsidianresearch.com>
+ <20140407180228.GN12170@pengutronix.de>
+ <53439F3F.2030801@monstr.eu>
+Message-ID: <20140408172752.GC27776@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.04.2014 13:29, schrieb Shawn Guo:
-> The .config() calls clk_get_rate() which might sleep, so we need to set
-> pwm_chip can_sleep flag.  Otherwise, we see the following warning when
-> using pwm driven heartbeat led.
->
-> WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
-> DEBUG_LOCKS_WARN_ON(in_interrupt())
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
-> [<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
-> [<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
-> [<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
-> [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
-> [<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
-> [<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
-> [<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
-> [<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
-> [<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
-> [<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
-> [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
-> [<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
-> [<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
-> [<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
-> [<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
-> [<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
-> [<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
-> [<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
-> [<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
->
-> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+On Tue, Apr 08, 2014 at 09:03:27AM +0200, Michal Simek wrote:
 
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > If in doubt follow common mainline practice. Although using includes
+> > for DT is not necessarily common practice, readability of DTs is
+> > really important IMHO.
+> 
+> Let me give you one example. When you add xilinx intc controller
+> to zynq HW design which uses gic with headers you are using
+> then you will find out that sensitivity for both controllers
+> are just different.
+> This is just one case I am aware of. I expect there will be one more.
 
-> ---
->  drivers/pwm/pwm-mxs.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
-> index 9475bc7..4f1bb4e 100644
-> --- a/drivers/pwm/pwm-mxs.c
-> +++ b/drivers/pwm/pwm-mxs.c
-> @@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
->  	mxs->chip.dev = &pdev->dev;
->  	mxs->chip.ops = &mxs_pwm_ops;
->  	mxs->chip.base = -1;
-> +	mxs->chip.can_sleep = true;
->  	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
+I'm not sure I see the problem here, just because some bindings can't
+use the standard shared constants doesn't mean the GIC bindings and
+users should avoid them. The binding documentation is supposed to make
+it clear what is correct.
+
+It is just as easy to get confused with numbers, does 4 mean
+XILINX_INTC_IRQ_RISING or IRQ_TYPE_LEVEL_HIGH ?
+
+> Using dtc preprocessor and macros improve DTS readability but at the same
+> time force other users to copy all necessary files from the kernel
+> to that projects which is just hassle.
+
+You can run the DTS through cpp before you export it out of the kernel
+environment, then you get a flat file with no includes.
+
+The shared kernel conventions are more important than constraints from
+outside projects.
+
+Jason
