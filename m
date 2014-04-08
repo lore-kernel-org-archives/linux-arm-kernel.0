@@ -1,93 +1,70 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 8 Apr 2014 11:14:17 -0600
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408175545.1b4d55a5@skate>
-References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140405193435.50d8dd81@skate>
- <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
- <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
- <20140408171309.09bbf968@skate> <20140408174034.79df403e@skate>
- <20140408175545.1b4d55a5@skate>
-Message-ID: <20140408171417.GB27776@obsidianresearch.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Apr 2014 18:24:25 +0100
+Subject: [PATCH 2/3] ARM: mm: add support for HW coherent systems in PL310
+In-Reply-To: <1395677872-32741-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1395677872-32741-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140408172424.GE16373@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 05:55:45PM +0200, Thomas Petazzoni wrote:
+On Mon, Mar 24, 2014 at 04:17:51PM +0000, Thomas Petazzoni wrote:
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -968,7 +968,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
+>  	{}
+>  };
+>  
+> -int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+> +int __init l2x0_of_init_common(u32 aux_val, u32 aux_mask, bool is_coherent)
+>  {
+>  	struct device_node *np;
+>  	const struct l2x0_of_data *data;
+> @@ -1005,8 +1005,28 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>  
+>  	of_init = true;
+>  	memcpy(&outer_cache, &data->outer_cache, sizeof(outer_cache));
+> +
+> +	/*
+> +	 * PL310 doesn't need an outer cache sync operation when the
+> +	 * system is operating with hardware coherency enabled, as it
+> +	 * is done directly in hardware.
+> +	 */
+> +	if (of_device_is_compatible(np, "arm,pl310-cache") && is_coherent)
+> +		outer_cache.sync = NULL;
+> +
 
-> mvebu-mbus/devices output:
-> 
-> # cat /sys/kernel/debug/mvebu-mbus/devices 
-> [10] 00000000e0000000 - 00000000e0900000 : 0004:00e8
+For this particular case, you can add a specific l2x0_of_data structure
+with the right compatible string for your platform where
+outer_cache.sync is NULL, assuming that dma_alloc_coherent() returns
+Cacheable memory (e.g. your platform uses arm_coherent_dma_ops). The
+only use of outer_sync() is for non-SMP barriers in relation to Normal
+NonCacheable buffers.
 
-> I'm not sure why I don't have the non-power-of-two problem for the MBus
-> windows.
+Even if the platform has coherent I/O, you still need the range L2 cache
+ops to be available for secondary CPU booting. Unless this platform can
+be configured in a way similar to the "marvell,aurora-system-cache" case
+and you can make all the outer_cache ops NULL.
 
-Well, you do, 0x900000 is not aligned. It converts to size=0b10001111,
-which is undefined behavior for mbus. 
+>  	l2x0_init(l2x0_base, aux_val, aux_mask);
+>  
+>  	return 0;
+>  }
+> +
+> +int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+> +{
+> +	return l2x0_of_init_common(aux_val, aux_mask, false);
+> +}
+> +
+> +int __init l2x0_of_init_coherent(u32 aux_val, u32 aux_mask)
+> +{
+> +	return l2x0_of_init_common(aux_val, aux_mask, true);
+> +}
 
-It looks like you are lucky, for your system the undefined behavior
-creates a window that hits all the BARs, but the others were not so
-lucky.
+This could be a bit misleading. I would rather have a generic
+pl310_data_dma_coherent structure (though even on coherent systems you
+could still have drivers that prefer writecombine/NormalNC memory to
+avoid thrashing the cache).
 
-What do you think about this:
-
->From 235b0bf637242a50ec45c8766d18a942bff601cf Mon Sep 17 00:00:00 2001
-From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Date: Tue, 8 Apr 2014 11:12:41 -0600
-Subject: [PATCH] bus: mvebu-mbus: Avoid setting an undefined window size
-
-The mbus hardware requires a power of two size, if a non-power
-of two is passed in to the low level routines they configure the
-register in a way that results in undefined behaviour.
-
-- WARN_ON to make this invalid usage really obvious
-- Round down to the nearest power of two so we only stuff a valid
-  size into the HW
-- When reading interpret undefined values in a conservative way,
-  the value is assumed to be the lowest power of two. This avoids
-  the debugfs output showing a value that looks 'correct'
-
-All together this makes the recent problems with silent failure
-of PCI very obvious, noisy and debuggable.
-
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/bus/mvebu-mbus.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 2ac754e..d26f63c 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -56,6 +56,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/debugfs.h>
-+#include <linux/log2.h>
- 
- /*
-  * DDR target is the same on all platforms.
-@@ -147,7 +148,7 @@ static void mvebu_mbus_read_window(struct mvebu_mbus_state *mbus,
- 	*enabled = 1;
- 	*base = ((u64)basereg & WIN_BASE_HIGH) << 32;
- 	*base |= (basereg & WIN_BASE_LOW);
--	*size = (ctrlreg | ~WIN_CTRL_SIZE_MASK) + 1;
-+	*size = 1 << (ffs(~(ctrlreg | ~WIN_CTRL_SIZE_MASK)) - 1);
- 
- 	if (target)
- 		*target = (ctrlreg & WIN_CTRL_TGT_MASK) >> WIN_CTRL_TGT_SHIFT;
-@@ -266,6 +267,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
- 		mbus->soc->win_cfg_offset(win);
- 	u32 ctrl, remap_addr;
- 
-+	WARN_ON(!is_power_of_2(size));
-+	size = rounddown_pow_of_two(size);
-+
- 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
- 		(attr << WIN_CTRL_ATTR_SHIFT)    |
- 		(target << WIN_CTRL_TGT_SHIFT)   |
 -- 
-1.8.1.2
+Catalin
