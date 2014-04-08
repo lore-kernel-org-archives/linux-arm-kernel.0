@@ -1,45 +1,73 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Tue, 8 Apr 2014 12:00:56 +0200
-Subject: [PATCH] video: exynos: Add a dependency to the menu
-Message-ID: <20140408120056.57556a00@endymion.delvare>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Apr 2014 10:49:42 +0100
+Subject: [PATCH] asm-generic: allow generic unaligned access if the
+ arch supports it
+In-Reply-To: <CAKv+Gu9TkLSivLuJH-oWnK0xpFb4jrhYDx6bTZBKUSmSJftCbQ@mail.gmail.com>
+References: <1395942387-14177-1-git-send-email-ard.biesheuvel@linaro.org>
+ <201403281914.20201.arnd@arndb.de>
+ <CAKv+Gu_9yD1jWhxkPxSUbwjJk4QxPNXBR=EXfmfCgzD1Pdig2g@mail.gmail.com>
+ <20140331095941.GA29871@arm.com>
+ <CAKv+Gu_05nmZrQxwELXae4tiK=-MpjUjmEKrULdg+6YuC-DW8Q@mail.gmail.com>
+ <20140331172436.GL29871@arm.com>
+ <CAKv+Gu9RATUkhya0zytS8FbSM8=49xwNg0m24Xp1LtCWoarDRQ@mail.gmail.com>
+ <20140331183618.GY7528@n2100.arm.linux.org.uk>
+ <CAKv+Gu9TkLSivLuJH-oWnK0xpFb4jrhYDx6bTZBKUSmSJftCbQ@mail.gmail.com>
+Message-ID: <20140408094942.GC16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All drivers under menu EXYNOS_VIDEO depend on either ARCH_S5PV210 or
-ARCH_EXYNOS, so add these as dependencies to the menu itself. This
-avoids presenting an empty and useless menu on other architectures.
+On Mon, Mar 31, 2014 at 08:51:54PM +0200, Ard Biesheuvel wrote:
+> On 31 March 2014 20:36, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Mon, Mar 31, 2014 at 08:22:43PM +0200, Ard Biesheuvel wrote:
+> >> On 31 March 2014 19:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > It actually affects arch/arm as well which selects
+> >> > HAVE_EFFICIENT_UNALIGNED_ACCESS for v6/v7 and uses the generic
+> >> > unaligned.h
+> >> >
+> >>
+> >> Oops, my bad. I did a quick 'find -name unaligned.h' but misread 'arc'
+> >> for 'arm'.
+> >>
+> >> @Russell: ARM is a user of asm-generic/unaligned.h, and I proposed a
+> >> patch to asm-generic that switches to unaligned accesses if
+> >> HAVE_EFFICIENT_UNALIGNED_ACCESS is set by the arch. This should affect
+> >> a fair amount of code living under net/ and drivers/ that don't test
+> >> for the Kconfig symbol but expect get_unaligned_xx/put_unaligned_xx to
+> >> turn into something suitable depending on the arch. Any objections?
+> >
+> > I'm not sure what you're talking about here, or what change you're
+> > proposing.  Without any kind of frame of reference, I can't comment.
+> > Sorry.
+> >
+> 
+> My apologies. I assumed the mail thread including a link to the patch
+> would be clear enough.
+> 
+> Currently, asm-generic's version of unaligned.h (defining stuff like
+> get_unaligned() and put_unaligned()) unconditionally defaults to the
+> most cautious method of performing unaligned memory accesses, even if
+> the Kconfig symbol HAVE_EFFICIENT_UNALIGNED_ACCESS is defined.
+> However, in that case, it makes sense to use a definition for
+> get_unaligned()/put_unaligned() that lets the hardware perform the
+> unaligned accesses instead.
+> 
+> So that is what I proposed here
+> 
+> http://marc.info/?l=linux-arch&m=139594237116121&w=2
+> 
+> and in the mail exchange that followed, I stated that arm64 should be
+> the only arch affected by this change. However, I didn't look
+> carefully enough and, as Catalin pointed out, ARM will also be
+> affected by it.
+> 
+> So that is why I redirected this thread to you: would you object to
+> changing asm-generic/unaligned.h so that calls to
+> get_aligned()/put_aligned() on ARM v6/v7 will let the CPU perform the
+> unaligned access?
 
-Then drivers under the menu only need a dependency if they depend on
-one of the supported architectures specifically.
-
-Signed-off-by: Jean Delvare <jdelvare@suse.de>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
----
- drivers/video/exynos/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- linux-3.15-rc0.orig/drivers/video/exynos/Kconfig	2014-04-07 10:23:07.316226676 +0200
-+++ linux-3.15-rc0/drivers/video/exynos/Kconfig	2014-04-08 11:50:17.406723187 +0200
-@@ -4,6 +4,7 @@
- 
- menuconfig EXYNOS_VIDEO
- 	bool "Exynos Video driver support"
-+	depends on ARCH_S5PV210 || ARCH_EXYNOS
- 	help
- 	  This enables support for EXYNOS Video device.
- 
-@@ -15,7 +16,6 @@ if EXYNOS_VIDEO
- 
- config EXYNOS_MIPI_DSI
- 	bool "EXYNOS MIPI DSI driver support."
--	depends on ARCH_S5PV210 || ARCH_EXYNOS
- 	select GENERIC_PHY
- 	help
- 	  This enables support for MIPI-DSI device.
-
+The change looks fine to me, but given where we are in the cycle, I'd
+rather hold off until after the merge window before queuing this up.
 
 -- 
-Jean Delvare
-SUSE L3 Support
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
