@@ -1,39 +1,84 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Apr 2014 18:00:32 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408155345.GC11052@1wt.eu>
-References: <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
- <20140326214259.GA12330@obsidianresearch.com>
- <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140405193435.50d8dd81@skate>
- <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
- <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
- <20140408171309.09bbf968@skate> <20140408155345.GC11052@1wt.eu>
-Message-ID: <20140408180032.384b33b0@skate>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 8 Apr 2014 09:01:36 -0700
+Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
+In-Reply-To: <1396960898.3567.55.camel@linaro1.home>
+References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
+ <1396577719-14786-3-git-send-email-keescook@chromium.org>
+ <20140404195818.GA21028@debian>
+ <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+ <1396960898.3567.55.camel@linaro1.home>
+Message-ID: <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Willy Tarreau,
+On Tue, Apr 8, 2014 at 5:41 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Fri, 2014-04-04 at 17:07 -0700, Kees Cook wrote:
+>> On Fri, Apr 4, 2014 at 12:58 PM, Rabin Vincent <rabin@rab.in> wrote:
+> [...]
+>> > You need a TLB flush.  I had a flush_tlb_all() in my example patch,
+>> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244335.html,
+>> > but the following is probably nicer (on top of this patch):
+>> >
+>> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> > index 9bea524..a92c45a 100644
+>> > --- a/arch/arm/mm/init.c
+>> > +++ b/arch/arm/mm/init.c
+>> > @@ -741,6 +741,8 @@ static inline bool arch_has_strict_perms(void)
+>> >                      addr += SECTION_SIZE)                              \
+>> >                         section_update(addr, perms[i].mask,             \
+>> >                                        perms[i].field);                 \
+>> > +                                                                       \
+>> > +               flush_tlb_kernel_range(perms[i].start, perms[i].end);   \
+>> >         }                                                               \
+>> >  }
+>> >
+>>
+>> When I do this, I hang the system, and get a WARN due to the tlb call
+>> attempting to flush on all CPUs, I think:
+>>
+>> [   34.246034] WARNING: at
+>> /mnt/host/source/src/third_party/kernel-next/kernel/smp.c:466
+>> smp_call_function_many+0xac/0x26c()
+>> ...
+>> [   34.246617] Backtrace:
+>> [   34.246697] [<c010d3b8>] (unwind_backtrace+0x0/0x118) from
+>> [<c060b9d8>] (dump_stack+0x28/0x30)
+>> [   34.246765] [<c060b9d8>] (dump_stack+0x28/0x30) from [<c0123044>]
+>> (warn_slowpath_null+0x44/0x5c)
+>> [   34.246824] [<c0123044>] (warn_slowpath_null+0x44/0x5c) from
+>> [<c017426c>] (smp_call_function_many+0xac/0x26c)
+>> [   34.246881] [<c017426c>] (smp_call_function_many+0xac/0x26c) from
+>> [<c0174468>] (smp_call_function+0x3c/0x48)
+>> [   34.246937] [<c0174468>] (smp_call_function+0x3c/0x48) from
+>> [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c)
+>> [   34.246994] [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c) from
+>> [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0)
+>> [   34.247046] [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0) from
+>> [<c011403c>] (set_kernel_text_rw+0xd8/0xec)
+>> [   34.247099] [<c011403c>] (set_kernel_text_rw+0xd8/0xec) from
+>> [<c010c878>] (__ftrace_modify_code+0x14/0x28)
+>> [   34.247156] [<c010c878>] (__ftrace_modify_code+0x14/0x28) from
+>> [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114)
+>> [   34.247212] [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114) from
+>> [<c01841cc>] (cpu_stopper_thread+0xd8/0x164)
+>> [   34.247266] [<c01841cc>] (cpu_stopper_thread+0xd8/0x164) from
+>> [<c0145c14>] (kthread+0xc8/0xd8)
+>> [   34.247323] [<c0145c14>] (kthread+0xc8/0xd8) from [<c0106118>]
+>> (ret_from_fork+0x14/0x20)
+>>
+>> Using local_flush_tlb_kernel_range() fixed it though.
+>
+> What about if another CPU had a TLB entry with the old permissions in?
+> Or do you consider that the likelihood and consequences of that aren't
+> significant?
 
-On Tue, 8 Apr 2014 17:53:45 +0200, Willy Tarreau wrote:
-> On Tue, Apr 08, 2014 at 05:13:09PM +0200, Thomas Petazzoni wrote:
-> > Unfortunately here your patch is not sufficient to solve the problem
-> > apparently. I've fixed another problem where the return value of
-> > armada_370_xp_alloc_msi() (which is signed) is casted into an unsigned
-> > irq_hw_number_t in armada_370_xp_setup_msi_irq(), but I'm still seeing
-> > many MSIs allocated, then some freed, and finally a kernel panic.
-> 
-> I thought we already fixed that one months ago ?
+The purpose of the function is to temporarily make text writable, do
+the write, and then restore read-only. Since only the writer needs to
+care about TLB state, this works fine. It's actually nice that only
+the current CPU can make text writes.
 
-Well, I don't see it fixed in mainline:
+-Kees
 
- http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/irqchip/irq-armada-370-xp.c#n130
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kees Cook
+Chrome OS Security
