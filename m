@@ -1,78 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Apr 2014 16:43:17 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408123632.GG8767@1wt.eu>
-References: <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140406185833.GI29787@1wt.eu>
- <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
- <20140407174106.GD9952@obsidianresearch.com>
- <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
- <20140407204817.GB20736@obsidianresearch.com>
- <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
- <20140408064003.GU29787@1wt.eu>
- <CAFJTrDu82avr6mSaz1PNzOJ0tnQiH5aiq6URiXZAbJ=4W+2EJg@mail.gmail.com>
- <CAFJTrDtiRctixnbBEbHMsnxsPy7ew9-7SoD5cyUA6DWPU9p6Fw@mail.gmail.com>
- <20140408123632.GG8767@1wt.eu>
-Message-ID: <20140408164317.0e9b9092@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Apr 2014 13:43:17 +0100
+Subject: [PATCH v12][ 03/12] imx-drm: Correct BGR666 and the board's
+ dts that use them.
+In-Reply-To: <1396874691-27954-3-git-send-email-denis@eukrea.com>
+References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
+ <1396874691-27954-3-git-send-email-denis@eukrea.com>
+Message-ID: <20140408124317.GF16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Willy, Neil, Matthew,
-
-On Tue, 8 Apr 2014 14:36:32 +0200, Willy Tarreau wrote:
-
-> On Tue, Apr 08, 2014 at 01:31:48PM +0100, Matthew Minter wrote:
-> > To add to my previous point, I would consider releasing these patches
-> > as soon as possible as it seems that it can easily cause panics on a
-> > range of boards. Failing that perhaps it is at least worth releasing a
-> > hotfix which will cause PCI probing to fail should the window not be a
-> > power of two? Thus it will fail early with a warning instead of
-> > potentially causing a kernel crash.
+On Mon, Apr 07, 2014 at 02:44:42PM +0200, Denis Carikli wrote:
+>  arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
+>  arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
+>  drivers/staging/imx-drm/imx-ldb.c       |    4 ++--
+>  drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
+>  4 files changed, 6 insertions(+), 6 deletions(-)
 > 
-> Have you tested the whole patch or just the one enforcing the power of 2 ?
-> It would be interesting to know if the one with SZ_4M is needed for you or
-> not (I guess not).
-> 
-> I suspect that just this single-liner will work as well, as it does for me.
-> 
-> Thanks,
-> Willy
-> 
-> 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 0e79665..552ab73 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -363,6 +363,7 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
->  	port->memwin_size  =
->  		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
->  		port->memwin_base;
-> +	port->memwin_size = roundup_pow_of_two(port->memwin_size);
+> diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+> index c5a9a24..7b3851d 100644
+> --- a/arch/arm/boot/dts/imx51-apf51dev.dts
+> +++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+> @@ -18,7 +18,7 @@
 >  
->  	mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
->  				    port->memwin_base, port->memwin_size);
+>  	display at di1 {
+>  		compatible = "fsl,imx-parallel-display";
+> -		interface-pix-fmt = "bgr666";
+> +		interface-pix-fmt = "rgb666";
 
-Thanks to all of you for the investigation. So if I summarize your
-findings, we have two patches needed to fix the problems of everybody:
+...
 
- 1) The bug fix for the MSI teardown function in irq-armada-370-xp.c.
-    This one is easy, I'll test it right now, and give my formal
-    Acked-by soon.
+>  	/* bgr666 */
+>  	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
+> -	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
+> +	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
+>  	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
+> -	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
+> +	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
 
- 2) The problem of non-power of 2 sized windows. This one is more
-    complicated, as we cannot simply round up the size of the windows
-    inside the pci-mvebu.c driver: the Linux PCI core is not aware of
-    this rounding, and might therefore allocate a BAR for the next
-    device at an address that overlaps the previous window we have
-    enlarged to match the power of two size requirement. This is
-    something that was already discussed with the PCI maintainers, but
-    the discussion needs to be revived I guess.
+arm-soc people have become very obtuse with respect to changes to any
+patches to arch/arm/boot/dts, and complain loudly if any changes to
+that directory do not go through them as separate patches.
 
-Am I correct, or are other patches needed, or are remaining problems
-not solved by these two fixes?
+What this means is that your patch is unacceptable and needs to be split
+up.
 
-Thomas
+The choices seem to be to either break imx-drm by splitting the patch in
+two, thereby ending up with the two dependent changes being merged
+entirely separate, resulting in breakage while one or other is merged,
+or to add the RGB666 support, wait for that to hit mainline, then
+update the DT files, wait for that to hit mainline, then fix the BGR666
+support.  That'll take around six to nine months (two to three months
+per release cycle.)
+
+Or arm-soc could come to their senses and realise that they do not have
+sole ownership over arch/arm/boot/dts.
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
