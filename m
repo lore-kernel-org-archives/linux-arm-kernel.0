@@ -1,44 +1,56 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Tue, 08 Apr 2014 12:14:22 +0300
-Subject: Big endian working?
-In-Reply-To: <20140408095446.0520dd28@skate>
-References: <20140408095446.0520dd28@skate>
-Message-ID: <5343BDEE.4010005@linaro.org>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Tue,  8 Apr 2014 11:20:17 +0200
+Subject: [PATCH] ARM: dts: OMAP2+: remove uses of obsolete gpmc,device-nand
+Message-ID: <1396948817-29362-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2014 10:54 AM, Thomas Petazzoni wrote:
-> Hello Taras,
->
-> I'm currently trying to get ARM BE to work on Armada XP. I'm pretty
-> sure it used to work on 3.13, but now I'm testing 3.13 and 3.14 and it
-> doesn't boot here (it hangs even before "Uncompressing kernel...",
-> apparently while relocating the kernel image before decompression).
->
-> Ben Dooks told me that the ARM BE kernel works for you. Can you confirm
-> which kernel version you're using, and if you've applied any patch?
-> Also, can you confirm which toolchain and toolchain version you're
-> using?
+Remove all remaining uses of gpmc,device-nand that have been added since
+the property was removed by commit f40739faba8e ("ARM: dts: OMAP2+:
+Simplify NAND support").
 
-Hi Tom
+Signed-off-by: Johan Hovold <jhovold@gmail.com>
+---
+ arch/arm/boot/dts/am335x-igep0033.dtsi  | 1 -
+ arch/arm/boot/dts/omap3-devkit8000.dts  | 1 -
+ arch/arm/boot/dts/omap3-lilly-a83x.dtsi | 1 -
+ 3 files changed, 3 deletions(-)
 
-To boot BE kernel from LE u-boot I'm using a few patches on top of 
-upstream kernel.
-
-git://git.linaro.org/people/taras.kondratiuk/linux.git arm-be-boot-le
-
-----------------------------------------------------------------
-Ben Dooks (1):
-       ARM: add CPU_BE8_BOOT_LE configuration
-
-Nico Pitre (1):
-       ARM: ensure loader information in LE format for BE kernels
-
-  arch/arm/boot/compressed/Makefile       |    5 ++++-
-  arch/arm/boot/compressed/head.S         |    7 ++++---
-  arch/arm/boot/compressed/vmlinux.lds.in |   14 ++++++++++++++
-  arch/arm/mm/Kconfig                     |    7 +++++++
-  4 files changed, 29 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index 7063311a58d9..06c822a48b71 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -118,7 +118,6 @@
+ 		reg = <0 0 0>; /* CS0, offset 0 */
+ 		nand-bus-width = <8>;
+ 		ti,nand-ecc-opt = "bch8";
+-		gpmc,device-nand = "true";
+ 		gpmc,device-width = <1>;
+ 		gpmc,sync-clk-ps = <0>;
+ 		gpmc,cs-on-ns = <0>;
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+index bf5a515a3247..da402f0fdab4 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000.dts
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -112,7 +112,6 @@
+ 		reg = <0 0 0>; /* CS0, offset 0 */
+ 		nand-bus-width = <16>;
+ 
+-		gpmc,device-nand;
+ 		gpmc,sync-clk-ps = <0>;
+ 		gpmc,cs-on-ns = <0>;
+ 		gpmc,cs-rd-off-ns = <44>;
+diff --git a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
+index 6369d9f43ca2..cc1dce6978f5 100644
+--- a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
++++ b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
+@@ -368,7 +368,6 @@
+ 		/* no elm on omap3 */
+ 
+ 		gpmc,mux-add-data = <0>;
+-		gpmc,device-nand;
+ 		gpmc,device-width = <2>;
+ 		gpmc,wait-pin = <0>;
+ 		gpmc,wait-monitoring-ns = <0>;
 -- 
-Taras Kondratiuk
+1.8.3.2
