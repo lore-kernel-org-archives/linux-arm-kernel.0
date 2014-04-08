@@ -1,43 +1,101 @@
-From: hector.palacios@digi.com (Hector Palacios)
-Date: Tue, 8 Apr 2014 18:55:05 +0200
-Subject: ethaddr0 alias for imx6
-Message-ID: <534429E9.1050202@digi.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 8 Apr 2014 09:59:07 -0700
+Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
+In-Reply-To: <1396973561.14809.26.camel@linaro1.home>
+References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
+ <1396577719-14786-3-git-send-email-keescook@chromium.org>
+ <20140404195818.GA21028@debian>
+ <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+ <1396960898.3567.55.camel@linaro1.home>
+ <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
+ <1396973561.14809.26.camel@linaro1.home>
+Message-ID: <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Apr 8, 2014 at 9:12 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Tue, 2014-04-08 at 09:01 -0700, Kees Cook wrote:
+>> On Tue, Apr 8, 2014 at 5:41 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+>> > On Fri, 2014-04-04 at 17:07 -0700, Kees Cook wrote:
+>> >> On Fri, Apr 4, 2014 at 12:58 PM, Rabin Vincent <rabin@rab.in> wrote:
+>> > [...]
+>> >> > You need a TLB flush.  I had a flush_tlb_all() in my example patch,
+>> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244335.html,
+>> >> > but the following is probably nicer (on top of this patch):
+>> >> >
+>> >> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> >> > index 9bea524..a92c45a 100644
+>> >> > --- a/arch/arm/mm/init.c
+>> >> > +++ b/arch/arm/mm/init.c
+>> >> > @@ -741,6 +741,8 @@ static inline bool arch_has_strict_perms(void)
+>> >> >                      addr += SECTION_SIZE)                              \
+>> >> >                         section_update(addr, perms[i].mask,             \
+>> >> >                                        perms[i].field);                 \
+>> >> > +                                                                       \
+>> >> > +               flush_tlb_kernel_range(perms[i].start, perms[i].end);   \
+>> >> >         }                                                               \
+>> >> >  }
+>> >> >
+>> >>
+>> >> When I do this, I hang the system, and get a WARN due to the tlb call
+>> >> attempting to flush on all CPUs, I think:
+>> >>
+>> >> [   34.246034] WARNING: at
+>> >> /mnt/host/source/src/third_party/kernel-next/kernel/smp.c:466
+>> >> smp_call_function_many+0xac/0x26c()
+>> >> ...
+>> >> [   34.246617] Backtrace:
+>> >> [   34.246697] [<c010d3b8>] (unwind_backtrace+0x0/0x118) from
+>> >> [<c060b9d8>] (dump_stack+0x28/0x30)
+>> >> [   34.246765] [<c060b9d8>] (dump_stack+0x28/0x30) from [<c0123044>]
+>> >> (warn_slowpath_null+0x44/0x5c)
+>> >> [   34.246824] [<c0123044>] (warn_slowpath_null+0x44/0x5c) from
+>> >> [<c017426c>] (smp_call_function_many+0xac/0x26c)
+>> >> [   34.246881] [<c017426c>] (smp_call_function_many+0xac/0x26c) from
+>> >> [<c0174468>] (smp_call_function+0x3c/0x48)
+>> >> [   34.246937] [<c0174468>] (smp_call_function+0x3c/0x48) from
+>> >> [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c)
+>> >> [   34.246994] [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c) from
+>> >> [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0)
+>> >> [   34.247046] [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0) from
+>> >> [<c011403c>] (set_kernel_text_rw+0xd8/0xec)
+>> >> [   34.247099] [<c011403c>] (set_kernel_text_rw+0xd8/0xec) from
+>> >> [<c010c878>] (__ftrace_modify_code+0x14/0x28)
+>> >> [   34.247156] [<c010c878>] (__ftrace_modify_code+0x14/0x28) from
+>> >> [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114)
+>> >> [   34.247212] [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114) from
+>> >> [<c01841cc>] (cpu_stopper_thread+0xd8/0x164)
+>> >> [   34.247266] [<c01841cc>] (cpu_stopper_thread+0xd8/0x164) from
+>> >> [<c0145c14>] (kthread+0xc8/0xd8)
+>> >> [   34.247323] [<c0145c14>] (kthread+0xc8/0xd8) from [<c0106118>]
+>> >> (ret_from_fork+0x14/0x20)
+>> >>
+>> >> Using local_flush_tlb_kernel_range() fixed it though.
+>> >
+>> > What about if another CPU had a TLB entry with the old permissions in?
+>> > Or do you consider that the likelihood and consequences of that aren't
+>> > significant?
+>>
+>> The purpose of the function is to temporarily make text writable, do
+>> the write, and then restore read-only. Since only the writer needs to
+>> care about TLB state, this works fine. It's actually nice that only
+>> the current CPU can make text writes.
+>
+> And is the page table being modified unique to the current CPU? I
+> thought a common set of page tables was shared across all of them. If
+> that is the case then one CPU can modify the PTE to be writeable,
+> another CPU take a TLB miss and pull in that writeable entry, which will
+> stay there until it drops out the TLB at some indefinite point in the
+> future. That's the scenario I was getting at with my previous comment.
 
-I think I'm missing a commit similar to 8c41d57395ff5b9b16724786c7c4b4c4081510cc to 
-add the ethernet0 alias so that U-Boot can fixup the MAC in the device tree for iMX6. 
-Like this:
+As I understood it, this would be true for small PTEs, but sections
+are fully duplicated on each CPU so we don't run that risk. This was
+the whole source of my problem with this patch series: even a full
+all-CPU TLB flush wasn't working -- the section permissions were
+unique to the CPU since the entries were duplicated.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index b48a128e519d..b3ec952eada6 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -15,6 +15,7 @@
+-Kees
 
-  / {
-         aliases {
-+               ethernet0 = &fec;
-                 flexcan0 = &flexcan1;
-                 flexcan1 = &flexcan2;
-                 gpio0 = &gpio1;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index b937a4a94202..2afd45c67996 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -13,6 +13,7 @@
-
-  / {
-         aliases {
-+               ethernet0 = &fec;
-                 serial0 = &uart1;
-                 serial1 = &uart2;
-                 serial2 = &uart3;
-
-Has this changed recently and is done in a different way or has nobody noticed it before?
-
-Best regards,
---
-Hector Palacios
+-- 
+Kees Cook
+Chrome OS Security
