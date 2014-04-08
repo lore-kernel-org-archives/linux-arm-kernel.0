@@ -1,46 +1,33 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue,  8 Apr 2014 16:00:42 +0800
-Subject: [PATCH v2 02/12] ARM: append ARCH_MULTI_V7_LPAE
-In-Reply-To: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1396944052-9887-3-git-send-email-haojian.zhuang@linaro.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 8 Apr 2014 17:10:56 +0200
+Subject: [PATCH v6 2/5] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <534406BD.8000702@codeaurora.org>
+References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
+ <1396641450-12854-3-git-send-email-sboyd@codeaurora.org>
+ <20140407201838.GC20822@pd.tnic>
+ <20140407215649.GH9985@codeaurora.org>
+ <20140408064328.GB30077@pd.tnic> <534406BD.8000702@codeaurora.org>
+Message-ID: <20140408151056.GH30077@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new ARCH_MULTI_V7_LPAE config. It will select ARM_LPAE only both
-ARCH_MULTI_V6 & ARCH_MULTI_V7 is disabled.
+On Tue, Apr 08, 2014 at 10:25:01AM -0400, Christopher Covington wrote:
+> As I understand it, the license authors. They find it important to maintain
+> clarity even when files get copied into other projects.
+> 
+> http://www.gnu.org/licenses/gpl-howto.html
+> 
+> http://www.gnu.org/licenses/gpl-faq.html#NoticeInSourceFile
 
-ARCH_MULTI_V7 means non-LPAE platform.
+Right, so what is wrong with stating the same thing in two lines:
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
----
- arch/arm/Kconfig | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+"Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5248923..a8b2b45 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -918,12 +918,19 @@ config ARCH_MULTI_V6
- 	select CPU_V6K
- 
- config ARCH_MULTI_V7
--	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
-+	bool "ARMv7 non-LPAE based platforms (Cortex-A, PJ4, Scorpion, Krait)"
- 	default y
- 	select ARCH_MULTI_V6_V7
- 	select CPU_V7
- 	select HAVE_SMP
- 
-+config ARCH_MULTI_V7_LPAE
-+	bool "ARMv7 LPAE based platforms (HIP04)"
-+	select ARCH_MULTI_V6_V7
-+	select CPU_V7
-+	select HAVE_SMP
-+	select ARM_LPAE if !(ARCH_MULTI_V6 || ARCH_MULTI_V7)
-+
- config ARCH_MULTI_V6_V7
- 	bool
- 	select MIGHT_HAVE_CACHE_L2X0
+This file is licensed under GNU GPLv2. See COPYING for full license text."
+
 -- 
-1.8.3.2
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
