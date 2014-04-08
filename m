@@ -1,333 +1,76 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 8 Apr 2014 11:11:25 +0200
-Subject: [PATCH RFC v5 3/3] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <20140407180350.GD25563@e102568-lin.cambridge.arm.com>
-References: <1395142132-20788-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1395142132-20788-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20140404155622.GA4061@e102568-lin.cambridge.arm.com>
- <CAKfTPtB=94pA__3pgO0G+=RZucwgGJ7rW0+HoAJLpWOtCo7g4Q@mail.gmail.com>
- <20140407143622.GB25563@e102568-lin.cambridge.arm.com>
- <CAKfTPtAr=YFxF7oew3EShBryyAobFNqe0Rf-bBUTCyAsLNV3JQ@mail.gmail.com>
- <20140407180350.GD25563@e102568-lin.cambridge.arm.com>
-Message-ID: <CAKfTPtC4gHufPnKwNJyzLgH5NACgyFF3uqptqWc1Txc6GLfCJQ@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 08 Apr 2014 09:03:27 +0200
+Subject: [PATCH v2 2/5] ARM: zynq: dt: Convert to preprocessor includes
+In-Reply-To: <20140407180228.GN12170@pengutronix.de>
+References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
+ <53423E75.3020008@monstr.eu> <53429754.8080105@topic.nl>
+ <534298E7.2020409@monstr.eu> <20140407171012.GC9952@obsidianresearch.com>
+ <20140407180228.GN12170@pengutronix.de>
+Message-ID: <53439F3F.2030801@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 April 2014 20:03, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Mon, Apr 07, 2014 at 04:34:49PM +0100, Vincent Guittot wrote:
->> On 7 April 2014 16:36, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > On Mon, Apr 07, 2014 at 01:25:17PM +0100, Vincent Guittot wrote:
->> >> On 4 April 2014 17:56, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> >> > [replying to self, since I have a query]
->> >> >
->> >> > [...]
->> >> >
->> >> >> +===========================================
->> >> >> +4 - Examples
->> >> >> +===========================================
->> >> >> +
->> >> >> +Example 1 (ARM 64-bit, 16-cpu system):
->> >> >> +
->> >> >> +pd_clusters: power-domain-clusters at 80002000 {
->> >> >> +       compatible = "arm,power-controller";
->> >> >> +       reg = <0x0 0x80002000 0x0 0x1000>;
->> >> >> +       #power-domain-cells = <1>;
->> >> >> +       #address-cells = <2>;
->> >> >> +       #size-cells = <2>;
->> >> >> +
->> >> >> +       pd_cores: power-domain-cores at 80000000 {
->> >> >> +               compatible = "arm,power-controller";
->> >> >> +               reg = <0x0 0x80000000 0x0 0x1000>;
->> >> >> +               #power-domain-cells = <1>;
->> >> >> +       };
->> >> >> +};
->> >> >> +
->> >> >> +cpus {
->> >> >> +       #size-cells = <0>;
->> >> >> +       #address-cells = <2>;
->> >> >> +
->> >> >> +       idle-states {
->> >> >> +               entry-method = "arm,psci-cpu-suspend";
->> >> >> +
->> >> >> +               CLUSTER_RETENTION_0: cluster-retention-0 {
->> >> >> +                       compatible = "arm,idle-state";
->> >> >> +                       index = <2>;
->> >> >> +                       logic-state-retained;
->> >> >> +                       cache-state-retained;
->> >> >> +                       entry-method-param = <0x1010000>;
->> >> >> +                       entry-latency-us = <50>;
->> >> >> +                       exit-latency-us = <100>;
->> >> >> +                       min-residency-us = <250>;
->> >> >> +                       power-domains = <&pd_clusters 0>;
->> >> >> +                       CPU_RETENTION_0_0: cpu-retention-0 {
->> >> >> +                               compatible = "arm,idle-state";
->> >> >> +                               index = <0>;
->> >> >> +                               cache-state-retained;
->> >> >> +                               entry-method-param = <0x0010000>;
->> >> >> +                               entry-latency-us = <20>;
->> >> >> +                               exit-latency-us = <40>;
->> >> >> +                               min-residency-us = <30>;
->> >> >> +                               power-domains = <&pd_cores 0>,
->> >> >> +                                               <&pd_cores 1>,
->> >> >> +                                               <&pd_cores 2>,
->> >> >> +                                               <&pd_cores 3>,
->> >> >> +                                               <&pd_cores 4>,
->> >> >> +                                               <&pd_cores 5>,
->> >> >> +                                               <&pd_cores 6>,
->> >> >> +                                               <&pd_cores 7>;
->> >> >> +                       };
->> >> >> +               };
->> >> >> +
->> >> >> +               CLUSTER_SLEEP_0: cluster-sleep-0 {
->> >> >> +                       compatible = "arm,idle-state";
->> >> >> +                       index = <3>;
->> >> >> +                       entry-method-param = <0x1010000>;
->> >> >> +                       entry-latency-us = <600>;
->> >> >> +                       exit-latency-us = <1100>;
->> >> >> +                       min-residency-us = <2700>;
->> >> >> +                       power-domains = <&pd_clusters 0>;
->> >> >> +                       CPU_SLEEP_0_0: cpu-sleep-0 {
->> >> >> +                               /* cpu sleep */
->> >> >> +                               compatible = "arm,idle-state";
->> >> >> +                               index = <1>;
->> >> >> +                               entry-method-param = <0x0010000>;
->> >> >> +                               entry-latency-us = <250>;
->> >> >> +                               exit-latency-us = <500>;
->> >> >> +                               min-residency-us = <350>;
->> >> >> +                               power-domains = <&pd_cores 0>,
->> >> >> +                                               <&pd_cores 1>,
->> >> >> +                                               <&pd_cores 2>,
->> >> >> +                                               <&pd_cores 3>,
->> >> >> +                                               <&pd_cores 4>,
->> >> >> +                                               <&pd_cores 5>,
->> >> >> +                                               <&pd_cores 6>,
->> >> >> +                                               <&pd_cores 7>;
->> >> >> +                       };
->> >> >> +               };
->> >> >
->> >> > I noticed while developing the CPUidle generic driver, that by using this
->> >> > representation I might end up requiring duplicated states.
->> >> >
->> >> > For instance, a cluster-retention state and a cluster-sleep state might
->> >> > want to have cpu-sleep state as substate, and this would require an
->> >> > idle state node duplication.
->> >> >
->> >> > I think it is better to have a single flat (and ordered...that would
->> >> > kill two birds with one stone) list of nodes in the idle-states node and
->> >> > every state might have a list of phandles to subnodes (substates), something
->> >> > like the following example.
->> >> >
->> >> > This simplifies parsing  and I think it solves the last issue I
->> >> > came across (the need for duplicate states - in the bindings below,
->> >> > CPU_SLEEP_0 is a substate of both CLUSTER_RETENTION_0 and
->> >> > CLUSTER_SLEEP_0, through phandles).
->> >>
->> >> Hi Lorenzo,
->> >>
->> >> You explanation above has triggered a question. You writes:
->> >> CPU_SLEEP_0 is a substate of CLUSTER_RETENTION_0 but i would have say
->> >> that both CPU_SLEEP_0 and CPU_RETENTION_0 are substates of
->> >> CLUSTER_RETENTION_0. I mean that if cpus are either in retention mode
->> >> OR in  sleep mode, you can enter the CLUSTER_RETENTION_0 state (you
->> >> can have some in sleep mode and other in retention of course)
->> >> I'm wondering how this OR  will be described.
->> >
->> > We need another state (because that's what happens in HW right ?), so we
->> > describe it (obviously having different latencies):
->> >
->> >
->> >         CLUSTER_RETENTION_1: cluster-retention-1 {
->> >                 compatible = "arm,idle-state";
->> >                 logic-state-retained;
->> >                 cache-state-retained;
->> >                 entry-method-param = <0x1010000>;
->> >                 entry-latency-us = <50>;
->> >                 exit-latency-us = <700>;
->> >                 min-residency-us = <2000>;
->> >                 power-domains = <&pd_clusters 0>;
->> >                 substates = <&CPU_RETENTION_0>;
->> >          };
->> >
->> > Using phandles all state combinations are now possible, with no state
->> > duplication.
->> >
->> > State above is entered when all CPUs are in retention mode and thanks
->> > to the phandle the kernel knows what has to be done as far as each
->> > CPU is concerned. The beauty of this approach is that for every state,
->> > it is well defined what has to be done for the respective power domain
->> > (eg state above, cache is retained. All caches in <&pd_clusters 0> are
->> > retained. Then we follow the substates, and take action according to
->> > the substate propertes and respective power domain).
->> >
->> > Does this make sense ? I can't find fault with this semantics, but
->> > please let me know if you do.
+On 04/07/2014 08:02 PM, Steffen Trumtrar wrote:
+> Hi!
+> 
+> On Mon, Apr 07, 2014 at 11:10:12AM -0600, Jason Gunthorpe wrote:
+>> On Mon, Apr 07, 2014 at 02:24:07PM +0200, Michal Simek wrote:
 >>
+>>> Device-tree BSP and in 2014.01 there will be new BSP which just
+>>> generate them directly from the Vivado tools which just target your
+>>> reference design.  You can connect your custom IP (or Xilinx or 3rd
+>>> party) directly to the GIC which using different IRQ sensitivity
+>>> with whatever register addresses and make no sense to write it by
+>>> hand.
 >>
->> So we will have some cpus of the cluster in CLUSTER_RETENTION_1 state
->> and other cpus of the same cluster in CLUSTER_RETENTION_0 depending of
->> the power state of the cpu part but for the same power state of common
->> part of the cluster.
->> How does the driver know that both power states are compatible ? I
->> mean how the last cpu will know that it can put the cluster in
->> retention state because all the other cpus of the cluster are in a
->> compatible state ?
->
-> Short answer: the power domain hierarchy will define what CPUs are in what
-> power domain. For states that encompass multiple cpus for them to be valid,
-> we just use the lowest common index approach (I am talking about index in the
-> idle state order - which, if the list is flat and ordered in terms of power
-> savings is easy to define).
->
-> That's how idle works today, I am not adding anything new.
-
-I agree but today each driver makes some internal check to ensure that
-the selected states of CPUs in the same domain are compatibles.
-
->
-> If:
->
-> CLUSTER_RETENTION_0  - index 2
-> CLUSTER_RETENTION_1  - index 3
->
-> Cleraly if some CPUs are in index 3 and some in 2, 2 must be chosen.
->
-> This demotion is easy to carry out with the information in the bindings.
-> If a state affect power domains that span multiples CPUs (and not only
-> CPUs....), all CPUs (+ devices) must be in that state (or "higher") for it
-> to be valid.
-
-So it implies that we assume a decreasing compatibility so that if a
-cpu is in index N but share power domain with other cpus in state n-3
-then we select n-3 for all cpus ? My point is that I'm not sure that
-this always apply but no simple example is coming for the moment in my
-mind :-)
-
->
-> If not, demotion should take place (or put it differently that state
-> becomes invalid).
->
-> A LUT should be sufficient for a CPU to detect what it has to do upon
-> state entry.
->
-> I will give it more thought but I think the information in the bindings
-> is still sufficient to pull this off.
->
-> I am a bit concerned about the power domains representation in the DT, I
-> will think more about this too and keep you posted.
-
-Thanks
-Vincent
-
->
-> Thanks,
-> Lorenzo
->
+>> On our Zynq design here we ended up being unwilling to use platform
+>> generation from Vivado. Basically all our IP was custom, so there was
+>> no win at all to invoking the complexity of the automatic tools.
 >>
->> Regards,
->> Vincent
+>> Thus we write the DT by hand, and our DT is complex, integrating
+>> peripherals that span two FPGAs.
 >>
->> >
->> > Thank you !!
->> > Lorenzo
->> >
->> >> Then, IMHO, the flat description below is clearer and remove the
->> >> duplicated description that you mention previously
->> >>
->> >> Regards,
->> >> Vincent
->> >>
->> >> >
->> >> > Thoughts very appreciated, thanks.
->> >> >
->> >> > Lorenzo
->> >> >
->> >> > idle-states {
->> >> >        entry-method = "arm,psci-cpu-suspend";
->> >> >
->> >> >         CPU_RETENTION_0: cpu-retention-0 {
->> >> >                        compatible = "arm,idle-state";
->> >> >                        cache-state-retained;
->> >> >                        entry-method-param = <0x0010000>;
->> >> >                        entry-latency-us = <20>;
->> >> >                        exit-latency-us = <40>;
->> >> >                        min-residency-us = <30>;
->> >> >                        power-domains = <&pd_cores 0>,
->> >> >                                        <&pd_cores 1>,
->> >> >                                        <&pd_cores 2>,
->> >> >                                        <&pd_cores 3>,
->> >> >         };
->> >> >
->> >> >         CPU_SLEEP_0: cpu-sleep-0 {
->> >> >                        /* cpu sleep */
->> >> >                        compatible = "arm,idle-state";
->> >> >                        entry-method-param = <0x0010000>;
->> >> >                        entry-latency-us = <250>;
->> >> >                        exit-latency-us = <500>;
->> >> >                        min-residency-us = <350>;
->> >> >                        power-domains = <&pd_cores 0>,
->> >> >                                        <&pd_cores 1>,
->> >> >                                        <&pd_cores 2>,
->> >> >                                        <&pd_cores 3>,
->> >> >         };
->> >> >
->> >> >         CPU_SLEEP_1: cpu-sleep-1 {
->> >> >                        /* cpu sleep */
->> >> >                        compatible = "arm,idle-state";
->> >> >                        entry-method-param = <0x0010000>;
->> >> >                        entry-latency-us = <250>;
->> >> >                        exit-latency-us = <500>;
->> >> >                        min-residency-us = <350>;
->> >> >                                        <&pd_cores 4>,
->> >> >                                        <&pd_cores 5>,
->> >> >                                        <&pd_cores 6>,
->> >> >                                        <&pd_cores 7>;
->> >> >         };
->> >> >
->> >> >         CLUSTER_RETENTION_0: cluster-retention-0 {
->> >> >                compatible = "arm,idle-state";
->> >> >                logic-state-retained;
->> >> >                cache-state-retained;
->> >> >                entry-method-param = <0x1010000>;
->> >> >                entry-latency-us = <50>;
->> >> >                exit-latency-us = <800>;
->> >> >                min-residency-us = <2400>;
->> >> >                power-domains = <&pd_clusters 0>;
->> >> >                substates = <&CPU_SLEEP_0>;
->> >> >         };
->> >> >
->> >> >         CLUSTER_SLEEP_0: cluster-sleep-0 {
->> >> >                compatible = "arm,idle-state";
->> >> >                entry-method-param = <0x1010000>;
->> >> >                entry-latency-us = <600>;
->> >> >                exit-latency-us = <1100>;
->> >> >                min-residency-us = <2700>;
->> >> >                power-domains = <&pd_clusters 0>;
->> >> >                substates = <&CPU_SLEEP_0>;
->> >> >         };
->> >> >
->> >> >         CLUSTER_SLEEP_1: cluster-sleep-1 {
->> >> >                compatible = "arm,idle-state";
->> >> >                entry-method-param = <0x1010000>;
->> >> >                entry-latency-us = <600>;
->> >> >                exit-latency-us = <1100>;
->> >> >                min-residency-us = <2700>;
->> >> >                power-domains = <&pd_clusters 1>;
->> >> >                substates = <&CPU_SLEEP_1>;
->> >> >         };
->> >> >
->> >> >         SYSTEM_SLEEP_0: system-sleep-0 {
->> >> >                compatible = "arm,idle-state";
->> >> >                entry-method-param = <0x2010000>;
->> >> >                entry-latency-us = <6000>;
->> >> >                exit-latency-us = <10000>;
->> >> >                min-residency-us = <30000>;
->> >> >                power-domains = <&pd_system 0>;
->> >> >                substates = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
->> >> >         };
->> >> > };
->> >> >
->> >>
->> >
+>> I think the in-kernel DT should use the kernel conventions, which
+>> means using #include and the binding constants over magic values.
 >>
->
+> 
+> ACK.
+> 
+> If in doubt follow common mainline practice. Although using includes
+> for DT is not necessarily common practice, readability of DTs is
+> really important IMHO.
+
+Let me give you one example. When you add xilinx intc controller
+to zynq HW design which uses gic with headers you are using
+then you will find out that sensitivity for both controllers
+are just different.
+This is just one case I am aware of. I expect there will be one more.
+
+Also dtses from kernel are copied to other project because separation
+from kernel hasn't be done but there is any plan regarding this.
+
+Using dtc preprocessor and macros improve DTS readability but at the same
+time force other users to copy all necessary files from the kernel
+to that projects which is just hassle.
+With example above there are also cases where using macros is just wrong
+that's why I don't want to start to use it.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140408/a9eb5171/attachment-0001.sig>
