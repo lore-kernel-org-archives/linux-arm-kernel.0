@@ -1,48 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 9 Apr 2014 01:16:54 +0200
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-In-Reply-To: <53442997.70209@i2se.com>
-References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
- <5343FDD3.3070308@i2se.com> <20140408141832.GA8861@piout.net>
- <53442997.70209@i2se.com>
-Message-ID: <20140408231654.GA13898@piout.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 8 Apr 2014 16:26:20 -0700
+Subject: [PATCH v2] ARM: qcom: Add initial APQ8064 SoC and IFC6410 board
+ device trees
+In-Reply-To: <1396972391-11759-1-git-send-email-galak@codeaurora.org>
+References: <1396972391-11759-1-git-send-email-galak@codeaurora.org>
+Message-ID: <20140408232619.GL9985@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/04/2014 at 18:53:43 +0200, Stefan Wahren wrote :
-> i applied these 5 patches, but it doesn't fix the problem.
+On 04/08, Kumar Gala wrote:
+> Add basic APQ8064 SoC include device tree and support for basic booting on
+> the IFC6410 board.
 > 
-> Here are my results for the pwm driver led on i.MX28:
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+> v2:
+> * created a v2.0 apq8064.dtsi to handle differences in Si rev in future
+> * changed /include/ to #include
+> * added PMU node
+> * dropped interrupts from cpus node, not currently part of binding
 > 
-> version                  | trigger: none          | trigger: heartbeat
-> -----------------------------------------------------------------------------
-> 3.14                     | OK                     | NOT OK (WARNING, LED
-> permanent on)
->   + shawn's patch        | OK                     | NOT OK (LED
-> permanent on)
->     + russell's patches  | OK                     | NOT OK (LED
-> permanent on)
->       + active-low       | NOT OK (inverse logic) | NOT OK (LED
-> permanent on)
 > 
-> Russell's patches work as expected, but have not influence on the heartbeat.
-> 
+>  arch/arm/boot/dts/Makefile                 |   1 +
+>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  12 +++
+>  arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi   |   1 +
+>  arch/arm/boot/dts/qcom-apq8064.dtsi        | 154 +++++++++++++++++++++++++++++
+>  arch/arm/mach-qcom/board.c                 |   1 +
 
-Yeah, I got it wrong or explained badly.
-
-So, if without Russell's patches, your pwm is not inversed, then you would
-have to set active_low and inverse the pwm.
-If it was inversed, then you'll have to set active_low and let the pwm
-with the normal polarity. I know this is a bit contrived but this was
-exactly my point why we shouldn't call it active_low.
-
-Can you try to switch the polarity when setting active_low ?
-
-I'm not home, else I'll try on my i.mx28 boards...
+I suspect the arm-soc folks would like us to split the mach-qcom
+changes from the dts changes.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
