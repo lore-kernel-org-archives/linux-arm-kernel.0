@@ -1,97 +1,69 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue,  8 Apr 2014 14:19:38 +0200
-Subject: [PATCH V3 16/17] ARM: exynos: cpuidle: Pass the AFTR callback to the
- platform_data
+Date: Tue,  8 Apr 2014 14:19:32 +0200
+Subject: [PATCH V3 10/17] ARM: exynos: cpuidle: Move exynos_set_wakeupmask in
+ the cpu_pm notifier
 In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396959579-18268-17-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396959579-18268-11-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No more dependency on the arch code. The platform_data field is used to set the
-PM callback as the other cpuidle drivers.
+Let's encapsulate more the PM code inside the PM file by moving the
+'exynos_set_wakeupmask' function inside the pm.c and the call in the cpu_pm
+notifier.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/mach-exynos/common.h  |    1 +
- arch/arm/mach-exynos/cpuidle.c |    6 ++++--
- arch/arm/mach-exynos/exynos.c  |    5 +++--
- arch/arm/mach-exynos/pmu.c     |    6 ++++++
- 4 files changed, 14 insertions(+), 4 deletions(-)
+ arch/arm/mach-exynos/cpuidle.c |    7 -------
+ arch/arm/mach-exynos/pm.c      |    7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 9ef3f83..7d9432e 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -62,5 +62,6 @@ struct exynos_pmu_conf {
- };
- 
- extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-+extern void exynos_sys_powerdown_aftr(void);
- 
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
 diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index a1f111e..25d2fad 100644
+index ce31004..01444ed 100644
 --- a/arch/arm/mach-exynos/cpuidle.c
 +++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -16,12 +16,12 @@
- #include <asm/suspend.h>
- #include <asm/cpuidle.h>
+@@ -58,15 +58,8 @@
+ #define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
+ #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
  
--#include "common.h"
-+static void (*exynos_aftr)(void);
- 
+-/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+-static void exynos_set_wakeupmask(void)
+-{
+-	__raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
+-}
+-
  static int idle_finisher(unsigned long flags)
  {
- 	/* Set value of power down register for aftr mode */
--	exynos_sys_powerdown_conf(SYS_AFTR);
-+	exynos_aftr();
- 	cpu_do_idle();
- 	return 1;
- }
-@@ -75,6 +75,8 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
- {
- 	int ret;
+-	exynos_set_wakeupmask();
  
-+	exynos_aftr = (void *)(pdev->dev.platform_data);
-+
- 	ret = cpuidle_register(&exynos_idle_driver, NULL);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index fe8dac8..a7ab561 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -221,8 +221,9 @@ void exynos_restart(enum reboot_mode mode, const char *cmd)
- }
- 
- static struct platform_device exynos_cpuidle = {
--	.name		= "exynos_cpuidle",
--	.id		= -1,
-+	.name              = "exynos_cpuidle",
-+	.dev.platform_data = exynos_sys_powerdown_aftr,
-+	.id                = -1,
+ 	__raw_writel(virt_to_phys(s3c_cpu_resume), REG_DIRECTGO_ADDR);
+ 	__raw_writel(S5P_CHECK_AFTR, REG_DIRECTGO_FLAG);
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 9773a00..c8b3dc4 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -322,6 +322,12 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
+ 	.valid		= suspend_valid_only_mem,
  };
  
- void __init exynos_cpuidle_init(void)
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 05c7ce1..fd1ae22 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -389,6 +389,12 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 	}
- }
- 
-+/* Set value of power down register for aftr mode */
-+void exynos_sys_powerdown_aftr(void)
++/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
++static void exynos_set_wakeupmask(void)
 +{
-+	exynos_sys_powerdown_conf(SYS_AFTR);
++	__raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
 +}
 +
- static int __init exynos_pmu_init(void)
+ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 				  unsigned long cmd, void *v)
  {
- 	unsigned int value;
+@@ -331,6 +337,7 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 	case CPU_PM_ENTER:
+ 		if (cpu == 0) {
+ 			exynos_cpu_save_register();
++			exynos_set_wakeupmask();
+ 		}
+ 		break;
+ 
 -- 
 1.7.9.5
