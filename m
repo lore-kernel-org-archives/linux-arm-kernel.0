@@ -1,49 +1,43 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 8 Apr 2014 10:54:01 -0600
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <4778371.oH3kIlbD0f@wuerfel>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <CAErSpo4iEV6khP63ZTF+YUTKi9WLFXzMv13nxw15y3qDg15Ztg@mail.gmail.com>
- <20140408095038.GT17163@e106497-lin.cambridge.arm.com>
- <4778371.oH3kIlbD0f@wuerfel>
-Message-ID: <CAErSpo4RtEovyRXw=UXxBSz_hD4kfayBOkaKH_4Qk_s+hsEAxg@mail.gmail.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Tue, 8 Apr 2014 18:55:05 +0200
+Subject: ethaddr0 alias for imx6
+Message-ID: <534429E9.1050202@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 8, 2014 at 4:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 08 April 2014 10:50:39 Liviu Dudau wrote:
->> On Mon, Apr 07, 2014 at 06:58:24PM +0100, Bjorn Helgaas wrote:
->> > On Mon, Apr 7, 2014 at 5:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >
->> > > I think migrating other architectures to use the same code should be
->> > > a separate effort from adding a generic implementation that can be
->> > > used by arm64. It's probably a good idea to have patches to convert
->> > > arm32 and/or microblaze.
->> >
->> > Let me reiterate that I am 100% in favor of replacing arch-specific
->> > code with more generic implementations.
->> >
->> > However, I am not 100% in favor of doing it as separate efforts
->> > (although maybe I could be convinced).  The reasons I hesitate are
->> > that (1) if only one architecture uses a new "generic" implementation,
->> > we really don't know whether it is generic enough, (2) until I see the
->> > patches to convert other architectures, I have to assume that I'm the
->> > one who will write them, and (3) as soon as we add the code to
->> > drivers/pci, it becomes partly my headache to maintain it, even if
->> > only one arch benefits from it.
->
-> Fair enough.
->
-> My approach to the asm-generic infrastruction has mostly been to ensure
-> that whoever adds a new architecture has to make things easier for the
-> next person.
+Hello,
 
-That's a good rule.  But if we add a generic implementation used only
-by one architecture, the overall complexity has increased (we added
-new unshared code), so the next person has to look at N+1 existing
-implementations.  If we even convert one existing arch, that seems
-like an improvement: we have N implementations with one being used by
-at least two arches.
+I think I'm missing a commit similar to 8c41d57395ff5b9b16724786c7c4b4c4081510cc to 
+add the ethernet0 alias so that U-Boot can fixup the MAC in the device tree for iMX6. 
+Like this:
 
-Bjorn
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index b48a128e519d..b3ec952eada6 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -15,6 +15,7 @@
+
+  / {
+         aliases {
++               ethernet0 = &fec;
+                 flexcan0 = &flexcan1;
+                 flexcan1 = &flexcan2;
+                 gpio0 = &gpio1;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index b937a4a94202..2afd45c67996 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -13,6 +13,7 @@
+
+  / {
+         aliases {
++               ethernet0 = &fec;
+                 serial0 = &uart1;
+                 serial1 = &uart2;
+                 serial2 = &uart3;
+
+Has this changed recently and is done in a different way or has nobody noticed it before?
+
+Best regards,
+--
+Hector Palacios
