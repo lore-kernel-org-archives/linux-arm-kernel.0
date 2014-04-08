@@ -1,188 +1,37 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon,  7 Apr 2014 20:15:10 -0700
-Subject: [PATCH v2 2/2] ARM: mm: allow text and rodata sections to be read-only
-In-Reply-To: <1396926910-11227-1-git-send-email-keescook@chromium.org>
-References: <1396926910-11227-1-git-send-email-keescook@chromium.org>
-Message-ID: <1396926910-11227-3-git-send-email-keescook@chromium.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 8 Apr 2014 09:27:04 +0530
+Subject: [PATCH V2 17/17] ARM: exynos: config: Enable cpuidle
+In-Reply-To: <CAOesGMgf4owZBCVz4RTgbFVsogws6WKARmA7COkgXVQaG5ky9A@mail.gmail.com>
+References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
+ <5825506.2ErDt1UQ5r@amdc1032>
+ <CAOesGMgkbfUX=cJ4rMf+-26Sq_fYUNW8m6unNiCXHKwj83dLbw@mail.gmail.com>
+ <3344539.A0GIVp3yPt@amdc1032>
+ <CAOesGMgf4owZBCVz4RTgbFVsogws6WKARmA7COkgXVQaG5ky9A@mail.gmail.com>
+Message-ID: <CAK9yfHz_J+NAtxk-Ec-cW6_u0ukssNGi24HZgGRRXb8Hzz2sig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
-read-only. Additionally, this splits rodata from text so that rodata can
-also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
+On 8 April 2014 00:03, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Apr 7, 2014 at 10:44 AM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+>>
+>> Hi,
+>>
+>> On Monday, April 07, 2014 09:28:39 AM Olof Johansson wrote:
+>>> On Fri, Apr 4, 2014 at 9:09 AM, Bartlomiej Zolnierkiewicz
+>>> <b.zolnierkie@samsung.com> wrote:
+>>>
+>>> [...]
+>
+> Does 5420 even work upstream? I have hardware access but nothing that
+> will run an upstream kernel as far as I know. Maybe SLSI has an SMDK
+> they can help out with?
 
-The read-only areas are made writable during ftrace updates. Additional
-work is needed for kprobes and kexec, so the feature is temporarily
-marked as unavailable in Kconfig when those options are selected.
+By working upstream if you mean being bootable, then yes I am able to boot both
+SMDK and Arndale Octa boards based on 5420 with the current upstream kernel.
+CPU idle however doesn't work though. I get a crash when I hot plug out all
+secondary CPUs on SMDK.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm/include/asm/cacheflush.h |    9 ++++++++
- arch/arm/kernel/ftrace.c          |   17 ++++++++++++++
- arch/arm/kernel/vmlinux.lds.S     |    3 +++
- arch/arm/mm/Kconfig               |   12 ++++++++++
- arch/arm/mm/init.c                |   46 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 87 insertions(+)
-
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 8b8b61685a34..b6fea0a1a88b 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -487,4 +487,13 @@ int set_memory_rw(unsigned long addr, int numpages);
- int set_memory_x(unsigned long addr, int numpages);
- int set_memory_nx(unsigned long addr, int numpages);
- 
-+#ifdef CONFIG_DEBUG_RODATA
-+void mark_rodata_ro(void);
-+void set_kernel_text_rw(void);
-+void set_kernel_text_ro(void);
-+#else
-+static inline void set_kernel_text_rw(void) { }
-+static inline void set_kernel_text_ro(void) { }
-+#endif
-+
- #endif
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index af9a8a927a4e..ea446ae09c89 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -15,6 +15,7 @@
- #include <linux/ftrace.h>
- #include <linux/uaccess.h>
- #include <linux/module.h>
-+#include <linux/stop_machine.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/opcodes.h>
-@@ -35,6 +36,22 @@
- 
- #define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
- 
-+static int __ftrace_modify_code(void *data)
-+{
-+	int *command = data;
-+
-+	set_kernel_text_rw();
-+	ftrace_modify_all_code(*command);
-+	set_kernel_text_ro();
-+
-+	return 0;
-+}
-+
-+void arch_ftrace_update_code(int command)
-+{
-+	stop_machine(__ftrace_modify_code, &command, NULL);
-+}
-+
- static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
- {
- 	return rec->arch.old_mcount ? OLD_NOP : NOP;
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 08fa667ef2f1..ec79e7268e09 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -120,6 +120,9 @@ SECTIONS
- 			ARM_CPU_KEEP(PROC_INFO)
- 	}
- 
-+#ifdef CONFIG_DEBUG_RODATA
-+	. = ALIGN(1<<SECTION_SHIFT);
-+#endif
- 	RO_DATA(PAGE_SIZE)
- 
- 	. = ALIGN(4);
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index b484fb04cf6f..e767ab6e1c27 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -966,3 +966,15 @@ config ARM_KERNMEM_PERMS
- 	  padded to section-size (1MiB) boundaries (because their permissions
- 	  are different and splitting the 1M pages into 4K ones causes TLB
- 	  performance problems), wasting memory.
-+
-+config DEBUG_RODATA
-+	bool "Make kernel text and rodata read-only"
-+	depends on ARM_KERNMEM_PERMS && KEXEC=n && KPROBES=n
-+	default y
-+	help
-+	  If this is set, kernel text and rodata will be made read-only. This
-+	  is to help catch accidental or malicious attempts to change the
-+	  kernel's executable code. Additionally splits rodata from kernel
-+	  text so it can be made explicitly non-executable. This creates
-+	  another section-size padded region, so it can waste more memory
-+	  space while gaining the read-only protections.
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 66a7283583cd..74647a4f1af4 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -634,6 +634,7 @@ struct section_perm {
- 	unsigned long end;
- 	pmdval_t mask;
- 	pmdval_t prot;
-+	pmdval_t clear;
- };
- 
- struct section_perm nx_perms[] = {
-@@ -651,8 +652,35 @@ struct section_perm nx_perms[] = {
- 		.mask	= ~PMD_SECT_XN,
- 		.prot	= PMD_SECT_XN,
- 	},
-+#ifdef CONFIG_DEBUG_RODATA
-+	/* Make rodata NX (set RO in ro_perms below). */
-+	{
-+		.start  = (unsigned long)__start_rodata,
-+		.end    = (unsigned long)__init_begin,
-+		.mask   = ~PMD_SECT_XN,
-+		.prot   = PMD_SECT_XN,
-+	},
-+#endif
- };
- 
-+#ifdef CONFIG_DEBUG_RODATA
-+struct section_perm ro_perms[] = {
-+	/* Make kernel code and rodata RX (set RO). */
-+	{
-+		.start  = (unsigned long)_stext,
-+		.end    = (unsigned long)__init_begin,
-+#ifdef CONFIG_ARM_LPAE
-+		.mask   = ~PMD_SECT_RDONLY,
-+		.prot   = PMD_SECT_RDONLY,
-+#else
-+		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
-+		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
-+		.clear  = PMD_SECT_AP_WRITE,
-+#endif
-+	},
-+};
-+#endif
-+
- /*
-  * Updates section permissions only for the current mm (sections are
-  * copied into each mm). During startup, this is the init_mm.
-@@ -721,6 +749,24 @@ static inline void fix_kernmem_perms(void)
- {
- 	set_section_perms(nx_perms, prot);
- }
-+
-+#ifdef CONFIG_DEBUG_RODATA
-+void mark_rodata_ro(void)
-+{
-+	set_section_perms(ro_perms, prot);
-+}
-+
-+void set_kernel_text_rw(void)
-+{
-+	set_section_perms(ro_perms, clear);
-+}
-+
-+void set_kernel_text_ro(void)
-+{
-+	set_section_perms(ro_perms, prot);
-+}
-+#endif /* CONFIG_DEBUG_RODATA */
-+
- #else
- static inline void fix_kernmem_perms(void) { }
- #endif /* CONFIG_ARM_KERNMEM_PERMS */
 -- 
-1.7.9.5
+With warm regards,
+Sachin
