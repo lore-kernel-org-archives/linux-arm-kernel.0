@@ -1,37 +1,70 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 8 Apr 2014 07:55:26 -0500
-Subject: [PATCH] of: Fix the section mismatch warnings.
-In-Reply-To: <1396936087-23043-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1396936087-23043-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <CAL_JsqKuvKwEv89hOSknc-0Pq3aiwyPFhB-kPA-cRjGK831oFQ@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Tue, 8 Apr 2014 15:51:34 +0300
+Subject: [PATCH v2] mtd: davinci-nand: disable subpage write for
+ keystone-nand
+In-Reply-To: <532B4C36.8060405@ti.com>
+References: <1395346112-13350-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B4C36.8060405@ti.com>
+Message-ID: <5343F0D6.2010804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 8, 2014 at 12:48 AM, Xiubo Li <Li.Xiubo@freescale.com> wrote:
-> In tag next-20140407, building with CONFIG_DEBUG_SECTION_MISMATCH
-> enabled, the following WARNING is occured:
->
-> WARNING: drivers/built-in.o(.text.unlikely+0x2220): Section mismatch
-> in reference from the function __reserved_mem_check_root() to the
-> function .init.text:of_get_flat_dt_prop()
-> The function __reserved_mem_check_root() references
-> the function __init of_get_flat_dt_prop().
-> This is often because __reserved_mem_check_root lacks a __init
-> annotation or the annotation of of_get_flat_dt_prop is wrong.
->
-> WARNING: vmlinux.o(.text.unlikely+0xb9d0): Section mismatch in reference
-> from the function __reserved_mem_check_root() to the (unknown reference)
-> .init.data:(unknown)
-> The function __reserved_mem_check_root() references
-> the (unknown reference) __initdata (unknown).
-> This is often because __reserved_mem_check_root lacks a __initdata
-> annotation or the annotation of (unknown) is wrong.
->
-> This is cause by :
-> 'drivers: of: add initialization code for dynamic reserved memory'.
->
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 
-Applied.
+On 03/20/2014 10:14 PM, Santosh Shilimkar wrote:
+> On Thursday 20 March 2014 04:08 PM, Ivan Khoronzhuk wrote:
+>> From: Murali Karicheri <m-karicheri2@ti.com>
+>>
+>> Sub page write doesn't work because of hw issue in controller found on
+>> Keystone SOCs. AEMIF controller is also used on DaVinci SOCs which
+>> don't seems to have any issue. So add "ti,keysone-nand" compatible
+>> to nand driver in order to set NAND_NO_SUBPAGE_WRITE option.
+>>
+>> Cc: Brian Norris <computersforpeace@gmail.com>
+>> Cc: Warner Losh <imp@bsdimp.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+>>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+>> This patch is a result of discussion on patch v1:
+>> https://lkml.org/lkml/2014/3/20/461
+>>
+>>   drivers/mtd/nand/davinci_nand.c | 6 ++++++
+>>   1 file changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+>> index 4615d79..b922c8e 100644
+>> --- a/drivers/mtd/nand/davinci_nand.c
+>> +++ b/drivers/mtd/nand/davinci_nand.c
+>> @@ -523,6 +523,7 @@ static struct nand_ecclayout hwecc4_2048 = {
+>>   #if defined(CONFIG_OF)
+>>   static const struct of_device_id davinci_nand_of_match[] = {
+>>   	{.compatible = "ti,davinci-nand", },
+>> +	{.compatible = "ti,keystone-nand", },
+>>   	{},
+>>   };
+>>   MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
+>> @@ -581,6 +582,11 @@ static struct davinci_nand_pdata
+>>   		    of_property_read_bool(pdev->dev.of_node,
+>>   			"ti,davinci-nand-use-bbt"))
+>>   			pdata->bbt_options = NAND_BBT_USE_FLASH;
+>> +
+>> +		if (of_device_is_compatible(pdev->dev.of_node,
+>> +					    "ti,keystone-nand")) {
+>> +			pdata->options |= NAND_NO_SUBPAGE_WRITE;
+>> +		}
+>>   	}
+>>   
+>>   	return dev_get_platdata(&pdev->dev);
+>>
+>>
 
-Rob
+Brian,
+Could you pick up subj patch?
+
+-- 
+Regards,
+Ivan Khoronzhuk
