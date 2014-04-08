@@ -1,432 +1,383 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue,  8 Apr 2014 16:00:48 +0800
-Subject: [PATCH v2 08/12] ARM: dts: add hip04-d01 dts file
+Date: Tue,  8 Apr 2014 16:00:47 +0800
+Subject: [PATCH v2 07/12] ARM: hisi: add hip04 SoC support
 In-Reply-To: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1396944052-9887-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1396944052-9887-8-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hip04.dtsi & hip04-d01.dts file to support HiP04 SoC platform.
+Hisilicon Hi3xxx is based on Cortex A9 Core. Now HiP04 SoC is based on
+Cortex A15 Core. Since multiple clusters is used in HiP04 SoC, it could
+be based on MCPM.
+
+And HiP04 supports LPAE to support large memory.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/gic.txt      |   1 +
- .../bindings/arm/hisilicon/hisilicon.txt           |  12 ++
- .../devicetree/bindings/clock/hip04-clock.txt      |  20 ++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/hip04-d01.dts                    |  74 +++++++
- arch/arm/boot/dts/hip04.dtsi                       | 240 +++++++++++++++++++++
- 6 files changed, 348 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
- create mode 100644 arch/arm/boot/dts/hip04-d01.dts
- create mode 100644 arch/arm/boot/dts/hip04.dtsi
+ arch/arm/Kconfig               |   2 +-
+ arch/arm/mach-hisi/Kconfig     |   7 ++
+ arch/arm/mach-hisi/core.h      |   6 +
+ arch/arm/mach-hisi/hisilicon.c |  19 +++
+ arch/arm/mach-hisi/platsmp.c   | 259 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 292 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-index 5573c08..150f7d6 100644
---- a/Documentation/devicetree/bindings/arm/gic.txt
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -16,6 +16,7 @@ Main node required properties:
- 	"arm,cortex-a9-gic"
- 	"arm,cortex-a7-gic"
- 	"arm,arm11mp-gic"
-+	"hisilicon,hip04-gic"
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Specifies the number of cells needed to encode an
-   interrupt source.  The type shall be a <u32> and the value shall be 3.
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index df0a452..47c0a13 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -4,6 +4,10 @@ Hisilicon Platforms Device Tree Bindings
- Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
-+HiP04 D01 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hip04-d01";
-+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a8b2b45..6af6609 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1113,7 +1113,7 @@ source arch/arm/mm/Kconfig
  
- Hisilicon system controller
+ config ARM_NR_BANKS
+ 	int
+-	default 16 if ARCH_EP93XX
++	default 16 if ARCH_EP93XX || ARCH_HIP04
+ 	default 8
  
-@@ -31,6 +35,14 @@ Example:
- 		reboot-offset = <0x4>;
- 	};
+ config IWMMXT
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index da16efd..4dd966a 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -19,6 +19,13 @@ config ARCH_HI3xxx
+ 	help
+ 	  Support for Hisilicon Hi36xx/Hi37xx processor family
  
++config ARCH_HIP04
++	bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7_LPAE
++	select HAVE_ARM_ARCH_TIMER
++	select MCPM if SMP
++	help
++	  Support for Hisilicon HiP04 processor family
 +
-+Hisilicon MCPM Implementation
-+
-+Required Properties:
-+- compatible: "hisilicon,hip04-mcpm"
-+- reg: Register address and size.
-+
-+
- PCTRL: Peripheral misc control register
+ endmenu
  
- Required Properties:
-diff --git a/Documentation/devicetree/bindings/clock/hip04-clock.txt b/Documentation/devicetree/bindings/clock/hip04-clock.txt
-new file mode 100644
-index 0000000..4d31ae3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/hip04-clock.txt
-@@ -0,0 +1,20 @@
-+* Hisilicon HiP04 Clock Controller
+ endif
+diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
+index af23ec2..e008c7a 100644
+--- a/arch/arm/mach-hisi/core.h
++++ b/arch/arm/mach-hisi/core.h
+@@ -12,4 +12,10 @@ extern void hi3xxx_cpu_die(unsigned int cpu);
+ extern int hi3xxx_cpu_kill(unsigned int cpu);
+ extern void hi3xxx_set_cpu(int cpu, bool enable);
+ 
++#define HIP04_BOOTWRAPPER_PHYS		0x10c00000
++#define HIP04_BOOTWRAPPER_MAGIC		0xa5a5a5a5
++#define HIP04_BOOTWRAPPER_SIZE		0x00010000
 +
-+The HiP04 clock controller generates and supplies clock to various
-+controllers within the HiP04 SoC.
++extern bool __init hip04_smp_init_ops(void);
 +
-+Required Properties:
+ #endif
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index 741faf3..10a605f 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -14,6 +14,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/clocksource.h>
+ #include <linux/irqchip.h>
++#include <linux/memblock.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ 
+@@ -88,3 +89,21 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.smp		= smp_ops(hi3xxx_smp_ops),
+ 	.restart	= hi3xxx_restart,
+ MACHINE_END
 +
-+- compatible: should be one of the following.
-+  - "hisilicon,hip04-clock" - controller compatible with HiP04 SoC.
-+
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+- #clock-cells: should be 1.
-+
-+
-+Each clock is assigned an identifier and client nodes use this identifier
-+to specify the clock which they consume.
-+
-+All these identifier could be found in <dt-bindings/clock/hip04-clock.h>.
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2145af6..d0cbc939 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -80,6 +80,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- dtb-$(CONFIG_ARCH_HI3xxx) += hi3620-hi4511.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
- 	ecx-2000.dtb
-+dtb-$(CONFIG_ARCH_HIP04) += hip04-d01.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- 	integratorcp.dtb
- dtb-$(CONFIG_ARCH_KEYSTONE) += k2hk-evm.dtb \
-diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
-new file mode 100644
-index 0000000..a10dcf3
---- /dev/null
-+++ b/arch/arm/boot/dts/hip04-d01.dts
-@@ -0,0 +1,74 @@
-+/*
-+ *  Copyright (C) 2013-2014 Linaro Ltd.
-+ *  Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+
-+#include "hip04.dtsi"
-+
-+/ {
-+	/* memory bus is 64-bit */
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	model = "Hisilicon D01 Development Board";
-+	compatible = "hisilicon,hip04-d01";
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		/*
-+		 * Bootloader loads kernel image into 0x1000_0000 region,
-+		 * so disables the region between [0000_0000 - 1000_0000]
-+		 * temporarily.
-+		 * Because the PHYS_TO_VIRT_OFFSET is calculated based on
-+		 * the original region that kenrel is loaded.
-+		 * This workaround will be removed only after UEFI updated.
-+		 */
-+		reg = <0x00000000 0x10000000 0xc0000000>;
-+	};
-+
-+	memory at 00000004c0000000 {
-+		device_type = "memory";
-+		reg = <0x00000004 0xc0000000 0x40000000>;
-+	};
-+
-+	memory at 0000000500000000 {
-+		device_type = "memory";
-+		reg = <0x00000005 0x00000000 0x80000000>;
-+	};
-+
-+	memory at 0000000580000000 {
-+		device_type = "memory";
-+		reg = <0x00000005 0x80000000 0x80000000>;
-+	};
-+
-+	memory at 0000000600000000 {
-+		device_type = "memory";
-+		reg = <0x00000006 0x00000000 0x80000000>;
-+	};
-+
-+	memory at 0000000680000000 {
-+		device_type = "memory";
-+		reg = <0x00000006 0x80000000 0x80000000>;
-+	};
-+
-+	memory at 0000000700000000 {
-+		device_type = "memory";
-+		reg = <0x00000007 0x00000000 0x80000000>;
-+	};
-+
-+	memory at 0000000780000000 {
-+		device_type = "memory";
-+		reg = <0x00000007 0x80000000 0x80000000>;
-+	};
-+
-+	soc {
-+		uart0: uart at 4007000 {
-+			status = "ok";
-+		};
-+	};
++static const char *hip04_compat[] __initconst = {
++	"hisilicon,hip04-d01",
++	NULL,
 +};
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-new file mode 100644
-index 0000000..eb5e5a2
---- /dev/null
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -0,0 +1,240 @@
-+/*
-+ * Hisilicon Ltd. HiP01 SoC
-+ *
-+ * Copyright (C) 2013-2014 Hisilicon Ltd.
-+ * Copyright (C) 2013-2014 Linaro Ltd.
-+ *
-+ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * publishhed by the Free Software Foundation.
++
++static void __init hip04_reserve(void)
++{
++	memblock_reserve(HIP04_BOOTWRAPPER_PHYS, HIP04_BOOTWRAPPER_SIZE);
++}
++
++DT_MACHINE_START(HIP04, "Hisilicon HiP04 (Flattened Device Tree)")
++	.dt_compat	= hip04_compat,
++#ifdef CONFIG_MCPM
++	.smp_init	= smp_init_ops(hip04_smp_init_ops),
++#endif
++	.reserve	= hip04_reserve,
++MACHINE_END
+diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
+index 471f1ee..3a5833f 100644
+--- a/arch/arm/mach-hisi/platsmp.c
++++ b/arch/arm/mach-hisi/platsmp.c
+@@ -9,9 +9,13 @@
+  */
+ #include <linux/smp.h>
+ #include <linux/io.h>
++#include <linux/irqchip/arm-gic.h>
+ #include <linux/of_address.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/cp15.h>
++#include <asm/cputype.h>
++#include <asm/mcpm.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ 
+@@ -87,3 +91,258 @@ struct smp_operations hi3xxx_smp_ops __initdata = {
+ 	.cpu_kill		= hi3xxx_cpu_kill,
+ #endif
+ };
++
++#ifdef CONFIG_MCPM
++/* bits definition in SC_CPU_RESET_REQ[x]/SC_CPU_RESET_DREQ[x]
++ * 1 -- unreset; 0 -- reset
 + */
++#define CORE_RESET_BIT(x)		(1 << x)
++#define NEON_RESET_BIT(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_BIT(x)		(1 << (x + 9))
++#define CLUSTER_L2_RESET_BIT		(1 << 8)
++#define CLUSTER_DEBUG_RESET_BIT		(1 << 13)
 +
-+#include <dt-bindings/clock/hip04-clock.h>
++/*
++ * bits definition in SC_CPU_RESET_STATUS[x]
++ * 1 -- reset status; 0 -- unreset status
++ */
++#define CORE_RESET_STATUS(x)		(1 << x)
++#define NEON_RESET_STATUS(x)		(1 << (x + 4))
++#define CORE_DEBUG_RESET_STATUS(x)	(1 << (x + 9))
++#define CLUSTER_L2_RESET_STATUS		(1 << 8)
++#define CLUSTER_DEBUG_RESET_STATUS	(1 << 13)
++#define CORE_WFI_STATUS(x)		(1 << (x + 16))
++#define CORE_WFE_STATUS(x)		(1 << (x + 20))
++#define CORE_DEBUG_ACK(x)		(1 << (x + 24))
 +
-+/ {
-+	/* memory bus is 64-bit */
-+	#address-cells = <2>;
-+	#size-cells = <1>;
++#define SC_CPU_RESET_REQ(x)		(0x520 + (x << 3))	/* reset */
++#define SC_CPU_RESET_DREQ(x)		(0x524 + (x << 3))	/* unreset */
++#define SC_CPU_RESET_STATUS(x)		(0x1520 + (x << 3))
 +
-+	aliases {
-+		serial0 = &uart0;
-+	};
++#define FAB_SF_MODE			0x0c
++#define FAB_SF_INVLD			0x10
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++/* bits definition in FB_SF_INVLD */
++#define FB_SF_INVLD_START		(1 << 8)
 +
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&CPU0>;
-+				};
-+				core1 {
-+					cpu = <&CPU1>;
-+				};
-+				core2 {
-+					cpu = <&CPU2>;
-+				};
-+				core3 {
-+					cpu = <&CPU3>;
-+				};
-+			};
-+			cluster1 {
-+				core0 {
-+					cpu = <&CPU4>;
-+				};
-+				core1 {
-+					cpu = <&CPU5>;
-+				};
-+				core2 {
-+					cpu = <&CPU6>;
-+				};
-+				core3 {
-+					cpu = <&CPU7>;
-+				};
-+			};
-+			cluster2 {
-+				core0 {
-+					cpu = <&CPU8>;
-+				};
-+				core1 {
-+					cpu = <&CPU9>;
-+				};
-+				core2 {
-+					cpu = <&CPU10>;
-+				};
-+				core3 {
-+					cpu = <&CPU11>;
-+				};
-+			};
-+			cluster3 {
-+				core0 {
-+					cpu = <&CPU12>;
-+				};
-+				core1 {
-+					cpu = <&CPU13>;
-+				};
-+				core2 {
-+					cpu = <&CPU14>;
-+				};
-+				core3 {
-+					cpu = <&CPU15>;
-+				};
-+			};
-+		};
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+		};
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+		CPU2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+		};
-+		CPU3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+		};
-+		CPU4: cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x100>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU5: cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x101>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU6: cpu at 102 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x102>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU7: cpu at 103 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x103>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU8: cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x200>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU9: cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x201>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU10: cpu at 202 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x202>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU11: cpu at 203 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x203>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU12: cpu at 300 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x300>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU13: cpu at 301 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x301>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU14: cpu at 302 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x302>;
-+			clock-frequency = <1350000000>;
-+		};
-+		CPU15: cpu at 303 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0x303>;
-+			clock-frequency = <1350000000>;
-+		};
-+	};
++#define HIP04_MAX_CLUSTERS		4
++#define HIP04_MAX_CPUS_PER_CLUSTER	4
 +
-+	soc {
-+		/* It's a 32-bit SoC. */
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "arm,amba-bus", "simple-bus";
-+		device_type = "soc";
-+		interrupt-parent = <&gic>;
-+		ranges = <0 0 0xe0000000 0x10000000>;
++static void __iomem *relocation, *sysctrl, *fabric;
++static int hip04_cpu_table[HIP04_MAX_CLUSTERS][HIP04_MAX_CPUS_PER_CLUSTER];
++static DEFINE_SPINLOCK(boot_lock);
 +
-+		gic: interrupt-controller at c01000 {
-+			compatible = "hisilicon,hip04-gic";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
++static bool hip04_cluster_down(unsigned int cluster)
++{
++	int i;
 +
-+			/* gic dist base, gic cpu base */
-+			reg = <0xc01000 0x1000>, <0xc02000 0x1000>;
-+		};
++	for (i = 0; i < HIP04_MAX_CPUS_PER_CLUSTER; i++)
++		if (hip04_cpu_table[cluster][i])
++			return false;
++	return true;
++}
 +
-+		mcpm: mcpm {
-+			compatible = "hisilicon,hip04-mcpm";
-+			reg = <0x100 0x1000>, <0x3e00000 0x00100000>,
-+			      <0x302a000 0x1000>;
-+		};
++static void hip04_set_snoop_filter(unsigned int cluster, unsigned int on)
++{
++	unsigned long data;
 +
-+		clock: clock {
-+			compatible = "hisilicon,hip04-clock";
-+			/* FIXME: the base of clock controller */
-+			reg = <0 0x1000>;
-+			#clock-cells = <1>;
-+		};
++	if (!fabric)
++		return;
++	data = readl_relaxed(fabric + FAB_SF_MODE);
++	if (on)
++		data |= 1 << cluster;
++	else
++		data &= ~(1 << cluster);
++	writel_relaxed(data, fabric + FAB_SF_MODE);
++	while (1) {
++		if (data == readl_relaxed(fabric + FAB_SF_MODE))
++			break;
++	}
++}
 +
-+		dual_timer0: dual_timer at 3000000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0x3000000 0x1000>;
-+			interrupts = <0 224 4>;
-+			clocks = <&clock HIP04_CLK_50M>;
-+			clock-names = "apb_pclk";
-+			status = "ok";
-+		};
++static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
++{
++	unsigned long data, mask;
 +
-+		timer {
-+			compatible = "arm,armv7-timer";
-+			interrupts = <1 13 0xf08>,
-+				     <1 14 0xf08>,
-+				     <1 11 0xf08>,
-+				     <1 10 0xf08>;
-+		};
++	if (!relocation || !sysctrl)
++		return -ENODEV;
++	if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
++		return -EINVAL;
 +
-+		uart0: uart at 4007000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x4007000 0x1000>;
-+			interrupts = <0 381 4>;
-+			clocks = <&clock HIP04_CLK_168M>;
-+			clock-names = "uartclk";
-+			reg-shift = <2>;
-+			status = "disabled";
-+		};
-+	};
++	spin_lock(&boot_lock);
++	writel_relaxed(HIP04_BOOTWRAPPER_PHYS, relocation);
++	writel_relaxed(HIP04_BOOTWRAPPER_MAGIC, relocation + 4);
++	writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
++	writel_relaxed(0, relocation + 12);
++
++	if (hip04_cluster_down(cluster)) {
++		data = CLUSTER_L2_RESET_BIT | CLUSTER_DEBUG_RESET_BIT;
++		writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
++		do {
++			mask = CLUSTER_L2_RESET_STATUS | \
++			       CLUSTER_DEBUG_RESET_STATUS;
++			data = readl_relaxed(sysctrl + \
++					     SC_CPU_RESET_STATUS(cluster));
++		} while (data & mask);
++		hip04_set_snoop_filter(cluster, 1);
++	}
++
++	hip04_cpu_table[cluster][cpu]++;
++
++	data = CORE_RESET_BIT(cpu) | NEON_RESET_BIT(cpu) | \
++	       CORE_DEBUG_RESET_BIT(cpu);
++	writel_relaxed(data, sysctrl + SC_CPU_RESET_DREQ(cluster));
++	spin_unlock(&boot_lock);
++
++	return 0;
++}
++
++static void hip04_mcpm_power_down(void)
++{
++	unsigned int mpidr, cpu, cluster;
++	unsigned int v;
++
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	local_irq_disable();
++	gic_cpu_if_down();
++
++	__mcpm_cpu_down(cpu, cluster);
++
++	asm volatile(
++	"	mrc	p15, 0, %0, c1, c0, 0\n"
++	"	bic	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 0\n"
++	  : "=&r" (v)
++	  : "Ir" (CR_C)
++	  : "cc");
++
++	flush_cache_louis();
++
++	asm volatile(
++	/*
++	* Turn off coherency
++	*/
++	"	mrc	p15, 0, %0, c1, c0, 1\n"
++	"	bic	%0, %0, %1\n"
++	"	mcr	p15, 0, %0, c1, c0, 1\n"
++	: "=&r" (v)
++	: "Ir" (0x40)
++	: "cc");
++
++	isb();
++	dsb();
++}
++
++static int hip04_mcpm_power_down_finish(unsigned int cpu, unsigned int cluster)
++{
++	int ret = -EBUSY;
++
++	spin_lock(&boot_lock);
++	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
++	__mcpm_cpu_going_down(cpu, cluster);
++
++	hip04_cpu_table[cluster][cpu]--;
++	if (hip04_cpu_table[cluster][cpu]) {
++		pr_err("Cluster %d CPU%d is still running\n", cluster, cpu);
++		goto out;
++	}
++	ret = 0;
++out:
++	spin_unlock(&boot_lock);
++	return ret;
++}
++
++static void hip04_mcpm_powered_up(void)
++{
++	if (!relocation)
++		return;
++	spin_lock(&boot_lock);
++	writel_relaxed(0, relocation);
++	writel_relaxed(0, relocation + 4);
++	writel_relaxed(0, relocation + 8);
++	writel_relaxed(0, relocation + 12);
++	spin_unlock(&boot_lock);
++}
++
++static const struct mcpm_platform_ops hip04_mcpm_ops = {
++	.power_up		= hip04_mcpm_power_up,
++	.power_down		= hip04_mcpm_power_down,
++	.power_down_finish	= hip04_mcpm_power_down_finish,
++	.powered_up		= hip04_mcpm_powered_up,
 +};
++
++static bool __init hip04_cpu_table_init(void)
++{
++	unsigned int mpidr, cpu, cluster;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	if (cluster >= HIP04_MAX_CLUSTERS ||
++	    cpu >= HIP04_MAX_CPUS_PER_CLUSTER) {
++		pr_err("%s: boot CPU is out of bound!\n", __func__);
++		return false;
++	}
++	hip04_set_snoop_filter(cluster, 1);
++	hip04_cpu_table[cluster][cpu] = 1;
++	return true;
++}
++
++static int __init hip04_mcpm_init(void)
++{
++	struct device_node *np;
++	int ret = -ENODEV;
++
++	np = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-mcpm");
++	if (!np) {
++		pr_err("failed to find hisilicon,hip04-mcpm node\n");
++		goto err;
++	}
++	relocation = of_iomap(np, 0);
++	if (!relocation) {
++		pr_err("failed to get relocation space\n");
++		ret = -ENOMEM;
++		goto err;
++	}
++	sysctrl = of_iomap(np, 1);
++	if (!sysctrl) {
++		pr_err("failed to get sysctrl base\n");
++		ret = -ENOMEM;
++		goto err_sysctrl;
++	}
++	fabric = of_iomap(np, 2);
++	if (!fabric) {
++		pr_err("failed to get fabric base\n");
++		ret = -ENOMEM;
++		goto err_fabric;
++	}
++	if (!hip04_cpu_table_init())
++		return -EINVAL;
++	ret = mcpm_platform_register(&hip04_mcpm_ops);
++	if (!ret) {
++		mcpm_sync_init(NULL);
++		pr_info("HiP04 MCPM initialized\n");
++	}
++	return ret;
++err_fabric:
++	iounmap(sysctrl);
++err_sysctrl:
++	iounmap(relocation);
++err:
++	return ret;
++}
++early_initcall(hip04_mcpm_init);
++
++bool __init hip04_smp_init_ops(void)
++{
++	mcpm_smp_set_ops();
++	return true;
++}
++#endif	/* CONFIG_MCPM */
 -- 
 1.8.3.2
