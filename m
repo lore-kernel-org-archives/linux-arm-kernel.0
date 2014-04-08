@@ -1,36 +1,59 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 8 Apr 2014 18:42:29 +0200
-Subject: [PATCH v6 2/5] ARM: Add Krait L2 register accessor functions
-In-Reply-To: <20140408171929.68f328a9@alan.etchedpixels.co.uk>
-References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
- <1396641450-12854-3-git-send-email-sboyd@codeaurora.org>
- <20140407201838.GC20822@pd.tnic>
- <20140407215649.GH9985@codeaurora.org>
- <20140408064328.GB30077@pd.tnic> <534406BD.8000702@codeaurora.org>
- <20140408151056.GH30077@pd.tnic>
- <20140408171929.68f328a9@alan.etchedpixels.co.uk>
-Message-ID: <20140408164228.GM30077@pd.tnic>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 8 Apr 2014 10:48:18 -0600
+Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
+ function.
+In-Reply-To: <6228807.4v9ZRtib77@wuerfel>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
+ <20140408094933.GS17163@e106497-lin.cambridge.arm.com>
+ <6228807.4v9ZRtib77@wuerfel>
+Message-ID: <CAErSpo4nZiEcTth5W6ZhcRSne80T8VWTWR2zm0yN7ogFR0Norw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 05:19:29PM +0100, One Thousand Gnomes wrote:
-> Including the without warranty is standard practice at a lot of
-> companies. It's not even wasting space - it'll compress beautifully as
-> there are already lots of similar headers all over the tree.
+On Tue, Apr 8, 2014 at 4:11 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Right, I was just trying to find out from Stephen/Christopher whether
-they're actually really required by legal to slap the boilerplate or
-they can get by with a smaller chunk. That's all.
+> There is a wide range of implementations across architectures:
+>
+> a) no access to I/O ports at all (tile, s390, ...)
+> b) access to I/O ports only through special instructions (x86, ...)
+> c) all MMIO is mapped virtual contiguous to PCI_IOBASE or _IO_BASE
+>    (most ppc64, arm32 with MMU, arm64, ...)
+> d) only one PCI host can have an I/O space (mips, microblaze, ...)
+> e) each host controller can have its own method (ppc64 with indirect pio)
+> f) PIO token equals virtual address plus offset (some legacy ARM platforms,
+>    probably some other architectures), or physical address (sparc)
+> g) PIO token encodes address space number plus offset (ia64)
+>
+> a) and b) are trivially handled by any implementation that falls
+> back to 'return -EINVAL'.
+> I believe that c) is the most appropriate solution and we should be
+> able to adopt it by most of the architectures that have an MMU and
+> make it the default implementation.
+> d) seems like a good fallback for noMMU architectures: While we do
+> need to support I/O spaces, we need to support multiple PCI domains,
+> and we need to support noMMU, the combination of all three should
+> be extremely rare, and I'd leave it up to the architecture to support
+> that if there is a real use case, rather than trying to put that into
+> common code.
+> Anything that currently requires e), f) or g) I think should keep
+> doing that and not try to use the generic implementation.
 
-But thanks for this Alan, I was hoping someone would school me on the
-legal practice wrt license boilerplates in the kernel, and there you
-are. :-)
+Thanks for the nice summary.  That's way more than I had figured out myself.
 
-Thanks.
+I don't know whether it'd be worth it, especially for something that's
+so close to obsolete, but it seems like it should be *possible* to
+generalize and unify this somewhat.  I would argue that g) (which I
+wrote, so I know it better than the others) could fairly easily
+subsume c), d), and f), since it maps an ioport number to a virtual
+address for an MMIO access, but it doesn't assume that all the MMIO
+spaces are contiguous.
 
--- 
-Regards/Gruss,
-    Boris.
+b), e), and maybe a) could be handled with an exception, e.g., inside
+inb(), look up the struct io_space (e.g., similar to what ia64 does in
+__ia64_mk_io_addr()), and if that struct contains a non-zero ops
+pointer, use that instead of doing the MMIO access.  The ops pointer
+functions could use the x86 INB instruction or do the indirect PIO
+thing or whatever.
 
-Sent from a fat crate under my desk. Formatting is fine.
---
+Bjorn
