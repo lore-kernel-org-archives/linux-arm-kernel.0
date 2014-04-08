@@ -1,59 +1,37 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Tue,  8 Apr 2014 18:22:41 +0200
-Subject: [PATCH v11][ 1/2] ARM: dts: cpuimx35 Add touchscreen support.
-Message-ID: <1396974162-16535-1-git-send-email-denis@eukrea.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 08 Apr 2014 18:27:02 +0200
+Subject: mx27 running too slow
+In-Reply-To: <CAOMZO5Ax9zymvSdts0=VTk05P7h6BxzO4MmEZ615h1npe=QY9A@mail.gmail.com>
+References: <CAOMZO5CC1NwP14H7uuygX7ZviFJLriG41hyczzvzxYWKHJu5DQ@mail.gmail.com>	<CAOMZO5AUemi9r_NqXXpnYZUqbqHhYnSvrnmu11voM_MZsVUa6Q@mail.gmail.com>	<CAOMZO5CCst0HHWa5JO-8-T3AHiw68FUvKRgCiVvFBu=9JdJzjw@mail.gmail.com>	<1396967505.692277642@f295.i.mail.ru>
+ <CAOMZO5Ax9zymvSdts0=VTk05P7h6BxzO4MmEZ615h1npe=QY9A@mail.gmail.com>
+Message-ID: <53442356.5040604@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v10->v11:
-- Moved the Cc to git-send-email.
-- Rebased (pingrp are now gone).
+On 04/08/2014 06:22 PM, Fabio Estevam wrote:
+>> Calibrating delay loop (skipped), value calculated using timer frequency.. 29.55 BogoMIPS (lpj=147777)
+>>
+>> Can you inspect code with "git-bisect"?
+> 
+> This is the result:
+> 
+> $ git bisect bad
+> 1119c84aa3053bd415ba731ada1ecef24c8f82a2 is the first bad commit
+> commit 1119c84aa3053bd415ba731ada1ecef24c8f82a2
+> Author: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Date:   Wed Jan 22 12:35:44 2014 +0100
+> 
+>     ARM: imx: enable delaytimer on the imx timer
+> 
+>     The imx can support timer-based delays, so implement this.
+>     Skips past jiffy calibration.
+> 
+>     Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+>     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
 
-ChangeLog v8->v10:
-- Reduced Cc list, not to bother unrelated subsystem maintainers.
-- Added the pinctrl node (because it is not anymore in the patch adding the cpuimx35).
-- Cosmetic fix: reordered the tsc2007 node properties.
+The BogoMIPS output is different and based on the timer clock. The
+delay loop now check the timer instead of counting cycles / loops.
+The different output is not a bug.
 
-ChangeLog v7->v8:
-- Added Shawn Guo in the cc list.
----
- arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-index 906ae93..9c2b715 100644
---- a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-+++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-@@ -37,6 +37,17 @@
- 		compatible = "nxp,pcf8563";
- 		reg = <0x51>;
- 	};
-+
-+	tsc2007: tsc2007 at 48 {
-+		compatible = "ti,tsc2007";
-+		gpios = <&gpio3 2 0>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <0x2 0x8>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_tsc2007_1>;
-+		reg = <0x48>;
-+		ti,x-plate-ohms = <180>;
-+	};
- };
- 
- &iomuxc {
-@@ -70,6 +81,10 @@
- 				MX35_PAD_I2C1_DAT__I2C1_SDA		0x80000000
- 			>;
- 		};
-+
-+		pinctrl_tsc2007_1: tsc2007grp-1 {
-+			fsl,pins = <MX35_PAD_ATA_DA2__GPIO3_2 0x80000000>;
-+		};
- 	};
- };
- 
--- 
-1.7.9.5
+Sebastian
