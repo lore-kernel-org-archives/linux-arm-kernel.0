@@ -1,70 +1,61 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue,  8 Apr 2014 17:44:14 -0600
-Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
-Message-ID: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Apr 2014 00:44:18 +0100
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <20140408231654.GA13898@piout.net>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com> <20140408141832.GA8861@piout.net>
+ <53442997.70209@i2se.com> <20140408231654.GA13898@piout.net>
+Message-ID: <20140408234418.GL16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mbus hardware requires a power of two size, and size aligned base.
-Currently, if a non-power of two is passed in to the low level routines
-they configure the register in a way that results in undefined behaviour.
+On Wed, Apr 09, 2014 at 01:16:54AM +0200, Alexandre Belloni wrote:
+> On 08/04/2014 at 18:53:43 +0200, Stefan Wahren wrote :
+> > i applied these 5 patches, but it doesn't fix the problem.
+> > 
+> > Here are my results for the pwm driver led on i.MX28:
+> > 
+> > version                  | trigger: none          | trigger: heartbeat
+> > -----------------------------------------------------------------------------
+> > 3.14                     | OK                     | NOT OK (WARNING, LED
+> > permanent on)
+> >   + shawn's patch        | OK                     | NOT OK (LED
+> > permanent on)
+> >     + russell's patches  | OK                     | NOT OK (LED
+> > permanent on)
+> >       + active-low       | NOT OK (inverse logic) | NOT OK (LED
+> > permanent on)
+> > 
+> > Russell's patches work as expected, but have not influence on the heartbeat.
+> > 
+> 
+> Yeah, I got it wrong or explained badly.
+> 
+> So, if without Russell's patches, your pwm is not inversed, then you would
+> have to set active_low and inverse the pwm.
+> If it was inversed, then you'll have to set active_low and let the pwm
+> with the normal polarity. I know this is a bit contrived but this was
+> exactly my point why we shouldn't call it active_low.
+> 
+> Can you try to switch the polarity when setting active_low ?
+> 
+> I'm not home, else I'll try on my i.mx28 boards...
 
-Call WARN and return EINVAL instead.
+I just tried heartbeat here, on iMX6, and it works fine.  That's with this
+in the DT:
 
-Also, update the debugfs routines to show a message if there is an
-invalid register setting.
+        pwmleds {
+                compatible = "pwm-leds";
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_cubox_i_pwm1>;
 
-All together this makes the recent problems with silent failure
-of PCI very obvious, noisy and debuggable.
+                front {
+                        active-low;
+                        label = "imx6:red:front";
+                        pwms = <&pwm1 0 50000>;
+                };
+        };
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/bus/mvebu-mbus.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-It would be good to see that these warn's trigger, my system here has
-everything aligned..
-
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 2ac754e..9578ae3 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -56,6 +56,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/debugfs.h>
-+#include <linux/log2.h>
- 
- /*
-  * DDR target is the same on all platforms.
-@@ -266,6 +267,17 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
- 		mbus->soc->win_cfg_offset(win);
- 	u32 ctrl, remap_addr;
- 
-+	if (!is_power_of_2(size)) {
-+		WARN(true, "Invalid MBus window size: 0x%zx\n", size);
-+		return -EINVAL;
-+	}
-+
-+	if ((base & (phys_addr_t)(size - 1)) != 0) {
-+		WARN(true, "Invalid MBus base/size: %pa len 0x%zx\n", &base,
-+		     size);
-+		return -EINVAL;
-+	}
-+
- 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
- 		(attr << WIN_CTRL_ATTR_SHIFT)    |
- 		(target << WIN_CTRL_TGT_SHIFT)   |
-@@ -413,6 +425,10 @@ static int mvebu_devs_debug_show(struct seq_file *seq, void *v)
- 			   win, (unsigned long long)wbase,
- 			   (unsigned long long)(wbase + wsize), wtarget, wattr);
- 
-+		if (!is_power_of_2(wsize) ||
-+		    ((wbase & (u64)(wsize - 1)) != 0))
-+			seq_puts(seq, " (Invalid base/size!!)");
-+
- 		if (win < mbus->soc->num_remappable_wins) {
- 			seq_printf(seq, " (remap %016llx)\n",
- 				   (unsigned long long)wremap);
 -- 
-1.8.1.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
