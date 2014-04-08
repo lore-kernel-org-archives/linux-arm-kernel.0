@@ -1,74 +1,48 @@
-From: adam@baker-net.org.uk (Adam Baker)
-Date: Tue, 08 Apr 2014 23:34:32 +0100
-Subject: [PATCH v2 3/3] ARM: kirkwood: rename kirwood-nsa310-common to
- 3x0-common
-In-Reply-To: <53446D6E.7070909@baker-net.org.uk>
-References: <5341C91D.4060007@baker-net.org.uk>
- <1396820569-3841-1-git-send-email-linux@baker-net.org.uk>
- <1396820569-3841-3-git-send-email-linux@baker-net.org.uk>
- <20140408192625.GD29372@lunn.ch> <53446D6E.7070909@baker-net.org.uk>
-Message-ID: <53447978.2020206@baker-net.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 9 Apr 2014 01:16:54 +0200
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <53442997.70209@i2se.com>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com> <20140408141832.GA8861@piout.net>
+ <53442997.70209@i2se.com>
+Message-ID: <20140408231654.GA13898@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Rename the include file kirkwood-nsa310-common.dtsi as
- it is now also used for NSA320. There is also an NSA325
- but that appears not to be as similar so is unlikely to
- want to share an include file.
+Hi,
 
-Signed-off-by: Adam Baker <linux@baker-net.org.uk>
----
-I've discovered that if I don't change the git repository but pass the -M option
-to git format-patch it generates a patch that describes the rename rather than
-deleting and re-adding the entire file.
----
- arch/arm/boot/dts/kirkwood-nsa310.dts                                |    2 +-
- arch/arm/boot/dts/kirkwood-nsa310a.dts                               |    2 +-
- arch/arm/boot/dts/kirkwood-nsa320.dts                                |    2 +-
- .../dts/{kirkwood-nsa310-common.dtsi => kirkwood-nsa3x0-common.dtsi} |    0
- 4 files changed, 3 insertions(+), 3 deletions(-)
- rename arch/arm/boot/dts/{kirkwood-nsa310-common.dtsi => kirkwood-nsa3x0-common.dtsi} (100%)
+On 08/04/2014 at 18:53:43 +0200, Stefan Wahren wrote :
+> i applied these 5 patches, but it doesn't fix the problem.
+> 
+> Here are my results for the pwm driver led on i.MX28:
+> 
+> version                  | trigger: none          | trigger: heartbeat
+> -----------------------------------------------------------------------------
+> 3.14                     | OK                     | NOT OK (WARNING, LED
+> permanent on)
+>   + shawn's patch        | OK                     | NOT OK (LED
+> permanent on)
+>     + russell's patches  | OK                     | NOT OK (LED
+> permanent on)
+>       + active-low       | NOT OK (inverse logic) | NOT OK (LED
+> permanent on)
+> 
+> Russell's patches work as expected, but have not influence on the heartbeat.
+> 
 
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
-index 372f701..989846a 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--#include "kirkwood-nsa310-common.dtsi"
-+#include "kirkwood-nsa3x0-common.dtsi"
- 
- / {
- 	compatible = "zyxel,nsa310", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310a.dts b/arch/arm/boot/dts/kirkwood-nsa310a.dts
-index ead7a36..d0a6025 100644
---- a/arch/arm/boot/dts/kirkwood-nsa310a.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa310a.dts
-@@ -1,6 +1,6 @@
- /dts-v1/;
- 
--#include "kirkwood-nsa310-common.dtsi"
-+#include "kirkwood-nsa3x0-common.dtsi"
- 
- /*
-  * There are at least two different NSA310 designs. This variant does
-diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
-index 6c8f692..fc20baf 100644
---- a/arch/arm/boot/dts/kirkwood-nsa320.dts
-+++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
-@@ -11,7 +11,7 @@
- 
- /dts-v1/;
- 
--#include "kirkwood-nsa310-common.dtsi"
-+#include "kirkwood-nsa3x0-common.dtsi"
- 
- / {
- 	model = "Zyxel NSA320";
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310-common.dtsi b/arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/kirkwood-nsa310-common.dtsi
-rename to arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi
+Yeah, I got it wrong or explained badly.
+
+So, if without Russell's patches, your pwm is not inversed, then you would
+have to set active_low and inverse the pwm.
+If it was inversed, then you'll have to set active_low and let the pwm
+with the normal polarity. I know this is a bit contrived but this was
+exactly my point why we shouldn't call it active_low.
+
+Can you try to switch the polarity when setting active_low ?
+
+I'm not home, else I'll try on my i.mx28 boards...
+
 -- 
-1.7.10.4
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
