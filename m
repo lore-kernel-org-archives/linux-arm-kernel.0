@@ -1,67 +1,38 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue,  8 Apr 2014 17:23:54 -0500
-Subject: [PATCH v2 3/5] ARM: dts: define clock binding for bcm21664
-In-Reply-To: <1396995836-31111-1-git-send-email-elder@linaro.org>
-References: <1396995836-31111-1-git-send-email-elder@linaro.org>
-Message-ID: <1396995836-31111-4-git-send-email-elder@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 9 Apr 2014 02:23:33 +0400
+Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add USB PHY DT support
+In-Reply-To: <201404090221.53167.sergei.shtylyov@cogentembedded.com>
+References: <201404090221.53167.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201404090223.33654.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for Broadcom BCM28164 clock control
-units and clocks.  This SoC uses Kona CCUs, similar to the BCM281XX
-SoC family.
+Define the R8A7791 generic part of the USB PHY device node. It is up to the
+board file to enable the device.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- .../devicetree/bindings/clock/bcm-kona-clock.txt   |   39 ++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt b/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
-index ebe3ab6..5286e26 100644
---- a/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
-@@ -98,3 +98,42 @@ be used.  These specifiers are defined in:
-     slave   bsc2            peri      7     BCM281XX_SLAVE_CCU_BSC2
-     slave   bsc3            peri      8     BCM281XX_SLAVE_CCU_BSC3
-     slave   pwm             peri      9     BCM281XX_SLAVE_CCU_PWM
+Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
++++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+@@ -502,6 +502,15 @@
+ 		status = "disabled";
+ 	};
+ 
++	usbphy: usb-phy at e6590100 {
++		compatible = "renesas,usb-phy-r8a7791";
++		reg = <0 0xe6590100 0 0x100>;
++		#phy-cells = <2>;
++		clocks = <&mstp7_clks R8A7791_CLK_HSUSB>;
++		clock-names = "usbhs";
++		status = "disabled";
++	};
 +
-+
-+BCM21664 family
-+---------------
-+CCU compatible string values for SoCs in the BCM21664 family are:
-+    "brcm,bcm21664-root-ccu"
-+    "brcm,bcm21664-aon-ccu"
-+    "brcm,bcm21664-master-ccu"
-+    "brcm,bcm21664-slave-ccu"
-+
-+The following table defines the set of CCUs and clock specifiers for
-+BCM21664 family clocks.  When a clock consumer references a clocks,
-+its symbolic specifier (rather than its numeric index value) should
-+be used.  These specifiers are defined in:
-+    "include/dt-bindings/clock/bcm21664.h"
-+
-+    CCU     Clock           Type    Index   Specifier
-+    ---     -----           ----    -----   ---------
-+    root    frac_1m         peri      0     BCM21664_ROOT_CCU_FRAC_1M
-+
-+    aon     hub_timer       peri      0     BCM21664_AON_CCU_HUB_TIMER
-+
-+    master  sdio1           peri      0     BCM21664_MASTER_CCU_SDIO1
-+    master  sdio2           peri      1     BCM21664_MASTER_CCU_SDIO2
-+    master  sdio3           peri      2     BCM21664_MASTER_CCU_SDIO3
-+    master  sdio4           peri      3     BCM21664_MASTER_CCU_SDIO4
-+    master  sdio1_sleep     peri      4     BCM21664_MASTER_CCU_SDIO1_SLEEP
-+    master  sdio2_sleep     peri      5     BCM21664_MASTER_CCU_SDIO2_SLEEP
-+    master  sdio3_sleep     peri      6     BCM21664_MASTER_CCU_SDIO3_SLEEP
-+    master  sdio4_sleep     peri      7     BCM21664_MASTER_CCU_SDIO4_SLEEP
-+
-+    slave   uartb           peri      0     BCM21664_SLAVE_CCU_UARTB
-+    slave   uartb2          peri      1     BCM21664_SLAVE_CCU_UARTB2
-+    slave   uartb3          peri      2     BCM21664_SLAVE_CCU_UARTB3
-+    slave   uartb4          peri      3     BCM21664_SLAVE_CCU_UARTB4
-+    slave   bsc1            peri      4     BCM21664_SLAVE_CCU_BSC1
-+    slave   bsc2            peri      5     BCM21664_SLAVE_CCU_BSC2
-+    slave   bsc3            peri      6     BCM21664_SLAVE_CCU_BSC3
-+    slave   bsc4            peri      7     BCM21664_SLAVE_CCU_BSC4
--- 
-1.7.9.5
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
