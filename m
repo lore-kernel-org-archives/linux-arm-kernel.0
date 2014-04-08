@@ -1,44 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Apr 2014 17:25:34 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408145344.GB11052@1wt.eu>
-References: <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
- <20140407174106.GD9952@obsidianresearch.com>
- <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
- <20140407204817.GB20736@obsidianresearch.com>
- <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
- <20140408064003.GU29787@1wt.eu>
- <CAFJTrDu82avr6mSaz1PNzOJ0tnQiH5aiq6URiXZAbJ=4W+2EJg@mail.gmail.com>
- <CAFJTrDtiRctixnbBEbHMsnxsPy7ew9-7SoD5cyUA6DWPU9p6Fw@mail.gmail.com>
- <20140408123632.GG8767@1wt.eu> <20140408164317.0e9b9092@skate>
- <20140408145344.GB11052@1wt.eu>
-Message-ID: <20140408172534.3900f005@skate>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Tue, 8 Apr 2014 13:48:07 +0800
+Subject: [PATCH] of: Fix the section mismatch warnings.
+Message-ID: <1396936087-23043-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Willy Tarreau,
+In tag next-20140407, building with CONFIG_DEBUG_SECTION_MISMATCH
+enabled, the following WARNING is occured:
 
-On Tue, 8 Apr 2014 16:53:44 +0200, Willy Tarreau wrote:
+WARNING: drivers/built-in.o(.text.unlikely+0x2220): Section mismatch
+in reference from the function __reserved_mem_check_root() to the
+function .init.text:of_get_flat_dt_prop()
+The function __reserved_mem_check_root() references
+the function __init of_get_flat_dt_prop().
+This is often because __reserved_mem_check_root lacks a __init
+annotation or the annotation of of_get_flat_dt_prop is wrong.
 
-> > Am I correct, or are other patches needed, or are remaining problems
-> > not solved by these two fixes?
-> 
-> There's still the older issue I got with trying to load a 2-port based
-> igb card on the xp-gp, the code says that hwirq 0xffffffe4 is invalid
-> and cannot be enabled and after that it panics. I recall having debugged
-> this one a few months ago, and finding something like ffffffe4 == -ENOSPC
-> which was returned by one of the inner functions. Let's put that aside
-> for a moment though, but I would appreciate it if you find the time to
-> try your igb NIC on your XPGP in 3.14 to see if you get the same result.
+WARNING: vmlinux.o(.text.unlikely+0xb9d0): Section mismatch in reference
+from the function __reserved_mem_check_root() to the (unknown reference)
+.init.data:(unknown)
+The function __reserved_mem_check_root() references
+the (unknown reference) __initdata (unknown).
+This is often because __reserved_mem_check_root lacks a __initdata
+annotation or the annotation of (unknown) is wrong.
 
-See my second e-mail: this is due to improperly casting a signed value
-into a unsigned value.
+This is cause by :
+'drivers: of: add initialization code for dynamic reserved memory'.
 
-I currently have the igb NIC in my Armada XP DB, and I've reported a
-panic :-)
+Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+---
+ drivers/of/fdt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thomas
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index fa16a91..7a2ef7b 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -491,7 +491,7 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
+  * in /reserved-memory matches the values supported by the current implementation,
+  * also check if ranges property has been provided
+  */
+-static int __reserved_mem_check_root(unsigned long node)
++static int __init __reserved_mem_check_root(unsigned long node)
+ {
+ 	__be32 *prop;
+ 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.4
