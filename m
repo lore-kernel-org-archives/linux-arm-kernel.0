@@ -1,61 +1,44 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 08 Apr 2014 16:00:17 +0200
-Subject: mach header files
-In-Reply-To: <20140404152041.6b06bd85@skate>
-References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
- <645d041db09d4cf883ba178c695fe504@HKXPR06MB168.apcprd06.prod.outlook.com>
- <20140404152041.6b06bd85@skate>
-Message-ID: <4261016.NOmSY7hXBc@avalon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Apr 2014 14:57:43 +0100
+Subject: [PATCH 0/2] ARM SMMU fixes
+In-Reply-To: <93132940.WGeAzvU3EP@avalon>
+References: <1393601830-4677-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2243447.NTvYmPQWSB@avalon> <93132940.WGeAzvU3EP@avalon>
+Message-ID: <53440057.6020703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Friday 04 April 2014 15:20:41 Thomas Petazzoni wrote:
-> On Fri, 4 Apr 2014 13:14:44 +0000, Phil Edworthy wrote:
-> > > If it is used only by one driver, then it should go directly into
-> > > that driver without a #include. For SoC defines, you'll need to
-> > > check with the arm-soc maintainers. I *think* we're trying to get
-> > > away from separate arch/arm/mach-* directories, but I'm slightly
-> > > out of touch. You certainly should not do anything that breaks
-> > > multiplatform builds.
-> > 
-> > This is where it gets tricky. The clock driver only wants to know
-> > about one reg in a block of general system control registers. There
-> > is very little input to the clock driver... the SoC code needs to
-> > access other registers in the system control block.
-> > 
-> > I think you are right about trying to avoid separate arch/arm/mach-*
-> > directories, which is what prompted my question. So, how best to
-> > handle this?
+On 08/04/14 14:41, Laurent Pinchart wrote:
+> I've obviously forgotten that Will was away for a month. CC'ing Marc Zyngier.
 > 
-> I believe there are two solutions here:
+> On Thursday 03 April 2014 01:52:55 Laurent Pinchart wrote:
+>> On Friday 28 February 2014 16:37:08 Laurent Pinchart wrote:
+>>> Hello Will,
+>>>
+>>> I've studied your arm-smmu driver as a base to write a Renesas IOMMU
+>>> driver and found two small issues. Here are patches to fix them. Please
+>>> bear with me if my understanding was incorrect and the patches wrong :-)
+>>>
+>>> Laurent Pinchart (2):
+>>>   iommu/arm-smmu: Replace list walk with platform driver data
+>>>   iommu/arm-smmu: Return 0 on unmap failure
+>>>  
+>>>  drivers/iommu/arm-smmu.c | 17 +++++------------
+>>>  1 file changed, 5 insertions(+), 12 deletions(-)
+>>
+>> Do you plan to take these patches (or at least patch 2/2) in your tree ? I
+>> can send a pull request to Joerg if you give me your acked-by.
 > 
->  * Have a driver in arch/arm/mach-foo/ for your "system control block"
->    that exposes a small API used by your clock driver in drivers/clk/.
->    The issue is of course always: where to put the header files for
->    this small API.
-> 
->  * Have both your clock driver and your system control block driver map
->    the registers they need, even if some of those registers are the
->    same. Then you can use atomic_io_modify() from both drivers to
->    atomically make changes to these registers. This is typically OK if
->    you don't have any performance sensitive usage of those registers
->    (atomic_io_modify accesses are protected by a global spinlock). This
->    is the solution we've used between the Armada watchdog and Armada
->    clocksource drivers, which require accessing a shared register, even
->    though those two drivers are completely unrelated.
+> Marc, would you like to handle this, or would you prefer to wait until Will 
+> comes back ?
 
-Just for what it's worth, we've solved this problem on R-Car Gen2 by passing 
-the boot mode using a direct explicit call from platform code to the clock 
-driver. See rcar_gen2_clocks_init() in drivers/clk/shmobile/clk-rcar-gen2.c 
-and arch/arm/mach-shmobile/setup-rcar-gen2.c.
+Hi Laurent,
 
-If we want to get rid of that I'd go for the first option, as the boot mode 
-register is really not part of the clock IP core and should not be listed as a 
-memory resource in its DT node.
+Yup, I'll have a look and stash them in a temp tree. Given that Will
+will be back in about a week, he will have the final say.
 
+Thanks,
+
+	M.
 -- 
-Regards,
-
-Laurent Pinchart
+Jazz is not dead. It just smells funny...
