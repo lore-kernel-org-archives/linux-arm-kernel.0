@@ -1,48 +1,42 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 9 Apr 2014 00:24:30 +0200
-Subject: ethaddr0 alias for imx6
-In-Reply-To: <534429E9.1050202@digi.com>
-References: <534429E9.1050202@digi.com>
-Message-ID: <201404090024.30624.marex@denx.de>
+From: elder@linaro.org (Alex Elder)
+Date: Tue,  8 Apr 2014 17:31:28 -0500
+Subject: [RFC PATCH RESEND] ARM: spear: send SGI to trigger secondary CPU start
+Message-ID: <1396996288-32020-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 08, 2014 at 06:55:05 PM, Hector Palacios wrote:
-> Hello,
-> 
-> I think I'm missing a commit similar to
-> 8c41d57395ff5b9b16724786c7c4b4c4081510cc to add the ethernet0 alias so
-> that U-Boot can fixup the MAC in the device tree for iMX6. Like this:
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
-> b/arch/arm/boot/dts/imx6qdl.dtsi index b48a128e519d..b3ec952eada6 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -15,6 +15,7 @@
-> 
->   / {
->          aliases {
-> +               ethernet0 = &fec;
->                  flexcan0 = &flexcan1;
->                  flexcan1 = &flexcan2;
->                  gpio0 = &gpio1;
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index b937a4a94202..2afd45c67996 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -13,6 +13,7 @@
-> 
->   / {
->          aliases {
-> +               ethernet0 = &fec;
->                  serial0 = &uart1;
->                  serial1 = &uart2;
->                  serial2 = &uart3;
-> 
-> Has this changed recently and is done in a different way or has nobody
-> noticed it before?
+The ARM spear machine uses the "holding pen" mechanism for starting
+secondary CPUs.  Most implementations indicate it's a secondary
+core's time to start by writing its CPU id into a location and
+then signaling the core with a software-generated interrupt.
 
-Try 10021ccaf042dd8d09c247c447b3ef22de0b83c8 in linux-next .
+The spear code does not send the signal.  Comments elsewhere
+in the code seem to indicate it should:
+    The BootMonitor waits until it receives a soft interrupt, and
+    then the secondary CPU branches to this address.
 
-Best regards,
-Marek Vasut
+I suspect this is an oversight, and this patch proposes a remedy.
+
+  *** I need the attention of a maintainer to verify this
+  *** because I am unable to test this proposed change.
+
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ arch/arm/mach-spear/platsmp.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-spear/platsmp.c b/arch/arm/mach-spear/platsmp.c
+index 5c4a198..c9064fe 100644
+--- a/arch/arm/mach-spear/platsmp.c
++++ b/arch/arm/mach-spear/platsmp.c
+@@ -62,6 +62,8 @@ static int spear13xx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	flush_cache_all();
+ 	outer_flush_all();
+ 
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+ 		smp_rmb();
+-- 
+1.7.9.5
