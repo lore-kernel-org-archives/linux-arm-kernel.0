@@ -1,68 +1,45 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 8 Apr 2014 13:52:31 -0500
-Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
-References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
- <1396907649-20212-2-git-send-email-tthayer@altera.com>
- <20140408133818.GB16054@pengutronix.de>
- <1396967390.23349.15.camel@dinh-ubuntu>
- <20140408143327.GC16054@pengutronix.de>
- <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
-Message-ID: <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
+Date: Tue, 8 Apr 2014 14:01:54 -0500
+Subject: [PATCH] driver: clocksource: fix age-old arch timer C3STOP
+ detection issue
+In-Reply-To: <1396947872-6673-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1396947872-6673-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAL_JsqLUjcrmXCcuA=UXEByUn9gjyOx9Wan=4rk+LRbTcJ+tNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 8, 2014 at 11:02 AM, delicious quinoa
-<delicious.quinoa@gmail.com> wrote:
-> On Tue, Apr 8, 2014 at 9:33 AM, Steffen Trumtrar
-> <s.trumtrar@pengutronix.de> wrote:
->> On Tue, Apr 08, 2014 at 09:29:50AM -0500, Thor Thayer wrote:
->>> On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
->>> > Hi!
->>> >
->>> > On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
->>> > > From: Thor Thayer <tthayer@altera.com>
->>> > >
->>> > > Addition of the Altera SDRAM controller bindings and device
->>> > > tree changes to the Altera SoC project.
->>> > >
->>> [snip]
->>> > > +
->>> > > +Required properties:
->>> > > +- compatible : "altr,sdr-ctl", "syscon";
->>> > > +                Note that syscon is invoked for this device to support the FPGA
->>> > > +         bridge driver, EDAC driver and other devices that share the
->>> > > +         registers.
->>> > > +- reg : Should contain 1 register ranges(address and length)
->>> >
->>> > I haven't really thought this through, but why would the FPGA bridge driver
->>> > access the sdram controller? For releasing the resets in fpgaportrst ? Or is
->>> > there more?
->>>
->>> Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
->>> path. Our SDRAM controller allows FPGA master access to the SDRAM.
->>>
->>
->> Yes. But what you have to do to enable the path is let the FPGA port you use
->> out of reset. And that is it as far as I can see. The rest happens in the
->> bitstream. Or is there more to enable the path?
->> The FPGA2SDRAM bridge is the one I didn't use as of yet, so if I miss something
->> please elaborate.
+On Tue, Apr 8, 2014 at 4:04 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> ARM arch timers are tightly coupled with the CPU logic and lose context
+> on platform implementing HW power management when cores are powered
+> down at run-time. Marking the arch timers as C3STOP regardless of power
+> management capabilities causes issues on platforms with no power management,
+> since in that case the arch timers cannot possibly enter states where the
+> timer loses context at runtime and therefore can always be used as a high
+> resolution clockevent device.
 >
-> Hi Steffen,
+> In order to fix the C3STOP issue in a way compliant with how real HW
+> works, this patch adds a boolean property to the arch timer bindings
+> to define if the arch timer is managed by an always-on power domain.
 >
-> The sdram controller is used by two drivers.  That's why we want to
-> specify "syscon" here.  The other driver is the FPGA bridge driver.
-> Its functionality is very separate from what this driver is doing (we
-> are not enabling the bridge in this driver; we are enabling the
-> monitoring and resetting the interrupt bit of the EDAC).  We wanted to
-> specify "syscon" her so that we don't have to have to change it for
-> the other driver.
+> This power domain is present on all ARM platforms to date, and manages
+> HW that must not be turned off, whatever the state of other HW
+> components (eg power controller). On platforms with no power management
+> capabilities, it is the only power domain present, which encompasses
+> and manages power supply for all HW components in the system.
+>
+> If the timer is powered by the always-on power domain, the always-on
+> property must be present in the bindings which means that the timer cannot
+> be shutdown at runtime, so it is not a C3STOP clockevent device.
+> If the timer binding does not contain the always-on property, the timer is
+> assumed to be power-gateable, hence it must be defined as a C3STOP
+> clockevent device.
+>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Magnus Damm <damm@opensource.se>
+> Cc: Marc Carino <marc.ceeeee@gmail.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-But are there actually overlapping registers which are accessed by
-both drivers and need the protection of regmap?
-
-Perhaps MFD is more appropriate than syscon?
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
