@@ -1,7 +1,7 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 8 Apr 2014 12:22:30 -0600
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 8 Apr 2014 20:32:53 +0200
 Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408200140.5dcc2ad7@skate>
+In-Reply-To: <20140408182230.GD32490@obsidianresearch.com>
 References: <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
  <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
  <20140405193435.50d8dd81@skate>
@@ -11,66 +11,56 @@ References: <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
  <20140408175545.1b4d55a5@skate>
  <20140408171417.GB27776@obsidianresearch.com>
  <20140408200140.5dcc2ad7@skate>
-Message-ID: <20140408182230.GD32490@obsidianresearch.com>
+ <20140408182230.GD32490@obsidianresearch.com>
+Message-ID: <20140408203253.6f9b535a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 08:01:40PM +0200, Thomas Petazzoni wrote:
+Dear Jason Gunthorpe,
 
-> > Well, you do, 0x900000 is not aligned. It converts to size=0b10001111,
-> > which is undefined behavior for mbus. 
+On Tue, 8 Apr 2014 12:22:30 -0600, Jason Gunthorpe wrote:
+
+> > Ah correct. Though I'm still puzzled as to why the undefined behavior
+> > works for me, and not for Willy, who I believe has the same NIC as me.
 > 
-> Ah correct. Though I'm still puzzled as to why the undefined behavior
-> works for me, and not for Willy, who I believe has the same NIC as me.
+> If we knew the algorithm in the HW it would probably make sense :)
 
-If we knew the algorithm in the HW it would probably make sense :)
+Indeed :)
 
-> > - When reading interpret undefined values in a conservative way,
-> >   the value is assumed to be the lowest power of two. This avoids
-> >   the debugfs output showing a value that looks 'correct'
+> > But I am not sure with this one. Since now you're anyway rounding down
+> > sizes, how is it possible to get a non-power-of-two size in the
+> > registers?
 > 
-> But I am not sure with this one. Since now you're anyway rounding down
-> sizes, how is it possible to get a non-power-of-two size in the
-> registers?
+> I agree, it should not happen if everything is correct, but the
+> apparently correct debugfs output obscured the root cause of the
+> problem..
 
-I agree, it should not happen if everything is correct, but the
-apparently correct debugfs output obscured the root cause of the
-problem..
+Absolutely.
 
-> I would probably prefer to have mvebu_devs_debug_show() do something
-> like:
+> > That being said, this warning doesn't really solve the problem that the
+> > PCI core may allocate BARs whose size cannot be represented through
+> > MBus windows :-)
 > 
->                 seq_printf(seq, "[%02d] %016llx - %016llx : %04x:%04x%s",
->                            win, (unsigned long long)wbase,
->                            (unsigned long long)(wbase + wsize), wtarget, wattr,
-> 			   (!is_power_of_2(wsize)) ? " non-pow2 undefined behavior!" : "");
+> Right, but Will pointed out it took 3 months to get to the root cause,
+> so it might save that time in future :)
 
-That sounds good
- 
-> > +	WARN_ON(!is_power_of_2(size));
-> > +	size = rounddown_pow_of_two(size);
-> 
-> Maybe something like:
-> 
-> 	if (!is_power_of_2(size)) {
-> 		WARN(true, "Invalid MBus window size: 0x%x, rounding down to 0x%x\n",
-> 		     size, rounddown_pow_of_two(size));
-> 		size = rounddown_pow_of_two(size);
-> 	}
-> 
-> And while we're adding checks, why not also verify that the base
-> address is a multiple of the window size? I think it's the other
-> requirement.
+Yes, I completely agree, and I'm totally in favor of making things more
+robust in mvebu-mbus.
 
-Yes, agree, sounds good
+Actually, should we simply return an error if something tries to set up
+a window with an invalid size? But maybe it's a bit too strong for the
+moment, until the power of two size problem gets resolved on the PCI
+side.
 
-> That being said, this warning doesn't really solve the problem that the
-> PCI core may allocate BARs whose size cannot be represented through
-> MBus windows :-)
+But the other day, I also had funky issues with another window, and it
+turned out to be caused by a non-power-of-two window as well...
 
-Right, but Will pointed out it took 3 months to get to the root cause,
-so it might save that time in future :)
+> I'll revise/resend the patch.
 
-I'll revise/resend the patch.
+Thanks!
 
-Jason
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
