@@ -1,51 +1,65 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 8 Apr 2014 17:19:29 +0100
-Subject: [PATCH v6 2/5] ARM: Add Krait L2 register accessor functions
-In-Reply-To: <20140408151056.GH30077@pd.tnic>
-References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
- <1396641450-12854-3-git-send-email-sboyd@codeaurora.org>
- <20140407201838.GC20822@pd.tnic>
- <20140407215649.GH9985@codeaurora.org>
- <20140408064328.GB30077@pd.tnic> <534406BD.8000702@codeaurora.org>
- <20140408151056.GH30077@pd.tnic>
-Message-ID: <20140408171929.68f328a9@alan.etchedpixels.co.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 8 Apr 2014 13:22:40 -0300
+Subject: mx27 running too slow
+In-Reply-To: <1396967505.692277642@f295.i.mail.ru>
+References: <CAOMZO5CC1NwP14H7uuygX7ZviFJLriG41hyczzvzxYWKHJu5DQ@mail.gmail.com>
+ <CAOMZO5AUemi9r_NqXXpnYZUqbqHhYnSvrnmu11voM_MZsVUa6Q@mail.gmail.com>
+ <CAOMZO5CCst0HHWa5JO-8-T3AHiw68FUvKRgCiVvFBu=9JdJzjw@mail.gmail.com>
+ <1396967505.692277642@f295.i.mail.ru>
+Message-ID: <CAOMZO5Ax9zymvSdts0=VTk05P7h6BxzO4MmEZ615h1npe=QY9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Apr 2014 17:10:56 +0200
-Borislav Petkov <bp@alien8.de> wrote:
+On Tue, Apr 8, 2014 at 11:31 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> Tue, 8 Apr 2014 10:49:38 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+>> On Wed, Apr 2, 2014 at 7:38 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> > On Wed, Apr 2, 2014 at 7:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> >> Hi Alexander,
+>> >>
+>> >> What is the BogoMIPs value you get on mx27 running 3.14?
+>> >>
+>> >> I am running Shawn's for-next branch and it is terribly slow on a mx27pdk:
+>> >>
+>> >> sched_clock: 32 bits at 13MHz, resolution 75ns, wraps every 322929872820ns
+>> >> CPU identified as i.MX27, silicon rev 2.1
+>> >> Console: colour dummy device 80x30
+>> >> Calibrating delay loop (skipped), value calculated using timer
+>> >> frequency.. 26.60 BogoMIPS (lpj=133000)
+>> >>
+>> >> ARM9 running at 400MHz should give around 200 BogoMIPs.
+>> >
+>> > Nevermind. On a clean 3.14 kernel I get the expected value:
+>> >
+>> > Calibrating delay loop... 199.06 BogoMIPS (lpj=995328)
+>> >
+>> > So this behaviour shows up only on Shawn's branch.
+>>
+>> Now I am running linux-next 20140408 and I am also getting the very
+>> slow BogoMIPS:
+>>
+>> Calibrating delay loop (skipped), value calculated using timer
+>> frequency.. 26.60 BogoMIPS (lpj=133000)
+>>
+>> Alexander,
+>>
+>> Do you see the same on Phytec mx27 board?
+>
+> Calibrating delay loop (skipped), value calculated using timer frequency.. 29.55 BogoMIPS (lpj=147777)
+>
+> Can you inspect code with "git-bisect"?
 
-> On Tue, Apr 08, 2014 at 10:25:01AM -0400, Christopher Covington wrote:
-> > As I understand it, the license authors. They find it important to maintain
-> > clarity even when files get copied into other projects.
-> > 
-> > http://www.gnu.org/licenses/gpl-howto.html
-> > 
-> > http://www.gnu.org/licenses/gpl-faq.html#NoticeInSourceFile
-> 
-> Right, so what is wrong with stating the same thing in two lines:
-> 
-> "Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
-> 
-> This file is licensed under GNU GPLv2. See COPYING for full license text.
+This is the result:
 
-The COPYING file may not be present. There may be cases where the absence
-of the warranty statement in the header is problematic etc etc.
+$ git bisect bad
+1119c84aa3053bd415ba731ada1ecef24c8f82a2 is the first bad commit
+commit 1119c84aa3053bd415ba731ada1ecef24c8f82a2
+Author: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Date:   Wed Jan 22 12:35:44 2014 +0100
 
-Corporate legals have their own policies on this and there is no point
-fighting them because
+    ARM: imx: enable delaytimer on the imx timer
 
-- they are the ones qualified to make the decision
+    The imx can support timer-based delays, so implement this.
+    Skips past jiffy calibration.
 
-- the corporate legal angle is often "do this or don't release it"
-
-- we have huge numbers of files using that same no warranty in every
-  file, and major companies who specify it must be present in their code
-  releases
-
-
-Including the without warranty is standard practice at a lot of
-companies. It's not even wasting space - it'll compress beautifully as
-there are already lots of similar headers all over the tree.
-
-Alan
+    Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
