@@ -1,84 +1,47 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 8 Apr 2014 16:53:44 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408164317.0e9b9092@skate>
-References: <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
- <20140407174106.GD9952@obsidianresearch.com>
- <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
- <20140407204817.GB20736@obsidianresearch.com>
- <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
- <20140408064003.GU29787@1wt.eu>
- <CAFJTrDu82avr6mSaz1PNzOJ0tnQiH5aiq6URiXZAbJ=4W+2EJg@mail.gmail.com>
- <CAFJTrDtiRctixnbBEbHMsnxsPy7ew9-7SoD5cyUA6DWPU9p6Fw@mail.gmail.com>
- <20140408123632.GG8767@1wt.eu> <20140408164317.0e9b9092@skate>
-Message-ID: <20140408145344.GB11052@1wt.eu>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 8 Apr 2014 20:23:39 +0530
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <20140404101808.GG27282@n2100.arm.linux.org.uk>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk>
+Message-ID: <53440D73.6060504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
+> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
+>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+>> index f8b8dac..6b2a056 100644
+>> --- a/arch/arm/mach-omap2/omap4-common.c
+>> +++ b/arch/arm/mach-omap2/omap4-common.c
+>> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
+>>  
+>>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
+>>  }
+>> +
+>> +int __init am43xx_l2_cache_init(void)
+>> +{
+>> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
+>> +		       L310_AUX_CTRL_INSTR_PREFETCH;
+> 
+> It would be good to documenting the difference between this and OMAP4,
+> and why you have chosen different values.
 
-On Tue, Apr 08, 2014 at 04:43:17PM +0200, Thomas Petazzoni wrote:
-> Willy, Neil, Matthew,
-> 
-> On Tue, 8 Apr 2014 14:36:32 +0200, Willy Tarreau wrote:
-> 
-> > On Tue, Apr 08, 2014 at 01:31:48PM +0100, Matthew Minter wrote:
-> > > To add to my previous point, I would consider releasing these patches
-> > > as soon as possible as it seems that it can easily cause panics on a
-> > > range of boards. Failing that perhaps it is at least worth releasing a
-> > > hotfix which will cause PCI probing to fail should the window not be a
-> > > power of two? Thus it will fail early with a warning instead of
-> > > potentially causing a kernel crash.
-> > 
-> > Have you tested the whole patch or just the one enforcing the power of 2 ?
-> > It would be interesting to know if the one with SZ_4M is needed for you or
-> > not (I guess not).
-> > 
-> > I suspect that just this single-liner will work as well, as it does for me.
-> > 
-> > Thanks,
-> > Willy
-> > 
-> > 
-> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > index 0e79665..552ab73 100644
-> > --- a/drivers/pci/host/pci-mvebu.c
-> > +++ b/drivers/pci/host/pci-mvebu.c
-> > @@ -363,6 +363,7 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
-> >  	port->memwin_size  =
-> >  		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
-> >  		port->memwin_base;
-> > +	port->memwin_size = roundup_pow_of_two(port->memwin_size);
-> >  
-> >  	mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
-> >  				    port->memwin_base, port->memwin_size);
-> 
-> Thanks to all of you for the investigation. So if I summarize your
-> findings, we have two patches needed to fix the problems of everybody:
-> 
->  1) The bug fix for the MSI teardown function in irq-armada-370-xp.c.
->     This one is easy, I'll test it right now, and give my formal
->     Acked-by soon.
-> 
->  2) The problem of non-power of 2 sized windows. This one is more
->     complicated, as we cannot simply round up the size of the windows
->     inside the pci-mvebu.c driver: the Linux PCI core is not aware of
->     this rounding, and might therefore allocate a BAR for the next
->     device at an address that overlaps the previous window we have
->     enlarged to match the power of two size requirement. This is
->     something that was already discussed with the PCI maintainers, but
->     the discussion needs to be revived I guess.
-> 
-> Am I correct, or are other patches needed, or are remaining problems
-> not solved by these two fixes?
+There are two main differences:
 
-There's still the older issue I got with trying to load a 2-port based
-igb card on the xp-gp, the code says that hwirq 0xffffffe4 is invalid
-and cannot be enabled and after that it panics. I recall having debugged
-this one a few months ago, and finding something like ffffffe4 == -ENOSPC
-which was returned by one of the inner functions. Let's put that aside
-for a moment though, but I would appreciate it if you find the time to
-try your igb NIC on your XPGP in 3.14 to see if you get the same result.
+1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
+not needed even in OMAP4 with latest kernel, but I am not sure if I can
+do this safely without breaking any usecase currently working with OMAP4.
+
+2) OMAP4 sets NS lockdown and NS interrupt access control bits. I
+searched through the commit history of L2 cache support on OMAP4 but
+there is no mention of why this was needed on OMAP4. I am checking
+internally on the history behind this.
+
+3) OMAP4 sets cache replacement policy to RR which is not a big deal
+since thats the default anyway. We can probably drop this setting even
+from OMAP4.
 
 Thanks,
-Willy
+Sekhar
