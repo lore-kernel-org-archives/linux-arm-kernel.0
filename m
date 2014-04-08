@@ -1,45 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 8 Apr 2014 10:49:38 -0300
-Subject: mx27 running too slow
-In-Reply-To: <CAOMZO5AUemi9r_NqXXpnYZUqbqHhYnSvrnmu11voM_MZsVUa6Q@mail.gmail.com>
-References: <CAOMZO5CC1NwP14H7uuygX7ZviFJLriG41hyczzvzxYWKHJu5DQ@mail.gmail.com>
- <CAOMZO5AUemi9r_NqXXpnYZUqbqHhYnSvrnmu11voM_MZsVUa6Q@mail.gmail.com>
-Message-ID: <CAOMZO5CCst0HHWa5JO-8-T3AHiw68FUvKRgCiVvFBu=9JdJzjw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 08 Apr 2014 16:00:17 +0200
+Subject: mach header files
+In-Reply-To: <20140404152041.6b06bd85@skate>
+References: <77a25b9038764679b3bda0f3d4018ee1@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <645d041db09d4cf883ba178c695fe504@HKXPR06MB168.apcprd06.prod.outlook.com>
+ <20140404152041.6b06bd85@skate>
+Message-ID: <4261016.NOmSY7hXBc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 2, 2014 at 7:38 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Wed, Apr 2, 2014 at 7:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> Hi Alexander,
->>
->> What is the BogoMIPs value you get on mx27 running 3.14?
->>
->> I am running Shawn's for-next branch and it is terribly slow on a mx27pdk:
->>
->> sched_clock: 32 bits at 13MHz, resolution 75ns, wraps every 322929872820ns
->> CPU identified as i.MX27, silicon rev 2.1
->> Console: colour dummy device 80x30
->> Calibrating delay loop (skipped), value calculated using timer
->> frequency.. 26.60 BogoMIPS (lpj=133000)
->>
->> ARM9 running at 400MHz should give around 200 BogoMIPs.
->
-> Nevermind. On a clean 3.14 kernel I get the expected value:
->
-> Calibrating delay loop... 199.06 BogoMIPS (lpj=995328)
->
-> So this behaviour shows up only on Shawn's branch.
+Hi,
 
-Now I am running linux-next 20140408 and I am also getting the very
-slow BogoMIPS:
+On Friday 04 April 2014 15:20:41 Thomas Petazzoni wrote:
+> On Fri, 4 Apr 2014 13:14:44 +0000, Phil Edworthy wrote:
+> > > If it is used only by one driver, then it should go directly into
+> > > that driver without a #include. For SoC defines, you'll need to
+> > > check with the arm-soc maintainers. I *think* we're trying to get
+> > > away from separate arch/arm/mach-* directories, but I'm slightly
+> > > out of touch. You certainly should not do anything that breaks
+> > > multiplatform builds.
+> > 
+> > This is where it gets tricky. The clock driver only wants to know
+> > about one reg in a block of general system control registers. There
+> > is very little input to the clock driver... the SoC code needs to
+> > access other registers in the system control block.
+> > 
+> > I think you are right about trying to avoid separate arch/arm/mach-*
+> > directories, which is what prompted my question. So, how best to
+> > handle this?
+> 
+> I believe there are two solutions here:
+> 
+>  * Have a driver in arch/arm/mach-foo/ for your "system control block"
+>    that exposes a small API used by your clock driver in drivers/clk/.
+>    The issue is of course always: where to put the header files for
+>    this small API.
+> 
+>  * Have both your clock driver and your system control block driver map
+>    the registers they need, even if some of those registers are the
+>    same. Then you can use atomic_io_modify() from both drivers to
+>    atomically make changes to these registers. This is typically OK if
+>    you don't have any performance sensitive usage of those registers
+>    (atomic_io_modify accesses are protected by a global spinlock). This
+>    is the solution we've used between the Armada watchdog and Armada
+>    clocksource drivers, which require accessing a shared register, even
+>    though those two drivers are completely unrelated.
 
-Calibrating delay loop (skipped), value calculated using timer
-frequency.. 26.60 BogoMIPS (lpj=133000)
+Just for what it's worth, we've solved this problem on R-Car Gen2 by passing 
+the boot mode using a direct explicit call from platform code to the clock 
+driver. See rcar_gen2_clocks_init() in drivers/clk/shmobile/clk-rcar-gen2.c 
+and arch/arm/mach-shmobile/setup-rcar-gen2.c.
 
-Alexander,
+If we want to get rid of that I'd go for the first option, as the boot mode 
+register is really not part of the clock IP core and should not be listed as a 
+memory resource in its DT node.
 
-Do you see the same on Phytec mx27 board?
-
+-- 
 Regards,
 
-Fabio Estevam
+Laurent Pinchart
