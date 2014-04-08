@@ -1,46 +1,148 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 8 Apr 2014 21:52:41 +0200
-Subject: [RFC 1/5] PCI: tegra: Overhaul regulator usage
-In-Reply-To: <53444AE3.6030603@wwwdotorg.org>
-References: <1396622969-17837-1-git-send-email-treding@nvidia.com>
- <1396622969-17837-2-git-send-email-treding@nvidia.com>
- <53444AE3.6030603@wwwdotorg.org>
-Message-ID: <20140408195240.GA21978@ulmo.nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 08 Apr 2014 12:54:47 -0700
+Subject: [PATCH v6 4/5] edac: Add support for Krait CPU cache error
+ detection
+In-Reply-To: <20140408173541.GO30077@pd.tnic>
+References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
+ <1396641450-12854-5-git-send-email-sboyd@codeaurora.org>
+ <20140408173541.GO30077@pd.tnic>
+Message-ID: <53445407.1010108@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 09:15:47PM +0200, Stephen Warren wrote:
-> On 04/04/2014 08:49 AM, Thierry Reding wrote:
-> > The current usage of regulators for the Tegra PCIe block is wrong. It
-> > doesn't accurately reflect the actual supply inputs of the IP block and
-> > therefore isn't as flexible as it should be. Rectify this by describing
-> > all possible supply inputs in the device tree binding documentation and
-> > deprecate the old supply properties.
-> 
-> > diff --git a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-> 
-> > +Power supplies for Tegra30:
-> ...
-> > +- Optional:
-> > +  - If port 0 is enabled:
-> > +    - avdd-pexa-supply: Power supply for analog PCIe logic. Must supply 1.05 V.
-> > +    - vdd-pexa-supply: Power supply for digital PCIe I/O. Must supply 1.05 V.
-> > +  - If at least one of ports 1 and 2 is enabled:
-> > +    - avdd-pexb-supply: Power supply for analog PCIe logic. Must supply 1.05 V.
-> > +    - vdd-pexb-supply: Power supply for digital PCIe I/O. Must supply 1.05 V.
-> 
-> Did you get confirmation from HW/... that the mapping from pexa/b to
-> PCIe ports you document above is correct? IIRC the two supplies might be
-> related to lanes rather than ports?
+On 04/08/14 10:35, Borislav Petkov wrote:
+> On Fri, Apr 04, 2014 at 12:57:29PM -0700, Stephen Boyd wrote:
+>> +
+>> +struct krait_edac_error {
+>> +	const char * const msg;
+>> +	void (*func)(struct edac_device_ctl_info *edac_dev,
+>> +			int inst_nr, int block_nr, const char *msg);
+> arg alignment (please start new line at the opening brace).
 
-Not yet, which is the primary reason this is still RFC. Just wanted to
-get early feedback on the general direction of the series.
+Done.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140408/03e93392/attachment-0001.sig>
+
+>> +	int print_regs = cesr & CESR_PRINT_MASK;
+>> +	int i;
+>> +	static const struct krait_edac_error errors[] = {
+>> +		{ "D-cache tag parity error", edac_device_handle_ue },
+>> +		{ "D-cache data parity error", edac_device_handle_ue },
+>> +		{ "I-cache tag parity error", edac_device_handle_ce },
+>> +		{ "I-cache data parity error", edac_device_handle_ce },
+>> +		{ "D-cache tag timing error", edac_device_handle_ue },
+>> +		{ "D-cache data timing error", edac_device_handle_ue },
+>> +		{ "I-cache tag timing error", edac_device_handle_ce },
+>> +		{ "I-cache data timing error", edac_device_handle_ce }
+>> +	};
+>> +
+>> +	if (print_regs) {
+> This variable is used only once here, you can simply do the binary and
+> test then and drop it:
+>
+> 	if (cesr & CESR_PRINT_MASK)
+
+Done.
+
+>
+>> +		pr_alert("L1 / TLB Error detected on CPU %d!\n", cpu);
+>> +		pr_alert("CESR      = 0x%08x\n", cesr);
+> You can use the edac_*_printk with KERN_ALERT as level which adds proper
+> prefixes.
+
+Done.
+
+>
+>
+>> +
+>> +	if (cesr & CESR_TLBMH) {
+>> +		asm ("mcr p15, 0, r0, c8, c7, 0");
+>> +		edac_device_handle_ce(edac, cpu, 0, "TLB Multi-Hit error");
+>> +	}
+>> +
+>> +	if (cesr & (CESR_ICTPE | CESR_ICDPE | CESR_ICTE)) {
+>> +		i_cesynr = read_cesynr();
+>> +		pr_alert("I-side CESYNR = 0x%08x\n", i_cesynr);
+> edac_printk
+>
+> and also, this message looks a bit cryptic for issuing it at ALERT
+> level. I'm ssuming people won't come to you and ask you what it
+> means...? :)
+
+Ok. I can lower it to error level?
+
+>
+>> +		write_cesr(CESR_I_MASK);
+>> +
+>> +		/*
+>> +		 * Clear the I-side bits from the captured CESR value so that we
+>> +		 * don't accidentally clear any new I-side errors when we do
+>> +		 * the CESR write-clear operation.
+>> +		 */
+>> +		cesr &= ~CESR_I_MASK;
+>> +	}
+>> +
+>> +	if (cesr & (CESR_DCTPE | CESR_DCDPE | CESR_DCTE)) {
+>> +		d_cesynr = read_cesynr();
+>> +		pr_alert("D-side CESYNR = 0x%08x\n", d_cesynr);
+> Ditto.
+>
+>> +	}
+>> +
+>> +	/* Clear the interrupt bits we processed */
+>> +	write_cesr(cesr);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static irqreturn_t krait_l2_irq(int irq, void *dev_id)
+>> +{
+>> +	struct edac_device_ctl_info *edac = dev_id;
+>> +	unsigned int l2esr;
+>> +	unsigned int l2esynr0;
+>> +	unsigned int l2esynr1;
+>> +	unsigned int l2ear0;
+>> +	unsigned int l2ear1;
+>> +	unsigned long cpu;
+>> +	int i;
+>> +	static const struct krait_edac_error errors[] = {
+>> +		{ "master port decode error", edac_device_handle_ce },
+>> +		{ "master port slave error", edac_device_handle_ce },
+>> +		{ "tag soft error, single-bit", edac_device_handle_ce },
+>> +		{ "tag soft error, double-bit", edac_device_handle_ue },
+>> +		{ "data soft error, single-bit", edac_device_handle_ce },
+>> +		{ "data soft error, double-bit", edac_device_handle_ue },
+>> +		{ "modified soft error", edac_device_handle_ce },
+>> +		{ "slave port exclusive monitor not available",
+>> +			edac_device_handle_ue},
+>> +		{ "master port LDREX received Normal OK response",
+>> +			edac_device_handle_ce },
+>> +	};
+>> +
+>> +	l2esr = krait_get_l2_indirect_reg(L2ESR);
+>> +	pr_alert("Error detected!\n");
+> Why print this not very telling message here if errors[i].func() will
+> get the proper .msg later?
+
+Sure I can drop it.
+
+>
+>> +	pr_alert("L2ESR    = 0x%08x\n", l2esr);
+>> +
+>> +	if (l2esr & (L2ESR_TSESB | L2ESR_TSEDB | L2ESR_MSE | L2ESR_SP)) {
+>> +		l2esynr0 = krait_get_l2_indirect_reg(L2ESYNR0);
+>> +		l2esynr1 = krait_get_l2_indirect_reg(L2ESYNR1);
+>> +		l2ear0 = krait_get_l2_indirect_reg(L2EAR0);
+>> +		l2ear1 = krait_get_l2_indirect_reg(L2EAR1);
+>> +
+>> +		pr_alert("L2ESYNR0 = 0x%08x\n", l2esynr0);
+>> +		pr_alert("L2ESYNR1 = 0x%08x\n", l2esynr1);
+>> +		pr_alert("L2EAR0   = 0x%08x\n", l2ear0);
+>> +		pr_alert("L2EAR1   = 0x%08x\n", l2ear1);
+> Also, please use edac_printk and consider making those messages
+> human-readable, otherwise it only confuses users.
+
+Ok.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
