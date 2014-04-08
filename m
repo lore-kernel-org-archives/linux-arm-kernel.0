@@ -1,34 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Apr 2014 20:52:25 +0200
-Subject: The Alphabet (or, the sorting of Kconfig symbols)
-In-Reply-To: <CACxGe6uoB6CkuV7HCg8wdyu2Tm471YaAz0sDA3W2C0MPAYYY+Q@mail.gmail.com>
-References: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
- <CACxGe6uoB6CkuV7HCg8wdyu2Tm471YaAz0sDA3W2C0MPAYYY+Q@mail.gmail.com>
-Message-ID: <20140408185225.GU29751@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 8 Apr 2014 13:52:31 -0500
+Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
+References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
+ <1396907649-20212-2-git-send-email-tthayer@altera.com>
+ <20140408133818.GB16054@pengutronix.de>
+ <1396967390.23349.15.camel@dinh-ubuntu>
+ <20140408143327.GC16054@pengutronix.de>
+ <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
+Message-ID: <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 04, 2014 at 04:24:27AM -0700, Grant Likely wrote:
-> On Fri, Apr 4, 2014 at 4:16 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > For those who don't know it, the order of letters in the alphabet is:
-> >
-> > A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
-> >
-> > and we use this order to determine the position of "select" entries in
-> > Kconfig files.  We do that so that we can reduce conflicts.  Conflicts
-> > such as these kinds of rubbish:
-> 
-> Equally applies to #include ordering.
-With #includes there might be exceptions though because of dependencies
-between headers.
-I don't know how common these are today, I didn't have had dependency
-problems for some time now, but I wouldn't want checkpatch to treat the
-order of #includes as error, while for Kconfig it's fine.
+On Tue, Apr 8, 2014 at 11:02 AM, delicious quinoa
+<delicious.quinoa@gmail.com> wrote:
+> On Tue, Apr 8, 2014 at 9:33 AM, Steffen Trumtrar
+> <s.trumtrar@pengutronix.de> wrote:
+>> On Tue, Apr 08, 2014 at 09:29:50AM -0500, Thor Thayer wrote:
+>>> On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
+>>> > Hi!
+>>> >
+>>> > On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
+>>> > > From: Thor Thayer <tthayer@altera.com>
+>>> > >
+>>> > > Addition of the Altera SDRAM controller bindings and device
+>>> > > tree changes to the Altera SoC project.
+>>> > >
+>>> [snip]
+>>> > > +
+>>> > > +Required properties:
+>>> > > +- compatible : "altr,sdr-ctl", "syscon";
+>>> > > +                Note that syscon is invoked for this device to support the FPGA
+>>> > > +         bridge driver, EDAC driver and other devices that share the
+>>> > > +         registers.
+>>> > > +- reg : Should contain 1 register ranges(address and length)
+>>> >
+>>> > I haven't really thought this through, but why would the FPGA bridge driver
+>>> > access the sdram controller? For releasing the resets in fpgaportrst ? Or is
+>>> > there more?
+>>>
+>>> Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
+>>> path. Our SDRAM controller allows FPGA master access to the SDRAM.
+>>>
+>>
+>> Yes. But what you have to do to enable the path is let the FPGA port you use
+>> out of reset. And that is it as far as I can see. The rest happens in the
+>> bitstream. Or is there more to enable the path?
+>> The FPGA2SDRAM bridge is the one I didn't use as of yet, so if I miss something
+>> please elaborate.
+>
+> Hi Steffen,
+>
+> The sdram controller is used by two drivers.  That's why we want to
+> specify "syscon" here.  The other driver is the FPGA bridge driver.
+> Its functionality is very separate from what this driver is doing (we
+> are not enabling the bridge in this driver; we are enabling the
+> monitoring and resetting the interrupt bit of the EDAC).  We wanted to
+> specify "syscon" her so that we don't have to have to change it for
+> the other driver.
 
-Best regards
-Uwe
+But are there actually overlapping registers which are accessed by
+both drivers and need the protection of regmap?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Perhaps MFD is more appropriate than syscon?
+
+Rob
