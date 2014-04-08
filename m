@@ -1,42 +1,31 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 8 Apr 2014 13:21:41 -0600
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408191514.GJ11052@1wt.eu>
-References: <20140405193435.50d8dd81@skate>
- <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
- <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
- <20140408171309.09bbf968@skate> <20140408174034.79df403e@skate>
- <20140408175545.1b4d55a5@skate>
- <20140408171417.GB27776@obsidianresearch.com>
- <20140408175324.GH11052@1wt.eu>
- <20140408180828.GC32490@obsidianresearch.com>
- <20140408191514.GJ11052@1wt.eu>
-Message-ID: <20140408192141.GH32490@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 08 Apr 2014 13:21:49 -0600
+Subject: [RFC 0/5] PCI: tegra: Overhaul regulator usage
+In-Reply-To: <1396622969-17837-1-git-send-email-treding@nvidia.com>
+References: <1396622969-17837-1-git-send-email-treding@nvidia.com>
+Message-ID: <53444C4D.2080800@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 09:15:14PM +0200, Willy Tarreau wrote:
-
-> OK that's what I understood, but I mean why rounding down instead of up
-> in order to correctly cover the window the device expects ? And we all
-> found that rounding up fixed our respective devices (3 igb NICs, one
-> myri10ge NIC, one SATA controller I believe).
+On 04/04/2014 08:49 AM, Thierry Reding wrote:
+> The current device tree binding for the regulator setup on Tegra PCIe is
+> not accurate. While it does work for current use-cases, that's likely by
+> accident rather than design. This series replaces the existing set of
+> power-supply properties with a new set that accurately describes the
+> inputs of the IP block (depending on SoC generation).
 > 
-> By rounding up you'd have had 1ffffff instead, which at least covers the
-> window the device expects.
+> As a heads-up, this breaks backwards compatibility with prior versions
+> of the device tree bindings, but I don't see a reason why that should
+> keep us from fixing this properly. Not many people are currently using
+> these bindings and those who are are most likely tracking upstream
+> development closely enough not to be impacted by this.
+> 
+> I've aimed to keep the series bisectible, which has the downside of
+> interleaving patches to unrelated trees (ARM and PCI). I'm hoping that
+> perhaps we can find a way to merge this as a whole to keep it possible
+> to bisect across the series. Although again, I guess it wouldn't be all
+> that bad if that wasn't the case, given how little PCIe is actually
+> being used.
 
-It is also an error to configure the mbus to have overlaping windows
-and the code checks for overlaps with the base/size given. If we round
-up then it might create an overlap.
-
-You guys were OK with the round up in the PCI code only because your
-systems have a single used PEX so the rounding didn't create an
-overlaping situation..
-
-The generic code should either round down, or compeltely bail, as
-Thomas suggested.
-
-Fundementally we shouldn't get to the WARN_ON, so what happens after
-is just an attempt to salvage something from the situation.
-
-Jason
+I'd be happy to put this series into a branch in the Tegra tree, given
+suitable acks from Bjorn on the PCI changes.
