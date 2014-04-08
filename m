@@ -1,72 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue,  8 Apr 2014 14:19:24 +0200
-Subject: [PATCH V3 02/17] ARM: exynos: cpuidle: use cpuidle_register
-In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396959579-18268-3-git-send-email-daniel.lezcano@linaro.org>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 8 Apr 2014 14:36:32 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <CAFJTrDtiRctixnbBEbHMsnxsPy7ew9-7SoD5cyUA6DWPU9p6Fw@mail.gmail.com>
+References: <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140406185833.GI29787@1wt.eu>
+ <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
+ <20140407174106.GD9952@obsidianresearch.com>
+ <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
+ <20140407204817.GB20736@obsidianresearch.com>
+ <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
+ <20140408064003.GU29787@1wt.eu>
+ <CAFJTrDu82avr6mSaz1PNzOJ0tnQiH5aiq6URiXZAbJ=4W+2EJg@mail.gmail.com>
+ <CAFJTrDtiRctixnbBEbHMsnxsPy7ew9-7SoD5cyUA6DWPU9p6Fw@mail.gmail.com>
+Message-ID: <20140408123632.GG8767@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the cpuidle generic function 'cpuidle_register'. That saves us from some
-extra lines of code and unneeded variables.
+Matthew,
 
-A side effect of this change is a bug fix where before the cpuidle driver was
-registered for each_online_cpu and now it is for each_possible_cpu.
+On Tue, Apr 08, 2014 at 01:31:48PM +0100, Matthew Minter wrote:
+> To add to my previous point, I would consider releasing these patches
+> as soon as possible as it seems that it can easily cause panics on a
+> range of boards. Failing that perhaps it is at least worth releasing a
+> hotfix which will cause PCI probing to fail should the window not be a
+> power of two? Thus it will fail early with a warning instead of
+> potentially causing a kernel crash.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-exynos/cpuidle.c |   18 ++----------------
- 1 file changed, 2 insertions(+), 16 deletions(-)
+Have you tested the whole patch or just the one enforcing the power of 2 ?
+It would be interesting to know if the one with SZ_4M is needed for you or
+not (I guess not).
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 9623a05..b7cd75b 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -59,8 +59,6 @@
- #define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
- #define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
+I suspect that just this single-liner will work as well, as it does for me.
+
+Thanks,
+Willy
+
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 0e79665..552ab73 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -363,6 +363,7 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+ 	port->memwin_size  =
+ 		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+ 		port->memwin_base;
++	port->memwin_size = roundup_pow_of_two(port->memwin_size);
  
--static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
--
- /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
- static void exynos4_set_wakeupmask(void)
- {
-@@ -211,8 +209,7 @@ static struct cpuidle_driver exynos4_idle_driver = {
- 
- static int exynos_cpuidle_probe(struct platform_device *pdev)
- {
--	int cpu_id, ret;
--	struct cpuidle_device *device;
-+	int ret;
- 
- 	if (soc_is_exynos5250())
- 		exynos5_core_down_clk();
-@@ -220,23 +217,12 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
- 	if (soc_is_exynos5440())
- 		exynos4_idle_driver.state_count = 1;
- 
--	ret = cpuidle_register_driver(&exynos4_idle_driver);
-+	ret = cpuidle_register(&exynos4_idle_driver, NULL);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
- 		return ret;
- 	}
- 
--	for_each_online_cpu(cpu_id) {
--		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
--		device->cpu = cpu_id;
--
--		ret = cpuidle_register_device(device);
--		if (ret) {
--			dev_err(&pdev->dev, "failed to register cpuidle device\n");
--			return ret;
--		}
--	}
--
- 	return 0;
- }
- 
--- 
-1.7.9.5
+ 	mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+ 				    port->memwin_base, port->memwin_size);
