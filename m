@@ -1,28 +1,23 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Apr 2014 09:54:46 +0200
-Subject: Big endian working?
-Message-ID: <20140408095446.0520dd28@skate>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 8 Apr 2014 08:43:28 +0200
+Subject: [PATCH v6 2/5] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <20140407215649.GH9985@codeaurora.org>
+References: <1396641450-12854-1-git-send-email-sboyd@codeaurora.org>
+ <1396641450-12854-3-git-send-email-sboyd@codeaurora.org>
+ <20140407201838.GC20822@pd.tnic>
+ <20140407215649.GH9985@codeaurora.org>
+Message-ID: <20140408064328.GB30077@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Taras,
+On Mon, Apr 07, 2014 at 02:56:49PM -0700, Stephen Boyd wrote:
+> No. This is the template I'm told to use.
 
-I'm currently trying to get ARM BE to work on Armada XP. I'm pretty
-sure it used to work on 3.13, but now I'm testing 3.13 and 3.14 and it
-doesn't boot here (it hangs even before "Uncompressing kernel...",
-apparently while relocating the kernel image before decompression).
+By whom? And why?
 
-Ben Dooks told me that the ARM BE kernel works for you. Can you confirm
-which kernel version you're using, and if you've applied any patch?
-Also, can you confirm which toolchain and toolchain version you're
-using?
-
-If needed, I'm on IRC, #armlinux on Freenode.
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
