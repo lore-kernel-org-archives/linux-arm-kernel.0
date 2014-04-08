@@ -1,20 +1,84 @@
-From: johannes@sipsolutions.net (Johannes Berg)
-Date: Tue, 08 Apr 2014 10:37:55 +0200
-Subject: [PATCHv3 0/5] net: rfkill: gpio: cleanup and a few new acpi ids
-In-Reply-To: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
-References: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <1396946275.5936.2.camel@jlt4.sipsolutions.net>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 8 Apr 2014 08:30:37 +0000
+Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
+In-Reply-To: <5343AE45.4020308@linaro.org>
+References: <1396672506-9296-1-git-send-email-zhangfei.gao@linaro.org>
+ <1396672506-9296-4-git-send-email-zhangfei.gao@linaro.org>
+ <20140407.145356.928382660541891827.davem@davemloft.net>
+ <5343AE45.4020308@linaro.org>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D0F6F1434@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-01 at 17:02 +0300, Heikki Krogerus wrote:
-> Hi,
+From: zhangfei [mailto:zhangfei.gao at linaro.org]
+> On 04/08/2014 02:53 AM, David Miller wrote:
+> > From: Zhangfei Gao <zhangfei.gao@linaro.org>
+> > Date: Sat,  5 Apr 2014 12:35:06 +0800
+> >
+> >> +struct tx_desc {
+> >> +	u32 send_addr;
+> >> +	u16 reserved_16;
+> >> +	u16 send_size;
+
+The above doesn't look right for endianness independence.
+I'd guess the hardware spec shows a 32bit word with the 'send size'
+in one half - that is what you need to define.
+
+Since this is a tx descriptor (and written by the host) you
+can't have 'reserved' field - the host has to write it.
+probably these are 'must be zero' fields.
+
+> >> +	u32 reserved_32;
+> >> +	u32 cfg;
+> >> +	u32 wb_addr;
+> >> +} ____cacheline_aligned;
+> >
+> > I do not think that ____cacheline_aligned is appropriate at all here.
+> >
+> > First of all, this is a hardware descriptor, so it has a fixed layout
+> > and therefore size.
+
+The structure also isn't even a multiple of a power of two.
+So there will be implicit padding at the end.
+
+Since there isn't a 'pointer to next' I presume the hardware accesses
+the descriptors from adjacent physical addresses.
+So you need to explicitly pad to that size.
+If the cache line size were 128 byte the above wouldn't work at all.
+
+> >
+> > Secondly, unless you declare this object statically in the data section
+> > of the object file, the alignment doesn't matter.  These descriptors
+> > are always dynamically allocated, rather than instantiated in the
+> > kernel/driver image.
 > 
-> I hope this one is OK with everyone.
+> The ____cacheline_aligned used here is only for the requirement of
+> alignment, and use dma_alloc_coherent, while at first dma_pool is used
+> for the requirement of alignment.
+> Otherwise desc[1] is not aligned and can not be used directly, the
+> structure is smaller.
 
-It's fine with me. Are you expecting me to pick up any of these patches,
-or do you want them to go through some other tree? Either way is fine
-with me, but the first patch looks like something I probably shouldn't
-be taking.
+It sounds like you should be explicitly padding the structure
+to 32 bytes - whether or not that is the cache line size.
 
-johannes
+...
+> I am sorry, but unfortunately this series really does NOT have TX done
+> interrupt after checked with hardware guy many times.
+> And next series will add TX done interrupt according to the feedback.
+> 
+> There are two reasons of removing the TX done interrupt when the chip is
+> designed.
+> 1. The specific product does not care the latency, only care the throughput.
+> 2. When doing many experiment, the tx done interrupt will impact the
+> throughput, as a result reclaim is moved to xmit as one of
+> optimizations, then finally tx done interrupt is removed at all.
+> 
+> Is it acceptable of removing timer as well as latency handling, or any
+> other work around of this kind of hardware?
+
+If you don't have a global 'TX done' interrupt, you need a per
+descriptor one.
+Otherwise you cannot send at maximum rate in the absence of
+receive traffic.
+
+	David
