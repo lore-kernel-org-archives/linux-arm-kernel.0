@@ -1,16 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 8 Apr 2014 20:11:43 +0800
-Subject: [PATCH 1/4] ARM: dts: imx6: edmqmx6: Fix usbotg id pin
-In-Reply-To: <1396880967-16319-1-git-send-email-l.stach@pengutronix.de>
-References: <1396880967-16319-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140408121140.GA28420@dragon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Apr 2014 12:49:49 +0100
+Subject: memcpy alignment for DEVICE_nGnRnE
+In-Reply-To: <20140408003547.GA18321@codeaurora.org>
+References: <53072343.4080505@marvell.com> <20140221105307.GE25363@localhost>
+ <20140408003547.GA18321@codeaurora.org>
+Message-ID: <20140408114949.GB21054@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 04:29:24PM +0200, Lucas Stach wrote:
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, Apr 08, 2014 at 01:35:47AM +0100, Michael Bohan wrote:
+> On Fri, Feb 21, 2014 at 10:53:08AM +0000, Catalin Marinas wrote:
+> > On Fri, Feb 21, 2014 at 09:58:27AM +0000, Zhou Zhu wrote:
+> > > We faced one issue using memcpy for memory type DEVICE_nGnRnE 
+> > > (pgprot_noncached). If the address is not aligned, exception would 
+> > > happen due to the alignment of this type could not be handled by hardware.
+> > 
+> > Indeed, that's expected. This memory type is the equivalent of Strongly
+> > Ordered.
+> > 
+> > > Is there any plan and ongoing patch to support this or we need to keep 
+> > > address aligned for memcpy using pgprot_noncached memory in drivers?
+> > 
+> > You either change the memory type to pgprot_writecombine() or use the
+> > right API (memcpy_toio/memcpy_fromio, these could be further optimised,
+> > similar to powerpc for example, but I didn't get there yet).
+> 
+> How should we handle Device Memory with copy_from_user / copy_to_user?
+> Should we follow the same scheme and create
+> copy_from_user_io / copy_to_user_io, or rather enforce that the stock
+> routines handle alignment?
 
-Applied all 4, thanks.
+We have generic copy_from_user_toio() and copy_to_user_fromio(). Are
+these what you need? As with the memcpy_(to|from)io, they can be further
+optimised.
+
+-- 
+Catalin
