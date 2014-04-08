@@ -1,76 +1,137 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 08 Apr 2014 09:03:27 +0200
-Subject: [PATCH v2 2/5] ARM: zynq: dt: Convert to preprocessor includes
-In-Reply-To: <20140407180228.GN12170@pengutronix.de>
-References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
- <1396653256-28397-3-git-send-email-soren.brinkmann@xilinx.com>
- <53423E75.3020008@monstr.eu> <53429754.8080105@topic.nl>
- <534298E7.2020409@monstr.eu> <20140407171012.GC9952@obsidianresearch.com>
- <20140407180228.GN12170@pengutronix.de>
-Message-ID: <53439F3F.2030801@monstr.eu>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 08 Apr 2014 10:31:59 +0100
+Subject: [PATCH 2/2] arm: use fixmap for text patching when text is RO
+In-Reply-To: <CAGXu5j+pWbLW6xkgqzh0ittvaqsbxbW6UuXa7ciqi+XAN0d6NQ@mail.gmail.com>
+References: <1396646870-29695-1-git-send-email-rabin@rab.in>
+ <1396646870-29695-2-git-send-email-rabin@rab.in>
+ <1396879071.3654.43.camel@linaro1.home>
+ <CAGXu5j+pWbLW6xkgqzh0ittvaqsbxbW6UuXa7ciqi+XAN0d6NQ@mail.gmail.com>
+Message-ID: <1396949519.3567.14.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2014 08:02 PM, Steffen Trumtrar wrote:
-> Hi!
+On Mon, 2014-04-07 at 11:04 -0700, Kees Cook wrote:
+> On Mon, Apr 7, 2014 at 6:57 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> > On Fri, 2014-04-04 at 23:27 +0200, Rabin Vincent wrote:
+> >> Use fixmaps for text patching when the kernel text is read-only,
+> >> inspired by x86.  This makes jump labels and kprobes work with the
+> >> currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
+> >> CONFIG_DEBUG_RODATA options.
+> >>
+> >> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> >> ---
+> >>  arch/arm/include/asm/fixmap.h |  3 ++
+> >>  arch/arm/kernel/jump_label.c  |  2 +-
+> >>  arch/arm/kernel/patch.c       | 66 ++++++++++++++++++++++++++++++++++++++-----
+> >>  arch/arm/kernel/patch.h       | 12 +++++++-
+> >>  4 files changed, 74 insertions(+), 9 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> >> index 55ed076..79c1719 100644
+> >> --- a/arch/arm/include/asm/fixmap.h
+> >> +++ b/arch/arm/include/asm/fixmap.h
+> >> @@ -18,6 +18,9 @@
+> >>  #define FIXADDR_TOP          (FIXADDR_END - PAGE_SIZE)
+> >>
+> >>  enum fixed_addresses {
+> >> +     FIX_TEXT_POKE0,
+> >> +     FIX_TEXT_POKE1,
+> >> +
+> >>       FIX_KMAP_BEGIN,
+> >>       FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
+> >>       __end_of_fixed_addresses
+> >> diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
+> >> index 4ce4f78..afeeb9e 100644
+> >> --- a/arch/arm/kernel/jump_label.c
+> >> +++ b/arch/arm/kernel/jump_label.c
+> >> @@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+> >>               insn = arm_gen_nop();
+> >>
+> >>       if (is_static)
+> >> -             __patch_text(addr, insn);
+> >> +             __patch_text_early(addr, insn);
+> >>       else
+> >>               patch_text(addr, insn);
+> >>  }
+> >> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+> >> index 07314af..761c5b6 100644
+> >> --- a/arch/arm/kernel/patch.c
+> >> +++ b/arch/arm/kernel/patch.c
+> >> @@ -1,8 +1,11 @@
+> >>  #include <linux/kernel.h>
+> >> +#include <linux/spinlock.h>
+> >>  #include <linux/kprobes.h>
+> >> +#include <linux/mm.h>
+> >>  #include <linux/stop_machine.h>
+> >>
+> >>  #include <asm/cacheflush.h>
+> >> +#include <asm/fixmap.h>
+> >>  #include <asm/smp_plat.h>
+> >>  #include <asm/opcodes.h>
+> >>
+> >> @@ -13,21 +16,67 @@ struct patch {
+> >>       unsigned int insn;
+> >>  };
+> >>
+> >> -void __kprobes __patch_text(void *addr, unsigned int insn)
+> >> +static DEFINE_SPINLOCK(patch_lock);
+> >> +
+> >> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+> >> +{
+> >> +     unsigned int uintaddr = (uintptr_t) addr;
+> >> +     bool module = !core_kernel_text(uintaddr);
+> >> +     struct page *page;
+> >> +
+> >> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
+> >> +             page = vmalloc_to_page(addr);
+> >> +     } else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
 > 
-> On Mon, Apr 07, 2014 at 11:10:12AM -0600, Jason Gunthorpe wrote:
->> On Mon, Apr 07, 2014 at 02:24:07PM +0200, Michal Simek wrote:
->>
->>> Device-tree BSP and in 2014.01 there will be new BSP which just
->>> generate them directly from the Vivado tools which just target your
->>> reference design.  You can connect your custom IP (or Xilinx or 3rd
->>> party) directly to the GIC which using different IRQ sensitivity
->>> with whatever register addresses and make no sense to write it by
->>> hand.
->>
->> On our Zynq design here we ended up being unwilling to use platform
->> generation from Vivado. Basically all our IP was custom, so there was
->> no win at all to invoking the complexity of the automatic tools.
->>
->> Thus we write the DT by hand, and our DT is complex, integrating
->> peripherals that span two FPGAs.
->>
->> I think the in-kernel DT should use the kernel conventions, which
->> means using #include and the binding constants over magic values.
->>
+> I think this should probably be CONFIG_DEBUG_RODATA now that I've
+> moved RO exclusively into that config.
 > 
-> ACK.
+> >> +             page = virt_to_page(addr);
+> >> +     } else {
+> >> +             return addr;
+> >> +     }
+> >
+> > I can't help but think that it'd be more maintainable to just always use
+> > fixmap, though that would obviously have some performance impact (not
+> > sure that particularly matters for text patching) and it would expose
+> > possible fixmap bugginess to more kernels (see my next comment...)
+> >
+> >> +
+> >> +     if (flags)
+> >> +             spin_lock_irqsave(&patch_lock, *flags);
+> >> +
+> >> +     set_fixmap(fixmap, page_to_phys(page));
+> >> +
+> >> +     return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+> >
+> > How does fixmap cope with cache colouring? Looking at the implementation
+> > it looks like it doesn't and so fixmap use on ARM is possibly buggy.
+> >
+> > For the text patching case where we know there are no writeable mappings
+> > [1] this should be OK if we used set_fixmap_nocache here, so long as we
+> > also invalidated the dcache later for the proper virtual address.
+> >
+> > [1] Can we know there are no writeable mappings though, the ftrace code
+> > modifying patches from Kees Cook have there own way of modifying text
+> > code permissions.
 > 
-> If in doubt follow common mainline practice. Although using includes
-> for DT is not necessarily common practice, readability of DTs is
-> really important IMHO.
+> I think performance becomes an issue for massive updates like ftrace
+> seems to do, so I got the sense it was good to have the "bulk" way to
+> do it, and then this tiny poking way to do it.
 
-Let me give you one example. When you add xilinx intc controller
-to zynq HW design which uses gic with headers you are using
-then you will find out that sensitivity for both controllers
-are just different.
-This is just one case I am aware of. I expect there will be one more.
+Probably performance is significant, but as safely modifying kernel code
+is virtually impossible to get right I would think that it best to
+concentrate on a single method for this.
 
-Also dtses from kernel are copied to other project because separation
-from kernel hasn't be done but there is any plan regarding this.
-
-Using dtc preprocessor and macros improve DTS readability but at the same
-time force other users to copy all necessary files from the kernel
-to that projects which is just hassle.
-With example above there are also cases where using macros is just wrong
-that's why I don't want to start to use it.
-
-Thanks,
-Michal
+There again, the whole concept of things like ftrace is fundamentally
+flawed, with it being impossible to determine all the functions which
+require notrace annotations in order to avoid kernel crashes and
+corruption. So perhaps a little flakiness in kprobes and ftrace is
+acceptable? (I hope these things aren't enabled on distro kernels and
+usable by non-root processes...)
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140408/a9eb5171/attachment-0001.sig>
+Tixy
