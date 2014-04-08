@@ -1,92 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Apr 2014 12:11:07 +0200
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <20140408094933.GS17163@e106497-lin.cambridge.arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
- <20140408094933.GS17163@e106497-lin.cambridge.arm.com>
-Message-ID: <6228807.4v9ZRtib77@wuerfel>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 08 Apr 2014 12:02:21 +0200
+Subject: [PATCH v12][ 07/12] drm: drm_display_mode: add signal polarity
+ flags
+In-Reply-To: <5343AE8A.50803@eukrea.com>
+References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
+ <1396874691-27954-7-git-send-email-denis@eukrea.com>
+ <534398D5.4090600@samsung.com> <5343AE8A.50803@eukrea.com>
+Message-ID: <5343C92D.2070508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 April 2014 10:49:33 Liviu Dudau wrote:
-> On Tue, Apr 08, 2014 at 12:21:51AM +0100, Bjorn Helgaas wrote:
-> > On Fri, Mar 14, 2014 at 9:34 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > > Some architectures do not share x86 simple view of the PCI I/O space
-> > > and instead use a range of addresses that map to bus addresses. For
-> > > some architectures these ranges will be expressed by OF bindings
-> > > in a device tree file.
-> > >
-> > > Introduce a pci_register_io_range() helper function that can be used
-> > > by the architecture code to keep track of the I/O ranges described by the
-> > > PCI bindings. If the PCI_IOBASE macro is not defined that signals
-> > > lack of support for PCI and we return an error.
-> > >
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > Acked-by: Grant Likely <grant.likely@linaro.org>
-> > > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> > > ---
-> > >  drivers/of/address.c       | 9 +++++++++
-> > >  include/linux/of_address.h | 1 +
-> > >  2 files changed, 10 insertions(+)
-> > >
-> > > diff --git a/drivers/of/address.c b/drivers/of/address.c
-> > > index 1a54f1f..be958ed 100644
-> > > --- a/drivers/of/address.c
-> > > +++ b/drivers/of/address.c
-> > > @@ -619,6 +619,15 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
-> > >  }
-> > >  EXPORT_SYMBOL(of_get_address);
-> > >
-> > > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> > > +{
-> > > +#ifndef PCI_IOBASE
-> > > +       return -EINVAL;
-> > > +#else
-> > > +       return 0;
-> > > +#endif
-> > > +}
-> > 
-> > This isn't PCI code, so I'm fine with it in that sense, but I'm not
-> > sure the idea of a PCI_IOBASE #define is really what we need.  It's
-> > not really determined by the processor architecture, it's determined
-> > by the platform.  And a single address isn't enough in general,
-> > either, because if there are multiple host bridges, there's no reason
-> > the apertures that generate PCI I/O transactions need to be contiguous
-> > on the CPU side.
+On 04/08/2014 10:08 AM, Denis Carikli wrote:
+> On 04/08/2014 08:36 AM, Andrzej Hajda wrote:
+>>
+>> Hi Denis,
+> Hi,
 > 
-> It should not be only platform's choice if the architecture doesn't support it.
-> To my mind PCI_IOBASE means "I support MMIO operations and this is the
-> start of the virtual address where my I/O ranges are mapped." It's the
-> same as ppc's _IO_BASE. And pci_address_to_pio() will take care to give
-> you the correct io_offset in the presence of multiple host bridges,
-> while keeping the io resource in the range [0 .. host_bridge_io_range_size - 1]
+>>> +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
+>>> +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
+>>> +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
+>>
+>> What is the purpose of DRM_MODE_FLAG_POL_PIXDATA_PRESERVE?
+>> If 'preserve' means 'ignore' we can set to zero negedge and posedge bits
+>> instead of adding new bit. If it is something different please describe it.
+> Yes, it meant 'ignore'.
+> 
+> The goal was to be able to have a way to keep the old behavior while 
+> still being able to set the flags.
+> 
+> So, with the imx-drm driver, if none of the DRM_MODE_FLAG_POL_PIXDATA 
+> were set(that is POSEDGE, NEGEDGE, PRESERVE), then in ipuv3-crtc.c, it 
+> went using the old flags settings that were previously hardcoded.
+> 
+> The same applied for DRM_MODE_FLAG_POL_DE.
+> The patch using theses flags is the 08/12 of this same serie.
 
-There is a wide range of implementations across architectures:
+So as I understand you want to:
+- do not change hw polarity settings by using preserve bit,
+- keep the old behavior of the driver by setting all bits to zero.
 
-a) no access to I/O ports at all (tile, s390, ...)
-b) access to I/O ports only through special instructions (x86, ...)
-c) all MMIO is mapped virtual contiguous to PCI_IOBASE or _IO_BASE
-   (most ppc64, arm32 with MMU, arm64, ...)
-d) only one PCI host can have an I/O space (mips, microblaze, ...)
-e) each host controller can have its own method (ppc64 with indirect pio)
-f) PIO token equals virtual address plus offset (some legacy ARM platforms,
-   probably some other architectures), or physical address (sparc)
-g) PIO token encodes address space number plus offset (ia64)
+I think this is the issue of the specific driver, and it should not
+influence core structs.
 
-a) and b) are trivially handled by any implementation that falls
-back to 'return -EINVAL'.
-I believe that c) is the most appropriate solution and we should be
-able to adopt it by most of the architectures that have an MMU and
-make it the default implementation.
-d) seems like a good fallback for noMMU architectures: While we do
-need to support I/O spaces, we need to support multiple PCI domains,
-and we need to support noMMU, the combination of all three should
-be extremely rare, and I'd leave it up to the architecture to support
-that if there is a real use case, rather than trying to put that into
-common code.
-Anything that currently requires e), f) or g) I think should keep
-doing that and not try to use the generic implementation.
+I am not familiar with imx but I guess it should not be a problem
+to solve the issue in the driver.
 
-	Arnd
+> 
+>>>   struct drm_display_mode {
+> [..]
+>>> +	unsigned int pol_flags;
+>>
+>> Adding field and macros description to the DocBook would be nice.
+> So I will have to describe it in the "Connector Helper Operations" 
+> section of drm.tmpl, right before the mode_valid synopsis ?
+
+Yes, I think so.
+
+Andrzej
+
+> 
+> Denis.
+> 
