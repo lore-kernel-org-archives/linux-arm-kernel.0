@@ -1,111 +1,101 @@
-From: matthew_minter@xyratex.com (Matthew Minter)
-Date: Tue, 8 Apr 2014 11:53:33 +0100
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408064003.GU29787@1wt.eu>
-References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140406185833.GI29787@1wt.eu>
- <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
- <20140407174106.GD9952@obsidianresearch.com>
- <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
- <20140407204817.GB20736@obsidianresearch.com>
- <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
- <20140408064003.GU29787@1wt.eu>
-Message-ID: <CAFJTrDu82avr6mSaz1PNzOJ0tnQiH5aiq6URiXZAbJ=4W+2EJg@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 8 Apr 2014 11:20:43 +0100
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
+ <20140405000007.GD15806@google.com>
+ <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
+ <1396862058.3671.40.camel@pasglop>
+ <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
+ <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
+Message-ID: <20140408102043.GV17163@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just to confirm, this patch is stopping my kernel panic also, I am
-still suffering from another minor issue however this does seem to be
-the crux of my problem also. I can however happily say that I regard
-my hotplug issue closed.
+On Mon, Apr 07, 2014 at 11:44:51PM +0100, Bjorn Helgaas wrote:
+> On Mon, Apr 7, 2014 at 4:07 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Mon, Apr 07, 2014 at 10:14:18AM +0100, Benjamin Herrenschmidt wrote:
+> >> On Mon, 2014-04-07 at 09:46 +0100, Liviu Dudau wrote:
+> >> >
+> >> > *My* strategy is to get rid of pci_domain_nr(). I don't see why we need
+> >> > to have arch specific way of providing the number, specially after looking
+> >> > at the existing implementations that return a value from a variable that
+> >> > is never touched or incremented. My guess is that pci_domain_nr() was
+> >> > created to work around the fact that there was no domain_nr maintainance in
+> >> > the generic code.
+> >>
+> >> Well, there was no generic host bridge structure. There is one now, it should
+> >> go there.
+> >
+> > Exactly! Hence my patch. After it gets accepted I will go through architectures
+> > and remove their version of pci_domain_nr().
+> 
+> Currently the arch has to supply pci_domain_nr() because that's the
+> only way for the generic code to learn the domain.  After you add
+> pci_create_root_bus_in_domain(), the arch can supply the domain that
+> way, and we won't need the arch-specific pci_domain_nr().  Right?
+> That makes more sense to me; thanks for the explanation.
 
-Many thanks guys
+Right.
 
-On 8 April 2014 07:40, Willy Tarreau <w@1wt.eu> wrote:
-> Oh and BTW, it also fixed another issue I had loading myri10ge on this
-> board :
->
-> Before the patch :
->
-> root at xpgp:~# lspci -vvnn |egrep -i '^0|memory'
-> 00:01.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
->         Prefetchable memory behind bridge: 00000000-000fffff
-> 00:09.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
->         Prefetchable memory behind bridge: 00000000-000fffff
-> 00:0a.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
->         Memory behind bridge: e0000000-e17fffff
->         Prefetchable memory behind bridge: 00000000-000fffff
-> 03:00.0 Ethernet controller [0200]: MYRICOM Inc. Myri-10G Dual-Protocol NIC [14c1:0008]
->         Region 0: Memory at e0000000 (64-bit, prefetchable) [size=16M]
->         Region 2: Memory at e1000000 (64-bit, non-prefetchable) [size=1M]
->
-> root at xpgp:~# modprobe myri10ge
-> myri10ge: Version 1.5.3-1.534
-> PCI: enabling device 0000:00:0a.0 (0140 -> 0143)
-> myri10ge 0000:03:00.0: PCIE x4 Link
-> myri10ge 0000:03:00.0: Direct firmware load failed with error -2
-> myri10ge 0000:03:00.0: Falling back to user helper
-> myri10ge 0000:03:00.0: Unable to load myri10ge_eth_z8e.dat firmware image via hotplug
-> myri10ge 0000:03:00.0: hotplug firmware loading failed
-> myri10ge 0000:03:00.0: Successfully adopted running firmware
-> myri10ge 0000:03:00.0: Using firmware currently running on NIC.  For optimal
-> myri10ge 0000:03:00.0: performance consider loading optimized firmware
-> myri10ge 0000:03:00.0: via hotplug
-> myri10ge 0000:03:00.0: dummy rdma enable failed
-> myri10ge 0000:03:00.0: command 44 timed out, result = -1
-> myri10ge 0000:03:00.0: command 12 timed out, result = -1
-> myri10ge 0000:03:00.0: failed MXGEFW_CMD_GET_RX_RING_SIZE
-> myri10ge 0000:03:00.0: failed to load firmware
-> myri10ge 0000:03:00.0: myri10ge_probe() failed: MAC=00:60:dd:47:63:e1, SN=320225
->
-> After the patch, the lspci output is *exactly* the same but it works
-> much better :
->
-> root at xpgp:~# lspci -vvnn |egrep -i '^0|memory'
-> 00:01.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
->         Prefetchable memory behind bridge: 00000000-000fffff
-> 00:09.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
->         Prefetchable memory behind bridge: 00000000-000fffff
-> 00:0a.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
->         Memory behind bridge: e0000000-e17fffff
->         Prefetchable memory behind bridge: 00000000-000fffff
-> 03:00.0 Ethernet controller [0200]: MYRICOM Inc. Myri-10G Dual-Protocol NIC [14c1:0008]
->         Region 0: Memory at e0000000 (64-bit, prefetchable) [size=16M]
->         Region 2: Memory at e1000000 (64-bit, non-prefetchable) [size=1M]
->
-> root at xpgp:~# modprobe myri10ge
-> myri10ge: Version 1.5.3-1.534
-> PCI: enabling device 0000:00:0a.0 (0140 -> 0143)
-> myri10ge 0000:03:00.0: PCIE x1 Link
-> myri10ge 0000:03:00.0: Direct firmware load failed with error -2
-> myri10ge 0000:03:00.0: Falling back to user helper
-> myri10ge 0000:03:00.0: Unable to load myri10ge_eth_z8e.dat firmware image via hotplug
-> myri10ge 0000:03:00.0: hotplug firmware loading failed
-> myri10ge 0000:03:00.0: Successfully adopted running firmware
-> myri10ge 0000:03:00.0: Using firmware currently running on NIC.  For optimal
-> myri10ge 0000:03:00.0: performance consider loading optimized firmware
-> myri10ge 0000:03:00.0: via hotplug
-> myri10ge 0000:03:00.0: MSI IRQ 112, tx bndry 2048, fw adopted, WC Disabled
-> root at xpgp:~#
->
-> Thus I guess that the timeout I was seeing above during the modprobe was
-> caused by the incorrect mbus window.
->
-> So +1 on this part of the patch here :
->
->         port->memwin_size = roundup_pow_of_two(port->memwin_size);
->
-> Cheers,
-> Willy
->
+> 
+> Let me try to explain my concern about the
+> pci_create_root_bus_in_domain() interface.  We currently have these
+> interfaces:
+> 
+>   pci_scan_root_bus()
+>   pci_scan_bus()
+>   pci_scan_bus_parented()
+>   pci_create_root_bus()
+> 
+> pci_scan_root_bus() is a higher-level interface than
+> pci_create_root_bus(), so I'm trying to migrate toward it because it
+> lets us remove a little code from the arch, e.g., pci_scan_child_bus()
+> and pci_bus_add_devices().
+> 
+> I think we can only remove the arch-specific pci_domain_nr() if that
+> arch uses pci_create_root_bus_in_domain().  When we convert an arch
+> from using scan_bus interfaces to using
+> pci_create_root_bus_in_domain(), we will have to move the rest of the
+> scan_bus code (pci_scan_child_bus(), pci_bus_add_devices()) back into
+> the arch code.
+> 
+> One alternative is to add an _in_domain() variant of each of these
+> interfaces, but that doesn't seem very convenient either.  My idea of
+> passing in a structure would also require adding variants, so there's
+> not really an advantage there, but I am thinking of the next
+> unification effort, e.g., for NUMA node info.  I don't really want to
+> have to change all the _in_domain() interfaces to also take yet
+> another parameter for the node number.
+
+OK, what about this: all the functions that you have mentioned take a
+void *sysdata parameter. Should we convert this opaque pointer into a
+specific structure that holds the domain_nr and (in future) the NUMA
+node info?
+
+Converting all the architectures is going to be a long winded job as
+everyone loved to add their own stuff in the structure pointed by sysdata,
+breaking that will lead to frustrations, but maybe the framework should
+take back ownership of it.
+
+Best regards,
+Liviu
+
+> 
+> Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
 -- 
-
-
-------------------------------
-For additional information including the registered office and the treatment of Xyratex confidential information please visit www.xyratex.com
-
-------------------------------
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
