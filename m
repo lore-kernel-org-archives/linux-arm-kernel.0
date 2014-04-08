@@ -1,188 +1,188 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 8 Apr 2014 08:28:41 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
-References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140406185833.GI29787@1wt.eu>
- <alpine.DEB.2.10.1404062253500.16719@vroombuntu>
- <20140407174106.GD9952@obsidianresearch.com>
- <CAAfodu0kbTspq2QQf0dh3U7LB-q+ECaX9FJ35fCc25UmgPJZSg@mail.gmail.com>
- <20140407204817.GB20736@obsidianresearch.com>
- <alpine.DEB.2.10.1404072239050.32332@vroombuntu>
-Message-ID: <20140408062841.GT29787@1wt.eu>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon,  7 Apr 2014 20:15:10 -0700
+Subject: [PATCH v2 2/2] ARM: mm: allow text and rodata sections to be read-only
+In-Reply-To: <1396926910-11227-1-git-send-email-keescook@chromium.org>
+References: <1396926910-11227-1-git-send-email-keescook@chromium.org>
+Message-ID: <1396926910-11227-3-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
+read-only. Additionally, this splits rodata from text so that rodata can
+also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
 
-On Mon, Apr 07, 2014 at 10:58:36PM +0100, Neil Greatorex wrote:
-> I have finally managed to get the card working on both ports! Of course, 
-> to do so I have added some nice kludges to the code that now need to be 
-> implemented properly, but it is verification of what the problem is and 
-> how to fix it!
-> 
-> I have included the patch at the end of this e-mail. It probably won't 
-> apply cleanly for you as I have other dev_dbg calls in pci-mvebu.c.
-> 
-> What I did was to alter mvebu_pcie_align_resource to make the bridge 
-> memory resource aligned to 4M. This had the effect that the 2nd bridge to 
-> the xHCI controller was bumped to address 0xe0400000 instead of 
-> 0xe0300000. I then also made it so that when we request the MBUS window to 
-> be set up we ensure that the size is a power of 2. This has the effect of 
-> creating the windows and addresses how we want them:
-> 
-> Relevant part of lspci -vvv:
-> 
-> 00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01) 
-> (prog-if 00 [Normal decode])
->         Memory behind bridge: e0000000-e02fffff
-> 
-> 00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01) 
-> (prog-if 00 [Normal decode])
->         Memory behind bridge: e0400000-e04fffff
-> 
-> cat /sys/kernel/debug/mvebu-mbus/devices:
-> 
-> [00] 00000000e8010000 - 00000000e8020000 : 0004:00e0 (remap 
-> 0000000000010000)
-> [01] disabled
-> [02] disabled
-> [03] disabled
-> [04] disabled
-> [05] disabled
-> [06] disabled
-> [07] disabled
-> [08] 00000000fff00000 - 0000000100000000 : 0001:00e0
-> [09] 00000000e0400000 - 00000000e0500000 : 0008:00e8
-> [10] 00000000e0000000 - 00000000e0400000 : 0004:00e8
-> [11] disabled
-> [12] disabled
-> [13] disabled
-> [14] disabled
-> [15] disabled
-> [16] disabled
-> [17] disabled
-> [18] disabled
-> [19] disabled
-> 
-> Now, over to the experts to implement this properly :-)
-> 
-> Thanks to Jason, Thomas and Willy for your help with tracking this down.
+The read-only areas are made writable during ftrace updates. Additional
+work is needed for kprobes and kexec, so the feature is temporarily
+marked as unavailable in Kconfig when those options are selected.
 
-Well, on the XPGP board, it made some progress, but now I'm getting
-another crash related to IRQs again when both ports are enabled (note
-that I do have your other MSI fix). However, enabling only the second
-port works now, so I guess it's just an IRQ assignment issue which is
-killing it.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/include/asm/cacheflush.h |    9 ++++++++
+ arch/arm/kernel/ftrace.c          |   17 ++++++++++++++
+ arch/arm/kernel/vmlinux.lds.S     |    3 +++
+ arch/arm/mm/Kconfig               |   12 ++++++++++
+ arch/arm/mm/init.c                |   46 +++++++++++++++++++++++++++++++++++++
+ 5 files changed, 87 insertions(+)
 
-Here's what the bus looks like with your patch :
-
-root at xpgp:~# lspci -tvnn
--[0000:00]-+-01.0-[01]--
-           +-09.0-[02]--+-00.0  Intel Corporation Device [8086:1521]
-           |            \-00.1  Intel Corporation Device [8086:1521]
-           \-0a.0-[03]--
-
-root at xpgp:~# lspci -vvv | egrep -i '(^0|memory)'
-00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (rev 02) (prog-if 00 [Normal decode])
-        Memory behind bridge: fff00000-000fffff
-        Prefetchable memory behind bridge: 00000000-000fffff
-00:09.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (rev 02) (prog-if 00 [Normal decode])
-        Memory behind bridge: e0000000-e02fffff
-        Prefetchable memory behind bridge: 00000000-000fffff
-00:0a.0 PCI bridge: Marvell Technology Group Ltd. Device 7846 (rev 02) (prog-if 00 [Normal decode])
-        Memory behind bridge: fff00000-000fffff
-        Prefetchable memory behind bridge: 00000000-000fffff
-02:00.0 Ethernet controller: Intel Corporation Device 1521 (rev 01)
-        Region 0: Memory at e0000000 (32-bit, non-prefetchable) [disabled] [size=512K]
-        Region 3: Memory at e0200000 (32-bit, non-prefetchable) [disabled] [size=16K]
-02:00.1 Ethernet controller: Intel Corporation Device 1521 (rev 01)
-        Region 0: Memory at e0100000 (32-bit, non-prefetchable) [disabled] [size=512K]
-        Region 3: Memory at e0204000 (32-bit, non-prefetchable) [disabled] [size=16K]
-
-I don't know if it's normal to see bridges 00:01.0 and 00:0a.0 overlap
-their areas or not. Maybe it's just because they're not configured.
-The second bridge seems to correctly cover the IGB's regions though.
-Also noteworthy, I get the exact same output when leaving SZ_1M instead
-of SZ_4M in your patch. Thus I think that the real part of the fix is this
-one :
-
-	if (!is_power_of_2(port->memwin_size))
-		port->memwin_size = 1 << fls(port->memwin_size);
-
-BTW, this could be simplified this way (which also happens to be more
-readable) which I could verify also works :
-
-	port->memwin_size = roundup_pow_of_two(port->memwin_size);
-	
-Concerning the panic with the two ports enabled, I suspect that it's again
-an issue related to the way IRQs are registered and rolled back in case of
-error.
-
-Before the patch :
-PCI: enabling device 0000:02:00.1 (0140 -> 0142)
-Unhandled fault: external abort on non-linefetch (0x1008) at 0xf0400018
-Internal error: : 1008 [#1] SMP THUMB2
-Modules linked in: igb(+) i2c_algo_bit
-CPU: 1 PID: 1250 Comm: modprobe Not tainted 3.14.0-mvebu #6
-task: c74b0e40 ti: c751c000 task.ti: c751c000
-PC is at igb_get_invariants_82575+0x75/0x894 [igb]
-LR is at igb_probe+0x22a/0xb80 [igb]
-...
-
-After the patch :
-PCI: enabling device 0000:02:00.1 (0140 -> 0142)
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1266 at kernel/irq/irqdomain.c:277 irq_domain_associate+0xb9/0x110()
-error: hwirq 0xffffffe4 is too large for armada_370_xp_msi_irq
-Modules linked in: igb(+) i2c_algo_bit
-CPU: 0 PID: 1266 Comm: modprobe Not tainted 3.14.0-mvebu #4
-[<c0011c39>] (unwind_backtrace) from [<c000f20b>] (show_stack+0xb/0xc)
-[<c000f20b>] (show_stack) from [<c02b5cbb>] (dump_stack+0x4f/0x64)
-[<c02b5cbb>] (dump_stack) from [<c001a145>] (warn_slowpath_common+0x49/0x68)
-[<c001a145>] (warn_slowpath_common) from [<c001a1bd>] (warn_slowpath_fmt+0x1d/0x28)
-[<c001a1bd>] (warn_slowpath_fmt) from [<c0044e81>] (irq_domain_associate+0xb9/0x110)
-[<c0044e81>] (irq_domain_associate) from [<c0044f1d>] (irq_create_mapping+0x45/0xa0)
-[<c0044f1d>] (irq_create_mapping) from [<c016fd2d>] (armada_370_xp_setup_msi_irq+0x35/0x80)
-[<c016fd2d>] (armada_370_xp_setup_msi_irq) from [<c0185243>] (arch_setup_msi_irq+0x17/0x2c)
-[<c0185243>] (arch_setup_msi_irq) from [<c018530d>] (arch_setup_msi_irqs+0x39/0x4c)
-[<c018530d>] (arch_setup_msi_irqs) from [<c01858bd>] (pci_enable_msix+0x195/0x2b0)
-[<c01858bd>] (pci_enable_msix) from [<bf80617b>] (igb_msix_other+0x8de/0xb44 [igb])
-[<bf80617b>] (igb_msix_other [igb]) from [<bf806dff>] (igb_probe+0x37a/0xb80 [igb])
-[<bf806dff>] (igb_probe [igb]) from [<c017d185>] (pci_device_probe+0x45/0x6c)
-...
-Unable to handle kernel NULL pointer dereference at virtual address 00000024
-pgd = ed9a0000
-[00000024] *pgd=074b3831, *pte=00000000, *ppte=00000000
-Internal error: Oops: 17 [#1] SMP THUMB2
-Modules linked in: igb(+) i2c_algo_bit
-CPU: 0 PID: 1266 Comm: modprobe Tainted: G        W    3.14.0-mvebu #4
-task: ed97aec0 ti: c75be000 task.ti: c75be000
-PC is at igb_set_mac+0x5d/0x164 [igb]
-LR is at igb_set_mac+0xaa/0x164 [igb]
-pc : [<bf80489e>]    lr : [<bf8048eb>]    psr: 200f0033
-sp : c75bfce8  ip : 00000000  fp : ec938898
-r10: bf816950  r9 : 00000001  r8 : ec938440
-r7 : edadc868  r6 : 00000008  r5 : ec938440  r4 : 00000006
-r3 : 00000000  r2 : 80000000  r1 : ec93845c  r0 : ec938440
-Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
-Control: 50c53c7d  Table: 2d9a006a  DAC: 00000015
-Process modprobe (pid: 1266, stack limit = 0xc75be240)
-...
-[<bf80489e>] (igb_set_mac [igb]) from [<bf8048eb>] (igb_set_mac+0xaa/0x164 [igb])
-[<bf8048eb>] (igb_set_mac [igb]) from [<bf806183>] (igb_msix_other+0x8e6/0xb44 [igb])
-[<bf806183>] (igb_msix_other [igb]) from [<bf806dff>] (igb_probe+0x37a/0xb80 [igb])
-[<bf806dff>] (igb_probe [igb]) from [<c017d185>] (pci_device_probe+0x45/0x6c)
-
-So we had :
-
-     igb_probe()
-         igb_msix_other()
-             pci_enable_msix()  => Warning
-             igb_set_mac()      => Panic
-
-Cheers,
-Willy
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 8b8b61685a34..b6fea0a1a88b 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -487,4 +487,13 @@ int set_memory_rw(unsigned long addr, int numpages);
+ int set_memory_x(unsigned long addr, int numpages);
+ int set_memory_nx(unsigned long addr, int numpages);
+ 
++#ifdef CONFIG_DEBUG_RODATA
++void mark_rodata_ro(void);
++void set_kernel_text_rw(void);
++void set_kernel_text_ro(void);
++#else
++static inline void set_kernel_text_rw(void) { }
++static inline void set_kernel_text_ro(void) { }
++#endif
++
+ #endif
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index af9a8a927a4e..ea446ae09c89 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -15,6 +15,7 @@
+ #include <linux/ftrace.h>
+ #include <linux/uaccess.h>
+ #include <linux/module.h>
++#include <linux/stop_machine.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/opcodes.h>
+@@ -35,6 +36,22 @@
+ 
+ #define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
+ 
++static int __ftrace_modify_code(void *data)
++{
++	int *command = data;
++
++	set_kernel_text_rw();
++	ftrace_modify_all_code(*command);
++	set_kernel_text_ro();
++
++	return 0;
++}
++
++void arch_ftrace_update_code(int command)
++{
++	stop_machine(__ftrace_modify_code, &command, NULL);
++}
++
+ static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+ {
+ 	return rec->arch.old_mcount ? OLD_NOP : NOP;
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 08fa667ef2f1..ec79e7268e09 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -120,6 +120,9 @@ SECTIONS
+ 			ARM_CPU_KEEP(PROC_INFO)
+ 	}
+ 
++#ifdef CONFIG_DEBUG_RODATA
++	. = ALIGN(1<<SECTION_SHIFT);
++#endif
+ 	RO_DATA(PAGE_SIZE)
+ 
+ 	. = ALIGN(4);
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index b484fb04cf6f..e767ab6e1c27 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -966,3 +966,15 @@ config ARM_KERNMEM_PERMS
+ 	  padded to section-size (1MiB) boundaries (because their permissions
+ 	  are different and splitting the 1M pages into 4K ones causes TLB
+ 	  performance problems), wasting memory.
++
++config DEBUG_RODATA
++	bool "Make kernel text and rodata read-only"
++	depends on ARM_KERNMEM_PERMS && KEXEC=n && KPROBES=n
++	default y
++	help
++	  If this is set, kernel text and rodata will be made read-only. This
++	  is to help catch accidental or malicious attempts to change the
++	  kernel's executable code. Additionally splits rodata from kernel
++	  text so it can be made explicitly non-executable. This creates
++	  another section-size padded region, so it can waste more memory
++	  space while gaining the read-only protections.
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 66a7283583cd..74647a4f1af4 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -634,6 +634,7 @@ struct section_perm {
+ 	unsigned long end;
+ 	pmdval_t mask;
+ 	pmdval_t prot;
++	pmdval_t clear;
+ };
+ 
+ struct section_perm nx_perms[] = {
+@@ -651,8 +652,35 @@ struct section_perm nx_perms[] = {
+ 		.mask	= ~PMD_SECT_XN,
+ 		.prot	= PMD_SECT_XN,
+ 	},
++#ifdef CONFIG_DEBUG_RODATA
++	/* Make rodata NX (set RO in ro_perms below). */
++	{
++		.start  = (unsigned long)__start_rodata,
++		.end    = (unsigned long)__init_begin,
++		.mask   = ~PMD_SECT_XN,
++		.prot   = PMD_SECT_XN,
++	},
++#endif
+ };
+ 
++#ifdef CONFIG_DEBUG_RODATA
++struct section_perm ro_perms[] = {
++	/* Make kernel code and rodata RX (set RO). */
++	{
++		.start  = (unsigned long)_stext,
++		.end    = (unsigned long)__init_begin,
++#ifdef CONFIG_ARM_LPAE
++		.mask   = ~PMD_SECT_RDONLY,
++		.prot   = PMD_SECT_RDONLY,
++#else
++		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
++		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
++		.clear  = PMD_SECT_AP_WRITE,
++#endif
++	},
++};
++#endif
++
+ /*
+  * Updates section permissions only for the current mm (sections are
+  * copied into each mm). During startup, this is the init_mm.
+@@ -721,6 +749,24 @@ static inline void fix_kernmem_perms(void)
+ {
+ 	set_section_perms(nx_perms, prot);
+ }
++
++#ifdef CONFIG_DEBUG_RODATA
++void mark_rodata_ro(void)
++{
++	set_section_perms(ro_perms, prot);
++}
++
++void set_kernel_text_rw(void)
++{
++	set_section_perms(ro_perms, clear);
++}
++
++void set_kernel_text_ro(void)
++{
++	set_section_perms(ro_perms, prot);
++}
++#endif /* CONFIG_DEBUG_RODATA */
++
+ #else
+ static inline void fix_kernmem_perms(void) { }
+ #endif /* CONFIG_ARM_KERNMEM_PERMS */
+-- 
+1.7.9.5
