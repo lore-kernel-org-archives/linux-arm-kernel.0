@@ -1,37 +1,55 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 8 Apr 2014 09:27:04 +0530
-Subject: [PATCH V2 17/17] ARM: exynos: config: Enable cpuidle
-In-Reply-To: <CAOesGMgf4owZBCVz4RTgbFVsogws6WKARmA7COkgXVQaG5ky9A@mail.gmail.com>
-References: <1396618989-2897-1-git-send-email-daniel.lezcano@linaro.org>
- <5825506.2ErDt1UQ5r@amdc1032>
- <CAOesGMgkbfUX=cJ4rMf+-26Sq_fYUNW8m6unNiCXHKwj83dLbw@mail.gmail.com>
- <3344539.A0GIVp3yPt@amdc1032>
- <CAOesGMgf4owZBCVz4RTgbFVsogws6WKARmA7COkgXVQaG5ky9A@mail.gmail.com>
-Message-ID: <CAK9yfHz_J+NAtxk-Ec-cW6_u0ukssNGi24HZgGRRXb8Hzz2sig@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 8 Apr 2014 19:29:57 +0800
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+Message-ID: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 April 2014 00:03, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Apr 7, 2014 at 10:44 AM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
->>
->> Hi,
->>
->> On Monday, April 07, 2014 09:28:39 AM Olof Johansson wrote:
->>> On Fri, Apr 4, 2014 at 9:09 AM, Bartlomiej Zolnierkiewicz
->>> <b.zolnierkie@samsung.com> wrote:
->>>
->>> [...]
->
-> Does 5420 even work upstream? I have hardware access but nothing that
-> will run an upstream kernel as far as I know. Maybe SLSI has an SMDK
-> they can help out with?
+The .config() calls clk_get_rate() which might sleep, so we need to set
+pwm_chip can_sleep flag.  Otherwise, we see the following warning when
+using pwm driven heartbeat led.
 
-By working upstream if you mean being bootable, then yes I am able to boot both
-SMDK and Arndale Octa boards based on 5420 with the current upstream kernel.
-CPU idle however doesn't work though. I get a crash when I hot plug out all
-secondary CPUs on SMDK.
+WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
+DEBUG_LOCKS_WARN_ON(in_interrupt())
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
+[<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
+[<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
+[<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
+[<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
+[<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
+[<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
+[<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
+[<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
+[<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
+[<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
+[<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
+[<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
+[<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
+[<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
+[<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
+[<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
+[<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
+[<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
+[<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
 
+Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ drivers/pwm/pwm-mxs.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
+index 9475bc7..4f1bb4e 100644
+--- a/drivers/pwm/pwm-mxs.c
++++ b/drivers/pwm/pwm-mxs.c
+@@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
+ 	mxs->chip.dev = &pdev->dev;
+ 	mxs->chip.ops = &mxs_pwm_ops;
+ 	mxs->chip.base = -1;
++	mxs->chip.can_sleep = true;
+ 	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
 -- 
-With warm regards,
-Sachin
+1.8.3.2
