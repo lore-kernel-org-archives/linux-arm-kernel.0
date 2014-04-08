@@ -1,38 +1,90 @@
-From: mbohan@codeaurora.org (Michael Bohan)
-Date: Mon, 7 Apr 2014 17:35:47 -0700
-Subject: memcpy alignment for DEVICE_nGnRnE
-In-Reply-To: <20140221105307.GE25363@localhost>
-References: <53072343.4080505@marvell.com> <20140221105307.GE25363@localhost>
-Message-ID: <20140408003547.GA18321@codeaurora.org>
+From: tthayer@altera.com (Thor Thayer)
+Date: Tue, 8 Apr 2014 09:29:50 -0500
+Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <20140408133818.GB16054@pengutronix.de>
+References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
+ <1396907649-20212-2-git-send-email-tthayer@altera.com>
+ <20140408133818.GB16054@pengutronix.de>
+Message-ID: <1396967390.23349.15.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Fri, Feb 21, 2014 at 10:53:08AM +0000, Catalin Marinas wrote:
-> On Fri, Feb 21, 2014 at 09:58:27AM +0000, Zhou Zhu wrote:
-> > We faced one issue using memcpy for memory type DEVICE_nGnRnE 
-> > (pgprot_noncached). If the address is not aligned, exception would 
-> > happen due to the alignment of this type could not be handled by hardware.
+On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
+> Hi!
 > 
-> Indeed, that's expected. This memory type is the equivalent of Strongly
-> Ordered.
+> On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
+> > From: Thor Thayer <tthayer@altera.com>
+> > 
+> > Addition of the Altera SDRAM controller bindings and device
+> > tree changes to the Altera SoC project.
+> > 
+[snip]
+> > +
+> > +Required properties:
+> > +- compatible : "altr,sdr-ctl", "syscon";
+> > +                Note that syscon is invoked for this device to support the FPGA
+> > +		bridge driver, EDAC driver and other devices that share the
+> > +		registers.
+> > +- reg : Should contain 1 register ranges(address and length)
 > 
-> > Is there any plan and ongoing patch to support this or we need to keep 
-> > address aligned for memcpy using pgprot_noncached memory in drivers?
+> I haven't really thought this through, but why would the FPGA bridge driver
+> access the sdram controller? For releasing the resets in fpgaportrst ? Or is
+> there more?
+
+Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
+path. Our SDRAM controller allows FPGA master access to the SDRAM.
+
+> Wouldn't it be more appropriate to represent those bits as a reset-controller to
+> some hypothetical IP core driver?
+> Then you could have something like
 > 
-> You either change the memory type to pgprot_writecombine() or use the
-> right API (memcpy_toio/memcpy_fromio, these could be further optimised,
-> similar to powerpc for example, but I didn't get there yet).
+> 	hps2fpga at c0000000 {
+> 		ipcore at 0 {
+> 			resets = <&sdr 1>;
+> 			reset-names = "foo";
+> 			resets = <&rst 96>;
+> 			reset-names = "bar";
+> 			(...)
+> 		};
+> 
+> 		ipcore at 1000 {
+> 			resets = <&rst 96>;
+> 			reset-names = "baz";
+> 			(...)
+> 		};
+> 	};
+> 
+> And you would always have the correct bridges released out of reset for your
+> IP core. Does the FPGA bridge driver do more? I think that is basically it.
+> Where we maybe could run into problems though is the early_init stuff.
+> 
+> I think syscon is nice for some things, but we should try not to overuse it.
 
-How should we handle Device Memory with copy_from_user / copy_to_user?
-Should we follow the same scheme and create
-copy_from_user_io / copy_to_user_io, or rather enforce that the stock
-routines handle alignment?
-
-Thanks,
-Mike
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Understood. In this case, syscon seems to be appropriate.
+> 
+> Regards,
+> Steffen
+> 
+> > +Example:
+> > +	sdrctl at ffc25000 {
+> > +		compatible = "altr,sdr-ctl", "syscon";
+> > +		reg = <0xffc25000 0x1000>;
+> > +	};
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> > index df43702..6ce912e 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -676,6 +676,11 @@
+> >  			clocks = <&l4_sp_clk>;
+> >  		};
+> >  
+> > +		sdrctl at ffc25000 {
+> > +			compatible = "altr,sdr-ctl", "syscon";
+> > +			reg = <0xffc25000 0x1000>;
+> > +		};
+> > +
+> >  		rstmgr at ffd05000 {
+> >  			compatible = "altr,rst-mgr";
+> >  			reg = <0xffd05000 0x1000>;
+> 
