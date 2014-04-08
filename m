@@ -1,88 +1,37 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 8 Apr 2014 14:09:20 +0100
-Subject: [PATCH v7 6/6] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <5343F252.2050708@linaro.org>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-7-git-send-email-Liviu.Dudau@arm.com>
- <5343F252.2050708@linaro.org>
-Message-ID: <20140408130920.GY17163@e106497-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 8 Apr 2014 07:55:26 -0500
+Subject: [PATCH] of: Fix the section mismatch warnings.
+In-Reply-To: <1396936087-23043-1-git-send-email-Li.Xiubo@freescale.com>
+References: <1396936087-23043-1-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <CAL_JsqKuvKwEv89hOSknc-0Pq3aiwyPFhB-kPA-cRjGK831oFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On Tue, Apr 8, 2014 at 12:48 AM, Xiubo Li <Li.Xiubo@freescale.com> wrote:
+> In tag next-20140407, building with CONFIG_DEBUG_SECTION_MISMATCH
+> enabled, the following WARNING is occured:
+>
+> WARNING: drivers/built-in.o(.text.unlikely+0x2220): Section mismatch
+> in reference from the function __reserved_mem_check_root() to the
+> function .init.text:of_get_flat_dt_prop()
+> The function __reserved_mem_check_root() references
+> the function __init of_get_flat_dt_prop().
+> This is often because __reserved_mem_check_root lacks a __init
+> annotation or the annotation of of_get_flat_dt_prop is wrong.
+>
+> WARNING: vmlinux.o(.text.unlikely+0xb9d0): Section mismatch in reference
+> from the function __reserved_mem_check_root() to the (unknown reference)
+> .init.data:(unknown)
+> The function __reserved_mem_check_root() references
+> the (unknown reference) __initdata (unknown).
+> This is often because __reserved_mem_check_root lacks a __initdata
+> annotation or the annotation of (unknown) is wrong.
+>
+> This is cause by :
+> 'drivers: of: add initialization code for dynamic reserved memory'.
+>
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 
-On Tue, Apr 08, 2014 at 01:57:54PM +0100, Hanjun Guo wrote:
-> Hi Liviu,
-> 
-> On 2014-3-14 23:34, Liviu Dudau wrote:
-> > Several platforms use a rather generic version of parsing
-> > the device tree to find the host bridge ranges. Move the common code
-> > into the generic PCI code and use it to create a pci_host_bridge
-> > structure that can be used by arch code.
-> > 
-> > Based on early attempts by Andrew Murray to unify the code.
-> > Used powerpc and microblaze PCI code as starting point.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> > ---
-> >  drivers/pci/host-bridge.c | 158 ++++++++++++++++++++++++++++++++++++
-> >  include/linux/pci.h       |  13 +++
-> >  2 files changed, 171 insertions(+)
-> > 
-> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> > index 8708b652..7cda90b 100644
-> > --- a/drivers/pci/host-bridge.c
-> > +++ b/drivers/pci/host-bridge.c
-> > @@ -6,9 +6,14 @@
-> >  #include <linux/init.h>
-> >  #include <linux/pci.h>
-> >  #include <linux/module.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_pci.h>
-> > +#include <linux/slab.h>
-> >  
-> >  #include "pci.h"
-> >  
-> > +static atomic_t domain_nr = ATOMIC_INIT(-1);
-> 
-> domain_nr will only be used inside the #ifdef CONFIG_OF,
-> and this will lead to compile warning which complains that
-> 'domain_nr' defined but not used when CONFIG_OF=n (for example
-> on x86).
-> 
-> How about moving the definition to --->
-> 
-> > +
-> >  static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
-> >  {
-> >  	while (bus->parent)
-> > @@ -92,3 +97,156 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
-> >  	res->end = region->end + offset;
-> >  }
-> >  EXPORT_SYMBOL(pcibios_bus_to_resource);
-> > +
-> > +#ifdef CONFIG_OF
-> 
-> here?
+Applied.
 
-I've already moved the definition there in my refresh.
-
-Thanks for reviewing the code,
-Liviu
-
-> 
-> Thanks
-> Hanjun
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Rob
