@@ -1,121 +1,90 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Apr 2014 18:09:09 +0200
-Subject: [PATCH 05/10] ARM: EXYNOS: Move "regs-pmu" header inclusion in
- common.h
-In-Reply-To: <1396425058-4012-6-git-send-email-pankaj.dubey@samsung.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425058-4012-6-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53441F25.9080801@samsung.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 08 Apr 2014 17:12:41 +0100
+Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
+In-Reply-To: <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
+References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
+ <1396577719-14786-3-git-send-email-keescook@chromium.org>
+ <20140404195818.GA21028@debian>
+ <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+ <1396960898.3567.55.camel@linaro1.home>
+ <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
+Message-ID: <1396973561.14809.26.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On Tue, 2014-04-08 at 09:01 -0700, Kees Cook wrote:
+> On Tue, Apr 8, 2014 at 5:41 AM, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> > On Fri, 2014-04-04 at 17:07 -0700, Kees Cook wrote:
+> >> On Fri, Apr 4, 2014 at 12:58 PM, Rabin Vincent <rabin@rab.in> wrote:
+> > [...]
+> >> > You need a TLB flush.  I had a flush_tlb_all() in my example patch,
+> >> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244335.html,
+> >> > but the following is probably nicer (on top of this patch):
+> >> >
+> >> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> >> > index 9bea524..a92c45a 100644
+> >> > --- a/arch/arm/mm/init.c
+> >> > +++ b/arch/arm/mm/init.c
+> >> > @@ -741,6 +741,8 @@ static inline bool arch_has_strict_perms(void)
+> >> >                      addr += SECTION_SIZE)                              \
+> >> >                         section_update(addr, perms[i].mask,             \
+> >> >                                        perms[i].field);                 \
+> >> > +                                                                       \
+> >> > +               flush_tlb_kernel_range(perms[i].start, perms[i].end);   \
+> >> >         }                                                               \
+> >> >  }
+> >> >
+> >>
+> >> When I do this, I hang the system, and get a WARN due to the tlb call
+> >> attempting to flush on all CPUs, I think:
+> >>
+> >> [   34.246034] WARNING: at
+> >> /mnt/host/source/src/third_party/kernel-next/kernel/smp.c:466
+> >> smp_call_function_many+0xac/0x26c()
+> >> ...
+> >> [   34.246617] Backtrace:
+> >> [   34.246697] [<c010d3b8>] (unwind_backtrace+0x0/0x118) from
+> >> [<c060b9d8>] (dump_stack+0x28/0x30)
+> >> [   34.246765] [<c060b9d8>] (dump_stack+0x28/0x30) from [<c0123044>]
+> >> (warn_slowpath_null+0x44/0x5c)
+> >> [   34.246824] [<c0123044>] (warn_slowpath_null+0x44/0x5c) from
+> >> [<c017426c>] (smp_call_function_many+0xac/0x26c)
+> >> [   34.246881] [<c017426c>] (smp_call_function_many+0xac/0x26c) from
+> >> [<c0174468>] (smp_call_function+0x3c/0x48)
+> >> [   34.246937] [<c0174468>] (smp_call_function+0x3c/0x48) from
+> >> [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c)
+> >> [   34.246994] [<c010c0fc>] (broadcast_tlb_a15_erratum+0x40/0x4c) from
+> >> [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0)
+> >> [   34.247046] [<c010c590>] (flush_tlb_kernel_range+0x74/0xa0) from
+> >> [<c011403c>] (set_kernel_text_rw+0xd8/0xec)
+> >> [   34.247099] [<c011403c>] (set_kernel_text_rw+0xd8/0xec) from
+> >> [<c010c878>] (__ftrace_modify_code+0x14/0x28)
+> >> [   34.247156] [<c010c878>] (__ftrace_modify_code+0x14/0x28) from
+> >> [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114)
+> >> [   34.247212] [<c0184318>] (stop_machine_cpu_stop+0xc0/0x114) from
+> >> [<c01841cc>] (cpu_stopper_thread+0xd8/0x164)
+> >> [   34.247266] [<c01841cc>] (cpu_stopper_thread+0xd8/0x164) from
+> >> [<c0145c14>] (kthread+0xc8/0xd8)
+> >> [   34.247323] [<c0145c14>] (kthread+0xc8/0xd8) from [<c0106118>]
+> >> (ret_from_fork+0x14/0x20)
+> >>
+> >> Using local_flush_tlb_kernel_range() fixed it though.
+> >
+> > What about if another CPU had a TLB entry with the old permissions in?
+> > Or do you consider that the likelihood and consequences of that aren't
+> > significant?
+> 
+> The purpose of the function is to temporarily make text writable, do
+> the write, and then restore read-only. Since only the writer needs to
+> care about TLB state, this works fine. It's actually nice that only
+> the current CPU can make text writes.
 
-On 02.04.2014 09:50, Pankaj Dubey wrote:
-> There are many machine files under "mach-exynos" including "regs-pmu.h"
-> as well as "common.h", so better we move this header inclusion in common.h.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   arch/arm/mach-exynos/common.h  |    1 +
->   arch/arm/mach-exynos/cpuidle.c |    1 -
->   arch/arm/mach-exynos/exynos.c  |    1 -
->   arch/arm/mach-exynos/hotplug.c |    1 -
->   arch/arm/mach-exynos/platsmp.c |    1 -
->   arch/arm/mach-exynos/pm.c      |    1 -
->   arch/arm/mach-exynos/pmu.c     |    1 -
->   7 files changed, 1 insertion(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 277a83e..ff28334 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -14,6 +14,7 @@
->
->   #include <linux/reboot.h>
->   #include <linux/of.h>
-> +#include "regs-pmu.h"
->
->   void exynos_init_io(void);
->   void exynos_restart(enum reboot_mode mode, const char *cmd);
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index b530231..b9dd8c3 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -29,7 +29,6 @@
->   #include <mach/map.h>
->
->   #include "common.h"
-> -#include "regs-pmu.h"
->
->   #define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
->   			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 57bd1cd..a5e1349 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -30,7 +30,6 @@
->
->   #include "common.h"
->   #include "mfc.h"
-> -#include "regs-pmu.h"
->   #include "regs-sys.h"
->
->   #define L2_AUX_VAL 0x7C470001
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..33db6ee 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -22,7 +22,6 @@
->   #include <plat/cpu.h>
->
->   #include "common.h"
-> -#include "regs-pmu.h"
->
->   static inline void cpu_enter_lowpower_a9(void)
->   {
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index d8d1555..3ebb03f 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -29,7 +29,6 @@
->   #include <plat/cpu.h>
->
->   #include "common.h"
-> -#include "regs-pmu.h"
->
->   extern void exynos4_secondary_startup(void);
->
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 723c988..875151f 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -34,7 +34,6 @@
->   #include <mach/map.h>
->
->   #include "common.h"
-> -#include "regs-pmu.h"
->   #include "regs-sys.h"
->
->   /**
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index 05c7ce1..fb44352 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -16,7 +16,6 @@
->   #include <plat/cpu.h>
->
->   #include "common.h"
-> -#include "regs-pmu.h"
->
->   static const struct exynos_pmu_conf *exynos_pmu_config;
->
->
+And is the page table being modified unique to the current CPU? I
+thought a common set of page tables was shared across all of them. If
+that is the case then one CPU can modify the PTE to be writeable,
+another CPU take a TLB miss and pull in that writeable entry, which will
+stay there until it drops out the TLB at some indefinite point in the
+future. That's the scenario I was getting at with my previous comment.
 
-I don't think this is a good idea. It adds hidden indirect dependencies 
-between source files and thus reduces maintainability and readability. 
-In addition it causes the file to be included even by files that don't 
-need it.
-
-Best regards,
-Tomasz
+-- 
+Tixy
