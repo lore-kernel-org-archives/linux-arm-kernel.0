@@ -1,18 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 8 Apr 2014 19:47:53 +0800
-Subject: [PATCH v12][ 12/12] ARM: imx_v6_v7_defconfig: Add more drm
- drivers.
-In-Reply-To: <1396874691-27954-12-git-send-email-denis@eukrea.com>
-References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
- <1396874691-27954-12-git-send-email-denis@eukrea.com>
-Message-ID: <20140408114751.GC3860@dragon>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 08 Apr 2014 14:01:57 +0200
+Subject: [PATCH V2] ACPI: Update the ownership and developers for ACPI in
+ Kconfig
+In-Reply-To: <1396956241-8337-1-git-send-email-hanjun.guo@linaro.org>
+References: <1396956241-8337-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <3442476.Y3PYFAt6A7@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 02:44:51PM +0200, Denis Carikli wrote:
-> The DRM_PANEL_SIMPLE is needed by the eukrea
-> mbimxsd51's displays.
+On Tuesday, April 08, 2014 07:24:01 PM Hanjun Guo wrote:
+> The UEFI Forum included the ACPI spec in its portfolio in October 2013
+> and will host future spec iterations, following the ACPI v5.0a release.
 > 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> A UEFI Forum working group named ACPI Specification Working Group (ASWG)
+> has been established to handle future ACPI developments, any UEFI member
+> can join the group and contribute to ACPI specification.
+> 
+> So update the ownership and developers for ACPI in Kconfig accordingly,
+> and add another website link to ACPI specification too.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/acpi/Kconfig |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index c205653..6bbf36e 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -32,9 +32,11 @@ menuconfig ACPI
+>  	  <http://acpica.org/>
+>  
+>  	  ACPI is an open industry specification co-developed by
+> -	  Hewlett-Packard, Intel, Microsoft, Phoenix, and Toshiba.
+> +	  ACPI Specification Working Group (ASWG) under UEFI Forum, any
+> +	  UEFI member can join ASWG and contribute to ACPI specification.
 
-Applied, thanks.
+Thinking a bit more about that, I'd prefer this wording:
+
+	ACPI is an open industry specification originally co-developed by
+	Hewlett-Packard, Intel, Microsoft, Phoenix, and Toshiba.  Currently,
+	it is developed by the ACPI Specification Working Group (ASWG) under
+	the UEFI Forum and any UEFI member can join the ASWG and contribute
+	to the ACPI specification.
+
+>  	  The specification is available at:
+>  	  <http://www.acpi.info>
+> +	  <http://www.uefi.org/acpi/specs>
+>  
+>  if ACPI
+
+Thanks!
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
