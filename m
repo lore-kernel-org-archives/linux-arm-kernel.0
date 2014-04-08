@@ -1,79 +1,131 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Apr 2014 19:59:04 +0200
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-In-Reply-To: <5343FDD3.3070308@i2se.com>
-References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
- <5343FDD3.3070308@i2se.com>
-Message-ID: <20140408175904.GT29751@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 8 Apr 2014 20:01:40 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <20140408171417.GB27776@obsidianresearch.com>
+References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140405193435.50d8dd81@skate>
+ <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
+ <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+ <20140408171309.09bbf968@skate> <20140408174034.79df403e@skate>
+ <20140408175545.1b4d55a5@skate>
+ <20140408171417.GB27776@obsidianresearch.com>
+Message-ID: <20140408200140.5dcc2ad7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Dear Jason Gunthorpe,
 
-On Tue, Apr 08, 2014 at 03:46:59PM +0200, Stefan Wahren wrote:
-> Am 08.04.2014 13:29, schrieb Shawn Guo:
-> > The .config() calls clk_get_rate() which might sleep, so we need to set
-> > pwm_chip can_sleep flag.  Otherwise, we see the following warning when
-> > using pwm driven heartbeat led.
-> >
-> > WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
-> > DEBUG_LOCKS_WARN_ON(in_interrupt())
-> > Modules linked in:
-> > CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
-> > [<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
-> > [<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
-> > [<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
-> > [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
-> > [<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
-> > [<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
-> > [<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
-> > [<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
-> > [<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
-> > [<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
-> > [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
-> > [<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
-> > [<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
-> > [<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
-> > [<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
-> > [<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
-> > [<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
-> > [<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
-> > [<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
-> >
-> > Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  drivers/pwm/pwm-mxs.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
-> > index 9475bc7..4f1bb4e 100644
-> > --- a/drivers/pwm/pwm-mxs.c
-> > +++ b/drivers/pwm/pwm-mxs.c
-> > @@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
-> >  	mxs->chip.dev = &pdev->dev;
-> >  	mxs->chip.ops = &mxs_pwm_ops;
-> >  	mxs->chip.base = -1;
-> > +	mxs->chip.can_sleep = true;
-> >  	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
-> >  	if (ret < 0) {
-> >  		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
-> 
-> thanks for the patch. I've tested it with our i.MX28 board and the
-> warning above never came. So it works.
-> Unfortunately the led still don't behave as expected. If i set the led
-> trigger to heartbeat the led goes on and stays in this state.
-> 
-> May be this has something to do with the following discussion
-> 
-> http://comments.gmane.org/gmane.linux.leds/208
-I guess that's your problem, yes. Does patch 2 of my series (i.e.
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/282593/focus=282596)
-help you?
+On Tue, 8 Apr 2014 11:14:17 -0600, Jason Gunthorpe wrote:
 
-Best regards
-Uwe
+> > mvebu-mbus/devices output:
+> > 
+> > # cat /sys/kernel/debug/mvebu-mbus/devices 
+> > [10] 00000000e0000000 - 00000000e0900000 : 0004:00e8
+> 
+> > I'm not sure why I don't have the non-power-of-two problem for the MBus
+> > windows.
+> 
+> Well, you do, 0x900000 is not aligned. It converts to size=0b10001111,
+> which is undefined behavior for mbus. 
 
+Ah correct. Though I'm still puzzled as to why the undefined behavior
+works for me, and not for Willy, who I believe has the same NIC as me.
+
+> What do you think about this:
+> 
+> From 235b0bf637242a50ec45c8766d18a942bff601cf Mon Sep 17 00:00:00 2001
+> From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Date: Tue, 8 Apr 2014 11:12:41 -0600
+> Subject: [PATCH] bus: mvebu-mbus: Avoid setting an undefined window size
+> 
+> The mbus hardware requires a power of two size, if a non-power
+> of two is passed in to the low level routines they configure the
+> register in a way that results in undefined behaviour.
+> 
+> - WARN_ON to make this invalid usage really obvious
+> - Round down to the nearest power of two so we only stuff a valid
+>   size into the HW
+
+I perfectly fine with those two.
+
+> - When reading interpret undefined values in a conservative way,
+>   the value is assumed to be the lowest power of two. This avoids
+>   the debugfs output showing a value that looks 'correct'
+
+But I am not sure with this one. Since now you're anyway rounding down
+sizes, how is it possible to get a non-power-of-two size in the
+registers?
+
+I would probably prefer to have mvebu_devs_debug_show() do something
+like:
+
+                seq_printf(seq, "[%02d] %016llx - %016llx : %04x:%04x%s",
+                           win, (unsigned long long)wbase,
+                           (unsigned long long)(wbase + wsize), wtarget, wattr,
+			   (!is_power_of_2(wsize)) ? " non-pow2 undefined behavior!" : "");
+
+or something like that. This way at least the function does not "hide"
+the fact that the configured value is invalid.
+
+See one more comment below.
+
+> All together this makes the recent problems with silent failure
+> of PCI very obvious, noisy and debuggable.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/bus/mvebu-mbus.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index 2ac754e..d26f63c 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -56,6 +56,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>  #include <linux/debugfs.h>
+> +#include <linux/log2.h>
+>  
+>  /*
+>   * DDR target is the same on all platforms.
+> @@ -147,7 +148,7 @@ static void mvebu_mbus_read_window(struct mvebu_mbus_state *mbus,
+>  	*enabled = 1;
+>  	*base = ((u64)basereg & WIN_BASE_HIGH) << 32;
+>  	*base |= (basereg & WIN_BASE_LOW);
+> -	*size = (ctrlreg | ~WIN_CTRL_SIZE_MASK) + 1;
+> +	*size = 1 << (ffs(~(ctrlreg | ~WIN_CTRL_SIZE_MASK)) - 1);
+>  
+>  	if (target)
+>  		*target = (ctrlreg & WIN_CTRL_TGT_MASK) >> WIN_CTRL_TGT_SHIFT;
+> @@ -266,6 +267,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
+>  		mbus->soc->win_cfg_offset(win);
+>  	u32 ctrl, remap_addr;
+>  
+> +	WARN_ON(!is_power_of_2(size));
+> +	size = rounddown_pow_of_two(size);
+
+Maybe something like:
+
+	if (!is_power_of_2(size)) {
+		WARN(true, "Invalid MBus window size: 0x%x, rounding down to 0x%x\n",
+		     size, rounddown_pow_of_two(size));
+		size = rounddown_pow_of_two(size);
+	}
+
+And while we're adding checks, why not also verify that the base
+address is a multiple of the window size? I think it's the other
+requirement.
+
+That being said, this warning doesn't really solve the problem that the
+PCI core may allocate BARs whose size cannot be represented through
+MBus windows :-)
+
+Thomas
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
