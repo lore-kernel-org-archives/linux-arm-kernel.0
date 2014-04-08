@@ -1,10 +1,8 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Apr 2014 20:01:40 +0200
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 8 Apr 2014 12:08:28 -0600
 Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408171417.GB27776@obsidianresearch.com>
-References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+In-Reply-To: <20140408175324.GH11052@1wt.eu>
+References: <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
  <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
  <20140405193435.50d8dd81@skate>
  <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
@@ -12,120 +10,84 @@ References: <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
  <20140408171309.09bbf968@skate> <20140408174034.79df403e@skate>
  <20140408175545.1b4d55a5@skate>
  <20140408171417.GB27776@obsidianresearch.com>
-Message-ID: <20140408200140.5dcc2ad7@skate>
+ <20140408175324.GH11052@1wt.eu>
+Message-ID: <20140408180828.GC32490@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
-
-On Tue, 8 Apr 2014 11:14:17 -0600, Jason Gunthorpe wrote:
-
-> > mvebu-mbus/devices output:
+On Tue, Apr 08, 2014 at 07:53:24PM +0200, Willy Tarreau wrote:
+> Hi Jason,
+> 
+> On Tue, Apr 08, 2014 at 11:14:17AM -0600, Jason Gunthorpe wrote:
+> > The mbus hardware requires a power of two size, if a non-power
+> > of two is passed in to the low level routines they configure the
+> > register in a way that results in undefined behaviour.
 > > 
-> > # cat /sys/kernel/debug/mvebu-mbus/devices 
-> > [10] 00000000e0000000 - 00000000e0900000 : 0004:00e8
+> > - WARN_ON to make this invalid usage really obvious
+> > - Round down to the nearest power of two so we only stuff a valid
+> >   size into the HW
 > 
-> > I'm not sure why I don't have the non-power-of-two problem for the MBus
-> > windows.
-> 
-> Well, you do, 0x900000 is not aligned. It converts to size=0b10001111,
-> which is undefined behavior for mbus. 
+> So if I understand it right, for example when my first NIC registers
+> e0000000-e02fffff, then we'll truncate it down to e0000000-e01fffff,
+> won't that cause any issue, for example if the NIC needs to access
+> data beyond that limit ?
 
-Ah correct. Though I'm still puzzled as to why the undefined behavior
-works for me, and not for Willy, who I believe has the same NIC as me.
+The mbus windows are assigned to the bridge, not to the NIC bars:
 
-> What do you think about this:
-> 
-> From 235b0bf637242a50ec45c8766d18a942bff601cf Mon Sep 17 00:00:00 2001
-> From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Date: Tue, 8 Apr 2014 11:12:41 -0600
-> Subject: [PATCH] bus: mvebu-mbus: Avoid setting an undefined window size
-> 
-> The mbus hardware requires a power of two size, if a non-power
-> of two is passed in to the low level routines they configure the
-> register in a way that results in undefined behaviour.
-> 
-> - WARN_ON to make this invalid usage really obvious
-> - Round down to the nearest power of two so we only stuff a valid
->   size into the HW
+00:0a.0 PCI bridge [0604]: Marvell Technology Group Ltd. Device [11ab:7846] (rev 02) (prog-if 00 [Normal decode])
+        Memory behind bridge: e0000000-e17fffff
 
-I perfectly fine with those two.
+So the above is not OK, 17fffff is not a power of two. The patch
+causes the mbus to WARN_ON and then round down so that the hardware is
+at least in a defined configuration.
 
-> - When reading interpret undefined values in a conservative way,
->   the value is assumed to be the lowest power of two. This avoids
->   the debugfs output showing a value that looks 'correct'
+> BTW I can try your patch with the myricom NIC which started to work
+> when rounding up, I'll quickly see if that fixes the issue as well,
+> but I'm now a little bit confused.
 
-But I am not sure with this one. Since now you're anyway rounding down
-sizes, how is it possible to get a non-power-of-two size in the
-registers?
+This patch won't fix anything, it just fixes the mbus driver to always
+program the hardware with valid values, even if the upper layer
+requests something invalid. Basically, we spent a few weeks tracking
+this behavior down, the patch would ensure that time doesn't get spent
+again.
 
-I would probably prefer to have mvebu_devs_debug_show() do something
-like:
+The goal now is to avoid the WARN_ON in the patch from firing.
 
-                seq_printf(seq, "[%02d] %016llx - %016llx : %04x:%04x%s",
-                           win, (unsigned long long)wbase,
-                           (unsigned long long)(wbase + wsize), wtarget, wattr,
-			   (!is_power_of_2(wsize)) ? " non-pow2 undefined behavior!" : "");
+For a proper fix, something like this to create multiple aligned
+windows is a simple option (untested, need the inverse on the
+de-register, loop should probably live in mbus code):
 
-or something like that. This way at least the function does not "hide"
-the fact that the configured value is invalid.
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 789cdb2..7312c82 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -382,6 +382,9 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 
+ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+ {
++       phys_addr_t base;
++       unsigned int mapped_size;
++
+        /* Are the new membase/memlimit values invalid? */
+        if (port->bridge.memlimit < port->bridge.membase ||
+            !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+@@ -408,8 +411,16 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+                (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+                port->memwin_base;
+ 
+-       mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+-                                   port->memwin_base, port->memwin_size);
++       base = port->memwin_base;
++       mapped_size = 0;
++       while (mapped_size < port->memwin_size) {
++               unsigned int size =
++                   rounddown_pow_of_two(port->memwin_size - mapped_size);
++               mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
++                                           base, size);
++               base += size;
++               mapped_size += size;
++       }
+ }
+ 
 
-See one more comment below.
-
-> All together this makes the recent problems with silent failure
-> of PCI very obvious, noisy and debuggable.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  drivers/bus/mvebu-mbus.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index 2ac754e..d26f63c 100644
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -56,6 +56,7 @@
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/debugfs.h>
-> +#include <linux/log2.h>
->  
->  /*
->   * DDR target is the same on all platforms.
-> @@ -147,7 +148,7 @@ static void mvebu_mbus_read_window(struct mvebu_mbus_state *mbus,
->  	*enabled = 1;
->  	*base = ((u64)basereg & WIN_BASE_HIGH) << 32;
->  	*base |= (basereg & WIN_BASE_LOW);
-> -	*size = (ctrlreg | ~WIN_CTRL_SIZE_MASK) + 1;
-> +	*size = 1 << (ffs(~(ctrlreg | ~WIN_CTRL_SIZE_MASK)) - 1);
->  
->  	if (target)
->  		*target = (ctrlreg & WIN_CTRL_TGT_MASK) >> WIN_CTRL_TGT_SHIFT;
-> @@ -266,6 +267,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
->  		mbus->soc->win_cfg_offset(win);
->  	u32 ctrl, remap_addr;
->  
-> +	WARN_ON(!is_power_of_2(size));
-> +	size = rounddown_pow_of_two(size);
-
-Maybe something like:
-
-	if (!is_power_of_2(size)) {
-		WARN(true, "Invalid MBus window size: 0x%x, rounding down to 0x%x\n",
-		     size, rounddown_pow_of_two(size));
-		size = rounddown_pow_of_two(size);
-	}
-
-And while we're adding checks, why not also verify that the base
-address is a multiple of the window size? I think it's the other
-requirement.
-
-That being said, this warning doesn't really solve the problem that the
-PCI core may allocate BARs whose size cannot be represented through
-MBus windows :-)
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason
