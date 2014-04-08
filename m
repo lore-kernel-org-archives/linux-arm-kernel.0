@@ -1,73 +1,384 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Apr 2014 10:49:42 +0100
-Subject: [PATCH] asm-generic: allow generic unaligned access if the
- arch supports it
-In-Reply-To: <CAKv+Gu9TkLSivLuJH-oWnK0xpFb4jrhYDx6bTZBKUSmSJftCbQ@mail.gmail.com>
-References: <1395942387-14177-1-git-send-email-ard.biesheuvel@linaro.org>
- <201403281914.20201.arnd@arndb.de>
- <CAKv+Gu_9yD1jWhxkPxSUbwjJk4QxPNXBR=EXfmfCgzD1Pdig2g@mail.gmail.com>
- <20140331095941.GA29871@arm.com>
- <CAKv+Gu_05nmZrQxwELXae4tiK=-MpjUjmEKrULdg+6YuC-DW8Q@mail.gmail.com>
- <20140331172436.GL29871@arm.com>
- <CAKv+Gu9RATUkhya0zytS8FbSM8=49xwNg0m24Xp1LtCWoarDRQ@mail.gmail.com>
- <20140331183618.GY7528@n2100.arm.linux.org.uk>
- <CAKv+Gu9TkLSivLuJH-oWnK0xpFb4jrhYDx6bTZBKUSmSJftCbQ@mail.gmail.com>
-Message-ID: <20140408094942.GC16119@n2100.arm.linux.org.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 8 Apr 2014 10:52:46 +0100
+Subject: [PATCH v7 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <20140407235830.GA9959@google.com>
+References: <1394811258-1500-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811258-1500-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140407235830.GA9959@google.com>
+Message-ID: <20140408095246.GU17163@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 08:51:54PM +0200, Ard Biesheuvel wrote:
-> On 31 March 2014 20:36, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Mon, Mar 31, 2014 at 08:22:43PM +0200, Ard Biesheuvel wrote:
-> >> On 31 March 2014 19:24, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > It actually affects arch/arm as well which selects
-> >> > HAVE_EFFICIENT_UNALIGNED_ACCESS for v6/v7 and uses the generic
-> >> > unaligned.h
-> >> >
-> >>
-> >> Oops, my bad. I did a quick 'find -name unaligned.h' but misread 'arc'
-> >> for 'arm'.
-> >>
-> >> @Russell: ARM is a user of asm-generic/unaligned.h, and I proposed a
-> >> patch to asm-generic that switches to unaligned accesses if
-> >> HAVE_EFFICIENT_UNALIGNED_ACCESS is set by the arch. This should affect
-> >> a fair amount of code living under net/ and drivers/ that don't test
-> >> for the Kconfig symbol but expect get_unaligned_xx/put_unaligned_xx to
-> >> turn into something suitable depending on the arch. Any objections?
+On Tue, Apr 08, 2014 at 12:58:30AM +0100, Bjorn Helgaas wrote:
+> On Fri, Mar 14, 2014 at 03:34:18PM +0000, Liviu Dudau wrote:
+> > Use the generic host bridge functions to provide support for
+> > PCI Express on arm64. There is no support for ISA memory.
 > >
-> > I'm not sure what you're talking about here, or what change you're
-> > proposing.  Without any kind of frame of reference, I can't comment.
-> > Sorry.
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> > ---
+> >  arch/arm64/Kconfig            |  19 +++-
+> >  arch/arm64/include/asm/Kbuild |   1 +
+> >  arch/arm64/include/asm/io.h   |   3 +-
+> >  arch/arm64/include/asm/pci.h  |  51 ++++++++++
+> >  arch/arm64/kernel/Makefile    |   1 +
+> >  arch/arm64/kernel/pci.c       | 173 ++++++++++++++++++++++++++++++++
+> >  6 files changed, 246 insertions(+), 2 deletions(-)
+> >  create mode 100644 arch/arm64/include/asm/pci.h
+> >  create mode 100644 arch/arm64/kernel/pci.c
 > >
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 27bbcfc..d1c8568 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -62,7 +62,7 @@ config MMU
+> >       def_bool y
+> >
+> >  config NO_IOPORT
+> > -     def_bool y
+> > +     def_bool y if !PCI
+> >
+> >  config STACKTRACE_SUPPORT
+> >       def_bool y
+> > @@ -134,6 +134,23 @@ menu "Bus support"
+> >  config ARM_AMBA
+> >       bool
+> >
+> > +config PCI
+> > +     bool "PCI support"
+> > +     help
+> > +       This feature enables support for PCIe bus system. If you say Y
+> > +       here, the kernel will include drivers and infrastructure code
+> > +       to support PCIe bus devices.
+> > +
+> > +config PCI_DOMAINS
+> > +     def_bool PCI
+> > +
+> > +config PCI_SYSCALL
+> > +     def_bool PCI
+> > +
+> > +source "drivers/pci/Kconfig"
+> > +source "drivers/pci/pcie/Kconfig"
+> > +source "drivers/pci/hotplug/Kconfig"
+> > +
+> >  endmenu
+> >
+> >  menu "Kernel Features"
+> > diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+> > index 71c53ec..46924bc 100644
+> > --- a/arch/arm64/include/asm/Kbuild
+> > +++ b/arch/arm64/include/asm/Kbuild
+> > @@ -26,6 +26,7 @@ generic-y += mman.h
+> >  generic-y += msgbuf.h
+> >  generic-y += mutex.h
+> >  generic-y += pci.h
+> > +generic-y += pci-bridge.h
+> >  generic-y += poll.h
+> >  generic-y += posix_types.h
+> >  generic-y += resource.h
+> > diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> > index 7846a6b..67463a5 100644
+> > --- a/arch/arm64/include/asm/io.h
+> > +++ b/arch/arm64/include/asm/io.h
+> > @@ -120,7 +120,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+> >  /*
+> >   *  I/O port access primitives.
+> >   */
+> > -#define IO_SPACE_LIMIT               0xffff
+> > +#define arch_has_dev_port()  (1)
+> > +#define IO_SPACE_LIMIT               0x1ffffff
+> >  #define PCI_IOBASE           ((void __iomem *)(MODULES_VADDR - SZ_32M))
+> >
+> >  static inline u8 inb(unsigned long addr)
+> > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> > new file mode 100644
+> > index 0000000..d93576f
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/pci.h
+> > @@ -0,0 +1,51 @@
+> > +#ifndef __ASM_PCI_H
+> > +#define __ASM_PCI_H
+> > +#ifdef __KERNEL__
+> > +
+> > +#include <linux/types.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/dma-mapping.h>
+> > +
+> > +#include <asm/io.h>
+> > +#include <asm-generic/pci-bridge.h>
+> > +#include <asm-generic/pci-dma-compat.h>
+> > +
+> > +#define PCIBIOS_MIN_IO               0x1000
+> > +#define PCIBIOS_MIN_MEM              0
+> > +
+> > +struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus);
+> > +
+> > +/*
+> > + * Set to 1 if the kernel should re-assign all PCI bus numbers
+> > + */
+> > +#define pcibios_assign_all_busses() \
+> > +     (pci_has_flag(PCI_REASSIGN_ALL_BUS))
+> > +
+> > +/*
+> > + * PCI address space differs from physical memory address space
+> > + */
+> > +#define PCI_DMA_BUS_IS_PHYS  (0)
+> > +
+> > +extern int isa_dma_bridge_buggy;
+> > +
+> > +#ifdef CONFIG_PCI
+> > +static inline int pci_domain_nr(struct pci_bus *bus)
+> > +{
+> > +     struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+> > +
+> > +     if (bridge)
+> > +             return bridge->domain_nr;
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static inline int pci_proc_domain(struct pci_bus *bus)
+> > +{
+> > +     return 1;
+> > +}
+> > +#endif
+> > +
+> > +extern unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr);
+> > +
+> > +#endif  /* __KERNEL__ */
+> > +#endif  /* __ASM_PCI_H */
+> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> > index 2d4554b..64fc479 100644
+> > --- a/arch/arm64/kernel/Makefile
+> > +++ b/arch/arm64/kernel/Makefile
+> > @@ -20,6 +20,7 @@ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
+> >  arm64-obj-$(CONFIG_EARLY_PRINTK)     += early_printk.o
+> >  arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)        += sleep.o suspend.o
+> >  arm64-obj-$(CONFIG_JUMP_LABEL)               += jump_label.o
+> > +arm64-obj-$(CONFIG_PCI)                      += pci.o
+> >
+> >  obj-y                                        += $(arm64-obj-y) vdso/
+> >  obj-m                                        += $(arm64-obj-m)
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > new file mode 100644
+> > index 0000000..9f29c9a
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -0,0 +1,173 @@
+> > +/*
+> > + * Code borrowed from powerpc/kernel/pci-common.c
+> > + *
+> > + * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
+> > + * Copyright (C) 2014 ARM Ltd.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License
+> > + * version 2 as published by the Free Software Foundation.
+> > + *
+> > + */
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/mm.h>
+> > +#include <linux/of_pci.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#include <asm/pci-bridge.h>
+> > +
+> > +struct ioresource {
+> > +     struct list_head list;
+> > +     phys_addr_t start;
+> > +     resource_size_t size;
+> > +};
+> > +
+> > +static LIST_HEAD(io_list);
+> > +
+> > +int pci_register_io_range(phys_addr_t address, resource_size_t size)
+> > +{
+> > +     struct ioresource *res;
+> > +     resource_size_t allocated_size = 0;
+> > +
+> > +     /* find if the range has not been already allocated */
+> > +     list_for_each_entry(res, &io_list, list) {
+> > +             if (address >= res->start &&
+> > +                     address + size <= res->start + size)
+> > +                     return 0;
+> > +             allocated_size += res->size;
+> > +     }
+> > +
+> > +     /* range not already registered, check for space */
+> > +     if (allocated_size + size > IO_SPACE_LIMIT)
+> > +             return -E2BIG;
+> > +
+> > +     /* add the range in the list */
+> > +     res = kzalloc(sizeof(*res), GFP_KERNEL);
+> > +     if (!res)
+> > +             return -ENOMEM;
+> > +     res->start = address;
+> > +     res->size = size;
+> > +
+> > +     list_add_tail(&res->list, &io_list);
+> > +
+> > +     return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(pci_register_io_range);
+> > +
+> > +unsigned long pci_address_to_pio(phys_addr_t address)
+> > +{
+> > +     struct ioresource *res;
+> > +
+> > +     list_for_each_entry(res, &io_list, list) {
+> > +             if (address >= res->start &&
+> > +                     address < res->start + res->size) {
+> > +                     return res->start - address;
+> > +             }
+> > +     }
+> > +
+> > +     return (unsigned long)-1;
+> > +}
+> > +EXPORT_SYMBOL_GPL(pci_address_to_pio);
+> > +
+> > +/*
+> > + * Called after each bus is probed, but before its children are examined
+> > + */
+> > +void pcibios_fixup_bus(struct pci_bus *bus)
+> > +{
+> > +     struct pci_dev *dev;
+> > +     struct resource *res;
+> > +     int i;
+> > +
+> > +     if (!pci_is_root_bus(bus)) {
+> > +             pci_read_bridge_bases(bus);
+> > +
+> > +             pci_bus_for_each_resource(bus, res, i) {
+> > +                     if (!res || !res->flags || res->parent)
+> > +                             continue;
+> > +
+> > +                     /*
+> > +                      * If we are going to reassign everything, we can
+> > +                      * shrink the P2P resource to have zero size to
+> > +                      * save space
+> > +                      */
+> > +                     if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
+> > +                             res->flags |= IORESOURCE_UNSET;
+> > +                             res->start = 0;
+> > +                             res->end = -1;
+> > +                             continue;
+> > +                     }
+> > +             }
+> > +     }
 > 
-> My apologies. I assumed the mail thread including a link to the patch
-> would be clear enough.
-> 
-> Currently, asm-generic's version of unaligned.h (defining stuff like
-> get_unaligned() and put_unaligned()) unconditionally defaults to the
-> most cautious method of performing unaligned memory accesses, even if
-> the Kconfig symbol HAVE_EFFICIENT_UNALIGNED_ACCESS is defined.
-> However, in that case, it makes sense to use a definition for
-> get_unaligned()/put_unaligned() that lets the hardware perform the
-> unaligned accesses instead.
-> 
-> So that is what I proposed here
-> 
-> http://marc.info/?l=linux-arch&m=139594237116121&w=2
-> 
-> and in the mail exchange that followed, I stated that arm64 should be
-> the only arch affected by this change. However, I didn't look
-> carefully enough and, as Catalin pointed out, ARM will also be
-> affected by it.
-> 
-> So that is why I redirected this thread to you: would you object to
-> changing asm-generic/unaligned.h so that calls to
-> get_aligned()/put_aligned() on ARM v6/v7 will let the CPU perform the
-> unaligned access?
+> Is there any other place we can put this?  I'm trying to nuke
+> pcibios_fixup_bus() because things like hotplug work better if we can do
+> them in a per-device way rather than a per-bus way.
 
-The change looks fine to me, but given where we are in the cycle, I'd
-rather hold off until after the merge window before queuing this up.
+That's good. I'm all for removing this one, will give it a go.
+
+> 
+> > +
+> > +     list_for_each_entry(dev, &bus->devices, bus_list) {
+> > +             /* Ignore fully discovered devices */
+> > +             if (dev->is_added)
+> > +                     continue;
+> > +
+> > +             set_dev_node(&dev->dev, pcibus_to_node(dev->bus));
+> 
+> Do you really need this?  pci_device_add() already contains the same line.
+
+OK.
+
+> 
+> > +
+> > +             /* Read default IRQs and fixup if necessary */
+> > +             dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> 
+> Could this be done in pcibios_add_device() or someplace similar?
+
+Will do.
+
+> 
+> > +     }
+> > +}
+> > +EXPORT_SYMBOL(pcibios_fixup_bus);
+> > +
+> > +/*
+> > + * We don't have to worry about legacy ISA devices, so nothing to do here
+> > + */
+> > +resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> > +                             resource_size_t size, resource_size_t align)
+> > +{
+> > +     return res->start;
+> > +}
+> > +
+> > +int pcibios_enable_device(struct pci_dev *dev, int mask)
+> > +{
+> > +     return pci_enable_resources(dev, mask);
+> > +}
+> 
+> There is already a weak default implementation of pcibios_enable_device()
+> that does this, so you should be able to just drop this.
+
+OK.
+
+Thanks for reviewing the series!
+
+Liviu
+
+> 
+> > +#define IO_SPACE_PAGES       ((IO_SPACE_LIMIT + 1) / PAGE_SIZE)
+> > +static DECLARE_BITMAP(pci_iospace, IO_SPACE_PAGES);
+> > +
+> > +unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr)
+> > +{
+> > +     unsigned long start, len, virt_start;
+> > +     int err;
+> > +
+> > +     if (res->end > IO_SPACE_LIMIT)
+> > +             return -EINVAL;
+> > +
+> > +     /*
+> > +      * try finding free space for the whole size first,
+> > +      * fall back to 64K if not available
+> > +      */
+> > +     len = resource_size(res);
+> > +     start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+> > +                             res->start / PAGE_SIZE, len / PAGE_SIZE, 0);
+> > +     if (start == IO_SPACE_PAGES && len > SZ_64K) {
+> > +             len = SZ_64K;
+> > +             start = 0;
+> > +             start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+> > +                                     start, len / PAGE_SIZE, 0);
+> > +     }
+> > +
+> > +     /* no 64K area found */
+> > +     if (start == IO_SPACE_PAGES)
+> > +             return -ENOMEM;
+> > +
+> > +     /* ioremap physical aperture to virtual aperture */
+> > +     virt_start = start * PAGE_SIZE + (unsigned long)PCI_IOBASE;
+> > +     err = ioremap_page_range(virt_start, virt_start + len,
+> > +                             phys_addr, __pgprot(PROT_DEVICE_nGnRE));
+> > +     if (err)
+> > +             return err;
+> > +
+> > +     bitmap_set(pci_iospace, start, len / PAGE_SIZE);
+> > +
+> > +     /* return io_offset */
+> > +     return start * PAGE_SIZE - res->start;
+> > +}
+> > --
+> > 1.9.0
+> >
+> 
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
