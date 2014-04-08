@@ -1,65 +1,53 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue,  8 Apr 2014 16:00:43 +0800
-Subject: [PATCH v2 03/12] ARM: hisi: add ARCH_HISI
+Date: Tue,  8 Apr 2014 16:00:41 +0800
+Subject: [PATCH v2 01/12] ARM: debug: add HiP04 debug uart
 In-Reply-To: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1396944052-9887-4-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1396944052-9887-2-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since multiple ARCH configuration will be appended into mach-hisi
-directory, add ARCH_HISI as common configuration for different ARCH in
-mach-hisi.
+Add the support of Hisilicon HiP04 debug uart.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/Makefile          |  2 +-
- arch/arm/mach-hisi/Kconfig | 16 ++++++++++++++--
- 2 files changed, 15 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 41c1931..4c2798a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -154,7 +154,7 @@ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
- machine-$(CONFIG_ARCH_EXYNOS)		+= exynos
- machine-$(CONFIG_ARCH_GEMINI)		+= gemini
- machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
--machine-$(CONFIG_ARCH_HI3xxx)		+= hisi
-+machine-$(CONFIG_ARCH_HISI)		+= hisi
- machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
- machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
- machine-$(CONFIG_ARCH_IOP32X)		+= iop32x
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index feee4db..da16efd 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -1,8 +1,16 @@
--config ARCH_HI3xxx
--	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-+config ARCH_HISI
-+	bool "Hisilicon SoC Support"
-+	depends on ARCH_MULTIPLATFORM
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select ARM_TIMER_SP804
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 7289853..fa1ebd5 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -223,6 +223,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HI3716 UART.
+ 
++	config DEBUG_HIP04_UART
++		bool "Hisilicon HiP04 Debug UART"
++		depends on ARCH_HIP04
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HIP04 UART.
 +
-+if ARCH_HISI
-+
-+menu "Hisilicon platform type"
-+
-+config ARCH_HI3xxx
-+	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
- 	select CACHE_L2X0
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
-@@ -10,3 +18,7 @@ config ARCH_HI3xxx
- 	select PINCTRL_SINGLE
- 	help
- 	  Support for Hisilicon Hi36xx/Hi37xx processor family
-+
-+endmenu
-+
-+endif
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -1053,6 +1061,7 @@ config DEBUG_UART_PHYS
+ 	default 0xd4017000 if DEBUG_MMP_UART2
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
++	default 0xe4007000 if DEBUG_HIP04_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+@@ -1085,6 +1094,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
++	default 0xf8007000 if DEBUG_HIP04_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+ 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
 -- 
 1.8.3.2
