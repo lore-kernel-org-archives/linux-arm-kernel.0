@@ -1,45 +1,20 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Tue, 08 Apr 2014 10:08:42 +0200
-Subject: [PATCH v12][ 07/12] drm: drm_display_mode: add signal polarity
- flags
-In-Reply-To: <534398D5.4090600@samsung.com>
-References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
- <1396874691-27954-7-git-send-email-denis@eukrea.com>
- <534398D5.4090600@samsung.com>
-Message-ID: <5343AE8A.50803@eukrea.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 8 Apr 2014 16:18:49 +0800
+Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to
+ kernel warning
+In-Reply-To: <20140408075916.GA30127@piout.net>
+References: <53345C93.9040005@i2se.com> <533EB9AC.6040708@i2se.com>
+ <20140404142656.GA16383@dragon> <20140404164446.GI4883@piout.net>
+ <20140408073402.GC2438@dragon> <20140408075916.GA30127@piout.net>
+Message-ID: <20140408081848.GH2438@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2014 08:36 AM, Andrzej Hajda wrote:
->
-> Hi Denis,
-Hi,
+On Tue, Apr 08, 2014 at 09:59:16AM +0200, Alexandre Belloni wrote:
+> The driver using the PWM should test the flag, have a look at:
+> http://lxr.free-electrons.com/source/drivers/leds/leds-pwm.c#L183
 
->> +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
->> +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
->> +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
->
-> What is the purpose of DRM_MODE_FLAG_POL_PIXDATA_PRESERVE?
-> If 'preserve' means 'ignore' we can set to zero negedge and posedge bits
-> instead of adding new bit. If it is something different please describe it.
-Yes, it meant 'ignore'.
+Ah, right, that' how the flag works.  Thanks, Alexandre.  I send a patch
+to set the flag for pwm-mxs driver shortly.
 
-The goal was to be able to have a way to keep the old behavior while 
-still being able to set the flags.
-
-So, with the imx-drm driver, if none of the DRM_MODE_FLAG_POL_PIXDATA 
-were set(that is POSEDGE, NEGEDGE, PRESERVE), then in ipuv3-crtc.c, it 
-went using the old flags settings that were previously hardcoded.
-
-The same applied for DRM_MODE_FLAG_POL_DE.
-The patch using theses flags is the 08/12 of this same serie.
-
->>   struct drm_display_mode {
-[..]
->> +	unsigned int pol_flags;
->
-> Adding field and macros description to the DocBook would be nice.
-So I will have to describe it in the "Connector Helper Operations" 
-section of drm.tmpl, right before the mode_valid synopsis ?
-
-Denis.
+Shawn
