@@ -1,81 +1,53 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 08 Apr 2014 08:36:05 +0200
-Subject: [PATCH v12][ 07/12] drm: drm_display_mode: add signal polarity
- flags
-In-Reply-To: <1396874691-27954-7-git-send-email-denis@eukrea.com>
-References: <1396874691-27954-1-git-send-email-denis@eukrea.com>
- <1396874691-27954-7-git-send-email-denis@eukrea.com>
-Message-ID: <534398D5.4090600@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 8 Apr 2014 08:48:44 +0200
+Subject: [PATCH] asm-generic: allow generic unaligned access if the arch
+ supports it
+In-Reply-To: <20140331095941.GA29871@arm.com>
+References: <1395942387-14177-1-git-send-email-ard.biesheuvel@linaro.org>
+ <201403281914.20201.arnd@arndb.de>
+ <CAKv+Gu_9yD1jWhxkPxSUbwjJk4QxPNXBR=EXfmfCgzD1Pdig2g@mail.gmail.com>
+ <20140331095941.GA29871@arm.com>
+Message-ID: <CAKv+Gu-rx8W05i=xHaoZCktj6YWH56Zn2yNaiEeenm0=NmcwUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+On 31 March 2014 11:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Mar 28, 2014 at 06:24:04PM +0000, Ard Biesheuvel wrote:
+>> On 28 March 2014 19:14, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Thursday 27 March 2014, Ard Biesheuvel wrote:
+>> >> Switch the default unaligned access method to 'hardware implemented'
+>> >> if HAVE_EFFICIENT_UNALIGNED_ACCESS is set.
+>> >>
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >
+>> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> >
+>> > Is this part of a longer series of patches? If so, please keep
+>> > the patch with the others and merge it through an appropriate
+>> > tree.
+>> >
+>>
+>> No, not really. I ran into the alignment issue while working on the
+>> arm64 crypto stuff, but it is unclear when that will be going in.
+>>
+>> > If not, I guess I'll have to send it myself, but it will be
+>> > the only asm-generic patch for the merge window ;-)
+>>
+>> Perhaps Catalin is interested in taking it, as arm64 is the only arch
+>> that defines HAVE_EFFICIENT_UNALIGNED_ACCESS /and/ uses the
+>> asm-generic version of unaligned.h.
+>>
+>> @Catalin?
+>>
+>> http://marc.info/?l=linux-arch&m=139594237116121&w=2
+>
+> I can take this, providing it doesn't break anything else. I'll push it
+> to -next but won't send it with the first arm64 pull request.
+>
 
-On 04/07/2014 02:44 PM, Denis Carikli wrote:
-> We need a way to pass signal polarity informations
->   between DRM panels, and the display drivers.
-> 
-> To do that, a pol_flags field was added to drm_display_mode.
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v11->v12:
-> - Rebased: This patch now applies against drm_modes.h
-> - Rebased: It now uses the new DRM_MODE_FLAG_POL_DE flags defines names
-> 
-> ChangeLog v10->v11:
-> - Since the imx-drm won't be able to retrive its regulators
->   from the device tree when using display-timings nodes,
->   and that I was told that the drm simple-panel driver 
->   already supported that, I then, instead, added what was
->   lacking to make the eukrea displays work with the
->   drm-simple-panel driver.
-> 
->   That required a way to get back the display polarity
->   informations from the imx-drm driver without affecting
->   userspace.
-> ---
->  include/drm/drm_modes.h |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/include/drm/drm_modes.h b/include/drm/drm_modes.h
-> index 2dbbf99..b3789e2 100644
-> --- a/include/drm/drm_modes.h
-> +++ b/include/drm/drm_modes.h
-> @@ -93,6 +93,13 @@ enum drm_mode_status {
->  
->  #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
->  
-> +#define DRM_MODE_FLAG_POL_PIXDATA_NEGEDGE	BIT(1)
-> +#define DRM_MODE_FLAG_POL_PIXDATA_POSEDGE	BIT(2)
-> +#define DRM_MODE_FLAG_POL_PIXDATA_PRESERVE	BIT(3)
+Are you still interested in taking this? Russell doesn't appear
+particularly unhappy with it, so I guess it should sit in -next for a
+bit before getting it merged.
 
-What is the purpose of DRM_MODE_FLAG_POL_PIXDATA_PRESERVE?
-If 'preserve' means 'ignore' we can set to zero negedge and posedge bits
-instead of adding new bit. If it is something different please describe it.
-
-> +#define DRM_MODE_FLAG_POL_DE_LOW		BIT(4)
-> +#define DRM_MODE_FLAG_POL_DE_HIGH		BIT(5)
-> +#define DRM_MODE_FLAG_POL_DE_PRESERVE		BIT(6)
-> +
-
-The same comments here.
-
->  struct drm_display_mode {
->  	/* Header */
->  	struct list_head head;
-> @@ -144,6 +151,7 @@ struct drm_display_mode {
->  	int vrefresh;		/* in Hz */
->  	int hsync;		/* in kHz */
->  	enum hdmi_picture_aspect picture_aspect_ratio;
-> +	unsigned int pol_flags;
-
-Adding field and macros description to the DocBook would be nice.
-
-Regards
-Andrzej
-
->  };
->  
->  /* mode specified on the command line */
-> 
+-- 
+Ard.
