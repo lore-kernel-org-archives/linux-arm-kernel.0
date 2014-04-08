@@ -1,70 +1,41 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Tue, 8 Apr 2014 15:51:34 +0300
-Subject: [PATCH v2] mtd: davinci-nand: disable subpage write for
- keystone-nand
-In-Reply-To: <532B4C36.8060405@ti.com>
-References: <1395346112-13350-1-git-send-email-ivan.khoronzhuk@ti.com>
- <532B4C36.8060405@ti.com>
-Message-ID: <5343F0D6.2010804@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue,  8 Apr 2014 14:19:28 +0200
+Subject: [PATCH V3 06/17] ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
+In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1396959579-18268-7-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This function should be called only when the powerdown sequence fails.
 
-On 03/20/2014 10:14 PM, Santosh Shilimkar wrote:
-> On Thursday 20 March 2014 04:08 PM, Ivan Khoronzhuk wrote:
->> From: Murali Karicheri <m-karicheri2@ti.com>
->>
->> Sub page write doesn't work because of hw issue in controller found on
->> Keystone SOCs. AEMIF controller is also used on DaVinci SOCs which
->> don't seems to have any issue. So add "ti,keysone-nand" compatible
->> to nand driver in order to set NAND_NO_SUBPAGE_WRITE option.
->>
->> Cc: Brian Norris <computersforpeace@gmail.com>
->> Cc: Warner Losh <imp@bsdimp.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->> ---
->>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
->> This patch is a result of discussion on patch v1:
->> https://lkml.org/lkml/2014/3/20/461
->>
->>   drivers/mtd/nand/davinci_nand.c | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
->> index 4615d79..b922c8e 100644
->> --- a/drivers/mtd/nand/davinci_nand.c
->> +++ b/drivers/mtd/nand/davinci_nand.c
->> @@ -523,6 +523,7 @@ static struct nand_ecclayout hwecc4_2048 = {
->>   #if defined(CONFIG_OF)
->>   static const struct of_device_id davinci_nand_of_match[] = {
->>   	{.compatible = "ti,davinci-nand", },
->> +	{.compatible = "ti,keystone-nand", },
->>   	{},
->>   };
->>   MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
->> @@ -581,6 +582,11 @@ static struct davinci_nand_pdata
->>   		    of_property_read_bool(pdev->dev.of_node,
->>   			"ti,davinci-nand-use-bbt"))
->>   			pdata->bbt_options = NAND_BBT_USE_FLASH;
->> +
->> +		if (of_device_is_compatible(pdev->dev.of_node,
->> +					    "ti,keystone-nand")) {
->> +			pdata->options |= NAND_NO_SUBPAGE_WRITE;
->> +		}
->>   	}
->>   
->>   	return dev_get_platdata(&pdev->dev);
->>
->>
+Even if the current code does not hurt, by moving this line, we have the same
+code than the one in pm.c.
 
-Brian,
-Could you pick up subj patch?
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/mach-exynos/cpuidle.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index cdfb1ae..6663349 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -134,11 +134,10 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
+ 	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
+ 		tmp |= S5P_CENTRAL_LOWPWR_CFG;
+ 		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
++		/* Clear wakeup state register */
++		__raw_writel(0x0, S5P_WAKEUP_STAT);
+ 	}
+ 
+-	/* Clear wakeup state register */
+-	__raw_writel(0x0, S5P_WAKEUP_STAT);
+-
+ 	return index;
+ }
+ 
 -- 
-Regards,
-Ivan Khoronzhuk
+1.7.9.5
