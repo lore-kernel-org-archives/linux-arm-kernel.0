@@ -1,85 +1,242 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 08 Apr 2014 17:52:11 +0200
-Subject: [PATCH 4/4] Revert
- "drm/exynos: add mout_hdmi clock in hdmi driver to change parent"
-In-Reply-To: <1396623201-26000-5-git-send-email-t.stanislaws@samsung.com>
-References: <1396623201-26000-1-git-send-email-t.stanislaws@samsung.com>
- <1396623201-26000-5-git-send-email-t.stanislaws@samsung.com>
-Message-ID: <53441B2B.1020001@samsung.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue,  8 Apr 2014 10:53:11 -0500
+Subject: [PATCH v2] ARM: qcom: Add initial APQ8064 SoC and IFC6410 board
+ device trees
+Message-ID: <1396972391-11759-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Add basic APQ8064 SoC include device tree and support for basic booting on
+the IFC6410 board.
 
-On 04.04.2014 16:53, Tomasz Stanislawski wrote:
-> This reverts commit 59956d35a8618235ea715280b49447bb36f2c975.
->
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+v2:
+* created a v2.0 apq8064.dtsi to handle differences in Si rev in future
+* changed /include/ to #include
+* added PMU node
+* dropped interrupts from cpus node, not currently part of binding
 
-Probably a reason why this commit is being reverted would be a good idea.
 
-> Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
-> ---
->   drivers/gpu/drm/exynos/exynos_hdmi.c |   14 ++++----------
->   1 file changed, 4 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> index 9a6d652..8ebb4bf 100644
-> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> @@ -75,7 +75,6 @@ struct hdmi_resources {
->   	struct clk			*sclk_pixel;
->   	struct clk			*sclk_hdmiphy;
->   	struct clk			*hdmiphy;
-> -	struct clk			*mout_hdmi;
->   	struct regulator_bulk_data	*regul_bulk;
->   	int				regul_count;
->   };
-> @@ -1282,7 +1281,7 @@ static void hdmi_v13_mode_apply(struct hdmi_context *hdata)
->   	}
->
->   	clk_disable_unprepare(hdata->res.sclk_hdmi);
-> -	clk_set_parent(hdata->res.mout_hdmi, hdata->res.sclk_hdmiphy);
-> +	clk_set_parent(hdata->res.sclk_hdmi, hdata->res.sclk_hdmiphy);
->   	clk_prepare_enable(hdata->res.sclk_hdmi);
->
->   	/* enable HDMI and timing generator */
-> @@ -1449,7 +1448,7 @@ static void hdmi_v14_mode_apply(struct hdmi_context *hdata)
->   	}
->
->   	clk_disable_unprepare(hdata->res.sclk_hdmi);
-> -	clk_set_parent(hdata->res.mout_hdmi, hdata->res.sclk_hdmiphy);
-> +	clk_set_parent(hdata->res.sclk_hdmi, hdata->res.sclk_hdmiphy);
->   	clk_prepare_enable(hdata->res.sclk_hdmi);
->
->   	/* enable HDMI and timing generator */
-> @@ -1475,7 +1474,7 @@ static void hdmiphy_conf_reset(struct hdmi_context *hdata)
->   	u32 reg;
->
->   	clk_disable_unprepare(hdata->res.sclk_hdmi);
-> -	clk_set_parent(hdata->res.mout_hdmi, hdata->res.sclk_pixel);
-> +	clk_set_parent(hdata->res.sclk_hdmi, hdata->res.sclk_pixel);
->   	clk_prepare_enable(hdata->res.sclk_hdmi);
->
->   	/* operation mode */
-> @@ -1982,13 +1981,8 @@ static int hdmi_resources_init(struct hdmi_context *hdata)
->   		DRM_ERROR("failed to get clock 'hdmiphy'\n");
->   		goto fail;
->   	}
-> -	res->mout_hdmi = devm_clk_get(dev, "mout_hdmi");
-> -	if (IS_ERR(res->mout_hdmi)) {
-> -		DRM_ERROR("failed to get clock 'mout_hdmi'\n");
-> -		goto fail;
-> -	}
->
-> -	clk_set_parent(res->mout_hdmi, res->sclk_pixel);
-> +	clk_set_parent(res->sclk_hdmi, res->sclk_pixel);
->
->   	res->regul_bulk = devm_kzalloc(dev, ARRAY_SIZE(supply) *
->   		sizeof(res->regul_bulk[0]), GFP_KERNEL);
->
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  12 +++
+ arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi   |   1 +
+ arch/arm/boot/dts/qcom-apq8064.dtsi        | 154 +++++++++++++++++++++++++++++
+ arch/arm/mach-qcom/board.c                 |   1 +
+ 5 files changed, 169 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064.dtsi
 
-Otherwise looks fine and will apply after all its dependencies are 
-agreed upon.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 0591ed0..1223fa89 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -232,6 +232,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
++	qcom-apq8064-ifc6410.dtb \
+ 	qcom-apq8074-dragonboard.dtb \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+new file mode 100644
+index 0000000..83933dc
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -0,0 +1,12 @@
++#include "qcom-apq8064-v2.0.dtsi"
++
++/ {
++	model = "Qualcomm APQ8064/IFC6410";
++	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
++
++	soc {
++		serial at 16640000 {
++			status = "ok";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi b/arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi
+new file mode 100644
+index 0000000..935c394
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8064-v2.0.dtsi
+@@ -0,0 +1 @@
++#include "qcom-apq8064.dtsi"
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+new file mode 100644
+index 0000000..e336c09
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -0,0 +1,154 @@
++/dts-v1/;
++
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/qcom,gcc-msm8960.h>
++
++/ {
++	model = "Qualcomm APQ8064";
++	compatible = "qcom,apq8064";
++	interrupt-parent = <&intc>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "qcom,krait";
++		enable-method = "qcom,kpss-acc-v1";
++
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc0>;
++			qcom,saw = <&saw0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc1>;
++			qcom,saw = <&saw1>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			reg = <2>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc2>;
++			qcom,saw = <&saw2>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			reg = <3>;
++			next-level-cache = <&L2>;
++			qcom,acc = <&acc3>;
++			qcom,saw = <&saw3>;
++		};
++
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
++			interrupts = <0 2 0x4>;
++		};
++	};
++
++	cpu-pmu {
++		compatible = "qcom,krait-pmu";
++		interrupts = <1 10 0x304>;
++	};
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++
++
++		intc: interrupt-controller at 2000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = < 0x02000000 0x1000 >,
++			      < 0x02002000 0x1000 >;
++		};
++
++		timer at 200a000 {
++			compatible = "qcom,kpss-timer", "qcom,msm-timer";
++			interrupts = <1 1 0x301>,
++				     <1 2 0x301>,
++				     <1 3 0x301>;
++			reg = <0x0200a000 0x100>;
++			clock-frequency = <27000000>,
++					  <32768>;
++			cpu-offset = <0x80000>;
++		};
++
++		acc0: clock-controller at 2088000 {
++			compatible = "qcom,kpss-acc-v1";
++			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
++		};
++
++		acc1: clock-controller at 2098000 {
++			compatible = "qcom,kpss-acc-v1";
++			reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
++		};
++
++		acc2: clock-controller at 20a8000 {
++			compatible = "qcom,kpss-acc-v1";
++			reg = <0x020a8000 0x1000>, <0x02008000 0x1000>;
++		};
++
++		acc3: clock-controller at 20b8000 {
++			compatible = "qcom,kpss-acc-v1";
++			reg = <0x020b8000 0x1000>, <0x02008000 0x1000>;
++		};
++
++		saw0: regulator at 2089000 {
++			compatible = "qcom,saw2";
++			reg = <0x02089000 0x1000>, <0x02009000 0x1000>;
++			regulator;
++		};
++
++		saw1: regulator at 2099000 {
++			compatible = "qcom,saw2";
++			reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
++			regulator;
++		};
++
++		saw2: regulator at 20a9000 {
++			compatible = "qcom,saw2";
++			reg = <0x020a9000 0x1000>, <0x02009000 0x1000>;
++			regulator;
++		};
++
++		saw3: regulator at 20b9000 {
++			compatible = "qcom,saw2";
++			reg = <0x020b9000 0x1000>, <0x02009000 0x1000>;
++			regulator;
++		};
++
++		serial at 16640000 {
++			compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
++			reg = <0x16640000 0x1000>,
++			      <0x16600000 0x1000>;
++			interrupts = <0 158 0x0>;
++			clocks = <&gcc GSBI7_UART_CLK>, <&gcc GSBI7_H_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
++
++		qcom,ssbi at 500000 {
++			compatible = "qcom,ssbi";
++			reg = <0x00500000 0x1000>;
++			qcom,controller-type = "pmic-arbiter";
++		};
++
++		gcc: clock-controller at 900000 {
++			compatible = "qcom,gcc-apq8064";
++			reg = <0x00900000 0x4000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++	};
++};
+diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
+index cb3c07c..333dced5 100644
+--- a/arch/arm/mach-qcom/board.c
++++ b/arch/arm/mach-qcom/board.c
+@@ -15,6 +15,7 @@
+ #include <asm/mach/arch.h>
+ 
+ static const char * const qcom_dt_match[] __initconst = {
++	"qcom,apq8064",
+ 	"qcom,apq8074-dragonboard",
+ 	"qcom,ipq8062",
+ 	"qcom,ipq8064",
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
