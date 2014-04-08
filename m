@@ -1,124 +1,77 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue,  8 Apr 2014 14:19:29 +0200
-Subject: [PATCH V3 07/17] ARM: exynos: cpuidle: Use the cpu_pm notifier
-In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1396959579-18268-8-git-send-email-daniel.lezcano@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 8 Apr 2014 17:13:09 +0200
+Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
+In-Reply-To: <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+References: <20140325202249.GA10378@obsidianresearch.com>
+ <20140325213638.5aba54b6@skate>
+ <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
+ <20140325222404.GC14718@obsidianresearch.com>
+ <20140325223510.GD14718@obsidianresearch.com>
+ <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
+ <20140326201243.GA1536@obsidianresearch.com>
+ <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
+ <20140326214259.GA12330@obsidianresearch.com>
+ <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
+ <20140327044054.GA22681@obsidianresearch.com>
+ <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
+ <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
+ <20140405193435.50d8dd81@skate>
+ <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
+ <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
+Message-ID: <20140408171309.09bbf968@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the cpu_pm_enter/exit notifier to group some pm code inside the pm file.
+Hello all,
 
-The save and restore code is duplicated across pm.c and cpuidle.c. By using
-the cpu_pm notifier, we can factor out the routine.
+On Sun, 6 Apr 2014 16:34:08 +0100 (BST), Neil Greatorex wrote:
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-exynos/cpuidle.c |   24 ------------------------
- arch/arm/mach-exynos/pm.c      |   29 +++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+), 24 deletions(-)
+> From e5698a4ae6b21c7e78538e16d293123903abbb40 Mon Sep 17 00:00:00 2001
+> From: Neil Greatorex <neil@fatboyfat.co.uk>
+> Date: Sun, 6 Apr 2014 16:10:43 +0100
+> Subject: [PATCH] irqchip: armada-370-xp: Fix releasing of MSIs
+> 
+> Store the value of d->hwirq in a local variable as the real value is wiped out
+> by calling irq_dispose_mapping. Without this patch, the armada_370_xp_free_msi
+> function would always free MSI#0, no matter what was passed to it.
+> 
+> Signed-off-by: Neil Greatorex <neil@fatboyfat.co.uk>
+> ---
+>   drivers/irqchip/irq-armada-370-xp.c | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index 5409564..916fae2 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -157,8 +157,10 @@ static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
+>   					   unsigned int irq)
+>   {
+>   	struct irq_data *d = irq_get_irq_data(irq);
+> +	unsigned long hwirq = d->hwirq;
+> +
+>   	irq_dispose_mapping(irq);
+> -	armada_370_xp_free_msi(d->hwirq);
+> +	armada_370_xp_free_msi(hwirq);
+>   }
+> 
+>   static struct irq_chip armada_370_xp_msi_irq_chip = {
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 6663349..7f1f4ef 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -65,26 +65,6 @@ static void exynos_set_wakeupmask(void)
- 	__raw_writel(0x0000ff3e, S5P_WAKEUP_MASK);
- }
- 
--static unsigned int g_pwr_ctrl, g_diag_reg;
--
--static void save_cpu_arch_register(void)
--{
--	/*read power control register*/
--	asm("mrc p15, 0, %0, c15, c0, 0" : "=r"(g_pwr_ctrl) : : "cc");
--	/*read diagnostic register*/
--	asm("mrc p15, 0, %0, c15, c0, 1" : "=r"(g_diag_reg) : : "cc");
--	return;
--}
--
--static void restore_cpu_arch_register(void)
--{
--	/*write power control register*/
--	asm("mcr p15, 0, %0, c15, c0, 0" : : "r"(g_pwr_ctrl) : "cc");
--	/*write diagnostic register*/
--	asm("mcr p15, 0, %0, c15, c0, 1" : : "r"(g_diag_reg) : "cc");
--	return;
--}
--
- static int idle_finisher(unsigned long flags)
- {
- 	exynos_set_wakeupmask();
-@@ -106,8 +86,6 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
- {
- 	unsigned long tmp;
- 
--	save_cpu_arch_register();
--
- 	/* Setting Central Sequence Register for power down mode */
- 	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
- 	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
-@@ -122,8 +100,6 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
- #endif
- 	cpu_pm_exit();
- 
--	restore_cpu_arch_register();
--
- 	/*
- 	 * If PMU failed while entering sleep mode, WFI will be
- 	 * ignored by PMU and then exiting cpu_do_idle().
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index adfdf4b..67d75fe 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/suspend.h>
- #include <linux/syscore_ops.h>
-+#include <linux/cpu_pm.h>
- #include <linux/io.h>
- #include <linux/irqchip/arm-gic.h>
- #include <linux/err.h>
-@@ -321,10 +322,38 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
- 	.valid		= suspend_valid_only_mem,
- };
- 
-+static int exynos_cpu_pm_notifier(struct notifier_block *self,
-+				  unsigned long cmd, void *v)
-+{
-+	int cpu = smp_processor_id();
-+
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		if (cpu == 0) {
-+			exynos_cpu_save_register();
-+		}
-+		break;
-+
-+	case CPU_PM_EXIT:
-+		if (cpu == 0) {
-+			exynos_cpu_restore_register();
-+		}
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block exynos_cpu_pm_notifier_block = {
-+	.notifier_call = exynos_cpu_pm_notifier,
-+};
-+
- void __init exynos_pm_init(void)
- {
- 	u32 tmp;
- 
-+	cpu_pm_register_notifier(&exynos_cpu_pm_notifier_block);
-+
- 	/* Platform-specific GIC callback */
- 	gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
- 
+Unfortunately here your patch is not sufficient to solve the problem
+apparently. I've fixed another problem where the return value of
+armada_370_xp_alloc_msi() (which is signed) is casted into an unsigned
+irq_hw_number_t in armada_370_xp_setup_msi_irq(), but I'm still seeing
+many MSIs allocated, then some freed, and finally a kernel panic.
+
+ * Log: https://gist.github.com/tpetazzoni/10140012
+
+ * Diff against v3.14: https://gist.github.com/tpetazzoni/10140121
+
+Ideas? If some of you are interested in discussing this live, I'm on
+#mvlinux on Freenode.
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
