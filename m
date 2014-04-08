@@ -1,109 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 8 Apr 2014 16:32:02 -0700
-Subject: [PATCH v2] ARM: qcom: Add initial APQ8064 SoC and IFC6410 board
- device trees
-In-Reply-To: <1396972391-11759-1-git-send-email-galak@codeaurora.org>
-References: <1396972391-11759-1-git-send-email-galak@codeaurora.org>
-Message-ID: <20140408233202.GM9985@codeaurora.org>
+From: mbohan@codeaurora.org (Michael Bohan)
+Date: Tue, 8 Apr 2014 16:39:37 -0700
+Subject: memcpy alignment for DEVICE_nGnRnE
+In-Reply-To: <20140408114949.GB21054@arm.com>
+References: <53072343.4080505@marvell.com> <20140221105307.GE25363@localhost>
+ <20140408003547.GA18321@codeaurora.org>
+ <20140408114949.GB21054@arm.com>
+Message-ID: <20140408233937.GA2100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08, Kumar Gala wrote:
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> new file mode 100644
-> index 0000000..e336c09
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -0,0 +1,154 @@
-> +/dts-v1/;
-> +
-> +#include "skeleton.dtsi"
-> +#include <dt-bindings/clock/qcom,gcc-msm8960.h>
-> +
-> +/ {
-> +	model = "Qualcomm APQ8064";
-> +	compatible = "qcom,apq8064";
-> +	interrupt-parent = <&intc>;
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "qcom,krait";
+On Tue, Apr 08, 2014 at 12:49:49PM +0100, Catalin Marinas wrote:
+> On Tue, Apr 08, 2014 at 01:35:47AM +0100, Michael Bohan wrote:
+> > How should we handle Device Memory with copy_from_user / copy_to_user?
+> > Should we follow the same scheme and create
+> > copy_from_user_io / copy_to_user_io, or rather enforce that the stock
+> > routines handle alignment?
+> 
+> We have generic copy_from_user_toio() and copy_to_user_fromio(). Are
+> these what you need? As with the memcpy_(to|from)io, they can be further
+> optimised.
 
-This doesn't follow the binding. We're supposed to put the
-compatible in each cpu node even though it's always the same.
+It seems these existing routines are in sound. Were you thinking
+the right approach would be to move them out of sound and make
+them per-arch defined?
 
-> +		enable-method = "qcom,kpss-acc-v1";
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +			next-level-cache = <&L2>;
-> +			qcom,acc = <&acc0>;
-> +			qcom,saw = <&saw0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			reg = <1>;
-> +			next-level-cache = <&L2>;
-> +			qcom,acc = <&acc1>;
-> +			qcom,saw = <&saw1>;
-> +		};
-> +
-> +		cpu at 2 {
-> +			device_type = "cpu";
-> +			reg = <2>;
-> +			next-level-cache = <&L2>;
-> +			qcom,acc = <&acc2>;
-> +			qcom,saw = <&saw2>;
-> +		};
-> +
-> +		cpu at 3 {
-> +			device_type = "cpu";
-> +			reg = <3>;
-> +			next-level-cache = <&L2>;
-> +			qcom,acc = <&acc3>;
-> +			qcom,saw = <&saw3>;
-> +		};
-> +
-> +		L2: l2-cache {
-> +			compatible = "cache";
+What about the other two use cases: copy_from_user_fromio and
+copy_to_user_toio? Are those reasonable to add? These two APIs
+would cover the use case I had in mind.
 
-This would be "qcom,arch-cache" if the binding is accepted.
+Then what about the strange but possible use case where both the
+source and destination pointers are iomem? This same question
+applies for memcpy_fromio / memcpy_toio as well.
 
-> +			cache-level = <2>;
-> +			interrupts = <0 2 0x4>;
+The implementations of copy_from_user_toio and
+copy_to_user_fromio are currently doing a second copy, so that
+seems bad for performance. We'd probably want to improve these as
+well if others are in agreement.
 
-These interrupts here are also not accepted as a binding yet.
-
-> +		};
-> +	};
-> +
-> +	cpu-pmu {
-> +		compatible = "qcom,krait-pmu";
-> +		interrupts = <1 10 0x304>;
-> +	};
-> +
-> +	soc: soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +		compatible = "simple-bus";
-> +
-> +
-
-Nit: Weird two newlines here
-
-> +		intc: interrupt-controller at 2000000 {
-> +			compatible = "qcom,msm-qgic2";
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			reg = < 0x02000000 0x1000 >,
-> +			      < 0x02002000 0x1000 >;
-> +		};
-> +
-
+Thanks,
+Mike
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
