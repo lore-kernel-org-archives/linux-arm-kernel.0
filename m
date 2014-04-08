@@ -1,67 +1,22 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 08 Apr 2014 20:57:54 +0800
-Subject: [PATCH v7 6/6] pci: Add support for creating a generic host_bridge
- from device tree
-In-Reply-To: <1394811272-1547-7-git-send-email-Liviu.Dudau@arm.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-7-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <5343F252.2050708@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 8 Apr 2014 09:16:17 -0400
+Subject: [PATCH v2 0/2] ARM: dts: keystone: i2c updates
+In-Reply-To: <1396957567-14540-1-git-send-email-grygorii.strashko@ti.com>
+References: <1396957567-14540-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <5343F6A1.6010608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
-
-On 2014-3-14 23:34, Liviu Dudau wrote:
-> Several platforms use a rather generic version of parsing
-> the device tree to find the host bridge ranges. Move the common code
-> into the generic PCI code and use it to create a pci_host_bridge
-> structure that can be used by arch code.
+On Tuesday 08 April 2014 07:46 AM, Strashko, Grygorii wrote:
+> Hi Santosh,
 > 
-> Based on early attempts by Andrew Murray to unify the code.
-> Used powerpc and microblaze PCI code as starting point.
+> There are two small non critical fixes for Keystone 2 I2C DT definitions.
 > 
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> ---
->  drivers/pci/host-bridge.c | 158 ++++++++++++++++++++++++++++++++++++
->  include/linux/pci.h       |  13 +++
->  2 files changed, 171 insertions(+)
+> Changes in v2;
+> - added additional patch to move i2c0 device node from SoC to board files
+> - updated commits messages
 > 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index 8708b652..7cda90b 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -6,9 +6,14 @@
->  #include <linux/init.h>
->  #include <linux/pci.h>
->  #include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/slab.h>
->  
->  #include "pci.h"
->  
-> +static atomic_t domain_nr = ATOMIC_INIT(-1);
+Thanks. I shall pick these up for 3.16.
 
-domain_nr will only be used inside the #ifdef CONFIG_OF,
-and this will lead to compile warning which complains that
-'domain_nr' defined but not used when CONFIG_OF=n (for example
-on x86).
-
-How about moving the definition to --->
-
-> +
->  static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
->  {
->  	while (bus->parent)
-> @@ -92,3 +97,156 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
->  	res->end = region->end + offset;
->  }
->  EXPORT_SYMBOL(pcibios_bus_to_resource);
-> +
-> +#ifdef CONFIG_OF
-
-here?
-
-Thanks
-Hanjun
+Regards,
+Santosh
