@@ -1,73 +1,22 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 8 Apr 2014 14:13:11 +0100
-Subject: [PATCH] ARM: VFP: Fix emulation of multiply accumulate
- instructions
-In-Reply-To: <1395852549-2745-1-git-send-email-jay.foad@gmail.com>
-References: <1395852549-2745-1-git-send-email-jay.foad@gmail.com>
-Message-ID: <20140408131256.GA5637@e103592.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Apr 2014 15:11:36 +0200
+Subject: [PATCH v2] pinctrl: st: use gpiolib irqchip helpers
+In-Reply-To: <1396961147-2754-1-git-send-email-maxime.coquelin@st.com>
+References: <1396961147-2754-1-git-send-email-maxime.coquelin@st.com>
+Message-ID: <CACRpkdbMFaqtPh43sss-eZbY7gFVQHg_+WH7TsJ04KkZvNJg5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 04:49:09PM +0000, Jay Foad wrote:
-> The emulation for single and double precision multiply accumulate
-> instructions correctly normalised any denormal values in the operand
-> registers, but failed to normalise the destination (accumulator)
-> register.
-> 
-> This fixes https://bugzilla.kernel.org/show_bug.cgi?id=70501
-> 
-> Signed-off-by: Jay Foad <jay.foad@gmail.com>
+On Tue, Apr 8, 2014 at 2:45 PM, Maxime COQUELIN <maxime.coquelin@st.com> wrote:
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> The v1 was sent by Linus (https://lkml.org/lkml/2014/4/4/287).
+> Two changes were necessary to make it to work properly on STiH416:
+>   1 - dev reference was not passed to the gpio_chip struct, causing a panic
+>   2 - gpiochip_irqchip_add passed IRQ_TYPE_NONE as default type, which caused
+> lot of warnings at init time. I choose IRQ_TYPE_LEVEL_LOW as default.
 
-This appears to be clean and straightforward, so if nobody else has
-commented on this by the time -rc1 comes out, I suggest you rebase it
-and send it to the patch system.  (See
-http://www.arm.linux.org.uk/developer/patches/info.php for details
--- make sure you read it carefully.)
+Thanks a lot for fixing this Maxime, this version of the patch
+applied!
 
-Has this issue been hitting real-world users of the kernel, or is
-this fixing a latent bug?
-
-Cheers
----Dave
-
-> ---
->  arch/arm/vfp/vfpdouble.c | 2 ++
->  arch/arm/vfp/vfpsingle.c | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/vfp/vfpdouble.c b/arch/arm/vfp/vfpdouble.c
-> index 6cac43bd1d86..423f56dd4028 100644
-> --- a/arch/arm/vfp/vfpdouble.c
-> +++ b/arch/arm/vfp/vfpdouble.c
-> @@ -866,6 +866,8 @@ vfp_double_multiply_accumulate(int dd, int dn, int dm, u32 fpscr, u32 negate, ch
->  		vdp.sign = vfp_sign_negate(vdp.sign);
->  
->  	vfp_double_unpack(&vdn, vfp_get_double(dd));
-> +	if (vdn.exponent == 0 && vdn.significand)
-> +		vfp_double_normalise_denormal(&vdn);
->  	if (negate & NEG_SUBTRACT)
->  		vdn.sign = vfp_sign_negate(vdn.sign);
->  
-> diff --git a/arch/arm/vfp/vfpsingle.c b/arch/arm/vfp/vfpsingle.c
-> index b252631b406b..4f96c1617aae 100644
-> --- a/arch/arm/vfp/vfpsingle.c
-> +++ b/arch/arm/vfp/vfpsingle.c
-> @@ -915,6 +915,8 @@ vfp_single_multiply_accumulate(int sd, int sn, s32 m, u32 fpscr, u32 negate, cha
->  	v = vfp_get_float(sd);
->  	pr_debug("VFP: s%u = %08x\n", sd, v);
->  	vfp_single_unpack(&vsn, v);
-> +	if (vsn.exponent == 0 && vsn.significand)
-> +		vfp_single_normalise_denormal(&vsn);
->  	if (negate & NEG_SUBTRACT)
->  		vsn.sign = vfp_sign_negate(vsn.sign);
->  
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yours,
+Linus Walleij
