@@ -1,40 +1,67 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 8 Apr 2014 22:59:48 +0900
-Subject: [PATCH v2 0/2] Add PCI USB DT support for R8A7790/Lager reference
- board
-In-Reply-To: <201404080235.22151.sergei.shtylyov@cogentembedded.com>
-References: <201404080235.22151.sergei.shtylyov@cogentembedded.com>
-Message-ID: <CANqRtoSg+JLZ5AbiOnnfXjg3m86q5J2U675VhgmhP1jxmDmmLA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 8 Apr 2014 16:24:26 +0200
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140408142425.GB8861@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 08/04/2014 at 19:29:57 +0800, Shawn Guo wrote :
+> The .config() calls clk_get_rate() which might sleep, so we need to set
+> pwm_chip can_sleep flag.  Otherwise, we see the following warning when
+> using pwm driven heartbeat led.
+> 
+> WARNING: CPU: 0 PID: 0 at kernel/locking/mutex.c:856 mutex_trylock+0x184/0x1a4()
+> DEBUG_LOCKS_WARN_ON(in_interrupt())
+> Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper Not tainted 3.14.0-rc5 #18
+> [<c0015420>] (unwind_backtrace) from [<c0012cb0>] (show_stack+0x10/0x14)
+> [<c0012cb0>] (show_stack) from [<c001daf8>] (warn_slowpath_common+0x6c/0x8c)
+> [<c001daf8>] (warn_slowpath_common) from [<c001dbac>] (warn_slowpath_fmt+0x30/0x40)
+> [<c001dbac>] (warn_slowpath_fmt) from [<c045df74>] (mutex_trylock+0x184/0x1a4)
+> [<c045df74>] (mutex_trylock) from [<c0360950>] (clk_prepare_lock+0xc/0xec)
+> [<c0360950>] (clk_prepare_lock) from [<c0362020>] (clk_get_rate+0xc/0x68)
+> [<c0362020>] (clk_get_rate) from [<c028d07c>] (mxs_pwm_config+0x20/0x198)
+> [<c028d07c>] (mxs_pwm_config) from [<c028bde8>] (pwm_config+0x60/0x70)
+> [<c028bde8>] (pwm_config) from [<c034b61c>] (__led_pwm_set+0x1c/0x3c)
+> [<c034b61c>] (__led_pwm_set) from [<c034bc3c>] (led_heartbeat_function+0x70/0x110)
+> [<c034bc3c>] (led_heartbeat_function) from [<c00292f0>] (call_timer_fn+0x7c/0x164)
+> [<c00292f0>] (call_timer_fn) from [<c00295c8>] (run_timer_softirq+0x1f0/0x260)
+> [<c00295c8>] (run_timer_softirq) from [<c002255c>] (__do_softirq+0xc4/0x2f0)
+> [<c002255c>] (__do_softirq) from [<c0022890>] (irq_exit+0xa4/0x10c)
+> [<c0022890>] (irq_exit) from [<c0010240>] (handle_IRQ+0x34/0x84)
+> [<c0010240>] (handle_IRQ) from [<c0013524>] (__irq_svc+0x44/0x54)
+> [<c0013524>] (__irq_svc) from [<c00107f8>] (arch_cpu_idle+0x40/0x48)
+> [<c00107f8>] (arch_cpu_idle) from [<c005deb8>] (cpu_startup_entry+0x70/0x198)
+> [<c005deb8>] (cpu_startup_entry) from [<c060aac8>] (start_kernel+0x2a8/0x2f8)
+> 
+> Reported-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-On Tue, Apr 8, 2014 at 7:35 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
->
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-v3.14-20140403' tag. Here we add the PCI USB device tree
-> support on the R8A7790/Lager reference board. The patchset requires the
-> 'pci-rcar-gen2' driver device tree support (just re-posted) in order to work.
->
-> [1/2] ARM: shmobile: r8a7790: add internal PCI bridge nodes
-> [2/2] ARM: shmobile: lager: enable internal PCI
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/pwm/pwm-mxs.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pwm/pwm-mxs.c b/drivers/pwm/pwm-mxs.c
+> index 9475bc7..4f1bb4e 100644
+> --- a/drivers/pwm/pwm-mxs.c
+> +++ b/drivers/pwm/pwm-mxs.c
+> @@ -147,6 +147,7 @@ static int mxs_pwm_probe(struct platform_device *pdev)
+>  	mxs->chip.dev = &pdev->dev;
+>  	mxs->chip.ops = &mxs_pwm_ops;
+>  	mxs->chip.base = -1;
+> +	mxs->chip.can_sleep = true;
+>  	ret = of_property_read_u32(np, "fsl,pwm-number", &mxs->chip.npwm);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "failed to get pwm number: %d\n", ret);
+> -- 
+> 1.8.3.2
+> 
+> 
 
-Thanks for your efforts. It is good to see that you are caring for
-both r8a7790 and r8a7791 now.
-
-By the way, have you decided how to use DT with the PHY driver? Just
-integrating this portion seems of the hardware seems insufficient to
-me.
-
-I believe the PHY driver is also needed in the system for correct
-runtime configuration of USB0 and USB2. So DT support is needed for
-multiple drivers for correct operation in the DT case. Regardless it
-is of course good to see DT support for this hardware block but it
-would be useful to have a good overview of DT support for all
-components involved in USB Host support to avoid committing to a
-premature half-baked ABI.
-
-/ magnus
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
