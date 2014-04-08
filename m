@@ -1,41 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 08 Apr 2014 18:10:14 +0400
-Subject: [PATCH v2 0/2] Add PCI USB DT support for R8A7790/Lager reference
- board
-In-Reply-To: <CANqRtoSg+JLZ5AbiOnnfXjg3m86q5J2U675VhgmhP1jxmDmmLA@mail.gmail.com>
-References: <201404080235.22151.sergei.shtylyov@cogentembedded.com>
- <CANqRtoSg+JLZ5AbiOnnfXjg3m86q5J2U675VhgmhP1jxmDmmLA@mail.gmail.com>
-Message-ID: <53440346.7020703@cogentembedded.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 8 Apr 2014 10:49:38 -0300
+Subject: mx27 running too slow
+In-Reply-To: <CAOMZO5AUemi9r_NqXXpnYZUqbqHhYnSvrnmu11voM_MZsVUa6Q@mail.gmail.com>
+References: <CAOMZO5CC1NwP14H7uuygX7ZviFJLriG41hyczzvzxYWKHJu5DQ@mail.gmail.com>
+ <CAOMZO5AUemi9r_NqXXpnYZUqbqHhYnSvrnmu11voM_MZsVUa6Q@mail.gmail.com>
+Message-ID: <CAOMZO5CCst0HHWa5JO-8-T3AHiw68FUvKRgCiVvFBu=9JdJzjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Apr 2, 2014 at 7:38 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Wed, Apr 2, 2014 at 7:32 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> Hi Alexander,
+>>
+>> What is the BogoMIPs value you get on mx27 running 3.14?
+>>
+>> I am running Shawn's for-next branch and it is terribly slow on a mx27pdk:
+>>
+>> sched_clock: 32 bits at 13MHz, resolution 75ns, wraps every 322929872820ns
+>> CPU identified as i.MX27, silicon rev 2.1
+>> Console: colour dummy device 80x30
+>> Calibrating delay loop (skipped), value calculated using timer
+>> frequency.. 26.60 BogoMIPS (lpj=133000)
+>>
+>> ARM9 running at 400MHz should give around 200 BogoMIPs.
+>
+> Nevermind. On a clean 3.14 kernel I get the expected value:
+>
+> Calibrating delay loop... 199.06 BogoMIPS (lpj=995328)
+>
+> So this behaviour shows up only on Shawn's branch.
 
-On 04/08/2014 05:59 PM, Magnus Damm wrote:
+Now I am running linux-next 20140408 and I am also getting the very
+slow BogoMIPS:
 
->>     Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
->> 'renesas-devel-v3.14-20140403' tag. Here we add the PCI USB device tree
->> support on the R8A7790/Lager reference board. The patchset requires the
->> 'pci-rcar-gen2' driver device tree support (just re-posted) in order to work.
+Calibrating delay loop (skipped), value calculated using timer
+frequency.. 26.60 BogoMIPS (lpj=133000)
 
->> [1/2] ARM: shmobile: r8a7790: add internal PCI bridge nodes
->> [2/2] ARM: shmobile: lager: enable internal PCI
+Alexander,
 
-> Thanks for your efforts. It is good to see that you are caring for
-> both r8a7790 and r8a7791 now.
+Do you see the same on Phytec mx27 board?
 
-> By the way, have you decided how to use DT with the PHY driver? Just
-> integrating this portion seems of the hardware seems insufficient to
-> me.
+Regards,
 
-    Yes, I have written the new driver for the generic PHY framework, 
-supporting DT probing. I'm going to post it today -- I lacked the time to post 
-all at once.
-    This new driver (and some additional patches) provides for doing what 
-you've indicated to be the desirable behavior, i.e. configuring the PHY's 
-UGCTRL2 register depending on what kind of USB driver gets loaded. I hope you 
-will be able to use my patches for your further work on USB DT support.
-
-> / magnus
-
-WBR, Sergei
+Fabio Estevam
