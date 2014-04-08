@@ -1,25 +1,22 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 09 Apr 2014 01:05:54 +0400
-Subject: The Alphabet (or, the sorting of Kconfig symbols)
-In-Reply-To: <20140408202137.GC30453@netboy>
-References: <20140404111647.GZ7528@n2100.arm.linux.org.uk>
- <CACxGe6uoB6CkuV7HCg8wdyu2Tm471YaAz0sDA3W2C0MPAYYY+Q@mail.gmail.com>
- <20140408185225.GU29751@pengutronix.de> <20140408202137.GC30453@netboy>
-Message-ID: <534464B2.4020004@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 8 Apr 2014 17:26:28 -0400
+Subject: [PATCH 3/3] ARM: kirkwood: rename kirwood-nsa310-common to
+ 3x0-common
+In-Reply-To: <20140408192625.GD29372@lunn.ch>
+References: <5341C91D.4060007@baker-net.org.uk>
+ <1396820569-3841-1-git-send-email-linux@baker-net.org.uk>
+ <1396820569-3841-3-git-send-email-linux@baker-net.org.uk>
+ <20140408192625.GD29372@lunn.ch>
+Message-ID: <20140408212628.GA26081@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Apr 08, 2014 at 09:26:25PM +0200, Andrew Lunn wrote:
+> Jason: Are you O.K. with it like this? Or do you want a new minimal
+> patch?
 
-On 04/09/2014 12:21 AM, Richard Cochran wrote:
+new, minimal please.
 
->> With #includes there might be exceptions though because of dependencies
->> between headers.
+thx,
 
-> That is surely a sign of broken code.
-
-    Yeah, such dependencies should normally be resolved in the headers 
-themselves, not the including code. Even the USB maintainer have finally 
-agreed with that. :-)
-
-WBR, Sergei
+Jason.
