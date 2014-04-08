@@ -1,76 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Apr 2014 09:12:50 +0200
-Subject: [PATCH v7 1/6] pci: Introduce pci_register_io_range() helper
- function.
-In-Reply-To: <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-2-git-send-email-Liviu.Dudau@arm.com>
- <CAErSpo6S49qNuJQB-XXEfJ1Nkz=4gZ5_hE93=gb_yGZesA1H9Q@mail.gmail.com>
-Message-ID: <4845032.VeNZmbvuW3@wuerfel>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 8 Apr 2014 08:35:01 -0700
+Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
+In-Reply-To: <CAA3XUr2kxKXpPwy8vqF1+CjcRsu86tGir-NuC7AXYiJVi4TuGw@mail.gmail.com>
+References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
+ <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
+ <20140408082444.GA3598@e103592.cambridge.arm.com>
+ <20140408114619.GE16119@n2100.arm.linux.org.uk>
+ <5343F42D.5090205@linaro.org>
+ <20140408133039.GH16119@n2100.arm.linux.org.uk>
+ <CAA3XUr2kxKXpPwy8vqF1+CjcRsu86tGir-NuC7AXYiJVi4TuGw@mail.gmail.com>
+Message-ID: <CAA3XUr1Bj4CD2fhZkWAHx+9W8eGz755OvnE+-3sxaAcQNV6Q-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 April 2014 17:21:51 Bjorn Helgaas wrote:
-> On Fri, Mar 14, 2014 at 9:34 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > Some architectures do not share x86 simple view of the PCI I/O space
-> > and instead use a range of addresses that map to bus addresses. For
-> > some architectures these ranges will be expressed by OF bindings
-> > in a device tree file.
-> >
-> > Introduce a pci_register_io_range() helper function that can be used
-> > by the architecture code to keep track of the I/O ranges described by the
-> > PCI bindings. If the PCI_IOBASE macro is not defined that signals
-> > lack of support for PCI and we return an error.
-> >
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Acked-by: Grant Likely <grant.likely@linaro.org>
-> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> > ---
-> >  drivers/of/address.c       | 9 +++++++++
-> >  include/linux/of_address.h | 1 +
-> >  2 files changed, 10 insertions(+)
-> >
-> > diff --git a/drivers/of/address.c b/drivers/of/address.c
-> > index 1a54f1f..be958ed 100644
-> > --- a/drivers/of/address.c
-> > +++ b/drivers/of/address.c
-> > @@ -619,6 +619,15 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
-> >  }
-> >  EXPORT_SYMBOL(of_get_address);
-> >
-> > +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> > +{
-> > +#ifndef PCI_IOBASE
-> > +       return -EINVAL;
-> > +#else
-> > +       return 0;
-> > +#endif
-> > +}
-> 
-> This isn't PCI code, so I'm fine with it in that sense, but I'm not
-> sure the idea of a PCI_IOBASE #define is really what we need.  It's
-> not really determined by the processor architecture, it's determined
-> by the platform.  And a single address isn't enough in general,
-> either, because if there are multiple host bridges, there's no reason
-> the apertures that generate PCI I/O transactions need to be contiguous
-> on the CPU side.
-> 
-> That's just a long way of saying that if we ever came up with a more
-> generic way to handle I/O port spaces, PCI_IOBASE might go away.  And
-> I guess part of that rework could be changing this use of it along
-> with the others.
+On 8 April 2014 07:09, Victor Kamensky <victor.kamensky@linaro.org> wrote:
+> On 8 April 2014 06:30, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> On Tue, Apr 08, 2014 at 09:05:49AM -0400, David Long wrote:
+>>> Unfortunately copy_to_user_page() also needs a pointer to a vma struct
+>>> so, while it presumably provides the model to follow, it can't simply be
+>>> dropped in.
+>>
+>> Well, isn't this code doing the same thing as ptrace?  It seems to want
+>> to modify a page in userspace of another process to change instructions
+>> that are going to be executed.  That's what ptrace does, and ptrace
+>> already copes with all the issues there.
+>
+> As I see it, the difference between ptrace use and xol single stepping
+> it that in first all cores should be involved and potentially cache operation
+> would be broadcasted. In case of uprobes only local core is involved.
+> The way I read uprobes code xol slot will be used once by current core
+> to execute one instruction, then it will hit next breakpoint and xol slot
+> will be freed and potentially reused by next uprobe.
+>
+> I assume that while doing xol single stepping task cannot migrate to
+> another core, wondering whether it is absolutely true. It seems that
+> similar ppc code that calls flush_dcache_page follow this assumption.
+> If uprobes xol single stepping need to handle all cores it will be very
+> expensive.
+>
+> In ptrace case caches of all cores must be handled.
+>
+> Having said above I do agree that large portion of flush_ptrace_access
+> could be reused between these two use cases.
 
-I'd rather not add a generic implementation of this at all, but
-keep it all within the host resource scanning code.
+Looking at flush_ptrace_access more closely. Now I am not sure that
+ptrace write code could easily reused.
 
-If we do add a generic implementation, my preference would be
-to use the version introduced for arm64, with a fallback of
-returning -EINVAL if the architecture doesn't implement it.
+1) flush_ptrace_access seems to handle both data and text segments
+write. In case of xol write we always know that it is code write
 
-There is no way ever that returning '0' makes sense here: Either
-the architecture supports memory mapped I/O spaces and then we
-should be able to find an appropriate io_offset for it, or it
-doesn't support memory mapped I/O spaces and we should never
-even call this function.
+2) as I pointed before flush_ptrace_access handles smp case whereas
+xol write does not need to do that
 
-	Arnd
+3) flush_ptrace_access needs vma, which uprobe code does not have on
+layer where xol is installed. That is probably most critical issue that
+could stop suggested code sharing. And note that vma in
+flush_ptrace_access is needed only for cases cases 1) and 2) above,
+about which xol write does not really care. If we take only required
+pieces from flush_ptrace_access would not xol cache flush look like
+this:
+
+void arch_uprobe_xol_sync_dcache_icache(struct page *page,
+                    unsigned long addr, unsigned long size)
+{
+    if (icache_is_vipt_aliasing())
+        flush_icache_alias(page_to_pfn(page), addr, size);
+    else
+        __cpuc_coherent_user_range(addr, size);
+}
+
+of course, above function should be properly places or flush_icache_alias
+function should be made globally visible.
+
+Note on the side: flush_ptrace_access works with user-land memory
+but it still uses __cpuc_coherent_kern_range. I think it should use
+__cpuc_coherent_user_range. It looks like implementation wise it is
+the same but user variant seems more appropriate in given situation.
+Or am I missing something here?
+
+Thanks,
+Victor
+
+> Thanks,
+> Victor
+>
+>> Given that we've already solved that problem, wouldn't it be a good idea
+>> if the tracing code would stop trying to reinvent broken solutions to
+>> problems we have already solved?
+>>
+>> --
+>> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+>> improving, and getting towards what was expected from it.
