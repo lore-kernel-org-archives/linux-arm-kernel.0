@@ -1,71 +1,40 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue,  8 Apr 2014 20:06:41 +0530
-Subject: [PATCH V4 3/5] dt: exynos5420: Enable support for DWC3 controller
+Date: Tue,  8 Apr 2014 20:06:42 +0530
+Subject: [PATCH V4 4/5] dt: exynos5250: Enable support for generic USB DRD phy
 In-Reply-To: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
 References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1396967803-28868-4-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1396967803-28868-5-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree nodes for DWC3 controller present on
-Exynos 5420 SoC, to enable support for USB 3.0.
+Add device tree node for new usbdrd-phy driver, which
+is based on generic phy framework.
 
 Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi |   34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/exynos5250.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index a6efb52..20c2d0b 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -653,6 +653,23 @@
- 		clock-names = "tmu_apbif", "tmu_triminfo_apbif";
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index b7dec41..92c6fcd 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -530,6 +530,16 @@
+ 		};
  	};
  
-+	usb at 12000000 {
-+		compatible = "samsung,exynos5250-dwusb3";
-+		clocks = <&clock 366>;
-+		clock-names = "usbdrd30";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		dwc3 {
-+			compatible = "synopsys,dwc3";
-+			reg = <0x12000000 0x10000>;
-+			interrupts = <0 72 0>;
-+			phys = <&usbdrd_phy0 0>, <&usbdrd_phy0 1>;
-+			phy-names = "usb2-phy", "usb3-phy";
-+		};
++	usbdrd_phy: phy at 12100000 {
++		compatible = "samsung,exynos5250-usbdrd-phy";
++		reg = <0x12100000 0x100>;
++		clocks = <&clock 286>, <&clock 1>;
++		clock-names = "phy", "ref";
++		samsung,syscon-phandle = <&pmu_system_controller>;
++		samsung,pmu-offset = <0x704>;
++		#phy-cells = <1>;
 +	};
 +
- 	usbdrd_phy0: phy at 12100000 {
- 		compatible = "samsung,exynos5420-usbdrd-phy";
- 		reg = <0x12100000 0x100>;
-@@ -663,6 +680,23 @@
- 		#phy-cells = <1>;
- 	};
- 
-+	usb at 12400000 {
-+		compatible = "samsung,exynos5250-dwusb3";
-+		clocks = <&clock 367>;
-+		clock-names = "usbdrd30";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		dwc3 {
-+			compatible = "synopsys,dwc3";
-+			reg = <0x12400000 0x10000>;
-+			interrupts = <0 73 0>;
-+			phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
-+			phy-names = "usb2-phy", "usb3-phy";
-+		};
-+	};
-+
- 	usbdrd_phy1: phy at 12500000 {
- 		compatible = "samsung,exynos5420-usbdrd-phy";
- 		reg = <0x12500000 0x100>;
+ 	usb at 12110000 {
+ 		compatible = "samsung,exynos4210-ehci";
+ 		reg = <0x12110000 0x100>;
 -- 
 1.7.10.4
