@@ -1,123 +1,54 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 08 Apr 2014 16:07:33 +0800
-Subject: [PATCH 3/3] net: hisilicon: new hip04 ethernet driver
-In-Reply-To: <20140407.145356.928382660541891827.davem@davemloft.net>
-References: <1396672506-9296-1-git-send-email-zhangfei.gao@linaro.org>	<1396672506-9296-4-git-send-email-zhangfei.gao@linaro.org>
- <20140407.145356.928382660541891827.davem@davemloft.net>
-Message-ID: <5343AE45.4020308@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 8 Apr 2014 09:59:16 +0200
+Subject: MX28: leds/pwm: Using pwm driven led as heartbeat leads to
+ kernel warning
+In-Reply-To: <20140408073402.GC2438@dragon>
+References: <53345C93.9040005@i2se.com> <533EB9AC.6040708@i2se.com>
+ <20140404142656.GA16383@dragon> <20140404164446.GI4883@piout.net>
+ <20140408073402.GC2438@dragon>
+Message-ID: <20140408075916.GA30127@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David
+On 08/04/2014 at 15:34:04 +0800, Shawn Guo wrote :
+> On Fri, Apr 04, 2014 at 06:44:47PM +0200, Alexandre Belloni wrote:
+> > On 04/04/2014 at 22:26:58 +0800, Shawn Guo wrote :
+> > > On Fri, Apr 04, 2014 at 03:54:52PM +0200, Stefan Wahren wrote:
+> > > > the problem is still reproducable in Mainline 3.14.0 and gives the same
+> > > > warning message.
+> > > > Also i add linux-leds in CC.
+> > > > 
+> > > > Are there any advices to narrow down the problem?
+> > > > 
+> > > > Is this problem specific to i.MX28 PWM (i don't have other kind of
+> > > > hardware)?
+> > > 
+> > > I don't think it's specific to i.MX28 PWM.  Since the .config hook of
+> > > pwm_ops will be called from interrupt context in this case, any pwm
+> > > drivers that do sleeping calls in the hook will have this problem, e.g.
+> > > the clk APIs that hold mutex like clk_prepare() and clk_get_rate() etc.
+> > > 
+> > 
+> > Yeah, I'm wondering whether we should set pwm->chip->can_sleep then.
+> 
+> Right, per kerneldoc of struct pwm_chip, we should set can_sleep.
+> 
+> /**
+>  * struct pwm_chip - abstract a PWM controller
+>  * ...
+>  * @can_sleep: must be true if the .config(), .enable() or .disable()
+>  *             operations may sleep
+>  */
+> 
+> But how does setting the flag make a difference there?  I see pwm core
+> does nothing about the flag, or am I missing something?
+> 
 
-On 04/08/2014 02:53 AM, David Miller wrote:
-> From: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Date: Sat,  5 Apr 2014 12:35:06 +0800
->
->> +struct tx_desc {
->> +	u32 send_addr;
->> +	u16 reserved_16;
->> +	u16 send_size;
->> +	u32 reserved_32;
->> +	u32 cfg;
->> +	u32 wb_addr;
->> +} ____cacheline_aligned;
->
-> I do not think that ____cacheline_aligned is appropriate at all here.
->
-> First of all, this is a hardware descriptor, so it has a fixed layout
-> and therefore size.
->
-> Secondly, unless you declare this object statically in the data section
-> of the object file, the alignment doesn't matter.  These descriptors
-> are always dynamically allocated, rather than instantiated in the
-> kernel/driver image.
+The driver using the PWM should test the flag, have a look at:
+http://lxr.free-electrons.com/source/drivers/leds/leds-pwm.c#L183
 
-The ____cacheline_aligned used here is only for the requirement of 
-alignment, and use dma_alloc_coherent, while at first dma_pool is used 
-for the requirement of alignment.
-Otherwise desc[1] is not aligned and can not be used directly, the 
-structure is smaller.
 
->
->> +	val = (duplex) ? BIT(0) : 0;
->
-> Parenthesis around duplex is not necessary, please remove.
-OK
->
->> +static void hip04_reset_ppe(struct hip04_priv *priv)
->> +{
->> +	u32 val, tmp;
->> +
->> +	do {
->> +		regmap_read(priv->map, priv->port * 4 + PPE_CURR_BUF_CNT, &val);
->> +		regmap_read(priv->map, priv->port * 4 + PPE_CFG_RX_ADDR, &tmp);
->> +	} while (val & 0xfff);
->> +}
->
-> This polling loop can loop forever, if the condition never triggers it will
-> loop forever.  You must add some kind of limit or timeout, and subsequent
-> error handing up the call chain to handle this.
-OK
->
->> +	val = readl_relaxed(priv->base + PPE_CFG_STS_MODE);
->> +	val |= BIT(12);			/* PPE_HIS_RX_PKT_CNT read clear */
->> +	writel_relaxed(val, priv->base + PPE_CFG_STS_MODE);
->   ...
->> +	/* set bus ctrl */
->> +	val = BIT(14);			/* buffer locally release */
->> +	val |= BIT(0);			/* big endian */
->> +	writel_relaxed(val, priv->base + PPE_CFG_BUS_CTRL_REG);
->
-> Instead of having to set only one bit at a time in every register and
-> adding comments here, just define these register values using macros
-> properly in a header file or similar.
->
-> Then you can go val |= PPE_CFG_BUS_CTRL_VAL_THIS | PPE_CFG_BUS_CTRL_VAL_THAT
-> on one line.
->
-> Document the registers where you define the macros, that way people can learn
-> what other bits are in these register and what they mean, even if you don't
-> currently use them in the driver itself.
-OK, got it.
-However, some bits is not planed to open since used internally and may 
-be removed later.
-
->
->> +static void hip04_tx_reclaim(struct net_device *ndev, bool force)
->   ...
->> +static void hip04_xmit_timer(unsigned long data)
->> +{
->> +	struct net_device *ndev = (void *) data;
->> +
->> +	hip04_tx_reclaim(ndev, false);
->> +}
->   ...
->> +	mod_timer(&priv->txtimer, jiffies + RECLAIM_PERIOD);
->
-> And this is where I stop reading your driver, I've stated already that this
-> kind of reclaim scheme is unacceptable.
->
-> The kernel timers lack the granularity necessary to service TX reclaim
-> with a reasonable amount of latency.
->
-> You must use some kind of hardware notification of TX slots becomming
-> available, I find it totally impossible that a modern ethernet controller
-> was created without a TX done interrupt.
->
-
-I am sorry, but unfortunately this series really does NOT have TX done 
-interrupt after checked with hardware guy many times.
-And next series will add TX done interrupt according to the feedback.
-
-There are two reasons of removing the TX done interrupt when the chip is 
-designed.
-1. The specific product does not care the latency, only care the throughput.
-2. When doing many experiment, the tx done interrupt will impact the 
-throughput, as a result reclaim is moved to xmit as one of 
-optimizations, then finally tx done interrupt is removed at all.
-
-Is it acceptable of removing timer as well as latency handling, or any 
-other work around of this kind of hardware?
-
-Thanks
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
