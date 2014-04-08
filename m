@@ -1,73 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Apr 2014 17:40:34 +0200
-Subject: Intel I350 mini-PCIe card (igb) on Mirabox (mvebu / Armada 370)
-In-Reply-To: <20140408171309.09bbf968@skate>
-References: <20140325202249.GA10378@obsidianresearch.com>
- <20140325213638.5aba54b6@skate>
- <CAAfodu3RmoN9MYNahwv2kLz5=GvZvK6G9fJorsyVgU8C0J-NEg@mail.gmail.com>
- <20140325222404.GC14718@obsidianresearch.com>
- <20140325223510.GD14718@obsidianresearch.com>
- <CAAfodu3HuzBCAc3r=PPufjrFhEKUQK2b_WRow=GJuC6hSqiuKw@mail.gmail.com>
- <20140326201243.GA1536@obsidianresearch.com>
- <CAAfodu0xZ0V8ikJMT1Z+0JSLeD+nezWAcGNF2_ryvad5tsVDWA@mail.gmail.com>
- <20140326214259.GA12330@obsidianresearch.com>
- <alpine.DEB.2.10.1403270025160.1545@vroombuntu>
- <20140327044054.GA22681@obsidianresearch.com>
- <alpine.DEB.2.10.1403280056250.4521@vroombuntu>
- <alpine.DEB.2.10.1404041408280.8617@vroombuntu>
- <20140405193435.50d8dd81@skate>
- <54BB31A2B04145E8908E0183FAB6B61B@fatboyfat.co.uk>
- <alpine.DEB.2.10.1404061631130.4683@vroombuntu>
- <20140408171309.09bbf968@skate>
-Message-ID: <20140408174034.79df403e@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Apr 2014 16:41:17 +0100
+Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
+In-Reply-To: <20140408152735.GA30076@redhat.com>
+References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
+ <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
+ <20140408082444.GA3598@e103592.cambridge.arm.com>
+ <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
+ <20140408133039.GH16119@n2100.arm.linux.org.uk>
+ <20140408152735.GA30076@redhat.com>
+Message-ID: <20140408154117.GI16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
-
-On Tue, 8 Apr 2014 17:13:09 +0200, Thomas Petazzoni wrote:
-
-> Unfortunately here your patch is not sufficient to solve the problem
-> apparently. I've fixed another problem where the return value of
-> armada_370_xp_alloc_msi() (which is signed) is casted into an unsigned
-> irq_hw_number_t in armada_370_xp_setup_msi_irq(), but I'm still seeing
-> many MSIs allocated, then some freed, and finally a kernel panic.
+On Tue, Apr 08, 2014 at 05:27:35PM +0200, Oleg Nesterov wrote:
+> Sorry, I din't read the whole thread yet...
 > 
->  * Log: https://gist.github.com/tpetazzoni/10140012
+> On 04/08, Russell King - ARM Linux wrote:
+> > On Tue, Apr 08, 2014 at 09:05:49AM -0400, David Long wrote:
+> > > Unfortunately copy_to_user_page() also needs a pointer to a vma struct
+> > > so, while it presumably provides the model to follow, it can't simply be
+> > > dropped in.
+> >
+> > Well, isn't this code doing the same thing as ptrace?  It seems to want
+> > to modify a page in userspace of another process to change instructions
+> > that are going to be executed. That's what ptrace does, and ptrace
+> > already copes with all the issues there.
 > 
->  * Diff against v3.14: https://gist.github.com/tpetazzoni/10140121
+> Yes, but it does get_user_pages(&vma) and thus it knows vma.
 > 
-> Ideas? If some of you are interested in discussing this live, I'm on
-> #mvlinux on Freenode.
+> > Given that we've already solved that problem, wouldn't it be a good idea
+> > if the tracing code would stop trying to reinvent broken solutions to
+> > problems we have already solved?
+> 
+> But uprobes can't do this. Of course, I am not saying this is impossible,
+> but it would be nice to avoid mmap_sem/find_vma/etc.
+> 
+> Almost nobody (iirc only sparc?) actually uses this "vma" arguments. And
+> at least the supported architectures do not (at least this is what I think
+> after the quick grep).
+> 
+> Perhaps we can rolerate the hack below?
 
-Please find attached the 3 patches I'm currently using on the
-irq-armada-370-xp. They make the situation a bit better (the igb driver
-no longer believes we support MSI-X), but it still crashes in the igb
-driver (see https://gist.github.com/tpetazzoni/10144886).
+This has no effect at fixing the reported problem though:
 
-Thomas
+#define flush_icache_user_range(vma,page,addr,len) \
+        flush_dcache_page(page)
+
+so it results in no change.
+
+The bigger question is... what is this function supposed to do?  It's
+not been documented in Documentation/cachetlb.txt, and nothing in the
+kernel refers to this function - it is completely unused.
+
+I think let's start out by killing this function - the semantics of
+this function have been lost, so it's not clear what it was supposed
+to do in its original form.  Even going back to the start of git
+history, it looks like it was never used outside arch code.
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-irqchip-armada-370-xp-fix-invalid-cast-of-signed-val.patch
-Type: text/x-patch
-Size: 1375 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140408/eff616ce/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0002-irqchip-armada-370-xp-implement-the-check_device-msi.patch
-Type: text/x-patch
-Size: 1698 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140408/eff616ce/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-irqchip-armada-370-xp-Fix-releasing-of-MSIs.patch
-Type: text/x-patch
-Size: 1271 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140408/eff616ce/attachment-0002.bin>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
