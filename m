@@ -1,55 +1,92 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue,  8 Apr 2014 16:00:52 +0800
-Subject: [PATCH v2 12/12] ARM: dts: Add PMU support in HiP04
+Date: Tue,  8 Apr 2014 16:00:49 +0800
+Subject: [PATCH v2 09/12] ARM: config: append hip04_defconfig
 In-Reply-To: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1396944052-9887-13-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1396944052-9887-10-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <kefeng.wang@linaro.org>
+Select HiP04 SoC configuration by hip04_defconfig.
 
-ARM Performance Monitor Units are available on the HiP04.
-So add the support in the dtsi.
-
-Simply tested with perf.
-
-Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/boot/dts/hip04.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/configs/hip04_defconfig | 67 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 arch/arm/configs/hip04_defconfig
 
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-index eb5e5a2..0ad1e7b 100644
---- a/arch/arm/boot/dts/hip04.dtsi
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -219,6 +219,26 @@
- 			status = "ok";
- 		};
- 
-+		arm-pmu {
-+			compatible = "arm,cortex-a15-pmu";
-+			interrupts = <0 64 4>,
-+				     <0 65 4>,
-+				     <0 66 4>,
-+				     <0 67 4>,
-+				     <0 68 4>,
-+				     <0 69 4>,
-+				     <0 70 4>,
-+				     <0 71 4>,
-+				     <0 72 4>,
-+				     <0 73 4>,
-+				     <0 74 4>,
-+				     <0 75 4>,
-+				     <0 76 4>,
-+				     <0 77 4>,
-+				     <0 78 4>,
-+				     <0 79 4>;
-+		};
-+
- 		timer {
- 			compatible = "arm,armv7-timer";
- 			interrupts = <1 13 0xf08>,
+diff --git a/arch/arm/configs/hip04_defconfig b/arch/arm/configs/hip04_defconfig
+new file mode 100644
+index 0000000..b6fa635
+--- /dev/null
++++ b/arch/arm/configs/hip04_defconfig
+@@ -0,0 +1,67 @@
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_IRQ_DOMAIN_DEBUG=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_RD_GZIP=y
++# CONFIG_ARCH_MULTI_V6 is not set
++# CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_MULTI_V7_LPAE=y
++CONFIG_ARCH_HISI=y
++CONFIG_ARCH_HIP04=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=16
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
++CONFIG_HIGHMEM=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_BLK_DEV=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=16
++CONFIG_BLK_DEV_RAM_SIZE=4096
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_NETDEVICES=y
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=2
++CONFIG_SERIAL_8250_RUNTIME_UARTS=2
++CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_PINCTRL_SINGLE=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_DRM=y
++CONFIG_FB_SIMPLE=y
++CONFIG_RTC_CLASS=y
++CONFIG_EXT4_FS=y
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_UART_8250=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_DEBUG_USER=y
 -- 
 1.8.3.2
