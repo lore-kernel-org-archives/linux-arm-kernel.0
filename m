@@ -1,29 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 8 Apr 2014 09:29:12 +0900
-Subject: [PATCH] ARM: shmobile: r8a7791: Add EHCI MSTP clock
-In-Reply-To: <5342890C.8090703@cogentembedded.com>
-References: <20140407060421.25826.64819.sendpatchset@w520>
- <5342890C.8090703@cogentembedded.com>
-Message-ID: <20140408002911.GC30496@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 7 Apr 2014 17:33:04 -0700
+Subject: [PATCH v2] clk: qcom: Add support for IPQ8064's global clock
+ controller (GCC)
+In-Reply-To: <1396642749-12979-1-git-send-email-galak@codeaurora.org>
+References: <1396642749-12979-1-git-send-email-galak@codeaurora.org>
+Message-ID: <20140408003304.GK9985@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 03:16:28PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On 04/04, Kumar Gala wrote:
+> Add a driver for the global clock controller found on IPQ8064 based
+> platforms. This should allow most non-multimedia device drivers to probe
+> and control their clocks.
 > 
-> On 07-04-2014 10:04, Magnus Damm wrote:
+> This is currently missing clocks for SATA, USB, and networking devices.
 > 
-> >From: Magnus Damm <damm@opensource.se>
-> 
-> >Add support for EHCI clock gating via the MSTP703 bit on r8a7791.
-> 
-> >Signed-off-by: Magnus Damm <damm@opensource.se>
-> 
->    I have already posted such patch at end of the last week.
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 
-Thanks for giving me the luxury of having two patches to choose from:
-much better than none. I regret that there could only be one winner :^)
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Ordinarily I would take the first one, Sergei's. But I have
-decided to take Magnus's as it is simpler due to not cleaning
-up the code at the same time as adding the feature described on the wrapper.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
