@@ -1,462 +1,88 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  8 Apr 2014 16:08:50 +0300
-Subject: [PATCH 1/2] ARM: dts: sbc-t54: add support for sbc-t54 with cm-t54
-In-Reply-To: <1396962531-27729-1-git-send-email-lifshitz@compulab.co.il>
-References: <1396962531-27729-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1396962531-27729-2-git-send-email-lifshitz@compulab.co.il>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 8 Apr 2014 14:09:20 +0100
+Subject: [PATCH v7 6/6] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <5343F252.2050708@linaro.org>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-7-git-send-email-Liviu.Dudau@arm.com>
+ <5343F252.2050708@linaro.org>
+Message-ID: <20140408130920.GY17163@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for CM-T54 CoM and SBC-T54 board:
+Hi Hanjun,
 
-http://compulab.co.il/products/computer-on-modules/cm-t54/
-http://compulab.co.il/products/sbcs/sbc-t54/
+On Tue, Apr 08, 2014 at 01:57:54PM +0100, Hanjun Guo wrote:
+> Hi Liviu,
+> 
+> On 2014-3-14 23:34, Liviu Dudau wrote:
+> > Several platforms use a rather generic version of parsing
+> > the device tree to find the host bridge ranges. Move the common code
+> > into the generic PCI code and use it to create a pci_host_bridge
+> > structure that can be used by arch code.
+> > 
+> > Based on early attempts by Andrew Murray to unify the code.
+> > Used powerpc and microblaze PCI code as starting point.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Tested-by: Tanmay Inamdar <tinamdar@apm.com>
+> > ---
+> >  drivers/pci/host-bridge.c | 158 ++++++++++++++++++++++++++++++++++++
+> >  include/linux/pci.h       |  13 +++
+> >  2 files changed, 171 insertions(+)
+> > 
+> > diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> > index 8708b652..7cda90b 100644
+> > --- a/drivers/pci/host-bridge.c
+> > +++ b/drivers/pci/host-bridge.c
+> > @@ -6,9 +6,14 @@
+> >  #include <linux/init.h>
+> >  #include <linux/pci.h>
+> >  #include <linux/module.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_pci.h>
+> > +#include <linux/slab.h>
+> >  
+> >  #include "pci.h"
+> >  
+> > +static atomic_t domain_nr = ATOMIC_INIT(-1);
+> 
+> domain_nr will only be used inside the #ifdef CONFIG_OF,
+> and this will lead to compile warning which complains that
+> 'domain_nr' defined but not used when CONFIG_OF=n (for example
+> on x86).
+> 
+> How about moving the definition to --->
+> 
+> > +
+> >  static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+> >  {
+> >  	while (bus->parent)
+> > @@ -92,3 +97,156 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+> >  	res->end = region->end + offset;
+> >  }
+> >  EXPORT_SYMBOL(pcibios_bus_to_resource);
+> > +
+> > +#ifdef CONFIG_OF
+> 
+> here?
 
-SBC-T54 is a single board computer based on OMAP5432 CPU.
-It is implemented with a CM-T54 CoM providing most of the functions,
-and SB-T54 carrier board providing connectors and several additional
-functions.
+I've already moved the definition there in my refresh.
 
-Added basic support for:
+Thanks for reviewing the code,
+Liviu
 
-* PMIC
-* LED
-* MMC/SD
-* eMMC
-* USB
-* I2C1/4
-* SB-T54 and CM-T54 EEPROMs
-* RTC
+> 
+> Thanks
+> Hanjun
+> 
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
----
- arch/arm/boot/dts/Makefile          |    2 +
- arch/arm/boot/dts/omap5-cm-t54.dts  |  363 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap5-sbc-t54.dts |   33 ++++
- 3 files changed, 398 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap5-cm-t54.dts
- create mode 100644 arch/arm/boot/dts/omap5-sbc-t54.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 84d90fc..e362b1c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -221,6 +221,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap4-var-som.dtb \
- 	omap4-sdp.dtb \
- 	omap4-sdp-es23plus.dtb \
-+	omap5-cm-t54.dtb \
-+	omap5-sbc-t54.dtb \
- 	omap5-uevm.dtb \
- 	omap5-pyra.dtb \
- 	am335x-evm.dtb \
-diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
-new file mode 100644
-index 0000000..c87401f
---- /dev/null
-+++ b/arch/arm/boot/dts/omap5-cm-t54.dts
-@@ -0,0 +1,363 @@
-+/*
-+ * Support for CompuLab CM-T54
-+ */
-+/dts-v1/;
-+
-+#include "omap5.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "CompuLab CM-T54";
-+	compatible = "compulab,omap5-cm-t54", "ti,omap5";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x7F000000>; /* 2048 MB */
-+	};
-+
-+	vmmcsd_fixed: fixed-regulator-mmcsd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmcsd_fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-gpios = <&gpio3 12 GPIO_ACTIVE_LOW>; /* gpio3_76 HUB_RESET */
-+	};
-+
-+	/* HS USB Host PHY on PORT 3 */
-+	hsusb3_phy: hsusb3_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-gpios = <&gpio3 19 GPIO_ACTIVE_LOW>; /* gpio3_83 ETH_RESET */
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		led at 1 {
-+			label = "Heartbeat";
-+			gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>; /* gpio3_80 ACT_LED */
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+	};
-+};
-+
-+&omap5_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&led_gpio_pins
-+			&usbhost_pins
-+	>;
-+
-+	led_gpio_pins: pinmux_led_gpio_pins {
-+		pinctrl-single,pins = <
-+			0x070 (PIN_OUTPUT | MUX_MODE6) /* hsi2_caflag.gpio3_80 */
-+		>;
-+	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			0x1b2 (PIN_INPUT_PULLUP | MUX_MODE0) /* i2c1_pmic_scl */
-+			0x1b4 (PIN_INPUT_PULLUP | MUX_MODE0) /* i2c1_pmic_sda */
-+		>;
-+	};
-+
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			0x1a2 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdcard_clk */
-+			0x1a4 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdcard_cmd */
-+			0x1a6 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdcard_data2 */
-+			0x1a8 (PIN_INPUT_PULLUP | MUX_MODE0) /* sdcard_data3 */
-+			0x1aa (PIN_INPUT_PULLUP | MUX_MODE0) /* sdcard_data0 */
-+			0x1ac (PIN_INPUT_PULLUP | MUX_MODE0) /* sdcard_data1 */
-+		>;
-+	};
-+
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			0x000 (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_clk */
-+			0x002 (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_cmd */
-+			0x004 (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data0 */
-+			0x006 (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data1 */
-+			0x008 (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data2 */
-+			0x00a (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data3 */
-+			0x00c (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data4 */
-+			0x00e (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data5 */
-+			0x010 (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data6 */
-+			0x012 (PIN_INPUT_PULLUP | MUX_MODE0) /* emmc_data7 */
-+		>;
-+	};
-+
-+	usbhost_pins: pinmux_usbhost_pins {
-+		pinctrl-single,pins = <
-+			0x084 (PIN_INPUT | MUX_MODE0)  /* usbb2_hsic_strobe */
-+			0x086 (PIN_INPUT | MUX_MODE0)  /* usbb2_hsic_data */
-+
-+			0x19e (PIN_INPUT | MUX_MODE0)  /* usbb3_hsic_strobe */
-+			0x1a0 (PIN_INPUT | MUX_MODE0)  /* usbb3_hsic_data */
-+
-+			0x068 (PIN_OUTPUT | MUX_MODE6) /* hsi2_caready.gpio3_76 */
-+			0x076 (PIN_OUTPUT | MUX_MODE6) /* hsi2_acdata.gpio3_83 */
-+		>;
-+	};
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&ldo9_reg>;
-+	bus-width = <4>;
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&vmmcsd_fixed>;
-+	bus-width = <8>;
-+	ti,non-removable;
-+};
-+
-+&mmc4 {
-+	status = "disabled";
-+};
-+
-+&mmc5 {
-+	status = "disabled";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
-+	clock-frequency = <400000>;
-+
-+	at24 at 50 {
-+		compatible = "at24,24c02";
-+		pagesize = <16>;
-+		reg = <0x50>;
-+	};
-+
-+	palmas: palmas at 48 {
-+		compatible = "ti,palmas";
-+		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* IRQ_SYS_1N */
-+		interrupt-parent = <&gic>;
-+		reg = <0x48>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		ti,system-power-controller;
-+
-+		extcon_usb3: palmas_usb {
-+			compatible = "ti,palmas-usb-vid";
-+			ti,enable-vbus-detection;
-+			ti,enable-id-detection;
-+			ti,wakeup;
-+		};
-+
-+		rtc {
-+			compatible = "ti,palmas-rtc";
-+			interrupt-parent = <&palmas>;
-+			interrupts = <8 IRQ_TYPE_NONE>;
-+		};
-+
-+		palmas_pmic {
-+			compatible = "ti,palmas-pmic";
-+			interrupt-parent = <&palmas>;
-+			interrupts = <14 IRQ_TYPE_NONE>;
-+			interrupt-name = "short-irq";
-+
-+			ti,ldo6-vibrator;
-+
-+			regulators {
-+				smps123_reg: smps123 {
-+					/* VDD_OPP_MPU */
-+					regulator-name = "smps123";
-+					regulator-min-microvolt = < 600000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps45_reg: smps45 {
-+					/* VDD_OPP_MM */
-+					regulator-name = "smps45";
-+					regulator-min-microvolt = < 600000>;
-+					regulator-max-microvolt = <1310000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps6_reg: smps6 {
-+					/* VDD_DDR3 - over VDD_SMPS6 */
-+					regulator-name = "smps6";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps7_reg: smps7 {
-+					/* VDDS_1v8_OMAP over VDDS_1v8_MAIN */
-+					regulator-name = "smps7";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps8_reg: smps8 {
-+					/* VDD_OPP_CORE */
-+					regulator-name = "smps8";
-+					regulator-min-microvolt = < 600000>;
-+					regulator-max-microvolt = <1310000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps9_reg: smps9 {
-+					/* VDDA_2v1_AUD over VDD_2v1 */
-+					regulator-name = "smps9";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					ti,smps-range = <0x80>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps10_out2_reg: smps10_out2 {
-+					/* VBUS_5V_OTG */
-+					regulator-name = "smps10_out2";
-+					regulator-min-microvolt = <5000000>;
-+					regulator-max-microvolt = <5000000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				smps10_out1_reg: smps10_out1 {
-+					/* VBUS_5V_OTG */
-+					regulator-name = "smps10_out1";
-+					regulator-min-microvolt = <5000000>;
-+					regulator-max-microvolt = <5000000>;
-+				};
-+
-+				ldo1_reg: ldo1 {
-+					/* VDDAPHY_CAM: vdda_csiport */
-+					regulator-name = "ldo1";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <1800000>;
-+				};
-+
-+				ldo2_reg: ldo2 {
-+					/* VDD_3V3_WLAN */
-+					regulator-name = "ldo2";
-+					regulator-min-microvolt = <3300000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-boot-on;
-+				};
-+
-+				ldo3_reg: ldo3 {
-+					/* VCC_1V5_AUD */
-+					regulator-name = "ldo3";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <1500000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldo4_reg: ldo4 {
-+					/* VDDAPHY_DISP: vdda_dsiport/hdmi */
-+					regulator-name = "ldo4";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <1800000>;
-+				};
-+
-+				ldo5_reg: ldo5 {
-+					/* VDDA_1V8_PHY: usb/sata/hdmi.. */
-+					regulator-name = "ldo5";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldo6_reg: ldo6 {
-+					/* VDDS_1V2_WKUP: hsic/ldo_emu_wkup */
-+					regulator-name = "ldo6";
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldo7_reg: ldo7 {
-+					/* VDD_VPP: vpp1 */
-+					regulator-name = "ldo7";
-+					regulator-min-microvolt = <2000000>;
-+					regulator-max-microvolt = <2000000>;
-+					/* Only for efuse reprograming! */
-+					status = "disabled";
-+				};
-+
-+				ldo8_reg: ldo8 {
-+					/* VDD_3v0: Does not go anywhere */
-+					regulator-name = "ldo8";
-+					regulator-min-microvolt = <3000000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-boot-on;
-+					/* Unused */
-+					status = "disabled";
-+				};
-+
-+				ldo9_reg: ldo9 {
-+					/* VCC_DV_SDIO: vdds_sdcard */
-+					regulator-name = "ldo9";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-boot-on;
-+				};
-+
-+				ldoln_reg: ldoln {
-+					/* VDDA_1v8_REF: vdds_osc/mm_l4per.. */
-+					regulator-name = "ldoln";
-+					regulator-min-microvolt = <1800000>;
-+					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				ldousb_reg: ldousb {
-+					/* VDDA_3V_USB: VDDA_USBHS33 */
-+					regulator-name = "ldousb";
-+					regulator-min-microvolt = <3250000>;
-+					regulator-max-microvolt = <3250000>;
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+
-+				regen3_reg: regen3 {
-+					/* REGEN3 controls LDO9 supply to card */
-+					regulator-name = "regen3";
-+					regulator-always-on;
-+					regulator-boot-on;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&usbhshost {
-+	port2-mode = "ehci-hsic";
-+	port3-mode = "ehci-hsic";
-+};
-+
-+&usbhsehci {
-+	phys = <0 &hsusb2_phy &hsusb3_phy>;
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&smps123_reg>;
-+};
-+
-diff --git a/arch/arm/boot/dts/omap5-sbc-t54.dts b/arch/arm/boot/dts/omap5-sbc-t54.dts
-new file mode 100644
-index 0000000..e4ea254
---- /dev/null
-+++ b/arch/arm/boot/dts/omap5-sbc-t54.dts
-@@ -0,0 +1,33 @@
-+/*
-+ * Suppport for CompuLab SBC-T54 with CM-T54
-+ */
-+
-+#include "omap5-cm-t54.dts"
-+
-+/ {
-+	model = "CompuLab SBC-T54 with CM-T54";
-+	compatible = "compulab,omap5-sbc-t54", "compulab,omap5-cm-t54", "ti,omap5";
-+};
-+
-+&omap5_pmx_core {
-+	i2c4_pins: pinmux_i2c4_pins {
-+		pinctrl-single,pins = <
-+			0x0b8 (PIN_INPUT_PULLUP | MUX_MODE0) /* i2c4_scl */
-+			0x0bc (PIN_INPUT_PULLUP | MUX_MODE0) /* i2c4_sda */
-+		>;
-+	};
-+};
-+
-+&i2c4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c4_pins>;
-+
-+	clock-frequency = <400000>;
-+
-+	at24 at 50 {
-+		compatible = "at24,24c02";
-+		pagesize = <16>;
-+		reg = <0x50>;
-+	};
-+};
-+
 -- 
-1.7.5.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
