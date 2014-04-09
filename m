@@ -1,65 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Apr 2014 17:23:27 +0100
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <53440D73.6060504@ti.com>
-References: <cover.1396605300.git.nsekhar@ti.com>
- <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
-Message-ID: <20140409162327.GH27282@n2100.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 09 Apr 2014 18:26:51 +0200
+Subject: [PATCH v2] ARM: pxa: Move iotable mapping inside vmalloc region
+In-Reply-To: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <2638213.3rVdlp7YXW@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 08:23:39PM +0530, Sekhar Nori wrote:
-> On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
-> > On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
-> >> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> >> index f8b8dac..6b2a056 100644
-> >> --- a/arch/arm/mach-omap2/omap4-common.c
-> >> +++ b/arch/arm/mach-omap2/omap4-common.c
-> >> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
-> >>  
-> >>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
-> >>  }
-> >> +
-> >> +int __init am43xx_l2_cache_init(void)
-> >> +{
-> >> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
-> >> +		       L310_AUX_CTRL_INSTR_PREFETCH;
-> > 
-> > It would be good to documenting the difference between this and OMAP4,
-> > and why you have chosen different values.
+Hi Ezequiel,
+
+On Thursday 28 November 2013 21:00:43 Ezequiel Garcia wrote:
+> In order to remove the following ugly message:
 > 
-> There are two main differences:
+>   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
 > 
-> 1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
-> not needed even in OMAP4 with latest kernel, but I am not sure if I can
-> do this safely without breaking any usecase currently working with OMAP4.
+> the iotable mappings should be re-located inside the vmalloc
+> region. Such move was introduced at commit:
 > 
-> 2) OMAP4 sets NS lockdown and NS interrupt access control bits. I
-> searched through the commit history of L2 cache support on OMAP4 but
-> there is no mention of why this was needed on OMAP4. I am checking
-> internally on the history behind this.
+> commit 0536bdf33faff4d940ac094c77998cfac368cfff
+> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date:   Thu Aug 25 00:35:59 2011 -0400
+> 
+>     ARM: move iotable mappings within the vmalloc region
+> 
+> While at it, condition the mapping to PXA25x and PXA27x, which
+> are the only platforms where it's used.
+> 
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Cc: David Heidelberger <david.heidelberger@ixit.cz>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+> David,
+> 
+> Is it possible for you to give this a try on your board?
 
-That is required because as part of the enable sequence, we write to the
-lockdown registers to clear out anything that may be there before we
-enable the L2 cache.  If we didn't set the NS lockdown bit, then we
-would need the secure monitor to do it for us.
+I'm running into the same issue on a PXA270 system.
 
-The NS interrupt access bit is also a good idea to be set, since this
-allows us to eventually support EDAC with PL310.  As we don't support
-EDAC at the moment, or touch the interrupt registers, we can probably
-ignore this difference and just preserve whatever value is there for
-the time being.
+UNCACHED_PHYS_0 is used as an immediate operand to a mov instruction, and thus 
+needs to be encoded as a shifted 8-bit value. One simple solution would be to 
+hardcode it to 0xfd000000 (0xfe000000 is already used for the IMEMC mapping).
 
-Both of these bits should be managed within the L2C code rather than by
-platforms.
+Another solution would be to keep the UNCACHED_PHYS_0 mapping at the end of 
+the vmalloc area (with a fix for the UL problem due to VMALLOC_END) and modify 
+pxa2[57]x_finish_suspend and pm_enter_standby_start to use an ldr instruction 
+instead of a move instruction to load the address.
 
-> 3) OMAP4 sets cache replacement policy to RR which is not a big deal
-> since thats the default anyway. We can probably drop this setting even
-> from OMAP4.
+As a side note, the IMEMC mapping seems unused, maybe we could thus reclaim it 
+and use 0xfe000000 for UNCACHED_PHYS_0.
 
-Yes, since that would just be a case of preserving that bit.
+Do you plan to submit a v3 of this patch ?
+
+>  arch/arm/mach-pxa/generic.c               | 6 ++++--
+>  arch/arm/mach-pxa/include/mach/hardware.h | 5 +++--
+>  2 files changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+> index 4225417..3c1b4fa 100644
+> --- a/arch/arm/mach-pxa/generic.c
+> +++ b/arch/arm/mach-pxa/generic.c
+> @@ -83,11 +83,13 @@ static struct map_desc common_io_desc[] __initdata = {
+>  		.pfn		= __phys_to_pfn(0x40000000),
+>  		.length		= 0x02000000,
+>  		.type		= MT_DEVICE
+> +#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
+>  	}, {	/* UNCACHED_PHYS_0 */
+> -		.virtual	= 0xff000000,
+> +		.virtual	= UNCACHED_PHYS_0,
+>  		.pfn		= __phys_to_pfn(0x00000000),
+> -		.length		= 0x00100000,
+> +		.length		= UNCACHED_SIZE,
+>  		.type		= MT_DEVICE
+> +#endif
+>  	}
+>  };
+> 
+> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
+> b/arch/arm/mach-pxa/include/mach/hardware.h index ccb06e4..b365a72 100644
+> --- a/arch/arm/mach-pxa/include/mach/hardware.h
+> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
+> @@ -14,13 +14,14 @@
+>  #define __ASM_ARCH_HARDWARE_H
+> 
+>  #include <mach/addr-map.h>
+> +#include <asm/pgtable.h>
+> 
+>  /*
+>   * Workarounds for at least 2 errata so far require this.
+>   * The mapping is set in mach-pxa/generic.c.
+>   */
+> -#define UNCACHED_PHYS_0		0xff000000
+> -#define UNCACHED_ADDR		UNCACHED_PHYS_0
+> +#define UNCACHED_PHYS_0		(VMALLOC_END - UNCACHED_SIZE)
+> +#define UNCACHED_SIZE		SZ_1M
+> 
+>  /*
+>   * Intel PXA2xx internal register mapping:
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Regards,
+
+Laurent Pinchart
