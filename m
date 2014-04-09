@@ -1,44 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 9 Apr 2014 15:06:25 +0100
-Subject: [PATCH 2/3] ARM: mm: add support for HW coherent systems in PL310
-In-Reply-To: <20140408201212.067d526d@skate>
-References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395677872-32741-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140408172424.GE16373@arm.com> <20140408201212.067d526d@skate>
-Message-ID: <20140409140625.GI13737@arm.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Wed, 09 Apr 2014 11:06:55 -0300
+Subject: [PATCH 07/15] ARM: sunxi: dt: define A31's APB0 clk gates node
+In-Reply-To: <1397051478-4113-8-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397051478-4113-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <534553FF.4060401@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 07:12:12PM +0100, Thomas Petazzoni wrote:
-> On Tue, 8 Apr 2014 18:24:25 +0100, Catalin Marinas wrote:
-> 
-> > >  	of_init = true;
-> > >  	memcpy(&outer_cache, &data->outer_cache, sizeof(outer_cache));
-> > > +
-> > > +	/*
-> > > +	 * PL310 doesn't need an outer cache sync operation when the
-> > > +	 * system is operating with hardware coherency enabled, as it
-> > > +	 * is done directly in hardware.
-> > > +	 */
-> > > +	if (of_device_is_compatible(np, "arm,pl310-cache") && is_coherent)
-> > > +		outer_cache.sync = NULL;
-> > > +
-> > 
-> > For this particular case, you can add a specific l2x0_of_data structure
-> > with the right compatible string for your platform where
-> > outer_cache.sync is NULL,
-> 
-> In fact, I'm not sure using a separate compatible string is possible,
-> because there are situations where the hardware platform may be I/O
-> coherent, and some situations where it is not the case. For example, in
-> the current kernel, the platform is I/O coherent when CONFIG_SMP is
-> enabled, but not I/O coherent when CONFIG_SMP is disabled. And it's the
-> same hardware platform, so same Device Tree in both cases.
+Hi Boris,
 
-I think Russell has a better solution in his L2 cache cleanup series.
-Patch 18/44 introduces a .fixup function which takes the outer_cache_fns
-pointer and that's a place where your code can check whether coherency
-is present or not (and turn .sync into NULL).
+El 09/04/14 10:51, Boris BREZILLON escribi?:
+> Define the APB0 clk gates controlled by the PRCM (Power/Reset/Clock
+> Management) block.
+>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
+>   1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 3858424..61e8b34 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -141,6 +141,16 @@
+>   					"ahb1_drc0", "ahb1_drc1";
+>   		};
+>
+> +		apb0_gates: apb0_gates at 01f01428 {
 
--- 
-Catalin
+Looks like this node is out of place, judging by the address. Try to 
+keep them in order.
+
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-apb0-gates-clk";
+> +			reg = <0x01f01428 0x4>;
+> +			clock-output-names = "apb0_pio", "apb0_ir",
+> +					"apb0_timer01", "apb0_p2wi",
+> +					"apb0_uart", "apb0_1wire",
+> +					"apb0_i2c";
+> +		};
+> +
+>   		apb1: apb1 at 01c20054 {
+>   			#clock-cells = <0>;
+>   			compatible = "allwinner,sun4i-apb0-clk";
+>
+
+Cheers,
+
+Emilio
