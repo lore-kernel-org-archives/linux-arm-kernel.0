@@ -1,47 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Apr 2014 17:38:03 +0100
-Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
-In-Reply-To: <20140409161826.GW16119@n2100.arm.linux.org.uk>
-References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
- <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
- <20140408082444.GA3598@e103592.cambridge.arm.com>
- <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
- <20140408133039.GH16119@n2100.arm.linux.org.uk>
- <20140408152735.GA30076@redhat.com>
- <20140408154117.GI16119@n2100.arm.linux.org.uk>
- <20140409161826.GW16119@n2100.arm.linux.org.uk>
-Message-ID: <20140409163803.GY16119@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 9 Apr 2014 12:52:36 -0400
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <20140409163330.GI27282@n2100.arm.linux.org.uk>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <534412FD.5030308@ti.com> <20140409163330.GI27282@n2100.arm.linux.org.uk>
+Message-ID: <53457AD4.8090708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 05:18:26PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 08, 2014 at 04:41:17PM +0100, Russell King - ARM Linux wrote:
-> > I think let's start out by killing this function - the semantics of
-> > this function have been lost, so it's not clear what it was supposed
-> > to do in its original form.  Even going back to the start of git
-> > history, it looks like it was never used outside arch code.
+On Wednesday 09 April 2014 12:33 PM, Russell King - ARM Linux wrote:
+> On Tue, Apr 08, 2014 at 11:17:17AM -0400, Santosh Shilimkar wrote:
+>> On Tuesday 08 April 2014 10:53 AM, Sekhar Nori wrote:
+>>> On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
+>>>> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
+>>>>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+>>>>> index f8b8dac..6b2a056 100644
+>>>>> --- a/arch/arm/mach-omap2/omap4-common.c
+>>>>> +++ b/arch/arm/mach-omap2/omap4-common.c
+>>>>> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
+>>>>>  
+>>>>>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
+>>>>>  }
+>>>>> +
+>>>>> +int __init am43xx_l2_cache_init(void)
+>>>>> +{
+>>>>> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
+>>>>> +		       L310_AUX_CTRL_INSTR_PREFETCH;
+>>>>
+>>>> It would be good to documenting the difference between this and OMAP4,
+>>>> and why you have chosen different values.
+>>>
+>>> There are two main differences:
+>>>
+>>> 1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
+>>> not needed even in OMAP4 with latest kernel, but I am not sure if I can
+>>> do this safely without breaking any usecase currently working with OMAP4.
+>>>
+>> Wrong. Shared bit is mandatory for the OMAP4. Its a SMP system
+>> which needs that.
 > 
-> I floated a patch to remove flush_icache_user_range() to the architecture
-> maintainers, giving the background to how this came about.  I received the
-> following reply from David Miller:
+> Errr.  This bit affects the L2 cache behaviour for Normal memory, outer
+> non-cacheable accesses - in other words, those performed to memory mapped
+> via dma_alloc_coherent() or dma_alloc_writecombine().  It does not affect
+> other types of mappings (other access types ignore the sharable attribute).
 > 
-> > ptrace() accesses (via __access_remote_vm()) already use an existing
-> > helper function for these sorts of situations, in the form of
-> > copy_{to,from}_user_page().  I would suggest that uprobes uses that
-> > as well.
+> When this bit is clear, accesses to such memory are:
 > 
-> I think this is a very valid point, and echo's my point.
+> - read: cacheable, no allocate
+> - write: write through, no write allocate
+> 
+> what this means is that if there are no cache lines in the L2 cache
+> corresponding with the physical address, then none will be allocated.
+> However, if there are cache lines present, then they will be hit,
+> read or updated as appropriate.
+> 
+> This may matter before CMA where we had the memory returned by
+> dma_alloc_coherent() and friends mapped as normal, cacheable mappings
+> which could be speculatively prefetched, and therefore cache lines
+> dragged into the L2 cache for these physical addresses.
+> 
+> However, now that we're using CMA, this does not apply as we no longer
+> have this aliasing mapping.
+> 
+> So, with CMA enabled, it should be safe not to set this bit.
+> 
+Agree. That should be safe now.
 
-More comments from David about using copy_{to,from}_user_page():
-
-> They should use it at first, then if there is a problem we can identify
-> exactly what can be optimized or needs to be, and expand the interface
-> as needed.
+> However, the shared bit in the page tables must be set for SMP systems.
+> Are you sure you're not confusing the shared bit in the page tables
+> with the shared override bit in the L2 cache controller?
 >
-> Let's not optimize first.
+No i didn't confuse with page table bits. But the SMP remark wasn't
+relevant which might have indicated that.
+ 
+>>> 2) OMAP4 sets NS lockdown and NS interrupt access control bits. I
+>>> searched through the commit history of L2 cache support on OMAP4 but
+>>> there is no mention of why this was needed on OMAP4. I am checking
+>>> internally on the history behind this.
+>>>
+>> These have also come from the aligned settings with hardware folks.
+> 
+> Again, this doesn't have much to do with hardware, it's secure/non-secure
+> access rights configuration to the L2 cache controller.
+> 
+The settings were aligned by hardware team after consulting security
+team and those couple of bit settings came from them. The folks
+are no longer working for TI so I can't go back and check the reasons.
+We just just leave them as is.
 
-Please look into using this solution, thanks.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Regards,
+Santosh
