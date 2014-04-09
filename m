@@ -1,56 +1,35 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 9 Apr 2014 09:17:30 -0700
-Subject: Big endian working?
-In-Reply-To: <4880190.MJBhke5aDa@wuerfel>
-References: <20140408095446.0520dd28@skate>
- <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
- <53450D3A.7030909@linaro.org> <4880190.MJBhke5aDa@wuerfel>
-Message-ID: <CAA3XUr2QQy_cy6yP19HWNxCcwPbY9FUi9VAZj7easz+HkLZa+A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Apr 2014 17:18:26 +0100
+Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
+In-Reply-To: <20140408154117.GI16119@n2100.arm.linux.org.uk>
+References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
+ <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
+ <20140408082444.GA3598@e103592.cambridge.arm.com>
+ <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
+ <20140408133039.GH16119@n2100.arm.linux.org.uk>
+ <20140408152735.GA30076@redhat.com>
+ <20140408154117.GI16119@n2100.arm.linux.org.uk>
+Message-ID: <20140409161826.GW16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 April 2014 02:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 09 April 2014 12:04:58 Taras Kondratiuk wrote:
->>
->> > Maybe Nico's zImage change was under atags umbrella by mistake and
->> > it really addresses general zImage issue. In this case we need to add
->> > this commit to main line. However, I don't think we need to carry
->> > CPU_BE8_BOOT_LE option forward, why we just use
->> > CONFIG_CPU_BIG_ENDIAN instead. Note in all cases when BE
->> > image used loader is always in LE mode. Never seen case
->> > otherwise.
->>
->> That makes sense, but I'm concerned about BE32 systems.
->> Do they also have LE bootloaders? I don't remember kernel code which
->> switches to BE32. I'd think that switch is done by bootloader or
->> ROMcode. Or even BE hardwired in HW. So BE32 bootloader may expect to
->> see BE zImage header.
->> Maybe instead of CONFIG_CPU_BIG_ENDIAN use CONFIG_CPU_ENDIAN_BE8?
+On Tue, Apr 08, 2014 at 04:41:17PM +0100, Russell King - ARM Linux wrote:
+> I think let's start out by killing this function - the semantics of
+> this function have been lost, so it's not clear what it was supposed
+> to do in its original form.  Even going back to the start of git
+> history, it looks like it was never used outside arch code.
 
-I doubt that those old bootloaders could handle zImage
-and patch under discussion is only about zImage. But
-it is fine let's use CONFIG_CPU_ENDIAN_BE8 to be
-on conservative side.
+I floated a patch to remove flush_icache_user_range() to the architecture
+maintainers, giving the background to how this came about.  I received the
+following reply from David Miller:
 
-Taras, could please change Nico's/Ben's zImage patch
-properly and submit it for quick review and further submission
-to mainline. It would be good to have zImage load fixed for
-big endian.
+> ptrace() accesses (via __access_remote_vm()) already use an existing
+> helper function for these sorts of situations, in the form of
+> copy_{to,from}_user_page().  I would suggest that uprobes uses that
+> as well.
 
-> Agreed. CONFIG_CPU_ENDIAN_BE32 basically means ixp4xx. Whatever those
-> systems do today, I think we should better not change anything
-> for them. If nobody has complained for the last 10 years, everyone
-> who cares must have already found a working solution by now.
->
-> For BE8, I think we should just try to do the right thing before
-> we see mass deployments of broken boot loaders.
+I think this is a very valid point, and echo's my point.
 
-Agreed. For any BE work we've done it was stated that
-it should work with regular LE bootloaders. In fact any system
-should be able to switch between LE and BE images without
-any other changes, not even bootloader setting or variable.
-
-Thanks,
-Victor
-
->         Arnd
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
