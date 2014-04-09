@@ -1,113 +1,155 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 09 Apr 2014 16:45:06 +0200
-Subject: [PATCH] arm: exynos: generalize power register address calculation
-In-Reply-To: <CANuQgHEdks=OwF=N3LULmxujAeVVcLW3H++ixVZ3REfSrOieQA@mail.gmail.com>
-References: <1396973737-18693-1-git-send-email-chander.kashyap@linaro.org>
- <1397041783-18531-1-git-send-email-chander.kashyap@linaro.org>
- <534533E6.10901@samsung.com>
- <CANuQgHEdks=OwF=N3LULmxujAeVVcLW3H++ixVZ3REfSrOieQA@mail.gmail.com>
-Message-ID: <53455CF2.9020704@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 10 Apr 2014 01:14:26 +0800
+Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
+In-Reply-To: <534571F0.10706@free-electrons.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+ <534571F0.10706@free-electrons.com>
+Message-ID: <CAGb2v651R-sG3OB4aD4UXWiyQVcHz7zXub1wO6B4xp-toUcC7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.04.2014 15:49, Chander Kashyap wrote:
-> Hi Tomasz,
+On Thu, Apr 10, 2014 at 12:14 AM, Boris BREZILLON
+<boris.brezillon@free-electrons.com> wrote:
 >
-> On 9 April 2014 17:19, Tomasz Figa <t.figa@samsung.com> wrote:
->> Hi Chander,
+> On 09/04/2014 16:53, Chen-Yu Tsai wrote:
+>> Hi Boris,
 >>
->>
->> On 09.04.2014 13:09, Chander Kashyap wrote:
+>> On Wed, Apr 9, 2014 at 9:51 PM, Boris BREZILLON
+>> <boris.brezillon@free-electrons.com> wrote:
+>>> Hello,
 >>>
->>> Currently status/configuration power register values are hard-coded for
->>> cpu1.
->>>
->>> Make it generic so that it is useful for SoC's with more than two cpus.
->>>
->>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->>> ---
->>> changes in v2 : Used existing macros for clusterid and cpuid calculation
->>>
->>>    arch/arm/mach-exynos/hotplug.c  |   15 ++++++++++++---
->>>    arch/arm/mach-exynos/platsmp.c  |   20 +++++++++++++++-----
->>>    arch/arm/mach-exynos/regs-pmu.h |    9 +++++++--
->>>    3 files changed, 34 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/hotplug.c
->>> b/arch/arm/mach-exynos/hotplug.c
->>> index 5eead53..eab6121 100644
->>> --- a/arch/arm/mach-exynos/hotplug.c
->>> +++ b/arch/arm/mach-exynos/hotplug.c
->>> @@ -17,6 +17,7 @@
->>>
->>>    #include <asm/cacheflush.h>
->>>    #include <asm/cp15.h>
->>> +#include <asm/cputype.h>
->>>    #include <asm/smp_plat.h>
->>>
->>>    #include <plat/cpu.h>
->>> @@ -92,11 +93,19 @@ static inline void cpu_leave_lowpower(void)
->>>
->>>    static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->>>    {
->>> +       unsigned int mpidr, cpunr, cluster;
->>> +
->>> +       mpidr = cpu_logical_map(cpu);
->>> +       cpunr = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->>> +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->>> +
->>> +       /* Maximum possible cpus in a cluster can be 4 */
->>> +       cpunr += cluster * 4;
->>
->>
->> I believe this is rather a weak assumption. First of all, the limit seems to
->> be hardcoded only for the few existing SoCs. In addition, the value is not
->> used as a maximum, but rather it is assumed that each cluster has always
->> four cores.
+>>> This series rework the sunxi pinctrl driver to support the PLx pins
+>>> available on the A31 SoC.
+>> Thanks for working on this. I mentioned to Maxime on IRC yesterday that
+>> we have complete pinctrl drivers for both A31 and A23, based on our current
+>> pinctrl-sunxi driver, in the A23 SDK. These have the complete pin mapping.
 >
-> The MPIDR register contains 2 bits for cpu id. Hence maximum number of
-> cpus can be 4 only (A15/A9/A7).
+> Thanks for pointing this out, I'll take a look.
 >
+>>
+>>> It also add missing A31 reset controller DT bindings documentation.
+>>>
+>>> I need those PL pins (actually I only need PL0 and PL1) to support
+>>> the P2WI bus, which in turn is used to communicate with the AXP221
+>>> PMIC.
+>> If you could, please add all the PL and PM pins.
+>
+> Sure, I'll add pin macros for L and M ports.
+>
+>> As I said, you can find complete definitions in the A23 SDK.
+>>
+>>> Let me know if these changes are too intrusive.
+>> I wonder if we should do a separate driver for the new PIO controller.
+>> Clearly it's a separate IP block, with it's own clock and reset controls.
+>
+> This is what I had in mind in the first place, but then I encountered
+> several issues when doing so:
+>
+>  1) the gpio chip is not dynamically allocated but is declared as a
+> static variable instead
 
-This is not what I meant. Exynos5260 contains 2 big cores (not 4) and 4 
-little cores. Are you sure that PMU register layout on Exynos5260 
-matches your equation?
+Hmm. Not sure if this is worth the change.
 
+>  2) we have to tweak the pinctrl base field, otherwise the pin numbers
+> overlap
+
+Documentation says pin numbers are global, however the pinctrl core code
+only looks up a pin by number in a pinctrl device only.
+
+Also I see mfd pinctrl drivers (ab8500, as3722) have pin numbers starting
+from 0. So definitely some confusion there.
+
+>  3) other things I haven't noticed yet :-)
+
+Reworking EINT to use one interrupt per bank will yield some more surprises.
+
+There's also new gpiolib irqchip helpers, but that will require reworking
+each pin bank into separate gpio chips. May be more work than just adding
+different irq domains for different banks.
+
+See: https://lkml.org/lkml/2014/3/25/175
+
+> I'll try to rework the driver to be able to declare 2 separated pin
+> controllers.
+
+Thanks again.
+
+ChenYu
+
+>> Allwinner sources list this block as "R_PIO". I suggest using this name.
+>> Clearly "pioL" does not cover all the functionality.
+>
+> Fair enough. I'll modify it.
+>
 >>
->> Moreover, it is assumed here that the mapping between core ID (calculated by
->> the equation below) and PMU core numbers is 1:1, which is not true. On
->> Exynos4210, the cluster ID is always 0x09 and on Exynos4x12 it is 0x0a,
->> which will lead to completely wrong register offsets.
+>> I have started to document the PRCM block: http://linux-sunxi.org/PRCM
+>>
+>> Last, please send the patches to the linux-sunxi mailing list as well.
+>> At the very least, Hans will see them and add them to sunxi-devel branch.
 >
-> Exynos4210 and Exynos4x12, cluster ids are not passed from DT as it
-> breaks the gic_init_bases. Hence the Physical CpuID for Exynos4210
-> will be 0,1 and Exynos4x12 will be 0,1,2,3.
+> Sure, this is an oversight, I'm using get_maintainer and just forgot to
+> add Hans and the linux-sunxi ML. But I'll take care to add you, hans and
+> the sunxi ML in Cc next time.
 >
-> So it will not break.
-
-I already have patches ready fixing GIC driver, just waiting for 
-3.15-rc1 to be released. Anyway, CPU topology in DT is mandatory and 
-Exynos4 device tree files need to be fixed to contain them. This needs 
-to be accounted for in any changes touching CPU topology related code.
-
+> Thanks for your review.
 >
+> Best Regards,
+>
+> Boris
 >
 >>
->> I believe the proper way to deal with this is to provide per-CPU property in
->> DT called "samsung,pmu-offset" that could be used be code like this to
->> calculate register addresses properly.
 >>
->> For now, I would recommend doing the above ignoring cluster ID completely to
->> not break (and actually fix) single cluster systems and existing multi
->> cluster ones on which only the first cluster is supported now.
+>> Cheers,
+>> ChenYu
 >>
->> After that, per-CPU PMU offset should be implemented to support
->> multi-cluster SoCs with proper support of multiple clusters.
+>>> Best Regards,
+>>>
+>>> Boris
+>>>
+>>> Boris BREZILLON (15):
+>>>   ARM: sunxi: dt: list all pinctrl compatible strings
+>>>   ARM: sunxi: dt: document pinctrl clock related properties
+>>>   ARM: sunxi: dt: add pinctrl clock-names properties
+>>>   pinctrl: sunxi: specify clk name when retrieving pinctrl pio clk
+>>>   clk: sunxi: add A31 APB0 clk gate defintions
+>>>   clk: sunxi: add A31 APB0 gates compatible string to the documentation
+>>>   ARM: sunxi: dt: define A31's APB0 clk gates node
+>>>   reset: sunxi: document sunxi's reset controllers bindings
+>>>   clk: sunxi: add A31 APB0 reset line defintions
+>>>   pinctrl: sunxi: add PL pin definitions
+>>>   pinctrl: sunxi: add support for A31 PL pins
+>>>   pinctrl: sunxi: retrieve and enable PL clk gate for A31 SoC
+>>>   pinctrl: sunxi: retrieve and enable PL reset line for A31 SoC
+>>>   pinctrl: sunxi: define A31 PL0/PL1 pins
+>>>   ARM: sunxi: dt: add support for A31's PL pins
+>>>
+>>>  Documentation/devicetree/bindings/clock/sunxi.txt  |   1 +
+>>>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |  13 +-
+>>>  .../bindings/reset/allwinner,sunxi-clock-reset.txt |  21 +++
+>>>  arch/arm/boot/dts/sun4i-a10.dtsi                   |   1 +
+>>>  arch/arm/boot/dts/sun5i-a10s.dtsi                  |   1 +
+>>>  arch/arm/boot/dts/sun5i-a13.dtsi                   |   1 +
+>>>  arch/arm/boot/dts/sun6i-a31.dtsi                   |  25 ++-
+>>>  arch/arm/boot/dts/sun7i-a20.dtsi                   |   1 +
+>>>  drivers/clk/sunxi/clk-sunxi.c                      |   5 +
+>>>  drivers/pinctrl/pinctrl-sunxi-pins.h               |   8 +
+>>>  drivers/pinctrl/pinctrl-sunxi.c                    | 205 +++++++++++++++------
+>>>  drivers/pinctrl/pinctrl-sunxi.h                    |  39 +++-
+>>>  12 files changed, 264 insertions(+), 57 deletions(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+>>>
+>>> --
+>>> 1.8.3.2
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
-> As of now the smp-boot (cores > 2) is broken. This is required to fix it.
-
-SMP boot works fine on all four cores of Exynos 4412. Obiously 
-hot-(un)plug doesn't, but this is another issue.
-
-Best regards,
-Tomasz
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
