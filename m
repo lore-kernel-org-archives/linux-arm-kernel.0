@@ -1,33 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 09 Apr 2014 17:35:34 +0100
-Subject: Big endian working?
-In-Reply-To: <CAA3XUr2QQy_cy6yP19HWNxCcwPbY9FUi9VAZj7easz+HkLZa+A@mail.gmail.com>
-References: <20140408095446.0520dd28@skate>
- <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
- <53450D3A.7030909@linaro.org> <4880190.MJBhke5aDa@wuerfel>
- <CAA3XUr2QQy_cy6yP19HWNxCcwPbY9FUi9VAZj7easz+HkLZa+A@mail.gmail.com>
-Message-ID: <534576D6.4060003@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Apr 2014 17:38:03 +0100
+Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
+In-Reply-To: <20140409161826.GW16119@n2100.arm.linux.org.uk>
+References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
+ <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
+ <20140408082444.GA3598@e103592.cambridge.arm.com>
+ <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
+ <20140408133039.GH16119@n2100.arm.linux.org.uk>
+ <20140408152735.GA30076@redhat.com>
+ <20140408154117.GI16119@n2100.arm.linux.org.uk>
+ <20140409161826.GW16119@n2100.arm.linux.org.uk>
+Message-ID: <20140409163803.GY16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/14 17:17, Victor Kamensky wrote:
-> On 9 April 2014 02:38, Arnd Bergmann <arnd@arndb.de> wrote:
->> For BE8, I think we should just try to do the right thing before
->> we see mass deployments of broken boot loaders.
+On Wed, Apr 09, 2014 at 05:18:26PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 08, 2014 at 04:41:17PM +0100, Russell King - ARM Linux wrote:
+> > I think let's start out by killing this function - the semantics of
+> > this function have been lost, so it's not clear what it was supposed
+> > to do in its original form.  Even going back to the start of git
+> > history, it looks like it was never used outside arch code.
 > 
-> Agreed. For any BE work we've done it was stated that
-> it should work with regular LE bootloaders. In fact any system
-> should be able to switch between LE and BE images without
-> any other changes, not even bootloader setting or variable.
+> I floated a patch to remove flush_icache_user_range() to the architecture
+> maintainers, giving the background to how this came about.  I received the
+> following reply from David Miller:
+> 
+> > ptrace() accesses (via __access_remote_vm()) already use an existing
+> > helper function for these sorts of situations, in the form of
+> > copy_{to,from}_user_page().  I would suggest that uprobes uses that
+> > as well.
+> 
+> I think this is a very valid point, and echo's my point.
 
-Yup.
+More comments from David about using copy_{to,from}_user_page():
 
-And from a slightly different perspective, kvmtool has no idea whether
-it is booting a BE or LE guest, and I'd very much like to keep it
-blissfully unaware.
+> They should use it at first, then if there is a problem we can identify
+> exactly what can be optimized or needs to be, and expand the interface
+> as needed.
+>
+> Let's not optimize first.
 
-Thanks,
+Please look into using this solution, thanks.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
