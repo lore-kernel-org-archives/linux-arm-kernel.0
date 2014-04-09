@@ -1,34 +1,19 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 9 Apr 2014 20:24:59 +0200
-Subject: [RFC PATCH] ARM: uprobes need icache flush after xol write
-In-Reply-To: <20140409161826.GW16119@n2100.arm.linux.org.uk>
-References: <1396926260-7705-1-git-send-email-victor.kamensky@linaro.org>
- <1396926260-7705-2-git-send-email-victor.kamensky@linaro.org>
- <20140408082444.GA3598@e103592.cambridge.arm.com>
- <20140408114619.GE16119@n2100.arm.linux.org.uk> <5343F42D.5090205@linaro.org>
- <20140408133039.GH16119@n2100.arm.linux.org.uk>
- <20140408152735.GA30076@redhat.com>
- <20140408154117.GI16119@n2100.arm.linux.org.uk>
- <20140409161826.GW16119@n2100.arm.linux.org.uk>
-Message-ID: <20140409182459.GA380@redhat.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 9 Apr 2014 20:25:53 +0200
+Subject: current->sched_class->yield_task is NULL, any hint?
+In-Reply-To: <CAF1ivSbZKbDc+rzd+CUqCzNmSgZmZTE-QeSU-2WmSiuEs-Kw_w@mail.gmail.com>
+References: <CAF1ivSbZKbDc+rzd+CUqCzNmSgZmZTE-QeSU-2WmSiuEs-Kw_w@mail.gmail.com>
+Message-ID: <20140409182553.GE10526@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09, Russell King - ARM Linux wrote:
->
-> I floated a patch to remove flush_icache_user_range() to the architecture
-> maintainers, giving the background to how this came about.  I received the
-> following reply from David Miller:
->
-> > ptrace() accesses (via __access_remote_vm()) already use an existing
-> > helper function for these sorts of situations, in the form of
-> > copy_{to,from}_user_page().  I would suggest that uprobes uses that
-> > as well.
->
-> I think this is a very valid point, and echo's my point.
+On Wed, Apr 09, 2014 at 10:43:32AM -0700, Lin Ming wrote:
+> Hi Peter,
+> 
+> I hit a panic in sys_sched_yield() because(for some unknown reason)
+> current->sched_class->yield_task is NULL.
+> It's an ARM embedded board with 3.4-rt kernel.
+> 
+> Could you share any hint for the possible causes?
 
-Well. So far I disagree, but let me reply tomorrow.
-
-Sorry, right now I can't even read this thread.
-
-Oleg.
+What class does current->sched_class point to?
