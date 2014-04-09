@@ -1,34 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Apr 2014 20:19:33 +0100
-Subject: [PATCH v2] ARM: uprobes need icache flush after xol write
-In-Reply-To: <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
-References: <1397023132-10313-1-git-send-email-victor.kamensky@linaro.org>
- <1397023132-10313-2-git-send-email-victor.kamensky@linaro.org>
- <20140409184507.GA1058@redhat.com>
- <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
-Message-ID: <20140409191932.GB16119@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 9 Apr 2014 23:19:30 +0400
+Subject: [PATCH] ARM: shmobile: r8a7791: link PCI USb devices to USB PHY
+Message-ID: <201404092319.31646.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 12:13:56PM -0700, Victor Kamensky wrote:
-> Fair enough. Can do that, as well as address Dave's comment about
-> checkpatch.
-> 
-> But before I do that let's reach some conclusion wrt latest Russell's
-> remarks about copy_{to,from}_user_page usage in uprobes. It is bigger
-> question covering more than ARM issue and possibly having bigger
-> implication on uprobes design. I have some comments/thoughts about
-> it, but since I am not uprobes maintainer, will wait for you to address
-> it first.
+Describe the PCI USB devices that are behind the PCI bridges, adding necessary
+links to the USB PHY device.
 
-I encourage folk to read this thread:
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-http://lkml.iu.edu//hypermail/linux/kernel/1404.1/00725.html
+---
+This patch is against 'renesas-devel-v3.14-20140408' tag of Simon Horman's
+'renesas.git' repo plus R8A7791/Koelsch PCI and USB PHY support patches posted
+yesterday and day before. The patch requires the internal PCI and USB PHY
+drivers (also already posted) in order to work...
 
-and involve David in the loop - I suspect you need to sell whatever
-solution you agree on to David (as one of the other arch maintainers)
-as well.  Thanks.
+ arch/arm/boot/dts/r8a7791.dtsi |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
++++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+@@ -891,6 +891,20 @@
+ 		bus-range = <0 0>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
++
++		pci at 0,1 {
++			reg = <0x800 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usbphy 0 0>;
++			phy-names = "usb";
++		};
++
++		pci at 0,2 {
++			reg = <0x1000 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usbphy 0 0>;
++			phy-names = "usb";
++		};
+ 	};
+ 
+ 	pci1: pci at ee0d0000 {
+@@ -904,5 +918,19 @@
+ 		bus-range = <1 1>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
++
++		pci at 0,1 {
++			reg = <0x800 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usbphy 2 0>;
++			phy-names = "usb";
++		};
++
++		pci at 0,2 {
++			reg = <0x1000 0 0 0 0>;
++			device_type = "pci";
++			phys = <&usbphy 2 0>;
++			phy-names = "usb";
++		};
+ 	};
+ };
