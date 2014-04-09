@@ -1,41 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Apr 2014 11:32:52 +0200
-Subject: [RFC 0/3] future of gemini platform
-In-Reply-To: <CACRpkdYuxJ2CWQGDCWx+4Yp2r3=OVunyx2kfTyBKay43jaHvnA@mail.gmail.com>
-References: <1357310500-19848-1-git-send-email-arnd@arndb.de>
- <1357310500-19848-5-git-send-email-arnd@arndb.de>
- <CACRpkdYuxJ2CWQGDCWx+4Yp2r3=OVunyx2kfTyBKay43jaHvnA@mail.gmail.com>
-Message-ID: <8341946.9jZiCPfkKB@wuerfel>
+Date: Wed, 09 Apr 2014 11:38:45 +0200
+Subject: Big endian working?
+In-Reply-To: <53450D3A.7030909@linaro.org>
+References: <20140408095446.0520dd28@skate>
+ <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
+ <53450D3A.7030909@linaro.org>
+Message-ID: <4880190.MJBhke5aDa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 April 2014 10:40:48 Linus Walleij wrote:
-> On Fri, Jan 4, 2013 at 3:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > Arnd Bergmann (3):
-> >   ARM: gemini: get platform to build again
-> >   ARM: gemini: remove platform support
-> >   ARM: remove fa526 CPU support
+On Wednesday 09 April 2014 12:04:58 Taras Kondratiuk wrote:
 > 
-> Arnd: I suggest you rebase and apply this series, sans the FA526
-> removal as I hear it may now be used on the Moxart.
+> > Maybe Nico's zImage change was under atags umbrella by mistake and
+> > it really addresses general zImage issue. In this case we need to add
+> > this commit to main line. However, I don't think we need to carry
+> > CPU_BE8_BOOT_LE option forward, why we just use
+> > CONFIG_CPU_BIG_ENDIAN instead. Note in all cases when BE
+> > image used loader is always in LE mode. Never seen case
+> > otherwise.
 > 
-> I patched the generic time code for gemini in october last year
-> and noone has yet bothered to even test it!
+> That makes sense, but I'm concerned about BE32 systems.
+> Do they also have LE bootloaders? I don't remember kernel code which
+> switches to BE32. I'd think that switch is done by bootloader or 
+> ROMcode. Or even BE hardwired in HW. So BE32 bootloader may expect to
+> see BE zImage header.
+> Maybe instead of CONFIG_CPU_BIG_ENDIAN use CONFIG_CPU_ENDIAN_BE8?
 
-I guess you mean just the middle patch then? The first one
-was actually applied.
+Agreed. CONFIG_CPU_ENDIAN_BE32 basically means ixp4xx. Whatever those
+systems do today, I think we should better not change anything
+for them. If nobody has complained for the last 10 years, everyone
+who cares must have already found a working solution by now.
 
-On the other hand, I did make a patch now to enable multiplatform
-support for gemini that I was planning to send for review.
-
-Florian, what is the status of gemini in openwrt? From what I can
-tell, it's stuck at linux-3.9 [1], which is probably why nobody has
-tested Linus' timer code. It's not clear if anyone is still interested
-in it, but I also don't see a reason why any of the patches in
-the openwrt repository couldn't just get merged (with some trivial
-changes in a few cases).
+For BE8, I think we should just try to do the right thing before
+we see mass deployments of broken boot loaders.
 
 	Arnd
-
-http://git.openwrt.org/?p=openwrt.git;a=history;f=target/linux/gemini/patches;h=b58795e82765935eba3f001c39c8e4ca8c3c549e;hb=HEAD
