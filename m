@@ -1,35 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 09 Apr 2014 09:32:31 -0600
-Subject: [PATCHv3 0/5] net: rfkill: gpio: cleanup and a few new acpi ids
-In-Reply-To: <20140409100147.GB3083@xps8300>
-References: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1396946275.5936.2.camel@jlt4.sipsolutions.net>
- <20140409100147.GB3083@xps8300>
-Message-ID: <5345680F.3040903@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Apr 2014 17:33:34 +0200
+Subject: [PATCH 12/15] pinctrl: sunxi: retrieve and enable PL clk gate
+ for A31 SoC
+In-Reply-To: <1397051478-4113-13-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397051478-4113-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140409153334.GI28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2014 04:01 AM, Heikki Krogerus wrote:
-> Hi,
+On Wed, Apr 09, 2014 at 03:51:15PM +0200, Boris BREZILLON wrote:
+> Retrieve and enable the clock gate related to PL pins.
 > 
-> On Tue, Apr 08, 2014 at 10:37:55AM +0200, Johannes Berg wrote:
->> On Tue, 2014-04-01 at 17:02 +0300, Heikki Krogerus wrote:
->>> I hope this one is OK with everyone.
->>
->> It's fine with me. Are you expecting me to pick up any of these patches,
->> or do you want them to go through some other tree? Either way is fine
->> with me, but the first patch looks like something I probably shouldn't
->> be taking.
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/pinctrl/pinctrl-sunxi.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> The second patch depends on it.
-> 
-> Stephen! Are you expecting any changes to board-paz00.c in this kernel
-> cycle? If not, I think it would be easiest if Johannes, you take the
-> whole set. What do you guys think?
+> diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+> index 64dffc8..da76ceb 100644
+> --- a/drivers/pinctrl/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/pinctrl-sunxi.c
+> @@ -898,6 +898,13 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
+>  			return -ENOMEM;
+>  
+>  		pctl->get_membase = sun6i_a31_pinctrl_get_membase;
+> +		clk = devm_clk_get(&pdev->dev, "pioL_clk");
+> +		if (IS_ERR(clk))
+> +			return PTR_ERR(clk);
+> +
+> +		ret = clk_prepare_enable(clk);
+> +		if (ret)
+> +			return ret;
 
-I can't predict the future, but the chances are pretty slim - that file
-is pretty tiny and doesn't have much churn.
+Since the pioL_clk isn't declared in the DT yet, the pinctrl driver
+won't ever probe here.
 
-The best approach is to put this series in its own topic branch. Then,
-if any conflict does come up, I can simply merge the branch into the
-Tegra treee and apply the conflicting patches on top.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/71bdef5e/attachment-0001.sig>
