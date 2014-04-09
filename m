@@ -1,52 +1,30 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 09 Apr 2014 16:45:52 +0200
-Subject: [PATCH 06/15] clk: sunxi: add A31 APB0 gates compatible string
- to the documentation
-In-Reply-To: <CAGb2v645Yu_1ODQhVcQjjFf1M0uf3aHBfRw4F_uhoYk9RozcOA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Apr 2014 16:49:40 +0200
+Subject: [PATCH 05/15] clk: sunxi: add A31 APB0 clk gate defintions
+In-Reply-To: <1397051478-4113-6-git-send-email-boris.brezillon@free-electrons.com>
 References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397051478-4113-7-git-send-email-boris.brezillon@free-electrons.com>
- <CAGb2v645Yu_1ODQhVcQjjFf1M0uf3aHBfRw4F_uhoYk9RozcOA@mail.gmail.com>
-Message-ID: <53455D20.1090804@free-electrons.com>
+ <1397051478-4113-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140409144940.GE28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 09, 2014 at 03:51:08PM +0200, Boris BREZILLON wrote:
+> Add APB0 gates support for the A31 SoC.
+> This gates are controlled by the PRCM (Power/Reset/Clock Management) block
+> and thus will act on a different iomem range.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-On 09/04/2014 15:59, Chen-Yu Tsai wrote:
-> Hi,
->
-> On Wed, Apr 9, 2014 at 9:51 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
->> Add the new "allwinner,sun6i-a31-apb0-gates-clk" compatible string to the
->> sunxi clock documentation.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index c2cb762..bc30387 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -25,6 +25,7 @@ Required properties:
->>         "allwinner,sun4i-apb0-gates-clk" - for the APB0 gates on A10
->>         "allwinner,sun5i-a13-apb0-gates-clk" - for the APB0 gates on A13
->>         "allwinner,sun5i-a10s-apb0-gates-clk" - for the APB0 gates on A10s
->> +       "allwinner,sun6i-a31-apb0-gates-clk" - for the APB0 gates on A10s
->                                                                        ^^^^
-> Copy paste error here.
-
-Oops, it'll be fixed in the next version.
-
->
->
-> ChenYu
->
->>         "allwinner,sun7i-a20-apb0-gates-clk" - for the APB0 gates on A20
->>         "allwinner,sun4i-apb1-clk" - for the APB1 clock
->>         "allwinner,sun4i-apb1-mux-clk" - for the APB1 clock muxing
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/65648e2f/attachment.sig>
