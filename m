@@ -1,32 +1,87 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Wed, 9 Apr 2014 13:01:47 +0300
-Subject: [PATCHv3 0/5] net: rfkill: gpio: cleanup and a few new acpi ids
-In-Reply-To: <1396946275.5936.2.camel@jlt4.sipsolutions.net>
-References: <1396360976-28657-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1396946275.5936.2.camel@jlt4.sipsolutions.net>
-Message-ID: <20140409100147.GB3083@xps8300>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 9 Apr 2014 12:03:13 +0200
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <20140409082341.GV29751@pengutronix.de>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com> <20140408175904.GT29751@pengutronix.de>
+ <20140408234243.GB13898@piout.net>
+ <20140409082341.GV29751@pengutronix.de>
+Message-ID: <20140409100313.GA20704@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Apr 08, 2014 at 10:37:55AM +0200, Johannes Berg wrote:
-> On Tue, 2014-04-01 at 17:02 +0300, Heikki Krogerus wrote:
-> > I hope this one is OK with everyone.
+On 09/04/2014 at 10:23:41 +0200, Uwe Kleine-K?nig wrote :
+> > While I had exactly the same issue back in september and wrote the exact
+> > same patch that got rejected. I would agree with Thierry here taht we
+> > need to keep the pwm_disable() there as it potentially allows to save
+> > power.
+> >
+> > However, it seems to not work quite well with PWMs from Freescale (see
+> > the thread from Russell). Or I would say with PWM with an undefined
+> > state when disabled and I believe we are soon to find more.
+> > 
+> > We could either:
+> >  - add a flag like can_sleep that would allow driver to know that the
+> >    pwm always has to be enable to get sane results.
+> >
+> >  - or introduce functions like prepare/unprepare to be called from probe
+> >    and remove in the leds-pwm driver and that will enable/disable the
+> > channel in pwm-mxs. pwm_enable/pwm_disable not doing anything.
+> There are a few more options. I repeat your's to get a single list:
 > 
-> It's fine with me. Are you expecting me to pick up any of these patches,
-> or do you want them to go through some other tree? Either way is fine
-> with me, but the first patch looks like something I probably shouldn't
-> be taking.
+>  a) Somehow tell the API users that pwm_disable might not result in a
+>     flat zero after set_duty(0).
+>  a') Anchor in the API that users must not expect anything from the pwm
+>     pin after pwm_disable.
+>  b) Make pwm_enable/pwm_disable noops on i.MX28
+>  c) Make set_duty only return when the new value reached the pin.
+>  d) Make pwm_disable wait to yield the expected result
+>  d') Make pwm_disable wait if the last programmed duty cycle is 0 or
+>     full period.
+>  e) Introduce a new callback that does the waiting, e.g. a .commit
+>     callback
+>  e') Introduce a new callback pwm_config_sync that does wait
+>     appropriatly, keep pwm_config as is.
+>  f) Make the i.MX28 driver switch the pin the gpio mode with the
+>     expected output level in pwm_disable.
+> 
+> a') is a special case of a); d') is a special case of d), ditto for e')
+> and e).
+> 
+> a) and e) would result in changes in the pwm API. For c) I'd like to
+> make the API docs more explicit, too. (i.e. demand that the new
+> configuration is already active after pwm_config returns)
+> 
+> Both e) and a) have the drawback that the API becomes more complicated
+> and users will get it wrong. a) and b) are bad from a power management
+> POV. Maybe c) is what most users expect, but d) and d') are more
+> effective as they result in less waiting and still are good enough. f)
+> is more complicated to implement, also it depends on a gpio being
+> available in hardware. So if we choose f) we still might need a fallback
+> implementation from the other options.
+> 
+> My series implemented a'), but Thierry didn't like it. I think my
+> favorite is e').
+> 
 
-The second patch depends on it.
+I think I would actually prefer d'. Doing the synchronisation in d' is
+abstracting it for the user.
+But e' is also fine as long as we manage to educate users of when to use
+pwm_config() or pwm_config_sync(). I believe your idea for leds-pwm
+would be to call pwm_config_sync() instead of pwm_config() before
+pwm_disable().
 
-Stephen! Are you expecting any changes to board-paz00.c in this kernel
-cycle? If not, I think it would be easiest if Johannes, you take the
-whole set. What do you guys think?
+I actually had to implement d' for pwm-atmel, to wait that the last
+update got through before disabling the pwm, see
+http://thread.gmane.org/gmane.linux.pwm/451 but doing that in
+pwm_config_sync() would probably also work.
 
 
-Thanks,
+For a and a' I think that Thierry intended that a user could expect
+pwm_disable() to not change the output of the PWM when the duty cycle is
+0.
 
 -- 
-heikki
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
