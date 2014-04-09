@@ -1,86 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 9 Apr 2014 10:23:41 +0200
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-In-Reply-To: <20140408234243.GB13898@piout.net>
-References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
- <5343FDD3.3070308@i2se.com> <20140408175904.GT29751@pengutronix.de>
- <20140408234243.GB13898@piout.net>
-Message-ID: <20140409082341.GV29751@pengutronix.de>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 09 Apr 2014 10:37:13 +0200
+Subject: [PATCH 3/3] ARM: socfpga: dts: add reset-controller
+In-Reply-To: <53435F37.7060301@gmail.com>
+References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396629087-23727-4-git-send-email-s.trumtrar@pengutronix.de>
+ <1396905121.25236.2.camel@linux-builds1>
+ <20140407224110.GA28399@pengutronix.de> <53435F37.7060301@gmail.com>
+Message-ID: <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Wed, Apr 09, 2014 at 01:42:43AM +0200, Alexandre Belloni wrote:
-> On 08/04/2014 at 19:59:04 +0200, Uwe Kleine-K?nig wrote :
-> > On Tue, Apr 08, 2014 at 03:46:59PM +0200, Stefan Wahren wrote:
-> > > Am 08.04.2014 13:29, schrieb Shawn Guo:
-> > > Unfortunately the led still don't behave as expected. If i set the led
-> > > trigger to heartbeat the led goes on and stays in this state.
-> > > 
-> > > May be this has something to do with the following discussion
-> > > 
-> > > http://comments.gmane.org/gmane.linux.leds/208
-> > I guess that's your problem, yes. Does patch 2 of my series (i.e.
-> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/282593/focus=282596)
-> > help you?
-> > 
-> 
-> While I had exactly the same issue back in september and wrote the exact
-> same patch that got rejected. I would agree with Thierry here taht we
-> need to keep the pwm_disable() there as it potentially allows to save
-> power.
+Dinh Nguyen <dinh.linux@gmail.com> writes:
+
+> On 4/7/14 5:41 PM, Steffen Trumtrar wrote:
+>> On Mon, Apr 07, 2014 at 04:12:01PM -0500, Dinh Nguyen wrote:
+>>> On Fri, 2014-04-04 at 18:31 +0200, Steffen Trumtrar wrote:
+>>>> Add the necessary #reset-cells property to the rst-mgr node and
+>>>> provide a header-file with all possible resets specified.
+>>>>
+>>>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>>> ---
+>>>>  arch/arm/boot/dts/socfpga.dtsi           |  8 ++-
+>>>>  include/dt-bindings/reset/altr,rst-mgr.h | 90 ++++++++++++++++++++++++++++++++
+>>> Does this file belong under dt-bindings/reset/ or
+>>> dt-bindings/reset-controller/?
+>>>
+>> ATM there is no such directory, or is there ?
+>> So, reset seems appropriate I think.
+> commit [6b7f06 ARM: STi: STiH415: Add reset controller support.]
+> Seems more appropriate for this to go into reset-controller.
 >
-> However, it seems to not work quite well with PWMs from Freescale (see
-> the thread from Russell). Or I would say with PWM with an undefined
-> state when disabled and I believe we are soon to find more.
-> 
-> We could either:
->  - add a flag like can_sleep that would allow driver to know that the
->    pwm always has to be enable to get sane results.
->
->  - or introduce functions like prepare/unprepare to be called from probe
->    and remove in the leds-pwm driver and that will enable/disable the
-> channel in pwm-mxs. pwm_enable/pwm_disable not doing anything.
-There are a few more options. I repeat your's to get a single list:
 
- a) Somehow tell the API users that pwm_disable might not result in a
-    flat zero after set_duty(0).
- a') Anchor in the API that users must not expect anything from the pwm
-    pin after pwm_disable.
- b) Make pwm_enable/pwm_disable noops on i.MX28
- c) Make set_duty only return when the new value reached the pin.
- d) Make pwm_disable wait to yield the expected result
- d') Make pwm_disable wait if the last programmed duty cycle is 0 or
-    full period.
- e) Introduce a new callback that does the waiting, e.g. a .commit
-    callback
- e') Introduce a new callback pwm_config_sync that does wait
-    appropriatly, keep pwm_config as is.
- f) Make the i.MX28 driver switch the pin the gpio mode with the
-    expected output level in pwm_disable.
+Okay, the current mainline master now has include/dt-bindings/reset and
+include/dt-bindings/reset-controller.
 
-a') is a special case of a); d') is a special case of d), ditto for e')
-and e).
+I think one of those directories shouldn't be there, but be merged in
+the other instead. But which one? Where shall I put my precious code?
 
-a) and e) would result in changes in the pwm API. For c) I'd like to
-make the API docs more explicit, too. (i.e. demand that the new
-configuration is already active after pwm_config returns)
 
-Both e) and a) have the drawback that the API becomes more complicated
-and users will get it wrong. a) and b) are bad from a power management
-POV. Maybe c) is what most users expect, but d) and d') are more
-effective as they result in less waiting and still are good enough. f)
-is more complicated to implement, also it depends on a gpio being
-available in hardware. So if we choose f) we still might need a fallback
-implementation from the other options.
-
-My series implemented a'), but Thierry didn't like it. I think my
-favorite is e').
-
-Best regards
-Uwe
+Regards,
+Steffen
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           | Steffen Trumtrar            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
