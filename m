@@ -1,84 +1,69 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 9 Apr 2014 13:32:47 +0200
-Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
-In-Reply-To: <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
-References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
- <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
-Message-ID: <20140409113246.GA8778@pd.tnic>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 9 Apr 2014 17:04:46 +0530
+Subject: [PATCH V4 5/5] usb-phy: samsung-usb3: Remove older
+ phy-samsung-usb3 driver
+In-Reply-To: <53452B59.8030901@samsung.com>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
+ <1396967803-28868-6-git-send-email-gautam.vivek@samsung.com>
+ <53452B59.8030901@samsung.com>
+Message-ID: <CAFp+6iGQMS5_YAimBRdV-P2h3LczQEHMq_cXGrOtHJSZqM7UfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 02, 2014 at 08:02:40PM +0530, Punnaiah Choudary Kalluri wrote:
-> Add support for ARM Pl310 L2 cache controller parity error
-> 
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> ---
->  .../devicetree/bindings/edac/pl310_edac_l2.txt     |   19 ++
->  drivers/edac/Kconfig                               |    7 +
->  drivers/edac/Makefile                              |    1 +
->  drivers/edac/pl310_edac_l2.c                       |  236 ++++++++++++++++++++
->  4 files changed, 263 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
->  create mode 100644 drivers/edac/pl310_edac_l2.c
-> 
-> diff --git a/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt b/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
-> new file mode 100644
-> index 0000000..94fbb8d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
-> @@ -0,0 +1,19 @@
-> +Pl310 L2 Cache EDAC driver, it does reports the data and tag ram parity errors.
-> +
-> +Required properties:
-> +- compatible: Should be "arm,pl310-cache".
-> +- intterupts: Interrupt number to the cpu.
-> +- reg: Physical base address and size of cache controller's memory mapped
-> +  registers
-> +
-> +Example:
-> +++++++++
-> +
-> +	L2: cache-controller {
-> +		compatible = "arm,pl310-cache";
-> +		interrupts = <0 2 4>;
-> +		reg = <0xf8f02000 0x1000>;
-> +	};
-> +
-> +PL310 L2 Cache EDAC driver detects the Parity enable state by reading the
-> +appropriate control register.
-> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-> index 878f090..059ac31 100644
-> --- a/drivers/edac/Kconfig
-> +++ b/drivers/edac/Kconfig
-> @@ -326,6 +326,13 @@ config EDAC_TILE
->  	  Support for error detection and correction on the
->  	  Tilera memory controller.
->  
-> +config EDAC_PL310_L2
-> +	tristate "Pl310 L2 Cache Controller"
-> +	depends on EDAC_MM_EDAC && ARM
-> +	help
-> +	  Support for parity error detection on L2 cache controller
-> +	  data and tag ram memory
-> +
+Hi Tomasz,
+'
 
+On Wed, Apr 9, 2014 at 4:43 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Vivek,
+>
+Thanks for reviewing the patch series.
 
-Ok, so I'm looking at this after having looked at the synopsys thing
-and it looks very similar in functionality - it does the basic dance of
-registering and setting up stuff, only using different devicetree nodes,
-regs, etc.
+>
+> On 08.04.2014 16:36, Vivek Gautam wrote:
+>>
+>> Removing this older USB 3.0 DRD controller PHY driver, since
+>> a new driver based on generic phy framework is now available.
+>>
+>> Also removing the dt node for older driver from Exynos5250
+>> device tree and updating the dt node for DWC3 controller.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>
+>> NOTE: This patch should be merged only when the new USB 3.0
+>> DRD phy controller driver is available in the tree from the
+>> patches:
+>>         phy: Add new Exynos5 USB 3.0 PHY driver; and
+>>         dt: exynos5250: Enable support for generic USB DRD phy
+>>
+>>   arch/arm/boot/dts/exynos5250.dtsi  |   17 +-
+>>   drivers/usb/phy/phy-samsung-usb.h  |   83 ---------
+>>   drivers/usb/phy/phy-samsung-usb3.c |  350
+>> ------------------------------------
+>>   3 files changed, 2 insertions(+), 448 deletions(-)
+>>   delete mode 100644 drivers/usb/phy/phy-samsung-usb3.c
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+>> b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 92c6fcd..1cb1e91 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>
+>
+> IMHO driver and dts changes should be separated into two patches, first
+> updating device tree to use the new driver and second removing the driver.
 
-However, it adds a new file under drivers/edac/ and I'm wondering if it
-wouldn't be better to simply create a xilinx_edac.c and put all your
-stuff in there, maybe even share code by abstracting it nicely. Having
-a separate driver only for a single L2 cache controller seems kinda too
-granulary for me.
+Sure will separate the patch into driver and dts change.
 
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+>
+> After fixing this issue,
+>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>
+> --
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
