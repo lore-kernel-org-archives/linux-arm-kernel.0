@@ -1,27 +1,54 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 9 Apr 2014 11:44:07 +0800
-Subject: [PATCH 2/3] ARM: dts: imx27-pdk: Pass the UART1 pin configuration
-In-Reply-To: <CAOMZO5DfoxjbFYW8q1S4jiQ4rmDwa5-9-5stf=hL5nzcK+9=Gw@mail.gmail.com>
-References: <1396477546-11130-1-git-send-email-festevam@gmail.com>
- <1396477546-11130-2-git-send-email-festevam@gmail.com>
- <20140403020137.GC2786@dragon>
- <CAOMZO5DfoxjbFYW8q1S4jiQ4rmDwa5-9-5stf=hL5nzcK+9=Gw@mail.gmail.com>
-Message-ID: <20140409034405.GC2611@dragon>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 8 Apr 2014 23:44:31 -0400 (EDT)
+Subject: Big endian working?
+In-Reply-To: <12950765.TpxjkTx5NP@wuerfel>
+References: <20140408095446.0520dd28@skate> <5343BDEE.4010005@linaro.org>
+ <12950765.TpxjkTx5NP@wuerfel>
+Message-ID: <alpine.LFD.2.11.1404082339291.1571@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 12:37:27AM -0300, Fabio Estevam wrote:
-> On Wed, Apr 2, 2014 at 11:01 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> 
-> > The iomuxc node in board dts is a little special now, and it will have a
-> > lot more data than others.  I like Alexander's idea to put it at the
-> > bottom of the file to make it easier for users to check board level
-> > settings of other device nodes.  So I would suggest that way for the new
-> > added iomuxc node in board dts.
-> 
-> Could you please point me Alexander's patch for reference? I was not
-> able to locate it.
+On Tue, 8 Apr 2014, Arnd Bergmann wrote:
 
-http://www.spinics.net/lists/arm-kernel/msg318968.html
+> On Tuesday 08 April 2014 12:14:22 Taras Kondratiuk wrote:
+> > On 04/08/2014 10:54 AM, Thomas Petazzoni wrote:
+> > > Hello Taras,
+> > >
+> > > I'm currently trying to get ARM BE to work on Armada XP. I'm pretty
+> > > sure it used to work on 3.13, but now I'm testing 3.13 and 3.14 and it
+> > > doesn't boot here (it hangs even before "Uncompressing kernel...",
+> > > apparently while relocating the kernel image before decompression).
+> > >
+> > > Ben Dooks told me that the ARM BE kernel works for you. Can you confirm
+> > > which kernel version you're using, and if you've applied any patch?
+> > > Also, can you confirm which toolchain and toolchain version you're
+> > > using?
+> > 
+> > Hi Tom
+> > 
+> > To boot BE kernel from LE u-boot I'm using a few patches on top of 
+> > upstream kernel.
+> > 
+> > git://git.linaro.org/people/taras.kondratiuk/linux.git arm-be-boot-le
+> > 
+> > ----------------------------------------------------------------
+> > Ben Dooks (1):
+> >        ARM: add CPU_BE8_BOOT_LE configuration
+> > 
+> > Nico Pitre (1):
+> >        ARM: ensure loader information in LE format for BE kernels
+> 
+> Sorry for lacking the history on this patch set, but why would
+> you ever want to have this as a compile-time conditional?
+> 
+> Did anyone really put a u-boot on shipping hardware that expects
+> the headers in big-endian format?
 
-Shawn
+If I remember correctly, those are for booting a BE kernel on hardware 
+that initializes in LE mode and expects a LE kernel.  Since the zImage 
+header values are defined to be words, those must be swapped so they 
+read as LE even if the kernel is BE.  Of course the kernel is then 
+responsible for switching the endian mode when entered.
+
+
+Nicolas
