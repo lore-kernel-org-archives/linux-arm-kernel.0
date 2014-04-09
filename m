@@ -1,36 +1,57 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 09 Apr 2014 11:29:38 +0100
-Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
-In-Reply-To: <20140408194815.GA6188@debian>
-References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
- <1396577719-14786-3-git-send-email-keescook@chromium.org>
- <20140404195818.GA21028@debian>
- <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
- <1396960898.3567.55.camel@linaro1.home>
- <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
- <1396973561.14809.26.camel@linaro1.home>
- <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
- <20140408194815.GA6188@debian>
-Message-ID: <1397039378.3537.32.camel@linaro1.home>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 09 Apr 2014 12:29:31 +0200
+Subject: [PATCH v7 2/3] ARM: dts: add dts files for exynos5260 SoC
+In-Reply-To: <1396519224-18712-3-git-send-email-rahul.sharma@samsung.com>
+References: <1396519224-18712-1-git-send-email-rahul.sharma@samsung.com>
+ <1396519224-18712-3-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <5345210B.5070807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-08 at 21:48 +0200, Rabin Vincent wrote:
-[...]
-> For any other CPU to pull in the writable entry it would have to get a
-> TLB miss inside the loop in multi_cpu_stop(), after the state transition
-> to MULTI_STOP_RUN and before the state transition to MULTI_STOP_EXIT.
-> This is unlikely, but theoretically possible, for example if
-> multi_cpu_stop() straddles sections.
+Hi Rahul,
 
-With speculative execution it is also possible for the CPU to fill the
-TLB with entries for a memory address that the program would never
-actually access. Basically, whatever is in the MMU registers and page
-tables at any given time, the CPU can speculatively use that address
-translation and read that memory. And if it's marked cacheable, pull it
-into the cache. Oh, and if there is a dirty cacheline in another
-CPU/clusters cache, move that dirty entry over into it's own cache (I
-believe).
+On 03.04.2014 12:00, Rahul Sharma wrote:
+> The patch adds the dts files for exynos5260.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos5260-pinctrl.dtsi |  574 +++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/exynos5260.dtsi         |  304 +++++++++++++++
+>   2 files changed, 878 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/exynos5260-pinctrl.dtsi
+>   create mode 100644 arch/arm/boot/dts/exynos5260.dtsi
 
--- 
-Tixy
+[snip]
+
+> diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
+> new file mode 100644
+> index 0000000..188a2ac
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos5260.dtsi
+> @@ -0,0 +1,304 @@
+> +/*
+> + * SAMSUNG EXYNOS5260 SoC device tree source
+> + *
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#include "skeleton.dtsi"
+> +
+> +#include <dt-bindings/clock/exynos5260-clk.h>
+> +
+> +/ {
+> +	compatible = "samsung,exynos5260";
+
+Since Sachin's patches, "samsung,exynos5" compatible should be also 
+added, before the more specific ones.
+
+Best regards,
+Tomasz
