@@ -1,83 +1,33 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Wed, 9 Apr 2014 16:54:16 +0200
-Subject: [PATCH] ARM: reinsert ARCH_MULTI_V4 Kconfig option
-In-Reply-To: <20131213113903.GE4360@n2100.arm.linux.org.uk>
-References: <1386922149-4561-1-git-send-email-jonas.jensen@gmail.com>
- <20131213095655.GB4360@n2100.arm.linux.org.uk>
- <CACmBeS1d-EX5oPD8f7P-ufmF=MutdTO+LgG23Cb0=biR8yQPCg@mail.gmail.com>
- <20131213113903.GE4360@n2100.arm.linux.org.uk>
-Message-ID: <CACmBeS3kC4dsdOrfANifgu8oQhLauFKcXhEu=iz8xbUxdhMq_A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Apr 2014 16:51:33 +0200
+Subject: [PATCH 06/15] clk: sunxi: add A31 APB0 gates compatible string
+ to the documentation
+In-Reply-To: <1397051478-4113-7-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397051478-4113-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140409145133.GF28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 December 2013 12:39, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> I see what's causing this: the kuser helpers are using "bx lr" to return
-> which will be undefined on non-Thumb CPUs.  We generally cope fine with
-> non-Thumb CPUs, conditionalising where necessary on HWCAP_THUMB or the
-> T bit in the PSR being set.
->
-> However, it looks like the kuser helpers got missed.  As a check, please
-> look at arch/arm/kernel/entry-armv.S, find the line with:
->
->         .macro  usr_ret, reg
->
-> and ensure that the mov pc, \reg case always gets used.  Please report
-> back.
+On Wed, Apr 09, 2014 at 03:51:09PM +0200, Boris BREZILLON wrote:
+> Add the new "allwinner,sun6i-a31-apb0-gates-clk" compatible string to the
+> sunxi clock documentation.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Uwe and Arnd came up with a solution except it doesn't work when I test it.
+I'd probably merge this with the previous patch.
 
-The suggested patch is:
+There's not really any new bindings introduced here, so I guess you
+don't really have to make it two commits.
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 1879e8d..de15bfd 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -739,6 +739,18 @@ ENDPROC(__switch_to)
-
-        .macro  usr_ret, reg
- #ifdef CONFIG_ARM_THUMB
-+       /*
-+        * Having CONFIG_ARM_THUMB isn't a guarantee that the cpu has support
-+        * for Thumb and so the bx instruction. Use a mov if the address to
-+        * jump to is 32 bit aligned. (Note that this code is compiled in ARM
-+        * mode, so this is the right test.)
-+        */
-+#if defined(CONFIG_CPU_32v4)
-+       tst     \reg, #3
-+       moveq   pc, \reg
-+       b       .
-+#endif
-+
-        bx      \reg
- #else
-        mov     pc, \reg
-
-
-With this applied, and the following two possibilities in next-20140403:
-
-[1] ARCH_MULTI_V4 only (no CONFIG_ARM_THUMB)
-     CONFIG_CPU_32v4=y
-
-[2] ARCH_MULTI_V4 and ARCH_MULTI_V4T
-     CONFIG_ARM_THUMB=y
-     CONFIG_CPU_32v4=y
-     CONFIG_CPU_32v4T=y
-
-
-Booting a kernel with either option [1] or [2] yield the following results:
-
-[1] works
-[2] hangs after "[    2.730000] Freeing unused kernel memory: 104K
-(c02f5000 - c030f000)"
-
-
-Any help why the moveq doesn't work would be much appreciated.
-
-
-The commit where this was tested:
-https://bitbucket.org/Kasreyn/linux-next/commits/48320cbe0d5a1fb6ada52cea9efd87c7712367cb
-
-
-Regards,
-Jonas
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/38ebf16f/attachment.sig>
