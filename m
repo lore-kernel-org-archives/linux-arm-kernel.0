@@ -1,87 +1,60 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 9 Apr 2014 12:03:13 +0200
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-In-Reply-To: <20140409082341.GV29751@pengutronix.de>
-References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
- <5343FDD3.3070308@i2se.com> <20140408175904.GT29751@pengutronix.de>
- <20140408234243.GB13898@piout.net>
- <20140409082341.GV29751@pengutronix.de>
-Message-ID: <20140409100313.GA20704@piout.net>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 09 Apr 2014 12:05:16 +0200
+Subject: [PATCH 3/3] ARM: socfpga: dts: add reset-controller
+In-Reply-To: <1397034967.4418.4.camel@paszta.hi.pengutronix.de>
+References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396629087-23727-4-git-send-email-s.trumtrar@pengutronix.de>
+ <1396905121.25236.2.camel@linux-builds1>
+ <20140407224110.GA28399@pengutronix.de> <53435F37.7060301@gmail.com>
+ <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
+ <1397034967.4418.4.camel@paszta.hi.pengutronix.de>
+Message-ID: <73k3ay3jj7.fsf@unicorn.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2014 at 10:23:41 +0200, Uwe Kleine-K?nig wrote :
-> > While I had exactly the same issue back in september and wrote the exact
-> > same patch that got rejected. I would agree with Thierry here taht we
-> > need to keep the pwm_disable() there as it potentially allows to save
-> > power.
-> >
-> > However, it seems to not work quite well with PWMs from Freescale (see
-> > the thread from Russell). Or I would say with PWM with an undefined
-> > state when disabled and I believe we are soon to find more.
-> > 
-> > We could either:
-> >  - add a flag like can_sleep that would allow driver to know that the
-> >    pwm always has to be enable to get sane results.
-> >
-> >  - or introduce functions like prepare/unprepare to be called from probe
-> >    and remove in the leds-pwm driver and that will enable/disable the
-> > channel in pwm-mxs. pwm_enable/pwm_disable not doing anything.
-> There are a few more options. I repeat your's to get a single list:
-> 
->  a) Somehow tell the API users that pwm_disable might not result in a
->     flat zero after set_duty(0).
->  a') Anchor in the API that users must not expect anything from the pwm
->     pin after pwm_disable.
->  b) Make pwm_enable/pwm_disable noops on i.MX28
->  c) Make set_duty only return when the new value reached the pin.
->  d) Make pwm_disable wait to yield the expected result
->  d') Make pwm_disable wait if the last programmed duty cycle is 0 or
->     full period.
->  e) Introduce a new callback that does the waiting, e.g. a .commit
->     callback
->  e') Introduce a new callback pwm_config_sync that does wait
->     appropriatly, keep pwm_config as is.
->  f) Make the i.MX28 driver switch the pin the gpio mode with the
->     expected output level in pwm_disable.
-> 
-> a') is a special case of a); d') is a special case of d), ditto for e')
-> and e).
-> 
-> a) and e) would result in changes in the pwm API. For c) I'd like to
-> make the API docs more explicit, too. (i.e. demand that the new
-> configuration is already active after pwm_config returns)
-> 
-> Both e) and a) have the drawback that the API becomes more complicated
-> and users will get it wrong. a) and b) are bad from a power management
-> POV. Maybe c) is what most users expect, but d) and d') are more
-> effective as they result in less waiting and still are good enough. f)
-> is more complicated to implement, also it depends on a gpio being
-> available in hardware. So if we choose f) we still might need a fallback
-> implementation from the other options.
-> 
-> My series implemented a'), but Thierry didn't like it. I think my
-> favorite is e').
-> 
 
-I think I would actually prefer d'. Doing the synchronisation in d' is
-abstracting it for the user.
-But e' is also fine as long as we manage to educate users of when to use
-pwm_config() or pwm_config_sync(). I believe your idea for leds-pwm
-would be to call pwm_config_sync() instead of pwm_config() before
-pwm_disable().
+Philipp Zabel <p.zabel@pengutronix.de> writes:
 
-I actually had to implement d' for pwm-atmel, to wait that the last
-update got through before disabling the pwm, see
-http://thread.gmane.org/gmane.linux.pwm/451 but doing that in
-pwm_config_sync() would probably also work.
+> Am Mittwoch, den 09.04.2014, 10:37 +0200 schrieb Steffen Trumtrar:
+>> Dinh Nguyen <dinh.linux@gmail.com> writes:
+>> 
+>> > On 4/7/14 5:41 PM, Steffen Trumtrar wrote:
+>> >> On Mon, Apr 07, 2014 at 04:12:01PM -0500, Dinh Nguyen wrote:
+>> >>> On Fri, 2014-04-04 at 18:31 +0200, Steffen Trumtrar wrote:
+>> >>>> Add the necessary #reset-cells property to the rst-mgr node and
+>> >>>> provide a header-file with all possible resets specified.
+>> >>>>
+>> >>>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>> >>>> ---
+>> >>>>  arch/arm/boot/dts/socfpga.dtsi           |  8 ++-
+>> >>>>  include/dt-bindings/reset/altr,rst-mgr.h | 90 ++++++++++++++++++++++++++++++++
+>> >>> Does this file belong under dt-bindings/reset/ or
+>> >>> dt-bindings/reset-controller/?
+>> >>>
+>> >> ATM there is no such directory, or is there ?
+>> >> So, reset seems appropriate I think.
+>> > commit [6b7f06 ARM: STi: STiH415: Add reset controller support.]
+>> > Seems more appropriate for this to go into reset-controller.
+>> >
+>> 
+>> Okay, the current mainline master now has include/dt-bindings/reset and
+>> include/dt-bindings/reset-controller.
+>> 
+>> I think one of those directories shouldn't be there, but be merged in
+>> the other instead. But which one? Where shall I put my precious code?
+>
+> My vote would be for dt-bindings/reset/, since that's shorter and
+> 2ec941304df9e1cd5e2f2404303a5fab0929969a came before
+> 6b7f06cc805bb4755e69cd916b3f565947e0a77a.
+>
 
+Agreed.
 
-For a and a' I think that Thierry intended that a user could expect
-pwm_disable() to not change the output of the PWM when the duty cycle is
-0.
+Regards,
+Steffen
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                           | Steffen Trumtrar            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
