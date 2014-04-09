@@ -1,56 +1,62 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Wed, 09 Apr 2014 17:31:00 +0100
-Subject: [RFC] Extend zImage format to support notes
-In-Reply-To: <20140407182553.GD14062@e106331-lin.cambridge.arm.com>
-References: <5342AF59.3030405@linaro.org>
- <20140407160452.GB14062@e106331-lin.cambridge.arm.com>
- <5342E02C.4010004@linaro.org>
- <20140407182553.GD14062@e106331-lin.cambridge.arm.com>
-Message-ID: <534575C4.2020906@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 9 Apr 2014 13:33:26 -0300
+Subject: [PATCH v2] ARM: pxa: Move iotable mapping inside vmalloc region
+In-Reply-To: <2638213.3rVdlp7YXW@avalon>
+References: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <2638213.3rVdlp7YXW@avalon>
+Message-ID: <20140409163326.GA17544@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 04/07/2014 07:25 PM, Mark Rutland wrote:
+On Apr 09, Laurent Pinchart wrote:
+> Hi Ezequiel,
 > 
-> I'm probably being thick here, but is there anything preventing those
-> foreign pages from being idmapped into DOM0 (at least for the duration
-> of the DMA access) such that there is a 1-1 PA<->IPA mapping?
+> On Thursday 28 November 2013 21:00:43 Ezequiel Garcia wrote:
+> > In order to remove the following ugly message:
+> > 
+> >   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+> > 
+> > the iotable mappings should be re-located inside the vmalloc
+> > region. Such move was introduced at commit:
+> > 
+> > commit 0536bdf33faff4d940ac094c77998cfac368cfff
+> > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Date:   Thu Aug 25 00:35:59 2011 -0400
+> > 
+> >     ARM: move iotable mappings within the vmalloc region
+> > 
+> > While at it, condition the mapping to PXA25x and PXA27x, which
+> > are the only platforms where it's used.
+> > 
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> > Cc: David Heidelberger <david.heidelberger@ixit.cz>
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> > David,
+> > 
+> > Is it possible for you to give this a try on your board?
 > 
-> That would mean that from the point of view of Linux, there's nothing to
-> care about, as every address it knows it can deal with is a valid IPA.
-> Existing kernels would function with the IOMMU(s) on.
+> I'm running into the same issue on a PXA270 system.
 > 
-> I assume I'm missing something fairly obvious :)
-
-I didn't though about this solution. It works on midway only when the
-physical address size is 32 bits.
-
-I didn't yet figure out why. I guess this is because I have a bug in my
-SMMU driver in Xen.
-
->> We though about runtime approach (see the whole discussion here
->> https://patches.linaro.org/26034/), but it's not as extensible as notes.
->> In fact, we might need more notes in the future when new feature will be
->> added and requires a DOM0/guest side support.
+> UNCACHED_PHYS_0 is used as an immediate operand to a mov instruction, and thus 
+> needs to be encoded as a shifted 8-bit value. One simple solution would be to 
+> hardcode it to 0xfd000000 (0xfe000000 is already used for the IMEMC mapping).
 > 
-> I can certainly see the usefulness of notes.
+> Another solution would be to keep the UNCACHED_PHYS_0 mapping at the end of 
+> the vmalloc area (with a fix for the UL problem due to VMALLOC_END) and modify 
+> pxa2[57]x_finish_suspend and pm_enter_standby_start to use an ldr instruction 
+> instead of a move instruction to load the address.
+> 
+> As a side note, the IMEMC mapping seems unused, maybe we could thus reclaim it 
+> and use 0xfe000000 for UNCACHED_PHYS_0.
+> 
+> Do you plan to submit a v3 of this patch ?
+> 
 
-[..]
-
-> If it makes sense for this case then I can see why we would want it on
-> arm64.
-
-With the solution of idmapping, the RFC seems irrelevant for now. But we
-may need to add notes in the future.
-
-I'm wondering if it would be worth to agree on a solution now. Thus, we
-will be able to add a note quickly when it will be necessary.
-
-Any thoughts?
-
-Sincerely yours,
-
+Not really. I've been a bit busy and couldn't work any longer on this issue,
+so feel free to pick the task :-)
 -- 
-Julien Grall
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
