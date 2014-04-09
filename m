@@ -1,39 +1,54 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 9 Apr 2014 09:56:24 +0200
-Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
-In-Reply-To: <20140409095350.47029549@skate>
-References: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20140409061128.GC16465@1wt.eu> <20140409091234.20f2e547@skate>
- <20140409074752.GF16465@1wt.eu> <20140409095350.47029549@skate>
-Message-ID: <20140409075624.GA17071@1wt.eu>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 Apr 2014 09:17:05 +0100
+Subject: memcpy alignment for DEVICE_nGnRnE
+In-Reply-To: <20140408233937.GA2100@codeaurora.org>
+References: <53072343.4080505@marvell.com> <20140221105307.GE25363@localhost>
+ <20140408003547.GA18321@codeaurora.org>
+ <20140408114949.GB21054@arm.com>
+ <20140408233937.GA2100@codeaurora.org>
+Message-ID: <20140409081705.GB13737@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 09:53:50AM +0200, Thomas Petazzoni wrote:
-> Dear Willy Tarreau,
-> 
-> On Wed, 9 Apr 2014 09:47:52 +0200, Willy Tarreau wrote:
-> 
-> > > Yes, the panic is expected: Jason's patch is not *fixing* anything,
-> > > it's just telling you *why* it's going to panic.
+On Wed, Apr 09, 2014 at 12:39:37AM +0100, Michael Bohan wrote:
+> On Tue, Apr 08, 2014 at 12:49:49PM +0100, Catalin Marinas wrote:
+> > On Tue, Apr 08, 2014 at 01:35:47AM +0100, Michael Bohan wrote:
+> > > How should we handle Device Memory with copy_from_user / copy_to_user?
+> > > Should we follow the same scheme and create
+> > > copy_from_user_io / copy_to_user_io, or rather enforce that the stock
+> > > routines handle alignment?
 > > 
-> > I just thought that the EINVAL would prevent one from registering
-> > the device, which would be more useful (if at all possible).
+> > We have generic copy_from_user_toio() and copy_to_user_fromio(). Are
+> > these what you need? As with the memcpy_(to|from)io, they can be further
+> > optimised.
 > 
-> Unfortunately, I don't think that's possible: the function that sets up
-> the MBus window is called by the emulated bridge code, i.e when the
-> Linux PCI core thinks it is doing a write to a bridge register. And I
-> don't think there is a way of "refusing" the write to let the Linux
-> PCI core know that it was not possible to set up the bridge BAR as it
-> was requested.
-> 
-> Maybe this is something that Jason can confirm/infirm. I remember
-> having a quick look at the core Linux PCI core to see if it was
-> somehow checking whether the bridge BAR has been properly configured,
-> but I think I concluded it was not the case, and it was just assuming
-> that write the memory base/limit in the bridge registers was
-> sufficient. 
+> It seems these existing routines are in sound. Were you thinking
+> the right approach would be to move them out of sound and make
+> them per-arch defined?
 
-OK thanks for the detailed explanation!
+If you have a use-case outside of the sound subsystem, they can be made
+more generic.
 
-Willy
+> What about the other two use cases: copy_from_user_fromio and
+> copy_to_user_toio? Are those reasonable to add? These two APIs
+> would cover the use case I had in mind.
+
+What's the use case for these?
+
+> Then what about the strange but possible use case where both the
+> source and destination pointers are iomem? This same question
+> applies for memcpy_fromio / memcpy_toio as well.
+
+You can come up with many combinations but we first need to see a real
+use of them, eliminate the alternatives and only then look at adding new
+API.
+
+> The implementations of copy_from_user_toio and
+> copy_to_user_fromio are currently doing a second copy, so that
+> seems bad for performance. We'd probably want to improve these as
+> well if others are in agreement.
+
+Yes, as I said they are not optimised (but good enough as a start).
+
+-- 
+Catalin
