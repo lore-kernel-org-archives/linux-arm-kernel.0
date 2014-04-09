@@ -1,99 +1,34 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 9 Apr 2014 13:07:50 +0100
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <CAErSpo4anYBmaRbJEFE9kAXSmnvfqud=w1QA=mSSsTUamM4kSw@mail.gmail.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <20140405000007.GD15806@google.com>
- <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
- <1396862058.3671.40.camel@pasglop>
- <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
- <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
- <20140408102043.GV17163@e106497-lin.cambridge.arm.com>
- <CAErSpo4anYBmaRbJEFE9kAXSmnvfqud=w1QA=mSSsTUamM4kSw@mail.gmail.com>
-Message-ID: <20140409120750.GN985@e106497-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 09 Apr 2014 14:11:34 +0200
+Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
+ on/off
+In-Reply-To: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <534538F6.2010009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 05:28:39PM +0100, Bjorn Helgaas wrote:
-> On Tue, Apr 8, 2014 at 4:20 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Mon, Apr 07, 2014 at 11:44:51PM +0100, Bjorn Helgaas wrote:
-> 
-> >> Let me try to explain my concern about the
-> >> pci_create_root_bus_in_domain() interface.  We currently have these
-> >> interfaces:
-> >>
-> >>   pci_scan_root_bus()
-> >>   pci_scan_bus()
-> >>   pci_scan_bus_parented()
-> >>   pci_create_root_bus()
-> >> ...
-> 
-> >> One alternative is to add an _in_domain() variant of each of these
-> >> interfaces, but that doesn't seem very convenient either.  My idea of
-> >> passing in a structure would also require adding variants, so there's
-> >> not really an advantage there, but I am thinking of the next
-> >> unification effort, e.g., for NUMA node info.  I don't really want to
-> >> have to change all the _in_domain() interfaces to also take yet
-> >> another parameter for the node number.
-> >
-> > OK, what about this: all the functions that you have mentioned take a
-> > void *sysdata parameter. Should we convert this opaque pointer into a
-> > specific structure that holds the domain_nr and (in future) the NUMA
-> > node info?
-> 
-> I doubt if we can make sysdata itself generic because I suspect we
-> need a way to have *some* arch-specific data.  But maybe the arch
-> could supply a structure containing a struct device *, domain, struct
-> pci_ops *, list of resources, aperture info, etc.  I wonder if struct
-> pci_host_bridge would be a reasonable place to put this stuff, e.g.,
-> something like this:
-> 
->   struct pci_host_bridge {
->     int domain;
->     int node;
->     struct device *dev;
->     struct pci_ops *ops;
->     struct list_head resources;
->     void *sysdata;
->     struct pci_bus *bus;  /* filled in by core, not by arch */
->     ... /* other existing contents managed by core */
->   };
-> 
->   struct pci_bus *pci_scan_host_bridge(struct pci_host_bridge *bridge);
+Hi Vivek,
 
-I'm really reluctant to give the arches more rope to hang themselves. I
-really dislike the use of xxxx_initcall() to do PCI initialisation ordering
-that is currently in widespread use through the arch code. As I hope to
-have proven with my arm64 code, you can have PCI support for an architecture
-without having to provide any arch specific code. We have enough correct
-code in the PCI framework, what would the architectures provide to the generic
-code that we cannot get by following the standard?
+On 09/04/14 13:54, Vivek Gautam wrote:
+> Adding support to enable/disable VBUS hooked to a gpio
+> to enable vbus supply on the port.
 
-Of course, there are always arch specific corners and they need their data
-structures to make sense of those, but rather than having architectures
-fill in a structure *before* we can setup host bridges I think we need
-to reverse the order. Using your example structure, I don't think is
-the arch's job to provide the list of resources or the domain number
-before we can scan the host bridge. We should be able to get those from
-somewhere else (like adding by default the ioport_resource and
-iomem_resource and managing domain numbers inside the core framework).
+Does the GPIO control a fixed voltage regulator ? If so, shouldn't
+it be modelled by the regulator API instead ?
 
-Best regards,
-Liviu
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+[...]
+> +	/* Get required GPIO for vbus */
+> +	phy_drd->gpio = of_get_named_gpio(dev->of_node,
+> +					  "samsung,vbus-gpio", 0);
+> +	if (!gpio_is_valid(phy_drd->gpio))
+> +		dev_dbg(dev, "no usbdrd-phy vbus gpio defined\n");
+> +
+> +	if (devm_gpio_request(dev, phy_drd->gpio, "phydrd_vbus_gpio"))
+> +		dev_dbg(dev, "can't request usbdrd-phy vbus gpio %d\n",
+> +			phy_drd->gpio);
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+--
+Regards,
+Sylwester
