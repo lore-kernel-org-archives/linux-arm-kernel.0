@@ -1,19 +1,29 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 9 Apr 2014 20:25:53 +0200
-Subject: current->sched_class->yield_task is NULL, any hint?
-In-Reply-To: <CAF1ivSbZKbDc+rzd+CUqCzNmSgZmZTE-QeSU-2WmSiuEs-Kw_w@mail.gmail.com>
-References: <CAF1ivSbZKbDc+rzd+CUqCzNmSgZmZTE-QeSU-2WmSiuEs-Kw_w@mail.gmail.com>
-Message-ID: <20140409182553.GE10526@twins.programming.kicks-ass.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  9 Apr 2014 20:26:09 +0200
+Subject: [PATCH] pwm: atmel: set pwm_chip can_sleep flag
+Message-ID: <1397067969-19905-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 10:43:32AM -0700, Lin Ming wrote:
-> Hi Peter,
-> 
-> I hit a panic in sys_sched_yield() because(for some unknown reason)
-> current->sched_class->yield_task is NULL.
-> It's an ARM embedded board with 3.4-rt kernel.
-> 
-> Could you share any hint for the possible causes?
+atmel_pwm_config() calls clk_get_rate() which might sleep, so we need to set
+pwm_chip can_sleep flag.
 
-What class does current->sched_class point to?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/pwm/pwm-atmel.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index 0e589594b1cb..180e34e46617 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -369,6 +369,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
+ 
+ 	atmel_pwm->chip.base = -1;
+ 	atmel_pwm->chip.npwm = 4;
++	atmel_pwm->chip.can_sleep = true;
+ 	atmel_pwm->config = data->config;
+ 
+ 	ret = pwmchip_add(&atmel_pwm->chip);
+-- 
+1.8.3.2
