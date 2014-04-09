@@ -1,103 +1,80 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 09 Apr 2014 18:26:51 +0200
-Subject: [PATCH v2] ARM: pxa: Move iotable mapping inside vmalloc region
-In-Reply-To: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <2638213.3rVdlp7YXW@avalon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 10 Apr 2014 00:27:32 +0800
+Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
+In-Reply-To: <20140409151747.GH28585@lukather>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+ <20140409151747.GH28585@lukather>
+Message-ID: <CAGb2v67+YNhw2MXSu9DTKSUfXH=v+uD7KEaxyiPezyf9CYtmPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Hi,
 
-On Thursday 28 November 2013 21:00:43 Ezequiel Garcia wrote:
-> In order to remove the following ugly message:
-> 
->   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
-> 
-> the iotable mappings should be re-located inside the vmalloc
-> region. Such move was introduced at commit:
-> 
-> commit 0536bdf33faff4d940ac094c77998cfac368cfff
-> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date:   Thu Aug 25 00:35:59 2011 -0400
-> 
->     ARM: move iotable mappings within the vmalloc region
-> 
-> While at it, condition the mapping to PXA25x and PXA27x, which
-> are the only platforms where it's used.
-> 
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: David Heidelberger <david.heidelberger@ixit.cz>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> David,
-> 
-> Is it possible for you to give this a try on your board?
+On Wed, Apr 9, 2014 at 11:17 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Apr 09, 2014 at 10:53:13PM +0800, Chen-Yu Tsai wrote:
+>> Hi Boris,
+>>
+>> On Wed, Apr 9, 2014 at 9:51 PM, Boris BREZILLON
+>> <boris.brezillon@free-electrons.com> wrote:
+>> > Hello,
+>> >
+>> > This series rework the sunxi pinctrl driver to support the PLx pins
+>> > available on the A31 SoC.
+>>
+>> Thanks for working on this. I mentioned to Maxime on IRC yesterday that
+>> we have complete pinctrl drivers for both A31 and A23, based on our current
+>> pinctrl-sunxi driver, in the A23 SDK. These have the complete pin mapping.
+>>
+>> > It also add missing A31 reset controller DT bindings documentation.
+>> >
+>> > I need those PL pins (actually I only need PL0 and PL1) to support
+>> > the P2WI bus, which in turn is used to communicate with the AXP221
+>> > PMIC.
+>>
+>> If you could, please add all the PL and PM pins.
+>> As I said, you can find complete definitions in the A23 SDK.
+>
+> We have no idea what these PM pins are for the A31. And this code only
+> is of interest for the A31 for the moment. Let's not take into account
+> the A23 for now as far as the pin definitions are concerned.
 
-I'm running into the same issue on a PXA270 system.
+Yes I was referring to the A31. In the A23 SDK, sun8iw1 refers to A31.
+As for the PM pins, the A31 EVB fex file uses one PM pin for LCD backlight
+control. And don't take my word for it. A31 standard design schematics from
+Omilex clearly show PL/PM pins with the possible functions on the top left of
+page 7. See:
 
-UNCACHED_PHYS_0 is used as an immediate operand to a mov instruction, and thus 
-needs to be encoded as a shifted 8-bit value. One simple solution would be to 
-hardcode it to 0xfd000000 (0xfe000000 is already used for the IMEMC mapping).
+https://github.com/OLIMEX/OLINUXINO/blob/master/HARDWARE/A31-PDFs/A31_PAD_STD_V1_90_130225.pdf
 
-Another solution would be to keep the UNCACHED_PHYS_0 mapping at the end of 
-the vmalloc area (with a fix for the UL problem due to VMALLOC_END) and modify 
-pxa2[57]x_finish_suspend and pm_enter_standby_start to use an ldr instruction 
-instead of a move instruction to load the address.
+>> > Let me know if these changes are too intrusive.
+>>
+>> I wonder if we should do a separate driver for the new PIO controller.
+>> Clearly it's a separate IP block, with it's own clock and reset controls.
+>
+> It's been merged together in the A23, hence why we did it like that.
 
-As a side note, the IMEMC mapping seems unused, maybe we could thus reclaim it 
-and use 0xfe000000 for UNCACHED_PHYS_0.
+I'm not sure I understand. The clock gate and reset control are still separate,
+are they not?
 
-Do you plan to submit a v3 of this patch ?
+>> Allwinner sources list this block as "R_PIO". I suggest using this name.
+>> Clearly "pioL" does not cover all the functionality.
+>
+> I'd agree with that.
+>
+>
+>> I have started to document the PRCM block: http://linux-sunxi.org/PRCM
+>
+> It's quite different on the A31 and on the A23 actually :(
+>
+> You don't have any of the audio thing for example, but you have the
+> CPUs power clamp controls, that have been removed in the A23.
 
->  arch/arm/mach-pxa/generic.c               | 6 ++++--
->  arch/arm/mach-pxa/include/mach/hardware.h | 5 +++--
->  2 files changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-> index 4225417..3c1b4fa 100644
-> --- a/arch/arm/mach-pxa/generic.c
-> +++ b/arch/arm/mach-pxa/generic.c
-> @@ -83,11 +83,13 @@ static struct map_desc common_io_desc[] __initdata = {
->  		.pfn		= __phys_to_pfn(0x40000000),
->  		.length		= 0x02000000,
->  		.type		= MT_DEVICE
-> +#if defined(CONFIG_PXA25x) || defined(CONFIG_PXA27x)
->  	}, {	/* UNCACHED_PHYS_0 */
-> -		.virtual	= 0xff000000,
-> +		.virtual	= UNCACHED_PHYS_0,
->  		.pfn		= __phys_to_pfn(0x00000000),
-> -		.length		= 0x00100000,
-> +		.length		= UNCACHED_SIZE,
->  		.type		= MT_DEVICE
-> +#endif
->  	}
->  };
-> 
-> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h
-> b/arch/arm/mach-pxa/include/mach/hardware.h index ccb06e4..b365a72 100644
-> --- a/arch/arm/mach-pxa/include/mach/hardware.h
-> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
-> @@ -14,13 +14,14 @@
->  #define __ASM_ARCH_HARDWARE_H
-> 
->  #include <mach/addr-map.h>
-> +#include <asm/pgtable.h>
-> 
->  /*
->   * Workarounds for at least 2 errata so far require this.
->   * The mapping is set in mach-pxa/generic.c.
->   */
-> -#define UNCACHED_PHYS_0		0xff000000
-> -#define UNCACHED_ADDR		UNCACHED_PHYS_0
-> +#define UNCACHED_PHYS_0		(VMALLOC_END - UNCACHED_SIZE)
-> +#define UNCACHED_SIZE		SZ_1M
-> 
->  /*
->   * Intel PXA2xx internal register mapping:
+Thank you for bringing this up. I went through the code and updated
+these bits on the wiki. The CPU power clamps are interleaved throughout
+the PRCM registers :(
 
--- 
-Regards,
 
-Laurent Pinchart
+Cheers,
+ChenYu
