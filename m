@@ -1,84 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 9 Apr 2014 16:35:16 +0200
-Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
-In-Reply-To: <20140409104652.GC9527@ulmo>
-References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
- <5343FDD3.3070308@i2se.com> <20140408175904.GT29751@pengutronix.de>
- <20140408234243.GB13898@piout.net>
- <20140409082341.GV29751@pengutronix.de>
- <20140409100313.GA20704@piout.net> <20140409104652.GC9527@ulmo>
-Message-ID: <20140409143516.GW29751@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Apr 2014 16:43:48 +0200
+Subject: [PATCH 01/15] ARM: sunxi: dt: list all pinctrl compatible strings
+In-Reply-To: <1397051478-4113-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397051478-4113-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140409144348.GC28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Wed, Apr 09, 2014 at 12:46:53PM +0200, Thierry Reding wrote:
-> On Wed, Apr 09, 2014 at 12:03:13PM +0200, Alexandre Belloni wrote:
-> > On 09/04/2014 at 10:23:41 +0200, Uwe Kleine-K?nig wrote :
-> > > > While I had exactly the same issue back in september and wrote the exact
-> > > > same patch that got rejected. I would agree with Thierry here taht we
-> > > > need to keep the pwm_disable() there as it potentially allows to save
-> > > > power.
-> > > >
-> > > > However, it seems to not work quite well with PWMs from Freescale (see
-> > > > the thread from Russell). Or I would say with PWM with an undefined
-> > > > state when disabled and I believe we are soon to find more.
-> > > > 
-> > > > We could either:
-> > > >  - add a flag like can_sleep that would allow driver to know that the
-> > > >    pwm always has to be enable to get sane results.
-> > > >
-> > > >  - or introduce functions like prepare/unprepare to be called from probe
-> > > >    and remove in the leds-pwm driver and that will enable/disable the
-> > > > channel in pwm-mxs. pwm_enable/pwm_disable not doing anything.
-> > > There are a few more options. I repeat your's to get a single list:
-> > > 
-> > >  a) Somehow tell the API users that pwm_disable might not result in a
-> > >     flat zero after set_duty(0).
-> > >  a') Anchor in the API that users must not expect anything from the pwm
-> > >     pin after pwm_disable.
-> > >  b) Make pwm_enable/pwm_disable noops on i.MX28
-> > >  c) Make set_duty only return when the new value reached the pin.
-> > >  d) Make pwm_disable wait to yield the expected result
-> > >  d') Make pwm_disable wait if the last programmed duty cycle is 0 or
-> > >     full period.
-> > >  e) Introduce a new callback that does the waiting, e.g. a .commit
-> > >     callback
-> > >  e') Introduce a new callback pwm_config_sync that does wait
-> > >     appropriatly, keep pwm_config as is.
-> > >  f) Make the i.MX28 driver switch the pin the gpio mode with the
-> > >     expected output level in pwm_disable.
-> > > [...]
-> > > My series implemented a'), but Thierry didn't like it. I think my
-> > > favorite is e').
-> > > 
-> > 
-> > I think I would actually prefer d'. Doing the synchronisation in d' is
-> > abstracting it for the user.
+On Wed, Apr 09, 2014 at 03:51:04PM +0200, Boris BREZILLON wrote:
+> List all sunxi pinctrl compatible strings in order to be able to grep for
+> those values.
 > 
-> My preference would be simply d). Mostly because I don't like special
-> cases and especially because I don't see an advantage in special casing
-> 0 and full period duty cycles. That doesn't mean of course that drivers
-> can't special case if they really want or have to.
-Well d' is just an optimisation, because if you have a duty cycle
-between 0 and full (exclusive) and no other means of syncronisation
-you cannot influence where pwm_disable stops the output, at low or high.
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt      | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> index dff0e5f..0e7e9a1 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+> @@ -6,8 +6,13 @@ the first two functions being GPIO in and out. The configuration on
+>  the pins includes drive strength and pull-up.
+>  
+>  Required properties:
+> -- compatible: "allwinner,<soc>-pinctrl". Supported SoCs for now are:
+> -  sun5i-a13.
+> +- compatible: Should be one of the followings (depending on you SoC):
+> +  "allwinner,sun4i-a10-pinctrl"
+> +  "allwinner,sun5i-a10s-pinctrl"
+> +  "allwinner,sun5i-a13-pinctrl"
+> +  "allwinner,sun6i-a31-pinctrl"
+> +  "allwinner,sun6i-a31-pinctrl"
 
-Do we have cases where pwm_disable makes the pin high-z? Or something
-else which violates the assumption "pwm_config(pwm, 0, period);
-pwm_disable(pwm); makes the pin 0"?
- 
-> That said I've also been thinking about adding support for e), which
-> would allow atomically changing the duty cycle, period and polarity of a
-> channel. This might become necessary at some point.
-On i.MX28 you cannot change atomically, only program atomically. The
-current period will end regularily anyhow as programmed before. But
-maybe that's what you mean?!
+Copy and paste error ? :)
 
-Best regards
-Uwe
+Thanks!
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/c1892db8/attachment-0001.sig>
