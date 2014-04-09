@@ -1,46 +1,38 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Wed, 09 Apr 2014 12:04:58 +0300
-Subject: Big endian working?
-In-Reply-To: <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
-References: <20140408095446.0520dd28@skate>	<5343BDEE.4010005@linaro.org>	<12950765.TpxjkTx5NP@wuerfel>	<alpine.LFD.2.11.1404082339291.1571@knanqh.ubzr>
- <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
-Message-ID: <53450D3A.7030909@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 09 Apr 2014 11:04:41 +0200
+Subject: [PATCH v7 1/3] ARM: EXYNOS: initial board support for exynos5260
+ SoC
+In-Reply-To: <CAK9yfHzuVZh-RhfT+0tEehnF+aWnYHG=X2cv_E6uvzq2aS7UQg@mail.gmail.com>
+References: <1396519224-18712-1-git-send-email-rahul.sharma@samsung.com>
+ <1396519224-18712-2-git-send-email-rahul.sharma@samsung.com>
+ <CAK9yfHzuVZh-RhfT+0tEehnF+aWnYHG=X2cv_E6uvzq2aS7UQg@mail.gmail.com>
+Message-ID: <53450D29.7020207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2014 07:46 AM, Victor Kamensky wrote:
-> My understanding is that CPU_BE8_BOOT_LE was needed only for
-> atags boot case. Since now practically nobody uses atags, but rather
-> fdt those patches were not pushed into main stream.
+On 07.04.2014 10:38, Sachin Kamat wrote:
+> Hi Rahul,
 >
-> Please look at
-> git://git.baserock.org/delta/linux baserock/311-rc7/be/atags-v2
+> On 3 April 2014 15:30, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>
+>> This patch add basic arch side support for exynos5260 SoC.
+> <snip>
 >
-> Thomas, does your Armada XP uboot still uses atags? I would think
-> not.
+>> @@ -374,6 +374,7 @@ static char const *exynos_dt_compat[] __initconst = {
+>>          "samsung,exynos4412",
+>>          "samsung,exynos5",
+>>          "samsung,exynos5250",
+>> +       "samsung,exynos5260",
 >
-> I can confirm that in main line TC2 works in BE mode without any
-> changes. In linaro kernel tree we have Arandle and Pandaboard with
-> additional, drivers only changes, and they work OK. However I don't
-> think we are testing zImage, in all cases I use it, it is uImage.
+> I don't think we should be adding this as we do not yet have any soc
+> specific quirk.
+> Compatibility to generic string, "samsung,exynos5"  should be sufficient.
+>
 
-Actually I usually use zImage, so I do need these patches :)
- From IRC discussion on Tom's issue I thought that he also have zImage.
+Yes. Unless a SoC specific quirk that needs to be handled at such low 
+level stage emerges, there is no need to add such compatible string to 
+the kernel.
 
-> Maybe Nico's zImage change was under atags umbrella by mistake and
-> it really addresses general zImage issue. In this case we need to add
-> this commit to main line. However, I don't think we need to carry
-> CPU_BE8_BOOT_LE option forward, why we just use
-> CONFIG_CPU_BIG_ENDIAN instead. Note in all cases when BE
-> image used loader is always in LE mode. Never seen case
-> otherwise.
-
-That makes sense, but I'm concerned about BE32 systems.
-Do they also have LE bootloaders? I don't remember kernel code which
-switches to BE32. I'd think that switch is done by bootloader or 
-ROMcode. Or even BE hardwired in HW. So BE32 bootloader may expect to
-see BE zImage header.
-Maybe instead of CONFIG_CPU_BIG_ENDIAN use CONFIG_CPU_ENDIAN_BE8?
-
--- 
-Taras Kondratiuk
+Best regards,
+Tomasz
