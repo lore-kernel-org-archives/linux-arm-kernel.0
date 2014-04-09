@@ -1,49 +1,65 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 9 Apr 2014 14:37:49 -0700
-Subject: [PATCH v5 5/8 fix] mtd: m25p80: use the SPI nor framework
-In-Reply-To: <1393574142-17234-1-git-send-email-b32955@freescale.com>
-References: <1393238262-8622-6-git-send-email-b32955@freescale.com>
- <1393574142-17234-1-git-send-email-b32955@freescale.com>
-Message-ID: <20140409213749.GH32070@ld-irv-0074>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 9 Apr 2014 16:39:42 -0500
+Subject: [PATCH 4/4] arm: mediatek: Add earlyprintk support for MT6589
+In-Reply-To: <1397072736-10793-5-git-send-email-matthias.bgg@gmail.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <1397072736-10793-5-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAL_JsqKq+D+c-qznP5aE3uyXf_YXyYzvoKRONAY7eXBkWcvqsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Russell
-
-On Fri, Feb 28, 2014 at 03:55:42PM +0800, Huang Shijie wrote:
-> add back the dependency information in the Kconfig. 
-> 
+On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
->  drivers/mtd/devices/Kconfig  |    2 +-
->  drivers/mtd/devices/m25p80.c | 1302 ++++--------------------------------------
->  2 files changed, 106 insertions(+), 1198 deletions(-)
-> 
-> diff --git a/drivers/mtd/devices/Kconfig b/drivers/mtd/devices/Kconfig
-> index 0128138..004b17b 100644
-> --- a/drivers/mtd/devices/Kconfig
-> +++ b/drivers/mtd/devices/Kconfig
-> @@ -80,7 +80,7 @@ config MTD_DATAFLASH_OTP
->  
->  config MTD_M25P80
->  	tristate "Support most SPI Flash chips (AT26DF, M25P, W25X, ...)"
-> -	depends on SPI_MASTER
-> +	depends on SPI_MASTER && MTD_SPI_NOR_BASE
->  	help
->  	  This enables access to most modern SPI flash chips, used for
->  	  program and data storage.   Series supported include Atmel AT26DF,
+>  arch/arm/Kconfig.debug            |   49 +++++++++++++++++++++++++++++++++++--
+>  arch/arm/include/debug/mediatek.S |   38 ++++++++++++++++++++++++++++
+>  2 files changed, 85 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/include/debug/mediatek.S
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 4a2fc0b..dc51495 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -797,6 +797,38 @@ choice
+>                   Say Y here if you want kernel low-level debugging support
+>                   on Ux500 based platforms.
+>
+> +       config DEBUG_MTK6589_UART0
+> +               depends on ARCH_MEDIATEK
+> +               bool "Mediatek mt6589 UART0"
+> +               select DEBUG_UART_MEDIATEK
+> +               help
+> +                 Say Y here if you want kernel low-level debugging support
+> +                 on Mediatek mt6589 based platforms.
+> +
+> +       config DEBUG_MTK6589_UART1
+> +               depends on ARCH_MEDIATEK
+> +               bool "Mediatek mt6589 UART1"
+> +               select DEBUG_UART_MEDIATEK
+> +               help
+> +                 Say Y here if you want kernel low-level debugging support
+> +                 on Mediatek mt6589 based platforms.
+> +
+> +       config DEBUG_MTK6589_UART2
+> +               depends on ARCH_MEDIATEK
+> +               bool "Mediatek mt6589 UART2"
+> +               select DEBUG_UART_MEDIATEK
+> +               help
+> +                 Say Y here if you want kernel low-level debugging support
+> +                 on Mediatek mt6589 based platforms.
+> +
+> +       config DEBUG_MTK6589_UART3
+> +               depends on ARCH_MEDIATEK
+> +               bool "Mediatek mt6589 UART3"
+> +               select DEBUG_UART_MEDIATEK
+> +               help
+> +                 Say Y here if you want kernel low-level debugging support
+> +                 on Mediatek mt6589 based platforms.
+> +
 
-Now that M25P80 depends on MTD_SPI_NOR_BASE (which I proposed to rename
-to MTD_SPI_NOR a few hours ago), shouldn't we be updating everybody's
-defconfigs? As it stands, the defconfigs that use M25P80 will just drop
-it silently when built.
+Do you really need all uarts defined? Only define what you have boards using.
 
-And if so, I'm not sure how this should be handled. Should defconfig
-patches be sent to their respective arch maintainers?
-
-Also, I think m25p80.c is no longer a "self-contained MTD device driver"
-and should be moved under drivers/mtd/spi-nor/.
-
-(Once these questions are settled, did you want to handle cooking the
-patches, Huang, or should I?)
-
-Brian
+Also, you have no uarts defined in your dts. Please add them there
+(and any necessary serial driver) before adding debug functionality.
+Otherwise, you can't actually boot a multi-platform kernel with this
+series.
