@@ -1,49 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Apr 2014 20:37:06 +0100
-Subject: [PATCH 1/2] pwm: add period and polarity to struct pwm_lookup
-In-Reply-To: <1397066649-3767-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1397066649-3767-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1397066649-3767-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140409193705.GJ27282@n2100.arm.linux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed,  9 Apr 2014 21:45:34 +0200
+Subject: [PATCH 2/4] dt-bindings: add mtk-timer bindings
+In-Reply-To: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1397072736-10793-3-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 08:04:08PM +0200, Alexandre Belloni wrote:
-> Adds a period and a polarity member to struct pwm_lookup so that when performing
-> a lookup using the lookup table instead of device tree, we are able to set the
-> period and the polarity accordingly like what is done in
-> of_pwm_xlate_with_flags.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/pwm/core.c  | 5 +++++
->  include/linux/pwm.h | 2 ++
->  2 files changed, 7 insertions(+)
-> 
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index a80471399c20..206e5996359c 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -663,6 +663,11 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
->  
->  	if (chip)
->  		pwm = pwm_request_from_chip(chip, index, con_id ?: dev_id);
-> +	if (IS_ERR(pwm))
-> +		return pwm;
-> +
-> +	pwm_set_period(pwm, p->period);
-> +	pwm_set_polarity(pwm, p->polarity);
->  
->  	mutex_unlock(&pwm_lookup_lock);
+Add binding documentation for the General Porpose Timer driver of
+the Mediatek SoCs.
 
-Clearly, this is not right.  Returning while leaving the mutex locked?
-No.
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ .../bindings/timer/mediatek,mtk-timer.txt          |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
 
-The second issue is... with _just_ this patch applied, we end up with
-"period" and "polarity" presumably initialised to zero, which means we
-now end up with the above explicitly setting the period and polarity as
-such.  Isn't that going to change the behaviour of this?
-
+diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+new file mode 100644
+index 0000000..db3c836
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+@@ -0,0 +1,19 @@
++Mediatek MT6598, MT6577 and MT6572 Timers
++---------------------------------------
++
++Required properties:
++- compatible: Should be "mediatek,mtk6589-timer"
++- reg: Should contain location and length for timers register.
++- clock-names : Must include the following entries:
++  "sysclk" (13 MHz system clock),
++  "rtcclk" (32 KHz RTC clock).
++
++Examples:
++
++	timer {
++		compatible = "mediatek,mtk6589-timer";
++		reg = <0x10008000 0x80>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&system_clk>, <&rtc-clk>;
++		clock-names = "sysclk", "rtcclk";
++	};
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
