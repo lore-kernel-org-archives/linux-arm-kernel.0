@@ -1,131 +1,284 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 9 Apr 2014 13:14:48 -0700
-Subject: [PATCH v2 2/2] ARM: mm: allow text and rodata sections to be
- read-only
-In-Reply-To: <5345A4FA.1090008@codeaurora.org>
-References: <1396926910-11227-1-git-send-email-keescook@chromium.org>
- <1396926910-11227-3-git-send-email-keescook@chromium.org>
- <20140409090204.GA6583@linaro.org>
- <CAGXu5jL0Exz0TSYE1EaPVwxik5+0y3QXTWLkU6Ti+9+ahHM=ow@mail.gmail.com>
- <5345A4FA.1090008@codeaurora.org>
-Message-ID: <CAGXu5jJdy4DVfvaG2smNhW+pHrLEZB+5fTABap3DGRdaKg80kw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 09 Apr 2014 20:26:40 +0000
+Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <5345AD00.9020508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 9, 2014 at 12:52 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> On 4/9/2014 9:12 AM, Kees Cook wrote:
->> On Wed, Apr 9, 2014 at 2:02 AM, Steve Capper <steve.capper@linaro.org> wrote:
->>> Hi Kees,
->>>
->>> On Mon, Apr 07, 2014 at 08:15:10PM -0700, Kees Cook wrote:
->>>> This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
->>>> read-only. Additionally, this splits rodata from text so that rodata can
->>>> also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
->>>>
->>>> The read-only areas are made writable during ftrace updates. Additional
->>>> work is needed for kprobes and kexec, so the feature is temporarily
->>>> marked as unavailable in Kconfig when those options are selected.
->>>>
->>>> Signed-off-by: Kees Cook <keescook@chromium.org>
->>>> ---
->>>>  arch/arm/include/asm/cacheflush.h |    9 ++++++++
->>>>  arch/arm/kernel/ftrace.c          |   17 ++++++++++++++
->>>>  arch/arm/kernel/vmlinux.lds.S     |    3 +++
->>>>  arch/arm/mm/Kconfig               |   12 ++++++++++
->>>>  arch/arm/mm/init.c                |   46 +++++++++++++++++++++++++++++++++++++
->>>>  5 files changed, 87 insertions(+)
->>>>
->>>> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
->>>> index 8b8b61685a34..b6fea0a1a88b 100644
->>>> --- a/arch/arm/include/asm/cacheflush.h
->>>> +++ b/arch/arm/include/asm/cacheflush.h
->>>> @@ -487,4 +487,13 @@ int set_memory_rw(unsigned long addr, int numpages);
->>>>  int set_memory_x(unsigned long addr, int numpages);
->>>>  int set_memory_nx(unsigned long addr, int numpages);
->>>>
->>>> +#ifdef CONFIG_DEBUG_RODATA
->>>> +void mark_rodata_ro(void);
->>>> +void set_kernel_text_rw(void);
->>>> +void set_kernel_text_ro(void);
->>>> +#else
->>>> +static inline void set_kernel_text_rw(void) { }
->>>> +static inline void set_kernel_text_ro(void) { }
->>>> +#endif
->>>> +
->>>>  #endif
->>>> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
->>>> index af9a8a927a4e..ea446ae09c89 100644
->>>> --- a/arch/arm/kernel/ftrace.c
->>>> +++ b/arch/arm/kernel/ftrace.c
->>>> @@ -15,6 +15,7 @@
->>>>  #include <linux/ftrace.h>
->>>>  #include <linux/uaccess.h>
->>>>  #include <linux/module.h>
->>>> +#include <linux/stop_machine.h>
->>>>
->>>>  #include <asm/cacheflush.h>
->>>>  #include <asm/opcodes.h>
->>>> @@ -35,6 +36,22 @@
->>>>
->>>>  #define      OLD_NOP         0xe1a00000      /* mov r0, r0 */
->>>>
->>>> +static int __ftrace_modify_code(void *data)
->>>> +{
->>>> +     int *command = data;
->>>> +
->>>> +     set_kernel_text_rw();
->>>> +     ftrace_modify_all_code(*command);
->>>> +     set_kernel_text_ro();
->>>> +
->>>> +     return 0;
->>>> +}
->>>
->>> Would another approach be to keep all the kernel .text ro then override
->>> probe_kernel_write (which has a weak reference), to create a separate
->>> temporary rw mapping to the specific page that needs to be modified?
->>>
->>> That way you only worry about TLB and cache maintenance for a smaller
->>> area. Also, your kernel .text VAs never actually become writable, so
->>> you don't need to worry as much about unauthorised changes whilst your
->>> guard is temporarily down.
->>>
->>> (Though lots of small changes could probably make this more
->>> expensive, and you will need to double check aliasing in pre-ARMv7).
->>
->> As I understand it, early boot needs some of these areas RWX. Doing
->> the protection during init-free means we can avoid all that and still
->> allow the memory to get reclaimed. As to not doing section
->> re-mappings, I share the same concern about it being very expensive to
->> do lots of small changes. As such, I think this is the cleanest
->> approach that is still portable.
->>
->
-> FWIW, our out of tree patches set up the permissions at map_lowmem time
-> and we've never run into any issue with incorrect RWX permissions to
-> the best of my knowledge.
+Hi Matthias,
 
-I thought there were problems with not being able to free init mem in this case?
+On 09/04/2014 19:45, Matthias Brugger wrote:
+> This adds a generic devicetree board file and a dtsi for boards
+> based on the MT6589 SoCs from Mediatek.
+> 
+> Apart from the generic parts (gic, clocks) the only component
+> currently supported are the timers.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>  arch/arm/Kconfig                                   |    2 +
+>  arch/arm/Makefile                                  |    1 +
+>  arch/arm/boot/dts/mtk6589.dtsi                     |  105 ++++++++++++++++++++
+>  arch/arm/mach-mediatek/Kconfig                     |   14 +++
+>  arch/arm/mach-mediatek/Makefile                    |    1 +
+>  arch/arm/mach-mediatek/mediatek.c                  |   40 ++++++++
+>  7 files changed, 164 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mtk6589.dtsi
+>  create mode 100644 arch/arm/mach-mediatek/Kconfig
+>  create mode 100644 arch/arm/mach-mediatek/Makefile
+>  create mode 100644 arch/arm/mach-mediatek/mediatek.c
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 0f01c9b..af48801 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -67,6 +67,7 @@ linux	Linux-specific binding
+>  lsi	LSI Corp. (LSI Logic)
+>  marvell	Marvell Technology Group Ltd.
+>  maxim	Maxim Integrated Products
+> +mediatek	MediaTek Inc.
+>  microchip	Microchip Technology Inc.
+>  mosaixtech	Mosaix Technologies, Inc.
+>  moxa	Moxa
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5db05f6a..04d46ec 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -995,6 +995,8 @@ source "arch/arm/mach-mv78xx0/Kconfig"
+>  
+>  source "arch/arm/mach-imx/Kconfig"
+>  
+> +source "arch/arm/mach-mediatek/Kconfig"
+> +
+>  source "arch/arm/mach-mxs/Kconfig"
+>  
+>  source "arch/arm/mach-netx/Kconfig"
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 41c1931..8ce9774 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -170,6 +170,7 @@ machine-$(CONFIG_ARCH_MSM)		+= msm
+>  machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
+>  machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
+>  machine-$(CONFIG_ARCH_MXC)		+= imx
+> +machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
+>  machine-$(CONFIG_ARCH_MXS)		+= mxs
+>  machine-$(CONFIG_ARCH_NETX)		+= netx
+>  machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
+> diff --git a/arch/arm/boot/dts/mtk6589.dtsi b/arch/arm/boot/dts/mtk6589.dtsi
+> new file mode 100644
+> index 0000000..6dbb74f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mtk6589.dtsi
+> @@ -0,0 +1,105 @@
+> +/*
+> + * Copyright (c) 2014 MundoReader S.L.
+> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "mediatek,mt6589";
+> +	interrupt-parent = <&gic>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x0>;
+> +		};
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x1>;
+> +		};
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x2>;
+> +		};
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x3>;
+> +		};
+> +
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		system_clk: system_clk {
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <13000000>;
+> +			#clock-cells = <0>;
+> +			clock-output-names = "system_clk";
+> +		};
 
-> Just for comparison, how many small changes would need to happen for an
-> ftrace use case? Would these changes be happening on a hot path?
+Is it really a fixed clock without any parent, or do you
+declare it as a fixed clock because you don't have any clock
+common framework support yet?
 
-I'm not familiar with the internals, but it seemed like it was fixing
-up a lot of entry points.
+> +
+> +		rtc_clk: rtc_clk {
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <32000>;
+> +			#clock-cells = <0>;
+> +			clock-output-names = "rtc_clk";
+> +		};
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		clock-ranges;
+> +		ranges;
+> +
+> +		gic: interrupt-controller at 10212000 {
+> +			compatible = "arm,cortex-a9-gic";
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +			reg = <0x10211000 0x1000>,
+> +			      <0x10212000 0x1000>;
+> +		};
+> +
+> +		L2: l2-cache-controller at 1020e000 {
+> +			compatible = "arm,pl310-cache";
+> +			reg = <0x1020e000 0x1000>;
+> +			cache-unified;
+> +			cache-level = <2>;
+> +		};
+> +
+> +		timer: timer at 10008000 {
+> +			compatible = "mediatek,mtk6589-timer";
+> +			reg = <0x10008000 0x80>;
+> +			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+> +			clocks = <&system_clk>, <&rtc_clk>;
+> +			clock-names = "sys_clk", "rtc_clk";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+> new file mode 100644
+> index 0000000..c0139ca
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/Kconfig
+> @@ -0,0 +1,14 @@
+> +config ARCH_MEDIATEK
+> +	bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
+> +	select ARCH_REQUIRE_GPIOLIB
+> +	select ARM_GIC
+> +	select CACHE_L2X0
+> +	select HAVE_ARM_TWD if LOCAL_TIMERS
 
--Kees
+LOCAL_TIMERS no longer exist
 
->
->> -Kees
->>
->
-> Thanks,
-> Laura
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+> +	select HAVE_SMP
+> +	select LOCAL_TIMERS if SMP
+ditto
 
+so what about this instead:
+
+	select HAVE_ARM_TWD if SMP
+
+
+The rest of this patch looks good.
+
+Thanks,
+
+Gregory
+
+> +	select COMMON_CLK
+> +	select GENERIC_CLOCKEVENTS
+> +	select MTK_TIMER
+> +	select CLKSRC_MMIO
+> +	help
+> +	  Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
+> diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+> new file mode 100644
+> index 0000000..43e619f
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> new file mode 100644
+> index 0000000..f630403
+> --- /dev/null
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -0,0 +1,40 @@
+> +/*
+> + * Device Tree support for Mediatek SoCs
+> + *
+> + * Copyright (c) 2014 MundoReader S.L.
+> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/irqchip.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +
+> +static void __init mediatek_dt_init(void)
+> +{
+> +	l2x0_of_init(0, ~0);
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+> +
+> +static const char * const mediatek_board_dt_compat[] = {
+> +	"mediatek,mt6589",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+> +	.init_machine	= mediatek_dt_init,
+> +	.dt_compat	= mediatek_board_dt_compat,
+> +MACHINE_END
+> 
 
 
 -- 
-Kees Cook
-Chrome OS Security
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
