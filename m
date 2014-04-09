@@ -1,93 +1,47 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 09 Apr 2014 15:33:05 +0200
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
- <534529B2.2020107@samsung.com>
- <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
-Message-ID: <53454C11.7060607@samsung.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 9 Apr 2014 10:48:37 -0700
+Subject: [PATCH v5 3/8] mtd: spi-nor: add the framework for SPI NOR
+In-Reply-To: <1393238262-8622-4-git-send-email-b32955@freescale.com>
+References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
+ <1393238262-8622-4-git-send-email-b32955@freescale.com>
+Message-ID: <20140409174837.GE32070@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.04.2014 13:49, Vivek Gautam wrote:
-> Hi,
->
->
-> On Wed, Apr 9, 2014 at 4:36 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->> Hi Vivek,
->>
->> Please see my comments inline.
->>
->>
->> On 08.04.2014 16:36, Vivek Gautam wrote:
->>>
->>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>> The new driver uses the generic PHY framework and will interact
->>> with DWC3 controller present on Exynos5 series of SoCs.
->>> Thereby, removing old phy-samsung-usb3 driver and related code
->>> used untill now which was based on usb/phy framework.
->>>
->>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>> ---
->>>    .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->>>    drivers/phy/Kconfig                                |   11 +
->>>    drivers/phy/Makefile                               |    1 +
->>>    drivers/phy/phy-exynos5-usbdrd.c                   |  668
->>> ++++++++++++++++++++
->>>    4 files changed, 722 insertions(+)
->>>    create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
->>
->>
->> [snip]
->>
->>
->>> +       Additional clock required for Exynos5420:
->>> +       - usb30_sclk_100m: Additional special clock used for PHY operation
->>> +                          depicted as 'sclk_usbphy30' in CMU of
->>> Exynos5420.
->>
->>
->> Are you sure this isn't simply a gate for the ref clock, as it can be found
->> on another SoC that is not upstream yet? I don't have documentation for
->> Exynos 5420 so I can't tell, but I'd like to ask you to recheck this.
->
->>From what i can see in the manual :
-> sclk_usbphy30 is derived from OSCCLK.
-> It is coming from a MUX (default input line to this is OSCCLK)  and
-> then through a DIV
-> there's this gate.
->
->        {OSCCLK  + other sources} --->[MUX] ---> [DIV] --> [GATE for
-> sclk_usbphy30]
->
-> the {rate of sclk_usbphy30} == OSCCLK
->
-> However the 'ref' clock that we have been using is the actual oscillator clock.
-> And on SoC Exynos5250, we don't have any such gate (sclk_usbphy30).
-> So should this mean that ref clock and sclk_usbphy30 are still be controlled by
-> two different gates ?
->
+On Mon, Feb 24, 2014 at 06:37:37PM +0800, Huang Shijie wrote:
+> This patch cloned most of the m25p80.c. In theory, it adds a new spi-nor layer.
+...
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> new file mode 100644
+> index 0000000..a840e88
+> --- /dev/null
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -0,0 +1,1087 @@
+> +/*
+> + * Cloned most of the code from the m25p80.c
 
-Is there maybe a diagram of PHY input clocks in the datasheet, like for 
-USB 2.0 PHY in Exynos4210/4412/5250 datasheets in the chapter about 
-USB2.0 Device? Something like:
+Please include a copyright notice here. This should carry both the
+original m25p80.c copyright notice, as well as your own additional
+copyright if you choose. For instance:
 
-                      ____________________________________
-                     |                                    |
-                     |                         ___________|
-XusbXTI             |   Phy_fsel[2:0]        |  _______  |
-    _______[X]_______|    |         __________|_|___|\__|_|
-   |                 |   _v___     |  _____   ^ |   |/  | |
-_____               |  |     |    | |     |  | |  ___  | |
-  ___                |  |     |    | |     |  | | |   |_|_|
-|___|               |  | X 0 |____|_| PLL |__|_|_|CLK|_|_|
-_____               |  |     |      |     |    | |DIV|_|_|
-   |_______[X]       |  |_____| 12   |_____|480 | |___| | |
-                     |          MHz         MHz |Digital| |
-XusbXTO             |   USB PHY                |_______| |
-                     |____________________________________|
+ * Based on m25p80.c, by Mike Lavender (mike at steroidmicros.com), with
+ * influence from lart.c (Abraham Van Der Merwe) and mtd_dataflash.c
+ *
+ * Copyright ? 2005, Intec Automation Inc.
+ * Copyright ? 2014, Freescale Semiconductor, Inc.
 
+> + *
+> + * This code is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/errno.h>
+> +#include <linux/module.h>
+> +#include <linux/device.h>
+> +#include <linux/mutex.h>
+> +#include <linux/math64.h>
+...
 
-Best regards,
-Tomasz
+Brian
