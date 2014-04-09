@@ -1,64 +1,93 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 9 Apr 2014 19:47:47 +0200
-Subject: [PATCH v5 0/8] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20140409033603.GA32070@ld-irv-0074>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
- <20140313063940.GU31517@norris-Latitude-E6410>
- <20140409033603.GA32070@ld-irv-0074>
-Message-ID: <201404091947.47428.marex@denx.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 09 Apr 2014 15:33:05 +0200
+Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
+ <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
+ <534529B2.2020107@samsung.com>
+ <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
+Message-ID: <53454C11.7060607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 09, 2014 at 05:36:03 AM, Brian Norris wrote:
-> + Lee, Marek
-> 
-> Hi Huang,
-> 
-> On Wed, Mar 12, 2014 at 11:39:40PM -0700, Brian Norris wrote:
-> > On Wed, Mar 12, 2014 at 04:13:51PM +0800, Huang Shijie wrote:
-> > > On Mon, Feb 24, 2014 at 06:37:34PM +0800, Huang Shijie wrote:
-> > >    Could you please review this patch set? I really hope it can be
-> > >    merged as soon as possibel.  But now, the patch set has stalled for
-> > >    a long time.
-> > 
-> > I'm sorry for the delay. Others are in the same position of delay (e.g.,
-> > Lee's SPI-NOR driver), because I simply have not had the time to really
-> > devote this the attention it deserves, especially considering how it
-> > rearchitects such an important, commonly-used driver.
-> > 
-> > Nonetheless, I will try to give your patches some more attention soon.
-> > 
-> > >    Since you have pushed the patches for m25p80.c, i have to rebase
-> > >    this patch set again and again...
-> > 
-> > You mean locally? I promise you, I can handle rebasing on my reviewing
-> > end for small one-line conflicts like new chip IDs, so don't rebase and
-> > resend simply for that. Unless I find substantive things that you should
-> > change, I'd only expect at most one more rebase to be necessary.
-> 
-> Unfortunately, I did not get the time to review and test this
-> sufficiently for the 3.15 merge window, but to avoid further delay, I've
-> queued it up in l2-mtd.git [1] under its own branch for now. I rebased
-> it myself, to accommodate for changes to m25p80.c since your submission.
-> Please take a look at the branch.
-> 
-> If all goes well, I should merge the spinor branch into master some time
-> after the 3.15 merge window closes, so it will get linux-next testing.
-> For any additional comments/corrections (I have a few), please just
-> submit patches on top, rather than resending the whole series.
-> 
-> Marek, what was your opinion on this series? Last response I saw was
-> "looking good"; is that an Ack? Or did you have any more gating
-> requests?
-> 
-> Personally, I think it looks ready enough, and it's better to merge this
-> than not. I was able to test with my platforms, with no regression.
+On 09.04.2014 13:49, Vivek Gautam wrote:
+> Hi,
+>
+>
+> On Wed, Apr 9, 2014 at 4:36 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Hi Vivek,
+>>
+>> Please see my comments inline.
+>>
+>>
+>> On 08.04.2014 16:36, Vivek Gautam wrote:
+>>>
+>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>>> The new driver uses the generic PHY framework and will interact
+>>> with DWC3 controller present on Exynos5 series of SoCs.
+>>> Thereby, removing old phy-samsung-usb3 driver and related code
+>>> used untill now which was based on usb/phy framework.
+>>>
+>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>> ---
+>>>    .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
+>>>    drivers/phy/Kconfig                                |   11 +
+>>>    drivers/phy/Makefile                               |    1 +
+>>>    drivers/phy/phy-exynos5-usbdrd.c                   |  668
+>>> ++++++++++++++++++++
+>>>    4 files changed, 722 insertions(+)
+>>>    create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+>>
+>>
+>> [snip]
+>>
+>>
+>>> +       Additional clock required for Exynos5420:
+>>> +       - usb30_sclk_100m: Additional special clock used for PHY operation
+>>> +                          depicted as 'sclk_usbphy30' in CMU of
+>>> Exynos5420.
+>>
+>>
+>> Are you sure this isn't simply a gate for the ref clock, as it can be found
+>> on another SoC that is not upstream yet? I don't have documentation for
+>> Exynos 5420 so I can't tell, but I'd like to ask you to recheck this.
+>
+>>From what i can see in the manual :
+> sclk_usbphy30 is derived from OSCCLK.
+> It is coming from a MUX (default input line to this is OSCCLK)  and
+> then through a DIV
+> there's this gate.
+>
+>        {OSCCLK  + other sources} --->[MUX] ---> [DIV] --> [GATE for
+> sclk_usbphy30]
+>
+> the {rate of sclk_usbphy30} == OSCCLK
+>
+> However the 'ref' clock that we have been using is the actual oscillator clock.
+> And on SoC Exynos5250, we don't have any such gate (sclk_usbphy30).
+> So should this mean that ref clock and sclk_usbphy30 are still be controlled by
+> two different gates ?
+>
 
-It looked OK to me, so that's an:
+Is there maybe a diagram of PHY input clocks in the datasheet, like for 
+USB 2.0 PHY in Exynos4210/4412/5250 datasheets in the chapter about 
+USB2.0 Device? Something like:
 
-Acked-by: Marek Vasut <marex@denx.de>
+                      ____________________________________
+                     |                                    |
+                     |                         ___________|
+XusbXTI             |   Phy_fsel[2:0]        |  _______  |
+    _______[X]_______|    |         __________|_|___|\__|_|
+   |                 |   _v___     |  _____   ^ |   |/  | |
+_____               |  |     |    | |     |  | |  ___  | |
+  ___                |  |     |    | |     |  | | |   |_|_|
+|___|               |  | X 0 |____|_| PLL |__|_|_|CLK|_|_|
+_____               |  |     |      |     |    | |DIV|_|_|
+   |_______[X]       |  |_____| 12   |_____|480 | |___| | |
+                     |          MHz         MHz |Digital| |
+XusbXTO             |   USB PHY                |_______| |
+                     |____________________________________|
 
-Thanks for watching over this!
 
 Best regards,
-Marek Vasut
+Tomasz
