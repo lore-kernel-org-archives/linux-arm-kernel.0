@@ -1,35 +1,46 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed,  9 Apr 2014 20:08:16 +0200
-Subject: [PATCH v3 3/4] ARM: pxa: pxa27x: Don't map IMEMC region statically
+Date: Wed,  9 Apr 2014 20:08:17 +0200
+Subject: [PATCH v3 4/4] ARM: pxa: Move iotable mapping inside vmalloc region
 In-Reply-To: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397066897-31826-4-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1397066897-31826-5-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IMEMC mapping not only has no user, but maps a reserved memory
-space. It just wastes vmalloc space, remove it.
+From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
+In order to remove the following ugly message:
+
+  BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+
+the iotable mappings should be re-located inside the vmalloc
+region. Such move was introduced at commit:
+
+commit 0536bdf33faff4d940ac094c77998cfac368cfff
+Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date:   Thu Aug 25 00:35:59 2011 -0400
+
+    ARM: move iotable mappings within the vmalloc region
+
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+[laurent.pinchart at ideasonboard.com: Hardcode the virtual address]
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/mach-pxa/pxa27x.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/mach-pxa/include/mach/hardware.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 6cc0f46..b040d7d 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -404,11 +404,6 @@ static struct map_desc pxa27x_io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(PXA2XX_SMEMC_BASE),
- 		.length		= SMEMC_SIZE,
- 		.type		= MT_DEVICE
--	}, {	/* IMem ctl */
--		.virtual	= (unsigned long)IMEMC_VIRT,
--		.pfn		= __phys_to_pfn(IMEMC_PHYS),
--		.length		= IMEMC_SIZE,
--		.type		= MT_DEVICE
- 	}, {	/* UNCACHED_PHYS_0 */
- 		.virtual	= UNCACHED_PHYS_0,
- 		.pfn		= __phys_to_pfn(0x00000000),
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index efb3965..8d63c21 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -19,7 +19,7 @@
+  * Workarounds for at least 2 errata so far require this.
+  * The mapping is set in mach-pxa/generic.c.
+  */
+-#define UNCACHED_PHYS_0		0xff000000
++#define UNCACHED_PHYS_0		0xfe000000
+ #define UNCACHED_PHYS_0_SIZE	0x00100000
+ 
+ /*
 -- 
 1.8.3.2
