@@ -1,48 +1,41 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 Apr 2014 15:55:21 -0300
-Subject: [PATCH v2 2/3] ARM: dts: imx27-pdk: Pass the UART1 pin configuration
-In-Reply-To: <1397069722-14778-1-git-send-email-festevam@gmail.com>
-References: <1397069722-14778-1-git-send-email-festevam@gmail.com>
-Message-ID: <1397069722-14778-2-git-send-email-festevam@gmail.com>
+Date: Wed,  9 Apr 2014 15:55:20 -0300
+Subject: [PATCH v2 1/3] ARM: dts: imx27-pdk: Keep the dt nodes sorted
+Message-ID: <1397069722-14778-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Provide an entry for the UART1 pin muxing.
+For better readability keep the dt nodes sorted.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v1:
-- Keep the iomuxc node at the bottom
+- Newly introduced
 
- arch/arm/boot/dts/imx27-pdk.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/imx27-pdk.dts | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-index bd95265..e0f4213 100644
+index 28c83bc..bd95265 100644
 --- a/arch/arm/boot/dts/imx27-pdk.dts
 +++ b/arch/arm/boot/dts/imx27-pdk.dts
-@@ -28,5 +28,20 @@
+@@ -21,11 +21,12 @@
+ 	};
+ };
  
- &uart1 {
- 	fsl,uart-has-rtscts;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
+-&uart1 {
+-	fsl,uart-has-rtscts;
++
++&fec {
  	status = "okay";
  };
-+
-+&iomuxc {
-+	imx27-pdk {
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX27_PAD_UART1_TXD__UART1_TXD 0x0
-+				MX27_PAD_UART1_RXD__UART1_RXD 0x0
-+				MX27_PAD_UART1_CTS__UART1_CTS 0x0
-+				MX27_PAD_UART1_RTS__UART1_RTS 0x0
-+			>;
-+		};
-+	};
-+};
+ 
+-&fec {
++&uart1 {
++	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
 -- 
 1.8.3.2
