@@ -1,104 +1,34 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Wed, 9 Apr 2014 19:19:35 +0530
-Subject: [PATCH] arm: exynos: generalize power register address calculation
-In-Reply-To: <534533E6.10901@samsung.com>
-References: <1396973737-18693-1-git-send-email-chander.kashyap@linaro.org>
- <1397041783-18531-1-git-send-email-chander.kashyap@linaro.org>
- <534533E6.10901@samsung.com>
-Message-ID: <CANuQgHEdks=OwF=N3LULmxujAeVVcLW3H++ixVZ3REfSrOieQA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed,  9 Apr 2014 15:51:07 +0200
+Subject: [PATCH 04/15] pinctrl: sunxi: specify clk name when retrieving
+ pinctrl pio clk
+In-Reply-To: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397051478-4113-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Specify base pio clk name when retrieving it using the CCF.
+This way we will avoid conflicts when introducing a second clk for the A31
+SoC.
 
-On 9 April 2014 17:19, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Chander,
->
->
-> On 09.04.2014 13:09, Chander Kashyap wrote:
->>
->> Currently status/configuration power register values are hard-coded for
->> cpu1.
->>
->> Make it generic so that it is useful for SoC's with more than two cpus.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->> changes in v2 : Used existing macros for clusterid and cpuid calculation
->>
->>   arch/arm/mach-exynos/hotplug.c  |   15 ++++++++++++---
->>   arch/arm/mach-exynos/platsmp.c  |   20 +++++++++++++++-----
->>   arch/arm/mach-exynos/regs-pmu.h |    9 +++++++--
->>   3 files changed, 34 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/hotplug.c
->> b/arch/arm/mach-exynos/hotplug.c
->> index 5eead53..eab6121 100644
->> --- a/arch/arm/mach-exynos/hotplug.c
->> +++ b/arch/arm/mach-exynos/hotplug.c
->> @@ -17,6 +17,7 @@
->>
->>   #include <asm/cacheflush.h>
->>   #include <asm/cp15.h>
->> +#include <asm/cputype.h>
->>   #include <asm/smp_plat.h>
->>
->>   #include <plat/cpu.h>
->> @@ -92,11 +93,19 @@ static inline void cpu_leave_lowpower(void)
->>
->>   static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->>   {
->> +       unsigned int mpidr, cpunr, cluster;
->> +
->> +       mpidr = cpu_logical_map(cpu);
->> +       cpunr = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->> +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->> +
->> +       /* Maximum possible cpus in a cluster can be 4 */
->> +       cpunr += cluster * 4;
->
->
-> I believe this is rather a weak assumption. First of all, the limit seems to
-> be hardcoded only for the few existing SoCs. In addition, the value is not
-> used as a maximum, but rather it is assumed that each cluster has always
-> four cores.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-sunxi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The MPIDR register contains 2 bits for cpu id. Hence maximum number of
-cpus can be 4 only (A15/A9/A7).
-
->
-> Moreover, it is assumed here that the mapping between core ID (calculated by
-> the equation below) and PMU core numbers is 1:1, which is not true. On
-> Exynos4210, the cluster ID is always 0x09 and on Exynos4x12 it is 0x0a,
-> which will lead to completely wrong register offsets.
-
-Exynos4210 and Exynos4x12, cluster ids are not passed from DT as it
-breaks the gic_init_bases. Hence the Physical CpuID for Exynos4210
-will be 0,1 and Exynos4x12 will be 0,1,2,3.
-
-So it will not break.
-
-
->
-> I believe the proper way to deal with this is to provide per-CPU property in
-> DT called "samsung,pmu-offset" that could be used be code like this to
-> calculate register addresses properly.
->
-> For now, I would recommend doing the above ignoring cluster ID completely to
-> not break (and actually fix) single cluster systems and existing multi
-> cluster ones on which only the first cluster is supported now.
->
-> After that, per-CPU PMU offset should be implemented to support
-> multi-cluster SoCs with proper support of multiple clusters.
-
-As of now the smp-boot (cores > 2) is broken. This is required to fix it.
-
->
-> Best regards,
-> Tomasz
-
-
-
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index f9fabe9..ef16311 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -878,7 +878,7 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
+ 			goto gpiochip_error;
+ 	}
+ 
+-	clk = devm_clk_get(&pdev->dev, NULL);
++	clk = devm_clk_get(&pdev->dev, "pio_clk");
+ 	if (IS_ERR(clk)) {
+ 		ret = PTR_ERR(clk);
+ 		goto gpiochip_error;
 -- 
-with warm regards,
-Chander Kashyap
+1.8.3.2
