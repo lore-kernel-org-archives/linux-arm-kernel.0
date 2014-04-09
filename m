@@ -1,49 +1,60 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 8 Apr 2014 22:47:00 -0700
-Subject: [PATCH 01/15] mtd: st_spi_fsm: Add Macronix MX25L25655E device
-In-Reply-To: <20140327082047.GB26627@lee--X1>
-References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
- <1395851969-13520-2-git-send-email-lee.jones@linaro.org>
- <CAMuHMdXgPiJSrA4Txp_OxrGx7osNsprm5a+w3Qag=Yd-_nFVBw@mail.gmail.com>
- <20140327082047.GB26627@lee--X1>
-Message-ID: <20140409054700.GC3131@norris-Latitude-E6410>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Apr 2014 15:15:41 +0900
+Subject: [PATCH] ARM: shmobile: lager: Correct setting of ethernet PHY
+ LED mode
+In-Reply-To: <1665021.dQPpZ5R559@avalon>
+References: <1396916495-13018-1-git-send-email-horms+renesas@verge.net.au>
+ <1665021.dQPpZ5R559@avalon>
+Message-ID: <20140409061540.GA26994@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 08:20:47AM +0000, Lee Jones wrote:
-> > > From: Angus Clark <angus.clark@st.com>
-> > >
-> > > Add Macronix MX25L25655E to the list of known devices.
-> > >
-> > > Signed-off-by: Angus Clark <angus.clark@st.com>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/mtd/devices/st_spi_fsm.c | 3 +++
-> > >  1 file changed, 3 insertions(+)
-> > >
-> > > diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-> > > index bea1416..2471061 100644
-> > > --- a/drivers/mtd/devices/st_spi_fsm.c
-> > > +++ b/drivers/mtd/devices/st_spi_fsm.c
-> > > @@ -380,6 +380,9 @@ static struct flash_info flash_types[] = {
-> > >         { "mx25l25635e", 0xc22019, 0, 64*1024, 512,
-> > >           (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
-> > >           stfsm_mx25_config },
-> > > +       { "mx25l25655e", 0xc22619, 0, 64*1024, 512,
-> > > +         (MX25_FLAG | FLASH_FLAG_32BIT_ADDR | FLASH_FLAG_RESET), 70,
-> > > +         stfsm_mx25_config},
-> > >
-> > >  #define N25Q_FLAG (FLASH_FLAG_READ_WRITE       |       \
-> > >                    FLASH_FLAG_READ_FAST         |       \
-> > 
-> > How much of this table can be shared with the one in m25p80.c?
+On Tue, Apr 08, 2014 at 02:07:49PM +0200, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> I have a long term plan to merge the two. Just waiting for the SPI NOR
-> Framework to land before I do so.
+> On Tuesday 08 April 2014 09:21:35 Simon Horman wrote:
+> > The correct binding is "micrel,led-mode", not "led-mode".
+> > 
+> > This corrects an error which was introduced when setting of ethernet PHY
+> > LED mode was added by 82e62182d59bd1d0 ("ARM: shmobile: lager: Set ethernet
+> > PHY LED mode").
+> 
+> Indeed. I wonder how I've missed that... :-( Sorry.
 
-Huang's work landed in the spinor branch at l2-mtd.git a bit ago. I will
-take a look at this series and probably take this as-is, but long-term I
-will not be taking many more additions to this custom table.
+Thanks, I have queued this up.
 
-Regards,
-Brian
+> 
+> > This makes the lager code consistent with the koelsch code which was added
+> > by ae00d12a032490b3 ("ARM: shmobile: koelsch: Set ethernet PHY LED mode").
+> > 
+> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> > ---
+> > 
+> > * This is compile tested only (which is of negligible value)
+> >   as I do not have physical access to a Lager board.
+> > ---
+> >  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts
+> > b/arch/arm/boot/dts/r8a7790-lager.dts index a55c5f8..265cba1 100644
+> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> > @@ -213,7 +213,7 @@
+> >  		reg = <1>;
+> >  		interrupt-parent = <&irqc0>;
+> >  		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> > -		led-mode = <1>;
+> > +		micrel,led-mode = <1>;
+> >  	};
+> >  };
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
