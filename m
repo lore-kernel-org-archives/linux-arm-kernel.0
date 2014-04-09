@@ -1,60 +1,36 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 09 Apr 2014 12:05:16 +0200
-Subject: [PATCH 3/3] ARM: socfpga: dts: add reset-controller
-In-Reply-To: <1397034967.4418.4.camel@paszta.hi.pengutronix.de>
-References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396629087-23727-4-git-send-email-s.trumtrar@pengutronix.de>
- <1396905121.25236.2.camel@linux-builds1>
- <20140407224110.GA28399@pengutronix.de> <53435F37.7060301@gmail.com>
- <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
- <1397034967.4418.4.camel@paszta.hi.pengutronix.de>
-Message-ID: <73k3ay3jj7.fsf@unicorn.hi.pengutronix.de>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 09 Apr 2014 11:29:38 +0100
+Subject: [PATCH 2/2] ARM: mm: make text and rodata read-only
+In-Reply-To: <20140408194815.GA6188@debian>
+References: <1396577719-14786-1-git-send-email-keescook@chromium.org>
+ <1396577719-14786-3-git-send-email-keescook@chromium.org>
+ <20140404195818.GA21028@debian>
+ <CAGXu5jKPX2igsb2rQzdCZQZ8X3h4YZihCV9D+cDW3F+qii8H2A@mail.gmail.com>
+ <1396960898.3567.55.camel@linaro1.home>
+ <CAGXu5jJq24k4uQbBJmihJ4RScJ40o41oKFtm13hBO_YZOvHpkA@mail.gmail.com>
+ <1396973561.14809.26.camel@linaro1.home>
+ <CAGXu5jJewy0Xy-qUEF2K6bAcEC8ZdKy0Ad2nLPjGRsq20fSQXQ@mail.gmail.com>
+ <20140408194815.GA6188@debian>
+Message-ID: <1397039378.3537.32.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2014-04-08 at 21:48 +0200, Rabin Vincent wrote:
+[...]
+> For any other CPU to pull in the writable entry it would have to get a
+> TLB miss inside the loop in multi_cpu_stop(), after the state transition
+> to MULTI_STOP_RUN and before the state transition to MULTI_STOP_EXIT.
+> This is unlikely, but theoretically possible, for example if
+> multi_cpu_stop() straddles sections.
 
-Philipp Zabel <p.zabel@pengutronix.de> writes:
-
-> Am Mittwoch, den 09.04.2014, 10:37 +0200 schrieb Steffen Trumtrar:
->> Dinh Nguyen <dinh.linux@gmail.com> writes:
->> 
->> > On 4/7/14 5:41 PM, Steffen Trumtrar wrote:
->> >> On Mon, Apr 07, 2014 at 04:12:01PM -0500, Dinh Nguyen wrote:
->> >>> On Fri, 2014-04-04 at 18:31 +0200, Steffen Trumtrar wrote:
->> >>>> Add the necessary #reset-cells property to the rst-mgr node and
->> >>>> provide a header-file with all possible resets specified.
->> >>>>
->> >>>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->> >>>> ---
->> >>>>  arch/arm/boot/dts/socfpga.dtsi           |  8 ++-
->> >>>>  include/dt-bindings/reset/altr,rst-mgr.h | 90 ++++++++++++++++++++++++++++++++
->> >>> Does this file belong under dt-bindings/reset/ or
->> >>> dt-bindings/reset-controller/?
->> >>>
->> >> ATM there is no such directory, or is there ?
->> >> So, reset seems appropriate I think.
->> > commit [6b7f06 ARM: STi: STiH415: Add reset controller support.]
->> > Seems more appropriate for this to go into reset-controller.
->> >
->> 
->> Okay, the current mainline master now has include/dt-bindings/reset and
->> include/dt-bindings/reset-controller.
->> 
->> I think one of those directories shouldn't be there, but be merged in
->> the other instead. But which one? Where shall I put my precious code?
->
-> My vote would be for dt-bindings/reset/, since that's shorter and
-> 2ec941304df9e1cd5e2f2404303a5fab0929969a came before
-> 6b7f06cc805bb4755e69cd916b3f565947e0a77a.
->
-
-Agreed.
-
-Regards,
-Steffen
+With speculative execution it is also possible for the CPU to fill the
+TLB with entries for a memory address that the program would never
+actually access. Basically, whatever is in the MMU registers and page
+tables at any given time, the CPU can speculatively use that address
+translation and read that memory. And if it's marked cacheable, pull it
+into the cache. Oh, and if there is a dirty cacheline in another
+CPU/clusters cache, move that dirty entry over into it's own cache (I
+believe).
 
 -- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tixy
