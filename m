@@ -1,126 +1,135 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 09 Apr 2014 13:06:26 +0200
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <534529B2.2020107@samsung.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed,  9 Apr 2014 16:39:43 +0530
+Subject: [PATCH] arm: exynos: generalize power register address calculation
+In-Reply-To: <1396973737-18693-1-git-send-email-chander.kashyap@linaro.org>
+References: <1396973737-18693-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1397041783-18531-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+Currently status/configuration power register values are hard-coded for cpu1.
 
-Please see my comments inline.
+Make it generic so that it is useful for SoC's with more than two cpus.
 
-On 08.04.2014 16:36, Vivek Gautam wrote:
-> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
-> The new driver uses the generic PHY framework and will interact
-> with DWC3 controller present on Exynos5 series of SoCs.
-> Thereby, removing old phy-samsung-usb3 driver and related code
-> used untill now which was based on usb/phy framework.
->
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
->   .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->   drivers/phy/Kconfig                                |   11 +
->   drivers/phy/Makefile                               |    1 +
->   drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
->   4 files changed, 722 insertions(+)
->   create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+---
+changes in v2 : Used existing macros for clusterid and cpuid calculation
 
-[snip]
+ arch/arm/mach-exynos/hotplug.c  |   15 ++++++++++++---
+ arch/arm/mach-exynos/platsmp.c  |   20 +++++++++++++++-----
+ arch/arm/mach-exynos/regs-pmu.h |    9 +++++++--
+ 3 files changed, 34 insertions(+), 10 deletions(-)
 
-> +	Additional clock required for Exynos5420:
-> +	- usb30_sclk_100m: Additional special clock used for PHY operation
-> +			   depicted as 'sclk_usbphy30' in CMU of Exynos5420.
-
-Are you sure this isn't simply a gate for the ref clock, as it can be 
-found on another SoC that is not upstream yet? I don't have 
-documentation for Exynos 5420 so I can't tell, but I'd like to ask you 
-to recheck this.
-
-> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
-> +			  control pmu registers for power isolation.
-> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
-> +		      base.
-> +- #phy-cells : from the generic PHY bindings, must be 1;
-> +
-> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
-> +compatible PHYs, the second cell in the PHY specifier identifies the
-> +PHY id, which is interpreted as follows:
-> +  0 - UTMI+ type phy,
-> +  1 - PIPE3 type phy,
-> +
-> +Example:
-> +	usb3_phy: usbphy at 12100000 {
-> +		compatible = "samsung,exynos5250-usbdrd-phy";
-> +		reg = <0x12100000 0x100>;
-> +		clocks = <&clock 286>, <&clock 1>;
-> +		clock-names = "phy", "usb3phy_refclk";
-
-Binding description above doesn't mention "usb3phy_refclk" entry.
-
-> +		samsung,syscon-phandle = <&pmu_syscon>;
-> +		samsung,pmu-offset = <0x704>;
-> +		#phy-cells = <1>;
-> +	};
-
-[snip]
-
-> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-> new file mode 100644
-> index 0000000..ff54a7c
-> --- /dev/null
-> +++ b/drivers/phy/phy-exynos5-usbdrd.c
-
-[snip]
-
-> +static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *node = dev->of_node;
-> +	struct exynos5_usbdrd_phy *phy_drd;
-> +	struct phy_provider *phy_provider;
-> +	struct resource *res;
-> +	const struct of_device_id *match;
-> +	const struct exynos5_usbdrd_phy_drvdata *drv_data;
-> +	struct regmap *reg_pmu;
-> +	u32 pmu_offset;
-> +	int i;
-> +
-> +	/*
-> +	 * Exynos systems are completely DT enabled,
-> +	 * so lets not have any platform data support for this driver.
-> +	 */
-> +	if (!node) {
-> +		dev_err(dev, "no device node found\n");
-
-This error message is not very meaningful. I'd rather use something like 
-"This driver can be only instantiated using Device Tree".
-
-> +		return -ENODEV;
-> +	}
-> +
-> +	match = of_match_node(exynos5_usbdrd_phy_of_match, pdev->dev.of_node);
-> +	if (!match) {
-> +		dev_err(dev, "of_match_node() failed\n");
-> +		return -EINVAL;
-> +	}
-> +	drv_data = match->data;
-> +
-> +	phy_drd = devm_kzalloc(dev, sizeof(*phy_drd), GFP_KERNEL);
-> +	if (!phy_drd)
-> +		return -ENOMEM;
-> +
-> +	dev_set_drvdata(dev, phy_drd);
-> +	phy_drd->dev = dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	phy_drd->reg_phy = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(phy_drd->reg_phy)) {
-> +		dev_err(dev, "Failed to map register memory (phy)\n");
-
-devm_ioremap_resource() already prints an error message.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 5eead53..eab6121 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -17,6 +17,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
++#include <asm/cputype.h>
+ #include <asm/smp_plat.h>
+ 
+ #include <plat/cpu.h>
+@@ -92,11 +93,19 @@ static inline void cpu_leave_lowpower(void)
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ {
++	unsigned int mpidr, cpunr, cluster;
++
++	mpidr = cpu_logical_map(cpu);
++	cpunr = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	/* Maximum possible cpus in a cluster can be 4 */
++	cpunr += cluster * 4;
+ 	for (;;) {
+ 
+-		/* make cpu1 to be turned off at next WFI command */
+-		if (cpu == 1)
+-			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
++		/* make cpu to be turned off at next WFI command */
++		if (cpu)
++			__raw_writel(0, S5P_ARM_CORE_CONFIGURATION(cpunr));
+ 
+ 		/*
+ 		 * here's the WFI
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 8ea02f6..8d06b2c 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -22,6 +22,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ #include <asm/firmware.h>
+@@ -92,6 +93,14 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
+ 	unsigned long phys_cpu = cpu_logical_map(cpu);
++	unsigned int mpidr, cpunr, cluster;
++
++	mpidr = cpu_logical_map(cpu);
++	cpunr = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++
++	/* Maximum possible cpus in a cluster can be 4 */
++	cpunr += cluster * 4;
+ 
+ 	/*
+ 	 * Set synchronisation state between this boot processor
+@@ -109,14 +118,15 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 */
+ 	write_pen_release(phys_cpu);
+ 
+-	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
++	if (!(__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
++		& S5P_CORE_LOCAL_PWR_EN)) {
+ 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
+-			     S5P_ARM_CORE1_CONFIGURATION);
++			     S5P_ARM_CORE_CONFIGURATION(cpunr));
+ 
+ 		timeout = 10;
+ 
+-		/* wait max 10 ms until cpu1 is on */
+-		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
++		/* wait max 10 ms until secondary cpu is on */
++		while ((__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
+ 			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
+ 			if (timeout-- == 0)
+ 				break;
+@@ -125,7 +135,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		}
+ 
+ 		if (timeout == 0) {
+-			printk(KERN_ERR "cpu1 power enable failed");
++			pr_err("cpu%x power enable failed", cpu);
+ 			spin_unlock(&boot_lock);
+ 			return -ETIMEDOUT;
+ 		}
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 7c029ce..16e17e4 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -104,8 +104,13 @@
+ #define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
+ #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
+ 
+-#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
+-#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
++#define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
++#define S5P_ARM_CORE0_STATUS			S5P_PMUREG(0x2004)
++
++#define S5P_ARM_CORE_CONFIGURATION(_cpunr)	\
++		(S5P_ARM_CORE0_CONFIGURATION + 0x80 * _cpunr)
++#define S5P_ARM_CORE_STATUS(_cpunr)		\
++		(S5P_ARM_CORE0_STATUS + 0x80 * _cpunr)
+ 
+ #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
+ #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
+-- 
+1.7.9.5
