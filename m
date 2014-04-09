@@ -1,79 +1,37 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 09 Apr 2014 14:30:37 +0200
-Subject: [PATCH V3 00/17] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle
-In-Reply-To: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1396959579-18268-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <53453D6D.8030903@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 09 Apr 2014 13:37:13 +0100
+Subject: [PULL] fix for ARM SMMU driver
+Message-ID: <53453EF9.8020704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Joerg,
 
-On 08.04.2014 14:19, Daniel Lezcano wrote:
-> Changelog:
->
-> V3:
-> 	* Added patch   : "ARM: exynos: cpuidle: Disable cpuidle for 5440"
-> 	* Removed patch : "ARM: exynos: config: Enable cpuidle"
-> 	* Removed default ARM_EXYNOS4210_CPUIDLE=y
-> 	* Added comment about bug fix side effect 'for_each_possible_cpu'
-> V2:
-> 	* Added comment in changelog for calls order (5/17)
-> 	* Call the powerdown only for cpu0 in the pm notifier
-> 	* Set the pm notifier for all boards
->
-> V1: initial post
->
-> This patchset relies on the cpm_pm notifier to initiate the powerdown sequence
-> operations from pm.c instead cpuidle.c. Thus the cpuidle driver is no longer
-> dependent from arch specific code as everything is called from the pm.c file.
->
-> The patchset applies on top of linux-samsung/for-next.
->
-> Tested on exynos4: 4210
-> Tested on exynos5: 5250 (without AFTR)
->
-> Daniel Lezcano (17):
->    ARM: exynos: cpuidle: Prevent forward declaration
->    ARM: exynos: cpuidle: use cpuidle_register
->    ARM: exynos: cpuidle: change function name prefix
->    ARM: exynos: cpuidle: encapsulate register access inside a function
->    ARM: exynos: cpuidle: Move some code inside the idle_finisher
->    ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
->    ARM: exynos: cpuidle: Use the cpu_pm notifier
->    ARM: exynos: cpuidle: Move scu_enable in the cpu_pm notifier
->    ARM: exynos: cpuidle: Remove ifdef for scu_enable
->    ARM: exynos: cpuidle: Move exynos_set_wakeupmask in the cpu_pm
->      notifier
->    ARM: exynos: cpuidle: Move the power sequence call in the cpu_pm
->      notifier
->    ARM: exynos: cpuidle: Move S5P_CHECK_AFTR in a header
->    ARM: exynos: cpuidle: Move clock setup to pm.c
->    ARM: exynos: cpuidle: Move the boot vector in pm.c
->    ARM: exynos: cpuidle: Disable cpuidle for 5440
->    ARM: exynos: cpuidle: Pass the AFTR callback to the platform_data
->    ARM: exynos: cpuidle: Move the driver to drivers/cpuidle directory
->
->   arch/arm/mach-exynos/Makefile    |    1 -
->   arch/arm/mach-exynos/common.h    |    1 +
->   arch/arm/mach-exynos/cpuidle.c   |  255 --------------------------------------
->   arch/arm/mach-exynos/exynos.c    |    8 +-
->   arch/arm/mach-exynos/pm.c        |  177 +++++++++++++++++++++-----
->   arch/arm/mach-exynos/pmu.c       |    6 +
->   arch/arm/mach-exynos/regs-pmu.h  |   20 +++
->   drivers/cpuidle/Kconfig.arm      |    6 +
->   drivers/cpuidle/Makefile         |    1 +
->   drivers/cpuidle/cpuidle-exynos.c |   97 +++++++++++++++
->   10 files changed, 285 insertions(+), 287 deletions(-)
->   delete mode 100644 arch/arm/mach-exynos/cpuidle.c
->   create mode 100644 drivers/cpuidle/cpuidle-exynos.c
->
+Please consider pulling the following branch, which contains the fix 
+for a bug affecting the ARM SMMU driver.
 
-For all patches except 10-12, 14 and 16:
+Thanks,
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+	M.
 
---
-Best regards,
-Tomasz
+The following changes since commit 455c6fdbd219161bd09b1165f11699d6d73de11c:
+
+  Linux 3.14 (2014-03-30 20:40:15 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git arm/smmu-fixes-3.15
+
+for you to fetch changes up to a1b10277530d4df09feffe9243f766aef945684e:
+
+  iommu/arm-smmu: fix panic in arm_smmu_alloc_init_pte (2014-04-09 13:28:58 +0100)
+
+----------------------------------------------------------------
+Bin Wang (1):
+      iommu/arm-smmu: fix panic in arm_smmu_alloc_init_pte
+
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+Jazz is not dead. It just smells funny...
