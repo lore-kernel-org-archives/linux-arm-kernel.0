@@ -1,91 +1,46 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 9 Apr 2014 10:02:06 +0100
-Subject: [PATCH v2 2/2] ARM: mm: allow text and rodata sections to be
- read-only
-In-Reply-To: <1396926910-11227-3-git-send-email-keescook@chromium.org>
-References: <1396926910-11227-1-git-send-email-keescook@chromium.org>
- <1396926910-11227-3-git-send-email-keescook@chromium.org>
-Message-ID: <20140409090204.GA6583@linaro.org>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Wed, 09 Apr 2014 12:04:58 +0300
+Subject: Big endian working?
+In-Reply-To: <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
+References: <20140408095446.0520dd28@skate>	<5343BDEE.4010005@linaro.org>	<12950765.TpxjkTx5NP@wuerfel>	<alpine.LFD.2.11.1404082339291.1571@knanqh.ubzr>
+ <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
+Message-ID: <53450D3A.7030909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+On 04/09/2014 07:46 AM, Victor Kamensky wrote:
+> My understanding is that CPU_BE8_BOOT_LE was needed only for
+> atags boot case. Since now practically nobody uses atags, but rather
+> fdt those patches were not pushed into main stream.
+>
+> Please look at
+> git://git.baserock.org/delta/linux baserock/311-rc7/be/atags-v2
+>
+> Thomas, does your Armada XP uboot still uses atags? I would think
+> not.
+>
+> I can confirm that in main line TC2 works in BE mode without any
+> changes. In linaro kernel tree we have Arandle and Pandaboard with
+> additional, drivers only changes, and they work OK. However I don't
+> think we are testing zImage, in all cases I use it, it is uImage.
 
-On Mon, Apr 07, 2014 at 08:15:10PM -0700, Kees Cook wrote:
-> This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
-> read-only. Additionally, this splits rodata from text so that rodata can
-> also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
-> 
-> The read-only areas are made writable during ftrace updates. Additional
-> work is needed for kprobes and kexec, so the feature is temporarily
-> marked as unavailable in Kconfig when those options are selected.
-> 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm/include/asm/cacheflush.h |    9 ++++++++
->  arch/arm/kernel/ftrace.c          |   17 ++++++++++++++
->  arch/arm/kernel/vmlinux.lds.S     |    3 +++
->  arch/arm/mm/Kconfig               |   12 ++++++++++
->  arch/arm/mm/init.c                |   46 +++++++++++++++++++++++++++++++++++++
->  5 files changed, 87 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> index 8b8b61685a34..b6fea0a1a88b 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -487,4 +487,13 @@ int set_memory_rw(unsigned long addr, int numpages);
->  int set_memory_x(unsigned long addr, int numpages);
->  int set_memory_nx(unsigned long addr, int numpages);
->  
-> +#ifdef CONFIG_DEBUG_RODATA
-> +void mark_rodata_ro(void);
-> +void set_kernel_text_rw(void);
-> +void set_kernel_text_ro(void);
-> +#else
-> +static inline void set_kernel_text_rw(void) { }
-> +static inline void set_kernel_text_ro(void) { }
-> +#endif
-> +
->  #endif
-> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> index af9a8a927a4e..ea446ae09c89 100644
-> --- a/arch/arm/kernel/ftrace.c
-> +++ b/arch/arm/kernel/ftrace.c
-> @@ -15,6 +15,7 @@
->  #include <linux/ftrace.h>
->  #include <linux/uaccess.h>
->  #include <linux/module.h>
-> +#include <linux/stop_machine.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/opcodes.h>
-> @@ -35,6 +36,22 @@
->  
->  #define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
->  
-> +static int __ftrace_modify_code(void *data)
-> +{
-> +	int *command = data;
-> +
-> +	set_kernel_text_rw();
-> +	ftrace_modify_all_code(*command);
-> +	set_kernel_text_ro();
-> +
-> +	return 0;
-> +}
+Actually I usually use zImage, so I do need these patches :)
+ From IRC discussion on Tom's issue I thought that he also have zImage.
 
-Would another approach be to keep all the kernel .text ro then override
-probe_kernel_write (which has a weak reference), to create a separate
-temporary rw mapping to the specific page that needs to be modified?
+> Maybe Nico's zImage change was under atags umbrella by mistake and
+> it really addresses general zImage issue. In this case we need to add
+> this commit to main line. However, I don't think we need to carry
+> CPU_BE8_BOOT_LE option forward, why we just use
+> CONFIG_CPU_BIG_ENDIAN instead. Note in all cases when BE
+> image used loader is always in LE mode. Never seen case
+> otherwise.
 
-That way you only worry about TLB and cache maintenance for a smaller
-area. Also, your kernel .text VAs never actually become writable, so
-you don't need to worry as much about unauthorised changes whilst your
-guard is temporarily down.
+That makes sense, but I'm concerned about BE32 systems.
+Do they also have LE bootloaders? I don't remember kernel code which
+switches to BE32. I'd think that switch is done by bootloader or 
+ROMcode. Or even BE hardwired in HW. So BE32 bootloader may expect to
+see BE zImage header.
+Maybe instead of CONFIG_CPU_BIG_ENDIAN use CONFIG_CPU_ENDIAN_BE8?
 
-(Though lots of small changes could probably make this more
-expensive, and you will need to double check aliasing in pre-ARMv7).
-
-Cheers,
 -- 
-Steve
+Taras Kondratiuk
