@@ -1,90 +1,20 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 9 Apr 2014 17:04:48 +0200
-Subject: [PATCH] ARM: reinsert ARCH_MULTI_V4 Kconfig option
-In-Reply-To: <CACmBeS3kC4dsdOrfANifgu8oQhLauFKcXhEu=iz8xbUxdhMq_A@mail.gmail.com>
-References: <1386922149-4561-1-git-send-email-jonas.jensen@gmail.com>
- <20131213095655.GB4360@n2100.arm.linux.org.uk>
- <CACmBeS1d-EX5oPD8f7P-ufmF=MutdTO+LgG23Cb0=biR8yQPCg@mail.gmail.com>
- <20131213113903.GE4360@n2100.arm.linux.org.uk>
- <CACmBeS3kC4dsdOrfANifgu8oQhLauFKcXhEu=iz8xbUxdhMq_A@mail.gmail.com>
-Message-ID: <20140409150448.GX29751@pengutronix.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 09 Apr 2014 19:05:47 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2Ml0gQVJNOiBkdHM6IGkuTVg6IFVzZSBzaW5nbGUgbmFt?=
+ =?UTF-8?B?aW5nIHN0eWxlIGZvciBpLk1YIFdFSU0gZGV2aWNlcw==?=
+In-Reply-To: <1397055854-29105-1-git-send-email-shc_work@mail.ru>
+References: <1397055854-29105-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1397055947.709842729@f217.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 04:54:16PM +0200, Jonas Jensen wrote:
-> On 13 December 2013 12:39, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > I see what's causing this: the kuser helpers are using "bx lr" to return
-> > which will be undefined on non-Thumb CPUs.  We generally cope fine with
-> > non-Thumb CPUs, conditionalising where necessary on HWCAP_THUMB or the
-> > T bit in the PSR being set.
-> >
-> > However, it looks like the kuser helpers got missed.  As a check, please
-> > look at arch/arm/kernel/entry-armv.S, find the line with:
-> >
-> >         .macro  usr_ret, reg
-> >
-> > and ensure that the mov pc, \reg case always gets used.  Please report
-> > back.
+Wed,  9 Apr 2014 19:04:14 +0400 ?? Alexander Shiyan <shc_work@mail.ru>:
+> This patch converts all i.MX WEIM users to use single naming style
+> for devices.
 > 
-> Uwe and Arnd came up with a solution except it doesn't work when I test it.
-> 
-> The suggested patch is:
-> 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 1879e8d..de15bfd 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -739,6 +739,18 @@ ENDPROC(__switch_to)
-> 
->         .macro  usr_ret, reg
->  #ifdef CONFIG_ARM_THUMB
-> +       /*
-> +        * Having CONFIG_ARM_THUMB isn't a guarantee that the cpu has support
-> +        * for Thumb and so the bx instruction. Use a mov if the address to
-> +        * jump to is 32 bit aligned. (Note that this code is compiled in ARM
-> +        * mode, so this is the right test.)
-> +        */
-> +#if defined(CONFIG_CPU_32v4)
-> +       tst     \reg, #3
-> +       moveq   pc, \reg
-> +       b       .
-> +#endif
-> +
->         bx      \reg
->  #else
->         mov     pc, \reg
-> 
-> 
-> With this applied, and the following two possibilities in next-20140403:
-> 
-> [1] ARCH_MULTI_V4 only (no CONFIG_ARM_THUMB)
->      CONFIG_CPU_32v4=y
-> 
-> [2] ARCH_MULTI_V4 and ARCH_MULTI_V4T
->      CONFIG_ARM_THUMB=y
->      CONFIG_CPU_32v4=y
->      CONFIG_CPU_32v4T=y
-> 
-> 
-> Booting a kernel with either option [1] or [2] yield the following results:
-> 
-> [1] works
-> [2] hangs after "[    2.730000] Freeing unused kernel memory: 104K
-> (c02f5000 - c030f000)"
-> 
-> 
-> Any help why the moveq doesn't work would be much appreciated.
-doing s/moveq/mov/ does the trick on the machine in question, but this
-is obviously not an option for mainline. But it means that even on this
-non-Thumb capable machine \reg contains an address that is not aligned.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
 
-Where does \reg come from? Is it provided by userspace? If so, is it a
-userspace bug?
+Ahh, sorry. Incorrect patch. I'll send v3.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+---
