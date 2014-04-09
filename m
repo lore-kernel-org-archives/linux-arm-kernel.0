@@ -1,20 +1,34 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 9 Apr 2014 12:29:24 +0800
-Subject: [PATCH v5 0/8] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20140409033603.GA32070@ld-irv-0074>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
- <20140312081350.GC30808@shlinux2.ap.freescale.net>
- <20140313063940.GU31517@norris-Latitude-E6410>
- <20140409033603.GA32070@ld-irv-0074>
-Message-ID: <5344CCA4.4090401@freescale.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 9 Apr 2014 10:11:15 +0530
+Subject: [PATCH RESEND] ARM: spear: add __init to spear_clocksource_init()
+In-Reply-To: <1396996485-632-1-git-send-email-elder@linaro.org>
+References: <1396996485-632-1-git-send-email-elder@linaro.org>
+Message-ID: <CAOh2x=mQF3MLbJwfaBqE3K4Hf-qUrnbHe=6zW0XeK0GEk9raLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014?04?09? 11:36, Brian Norris ??:
-> For any additional comments/corrections (I have a few), please just
-> submit patches on top, rather than resending the whole series.
-thanks a lot!
+On Wed, Apr 9, 2014 at 4:04 AM, Alex Elder <elder@linaro.org> wrote:
+> I get a build warning because spear_clocksource_init() calls
+> clocksource_mmio_init(), but it doesn't have an __init annotation.
+> Fix that.
+>
+> Signed-off-by: Alex Elder <elder@linaro.org>
+> ---
+>  arch/arm/mach-spear/time.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+> index 218ba5b..c4d0931 100644
+> --- a/arch/arm/mach-spear/time.c
+> +++ b/arch/arm/mach-spear/time.c
+> @@ -71,7 +71,7 @@ static void clockevent_set_mode(enum clock_event_mode mode,
+>  static int clockevent_next_event(unsigned long evt,
+>                                  struct clock_event_device *clk_event_dev);
+>
+> -static void spear_clocksource_init(void)
+> +static void __init spear_clocksource_init(void)
+>  {
+>         u32 tick_rate;
+>         u16 val;
 
-i am happy that we can add more features on base of the spi nor framework.
-
-Huang Shijie
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
