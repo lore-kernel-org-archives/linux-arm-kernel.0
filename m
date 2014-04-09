@@ -1,302 +1,84 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 09 Apr 2014 13:26:30 +0200
-Subject: [PATCH RFC v5 2/2] clk: Add handling of clk parent and rate assigned
- from DT
-In-Reply-To: <1397042790-10636-1-git-send-email-s.nawrocki@samsung.com>
-References: <1397042790-10636-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1397042790-10636-3-git-send-email-s.nawrocki@samsung.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 9 Apr 2014 13:32:47 +0200
+Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
+In-Reply-To: <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
+References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
+ <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
+Message-ID: <20140409113246.GA8778@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a helper function to configure clock parents and
-rates as specified in clock-parents, clock-rates DT properties
-for a consumer device and a call to it before driver is bound to
-a device.
+On Sun, Mar 02, 2014 at 08:02:40PM +0530, Punnaiah Choudary Kalluri wrote:
+> Add support for ARM Pl310 L2 cache controller parity error
+> 
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> ---
+>  .../devicetree/bindings/edac/pl310_edac_l2.txt     |   19 ++
+>  drivers/edac/Kconfig                               |    7 +
+>  drivers/edac/Makefile                              |    1 +
+>  drivers/edac/pl310_edac_l2.c                       |  236 ++++++++++++++++++++
+>  4 files changed, 263 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
+>  create mode 100644 drivers/edac/pl310_edac_l2.c
+> 
+> diff --git a/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt b/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
+> new file mode 100644
+> index 0000000..94fbb8d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
+> @@ -0,0 +1,19 @@
+> +Pl310 L2 Cache EDAC driver, it does reports the data and tag ram parity errors.
+> +
+> +Required properties:
+> +- compatible: Should be "arm,pl310-cache".
+> +- intterupts: Interrupt number to the cpu.
+> +- reg: Physical base address and size of cache controller's memory mapped
+> +  registers
+> +
+> +Example:
+> +++++++++
+> +
+> +	L2: cache-controller {
+> +		compatible = "arm,pl310-cache";
+> +		interrupts = <0 2 4>;
+> +		reg = <0xf8f02000 0x1000>;
+> +	};
+> +
+> +PL310 L2 Cache EDAC driver detects the Parity enable state by reading the
+> +appropriate control register.
+> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+> index 878f090..059ac31 100644
+> --- a/drivers/edac/Kconfig
+> +++ b/drivers/edac/Kconfig
+> @@ -326,6 +326,13 @@ config EDAC_TILE
+>  	  Support for error detection and correction on the
+>  	  Tilera memory controller.
+>  
+> +config EDAC_PL310_L2
+> +	tristate "Pl310 L2 Cache Controller"
+> +	depends on EDAC_MM_EDAC && ARM
+> +	help
+> +	  Support for parity error detection on L2 cache controller
+> +	  data and tag ram memory
+> +
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
-Changes since v4:
- - added note explaining how to skip setting parent and rate
-   of a clock,
- - moved of_clk_dev_init() calls to the platform bus,
- - added missing call to of_node_put(),
- - dropped debug traces.
 
-Changes since v3:
- - added detailed description of the assigned-clocks subnode,
- - added missing 'static inline' to the function stub definition,
- - clk-conf.c is now excluded when CONFIG_OF is not set,
- - s/of_clk_device_setup/of_clk_device_init.
+Ok, so I'm looking at this after having looked at the synopsys thing
+and it looks very similar in functionality - it does the basic dance of
+registering and setting up stuff, only using different devicetree nodes,
+regs, etc.
 
-Changes since v2:
- - edited in clock-bindings.txt, added note about 'assigned-clocks'
-   subnode which may be used to specify "global" clocks configuration
-   at a clock provider node,
- - moved of_clk_device_setup() function declaration from clk-provider.h
-   to clk-conf.h so required function stubs are available when
-   CONFIG_COMMON_CLK is not enabled,
+However, it adds a new file under drivers/edac/ and I'm wondering if it
+wouldn't be better to simply create a xilinx_edac.c and put all your
+stuff in there, maybe even share code by abstracting it nicely. Having
+a separate driver only for a single L2 cache controller seems kinda too
+granulary for me.
 
-Changes since v1:
- - the helper function to parse and set assigned clock parents and
-   rates made public so it is available to clock providers to call
-   directly;
- - dropped the platform bus notification and call of_clk_device_setup()
-   is is now called from the driver core, rather than from the
-   notification callback;
- - s/of_clk_get_list_entry/of_clk_get_by_property.
----
- .../devicetree/bindings/clock/clock-bindings.txt   |   44 ++++++++++
- drivers/base/platform.c                            |    5 ++
- drivers/clk/Makefile                               |    3 +
- drivers/clk/clk-conf.c                             |   85 ++++++++++++++++++++
- drivers/clk/clk.c                                  |   12 ++-
- include/linux/clk/clk-conf.h                       |   19 +++++
- 6 files changed, 167 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/clk-conf.c
- create mode 100644 include/linux/clk/clk-conf.h
+Thanks.
 
-diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-index 700e7aa..93513fc 100644
---- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-+++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-@@ -132,3 +132,47 @@ clock signal, and a UART.
-   ("pll" and "pll-switched").
- * The UART has its baud clock connected the external oscillator and its
-   register clock connected to the PLL clock (the "pll-switched" signal)
-+
-+==Assigned clock parents and rates==
-+
-+Some platforms require static initial configuration of parts of the clocks
-+controller. Such a configuration can be specified in a clock consumer node
-+through clock-parents and clock-rates DT properties. The former should
-+contain a list of parent clocks in form of phandle and clock specifier pairs,
-+the latter the list of assigned clock frequency values (one cell each).
-+To skip setting parent or rate of a clock its corresponding entry should be
-+set to 0, or can be omitted if it is not followed by any non-zero entry.
-+
-+    uart at a000 {
-+        compatible = "fsl,imx-uart";
-+        reg = <0xa000 0x1000>;
-+        ...
-+        clocks = <&clkcon 0>, <&clkcon 3>;
-+        clock-names = "baud", "mux";
-+
-+        clock-parents = <0>, <&pll 1>;
-+        clock-rates = <460800>;
-+    };
-+
-+In this example the pll is set as parent of "mux" clock and frequency of "baud"
-+clock is specified as 460800 Hz.
-+
-+Configuring a clock's parent and rate through the device node that uses
-+the clock can be done only for clocks that have a single user. Specifying
-+conflicting parent or rate configuration in multiple consumer nodes for
-+a shared clock is forbidden.
-+
-+Configuration of common clocks, which affect multiple consumer devices
-+can be specified in a dedicated 'assigned-clocks' subnode of a clock
-+provider node, e.g.:
-+
-+    clkcon {
-+        ...
-+        #clock-cells = <1>;
-+
-+        assigned-clocks {
-+            clocks = <&clkcon 16>, <&clkcon 17>;
-+            clock-parents = <0>, <&clkcon 1>;
-+            clock-rates = <200000>;
-+        };
-+    };
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index e714709..4b95322 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -22,6 +22,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/idr.h>
- #include <linux/acpi.h>
-+#include <linux/clk/clk-conf.h>
- 
- #include "base.h"
- #include "power/power.h"
-@@ -481,6 +482,10 @@ static int platform_drv_probe(struct device *_dev)
- 	struct platform_device *dev = to_platform_device(_dev);
- 	int ret;
- 
-+	ret = of_clk_dev_init(_dev->of_node);
-+	if (ret < 0)
-+		return ret;
-+
- 	acpi_dev_pm_attach(_dev, true);
- 
- 	ret = drv->probe(dev);
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 5f8a287..45598f7 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -8,6 +8,9 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
-+ifeq ($(CONFIG_OF), y)
-+obj-$(CONFIG_COMMON_CLK)	+= clk-conf.o
-+endif
- 
- # hardware specific clock types
- # please keep this section sorted lexicographically by file/directory path name
-diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-new file mode 100644
-index 0000000..c0d4096
---- /dev/null
-+++ b/drivers/clk/clk-conf.c
-@@ -0,0 +1,85 @@
-+/*
-+ * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-+ * Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/device.h>
-+#include <linux/of.h>
-+#include <linux/printk.h>
-+
-+/**
-+ * of_clk_dev_init() - parse and set clk configuration assigned to a device
-+ * @node: device node to apply the configuration for
-+ *
-+ * This function parses 'clock-parents' and 'clock-rates' properties and sets
-+ * any specified clock parents and rates.
-+ */
-+int of_clk_dev_init(struct device_node *node)
-+{
-+	struct property	*prop;
-+	const __be32 *cur;
-+	int rc, index, num_parents;
-+	struct clk *clk, *pclk;
-+	u32 rate;
-+
-+	if (!node)
-+		return 0;
-+
-+	num_parents = of_count_phandle_with_args(node, "clock-parents",
-+						 "#clock-cells");
-+	if (num_parents == -EINVAL)
-+		pr_err("clk: invalid value of clock-parents property at %s\n",
-+		       node->full_name);
-+
-+	for (index = 0; index < num_parents; index++) {
-+		pclk = of_clk_get_by_property(node, "clock-parents", index);
-+		if (IS_ERR(pclk)) {
-+			/* skip empty (null) phandles */
-+			if (PTR_ERR(pclk) == -ENOENT)
-+				continue;
-+
-+			pr_warn("clk: couldn't get parent clock %d for %s\n",
-+				index, node->full_name);
-+
-+			return PTR_ERR(pclk);
-+		}
-+
-+		clk = of_clk_get(node, index);
-+		if (IS_ERR(clk)) {
-+			pr_warn("clk: couldn't get clock %d for %s\n",
-+				index, node->full_name);
-+			return PTR_ERR(clk);
-+		}
-+
-+		rc = clk_set_parent(clk, pclk);
-+		if (rc < 0)
-+			pr_err("clk: failed to reparent %s to %s: %d\n",
-+			       __clk_get_name(clk), __clk_get_name(pclk), rc);
-+	}
-+
-+	index = 0;
-+	of_property_for_each_u32(node, "clock-rates", prop, cur, rate) {
-+		if (rate) {
-+			clk = of_clk_get(node, index);
-+			if (IS_ERR(clk)) {
-+				pr_warn("clk: couldn't get clock %d for %s\n",
-+					index, node->full_name);
-+				return PTR_ERR(clk);
-+			}
-+
-+			rc = clk_set_rate(clk, rate);
-+			if (rc < 0)
-+				pr_err("clk: couldn't set %s clock rate: %d\n",
-+				       __clk_get_name(clk), rc);
-+		}
-+		index++;
-+	}
-+
-+	return 0;
-+}
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index dff0373..0d72a4d 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -10,6 +10,7 @@
-  */
- 
- #include <linux/clk-private.h>
-+#include <linux/clk/clk-conf.h>
- #include <linux/module.h>
- #include <linux/mutex.h>
- #include <linux/spinlock.h>
-@@ -2620,7 +2621,17 @@ void __init of_clk_init(const struct of_device_id *matches)
- 		list_for_each_entry_safe(clk_provider, next,
- 					&clk_provider_list, node) {
- 			if (force || parent_ready(clk_provider->np)) {
-+
- 				clk_provider->clk_init_cb(clk_provider->np);
-+
-+				/* Set any assigned clock parents and rates */
-+				np = of_get_child_by_name(clk_provider->np,
-+							  "assigned-clocks");
-+				if (np) {
-+					of_clk_dev_init(np);
-+					of_node_put(np);
-+				}
-+
- 				list_del(&clk_provider->node);
- 				kfree(clk_provider);
- 				is_init_done = true;
-@@ -2635,7 +2646,6 @@ void __init of_clk_init(const struct of_device_id *matches)
- 		 */
- 		if (!is_init_done)
- 			force = true;
--
- 	}
- }
- #endif
-diff --git a/include/linux/clk/clk-conf.h b/include/linux/clk/clk-conf.h
-new file mode 100644
-index 0000000..afb4228
---- /dev/null
-+++ b/include/linux/clk/clk-conf.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-+ * Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+struct device_node;
-+
-+#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-+int of_clk_dev_init(struct device_node *node);
-+#else
-+static inline int of_clk_dev_init(struct device_node *node)
-+{
-+	return 0;
-+}
-+#endif
 -- 
-1.7.9.5
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
