@@ -1,51 +1,50 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Wed, 9 Apr 2014 14:45:50 +0530
-Subject: [PATCH v7 1/3] ARM: EXYNOS: initial board support for exynos5260
- SoC
-In-Reply-To: <53450D29.7020207@samsung.com>
-References: <1396519224-18712-1-git-send-email-rahul.sharma@samsung.com>
- <1396519224-18712-2-git-send-email-rahul.sharma@samsung.com>
- <CAK9yfHzuVZh-RhfT+0tEehnF+aWnYHG=X2cv_E6uvzq2aS7UQg@mail.gmail.com>
- <53450D29.7020207@samsung.com>
-Message-ID: <CAPdUM4OitgCTOT4Eo2Uq-UW95Z1D7yoLrqC_=+==tPAg8kJBtA@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 09 Apr 2014 11:16:07 +0200
+Subject: [PATCH 3/3] ARM: socfpga: dts: add reset-controller
+In-Reply-To: <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
+References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1396629087-23727-4-git-send-email-s.trumtrar@pengutronix.de>
+ <1396905121.25236.2.camel@linux-builds1>
+ <20140407224110.GA28399@pengutronix.de> <53435F37.7060301@gmail.com>
+ <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
+Message-ID: <1397034967.4418.4.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 April 2014 14:34, Tomasz Figa <t.figa@samsung.com> wrote:
-> On 07.04.2014 10:38, Sachin Kamat wrote:
->>
->> Hi Rahul,
->>
->> On 3 April 2014 15:30, Rahul Sharma <rahul.sharma@samsung.com> wrote:
->>>
->>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>
->>> This patch add basic arch side support for exynos5260 SoC.
->>
->> <snip>
->>
->>> @@ -374,6 +374,7 @@ static char const *exynos_dt_compat[] __initconst = {
->>>          "samsung,exynos4412",
->>>          "samsung,exynos5",
->>>          "samsung,exynos5250",
->>> +       "samsung,exynos5260",
->>
->>
->> I don't think we should be adding this as we do not yet have any soc
->> specific quirk.
->> Compatibility to generic string, "samsung,exynos5"  should be sufficient.
->>
->
-> Yes. Unless a SoC specific quirk that needs to be handled at such low level
-> stage emerges, there is no need to add such compatible string to the kernel.
->
+Am Mittwoch, den 09.04.2014, 10:37 +0200 schrieb Steffen Trumtrar:
+> Dinh Nguyen <dinh.linux@gmail.com> writes:
+> 
+> > On 4/7/14 5:41 PM, Steffen Trumtrar wrote:
+> >> On Mon, Apr 07, 2014 at 04:12:01PM -0500, Dinh Nguyen wrote:
+> >>> On Fri, 2014-04-04 at 18:31 +0200, Steffen Trumtrar wrote:
+> >>>> Add the necessary #reset-cells property to the rst-mgr node and
+> >>>> provide a header-file with all possible resets specified.
+> >>>>
+> >>>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> >>>> ---
+> >>>>  arch/arm/boot/dts/socfpga.dtsi           |  8 ++-
+> >>>>  include/dt-bindings/reset/altr,rst-mgr.h | 90 ++++++++++++++++++++++++++++++++
+> >>> Does this file belong under dt-bindings/reset/ or
+> >>> dt-bindings/reset-controller/?
+> >>>
+> >> ATM there is no such directory, or is there ?
+> >> So, reset seems appropriate I think.
+> > commit [6b7f06 ARM: STi: STiH415: Add reset controller support.]
+> > Seems more appropriate for this to go into reset-controller.
+> >
+> 
+> Okay, the current mainline master now has include/dt-bindings/reset and
+> include/dt-bindings/reset-controller.
+> 
+> I think one of those directories shouldn't be there, but be merged in
+> the other instead. But which one? Where shall I put my precious code?
 
-Thanks Sachin, Tomasz,
+My vote would be for dt-bindings/reset/, since that's shorter and
+2ec941304df9e1cd5e2f2404303a5fab0929969a came before
+6b7f06cc805bb4755e69cd916b3f565947e0a77a.
 
-I will change this.
+Maybe something also should be done about dt-bindings/clk/ and
+dt-bindings/clock/.
 
-Regards,
-Rahul Sharma.
-
-> Best regards,
-> Tomasz
+regards
+Philipp
