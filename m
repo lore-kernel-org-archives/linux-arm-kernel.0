@@ -1,55 +1,71 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 9 Apr 2014 17:19:32 +0200
-Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
-In-Reply-To: <CAL_Jsq+gszc+R_BrLtHKEBGYd=3T+sE1d+-HoF9aYZt6C2k5-g@mail.gmail.com>
-References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
- <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
- <20140409113246.GA8778@pd.tnic>
- <CAL_Jsq+gszc+R_BrLtHKEBGYd=3T+sE1d+-HoF9aYZt6C2k5-g@mail.gmail.com>
-Message-ID: <20140409151932.GK6529@pd.tnic>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Apr 2014 17:17:47 +0200
+Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
+In-Reply-To: <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+Message-ID: <20140409151747.GH28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 08:18:28AM -0500, Rob Herring wrote:
-> I don't think so, the PL310 is present on lots of ARM chips besides
-> Xilinx. I don't know how many support parity as that is optional. In
-> fact the highbank_l2_edac.c is for the PL310 as well, but the
-> registers it uses is all custom logic added for ECC and there is no
-> part of the PL310 h/w used by the driver.
+On Wed, Apr 09, 2014 at 10:53:13PM +0800, Chen-Yu Tsai wrote:
+> Hi Boris,
+> 
+> On Wed, Apr 9, 2014 at 9:51 PM, Boris BREZILLON
+> <boris.brezillon@free-electrons.com> wrote:
+> > Hello,
+> >
+> > This series rework the sunxi pinctrl driver to support the PLx pins
+> > available on the A31 SoC.
+> 
+> Thanks for working on this. I mentioned to Maxime on IRC yesterday that
+> we have complete pinctrl drivers for both A31 and A23, based on our current
+> pinctrl-sunxi driver, in the A23 SDK. These have the complete pin mapping.
+> 
+> > It also add missing A31 reset controller DT bindings documentation.
+> >
+> > I need those PL pins (actually I only need PL0 and PL1) to support
+> > the P2WI bus, which in turn is used to communicate with the AXP221
+> > PMIC.
+> 
+> If you could, please add all the PL and PM pins.
+> As I said, you can find complete definitions in the A23 SDK.
 
-Oh ok, so highbank_l2 and PL310 could theoretically be merged together
-in one compilation unit, even if they don't really share code at all...
+We have no idea what these PM pins are for the A31. And this code only
+is of interest for the A31 for the moment. Let's not take into account
+the A23 for now as far as the pin definitions are concerned.
 
-> If there is lots duplication, then that's a sign the framework needs
-> to handle more of the boilerplate pieces. There could be a "simple"
-> driver/library for devices which are no more than some registers, an
-> interrupt handler and static information about the type of EDAC
-> device.
+> > Let me know if these changes are too intrusive.
+> 
+> I wonder if we should do a separate driver for the new PIO controller.
+> Clearly it's a separate IP block, with it's own clock and reset controls.
 
-Yeah, it's not that - I'm just getting worried that I'm receiving an
-EDAC driver for each piece of silicon out there and would like to still
-keep drivers/edac/ sane and be able to control that wild growth.
+It's been merged together in the A23, hence why we did it like that.
 
-I'm just thinking out loud here, bear with me pls:
+> Allwinner sources list this block as "R_PIO". I suggest using this name.
+> Clearly "pioL" does not cover all the functionality.
 
-Frankly, having a single compilation unit contain similar silicon
-functionality could be a good way to put a hold on the growth but the
-disadvantage of this is fatter drivers. Which wouldn't matter all too
-much but after a certain level of fat, they might need splitting.
+I'd agree with that.
 
-And the highbank version is nothing but the big probe routine and a
-small irq handler.
 
-And the PL310 is similar but also with a poller.
+> I have started to document the PRCM block: http://linux-sunxi.org/PRCM
 
-I guess, if they don't share functionality at all, putting them together
-might not be worth it. Hohummm.
+It's quite different on the A31 and on the A23 actually :(
 
-Thanks.
+You don't have any of the audio thing for example, but you have the
+CPUs power clamp controls, that have been moved to the 
+
+Maxime
+
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/de87e34b/attachment-0001.sig>
