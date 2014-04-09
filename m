@@ -1,64 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 9 Apr 2014 15:05:26 -0400 (EDT)
-Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
-In-Reply-To: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <alpine.LFD.2.11.1404091504240.28063@knanqh.ubzr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Apr 2014 20:37:06 +0100
+Subject: [PATCH 1/2] pwm: add period and polarity to struct pwm_lookup
+In-Reply-To: <1397066649-3767-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1397066649-3767-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1397066649-3767-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140409193705.GJ27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Apr 2014, Laurent Pinchart wrote:
+On Wed, Apr 09, 2014 at 08:04:08PM +0200, Alexandre Belloni wrote:
+> Adds a period and a polarity member to struct pwm_lookup so that when performing
+> a lookup using the lookup table instead of device tree, we are able to set the
+> period and the polarity accordingly like what is done in
+> of_pwm_xlate_with_flags.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/pwm/core.c  | 5 +++++
+>  include/linux/pwm.h | 2 ++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index a80471399c20..206e5996359c 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -663,6 +663,11 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+>  
+>  	if (chip)
+>  		pwm = pwm_request_from_chip(chip, index, con_id ?: dev_id);
+> +	if (IS_ERR(pwm))
+> +		return pwm;
+> +
+> +	pwm_set_period(pwm, p->period);
+> +	pwm_set_polarity(pwm, p->polarity);
+>  
+>  	mutex_unlock(&pwm_lookup_lock);
 
-> Hello,
-> 
-> (Resending due to a typo in an e-mail address that caused LAKML to reject the
-> mails. Sorry about the noise.)
-> 
-> This patch set reworks Ezequiel Garcia's previous fix [1] of an out of vmalloc
-> space bug on PXA2[57]x platforms caused by an attempt to map the start of
-> physical uncached outside of the vmalloc space.
-> 
-> This first three patches perform a couple of cleanups, and the last patch
-> fixes the problem. I've decided to map the memory at address 0xfe000000 to
-> minimize changes to the code, but this causes a bit of fragmentation of
-> vmalloc space. I could map it to the very end of vmalloc space (0xfef00000)
-> instead if preferred, which would involve replacing a mov by an ldr in
-> pxa2[57]x_finish_suspend and pm_enter_standby_start.
-> 
-> I've tested the patch set on a PXA270-based system.
+Clearly, this is not right.  Returning while leaving the mutex locked?
+No.
 
-For those patches:
+The second issue is... with _just_ this patch applied, we end up with
+"period" and "polarity" presumably initialised to zero, which means we
+now end up with the above explicitly setting the period and polarity as
+such.  Isn't that going to change the behaviour of this?
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-
-> 
-> [1] https://lkml.org/lkml/2013/11/28/474
-> 
-> Ezequiel Garcia (1):
->   ARM: pxa: Move iotable mapping inside vmalloc region
-> 
-> Laurent Pinchart (3):
->   ARM: pxa: Don't hardcode addresses and size in map_desc tables
->   ARM: pxa: Move UNCACHED_PHYS_0 mapping from generic.c to pxa2[57]x.c
->   ARM: pxa: pxa27x: Don't map IMEMC region statically
-> 
->  arch/arm/mach-pxa/generic.c               | 11 +++--------
->  arch/arm/mach-pxa/include/mach/hardware.h |  4 ++--
->  arch/arm/mach-pxa/pxa25x.c                |  7 ++++++-
->  arch/arm/mach-pxa/pxa27x.c                | 10 +++++-----
->  arch/arm/mach-pxa/pxa3xx.c                |  2 +-
->  5 files changed, 17 insertions(+), 17 deletions(-)
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
