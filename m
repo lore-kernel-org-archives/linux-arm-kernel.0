@@ -1,46 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 9 Apr 2014 16:45:03 +0200
-Subject: [PATCH 02/15] ARM: sunxi: dt: document pinctrl clock related
- properties
-In-Reply-To: <1397051478-4113-3-git-send-email-boris.brezillon@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 09 Apr 2014 16:43:40 +0200
+Subject: [PATCH 07/15] ARM: sunxi: dt: define A31's APB0 clk gates node
+In-Reply-To: <534553FF.4060401@elopez.com.ar>
 References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397051478-4113-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140409144502.GD28585@lukather>
+ <1397051478-4113-8-git-send-email-boris.brezillon@free-electrons.com>
+ <534553FF.4060401@elopez.com.ar>
+Message-ID: <53455C9C.1040607@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 03:51:05PM +0200, Boris BREZILLON wrote:
-> Document clocks and clock-names properties for the pinctrl driver.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> index 0e7e9a1..b3e5c30 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> @@ -15,6 +15,10 @@ Required properties:
->    "allwinner,sun7i-a20-pinctrl"
->  - reg: Should contain the register physical address and length for the
->    pin controller.
-> +- clocks: Should contain a list of gate clk needed by the pin controller
-> +- clock-names: Should at least contain "pio_clk" which is used by the
-> +  base pin controller. In case of sun6i-a31 SoC, this property should
-> +  also contain the "pioL_clk" string.
 
-You should probably mention that these two should be in the same
-order.
+On 09/04/2014 16:06, Emilio L?pez wrote:
+> Hi Boris,
+>
+> El 09/04/14 10:51, Boris BREZILLON escribi?:
+>> Define the APB0 clk gates controlled by the PRCM (Power/Reset/Clock
+>> Management) block.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> ---
+>>   arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> index 3858424..61e8b34 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> @@ -141,6 +141,16 @@
+>>                       "ahb1_drc0", "ahb1_drc1";
+>>           };
+>>
+>> +        apb0_gates: apb0_gates at 01f01428 {
+>
+> Looks like this node is out of place, judging by the address. Try to
+> keep them in order.
+
+Sure, I'll fix it for the next version.
+
+>
+>> +            #clock-cells = <1>;
+>> +            compatible = "allwinner,sun6i-a31-apb0-gates-clk";
+>> +            reg = <0x01f01428 0x4>;
+>> +            clock-output-names = "apb0_pio", "apb0_ir",
+>> +                    "apb0_timer01", "apb0_p2wi",
+>> +                    "apb0_uart", "apb0_1wire",
+>> +                    "apb0_i2c";
+>> +        };
+>> +
+>>           apb1: apb1 at 01c20054 {
+>>               #clock-cells = <0>;
+>>               compatible = "allwinner,sun4i-apb0-clk";
+>>
+>
+> Cheers,
+>
+> Emilio
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/d424952f/attachment.sig>
