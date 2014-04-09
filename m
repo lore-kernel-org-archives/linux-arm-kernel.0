@@ -1,100 +1,65 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 9 Apr 2014 11:21:19 +0800
-Subject: [PATCH] ARM: dts: i.MX: Use single naming style for i.MX WEIM
- devices
-In-Reply-To: <1396972483-2342-1-git-send-email-shc_work@mail.ru>
-References: <1396972483-2342-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140409032117.GA2611@dragon>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 8 Apr 2014 20:36:03 -0700
+Subject: [PATCH v5 0/8] mtd: spi-nor: add a new framework for SPI NOR
+In-Reply-To: <20140313063940.GU31517@norris-Latitude-E6410>
+References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
+ <20140312081350.GC30808@shlinux2.ap.freescale.net>
+ <20140313063940.GU31517@norris-Latitude-E6410>
+Message-ID: <20140409033603.GA32070@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 07:54:43PM +0400, Alexander Shiyan wrote:
-> This patch converts all i.MX WEIM users to use single naming style
-> for devices.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  Documentation/devicetree/bindings/bus/imx-weim.txt | 4 ++--
->  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     | 2 +-
->  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    | 4 ++--
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           | 4 ++--
->  4 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> index 6630d84..73aa2f3 100644
-> --- a/Documentation/devicetree/bindings/bus/imx-weim.txt
-> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> @@ -70,9 +70,9 @@ Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
->  		ranges = <0 0 0x08000000 0x08000000>;
->  		fsl,weim-cs-gpr = <&gpr>;
->  
-> -		nor at 0,0 {
-> +		nor at 0,00000000 {
++ Lee, Marek
 
-Hmm, I think the idiom for unit-address is that the number has neither
-'0x' nor leading zeros.  That said, the existing form is just good.
+Hi Huang,
 
-Shawn
+On Wed, Mar 12, 2014 at 11:39:40PM -0700, Brian Norris wrote:
+> On Wed, Mar 12, 2014 at 04:13:51PM +0800, Huang Shijie wrote:
+> > On Mon, Feb 24, 2014 at 06:37:34PM +0800, Huang Shijie wrote:
+> >    Could you please review this patch set? I really hope it can be merged
+> >    as soon as possibel.  But now, the patch set has stalled for a long time.
+> 
+> I'm sorry for the delay. Others are in the same position of delay (e.g.,
+> Lee's SPI-NOR driver), because I simply have not had the time to really
+> devote this the attention it deserves, especially considering how it
+> rearchitects such an important, commonly-used driver.
+> 
+> Nonetheless, I will try to give your patches some more attention soon.
+> 
+> >    Since you have pushed the patches for m25p80.c, i have to rebase this
+> >    patch set again and again...
+> 
+> You mean locally? I promise you, I can handle rebasing on my reviewing
+> end for small one-line conflicts like new chip IDs, so don't rebase and
+> resend simply for that. Unless I find substantive things that you should
+> change, I'd only expect at most one more rebase to be necessary.
 
->  			compatible = "cfi-flash";
-> -			reg = <0 0 0x02000000>;
-> +			reg = <0 0x00000000 0x02000000>;
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			bank-width = <2>;
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> index 9117a3c..e501aa9 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> @@ -280,7 +280,7 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_weim>;
->  
-> -	can at d4000000 {
-> +	can at 4,00000000 {
->  		compatible = "nxp,sja1000";
->  		reg = <4 0x00000000 0x00000100>;
->  		interrupt-parent = <&gpio5>;
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> index 8e10aef..758612a 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> @@ -311,7 +311,7 @@
->  &weim {
->  	status = "okay";
->  
-> -	nor: nor at c0000000 {
-> +	nor: nor at 0,00000000 {
->  		compatible = "cfi-flash";
->  		reg = <0 0x00000000 0x02000000>;
->  		bank-width = <2>;
-> @@ -321,7 +321,7 @@
->  		#size-cells = <1>;
->  	};
->  
-> -	sram: sram at c8000000 {
-> +	sram: sram at 1,00000000 {
->  		compatible = "mtd-ram";
->  		reg = <1 0x00000000 0x00800000>;
->  		bank-width = <2>;
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 009abd6..fde8b31 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -446,9 +446,9 @@
->  	ranges = <0 0 0x08000000 0x08000000>;
->  	status = "disabled"; /* pin conflict with SPI NOR */
->  
-> -	nor at 0,0 {
-> +	nor at 0,00000000 {
->  		compatible = "cfi-flash";
-> -		reg = <0 0 0x02000000>;
-> +		reg = <0 0x00000000 0x02000000>;
->  		#address-cells = <1>;
->  		#size-cells = <1>;
->  		bank-width = <2>;
-> -- 
-> 1.8.3.2
-> 
-> 
-> 
+Unfortunately, I did not get the time to review and test this
+sufficiently for the 3.15 merge window, but to avoid further delay, I've
+queued it up in l2-mtd.git [1] under its own branch for now. I rebased
+it myself, to accommodate for changes to m25p80.c since your submission.
+Please take a look at the branch.
+
+If all goes well, I should merge the spinor branch into master some time
+after the 3.15 merge window closes, so it will get linux-next testing.
+For any additional comments/corrections (I have a few), please just
+submit patches on top, rather than resending the whole series.
+
+Marek, what was your opinion on this series? Last response I saw was
+"looking good"; is that an Ack? Or did you have any more gating
+requests?
+
+Personally, I think it looks ready enough, and it's better to merge this
+than not. I was able to test with my platforms, with no regression.
+
+Lee, I have a few patches that do some trivial unification of your ST
+SPI FSM driver and the SPI-NOR framework. I plan to send these out
+soon, and I will begin applying any ST-FSM patches to the same spinor
+branch along with Huang's code. I hope that you can spend some effort on
+improving integration within the next few months in preparation for
+3.16, when I expect this to all go upstream.
+
+Thanks,
+Brian
+
+[1] branch spinor, at http://git.infradead.org/l2-mtd.git
