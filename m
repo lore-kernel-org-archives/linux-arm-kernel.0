@@ -1,50 +1,41 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 09 Apr 2014 11:16:07 +0200
-Subject: [PATCH 3/3] ARM: socfpga: dts: add reset-controller
-In-Reply-To: <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
-References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396629087-23727-4-git-send-email-s.trumtrar@pengutronix.de>
- <1396905121.25236.2.camel@linux-builds1>
- <20140407224110.GA28399@pengutronix.de> <53435F37.7060301@gmail.com>
- <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
-Message-ID: <1397034967.4418.4.camel@paszta.hi.pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Apr 2014 11:32:52 +0200
+Subject: [RFC 0/3] future of gemini platform
+In-Reply-To: <CACRpkdYuxJ2CWQGDCWx+4Yp2r3=OVunyx2kfTyBKay43jaHvnA@mail.gmail.com>
+References: <1357310500-19848-1-git-send-email-arnd@arndb.de>
+ <1357310500-19848-5-git-send-email-arnd@arndb.de>
+ <CACRpkdYuxJ2CWQGDCWx+4Yp2r3=OVunyx2kfTyBKay43jaHvnA@mail.gmail.com>
+Message-ID: <8341946.9jZiCPfkKB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 09.04.2014, 10:37 +0200 schrieb Steffen Trumtrar:
-> Dinh Nguyen <dinh.linux@gmail.com> writes:
-> 
-> > On 4/7/14 5:41 PM, Steffen Trumtrar wrote:
-> >> On Mon, Apr 07, 2014 at 04:12:01PM -0500, Dinh Nguyen wrote:
-> >>> On Fri, 2014-04-04 at 18:31 +0200, Steffen Trumtrar wrote:
-> >>>> Add the necessary #reset-cells property to the rst-mgr node and
-> >>>> provide a header-file with all possible resets specified.
-> >>>>
-> >>>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> >>>> ---
-> >>>>  arch/arm/boot/dts/socfpga.dtsi           |  8 ++-
-> >>>>  include/dt-bindings/reset/altr,rst-mgr.h | 90 ++++++++++++++++++++++++++++++++
-> >>> Does this file belong under dt-bindings/reset/ or
-> >>> dt-bindings/reset-controller/?
-> >>>
-> >> ATM there is no such directory, or is there ?
-> >> So, reset seems appropriate I think.
-> > commit [6b7f06 ARM: STi: STiH415: Add reset controller support.]
-> > Seems more appropriate for this to go into reset-controller.
+On Wednesday 09 April 2014 10:40:48 Linus Walleij wrote:
+> On Fri, Jan 4, 2013 at 3:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > >
+> > Arnd Bergmann (3):
+> >   ARM: gemini: get platform to build again
+> >   ARM: gemini: remove platform support
+> >   ARM: remove fa526 CPU support
 > 
-> Okay, the current mainline master now has include/dt-bindings/reset and
-> include/dt-bindings/reset-controller.
+> Arnd: I suggest you rebase and apply this series, sans the FA526
+> removal as I hear it may now be used on the Moxart.
 > 
-> I think one of those directories shouldn't be there, but be merged in
-> the other instead. But which one? Where shall I put my precious code?
+> I patched the generic time code for gemini in october last year
+> and noone has yet bothered to even test it!
 
-My vote would be for dt-bindings/reset/, since that's shorter and
-2ec941304df9e1cd5e2f2404303a5fab0929969a came before
-6b7f06cc805bb4755e69cd916b3f565947e0a77a.
+I guess you mean just the middle patch then? The first one
+was actually applied.
 
-Maybe something also should be done about dt-bindings/clk/ and
-dt-bindings/clock/.
+On the other hand, I did make a patch now to enable multiplatform
+support for gemini that I was planning to send for review.
 
-regards
-Philipp
+Florian, what is the status of gemini in openwrt? From what I can
+tell, it's stuck at linux-3.9 [1], which is probably why nobody has
+tested Linus' timer code. It's not clear if anyone is still interested
+in it, but I also don't see a reason why any of the patches in
+the openwrt repository couldn't just get merged (with some trivial
+changes in a few cases).
+
+	Arnd
+
+http://git.openwrt.org/?p=openwrt.git;a=history;f=target/linux/gemini/patches;h=b58795e82765935eba3f001c39c8e4ca8c3c549e;hb=HEAD
