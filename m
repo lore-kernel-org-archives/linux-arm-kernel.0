@@ -1,35 +1,54 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 9 Apr 2014 22:59:38 +0800
-Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <CAOMZO5CO8ucya8qmVXBo5kgRmuLqKGtpub07o1DuE9yh5LmmPQ@mail.gmail.com>
-References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
- <20140409133422.GA2334@dragon>
- <CAOMZO5CO8ucya8qmVXBo5kgRmuLqKGtpub07o1DuE9yh5LmmPQ@mail.gmail.com>
-Message-ID: <20140409145936.GB2334@dragon>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed,  9 Apr 2014 19:04:14 +0400
+Subject: [PATCH v2] ARM: dts: i.MX: Use single naming style for i.MX WEIM
+ devices
+Message-ID: <1397055854-29105-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 11:20:28AM -0300, Fabio Estevam wrote:
-> On Wed, Apr 9, 2014 at 10:34 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> 
-> > I'm not sure this is a full/correct fix to the problem.  You assume that
-> > the re-parenting only happens during boot for once?  What about the
-> 
-> Yes, correct. As far as I can see LDB parent is only set once in clk-imx6q.
-> 
-> > re-parenting triggered by the clk_set_parent() call?
-> 
-> Where do you see the LDB clock parent to change via clk_set_parent() call?
-> 
-> In imx_ldb.c we use clk_set_parent() to set the di parent, not ldb parent.
+This patch converts all i.MX WEIM users to use single naming style
+for devices.
 
-As long as you call clk_register_mux() to register a multiplexer, you
-have to ensure that clk_set_parent() call always works properly on it,
-no matter whether there is one actually calling into it right now.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts  | 2 +-
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Furthermore, some re-parenting happens in a way you may not be aware of.
-See commit e366fdd (clk: clk-mux: implement remuxing on set_rate), for
-example.
-
-Shawn
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index 9117a3c..67f3fef 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -280,7 +280,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_weim>;
+ 
+-	can at d4000000 {
++	can at 0,0 {
+ 		compatible = "nxp,sja1000";
+ 		reg = <4 0x00000000 0x00000100>;
+ 		interrupt-parent = <&gpio5>;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index 8e10aef..b46d280 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -311,7 +311,7 @@
+ &weim {
+ 	status = "okay";
+ 
+-	nor: nor at c0000000 {
++	nor: nor at 0,0 {
+ 		compatible = "cfi-flash";
+ 		reg = <0 0x00000000 0x02000000>;
+ 		bank-width = <2>;
+@@ -321,7 +321,7 @@
+ 		#size-cells = <1>;
+ 	};
+ 
+-	sram: sram at c8000000 {
++	sram: sram at 0,0 {
+ 		compatible = "mtd-ram";
+ 		reg = <1 0x00000000 0x00800000>;
+ 		bank-width = <2>;
+-- 
+1.8.3.2
