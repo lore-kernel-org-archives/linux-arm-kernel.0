@@ -1,84 +1,70 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 09 Apr 2014 13:55:30 +0100
-Subject: [PATCH 8/8] imx-drm: Add RGB666 support for parallel display.
+Date: Wed, 09 Apr 2014 13:54:54 +0100
+Subject: [PATCH 1/8] imx-drm: Move IPU_PIX_FMT_GBR24 definition into
+ imx-ipu-v3.h
 In-Reply-To: <20140409125354.GP16119@n2100.arm.linux.org.uk>
 References: <20140409125354.GP16119@n2100.arm.linux.org.uk>
-Message-ID: <E1WXs2M-0002bG-3u@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WXs1m-0002ak-Ba@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Denis Carikli <denis@eukrea.com>
+From: Philipp Zabel <p.zabel@pengutronix.de>
 To: linux-arm-kernel at lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+The IPU display controller supports a non-standard green-red-blue ordered
+format that is used on the connection between IPU display interface 1 and
+the TV encoder on i.MX53.
+In preparation for the move of IPU core code out of staging, place the
+IPU_PIX_FMT_GBR24 definition in imx-ipu-v3.h, so that both the IPU
+display interface driver and the TVE encoder driver can access it.
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- .../devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt          | 3 ++-
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c                          | 9 +++++++++
- drivers/staging/imx-drm/parallel-display.c                       | 2 ++
- 3 files changed, 13 insertions(+), 1 deletion(-)
+ drivers/staging/imx-drm/imx-drm.h           | 4 ----
+ drivers/staging/imx-drm/imx-tve.c           | 1 +
+ drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h | 2 ++
+ 3 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-index 3be5ce7a9654..83137ef5a1ba 100644
---- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-@@ -60,7 +60,8 @@ Parallel display support
- - compatible: Should be "fsl,imx-parallel-display"
- Optional properties:
- - interface_pix_fmt: How this display is connected to the
--  display interface. Currently supported types: "rgb24", "rgb565", "bgr666"
-+  display interface. Currently supported types: "rgb24", "rgb565", "bgr666",
-+  "rgb666"
- - edid: verbatim EDID data block describing attached display.
- - ddc: phandle describing the i2c bus handling the display data
-   channel
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index d5de8bb5c803..6f9abe8a4575 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -92,6 +92,7 @@ enum ipu_dc_map {
- 	IPU_DC_MAP_GBR24, /* TVEv2 */
- 	IPU_DC_MAP_BGR666,
- 	IPU_DC_MAP_BGR24,
-+	IPU_DC_MAP_RGB666,
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index a24d46ad3dce..a322bac55414 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -1,10 +1,6 @@
+ #ifndef _IMX_DRM_H_
+ #define _IMX_DRM_H_
+ 
+-#include <linux/videodev2.h>
+-
+-#define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
+-
+ struct device_node;
+ struct drm_crtc;
+ struct drm_connector;
+diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
+index 7002ae0a08ca..575533f4fd64 100644
+--- a/drivers/staging/imx-drm/imx-tve.c
++++ b/drivers/staging/imx-drm/imx-tve.c
+@@ -31,6 +31,7 @@
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_crtc_helper.h>
+ 
++#include "ipu-v3/imx-ipu-v3.h"
+ #include "imx-drm.h"
+ 
+ #define TVE_COM_CONF_REG	0x00
+diff --git a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+index 4826b5c0249d..c4d14ead5837 100644
+--- a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
++++ b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
+@@ -25,6 +25,8 @@ enum ipuv3_type {
+ 	IPUV3H,
  };
  
- struct ipu_dc {
-@@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
- 		return IPU_DC_MAP_BGR666;
- 	case V4L2_PIX_FMT_BGR24:
- 		return IPU_DC_MAP_BGR24;
-+	case V4L2_PIX_FMT_RGB666:
-+		return IPU_DC_MAP_RGB666;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -404,6 +407,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
- 
-+	/* rgb666 */
-+	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
++#define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
 +
- 	return 0;
- }
- 
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index d610f0726bb2..12a1b5e54f14 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -196,6 +196,8 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
- 		else if (!strcmp(fmt, "bgr666"))
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
-+		else if (!strcmp(fmt, "rgb666"))
-+			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
- 	}
- 
- 	imxpd->dev = dev;
+ /*
+  * Bitfield of Display Interface signal polarities.
+  */
 -- 
 1.8.3.1
