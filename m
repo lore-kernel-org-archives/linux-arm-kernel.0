@@ -1,39 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Apr 2014 09:09:36 +0200
-Subject: Big endian working?
-In-Reply-To: <20140409073016.72060cd3@skate>
-References: <20140408095446.0520dd28@skate>
- <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
- <20140409073016.72060cd3@skate>
-Message-ID: <7521814.ApkjdzgJjE@wuerfel>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 9 Apr 2014 00:11:05 -0700
+Subject: [PATCH 14/15] mtd: st_spi_fsm: Provide mask to obtain correct
+ boot device pins
+In-Reply-To: <1395851969-13520-15-git-send-email-lee.jones@linaro.org>
+References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
+ <1395851969-13520-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140409071105.GE3131@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 April 2014 07:30:16 Thomas Petazzoni wrote:
-> On Tue, 8 Apr 2014 21:46:05 -0700, Victor Kamensky wrote:
++ DT list
+
+On Wed, Mar 26, 2014 at 04:39:28PM +0000, Lee Jones wrote:
+> From: Christophe Kerello <christophe.kerello@st.com>
 > 
-> > > If I remember correctly, those are for booting a BE kernel on hardware
-> > > that initializes in LE mode and expects a LE kernel.  Since the zImage
-> > > header values are defined to be words, those must be swapped so they
-> > > read as LE even if the kernel is BE.  Of course the kernel is then
-> > > responsible for switching the endian mode when entered.
-> > 
-> > My understanding is that CPU_BE8_BOOT_LE was needed only for
-> > atags boot case. Since now practically nobody uses atags, but rather
-> > fdt those patches were not pushed into main stream.
+> This patch adds a mask to be able to get the right boot device selection.
 > 
-> Well it would still be nice to have ATAGs support, as a few people are
-> still using old, non fdt-capable bootloaders.
+> For example:
+>     for STiH415, value = SYSTEM_STATUS398[4:0]
+>     for STiH416, value = SYSTEM_STATUS2598[4:0]
+>     for STiH407, value = SYSTEM_STATUS5561[6:2]
+> 
+> Signed-off-by: Christophe Kerello <christophe.kerello@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mtd/devices/st_spi_fsm.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+> index 9e00173..3ab27c8 100644
+> --- a/drivers/mtd/devices/st_spi_fsm.c
+> +++ b/drivers/mtd/devices/st_spi_fsm.c
+> @@ -2159,6 +2159,7 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+>  	struct regmap *regmap;
+>  	uint32_t boot_device_reg;
+>  	uint32_t boot_device_spi;
+> +	uint32_t boot_device_msk;
+>  	uint32_t boot_device;     /* Value we read from *boot_device_reg */
+>  	int ret;
+>  
+> @@ -2183,10 +2184,17 @@ static void stfsm_fetch_platform_configs(struct platform_device *pdev)
+>  	if (ret)
+>  		goto boot_device_fail;
+>  
+> +	/* Mask to apply on boot_device_reg */
+> +	ret = of_property_read_u32(np, "st,boot-device-msk", &boot_device_msk);
 
-My point was actually that it should never be wrong to use
-CPU_BE8_BOOT_LE on a BE8 kernel. We have at no point supported
-a boot loader that uses a big-endian boot protocol for ARMv6/v7
-upstream kernel, and there is a danger of people expecting it
-to work in the future if the kernel does it now.
+You need to document this binding in Documentation/devicetree/bindings/,
+and CC the devicetree list.
 
-If we ensure that we only support boot loaders that expect
-little-endian numbers in these fields, any kernel (DT or ATAGS,
-little-endian or big-endian) should work on any boot loader
-that has matching boot data.
+> +	if (ret)
+> +		goto boot_device_fail;
+> +
+>  	ret = regmap_read(regmap, boot_device_reg, &boot_device);
+>  	if (ret)
+>  		goto boot_device_fail;
+>  
+> +	boot_device &= boot_device_msk;
+> +
+>  	if (boot_device != boot_device_spi)
+>  		fsm->booted_from_spi = false;
+>  
 
-	Arnd
+Brian
