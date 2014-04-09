@@ -1,57 +1,93 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 09 Apr 2014 12:29:31 +0200
-Subject: [PATCH v7 2/3] ARM: dts: add dts files for exynos5260 SoC
-In-Reply-To: <1396519224-18712-3-git-send-email-rahul.sharma@samsung.com>
-References: <1396519224-18712-1-git-send-email-rahul.sharma@samsung.com>
- <1396519224-18712-3-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <5345210B.5070807@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 9 Apr 2014 12:46:53 +0200
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <20140409100313.GA20704@piout.net>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com> <20140408175904.GT29751@pengutronix.de>
+ <20140408234243.GB13898@piout.net>
+ <20140409082341.GV29751@pengutronix.de>
+ <20140409100313.GA20704@piout.net>
+Message-ID: <20140409104652.GC9527@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+On Wed, Apr 09, 2014 at 12:03:13PM +0200, Alexandre Belloni wrote:
+> On 09/04/2014 at 10:23:41 +0200, Uwe Kleine-K?nig wrote :
+> > > While I had exactly the same issue back in september and wrote the exact
+> > > same patch that got rejected. I would agree with Thierry here taht we
+> > > need to keep the pwm_disable() there as it potentially allows to save
+> > > power.
+> > >
+> > > However, it seems to not work quite well with PWMs from Freescale (see
+> > > the thread from Russell). Or I would say with PWM with an undefined
+> > > state when disabled and I believe we are soon to find more.
+> > > 
+> > > We could either:
+> > >  - add a flag like can_sleep that would allow driver to know that the
+> > >    pwm always has to be enable to get sane results.
+> > >
+> > >  - or introduce functions like prepare/unprepare to be called from probe
+> > >    and remove in the leds-pwm driver and that will enable/disable the
+> > > channel in pwm-mxs. pwm_enable/pwm_disable not doing anything.
+> > There are a few more options. I repeat your's to get a single list:
+> > 
+> >  a) Somehow tell the API users that pwm_disable might not result in a
+> >     flat zero after set_duty(0).
+> >  a') Anchor in the API that users must not expect anything from the pwm
+> >     pin after pwm_disable.
+> >  b) Make pwm_enable/pwm_disable noops on i.MX28
+> >  c) Make set_duty only return when the new value reached the pin.
+> >  d) Make pwm_disable wait to yield the expected result
+> >  d') Make pwm_disable wait if the last programmed duty cycle is 0 or
+> >     full period.
+> >  e) Introduce a new callback that does the waiting, e.g. a .commit
+> >     callback
+> >  e') Introduce a new callback pwm_config_sync that does wait
+> >     appropriatly, keep pwm_config as is.
+> >  f) Make the i.MX28 driver switch the pin the gpio mode with the
+> >     expected output level in pwm_disable.
+> > 
+> > a') is a special case of a); d') is a special case of d), ditto for e')
+> > and e).
+> > 
+> > a) and e) would result in changes in the pwm API. For c) I'd like to
+> > make the API docs more explicit, too. (i.e. demand that the new
+> > configuration is already active after pwm_config returns)
+> > 
+> > Both e) and a) have the drawback that the API becomes more complicated
+> > and users will get it wrong. a) and b) are bad from a power management
+> > POV. Maybe c) is what most users expect, but d) and d') are more
+> > effective as they result in less waiting and still are good enough. f)
+> > is more complicated to implement, also it depends on a gpio being
+> > available in hardware. So if we choose f) we still might need a fallback
+> > implementation from the other options.
+> > 
+> > My series implemented a'), but Thierry didn't like it. I think my
+> > favorite is e').
+> > 
+> 
+> I think I would actually prefer d'. Doing the synchronisation in d' is
+> abstracting it for the user.
 
-On 03.04.2014 12:00, Rahul Sharma wrote:
-> The patch adds the dts files for exynos5260.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5260-pinctrl.dtsi |  574 +++++++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5260.dtsi         |  304 +++++++++++++++
->   2 files changed, 878 insertions(+)
->   create mode 100644 arch/arm/boot/dts/exynos5260-pinctrl.dtsi
->   create mode 100644 arch/arm/boot/dts/exynos5260.dtsi
+My preference would be simply d). Mostly because I don't like special
+cases and especially because I don't see an advantage in special casing
+0 and full period duty cycles. That doesn't mean of course that drivers
+can't special case if they really want or have to.
 
-[snip]
+That said I've also been thinking about adding support for e), which
+would allow atomically changing the duty cycle, period and polarity of a
+channel. This might become necessary at some point.
 
-> diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
-> new file mode 100644
-> index 0000000..188a2ac
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5260.dtsi
-> @@ -0,0 +1,304 @@
-> +/*
-> + * SAMSUNG EXYNOS5260 SoC device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include "skeleton.dtsi"
-> +
-> +#include <dt-bindings/clock/exynos5260-clk.h>
-> +
-> +/ {
-> +	compatible = "samsung,exynos5260";
+The downside of course being that user drivers will need to change. But
+I suspect that may not be necessary for existing users since the current
+API works for them well enough (except for the case currently under
+discussion, of course).
 
-Since Sachin's patches, "samsung,exynos5" compatible should be also 
-added, before the more specific ones.
-
-Best regards,
-Tomasz
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/e0fb25bb/attachment.sig>
