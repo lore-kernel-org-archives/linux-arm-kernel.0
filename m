@@ -1,114 +1,111 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  8 Apr 2014 18:25:52 -0700
-Subject: [PATCH 2/2] ARM: dts: msm: Add 8058 PMIC to ssbi bus
-In-Reply-To: <1397006752-19494-1-git-send-email-sboyd@codeaurora.org>
-References: <1397006752-19494-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1397006752-19494-2-git-send-email-sboyd@codeaurora.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue,  8 Apr 2014 18:45:08 -0700
+Subject: [PATCH] arm64: Add user_debug command line option
+Message-ID: <1397007908-17993-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the PMIC and the sub-devices that are currently supported in
-the kernel to the DT.
+arm had a useful command line option to print out debug
+information on user signals. This is somewhat like a more verbose
+version of show_unhandled_signals. Add the user_debug command line
+option to print out more information in a similar manner to
+arm.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8660-surf.dts | 30 +++++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8660.dtsi     | 42 +++++++++++++++++++++++++++++++++
- 2 files changed, 72 insertions(+)
+ arch/arm64/include/asm/system_misc.h | 25 +++++++++++++++++++++++++
+ arch/arm64/kernel/traps.c            | 13 ++++++++++---
+ arch/arm64/mm/fault.c                |  3 +--
+ 3 files changed, 36 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-index 169bad90dac9..a27eedff62d3 100644
---- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
-+++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-@@ -1,6 +1,36 @@
-+#include <dt-bindings/input/input.h>
-+
- #include "qcom-msm8660.dtsi"
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 7a18fab..2f95589 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -50,6 +50,31 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ #define UDBG_SEGV	(1 << 3)
+ #define UDBG_BUS	(1 << 4)
  
- / {
- 	model = "Qualcomm MSM8660 SURF";
- 	compatible = "qcom,msm8660-surf", "qcom,msm8660";
++extern unsigned int user_debug;
++extern int show_unhandled_signals;
++
++static inline bool print_user_debug(unsigned int signum, unsigned int mask)
++{
++	int ret = 0;
++	bool sig_assert = false;
++
++	ret |= show_unhandled_signals &&
++		(signum ? unhandled_signal(current, signum) : 1);
++	if (mask & UDBG_SEGV) {
++		sig_assert = true;
++		ret |= (user_debug & mask) && signum == SIGSEGV;
++	}
++	if (mask & UDBG_BUS) {
++		sig_assert = true;
++		ret |= (user_debug & mask) && signum == SIGBUS;
++	}
++	if (sig_assert)
++		ret |= (user_debug & mask);
++
++	return ret ? printk_ratelimit() : false;
++}
++
++
+ #endif	/* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index a6740d0..5519ef1 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -48,6 +48,14 @@ static const char *handler[]= {
  };
+ 
+ int show_unhandled_signals = 1;
++unsigned int user_debug;
 +
-+&pmicintc {
-+	keypad at 148 {
-+		linux,keymap = <
-+			MATRIX_KEY(0, 0, KEY_FN_F1)
-+			MATRIX_KEY(0, 1, KEY_UP)
-+			MATRIX_KEY(0, 2, KEY_LEFT)
-+			MATRIX_KEY(0, 3, KEY_VOLUMEUP)
-+			MATRIX_KEY(1, 0, KEY_FN_F2)
-+			MATRIX_KEY(1, 1, KEY_RIGHT)
-+			MATRIX_KEY(1, 2, KEY_DOWN)
-+			MATRIX_KEY(1, 3, KEY_VOLUMEDOWN)
-+			MATRIX_KEY(2, 3, KEY_ENTER)
-+			MATRIX_KEY(4, 0, KEY_CAMERA_FOCUS)
-+			MATRIX_KEY(4, 1, KEY_UP)
-+			MATRIX_KEY(4, 2, KEY_LEFT)
-+			MATRIX_KEY(4, 3, KEY_HOME)
-+			MATRIX_KEY(4, 4, KEY_FN_F3)
-+			MATRIX_KEY(5, 0, KEY_CAMERA)
-+			MATRIX_KEY(5, 1, KEY_RIGHT)
-+			MATRIX_KEY(5, 2, KEY_DOWN)
-+			MATRIX_KEY(5, 3, KEY_BACK)
-+			MATRIX_KEY(5, 4, KEY_MENU)
-+			>;
-+		keypad,num-rows = <6>;
-+		keypad,num-columns = <5>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index c52a9e964a44..985b4c16976a 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -83,5 +83,47 @@
- 		compatible = "qcom,ssbi";
- 		reg = <0x500000 0x1000>;
- 		qcom,controller-type = "pmic-arbiter";
-+
-+		pmicintc: pmic at 0 {
-+			compatible = "qcom,pm8058";
-+			interrupt-parent = <&msmgpio>;
-+			interrupts = <88 8>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			pwrkey at 1c {
-+				compatible = "qcom,pm8058-pwrkey";
-+				reg = <0x1c>;
-+				interrupt-parent = <&pmicintc>;
-+				interrupts = <50 1>, <51 1>;
-+				debounce = <15625>;
-+				pull-up;
-+			};
-+
-+			keypad at 148 {
-+				compatible = "qcom,pm8058-keypad";
-+				reg = <0x148>;
-+				interrupt-parent = <&pmicintc>;
-+				interrupts = <74 1>, <75 1>;
-+				debounce = <15>;
-+				scan-delay = <32>;
-+				row-hold = <91500>;
-+			};
-+
-+			rtc at 11d {
-+				compatible = "qcom,pm8058-rtc";
-+				interrupt-parent = <&pmicintc>;
-+				interrupts = <39 1>;
-+				reg = <0x11d>;
-+				allow-set-time;
-+			};
-+
-+			vibrator at 4a {
-+				compatible = "qcom,pm8058-vib";
-+				reg = <0x4a>;
-+			};
-+		};
- 	};
- };
++static int __init user_debug_setup(char *str)
++{
++	get_option(&str, &user_debug);
++	return 1;
++}
++__setup("user_debug=", user_debug_setup);
+ 
+ /*
+  * Dump out the contents of some memory nicely...
+@@ -270,8 +278,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 
+ 	trace_undef_instr(regs, (void *)pc);
+ 
+-	if (show_unhandled_signals && unhandled_signal(current, SIGILL) &&
+-	    printk_ratelimit()) {
++	if (print_user_debug(SIGILL, UDBG_UNDEFINED)) {
+ 		pr_info("%s[%d]: undefined instruction: pc=%p\n",
+ 			current->comm, task_pid_nr(current), pc);
+ 		dump_instr(KERN_INFO, regs);
+@@ -298,7 +305,7 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+ 	}
+ #endif
+ 
+-	if (show_unhandled_signals && printk_ratelimit()) {
++	if (print_user_debug(0, UDBG_SYSCALL)) {
+ 		pr_info("%s[%d]: syscall %d\n", current->comm,
+ 			task_pid_nr(current), (int)regs->syscallno);
+ 		dump_instr("", regs);
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 8e783eb..bbef0b5 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -117,8 +117,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 
+ 	trace_user_fault(tsk, addr, esr);
+ 
+-	if (show_unhandled_signals && unhandled_signal(tsk, sig) &&
+-	    printk_ratelimit()) {
++	if (print_user_debug(sig, UDBG_BUS | UDBG_SEGV)) {
+ 		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+ 			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+ 			addr, esr);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
