@@ -1,129 +1,216 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed,  9 Apr 2014 21:45:36 +0200
-Subject: [PATCH 4/4] arm: mediatek: Add earlyprintk support for MT6589
+Date: Wed,  9 Apr 2014 21:45:35 +0200
+Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
 In-Reply-To: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
 References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1397072736-10793-5-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds a generic devicetree board file and a dtsi for boards
+based on the MT6589 SoCs from Mediatek.
+
+Apart from the generic parts (gic, clocks) the only component
+currently supported are the timers.
+
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/Kconfig.debug            |   49 +++++++++++++++++++++++++++++++++++--
- arch/arm/include/debug/mediatek.S |   38 ++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/include/debug/mediatek.S
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/mtk6589.dtsi                     |  105 ++++++++++++++++++++
+ arch/arm/mach-mediatek/Kconfig                     |   14 +++
+ arch/arm/mach-mediatek/Makefile                    |    1 +
+ arch/arm/mach-mediatek/mediatek.c                  |   40 ++++++++
+ 7 files changed, 164 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mtk6589.dtsi
+ create mode 100644 arch/arm/mach-mediatek/Kconfig
+ create mode 100644 arch/arm/mach-mediatek/Makefile
+ create mode 100644 arch/arm/mach-mediatek/mediatek.c
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 4a2fc0b..dc51495 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -797,6 +797,38 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on Ux500 based platforms.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 0f01c9b..af48801 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -67,6 +67,7 @@ linux	Linux-specific binding
+ lsi	LSI Corp. (LSI Logic)
+ marvell	Marvell Technology Group Ltd.
+ maxim	Maxim Integrated Products
++mediatek	MediaTek Inc.
+ microchip	Microchip Technology Inc.
+ mosaixtech	Mosaix Technologies, Inc.
+ moxa	Moxa
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5db05f6a..04d46ec 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -995,6 +995,8 @@ source "arch/arm/mach-mv78xx0/Kconfig"
  
-+	config DEBUG_MTK6589_UART0
-+		depends on ARCH_MEDIATEK
-+		bool "Mediatek mt6589 UART0"
-+		select DEBUG_UART_MEDIATEK
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Mediatek mt6589 based platforms.
-+
-+	config DEBUG_MTK6589_UART1
-+		depends on ARCH_MEDIATEK
-+		bool "Mediatek mt6589 UART1"
-+		select DEBUG_UART_MEDIATEK
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Mediatek mt6589 based platforms.
-+
-+	config DEBUG_MTK6589_UART2
-+		depends on ARCH_MEDIATEK
-+		bool "Mediatek mt6589 UART2"
-+		select DEBUG_UART_MEDIATEK
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Mediatek mt6589 based platforms.
-+
-+	config DEBUG_MTK6589_UART3
-+		depends on ARCH_MEDIATEK
-+		bool "Mediatek mt6589 UART3"
-+		select DEBUG_UART_MEDIATEK
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Mediatek mt6589 based platforms.
-+
- 	config DEBUG_VEXPRESS_UART0_DETECT
- 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
- 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
-@@ -954,6 +986,10 @@ config DEBUG_MSM_UART
- 	bool
- 	depends on ARCH_MSM || ARCH_QCOM
+ source "arch/arm/mach-imx/Kconfig"
  
-+config DEBUG_UART_MEDIATEK
-+	bool
-+	depends on ARCH_MEDIATEK
++source "arch/arm/mach-mediatek/Kconfig"
 +
- config DEBUG_LL_INCLUDE
- 	string
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
-@@ -971,6 +1007,7 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX53_UART ||\
- 				 DEBUG_IMX6Q_UART || \
- 				 DEBUG_IMX6SL_UART
-+	default "debug/mediatek.S" if DEBUG_UART_MEDIATEK
- 	default "debug/msm.S" if DEBUG_MSM_UART
- 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
- 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
-@@ -1043,6 +1080,10 @@ config DEBUG_UART_PHYS
- 	default 0xd0012000 if DEBUG_MVEBU_UART
- 	default 0xd4017000 if DEBUG_MMP_UART2
- 	default 0xd4018000 if DEBUG_MMP_UART3
-+	default 0x11006000 if DEBUG_MTK6589_UART0
-+	default 0x11007000 if DEBUG_MTK6589_UART1
-+	default 0x11008000 if DEBUG_MTK6589_UART2
-+	default 0x11009000 if DEBUG_MTK6589_UART3
- 	default 0xe0000000 if ARCH_SPEAR13XX
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
-@@ -1058,7 +1099,7 @@ config DEBUG_UART_PHYS
- 	default 0xfffff700 if ARCH_IOP33X
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_LL_UART_EFM32 || \
--		DEBUG_UART_8250 || DEBUG_UART_PL01X
-+		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_UART_MEDIATEK
+ source "arch/arm/mach-mxs/Kconfig"
  
- config DEBUG_UART_VIRT
- 	hex "Virtual base address of debug UART"
-@@ -1087,6 +1128,10 @@ config DEBUG_UART_VIRT
- 	default 0xfe012000 if ARCH_ORION5X
- 	default 0xfe017000 if DEBUG_MMP_UART2
- 	default 0xfe018000 if DEBUG_MMP_UART3
-+	default 0xF1006000 if DEBUG_MTK6589_UART0
-+	default 0xF1007000 if DEBUG_MTK6589_UART1
-+	default 0xF1008000 if DEBUG_MTK6589_UART2
-+	default 0xF1009000 if DEBUG_MTK6589_UART3
- 	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
- 	default 0xfe230000 if DEBUG_PICOXCELL_UART
- 	default 0xfe300000 if DEBUG_BCM_KONA_UART
-@@ -1116,7 +1161,7 @@ config DEBUG_UART_VIRT
- 	default 0xff003000 if DEBUG_U300_UART
- 	default DEBUG_UART_PHYS if !MMU
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
--		DEBUG_UART_8250 || DEBUG_UART_PL01X
-+		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_UART_MEDIATEK
- 
- config DEBUG_UART_8250_SHIFT
- 	int "Register offset shift for the 8250 debug UART"
-diff --git a/arch/arm/include/debug/mediatek.S b/arch/arm/include/debug/mediatek.S
+ source "arch/arm/mach-netx/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 41c1931..8ce9774 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -170,6 +170,7 @@ machine-$(CONFIG_ARCH_MSM)		+= msm
+ machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
+ machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
+ machine-$(CONFIG_ARCH_MXC)		+= imx
++machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
+ machine-$(CONFIG_ARCH_MXS)		+= mxs
+ machine-$(CONFIG_ARCH_NETX)		+= netx
+ machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
+diff --git a/arch/arm/boot/dts/mtk6589.dtsi b/arch/arm/boot/dts/mtk6589.dtsi
 new file mode 100644
-index 0000000..98e8414
+index 0000000..6dbb74f
 --- /dev/null
-+++ b/arch/arm/include/debug/mediatek.S
-@@ -0,0 +1,38 @@
++++ b/arch/arm/boot/dts/mtk6589.dtsi
+@@ -0,0 +1,105 @@
 +/*
-+ * Low-level debug macro for Mediatek SoCs
++ * Copyright (c) 2014 MundoReader S.L.
++ * Author: Matthias Brugger <matthias.bgg@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "mediatek,mt6589";
++	interrupt-parent = <&gic>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			next-level-cache = <&L2>;
++			reg = <0x0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			next-level-cache = <&L2>;
++			reg = <0x1>;
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			next-level-cache = <&L2>;
++			reg = <0x2>;
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			next-level-cache = <&L2>;
++			reg = <0x3>;
++		};
++
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		system_clk: system_clk {
++			compatible = "fixed-clock";
++			clock-frequency = <13000000>;
++			#clock-cells = <0>;
++			clock-output-names = "system_clk";
++		};
++
++		rtc_clk: rtc_clk {
++			compatible = "fixed-clock";
++			clock-frequency = <32000>;
++			#clock-cells = <0>;
++			clock-output-names = "rtc_clk";
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		clock-ranges;
++		ranges;
++
++		gic: interrupt-controller at 10212000 {
++			compatible = "arm,cortex-a9-gic";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x10211000 0x1000>,
++			      <0x10212000 0x1000>;
++		};
++
++		L2: l2-cache-controller at 1020e000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x1020e000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++		};
++
++		timer: timer at 10008000 {
++			compatible = "mediatek,mtk6589-timer";
++			reg = <0x10008000 0x80>;
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&system_clk>, <&rtc_clk>;
++			clock-names = "sys_clk", "rtc_clk";
++		};
++	};
++};
+diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+new file mode 100644
+index 0000000..c0139ca
+--- /dev/null
++++ b/arch/arm/mach-mediatek/Kconfig
+@@ -0,0 +1,14 @@
++config ARCH_MEDIATEK
++	bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_GIC
++	select CACHE_L2X0
++	select HAVE_ARM_TWD if LOCAL_TIMERS
++	select HAVE_SMP
++	select LOCAL_TIMERS if SMP
++	select COMMON_CLK
++	select GENERIC_CLOCKEVENTS
++	select MTK_TIMER
++	select CLKSRC_MMIO
++	help
++	  Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
+diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+new file mode 100644
+index 0000000..43e619f
+--- /dev/null
++++ b/arch/arm/mach-mediatek/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+new file mode 100644
+index 0000000..f630403
+--- /dev/null
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -0,0 +1,40 @@
++/*
++ * Device Tree support for Mediatek SoCs
 + *
 + * Copyright (c) 2014 MundoReader S.L.
 + * Author: Matthias Brugger <matthias.bgg@gmail.com>
@@ -138,27 +225,29 @@ index 0000000..98e8414
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
-+#include <linux/serial_reg.h>
 +
-+	        .macro  addruart, rp, rv, tmp
-+	        ldr	\rp, =CONFIG_DEBUG_UART_PHYS
-+	        ldr	\rv, =CONFIG_DEBUG_UART_VIRT
-+	        .endm
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_platform.h>
++#include <linux/irqchip.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++#include <asm/hardware/cache-l2x0.h>
 +
-+	        .macro  senduart,rd,rx
-+	        strb    \rd, [\rx, #0x0]
-+	        .endm
++static void __init mediatek_dt_init(void)
++{
++	l2x0_of_init(0, ~0);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
 +
-+	        .macro  waituart,rd,rx
-+1001:   	ldr \rd, [\rx, #0x14]
-+	        tst \rd, #0x40
-+	        beq 1001b
-+	        .endm
++static const char * const mediatek_board_dt_compat[] = {
++	"mediatek,mt6589",
++	NULL,
++};
 +
-+		.macro  busyuart,rd,rx
-+1002:   	ldr \rd, [\rx, #0x14]
-+	        tst \rd, #0x40
-+	        beq 1002b
-+	        .endm
++DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
++	.init_machine	= mediatek_dt_init,
++	.dt_compat	= mediatek_board_dt_compat,
++MACHINE_END
 -- 
 1.7.9.5
