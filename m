@@ -1,27 +1,56 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 9 Apr 2014 10:30:54 -0600
-Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
-In-Reply-To: <20140409095350.47029549@skate>
-References: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20140409061128.GC16465@1wt.eu> <20140409091234.20f2e547@skate>
- <20140409074752.GF16465@1wt.eu> <20140409095350.47029549@skate>
-Message-ID: <20140409163054.GA30642@obsidianresearch.com>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Wed, 09 Apr 2014 17:31:00 +0100
+Subject: [RFC] Extend zImage format to support notes
+In-Reply-To: <20140407182553.GD14062@e106331-lin.cambridge.arm.com>
+References: <5342AF59.3030405@linaro.org>
+ <20140407160452.GB14062@e106331-lin.cambridge.arm.com>
+ <5342E02C.4010004@linaro.org>
+ <20140407182553.GD14062@e106331-lin.cambridge.arm.com>
+Message-ID: <534575C4.2020906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 09:53:50AM +0200, Thomas Petazzoni wrote:
+Hi Mark,
 
-> Maybe this is something that Jason can confirm/infirm. I remember
-> having a quick look at the core Linux PCI core to see if it was
-> somehow checking whether the bridge BAR has been properly configured,
-> but I think I concluded it was not the case, and it was just assuming
-> that write the memory base/limit in the bridge registers was
-> sufficient. 
+On 04/07/2014 07:25 PM, Mark Rutland wrote:
+> 
+> I'm probably being thick here, but is there anything preventing those
+> foreign pages from being idmapped into DOM0 (at least for the duration
+> of the DMA access) such that there is a 1-1 PA<->IPA mapping?
+> 
+> That would mean that from the point of view of Linux, there's nothing to
+> care about, as every address it knows it can deal with is a valid IPA.
+> Existing kernels would function with the IOMMU(s) on.
+> 
+> I assume I'm missing something fairly obvious :)
 
-I think the best way to fail would be to return an error from
-mvebu_pcie_align_resource - but we can't create the window in that
-call.
+I didn't though about this solution. It works on midway only when the
+physical address size is 32 bits.
 
-Once things get to the BAR write stage it shouldn't fail unfortunately.
+I didn't yet figure out why. I guess this is because I have a bug in my
+SMMU driver in Xen.
 
-Jason
+>> We though about runtime approach (see the whole discussion here
+>> https://patches.linaro.org/26034/), but it's not as extensible as notes.
+>> In fact, we might need more notes in the future when new feature will be
+>> added and requires a DOM0/guest side support.
+> 
+> I can certainly see the usefulness of notes.
+
+[..]
+
+> If it makes sense for this case then I can see why we would want it on
+> arm64.
+
+With the solution of idmapping, the RFC seems irrelevant for now. But we
+may need to add notes in the future.
+
+I'm wondering if it would be worth to agree on a solution now. Thus, we
+will be able to add a note quickly when it will be necessary.
+
+Any thoughts?
+
+Sincerely yours,
+
+-- 
+Julien Grall
