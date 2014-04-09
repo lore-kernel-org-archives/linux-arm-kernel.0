@@ -1,177 +1,99 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 Apr 2014 08:55:38 -0300
-Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of LDB_DI_CLK
-Message-ID: <1397044538-12676-1-git-send-email-festevam@gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 9 Apr 2014 13:07:50 +0100
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <CAErSpo4anYBmaRbJEFE9kAXSmnvfqud=w1QA=mSSsTUamM4kSw@mail.gmail.com>
+References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
+ <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
+ <20140405000007.GD15806@google.com>
+ <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
+ <1396862058.3671.40.camel@pasglop>
+ <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
+ <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
+ <20140408102043.GV17163@e106497-lin.cambridge.arm.com>
+ <CAErSpo4anYBmaRbJEFE9kAXSmnvfqud=w1QA=mSSsTUamM4kSw@mail.gmail.com>
+Message-ID: <20140409120750.GN985@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Apr 08, 2014 at 05:28:39PM +0100, Bjorn Helgaas wrote:
+> On Tue, Apr 8, 2014 at 4:20 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Mon, Apr 07, 2014 at 11:44:51PM +0100, Bjorn Helgaas wrote:
+> 
+> >> Let me try to explain my concern about the
+> >> pci_create_root_bus_in_domain() interface.  We currently have these
+> >> interfaces:
+> >>
+> >>   pci_scan_root_bus()
+> >>   pci_scan_bus()
+> >>   pci_scan_bus_parented()
+> >>   pci_create_root_bus()
+> >> ...
+> 
+> >> One alternative is to add an _in_domain() variant of each of these
+> >> interfaces, but that doesn't seem very convenient either.  My idea of
+> >> passing in a structure would also require adding variants, so there's
+> >> not really an advantage there, but I am thinking of the next
+> >> unification effort, e.g., for NUMA node info.  I don't really want to
+> >> have to change all the _in_domain() interfaces to also take yet
+> >> another parameter for the node number.
+> >
+> > OK, what about this: all the functions that you have mentioned take a
+> > void *sysdata parameter. Should we convert this opaque pointer into a
+> > specific structure that holds the domain_nr and (in future) the NUMA
+> > node info?
+> 
+> I doubt if we can make sysdata itself generic because I suspect we
+> need a way to have *some* arch-specific data.  But maybe the arch
+> could supply a structure containing a struct device *, domain, struct
+> pci_ops *, list of resources, aperture info, etc.  I wonder if struct
+> pci_host_bridge would be a reasonable place to put this stuff, e.g.,
+> something like this:
+> 
+>   struct pci_host_bridge {
+>     int domain;
+>     int node;
+>     struct device *dev;
+>     struct pci_ops *ops;
+>     struct list_head resources;
+>     void *sysdata;
+>     struct pci_bus *bus;  /* filled in by core, not by arch */
+>     ... /* other existing contents managed by core */
+>   };
+> 
+>   struct pci_bus *pci_scan_host_bridge(struct pci_host_bridge *bridge);
 
-Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk tree,
-the glitchy parent mux of ldb_di[x]_clk can cause a glitch to enter the
-ldb_di_ipu_div divider. If the divider gets locked up, no ldb_di[x]_clk is
-generated, and the LVDS display will hang when the ipu_di_clk is sourced from
-ldb_di_clk.
+I'm really reluctant to give the arches more rope to hang themselves. I
+really dislike the use of xxxx_initcall() to do PCI initialisation ordering
+that is currently in widespread use through the arch code. As I hope to
+have proven with my arm64 code, you can have PCI support for an architecture
+without having to provide any arch specific code. We have enough correct
+code in the PCI framework, what would the architectures provide to the generic
+code that we cannot get by following the standard?
 
-To fix the problem, both the new and current parent of the ldb_di_clk should
-be disabled before the switch. This patch ensures that correct steps are
-followed when ldb_di_clk parent is switched in the beginning of boot.
+Of course, there are always arch specific corners and they need their data
+structures to make sense of those, but rather than having architectures
+fill in a structure *before* we can setup host bridges I think we need
+to reverse the order. Using your example structure, I don't think is
+the arch's job to provide the list of resources or the domain number
+before we can scan the host bridge. We should be able to get those from
+somewhere else (like adding by default the ioport_resource and
+iomem_resource and managing domain numbers inside the core framework).
 
-Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c | 125 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 121 insertions(+), 4 deletions(-)
+Best regards,
+Liviu
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 20ad0d1..3ee45f4 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -140,6 +140,123 @@ static struct clk_div_table video_div_table[] = {
- 	{ /* sentinel */ }
- };
- 
-+static void init_ldb_clks(enum mx6q_clks new_parent)
-+{
-+	struct device_node *np;
-+	static void __iomem *ccm_base;
-+	unsigned int reg;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-ccm");
-+	ccm_base = of_iomap(np, 0);
-+	WARN_ON(!ccm_base);
-+
-+	/*
-+	 * Need to follow a strict procedure when changing the LDB
-+	 * clock, else we can introduce a glitch. Things to keep in
-+	 * mind:
-+	 * 1. The current and new parent clocks must be disabled.
-+	 * 2. The default clock for ldb_dio_clk is mmdc_ch1 which has
-+	 * no CG bit.
-+	 * 3. In the RTL implementation of the LDB_DI_CLK_SEL mux
-+	 * the top four options are in one mux and the PLL3 option along
-+	 * with another option is in the second mux. There is third mux
-+	 * used to decide between the first and second mux.
-+	 * The code below switches the parent to the bottom mux first
-+	 * and then manipulates the top mux. This ensures that no glitch
-+	 * will enter the divider.
-+	 *
-+	 * Need to disable MMDC_CH1 clock manually as there is no CG bit
-+	 * for this clock. The only way to disable this clock is to move
-+	 * it topll3_sw_clk and then to disable pll3_sw_clk
-+	 * Make sure periph2_clk2_sel is set to pll3_sw_clk
-+	 */
-+	reg = readl_relaxed(ccm_base + 0x18);
-+	reg &= ~(1 << 20);
-+	writel_relaxed(reg, ccm_base + 0x18);
-+
-+	/* Set MMDC_CH1 mask bit */
-+	reg = readl_relaxed(ccm_base + 0x4);
-+	reg |= 1 << 16;
-+	writel_relaxed(reg, ccm_base + 0x4);
-+
-+	/*
-+	 * Set the periph2_clk_sel to the top mux so that
-+	 * mmdc_ch1 is from pll3_sw_clk.
-+	 */
-+	reg = readl_relaxed(ccm_base + 0x14);
-+	reg |= 1 << 26;
-+	writel_relaxed(reg, ccm_base + 0x14);
-+
-+	/* Wait for the clock switch */
-+	while (readl_relaxed(ccm_base + 0x48))
-+		;
-+
-+	/* Disable pll3_sw_clk by selecting the bypass clock source */
-+	reg = readl_relaxed(ccm_base + 0xc);
-+	reg |= 1 << 0;
-+	writel_relaxed(reg, ccm_base + 0xc);
-+
-+	/* Set the ldb_di0_clk and ldb_di1_clk to 111b */
-+	reg = readl_relaxed(ccm_base + 0x2c);
-+	reg |= ((7 << 9) | (7 << 12));
-+	writel_relaxed(reg, ccm_base + 0x2c);
-+
-+	/* Set the ldb_di0_clk and ldb_di1_clk to 100b */
-+	reg = readl_relaxed(ccm_base + 0x2c);
-+	reg &= ~((7 << 9) | (7 << 12));
-+	reg |= ((4 << 9) | (4 << 12));
-+	writel_relaxed(reg, ccm_base + 0x2c);
-+
-+	/* Perform the LDB parent clock switch */
-+	clk_set_parent(clk[ldb_di0_sel], clk[new_parent]);
-+	clk_set_parent(clk[ldb_di1_sel], clk[new_parent]);
-+
-+	/* Unbypass pll3_sw_clk */
-+	reg = readl_relaxed(ccm_base + 0xc);
-+	reg &= ~(1 << 0);
-+	writel_relaxed(reg, ccm_base + 0xc);
-+
-+	/*
-+	 * Set the periph2_clk_sel back to the bottom mux so that
-+	 * mmdc_ch1 is from its original parent.
-+	 */
-+	reg = readl_relaxed(ccm_base + 0x14);
-+	reg &= ~(1 << 26);
-+	writel_relaxed(reg, ccm_base + 0x14);
-+
-+	/* Wait for the clock switch */
-+	while (readl_relaxed(ccm_base + 0x48))
-+		;
-+
-+	/* Clear MMDC_CH1 mask bit */
-+	reg = readl_relaxed(ccm_base + 0x4);
-+	reg &= ~(1 << 16);
-+	writel_relaxed(reg, ccm_base + 0x4);
-+}
-+
-+static void disable_anatop_clocks(void __iomem *anatop_base)
-+{
-+	unsigned int reg;
-+
-+	/* Make sure PFDs are disabled@boot. */
-+	reg = readl_relaxed(anatop_base + 0x100);
-+	/* Cannot disable pll2_pfd2_396M, as it is the MMDC clock in iMX6DL */
-+	if (cpu_is_imx6dl())
-+		reg |= 0x80008080;
-+	else
-+		reg |= 0x80808080;
-+	writel_relaxed(reg, anatop_base + 0x100);
-+
-+	reg = readl_relaxed(anatop_base + 0xf0);
-+	reg |= 0x80808080;
-+	writel_relaxed(reg, anatop_base + 0xf0);
-+
-+	/* Make sure PLLs is disabled */
-+	reg = readl_relaxed(anatop_base + 0xa0);
-+	reg &= ~(1 << 13);
-+	writel_relaxed(reg, anatop_base + 0xa0);
-+}
-+
- static void __init imx6q_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
-@@ -232,6 +349,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[pll5_post_div] = clk_register_divider_table(NULL, "pll5_post_div", "pll5_video", CLK_SET_RATE_PARENT, base + 0xa0, 19, 2, 0, post_div_table, &imx_ccm_lock);
- 	clk[pll5_video_div] = clk_register_divider_table(NULL, "pll5_video_div", "pll5_post_div", CLK_SET_RATE_PARENT, base + 0x170, 30, 2, 0, video_div_table, &imx_ccm_lock);
- 
-+	disable_anatop_clocks(base);
-+
- 	np = ccm_node;
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
-@@ -440,10 +559,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk_register_clkdev(clk[enet_ref], "enet_ref", NULL);
- 
- 	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
--	    cpu_is_imx6dl()) {
--		clk_set_parent(clk[ldb_di0_sel], clk[pll5_video_div]);
--		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
--	}
-+	    cpu_is_imx6dl())
-+		init_ldb_clks(pll5_video_div);
- 
- 	/*
- 	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-1.8.3.2
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
