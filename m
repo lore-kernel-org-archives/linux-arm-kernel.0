@@ -1,61 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Apr 2014 13:53:54 +0100
-Subject: [PATCH 0/8] Current imx-drm queue
-Message-ID: <20140409125354.GP16119@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Wed, 09 Apr 2014 13:55:19 +0100
+Subject: [PATCH 6/8] imx-drm: Match ipu_di_signal_cfg's clk_pol with its
+ description.
+In-Reply-To: <20140409125354.GP16119@n2100.arm.linux.org.uk>
+References: <20140409125354.GP16119@n2100.arm.linux.org.uk>
+Message-ID: <E1WXs2B-0002b8-Tg@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Denis Carikli <denis@eukrea.com>
+To: linux-arm-kernel at lists.infradead.org
 
-The following patches are those which I currently have queued up for
-Greg for merging into his stable tree when he's next accepting patches.
-If you have any concerns about these patches, please let me know in
-a timely fashion.
+According to the datasheet, setting the di0_polarity_disp_clk
+field in the GENERAL di register sets the output clock polarity
+to active high.
 
-I've re-ordered and cherry-picked some of Denis' patches, as I can't
-take the patches which touch arch/arm/boot/dts.  Some other method is
-going to have to be found to deal with those changes.
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c | 2 +-
+ drivers/staging/imx-drm/ipuv3-crtc.c    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-The unfortunate thing is that without the DT changes able to be merged
-in a timely and sane manner, in a way which does not result in breaking
-this driver, it pushes the point where we can finally think about moving
-this driver out of drivers/staging back even further.
-
-It seems arm-soc want to be obtuse, so let's let them be obtuse and show
-what damage it does to being able to make progress.
-
-Thanks.
-
-Denis Carikli (3):
-      imx-drm: Match ipu_di_signal_cfg's clk_pol with its description.
-      v4l2: add new V4L2_PIX_FMT_RGB666 pixel format.
-      imx-drm: Add RGB666 support for parallel display.
-
-Fabio Estevam (2):
-      imx-drm: ipu-dmfc: Remove unneeded 'dmfc' check
-      imx-drm: imx-ldb: Use snprintf()
-
-Philipp Zabel (3):
-      imx-drm: Move IPU_PIX_FMT_GBR24 definition into imx-ipu-v3.h
-      imx-drm: ipu-dc: Use usleep_range instead of msleep
-      imx-drm: imx-ldb: Add drm_panel support
-
- Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml             | 39 +++++++++++++++++++++++++++++++++++++++
- Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt |  3 ++-
- drivers/staging/imx-drm/Kconfig                                   |  1 +
- drivers/staging/imx-drm/imx-drm.h                                 |  4 ----
- drivers/staging/imx-drm/imx-ldb.c                                 | 25 +++++++++++++++++++++++--
- drivers/staging/imx-drm/imx-tve.c                                 |  1 +
- drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h                       |  2 ++
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c                           | 11 ++++++++++-
- drivers/staging/imx-drm/ipu-v3/ipu-di.c                           |  2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c                         |  3 ---
- drivers/staging/imx-drm/ipuv3-crtc.c                              |  2 +-
- drivers/staging/imx-drm/parallel-display.c                        |  2 ++
- include/uapi/linux/videodev2.h                                    |  1 +
- 13 files changed, 83 insertions(+), 13 deletions(-)
-
-
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+index 82a9ebad697c..849b3e120ef0 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+@@ -595,7 +595,7 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		}
+ 	}
+ 
+-	if (!sig->clk_pol)
++	if (sig->clk_pol)
+ 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
+ 
+ 	ipu_di_write(di, di_gen, DI_GENERAL);
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index a8d017854615..db6bd64efe98 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -158,7 +158,7 @@ static int ipu_crtc_mode_set(struct drm_crtc *crtc,
+ 		sig_cfg.Vsync_pol = 1;
+ 
+ 	sig_cfg.enable_pol = 1;
+-	sig_cfg.clk_pol = 1;
++	sig_cfg.clk_pol = 0;
+ 	sig_cfg.width = mode->hdisplay;
+ 	sig_cfg.height = mode->vdisplay;
+ 	sig_cfg.pixel_fmt = out_pixel_fmt;
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.1
