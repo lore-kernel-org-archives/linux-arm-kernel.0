@@ -1,46 +1,36 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed,  9 Apr 2014 20:08:17 +0200
-Subject: [PATCH v3 4/4] ARM: pxa: Move iotable mapping inside vmalloc region
-In-Reply-To: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397066897-31826-5-git-send-email-laurent.pinchart@ideasonboard.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 09 Apr 2014 11:11:06 -0700
+Subject: [PATCH] arm64: Add user_debug command line option
+In-Reply-To: <20140409084101.GC13737@arm.com>
+References: <1397007908-17993-1-git-send-email-lauraa@codeaurora.org>
+ <20140409084101.GC13737@arm.com>
+Message-ID: <53458D3A.8080806@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+On 4/9/2014 1:41 AM, Catalin Marinas wrote:
+> On Wed, Apr 09, 2014 at 02:45:08AM +0100, Laura Abbott wrote:
+>> arm had a useful command line option to print out debug
+>> information on user signals. This is somewhat like a more verbose
+>> version of show_unhandled_signals. Add the user_debug command line
+>> option to print out more information in a similar manner to
+>> arm.
+> 
+> Is this because you want to print information for handled signals as
+> well? What is the use case? (there are alternatives like ptrace as
+> well).
+> 
 
-In order to remove the following ugly message:
+Yes. We've found user_debug to be helpful in correlating userspace
+crashes to other events that are spewed in the system log. Example
+from last week: userspace program crashes, bad page state and panic
+happens soon after. Some kernel driver was not cleaning up after
+itself properly after the crash. Without seeing the userspace crash
+logs it would have been much more difficult to correlate the bad
+page state to anything.
 
-  BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+Laura
 
-the iotable mappings should be re-located inside the vmalloc
-region. Such move was introduced at commit:
-
-commit 0536bdf33faff4d940ac094c77998cfac368cfff
-Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date:   Thu Aug 25 00:35:59 2011 -0400
-
-    ARM: move iotable mappings within the vmalloc region
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-[laurent.pinchart at ideasonboard.com: Hardcode the virtual address]
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- arch/arm/mach-pxa/include/mach/hardware.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
-index efb3965..8d63c21 100644
---- a/arch/arm/mach-pxa/include/mach/hardware.h
-+++ b/arch/arm/mach-pxa/include/mach/hardware.h
-@@ -19,7 +19,7 @@
-  * Workarounds for at least 2 errata so far require this.
-  * The mapping is set in mach-pxa/generic.c.
-  */
--#define UNCACHED_PHYS_0		0xff000000
-+#define UNCACHED_PHYS_0		0xfe000000
- #define UNCACHED_PHYS_0_SIZE	0x00100000
- 
- /*
 -- 
-1.8.3.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
