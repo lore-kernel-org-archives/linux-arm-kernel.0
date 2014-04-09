@@ -1,82 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Apr 2014 16:27:11 +0100
-Subject: [PATCH] ARM: reinsert ARCH_MULTI_V4 Kconfig option
-In-Reply-To: <20140409151326.GY29751@pengutronix.de>
-References: <1386922149-4561-1-git-send-email-jonas.jensen@gmail.com>
- <20131213095655.GB4360@n2100.arm.linux.org.uk>
- <CACmBeS1d-EX5oPD8f7P-ufmF=MutdTO+LgG23Cb0=biR8yQPCg@mail.gmail.com>
- <20131213113903.GE4360@n2100.arm.linux.org.uk>
- <CACmBeS3kC4dsdOrfANifgu8oQhLauFKcXhEu=iz8xbUxdhMq_A@mail.gmail.com>
- <20140409150640.GQ16119@n2100.arm.linux.org.uk>
- <20140409151326.GY29751@pengutronix.de>
-Message-ID: <20140409152711.GT16119@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 9 Apr 2014 12:28:50 -0300
+Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <20140409145936.GB2334@dragon>
+References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
+ <20140409133422.GA2334@dragon>
+ <CAOMZO5CO8ucya8qmVXBo5kgRmuLqKGtpub07o1DuE9yh5LmmPQ@mail.gmail.com>
+ <20140409145936.GB2334@dragon>
+Message-ID: <CAOMZO5AuwgVijZ_SMYZBOxbq8dVtvUzcQ06TFmmDtiaEQJrYRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 05:13:26PM +0200, Uwe Kleine-K?nig wrote:
-> Hello Russell,
-> 
-> On Wed, Apr 09, 2014 at 04:06:40PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Apr 09, 2014 at 04:54:16PM +0200, Jonas Jensen wrote:
-> > > On 13 December 2013 12:39, Russell King - ARM Linux
-> > > <linux@arm.linux.org.uk> wrote:
-> > > > I see what's causing this: the kuser helpers are using "bx lr" to return
-> > > > which will be undefined on non-Thumb CPUs.  We generally cope fine with
-> > > > non-Thumb CPUs, conditionalising where necessary on HWCAP_THUMB or the
-> > > > T bit in the PSR being set.
-> > > >
-> > > > However, it looks like the kuser helpers got missed.  As a check, please
-> > > > look at arch/arm/kernel/entry-armv.S, find the line with:
-> > > >
-> > > >         .macro  usr_ret, reg
-> > > >
-> > > > and ensure that the mov pc, \reg case always gets used.  Please report
-> > > > back.
-> > > 
-> > > Uwe and Arnd came up with a solution except it doesn't work when I test it.
-> > > 
-> > > The suggested patch is:
-> > > 
-> > > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> > > index 1879e8d..de15bfd 100644
-> > > --- a/arch/arm/kernel/entry-armv.S
-> > > +++ b/arch/arm/kernel/entry-armv.S
-> > > @@ -739,6 +739,18 @@ ENDPROC(__switch_to)
-> > > 
-> > >         .macro  usr_ret, reg
-> > >  #ifdef CONFIG_ARM_THUMB
-> > > +       /*
-> > > +        * Having CONFIG_ARM_THUMB isn't a guarantee that the cpu has support
-> > > +        * for Thumb and so the bx instruction. Use a mov if the address to
-> > > +        * jump to is 32 bit aligned. (Note that this code is compiled in ARM
-> > > +        * mode, so this is the right test.)
-> > > +        */
-> > > +#if defined(CONFIG_CPU_32v4)
-> > > +       tst     \reg, #3
-> > > +       moveq   pc, \reg
-> > > +       b       .
-> > > +#endif
-> > > +
-> > >         bx      \reg
-> > 
-> > What's wrong with:
-> > 	tst	\reg, #3
-> > 	moveq	pc, \reg
-> > 	bx	\reg
-> > 
-> > rather than ending in an infinite loop?
-> The added b . was a test to check if the machine then hangs instead of
-> crashing. (And yes, that was the case, so it was tried to return to a
-> non-aligned address.)
+Hi Shawn,
 
-If it's called from ARM code, then \reg will contain a 4-byte aligned
-address.  If it's called from Thumb code, \reg will contain a 2-byte
-aligned address with bit 0 *always* set.
+On Wed, Apr 9, 2014 at 11:59 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
 
-So, with the code originally quoted above, if the helper is called from
-thumb code, and CONFIG_CPU_32v4 is enabled, then we end up falling past
-the moveq to the "b ." and entering an infinite loop.
+> As long as you call clk_register_mux() to register a multiplexer, you
+> have to ensure that clk_set_parent() call always works properly on it,
+> no matter whether there is one actually calling into it right now.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+clk_register_mux() is not called for the ldb_di_sels multiplexer:
+
+**** Clk name is lvds1_sel
+********* Calling clk_register_mux
+**** Clk name is lvds2_sel
+********* Calling clk_register_mux
+**** Clk name is step
+********* Calling clk_register_mux
+**** Clk name is pll1_sw
+********* Calling clk_register_mux
+**** Clk name is periph_pre
+********* Calling clk_register_mux
+**** Clk name is periph2_pre
+********* Calling clk_register_mux
+**** Clk name is periph_clk2_sel
+********* Calling clk_register_mux
+**** Clk name is periph2_clk2_sel
+********* Calling clk_register_mux
+**** Clk name is axi_sel
+********* Calling clk_register_mux
+**** Clk name is esai_sel
+********* Calling clk_register_mux
+**** Clk name is asrc_sel
+********* Calling clk_register_mux
+**** Clk name is spdif_sel
+********* Calling clk_register_mux
+**** Clk name is gpu2d_axi
+********* Calling clk_register_mux
+**** Clk name is gpu3d_axi
+********* Calling clk_register_mux
+**** Clk name is gpu2d_core_sel
+********* Calling clk_register_mux
+**** Clk name is gpu3d_core_sel
+********* Calling clk_register_mux
+**** Clk name is gpu3d_shader_sel
+********* Calling clk_register_mux
+**** Clk name is ipu1_sel
+********* Calling clk_register_mux
+**** Clk name is ipu2_sel
+********* Calling clk_register_mux
+********* Calling clk_register_mux
+********* Calling clk_register_mux
+**** Clk name is ipu1_di0_pre_sel
+********* Calling clk_register_mux
+**** Clk name is ipu1_di1_pre_sel
+********* Calling clk_register_mux
+**** Clk name is ipu2_di0_pre_sel
+********* Calling clk_register_mux
+**** Clk name is ipu2_di1_pre_sel
+********* Calling clk_register_mux
+**** Clk name is ipu1_di0_sel
+********* Calling clk_register_mux
+**** Clk name is ipu1_di1_sel
+********* Calling clk_register_mux
+**** Clk name is ipu2_di0_sel
+********* Calling clk_register_mux
+**** Clk name is ipu2_di1_sel
+********* Calling clk_register_mux
+**** Clk name is hsi_tx_sel
+********* Calling clk_register_mux
+**** Clk name is pcie_axi_sel
+********* Calling clk_register_mux
+**** Clk name is enfc_sel
+********* Calling clk_register_mux
+**** Clk name is vdo_axi_sel
+********* Calling clk_register_mux
+**** Clk name is vpu_axi_sel
+********* Calling clk_register_mux
+**** Clk name is cko1_sel
+********* Calling clk_register_mux
+**** Clk name is cko2_sel
+********* Calling clk_register_mux
+**** Clk name is cko
+********* Calling clk_register_mux
+********* doing ldb clock switch
+
+>
+> Furthermore, some re-parenting happens in a way you may not be aware of.
+> See commit e366fdd (clk: clk-mux: implement remuxing on set_rate), for
+> example.
+
+This commit does not affect us as we pass the CLK_SET_RATE_NO_REPARENT flag.
