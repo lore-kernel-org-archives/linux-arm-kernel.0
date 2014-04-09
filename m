@@ -1,8 +1,10 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed,  9 Apr 2014 09:30:41 +0530
-Subject: [PATCH 1/2] usb: ehci-exynos: Return immediately from suspend if
+Date: Wed,  9 Apr 2014 09:30:42 +0530
+Subject: [PATCH 2/2] usb: ehci-platform: Return immediately from suspend if
  ehci_suspend fails
-Message-ID: <1397016042-4451-1-git-send-email-gautam.vivek@samsung.com>
+In-Reply-To: <1397016042-4451-1-git-send-email-gautam.vivek@samsung.com>
+References: <1397016042-4451-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1397016042-4451-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,35 +18,33 @@ powering down the essential things, like phy.
 
 Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Hauke Mehrtens <hauke@hauke-m.de>
+Cc: Hans de Goede <hdegoede@redhat.com>
 ---
 
 Based on 'usb-next' branch of Greg's usb tree.
 
- drivers/usb/host/ehci-exynos.c |    4 +++-
+ drivers/usb/host/ehci-platform.c |    4 +++-
  1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-index d1d8c47..a4550eb 100644
---- a/drivers/usb/host/ehci-exynos.c
-+++ b/drivers/usb/host/ehci-exynos.c
-@@ -212,6 +212,8 @@ static int exynos_ehci_suspend(struct device *dev)
- 	int rc;
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index b3a0e11..60d3d1a 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -303,11 +303,13 @@ static int ehci_platform_suspend(struct device *dev)
+ 	int ret;
  
- 	rc = ehci_suspend(hcd, do_wakeup);
-+	if (rc)
-+		return rc;
+ 	ret = ehci_suspend(hcd, do_wakeup);
++	if (ret)
++		return ret;
  
- 	if (exynos_ehci->otg)
- 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
-@@ -221,7 +223,7 @@ static int exynos_ehci_suspend(struct device *dev)
+ 	if (pdata->power_suspend)
+ 		pdata->power_suspend(pdev);
  
- 	clk_disable_unprepare(exynos_ehci->clk);
- 
--	return rc;
+-	return ret;
 +	return 0;
  }
  
- static int exynos_ehci_resume(struct device *dev)
+ static int ehci_platform_resume(struct device *dev)
 -- 
 1.7.10.4
