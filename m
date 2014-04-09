@@ -1,36 +1,43 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 09 Apr 2014 13:54:59 +0100
-Subject: [PATCH 2/8] imx-drm: ipu-dc: Use usleep_range instead of msleep
+Date: Wed, 09 Apr 2014 13:55:04 +0100
+Subject: [PATCH 3/8] imx-drm: ipu-dmfc: Remove unneeded 'dmfc' check
 In-Reply-To: <20140409125354.GP16119@n2100.arm.linux.org.uk>
 References: <20140409125354.GP16119@n2100.arm.linux.org.uk>
-Message-ID: <E1WXs1r-0002ao-F1@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WXs1w-0002as-Iz@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 To: linux-arm-kernel at lists.infradead.org
 
-Since msleep(2) can sleep up to 20ms anyway, make this explicit by using
-usleep_range(2000, 20000).
+Fix the following static checker warning:
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c:164 ipu_dmfc_setup_channel() warn: variable dereferenced before check 'dmfc' (see line 157)
+
+As 'dmfc' could never be null, there is no need to do such check.
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index d0e3bc3c53e7..d5de8bb5c803 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -262,7 +262,7 @@ void ipu_dc_disable_channel(struct ipu_dc *dc)
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
+index 98070dd8c920..45213017fa4b 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c
+@@ -161,9 +161,6 @@ static int ipu_dmfc_setup_channel(struct dmfc_channel *dmfc, int slots,
+ 			"dmfc: using %d slots starting from segment %d for IPU channel %d\n",
+ 			slots, segment, dmfc->data->ipu_channel);
  
- 	/* Wait for DC triple buffer to empty */
- 	while ((readl(priv->dc_reg + DC_STAT) & val) != val) {
--		msleep(2);
-+		usleep_range(2000, 20000);
- 		timeout -= 2;
- 		if (timeout <= 0)
- 			break;
+-	if (!dmfc)
+-		return -EINVAL;
+-
+ 	switch (slots) {
+ 	case 1:
+ 		field = DMFC_FIFO_SIZE_64;
 -- 
 1.8.3.1
