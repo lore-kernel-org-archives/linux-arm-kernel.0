@@ -1,23 +1,21 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 9 Apr 2014 11:20:28 -0300
-Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <20140409133422.GA2334@dragon>
-References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
- <20140409133422.GA2334@dragon>
-Message-ID: <CAOMZO5CO8ucya8qmVXBo5kgRmuLqKGtpub07o1DuE9yh5LmmPQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 9 Apr 2014 22:26:29 +0800
+Subject: [PATCH] gpio: mxs: Allow for recursive enable_irq_wake() call
+In-Reply-To: <CACRpkda1qnx24YdfnSwu3tJw9NiVKpKjNbibGoG5JeZ+rAFpeQ@mail.gmail.com>
+References: <1395628690-7225-1-git-send-email-marex@denx.de>
+ <CACRpkda1qnx24YdfnSwu3tJw9NiVKpKjNbibGoG5JeZ+rAFpeQ@mail.gmail.com>
+Message-ID: <20140409142626.GA2317@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 9, 2014 at 10:34 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+On Thu, Mar 27, 2014 at 10:15:27AM +0100, Linus Walleij wrote:
+> I would like someone to look into converting the MXS to use the new
+> gpiolib irqchip helpers merged on my devel branch so we can centralize
+> and get rid of surplus redundant bug fixing everywhere around the drivers.
+> 
+> That code does not use generic irqchip, but rather a regular irqchip+domain
+> and explicitly chained interrupt handlers.
 
-> I'm not sure this is a full/correct fix to the problem.  You assume that
-> the re-parenting only happens during boot for once?  What about the
+No.  The driver uses generic irqchip.  See function mxs_gpio_init_gc().
 
-Yes, correct. As far as I can see LDB parent is only set once in clk-imx6q.
-
-> re-parenting triggered by the clk_set_parent() call?
-
-Where do you see the LDB clock parent to change via clk_set_parent() call?
-
-In imx_ldb.c we use clk_set_parent() to set the di parent, not ldb parent.
+Shawn
