@@ -1,111 +1,66 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue,  8 Apr 2014 18:45:08 -0700
-Subject: [PATCH] arm64: Add user_debug command line option
-Message-ID: <1397007908-17993-1-git-send-email-lauraa@codeaurora.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 09 Apr 2014 11:13:32 +0900
+Subject: [PATCH RESEND] usb: ohci-exynos: Remove locks for 'ohci' in
+ suspend callback
+In-Reply-To: <1396968035-32286-1-git-send-email-gautam.vivek@samsung.com>
+References: <1396968035-32286-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <003a01cf5399$4e7e8590$eb7b90b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm had a useful command line option to print out debug
-information on user signals. This is somewhat like a more verbose
-version of show_unhandled_signals. Add the user_debug command line
-option to print out more information in a similar manner to
-arm.
+On Tuesday, April 08, 2014 11:41 PM, Vivek Gautam wrote:
+> 
+> Patch : 14982e3 USB: OHCI: Properly handle ohci-exynos suspend
+> has already removed 'ohci_hcd' settings from exynos glue layer
+> as a part of streamlining the ohci controller's suspend.
+> So we don't need the locks for 'ohci_hcd' anymore.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/include/asm/system_misc.h | 25 +++++++++++++++++++++++++
- arch/arm64/kernel/traps.c            | 13 ++++++++++---
- arch/arm64/mm/fault.c                |  3 +--
- 3 files changed, 36 insertions(+), 5 deletions(-)
+Right, this spin_lock/unlock is unnecessary, because it is
+already used in ohci_suspend().
 
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 7a18fab..2f95589 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -50,6 +50,31 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- #define UDBG_SEGV	(1 << 3)
- #define UDBG_BUS	(1 << 4)
- 
-+extern unsigned int user_debug;
-+extern int show_unhandled_signals;
-+
-+static inline bool print_user_debug(unsigned int signum, unsigned int mask)
-+{
-+	int ret = 0;
-+	bool sig_assert = false;
-+
-+	ret |= show_unhandled_signals &&
-+		(signum ? unhandled_signal(current, signum) : 1);
-+	if (mask & UDBG_SEGV) {
-+		sig_assert = true;
-+		ret |= (user_debug & mask) && signum == SIGSEGV;
-+	}
-+	if (mask & UDBG_BUS) {
-+		sig_assert = true;
-+		ret |= (user_debug & mask) && signum == SIGBUS;
-+	}
-+	if (sig_assert)
-+		ret |= (user_debug & mask);
-+
-+	return ret ? printk_ratelimit() : false;
-+}
-+
-+
- #endif	/* __ASSEMBLY__ */
- 
- #endif	/* __ASM_SYSTEM_MISC_H */
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index a6740d0..5519ef1 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -48,6 +48,14 @@ static const char *handler[]= {
- };
- 
- int show_unhandled_signals = 1;
-+unsigned int user_debug;
-+
-+static int __init user_debug_setup(char *str)
-+{
-+	get_option(&str, &user_debug);
-+	return 1;
-+}
-+__setup("user_debug=", user_debug_setup);
- 
- /*
-  * Dump out the contents of some memory nicely...
-@@ -270,8 +278,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 
- 	trace_undef_instr(regs, (void *)pc);
- 
--	if (show_unhandled_signals && unhandled_signal(current, SIGILL) &&
--	    printk_ratelimit()) {
-+	if (print_user_debug(SIGILL, UDBG_UNDEFINED)) {
- 		pr_info("%s[%d]: undefined instruction: pc=%p\n",
- 			current->comm, task_pid_nr(current), pc);
- 		dump_instr(KERN_INFO, regs);
-@@ -298,7 +305,7 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
- 	}
- #endif
- 
--	if (show_unhandled_signals && printk_ratelimit()) {
-+	if (print_user_debug(0, UDBG_SYSCALL)) {
- 		pr_info("%s[%d]: syscall %d\n", current->comm,
- 			task_pid_nr(current), (int)regs->syscallno);
- 		dump_instr("", regs);
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 8e783eb..bbef0b5 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -117,8 +117,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 
- 	trace_user_fault(tsk, addr, esr);
- 
--	if (show_unhandled_signals && unhandled_signal(tsk, sig) &&
--	    printk_ratelimit()) {
-+	if (print_user_debug(sig, UDBG_BUS | UDBG_SEGV)) {
- 		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
- 			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
- 			addr, esr);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+
+Best regards,
+Jingoo Han
+
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Manjunath Goudar <csmanjuvijay@gmail.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> ---
+>  drivers/usb/host/ohci-exynos.c |    6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> index 68588d8..9cf80cb 100644
+> --- a/drivers/usb/host/ohci-exynos.c
+> +++ b/drivers/usb/host/ohci-exynos.c
+> @@ -190,17 +190,13 @@ static int exynos_ohci_suspend(struct device *dev)
+>  {
+>  	struct usb_hcd *hcd = dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
+> -	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	bool do_wakeup = device_may_wakeup(dev);
+> -	unsigned long flags;
+>  	int rc = ohci_suspend(hcd, do_wakeup);
+> 
+>  	if (rc)
+>  		return rc;
+> 
+> -	spin_lock_irqsave(&ohci->lock, flags);
+> -
+>  	if (exynos_ohci->otg)
+>  		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+> 
+> @@ -208,8 +204,6 @@ static int exynos_ohci_suspend(struct device *dev)
+> 
+>  	clk_disable_unprepare(exynos_ohci->clk);
+> 
+> -	spin_unlock_irqrestore(&ohci->lock, flags);
+> -
+>  	return 0;
+>  }
+> 
+> --
+> 1.7.10.4
