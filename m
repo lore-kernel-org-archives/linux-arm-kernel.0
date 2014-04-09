@@ -1,21 +1,84 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 9 Apr 2014 22:26:29 +0800
-Subject: [PATCH] gpio: mxs: Allow for recursive enable_irq_wake() call
-In-Reply-To: <CACRpkda1qnx24YdfnSwu3tJw9NiVKpKjNbibGoG5JeZ+rAFpeQ@mail.gmail.com>
-References: <1395628690-7225-1-git-send-email-marex@denx.de>
- <CACRpkda1qnx24YdfnSwu3tJw9NiVKpKjNbibGoG5JeZ+rAFpeQ@mail.gmail.com>
-Message-ID: <20140409142626.GA2317@dragon>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 9 Apr 2014 16:35:16 +0200
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <20140409104652.GC9527@ulmo>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com> <20140408175904.GT29751@pengutronix.de>
+ <20140408234243.GB13898@piout.net>
+ <20140409082341.GV29751@pengutronix.de>
+ <20140409100313.GA20704@piout.net> <20140409104652.GC9527@ulmo>
+Message-ID: <20140409143516.GW29751@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 27, 2014 at 10:15:27AM +0100, Linus Walleij wrote:
-> I would like someone to look into converting the MXS to use the new
-> gpiolib irqchip helpers merged on my devel branch so we can centralize
-> and get rid of surplus redundant bug fixing everywhere around the drivers.
+Hello,
+
+On Wed, Apr 09, 2014 at 12:46:53PM +0200, Thierry Reding wrote:
+> On Wed, Apr 09, 2014 at 12:03:13PM +0200, Alexandre Belloni wrote:
+> > On 09/04/2014 at 10:23:41 +0200, Uwe Kleine-K?nig wrote :
+> > > > While I had exactly the same issue back in september and wrote the exact
+> > > > same patch that got rejected. I would agree with Thierry here taht we
+> > > > need to keep the pwm_disable() there as it potentially allows to save
+> > > > power.
+> > > >
+> > > > However, it seems to not work quite well with PWMs from Freescale (see
+> > > > the thread from Russell). Or I would say with PWM with an undefined
+> > > > state when disabled and I believe we are soon to find more.
+> > > > 
+> > > > We could either:
+> > > >  - add a flag like can_sleep that would allow driver to know that the
+> > > >    pwm always has to be enable to get sane results.
+> > > >
+> > > >  - or introduce functions like prepare/unprepare to be called from probe
+> > > >    and remove in the leds-pwm driver and that will enable/disable the
+> > > > channel in pwm-mxs. pwm_enable/pwm_disable not doing anything.
+> > > There are a few more options. I repeat your's to get a single list:
+> > > 
+> > >  a) Somehow tell the API users that pwm_disable might not result in a
+> > >     flat zero after set_duty(0).
+> > >  a') Anchor in the API that users must not expect anything from the pwm
+> > >     pin after pwm_disable.
+> > >  b) Make pwm_enable/pwm_disable noops on i.MX28
+> > >  c) Make set_duty only return when the new value reached the pin.
+> > >  d) Make pwm_disable wait to yield the expected result
+> > >  d') Make pwm_disable wait if the last programmed duty cycle is 0 or
+> > >     full period.
+> > >  e) Introduce a new callback that does the waiting, e.g. a .commit
+> > >     callback
+> > >  e') Introduce a new callback pwm_config_sync that does wait
+> > >     appropriatly, keep pwm_config as is.
+> > >  f) Make the i.MX28 driver switch the pin the gpio mode with the
+> > >     expected output level in pwm_disable.
+> > > [...]
+> > > My series implemented a'), but Thierry didn't like it. I think my
+> > > favorite is e').
+> > > 
+> > 
+> > I think I would actually prefer d'. Doing the synchronisation in d' is
+> > abstracting it for the user.
 > 
-> That code does not use generic irqchip, but rather a regular irqchip+domain
-> and explicitly chained interrupt handlers.
+> My preference would be simply d). Mostly because I don't like special
+> cases and especially because I don't see an advantage in special casing
+> 0 and full period duty cycles. That doesn't mean of course that drivers
+> can't special case if they really want or have to.
+Well d' is just an optimisation, because if you have a duty cycle
+between 0 and full (exclusive) and no other means of syncronisation
+you cannot influence where pwm_disable stops the output, at low or high.
 
-No.  The driver uses generic irqchip.  See function mxs_gpio_init_gc().
+Do we have cases where pwm_disable makes the pin high-z? Or something
+else which violates the assumption "pwm_config(pwm, 0, period);
+pwm_disable(pwm); makes the pin 0"?
+ 
+> That said I've also been thinking about adding support for e), which
+> would allow atomically changing the duty cycle, period and polarity of a
+> channel. This might become necessary at some point.
+On i.MX28 you cannot change atomically, only program atomically. The
+current period will end regularily anyhow as programmed before. But
+maybe that's what you mean?!
 
-Shawn
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
