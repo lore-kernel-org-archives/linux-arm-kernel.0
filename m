@@ -1,129 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 09 Apr 2014 18:14:40 +0200
-Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
-In-Reply-To: <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
-References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
- <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
-Message-ID: <534571F0.10706@free-electrons.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 9 Apr 2014 09:17:30 -0700
+Subject: Big endian working?
+In-Reply-To: <4880190.MJBhke5aDa@wuerfel>
+References: <20140408095446.0520dd28@skate>
+ <CAA3XUr3gR-R1X6+CxP-Z0fv7kiSzENtm0NsYd539BNVWKCgdNw@mail.gmail.com>
+ <53450D3A.7030909@linaro.org> <4880190.MJBhke5aDa@wuerfel>
+Message-ID: <CAA3XUr2QQy_cy6yP19HWNxCcwPbY9FUi9VAZj7easz+HkLZa+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/04/2014 16:53, Chen-Yu Tsai wrote:
-> Hi Boris,
->
-> On Wed, Apr 9, 2014 at 9:51 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
->> Hello,
+On 9 April 2014 02:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 09 April 2014 12:04:58 Taras Kondratiuk wrote:
 >>
->> This series rework the sunxi pinctrl driver to support the PLx pins
->> available on the A31 SoC.
-> Thanks for working on this. I mentioned to Maxime on IRC yesterday that
-> we have complete pinctrl drivers for both A31 and A23, based on our current
-> pinctrl-sunxi driver, in the A23 SDK. These have the complete pin mapping.
-
-Thanks for pointing this out, I'll take a look.
-
->
->> It also add missing A31 reset controller DT bindings documentation.
+>> > Maybe Nico's zImage change was under atags umbrella by mistake and
+>> > it really addresses general zImage issue. In this case we need to add
+>> > this commit to main line. However, I don't think we need to carry
+>> > CPU_BE8_BOOT_LE option forward, why we just use
+>> > CONFIG_CPU_BIG_ENDIAN instead. Note in all cases when BE
+>> > image used loader is always in LE mode. Never seen case
+>> > otherwise.
 >>
->> I need those PL pins (actually I only need PL0 and PL1) to support
->> the P2WI bus, which in turn is used to communicate with the AXP221
->> PMIC.
-> If you could, please add all the PL and PM pins.
+>> That makes sense, but I'm concerned about BE32 systems.
+>> Do they also have LE bootloaders? I don't remember kernel code which
+>> switches to BE32. I'd think that switch is done by bootloader or
+>> ROMcode. Or even BE hardwired in HW. So BE32 bootloader may expect to
+>> see BE zImage header.
+>> Maybe instead of CONFIG_CPU_BIG_ENDIAN use CONFIG_CPU_ENDIAN_BE8?
 
-Sure, I'll add pin macros for L and M ports.
+I doubt that those old bootloaders could handle zImage
+and patch under discussion is only about zImage. But
+it is fine let's use CONFIG_CPU_ENDIAN_BE8 to be
+on conservative side.
 
-> As I said, you can find complete definitions in the A23 SDK.
+Taras, could please change Nico's/Ben's zImage patch
+properly and submit it for quick review and further submission
+to mainline. It would be good to have zImage load fixed for
+big endian.
+
+> Agreed. CONFIG_CPU_ENDIAN_BE32 basically means ixp4xx. Whatever those
+> systems do today, I think we should better not change anything
+> for them. If nobody has complained for the last 10 years, everyone
+> who cares must have already found a working solution by now.
 >
->> Let me know if these changes are too intrusive.
-> I wonder if we should do a separate driver for the new PIO controller.
-> Clearly it's a separate IP block, with it's own clock and reset controls.
+> For BE8, I think we should just try to do the right thing before
+> we see mass deployments of broken boot loaders.
 
-This is what I had in mind in the first place, but then I encountered
-several issues when doing so:
+Agreed. For any BE work we've done it was stated that
+it should work with regular LE bootloaders. In fact any system
+should be able to switch between LE and BE images without
+any other changes, not even bootloader setting or variable.
 
- 1) the gpio chip is not dynamically allocated but is declared as a
-static variable instead
- 2) we have to tweak the pinctrl base field, otherwise the pin numbers
-overlap
- 3) other things I haven't noticed yet :-)
+Thanks,
+Victor
 
-I'll try to rework the driver to be able to declare 2 separated pin
-controllers.
-
-> Allwinner sources list this block as "R_PIO". I suggest using this name.
-> Clearly "pioL" does not cover all the functionality.
-
-Fair enough. I'll modify it.
-
->
-> I have started to document the PRCM block: http://linux-sunxi.org/PRCM
->
-> Last, please send the patches to the linux-sunxi mailing list as well.
-> At the very least, Hans will see them and add them to sunxi-devel branch.
-
-Sure, this is an oversight, I'm using get_maintainer and just forgot to
-add Hans and the linux-sunxi ML. But I'll take care to add you, hans and
-the sunxi ML in Cc next time.
-
-Thanks for your review.
-
-Best Regards,
-
-Boris
-
->
->
-> Cheers,
-> ChenYu
->
->> Best Regards,
->>
->> Boris
->>
->> Boris BREZILLON (15):
->>   ARM: sunxi: dt: list all pinctrl compatible strings
->>   ARM: sunxi: dt: document pinctrl clock related properties
->>   ARM: sunxi: dt: add pinctrl clock-names properties
->>   pinctrl: sunxi: specify clk name when retrieving pinctrl pio clk
->>   clk: sunxi: add A31 APB0 clk gate defintions
->>   clk: sunxi: add A31 APB0 gates compatible string to the documentation
->>   ARM: sunxi: dt: define A31's APB0 clk gates node
->>   reset: sunxi: document sunxi's reset controllers bindings
->>   clk: sunxi: add A31 APB0 reset line defintions
->>   pinctrl: sunxi: add PL pin definitions
->>   pinctrl: sunxi: add support for A31 PL pins
->>   pinctrl: sunxi: retrieve and enable PL clk gate for A31 SoC
->>   pinctrl: sunxi: retrieve and enable PL reset line for A31 SoC
->>   pinctrl: sunxi: define A31 PL0/PL1 pins
->>   ARM: sunxi: dt: add support for A31's PL pins
->>
->>  Documentation/devicetree/bindings/clock/sunxi.txt  |   1 +
->>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |  13 +-
->>  .../bindings/reset/allwinner,sunxi-clock-reset.txt |  21 +++
->>  arch/arm/boot/dts/sun4i-a10.dtsi                   |   1 +
->>  arch/arm/boot/dts/sun5i-a10s.dtsi                  |   1 +
->>  arch/arm/boot/dts/sun5i-a13.dtsi                   |   1 +
->>  arch/arm/boot/dts/sun6i-a31.dtsi                   |  25 ++-
->>  arch/arm/boot/dts/sun7i-a20.dtsi                   |   1 +
->>  drivers/clk/sunxi/clk-sunxi.c                      |   5 +
->>  drivers/pinctrl/pinctrl-sunxi-pins.h               |   8 +
->>  drivers/pinctrl/pinctrl-sunxi.c                    | 205 +++++++++++++++------
->>  drivers/pinctrl/pinctrl-sunxi.h                    |  39 +++-
->>  12 files changed, 264 insertions(+), 57 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
->>
->> --
->> 1.8.3.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>         Arnd
