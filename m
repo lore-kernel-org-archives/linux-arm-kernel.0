@@ -1,44 +1,37 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed,  9 Apr 2014 15:51:18 +0200
-Subject: [PATCH 15/15] ARM: sunxi: dt: add support for A31's PL pins
+Date: Wed,  9 Apr 2014 15:51:12 +0200
+Subject: [PATCH 09/15] clk: sunxi: add A31 APB0 reset line defintions
 In-Reply-To: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397051478-4113-16-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397051478-4113-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 SoC control its PL pins using a different memory, and needs both a
-new gate clk and a reset line to enable these PL port.
+Add APB0 reset line support for the A31 SoC.
+This reset lines are controlled by the PRCM (Power/Reset/Clock Management) block
+and thus will act on a different iomem range.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index ed9c2c1..90b3a25 100644
+index 61e8b34..ed9c2c1 100644
 --- a/arch/arm/boot/dts/sun6i-a31.dtsi
 +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -210,13 +210,17 @@
+@@ -237,6 +237,12 @@
+ 			reg = <0x01c202c0 0xc>;
+ 		};
  
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun6i-a31-pinctrl";
--			reg = <0x01c20800 0x400>;
-+			reg = <0x01c20800 0x400>,
-+			      <0x01f02c00 0x400>;
- 			interrupts = <0 11 4>,
- 				     <0 15 4>,
- 				     <0 16 4>,
- 				     <0 17 4>;
--			clocks = <&apb1_gates 5>;
--			clock-names = "pio_clk";
-+			clocks = <&apb1_gates 5>,
-+				 <&apb0_gates 0>;
-+			clock-names = "pio_clk", "pioL_clk";
-+			resets = <&apb0_rst 0>;
++		apb0_rst: reset at 01f014b0 {
++			#reset-cells = <1>;
++			compatible = "allwinner,sun6i-a31-clock-reset";
++			reg = <0x01f014b0 0x4>;
++		};
 +
- 			gpio-controller;
- 			interrupt-controller;
- 			#address-cells = <1>;
+ 		apb1_rst: reset at 01c202d0 {
+ 			#reset-cells = <1>;
+ 			compatible = "allwinner,sun6i-a31-clock-reset";
 -- 
 1.8.3.2
