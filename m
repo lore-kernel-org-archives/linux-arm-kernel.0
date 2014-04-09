@@ -1,49 +1,40 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Wed, 9 Apr 2014 09:23:07 -0700
-Subject: [RESEND PATCH v5 1/5] Documentation: dt: Add Kona PWM binding
+Date: Wed, 9 Apr 2014 09:23:09 -0700
+Subject: [RESEND PATCH v5 3/5] ARM: dts: Declare the PWM for bcm11351
+ (bcm281xx)
 In-Reply-To: <1397060591-5060-1-git-send-email-tim.kryger@linaro.org>
 References: <1397060591-5060-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1397060591-5060-2-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1397060591-5060-4-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the binding description for the Kona PWM controller found on Broadcom's
-mobile SoCs.
+Add the device tree node for the PWM on bcm11351 SoCs.
 
 Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
 Reviewed-by: Alex Elder <elder@linaro.org>
 Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 ---
- .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |   21 ++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+ arch/arm/boot/dts/bcm11351.dtsi |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-new file mode 100644
-index 0000000..8eae9fe
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
-@@ -0,0 +1,21 @@
-+Broadcom Kona PWM controller device tree bindings
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 64d069b..6b05ae6 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -193,6 +193,14 @@
+ 		status = "disabled";
+ 	};
+ 
++	pwm: pwm at 3e01a000 {
++		compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
++		reg = <0x3e01a000 0xcc>;
++		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_PWM>;
++		#pwm-cells = <3>;
++		status = "disabled";
++	};
 +
-+This controller has 6 channels.
-+
-+Required Properties :
-+- compatible: should contain "brcm,kona-pwm"
-+- reg: physical base address and length of the controller's registers
-+- clocks: phandle + clock specifier pair for the external clock
-+- #pwm-cells: Should be 3. See pwm.txt in this directory for a
-+  description of the cells format.
-+
-+Refer to clocks/clock-bindings.txt for generic clock consumer properties.
-+
-+Example:
-+
-+pwm: pwm at 3e01a000 {
-+	compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
-+	reg = <0x3e01a000 0xc4>;
-+	clocks = <&pwm_clk>;
-+	#pwm-cells = <3>;
-+};
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 1.7.9.5
