@@ -1,49 +1,36 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 09 Apr 2014 10:37:13 +0200
-Subject: [PATCH 3/3] ARM: socfpga: dts: add reset-controller
-In-Reply-To: <53435F37.7060301@gmail.com>
-References: <1396629087-23727-1-git-send-email-s.trumtrar@pengutronix.de>
- <1396629087-23727-4-git-send-email-s.trumtrar@pengutronix.de>
- <1396905121.25236.2.camel@linux-builds1>
- <20140407224110.GA28399@pengutronix.de> <53435F37.7060301@gmail.com>
-Message-ID: <73mwfu3nly.fsf@unicorn.hi.pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Apr 2014 09:39:14 +0100
+Subject: [PATCH] pwm: mxs: set pwm_chip can_sleep flag
+In-Reply-To: <20140409034115.GB2611@dragon>
+References: <1396956597-26159-1-git-send-email-shawn.guo@freescale.com>
+ <5343FDD3.3070308@i2se.com> <20140408141832.GA8861@piout.net>
+ <53442997.70209@i2se.com> <20140408231654.GA13898@piout.net>
+ <20140408234418.GL16119@n2100.arm.linux.org.uk>
+ <20140409034115.GB2611@dragon>
+Message-ID: <20140409083914.GN16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 09, 2014 at 11:41:17AM +0800, Shawn Guo wrote:
+> On Wed, Apr 09, 2014 at 12:44:18AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Apr 09, 2014 at 01:16:54AM +0200, Alexandre Belloni wrote:
+> > > I'm not home, else I'll try on my i.mx28 boards...
+> > 
+> > I just tried heartbeat here, on iMX6, and it works fine.  That's with this
+> > in the DT:
+> 
+> FYI. i.MX28 is known as 'mxs' sub-architecture and uses pwm-mxs driver
+> rather than pwm-imx which is the one for i.MX6.
 
-Dinh Nguyen <dinh.linux@gmail.com> writes:
+My point being by doing the above test is that the pwm_disable() call
+in leds-pwm works correctly with iMX6 and the "troublesome" active-low
+flag set at the leds-pwm level.
 
-> On 4/7/14 5:41 PM, Steffen Trumtrar wrote:
->> On Mon, Apr 07, 2014 at 04:12:01PM -0500, Dinh Nguyen wrote:
->>> On Fri, 2014-04-04 at 18:31 +0200, Steffen Trumtrar wrote:
->>>> Add the necessary #reset-cells property to the rst-mgr node and
->>>> provide a header-file with all possible resets specified.
->>>>
->>>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>>> ---
->>>>  arch/arm/boot/dts/socfpga.dtsi           |  8 ++-
->>>>  include/dt-bindings/reset/altr,rst-mgr.h | 90 ++++++++++++++++++++++++++++++++
->>> Does this file belong under dt-bindings/reset/ or
->>> dt-bindings/reset-controller/?
->>>
->> ATM there is no such directory, or is there ?
->> So, reset seems appropriate I think.
-> commit [6b7f06 ARM: STi: STiH415: Add reset controller support.]
-> Seems more appropriate for this to go into reset-controller.
->
-
-Okay, the current mainline master now has include/dt-bindings/reset and
-include/dt-bindings/reset-controller.
-
-I think one of those directories shouldn't be there, but be merged in
-the other instead. But which one? Where shall I put my precious code?
-
-
-Regards,
-Steffen
+It wouldn't work on iMX6 if you tried to use the broken inversion on the
+PWM output - it would have exactly the effects being reported on iMX28
+as setting a duty of 100% would pull the signal low and disabling the PWM
+will also pull the signal low (which are the two states heartbeat uses.)
 
 -- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
