@@ -1,28 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  9 Apr 2014 09:18:55 +0200
-Subject: [PATCH] pinctrl: nomadik: delete stray debug print
-Message-ID: <1397027935-14926-1-git-send-email-linus.walleij@linaro.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 9 Apr 2014 00:27:10 -0700
+Subject: [PATCH 00/15] mtd: st_spi_fsm: Align with ST's internal
+ development
+In-Reply-To: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
+References: <1395851969-13520-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140409072710.GF3131@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I left this in by mistake, get rid of it.
+On Wed, Mar 26, 2014 at 04:39:14PM +0000, Lee Jones wrote:
+> This patch-set updates ST's FSM SPI-NOR driver with all the internal
+> goodness which has happened since the initial (now upstreamed) snapshot
+> was taken. It covers just over 6 months worth of internal development
+> and bug-fixes. A final whitespace clean-up is also appended to the set
+> - to make it look pretty and stuff. :)
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik.c | 1 -
- 1 file changed, 1 deletion(-)
+I applied the first 6 to l2-mtd.git/spinor. Please rebase the others so
+they can apply, and address the DT comment I sent.
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 208341fd57d2..8f6f16ef73f3 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -877,7 +877,6 @@ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	struct nmk_gpio_chip *nmk_chip = container_of(chip, struct nmk_gpio_chip, chip);
- 	u32 status;
- 
--	pr_err("PLONK IRQ %d\n", irq);
- 	clk_enable(nmk_chip->clk);
- 	status = readl(nmk_chip->addr + NMK_GPIO_IS);
- 	clk_disable(nmk_chip->clk);
--- 
-1.9.0
+Thanks,
+Brian
