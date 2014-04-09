@@ -1,34 +1,91 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 09 Apr 2014 15:08:56 +0200
-Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
- on/off
-In-Reply-To: <CAFp+6iHf5Ndt3yNbdAaayXi08-A54Sk8LDTiASm4RTw09GuWvg@mail.gmail.com>
-References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
- <534538F6.2010009@samsung.com>
- <CAFp+6iHf5Ndt3yNbdAaayXi08-A54Sk8LDTiASm4RTw09GuWvg@mail.gmail.com>
-Message-ID: <53454668.8090300@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 9 Apr 2014 08:18:28 -0500
+Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
+In-Reply-To: <20140409113246.GA8778@pd.tnic>
+References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
+ <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
+ <20140409113246.GA8778@pd.tnic>
+Message-ID: <CAL_Jsq+gszc+R_BrLtHKEBGYd=3T+sE1d+-HoF9aYZt6C2k5-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/14 14:24, Vivek Gautam wrote:
-> On Wed, Apr 9, 2014 at 5:41 PM, Sylwester Nawrocki
-> <s.nawrocki@samsung.com> wrote:
->> > On 09/04/14 13:54, Vivek Gautam wrote:
->>> >> Adding support to enable/disable VBUS hooked to a gpio
->>> >> to enable vbus supply on the port.
->> >
->> > Does the GPIO control a fixed voltage regulator ? If so, shouldn't
->> > it be modelled by the regulator API instead ?
+On Wed, Apr 9, 2014 at 6:32 AM, Borislav Petkov <bp@alien8.de> wrote:
+> On Sun, Mar 02, 2014 at 08:02:40PM +0530, Punnaiah Choudary Kalluri wrote:
+>> Add support for ARM Pl310 L2 cache controller parity error
+>>
+>> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+>> ---
+>>  .../devicetree/bindings/edac/pl310_edac_l2.txt     |   19 ++
+>>  drivers/edac/Kconfig                               |    7 +
+>>  drivers/edac/Makefile                              |    1 +
+>>  drivers/edac/pl310_edac_l2.c                       |  236 ++++++++++++++++++++
+>>  4 files changed, 263 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
+>>  create mode 100644 drivers/edac/pl310_edac_l2.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt b/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
+>> new file mode 100644
+>> index 0000000..94fbb8d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/edac/pl310_edac_l2.txt
+>> @@ -0,0 +1,19 @@
+>> +Pl310 L2 Cache EDAC driver, it does reports the data and tag ram parity errors.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "arm,pl310-cache".
+>> +- intterupts: Interrupt number to the cpu.
+>> +- reg: Physical base address and size of cache controller's memory mapped
+>> +  registers
+>> +
+>> +Example:
+>> +++++++++
+>> +
+>> +     L2: cache-controller {
+>> +             compatible = "arm,pl310-cache";
+>> +             interrupts = <0 2 4>;
+>> +             reg = <0xf8f02000 0x1000>;
+>> +     };
+>> +
+>> +PL310 L2 Cache EDAC driver detects the Parity enable state by reading the
+>> +appropriate control register.
+>> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+>> index 878f090..059ac31 100644
+>> --- a/drivers/edac/Kconfig
+>> +++ b/drivers/edac/Kconfig
+>> @@ -326,6 +326,13 @@ config EDAC_TILE
+>>         Support for error detection and correction on the
+>>         Tilera memory controller.
+>>
+>> +config EDAC_PL310_L2
+>> +     tristate "Pl310 L2 Cache Controller"
+>> +     depends on EDAC_MM_EDAC && ARM
+>> +     help
+>> +       Support for parity error detection on L2 cache controller
+>> +       data and tag ram memory
+>> +
 >
-> No, this GPIO controls a 'current limiting power distribution switch',
-> which gives the output vbus to usb controller.
-> Should i model this as a fixed regulator ?
+>
+> Ok, so I'm looking at this after having looked at the synopsys thing
+> and it looks very similar in functionality - it does the basic dance of
+> registering and setting up stuff, only using different devicetree nodes,
+> regs, etc.
+>
+> However, it adds a new file under drivers/edac/ and I'm wondering if it
+> wouldn't be better to simply create a xilinx_edac.c and put all your
+> stuff in there, maybe even share code by abstracting it nicely. Having
+> a separate driver only for a single L2 cache controller seems kinda too
+> granulary for me.
 
-OK, it's just a power switch then. I suspect using the regulator API
-would be more universal, as such a GPIO is somewhat a board design
-detail. I'm not going to object to your patch, just might be better
-to use the gpiod API instead.
+I don't think so, the PL310 is present on lots of ARM chips besides
+Xilinx. I don't know how many support parity as that is optional. In
+fact the highbank_l2_edac.c is for the PL310 as well, but the
+registers it uses is all custom logic added for ECC and there is no
+part of the PL310 h/w used by the driver.
 
--- 
-Regards,
-Sylwester
+If there is lots duplication, then that's a sign the framework needs
+to handle more of the boilerplate pieces. There could be a "simple"
+driver/library for devices which are no more than some registers, an
+interrupt handler and static information about the type of EDAC
+device.
+
+Rob
