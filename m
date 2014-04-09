@@ -1,94 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 9 Apr 2014 12:52:36 -0400
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <20140409163330.GI27282@n2100.arm.linux.org.uk>
-References: <cover.1396605300.git.nsekhar@ti.com>
- <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
- <534412FD.5030308@ti.com> <20140409163330.GI27282@n2100.arm.linux.org.uk>
-Message-ID: <53457AD4.8090708@ti.com>
+From: Nikolay.Borisov@arm.com (Nikolay Borisov)
+Date: Wed,  9 Apr 2014 17:50:35 +0100
+Subject: [RFC PATCH 0/3] Make kexec work with CONFIG_DEBUG_RODATA enabled
+Message-ID: <1397062238-10515-1-git-send-email-Nikolay.Borisov@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 April 2014 12:33 PM, Russell King - ARM Linux wrote:
-> On Tue, Apr 08, 2014 at 11:17:17AM -0400, Santosh Shilimkar wrote:
->> On Tuesday 08 April 2014 10:53 AM, Sekhar Nori wrote:
->>> On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
->>>> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
->>>>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->>>>> index f8b8dac..6b2a056 100644
->>>>> --- a/arch/arm/mach-omap2/omap4-common.c
->>>>> +++ b/arch/arm/mach-omap2/omap4-common.c
->>>>> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
->>>>>  
->>>>>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
->>>>>  }
->>>>> +
->>>>> +int __init am43xx_l2_cache_init(void)
->>>>> +{
->>>>> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
->>>>> +		       L310_AUX_CTRL_INSTR_PREFETCH;
->>>>
->>>> It would be good to documenting the difference between this and OMAP4,
->>>> and why you have chosen different values.
->>>
->>> There are two main differences:
->>>
->>> 1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
->>> not needed even in OMAP4 with latest kernel, but I am not sure if I can
->>> do this safely without breaking any usecase currently working with OMAP4.
->>>
->> Wrong. Shared bit is mandatory for the OMAP4. Its a SMP system
->> which needs that.
-> 
-> Errr.  This bit affects the L2 cache behaviour for Normal memory, outer
-> non-cacheable accesses - in other words, those performed to memory mapped
-> via dma_alloc_coherent() or dma_alloc_writecombine().  It does not affect
-> other types of mappings (other access types ignore the sharable attribute).
-> 
-> When this bit is clear, accesses to such memory are:
-> 
-> - read: cacheable, no allocate
-> - write: write through, no write allocate
-> 
-> what this means is that if there are no cache lines in the L2 cache
-> corresponding with the physical address, then none will be allocated.
-> However, if there are cache lines present, then they will be hit,
-> read or updated as appropriate.
-> 
-> This may matter before CMA where we had the memory returned by
-> dma_alloc_coherent() and friends mapped as normal, cacheable mappings
-> which could be speculatively prefetched, and therefore cache lines
-> dragged into the L2 cache for these physical addresses.
-> 
-> However, now that we're using CMA, this does not apply as we no longer
-> have this aliasing mapping.
-> 
-> So, with CMA enabled, it should be safe not to set this bit.
-> 
-Agree. That should be safe now.
+This patch makes kexec work on a kernel that has its .text section set to read
+only. The main reason of doing it is because there is a patch in the making 
+(http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244779.html)
+which aims to make it possible to flag the kernel's code section as read-only,
+rendering kexec inoperable.
 
-> However, the shared bit in the page tables must be set for SMP systems.
-> Are you sure you're not confusing the shared bit in the page tables
-> with the shared override bit in the L2 cache controller?
->
-No i didn't confuse with page table bits. But the SMP remark wasn't
-relevant which might have indicated that.
- 
->>> 2) OMAP4 sets NS lockdown and NS interrupt access control bits. I
->>> searched through the commit history of L2 cache support on OMAP4 but
->>> there is no mention of why this was needed on OMAP4. I am checking
->>> internally on the history behind this.
->>>
->> These have also come from the aligned settings with hardware folks.
-> 
-> Again, this doesn't have much to do with hardware, it's secure/non-secure
-> access rights configuration to the L2 cache controller.
-> 
-The settings were aligned by hardware team after consulting security
-team and those couple of bit settings came from them. The folks
-are no longer working for TI so I can't go back and check the reasons.
-We just just leave them as is.
+The first patch does the actual functional changes while the 2nd one is
+optionail and is only to be used in case you have already applied the aforementioned
+CONFIG_DEBUG_RODATA patch
 
-Regards,
-Santosh
+Patch 3 is also optional and tries to make the assembly code a bit more "sane"
+by introducing a .struct to describe the parameters for the kernel relocation
+stub. 
+
+Those patches have been tested on linux 3.14 on THUMB-2/non-THUMB-2 host
+kernels.
+
+Nikolay Borisov (3):
+  ARM: kexec: Make kexec work with read-only kernel .text section
+  ARM: Kconfig: remove dependence of CONFIG_DEBUG_RODATA on !kexec
+  ARM: kexec: Use .struct to describe relocate_new_kernel parameter
+    layout
+
+ arch/arm/kernel/machine_kexec.c   | 54 ++++++++++++++++++++++++++++-----------
+ arch/arm/kernel/relocate_kernel.S | 47 +++++++++++++++++-----------------
+ arch/arm/mm/Kconfig               |  2 +-
+ 3 files changed, 63 insertions(+), 40 deletions(-)
+
+-- 
+1.8.1.5
