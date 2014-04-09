@@ -1,102 +1,129 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 9 Apr 2014 09:12:10 -0700
-Subject: [PATCH v2 2/2] ARM: mm: allow text and rodata sections to be
- read-only
-In-Reply-To: <20140409090204.GA6583@linaro.org>
-References: <1396926910-11227-1-git-send-email-keescook@chromium.org>
- <1396926910-11227-3-git-send-email-keescook@chromium.org>
- <20140409090204.GA6583@linaro.org>
-Message-ID: <CAGXu5jL0Exz0TSYE1EaPVwxik5+0y3QXTWLkU6Ti+9+ahHM=ow@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 09 Apr 2014 18:14:40 +0200
+Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
+In-Reply-To: <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+Message-ID: <534571F0.10706@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 9, 2014 at 2:02 AM, Steve Capper <steve.capper@linaro.org> wrote:
-> Hi Kees,
->
-> On Mon, Apr 07, 2014 at 08:15:10PM -0700, Kees Cook wrote:
->> This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
->> read-only. Additionally, this splits rodata from text so that rodata can
->> also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
->>
->> The read-only areas are made writable during ftrace updates. Additional
->> work is needed for kprobes and kexec, so the feature is temporarily
->> marked as unavailable in Kconfig when those options are selected.
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->>  arch/arm/include/asm/cacheflush.h |    9 ++++++++
->>  arch/arm/kernel/ftrace.c          |   17 ++++++++++++++
->>  arch/arm/kernel/vmlinux.lds.S     |    3 +++
->>  arch/arm/mm/Kconfig               |   12 ++++++++++
->>  arch/arm/mm/init.c                |   46 +++++++++++++++++++++++++++++++++++++
->>  5 files changed, 87 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
->> index 8b8b61685a34..b6fea0a1a88b 100644
->> --- a/arch/arm/include/asm/cacheflush.h
->> +++ b/arch/arm/include/asm/cacheflush.h
->> @@ -487,4 +487,13 @@ int set_memory_rw(unsigned long addr, int numpages);
->>  int set_memory_x(unsigned long addr, int numpages);
->>  int set_memory_nx(unsigned long addr, int numpages);
->>
->> +#ifdef CONFIG_DEBUG_RODATA
->> +void mark_rodata_ro(void);
->> +void set_kernel_text_rw(void);
->> +void set_kernel_text_ro(void);
->> +#else
->> +static inline void set_kernel_text_rw(void) { }
->> +static inline void set_kernel_text_ro(void) { }
->> +#endif
->> +
->>  #endif
->> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
->> index af9a8a927a4e..ea446ae09c89 100644
->> --- a/arch/arm/kernel/ftrace.c
->> +++ b/arch/arm/kernel/ftrace.c
->> @@ -15,6 +15,7 @@
->>  #include <linux/ftrace.h>
->>  #include <linux/uaccess.h>
->>  #include <linux/module.h>
->> +#include <linux/stop_machine.h>
->>
->>  #include <asm/cacheflush.h>
->>  #include <asm/opcodes.h>
->> @@ -35,6 +36,22 @@
->>
->>  #define      OLD_NOP         0xe1a00000      /* mov r0, r0 */
->>
->> +static int __ftrace_modify_code(void *data)
->> +{
->> +     int *command = data;
->> +
->> +     set_kernel_text_rw();
->> +     ftrace_modify_all_code(*command);
->> +     set_kernel_text_ro();
->> +
->> +     return 0;
->> +}
->
-> Would another approach be to keep all the kernel .text ro then override
-> probe_kernel_write (which has a weak reference), to create a separate
-> temporary rw mapping to the specific page that needs to be modified?
->
-> That way you only worry about TLB and cache maintenance for a smaller
-> area. Also, your kernel .text VAs never actually become writable, so
-> you don't need to worry as much about unauthorised changes whilst your
-> guard is temporarily down.
->
-> (Though lots of small changes could probably make this more
-> expensive, and you will need to double check aliasing in pre-ARMv7).
 
-As I understand it, early boot needs some of these areas RWX. Doing
-the protection during init-free means we can avoid all that and still
-allow the memory to get reclaimed. As to not doing section
-re-mappings, I share the same concern about it being very expensive to
-do lots of small changes. As such, I think this is the cleanest
-approach that is still portable.
+On 09/04/2014 16:53, Chen-Yu Tsai wrote:
+> Hi Boris,
+>
+> On Wed, Apr 9, 2014 at 9:51 PM, Boris BREZILLON
+> <boris.brezillon@free-electrons.com> wrote:
+>> Hello,
+>>
+>> This series rework the sunxi pinctrl driver to support the PLx pins
+>> available on the A31 SoC.
+> Thanks for working on this. I mentioned to Maxime on IRC yesterday that
+> we have complete pinctrl drivers for both A31 and A23, based on our current
+> pinctrl-sunxi driver, in the A23 SDK. These have the complete pin mapping.
 
--Kees
+Thanks for pointing this out, I'll take a look.
+
+>
+>> It also add missing A31 reset controller DT bindings documentation.
+>>
+>> I need those PL pins (actually I only need PL0 and PL1) to support
+>> the P2WI bus, which in turn is used to communicate with the AXP221
+>> PMIC.
+> If you could, please add all the PL and PM pins.
+
+Sure, I'll add pin macros for L and M ports.
+
+> As I said, you can find complete definitions in the A23 SDK.
+>
+>> Let me know if these changes are too intrusive.
+> I wonder if we should do a separate driver for the new PIO controller.
+> Clearly it's a separate IP block, with it's own clock and reset controls.
+
+This is what I had in mind in the first place, but then I encountered
+several issues when doing so:
+
+ 1) the gpio chip is not dynamically allocated but is declared as a
+static variable instead
+ 2) we have to tweak the pinctrl base field, otherwise the pin numbers
+overlap
+ 3) other things I haven't noticed yet :-)
+
+I'll try to rework the driver to be able to declare 2 separated pin
+controllers.
+
+> Allwinner sources list this block as "R_PIO". I suggest using this name.
+> Clearly "pioL" does not cover all the functionality.
+
+Fair enough. I'll modify it.
+
+>
+> I have started to document the PRCM block: http://linux-sunxi.org/PRCM
+>
+> Last, please send the patches to the linux-sunxi mailing list as well.
+> At the very least, Hans will see them and add them to sunxi-devel branch.
+
+Sure, this is an oversight, I'm using get_maintainer and just forgot to
+add Hans and the linux-sunxi ML. But I'll take care to add you, hans and
+the sunxi ML in Cc next time.
+
+Thanks for your review.
+
+Best Regards,
+
+Boris
+
+>
+>
+> Cheers,
+> ChenYu
+>
+>> Best Regards,
+>>
+>> Boris
+>>
+>> Boris BREZILLON (15):
+>>   ARM: sunxi: dt: list all pinctrl compatible strings
+>>   ARM: sunxi: dt: document pinctrl clock related properties
+>>   ARM: sunxi: dt: add pinctrl clock-names properties
+>>   pinctrl: sunxi: specify clk name when retrieving pinctrl pio clk
+>>   clk: sunxi: add A31 APB0 clk gate defintions
+>>   clk: sunxi: add A31 APB0 gates compatible string to the documentation
+>>   ARM: sunxi: dt: define A31's APB0 clk gates node
+>>   reset: sunxi: document sunxi's reset controllers bindings
+>>   clk: sunxi: add A31 APB0 reset line defintions
+>>   pinctrl: sunxi: add PL pin definitions
+>>   pinctrl: sunxi: add support for A31 PL pins
+>>   pinctrl: sunxi: retrieve and enable PL clk gate for A31 SoC
+>>   pinctrl: sunxi: retrieve and enable PL reset line for A31 SoC
+>>   pinctrl: sunxi: define A31 PL0/PL1 pins
+>>   ARM: sunxi: dt: add support for A31's PL pins
+>>
+>>  Documentation/devicetree/bindings/clock/sunxi.txt  |   1 +
+>>  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |  13 +-
+>>  .../bindings/reset/allwinner,sunxi-clock-reset.txt |  21 +++
+>>  arch/arm/boot/dts/sun4i-a10.dtsi                   |   1 +
+>>  arch/arm/boot/dts/sun5i-a10s.dtsi                  |   1 +
+>>  arch/arm/boot/dts/sun5i-a13.dtsi                   |   1 +
+>>  arch/arm/boot/dts/sun6i-a31.dtsi                   |  25 ++-
+>>  arch/arm/boot/dts/sun7i-a20.dtsi                   |   1 +
+>>  drivers/clk/sunxi/clk-sunxi.c                      |   5 +
+>>  drivers/pinctrl/pinctrl-sunxi-pins.h               |   8 +
+>>  drivers/pinctrl/pinctrl-sunxi.c                    | 205 +++++++++++++++------
+>>  drivers/pinctrl/pinctrl-sunxi.h                    |  39 +++-
+>>  12 files changed, 264 insertions(+), 57 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+>>
+>> --
+>> 1.8.3.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Kees Cook
-Chrome OS Security
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
