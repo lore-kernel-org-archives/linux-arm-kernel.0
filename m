@@ -1,35 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  9 Apr 2014 20:04:07 +0200
-Subject: [PATCH 0/2] improve pwm lookup support without device tree
-Message-ID: <1397066649-3767-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed,  9 Apr 2014 20:08:13 +0200
+Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
+Message-ID: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-a small patch set as suggested byt Thierry to make lokkup with the lookup table
-instead of device tree bahve more like when using device tree.
+(Resending due to a typo in an e-mail address that caused LAKML to reject the
+mails. Sorry about the noise.)
 
-The first patch adds a period annd a polarity member to the lookup table and use
-those to set period and polarity.
+This patch set reworks Ezequiel Garcia's previous fix [1] of an out of vmalloc
+space bug on PXA2[57]x platforms caused by an attempt to map the start of
+physical uncached outside of the vmalloc space.
 
-The second patch changes PWM_LOOKUP to set period an polarity. I was wondering
-about adding a new macro to d that but the number of boards using it is limited
-(only 3) so I guess it is ok to do that now.
+This first three patches perform a couple of cleanups, and the last patch
+fixes the problem. I've decided to map the memory at address 0xfe000000 to
+minimize changes to the code, but this causes a bit of fragmentation of
+vmalloc space. I could map it to the very end of vmalloc space (0xfef00000)
+instead if preferred, which would involve replacing a mov by an ldr in
+pxa2[57]x_finish_suspend and pm_enter_standby_start.
 
-The final goal would be to get rid of .pwm_period_ns in leds-pwm and pwm_bl.
+I've tested the patch set on a PXA270-based system.
 
-Alexandre Belloni (2):
-  pwm: add period and polarity to struct pwm_lookup
-  pwm: use PWM_LOOKUP to set the period and polarity
+[1] https://lkml.org/lkml/2013/11/28/474
 
- Documentation/pwm.txt                          | 3 ++-
- arch/arm/mach-omap2/board-omap3beagle.c        | 3 ++-
- arch/arm/mach-pxa/hx4700.c                     | 3 ++-
- arch/arm/mach-shmobile/board-armadillo800eva.c | 3 ++-
- drivers/pwm/core.c                             | 5 +++++
- include/linux/pwm.h                            | 6 +++++-
- 6 files changed, 18 insertions(+), 5 deletions(-)
+Ezequiel Garcia (1):
+  ARM: pxa: Move iotable mapping inside vmalloc region
+
+Laurent Pinchart (3):
+  ARM: pxa: Don't hardcode addresses and size in map_desc tables
+  ARM: pxa: Move UNCACHED_PHYS_0 mapping from generic.c to pxa2[57]x.c
+  ARM: pxa: pxa27x: Don't map IMEMC region statically
+
+ arch/arm/mach-pxa/generic.c               | 11 +++--------
+ arch/arm/mach-pxa/include/mach/hardware.h |  4 ++--
+ arch/arm/mach-pxa/pxa25x.c                |  7 ++++++-
+ arch/arm/mach-pxa/pxa27x.c                | 10 +++++-----
+ arch/arm/mach-pxa/pxa3xx.c                |  2 +-
+ 5 files changed, 17 insertions(+), 17 deletions(-)
 
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
