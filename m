@@ -1,41 +1,61 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 9 Apr 2014 14:40:24 +0200
-Subject: [PATCH 2/2] net: mvneta: fix usage as a module on RGMII
- configurations
-In-Reply-To: <20140409122241.GE1160@arch.cereza>
-References: <1395789942-20764-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395789942-20764-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <533C1B75.2020803@free-electrons.com>
- <20140403113652.33f11413@skate> <20140409122241.GE1160@arch.cereza>
-Message-ID: <20140409144024.0d0e5151@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Apr 2014 13:53:54 +0100
+Subject: [PATCH 0/8] Current imx-drm queue
+Message-ID: <20140409125354.GP16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Hi,
 
-On Wed, 9 Apr 2014 09:22:41 -0300, Ezequiel Garcia wrote:
+The following patches are those which I currently have queued up for
+Greg for merging into his stable tree when he's next accepting patches.
+If you have any concerns about these patches, please let me know in
+a timely fashion.
 
-> Just found this commit is in v3.12.17 and prevents booting the A370
-> Mirabox with nfsroot.
-> 
-> Maybe we should revert it in stable for now until we can solve it?
-> 
-> Unless you have a better idea.
+I've re-ordered and cherry-picked some of Denis' patches, as I can't
+take the patches which touch arch/arm/boot/dts.  Some other method is
+going to have to be found to deal with those changes.
 
-Yes, this problem is already tracked at
-https://bugzilla.kernel.org/show_bug.cgi?id=73401, where I've explained
-what's going on.
+The unfortunate thing is that without the DT changes able to be merged
+in a timely and sane manner, in a way which does not result in breaking
+this driver, it pushes the point where we can finally think about moving
+this driver out of drivers/staging back even further.
 
-Unfortunately, I'm still waiting for details from Marvell to understand
-in which cases the PCS needs to be set, and in which situations it
-needs to be cleared.
+It seems arm-soc want to be obtuse, so let's let them be obtuse and show
+what damage it does to being able to make progress.
 
-Since getting this information is apparently going to take much more
-time that I originally hoped, I'm starting to think that the safest and
-fastest course of action is indeed to revert this patch.
+Thanks.
 
-Thomas
+Denis Carikli (3):
+      imx-drm: Match ipu_di_signal_cfg's clk_pol with its description.
+      v4l2: add new V4L2_PIX_FMT_RGB666 pixel format.
+      imx-drm: Add RGB666 support for parallel display.
+
+Fabio Estevam (2):
+      imx-drm: ipu-dmfc: Remove unneeded 'dmfc' check
+      imx-drm: imx-ldb: Use snprintf()
+
+Philipp Zabel (3):
+      imx-drm: Move IPU_PIX_FMT_GBR24 definition into imx-ipu-v3.h
+      imx-drm: ipu-dc: Use usleep_range instead of msleep
+      imx-drm: imx-ldb: Add drm_panel support
+
+ Documentation/DocBook/media/v4l/pixfmt-packed-rgb.xml             | 39 +++++++++++++++++++++++++++++++++++++++
+ Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt |  3 ++-
+ drivers/staging/imx-drm/Kconfig                                   |  1 +
+ drivers/staging/imx-drm/imx-drm.h                                 |  4 ----
+ drivers/staging/imx-drm/imx-ldb.c                                 | 25 +++++++++++++++++++++++--
+ drivers/staging/imx-drm/imx-tve.c                                 |  1 +
+ drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h                       |  2 ++
+ drivers/staging/imx-drm/ipu-v3/ipu-dc.c                           | 11 ++++++++++-
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c                           |  2 +-
+ drivers/staging/imx-drm/ipu-v3/ipu-dmfc.c                         |  3 ---
+ drivers/staging/imx-drm/ipuv3-crtc.c                              |  2 +-
+ drivers/staging/imx-drm/parallel-display.c                        |  2 ++
+ include/uapi/linux/videodev2.h                                    |  1 +
+ 13 files changed, 83 insertions(+), 13 deletions(-)
+
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
