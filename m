@@ -1,66 +1,129 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  9 Apr 2014 15:55:22 -0300
-Subject: [PATCH v2 3/3] ARM: dts: imx27-pdk: Pass the FEC pin configuration
-In-Reply-To: <1397069722-14778-1-git-send-email-festevam@gmail.com>
-References: <1397069722-14778-1-git-send-email-festevam@gmail.com>
-Message-ID: <1397069722-14778-3-git-send-email-festevam@gmail.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 9 Apr 2014 12:13:56 -0700
+Subject: [PATCH v2] ARM: uprobes need icache flush after xol write
+In-Reply-To: <20140409184507.GA1058@redhat.com>
+References: <1397023132-10313-1-git-send-email-victor.kamensky@linaro.org>
+ <1397023132-10313-2-git-send-email-victor.kamensky@linaro.org>
+ <20140409184507.GA1058@redhat.com>
+Message-ID: <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 9 April 2014 11:45, Oleg Nesterov <oleg@redhat.com> wrote:
+> Victor, sorry, I can't even read this thread now, will try to reply
+> tomorrow... But at first glance,
 
-Provide an entry for the FEC pin muxing.
+Sure, np. Will wait for you to free up.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Keep the iomuxc node at the bottom
+> On 04/08, Victor Kamensky wrote:
+>>
+>> Because on ARM cache flush function need kernel address
+>
+> ...
+>
+>> --- a/kernel/events/uprobes.c
+>> +++ b/kernel/events/uprobes.c
+>> @@ -1287,6 +1287,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
+>>  {
+>>       struct xol_area *area;
+>>       unsigned long xol_vaddr;
+>> +     void *xol_page_kaddr;
+>>
+>>       area = get_xol_area();
+>>       if (!area)
+>> @@ -1296,14 +1297,22 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
+>>       if (unlikely(!xol_vaddr))
+>>               return 0;
+>>
+>> -     /* Initialize the slot */
+>> -     copy_to_page(area->page, xol_vaddr,
+>> -                     &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
+>>       /*
+>> -      * We probably need flush_icache_user_range() but it needs vma.
+>> -      * This should work on supported architectures too.
+>> +      * We don't use copy_to_page here because we need kernel page
+>> +      * addr to invalidate caches correctly
+>>        */
+>> -     flush_dcache_page(area->page);
+>> +     xol_page_kaddr = kmap_atomic(area->page);
+>> +
+>> +     /* Initialize the slot */
+>> +     memcpy(xol_page_kaddr + (xol_vaddr & ~PAGE_MASK),
+>> +            &uprobe->arch.ixol,
+>> +            sizeof(uprobe->arch.ixol));
+>> +
+>> +     arch_uprobe_flush_xol_access(area->page, xol_vaddr,
+>> +                                  xol_page_kaddr + (xol_vaddr & ~PAGE_MASK),
+>> +                                  sizeof(uprobe->arch.ixol));
+>> +
+>> +     kunmap_atomic(xol_page_kaddr);
+>>
+>>       return xol_vaddr;
+>>  }
+>> @@ -1346,6 +1355,18 @@ static void xol_free_insn_slot(struct task_struct *tsk)
+>>       }
+>>  }
+>>
+>> +void __weak arch_uprobe_flush_xol_access(struct page *page, unsigned long vaddr,
+>> +                                      void *kaddr, unsigned long len)
+>> +{
+>> +     /*
+>> +      * We probably need flush_icache_user_range() but it needs vma.
+>> +      * This should work on most of architectures by default. If
+>> +      * architecture needs to do something different it can define
+>> +      * its own version of the function.
+>> +      */
+>> +     flush_dcache_page(page);
+>> +}
+>
+> In this case I'd suggest to move this kmap/memcpy horror into arch_ helper.
+> IOW, something like below.
+>
+> If arm needs the kernel address we are writing to, let it do kmap/etc in
+> its implementation.
 
- arch/arm/boot/dts/imx27-pdk.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Fair enough. Can do that, as well as address Dave's comment about
+checkpatch.
 
-diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-index e0f4213..97ee781 100644
---- a/arch/arm/boot/dts/imx27-pdk.dts
-+++ b/arch/arm/boot/dts/imx27-pdk.dts
-@@ -23,6 +23,9 @@
- 
- 
- &fec {
-+	phy-mode = "mii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
- 	status = "okay";
- };
- 
-@@ -43,5 +46,28 @@
- 				MX27_PAD_UART1_RTS__UART1_RTS 0x0
- 			>;
- 		};
-+
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <
-+				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
-+				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
-+				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
-+				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
-+				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
-+				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
-+				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
-+				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
-+				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
-+				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
-+				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
-+				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
-+				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
-+				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
-+				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
-+				MX27_PAD_ATA_DATA13__FEC_COL 0x0
-+				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
-+				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
-+			>;
-+		};
- 	};
- };
--- 
-1.8.3.2
+But before I do that let's reach some conclusion wrt latest Russell's
+remarks about copy_{to,from}_user_page usage in uprobes. It is bigger
+question covering more than ARM issue and possibly having bigger
+implication on uprobes design. I have some comments/thoughts about
+it, but since I am not uprobes maintainer, will wait for you to address
+it first.
+
+Thanks,
+Victor
+
+> Oleg.
+>
+>
+> --- x/kernel/events/uprobes.c
+> +++ x/kernel/events/uprobes.c
+> @@ -1291,18 +1291,16 @@ static unsigned long xol_get_insn_slot(s
+>         if (unlikely(!xol_vaddr))
+>                 return 0;
+>
+> -       /* Initialize the slot */
+> -       copy_to_page(area->page, xol_vaddr,
+> -                       &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
+> -       /*
+> -        * We probably need flush_icache_user_range() but it needs vma.
+> -        * This should work on supported architectures too.
+> -        */
+> -       flush_dcache_page(area->page);
+> -
+> +       arch_uprobe_xxx(area->page, xol_vaddr, ...);
+>         return xol_vaddr;
+>  }
+>
+> +void __weak arch_uprobe_xxx(page, xol_vaddr, ...)
+> +{
+> +       copy_to_page(page, xol_vaddr, ...)
+> +       flush_dcache_page(page);
+> +}
+> +
+>  /*
+>   * xol_free_insn_slot - If slot was earlier allocated by
+>   * @xol_get_insn_slot(), make the slot available for
+>
