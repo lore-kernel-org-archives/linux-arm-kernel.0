@@ -1,916 +1,265 @@
-From: punnaia@xilinx.com (punnaiah choudary kalluri)
-Date: Wed, 9 Apr 2014 11:34:31 +0530
-Subject: [RFC PATCH v2] edac: synopsys: Added EDAC support for zynq ddr
- ecc controller
-In-Reply-To: <20140408204047.GQ30077@pd.tnic>
-References: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
- <20140408204047.GQ30077@pd.tnic>
-Message-ID: <CAGnW=BYJxEkhAitCGi-i6+260-i-+GPrg0yPcY=M+7YmDF6ZRw@mail.gmail.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Wed, 9 Apr 2014 08:11:29 +0200
+Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
+In-Reply-To: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <20140409061128.GC16465@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 9, 2014 at 2:10 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Mon, Mar 17, 2014 at 10:53:44AM +0530, Punnaiah Choudary Kalluri wrote:
->> Added EDAC support for reporting the ecc errors of synopsys ddr controller.
->> The ddr ecc controller corrects single bit errors and detects double bit
->> errors
->>
->> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
->> ---
->> Changes for v2:
->> - Updated the commit header and message
->> - Renamed the filenames to synopsys_edac
->> - Corrected the compatilble string, commnets
->> - Renamed the macros,fucntions and data structures
->> ---
->>  .../devicetree/bindings/edac/synopsys_edac.txt     |   18 +
->>  drivers/edac/Kconfig                               |    7 +
->>  drivers/edac/Makefile                              |    1 +
->>  drivers/edac/synopsys_edac.c                       |  614 ++++++++++++++++++++
->>  4 files changed, 640 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/edac/synopsys_edac.txt
->>  create mode 100644 drivers/edac/synopsys_edac.c
->>
->> diff --git a/Documentation/devicetree/bindings/edac/synopsys_edac.txt b/Documentation/devicetree/bindings/edac/synopsys_edac.txt
->> new file mode 100644
->> index 0000000..c4a559b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/edac/synopsys_edac.txt
->> @@ -0,0 +1,18 @@
->> +Synopsys EDAC driver, it does reports the DDR ECC single bit errors that are
->> +corrected and double bit ecc errors that are detected by the DDR ECC controller.
->> +ECC support for DDR is available in half-bus width(16 bit) configuration only.
->> +
->> +Required properties:
->> +- compatible: Should be "xlnx,zynq-ddrc-1.04"
->> +- reg: Should contain DDR controller registers location and length.
->> +
->> +Example:
->> +++++++++
->> +
->> +ddrc0: ddrc at f8006000 {
->> +     compatible = "xlnx,zynq-ddrc-1.04";
->> +     reg = <0xf8006000 0x1000>;
->> +};
->> +
->> +Synopsys EDAC driver detects the DDR ECC enable state by reading the appropriate
->> +control register.
->> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
->> index 878f090..58b69b1 100644
->> --- a/drivers/edac/Kconfig
->> +++ b/drivers/edac/Kconfig
->> @@ -368,4 +368,11 @@ config EDAC_OCTEON_PCI
->>         Support for error detection and correction on the
->>         Cavium Octeon family of SOCs.
->>
->> +config EDAC_SYNOPSYS
->> +     tristate "Synopsys DDR Memory Controller"
->> +     depends on EDAC_MM_EDAC && ARCH_ZYNQ
->> +     help
->> +       This enables support for EDAC on the ECC memory used
->> +       with the Synopsys DDR memory controller.
->
-> s/This enables s/S/
->
->> +
->>  endif # EDAC
->> diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
->> index 4154ed6..5628a6f 100644
->> --- a/drivers/edac/Makefile
->> +++ b/drivers/edac/Makefile
->> @@ -64,3 +64,4 @@ obj-$(CONFIG_EDAC_OCTEON_PC)                += octeon_edac-pc.o
->>  obj-$(CONFIG_EDAC_OCTEON_L2C)                += octeon_edac-l2c.o
->>  obj-$(CONFIG_EDAC_OCTEON_LMC)                += octeon_edac-lmc.o
->>  obj-$(CONFIG_EDAC_OCTEON_PCI)                += octeon_edac-pci.o
->> +obj-$(CONFIG_EDAC_SYNOPSYS)          += synopsys_edac.o
->> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
->> new file mode 100644
->> index 0000000..7cec331
->> --- /dev/null
->> +++ b/drivers/edac/synopsys_edac.c
->> @@ -0,0 +1,614 @@
->> +/*
->> + * Synopsys DDR ECC Driver
->> + * This driver is based on ppc4xx_edac.c drivers
->> + *
->> + * Copyright (C) 2012 - 2014 Xilinx, Inc.
->
-> The same question to you: are you going to maintain this driver? If so,
-> please consider adding yourself to the MAINTAINERS file so that people
-> reporting issues with it can send you a note.
+Hi Jason,
 
-Let me check internally with team and get back to you on this.
->
->> + *
->> + * This program is free software: you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation, either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->
-> Please drop the GPL boilerplate - simply refer to the COPYING file in
-> the kernel source repository instead.
->
->> +
->> +#include <linux/edac.h>
->> +#include <linux/module.h>
->> +#include <linux/platform_device.h>
->> +
->> +#include "edac_core.h"
->> +
->> +/* Number of cs_rows needed per memory controller */
->> +#define SYNOPSYS_EDAC_NR_CSROWS      1
->> +
->> +/* Number of channels per memory controller */
->> +#define SYNOPSYS_EDAC_NR_CHANS       1
->> +
->> +/* Granularity of reported error in bytes */
->> +#define SYNOPSYS_EDAC_ERROR_GRAIN    1
->> +
->> +#define SYNOPSYS_EDAC_MESSAGE_SIZE   256
->> +
->> +/* Synopsys DDR memory controller registers that are relevant to ECC */
->> +#define SYNOPSYS_DDRC_CONTROL_REG_OFFSET     0x0 /* Control regsieter */
->> +#define SYNOPSYS_DDRC_T_ZQ_REG_OFFSET        0xA4 /* ZQ register */
->> +
->> +/* ECC control register */
->> +#define SYNOPSYS_DDRC_ECC_CONTROL_REG_OFFSET 0xC4
->> +/* ECC log register */
->> +#define SYNOPSYS_DDRC_ECC_CE_LOG_REG_OFFSET          0xC8
->> +/* ECC address register */
->> +#define SYNOPSYS_DDRC_ECC_CE_ADDR_REG_OFFSET 0xCC
->> +/* ECC data[31:0] register */
->> +#define SYNOPSYS_DDRC_ECC_CE_DATA_31_0_REG_OFFSET    0xD0
->> +
->> +/* Uncorrectable error info regsisters */
->> +#define SYNOPSYS_DDRC_ECC_UE_LOG_REG_OFFSET  0xDC /* ECC log register */
->> +#define SYNOPSYS_DDRC_ECC_UE_ADDR_REG_OFFSET 0xE0 /* ECC address register */
->> +#define SYNOPSYS_DDRC_ECC_UE_DATA_31_0_REG_OFFSET    0xE4 /* ECC data reg */
->> +
->> +#define SYNOPSYS_DDRC_ECC_STAT_REG_OFFSET    0xF0 /* ECC stats register */
->> +#define SYNOPSYS_DDRC_ECC_SCRUB_REG_OFFSET   0xF4 /* ECC scrub register */
->> +
->> +/* Control regsiter bitfield definitions */
->> +#define SYNOPSYS_DDRC_CTRLREG_BUSWIDTH_MASK  0xC
->> +#define SYNOPSYS_DDRC_CTRLREG_BUSWIDTH_SHIFT 2
->> +
->> +#define SYNOPSYS_DDRCTL_WDTH_16      1
->> +#define SYNOPSYS_DDRCTL_WDTH_32      0
->> +
->> +/* ZQ register bitfield definitions */
->> +#define SYNOPSYS_DDRC_T_ZQ_REG_DDRMODE_MASK  0x2
->> +
->> +/* ECC control register bitfield definitions */
->> +#define SYNOPSYS_DDRC_ECCCTRL_CLR_CE_ERR     0x2
->> +#define SYNOPSYS_DDRC_ECCCTRL_CLR_UE_ERR     0x1
->> +
->> +/* ECC correctable/uncorrectable error log register definitions */
->> +#define SYNOPSYS_DDRC_ECC_CE_LOGREG_VALID            0x1
->> +#define SYNOPSYS_DDRC_ECC_CE_LOGREG_BITPOS_MASK              0xFE
->> +#define SYNOPSYS_DDRC_ECC_CE_LOGREG_BITPOS_SHIFT     1
->> +
->> +/* ECC correctable/uncorrectable error address register definitions */
->> +#define SYNOPSYS_DDRC_ECC_ADDRREG_COL_MASK           0xFFF
->> +#define SYNOPSYS_DDRC_ECC_ADDRREG_ROW_MASK           0xFFFF000
->> +#define SYNOPSYS_DDRC_ECC_ADDRREG_ROW_SHIFT          12
->> +#define SYNOPSYS_DDRC_ECC_ADDRREG_BANK_MASK          0x70000000
->> +#define SYNOPSYS_DDRC_ECC_ADDRREG_BANK_SHIFT 28
->> +
->> +/* ECC statistic regsiter definitions */
->> +#define SYNOPSYS_DDRC_ECC_STATREG_UECOUNT_MASK       0xFF
->> +#define SYNOPSYS_DDRC_ECC_STATREG_CECOUNT_MASK       0xFF00
->> +#define SYNOPSYS_DDRC_ECC_STATREG_CECOUNT_SHIFT      8
->> +
->> +/* ECC scrub regsiter definitions */
->> +#define SYNOPSYS_DDRC_ECC_SCRUBREG_ECC_MODE_MASK     0x7
->> +#define SYNOPSYS_DDRC_ECC_SCRUBREG_ECCMODE_SECDED    0x4
->
-> Those defines and their values could use better alignment. Also see
-> below the note about slimming down those names in general.
->
->> +/**
->> + * struct ecc_error_info - ECC error log information
->> + * @row:     Row number
->> + * @col:     Column number
->> + * @bank:    Bank number
->> + * @bitpos:  Bit position
->> + * @data:    Data causing the error
->> + */
->> +struct ecc_error_info {
->> +     u32 row;
->> +     u32 col;
->> +     u32 bank;
->> +     u32 bitpos;
->> +     u32 data;
->> +};
->> +
->> +/**
->> + * struct synopsys_ecc_status - ECC status information to report
->> + * @ce_count:        Correctable error count
->> + * @ue_count:        Uncorrectable error count
->> + * @ceinfo:  Correctable error log information
->> + * @ueinfo:  Uncorrectable error log information
->> + */
->> +struct synopsys_ecc_status {
->> +     u32 ce_count;
->> +     u32 ue_count;
->> +     struct ecc_error_info ceinfo;
->> +     struct ecc_error_info ueinfo;
->> +};
->> +
->> +/**
->> + * struct synopsys_edac_priv - DDR memory controller private instance data
->> + * @baseaddr:                Base address of the DDR controller
->> + * @ce_count:                Correctable Error count
->> + * @ue_count:                Uncorrectable Error count
->> + */
->> +struct synopsys_edac_priv {
->> +     void __iomem *baseaddr;
->> +     u32 ce_count;
->> +     u32 ue_count;
->> +};
->> +
->> +/**
->
-> Why do we need the kernel-doc annotation for all those static functions?
+On Tue, Apr 08, 2014 at 05:44:14PM -0600, Jason Gunthorpe wrote:
+> The mbus hardware requires a power of two size, and size aligned base.
+> Currently, if a non-power of two is passed in to the low level routines
+> they configure the register in a way that results in undefined behaviour.
+> 
+> Call WARN and return EINVAL instead.
 
-Since it is recommended in Documentation/kernel-doc-nano-HOWTO.txt
-but also said it is low priority and at the discretion of the MAINTAINER of
-that kernel source file
+The WARN is correctly emitted for both igb ports here, but unfortunately
+despite EINVAL, I still get the panic. Also I find it surprizing that it
+reports sizes ending in ffff. I read the patch and it looks correct, so
+we possibly have something else wrong here.
 
-So, if you recommend not use kernel-doc annotation then i will take care
-in next version.
->
-> Also, drop the "synopsys_edac_" prefix of all static functions - that'll
-> slim up the code even further.
+OK I just got it by adding two printk() in pci-mvebu.c. Both functions
+mvebu_pcie_handle_iobase_change() and mvebu_pcie_handle_membase_change()
+do pass a size which is in fact a mask (size - 1) and not the real size.
+So the mbus is fed with an incorrect size which is off by one :
 
-Ok. it means using geterr_info is sufficient than synopsys_edac_geterror_info
-and applicable to other static functions
->
->> + * synopsys_edac_geterror_info - Get the current ecc error info
->> + * @base:    Pointer to the base address of the ddr memory controller
->> + * @perrstatus:      Pointer to the synopsys ecc status structure
->> + *
->> + * This routine determines there is any ecc error or not
->> + *
->> + * Return: zero if there is no error otherwise returns 1
->> + */
->> +static int synopsys_edac_geterror_info(void __iomem *base,
->
-> That base is an arg to readl, so it should be "const volatile void
-> __iomem *base", no?
+root at xpgp:~# modprobe igb
+igb: Intel(R) Gigabit Ethernet Network Driver - version 5.0.5-k
+igb: Copyright (c) 2007-2013 Intel Corporation.
+PCI: enabling device 0000:00:09.0 (0140 -> 0143)
+mvebu_pcie_handle_iobase_change: base=e8010000 size=00000fff
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1258 at drivers/bus/mvebu-mbus.c:271 mvebu_mbus_setup_window+0xb3/0xe4()
+Invalid MBus window size: 0xfff
+Modules linked in: igb(+) i2c_algo_bit
+CPU: 0 PID: 1258 Comm: modprobe Not tainted 3.14.0-mvebu #18
+[<c0011c39>] (unwind_backtrace) from [<c000f20b>] (show_stack+0xb/0xc)
+[<c000f20b>] (show_stack) from [<c02b5d1b>] (dump_stack+0x4f/0x64)
+[<c02b5d1b>] (dump_stack) from [<c001a145>] (warn_slowpath_common+0x49/0x68)
+[<c001a145>] (warn_slowpath_common) from [<c001a1bd>] (warn_slowpath_fmt+0x1d/0x28)
+[<c001a1bd>] (warn_slowpath_fmt) from [<c017005b>] (mvebu_mbus_setup_window+0xb3/0xe4)
+[<c017005b>] (mvebu_mbus_setup_window) from [<c01700f1>] (mvebu_mbus_alloc_window.constprop.7+0x65/0xc4)
+[<c01700f1>] (mvebu_mbus_alloc_window.constprop.7) from [<c01865cf>] (mvebu_pcie_handle_iobase_change+0x6b/0xb0)
+[<c01865cf>] (mvebu_pcie_handle_iobase_change) from [<c0186d1b>] (mvebu_pcie_wr_conf+0x2eb/0x2f4)
+[<c0186d1b>] (mvebu_pcie_wr_conf) from [<c0177f39>] (pci_bus_write_config_word+0x35/0x44)
+[<c0177f39>] (pci_bus_write_config_word) from [<c0010bf3>] (pcibios_enable_device+0xab/0xc0)
+[<c0010bf3>] (pcibios_enable_device) from [<c017bb67>] (do_pci_enable_device+0x27/0x80)
+[<c017bb67>] (do_pci_enable_device) from [<c017c727>] (pci_enable_device_flags+0x8f/0xc4)
+[<c017c727>] (pci_enable_device_flags) from [<c017c67b>] (pci_enable_bridge+0x2b/0x48)
+[<c017c67b>] (pci_enable_bridge) from [<c017c6e1>] (pci_enable_device_flags+0x49/0xc4)
+[<c017c6e1>] (pci_enable_device_flags) from [<bf806aa1>] (igb_probe+0x1c/0xb80 [igb])
+[<bf806aa1>] (igb_probe [igb]) from [<c017d1f5>] (pci_device_probe+0x45/0x6c)
+[<c017d1f5>] (pci_device_probe) from [<c019bead>] (driver_probe_device+0xb5/0x174)
+[<c019bead>] (driver_probe_device) from [<c019bfb7>] (__driver_attach+0x4b/0x4c)
+[<c019bfb7>] (__driver_attach) from [<c019af43>] (bus_for_each_dev+0x27/0x48)
+[<c019af43>] (bus_for_each_dev) from [<c019b967>] (bus_add_driver+0x87/0x128)
+[<c019b967>] (bus_add_driver) from [<c019c379>] (driver_register+0x35/0x84)
+[<c019c379>] (driver_register) from [<bf81e027>] (init_module+0x26/0x3f [igb])
+[<bf81e027>] (init_module [igb]) from [<c0008809>] (do_one_initcall+0xa1/0xe4)
+[<c0008809>] (do_one_initcall) from [<c00555e3>] (load_module+0x1067/0x1544)
+[<c00555e3>] (load_module) from [<c0055b3f>] (SyS_init_module+0x7f/0x8c)
+[<c0055b3f>] (SyS_init_module) from [<c000cc81>] (ret_fast_syscall+0x1/0x46)
+---[ end trace 53f41ddadca51c5e ]---
+mvebu_pcie_handle_membase_change: base=e0000000 size=002fffff
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1258 at drivers/bus/mvebu-mbus.c:271 mvebu_mbus_setup_window+0xb3/0xe4()
+Invalid MBus window size: 0x2fffff
+Modules linked in: igb(+) i2c_algo_bit
+CPU: 0 PID: 1258 Comm: modprobe Tainted: G        W    3.14.0-mvebu #18
+[<c0011c39>] (unwind_backtrace) from [<c000f20b>] (show_stack+0xb/0xc)
+[<c000f20b>] (show_stack) from [<c02b5d1b>] (dump_stack+0x4f/0x64)
+[<c02b5d1b>] (dump_stack) from [<c001a145>] (warn_slowpath_common+0x49/0x68)
+[<c001a145>] (warn_slowpath_common) from [<c001a1bd>] (warn_slowpath_fmt+0x1d/0x28)
+[<c001a1bd>] (warn_slowpath_fmt) from [<c017005b>] (mvebu_mbus_setup_window+0xb3/0xe4)
+[<c017005b>] (mvebu_mbus_setup_window) from [<c0170145>] (mvebu_mbus_alloc_window.constprop.7+0xb9/0xc4)
+[<c0170145>] (mvebu_mbus_alloc_window.constprop.7) from [<c0170447>] (mvebu_mbus_add_window_by_id+0xf/0x14)
+[<c0170447>] (mvebu_mbus_add_window_by_id) from [<c0186cf1>] (mvebu_pcie_wr_conf+0x2c1/0x2f4)
+[<c0186cf1>] (mvebu_pcie_wr_conf) from [<c0177f39>] (pci_bus_write_config_word+0x35/0x44)
+[<c0177f39>] (pci_bus_write_config_word) from [<c0010bf3>] (pcibios_enable_device+0xab/0xc0)
+[<c0010bf3>] (pcibios_enable_device) from [<c017bb67>] (do_pci_enable_device+0x27/0x80)
+[<c017bb67>] (do_pci_enable_device) from [<c017c727>] (pci_enable_device_flags+0x8f/0xc4)
+[<c017c727>] (pci_enable_device_flags) from [<c017c67b>] (pci_enable_bridge+0x2b/0x48)
+[<c017c67b>] (pci_enable_bridge) from [<c017c6e1>] (pci_enable_device_flags+0x49/0xc4)
+[<c017c6e1>] (pci_enable_device_flags) from [<bf806aa1>] (igb_probe+0x1c/0xb80 [igb])
+[<bf806aa1>] (igb_probe [igb]) from [<c017d1f5>] (pci_device_probe+0x45/0x6c)
+[<c017d1f5>] (pci_device_probe) from [<c019bead>] (driver_probe_device+0xb5/0x174)
+[<c019bead>] (driver_probe_device) from [<c019bfb7>] (__driver_attach+0x4b/0x4c)
+[<c019bfb7>] (__driver_attach) from [<c019af43>] (bus_for_each_dev+0x27/0x48)
+[<c019af43>] (bus_for_each_dev) from [<c019b967>] (bus_add_driver+0x87/0x128)
+[<c019b967>] (bus_add_driver) from [<c019c379>] (driver_register+0x35/0x84)
+[<c019c379>] (driver_register) from [<bf81e027>] (init_module+0x26/0x3f [igb])
+[<bf81e027>] (init_module [igb]) from [<c0008809>] (do_one_initcall+0xa1/0xe4)
+[<c0008809>] (do_one_initcall) from [<c00555e3>] (load_module+0x1067/0x1544)
+[<c00555e3>] (load_module) from [<c0055b3f>] (SyS_init_module+0x7f/0x8c)
+[<c0055b3f>] (SyS_init_module) from [<c000cc81>] (ret_fast_syscall+0x1/0x46)
+---[ end trace 53f41ddadca51c5f ]---
+PCI: enabling device 0000:02:00.0 (0140 -> 0142)
+Unhandled fault: external abort on non-linefetch (0x1008) at 0xf0300018
+Internal error: : 1008 [#1] SMP THUMB2
+Modules linked in: igb(+) i2c_algo_bit
+CPU: 0 PID: 1258 Comm: modprobe Tainted: G        W    3.14.0-mvebu #18
+task: c7534d00 ti: edb9c000 task.ti: edb9c000
+PC is at igb_get_invariants_82575+0x75/0x894 [igb]
+LR is at igb_probe+0x22a/0xb80 [igb]
+pc : [<bf80fe26>]    lr : [<bf806caf>]    psr: 20000033
+sp : edb9dd00  ip : bf811e51  fp : c7488898
+r10: bf816950  r9 : 00000001  r8 : c7488440
+r7 : ed9a7068  r6 : 00000001  r5 : 00000000  r4 : c7488898
+r3 : f0300000  r2 : 00001524  r1 : bf819654  r0 : c7488898
+Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment user
+Control: 50c53c7d  Table: 075f406a  DAC: 00000015
+Process modprobe (pid: 1258, stack limit = 0xedb9c240)
+Stack: (0xedb9dd00 to 0xedb9e000)
+dd00: ed9a7068 c7488440 00000001 bf818c28 c7488898 ed9a7000 00000000 c7488000
+dd20: ed9a7068 c7488440 00000001 bf816950 c7488898 bf806caf 7ffffffe ec96a870
+dd40: ec96a900 c00bdd75 edaea900 edaea900 00000001 00000001 ec96a870 ec96a870
+dd60: 00000000 ec96a900 ec96a870 c03f5560 edaea900 ed9a7068 bf818c64 ed9a7000
+dd80: 00000000 bf818c30 00000001 edb9c000 00000000 c017d1f5 ed9a7068 c0701170
+dda0: 00000000 bf818c64 bf81e001 c019bead 00000000 ed9a7068 bf818c64 ed9a709c
+ddc0: 00000000 c019bfb7 00000000 bf818c64 c019bf6d c019af43 ed8a02dc edaebeb4
+dde0: bf818c64 c75e5880 c065c5b8 c019b967 bf818cac bf818c64 bf815948 bf818c64
+de00: bf815948 bf8196a4 00000001 c019c379 bf818c30 bf818c28 bf815948 bf81e027
+de20: 00000000 00400100 bf8196b0 c0008809 edb9de30 edb9de30 ed8f4d00 ed9e2000
+de40: ed8f4d00 ed9e2000 ef7d2590 ef7d2580 40000000 f02a2000 ef7d2580 00000001
+de60: f02a2000 00000000 ecd6d800 c0671680 ef7d2590 0000001f edb6df80 f02a2000
+de80: 00000000 00400100 bf8196b0 bf8196a4 00000001 ecd6d800 00000001 00000124
+dea0: bf8196ec c00555e3 bf8196b0 00007fff c0053c85 f02c1000 f02c0fff 00000000
+dec0: f02a2000 bf8196b0 0001a670 edb9c000 00000000 bf8196b0 edb9c000 00000000
+dee0: 0001a090 c007cbe3 edb9c000 00000000 0000001f 00000000 00000000 00000000
+df00: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+df20: 00000000 00000000 00000000 00000000 ffffffff 0001e400 0002e328 0001a670
+df40: 00000080 c000ce24 edb9c000 00000000 0001a090 c0055b3f f02a2000 0001e400
+df60: f02b83e4 f02b8239 f02ba824 00015800 000169b0 00000000 00000000 00000000
+df80: 00000028 00000029 0000001e 00000000 00000017 00000000 0001a070 0001a6e8
+dfa0: 0001a688 c000cc81 0001a070 0001a6e8 0002e328 0001e400 0001a670 00000000
+dfc0: 0001a070 0001a6e8 0001a688 00000080 0001a670 0001a008 0001a090 0001a090
+dfe0: 00019220 bef988f8 0000bbd3 b6f1e558 60000030 0002e328 00000000 00000000
+[<bf80fe26>] (igb_get_invariants_82575 [igb]) from [<bf806caf>] (igb_probe+0x22a/0xb80 [igb])
+[<bf806caf>] (igb_probe [igb]) from [<c017d1f5>] (pci_device_probe+0x45/0x6c)
+[<c017d1f5>] (pci_device_probe) from [<c019bead>] (driver_probe_device+0xb5/0x174)
+[<c019bead>] (driver_probe_device) from [<c019bfb7>] (__driver_attach+0x4b/0x4c)
+[<c019bfb7>] (__driver_attach) from [<c019af43>] (bus_for_each_dev+0x27/0x48)
+[<c019af43>] (bus_for_each_dev) from [<c019b967>] (bus_add_driver+0x87/0x128)
+[<c019b967>] (bus_add_driver) from [<c019c379>] (driver_register+0x35/0x84)
+[<c019c379>] (driver_register) from [<bf81e027>] (init_module+0x26/0x3f [igb])
+[<bf81e027>] (init_module [igb]) from [<c0008809>] (do_one_initcall+0xa1/0xe4)
+[<c0008809>] (do_one_initcall) from [<c00555e3>] (load_module+0x1067/0x1544)
+[<c00555e3>] (load_module) from [<c0055b3f>] (SyS_init_module+0x7f/0x8c)
+[<c0055b3f>] (SyS_init_module) from [<c000cc81>] (ret_fast_syscall+0x1/0x46)
+Code: 33b9 f8c4 6300 6863 (f8d3) 8018 
+---[ end trace 53f41ddadca51c60 ]---
+Kernel panic - not syncing: Fatal exception
+CPU2: stopping
+CPU: 2 PID: 0 Comm: swapper/2 Tainted: G      D W    3.14.0-mvebu #18
+[<c0011c39>] (unwind_backtrace) from [<c000f20b>] (show_stack+0xb/0xc)
+[<c000f20b>] (show_stack) from [<c02b5d1b>] (dump_stack+0x4f/0x64)
+[<c02b5d1b>] (dump_stack) from [<c00113b3>] (handle_IPI+0xcb/0x100)
+[<c00113b3>] (handle_IPI) from [<c0008485>] (armada_370_xp_handle_irq+0x7d/0xc8)
+[<c0008485>] (armada_370_xp_handle_irq) from [<c000f9fb>] (__irq_svc+0x3b/0x5c)
+Exception stack(0xed87ffa8 to 0xed87fff0)
+ffa0:                   ffffffed 2d990000 c064ea1c 00000c32 ed87e000 c064e4ac
+ffc0: c064e448 c0671ce5 00000001 c0671ce5 c02bae78 00000000 a0000000 ed87fff0
+ffe0: c000d74d c00416ec 600f0033 ffffffff
+[<c000f9fb>] (__irq_svc) from [<c00416ec>] (cpu_startup_entry+0x44/0xd4)
+[<c00416ec>] (cpu_startup_entry) from [<00008569>] (0x8569)
+CPU1: stopping
+CPU: 1 PID: 0 Comm: swapper/1 Tainted: G      D W    3.14.0-mvebu #18
+[<c0011c39>] (unwind_backtrace) from [<c000f20b>] (show_stack+0xb/0xc)
+[<c000f20b>] (show_stack) from [<c02b5d1b>] (dump_stack+0x4f/0x64)
+[<c02b5d1b>] (dump_stack) from [<c00113b3>] (handle_IPI+0xcb/0x100)
+[<c00113b3>] (handle_IPI) from [<c0008485>] (armada_370_xp_handle_irq+0x7d/0xc8)
+[<c0008485>] (armada_370_xp_handle_irq) from [<c000f9fb>] (__irq_svc+0x3b/0x5c)
+Exception stack(0xed87dfa8 to 0xed87dff0)
+dfa0:                   ffffffed 2d988000 c064ea1c 00001fa4 ed87c000 c064e4ac
+dfc0: c064e448 c0671ce5 00000001 c0671ce5 c02bae78 00000000 a0000000 ed87dff0
+dfe0: c000d74d c00416ec 600f0033 ffffffff
+[<c000f9fb>] (__irq_svc) from [<c00416ec>] (cpu_startup_entry+0x44/0xd4)
+[<c00416ec>] (cpu_startup_entry) from [<00008569>] (0x8569)
+CPU3: stopping
+CPU: 3 PID: 0 Comm: swapper/3 Tainted: G      D W    3.14.0-mvebu #18
+[<c0011c39>] (unwind_backtrace) from [<c000f20b>] (show_stack+0xb/0xc)
+[<c000f20b>] (show_stack) from [<c02b5d1b>] (dump_stack+0x4f/0x64)
+[<c02b5d1b>] (dump_stack) from [<c00113b3>] (handle_IPI+0xcb/0x100)
+[<c00113b3>] (handle_IPI) from [<c0008485>] (armada_370_xp_handle_irq+0x7d/0xc8)
+[<c0008485>] (armada_370_xp_handle_irq) from [<c000f9fb>] (__irq_svc+0x3b/0x5c)
+Exception stack(0xed881fa8 to 0xed881ff0)
+1fa0:                   ffffffed 2d998000 c064ea1c 000006fc ed880000 c064e4ac
+1fc0: c064e448 c0671ce5 00000001 c0671ce5 c02bae78 00000000 a0000000 ed881ff0
+1fe0: c000d74d c00416ec 60000033 ffffffff
+[<c000f9fb>] (__irq_svc) from [<c00416ec>] (cpu_startup_entry+0x44/0xd4)
+[<c00416ec>] (cpu_startup_entry) from [<00008569>] (0x8569)
+Rebooting in 1 seconds..
+BootROM 1.20
 
-Yes. I will fix
->
->> +             struct synopsys_ecc_status *perrstatus)
->
-> Please align function args at the opening brace "("
->
->> +{
->> +     u32 regval;
->> +     u32 clearval = 0;
->> +
->> +     regval = readl(base + SYNOPSYS_DDRC_ECC_STAT_REG_OFFSET) &
->> +                     (SYNOPSYS_DDRC_ECC_STATREG_UECOUNT_MASK |
->> +                     SYNOPSYS_DDRC_ECC_STATREG_CECOUNT_MASK);
->
-> All your macro definitions start with "SYNOPSYS_DDRC" even though
-> they're only local to this file. Which makes the code very unreadable
-> due to their size.
->
-> You could slim them up by dropping the prefix and doing:
->
->         regval = readl(base + STAT_REG_OFFSET) &
->                         (STATREG_UECOUNT_MASK | STATREG_CECOUNT_MASK);
->
-> which is much better IMO.
->
-> The same is true for struct names like synopsys_ecc_status and the like.
-> Shortening them too would slim down your code considerably.
->
->> +
->> +     if (regval == 0)
->> +             return 0;
->
->         if (!regval)
->
->> +
->> +     memset(perrstatus, 0, sizeof(struct synopsys_ecc_status));
->
-> That perrstatus could also be shortened to errstat and make the whole
-> code shorter:
->
->         memset(errstat, 0, sizeof(*errstat));
->
-> and so on...
->
->> +
->> +     perrstatus->ce_count =
->> +                        (regval & SYNOPSYS_DDRC_ECC_STATREG_CECOUNT_MASK) >>
->> +                         SYNOPSYS_DDRC_ECC_STATREG_CECOUNT_SHIFT;
->> +     perrstatus->ue_count =
->> +                        (regval & SYNOPSYS_DDRC_ECC_STATREG_UECOUNT_MASK);
->> +
->> +     if (perrstatus->ce_count) {
->> +             regval = readl(base + SYNOPSYS_DDRC_ECC_CE_LOG_REG_OFFSET);
->> +             if (regval & SYNOPSYS_DDRC_ECC_CE_LOGREG_VALID) {
->> +                     perrstatus->ceinfo.bitpos = (regval &
->> +                             SYNOPSYS_DDRC_ECC_CE_LOGREG_BITPOS_MASK) >>
->> +                             SYNOPSYS_DDRC_ECC_CE_LOGREG_BITPOS_SHIFT;
->> +                     regval = readl(base +
->> +                                     SYNOPSYS_DDRC_ECC_CE_ADDR_REG_OFFSET);
->> +                     perrstatus->ceinfo.row = (regval &
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_ROW_MASK) >>
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_ROW_SHIFT;
->> +                     perrstatus->ceinfo.col = (regval &
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_COL_MASK);
->> +                     perrstatus->ceinfo.bank = (regval &
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_BANK_MASK) >>
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_BANK_SHIFT;
->> +                     perrstatus->ceinfo.data = readl(base +
->> +                             SYNOPSYS_DDRC_ECC_CE_DATA_31_0_REG_OFFSET);
->> +                     edac_dbg(3, "ce bitposition: %d data: %d\n",
->> +                                     perrstatus->ceinfo.bitpos,
->> +                                     perrstatus->ceinfo.data);
->> +             }
->> +             clearval = SYNOPSYS_DDRC_ECCCTRL_CLR_CE_ERR;
->> +     }
->> +
->> +     if (perrstatus->ue_count) {
->> +             regval = readl(base + SYNOPSYS_DDRC_ECC_UE_LOG_REG_OFFSET);
->> +             if (regval & SYNOPSYS_DDRC_ECC_CE_LOGREG_VALID) {
->> +                     regval = readl(base +
->> +                                     SYNOPSYS_DDRC_ECC_UE_ADDR_REG_OFFSET);
->> +                     perrstatus->ueinfo.row = (regval &
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_ROW_MASK) >>
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_ROW_SHIFT;
->> +                     perrstatus->ueinfo.col = (regval &
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_COL_MASK);
->> +                     perrstatus->ueinfo.bank = (regval &
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_BANK_MASK) >>
->> +                                     SYNOPSYS_DDRC_ECC_ADDRREG_BANK_SHIFT;
->> +                     perrstatus->ueinfo.data = readl(base +
->> +                                 SYNOPSYS_DDRC_ECC_UE_DATA_31_0_REG_OFFSET);
->
-> All those assignments could be much shorter:
->
->                         p->ueinfo.row = (regval & ADDRREG_ROW_MASK) >> ADDRREG_ROW_SHIFT;
->
-> Also, you can save yourself two indentation levels by flipping the
-> logic:
->
->         if (!(p->ce_count && (regval & CE_LOGREG_VALID)))
->                 goto ue_error;
->
->         /* CE assignments */
->
->         ...
->
->  ue_error:
->
->         if (!(p->ue_count && (regval & UE_LOGREG_VALID)))
->                 goto out;
->
->         /* UE assignments */
->
->         ...
->
->  out:
->
->         writel(...);
->         writel(...);
->
->
->> +             }
->> +             clearval |= SYNOPSYS_DDRC_ECCCTRL_CLR_UE_ERR;
->> +     }
->> +
->> +     writel(clearval, base + SYNOPSYS_DDRC_ECC_CONTROL_REG_OFFSET);
->> +     writel(0x0, base + SYNOPSYS_DDRC_ECC_CONTROL_REG_OFFSET);
->> +
->> +     return 1;
->> +}
->> +
->> +/**
->> + * synopsys_edac_generate_message - Generate interpreted ECC status message
->> + * @mci:     Pointer to the edac memory controller instance
->> + * @perrstatus:      Pointer to the synopsys ecc status structure
->> + * @buffer:  Pointer to the buffer in which to generate the
->> + *           message
->> + * @size:    The size, in bytes, of space available in buffer
->> + *
->> + * This routine generates to the provided buffer the portion of the
->> + * driver-unique report message associated with the ECC register of
->> + * the specified ECC status.
->> + */
->> +static void synopsys_edac_generate_message(const struct mem_ctl_info *mci,
->> +                     struct synopsys_ecc_status *perrstatus, char *buffer,
->> +                     size_t size)
->> +{
->> +     struct ecc_error_info *pinfo = NULL;
->> +
->> +     if (perrstatus->ce_count > 0)
->> +             pinfo = &perrstatus->ceinfo;
->> +     else
->> +             pinfo = &perrstatus->ueinfo;
->> +
->> +     snprintf(buffer, SYNOPSYS_EDAC_MESSAGE_SIZE,
->> +              "DDR ECC error type :%s Row %d Bank %d Col %d ",
->> +              (perrstatus->ce_count > 0) ? "CE" : "UE", pinfo->row,
->> +              pinfo->bank, pinfo->col);
->> +}
->
-> This function can be part of synopsys_edac_handle_error() below instead
-> as it is simple enough and called only once there - no need for a
-> separate function.
->
->> +
->> +/**
->> + * synopsys_edac_handle_error - Handle controller error types CE and UE
->> + * @mci:     Pointer to the edac memory controller instance
->> + * @perrstatus:      Pointer to the synopsys ecc status structure
->> + *
->> + * This routine handles the controller ECC correctable error.
->
-> It handles also UC errors.
->
->> + */
->> +static void synopsys_edac_handle_error(struct mem_ctl_info *mci,
->> +                     struct synopsys_ecc_status *perrstatus)
->> +{
->> +     char message[SYNOPSYS_EDAC_MESSAGE_SIZE];
->> +
->> +     synopsys_edac_generate_message(mci, perrstatus, &message[0],
->> +                                SYNOPSYS_EDAC_MESSAGE_SIZE);
->> +
->> +     if (perrstatus->ce_count)
->> +             edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
->> +                                  perrstatus->ce_count, 0, 0, 0, 0, 0, -1,
->> +                                  &message[0], "");
->
-> string_array == &string_array[0]
->
->> +     else
->> +             edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci,
->> +                                  perrstatus->ue_count, 0, 0, 0, 0, 0, -1,
->> +                                  &message[0], "");
->
-> Ditto.
->
->> +}
->> +
->> +/**
->> + * synopsys_edac_check - Check controller for ECC errors
->> + * @mci:     Pointer to the edac memory controller instance
->> + *
->> + * This routine is used to check and post ECC errors and is called by
->> + * the EDAC polling thread
->> + */
->> +static void synopsys_edac_check(struct mem_ctl_info *mci)
->> +{
->> +     struct synopsys_edac_priv *priv = mci->pvt_info;
->> +     struct synopsys_ecc_status errstatus;
->> +     int status;
->> +
->> +     status = synopsys_edac_geterror_info(priv->baseaddr, &errstatus);
->> +     if (status) {
->
-> Save an indentation level:
->
->         if (!status)
->                 return;
->
->         priv->ce_count += ...
->         ...
->
->> +             priv->ce_count += errstatus.ce_count;
->> +             priv->ue_count += errstatus.ue_count;
->> +
->> +             if (errstatus.ce_count) {
->> +                     synopsys_edac_handle_error(mci, &errstatus);
->> +                     errstatus.ce_count = 0;
->> +             }
->> +             if (errstatus.ue_count) {
->> +                     synopsys_edac_handle_error(mci, &errstatus);
->> +                     errstatus.ue_count = 0;
->> +             }
->> +             edac_dbg(3, "total error count ce %d ue %d\n",
->> +                      priv->ce_count, priv->ue_count);
->> +     }
->> +}
->> +
->> +/**
->> + * synopsys_edac_get_dtype - Return the controller memory width
->> + * @base:    Pointer to the ddr memory contoller base address
->> + *
->> + * This routine returns the EDAC device type width appropriate for the
->> + * current controller configuration.
->> + *
->> + * Return: a device type width enumeration.
->> + */
->> +static enum dev_type synopsys_edac_get_dtype(void __iomem *base)
->> +{
->> +     enum dev_type dt;
->> +     u32 width;
->> +
->> +     width = readl(base + SYNOPSYS_DDRC_CONTROL_REG_OFFSET);
->> +     width = (width & SYNOPSYS_DDRC_CTRLREG_BUSWIDTH_MASK) >>
->> +                     SYNOPSYS_DDRC_CTRLREG_BUSWIDTH_SHIFT;
->> +
->> +     switch (width) {
->> +     case SYNOPSYS_DDRCTL_WDTH_16:
->> +             dt = DEV_X2;
->> +             break;
->> +     case SYNOPSYS_DDRCTL_WDTH_32:
->> +             dt = DEV_X4;
->> +             break;
->> +     default:
->> +             dt = DEV_UNKNOWN;
->> +     }
->> +
->> +     return dt;
->> +}
->> +
->> +/**
->> + * synopsys_edac_get_eccstate - Return the controller ecc enable/disable status
->> + * @base:    Pointer to the ddr memory contoller base address
->> + *
->> + * This routine returns the ECC enable/diable status for the controller
->> + *
->> + * Return: a ecc status boolean i.e true/false - enabled/disabled.
->> + */
->> +static bool synopsys_edac_get_eccstate(void __iomem *base)
->> +{
->> +     enum dev_type dt;
->> +     u32 ecctype;
->> +     bool state = false;
->> +
->> +     dt = synopsys_edac_get_dtype(base);
->
-> Shouldn't you handle the error case where it returns DEV_UNKNOWN type?
->
->> +
->> +     ecctype = (readl(base + SYNOPSYS_DDRC_ECC_SCRUB_REG_OFFSET) &
->> +                     SYNOPSYS_DDRC_ECC_SCRUBREG_ECC_MODE_MASK);
->> +
->> +     if ((ecctype == SYNOPSYS_DDRC_ECC_SCRUBREG_ECCMODE_SECDED)
->> +                     && (dt == DEV_X2)) {
->> +             state = true;
->> +             writel(0x0, base + SYNOPSYS_DDRC_ECC_CONTROL_REG_OFFSET);
->> +     } else {
->> +             state = false;
->
-> Why that else branch? state is already initialized to false at function
-> entry time.
->
->> +     }
->> +
->> +     return state;
->> +}
->> +
->> +/**
->> + * synopsys_edac_get_memsize - reads the size of the attached memory device
->> + *
->> + * Return: the memory size in bytes
->> + *
->> + * This routine returns the size of the system memory by reading the sysinfo
->> + * information
->> + */
->
-> No need for that comment.
->
->> +static u32 synopsys_edac_get_memsize(void)
->> +{
->> +     struct sysinfo inf;
->> +
->> +     /* Reading the system memory size from the global meminfo structure */
->
-> Same here.
->
-> For simple functions where it is paramount what the function does, you
-> don't need to comment every line.
->
->> +     si_meminfo(&inf);
->> +
->> +     return inf.totalram * inf.mem_unit;
->> +}
->> +
->> +/**
->> + * synopsys_edac_get_mtype - Returns controller memory type
->> + * @base:    pointer to the synopsys ecc status structure
->> + *
->> + * This routine returns the EDAC memory type appropriate for the
->> + * current controller configuration.
->> + *
->> + * Return: a memory type enumeration.
->> + */
->> +static enum mem_type synopsys_edac_get_mtype(void __iomem *base)
->> +{
->> +     enum mem_type mt;
->> +     u32 memtype;
->> +
->> +     memtype = readl(base + SYNOPSYS_DDRC_T_ZQ_REG_OFFSET);
->> +
->> +     if (memtype & SYNOPSYS_DDRC_T_ZQ_REG_DDRMODE_MASK)
->> +             mt = MEM_DDR3;
->> +     else
->> +             mt = MEM_DDR2;
->> +
->> +     return mt;
->> +}
->> +
->> +/**
->> + * synopsys_edac_init_csrows - Initialize the cs row data
->> + * @mci:     Pointer to the edac memory controller instance
->> + *
->> + * This routine initializes the chip select rows associated
->> + * with the EDAC memory controller instance
->> + *
->> + * Return: 0 if OK; otherwise, -EINVAL if the memory bank size
->
-> Where is that -EINVAL being returned?
->
->> + * configuration cannot be determined.
->> + */
->> +static int synopsys_edac_init_csrows(struct mem_ctl_info *mci)
->> +{
->> +     struct csrow_info *csi;
->> +     struct dimm_info *dimm;
->> +     struct synopsys_edac_priv *priv = mci->pvt_info;
->> +     u32 size;
->> +     int row, j;
->> +
->> +     for (row = 0; row < mci->nr_csrows; row++) {
->> +             csi = mci->csrows[row];
->> +             size = synopsys_edac_get_memsize();
->> +
->> +             for (j = 0; j < csi->nr_channels; j++) {
->> +                     dimm = csi->channels[j]->dimm;
->> +                     dimm->edac_mode = EDAC_FLAG_SECDED;
->> +                     dimm->mtype = synopsys_edac_get_mtype(priv->baseaddr);
->> +                     dimm->nr_pages =
->> +                         (size >> PAGE_SHIFT) / csi->nr_channels;
->> +                     dimm->grain = SYNOPSYS_EDAC_ERROR_GRAIN;
->> +                     dimm->dtype = synopsys_edac_get_dtype(priv->baseaddr);
->> +             }
->> +
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +/**
->> + * synopsys_edac_mc_init - Initialize driver instance
->> + * @mci:     Pointer to the edac memory controller instance
->> + * @pdev:    Pointer to the platform_device struct
->> + *
->> + * This routine performs initialization of the EDAC memory controller
->> + * instance and related driver-private data associated with the
->> + * memory controller the instance is bound to.
->> + *
->> + * Return: 0 if OK; otherwise, < 0 on error.
->> + */
->> +static int synopsys_edac_mc_init(struct mem_ctl_info *mci,
->> +                     struct platform_device *pdev)
->> +{
->> +     int status;
->> +     struct synopsys_edac_priv *priv;
->> +
->> +     /* Initial driver pointers and private data */
->
-> Useless comment.
->
->> +     mci->pdev = &pdev->dev;
->> +     priv = mci->pvt_info;
->> +     platform_set_drvdata(pdev, mci);
->> +
->> +     /* Initialize controller capabilities and configuration */
->> +     mci->mtype_cap = MEM_FLAG_DDR3 | MEM_FLAG_DDR2;
->> +     mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
->> +     mci->scrub_cap = SCRUB_HW_SRC;
->> +     /* Check the scrub setting from the controller */
->
-> Useless comment.
->
->> +     mci->scrub_mode = SCRUB_NONE;
->> +
->> +     mci->edac_cap = EDAC_FLAG_SECDED;
->> +     /* Initialize strings */
->
-> Useless comment.
->
->> +     mci->ctl_name = "synopsys_ddr_controller";
->> +     mci->dev_name = dev_name(&pdev->dev);
->> +     mci->mod_name = "synopsys_edac";
->
-> Do a
->
-> #define EDAC_MOD_STR    "synopsys_edac"
->
-> like the other drivers do and use that here and below.
->
->> +     mci->mod_ver = "1";
->> +
->> +     /* Initialize callbacks */
->
-> Useless comment.
->
->> +     edac_op_state = EDAC_OPSTATE_POLL;
->> +     mci->edac_check = synopsys_edac_check;
->> +     mci->ctl_page_to_phys = NULL;
->> +
->> +     /*
->> +      * Initialize the MC control structure 'csrows' table
->> +      * with the mapping and control information.
->> +      */
->> +     status = synopsys_edac_init_csrows(mci);
->> +     if (status)
->> +             pr_err("Failed to initialize rows!\n");
->
-> edac_printk
->
->> +
->> +     return status;
->> +}
->> +
->> +/**
->> + * synopsys_edac_mc_probe - Check controller and bind driver
->> + * @pdev:    Pointer to the platform_device struct
->> + *
->> + * This routine probes a specific controller
->> + * instance for binding with the driver.
->> + *
->> + * Return: 0 if the controller instance was successfully bound to the
->> + * driver; otherwise, < 0 on error.
->> + */
->> +static int synopsys_edac_mc_probe(struct platform_device *pdev)
->> +{
->> +     struct mem_ctl_info *mci;
->> +     struct edac_mc_layer layers[2];
->> +     struct synopsys_edac_priv *priv;
->> +     int rc;
->> +     struct resource *res;
->> +     void __iomem *baseaddr;
->> +
->> +     /* Get the data from the platform device */
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->
-> You're not handling the case where this function returns NULL.
 
-devm_ioremap_resource function will check this condition, so not
-checking for the NULL explicitly
->
->> +     baseaddr = devm_ioremap_resource(&pdev->dev, res);
->> +     if (IS_ERR(baseaddr))
->> +             return PTR_ERR(baseaddr);
->> +
->> +     /* Check for the ecc enable status */
->> +     if (synopsys_edac_get_eccstate(baseaddr) == false) {
->
->         if (!get_eccstate(...))
->
->> +             dev_err(&pdev->dev, "ecc not enabled\n");
->
-> edac_printk pls.
->
->> +             return -ENXIO;
->> +     }
->> +
->> +     /*
->> +      * At this point, we know ECC is enabled, allocate an EDAC
->> +      * controller instance and perform the appropriate
->> +      * initialization.
->> +      */
->> +     layers[0].type = EDAC_MC_LAYER_CHIP_SELECT;
->> +     layers[0].size = SYNOPSYS_EDAC_NR_CSROWS;
->> +     layers[0].is_virt_csrow = true;
->> +     layers[1].type = EDAC_MC_LAYER_CHANNEL;
->> +     layers[1].size = SYNOPSYS_EDAC_NR_CHANS;
->> +     layers[1].is_virt_csrow = false;
->> +
->> +     mci = edac_mc_alloc(0, ARRAY_SIZE(layers), layers,
->> +                         sizeof(struct synopsys_edac_priv));
->> +     if (mci == NULL) {
->
->         if (!mci)
->
->> +             pr_err("Failed memory allocation for mci instance!\n");
->
-> edac_printk
->
-> Before you return, devm_iounmap(... baseaddr). Just do it with nice goto
-> labels.
+The cause is obvious, the two callers compute a wrong size, so the attached
+patch fixes it. After that I still get the panic but for the proper reason :
 
-Since the probe returns error, it it that the devm_ framework will clean these
-resources automatically?
->
->> +             return -ENOMEM;
->> +     }
->> +
->> +     priv = mci->pvt_info;
->> +     priv->baseaddr = baseaddr;
->> +     rc = synopsys_edac_mc_init(mci, pdev);
->> +     if (rc) {
->> +             pr_err("Failed to initialize instance!\n");
->
-> edac_printk
->
->> +             goto free_edac_mc;
->> +     }
->> +
->> +     /*
->> +      * We have a valid, initialized EDAC instance bound to the
->> +      * controller. Attempt to register it with the EDAC subsystem
->> +      */
->> +     rc = edac_mc_add_mc(mci);
->> +     if (rc) {
->> +             dev_err(&pdev->dev, "failed to register with EDAC core\n");
->
-> Ditto.
->
->> +             goto del_edac_mc;
->> +     }
->> +
->> +     return rc;
->> +
->> +del_edac_mc:
->> +     edac_mc_del_mc(&pdev->dev);
->> +free_edac_mc:
->> +     edac_mc_free(mci);
->> +
->> +     return rc;
->> +}
->> +
->> +/**
->> + * synopsys_edac_mc_remove - Unbind driver from controller
->> + * @pdev:    Pointer to the platform_device struct
->> + *
->> + * This routine unbinds the EDAC memory controller instance associated
->> + * with the specified controller described by the
->> + * OpenFirmware device tree node passed as a parameter.
->> + *
->> + * Return: Unconditionally 0
->> + */
->
-> No need for that whole comment at all.
->
->> +static int synopsys_edac_mc_remove(struct platform_device *pdev)
->> +{
->> +     struct mem_ctl_info *mci = platform_get_drvdata(pdev);
->> +
->> +     edac_mc_del_mc(&pdev->dev);
->> +     edac_mc_free(mci);
->> +
->> +     return 0;
->> +}
->> +
->> +/* Device tree node type and compatible tuples this driver can match on */
->
-> Ditto.
->
->> +static struct of_device_id synopsys_edac_match[] = {
->> +     { .compatible = "xlnx,zynq-ddrc-1.04", },
->> +     { /* end of table */ }
->> +};
->> +
->> +MODULE_DEVICE_TABLE(of, synopsys_edac_match);
->> +
->> +static struct platform_driver synopsys_edac_mc_driver = {
->> +     .driver = {
->> +                .name = "synopsys-edac",
->> +                .owner = THIS_MODULE,
->> +                .of_match_table = synopsys_edac_match,
->> +                },
->> +     .probe = synopsys_edac_mc_probe,
->> +     .remove = synopsys_edac_mc_remove,
->> +};
->> +
->> +module_platform_driver(synopsys_edac_mc_driver);
->> +
->> +MODULE_AUTHOR("Xilinx, Inc.");
->> +MODULE_DESCRIPTION("Synopsys DDR ECC driver");
->> +MODULE_LICENSE("GPL v2");
->
-> Ok, that should be it so far, more review with the next submission.
+root at xpgp:~# modprobe igb
+igb: Intel(R) Gigabit Ethernet Network Driver - version 5.0.5-k
+igb: Copyright (c) 2007-2013 Intel Corporation.
+PCI: enabling device 0000:00:09.0 (0140 -> 0143)
+mvebu_pcie_handle_iobase_change: base=e8010000 size=00001000
+mvebu_pcie_handle_membase_change: base=e0000000 size=00300000
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1242 at drivers/bus/mvebu-mbus.c:271 mvebu_mbus_setup_window+0xb3/0xe4()
+Invalid MBus window size: 0x300000
+Modules linked in: igb(+) i2c_algo_bit
+CPU: 0 PID: 1242 Comm: modprobe Not tainted 3.14.0-mvebu #26
+[<c0011c39>] (unwind_backtrace) from [<c000f20b>] (show_stack+0xb/0xc)
+[<c000f20b>] (show_stack) from [<c02b5d4b>] (dump_stack+0x4f/0x64)
+[<c02b5d4b>] (dump_stack) from [<c001a145>] (warn_slowpath_common+0x49/0x68)
+[<c001a145>] (warn_slowpath_common) from [<c001a1bd>] (warn_slowpath_fmt+0x1d/0x28)
+(...)
 
-Thanks for the detailed review and i will implement all other comments and will
-send the next version once we conclude the resolutions for my above concerns
-and comments.
+I still don't know why it ends up in a panic, but we die on the expected
+test now.
 
-Regrads,
-Punnaiah
->
-> --
-> Regards/Gruss,
->     Boris.
->
-> Sent from a fat crate under my desk. Formatting is fine.
-> --
+Regards,
+Willy
+
+-------------- next part --------------
+>From de000611015c7490a07ced6e36bfffbfdd136832 Mon Sep 17 00:00:00 2001
+From: Willy Tarreau <w@1wt.eu>
+Date: Wed, 9 Apr 2014 08:05:09 +0200
+Subject: pci: mvebu: fix off-by-one in the computed size of the mbus windows
+
+mvebu_pcie_handle_membase_change() and mvebu_pcie_handle_iobase_change()
+compute a window size which is in fact a mask. This size is fed to
+mvebu_mbus_add_window_by_id() which itself subtracts 1 to get the
+mask. So clearly the two functions above are wrong.
+
+Fix this by adding one to the computed size.
+
+Signed-off-by: Willy Tarreau <w@1wt.eu>
+---
+ drivers/pci/host/pci-mvebu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 0e79665..eff0ab5 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -329,7 +329,7 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 	port->iowin_base = port->pcie->io.start + iobase;
+ 	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+ 			    (port->bridge.iolimitupper << 16)) -
+-			    iobase);
++			    iobase) + 1;
+ 
+ 	mvebu_mbus_add_window_remap_by_id(port->io_target, port->io_attr,
+ 					  port->iowin_base, port->iowin_size,
+@@ -362,7 +362,7 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+ 	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
+ 	port->memwin_size  =
+ 		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+-		port->memwin_base;
++		port->memwin_base + 1;
+ 
+ 	mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+ 				    port->memwin_base, port->memwin_size);
+-- 
+1.7.12.2.21.g234cd45.dirty
