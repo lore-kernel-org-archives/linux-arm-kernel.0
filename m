@@ -1,192 +1,57 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 09 Apr 2014 20:54:08 +0000
-Subject: [PATCH 4/4] arm: mediatek: Add earlyprintk support for MT6589
-In-Reply-To: <1397072736-10793-5-git-send-email-matthias.bgg@gmail.com>
+Date: Wed, 09 Apr 2014 20:56:34 +0000
+Subject: [PATCH 2/4] dt-bindings: add mtk-timer bindings
+In-Reply-To: <1397072736-10793-3-git-send-email-matthias.bgg@gmail.com>
 References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
- <1397072736-10793-5-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <5345B370.6060004@free-electrons.com>
+ <1397072736-10793-3-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <5345B402.9070904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Matthias,
-
 On 09/04/2014 19:45, Matthias Brugger wrote:
+> Add binding documentation for the General Porpose Timer driver of
+> the Mediatek SoCs.
+> 
 > Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
->  arch/arm/Kconfig.debug            |   49 +++++++++++++++++++++++++++++++++++--
->  arch/arm/include/debug/mediatek.S |   38 ++++++++++++++++++++++++++++
->  2 files changed, 85 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/include/debug/mediatek.S
+>  .../bindings/timer/mediatek,mtk-timer.txt          |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
 > 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 4a2fc0b..dc51495 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -797,6 +797,38 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on Ux500 based platforms.
->  
-> +	config DEBUG_MTK6589_UART0
-> +		depends on ARCH_MEDIATEK
-> +		bool "Mediatek mt6589 UART0"
-> +		select DEBUG_UART_MEDIATEK
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Mediatek mt6589 based platforms.
-> +
-> +	config DEBUG_MTK6589_UART1
-> +		depends on ARCH_MEDIATEK
-> +		bool "Mediatek mt6589 UART1"
-> +		select DEBUG_UART_MEDIATEK
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Mediatek mt6589 based platforms.
-> +
-> +	config DEBUG_MTK6589_UART2
-> +		depends on ARCH_MEDIATEK
-> +		bool "Mediatek mt6589 UART2"
-> +		select DEBUG_UART_MEDIATEK
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Mediatek mt6589 based platforms.
-> +
-> +	config DEBUG_MTK6589_UART3
-> +		depends on ARCH_MEDIATEK
-> +		bool "Mediatek mt6589 UART3"
-> +		select DEBUG_UART_MEDIATEK
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Mediatek mt6589 based platforms.
-> +
->  	config DEBUG_VEXPRESS_UART0_DETECT
->  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
->  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
-> @@ -954,6 +986,10 @@ config DEBUG_MSM_UART
->  	bool
->  	depends on ARCH_MSM || ARCH_QCOM
->  
-> +config DEBUG_UART_MEDIATEK
-> +	bool
-> +	depends on ARCH_MEDIATEK
-> +
->  config DEBUG_LL_INCLUDE
->  	string
->  	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
-> @@ -971,6 +1007,7 @@ config DEBUG_LL_INCLUDE
->  				 DEBUG_IMX53_UART ||\
->  				 DEBUG_IMX6Q_UART || \
->  				 DEBUG_IMX6SL_UART
-> +	default "debug/mediatek.S" if DEBUG_UART_MEDIATEK
->  	default "debug/msm.S" if DEBUG_MSM_UART
->  	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
->  	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
-> @@ -1043,6 +1080,10 @@ config DEBUG_UART_PHYS
->  	default 0xd0012000 if DEBUG_MVEBU_UART
->  	default 0xd4017000 if DEBUG_MMP_UART2
->  	default 0xd4018000 if DEBUG_MMP_UART3
-
-it seems that this symbol are sorted by address so your symbols
-should go just after the line
-default 0x101fb000 if DEBUG_NOMADIK_UART
-
-> +	default 0x11006000 if DEBUG_MTK6589_UART0
-> +	default 0x11007000 if DEBUG_MTK6589_UART1
-> +	default 0x11008000 if DEBUG_MTK6589_UART2
-> +	default 0x11009000 if DEBUG_MTK6589_UART3
->  	default 0xe0000000 if ARCH_SPEAR13XX
->  	default 0xf0000be0 if ARCH_EBSA110
->  	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
-> @@ -1058,7 +1099,7 @@ config DEBUG_UART_PHYS
->  	default 0xfffff700 if ARCH_IOP33X
->  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
->  		DEBUG_LL_UART_EFM32 || \
-> -		DEBUG_UART_8250 || DEBUG_UART_PL01X
-> +		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_UART_MEDIATEK
->  
->  config DEBUG_UART_VIRT
->  	hex "Virtual base address of debug UART"
-> @@ -1087,6 +1128,10 @@ config DEBUG_UART_VIRT
->  	default 0xfe012000 if ARCH_ORION5X
->  	default 0xfe017000 if DEBUG_MMP_UART2
->  	default 0xfe018000 if DEBUG_MMP_UART3
-> +	default 0xF1006000 if DEBUG_MTK6589_UART0
-> +	default 0xF1007000 if DEBUG_MTK6589_UART1
-> +	default 0xF1008000 if DEBUG_MTK6589_UART2
-> +	default 0xF1009000 if DEBUG_MTK6589_UART3
->  	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
->  	default 0xfe230000 if DEBUG_PICOXCELL_UART
->  	default 0xfe300000 if DEBUG_BCM_KONA_UART
-> @@ -1116,7 +1161,7 @@ config DEBUG_UART_VIRT
->  	default 0xff003000 if DEBUG_U300_UART
->  	default DEBUG_UART_PHYS if !MMU
->  	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
-> -		DEBUG_UART_8250 || DEBUG_UART_PL01X
-> +		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_UART_MEDIATEK
->  
->  config DEBUG_UART_8250_SHIFT
->  	int "Register offset shift for the 8250 debug UART"
-> diff --git a/arch/arm/include/debug/mediatek.S b/arch/arm/include/debug/mediatek.S
+> diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
 > new file mode 100644
-> index 0000000..98e8414
+> index 0000000..db3c836
 > --- /dev/null
-> +++ b/arch/arm/include/debug/mediatek.S
-> @@ -0,0 +1,38 @@
-> +/*
-> + * Low-level debug macro for Mediatek SoCs
-> + *
-> + * Copyright (c) 2014 MundoReader S.L.
-> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/serial_reg.h>
+> +++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+> @@ -0,0 +1,19 @@
+> +Mediatek MT6598, MT6577 and MT6572 Timers
+> +---------------------------------------
 > +
-> +	        .macro  addruart, rp, rv, tmp
-> +	        ldr	\rp, =CONFIG_DEBUG_UART_PHYS
-> +	        ldr	\rv, =CONFIG_DEBUG_UART_VIRT
-> +	        .endm
-> +
-> +	        .macro  senduart,rd,rx
-> +	        strb    \rd, [\rx, #0x0]
-What about using a #define instead of numerical value?
+> +Required properties:
+> +- compatible: Should be "mediatek,mtk6589-timer"
+> +- reg: Should contain location and length for timers register.
+> +- clock-names : Must include the following entries:
+> +  "sysclk" (13 MHz system clock),
+> +  "rtcclk" (32 KHz RTC clock).
 
-> +	        .endm
-> +
-> +	        .macro  waituart,rd,rx
-> +1001:   	ldr \rd, [\rx, #0x14]
-ditto
-> +	        tst \rd, #0x40
-ditto
-> +	        beq 1001b
-> +	        .endm
-> +
-> +		.macro  busyuart,rd,rx
-> +1002:   	ldr \rd, [\rx, #0x14]
-ditto
-> +	        tst \rd, #0x40
-ditto
-> +	        beq 1002b
-> +	        .endm
-> 
-
-This file looks very similar to arch/arm/include/debug/pl01x.S,
-the only difference is the value of some register offsets.
-Should it be possible to make it configurable and then use the
-same file?
-
+It would be better to make the clocks mandatory and not their name
 
 Thanks,
 
 Gregory
 
+> +
+> +Examples:
+> +
+> +	timer {
+> +		compatible = "mediatek,mtk6589-timer";
+> +		reg = <0x10008000 0x80>;
+> +		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&system_clk>, <&rtc-clk>;
+> +		clock-names = "sysclk", "rtcclk";
+> +	};
+> 
 
 
 -- 
