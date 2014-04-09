@@ -1,53 +1,49 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 9 Apr 2014 10:20:40 -0600
-Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
-In-Reply-To: <20140409061128.GC16465@1wt.eu>
-References: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20140409061128.GC16465@1wt.eu>
-Message-ID: <20140409162040.GA19743@obsidianresearch.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Wed, 9 Apr 2014 09:23:07 -0700
+Subject: [RESEND PATCH v5 1/5] Documentation: dt: Add Kona PWM binding
+In-Reply-To: <1397060591-5060-1-git-send-email-tim.kryger@linaro.org>
+References: <1397060591-5060-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1397060591-5060-2-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 08:11:29AM +0200, Willy Tarreau wrote:
+Add the binding description for the Kona PWM controller found on Broadcom's
+mobile SoCs.
 
-> OK I just got it by adding two printk() in pci-mvebu.c. Both functions
-> mvebu_pcie_handle_iobase_change() and mvebu_pcie_handle_membase_change()
-> do pass a size which is in fact a mask (size - 1) and not the real size.
-> So the mbus is fed with an incorrect size which is off by one :
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Alex Elder <elder@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+---
+ .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |   21 ++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
 
-Yes, that is right. I tested my patch here and didn't see any problem,
-but I realize now that the mbus code is bailing early due to this:
-
-kernel: mvebu_mbus: cannot add window '4:e8', conflicts with another window
-
-Which I've never got around to fixing.. (whole other story there)
-
-Your patch looks fine, and it obviously needs to be sequenced before
-mine. (Thomas/Jason C: how do you want to do this?)
-
-Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-
-> From de000611015c7490a07ced6e36bfffbfdd136832 Mon Sep 17 00:00:00 2001
-> From: Willy Tarreau <w@1wt.eu>
-> Date: Wed, 9 Apr 2014 08:05:09 +0200
-> Subject: pci: mvebu: fix off-by-one in the computed size of the mbus windows
-> 
-> mvebu_pcie_handle_membase_change() and mvebu_pcie_handle_iobase_change()
-> compute a window size which is in fact a mask. This size is fed to
-> mvebu_mbus_add_window_by_id() which itself subtracts 1 to get the
-> mask. So clearly the two functions above are wrong.
-
-Mask isn't the right word, maybe:
-
-mvebu_pcie_handle_membase_change() and
-mvebu_pcie_handle_iobase_change() do not correctly compute the window
-size. PCI uses an inclusive start/end address pair, which requires a
-+1 when converting to size.
-
-This only worked because a bug in the mbus driver allowed it to
-silently accept and round up bogus sizes.
-
-Fix this by adding one to the computed size.
-
-Regards,
-Jason
+diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+new file mode 100644
+index 0000000..8eae9fe
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+@@ -0,0 +1,21 @@
++Broadcom Kona PWM controller device tree bindings
++
++This controller has 6 channels.
++
++Required Properties :
++- compatible: should contain "brcm,kona-pwm"
++- reg: physical base address and length of the controller's registers
++- clocks: phandle + clock specifier pair for the external clock
++- #pwm-cells: Should be 3. See pwm.txt in this directory for a
++  description of the cells format.
++
++Refer to clocks/clock-bindings.txt for generic clock consumer properties.
++
++Example:
++
++pwm: pwm at 3e01a000 {
++	compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
++	reg = <0x3e01a000 0xc4>;
++	clocks = <&pwm_clk>;
++	#pwm-cells = <3>;
++};
+-- 
+1.7.9.5
