@@ -1,48 +1,49 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 9 Apr 2014 09:22:41 -0300
-Subject: [PATCH 2/2] net: mvneta: fix usage as a module on RGMII
- configurations
-In-Reply-To: <20140403113652.33f11413@skate>
-References: <1395789942-20764-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1395789942-20764-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <533C1B75.2020803@free-electrons.com>
- <20140403113652.33f11413@skate>
-Message-ID: <20140409122241.GE1160@arch.cereza>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 9 Apr 2014 17:54:38 +0530
+Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
+ on/off
+In-Reply-To: <534538F6.2010009@samsung.com>
+References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+ <534538F6.2010009@samsung.com>
+Message-ID: <CAFp+6iHf5Ndt3yNbdAaayXi08-A54Sk8LDTiASm4RTw09GuWvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+Hi Sylwester,
 
-On Apr 03, Thomas Petazzoni wrote:
-> On Wed, 02 Apr 2014 16:15:17 +0200, Gregory CLEMENT wrote:
-> 
-> > > This commit was successfully tested with mvneta compiled as a module,
-> > > on both the OpenBlocks AX3 (SGMII configuration) and the Armada XP GP
-> > > (RGMII configuration).
-> > 
-> > Unfortunately with this patch, mvneta doesn't work anymore on the
-> > Mirabox (Armada 370 based board) on 3.14.I didn't managed to do a
-> > simple ping.
-> > 
-> > Once I removed this commit then the driver worked again.
-> 
-> Problem reproduced. It turns out that some RGMII platforms need the
-> PCS_ENABLE bit to be set (e.g: Armada XP GP), while some other
-> platforms need the PCS_ENABLE bit to be cleared (e.g: Armada 370
-> Mirabox). I've verified that on both platforms.
-> 
-> I've asked for more details about this bit to understand in which
-> situation it should be set or cleared. I'll get back to you with an
-> updated patch once I have enough information to write a fix.
-> 
 
-Just found this commit is in v3.12.17 and prevents booting the A370
-Mirabox with nfsroot.
+On Wed, Apr 9, 2014 at 5:41 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> Hi Vivek,
+>
+> On 09/04/14 13:54, Vivek Gautam wrote:
+>> Adding support to enable/disable VBUS hooked to a gpio
+>> to enable vbus supply on the port.
+>
+> Does the GPIO control a fixed voltage regulator ? If so, shouldn't
+> it be modelled by the regulator API instead ?
 
-Maybe we should revert it in stable for now until we can solve it?
+No, this GPIO controls a 'current limiting power distribution switch',
+which gives the output vbus to usb controller.
+Should i model this as a fixed regulator ?
 
-Unless you have a better idea.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> [...]
+>> +     /* Get required GPIO for vbus */
+>> +     phy_drd->gpio = of_get_named_gpio(dev->of_node,
+>> +                                       "samsung,vbus-gpio", 0);
+>> +     if (!gpio_is_valid(phy_drd->gpio))
+>> +             dev_dbg(dev, "no usbdrd-phy vbus gpio defined\n");
+>> +
+>> +     if (devm_gpio_request(dev, phy_drd->gpio, "phydrd_vbus_gpio"))
+>> +             dev_dbg(dev, "can't request usbdrd-phy vbus gpio %d\n",
+>> +                     phy_drd->gpio);
+>
+> --
+> Regards,
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
