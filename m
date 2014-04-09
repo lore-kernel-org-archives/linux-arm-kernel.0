@@ -1,45 +1,44 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed,  9 Apr 2014 21:45:34 +0200
-Subject: [PATCH 2/4] dt-bindings: add mtk-timer bindings
-In-Reply-To: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1397072736-10793-3-git-send-email-matthias.bgg@gmail.com>
+Date: Wed,  9 Apr 2014 21:45:32 +0200
+Subject: [PATCH 0/4] arm: Add basic support for Mediatek Cortex-A7 SoCs
+Message-ID: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for the General Porpose Timer driver of
-the Mediatek SoCs.
+This patch set adds basic support for the Mediatek Cortex-A7 SoCs.
+Support is quite basic, as the only components working up to now are the
+timers and the low-level debug via UART.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- .../bindings/timer/mediatek,mtk-timer.txt          |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+The patch series is build against torvalds/master tree
+
+
+Matthias Brugger (4):
+  clocksource: Add support for the Mediatek SoCs
+  dt-bindings: add mtk-timer bindings
+  arm: add basic support for Mediatek MT6589 boards
+  arm: mediatek: Add earlyprintk support for MT6589
+
+ .../bindings/timer/mediatek,mtk-timer.txt          |   19 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |   49 +++-
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/mtk6589.dtsi                     |  105 +++++++++
+ arch/arm/include/debug/mediatek.S                  |   38 +++
+ arch/arm/mach-mediatek/Kconfig                     |   14 ++
+ arch/arm/mach-mediatek/Makefile                    |    1 +
+ arch/arm/mach-mediatek/mediatek.c                  |   40 ++++
+ drivers/clocksource/Kconfig                        |    4 +
+ drivers/clocksource/Makefile                       |    1 +
+ drivers/clocksource/mtk_timer.c                    |  248 ++++++++++++++++++++
+ 13 files changed, 521 insertions(+), 2 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+ create mode 100644 arch/arm/boot/dts/mtk6589.dtsi
+ create mode 100644 arch/arm/include/debug/mediatek.S
+ create mode 100644 arch/arm/mach-mediatek/Kconfig
+ create mode 100644 arch/arm/mach-mediatek/Makefile
+ create mode 100644 arch/arm/mach-mediatek/mediatek.c
+ create mode 100644 drivers/clocksource/mtk_timer.c
 
-diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-new file mode 100644
-index 0000000..db3c836
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
-@@ -0,0 +1,19 @@
-+Mediatek MT6598, MT6577 and MT6572 Timers
-+---------------------------------------
-+
-+Required properties:
-+- compatible: Should be "mediatek,mtk6589-timer"
-+- reg: Should contain location and length for timers register.
-+- clock-names : Must include the following entries:
-+  "sysclk" (13 MHz system clock),
-+  "rtcclk" (32 KHz RTC clock).
-+
-+Examples:
-+
-+	timer {
-+		compatible = "mediatek,mtk6589-timer";
-+		reg = <0x10008000 0x80>;
-+		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&system_clk>, <&rtc-clk>;
-+		clock-names = "sysclk", "rtcclk";
-+	};
 -- 
 1.7.9.5
