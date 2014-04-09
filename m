@@ -1,54 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 8 Apr 2014 23:44:31 -0400 (EDT)
-Subject: Big endian working?
-In-Reply-To: <12950765.TpxjkTx5NP@wuerfel>
-References: <20140408095446.0520dd28@skate> <5343BDEE.4010005@linaro.org>
- <12950765.TpxjkTx5NP@wuerfel>
-Message-ID: <alpine.LFD.2.11.1404082339291.1571@knanqh.ubzr>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed,  9 Apr 2014 09:30:41 +0530
+Subject: [PATCH 1/2] usb: ehci-exynos: Return immediately from suspend if
+ ehci_suspend fails
+Message-ID: <1397016042-4451-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Apr 2014, Arnd Bergmann wrote:
+Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
+adds a check for possible race between suspend and wakeup interrupt,
+and thereby it returns -EBUSY as error code if there's a wakeup
+interrupt.
+So the platform host controller should not proceed further with
+its suspend callback, rather should return immediately to avoid
+powering down the essential things, like phy.
 
-> On Tuesday 08 April 2014 12:14:22 Taras Kondratiuk wrote:
-> > On 04/08/2014 10:54 AM, Thomas Petazzoni wrote:
-> > > Hello Taras,
-> > >
-> > > I'm currently trying to get ARM BE to work on Armada XP. I'm pretty
-> > > sure it used to work on 3.13, but now I'm testing 3.13 and 3.14 and it
-> > > doesn't boot here (it hangs even before "Uncompressing kernel...",
-> > > apparently while relocating the kernel image before decompression).
-> > >
-> > > Ben Dooks told me that the ARM BE kernel works for you. Can you confirm
-> > > which kernel version you're using, and if you've applied any patch?
-> > > Also, can you confirm which toolchain and toolchain version you're
-> > > using?
-> > 
-> > Hi Tom
-> > 
-> > To boot BE kernel from LE u-boot I'm using a few patches on top of 
-> > upstream kernel.
-> > 
-> > git://git.linaro.org/people/taras.kondratiuk/linux.git arm-be-boot-le
-> > 
-> > ----------------------------------------------------------------
-> > Ben Dooks (1):
-> >        ARM: add CPU_BE8_BOOT_LE configuration
-> > 
-> > Nico Pitre (1):
-> >        ARM: ensure loader information in LE format for BE kernels
-> 
-> Sorry for lacking the history on this patch set, but why would
-> you ever want to have this as a compile-time conditional?
-> 
-> Did anyone really put a u-boot on shipping hardware that expects
-> the headers in big-endian format?
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Jingoo Han <jg1.han@samsung.com>
+---
 
-If I remember correctly, those are for booting a BE kernel on hardware 
-that initializes in LE mode and expects a LE kernel.  Since the zImage 
-header values are defined to be words, those must be swapped so they 
-read as LE even if the kernel is BE.  Of course the kernel is then 
-responsible for switching the endian mode when entered.
+Based on 'usb-next' branch of Greg's usb tree.
 
+ drivers/usb/host/ehci-exynos.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Nicolas
+diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+index d1d8c47..a4550eb 100644
+--- a/drivers/usb/host/ehci-exynos.c
++++ b/drivers/usb/host/ehci-exynos.c
+@@ -212,6 +212,8 @@ static int exynos_ehci_suspend(struct device *dev)
+ 	int rc;
+ 
+ 	rc = ehci_suspend(hcd, do_wakeup);
++	if (rc)
++		return rc;
+ 
+ 	if (exynos_ehci->otg)
+ 		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
+@@ -221,7 +223,7 @@ static int exynos_ehci_suspend(struct device *dev)
+ 
+ 	clk_disable_unprepare(exynos_ehci->clk);
+ 
+-	return rc;
++	return 0;
+ }
+ 
+ static int exynos_ehci_resume(struct device *dev)
+-- 
+1.7.10.4
