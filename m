@@ -1,59 +1,94 @@
-From: wuqixuan@huawei.com (Wuqixuan)
-Date: Wed, 9 Apr 2014 01:22:04 +0000
-Subject: Help for doubt about why update SCTLR by cr_alignment every
- syscall,IRQ,exception ?
-Message-ID: <BB7C62C2B0732E4DA93834A501E846456C8F16B0@szxema505-mbx.china.huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  8 Apr 2014 18:25:51 -0700
+Subject: [PATCH 1/2] ARM: dts: msm: Add 8921 PMIC to ssbi bus
+Message-ID: <1397006752-19494-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 05, 2014 at 5:43:00 PM +0800, Russell King wrote:
+Add the PMIC and the sub-devices that are currently supported in
+the kernel to the DT.
 
-> This code in arch/arm/kernel/head-common.S:
-> 
->         bicne   r4, r0, #CR_A                   @ Clear 'A' bit
->         stmneia r7, {r0, r4}                    @ Save control register values
-> saves different values to cr_alignment and cr_no_alignment.  One always
-> has the A bit cleared, the other may have the A bit set.
-> For ARMv5 and older, we must have the A bit set while in the kernel so
-> misaligned loads are aborted, so that they can be fixed up.  This
-> behaviour is relied upon by the networking code amongst other places.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts | 16 +++++++++++++++
+ arch/arm/boot/dts/qcom-msm8960.dtsi    | 37 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+)
 
-Thank you very much for your reply, King. 
-
-Our chip is ARMv7, as per our observation, the cr_alignment and cr_no_alignment are the same, i think it's below code cause it: 
-
-static int __init alignment_init(void) {
-...
- /*
-  * ARMv6 and later CPUs can perform unaligned accesses for
-  * most single load and store instructions up to word size.
-  * LDM, STM, LDRD and STRD still need to be handled.
-  *
-  * Ignoring the alignment fault is not an option on these
-  * CPUs since we spin re-faulting the instruction without
-  * making any progress.
-  */         /*Actually, above comments are copied from 2.6.34, and code is from 3.10.18 */
-#ifdef CONFIG_CPU_CP15
- if (cpu_is_v6_unaligned()) {
-  cr_alignment &= ~CR_A;
-  cr_no_alignment &= ~CR_A;
-  set_cr(cr_alignment);
-  ai_usermode = safe_usermode(ai_usermode, false);
- }
-#endif
-...
-}
-
-static bool cpu_is_v6_unaligned(void){
- return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-}
-
-So whether it means:
-
-1. In ARMv7 or later CPUs, CPU has the ability to handle the alignment automatically for some case, so cr_alignment and cr_no_alignment are the same, both clearing the A bit. 
-
-2. Remove the updation for SCTLR every syscall,IRQ,exception has no risk. 
-Second question is important for us, because the instruction of updation is too slow(about 100 cycles) in our chip, we want to remove the updation instruction for low latency reason, so need your opinion. 
-
-Regards and Thanks a lot.
-Wuqixuan. 
+diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+index a58fb88315f6..6f61c54a653e 100644
+--- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
++++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
+@@ -1,6 +1,22 @@
++#include <dt-bindings/input/input.h>
++
+ #include "qcom-msm8960.dtsi"
+ 
+ / {
+ 	model = "Qualcomm MSM8960 CDP";
+ 	compatible = "qcom,msm8960-cdp", "qcom,msm8960";
++
++};
++
++&pmicintc {
++	keypad at 148 {
++		linux,keymap = <
++			MATRIX_KEY(0, 0, KEY_VOLUMEUP)
++			MATRIX_KEY(0, 1, KEY_VOLUMEDOWN)
++			MATRIX_KEY(0, 2, KEY_CAMERA_FOCUS)
++			MATRIX_KEY(0, 3, KEY_CAMERA)
++			>;
++		keypad,num-rows = <1>;
++		keypad,num-columns = <5>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
+index 997b7b94e117..fb7d3beece6d 100644
+--- a/arch/arm/boot/dts/qcom-msm8960.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
+@@ -124,6 +124,43 @@
+ 		compatible = "qcom,ssbi";
+ 		reg = <0x500000 0x1000>;
+ 		qcom,controller-type = "pmic-arbiter";
++
++		pmicintc: pmic at 0 {
++			compatible = "qcom,pm8921";
++			interrupt-parent = <&msmgpio>;
++			interrupts = <104 8>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			pwrkey at 1c {
++				compatible = "qcom,pm8921-pwrkey";
++				reg = <0x1c>;
++				interrupt-parent = <&pmicintc>;
++				interrupts = <50 1>, <51 1>;
++				debounce = <15625>;
++				pull-up;
++			};
++
++			keypad at 148 {
++				compatible = "qcom,pm8921-keypad";
++				reg = <0x148>;
++				interrupt-parent = <&pmicintc>;
++				interrupts = <74 1>, <75 1>;
++				debounce = <15>;
++				scan-delay = <32>;
++				row-hold = <91500>;
++			};
++
++			rtc at 11d {
++				compatible = "qcom,pm8921-rtc";
++				interrupt-parent = <&pmicintc>;
++				interrupts = <39 1>;
++				reg = <0x11d>;
++				allow-set-time;
++			};
++		};
+ 	};
+ 
+ 	rng at 1a500000 {
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
