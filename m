@@ -1,75 +1,79 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 09 Apr 2014 13:49:58 +0200
-Subject: [PATCH] arm: exynos: generalize power register address calculation
-In-Reply-To: <1397041783-18531-1-git-send-email-chander.kashyap@linaro.org>
-References: <1396973737-18693-1-git-send-email-chander.kashyap@linaro.org>
- <1397041783-18531-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <534533E6.10901@samsung.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed,  9 Apr 2014 17:24:45 +0530
+Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio on/off
+Message-ID: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
+Adding support to enable/disable VBUS hooked to a gpio
+to enable vbus supply on the port.
 
-On 09.04.2014 13:09, Chander Kashyap wrote:
-> Currently status/configuration power register values are hard-coded for cpu1.
->
-> Make it generic so that it is useful for SoC's with more than two cpus.
->
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> ---
-> changes in v2 : Used existing macros for clusterid and cpuid calculation
->
->   arch/arm/mach-exynos/hotplug.c  |   15 ++++++++++++---
->   arch/arm/mach-exynos/platsmp.c  |   20 +++++++++++++++-----
->   arch/arm/mach-exynos/regs-pmu.h |    9 +++++++--
->   3 files changed, 34 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..eab6121 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -17,6 +17,7 @@
->
->   #include <asm/cacheflush.h>
->   #include <asm/cp15.h>
-> +#include <asm/cputype.h>
->   #include <asm/smp_plat.h>
->
->   #include <plat/cpu.h>
-> @@ -92,11 +93,19 @@ static inline void cpu_leave_lowpower(void)
->
->   static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->   {
-> +	unsigned int mpidr, cpunr, cluster;
-> +
-> +	mpidr = cpu_logical_map(cpu);
-> +	cpunr = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> +
-> +	/* Maximum possible cpus in a cluster can be 4 */
-> +	cpunr += cluster * 4;
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
 
-I believe this is rather a weak assumption. First of all, the limit 
-seems to be hardcoded only for the few existing SoCs. In addition, the 
-value is not used as a maximum, but rather it is assumed that each 
-cluster has always four cores.
+Based on 'phy-exynos5-usbdrd' patches:
+[PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
+http://www.spinics.net/lists/linux-usb/msg105507.html
 
-Moreover, it is assumed here that the mapping between core ID 
-(calculated by the equation below) and PMU core numbers is 1:1, which is 
-not true. On Exynos4210, the cluster ID is always 0x09 and on Exynos4x12 
-it is 0x0a, which will lead to completely wrong register offsets.
+ drivers/phy/phy-exynos5-usbdrd.c |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-I believe the proper way to deal with this is to provide per-CPU 
-property in DT called "samsung,pmu-offset" that could be used be code 
-like this to calculate register addresses properly.
-
-For now, I would recommend doing the above ignoring cluster ID 
-completely to not break (and actually fix) single cluster systems and 
-existing multi cluster ones on which only the first cluster is supported 
-now.
-
-After that, per-CPU PMU offset should be implemented to support 
-multi-cluster SoCs with proper support of multiple clusters.
-
-Best regards,
-Tomasz
+diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+index ff54a7c..5ca7485 100644
+--- a/drivers/phy/phy-exynos5-usbdrd.c
++++ b/drivers/phy/phy-exynos5-usbdrd.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_gpio.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
+ #include <linux/mutex.h>
+@@ -176,6 +177,7 @@ struct exynos5_usbdrd_phy {
+ 	struct clk *ref_clk;
+ 	unsigned long ref_rate;
+ 	unsigned int refclk_reg;
++	int gpio;
+ };
+ 
+ #define to_usbdrd_phy(inst) \
+@@ -460,6 +462,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+ 	if (!IS_ERR(phy_drd->usb30_sclk))
+ 		clk_prepare_enable(phy_drd->usb30_sclk);
+ 
++	/* Toggle VBUS gpio - on */
++	gpio_set_value(phy_drd->gpio, 1);
++
+ 	/* Power-on PHY*/
+ 	inst->phy_cfg->phy_isol(inst, 0);
+ 
+@@ -476,6 +481,9 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+ 	/* Power-off the PHY */
+ 	inst->phy_cfg->phy_isol(inst, 1);
+ 
++	/* Toggle VBUS gpio - off */
++	gpio_set_value(phy_drd->gpio, 0);
++
+ 	if (!IS_ERR(phy_drd->usb30_sclk))
+ 		clk_disable_unprepare(phy_drd->usb30_sclk);
+ 
+@@ -585,6 +593,16 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+ 
+ 	phy_drd->drv_data = drv_data;
+ 
++	/* Get required GPIO for vbus */
++	phy_drd->gpio = of_get_named_gpio(dev->of_node,
++					  "samsung,vbus-gpio", 0);
++	if (!gpio_is_valid(phy_drd->gpio))
++		dev_dbg(dev, "no usbdrd-phy vbus gpio defined\n");
++
++	if (devm_gpio_request(dev, phy_drd->gpio, "phydrd_vbus_gpio"))
++		dev_dbg(dev, "can't request usbdrd-phy vbus gpio %d\n",
++			phy_drd->gpio);
++
+ 	if (of_property_read_u32(node, "samsung,pmu-offset", &pmu_offset)) {
+ 		dev_err(dev, "Missing pmu-offset for phy isolation\n");
+ 		return -EINVAL;
+-- 
+1.7.10.4
