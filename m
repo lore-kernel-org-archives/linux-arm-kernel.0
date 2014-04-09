@@ -1,62 +1,84 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 9 Apr 2014 13:33:26 -0300
-Subject: [PATCH v2] ARM: pxa: Move iotable mapping inside vmalloc region
-In-Reply-To: <2638213.3rVdlp7YXW@avalon>
-References: <1385683243-6688-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <2638213.3rVdlp7YXW@avalon>
-Message-ID: <20140409163326.GA17544@arch.cereza>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Apr 2014 17:33:30 +0100
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <534412FD.5030308@ti.com>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <534412FD.5030308@ti.com>
+Message-ID: <20140409163330.GI27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 09, Laurent Pinchart wrote:
-> Hi Ezequiel,
-> 
-> On Thursday 28 November 2013 21:00:43 Ezequiel Garcia wrote:
-> > In order to remove the following ugly message:
+On Tue, Apr 08, 2014 at 11:17:17AM -0400, Santosh Shilimkar wrote:
+> On Tuesday 08 April 2014 10:53 AM, Sekhar Nori wrote:
+> > On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
+> >> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
+> >>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> >>> index f8b8dac..6b2a056 100644
+> >>> --- a/arch/arm/mach-omap2/omap4-common.c
+> >>> +++ b/arch/arm/mach-omap2/omap4-common.c
+> >>> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
+> >>>  
+> >>>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
+> >>>  }
+> >>> +
+> >>> +int __init am43xx_l2_cache_init(void)
+> >>> +{
+> >>> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
+> >>> +		       L310_AUX_CTRL_INSTR_PREFETCH;
+> >>
+> >> It would be good to documenting the difference between this and OMAP4,
+> >> and why you have chosen different values.
 > > 
-> >   BUG: mapping for 0x00000000 at 0xff000000 out of vmalloc space
+> > There are two main differences:
 > > 
-> > the iotable mappings should be re-located inside the vmalloc
-> > region. Such move was introduced at commit:
+> > 1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
+> > not needed even in OMAP4 with latest kernel, but I am not sure if I can
+> > do this safely without breaking any usecase currently working with OMAP4.
 > > 
-> > commit 0536bdf33faff4d940ac094c77998cfac368cfff
-> > Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Date:   Thu Aug 25 00:35:59 2011 -0400
-> > 
-> >     ARM: move iotable mappings within the vmalloc region
-> > 
-> > While at it, condition the mapping to PXA25x and PXA27x, which
-> > are the only platforms where it's used.
-> > 
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> > Cc: David Heidelberger <david.heidelberger@ixit.cz>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> > David,
-> > 
-> > Is it possible for you to give this a try on your board?
-> 
-> I'm running into the same issue on a PXA270 system.
-> 
-> UNCACHED_PHYS_0 is used as an immediate operand to a mov instruction, and thus 
-> needs to be encoded as a shifted 8-bit value. One simple solution would be to 
-> hardcode it to 0xfd000000 (0xfe000000 is already used for the IMEMC mapping).
-> 
-> Another solution would be to keep the UNCACHED_PHYS_0 mapping at the end of 
-> the vmalloc area (with a fix for the UL problem due to VMALLOC_END) and modify 
-> pxa2[57]x_finish_suspend and pm_enter_standby_start to use an ldr instruction 
-> instead of a move instruction to load the address.
-> 
-> As a side note, the IMEMC mapping seems unused, maybe we could thus reclaim it 
-> and use 0xfe000000 for UNCACHED_PHYS_0.
-> 
-> Do you plan to submit a v3 of this patch ?
-> 
+> Wrong. Shared bit is mandatory for the OMAP4. Its a SMP system
+> which needs that.
 
-Not really. I've been a bit busy and couldn't work any longer on this issue,
-so feel free to pick the task :-)
+Errr.  This bit affects the L2 cache behaviour for Normal memory, outer
+non-cacheable accesses - in other words, those performed to memory mapped
+via dma_alloc_coherent() or dma_alloc_writecombine().  It does not affect
+other types of mappings (other access types ignore the sharable attribute).
+
+When this bit is clear, accesses to such memory are:
+
+- read: cacheable, no allocate
+- write: write through, no write allocate
+
+what this means is that if there are no cache lines in the L2 cache
+corresponding with the physical address, then none will be allocated.
+However, if there are cache lines present, then they will be hit,
+read or updated as appropriate.
+
+This may matter before CMA where we had the memory returned by
+dma_alloc_coherent() and friends mapped as normal, cacheable mappings
+which could be speculatively prefetched, and therefore cache lines
+dragged into the L2 cache for these physical addresses.
+
+However, now that we're using CMA, this does not apply as we no longer
+have this aliasing mapping.
+
+So, with CMA enabled, it should be safe not to set this bit.
+
+However, the shared bit in the page tables must be set for SMP systems.
+Are you sure you're not confusing the shared bit in the page tables
+with the shared override bit in the L2 cache controller?
+
+> > 2) OMAP4 sets NS lockdown and NS interrupt access control bits. I
+> > searched through the commit history of L2 cache support on OMAP4 but
+> > there is no mention of why this was needed on OMAP4. I am checking
+> > internally on the history behind this.
+> >
+> These have also come from the aligned settings with hardware folks.
+
+Again, this doesn't have much to do with hardware, it's secure/non-secure
+access rights configuration to the L2 cache controller.
+
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
