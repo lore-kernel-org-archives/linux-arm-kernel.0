@@ -1,94 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Apr 2014 16:09:24 +0100
-Subject: [PATCH] ARM: reinsert ARCH_MULTI_V4 Kconfig option
-In-Reply-To: <20140409150448.GX29751@pengutronix.de>
-References: <1386922149-4561-1-git-send-email-jonas.jensen@gmail.com>
- <20131213095655.GB4360@n2100.arm.linux.org.uk>
- <CACmBeS1d-EX5oPD8f7P-ufmF=MutdTO+LgG23Cb0=biR8yQPCg@mail.gmail.com>
- <20131213113903.GE4360@n2100.arm.linux.org.uk>
- <CACmBeS3kC4dsdOrfANifgu8oQhLauFKcXhEu=iz8xbUxdhMq_A@mail.gmail.com>
- <20140409150448.GX29751@pengutronix.de>
-Message-ID: <20140409150923.GS16119@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 9 Apr 2014 17:08:46 +0200
+Subject: [PATCH 07/15] ARM: sunxi: dt: define A31's APB0 clk gates node
+In-Reply-To: <1397051478-4113-8-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397051478-4113-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140409150846.GG28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 05:04:48PM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, Apr 09, 2014 at 04:54:16PM +0200, Jonas Jensen wrote:
-> > On 13 December 2013 12:39, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > I see what's causing this: the kuser helpers are using "bx lr" to return
-> > > which will be undefined on non-Thumb CPUs.  We generally cope fine with
-> > > non-Thumb CPUs, conditionalising where necessary on HWCAP_THUMB or the
-> > > T bit in the PSR being set.
-> > >
-> > > However, it looks like the kuser helpers got missed.  As a check, please
-> > > look at arch/arm/kernel/entry-armv.S, find the line with:
-> > >
-> > >         .macro  usr_ret, reg
-> > >
-> > > and ensure that the mov pc, \reg case always gets used.  Please report
-> > > back.
-> > 
-> > Uwe and Arnd came up with a solution except it doesn't work when I test it.
-> > 
-> > The suggested patch is:
-> > 
-> > diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> > index 1879e8d..de15bfd 100644
-> > --- a/arch/arm/kernel/entry-armv.S
-> > +++ b/arch/arm/kernel/entry-armv.S
-> > @@ -739,6 +739,18 @@ ENDPROC(__switch_to)
-> > 
-> >         .macro  usr_ret, reg
-> >  #ifdef CONFIG_ARM_THUMB
-> > +       /*
-> > +        * Having CONFIG_ARM_THUMB isn't a guarantee that the cpu has support
-> > +        * for Thumb and so the bx instruction. Use a mov if the address to
-> > +        * jump to is 32 bit aligned. (Note that this code is compiled in ARM
-> > +        * mode, so this is the right test.)
-> > +        */
-> > +#if defined(CONFIG_CPU_32v4)
-> > +       tst     \reg, #3
-> > +       moveq   pc, \reg
-> > +       b       .
-> > +#endif
-> > +
-> >         bx      \reg
-> >  #else
-> >         mov     pc, \reg
-> > 
-> > 
-> > With this applied, and the following two possibilities in next-20140403:
-> > 
-> > [1] ARCH_MULTI_V4 only (no CONFIG_ARM_THUMB)
-> >      CONFIG_CPU_32v4=y
-> > 
-> > [2] ARCH_MULTI_V4 and ARCH_MULTI_V4T
-> >      CONFIG_ARM_THUMB=y
-> >      CONFIG_CPU_32v4=y
-> >      CONFIG_CPU_32v4T=y
-> > 
-> > 
-> > Booting a kernel with either option [1] or [2] yield the following results:
-> > 
-> > [1] works
-> > [2] hangs after "[    2.730000] Freeing unused kernel memory: 104K
-> > (c02f5000 - c030f000)"
-> > 
-> > 
-> > Any help why the moveq doesn't work would be much appreciated.
-> doing s/moveq/mov/ does the trick on the machine in question, but this
-> is obviously not an option for mainline. But it means that even on this
-> non-Thumb capable machine \reg contains an address that is not aligned.
+On Wed, Apr 09, 2014 at 03:51:10PM +0200, Boris BREZILLON wrote:
+> Define the APB0 clk gates controlled by the PRCM (Power/Reset/Clock
+> Management) block.
 > 
-> Where does \reg come from? Is it provided by userspace? If so, is it a
-> userspace bug?
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 3858424..61e8b34 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -141,6 +141,16 @@
+>  					"ahb1_drc0", "ahb1_drc1";
+>  		};
+>  
+> +		apb0_gates: apb0_gates at 01f01428 {
 
-Well, in case (2), if usr_ret is returning to a caller running thumb code,
-it will lock up - because the register will not be aligned, so moveq will
-fail, and the next instruction is a branch which only ever branches to
-itself.
+The node name should reflect the class of the device, so it should be
+clk@<address>.
+
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun6i-a31-apb0-gates-clk";
+> +			reg = <0x01f01428 0x4>;
+> +			clock-output-names = "apb0_pio", "apb0_ir",
+> +					"apb0_timer01", "apb0_p2wi",
+> +					"apb0_uart", "apb0_1wire",
+> +					"apb0_i2c";
+> +		};
+> +
+
+Hmmm, I'm not really fond of this.
+
+There's already a PRCM node in the DT, which is used for the SMP
+bringup.
+
+I really don't want any duplicate memory regions in the DT, so you'll
+have to fix the SMP code.
+
+That being said, I can understand that you did this to be consistent
+with the scheme we have for the clock controller where we chose to
+make every clock a single driver.
+
+That worked well for the CCU precisely because we only had clocks. It
+doesn't for the PRCM because it's not been very well documented, and
+it does clocks, resets, that fits pretty well in the existing
+frameworks we have, but the SMP related functions are actually not
+fitting that well.
+
+It's mostly a power clamp and a power gating bits, that could maybe
+fit in the regulator framework.
+
+I don't really have a solution for this. Maybe someone else will.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140409/9455aa24/attachment.sig>
