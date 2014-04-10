@@ -1,44 +1,44 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 10 Apr 2014 16:33:50 +0900
-Subject: [PATCH] ARM: shmobile: Enable USB [EO]HCI HCD support in
- shmobile_defconfig
-Message-ID: <1397115230-18437-1-git-send-email-horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Apr 2014 09:36:40 +0200
+Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <4752537.la6uZladzC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB [EO]HCI HCD drivers provide USB host support for Renesas
-R-Car Gen2 platforms. To increase hardware support enable the driver in the
-shmobile_defconfig multiplatform configuration.
+On Wednesday 09 April 2014 21:45:35 Matthias Brugger wrote:
+> This adds a generic devicetree board file and a dtsi for boards
+> based on the MT6589 SoCs from Mediatek.
+> 
+> Apart from the generic parts (gic, clocks) the only component
+> currently supported are the timers.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Matthias,
 
----
+First of all, I'm really glad to see this get started, thanks for looking
+into these!
 
-* Applies on top of renesas-devel-v3.14-20140409v2
+Do you know how similar the MT6589 is to the later chips like MT65x2
+and MT6588? What are the on-chip devices like, is it mostly licensed
+IP blocks from designware and others that we already have drivers for,
+or all new drivers?
 
-* Tested with the following patches applied:
-  sh_eth: add device tree support
-  ARM: shmobile: Koelsch DT reference USB pinmux setup
-  ARM: shmobile: Koelsch DT reference USB platform devices
-  ARM: shmobile: Lager DT reference USB pinmux setup
-  ARM: shmobile: Lager DT reference USB platform devices
-  gpio: rcar: Per-controller gpios property prototype
----
- arch/arm/configs/shmobile_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> +#include <asm/hardware/cache-l2x0.h>
+> +
+> +static void __init mediatek_dt_init(void)
+> +{
+> +	l2x0_of_init(0, ~0);
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 8fb30b0..6d6437c 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -110,6 +110,8 @@ CONFIG_SND_SOC=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_USB=y
- CONFIG_USB_RCAR_GEN2_PHY=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_RENESAS_USBHS=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_RENESAS_USBHS_UDC=y
--- 
-1.8.5.2
+I hope that with all the cleanup work that Russell has done in the
+past few weeks, we can manage to kill off the call to l2x0_of_init()
+here and have it done by core architecture code instead. That would
+let you have an empty machine file, unless you have other things you
+will need to add in the future.
+
+	Arnd
