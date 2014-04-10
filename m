@@ -1,76 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 10 Apr 2014 08:42:53 +0100
-Subject: [PATCH v5 0/8] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20140409033603.GA32070@ld-irv-0074>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
- <20140312081350.GC30808@shlinux2.ap.freescale.net>
- <20140313063940.GU31517@norris-Latitude-E6410>
- <20140409033603.GA32070@ld-irv-0074>
-Message-ID: <20140410074253.GD4214@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Apr 2014 10:00:17 +0200
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <CAErSpo7egL2T_W_OCJw2kPHFDqspwOHXtZJw8JyjWU=56ofFKQ@mail.gmail.com>
+References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
+ <20140410012715.GA1328@bart>
+ <CAErSpo7egL2T_W_OCJw2kPHFDqspwOHXtZJw8JyjWU=56ofFKQ@mail.gmail.com>
+Message-ID: <4506772.YFSM2m1eaP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> + Lee, Marek
+On Wednesday 09 April 2014 21:48:14 Bjorn Helgaas wrote:
+> On Wed, Apr 9, 2014 at 7:27 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> > On Wed, Apr 09, 2014 at 08:02:41AM -0600, Bjorn Helgaas wrote:
+> >> >>   struct pci_host_bridge {
+> >> >>     int domain;
+> >> >>     int node;
+> >> >>     struct device *dev;
+> >> >>     struct pci_ops *ops;
+> >> >>     struct list_head resources;
+> >> >>     void *sysdata;
+> >> >>     struct pci_bus *bus;  /* filled in by core, not by arch */
+> >> >>     ... /* other existing contents managed by core */
+> >> >>   };
+> >> >>
+> >> >>   struct pci_bus *pci_scan_host_bridge(struct pci_host_bridge *bridge);
+> >> >
+> >> > I'm really reluctant to give the arches more rope to hang themselves.
+> >>
+> >> If you mean the sysdata pointer is rope to hang themselves, I think it
+> >> would be great it we didn't need sysdata at all.  But I think it would
+> >> be a huge amount of work to get rid of it completely, and keeping it
+> >> would let us work at that incrementally.
+> >
+> > Agree. But then your suggestion was to wrap sysdata inside another structure,
+> > which to me constitutes additional rope.
 > 
-> Hi Huang,
-> 
-> On Wed, Mar 12, 2014 at 11:39:40PM -0700, Brian Norris wrote:
-> > On Wed, Mar 12, 2014 at 04:13:51PM +0800, Huang Shijie wrote:
-> > > On Mon, Feb 24, 2014 at 06:37:34PM +0800, Huang Shijie wrote:
-> > >    Could you please review this patch set? I really hope it can be merged
-> > >    as soon as possibel.  But now, the patch set has stalled for a long time.
-> > 
-> > I'm sorry for the delay. Others are in the same position of delay (e.g.,
-> > Lee's SPI-NOR driver), because I simply have not had the time to really
-> > devote this the attention it deserves, especially considering how it
-> > rearchitects such an important, commonly-used driver.
-> > 
-> > Nonetheless, I will try to give your patches some more attention soon.
-> > 
-> > >    Since you have pushed the patches for m25p80.c, i have to rebase this
-> > >    patch set again and again...
-> > 
-> > You mean locally? I promise you, I can handle rebasing on my reviewing
-> > end for small one-line conflicts like new chip IDs, so don't rebase and
-> > resend simply for that. Unless I find substantive things that you should
-> > change, I'd only expect at most one more rebase to be necessary.
-> 
-> Unfortunately, I did not get the time to review and test this
-> sufficiently for the 3.15 merge window, but to avoid further delay, I've
-> queued it up in l2-mtd.git [1] under its own branch for now. I rebased
-> it myself, to accommodate for changes to m25p80.c since your submission.
-> Please take a look at the branch.
-> 
-> If all goes well, I should merge the spinor branch into master some time
-> after the 3.15 merge window closes, so it will get linux-next testing.
-> For any additional comments/corrections (I have a few), please just
-> submit patches on top, rather than resending the whole series.
-> 
-> Marek, what was your opinion on this series? Last response I saw was
-> "looking good"; is that an Ack? Or did you have any more gating
-> requests?
-> 
-> Personally, I think it looks ready enough, and it's better to merge this
-> than not. I was able to test with my platforms, with no regression.
-> 
-> Lee, I have a few patches that do some trivial unification of your ST
-> SPI FSM driver and the SPI-NOR framework. I plan to send these out
-> soon, and I will begin applying any ST-FSM patches to the same spinor
-> branch along with Huang's code. I hope that you can spend some effort on
-> improving integration within the next few months in preparation for
-> 3.16, when I expect this to all go upstream.
+> I'll ponder this more, but I don't see your point here yet.  The arch
+> already supplies a sysdata pointer to pci_scan_root_bus(), and we
+> stash it in every struct pci_bus already.  My idea was just to pass it
+> in differently, as a structure member rather than a separate argument.
+>  (And I'm not completely attached to my proposal; it was only to
+> illustrate my concern about the explosion of interfaces if we have to
+> add *_domain(), *_node(), etc.)
 
-I certainly plan to. Although, I'm up to my neck in the ST BCH NAND
-driver at the moment. Trying to re-spin something that'll be
-accepted i.e. more intensive use of the framework.
+As a minor variation of your suggestion, how about passing in a pointer
+to struct pci_host_bridge, and embed that within its own private
+structure? I think this is closer to how a lot of other subsystems
+do the abstraction.
 
-Quick question, is there a chat medium for MTD? Somewhere for
-quick-fire questions i.e. an IRC channel or similar?
+> > The "what" for PCI host bridges is defined in the spec. The "how" is implementation
+> > defined. What I'm trying to get with the cleanup is the ordering of pci_host_bridge
+> > creation: core creates the structure first ("what"), arch then has the chance
+> > of adding specific data to it (ops, resources, etc) ("how").
+> >
+> > At the moment arm and powerpc do some horrible dances in trying to create their
+> > local idea of a host bridge before passing it to the core code.
+> >
+> > As for the root bus number, maybe we can offer some sensible default strategy
+> > for numbering them and the arches that don't care too much can use that.
+> 
+> I think we're at the limit of what can be accomplished with the
+> abstractness of English.
+> 
+> My opinion is that it's reasonable for the arch to discover the host
+> bridge properties first and pass them to the core, and it doesn't
+> require unreasonable things of the arch.  I know the arm PCI setup is
+> complicated, partly because it deals with a huge number of machines
+> that don't have a consistent firmware interface.  The x86/ACPI setup
+> is relatively simple because it deals with a simple firmware
+> interface.  But that's just my opinion, and maybe your code will show
+> otherwise.
 
-> [1] branch spinor, at http://git.infradead.org/l2-mtd.git
+Makes sense. One of the areas where the PCI code shows its age is the
+method how the various parts link together: there are function calls
+going back and forth between architecture specific files and generic
+files, rather a hierarchy of files with generic code being code by more
+specific code.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+To do the probing properly, I think it's totally fine to have the
+core code expect stuff like the resources and domain number
+to be filled out already by whoever calls it, but then have wrappers
+around it that get this information from a firmware interface, or
+from hardwired architecture specific code where necessary.
+
+	Arnd
