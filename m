@@ -1,60 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Apr 2014 15:52:39 +0200
-Subject: [PATCH v3 0/7] ARM: sunxi: add multi pin controller support
-Message-ID: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Apr 2014 19:54:57 +0200
+Subject: [PATCH 1/2] GPIO: Add driver for Zynq GPIO controller
+In-Reply-To: <7da0486b-bbdd-445b-8a6d-b5bcb311d908@TX2EHSMHS036.ehs.local>
+References: <1395933906-2268-1-git-send-email-harinik@xilinx.com>
+ <CAPDyKFo4R9izP=jcoU+jqd74Nbeh+-5A1T8c_=EL4cmzja_29A@mail.gmail.com>
+ <7da0486b-bbdd-445b-8a6d-b5bcb311d908@TX2EHSMHS036.ehs.local>
+Message-ID: <CACRpkdbXx4Wpqg1ZiisQnVM7AaDWpA0TjWPD=YnYYBAr2kCrMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Apr 7, 2014 at 9:00 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Mon, 2014-03-31 at 11:23AM +0200, Ulf Hansson wrote:
+>> On 27 March 2014 16:25, Harini Katakam <harinik@xilinx.com> wrote:
+> [...]
+>> > +static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
+>> > +{
+>> > +       struct platform_device *pdev = to_platform_device(dev);
+>> > +       struct zynq_gpio *gpio = platform_get_drvdata(pdev);
+>> > +
+>> > +       clk_disable(gpio->clk);
+>>
+>> You should be able can use clk_disable_unprepare() here.
+>>
+>> > +
+>> > +       return 0;
+>> > +}
+>> > +
+>> > +static int __maybe_unused zynq_gpio_runtime_resume(struct device *dev)
+>> > +{
+>> > +       struct platform_device *pdev = to_platform_device(dev);
+>> > +       struct zynq_gpio *gpio = platform_get_drvdata(pdev);
+>> > +
+>> > +       return clk_enable(gpio->clk);
+>>
+>> You should be able can use clk_prepare_enable() here.
+>
+> Is there some common practice regarding this? As I understand it, we
+> want to ensure the clock to be gated during suspend, which should happen
+> with clk_disable(). Why would we also unprepare the clock? We are highly
+> likely to use it again once we resume.
 
-This series rework the sunxi pinctrl driver to support the PL and PM
-pins available on the A31 SoC, which are controlled using the R_PIO
-block.
+enable() is fastpath (e.g. in IRQs disabled context) whereas
+prepare() is slowpath() in normal, threaded context.
 
-This series add support for multi pin controller which was previously
-impossible for several reasons:
-1) the pinctrl instance was registering a static instance of the gpio
-   chip, which means, in case you were probing 2 devices, the gpio chip
-   was added twice to the gpiochip list
-2) the base pin of the gpio chip was always set to 0, and thus the 2
-   gpiochip pin numbers were overlapping
+As [runtime]_suspend/resume happens in normal context you
+want to make sure clocks are both disabled/unprepared
+and prepared/enabled to make sure any clocks that can only
+be accessed in slowpath are also turned off/on.
 
-I still haven't reworked the interrupt part (to handle the "per bank
-interrupt" instead of the "one interrupt for the whole gpio" chip
-approach), but this will be part of another series.
-
-Best Regards,
-
-Boris
-
-Changes since v2:
- - check clk_prepare_enable return value
- - disable the clk in case of probe failure
- - make use devm_reset_control_get_optional
- - reassert the reset line in case of probe failure
-Changes since v1:
- - rework the pinctrl driver to support multiple pin controller instances
- - removed reset and clock gate patches from the series
- - removed A31 DT modifications from the series (we need to get the PRCM
- reset and clk drivers before being able to declare the r_pio node, and
- we're still discussing how this should be implemented)
-
-
-Boris BREZILLON (7):
-  pinctrl: sunxi: check clk_prepare_enable return value
-  pinctrl: sunxi: disable clk when failing to probe pin controller
-  pinctrl: sunxi: add PL and PM pin definitions
-  pinctrl: sunxi: support multiple pin controller
-  pinctrl: sunxi: define A31 R_PIO pin functions
-  pinctrl: sunxi: add reset control support
-  ARM: sunxi: update the default ARCH_NR_GPIO for sunxi arch
-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |  1 +
- arch/arm/Kconfig                                   |  2 +-
- drivers/pinctrl/pinctrl-sunxi-pins.h               | 74 ++++++++++++++++++++++
- drivers/pinctrl/pinctrl-sunxi.c                    | 53 ++++++++++------
- drivers/pinctrl/pinctrl-sunxi.h                    | 69 ++++++++++++++++++++
- 5 files changed, 179 insertions(+), 20 deletions(-)
-
--- 
-1.8.3.2
+Yours,
+Linus Walleij
