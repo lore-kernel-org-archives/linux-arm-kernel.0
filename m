@@ -1,67 +1,36 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 10 Apr 2014 15:07:53 +0200
-Subject: [PATCH RESEND 4/5] Documentation: add the Marvell Berlin pinctrl
- documentation
-In-Reply-To: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1397135274-10764-5-git-send-email-antoine.tenart@free-electrons.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 10 Apr 2014 21:17:46 +0200
+Subject: [PATCH 08/27] pinctrl: exynos: Add driver data for Exynos3250
+In-Reply-To: <CACRpkdYiFCHFifkpRwDhdAGqBrGTU5E4mfdGE8u1c=zrim17aA@mail.gmail.com>
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>	<1397122124-15690-9-git-send-email-cw00.choi@samsung.com>
+ <CACRpkdYiFCHFifkpRwDhdAGqBrGTU5E4mfdGE8u1c=zrim17aA@mail.gmail.com>
+Message-ID: <5346EE5A.3070408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- .../bindings/pinctrl/marvell,berlin-pinctrl.txt    | 43 ++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt
+Hi,
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt
-new file mode 100644
-index 000000000000..e21538a37734
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,berlin-pinctrl.txt
-@@ -0,0 +1,43 @@
-+* Pinctrl driver for the Marvell Berlin SoCs
-+
-+The pins controlled by the Marvell Berlin controller are organized in groups.
-+Configuration is done by group, so no actual pin information is needed.
-+
-+Required properties:
-+- compatible:	"marvell-berlin2cd-pinctrl",
-+		"marvell-berlin2-pinctrl",
-+		"marvell-berlin2q-pinctrl"
-+- reg: registers physical addresses and lengths of the pin controller.
-+- reg-names: name of the register regions.
-+
-+Please refer to pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices.
-+
-+A pinctrl should contains subnodes representing the pinctrl pin group
-+configurations, one per group. Each subnode has the group name and the muxing
-+function used.
-+
-+Required subnode-properties:
-+- berlin,group: a string describing the group's name.
-+- berlin,function: the function used to mux the group.
-+	0: function 0
-+	1: function 1
-+	...
-+
-+Example:
-+
-+pinctrl: pinctrl at 0 {
-+	compatible = "marvell,berlin2q-pinctrl";
-+	reg = <0xea0000 0x08>, <0xfc0000 0x44>;
-+	reg-names = "global_base", "sm_base";
-+
-+	uart0_pmux: uart0-pmux {
-+		berlin,group = "GSM12";
-+		berlin,function = <0>;
-+	};
-+}
-+
-+&uart0 {
-+	pinctrl-0 = <&uart0_pmux>;
-+	pinctrl-names = "default";
-+};
--- 
-1.8.3.2
+On 10.04.2014 20:42, Linus Walleij wrote:
+> On Thu, Apr 10, 2014 at 11:28 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>
+>> From: Tomasz Figa <t.figa@samsung.com>
+>>
+>> This patch adds driver data (bank list and EINT layout) for Exynos3250
+>> to pinctrl-exynos driver. Exynos3250 includes 158 multi-functional input/output
+>> ports. There are 23 general port groups.
+>>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> Ugh can Tomasz send out his patches himself, I get confused...
+> It was also sent two times, the second time with CC:s added.
+> Tomasz, shall I merge this?
+
+I'm fine with this patch being sent by Chanwoo, although he should have 
+probably added his sign-off to the list, as the person sending it.
+
+Chanwoo, can you make sure that there is your sign-off on all the 
+patches from this series?
+
+Best regards,
+Tomasz
