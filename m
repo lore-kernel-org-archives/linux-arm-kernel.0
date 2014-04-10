@@ -1,41 +1,41 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 10 Apr 2014 15:25:11 +0800
-Subject: [PATCH v5 5/8 fix] mtd: m25p80: use the SPI nor framework
-In-Reply-To: <20140409213749.GH32070@ld-irv-0074>
-References: <1393238262-8622-6-git-send-email-b32955@freescale.com>
- <1393574142-17234-1-git-send-email-b32955@freescale.com>
- <20140409213749.GH32070@ld-irv-0074>
-Message-ID: <20140410072509.GA24100@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Apr 2014 10:16:11 +0200
+Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
+In-Reply-To: <CAGb2v651R-sG3OB4aD4UXWiyQVcHz7zXub1wO6B4xp-toUcC7Q@mail.gmail.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+ <534571F0.10706@free-electrons.com>
+ <CAGb2v651R-sG3OB4aD4UXWiyQVcHz7zXub1wO6B4xp-toUcC7Q@mail.gmail.com>
+Message-ID: <20140410081611.GN28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 02:37:49PM -0700, Brian Norris wrote:
-> >  config MTD_M25P80
-> >  	tristate "Support most SPI Flash chips (AT26DF, M25P, W25X, ...)"
-> > -	depends on SPI_MASTER
-> > +	depends on SPI_MASTER && MTD_SPI_NOR_BASE
-> >  	help
-> >  	  This enables access to most modern SPI flash chips, used for
-> >  	  program and data storage.   Series supported include Atmel AT26DF,
+On Thu, Apr 10, 2014 at 01:14:26AM +0800, Chen-Yu Tsai wrote:
+> >  3) other things I haven't noticed yet :-)
 > 
-> Now that M25P80 depends on MTD_SPI_NOR_BASE (which I proposed to rename
-> to MTD_SPI_NOR a few hours ago), shouldn't we be updating everybody's
-> defconfigs? As it stands, the defconfigs that use M25P80 will just drop
-> it silently when built.
+> Reworking EINT to use one interrupt per bank will yield some more surprises.
 > 
-> And if so, I'm not sure how this should be handled. Should defconfig
-> patches be sent to their respective arch maintainers?
-
-IMHO, we should create a patch or several patches to add the MTD_SPI_NOR
-to the defconfigs.
-
-Another method is to select the MTD_SPI_NOR which we enable the MTD.
-
+> There's also new gpiolib irqchip helpers, but that will require reworking
+> each pin bank into separate gpio chips. May be more work than just adding
+> different irq domains for different banks.
 > 
-> Also, I think m25p80.c is no longer a "self-contained MTD device driver"
-> and should be moved under drivers/mtd/spi-nor/.
-If we move the m25p80.c to the drivers/mtd/spi-nor/, we also need to move
-other drivers too.
+> See: https://lkml.org/lkml/2014/3/25/175
 
-thanks
-Huang Shijie
+I'm not sure it's worth it actually. Using these helpers will probably
+simplify the A31/A23 case, where you have one interrupt controller per
+bank, but it will be much more complicated to handle the A10/A20 case
+where you have a single interrupt controller for all the banks.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/095244f2/attachment.sig>
