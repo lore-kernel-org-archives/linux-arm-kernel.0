@@ -1,62 +1,54 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 10 Apr 2014 08:12:17 +0200
-Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
-In-Reply-To: <20140409174701.GO6529@pd.tnic>
-References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
- <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
- <20140409113246.GA8778@pd.tnic>
- <CAL_Jsq+gszc+R_BrLtHKEBGYd=3T+sE1d+-HoF9aYZt6C2k5-g@mail.gmail.com>
- <20140409151932.GK6529@pd.tnic>
- <CAHLkNHJTA5bGD1zAfzE2JrDFAWvmgYyYjir+4vR-d9Fe2-E48g@mail.gmail.com>
- <20140409174701.GO6529@pd.tnic>
-Message-ID: <53463641.1030800@monstr.eu>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 10 Apr 2014 14:19:05 +0800
+Subject: [PATCH] mx-drm: imx-tve: correct DDC property name to 'ddc-i2c-bus'
+Message-ID: <1397110745-15731-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2014 07:47 PM, Borislav Petkov wrote:
-> On Wed, Apr 09, 2014 at 10:59:49PM +0530, Punnaiah Choudary wrote:
->> There is a driver file cache-l2x0.c under arch/arm/mm for pl310 cache
->> configuration and management. Russel king had suggested to use
->> single driver file for both pl310 edac implementation and cache-l2x0.c
->> Here is the thread
->> http://www.spinics.net/lists/arm-kernel/msg320407.html
->>
->> please provide your inputs
-> 
-> Well, it is very simple - you don't really need an EDAC compilation unit
-> just so that you can report errors - you can very well do that in your
-> cache-l2x0.c and boom, problem solved.
-> 
-> Simply move the irq handler and the parity error checker to that file.
+Commit 62e3879 (imx-drm: imx-tve: Fix DDC I2C bus property) was trying
+to use 'ddc-i2c-bus' as the DDC property name (we can see that from the
+commit log), but unfortunately 'i2c-ddc-bus' which is a typo was
+actually used in the code.  This results in some unnecessary
+inconsistency and confusions, because all the documented DDC property
+in device tree bindings use 'ddc-i2c-bus'.
 
-I am just curious about this recommendation. Does it mean that we shouldn't
-use edac interface just for reporting problems?
+  Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+  Documentation/devicetree/bindings/panel/simple-panel.txt
+  Documentation/devicetree/bindings/video/dvi-connector.txt
 
-I didn't play with it but I guess that there is a record about edac driver
-via sysfs, etc. You could read some useful information that you know
-what it is protected and I hope that edac interface bring any value
-to reporting errors comparing to just printk message from IRQ handler.
+Let's fix it before the error spreads.
 
-My question is if using printk in IRQ handler and report problem is equal to
-reporting this via edac interface. Or it is just easy way to do but
-using edac interface is right solution and how to do it properly
-is different question.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/boot/dts/imx53-mba53.dts | 2 +-
+ drivers/staging/imx-drm/imx-tve.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-Michal
-
+diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
+index 7c8c129..a3431d7 100644
+--- a/arch/arm/boot/dts/imx53-mba53.dts
++++ b/arch/arm/boot/dts/imx53-mba53.dts
+@@ -244,7 +244,7 @@
+ &tve {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_vga_sync_1>;
+-	i2c-ddc-bus = <&i2c3>;
++	ddc-i2c-bus = <&i2c3>;
+ 	fsl,tve-mode = "vga";
+ 	fsl,hsync-pin = <4>;
+ 	fsl,vsync-pin = <6>;
+diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
+index 575533f..a23f4f7 100644
+--- a/drivers/staging/imx-drm/imx-tve.c
++++ b/drivers/staging/imx-drm/imx-tve.c
+@@ -582,7 +582,7 @@ static int imx_tve_bind(struct device *dev, struct device *master, void *data)
+ 	tve->dev = dev;
+ 	spin_lock_init(&tve->lock);
+ 
+-	ddc_node = of_parse_phandle(np, "i2c-ddc-bus", 0);
++	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
+ 	if (ddc_node) {
+ 		tve->ddc = of_find_i2c_adapter_by_node(ddc_node);
+ 		of_node_put(ddc_node);
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/0ef1acc7/attachment-0001.sig>
+1.8.3.2
