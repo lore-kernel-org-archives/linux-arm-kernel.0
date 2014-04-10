@@ -1,87 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Apr 2014 15:52:43 +0200
-Subject: [PATCH v3 4/7] pinctrl: sunxi: support multiple pin controller
-In-Reply-To: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397137966-30818-5-git-send-email-boris.brezillon@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Apr 2014 19:41:20 +0200
+Subject: [PATCH v3 1/3] pinctrl: Rename Broadcom Capri pinctrl driver
+In-Reply-To: <20140410165626.GB23695@beef>
+References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
+ <1396478439-16586-1-git-send-email-syin@broadcom.com>
+ <1396478439-16586-2-git-send-email-syin@broadcom.com>
+ <CACRpkdZ1Lt2JsMMWVMBgfS8ktkpeYzA3MiGmWB27Jwhw16UYYg@mail.gmail.com>
+ <CACRpkdbY58J7GcQnYcUVTkfVO3VNCyJa0zVTKV4ibF8khxD8EA@mail.gmail.com>
+ <20140410165626.GB23695@beef>
+Message-ID: <CACRpkdZaMcSjy+-15y4kNsBgLZrThwxzJQr7SEy59AVm3yuM_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for multiple pin controller instances.
+On Thu, Apr 10, 2014 at 6:56 PM, Matt Porter <matt.porter@linaro.org> wrote:
+> On Thu, Apr 10, 2014 at 06:51:12PM +0200, Linus Walleij wrote:
+>> On Thu, Apr 10, 2014 at 6:49 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> > On Thu, Apr 3, 2014 at 12:40 AM, Sherman Yin <syin@broadcom.com> wrote:
+>> >
+>> >> To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
+>> >> driver and its related CONFIG option are renamed to bcm281xx.
+>> >>
+>> >> Devicetree compatible string and binding documentation use
+>> >> "brcm,bcm11351-pinctrl" to match the machine binding here:
+>> >> Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+>> >>
+>> >> This driver supports pinctrl on BCM11130, BCM11140, BCM11351, BCM28145
+>> >> and BCM28155 SoCs.
+>> >>
+>> >> Signed-off-by: Sherman Yin <syin@broadcom.com>
+>> >> Reviewed-by: Matt Porter <mporter@linaro.org>
+>> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>> >> ---
+>> >>  drivers/pinctrl/Kconfig                            |    8 +-
+>> >>  drivers/pinctrl/Makefile                           |    2 +-
+>> >>  .../{pinctrl-capri.c => pinctrl-bcm281xx.c}        | 1519 ++++++++++----------
+>> >
+>> > This last version from apr 7 does not change
+>> > arch/arm/configs/bcm_defconfig:CONFIG_PINCTRL_CAPRI=y
+>> >
+>> > Doesn't this mean that you render this platform without a pin
+>> > control driver and thus broken?
+>>
+>> Bah I see that it's a separate patch now, sorry...
+>>
+>> Looking closer.
+>
+> I can take that one through mach-bcm for 3.16 to keep these changes
+> in one place.
 
-First remove the static definition of the sunxi gpio chip struct and fill
-the dynamically struct instead.
-Then define a new pin_base field in the sunxi_pinctrl_desc which will be
-used to specify the gpiochip base pin.
+Nah I might as well take all of it through the pin control tree.
+Can I have your ACK on the defconfig change?
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/pinctrl/pinctrl-sunxi.c | 30 ++++++++++++++----------------
- drivers/pinctrl/pinctrl-sunxi.h |  1 +
- 2 files changed, 15 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 73d11e2..6db1c9e 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -538,19 +538,6 @@ static int sunxi_pinctrl_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	return irq_find_mapping(pctl->domain, desc->irqnum);
- }
- 
--static struct gpio_chip sunxi_pinctrl_gpio_chip = {
--	.owner			= THIS_MODULE,
--	.request		= sunxi_pinctrl_gpio_request,
--	.free			= sunxi_pinctrl_gpio_free,
--	.direction_input	= sunxi_pinctrl_gpio_direction_input,
--	.direction_output	= sunxi_pinctrl_gpio_direction_output,
--	.get			= sunxi_pinctrl_gpio_get,
--	.set			= sunxi_pinctrl_gpio_set,
--	.of_xlate		= sunxi_pinctrl_gpio_of_xlate,
--	.to_irq			= sunxi_pinctrl_gpio_to_irq,
--	.of_gpio_n_cells	= 3,
--	.can_sleep		= false,
--};
- 
- static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
- 				      unsigned int type)
-@@ -858,11 +845,22 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
- 	}
- 
- 	last_pin = pctl->desc->pins[pctl->desc->npins - 1].pin.number;
--	pctl->chip = &sunxi_pinctrl_gpio_chip;
--	pctl->chip->ngpio = round_up(last_pin, PINS_PER_BANK);
-+	pctl->chip->owner = THIS_MODULE;
-+	pctl->chip->request = sunxi_pinctrl_gpio_request,
-+	pctl->chip->free = sunxi_pinctrl_gpio_free,
-+	pctl->chip->direction_input = sunxi_pinctrl_gpio_direction_input,
-+	pctl->chip->direction_output = sunxi_pinctrl_gpio_direction_output,
-+	pctl->chip->get = sunxi_pinctrl_gpio_get,
-+	pctl->chip->set = sunxi_pinctrl_gpio_set,
-+	pctl->chip->of_xlate = sunxi_pinctrl_gpio_of_xlate,
-+	pctl->chip->to_irq = sunxi_pinctrl_gpio_to_irq,
-+	pctl->chip->of_gpio_n_cells = 3,
-+	pctl->chip->can_sleep = false,
-+	pctl->chip->ngpio = round_up(last_pin, PINS_PER_BANK) -
-+			    pctl->desc->pin_base;
- 	pctl->chip->label = dev_name(&pdev->dev);
- 	pctl->chip->dev = &pdev->dev;
--	pctl->chip->base = 0;
-+	pctl->chip->base = pctl->desc->pin_base;
- 
- 	ret = gpiochip_add(pctl->chip);
- 	if (ret)
-diff --git a/drivers/pinctrl/pinctrl-sunxi.h b/drivers/pinctrl/pinctrl-sunxi.h
-index ed3c4d7..35d15b2 100644
---- a/drivers/pinctrl/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/pinctrl-sunxi.h
-@@ -450,6 +450,7 @@ struct sunxi_pinctrl_desc {
- 	int				npins;
- 	struct pinctrl_gpio_range	*ranges;
- 	int				nranges;
-+	unsigned			pin_base;
- };
- 
- struct sunxi_pinctrl_function {
--- 
-1.8.3.2
+Yours,
+Linus Walleij
