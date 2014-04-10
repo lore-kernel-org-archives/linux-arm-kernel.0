@@ -1,66 +1,28 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 10 Apr 2014 10:02:57 -0400
-Subject: [GIT PULL] ARM: mvebu: DT fixes-non-critical for v3.15-rc1
-Message-ID: <20140410140257.GC28159@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Apr 2014 19:29:26 +0200
+Subject: [PATCH 0/5] GPIO OMAP driver changes for v3.16
+In-Reply-To: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CACRpkdarYt4tAD9WMDu6Me+dhipVyDHMpgF-AQ8SDNKMmhSjsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On Sun, Apr 6, 2014 at 4:58 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
 
-Here are a few small changes I've picked up for the mvebu DT files.
-They've been in -next a few days, and are fairly minimal fixes.
+> Now that you have sent your changes for v3.15 to Torvalds, here are some
+> changes for the OMAP GPIO driver targeted to v3.16. Mostly improvements
+> so nothing here is -rc material.
 
-This branch is based on top of mvebu/dt, specifically,
-tags/mvebu-dt-3.15-5.  As the changes are on top of changes in that
-branch.
+I like this series so I have applied them for v3.16, pending some ACK
+from Kevin &| Santosh.
 
-Please pull.
+> The biggest change is Patch 4 that converts the driver to use the newly
+> introduced generic irqchip helpers in the gpiolib core which allows to
+> remove some driver specific logic that should really be generic.
 
-thx,
+Excellent, I will take a closer look at this, it seems there is some
+cruft still in but let me look.
 
-Jason.
-
-
-The following changes since commit 4de29e636946dbc97586de6136a3c496a55fd5e6:
-
-  ARM: mvebu: Enable NAND controller in Armada 385-DB (2014-03-13 23:37:17 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-fixes-non-crit-3.15
-
-for you to fetch changes up to 33faf20b8ebe2770f2d7b52796f5f35eeb87ab6f:
-
-  ARM: mvebu: ensure the mdio node has a clock reference on Armada 38x (2014-04-07 17:23:56 +0000)
-
-----------------------------------------------------------------
-mvebu DT fixes-non-critical (for v3.15-rc1)
-
- - kirkwood
-    - add some missing vendor prefixes to keep checkpatch happy
-
- - mvebu
-    - add clock ref to mdio node on 370/XP/38x
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: Kirkwood: Fix Atmel vendor prefix
-      ARM: Kirkwood: DT: Add missing vendor prefix
-
-Thomas Petazzoni (2):
-      ARM: mvebu: ensure the mdio node has a clock reference on Armada 370/XP
-      ARM: mvebu: ensure the mdio node has a clock reference on Armada 38x
-
- arch/arm/boot/dts/armada-370-xp.dtsi           | 1 +
- arch/arm/boot/dts/armada-38x.dtsi              | 1 +
- arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
- arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
- arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
- arch/arm/boot/dts/kirkwood-laplug.dts          | 2 +-
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 4 ++--
- arch/arm/boot/dts/kirkwood-nsa310.dts          | 2 +-
- arch/arm/boot/dts/kirkwood-nsa310a.dts         | 2 +-
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts   | 2 +-
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts   | 2 +-
- 12 files changed, 13 insertions(+), 11 deletions(-)
+Yours,
+Linus Walleij
