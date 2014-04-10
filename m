@@ -1,70 +1,70 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 10 Apr 2014 17:46:14 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <20140410120348.GK27282@n2100.arm.linux.org.uk>
-References: <cover.1396605300.git.nsekhar@ti.com>
- <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
- <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
- <20140410120348.GK27282@n2100.arm.linux.org.uk>
-Message-ID: <53468B8E.9040604@ti.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 10 Apr 2014 10:57:33 -0600
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <20140410181953.50ccfcc3@skate>
+References: <20140410181953.50ccfcc3@skate>
+Message-ID: <20140410165733.GB23104@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 April 2014 05:33 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 10, 2014 at 05:26:15PM +0530, Sekhar Nori wrote:
->> On Wednesday 09 April 2014 09:53 PM, Russell King - ARM Linux wrote:
->>> That is required because as part of the enable sequence, we write to the
->>> lockdown registers to clear out anything that may be there before we
->>> enable the L2 cache.  If we didn't set the NS lockdown bit, then we
->>> would need the secure monitor to do it for us.
->>
->> And I realized yesterday that the only reason L2C is working on AM437x
->> is because AM437x ROM is setting these bits up for us.
->>
->>> Both of these bits should be managed within the L2C code rather than by
->>> platforms.
->>
->> The current L2C code is not managing the NS_LOCKDOWN bit. I can take a
->> shot at adding this support unless you are already looking at it.
-> 
-> True, and I'm aware that it's missing.  So... how about this on top
-> of my series so far.  We can deal with L310_AUX_CTRL_NS_INT_CTRL when
-> the need to access those registers arises (if/when the edac driver
-> is submitted.)
-> 
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index c0f9a81a2d32..4a494cde8367 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -213,8 +213,6 @@ static int __init omap_l2_cache_init(void)
->  
->  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
->  	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
-> -		   L310_AUX_CTRL_NS_LOCKDOWN |
-> -		   L310_AUX_CTRL_NS_INT_CTRL |
->  		   L2C_AUX_CTRL_SHARED_OVERRIDE |
->  		   L310_AUX_CTRL_DATA_PREFETCH |
->  		   L310_AUX_CTRL_INSTR_PREFETCH;
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 98796b789eb9..837f384c1d51 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -776,6 +776,13 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
->  			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
->  	}
->  
-> +	/*
-> +	 * Always enable non-secure access to the lockdown registers -
-> +	 * we write to them as part of the L2C enable sequence so they
-> +	 * need to be accessible.
-> +	 */
-> +	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
-> +
+On Thu, Apr 10, 2014 at 06:19:53PM +0200, Thomas Petazzoni wrote:
 
-This will work. NS_LOCKDOWN is required for L2C-220 as well and so I was
-thinking about adding a new l2c220_enable() which will set the
-NS_LOCKDOWN and then call l2c_enable()
+> This is an e-mail that attempts to summarize the situation in terms of
+> Armada XP PCIe issues.
+> 
+> At
+> https://github.com/MISL-EBU-System-SW/mainline-public/commits/3.14/pci-debug,
+> I've pushed a branch based on top of v3.14 that contains:
 
-Thanks,
-Sekhar
+mvebu_pcie_del_windows / mvebu_pcie_add_windows I wonder if these
+functions should be dropped into the mbus driver.. They are pretty
+generic.
+
+'bus: mvebu-mbus: Avoid setting an undefined window size' and
+'pci: mvebu: fix off-by-one in the computed size of the mbus windows'
+need to be swapped in order to maintain bisect-ability.
+
+> Can you test this stack of patches on your system and configuration, and
+> let me know if that works for you? 
+
+Continues to work as expected here, and I see the new error message:
+
+mvebu_mbus: cannot add window '4:e8', conflicts with another window
+mvebu-pcie pex.1: Could not create MBus window at 0xe0000000, size 0x100000: -22
+
+(this is due to the PEX window being in the DT mbus ranges already)
+
+Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+
+> 
+>  * The link up problem. Unfortunately, I tried to reproduce it today,
+>    and didn't manage to. It's weird, because I'm sure I was able to
+>    produce it in the past, but I'm no longer able to, I don't know.
+>    Therefore, it's not easy for me to work on this topic. Neil, Jason,
+>    do you think this is a topic you could potentially handle?
+
+You said you had a system that sometimes required the udelay? Can you
+run Neil's patch and see if your system behaves the same? Specifically
+that the link eventually goes down after mvebu_pcie_set_local_dev_nr ?
+
+I couldn't find any case where the BDF leaks below the TLP layer, and
+the spec is very clear that the assigned BDF can change at run time,
+so I don't have an explanation for why the link reset is happening.
+Do you have a contact at Marvell that might shed some light on that
+behavior?
+
+>  * On my Armada XP DB board, if I plug 5 PCIe cards, the IGB card for
+>    some reason isn't able to read data from its non-volatile memory. So
+>    the window points to something, but it doesn't seem to patch what
+>    the igb driver expects. I've double checked the MBus windows, and
+>    they look correct. I haven't tested this PCIe configuration with the
+>    Marvell LSP though, so maybe I'm hitting an unrelated hardware
+>    problem or something.
+
+Certainly troubling.. And the IGB works if it is the only card in the
+system?
+
+That does sound like more mbus troubles.
+
+Regrads,
+Jason
