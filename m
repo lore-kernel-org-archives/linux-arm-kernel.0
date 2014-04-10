@@ -1,44 +1,66 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 19:06:07 +0900
-Subject: [PATCH 17/27] ARM: dts: exynos3250: Add ADC dt node to read analog raw
- data
+Date: Thu, 10 Apr 2014 19:06:10 +0900
+Subject: [PATCH 20/27] ARM: dts: exynos3250: Move definitions of external
+ clocks to SoC dtsi
 In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
 References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397124377-16969-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397124377-16969-12-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add ADC (Analog to Digital Converter) dt node to get raw data with
-IIO subsystem. Usually, ADC is used to check temperature, jack type and so on.
-Exynos3250 includes ADCv2 which is different from ADCv1 for Exynos4 SoC.
+From: Tomasz Figa <t.figa@samsung.com>
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+This allows proper ordering of clock registration and is still correct,
+because list of external clocks is SoC-specific, just their frequencies
+and availability are board-specific.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 2013d0d..c5e6917 100644
+index 587a124..ceed761 100644
 --- a/arch/arm/boot/dts/exynos3250.dtsi
 +++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -84,6 +84,17 @@
- 		interrupts = <0 240 0>;
+@@ -40,6 +40,36 @@
+ 		i2c7 = &i2c_7;
  	};
  
-+	adc: adc at 126C0000 {
-+		compatible = "samsung,exynos-adc-v2";
-+		reg = <0x126C0000 0x100>, <0x10020718 0x4>;
-+		interrupts = <0 137 0>;
-+		clock-names = "adc", "sclk_tsadc";
-+		clocks = <&cmu CLK_TSADC>, <&cmu CLK_SCLK_TSADC>;
-+		#io-channel-cells = <1>;
-+		io-channel-ranges;
-+		status = "disabled";
++	fixed-rate-clocks {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		xusbxti: clock at 0 {
++			compatible = "fixed-clock";
++			reg = <0>;
++			clock-frequency = <0>;
++			#clock-cells = <0>;
++			clock-output-names = "xusbxti";
++		};
++
++		xxti: clock at 1 {
++			compatible = "fixed-clock";
++			reg = <1>;
++			clock-frequency = <0>;
++			#clock-cells = <0>;
++			clock-output-names = "xxti";
++		};
++
++		xtcxo: clock at 2 {
++			compatible = "fixed-clock";
++			reg = <2>;
++			clock-frequency = <0>;
++			#clock-cells = <0>;
++			clock-output-names = "xtcxo";
++		};
 +	};
 +
- 	serial at 13800000 {
- 		compatible = "samsung,exynos4210-uart";
- 		reg = <0x13800000 0x100>;
+ 	chipid at 10000000 {
+ 		compatible = "samsung,exynos4210-chipid";
+ 		reg = <0x10000000 0x100>;
 -- 
 1.8.0
