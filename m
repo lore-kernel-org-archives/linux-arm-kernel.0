@@ -1,54 +1,71 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 10 Apr 2014 16:42:54 +0900
-Subject: [PATCH v3 0/4] Introduce new Kconfig for Samsung common clock
-In-Reply-To: <1395291325-4043-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1394598781-3848-1-git-send-email-pankaj.dubey@samsung.com>
- <1395291325-4043-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <53464B7E.8080507@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 10 Apr 2014 08:25:56 +0100
+Subject: [PATCH V3 4/5] mfd: palmas: support IRQ inversion at the board
+ level
+In-Reply-To: <CAAVeFuJY67zdoHiZufxDbkaw=xt8YwxyDAwHW_T7UZeSOt35NA@mail.gmail.com>
+References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
+ <1393876300-3061-4-git-send-email-swarren@wwwdotorg.org>
+ <CAAVeFuJY67zdoHiZufxDbkaw=xt8YwxyDAwHW_T7UZeSOt35NA@mail.gmail.com>
+Message-ID: <20140410072556.GB4214@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2014 01:55 PM, Pankaj Dubey wrote:
-> Introduce a new Kconfig file for Samsung common clock infrastructure
-> related config options. As current Samsung common clock gets compiled
-> based on PLAT_SAMSUNG, but moving ahead with ARM64 we can not have any
-> more such config options, so this patch introduce new COMMON_CLK_SAMSUNG
-> invisible option. This option also select COMMON_CLK so ARCH Kconfig just
-> need to select COMMON_CLK_SAMSUNG in case they want to use Samsung common
-> clock.
->
-> This series is based on Kukjin's for-next branch.
->
-> V3:
->   1) Re-organized patches for preventing bisect issues.
->   2) Rebase on top of latest Kukjin's for-next branch.
->   3) Compile tested exynos_defconfig, s3c6400_defconfig and s3c2410_defconfig
->      after each commit.
->
-> V2:
->   1) Adding new Kconfig file for Samsung common clock.
->   2) Make COMMON_CLK_SAMSUNG option invisible. (as suggested by Tomasz Figa)
->   3) Let COMMON_CLK_SAMSUNG select COMMON_CLK. (as suggested by Tomasz Figa)
->   4) Move S3C24XX clock config option in new Kconfig file.
->
-> Pankaj Dubey (4):
->    clk: samsung: add new Kconfig for Samsung common clock option
->    ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and ARCH_S3C64XX
->    ARM: S3C24XX: move S3C24XX clock Kconfig options to Samsung clock
->      Kconfig file
->    drivers: clk: use COMMON_CLK_SAMSUNG for Samsung clock support
->
->   arch/arm/Kconfig              |    4 ++--
->   arch/arm/mach-s3c24xx/Kconfig |   14 --------------
->   drivers/clk/Kconfig           |    2 ++
->   drivers/clk/Makefile          |    2 +-
->   drivers/clk/samsung/Kconfig   |   12 ++++++++++++
->   5 files changed, 17 insertions(+), 17 deletions(-)
->   create mode 100644 drivers/clk/samsung/Kconfig
->
+> Stephen, any news about this patch? I'm waiting for it to be merged in
+> order to resend some Tegra DTs, but still cannot see it in -next.
 
-Gentle Ping.
+I doubt it's been applied.
+
+No one got back to me with reference to how to deal with the set [1],
+so I certainly didn't apply it.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg312694.html
+
+> On Tue, Mar 4, 2014 at 4:51 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > From: Stephen Warren <swarren@nvidia.com>
+> >
+> > Implement the new DT property ti,irq-externally-inverted, and add an
+> > equivalent platform data field to match. This allows the driver to
+> > correctly automatically configure the IRQ output polarity when the board
+> > or SoC contains an inverter between the Palmas IRQ output and IRQ
+> > controller input.
+> >
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > ---
+> > v3:
+> > * Use an IRQD flag to represent the data, rather than a custom DT property.
+> > v2:
+> > * Split V1's patch 1/2 into separate patches 1/3 and 2/3.
+> > ---
+> >  drivers/mfd/palmas.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
+> > index d280d789e55a..3281d4103e9d 100644
+> > --- a/drivers/mfd/palmas.c
+> > +++ b/drivers/mfd/palmas.c
+> > @@ -292,7 +292,8 @@ static int palmas_set_pdata_irq_flag(struct i2c_client *i2c,
+> >                 return -EINVAL;
+> >         }
+> >
+> > -       pdata->irq_flags = irqd_get_trigger_type(irq_data);
+> > +       pdata->irq_flags = irqd_get_trigger_type(irq_data) |
+> > +                          irqd_get_src_dst_inverted(irq_data);
+> >         dev_info(&i2c->dev, "Irq flag is 0x%08x\n", pdata->irq_flags);
+> >         return 0;
+> >  }
+> > @@ -447,6 +448,8 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
+> >                 reg = PALMAS_POLARITY_CTRL_INT_POLARITY;
+> >         else
+> >                 reg = 0;
+> > +       if (pdata->irq_flags & IRQ_SRC_DST_INVERTED)
+> > +               reg ^= PALMAS_POLARITY_CTRL_INT_POLARITY;
+> >         ret = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
+> >                         PALMAS_POLARITY_CTRL, PALMAS_POLARITY_CTRL_INT_POLARITY,
+> >                         reg);
+> >
 
 -- 
-Best Regards,
-Pankaj Dubey
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
