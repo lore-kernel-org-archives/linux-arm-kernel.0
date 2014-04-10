@@ -1,55 +1,143 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Apr 2014 22:46:36 +0200
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <20140410145304.GS985@e106497-lin.cambridge.arm.com>
-References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <6144916.rD76jOL8sv@wuerfel>
- <20140410145304.GS985@e106497-lin.cambridge.arm.com>
-Message-ID: <6459805.ygy4tBNDNz@wuerfel>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Thu, 10 Apr 2014 15:07:54 +0200
+Subject: [PATCH RESEND 5/5] ARM: dts: berlin: add the pinctrl node and muxing
+ setup for uarts
+In-Reply-To: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1397135274-10764-6-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 April 2014 15:53:04 Liviu Dudau wrote:
-> On Thu, Apr 10, 2014 at 03:07:44PM +0100, Arnd Bergmann wrote:
+The uart0 pinmux configuration is in the dtsi because uart0 will always
+use uart0-pmux to work, no other possibility. Same thing for uart1.
 
-> > This mirrors how we treat devices: a pci_device has an embedded device,
-> > and so on, in other subsystems we can have multiple layers.
-> > 
-> > In this example, the tegra pcie driver then allocates its own tegra_pcie
-> > structure, fills out the fields it needs, and registers it with the
-> > ARM architecture code, passing just the pci_sys_data pointer. That function
-> > in turn passes a pointer to the embedded pci_host_bridge down to the
-> > generic code. Ideally we should try to eliminate the architecture specific
-> > portion here, but that is a later step.
-> 
-> So Arnd seems to agree with me: we should try to get out of architecture specific
-> pci_sys_data and link the host bridge driver straight into the PCI core. The
-> core then can call into arch code via pcibios_*() functions.
-> 
-> Arnd, am I reading correctly into what you are saying?
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/berlin2.dtsi   | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/berlin2q.dtsi  | 20 ++++++++++++++++++++
+ 3 files changed, 53 insertions(+)
 
-Half of it ;-)
-
-I think it would be better to not have an architecture specific data
-structure, just like it would be better not to have architecture specific
-pcibios_* functions that get called by the PCI core. Note that the
-architecture specific functions are the ones that rely on the architecture
-specific data structures as well. If they only use the common fields,
-it should also be possible to share the code.
-
-I also don't realistically think we can get there on a lot of architectures
-any time soon. Note that most architectures only have one PCI host
-implementation, so the architecture structure is the same as the host
-driver structure anyway.
-
-For architectures like powerpc and arm that have people actively working
-on them, we have a chance to clean up that code in the way we want it
-(if we can agree on the direction), but it's still not trivial to do.
-
-Speaking of arm32 in particular, I think we will end up with a split
-approach: modern platforms (multiplatform, possibly all DT based) using
-PCI core infrastructure directly and no architecture specific PCI
-code on the one side, and a variation of today's code for the legacy
-platforms on the other.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 56a1af2f1052..43eb90c36050 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -176,6 +176,22 @@
+ 			};
+ 		};
+ 
++		pinctrl: pinctrl at 0 {
++			compatible = "marvell,berlin2-pinctrl";
++			reg = <0xea0000 0x08>, <0xfc0000 0x44>;
++			reg-names = "global_base", "apb_base";
++
++			uart0_pmux: uart0-pmux {
++				berlin,group = "GSM4";
++				berlin,function = <0>;
++			};
++
++			uart1_pmux: uart1-pmux {
++				berlin,group = "GSM5";
++				berlin,function = <1>;
++			};
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -191,6 +207,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+@@ -201,6 +219,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <9>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart1_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index 094968c27533..4c04cff89226 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -169,6 +169,17 @@
+ 			};
+ 		};
+ 
++		pinctrl: pinctrl at 0 {
++			compatible = "marvell,berlin2cd-pinctrl";
++			reg = <0xea0000 0x08>, <0xfc0000 0x44>;
++			reg-names = "global_base", "apb_base";
++
++			uart0_pmux: uart0-pmux {
++				berlin,group = "G6";
++				berlin,function = <0>;
++			};
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -184,6 +195,8 @@
+ 				reg-io-width = <1>;
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 07452a7483fa..e6e556055dfc 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -183,6 +183,22 @@
+ 			};
+ 		};
+ 
++		pinctrl: pinctrl at 0 {
++			compatible = "marvell,berlin2q-pinctrl";
++			reg = <0xea0000 0x4c>, <0xfcd000 0x44>;
++			reg-names = "global_base", "sm_base";
++
++			uart0_pmux: uart0-pmux {
++				berlin,group = "GSM12";
++				berlin,function = <0>;
++			};
++
++			uart1_pmux: uart1-pmux {
++				berlin,group = "GSM14";
++				berlin,function = <1>;
++			};
++		};
++
+ 		apb at fc0000 {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -198,6 +214,8 @@
+ 				interrupts = <8>;
+ 				clocks = <&smclk>;
+ 				reg-shift = <2>;
++				pinctrl-0 = <&uart0_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+@@ -208,6 +226,8 @@
+ 				interrupts = <9>;
+ 				clocks = <&smclk>;
+ 				reg-shift = <2>;
++				pinctrl-0 = <&uart1_pmux>;
++				pinctrl-names = "default";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.8.3.2
