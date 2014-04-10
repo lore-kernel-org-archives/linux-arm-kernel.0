@@ -1,32 +1,30 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 10 Apr 2014 08:54:02 -0400
-Subject: [PATCH v3 06/10] arm64: efi: add EFI stub
-In-Reply-To: <20140409142013.GC26210@e106331-lin.cambridge.arm.com>
-References: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
- <1396637113-22790-7-git-send-email-leif.lindholm@linaro.org>
- <20140409142013.GC26210@e106331-lin.cambridge.arm.com>
-Message-ID: <1397134442.31272.38.camel@deneb.redhat.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Thu, 10 Apr 2014 15:07:52 +0200
+Subject: [PATCH RESEND 3/5] ARM: berlin: add the pinctrl dependency for the
+ Marvell Berlin SoCs
+In-Reply-To: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1397135274-10764-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-09 at 15:20 +0100, Mark Rutland wrote:
-> >
-> > +config EFI
-> > +       bool "UEFI firmware support"
-> > +       depends on OF
-> 
-> I note we're not depending on !CPU_BIG_ENDIAN here, and it looks like
-> the implementation is not endian-clean (I've pointed out a few issues
-> below).
-> 
-> We need to fix that up for CPU_BIG_ENDIAN. For the moment we could
-> depend on !CPU_BIG_ENDIAN which would at least to make it clear we don't
-> support EFI && CPU_BIG_ENDIAN yet. The commit message should be updated
-> to mention that.
-> 
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/mach-berlin/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yes, the !CPU_BIG_ENDIAN was there at one point but got lost along
-the way. It may be best to put it back for now, but I'll take a
-stab at getting the stub part sorted out based on your comments.
-Full runtime services will be trickier and need a followup patch in
-the future after the initial patch series goes in.
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+index d3c5f14dc142..291f1cac6c3d 100644
+--- a/arch/arm/mach-berlin/Kconfig
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -4,6 +4,8 @@ config ARCH_BERLIN
+ 	select GENERIC_IRQ_CHIP
+ 	select DW_APB_ICTL
+ 	select DW_APB_TIMER_OF
++	select PINCTRL
++	select PINCTRL_BERLIN
+ 
+ if ARCH_BERLIN
+ 
+-- 
+1.8.3.2
