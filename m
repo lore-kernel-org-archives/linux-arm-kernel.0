@@ -1,90 +1,116 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 18:32:41 +0900
-Subject: [PATCH 00/27] Support new Exynos3250 SoC based on Cortex-A7 dual
- core
-In-Reply-To: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53466539.8060100@samsung.com>
+From: heiko.stuebner@bq.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 10 Apr 2014 11:34:47 +0200
+Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <53465A4B.4040906@free-electrons.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <CABuKBeKnEw38sQYwrkheoWetZZcPTJhKRsBK4a62FS6-6dRFTA@mail.gmail.com>
+ <53465A4B.4040906@free-electrons.com>
+Message-ID: <3428574.kpvz0qlT1a@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+Hi Gregory,
 
-Ignore this patchset because this patchset don't include all of patches.
-I'll send this patchset again right now.
+Am Donnerstag, 10. April 2014, 08:46:03 schrieb Gregory CLEMENT:
+> On 10/04/2014 08:29, Matthias Brugger wrote:
+> > 2014-04-09 22:26 GMT+02:00 Gregory CLEMENT <gregory.clement@free-
+electrons.com>:
+> >> Hi Matthias,
+> >> 
+> >> On 09/04/2014 19:45, Matthias Brugger wrote:
+> >>> diff --git a/arch/arm/boot/dts/mtk6589.dtsi
+> >>> b/arch/arm/boot/dts/mtk6589.dtsi new file mode 100644
+> >>> index 0000000..6dbb74f
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/boot/dts/mtk6589.dtsi
+> >>> @@ -0,0 +1,105 @@
+> >>> +/*
+> >>> + * Copyright (c) 2014 MundoReader S.L.
+> >>> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+> >>> + *
+> >>> + * This program is free software; you can redistribute it and/or modify
+> >>> + * it under the terms of the GNU General Public License as published by
+> >>> + * the Free Software Foundation; either version 2 of the License, or
+> >>> + * (at your option) any later version.
+> >>> + *
+> >>> + * This program is distributed in the hope that it will be useful,
+> >>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>> + * GNU General Public License for more details.
+> >>> + */
+> >>> +
+> >>> +#include <dt-bindings/interrupt-controller/irq.h>
+> >>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> >>> +#include "skeleton.dtsi"
+> >>> +
+> >>> +/ {
+> >>> +     compatible = "mediatek,mt6589";
+> >>> +     interrupt-parent = <&gic>;
+> >>> +
+> >>> +     cpus {
+> >>> +             #address-cells = <1>;
+> >>> +             #size-cells = <0>;
+> >>> +
+> >>> +             cpu at 0 {
+> >>> +                     device_type = "cpu";
+> >>> +                     compatible = "arm,cortex-a7";
+> >>> +                     next-level-cache = <&L2>;
+> >>> +                     reg = <0x0>;
+> >>> +             };
+> >>> +             cpu at 1 {
+> >>> +                     device_type = "cpu";
+> >>> +                     compatible = "arm,cortex-a7";
+> >>> +                     next-level-cache = <&L2>;
+> >>> +                     reg = <0x1>;
+> >>> +             };
+> >>> +             cpu at 2 {
+> >>> +                     device_type = "cpu";
+> >>> +                     compatible = "arm,cortex-a7";
+> >>> +                     next-level-cache = <&L2>;
+> >>> +                     reg = <0x2>;
+> >>> +             };
+> >>> +             cpu at 3 {
+> >>> +                     device_type = "cpu";
+> >>> +                     compatible = "arm,cortex-a7";
+> >>> +                     next-level-cache = <&L2>;
+> >>> +                     reg = <0x3>;
+> >>> +             };
+> >>> +
+> >>> +     };
+> >>> +
+> >>> +     clocks {
+> >>> +             #address-cells = <1>;
+> >>> +             #size-cells = <1>;
+> >>> +             ranges;
+> >>> +
+> >>> +             system_clk: system_clk {
+> >>> +                     compatible = "fixed-clock";
+> >>> +                     clock-frequency = <13000000>;
+> >>> +                     #clock-cells = <0>;
+> >>> +                     clock-output-names = "system_clk";
+> >>> +             };
+> >> 
+> >> Is it really a fixed clock without any parent, or do you
+> >> declare it as a fixed clock because you don't have any clock
+> >> common framework support yet?
+> > 
+> > I don't have any common clock framework support yet.
+> 
+> So maybe you should provide one (even a very simple one).
+> 
+> Pretending a clock is a fixed clock and ignoring its parents
+> will be problematic when you will add the common clock framework
+> support because the device tree is supposed to be stable and you won't
+> be able to change it then.
 
-Sorry for my mistake.
+personally I think the danger of introducing unsuitable bindings/precedents 
+for a clock controller before it is fully understood is higher.
 
-Best Regards,
-Chanwoo Choi
+I'd just rename the clock above to something like dummy130m like sunxi also 
+does for example, to reflect its unfinished state and when the clock controller 
+is present later on change the supplying clock of the timer.
 
-On 04/10/2014 06:28 PM, Chanwoo Choi wrote:
-> This patchset support new Exynos3250 Samsung SoC based on Cortex-A7 dual core.
-> Exynos3250 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
-> for Smartphone. It is desigend with the 28nm low-power high-K metal gate process
-> and provides the best performance features.
-> 
-> This patchset include some patches such as:
-> - Support secondary CPU of Exynos3250 (cpu up/down)
-> - Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/pwm/amba
-> - Support the gpio control for Exynos3250 using pinctrl
-> - Support the clock control for Exynos3250 using common clk framework
-> 
-> Chanwoo Choi (11):
->   ARM: EXYNOS: Add Exynos3250 SoC ID
->   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of Exynos3250
->   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
->   ARM: EXYNOS: Support secondary CPU boot of Exynos3250
->   ARM: EXYNOS:: Enter a15 lowpower mode for Exynos3250 based on Cortex-a7
->   irqchip: Declare cortex-a7's irqchip to initialize gic from dt
->   ARM: dts: exynos3250: Add default interrupt-parent connected with GIC
->   ARM: dts: exynos3250: Add uart dt node to support seiral ports
->   ARM: dts: exynos3250: Add MCT dt node
->   ARM: dts: exynos3250: Add ADC dt node to read analog raw data
->   ARM: dts: exynos3250: Add CPUs dt node for Exynos3250
-> 
-> Hyunhee Kim (1):
->   ARM: dts: exynos3250: Add PMU dt data
-> 
-> Inki Dae (2):
->   ARM: dts: exynos3250: Add i2c dt node
->   ARM: dts: exynos3250: Add power domain dt nodes
-> 
-> Kyungmin Park (2):
->   ARM: EXYNOS: Support secondary CPU boot of Exynos4212
->   ARM: dts: exynos3250: Add Mobile Storage Host Card
-> 
-> Tomasz Figa (11):
->   pinctrl: exynos: Add driver data for Exynos3250
->   clk: samsung: exynos3250: Add clocks using common clock framework
->   ARM: dts: exynos3250: Add new exynos3250.dtsi file
->   ARM: dts: exynos3250: Add GIC dt node for Exynos3250
->   ARM: dts: exynos3250: Add pin control device tree data
->   ARM: dts: exynos3250: Add device tree nodes for clock controllers
->   ARM: dts: exynos3250: Move definitions of external clocks to SoC dtsi
->   ARM: dts: exynos3250: Add amba and pdma dt node
->   ARM: dts: exynos3250: Add spi dt node to support spi bus
->   ARM: dts: exynos3250: Add pwm dt node to support PWM Timer
->   ARM: dts: exynos3250: Add RTC dt node
-> 
->  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 477 ++++++++++++++++++
->  arch/arm/boot/dts/exynos3250.dtsi         | 410 ++++++++++++++++
->  arch/arm/mach-exynos/Kconfig              |  22 +
->  arch/arm/mach-exynos/exynos.c             |  18 +
->  arch/arm/mach-exynos/firmware.c           |  17 +-
->  arch/arm/mach-exynos/hotplug.c            |  13 +-
->  arch/arm/mach-exynos/include/mach/map.h   |   2 +
->  arch/arm/plat-samsung/include/plat/cpu.h  |  10 +
->  drivers/clk/samsung/Makefile              |   1 +
->  drivers/clk/samsung/clk-exynos3250.c      | 785 ++++++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic.c                 |   1 +
->  drivers/pinctrl/pinctrl-exynos.c          |  67 +++
->  drivers/pinctrl/pinctrl-samsung.c         |   2 +
->  drivers/pinctrl/pinctrl-samsung.h         |   1 +
->  include/dt-bindings/clock/exynos3250.h    | 256 ++++++++++
->  15 files changed, 2077 insertions(+), 5 deletions(-)
->  create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
->  create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
->  create mode 100644 drivers/clk/samsung/clk-exynos3250.c
->  create mode 100644 include/dt-bindings/clock/exynos3250.h
-> 
+Or maybe I'm overlooking something here :-)
+
+
+Heiko
