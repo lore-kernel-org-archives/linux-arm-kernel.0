@@ -1,52 +1,45 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Apr 2014 14:25:42 +0200
-Subject: [PATCH v2 0/5] ARM: sunxi: add multi pin controller support
-Message-ID: <1397132747-13917-1-git-send-email-boris.brezillon@free-electrons.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 10 Apr 2014 11:27:38 -0400 (EDT)
+Subject: [PATCH v2 1/2] usb: ehci-exynos: Return immediately from suspend
+ if ehci_suspend fails
+In-Reply-To: <1397125682-4955-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <Pine.LNX.4.44L0.1404101127270.32351-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 10 Apr 2014, Vivek Gautam wrote:
 
-This series rework the sunxi pinctrl driver to support the PL and PM
-pins available on the A31 SoC, which are controlled using the R_PIO
-block.
+> Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
+> adds a check for possible race between suspend and wakeup interrupt,
+> and thereby it returns -EBUSY as error code if there's a wakeup
+> interrupt.
+> So the platform host controller should not proceed further with
+> its suspend callback, rather should return immediately to avoid
+> powering down the essential things, like phy.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> ---
+> 
+> Changes from v1:
+> -- Removed unnecessary change 'return 0'
+> 
+>  drivers/usb/host/ehci-exynos.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+> index d1d8c47..7f425ac 100644
+> --- a/drivers/usb/host/ehci-exynos.c
+> +++ b/drivers/usb/host/ehci-exynos.c
+> @@ -212,6 +212,8 @@ static int exynos_ehci_suspend(struct device *dev)
+>  	int rc;
+>  
+>  	rc = ehci_suspend(hcd, do_wakeup);
+> +	if (rc)
+> +		return rc;
+>  
+>  	if (exynos_ehci->otg)
+>  		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
 
-This series add support for multi pin controller which was previously
-impossible for several reasons:
-1) the pinctrl instance was registering a static instance of the gpio
-   chip, which means, in case you were probing 2 devices, the gpio chip
-   was added twice to the gpiochip list
-2) the base pin of the gpio chip was always set to 0, and thus the 2
-   gpiochip pin numbers were overlapping
-
-I still haven't reworked the interrupt part (to handle the "per bank
-interrupt" instead of the "one interrupt for the whole gpio" chip
-approach), but this will be part of another series.
-
-Best Regards,
-
-Boris
-
-Changes since v1:
- - rework the pinctrl driver to support multiple pin controller instances
- - removed reset and clock gate patches from the series
- - removed A31 DT modifications from the series (we need to get the PRCM
- reset and clk drivers before being able to declare the r_pio node, and
- we're still discussing how this should be implemented)
-
-Boris BREZILLON (5):
-  pinctrl: sunxi: add PL and PM pin definitions
-  pinctrl: sunxi: support multiple pin controller
-  pinctrl: sunxi: define A31 R_PIO pin functions
-  pinctrl: sunxi: add reset control support
-  ARM: sunxi: update the default ARCH_NR_GPIO for sunxi arch
-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |  1 +
- arch/arm/Kconfig                                   |  2 +-
- drivers/pinctrl/pinctrl-sunxi-pins.h               | 74 ++++++++++++++++++++++
- drivers/pinctrl/pinctrl-sunxi.c                    | 40 +++++++-----
- drivers/pinctrl/pinctrl-sunxi.h                    | 69 ++++++++++++++++++++
- 5 files changed, 169 insertions(+), 17 deletions(-)
-
--- 
-1.8.3.2
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
