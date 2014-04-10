@@ -1,51 +1,89 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 11 Apr 2014 00:22:02 +0300
-Subject: [PATCH 0/5] GPIO OMAP driver changes for v3.16
-In-Reply-To: <CABxcv=miFY3gE6HOU5ovWwCzgC6Un3ANh_Weh_bPCb7OoYQ+pA@mail.gmail.com>
-References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
- <CACRpkdarYt4tAD9WMDu6Me+dhipVyDHMpgF-AQ8SDNKMmhSjsA@mail.gmail.com>
- <20140410193048.GE15736@drone.musicnaut.iki.fi>
- <CABxcv=miFY3gE6HOU5ovWwCzgC6Un3ANh_Weh_bPCb7OoYQ+pA@mail.gmail.com>
-Message-ID: <20140410212202.GF15736@drone.musicnaut.iki.fi>
+From: neil@fatboyfat.co.uk (Neil Greatorex)
+Date: Thu, 10 Apr 2014 22:56:00 +0100 (BST)
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <20140410201201.GA12661@obsidianresearch.com>
+References: <20140410181953.50ccfcc3@skate>
+ <20140410165733.GB23104@obsidianresearch.com> <20140410200153.46669e0c@skate>
+ <20140410201201.GA12661@obsidianresearch.com>
+Message-ID: <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Jason,
 
-On Thu, Apr 10, 2014 at 10:17:44PM +0200, Javier Martinez Canillas wrote:
-> > The same happens also on Nokia 770:
-> >
-> > [    0.118896] genirq: Setting trigger mode 0 for irq 128 failed (gpio_irq_type+0x0/0x220)
-> 
-> I don't have those errors when booting on my DM3730 IGEPv2 board but
-> it seems that for some reason on omap1  __irq_set_trigger() complains
-> when IRQ_TYPE_NONE is used as a default flag when calling
-> gpiochip_irqchip_add()
-> 
-> Could you please test the following patch and tell me if your board
-> still works and makes the errors go away?
+On Thu, 10 Apr 2014, Jason Gunthorpe wrote:
 
-Now it complains about mode 8...
+> Gating the clock without disabling the Phy first does sound like a
+> bad idea..
+>
+> Neil, does this do anything for you?
+>
+> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> index f3b325f..e0a032f 100644
+> --- a/arch/arm/mach-mvebu/mvebu-soc-id.c
+> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> @@ -107,7 +107,7 @@ static int __init mvebu_soc_id_init(void)
+>        iounmap(pci_base);
+>
+> res_ioremap:
+> -       clk_disable_unprepare(clk);
+> +//     clk_disable_unprepare(clk);
+>
+> clk_err:
+>        of_node_put(child);
+>
 
-[    0.118835] genirq: Setting trigger mode 8 for irq 128 failed (gpio_irq_type
-+0x0/0x220)
+That patch has fixed it for me. The PCIe card seems to be now be always 
+properly detected.
 
-A.
+> In any event, turning on the clock should almost certainly be
+> accompanied by a phy reset sequence to get both link ends on the same
+> page.
+>
+> Attached is a rough, untested patch along those lines.
+>
 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 8cc9e91..5bc8aec 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1122,7 +1122,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank)
-> 
->         ret = gpiochip_irqchip_add(&bank->chip, &gpio_irq_chip,
->                                    irq_base, gpio_irq_handler,
-> -                                  IRQ_TYPE_NONE);
-> +                                  IRQ_TYPE_LEVEL_LOW);
-> 
->         if (ret) {
->                 dev_err(bank->dev, "Couldn't add irqchip to gpiochip
-> %d\n", ret);
-> 
-> Best regards,
-> Javier
+I took your attached patch and extended it a bit to print out how long it 
+took. The delays also need to be much longer for me. I also fixed a small 
+typo you made where the bit wasn't being set again to bring the link back 
+up. I've attached the diff to your patch, as well as the combined patch 
+(hope that makes sense).
+
+With the attached patch I get the following output:
+
+mirabox ~ # dmesg | grep PCIe0.0
+[    0.135947] mvebu-pcie pcie-controller.3: PCIe0.0: performing link 
+reset
+[    0.161989] mvebu-pcie pcie-controller.3: PCIe0.0: link went down after 
+26 tries
+[    0.173984] mvebu-pcie pcie-controller.3: PCIe0.0: link came back up 
+after 12 tries
+mirabox ~ # lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710 (rev 01)
+01:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network 
+Connection (rev 01)
+01:00.1 Ethernet controller: Intel Corporation I350 Gigabit Network 
+Connection (rev 01)
+03:00.0 USB controller: Fresco Logic FL1009 USB 3.0 Host Controller (rev 
+02)
+
+So that seems to also work. I will leave it to you and Thomas to decide 
+which approach is better!
+
+Cheers,
+Neil
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pex-combined.diff
+Type: text/x-diff
+Size: 2236 bytes
+Desc: Combined patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/c4f61db5/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pex-diff-to-jasons-patch.diff
+Type: text/x-diff
+Size: 1179 bytes
+Desc: Diff to Jason's patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/c4f61db5/attachment-0001.bin>
