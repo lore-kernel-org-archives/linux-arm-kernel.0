@@ -1,45 +1,63 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 10 Apr 2014 11:27:38 -0400 (EDT)
-Subject: [PATCH v2 1/2] usb: ehci-exynos: Return immediately from suspend
- if ehci_suspend fails
-In-Reply-To: <1397125682-4955-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <Pine.LNX.4.44L0.1404101127270.32351-100000@netrider.rowland.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 10 Apr 2014 20:20:10 +0900
+Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
+In-Reply-To: <002701cf54a6$f6593720$e30ba560$@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397124377-16969-13-git-send-email-cw00.choi@samsung.com>
+ <002701cf54a6$f6593720$e30ba560$@samsung.com>
+Message-ID: <53467E6A.6040105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Apr 2014, Vivek Gautam wrote:
+Hi,
 
-> Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
-> adds a check for possible race between suspend and wakeup interrupt,
-> and thereby it returns -EBUSY as error code if there's a wakeup
-> interrupt.
-> So the platform host controller should not proceed further with
-> its suspend callback, rather should return immediately to avoid
-> powering down the essential things, like phy.
+On 04/10/2014 07:23 PM, Chanho Park wrote:
+> Hi,
 > 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Acked-by: Jingoo Han <jg1.han@samsung.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> ---
+>> -----Original Message-----
+>> From: linux-arm-kernel [mailto:linux-arm-kernel-
+>> bounces at lists.infradead.org] On Behalf Of Chanwoo Choi
+>> Sent: Thursday, April 10, 2014 7:06 PM
+>> To: kgene.kim at samsung.com; t.figa at samsung.com; linux-samsung-
+>> soc at vger.kernel.org
+>> Cc: hyunhee.kim at samsung.com; sw0312.kim at samsung.com; linux-
+>> kernel at vger.kernel.org; yj44.cho at samsung.com; inki.dae at samsung.com;
+>> cw00.choi at samsung.com; kyungmin.park at samsung.com; linux-arm-
+>> kernel at lists.infradead.org
+>> Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
+>>
+>> From: Hyunhee Kim <hyunhee.kim@samsung.com>
+>>
+>> ARM CPU has its own PMU (Performance Monitoring Unit). This patch add
+>> PMU dt
+>> data to support PMU for CPU. Exynos3250 has four PMU interrupts.
+>>
+>> Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos3250.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi
+>> b/arch/arm/boot/dts/exynos3250.dtsi
+>> index ceed761..2f0ca32 100644
+>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>> @@ -280,4 +280,9 @@
+>>  		pinctrl-0 = <&i2c7_bus>;
+>>  		status = "disabled";
+>>  	};
+>> +
+>> +	pmu {
+>> +		compatible = "arm,cortex-a7-pmu";
+>> +		interrupts = <0 18 0>, <0 19 0>, <0 20 0>, <0 21 0>;
+>> +	};
 > 
-> Changes from v1:
-> -- Removed unnecessary change 'return 0'
-> 
->  drivers/usb/host/ehci-exynos.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-> index d1d8c47..7f425ac 100644
-> --- a/drivers/usb/host/ehci-exynos.c
-> +++ b/drivers/usb/host/ehci-exynos.c
-> @@ -212,6 +212,8 @@ static int exynos_ehci_suspend(struct device *dev)
->  	int rc;
->  
->  	rc = ehci_suspend(hcd, do_wakeup);
-> +	if (rc)
-> +		return rc;
->  
->  	if (exynos_ehci->otg)
->  		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
+> As I know, the exynos3250 has two CPU cores. Why does it have four pmu
+> interrupts?
+> IMO it is sufficient it has only two interrupts.
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+OK, I'll fix it using only two interrupt for dual-core.
+
+Best Regards,
+Chanwoo Choi
