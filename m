@@ -1,62 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:21:02 +0200
-Subject: [PATCH V3 19/19] mmc: mmci: Enforce max frequency configuration
- through DT
-In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397132462-8005-20-git-send-email-ulf.hansson@linaro.org>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Thu, 10 Apr 2014 19:23:48 +0900
+Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
+In-Reply-To: <1397124377-16969-13-git-send-email-cw00.choi@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397124377-16969-13-git-send-email-cw00.choi@samsung.com>
+Message-ID: <002701cf54a6$f6593720$e30ba560$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the option to provide a maximum frequency as platform data,
-enforce it through DT.
+Hi,
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c   |    5 +----
- include/linux/amba/mmci.h |    4 ----
- 2 files changed, 1 insertion(+), 8 deletions(-)
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Chanwoo Choi
+> Sent: Thursday, April 10, 2014 7:06 PM
+> To: kgene.kim at samsung.com; t.figa at samsung.com; linux-samsung-
+> soc at vger.kernel.org
+> Cc: hyunhee.kim at samsung.com; sw0312.kim at samsung.com; linux-
+> kernel at vger.kernel.org; yj44.cho at samsung.com; inki.dae at samsung.com;
+> cw00.choi at samsung.com; kyungmin.park at samsung.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
+> 
+> From: Hyunhee Kim <hyunhee.kim@samsung.com>
+> 
+> ARM CPU has its own PMU (Performance Monitoring Unit). This patch add
+> PMU dt
+> data to support PMU for CPU. Exynos3250 has four PMU interrupts.
+> 
+> Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos3250.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi
+> b/arch/arm/boot/dts/exynos3250.dtsi
+> index ceed761..2f0ca32 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -280,4 +280,9 @@
+>  		pinctrl-0 = <&i2c7_bus>;
+>  		status = "disabled";
+>  	};
+> +
+> +	pmu {
+> +		compatible = "arm,cortex-a7-pmu";
+> +		interrupts = <0 18 0>, <0 19 0>, <0 20 0>, <0 21 0>;
+> +	};
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 04cff5e..83f5e56 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1478,13 +1478,10 @@ static int mmci_probe(struct amba_device *dev,
- 	 * If no maximum operating frequency is supplied, fall back to use
- 	 * the module parameter, which has a (low) default value in case it
- 	 * is not specified. Either value must not exceed the clock rate into
--	 * the block, of course. Also note that DT takes precedence over
--	 * platform data.
-+	 * the block, of course.
- 	 */
- 	if (mmc->f_max)
- 		mmc->f_max = min(host->mclk, mmc->f_max);
--	else if (plat->f_max)
--		mmc->f_max = min(host->mclk, plat->f_max);
- 	else
- 		mmc->f_max = min(host->mclk, fmax);
- 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index bf339ff..8c98113 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -9,9 +9,6 @@
- /**
-  * struct mmci_platform_data - platform configuration for the MMCI
-  * (also known as PL180) block.
-- * @f_max: the maximum operational frequency for this host in this
-- * platform configuration. When this is specified it takes precedence
-- * over the module parameter for the same frequency.
-  * @ocr_mask: available voltages on the 4 pins from the block, this
-  * is ignored if a regulator is used, see the MMC_VDD_* masks in
-  * mmc/host.h
-@@ -28,7 +25,6 @@
-  * @cd_invert: true if the gpio_cd pin value is active low
-  */
- struct mmci_platform_data {
--	unsigned int f_max;
- 	unsigned int ocr_mask;
- 	int (*ios_handler)(struct device *, struct mmc_ios *);
- 	unsigned int (*status)(struct device *);
--- 
-1.7.9.5
+As I know, the exynos3250 has two CPU cores. Why does it have four pmu
+interrupts?
+IMO it is sufficient it has only two interrupts.
+
+Best Regards,
+Chanho Park 
