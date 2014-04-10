@@ -1,54 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Apr 2014 23:17:28 +0200
-Subject: [PATCH 04/15] pinctrl: sunxi: specify clk name when retrieving
- pinctrl pio clk
-In-Reply-To: <CACRpkdbG-D5RXrrJs9LBEGs-1dydmfPKvCgNb4S2=BbBq3SxQw@mail.gmail.com>
-References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>	<1397051478-4113-5-git-send-email-boris.brezillon@free-electrons.com>	<CACRpkdYW6b_37V40TRxs=7ecaWuV0X7_YJ4=-Psr9CG-cTb79w@mail.gmail.com>
- <CACRpkdbG-D5RXrrJs9LBEGs-1dydmfPKvCgNb4S2=BbBq3SxQw@mail.gmail.com>
-Message-ID: <53470A68.6090005@free-electrons.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 11 Apr 2014 00:22:02 +0300
+Subject: [PATCH 0/5] GPIO OMAP driver changes for v3.16
+In-Reply-To: <CABxcv=miFY3gE6HOU5ovWwCzgC6Un3ANh_Weh_bPCb7OoYQ+pA@mail.gmail.com>
+References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CACRpkdarYt4tAD9WMDu6Me+dhipVyDHMpgF-AQ8SDNKMmhSjsA@mail.gmail.com>
+ <20140410193048.GE15736@drone.musicnaut.iki.fi>
+ <CABxcv=miFY3gE6HOU5ovWwCzgC6Un3ANh_Weh_bPCb7OoYQ+pA@mail.gmail.com>
+Message-ID: <20140410212202.GF15736@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+Hi,
 
-On 10/04/2014 20:16, Linus Walleij wrote:
-> On Thu, Apr 10, 2014 at 8:14 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Apr 9, 2014 at 3:51 PM, Boris BREZILLON
->> <boris.brezillon@free-electrons.com> wrote:
->>
->>> Specify base pio clk name when retrieving it using the CCF.
->>> This way we will avoid conflicts when introducing a second clk for the A31
->>> SoC.
->>>
->>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> Are you merging all these through ARM SoC?
->>
->> In that case
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> If it's OK to merge stand-alone tell me and I'll apply it to
->> the pinctrl tree.
-> Hm there seems to be quite a few patches to pinctrl here...
->
-> May I apply this and the others to the pinctrl tree simply?
+On Thu, Apr 10, 2014 at 10:17:44PM +0200, Javier Martinez Canillas wrote:
+> > The same happens also on Nokia 770:
+> >
+> > [    0.118896] genirq: Setting trigger mode 0 for irq 128 failed (gpio_irq_type+0x0/0x220)
+> 
+> I don't have those errors when booting on my DM3730 IGEPv2 board but
+> it seems that for some reason on omap1  __irq_set_trigger() complains
+> when IRQ_TYPE_NONE is used as a default flag when calling
+> gpiochip_irqchip_add()
+> 
+> Could you please test the following patch and tell me if your board
+> still works and makes the errors go away?
 
-Actually I made a v2 (and then a v3 https://lkml.org/lkml/2014/4/10/320
-:-)) of this series, in which I removed all DT related stuff.
-So, if you agree with these changes, I guess you can take them through
-you tree.
+Now it complains about mode 8...
 
-Best Regards,
+[    0.118835] genirq: Setting trigger mode 8 for irq 128 failed (gpio_irq_type
++0x0/0x220)
 
-Boris
+A.
 
->
-> As DTS files should be maintained separately I don't think
-> it's important to keep driver and DTS file changes together.
->
-> Yours,
-> Linus Walleij
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 8cc9e91..5bc8aec 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1122,7 +1122,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank)
+> 
+>         ret = gpiochip_irqchip_add(&bank->chip, &gpio_irq_chip,
+>                                    irq_base, gpio_irq_handler,
+> -                                  IRQ_TYPE_NONE);
+> +                                  IRQ_TYPE_LEVEL_LOW);
+> 
+>         if (ret) {
+>                 dev_err(bank->dev, "Couldn't add irqchip to gpiochip
+> %d\n", ret);
+> 
+> Best regards,
+> Javier
