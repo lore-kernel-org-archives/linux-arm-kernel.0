@@ -1,49 +1,34 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 18:37:17 +0900
-Subject: [PATCH 06/27] ARM: EXYNOS:: Enter a15 lowpower mode for Exynos3250
- based on Cortex-a7
+Date: Thu, 10 Apr 2014 18:37:18 +0900
+Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize gic
+ from dt
 In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
 References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397122658-16013-7-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397122658-16013-8-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch decide proper lowpower mode of either a15 or a9 according to own ID
-from Main ID register.
+This patch declare coretex-a7's irqchip to initialze gic from dt
+with "arm,cortex-a7-gic" data.
 
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/hotplug.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-gic.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead53..36d3db6 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -135,13 +135,20 @@ void __ref exynos_cpu_die(unsigned int cpu)
- 	int primary_part = 0;
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 4300b66..8e906e4 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ }
+ IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
+ IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
++IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
+ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+ IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
  
- 	/*
--	 * we're ready for shutdown now, so do it.
--	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
-+	 * we're ready for shutdown now, so do it. Exynos4 is A9 based
-+	 * while Exynos5 is A15/Exynos7 is A7; check the CPU part
- 	 * number by reading the Main ID register and then perform the
- 	 * appropriate sequence for entering low power.
- 	 */
- 	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
--	if ((primary_part & 0xfff0) == 0xc0f0)
-+
-+	/*
-+	 * Main ID register of Cortex series
-+	 * - Cortex-a7  : 0x410F_C07x
-+	 * - Cortex-a15 : 0x410F_C0Fx
-+	 */
-+	primary_part = primary_part & 0xfff0;
-+	if (primary_part == 0xc0f0 || primary_part == 0xc070)
- 		cpu_enter_lowpower_a15();
- 	else
- 		cpu_enter_lowpower_a9();
 -- 
 1.8.0
