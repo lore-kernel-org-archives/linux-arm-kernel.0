@@ -1,67 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Apr 2014 14:40:28 +0100
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <53469C29.8050906@ti.com>
-References: <cover.1396605300.git.nsekhar@ti.com>
- <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
- <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
- <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
- <53469C29.8050906@ti.com>
-Message-ID: <20140410134028.GL27282@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 10 Apr 2014 14:12:01 -0600
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <20140410200153.46669e0c@skate>
+References: <20140410181953.50ccfcc3@skate>
+ <20140410165733.GB23104@obsidianresearch.com>
+ <20140410200153.46669e0c@skate>
+Message-ID: <20140410201201.GA12661@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 06:57:05PM +0530, Sekhar Nori wrote:
-> On Thursday 10 April 2014 05:46 PM, Sekhar Nori wrote:
-> > This will work. NS_LOCKDOWN is required for L2C-220 as well and so I was
-> > thinking about adding a new l2c220_enable() which will set the
-> > NS_LOCKDOWN and then call l2c_enable()
+On Thu, Apr 10, 2014 at 08:01:53PM +0200, Thomas Petazzoni wrote:
+> > Can you run Neil's patch and see if your system behaves the same?
+> > Specifically that the link eventually goes down after
+> > mvebu_pcie_set_local_dev_nr ?
+> > 
+> > I couldn't find any case where the BDF leaks below the TLP layer, and
+> > the spec is very clear that the assigned BDF can change at run time,
+> > so I don't have an explanation for why the link reset is happening.
+> > Do you have a contact at Marvell that might shed some light on that
+> > behavior?
 > 
-> Here is a patch for what I was saying above.
+> There was a potential explanation about the mvebu-soc-id driver that
+> enables the clock and then disables it, before the pci-mvebu driver.
+> This is different that what was happening before, where the pci-mvebu
+> driver was the only one to enable the clock, which was already enabled
+> by the bootloader. So if the clock takes some time to stabilize, the
+> introduction of mvebu-soc-id may lead to problems.
+
+Oh, that certainly sounds like a potential problem. Disabling the
+clock will certainly cause 'interesting' effects on the PEX, depending
+on exactly what it does it could confuse the link partner (trigger a
+timeout based retrain?).
+
+Gating the clock without disabling the Phy first does sound like a
+bad idea..
+
+Neil, does this do anything for you?
+
+diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+index f3b325f..e0a032f 100644
+--- a/arch/arm/mach-mvebu/mvebu-soc-id.c
++++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+@@ -107,7 +107,7 @@ static int __init mvebu_soc_id_init(void)
+        iounmap(pci_base);
+ 
+ res_ioremap:
+-       clk_disable_unprepare(clk);
++//     clk_disable_unprepare(clk);
+ 
+ clk_err:
+        of_node_put(child);
+
+> But I'm not entirely convinced by this, because in my testing, I saw:
 > 
-> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-> index c47ac8f..dc9e03b 100644
-> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
-> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-> @@ -105,6 +105,8 @@
->  #define L2X0_AUX_CTRL_DIRTY_LATENCY_MASK	(7 << 9)
->  #define L2X0_AUX_CTRL_ASSOC_SHIFT		13
->  #define L2X0_AUX_CTRL_ASSOC_MASK		(15 << 13)
-> +/* L2C-220/310 common bits */
-> +#define L2C_AUX_CTRL_NS_LOCKDOWN		BIT(26)
->  /* L2C-210 specific bits */
->  #define L210_AUX_CTRL_WRAP_DISABLE		BIT(12)
->  #define L210_AUX_CTRL_WA_OVERRIDE		BIT(23)
-> @@ -113,7 +115,6 @@
->  #define L220_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
->  #define L220_AUX_CTRL_FWA_SHIFT			23
->  #define L220_AUX_CTRL_FWA_MASK			(3 << 23)
-> -#define L220_AUX_CTRL_NS_LOCKDOWN		BIT(26)
->  #define L220_AUX_CTRL_NS_INT_CTRL		BIT(27)
->  /* L2C-310 specific bits */
->  #define L310_AUX_CTRL_FULL_LINE_ZERO		BIT(0)	/* R2P0+ */
-> @@ -122,7 +123,6 @@
->  #define L310_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
->  #define L310_AUX_CTRL_ASSOCIATIVITY_16		BIT(16)
->  #define L310_AUX_CTRL_CACHE_REPLACE_RR		BIT(25)	/* R2P0+ */
-> -#define L310_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+>  * Enable the clock
+>  * Values in the PCI configuration space are correct (like
+>    vendor/product ID)
+>  * mvebu_pcie_set_local_dev_nr()
+>  * Values in the PCI configuration space are no longer correct, unless
+>    you wait a little bit.
 
-NAK.  The reason for this split is because the NS lockdown bit is *not*
-on L2C-210, and so it does not deserve to be a "common" bit - because it
-isn't common to all variants.
+Were you reading the configuation space through the MMIO mapping or
+through the configuration indirection?
 
-> @@ -764,7 +776,7 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
->  			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
->  	}
->  
-> -	l2c_enable(base, aux, num_lock);
-> +	l2c220_enable(base, aux, num_lock);
+In any event, turning on the clock should almost certainly be
+accompanied by a phy reset sequence to get both link ends on the same
+page.
 
-My first reaction to this is to say NAK again - I don't want to create
-a multi-layered maze of X calls Y calls Z.  Who's to say that The 220
-won't need to do something different from 310 in the future?
+Attached is a rough, untested patch along those lines.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> > That does sound like more mbus troubles.
+> 
+> Interestingly, the problem occurred when I was plugging a SATA PCIe
+> card. And regardless of whether the SATA PCIe card is present or not,
+> the MBus mappings for the IGB are exactly the same.
+
+Maybe something wrong with mbus window index 13?
+
+Any change if you use other windows?
+
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -299,7 +299,7 @@ static int mvebu_mbus_alloc_window(struct mvebu_mbus_state *mbus,
+        int win;
+ 
+        if (remap == MVEBU_MBUS_NO_REMAP) {
+-               for (win = mbus->soc->num_remappable_wins;
++               for (win = 0;
+                     win < mbus->soc->num_wins; win++)
+                        if (mvebu_mbus_window_is_free(mbus, win))
+                                return mvebu_mbus_setup_window(mbus, win, base,
+
+Jason
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pex-reset.diff
+Type: text/x-diff
+Size: 1897 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/e9227692/attachment.bin>
