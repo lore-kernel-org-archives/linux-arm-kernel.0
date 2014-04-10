@@ -1,42 +1,77 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 10 Apr 2014 09:49:51 +1000
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <CAErSpo4BmoYzf6GxOPRni=q563zhON57s7=5Hz=2Cf-X2ft-1A@mail.gmail.com>
-References: <1394811272-1547-1-git-send-email-Liviu.Dudau@arm.com>
- <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <20140405000007.GD15806@google.com>
- <20140407084623.GG17163@e106497-lin.cambridge.arm.com>
- <1396862058.3671.40.camel@pasglop>
- <20140407100715.GI17163@e106497-lin.cambridge.arm.com>
- <CAErSpo7h+Yew2hBztzkOzcHU5r4OQebxFbcZGkNUwJwfTFsbfg@mail.gmail.com>
- <20140408102043.GV17163@e106497-lin.cambridge.arm.com>
- <CAErSpo4anYBmaRbJEFE9kAXSmnvfqud=w1QA=mSSsTUamM4kSw@mail.gmail.com>
- <20140409120750.GN985@e106497-lin.cambridge.arm.com>
- <CAErSpo4BmoYzf6GxOPRni=q563zhON57s7=5Hz=2Cf-X2ft-1A@mail.gmail.com>
-Message-ID: <1397087391.3671.153.camel@pasglop>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 10 Apr 2014 09:23:48 +0900
+Subject: [PATCH 1/2] usb: ehci-exynos: Return immediately from suspend if
+ ehci_suspend fails
+In-Reply-To: <Pine.LNX.4.44L0.1404091430240.28384-100000@netrider.rowland.org>
+References: <1397016042-4451-1-git-send-email-gautam.vivek@samsung.com>
+ <Pine.LNX.4.44L0.1404091430240.28384-100000@netrider.rowland.org>
+Message-ID: <001a01cf5453$243d9c70$6cb8d550$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-04-09 at 08:02 -0600, Bjorn Helgaas wrote:
-> It's possible we could manage domain numbers in the core.  On ACPI
-> systems, we currently we use the ACPI _SEG value as the domain.  In
-> some cases, e.g., on ia64, config space access is done via firmware
-> interfaces, and those interfaces expect the _SEG values.  We could
-> conceivably maintain a mapping between _SEG and domain, but I'm not
-> sure there's an advantage there.
+On Thursday, April 10, 2014 3:32 AM, Alan Stern wrote:
+> On Wed, 9 Apr 2014, Vivek Gautam wrote:
+> 
+> > Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
+> > adds a check for possible race between suspend and wakeup interrupt,
+> > and thereby it returns -EBUSY as error code if there's a wakeup
+> > interrupt.
+> > So the platform host controller should not proceed further with
+> > its suspend callback, rather should return immediately to avoid
+> > powering down the essential things, like phy.
+> >
+> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> > Cc: Alan Stern <stern@rowland.harvard.edu>
+> > Cc: Jingoo Han <jg1.han@samsung.com>
+> > ---
+> >
+> > Based on 'usb-next' branch of Greg's usb tree.
+> >
+> >  drivers/usb/host/ehci-exynos.c |    4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+> > index d1d8c47..a4550eb 100644
+> > --- a/drivers/usb/host/ehci-exynos.c
+> > +++ b/drivers/usb/host/ehci-exynos.c
+> > @@ -212,6 +212,8 @@ static int exynos_ehci_suspend(struct device *dev)
+> >  	int rc;
+> >
+> >  	rc = ehci_suspend(hcd, do_wakeup);
+> > +	if (rc)
+> > +		return rc;
+> >
+> >  	if (exynos_ehci->otg)
+> >  		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
+> > @@ -221,7 +223,7 @@ static int exynos_ehci_suspend(struct device *dev)
+> >
+> >  	clk_disable_unprepare(exynos_ehci->clk);
+> >
+> > -	return rc;
+> > +	return 0;
+> >  }
+> >
+> >  static int exynos_ehci_resume(struct device *dev)
+> 
+> The first hunk of this patch is correct, but the second hunk isn't
+> needed.  A similar remark is true for the ehci-platform patch.
 
-I'd rather keep the ability for the architecture to assign domain
-numbers.
+Hi Alan,
 
-I'm working on making them relate to the physical slot numbers
-on our new systems so we get predictable PCI IDs which helps with
-some stuff like the new network device naming scheme etc...
+Do you mean the following?
 
-Predictability is a good thing :-)
+1st hunk
+ +	if (rc)
+ +		return rc;
 
-> I probably don't understand what you intend by reversing the order.
-> Are you suggesting something like new pcibios_*() interfaces the arch
-> can use to get the host bridge apertures and domain number?
+2nd hunk
+ -	return rc;
+ +	return 0;
 
-Cheers,
-Ben.
+Currently, the 'rc' will be always 'zero'; however, I don't
+Have any objection, because the code might be  modified later.
+
+Best regards,
+Jingoo Han
+> 
+> Alan Stern
