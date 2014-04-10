@@ -1,67 +1,171 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Apr 2014 16:47:17 -0700
-Subject: [PATCH 09/11] ARM: OMAP2+: Enable CPUidle in omap2plus_defconfig
+Date: Thu, 10 Apr 2014 16:47:18 -0700
+Subject: [PATCH 10/11] mfd: twl-core: Fix idle mode signaling for omaps when
+ booted with device tree
 In-Reply-To: <1397173639-29587-1-git-send-email-tony@atomide.com>
 References: <1397173639-29587-1-git-send-email-tony@atomide.com>
-Message-ID: <1397173639-29587-10-git-send-email-tony@atomide.com>
+Message-ID: <1397173639-29587-11-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CPUidle so it's easier for maintainers to notice
-if some future code changes cause regressions.
+I noticed a regression where the omap sys_clkreq signal will never
+trigger for omap3 when booted with device tree while it triggers
+when booted in legacy mode. This means voltage scaling does not
+do anything when booted with device tree.
+
+Turns out the reason is we fail to initialize the SmartReflex
+enable bit in twl4030 with the following error:
+
+twl: not initialized
+
+And that happens because we are wrongly tinkering with the twl4030
+registers in arch/arm/mach-omap2/omap_twl.c before the driver is
+initialized. Looking at the the SmartReflex bit enable code in
+omap_twl.c, we need to always set it.
+
+So let's fix the issue by always enabling the twl4030 SmartReflex
+bit in the drivers/mfd/twl-core.c probe, and drop the related
+code in omap_twl.c.
+
+Note that we still have some twl4030 tinkering left in omap_twl.c
+for the twl6030 case, but that's a different patch.
 
 Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Lee Jones <lee.jones@linaro.org>
 Cc: Nishanth Menon <nm@ti.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/configs/omap2plus_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-omap2/omap_twl.c | 60 ------------------------------------------
+ drivers/mfd/twl-core.c         | 15 +++++++++++
+ 2 files changed, 15 insertions(+), 60 deletions(-)
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 3a0b53d..9da475a 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -21,6 +21,8 @@ CONFIG_MODULE_SRCVERSION_ALL=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_MULTI_V6=y
-+CONFIG_POWER_AVS_OMAP=y
-+CONFIG_POWER_AVS_OMAP_CLASS3=y
- CONFIG_OMAP_RESET_CLOCKS=y
- CONFIG_OMAP_MUX_DEBUG=y
- CONFIG_ARCH_OMAP2=y
-@@ -41,6 +43,7 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
- CONFIG_KEXEC=y
- CONFIG_FPE_NWFPE=y
-+CONFIG_CPU_IDLE=y
- CONFIG_BINFMT_MISC=y
- CONFIG_PM_DEBUG=y
- CONFIG_NET=y
-@@ -158,11 +161,14 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_W1=y
- CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_AVS=y
- CONFIG_SENSORS_LM75=m
- CONFIG_THERMAL=y
- CONFIG_THERMAL_GOV_FAIR_SHARE=y
- CONFIG_THERMAL_GOV_USER_SPACE=y
-+CONFIG_CPU_THERMAL=y
- CONFIG_TI_SOC_THERMAL=y
-+CONFIG_TI_THERMAL=y
- CONFIG_OMAP4_THERMAL=y
- CONFIG_OMAP5_THERMAL=y
- CONFIG_DRA752_THERMAL=y
-@@ -175,6 +181,7 @@ CONFIG_MFD_TPS65910=y
- CONFIG_TWL6040_CORE=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_PALMAS=y
-+CONFIG_REGULATOR_TI_ABB=y
- CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
- CONFIG_REGULATOR_TPS65217=y
+diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+index 615e5b1..6bf6267 100644
+--- a/arch/arm/mach-omap2/omap_twl.c
++++ b/arch/arm/mach-omap2/omap_twl.c
+@@ -46,15 +46,8 @@
+ 
+ static bool is_offset_valid;
+ static u8 smps_offset;
+-/*
+- * Flag to ensure Smartreflex bit in TWL
+- * being cleared in board file is not overwritten.
+- */
+-static bool __initdata twl_sr_enable_autoinit;
+ 
+-#define TWL4030_DCDC_GLOBAL_CFG        0x06
+ #define REG_SMPS_OFFSET         0xE0
+-#define SMARTREFLEX_ENABLE     BIT(3)
+ 
+ static unsigned long twl4030_vsel_to_uv(const u8 vsel)
+ {
+@@ -251,18 +244,6 @@ int __init omap3_twl_init(void)
+ 	if (!cpu_is_omap34xx())
+ 		return -ENODEV;
+ 
+-	/*
+-	 * The smartreflex bit on twl4030 specifies if the setting of voltage
+-	 * is done over the I2C_SR path. Since this setting is independent of
+-	 * the actual usage of smartreflex AVS module, we enable TWL SR bit
+-	 * by default irrespective of whether smartreflex AVS module is enabled
+-	 * on the OMAP side or not. This is because without this bit enabled,
+-	 * the voltage scaling through vp forceupdate/bypass mechanism of
+-	 * voltage scaling will not function on TWL over I2C_SR.
+-	 */
+-	if (!twl_sr_enable_autoinit)
+-		omap3_twl_set_sr_bit(true);
+-
+ 	voltdm = voltdm_lookup("mpu_iva");
+ 	omap_voltage_register_pmic(voltdm, &omap3_mpu_pmic);
+ 
+@@ -271,44 +252,3 @@ int __init omap3_twl_init(void)
+ 
+ 	return 0;
+ }
+-
+-/**
+- * omap3_twl_set_sr_bit() - Set/Clear SR bit on TWL
+- * @enable: enable SR mode in twl or not
+- *
+- * If 'enable' is true, enables Smartreflex bit on TWL 4030 to make sure
+- * voltage scaling through OMAP SR works. Else, the smartreflex bit
+- * on twl4030 is cleared as there are platforms which use OMAP3 and T2 but
+- * use Synchronized Scaling Hardware Strategy (ENABLE_VMODE=1) and Direct
+- * Strategy Software Scaling Mode (ENABLE_VMODE=0), for setting the voltages,
+- * in those scenarios this bit is to be cleared (enable = false).
+- *
+- * Returns 0 on success, error is returned if I2C read/write fails.
+- */
+-int __init omap3_twl_set_sr_bit(bool enable)
+-{
+-	u8 temp;
+-	int ret;
+-	if (twl_sr_enable_autoinit)
+-		pr_warning("%s: unexpected multiple calls\n", __func__);
+-
+-	ret = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
+-			      TWL4030_DCDC_GLOBAL_CFG);
+-	if (ret)
+-		goto err;
+-
+-	if (enable)
+-		temp |= SMARTREFLEX_ENABLE;
+-	else
+-		temp &= ~SMARTREFLEX_ENABLE;
+-
+-	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
+-			       TWL4030_DCDC_GLOBAL_CFG);
+-	if (!ret) {
+-		twl_sr_enable_autoinit = true;
+-		return 0;
+-	}
+-err:
+-	pr_err("%s: Error access to TWL4030 (%d)\n", __func__, ret);
+-	return ret;
+-}
+diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+index ed71832..ad7d04f 100644
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -98,7 +98,11 @@
+ #define TWL4030_BASEADD_BACKUP		0x0014
+ #define TWL4030_BASEADD_INT		0x002E
+ #define TWL4030_BASEADD_PM_MASTER	0x0036
++
+ #define TWL4030_BASEADD_PM_RECEIVER	0x005B
++#define TWL4030_DCDC_GLOBAL_CFG		0x06
++#define SMARTREFLEX_ENABLE		BIT(3)
++
+ #define TWL4030_BASEADD_RTC		0x001C
+ #define TWL4030_BASEADD_SECURED_REG	0x0000
+ 
+@@ -1204,6 +1208,11 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 	 * Disable TWL4030/TWL5030 I2C Pull-up on I2C1 and I2C4(SR) interface.
+ 	 * Program I2C_SCL_CTRL_PU(bit 0)=0, I2C_SDA_CTRL_PU (bit 2)=0,
+ 	 * SR_I2C_SCL_CTRL_PU(bit 4)=0 and SR_I2C_SDA_CTRL_PU(bit 6)=0.
++	 *
++	 * Also, always enable SmartReflex bit as that's needed for omaps to
++	 * to do anything over I2C4 for voltage scaling even if SmartReflex
++	 * is disabled. Without the SmartReflex bit omap sys_clkreq idle
++	 * signal will never trigger for retention idle.
+ 	 */
+ 	if (twl_class_is_4030()) {
+ 		u8 temp;
+@@ -1212,6 +1221,12 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 		temp &= ~(SR_I2C_SDA_CTRL_PU | SR_I2C_SCL_CTRL_PU | \
+ 			I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
+ 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
++
++		twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
++				TWL4030_DCDC_GLOBAL_CFG);
++		temp |= SMARTREFLEX_ENABLE;
++		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
++				 TWL4030_DCDC_GLOBAL_CFG);
+ 	}
+ 
+ 	if (node) {
 -- 
 1.8.1.1
