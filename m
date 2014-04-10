@@ -1,31 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 10 Apr 2014 09:37:03 +0200
-Subject: [PATCH 2/2] pwm: use PWM_LOOKUP to set the period and polarity
-In-Reply-To: <20140409231549.GD2187@verge.net.au>
-References: <1397066649-3767-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1397066649-3767-3-git-send-email-alexandre.belloni@free-electrons.com>
- <20140409231549.GD2187@verge.net.au>
-Message-ID: <20140410073702.GF2879@piout.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 10 Apr 2014 08:33:54 +0100
+Subject: [PATCH v4 00/16] mfd: max14577: Add support for MAX77836
+In-Reply-To: <1397112697.6717.2.camel@AMDC1943>
+References: <1393236641-14977-1-git-send-email-k.kozlowski@samsung.com>
+ <53461E09.7090408@samsung.com> <1397112697.6717.2.camel@AMDC1943>
+Message-ID: <20140410073354.GC4214@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2014 at 08:15:49 +0900, Simon Horman wrote :
-> On Wed, Apr 09, 2014 at 08:04:09PM +0200, Alexandre Belloni wrote:
-> > Now that the PWM core is able to set the period and polarity based on
-> > the lookup table, add those to PWM_LOOKUP to ease their usage.
+> > Hi Krzysztof,
+> > 
+> > Did you finish this patchset for applying git repository?
+> > I can't find this patchset on mainline kernel.
+> > 
+> > If this patchset isn't applied on mainline, I'd like you to finish this patch
+> > because I want to maintain up to date patch for max77836/max14577 on mainline.
 > 
-> I would prefer if this change was made in a non-atomic manner.
+> Hi,
 > 
-> 1. Add new infrastructure
-> 2. Update users individually
-> 3. Remove old infrastructure
-> 
+> The patches didn't get to mainline. I couldn't obtain all needed acks. I
+> prepared another version of the patchset (with less cross-subsystem
+> renames) which I plan to send after 3.15 merge window.
 
-I agree this would be better but I'm not sure how you can modify a macro
-without renaming it or changing it everywhere at once. Like said, I'm
-open to creating a new macro.
+If this is technically possible it should always be the default as it
+makes things easier for everyone.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
