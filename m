@@ -1,17 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Apr 2014 14:02:59 +0100
-Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to
- initialize gic from dt
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Thu, 10 Apr 2014 19:37:12 +0900
+Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize
+ gic from dt
 In-Reply-To: <878urd33g4.fsf@approximate.cambridge.arm.com>
 References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
  <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
  <878urd33g4.fsf@approximate.cambridge.arm.com>
-Message-ID: <20140410130259.GA4462@e106331-lin.cambridge.arm.com>
+Message-ID: <002e01cf54a8$d59897e0$80c9c7a0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 11:04:59AM +0100, Marc Zyngier wrote:
-> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+Hi,
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Marc Zyngier
+> Sent: Thursday, April 10, 2014 7:05 PM
+> To: Chanwoo Choi
+> Cc: mark.rutland at arm.com; linux-samsung-soc at vger.kernel.org;
+> t.figa at samsung.com; hyunhee.kim at samsung.com; sw0312.kim at samsung.com;
+> linux-kernel at vger.kernel.org; yj44.cho at samsung.com; inki.dae at samsung.com;
+> kyungmin.park at samsung.com; kgene.kim at samsung.com; Thomas Gleixner;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to
+> initialize gic from dt
+> 
+> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi
+> <cw00.choi@samsung.com> wrote:
 > > This patch declare coretex-a7's irqchip to initialze gic from dt
 > > with "arm,cortex-a7-gic" data.
 > >
@@ -26,7 +41,8 @@ On Thu, Apr 10, 2014 at 11:04:59AM +0100, Marc Zyngier wrote:
 > > index 4300b66..8e906e4 100644
 > > --- a/drivers/irqchip/irq-gic.c
 > > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+> > @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct
+> device_node *parent)
 > >  }
 > >  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
 > >  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
@@ -42,18 +58,8 @@ On Thu, Apr 10, 2014 at 11:04:59AM +0100, Marc Zyngier wrote:
 > that new DT files are using that? We can always use a more precise
 > compatible for quirks.
 
-Nit: s/property/compatible/
+I prefer it would be arm,gicv2 instead arm-gic.
+In case of GICv3 of arm64, it can be arm,gicv3.
 
-As mentioned elsewhere, "arm,gic-v2" would seem to fit the bill (and we
-can have "arm,gic" or "arm,gic-v1" for v1).
-
-> Mark, what do you think? I think this has been discussed in the past
-> already.
-
-It's been repeatedly brought up and agreed on, it's just that no-one's
-implemented it. I agree that having an "arm,gic-v2" binding that people
-can place in their compatible list is a sensible thing to do, and I'd be
-happy to Ack patches implementing it.
-
-Cheers,
-Mark.
+Best Regards,
+Chanho Park
