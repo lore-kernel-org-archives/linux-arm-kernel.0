@@ -1,50 +1,54 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 10 Apr 2014 23:07:01 +0200
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <alpine.DEB.2.10.1404101849270.1578@vroombuntu>
-References: <20140410181953.50ccfcc3@skate>
- <alpine.DEB.2.10.1404101849270.1578@vroombuntu>
-Message-ID: <20140410230701.1aabb32b@skate>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 10 Apr 2014 23:17:28 +0200
+Subject: [PATCH 04/15] pinctrl: sunxi: specify clk name when retrieving
+ pinctrl pio clk
+In-Reply-To: <CACRpkdbG-D5RXrrJs9LBEGs-1dydmfPKvCgNb4S2=BbBq3SxQw@mail.gmail.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>	<1397051478-4113-5-git-send-email-boris.brezillon@free-electrons.com>	<CACRpkdYW6b_37V40TRxs=7ecaWuV0X7_YJ4=-Psr9CG-cTb79w@mail.gmail.com>
+ <CACRpkdbG-D5RXrrJs9LBEGs-1dydmfPKvCgNb4S2=BbBq3SxQw@mail.gmail.com>
+Message-ID: <53470A68.6090005@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Neil Greatorex,
+Hello Linus,
 
-On Thu, 10 Apr 2014 19:20:37 +0100 (BST), Neil Greatorex wrote:
+On 10/04/2014 20:16, Linus Walleij wrote:
+> On Thu, Apr 10, 2014 at 8:14 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Wed, Apr 9, 2014 at 3:51 PM, Boris BREZILLON
+>> <boris.brezillon@free-electrons.com> wrote:
+>>
+>>> Specify base pio clk name when retrieving it using the CCF.
+>>> This way we will avoid conflicts when introducing a second clk for the A31
+>>> SoC.
+>>>
+>>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Are you merging all these through ARM SoC?
+>>
+>> In that case
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> If it's OK to merge stand-alone tell me and I'll apply it to
+>> the pinctrl tree.
+> Hm there seems to be quite a few patches to pinctrl here...
+>
+> May I apply this and the others to the pinctrl tree simply?
 
-> I have tested this branch on my Mirabox. I still get the link up problem 
-> but if I work around that (see below) the igb driver works flawlessly.
-> 
-> Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
+Actually I made a v2 (and then a v3 https://lkml.org/lkml/2014/4/10/320
+:-)) of this series, in which I removed all DT related stuff.
+So, if you agree with these changes, I guess you can take them through
+you tree.
 
-Good, thanks, we're making progress!
+Best Regards,
 
-> > Remaining issues:
-> >
-> > * The link up problem. Unfortunately, I tried to reproduce it today,
-> >   and didn't manage to. It's weird, because I'm sure I was able to
-> >   produce it in the past, but I'm no longer able to, I don't know.
-> >   Therefore, it's not easy for me to work on this topic. Neil, Jason,
-> >   do you think this is a topic you could potentially handle?
-> 
-> Do you have earlyprintk enabled? I've found that if I have earlyprintk in 
-> my bootargs / command line then I don't get the issue. I assume that is 
-> because of timing, but it could be something else?
+Boris
 
-I have indeed disabled earlyprintk. Initially by removing it from the
-command line, and then even by disabling CONFIG_DEBUG_LL.
+>
+> As DTS files should be maintained separately I don't think
+> it's important to keep driver and DTS file changes together.
+>
+> Yours,
+> Linus Walleij
 
-In fact the original bug report I had came from my colleague Gregory
-Clement, who precisely reported to me that a PCIe card was properly
-detected on his Armada 385 board when earlyprintk was enabled, but the
-PCIe card was not detected when earlyprintk was disabled. At the time,
-I was able to reproduce the problem as well on my Armada 385, and
-debugged it to find that the mvebu_pcie_set_local_dev_nr().
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
