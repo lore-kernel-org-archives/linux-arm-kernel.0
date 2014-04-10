@@ -1,23 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 10 Apr 2014 12:49:18 -0300
-Subject: Wrong SPI NOR model detected by mx6sl
-Message-ID: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 10 Apr 2014 09:31:54 -0500
+Subject: [PATCH] dt-bindings: add vendor-prefix for Newhaven Display
+In-Reply-To: <20140404103527.GC9242@amd.pavel.ucw.cz>
+References: <1396493527-26170-1-git-send-email-dinguyen@altera.com>
+ <20140404103527.GC9242@amd.pavel.ucw.cz>
+Message-ID: <CAL_Jsq+qHLgLP=C=m4DFNeLOKhQGgVf6hzpv9BrmzoX6Hy7zAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Apr 4, 2014 at 5:35 AM, Pavel Machek <pavel@denx.de> wrote:
+> On Wed 2014-04-02 21:52:07, dinguyen at altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@altera.com>
+>>
+>> Newhaven Display provides the worldwide marketplace with cost
+>> effective high quality display devices ranging from OLED and LCD
+>> Displays to VFD Displays.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+>
+> Commit log should not be a place for advertising? :-)
+>
+> Reviewed-by: Pavel Machek <pavel@denx.de>
 
-On the imx6sl-evk there is a m25p32 spi nor flash, but in the kernel
-probe we get:
+Applied for 3.15.
 
-m25p80 spi0.0: found mr25h256, expected m25p32
-m25p80 spi0.0: mr25h256 (32 Kbytes)
-
-On the mx6qsabresd there is also a m25p32, which is correctly detected:
-m25p80 spi0.0: m25p32 (4096 Kbytes)
-
-Any ideas as to why mx6sl detects the wrong spi nor model?
-
-Regards,
-
-Fabio Estevam
+Rob
