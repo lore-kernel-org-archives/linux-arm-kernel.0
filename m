@@ -1,86 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Apr 2014 10:00:17 +0200
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <CAErSpo7egL2T_W_OCJw2kPHFDqspwOHXtZJw8JyjWU=56ofFKQ@mail.gmail.com>
-References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <20140410012715.GA1328@bart>
- <CAErSpo7egL2T_W_OCJw2kPHFDqspwOHXtZJw8JyjWU=56ofFKQ@mail.gmail.com>
-Message-ID: <4506772.YFSM2m1eaP@wuerfel>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Thu, 10 Apr 2014 16:05:11 +0800
+Subject: [PATCH] pwm: i.MX: Avoid sample fifo overflow for i.MX pwm version2
+Message-ID: <1397117111-19306-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 April 2014 21:48:14 Bjorn Helgaas wrote:
-> On Wed, Apr 9, 2014 at 7:27 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> > On Wed, Apr 09, 2014 at 08:02:41AM -0600, Bjorn Helgaas wrote:
-> >> >>   struct pci_host_bridge {
-> >> >>     int domain;
-> >> >>     int node;
-> >> >>     struct device *dev;
-> >> >>     struct pci_ops *ops;
-> >> >>     struct list_head resources;
-> >> >>     void *sysdata;
-> >> >>     struct pci_bus *bus;  /* filled in by core, not by arch */
-> >> >>     ... /* other existing contents managed by core */
-> >> >>   };
-> >> >>
-> >> >>   struct pci_bus *pci_scan_host_bridge(struct pci_host_bridge *bridge);
-> >> >
-> >> > I'm really reluctant to give the arches more rope to hang themselves.
-> >>
-> >> If you mean the sysdata pointer is rope to hang themselves, I think it
-> >> would be great it we didn't need sysdata at all.  But I think it would
-> >> be a huge amount of work to get rid of it completely, and keeping it
-> >> would let us work at that incrementally.
-> >
-> > Agree. But then your suggestion was to wrap sysdata inside another structure,
-> > which to me constitutes additional rope.
-> 
-> I'll ponder this more, but I don't see your point here yet.  The arch
-> already supplies a sysdata pointer to pci_scan_root_bus(), and we
-> stash it in every struct pci_bus already.  My idea was just to pass it
-> in differently, as a structure member rather than a separate argument.
->  (And I'm not completely attached to my proposal; it was only to
-> illustrate my concern about the explosion of interfaces if we have to
-> add *_domain(), *_node(), etc.)
+The i.MX pwm version2 is embedded in several i.MX SoCs, such
+as i.MX27, i.MX51 and i.MX6SL.  There are four 16bit sample
+fifos in this IP, each of which determines the duty period
+of a PWM waveform in one full cycle.  The IP spec mentions
+that we should not write a fourth sample because the fifo
+will become full and trigger a fifo write error(FWE) which
+will prevent the PWM from starting once it is enabled.  In
+order to avoid any sample fifo overflow issue, this patch
+does software reset to clear all the sample fifos in the
+very beginning of the pwm configuration function.
 
-As a minor variation of your suggestion, how about passing in a pointer
-to struct pci_host_bridge, and embed that within its own private
-structure? I think this is closer to how a lot of other subsystems
-do the abstraction.
+The fifo overflow issue can be reproduced by the following
+commands on the i.MX6SL evk platform, assuming we use pwm2
+for the debug LED which is driven by the pin HSIC_STROBE
+and the maximal brightness is 255.
+echo 0   > /sys/class/leds/user/brightness
+echo 0   > /sys/class/leds/user/brightness
+echo 0   > /sys/class/leds/user/brightness
+echo 0   > /sys/class/leds/user/brightness
+echo 255 > /sys/class/leds/user/brightness
+Here, FWE happens(PWMSR register reads 0x58) and the LED
+can not be lighten.
 
-> > The "what" for PCI host bridges is defined in the spec. The "how" is implementation
-> > defined. What I'm trying to get with the cleanup is the ordering of pci_host_bridge
-> > creation: core creates the structure first ("what"), arch then has the chance
-> > of adding specific data to it (ops, resources, etc) ("how").
-> >
-> > At the moment arm and powerpc do some horrible dances in trying to create their
-> > local idea of a host bridge before passing it to the core code.
-> >
-> > As for the root bus number, maybe we can offer some sensible default strategy
-> > for numbering them and the arches that don't care too much can use that.
-> 
-> I think we're at the limit of what can be accomplished with the
-> abstractness of English.
-> 
-> My opinion is that it's reasonable for the arch to discover the host
-> bridge properties first and pass them to the core, and it doesn't
-> require unreasonable things of the arch.  I know the arm PCI setup is
-> complicated, partly because it deals with a huge number of machines
-> that don't have a consistent firmware interface.  The x86/ACPI setup
-> is relatively simple because it deals with a simple firmware
-> interface.  But that's just my opinion, and maybe your code will show
-> otherwise.
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: linux-pwm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+---
+ drivers/pwm/pwm-imx.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Makes sense. One of the areas where the PCI code shows its age is the
-method how the various parts link together: there are function calls
-going back and forth between architecture specific files and generic
-files, rather a hierarchy of files with generic code being code by more
-specific code.
-
-To do the probing properly, I think it's totally fine to have the
-core code expect stuff like the resources and domain number
-to be filled out already by whoever calls it, but then have wrappers
-around it that get this information from a firmware interface, or
-from hardwired architecture specific code where necessary.
-
-	Arnd
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index cc47733..efdce53 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -38,6 +38,7 @@
+ #define MX3_PWMCR_DBGEN			(1 << 22)
+ #define MX3_PWMCR_CLKSRC_IPG_HIGH (2 << 16)
+ #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
++#define MX3_PWMCR_SWR		  (1 << 3)
+ #define MX3_PWMCR_EN              (1 << 0)
+ 
+ struct imx_chip {
+@@ -107,6 +108,12 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
+ 	unsigned long period_cycles, duty_cycles, prescale;
+ 	u32 cr;
+ 
++	/* do software reset in case fifo overflows */
++	writel(MX3_PWMCR_SWR, imx->mmio_base + MX3_PWMCR);
++	do {
++		cr = readl(imx->mmio_base + MX3_PWMCR);
++	} while (cr & MX3_PWMCR_SWR);
++
+ 	c = clk_get_rate(imx->clk_per);
+ 	c = c * period_ns;
+ 	do_div(c, 1000000000);
+-- 
+1.7.9.5
