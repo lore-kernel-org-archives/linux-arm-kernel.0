@@ -1,27 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 20:42:28 +0200
-Subject: [PATCH 08/27] pinctrl: exynos: Add driver data for Exynos3250
-In-Reply-To: <1397122124-15690-9-git-send-email-cw00.choi@samsung.com>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-9-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CACRpkdYiFCHFifkpRwDhdAGqBrGTU5E4mfdGE8u1c=zrim17aA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 10 Apr 2014 22:46:47 +0400
+Subject: [PATCH] ARM: shmobile: r8a7790: link PCI USb devices to USB PHY
+In-Reply-To: <534674B5.6080706@cogentembedded.com>
+References: <201404092318.26231.sergei.shtylyov@cogentembedded.com>
+ <CANqRtoQeuT=Q9PRYNMqA079gjb1VkwgvcDmsWKxjzSVxcVfeWw@mail.gmail.com>
+ <534674B5.6080706@cogentembedded.com>
+Message-ID: <5346E717.4040507@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 11:28 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+On 04/10/2014 02:38 PM, Sergei Shtylyov wrote:
 
-> From: Tomasz Figa <t.figa@samsung.com>
->
-> This patch adds driver data (bank list and EINT layout) for Exynos3250
-> to pinctrl-exynos driver. Exynos3250 includes 158 multi-functional input/output
-> ports. There are 23 general port groups.
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> Thanks for this patch, good to see that the relationship between the
+>> USB Host and the PHY is described via DT.
 
-Ugh can Tomasz send out his patches himself, I get confused...
-It was also sent two times, the second time with CC:s added.
-Tomasz, shall I merge this?
+>> This patch seems to cover USB0 and USB2 that both require special
+>> control in the PHY. How about USB1? Can you explain about the reason
+>> why you omit that?
 
-Yours,
-Linus Walleij
+>     Because the driver does nothing for USB1 anyway.
+
+    Looks like I should have tested that last minute change: kernel oopses due 
+to NULL pointer dereference somewhere in phy_get() once it gets called for 
+EHCI on the channel #1. At least doesn't seem to be my mistake...
+
+WBR, Sergei
