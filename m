@@ -1,39 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 19:45:01 +0200
-Subject: [PATCH 4/5] gpio: omap: convert driver to use gpiolib irqchip
-In-Reply-To: <5346D758.5020103@ti.com>
-References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
- <1396796297-13002-5-git-send-email-javier.martinez@collabora.co.uk>
- <5346D758.5020103@ti.com>
-Message-ID: <CACRpkdazRZvNwZcdkn1EQpv7PEGv83pL+yaFRHA8z0SSXw2gkg@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 10 Apr 2014 19:56:33 +0900
+Subject: [PATCH 06/27] ARM: EXYNOS:: Enter a15 lowpower mode for Exynos3250
+ based on Cortex-a7
+In-Reply-To: <87d2gp3430.fsf@approximate.cambridge.arm.com>
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+ <1397122124-15690-7-git-send-email-cw00.choi@samsung.com>
+ <87d2gp3430.fsf@approximate.cambridge.arm.com>
+Message-ID: <534678E1.2000005@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 7:39 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Sunday 06 April 2014 10:58 AM, Javier Martinez Canillas wrote:
+On 04/10/2014 06:51 PM, Marc Zyngier wrote:
+> On Thu, Apr 10 2014 at 10:28:23 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patch decide proper lowpower mode of either a15 or a9 according to own ID
+>> from Main ID register.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/hotplug.c | 13 ++++++++++---
+>>  1 file changed, 10 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+>> index 5eead53..36d3db6 100644
+>> --- a/arch/arm/mach-exynos/hotplug.c
+>> +++ b/arch/arm/mach-exynos/hotplug.c
+>> @@ -135,13 +135,20 @@ void __ref exynos_cpu_die(unsigned int cpu)
+>>  	int primary_part = 0;
+>>  
+>>  	/*
+>> -	 * we're ready for shutdown now, so do it.
+>> -	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
+>> +	 * we're ready for shutdown now, so do it. Exynos4 is A9 based
+>> +	 * while Exynos5 is A15/Exynos7 is A7; check the CPU part
+>>  	 * number by reading the Main ID register and then perform the
+>>  	 * appropriate sequence for entering low power.
+>>  	 */
+>>  	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
+> 
+> While you're touching that code, how about using:
+> 
+>       primary_part = read_cpuid(CPUID_ID);
 
->> +#ifdef CONFIG_ARCH_OMAP1
->> +     /*
->> +      * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
->> +      * irq_alloc_descs() since a base IRQ offset will no longer be needed.
->> +      */
->> +     irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
->> +     if (irq_base < 0) {
->> +             dev_err(bank->dev, "Couldn't allocate IRQ numbers\n");
->> +             return -ENODEV;
->> +     }
->> +#endif
+Or, 
+I suggest read_cpuid_part_number() instead of assembler directly.
+
+	primary_part = read_cpuid_part_number();
+
+> 
+>> -	if ((primary_part & 0xfff0) == 0xc0f0)
 >> +
-> Do we still need above after first patch ? Would be good
-> to get rid of above ugly #ifdef on the middle of the code.
+>> +	/*
+>> +	 * Main ID register of Cortex series
+>> +	 * - Cortex-a7  : 0x410F_C07x
+>> +	 * - Cortex-a15 : 0x410F_C0Fx
+>> +	 */
+>> +	primary_part = primary_part & 0xfff0;
+>> +	if (primary_part == 0xc0f0 || primary_part == 0xc070)
+> 
+> ARM_CPU_PART_CORTEX_A15, ARM_CPU_PART_CORTEX_A7
 
-I don't think so actually, simple irqdomain adds descriptors
-for irqbase != 0, and the gpiochip irqchip helpers call
-irq_create_mapping() on all offsets.
+OK I'll use this defined constant as following:
 
-Preferably a separate patch on top of this removing that code
-though so it's bisectable.
+	switch (primary_part)
+	case ARM_CPU_PART_CORTEX_A7:
+	case ARM_CPU_PART_CORTEX_A15:
+		cpu_enter_lowpower_a15();
+		break;
+	default:
+		cpu_enter_lowpower_a9();
+		break;
+	}
 
-Yours,
-Linus Walleij
+> 
+>>  		cpu_enter_lowpower_a15();
+>>  	else
+>>  		cpu_enter_lowpower_a9();
+> 
+
+Best Regards,
+Chanwoo Choi
