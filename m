@@ -1,60 +1,87 @@
-From: armdev.ftm@gmail.com (armdev)
-Date: Thu, 10 Apr 2014 15:39:02 +0530
-Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize
- gic from dt
-In-Reply-To: <878urd33g4.fsf@approximate.cambridge.arm.com>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
- <878urd33g4.fsf@approximate.cambridge.arm.com>
-Message-ID: <C136A675-6D64-42EE-918E-351A266946C5@gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 10 Apr 2014 20:58:31 +0200
+Subject: [PATCH 4/5] gpio: omap: convert driver to use gpiolib irqchip
+In-Reply-To: <CACRpkdazRZvNwZcdkn1EQpv7PEGv83pL+yaFRHA8z0SSXw2gkg@mail.gmail.com>
+References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1396796297-13002-5-git-send-email-javier.martinez@collabora.co.uk>
+ <5346D758.5020103@ti.com>
+ <CACRpkdazRZvNwZcdkn1EQpv7PEGv83pL+yaFRHA8z0SSXw2gkg@mail.gmail.com>
+Message-ID: <CABxcv=ktiH346PBueYKtitKWVXznjdYOJe=qvOfxfT37MTL_Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Linus and Santosh,
 
-On 10-Apr-2014, at 3:34 pm, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Thu, Apr 10, 2014 at 7:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Apr 10, 2014 at 7:39 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Sunday 06 April 2014 10:58 AM, Javier Martinez Canillas wrote:
+>
+>>> +#ifdef CONFIG_ARCH_OMAP1
+>>> +     /*
+>>> +      * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
+>>> +      * irq_alloc_descs() since a base IRQ offset will no longer be needed.
+>>> +      */
+>>> +     irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
+>>> +     if (irq_base < 0) {
+>>> +             dev_err(bank->dev, "Couldn't allocate IRQ numbers\n");
+>>> +             return -ENODEV;
+>>> +     }
+>>> +#endif
+>>> +
+>> Do we still need above after first patch ? Would be good
+>> to get rid of above ugly #ifdef on the middle of the code.
 
-> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch declare coretex-a7's irqchip to initialze gic from dt
->> with "arm,cortex-a7-gic" data.
->> 
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> drivers/irqchip/irq-gic.c | 1 +
->> 1 file changed, 1 insertion(+)
->> 
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 4300b66..8e906e4 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->> }
->> IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
->> IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
->> +IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
->> IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->> IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
-> 
-> Frankly, this patch adds no value. Are we going to add
-> "arm,cortex-a12-gic", "arm,cortex-a17-gic", "arm,cortex-a53-gic",
-> "arm,cortex-a57-gic"? And that's just to mention the ARM Ltd cores...
-> 
-> Instead, how about defining a generic "arm,gic" property, and mandate
-> that new DT files are using that? We can always use a more precise
-> compatible for quirks.
-> 
+When working on this series I tried to remove the #ifdef but as far as
+I understood is not currently possible until OMAP1 supports sparse irq
+numbering.
 
-How about keeping it simple and tied to arm gic versions
-arm,gicv1, arm,gicv2, arm,gicv2ve
+Not so long ago the GPIO OMAP driver used the legacy domain mapping
+for all OMAP SoCs and Jon Hunter converted to use linear domain
+mapping on commit ede4d7a ("gpio/omap: convert gpio irq domain to
+linear mapping").
 
-> Mark, what do you think? I think this has been discussed in the past
-> already.
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny.
+Unfortunately that change caused a regression on OMAP1 platforms as
+reported by Aaro [0] so I had to partially revert the linear domain
+mapping for OMAP1 platforms on commit 397ead ("gpio/omap: don't use
+linear domain mapping for OMAP1") introducing this ugly ifdefery in
+the middle of the code.
+
+>
+> I don't think so actually, simple irqdomain adds descriptors
+> for irqbase != 0, and the gpiochip irqchip helpers call
+> irq_create_mapping() on all offsets.
+>
+
+Looking at irq_domain_add_simple() [1] I see that it only calls
+irq_alloc_descs() and irq_domain_associate_many() if first_irq > 0 and
+CONFIG_SPARSE_IRQ is enabled (which is not the case for
+omap1_defconfig).
+
+So, if I got this correctly removing the #ifdef for OMAP1 and calling
+irq_domain_add_simple() is functionally equivalent to what Jon's patch
+did that broke omap1. That is would have the same effect that just
+calling irq_domain_add_linear() [2] for OMAP1.
+
+> Preferably a separate patch on top of this removing that code
+> though so it's bisectable.
+>
+
+If I remember correctly we did that partial revert because we were in
+a -rc cycle and I didn't have time to investigate why
+irq_domain_add_linear() does not work on omap1. I could try to do this
+as a follow up patch but unfortunately I don't have access to any
+omap1 platform to do further debug.
+
+Please let me know if I got something wrong while looking at the code.
+
+> Yours,
+> Linus Walleij
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks a lot and best regards,
+Javier
+
+[0]: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg89005.html
+[1]: http://lxr.free-electrons.com/source/kernel/irq/irqdomain.c#L123
+[2]: http://lxr.free-electrons.com/source/include/linux/irqdomain.h#L139
