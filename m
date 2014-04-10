@@ -1,215 +1,226 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:20:44 +0200
-Subject: [PATCH V3 01/19] mmc: mmci: Convert to the mmc gpio API
-In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397132462-8005-2-git-send-email-ulf.hansson@linaro.org>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Thu, 10 Apr 2014 18:54:21 +0530
+Subject: [PATCH] usb: ohci-exynos: Add facility to use phy provided by the
+ generic phy framework
+Message-ID: <1397136261-16408-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid duplication of code while handling card detect and write
-protect GPIO pins/irqs, let's convert to use the mmc gpio API.
+Add support to consume phy provided by Generic phy framework.
+Keeping the support for older usb-phy intact right now, in order
+to prevent any functionality break in absence of relevant
+device tree side change for ohci-exynos.
+Once we move to new phy in the device nodes for ohci, we can
+remove the support for older phys.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/mmc/host/mmci.c |   97 ++++++++---------------------------------------
- drivers/mmc/host/mmci.h |    3 --
- 2 files changed, 15 insertions(+), 85 deletions(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 771c60a..b0b81ac 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -23,6 +23,7 @@
- #include <linux/mmc/pm.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
-+#include <linux/mmc/slot-gpio.h>
- #include <linux/amba/bus.h>
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
-@@ -1326,35 +1327,18 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	pm_runtime_put_autosuspend(mmc_dev(mmc));
- }
+Based on 'usb-next' branch of Greg's usb tree.
+Tested with local dt patches, similar to ehci dt changes posted by Kamil[1].
+Tested on Exynos5250 smdk.
+
+[1] [PATCH v6 4/8] dts: Add usb2phy to Exynos 5250
+    https://lkml.org/lkml/2014/1/29/302
+
+ .../devicetree/bindings/usb/exynos-usb.txt         |   14 ++++
+ drivers/usb/host/ohci-exynos.c                     |   79 ++++++++++++++++++--
+ 2 files changed, 85 insertions(+), 8 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+index d967ba1..ef0bc09 100644
+--- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
++++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+@@ -38,6 +38,10 @@ Required properties:
+  - interrupts: interrupt number to the cpu.
+  - clocks: from common clock binding: handle to usb clock.
+  - clock-names: from common clock binding: Shall be "usbhost".
++ - port: if in the SoC there are OHCI phys, they should be listed here.
++One phy per port. Each port should have its reg entry with a consecutive
++number. Also it should contain phys and phy-names entries specifying the
++phy used by the port.
  
--static int mmci_get_ro(struct mmc_host *mmc)
--{
--	struct mmci_host *host = mmc_priv(mmc);
--
--	if (host->gpio_wp == -ENOSYS)
--		return -ENOSYS;
--
--	return gpio_get_value_cansleep(host->gpio_wp);
--}
--
- static int mmci_get_cd(struct mmc_host *mmc)
- {
- 	struct mmci_host *host = mmc_priv(mmc);
- 	struct mmci_platform_data *plat = host->plat;
--	unsigned int status;
-+	unsigned int status = mmc_gpio_get_cd(mmc);
+ Example:
+ 	usb at 12120000 {
+@@ -47,6 +51,16 @@ Example:
  
--	if (host->gpio_cd == -ENOSYS) {
-+	if (status == -ENOSYS) {
- 		if (!plat->status)
- 			return 1; /* Assume always present */
+ 		clocks = <&clock 285>;
+ 		clock-names = "usbhost";
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port at 0 {
++		    reg = <0>;
++		    phys = <&usb2phy 1>;
++		    phy-names = "host";
++		    status = "disabled";
++		};
++
+ 	};
  
- 		status = plat->status(mmc_dev(host->mmc));
--	} else
--		status = !!gpio_get_value_cansleep(host->gpio_cd)
--			^ plat->cd_invert;
--
--	/*
--	 * Use positive logic throughout - status is zero for no card,
--	 * non-zero for card inserted.
--	 */
-+	}
- 	return status;
- }
- 
-@@ -1391,21 +1375,12 @@ static int mmci_sig_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
- 	return ret;
- }
- 
--static irqreturn_t mmci_cd_irq(int irq, void *dev_id)
--{
--	struct mmci_host *host = dev_id;
--
--	mmc_detect_change(host->mmc, msecs_to_jiffies(500));
--
--	return IRQ_HANDLED;
--}
--
- static struct mmc_host_ops mmci_ops = {
- 	.request	= mmci_request,
- 	.pre_req	= mmci_pre_request,
- 	.post_req	= mmci_post_request,
- 	.set_ios	= mmci_set_ios,
--	.get_ro		= mmci_get_ro,
-+	.get_ro		= mmc_gpio_get_ro,
- 	.get_cd		= mmci_get_cd,
- 	.start_signal_voltage_switch = mmci_sig_volt_switch,
+ DWC3
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index 68588d8..52eb821 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/phy/phy.h>
+ #include <linux/usb/phy.h>
+ #include <linux/usb/samsung_usb_phy.h>
+ #include <linux/usb.h>
+@@ -37,6 +38,7 @@ struct exynos_ohci_hcd {
+ 	struct clk *clk;
+ 	struct usb_phy *phy;
+ 	struct usb_otg *otg;
++	struct phy *phy_g;
  };
-@@ -1494,10 +1469,6 @@ static int mmci_probe(struct amba_device *dev,
- 	host = mmc_priv(mmc);
- 	host->mmc = mmc;
  
--	host->gpio_wp = -ENOSYS;
--	host->gpio_cd = -ENOSYS;
--	host->gpio_cd_irq = -1;
--
- 	host->hw_designer = amba_manf(dev);
- 	host->hw_revision = amba_rev(dev);
- 	dev_dbg(mmc_dev(mmc), "designer ID = 0x%02x\n", host->hw_designer);
-@@ -1568,6 +1539,9 @@ static int mmci_probe(struct amba_device *dev,
+ static void exynos_ohci_phy_enable(struct platform_device *pdev)
+@@ -57,12 +59,26 @@ static void exynos_ohci_phy_disable(struct platform_device *pdev)
+ 		usb_phy_shutdown(exynos_ohci->phy);
+ }
  
- 	mmc->caps = plat->capabilities;
- 	mmc->caps2 = plat->capabilities2;
-+	if (!plat->cd_invert)
-+		mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
-+	mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
++static int exynos_ohci_phyg_on(struct phy *phy, bool on)
++{
++	int ret = 0;
++
++	if (phy) {
++		if (on)
++			ret = phy_power_on(phy);
++		else
++			ret = phy_power_off(phy);
++	}
++
++	return ret;
++}
++
+ static int exynos_ohci_probe(struct platform_device *pdev)
+ {
+ 	struct exynos_ohci_hcd *exynos_ohci;
+ 	struct usb_hcd *hcd;
+ 	struct resource *res;
+-	struct usb_phy *phy;
++	struct device_node *child;
+ 	int irq;
+ 	int err;
  
- 	if (variant->busy_detect) {
- 		mmci_ops.card_busy = mmci_card_busy;
-@@ -1621,49 +1595,23 @@ static int mmci_probe(struct amba_device *dev,
- 		goto err_gpio_cd;
- 	}
- 	if (gpio_is_valid(plat->gpio_cd)) {
--		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
--		if (ret == 0)
--			ret = gpio_direction_input(plat->gpio_cd);
--		if (ret == 0)
--			host->gpio_cd = plat->gpio_cd;
--		else if (ret != -ENOSYS)
-+		ret = mmc_gpio_request_cd(mmc, plat->gpio_cd, 0);
-+		if (ret)
- 			goto err_gpio_cd;
--
--		/*
--		 * A gpio pin that will detect cards when inserted and removed
--		 * will most likely want to trigger on the edges if it is
--		 * 0 when ejected and 1 when inserted (or mutatis mutandis
--		 * for the inverted case) so we request triggers on both
--		 * edges.
--		 */
--		ret = request_any_context_irq(gpio_to_irq(plat->gpio_cd),
--				mmci_cd_irq,
--				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
--				DRIVER_NAME " (cd)", host);
--		if (ret >= 0)
--			host->gpio_cd_irq = gpio_to_irq(plat->gpio_cd);
- 	}
- 	if (plat->gpio_wp == -EPROBE_DEFER) {
- 		ret = -EPROBE_DEFER;
--		goto err_gpio_wp;
-+		goto err_gpio_cd;
- 	}
- 	if (gpio_is_valid(plat->gpio_wp)) {
--		ret = gpio_request(plat->gpio_wp, DRIVER_NAME " (wp)");
--		if (ret == 0)
--			ret = gpio_direction_input(plat->gpio_wp);
--		if (ret == 0)
--			host->gpio_wp = plat->gpio_wp;
--		else if (ret != -ENOSYS)
--			goto err_gpio_wp;
-+		ret = mmc_gpio_request_ro(mmc, plat->gpio_wp);
-+		if (ret)
-+			goto err_gpio_cd;
+@@ -88,16 +104,49 @@ static int exynos_ohci_probe(struct platform_device *pdev)
+ 					"samsung,exynos5440-ohci"))
+ 		goto skip_phy;
+ 
+-	phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+-	if (IS_ERR(phy)) {
+-		usb_put_hcd(hcd);
+-		dev_warn(&pdev->dev, "no platform data or transceiver defined\n");
+-		return -EPROBE_DEFER;
++	exynos_ohci->phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
++	if (IS_ERR(exynos_ohci->phy)) {
++		err = PTR_ERR(exynos_ohci->phy);
++		if (err == -ENXIO || err == -ENODEV) {
++			exynos_ohci->phy = NULL;
++		} else if (err == -EPROBE_DEFER) {
++			usb_put_hcd(hcd);
++			return err;
++		} else {
++			dev_err(&pdev->dev, "no usb2 phy configured\n");
++			usb_put_hcd(hcd);
++			return err;
++		}
+ 	} else {
+-		exynos_ohci->phy = phy;
+-		exynos_ohci->otg = phy->otg;
++		exynos_ohci->otg = exynos_ohci->phy->otg;
  	}
  
--	if ((host->plat->status || host->gpio_cd != -ENOSYS)
--	    && host->gpio_cd_irq < 0)
--		mmc->caps |= MMC_CAP_NEEDS_POLL;
--
- 	ret = request_irq(dev->irq[0], mmci_irq, IRQF_SHARED, DRIVER_NAME " (cmd)", host);
- 	if (ret)
--		goto unmap;
-+		goto err_gpio_cd;
++	/* Getting generic phy:
++	 * We are keeping both types of phys as a part of transiting OHCI
++	 * to generic phy framework, so that in absence of supporting dts
++	 * changes the functionality doesn't break.
++	 * Once we move the ohci dt nodes to use new generic phys,
++	 * we can remove support for older PHY in this driver.
++	 */
++	child = of_get_next_child(pdev->dev.of_node, NULL);
++	exynos_ohci->phy_g = devm_of_phy_get(&pdev->dev, child, 0);
++	of_node_put(child);
++	if (IS_ERR(exynos_ohci->phy_g)) {
++		err = PTR_ERR(exynos_ohci->phy_g);
++		if (err == -ENOSYS || err == -ENODEV) {
++			exynos_ohci->phy_g = NULL;
++		} else if (err == -EPROBE_DEFER) {
++			usb_put_hcd(hcd);
++			return err;
++		} else {
++			dev_err(&pdev->dev, "no usb2 phy configured\n");
++			usb_put_hcd(hcd);
++			return err;
++		}
++	}
++
++	if (!exynos_ohci->phy && !exynos_ohci->phy_g)
++		dev_dbg(&pdev->dev, "Failed to get usb2 phy\n");
+ skip_phy:
+ 	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
  
- 	if (!dev->irq[1])
- 		host->singleirq = true;
-@@ -1695,14 +1643,6 @@ static int mmci_probe(struct amba_device *dev,
+@@ -140,6 +189,11 @@ skip_phy:
+ 	platform_set_drvdata(pdev, hcd);
  
-  irq0_free:
- 	free_irq(dev->irq[0], host);
-- unmap:
--	if (host->gpio_wp != -ENOSYS)
--		gpio_free(host->gpio_wp);
-- err_gpio_wp:
--	if (host->gpio_cd_irq >= 0)
--		free_irq(host->gpio_cd_irq, host);
--	if (host->gpio_cd != -ENOSYS)
--		gpio_free(host->gpio_cd);
-  err_gpio_cd:
- 	iounmap(host->base);
-  clk_disable:
-@@ -1741,13 +1681,6 @@ static int mmci_remove(struct amba_device *dev)
- 		if (!host->singleirq)
- 			free_irq(dev->irq[1], host);
+ 	exynos_ohci_phy_enable(pdev);
++	err = exynos_ohci_phyg_on(exynos_ohci->phy_g, true);
++	if (err) {
++		dev_err(&pdev->dev, "Failed to enable phy\n");
++		goto fail_io;
++	}
  
--		if (host->gpio_wp != -ENOSYS)
--			gpio_free(host->gpio_wp);
--		if (host->gpio_cd_irq >= 0)
--			free_irq(host->gpio_cd_irq, host);
--		if (host->gpio_cd != -ENOSYS)
--			gpio_free(host->gpio_cd);
--
- 		iounmap(host->base);
- 		clk_disable_unprepare(host->clk);
+ 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (err) {
+@@ -151,6 +205,7 @@ skip_phy:
  
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 58b1b88..8fc5814 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -176,9 +176,6 @@ struct mmci_host {
- 	struct mmc_data		*data;
- 	struct mmc_host		*mmc;
- 	struct clk		*clk;
--	int			gpio_cd;
--	int			gpio_wp;
--	int			gpio_cd_irq;
- 	bool			singleirq;
+ fail_add_hcd:
+ 	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phyg_on(exynos_ohci->phy_g, false);
+ fail_io:
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ fail_clk:
+@@ -169,6 +224,7 @@ static int exynos_ohci_remove(struct platform_device *pdev)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
  
- 	spinlock_t		lock;
+ 	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phyg_on(exynos_ohci->phy_g, false);
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
+@@ -205,6 +261,7 @@ static int exynos_ohci_suspend(struct device *dev)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+ 	exynos_ohci_phy_disable(pdev);
++	exynos_ohci_phyg_on(exynos_ohci->phy_g, false);
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
+@@ -218,6 +275,7 @@ static int exynos_ohci_resume(struct device *dev)
+ 	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+ 	struct platform_device *pdev		= to_platform_device(dev);
++	int ret;
+ 
+ 	clk_prepare_enable(exynos_ohci->clk);
+ 
+@@ -225,6 +283,11 @@ static int exynos_ohci_resume(struct device *dev)
+ 		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
+ 
+ 	exynos_ohci_phy_enable(pdev);
++	ret = exynos_ohci_phyg_on(exynos_ohci->phy_g, true);
++	if (ret) {
++		dev_err(dev, "Failed to enable phy\n");
++		return ret;
++	}
+ 
+ 	ohci_resume(hcd, false);
+ 
 -- 
-1.7.9.5
+1.7.10.4
