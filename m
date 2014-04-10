@@ -1,39 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 18:49:56 +0200
-Subject: [PATCH v3 1/3] pinctrl: Rename Broadcom Capri pinctrl driver
-In-Reply-To: <1396478439-16586-2-git-send-email-syin@broadcom.com>
-References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
- <1396478439-16586-1-git-send-email-syin@broadcom.com>
- <1396478439-16586-2-git-send-email-syin@broadcom.com>
-Message-ID: <CACRpkdZ1Lt2JsMMWVMBgfS8ktkpeYzA3MiGmWB27Jwhw16UYYg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 10 Apr 2014 17:26:15 +0530
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <20140409162327.GH27282@n2100.arm.linux.org.uk>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <20140409162327.GH27282@n2100.arm.linux.org.uk>
+Message-ID: <534686DF.7070207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 3, 2014 at 12:40 AM, Sherman Yin <syin@broadcom.com> wrote:
+On Wednesday 09 April 2014 09:53 PM, Russell King - ARM Linux wrote:
+> On Tue, Apr 08, 2014 at 08:23:39PM +0530, Sekhar Nori wrote:
+>> On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
+>>> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
+>>>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+>>>> index f8b8dac..6b2a056 100644
+>>>> --- a/arch/arm/mach-omap2/omap4-common.c
+>>>> +++ b/arch/arm/mach-omap2/omap4-common.c
+>>>> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
+>>>>  
+>>>>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
+>>>>  }
+>>>> +
+>>>> +int __init am43xx_l2_cache_init(void)
+>>>> +{
+>>>> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
+>>>> +		       L310_AUX_CTRL_INSTR_PREFETCH;
+>>>
+>>> It would be good to documenting the difference between this and OMAP4,
+>>> and why you have chosen different values.
+>>
+>> There are two main differences:
+>>
+>> 1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
+>> not needed even in OMAP4 with latest kernel, but I am not sure if I can
+>> do this safely without breaking any usecase currently working with OMAP4.
+>>
+>> 2) OMAP4 sets NS lockdown and NS interrupt access control bits. I
+>> searched through the commit history of L2 cache support on OMAP4 but
+>> there is no mention of why this was needed on OMAP4. I am checking
+>> internally on the history behind this.
+> 
+> That is required because as part of the enable sequence, we write to the
+> lockdown registers to clear out anything that may be there before we
+> enable the L2 cache.  If we didn't set the NS lockdown bit, then we
+> would need the secure monitor to do it for us.
 
-> To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
-> driver and its related CONFIG option are renamed to bcm281xx.
->
-> Devicetree compatible string and binding documentation use
-> "brcm,bcm11351-pinctrl" to match the machine binding here:
-> Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
->
-> This driver supports pinctrl on BCM11130, BCM11140, BCM11351, BCM28145
-> and BCM28155 SoCs.
->
-> Signed-off-by: Sherman Yin <syin@broadcom.com>
-> Reviewed-by: Matt Porter <mporter@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/Kconfig                            |    8 +-
->  drivers/pinctrl/Makefile                           |    2 +-
->  .../{pinctrl-capri.c => pinctrl-bcm281xx.c}        | 1519 ++++++++++----------
+And I realized yesterday that the only reason L2C is working on AM437x
+is because AM437x ROM is setting these bits up for us.
 
-This last version from apr 7 does not change
-arch/arm/configs/bcm_defconfig:CONFIG_PINCTRL_CAPRI=y
+> 
+> The NS interrupt access bit is also a good idea to be set, since this
+> allows us to eventually support EDAC with PL310.  As we don't support
+> EDAC at the moment, or touch the interrupt registers, we can probably
+> ignore this difference and just preserve whatever value is there for
+> the time being.
+> 
+> Both of these bits should be managed within the L2C code rather than by
+> platforms.
 
-Doesn't this mean that you render this platform without a pin
-control driver and thus broken?
+The current L2C code is not managing the NS_LOCKDOWN bit. I can take a
+shot at adding this support unless you are already looking at it.
 
-Yours,
-Linus Walleij
+> 
+>> 3) OMAP4 sets cache replacement policy to RR which is not a big deal
+>> since thats the default anyway. We can probably drop this setting even
+>> from OMAP4.
+> 
+> Yes, since that would just be a case of preserving that bit.
+
+Okay will drop this explicit setting.
+
+Thanks,
+Sekhar
