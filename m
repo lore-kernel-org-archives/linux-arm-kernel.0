@@ -1,82 +1,67 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 10 Apr 2014 13:00:04 -0700
-Subject: [RFC 00/47] mtd: nand: Add new driver supporting ST's BCH h/w
-In-Reply-To: <20140401112926.GB24013@lee--X1>
-References: <1395735604-26706-1-git-send-email-lee.jones@linaro.org>
- <20140325125050.GB665@arch.cereza> <20140325131139.GB24823@lee--X1>
- <20140325220045.GA12185@arch.cereza>
- <20140326072805.GB31517@norris-Latitude-E6410>
- <20140327102835.GA17779@lee--X1> <20140401112926.GB24013@lee--X1>
-Message-ID: <20140410200004.GP32070@ld-irv-0074>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Apr 2014 14:40:28 +0100
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <53469C29.8050906@ti.com>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
+ <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
+ <53469C29.8050906@ti.com>
+Message-ID: <20140410134028.GL27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 12:29:26PM +0100, Lee Jones wrote:
-> > The BBT requirements are somewhere more complex. To provide you with
-> > the complete picture, a little knowledge of driver history is
-> > required. When it was initially created the MTD core only supported
-> > OOB BBTs, but the ST BCH Controller doesn't support OOB access, so
-> > Angus wrote his on In-Band (IB) implementation. Unfortunately the IB
-> > support which _is_ now present in the kernel doesn't match the
-> > internal implementation. Normally this wouldn't be an issue in itself,
-> > but ST's boot-stack and tooling (Primary Bootloader, U-Boot, various
-> > Programmers, etc) are aware of the internal IB BTT and utilise it
-> > in varying ways. Shifting over to the Mainline version in
-> > one-foul-swoop _will_ cause lots of pain and will probably result in
-> > the disownership of driver we're trying to Mainline today. Naturally
-> > I'm keen to avoid this.
+On Thu, Apr 10, 2014 at 06:57:05PM +0530, Sekhar Nori wrote:
+> On Thursday 10 April 2014 05:46 PM, Sekhar Nori wrote:
+> > This will work. NS_LOCKDOWN is required for L2C-220 as well and so I was
+> > thinking about adding a new l2c220_enable() which will set the
+> > NS_LOCKDOWN and then call l2c_enable()
 > 
-> Just looking into this now. Can I add support for a vendor specific
-> signature extension? ST's flashers, bootloaders and tooling currently
-> use the format:
+> Here is a patch for what I was saying above.
 > 
-> /* Extend IBBT header with some stm-nand-bch niceties */
-> struct nand_ibbt_bch_header {
-> 	uint8_t signature[4];           /* "Bbt0" or "1tbB" signature */
-> 	uint8_t version;                /* BBT version ("age") */
-> 	uint8_t reserved[3];            /* padding */
-> 	uint8_t baseschema[4];          /* "base" schema (x4) */
-> 	uint8_t privschema[4];          /* "private" schema (x4) */
+> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+> index c47ac8f..dc9e03b 100644
+> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+> @@ -105,6 +105,8 @@
+>  #define L2X0_AUX_CTRL_DIRTY_LATENCY_MASK	(7 << 9)
+>  #define L2X0_AUX_CTRL_ASSOC_SHIFT		13
+>  #define L2X0_AUX_CTRL_ASSOC_MASK		(15 << 13)
+> +/* L2C-220/310 common bits */
+> +#define L2C_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+>  /* L2C-210 specific bits */
+>  #define L210_AUX_CTRL_WRAP_DISABLE		BIT(12)
+>  #define L210_AUX_CTRL_WA_OVERRIDE		BIT(23)
+> @@ -113,7 +115,6 @@
+>  #define L220_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
+>  #define L220_AUX_CTRL_FWA_SHIFT			23
+>  #define L220_AUX_CTRL_FWA_MASK			(3 << 23)
+> -#define L220_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+>  #define L220_AUX_CTRL_NS_INT_CTRL		BIT(27)
+>  /* L2C-310 specific bits */
+>  #define L310_AUX_CTRL_FULL_LINE_ZERO		BIT(0)	/* R2P0+ */
+> @@ -122,7 +123,6 @@
+>  #define L310_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
+>  #define L310_AUX_CTRL_ASSOCIATIVITY_16		BIT(16)
+>  #define L310_AUX_CTRL_CACHE_REPLACE_RR		BIT(25)	/* R2P0+ */
+> -#define L310_AUX_CTRL_NS_LOCKDOWN		BIT(26)
 
-Not sure what these schema mean.
+NAK.  The reason for this split is because the NS lockdown bit is *not*
+on L2C-210, and so it does not deserve to be a "common" bit - because it
+isn't common to all variants.
 
-> 	uint8_t ecc_size[4];            /* ECC bytes (0, 32, 54) (x4) */
-> 	char    author[64];             /* Arbitrary string for S/W to use */
-> }; __attribute__((__packed__))
+> @@ -764,7 +776,7 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>  			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+>  	}
+>  
+> -	l2c_enable(base, aux, num_lock);
+> +	l2c220_enable(base, aux, num_lock);
 
-Nit: that would just be __packed (see compiler-gcc.h).
+My first reaction to this is to say NAK again - I don't want to create
+a multi-layered maze of X calls Y calls Z.  Who's to say that The 220
+won't need to do something different from 310 in the future?
 
-In principle, I'm OK with extending the BBT somewhat. Preferably, this
-would provide some extensibility, so that other custom formats can use
-the same base code. For instance, it looks like many of these fields
-would be fixed, and specific to your platform. So (from nand_bbt's
-perspective) these could just be consolidated int a field:
-
-	u8 custom[76];
-
-Or make it variable-length, with the length provided by the driver?
-nand_bbt would just know not to check for it when scanning, and it
-would know to program it to flash when updating.
-
-> It would be great if we can support this with a descriptor option or
-> suchlike, as it would a) save me a lot of aggravation and b) continue
-> to support ST with their current use-case.
-
-Yeah, I realize you can't just jump over to the current format for
-production systems. And there are admittedly some rough spots in our
-current nand_bbt; it's not perfect.
-
-Some random notes (not necessarily your problem; but things to be aware
-of): nand_bbt could use some additional robustness checks, I think. Like
-a CRC field, and maybe a versioning system for allowing
-(backwards-compatible) changes in the format. To make
-backwards-compatible changes, though, the original format needs to have
-reserved space, or at least an 'offset' field, which would point to
-where the actual BBT starts--not just a fixed offset.
-
-There's also still a bit of cruft that really can be removed from
-nand_bbt (the handling of bad block markers, which is duplicated in
-nand_base). It's a low-priority item on my plate, but I think it might
-be a good first step before trying to expand nand_bbt much.
-
-Brian
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
