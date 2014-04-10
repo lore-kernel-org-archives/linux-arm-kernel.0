@@ -1,37 +1,30 @@
-From: neil@fatboyfat.co.uk (Neil Greatorex)
-Date: Thu, 10 Apr 2014 19:20:37 +0100 (BST)
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <20140410181953.50ccfcc3@skate>
-References: <20140410181953.50ccfcc3@skate>
-Message-ID: <alpine.DEB.2.10.1404101849270.1578@vroombuntu>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Apr 2014 20:20:46 +0200
+Subject: [PATCH] gpio: mxs: Allow for recursive enable_irq_wake() call
+In-Reply-To: <20140409142626.GA2317@dragon>
+References: <1395628690-7225-1-git-send-email-marex@denx.de>
+ <CACRpkda1qnx24YdfnSwu3tJw9NiVKpKjNbibGoG5JeZ+rAFpeQ@mail.gmail.com>
+ <20140409142626.GA2317@dragon>
+Message-ID: <CACRpkdZEsab4meuNC7P0thw=NhReEgt3hte=F2v7A6ncPZmd6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-On Thu, 10 Apr 2014, Thomas Petazzoni wrote:
-
-> Can you test this stack of patches on your system and configuration, and
-> let me know if that works for you? Of course, please do not include any
-> other PCI related fix: the goal is to be aware of *all* the issues, and
-> fix them in mainline.
-
-I have tested this branch on my Mirabox. I still get the link up problem 
-but if I work around that (see below) the igb driver works flawlessly.
-
-Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
-
-> Remaining issues:
+On Wed, Apr 9, 2014 at 4:26 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> On Thu, Mar 27, 2014 at 10:15:27AM +0100, Linus Walleij wrote:
+>> I would like someone to look into converting the MXS to use the new
+>> gpiolib irqchip helpers merged on my devel branch so we can centralize
+>> and get rid of surplus redundant bug fixing everywhere around the drivers.
+>>
+>> That code does not use generic irqchip, but rather a regular irqchip+domain
+>> and explicitly chained interrupt handlers.
 >
-> * The link up problem. Unfortunately, I tried to reproduce it today,
->   and didn't manage to. It's weird, because I'm sure I was able to
->   produce it in the past, but I'm no longer able to, I don't know.
->   Therefore, it's not easy for me to work on this topic. Neil, Jason,
->   do you think this is a topic you could potentially handle?
+> No.  The driver uses generic irqchip.  See function mxs_gpio_init_gc().
 
-Do you have earlyprintk enabled? I've found that if I have earlyprintk in 
-my bootargs / command line then I don't get the issue. I assume that is 
-because of timing, but it could be something else?
+Hm I see.
 
-Cheers,
-Neil
+Still I think it should be possible to lift some code into gpiolib also
+with generic chips. Must be some elegant refactoring lurking
+here...
+
+Yours,
+Linus Walleij
