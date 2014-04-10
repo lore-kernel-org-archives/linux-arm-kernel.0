@@ -1,56 +1,77 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 9 Apr 2014 21:36:12 -0400 (EDT)
-Subject: [PATCH 1/2] usb: ehci-exynos: Return immediately from suspend
- if ehci_suspend fails
-In-Reply-To: <001a01cf5453$243d9c70$6cb8d550$%han@samsung.com>
-Message-ID: <Pine.LNX.4.44L0.1404092134420.7397-100000@netrider.rowland.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 9 Apr 2014 22:55:44 -0300
+Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <20140410012140.GC2334@dragon>
+References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
+ <20140409133422.GA2334@dragon>
+ <CAOMZO5CO8ucya8qmVXBo5kgRmuLqKGtpub07o1DuE9yh5LmmPQ@mail.gmail.com>
+ <20140409145936.GB2334@dragon>
+ <CAOMZO5AuwgVijZ_SMYZBOxbq8dVtvUzcQ06TFmmDtiaEQJrYRw@mail.gmail.com>
+ <20140410012140.GC2334@dragon>
+Message-ID: <CAOMZO5Cj3yoY-Y+uD5XAW8tgyd3_Be-VCUEkEHh+gNjoKdF-6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Apr 2014, Jingoo Han wrote:
+On Wed, Apr 9, 2014 at 10:21 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
 
-> > > --- a/drivers/usb/host/ehci-exynos.c
-> > > +++ b/drivers/usb/host/ehci-exynos.c
-> > > @@ -212,6 +212,8 @@ static int exynos_ehci_suspend(struct device *dev)
-> > >  	int rc;
-> > >
-> > >  	rc = ehci_suspend(hcd, do_wakeup);
-> > > +	if (rc)
-> > > +		return rc;
-> > >
-> > >  	if (exynos_ehci->otg)
-> > >  		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
-> > > @@ -221,7 +223,7 @@ static int exynos_ehci_suspend(struct device *dev)
-> > >
-> > >  	clk_disable_unprepare(exynos_ehci->clk);
-> > >
-> > > -	return rc;
-> > > +	return 0;
-> > >  }
-> > >
-> > >  static int exynos_ehci_resume(struct device *dev)
-> > 
-> > The first hunk of this patch is correct, but the second hunk isn't
-> > needed.  A similar remark is true for the ehci-platform patch.
-> 
-> Hi Alan,
-> 
-> Do you mean the following?
-> 
-> 1st hunk
->  +	if (rc)
->  +		return rc;
-> 
-> 2nd hunk
->  -	return rc;
->  +	return 0;
+> For the record, here is my printk gives.
+...
+> *** clk_register_mux: ldb_di0_sel
+> *** clk_register_mux: ldb_di1_sel
 
-Yes, that's what I mean.
+Ok, I ran it again and yes, I can see it now. Sorry for the previous
+wrong printk's.
 
-> Currently, the 'rc' will be always 'zero'; however, I don't
-> Have any objection, because the code might be  modified later.
+>>
+>> >
+>> > Furthermore, some re-parenting happens in a way you may not be aware of.
+>> > See commit e366fdd (clk: clk-mux: implement remuxing on set_rate), for
+>> > example.
+>>
+>> This commit does not affect us as we pass the CLK_SET_RATE_NO_REPARENT flag.
+>
+> You did not get my point.  This is just an example, and we happen to set
+> this flag for now.  My point is that as long as you register a clk to
+> clock framework, you do not have a way to stop one from calling clk
+> API on the clock then.  This is how clk framework and API work, simple
+> as it is.
 
-Exactly.  We should add the new "if" statement but leave the "return 
-rc" the way it is.
+The issue that this patch wants to solve is that we need to perform
+this protection clock switching mechanism prior to doing the
+clk_set_parent for the ldb clocks.
 
-Alan Stern
+Putting a printk in clk_set_parent like this:
+
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1719,6 +1719,8 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+        if (!clk->ops)
+                return -EINVAL;
+
++       pr_info(" *** Calling clk_set_parent for %s clock\n", clk->name);
++
+        /* verify ops for for multi-parent clks */
+        if ((clk->num_parents > 1) && (!clk->ops->set_parent))
+                return -ENOSYS;
+,results in:
+
+ *** Calling clk_set_parent for ldb_di0_sel clock
+ *** Calling clk_set_parent for ldb_di1_sel clock
+ *** Calling clk_set_parent for enfc_sel clock
+ *** Calling clk_set_parent for cko2_sel clock
+ *** Calling clk_set_parent for cko clock
+ *** Calling clk_set_parent for spdif_sel clock
+ *** Calling clk_set_parent for lvds1_sel clock
+ *** Calling clk_set_parent for ipu1_di0_sel clock
+
+Which shows that there is only one clk_set_parent being called for the
+ldb_di clocks and this one is in clk-mx6q.c.
+
+So it is safe to perform this workaround in clk-imx6q.c.
+
+Don't you agree?
+
+Thanks,
+
+Fabio Estevam
