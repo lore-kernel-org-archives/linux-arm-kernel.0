@@ -1,118 +1,82 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 10 Apr 2014 11:06:21 +0200
-Subject: [PATCH v2 4/5] ARM: shmobile: r8a7790: add IIC(B) clocks to dtsi
-In-Reply-To: <20140410085746.GC16758@verge.net.au>
-References: <1395773789-17249-1-git-send-email-wsa@the-dreams.de>
- <1467516.9721qlt3iV@avalon> <20140410085746.GC16758@verge.net.au>
-Message-ID: <1469546.BhG9x3Qly1@avalon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 10 Apr 2014 14:39:13 +0530
+Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
+ on/off
+In-Reply-To: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <53465FB9.7070002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi.
 
-On Thursday 10 April 2014 17:57:46 Simon Horman wrote:
-> On Wed, Mar 26, 2014 at 03:04:41PM +0100, Laurent Pinchart wrote:
-> > Hi Wolfram,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Tuesday 25 March 2014 19:56:28 Wolfram Sang wrote:
-> > > From: Wolfram Sang <wsa@sang-engineering.com>
-> > > 
-> > > Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+On Wednesday 09 April 2014 05:24 PM, Vivek Gautam wrote:
+> Adding support to enable/disable VBUS hooked to a gpio
+> to enable vbus supply on the port.
 > 
-> Thanks.
-> 
-> I had to resolve a minor conflict when queueing this up.
-> And I also replaced a tab with a whitspace as a separator
-> on the line that (now) contains ""i2c3", "i2c2", "i2c1", "i2c0";".
-> 
-> Please check the result to make sure I didn't introduce errors.
-
-It still looks good to me.
-
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> ARM: shmobile: r8a7790: add IIC(B) clocks to dtsi
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> [horms+renesas at verge.net.au resolved conflicts]
-> [horms+renesas at verge.net.au consistently use space as separator]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 > ---
->  arch/arm/boot/dts/r8a7790.dtsi | 27 ++++++++++++++-------------
->  1 file changed, 14 insertions(+), 13 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-> index b74631e..903efe7 100644
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -679,18 +679,19 @@
->  		mstp3_clks: mstp3_clks at e615013c {
->  			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
-clocks";
->  			reg = <0 0xe615013c 0 4>, <0 0xe6150048 0 4>;
-> -			clocks = <&cp_clk>, <&mmc1_clk>, <&sd3_clk>, <&sd2_clk>,
-> -				 <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks 
-R8A7790_CLK_SD0>,
-> -				 <&mmc0_clk>, <&rclk_clk>;
-> +			clocks = <&hp_clk>, <&cp_clk>, <&mmc1_clk>, <&sd3_clk>,
-> +				 <&sd2_clk>, <&cpg_clocks R8A7790_CLK_SD1>, <&cpg_clocks
-> R8A7790_CLK_SD0>, <&mmc0_clk>, +				 <&hp_clk>, <&hp_clk>, 
-<&rclk_clk>;
->  			#clock-cells = <1>;
->  			renesas,clock-indices = <
-> -				R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 R8A7790_CLK_SDHI3
-> -				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
-> -				R8A7790_CLK_MMCIF0 R8A7790_CLK_CMT1
-> +				R8A7790_CLK_IIC2 R8A7790_CLK_TPU0 R8A7790_CLK_MMCIF1 
-R8A7790_CLK_SDHI3
-> +				R8A7790_CLK_SDHI2 R8A7790_CLK_SDHI1 R8A7790_CLK_SDHI0
-> R8A7790_CLK_MMCIF0 +				R8A7790_CLK_IIC0 R8A7790_CLK_IIC1 
-R8A7790_CLK_CMT1
+> Based on 'phy-exynos5-usbdrd' patches:
+> [PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
+> http://www.spinics.net/lists/linux-usb/msg105507.html
 > 
->  			>;
+>  drivers/phy/phy-exynos5-usbdrd.c |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 > 
->  			clock-output-names =
-> -				"tpu0", "mmcif1", "sdhi3", "sdhi2",
-> -				"sdhi1", "sdhi0", "mmcif0", "cmt1";
-> +				"iic2", "tpu0", "mmcif1", "sdhi3",
-> +				"sdhi2", "sdhi1", "sdhi0", "mmcif0",
-> +				"iic0", "iic1", "cmt1";
->  		};
->  		mstp5_clks: mstp5_clks at e6150144 {
->  			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
-clocks";
-> @@ -734,16 +735,16 @@
->  		mstp9_clks: mstp9_clks at e6150994 {
->  			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-
-clocks";
->  			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
-> -			clocks = <&p_clk>, <&p_clk>, <&cpg_clocks R8A7790_CLK_QSPI>,
-> +			clocks = <&p_clk>, <&p_clk>, <&cpg_clocks R8A7790_CLK_QSPI>, 
-<&cp_clk>,
->  				 <&hp_clk>, <&hp_clk>, <&hp_clk>, <&hp_clk>;
->  			#clock-cells = <1>;
->  			renesas,clock-indices = <
-> -				R8A7790_CLK_RCAN1 R8A7790_CLK_RCAN0 R8A7790_CLK_QSPI_MOD
-> -				R8A7790_CLK_I2C3 R8A7790_CLK_I2C2 R8A7790_CLK_I2C1
-> -				R8A7790_CLK_I2C0
-> +				R8A7790_CLK_RCAN1 R8A7790_CLK_RCAN0 R8A7790_CLK_QSPI_MOD
-> R8A7790_CLK_IICDVFS +				R8A7790_CLK_I2C3 R8A7790_CLK_I2C2 
-R8A7790_CLK_I2C1
-> R8A7790_CLK_I2C0
->  			>;
-> 
->  			clock-output-names =
-> -				"rcan1", "rcan0", "qspi_mod", "i2c3", "i2c2", "i2c1", "i2c0";
-> +				"rcan1", "rcan0", "qspi_mod", "iic3",
-> +				"i2c3", "i2c2", "i2c1", "i2c0";
->  		};
->  	};
+> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+> index ff54a7c..5ca7485 100644
+> --- a/drivers/phy/phy-exynos5-usbdrd.c
+> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/phy/phy.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/mutex.h>
+> @@ -176,6 +177,7 @@ struct exynos5_usbdrd_phy {
+>  	struct clk *ref_clk;
+>  	unsigned long ref_rate;
+>  	unsigned int refclk_reg;
+> +	int gpio;
+>  };
+>  
+>  #define to_usbdrd_phy(inst) \
+> @@ -460,6 +462,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+>  	if (!IS_ERR(phy_drd->usb30_sclk))
+>  		clk_prepare_enable(phy_drd->usb30_sclk);
+>  
+> +	/* Toggle VBUS gpio - on */
+> +	gpio_set_value(phy_drd->gpio, 1);
+> +
+>  	/* Power-on PHY*/
+>  	inst->phy_cfg->phy_isol(inst, 0);
+>  
+> @@ -476,6 +481,9 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+>  	/* Power-off the PHY */
+>  	inst->phy_cfg->phy_isol(inst, 1);
+>  
+> +	/* Toggle VBUS gpio - off */
+> +	gpio_set_value(phy_drd->gpio, 0);
+> +
+>  	if (!IS_ERR(phy_drd->usb30_sclk))
+>  		clk_disable_unprepare(phy_drd->usb30_sclk);
+>  
+> @@ -585,6 +593,16 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+>  
+>  	phy_drd->drv_data = drv_data;
+>  
+> +	/* Get required GPIO for vbus */
+> +	phy_drd->gpio = of_get_named_gpio(dev->of_node,
+> +					  "samsung,vbus-gpio", 0);
 
--- 
-Regards,
+Is this dt property documented somewhere?
+> +	if (!gpio_is_valid(phy_drd->gpio))
+> +		dev_dbg(dev, "no usbdrd-phy vbus gpio defined\n");
 
-Laurent Pinchart
+No return here? Can the PHY be functional even without the VBUS?
+
+Thanks
+Kishon
