@@ -1,68 +1,76 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Apr 2014 13:35:14 -0400
-Subject: [PATCH 1/5] gpio: omap: convert to use irq_domain_add_simple()
-In-Reply-To: <1396796297-13002-2-git-send-email-javier.martinez@collabora.co.uk>
-References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
- <1396796297-13002-2-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <5346D652.3020702@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Apr 2014 11:46:39 +0100
+Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize
+ gic from dt
+In-Reply-To: <002e01cf54a8$d59897e0$80c9c7a0$@samsung.com> (Chanho Park's
+ message of "Thu, 10 Apr 2014 11:37:12 +0100")
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+ <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
+ <878urd33g4.fsf@approximate.cambridge.arm.com>
+ <002e01cf54a8$d59897e0$80c9c7a0$@samsung.com>
+Message-ID: <87vbuh1my8.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 06 April 2014 10:58 AM, Javier Martinez Canillas wrote:
-> The GPIO OMAP driver supports different OMAP SoC families and
-> not all of them have the needed support to use the linear IRQ
-> domain mapping like OMAP1 that use the legacy domain mapping.
-> 
-> But this special check is not necessary since the simple IRQ
-> domain mapping is able to handle both cases. Having a zero
-> IRQ offset will be interpreted as a linear domain case while
-> a non-zero value will be interpreted as a legacy domain case.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  drivers/gpio/gpio-omap.c | 15 ++++-----------
->  1 file changed, 4 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 19b886c..3ee9b8d 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1138,9 +1138,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
->  	const struct omap_gpio_platform_data *pdata;
->  	struct resource *res;
->  	struct gpio_bank *bank;
-> -#ifdef CONFIG_ARCH_OMAP1
-> -	int irq_base;
-> -#endif
-> +	int irq_base = 0;
->  
->  	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
->  
-> @@ -1185,21 +1183,16 @@ static int omap_gpio_probe(struct platform_device *pdev)
->  #ifdef CONFIG_ARCH_OMAP1
->  	/*
->  	 * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
-> -	 * irq_alloc_descs() and irq_domain_add_legacy() and just use a
-> -	 * linear IRQ domain mapping for all OMAP platforms.
-> +	 * irq_alloc_descs() since a base IRQ offset will no longer be needed.
->  	 */
->  	irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
->  	if (irq_base < 0) {
->  		dev_err(dev, "Couldn't allocate IRQ numbers\n");
->  		return -ENODEV;
->  	}
-> -
-> -	bank->domain = irq_domain_add_legacy(node, bank->width, irq_base,
-> -					     0, &irq_domain_simple_ops, NULL);
-> -#else
-> -	bank->domain = irq_domain_add_linear(node, bank->width,
-> -					     &irq_domain_simple_ops, NULL);
->  #endif
-> +	bank->domain = irq_domain_add_simple(node, bank->width, irq_base,
-> +					     &irq_domain_simple_ops, NULL);
->  	if (!bank->domain) {
->  		dev_err(dev, "Couldn't register an IRQ domain\n");
->  		return -ENODEV;
-> 
-Looks good.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Thu, Apr 10 2014 at 11:37:12 am BST, Chanho Park <chanho61.park@samsung.com> wrote:
+> Hi,
+>
+>> -----Original Message-----
+>> From: linux-arm-kernel [mailto:linux-arm-kernel-
+>> bounces at lists.infradead.org] On Behalf Of Marc Zyngier
+>> Sent: Thursday, April 10, 2014 7:05 PM
+>> To: Chanwoo Choi
+>> Cc: mark.rutland at arm.com; linux-samsung-soc at vger.kernel.org;
+>> t.figa at samsung.com; hyunhee.kim at samsung.com; sw0312.kim at samsung.com;
+>> linux-kernel at vger.kernel.org; yj44.cho at samsung.com; inki.dae at samsung.com;
+>> kyungmin.park at samsung.com; kgene.kim at samsung.com; Thomas Gleixner;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to
+>> initialize gic from dt
+>> 
+>> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi
+>> <cw00.choi@samsung.com> wrote:
+>> > This patch declare coretex-a7's irqchip to initialze gic from dt
+>> > with "arm,cortex-a7-gic" data.
+>> >
+>> > Cc: Thomas Gleixner <tglx@linutronix.de>
+>> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> > ---
+>> >  drivers/irqchip/irq-gic.c | 1 +
+>> >  1 file changed, 1 insertion(+)
+>> >
+>> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> > index 4300b66..8e906e4 100644
+>> > --- a/drivers/irqchip/irq-gic.c
+>> > +++ b/drivers/irqchip/irq-gic.c
+>> > @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct
+>> device_node *parent)
+>> >  }
+>> >  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
+>> >  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
+>> > +IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
+>> >  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+>> >  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+>> 
+>> Frankly, this patch adds no value. Are we going to add
+>> "arm,cortex-a12-gic", "arm,cortex-a17-gic", "arm,cortex-a53-gic",
+>> "arm,cortex-a57-gic"? And that's just to mention the ARM Ltd cores...
+>> 
+>> Instead, how about defining a generic "arm,gic" property, and mandate
+>> that new DT files are using that? We can always use a more precise
+>> compatible for quirks.
+>
+> I prefer it would be arm,gicv2 instead arm-gic.
+
+If you prefer, fine by me. Consider spelling it "arm,gic-v2", which
+seems to be the current convention for version numbers.
+
+> In case of GICv3 of arm64, it can be arm,gicv3.
+
+GICv3 and arm64 are independent of each other, and the binding has
+already been specified as "arm,gic-v3".
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
