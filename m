@@ -1,22 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Apr 2014 16:47:12 -0700
-Subject: [PATCH 04/11] ARM: OMAP3: Fix voltage control for deeper idle states
+Date: Thu, 10 Apr 2014 16:47:10 -0700
+Subject: [PATCH 02/11] ARM: OMAP3: Fix idle mode signaling for sys_clkreq and
+ sys_off_mode
 In-Reply-To: <1397173639-29587-1-git-send-email-tony@atomide.com>
 References: <1397173639-29587-1-git-send-email-tony@atomide.com>
-Message-ID: <1397173639-29587-5-git-send-email-tony@atomide.com>
+Message-ID: <1397173639-29587-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we're attempting to use a static value for the
-voltctrl register that only works for controlling the PMIC
-over I2C4. For using sys_off_mode signaling, we need to update
-update clksetup, voltsetup1, voltsetup2 and voltctrl registers
-dynamically depending on the idle state.
+While debugging legacy mode vs device tree booted PM regressions,
+I noticed that omap3 is not toggling sys_clkreq and sys_off_mode
+pins like it should.
 
-So let's fix this by configuring things for I2C4 controlled idle
-and sys_off_mode pin controlled idle, and then write the
-configured register values depending on the idle state. This
-is similar what N900 kernel is doing too.
+The sys_clkreq and sys_off_mode pins are not toggling because of
+the following issues:
+
+1. The default polarity for the sys_off_mode pin is wrong.
+   OFFMODE_POL needs to be cleared for sys_off_mode to go down when
+   hitting off-idle, while CLKREQ_POL needs to be set so sys_clkreq
+   goes down when hitting retention.
+
+2. The values for voltctrl register need to be updated dynamically.
+   We need to set either the retention idle bits, or off idle bits
+   in the voltctrl register depending the idle mode we're targeting
+   to hit.
+
+Let's fix these two issues as otherwise the system will just
+hang if any twl4030 PMIC idle scripts are loaded. The only case
+where the system does not hang is if only retention idle over I2C4
+is configured by the bootloader.
+
+Note that even without the twl4030 PMIC scripts, these fixes will
+do the proper signaling of sys_clkreq and sys_off_mode pins, so
+the fixes are needed to fix monitoring of PM states with LEDs or
+an oscilloscope.
 
 Cc: Kevin Hilman <khilman@linaro.org>
 Cc: Nishanth Menon <nm@ti.com>
@@ -24,168 +41,166 @@ Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/vc.c | 99 +++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 73 insertions(+), 26 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c           |  2 +
+ arch/arm/mach-omap2/prm-regbits-34xx.h | 11 ++++-
+ arch/arm/mach-omap2/vc.c               | 75 +++++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/vc.h               |  2 +
+ 4 files changed, 87 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 87099bb..3119ec2 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -50,6 +50,7 @@
+ #include "sdrc.h"
+ #include "sram.h"
+ #include "control.h"
++#include "vc.h"
+ 
+ /* pm34xx errata defined in pm.h */
+ u16 pm34xx_errata;
+@@ -282,6 +283,7 @@ void omap_sram_idle(void)
+ 
+ 	/* CORE */
+ 	if (core_next_state < PWRDM_POWER_ON) {
++		omap3_vc_set_pmic_signaling(core_next_state);
+ 		if (core_next_state == PWRDM_POWER_OFF) {
+ 			omap3_core_save_context();
+ 			omap3_cm_save_context();
+diff --git a/arch/arm/mach-omap2/prm-regbits-34xx.h b/arch/arm/mach-omap2/prm-regbits-34xx.h
+index cebad56..106132d 100644
+--- a/arch/arm/mach-omap2/prm-regbits-34xx.h
++++ b/arch/arm/mach-omap2/prm-regbits-34xx.h
+@@ -123,8 +123,15 @@
+ #define OMAP3430_GLOBAL_SW_RST_SHIFT			1
+ #define OMAP3430_GLOBAL_COLD_RST_SHIFT			0
+ #define OMAP3430_GLOBAL_COLD_RST_MASK			(1 << 0)
+-#define OMAP3430_SEL_OFF_MASK				(1 << 3)
+-#define OMAP3430_AUTO_OFF_MASK				(1 << 2)
++#define OMAP3430_PRM_VOLTCTRL_SEL_VMODE			(1 << 4)
++#define OMAP3430_PRM_VOLTCTRL_SEL_OFF			(1 << 3)
++#define OMAP3430_PRM_VOLTCTRL_AUTO_OFF			(1 << 2)
++#define OMAP3430_PRM_VOLTCTRL_AUTO_RET			(1 << 1)
++#define OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP		(1 << 0)
+ #define OMAP3430_SETUP_TIME2_MASK			(0xffff << 16)
+ #define OMAP3430_SETUP_TIME1_MASK			(0xffff << 0)
++#define OMAP3430_PRM_POLCTRL_OFFMODE_POL		(1 << 3)
++#define OMAP3430_PRM_POLCTRL_CLKOUT_POL			(1 << 2)
++#define OMAP3430_PRM_POLCTRL_CLKREQ_POL			(1 << 1)
++#define OMAP3430_PRM_POLCTRL_EXTVOL_POL			(1 << 0)
+ #endif
 diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index dee4cee..63662e1 100644
+index 49ac797..3d5ba5d 100644
 --- a/arch/arm/mach-omap2/vc.c
 +++ b/arch/arm/mach-omap2/vc.c
-@@ -220,8 +220,18 @@ static inline u32 omap_usec_to_32k(u32 usec)
+@@ -220,6 +220,78 @@ static inline u32 omap_usec_to_32k(u32 usec)
  	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
  }
  
-+struct omap3_vc_config {
-+	u32 clksetup;
-+	u32 voltsetup1;
-+	u32 voltsetup2;
-+	u32 voltctrl;
-+};
-+
-+static struct omap3_vc_config omap3_vc_timings[2];
-+
- void omap3_vc_set_pmic_signaling(int core_next_state)
- {
-+	struct omap3_vc_config *c = omap3_vc_timings;
- 	u32 voltctrl;
- 
- 	voltctrl = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
-@@ -231,11 +241,20 @@ void omap3_vc_set_pmic_signaling(int core_next_state)
- 		voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_RET |
- 			      OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP);
- 		voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_OFF;
-+		if (voltctrl & OMAP3430_PRM_VOLTCTRL_SEL_OFF)
-+			omap2_prm_write_mod_reg(c->voltsetup2, OMAP3430_GR_MOD,
-+						OMAP3_PRM_VOLTSETUP2_OFFSET);
-+		else
-+			omap2_prm_write_mod_reg(c->voltsetup1, OMAP3430_GR_MOD,
-+						OMAP3_PRM_VOLTSETUP1_OFFSET);
- 		break;
- 	case PWRDM_POWER_RET:
-+		c++;
- 		voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_OFF |
- 			      OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP);
- 		voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_RET;
-+		omap2_prm_write_mod_reg(c->voltsetup1, OMAP3430_GR_MOD,
-+					OMAP3_PRM_VOLTSETUP1_OFFSET);
- 		break;
- 	default:
- 		voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_OFF |
-@@ -292,6 +311,18 @@ static void __init omap3_vc_init_pmic_signaling(void)
- 	omap3_vc_set_pmic_signaling(PWRDM_POWER_ON);
- }
- 
-+static void omap3_init_voltsetup1(struct voltagedomain *voltdm,
-+				  struct omap3_vc_config *c, u32 idle)
++void omap3_vc_set_pmic_signaling(int core_next_state)
 +{
-+	unsigned long val;
++	u32 voltctrl;
 +
-+	val = (voltdm->vc_param->on - idle) / voltdm->pmic->slew_rate;
-+	val *= voltdm->sys_clk.rate / 8 / 1000000 + 1;
-+	val <<= __ffs(voltdm->vfsm->voltsetup_mask);
-+	c->voltsetup1 &= ~voltdm->vfsm->voltsetup_mask;
-+	c->voltsetup1 |= val;
++	voltctrl = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
++					  OMAP3_PRM_VOLTCTRL_OFFSET);
++	switch (core_next_state) {
++	case PWRDM_POWER_OFF:
++		voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_RET |
++			      OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP);
++		voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_OFF;
++		break;
++	case PWRDM_POWER_RET:
++		voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_OFF |
++			      OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP);
++		voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_RET;
++		break;
++	default:
++		voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_OFF |
++			      OMAP3430_PRM_VOLTCTRL_AUTO_RET);
++		voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP;
++		break;
++	}
++	omap2_prm_write_mod_reg(voltctrl, OMAP3430_GR_MOD,
++				OMAP3_PRM_VOLTCTRL_OFFSET);
 +}
 +
- /**
-  * omap3_set_i2c_timings - sets i2c sleep timings for a channel
-  * @voltdm: channel to configure
-@@ -302,31 +333,21 @@ static void __init omap3_vc_init_pmic_signaling(void)
-  * or retention. Off mode has additionally an option to use sys_off_mode
-  * pad, which uses a global signal to program the whole power IC to
-  * off-mode.
-+ *
-+ * Note that pmic is not controlling the voltage scaling during
-+ * retention signaled over I2C4, so we can keep voltsetup2 as 0.
-+ * And the oscillator is not shut off over I2C4, so no need to
-+ * set clksetup.
-  */
--static void omap3_set_i2c_timings(struct voltagedomain *voltdm, bool off_mode)
-+static void omap3_set_i2c_timings(struct voltagedomain *voltdm)
- {
--	unsigned long voltsetup1;
--	u32 tgt_volt;
--
--	if (off_mode)
--		tgt_volt = voltdm->vc_param->off;
--	else
--		tgt_volt = voltdm->vc_param->ret;
--
--	voltsetup1 = (voltdm->vc_param->on - tgt_volt) /
--			voltdm->pmic->slew_rate;
--
--	voltsetup1 = voltsetup1 * voltdm->sys_clk.rate / 8 / 1000000 + 1;
-+	struct omap3_vc_config *c = omap3_vc_timings;
- 
--	voltdm->rmw(voltdm->vfsm->voltsetup_mask,
--		voltsetup1 << __ffs(voltdm->vfsm->voltsetup_mask),
--		voltdm->vfsm->voltsetup_reg);
--
--	/*
--	 * pmic is not controlling the voltage scaling during retention,
--	 * thus set voltsetup2 to 0
--	 */
--	voltdm->write(0, OMAP3_PRM_VOLTSETUP2_OFFSET);
-+	/* Configure PRWDM_POWER_OFF over I2C4 */
-+	omap3_init_voltsetup1(voltdm, c, voltdm->vc_param->off);
-+	c++;
-+	/* Configure PRWDM_POWER_RET over I2C4 */
-+	omap3_init_voltsetup1(voltdm, c, voltdm->vc_param->ret);
- }
- 
- /**
-@@ -335,22 +356,48 @@ static void omap3_set_i2c_timings(struct voltagedomain *voltdm, bool off_mode)
-  *
-  * Calculates and sets up off-mode timings for a channel. Off-mode
-  * can use either I2C based voltage scaling, or alternatively
-- * sys_off_mode pad can be used to send a global command to power IC.
-- * This function first checks which mode is being used, and calls
-- * omap3_set_i2c_timings() if the system is using I2C control mode.
-+ * sys_off_mode pad can be used to send a global command to power IC.n,
-  * sys_off_mode has the additional benefit that voltages can be
-  * scaled to zero volt level with TWL4030 / TWL5030, I2C can only
-  * scale to 600mV.
-+ *
-+ * Note that omap is not controlling the voltage scaling during
-+ * off idle signaled by sys_off_mode, so we can keep voltsetup1
-+ * as 0.
-  */
- static void omap3_set_off_timings(struct voltagedomain *voltdm)
- {
-+	struct omap3_vc_config *c = omap3_vc_timings;
-+	u32 tstart, tshut, voltoffset;
++/*
++ * Configure signal polarity for sys_clkreq and sys_off_mode pins
++ * as the default values are wrong and can cause the system to hang
++ * if any twl4030 sccripts are loaded.
++ */
++static void __init omap3_vc_init_pmic_signaling(void)
++{
++	u32 val, old;
 +
-+	if (c->clksetup)
-+		return;
++	val = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
++				     OMAP3_PRM_POLCTRL_OFFSET);
++	old = val;
 +
-+	omap_pm_get_oscillator(&tstart, &tshut);
-+	if (tstart == ULONG_MAX) {
-+		pr_debug("PM: oscillator start-up time not initialized, using 10ms\n");
-+		c->clksetup = omap_usec_to_32k(10000);
-+	} else {
-+		c->clksetup = omap_usec_to_32k(tstart);
++	if (old & OMAP3430_PRM_POLCTRL_CLKREQ_POL)
++		val |= OMAP3430_PRM_POLCTRL_CLKREQ_POL;
++	if (old & OMAP3430_PRM_POLCTRL_OFFMODE_POL)
++		val &= ~OMAP3430_PRM_POLCTRL_OFFMODE_POL;
++
++	if (val != old) {
++		pr_debug("PM: fixing sys_clkreq and sys_off_mode polarity 0x%x -> 0x%x\n",
++			 old, val);
 +	}
++	omap2_prm_write_mod_reg(val, OMAP3430_GR_MOD,
++				OMAP3_PRM_POLCTRL_OFFSET);
 +
 +	/*
-+	 * For twl4030 errata 27, we need to allow minimum ~488.32 us wait to
-+	 * switch from HFCLKIN to internal oscillator. That means timings
-+	 * have voltoffset fixed to 0xa in rounded up 32 KiHz cycles. And
-+	 * that means we can calculate the value based on the oscillator
-+	 * start-up time since voltoffset2 = clksetup - voltoffset.
++	 * By default let's use I2C4 signaling for retention idle
++	 * and sys_off_mode pin signaling for off idle. This way we
++	 * have sys_clk_req pin go down for retention and both
++	 * sys_clk_req and sys_off_mode pins will go down for off
++	 * idle. And we can also scale voltages to zero for off-idle.
++	 * Note that no actual voltage scaling will happen unless the
++	 * board specific twl4030 PMIC scripts are loaded.
 +	 */
-+	voltoffset = omap_usec_to_32k(488);
-+	c->voltsetup2 = c->clksetup - voltoffset;
-+	voltdm->write(voltoffset, OMAP3_PRM_VOLTOFFSET_OFFSET);
- }
++	val = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
++				     OMAP3_PRM_VOLTCTRL_OFFSET);
++	old = val;
++	val |= OMAP3430_PRM_VOLTCTRL_SEL_OFF;
++	pr_debug("PM: enabling voltctrl sys_off_mode signaling 0x%x -> 0x%x\n",
++		 old, val);
++	omap2_prm_write_mod_reg(val, OMAP3430_GR_MOD,
++				OMAP3_PRM_VOLTCTRL_OFFSET);
++	omap3_vc_set_pmic_signaling(PWRDM_POWER_ON);
++}
++
+ /* Set oscillator setup time for omap3 */
+ static void omap3_set_clksetup(u32 usec, struct voltagedomain *voltdm)
+ {
+@@ -292,7 +364,7 @@ static void omap3_set_off_timings(struct voltagedomain *voltdm)
+ 
+ 	/* check if sys_off_mode is used to control off-mode voltages */
+ 	val = voltdm->read(OMAP3_PRM_VOLTCTRL_OFFSET);
+-	if (!(val & OMAP3430_SEL_OFF_MASK)) {
++	if (!(val & OMAP3430_PRM_VOLTCTRL_SEL_OFF)) {
+ 		/* No, omap is controlling them over I2C */
+ 		omap3_set_i2c_timings(voltdm, true);
+ 		return;
+@@ -337,6 +409,7 @@ static void omap3_set_off_timings(struct voltagedomain *voltdm)
  
  static void __init omap3_vc_init_channel(struct voltagedomain *voltdm)
  {
- 	omap3_vc_init_pmic_signaling();
++	omap3_vc_init_pmic_signaling();
  	omap3_set_off_timings(voltdm);
--	omap3_set_i2c_timings(voltdm, true);
-+	omap3_set_i2c_timings(voltdm);
  }
  
- /**
+diff --git a/arch/arm/mach-omap2/vc.h b/arch/arm/mach-omap2/vc.h
+index 91c8d75..6351f62 100644
+--- a/arch/arm/mach-omap2/vc.h
++++ b/arch/arm/mach-omap2/vc.h
+@@ -117,6 +117,8 @@ extern struct omap_vc_param omap4_mpu_vc_data;
+ extern struct omap_vc_param omap4_iva_vc_data;
+ extern struct omap_vc_param omap4_core_vc_data;
+ 
++void omap3_vc_set_pmic_signaling(int core_next_state);
++
+ void omap_vc_init_channel(struct voltagedomain *voltdm);
+ int omap_vc_pre_scale(struct voltagedomain *voltdm,
+ 		      unsigned long target_volt,
 -- 
 1.8.1.1
