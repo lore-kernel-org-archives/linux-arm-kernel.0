@@ -1,35 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 10 Apr 2014 23:42:44 +0100
-Subject: [PATCH v4 2/3] rtc: Add APM X-Gene SoC RTC driver
-In-Reply-To: <1397155678-26607-3-git-send-email-lho@apm.com>
-References: <1397155678-26607-1-git-send-email-lho@apm.com>
- <1397155678-26607-2-git-send-email-lho@apm.com>
- <1397155678-26607-3-git-send-email-lho@apm.com>
-Message-ID: <20140410224244.GH6518@sirena.org.uk>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 10 Apr 2014 17:52:03 -0500
+Subject: [PATCH v2 00/14] dma: edma: Fixes for cyclic (audio) operation
+In-Reply-To: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <53472093.7040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 12:47:57PM -0600, Loc Ho wrote:
+Hi Peter,
 
-> +	if (device_may_wakeup(&pdev->dev)) {
-> +		if (!enable_irq_wake(irq))
-> +			pdata->irq_wake = 1;
-> +	} else {
-> +		pdata->irq_enabled = xgene_rtc_alarm_irq_enabled(dev);
-> +		xgene_rtc_alarm_irq_enable(dev, 0);
-> +		clk_disable(pdata->clk);
-> +	}
-> +	clk_unprepare(pdata->clk);
+Other than patches 8/14 and 10/14 which I responded to, you could add my
+Acked-by, or add it to the series itself once you make the changes and
+drop 10.
 
-This will unconditionally unprepare the clock even if it wasn't disabled
-which looks like a bug - I would have expected the disable to be a
-clk_disable_unprepare() instead?  Similarly for the resume path.
+Acked-by: Joel Fernandes <joelf@ti.com>
 
-Otherwise this looks good to me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/2d493b32/attachment.sig>
+Thanks,
+-Joel
+
+On 04/01/2014 08:06 AM, Peter Ujfalusi wrote:
+> Hi,
+> 
+> This is basically a resend of the previous series:
+> https://lkml.org/lkml/2014/3/13/119
+> with removed ASoC patches (most of them are applied already).
+> 
+> Changes since v1:
+> - ASoC patches removed
+> - Comments from Andriy Shevchenko addressed
+> - patch added to fix cases when src/dst_maxburst is set to 0
+> 
+> Adding support for DMA pause/resume
+> Possibility to select non default event queue/TC for cyclic (audio) dma
+> channels: all devices using the eDMA via dmaengine was assigned to the default
+> EQ/TC (mmc, i2c, spi, etc, and audio). This is not optimal from system
+> performance point of view since sharing the same EQ/TC can cause latency spikes
+> for cyclic channels (long DMA transfers for MMC for example).
+> 
+> While debugging the edma to get things sorted out I noticed that the debug was
+> too verbose and the important information was hidden even when the we did not
+> asked for verbose dmaengine debug.
+> I have included some debug cleanups for the edma dmaengine driver also.
+> 
+> Regards,
+> Peter
+> ---
+> Peter Ujfalusi (14):
+>   platform_data: edma: Be precise with the paRAM struct
+>   dma: edma: Correct the handling of src/dst_maxburst == 0
+>   dma: edma: Add support for DMA_PAUSE/RESUME operation
+>   dma: edma: Set DMA_CYCLIC capability flag
+>   arm: common: edma: Select event queue 1 as default when booted with DT
+>   arm: common: edma: Save the number of event queues/TCs
+>   arm: common: edma: API to request non default queue for a channel
+>   DMA: edma: Use different eventq for cyclic channels
+>   dma: edma: Implement device_slave_caps callback
+>   dma: edma: Simplify direction configuration in edma_config_pset()
+>   dma: edma: Reduce debug print verbosity for non verbose debugging
+>   dma: edma: Prefix debug prints where the text were identical in prep
+>     callbacks
+>   dma: edma: Add channel number to debug prints
+>   dma: edma: Print the direction value as well when it is not supported
+> 
+>  arch/arm/common/edma.c             | 34 +++++++++++++-
+>  drivers/dma/edma.c                 | 96 +++++++++++++++++++++++++++++---------
+>  include/linux/platform_data/edma.h | 20 ++++----
+>  3 files changed, 119 insertions(+), 31 deletions(-)
+> 
