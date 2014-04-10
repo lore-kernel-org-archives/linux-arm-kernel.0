@@ -1,45 +1,74 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 10 Apr 2014 16:55:27 -0500
-Subject: [PATCH] irq: crossbar: improve allocate_free_irq() complexity
-In-Reply-To: <1396392259-27437-1-git-send-email-balbi@ti.com>
-References: <1396392259-27437-1-git-send-email-balbi@ti.com>
-Message-ID: <20140410215527.GF27668@saruman.home>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 10 Apr 2014 16:06:50 -0600
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
+References: <20140410181953.50ccfcc3@skate>
+ <20140410165733.GB23104@obsidianresearch.com>
+ <20140410200153.46669e0c@skate>
+ <20140410201201.GA12661@obsidianresearch.com>
+ <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
+Message-ID: <20140410220650.GA10540@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 05:44:19PM -0500, Felipe Balbi wrote:
-> current algorithm in allocate_free_irq() is O(n),
-> by just keeping track of last allocated IRQ with a
-> simple unsigned integer, we can find a free IRQ
-> in O(1).
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> compile-tested only as J6 DTS is currently missing crossbar
-> altogether :-(
-> 
-> There's a drawback with this patch which I'm not sure if we
-> should care a lot because I couldn't entirely grasp when is
-> domain->xlate() called and if we will map/unmap IRQs in runtime
-> or will this *always* be done only during boot.
-> 
-> If we're talking about runtime IRQ remapping, then this, clearly,
-> won't work. But if this will be done only during boot up, then we
-> avoid iterating over the irq_map array each time we try to translate
-> a new IRQ prior to mapping it.
-> 
-> Comments are highly welcome as I'll probably learn something new
-> about the IRQ subsystem ;-)
+On Thu, Apr 10, 2014 at 10:56:00PM +0100, Neil Greatorex wrote:
 
-do not apply this one!!! It won't work in all cases.
+> >diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> >index f3b325f..e0a032f 100644
+> >+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+> >@@ -107,7 +107,7 @@ static int __init mvebu_soc_id_init(void)
+> >       iounmap(pci_base);
+> >
+> >res_ioremap:
+> >-       clk_disable_unprepare(clk);
+> >+//     clk_disable_unprepare(clk);
+> >
+> >clk_err:
+> >       of_node_put(child);
+> >
+> 
+> That patch has fixed it for me. The PCIe card seems to be now be
+> always properly detected.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/76691006/attachment.sig>
+Okay, that makes lots of sense to me at least.
+
+Gregory: I have this vauge recollection it was discussed when you
+wrote the mvebu_soc_id_init patch to use a __clk_is_enabled but got
+shot down? Clearly this needs to be fixed.
+
+> >In any event, turning on the clock should almost certainly be
+> >accompanied by a phy reset sequence to get both link ends on the same
+> >page.
+> >
+> >Attached is a rough, untested patch along those lines.
+> >
+> 
+> I took your attached patch and extended it a bit to print out how
+> long it took. The delays also need to be much longer for me. I also
+> fixed a small typo you made where the bit wasn't being set again to
+> bring the link back up. I've attached the diff to your patch, as
+> well as the combined patch (hope that makes sense).
+
+Just to be clear you tried this alone without the above?
+
+Thanks for fixing the patch, I think it also confirms the theory.
+
+IMHO, both approaches are required.
+
+The first prevents messing up the PEX as was left by the bootloader
+
+The second allows the driver to startup a PEX that wasn't enabled by
+the bootloader, and recover from clock gating in the kernel (eg the
+modular case)
+
+Both seem valuable..
+
+Ideally I'd like to see the clk driver turn off the PEX PHY when it
+gates the clock, but I have no great idea how to accomplish that sort
+of cross register space adventure...
+
+Thomas, if we can figure out how to properly do __clk_is_enabled I
+can probably send a proper patch?
+
+Thanks,
+Jason
