@@ -1,132 +1,70 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:26:32 +0200
-Subject: [PATCH V3 00/19] mmc: mmci: Improve DT support
-In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFpcoFvPE1fMHGs=hWnZ+zwYJ26yen3LFgdVZY-gfrr=DA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 10 Apr 2014 17:46:14 +0530
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <20140410120348.GK27282@n2100.arm.linux.org.uk>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
+ <20140410120348.GK27282@n2100.arm.linux.org.uk>
+Message-ID: <53468B8E.9040604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2014 14:20, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Step by step, improve the DT support for the mmci host driver.
->
-> This enables us to move the final pieces of platform data for mmci for ux500
-> into DT. We are then able to remove yet another machine specific file for ux500.
->
-> This patchset needs to be merged together. I suggest we go through Russell's
-> ARM tree, since most of the patches are mmci specific which he maintains -
-> unless someone think there is a better alternative.
->
-> I will thus seek acks from the SOC maintainers for the SOC specific patches.
->
-> The goal is to queue this for 3.16, thus I might need to rebase the patches for
-> 3.15 rc[n]. Still I would appreciate any comments at this point.
->
-> Changes in v3:
->         - Adopting to review comments from Michal Simek for patch 2.
->         - Rebased patches and added some acks/reviewed by tags.
->
-> Changes in v2:
->         - Adopting to review comments from Rob Herring and Linus Walleij. More
->         or less causing each an every patch to be rebased.
->         - Removed the patch for regulator for the db8500-prcmu from this
->         patchset, since Mark Brown already queued it for 3.15.
->
-> Ulf Hansson (19):
->   mmc: mmci: Convert to the mmc gpio API
->   mmc: mmci: Convert to devm functions
->   mmc: mmci: Update DT documentation
->   mmc: mmci: Add DT bindings for signal direction
->   mmc: mmci: Add DT bindings for feedback clock pin
->   mmc: mmci: Use the common mmc DT parser
->   ARM: ux500: Add mmci signal directions and feeback clock in DT for
->     href
->   ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
->   ARM: nomadik: Convert to the common mmc DT bindings for highspeed
->     mode
->   ARM: u300: Convert to the common mmc DT bindings for highspeed mode
->   mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
->   mmc: mmci: Enable MMC_CAP_CMD23
->   ARM: ux500: Add the mmc capabilities flags to DT
->   ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for
->     href
->   ARM: ux500: Remove redundant board file for mmci platform data
->   mmc: mmci: Enforce DT for signal direction and feedback clock
->   mmc: mmci: Enforce mmc capabilities through DT
->   mmc: mmci: Enforce DMA configuration through DT
->   mmc: mmci: Enforce max frequency configuration through DT
->
->  Documentation/devicetree/bindings/mmc/mmci.txt |   54 ++++-
->  arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
->  arch/arm/boot/dts/ste-href.dtsi                |   19 +-
->  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
->  arch/arm/boot/dts/ste-snowball.dts             |    4 +-
->  arch/arm/boot/dts/ste-u300.dts                 |    4 +-
->  arch/arm/mach-ux500/Makefile                   |    3 +-
->  arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ---------------
->  arch/arm/mach-ux500/board-mop500.h             |    5 -
->  arch/arm/mach-ux500/cpu-db8500.c               |    4 -
->  drivers/mmc/host/mmci.c                        |  265 +++++++-----------------
->  drivers/mmc/host/mmci.h                        |   14 +-
->  include/linux/amba/mmci.h                      |   42 ----
->  13 files changed, 157 insertions(+), 433 deletions(-)
->  delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
->
-> --
-> 1.7.9.5
->
->
->
+On Thursday 10 April 2014 05:33 PM, Russell King - ARM Linux wrote:
+> On Thu, Apr 10, 2014 at 05:26:15PM +0530, Sekhar Nori wrote:
+>> On Wednesday 09 April 2014 09:53 PM, Russell King - ARM Linux wrote:
+>>> That is required because as part of the enable sequence, we write to the
+>>> lockdown registers to clear out anything that may be there before we
+>>> enable the L2 cache.  If we didn't set the NS lockdown bit, then we
+>>> would need the secure monitor to do it for us.
+>>
+>> And I realized yesterday that the only reason L2C is working on AM437x
+>> is because AM437x ROM is setting these bits up for us.
+>>
+>>> Both of these bits should be managed within the L2C code rather than by
+>>> platforms.
+>>
+>> The current L2C code is not managing the NS_LOCKDOWN bit. I can take a
+>> shot at adding this support unless you are already looking at it.
+> 
+> True, and I'm aware that it's missing.  So... how about this on top
+> of my series so far.  We can deal with L310_AUX_CTRL_NS_INT_CTRL when
+> the need to access those registers arises (if/when the edac driver
+> is submitted.)
+> 
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> index c0f9a81a2d32..4a494cde8367 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -213,8 +213,6 @@ static int __init omap_l2_cache_init(void)
+>  
+>  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+>  	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
+> -		   L310_AUX_CTRL_NS_LOCKDOWN |
+> -		   L310_AUX_CTRL_NS_INT_CTRL |
+>  		   L2C_AUX_CTRL_SHARED_OVERRIDE |
+>  		   L310_AUX_CTRL_DATA_PREFETCH |
+>  		   L310_AUX_CTRL_INSTR_PREFETCH;
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 98796b789eb9..837f384c1d51 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -776,6 +776,13 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>  			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+>  	}
+>  
+> +	/*
+> +	 * Always enable non-secure access to the lockdown registers -
+> +	 * we write to them as part of the L2C enable sequence so they
+> +	 * need to be accessible.
+> +	 */
+> +	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
+> +
 
-Some cut/paste errors below. Please ignore the patchset summary above,
-the below is the correct one.
+This will work. NS_LOCKDOWN is required for L2C-220 as well and so I was
+thinking about adding a new l2c220_enable() which will set the
+NS_LOCKDOWN and then call l2c_enable()
 
-Kind regards
-Ulf Hansson
-
->
->
->
-> Ulf Hansson (19):
->   mmc: mmci: Convert to the mmc gpio API
->   mmc: mmci: Convert to devm functions
->   mmc: mmci: Update DT documentation
->   mmc: mmci: Add DT bindings for signal direction
->   mmc: mmci: Add DT bindings for feedback clock pin
->   mmc: mmci: Use the common mmc DT parser
->   ARM: ux500: Add mmci signal directions and feeback clock in DT for
->     href
->   ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
->   ARM: nomadik: Convert to the common mmc DT bindings for highspeed
->     mode
->   ARM: u300: Convert to the common mmc DT bindings for highspeed mode
->   mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
->   mmc: mmci: Enable MMC_CAP_CMD23
->   ARM: ux500: Add the mmc capabilities flags to DT
->   ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for
->     href
->   ARM: ux500: Remove redundant board file for mmci platform data
->   mmc: mmci: Enforce DT for signal direction and feedback clock
->   mmc: mmci: Enforce mmc capabilities through DT
->   mmc: mmci: Enforce DMA configuration through DT
->   mmc: mmci: Enforce max frequency configuration through DT
->
->  Documentation/devicetree/bindings/mmc/mmci.txt |   54 ++++-
->  arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
->  arch/arm/boot/dts/ste-href.dtsi                |   19 +-
->  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
->  arch/arm/boot/dts/ste-snowball.dts             |    4 +-
->  arch/arm/boot/dts/ste-u300.dts                 |    4 +-
->  arch/arm/mach-ux500/Makefile                   |    3 +-
->  arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ---------------
->  arch/arm/mach-ux500/board-mop500.h             |    5 -
->  arch/arm/mach-ux500/cpu-db8500.c               |    4 -
->  drivers/mmc/host/mmci.c                        |  264 ++++++------------------
->  drivers/mmc/host/mmci.h                        |   14 +-
->  include/linux/amba/mmci.h                      |   42 ----
->  13 files changed, 154 insertions(+), 435 deletions(-)
->  delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
->
-> --
-> 1.7.9.5
->
+Thanks,
+Sekhar
