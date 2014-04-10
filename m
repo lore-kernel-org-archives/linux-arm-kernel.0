@@ -1,65 +1,130 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Thu, 10 Apr 2014 19:37:12 +0900
-Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize
- gic from dt
-In-Reply-To: <878urd33g4.fsf@approximate.cambridge.arm.com>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
- <878urd33g4.fsf@approximate.cambridge.arm.com>
-Message-ID: <002e01cf54a8$d59897e0$80c9c7a0$@samsung.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 10 Apr 2014 15:53:04 +0100
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <6144916.rD76jOL8sv@wuerfel>
+References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
+ <4506772.YFSM2m1eaP@wuerfel>
+ <CAErSpo6u7kr+QdnhAXBo20izg-DNHR4zHT+kRvq34whp68RJCQ@mail.gmail.com>
+ <6144916.rD76jOL8sv@wuerfel>
+Message-ID: <20140410145304.GS985@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Marc Zyngier
-> Sent: Thursday, April 10, 2014 7:05 PM
-> To: Chanwoo Choi
-> Cc: mark.rutland at arm.com; linux-samsung-soc at vger.kernel.org;
-> t.figa at samsung.com; hyunhee.kim at samsung.com; sw0312.kim at samsung.com;
-> linux-kernel at vger.kernel.org; yj44.cho at samsung.com; inki.dae at samsung.com;
-> kyungmin.park at samsung.com; kgene.kim at samsung.com; Thomas Gleixner;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to
-> initialize gic from dt
+On Thu, Apr 10, 2014 at 03:07:44PM +0100, Arnd Bergmann wrote:
+> On Thursday 10 April 2014 07:50:52 Bjorn Helgaas wrote:
+> > On Thu, Apr 10, 2014 at 2:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Wednesday 09 April 2014 21:48:14 Bjorn Helgaas wrote:
+> > >> On Wed, Apr 9, 2014 at 7:27 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> > >> > On Wed, Apr 09, 2014 at 08:02:41AM -0600, Bjorn Helgaas wrote:
+> > >> >> >>   struct pci_host_bridge {
+> > >> >> >>     int domain;
+> > >> >> >>     int node;
+> > >> >> >>     struct device *dev;
+> > >> >> >>     struct pci_ops *ops;
+> > >> >> >>     struct list_head resources;
+> > >> >> >>     void *sysdata;
+> > >> >> >>     struct pci_bus *bus;  /* filled in by core, not by arch */
+> > >> >> >>     ... /* other existing contents managed by core */
+> > >> >> >>   };
+> > >> >> >>
+> > >> >> >>   struct pci_bus *pci_scan_host_bridge(struct pci_host_bridge *bridge);
+> > >> >> >
+> > 
+> > I'm not sure I'm following you; you mean the arch-specific sysdata
+> > structure would contain a pointer to struct pci_host_bridge?
+> > 
+> > I have to admit that I'm not up on how other subsystems handle this
+> > sort of abstraction.  Do you have any pointers to good examples that I
+> > can study?
 > 
-> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi
-> <cw00.choi@samsung.com> wrote:
-> > This patch declare coretex-a7's irqchip to initialze gic from dt
-> > with "arm,cortex-a7-gic" data.
-> >
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  drivers/irqchip/irq-gic.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index 4300b66..8e906e4 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct
-> device_node *parent)
-> >  }
-> >  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
-> >  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
-> > +IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
-> >  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
-> >  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+> What I mean is like this:
 > 
-> Frankly, this patch adds no value. Are we going to add
-> "arm,cortex-a12-gic", "arm,cortex-a17-gic", "arm,cortex-a53-gic",
-> "arm,cortex-a57-gic"? And that's just to mention the ARM Ltd cores...
+> /* generic structure */
+> struct pci_host_bridge {
+>         int domain;
+>         int node;
+>         struct device *dev;
+>         struct pci_ops *ops; 
+>         struct list_head resources;
+>         struct pci_bus *bus;  /* filled in by core, not by arch */
+>         ... /* other existing contents managed by core */
+> };
 > 
-> Instead, how about defining a generic "arm,gic" property, and mandate
-> that new DT files are using that? We can always use a more precise
-> compatible for quirks.
+> /* arm specific structure */
+> struct pci_sys_data {
+>         char            io_res_name[12];
+>                                         /* Bridge swizzling                     */
+>         u8              (*swizzle)(struct pci_dev *, u8 *);
+>                                         /* IRQ mapping                          */
+>         int             (*map_irq)(const struct pci_dev *, u8, u8);
+>                                         /* Resource alignement requirements     */
+>         void            (*add_bus)(struct pci_bus *bus);
+>         void            (*remove_bus)(struct pci_bus *bus);
+>         void            *private_data;  /* platform controller private data     */
+> 
+> 	/* not a pointer: */
+> 	struct pci_host_bridge bridge;
+> };
+> static inline struct pci_sys_data *to_pci_sys_data(struct pci_host_bridge *bridge)
+> {
+> 	return container_of(bridge, struct pci_sys_data, bridge);
+> }
+> 
+> /* arm specific, driver specific structure */
+> struct tegra_pcie {
+>         void __iomem *pads;
+>         void __iomem *afi;
+> 
+>         struct clk *pex_clk;
+>         struct clk *afi_clk;
+>         struct clk *pll_e;
+>         struct clk *cml_clk;
+> 
+>         struct tegra_msi msi;
+> 
+>         struct list_head ports;
+>         unsigned int num_ports;
+> 
+> 	struct pci_sys_data sysdata;
+> };
+> static inline struct tegra_pcie *to_tegra_pcie(struct pci_sys_data *sysdata)
+> {
+> 	return container_of(sysdata, struct tegra_pcie, sysdata);
+> }
+> 
+> This mirrors how we treat devices: a pci_device has an embedded device,
+> and so on, in other subsystems we can have multiple layers.
+> 
+> In this example, the tegra pcie driver then allocates its own tegra_pcie
+> structure, fills out the fields it needs, and registers it with the
+> ARM architecture code, passing just the pci_sys_data pointer. That function
+> in turn passes a pointer to the embedded pci_host_bridge down to the
+> generic code. Ideally we should try to eliminate the architecture specific
+> portion here, but that is a later step.
 
-I prefer it would be arm,gicv2 instead arm-gic.
-In case of GICv3 of arm64, it can be arm,gicv3.
+So Arnd seems to agree with me: we should try to get out of architecture specific
+pci_sys_data and link the host bridge driver straight into the PCI core. The
+core then can call into arch code via pcibios_*() functions.
 
-Best Regards,
-Chanho Park
+Arnd, am I reading correctly into what you are saying?
+
+Liviu
+
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
