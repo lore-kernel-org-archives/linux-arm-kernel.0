@@ -1,76 +1,109 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Apr 2014 11:46:39 +0100
-Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize
- gic from dt
-In-Reply-To: <002e01cf54a8$d59897e0$80c9c7a0$@samsung.com> (Chanho Park's
- message of "Thu, 10 Apr 2014 11:37:12 +0100")
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
- <878urd33g4.fsf@approximate.cambridge.arm.com>
- <002e01cf54a8$d59897e0$80c9c7a0$@samsung.com>
-Message-ID: <87vbuh1my8.fsf@approximate.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 10 Apr 2014 18:57:05 +0530
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <53468B8E.9040604@ti.com>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
+ <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
+Message-ID: <53469C29.8050906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10 2014 at 11:37:12 am BST, Chanho Park <chanho61.park@samsung.com> wrote:
-> Hi,
->
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Marc Zyngier
->> Sent: Thursday, April 10, 2014 7:05 PM
->> To: Chanwoo Choi
->> Cc: mark.rutland at arm.com; linux-samsung-soc at vger.kernel.org;
->> t.figa at samsung.com; hyunhee.kim at samsung.com; sw0312.kim at samsung.com;
->> linux-kernel at vger.kernel.org; yj44.cho at samsung.com; inki.dae at samsung.com;
->> kyungmin.park at samsung.com; kgene.kim at samsung.com; Thomas Gleixner;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to
->> initialize gic from dt
->> 
->> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi
->> <cw00.choi@samsung.com> wrote:
->> > This patch declare coretex-a7's irqchip to initialze gic from dt
->> > with "arm,cortex-a7-gic" data.
->> >
->> > Cc: Thomas Gleixner <tglx@linutronix.de>
->> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> > ---
->> >  drivers/irqchip/irq-gic.c | 1 +
->> >  1 file changed, 1 insertion(+)
->> >
->> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> > index 4300b66..8e906e4 100644
->> > --- a/drivers/irqchip/irq-gic.c
->> > +++ b/drivers/irqchip/irq-gic.c
->> > @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct
->> device_node *parent)
->> >  }
->> >  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
->> >  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
->> > +IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
->> >  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->> >  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->> 
->> Frankly, this patch adds no value. Are we going to add
->> "arm,cortex-a12-gic", "arm,cortex-a17-gic", "arm,cortex-a53-gic",
->> "arm,cortex-a57-gic"? And that's just to mention the ARM Ltd cores...
->> 
->> Instead, how about defining a generic "arm,gic" property, and mandate
->> that new DT files are using that? We can always use a more precise
->> compatible for quirks.
->
-> I prefer it would be arm,gicv2 instead arm-gic.
+On Thursday 10 April 2014 05:46 PM, Sekhar Nori wrote:
+> This will work. NS_LOCKDOWN is required for L2C-220 as well and so I was
+> thinking about adding a new l2c220_enable() which will set the
+> NS_LOCKDOWN and then call l2c_enable()
 
-If you prefer, fine by me. Consider spelling it "arm,gic-v2", which
-seems to be the current convention for version numbers.
+Here is a patch for what I was saying above.
 
-> In case of GICv3 of arm64, it can be arm,gicv3.
-
-GICv3 and arm64 are independent of each other, and the binding has
-already been specified as "arm,gic-v3".
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index c47ac8f..dc9e03b 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -105,6 +105,8 @@
+ #define L2X0_AUX_CTRL_DIRTY_LATENCY_MASK	(7 << 9)
+ #define L2X0_AUX_CTRL_ASSOC_SHIFT		13
+ #define L2X0_AUX_CTRL_ASSOC_MASK		(15 << 13)
++/* L2C-220/310 common bits */
++#define L2C_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+ /* L2C-210 specific bits */
+ #define L210_AUX_CTRL_WRAP_DISABLE		BIT(12)
+ #define L210_AUX_CTRL_WA_OVERRIDE		BIT(23)
+@@ -113,7 +115,6 @@
+ #define L220_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
+ #define L220_AUX_CTRL_FWA_SHIFT			23
+ #define L220_AUX_CTRL_FWA_MASK			(3 << 23)
+-#define L220_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+ #define L220_AUX_CTRL_NS_INT_CTRL		BIT(27)
+ /* L2C-310 specific bits */
+ #define L310_AUX_CTRL_FULL_LINE_ZERO		BIT(0)	/* R2P0+ */
+@@ -122,7 +123,6 @@
+ #define L310_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
+ #define L310_AUX_CTRL_ASSOCIATIVITY_16		BIT(16)
+ #define L310_AUX_CTRL_CACHE_REPLACE_RR		BIT(25)	/* R2P0+ */
+-#define L310_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+ #define L310_AUX_CTRL_NS_INT_CTRL		BIT(27)
+ #define L310_AUX_CTRL_DATA_PREFETCH		BIT(28)
+ #define L310_AUX_CTRL_INSTR_PREFETCH		BIT(29)
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 6b2a056..34cafe0 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -216,8 +216,6 @@ int __init omap4_l2_cache_init(void)
+ {
+ 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+ 	u32 aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
+-		       L310_AUX_CTRL_NS_LOCKDOWN |
+-		       L310_AUX_CTRL_NS_INT_CTRL |
+ 		       L2C_AUX_CTRL_SHARED_OVERRIDE |
+ 		       L310_AUX_CTRL_DATA_PREFETCH |
+ 		       L310_AUX_CTRL_INSTR_PREFETCH;
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b1f103d..b6af13f 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -498,11 +498,23 @@ static void l2c220_sync(void)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
++static void __init l2c220_enable(void __iomem *base, u32 aux, unsigned num_lock)
++{
++	/*
++	 * Always enable non-secure access to the lockdown registers -
++	 * we write to them as part of the L2C enable sequence so they
++	 * need to be accessible.
++	 */
++	aux |= L2C_AUX_CTRL_NS_LOCKDOWN;
++
++	l2c_enable(base, aux, num_lock);
++}
++
+ static const struct l2c_init_data l2c220_data = {
+ 	.type = "L2C-220",
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 1,
+-	.enable = l2c_enable,
++	.enable = l2c220_enable,
+ 	.outer_cache = {
+ 		.inv_range = l2c220_inv_range,
+ 		.clean_range = l2c220_clean_range,
+@@ -764,7 +776,7 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+ 	}
+ 
+-	l2c_enable(base, aux, num_lock);
++	l2c220_enable(base, aux, num_lock);
+ 
+ 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
+ 		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+@@ -1027,7 +1039,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 1,
+ 	.of_parse = l2x0_of_parse,
+-	.enable = l2c_enable,
++	.enable = l2c220_enable,
+ 	.outer_cache = {
+ 		.inv_range   = l2c220_inv_range,
+ 		.clean_range = l2c220_clean_range,
