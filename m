@@ -1,36 +1,87 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:20:53 +0200
-Subject: [PATCH V3 10/19] ARM: u300: Convert to the common mmc DT bindings for
- highspeed mode
-In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397132462-8005-11-git-send-email-ulf.hansson@linaro.org>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 10 Apr 2014 18:05:17 +0530
+Subject: [PATCH 2/6] ARM: EXYNOS: Staticize exynos_subsys
+In-Reply-To: <53468F44.3050109@samsung.com>
+References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
+ <1397118296-6846-3-git-send-email-sachin.kamat@linaro.org>
+ <534661C7.9090304@samsung.com>
+ <CAK9yfHwAM0d5JsrhKGP0gkrjQLxGFE0+oEjv26N5jsFnvYku9A@mail.gmail.com>
+ <53468F44.3050109@samsung.com>
+Message-ID: <CAK9yfHw9fga+1kOo5tpW37wskZEQarrABiyZD+SBzBwk1h6DbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmci host driver supports the common mmc DT parser, which enables
-us to use the use common names instead.
+On 10 April 2014 18:02, Tomasz Figa <t.figa@samsung.com> wrote:
+> On 10.04.2014 11:22, Sachin Kamat wrote:
+>>
+>> Hi Tomasz,
+>>
+>> On 10 April 2014 14:47, Tomasz Figa <t.figa@samsung.com> wrote:
+>>>
+>>> Hi Sachin,
+>>>
+>>>
+>>> On 10.04.2014 10:24, Sachin Kamat wrote:
+>>>>
+>>>>
+>>>> 'exynos_subsys' is now local to this file. Make it static
+>>>> and remove the declaration from header file.
+>>>>
+>>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>>> ---
+>>>>    arch/arm/mach-exynos/exynos.c            |    2 +-
+>>>>    arch/arm/plat-samsung/include/plat/cpu.h |    1 -
+>>>>    2 files changed, 1 insertion(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-exynos/exynos.c
+>>>> b/arch/arm/mach-exynos/exynos.c
+>>>> index 6a5fe18ec9b1..0ef42b9efd36 100644
+>>>> --- a/arch/arm/mach-exynos/exynos.c
+>>>> +++ b/arch/arm/mach-exynos/exynos.c
+>>>> @@ -284,7 +284,7 @@ void __init exynos_init_io(void)
+>>>>          of_scan_flat_dt(exynos_fdt_map_sysram, NULL);
+>>>>    }
+>>>>
+>>>> -struct bus_type exynos_subsys = {
+>>>> +static struct bus_type exynos_subsys = {
+>>>>          .name           = "exynos-core",
+>>>>          .dev_name       = "exynos-core",
+>>>>    };
+>>>> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h
+>>>> b/arch/arm/plat-samsung/include/plat/cpu.h
+>>>> index 5992b8dd9b89..930b4be832cd 100644
+>>>> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+>>>> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+>>>> @@ -239,7 +239,6 @@ extern struct bus_type s3c2443_subsys;
+>>>>    extern struct bus_type s3c6410_subsys;
+>>>>    extern struct bus_type s5p64x0_subsys;
+>>>>    extern struct bus_type s5pv210_subsys;
+>>>> -extern struct bus_type exynos_subsys;
+>>>>
+>>>>    extern void (*s5pc1xx_idle)(void);
+>>>>
+>>>>
+>>>
+>>> This struct and registration of it do not seem to be needed for anything
+>>> anymore. Would you consider removing it instead?
+>>
+>>
+>> I had considered removing that while I was doing other code consolidation
+>> of this file. However I found that without this, the system failed to
+>> boot. I
+>> did not look much into it then. Probably I can revisit it and if it
+>> doesn't cause
+>> any boot issue, will remove it.
+>>
+>
+> Hmm, I don't see why it could break anything as I can't find any users of
+> it. Anyway I just tested removing this code on Exynos4412-trats2 board and
+> didn't find any problems.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-u300.dts |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks for testing. Let me check at my end on other boards and if it
+doesn't cause
+any problem, will remove this.
 
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index 6fe688e..82a6616 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -442,8 +442,8 @@
- 			clock-names = "apb_pclk", "mclk";
- 			max-frequency = <24000000>;
- 			bus-width = <4>; // SD-card slot
--			mmc-cap-mmc-highspeed;
--			mmc-cap-sd-highspeed;
-+			cap-mmc-highspeed;
-+			cap-sd-highspeed;
- 			cd-gpios = <&gpio 12 0x4>;
- 			cd-inverted;
- 			vmmc-supply = <&ab3100_ldo_g_reg>;
 -- 
-1.7.9.5
+With warm regards,
+Sachin
