@@ -1,70 +1,68 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 10 Apr 2014 10:57:33 -0600
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <20140410181953.50ccfcc3@skate>
-References: <20140410181953.50ccfcc3@skate>
-Message-ID: <20140410165733.GB23104@obsidianresearch.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 10 Apr 2014 13:35:14 -0400
+Subject: [PATCH 1/5] gpio: omap: convert to use irq_domain_add_simple()
+In-Reply-To: <1396796297-13002-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1396796297-13002-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <5346D652.3020702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 06:19:53PM +0200, Thomas Petazzoni wrote:
-
-> This is an e-mail that attempts to summarize the situation in terms of
-> Armada XP PCIe issues.
+On Sunday 06 April 2014 10:58 AM, Javier Martinez Canillas wrote:
+> The GPIO OMAP driver supports different OMAP SoC families and
+> not all of them have the needed support to use the linear IRQ
+> domain mapping like OMAP1 that use the legacy domain mapping.
 > 
-> At
-> https://github.com/MISL-EBU-System-SW/mainline-public/commits/3.14/pci-debug,
-> I've pushed a branch based on top of v3.14 that contains:
-
-mvebu_pcie_del_windows / mvebu_pcie_add_windows I wonder if these
-functions should be dropped into the mbus driver.. They are pretty
-generic.
-
-'bus: mvebu-mbus: Avoid setting an undefined window size' and
-'pci: mvebu: fix off-by-one in the computed size of the mbus windows'
-need to be swapped in order to maintain bisect-ability.
-
-> Can you test this stack of patches on your system and configuration, and
-> let me know if that works for you? 
-
-Continues to work as expected here, and I see the new error message:
-
-mvebu_mbus: cannot add window '4:e8', conflicts with another window
-mvebu-pcie pex.1: Could not create MBus window at 0xe0000000, size 0x100000: -22
-
-(this is due to the PEX window being in the DT mbus ranges already)
-
-Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-
+> But this special check is not necessary since the simple IRQ
+> domain mapping is able to handle both cases. Having a zero
+> IRQ offset will be interpreted as a linear domain case while
+> a non-zero value will be interpreted as a legacy domain case.
 > 
->  * The link up problem. Unfortunately, I tried to reproduce it today,
->    and didn't manage to. It's weird, because I'm sure I was able to
->    produce it in the past, but I'm no longer able to, I don't know.
->    Therefore, it's not easy for me to work on this topic. Neil, Jason,
->    do you think this is a topic you could potentially handle?
-
-You said you had a system that sometimes required the udelay? Can you
-run Neil's patch and see if your system behaves the same? Specifically
-that the link eventually goes down after mvebu_pcie_set_local_dev_nr ?
-
-I couldn't find any case where the BDF leaks below the TLP layer, and
-the spec is very clear that the assigned BDF can change at run time,
-so I don't have an explanation for why the link reset is happening.
-Do you have a contact at Marvell that might shed some light on that
-behavior?
-
->  * On my Armada XP DB board, if I plug 5 PCIe cards, the IGB card for
->    some reason isn't able to read data from its non-volatile memory. So
->    the window points to something, but it doesn't seem to patch what
->    the igb driver expects. I've double checked the MBus windows, and
->    they look correct. I haven't tested this PCIe configuration with the
->    Marvell LSP though, so maybe I'm hitting an unrelated hardware
->    problem or something.
-
-Certainly troubling.. And the IGB works if it is the only card in the
-system?
-
-That does sound like more mbus troubles.
-
-Regrads,
-Jason
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  drivers/gpio/gpio-omap.c | 15 ++++-----------
+>  1 file changed, 4 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 19b886c..3ee9b8d 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1138,9 +1138,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>  	const struct omap_gpio_platform_data *pdata;
+>  	struct resource *res;
+>  	struct gpio_bank *bank;
+> -#ifdef CONFIG_ARCH_OMAP1
+> -	int irq_base;
+> -#endif
+> +	int irq_base = 0;
+>  
+>  	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
+>  
+> @@ -1185,21 +1183,16 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>  #ifdef CONFIG_ARCH_OMAP1
+>  	/*
+>  	 * REVISIT: Once we have OMAP1 supporting SPARSE_IRQ, we can drop
+> -	 * irq_alloc_descs() and irq_domain_add_legacy() and just use a
+> -	 * linear IRQ domain mapping for all OMAP platforms.
+> +	 * irq_alloc_descs() since a base IRQ offset will no longer be needed.
+>  	 */
+>  	irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
+>  	if (irq_base < 0) {
+>  		dev_err(dev, "Couldn't allocate IRQ numbers\n");
+>  		return -ENODEV;
+>  	}
+> -
+> -	bank->domain = irq_domain_add_legacy(node, bank->width, irq_base,
+> -					     0, &irq_domain_simple_ops, NULL);
+> -#else
+> -	bank->domain = irq_domain_add_linear(node, bank->width,
+> -					     &irq_domain_simple_ops, NULL);
+>  #endif
+> +	bank->domain = irq_domain_add_simple(node, bank->width, irq_base,
+> +					     &irq_domain_simple_ops, NULL);
+>  	if (!bank->domain) {
+>  		dev_err(dev, "Couldn't register an IRQ domain\n");
+>  		return -ENODEV;
+> 
+Looks good.
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
