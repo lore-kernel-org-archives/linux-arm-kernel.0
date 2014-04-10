@@ -1,62 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Apr 2014 16:47:13 -0700
-Subject: [PATCH 05/11] ARM: dts: Configure omap3 twl4030 I2C4 pins by default
+Date: Thu, 10 Apr 2014 16:47:09 -0700
+Subject: [PATCH 01/11] ARM: OMAP3: PM: remove access to PRM_VOLTCTRL register
 In-Reply-To: <1397173639-29587-1-git-send-email-tony@atomide.com>
 References: <1397173639-29587-1-git-send-email-tony@atomide.com>
-Message-ID: <1397173639-29587-6-git-send-email-tony@atomide.com>
+Message-ID: <1397173639-29587-2-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Almost certainly any sane board has the twl4030 has the I2C4
-pins connected as those are needed for voltage control during
-idle. If the I2C4 lines are not properly muxed, any voltage
-scaling over I2C4 will fail.
+From: Tero Kristo <t-kristo@ti.com>
 
-Let's mux those pins by default, the boards that are not using
-them can still configure things separately.
+There is a solitary write to this register every wakeup from off-mode,
+which isn't doing anything, so remove it.
 
-Cc: Kevin Hilman <khilman@linaro.org>
+Also note that modifying this register trashes any attempted
+voltage scaling configuration and the change probably should
+never have gotten merged in the first place.
+
 Cc: Nishanth Menon <nm@ti.com>
+Cc: Kevin Hilman <khilman@linaro.org>
 Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+[tony at atomide.com: updated comments to describe regression]
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/twl4030_omap3.dtsi | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/pm34xx.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/twl4030_omap3.dtsi b/arch/arm/boot/dts/twl4030_omap3.dtsi
-index c353ef0..3537ae5 100644
---- a/arch/arm/boot/dts/twl4030_omap3.dtsi
-+++ b/arch/arm/boot/dts/twl4030_omap3.dtsi
-@@ -8,7 +8,7 @@
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 1f3770a..87099bb 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -330,10 +330,6 @@ void omap_sram_idle(void)
+ 			omap3_sram_restore_context();
+ 			omap2_sms_restore_context();
+ 		}
+-		if (core_next_state == PWRDM_POWER_OFF)
+-			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+-					       OMAP3430_GR_MOD,
+-					       OMAP3_PRM_VOLTCTRL_OFFSET);
+ 	}
+ 	omap3_intc_resume_idle();
  
- &twl {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&twl4030_pins>;
-+	pinctrl-0 = <&twl4030_pins &twl4030_vpins>;
- };
- 
- &omap3_pmx_core {
-@@ -23,3 +23,20 @@
- 		>;
- 	};
- };
-+
-+/*
-+ * If your board is not using the I2C4 pins with twl4030, then don't include
-+ * this file. For proper idle mode signaling with sys_clkreq and sys_off_mode
-+ * pins we need to configure I2C4, or else use the legacy sys_nvmode1 and
-+ * sys_nvmode2 signaling.
-+ */
-+&omap3_pmx_wkup {
-+	twl4030_vpins: pinmux_twl4030_vpins {
-+		pinctrl-single,pins = <
-+			OMAP3_WKUP_IOPAD(0x2a00, PIN_INPUT | MUX_MODE0)		/* i2c4_scl.i2c4_scl */
-+			OMAP3_WKUP_IOPAD(0x2a02, PIN_INPUT | MUX_MODE0)		/* i2c4_sda.i2c4_sda */
-+			OMAP3_WKUP_IOPAD(0x2a06, PIN_OUTPUT | MUX_MODE0)	/* sys_clkreq.sys_clkreq */
-+			OMAP3_WKUP_IOPAD(0x2a18, PIN_OUTPUT | MUX_MODE0)	/* sys_off_mode.sys_off_mode */
-+		>;
-+	};
-+};
 -- 
 1.8.1.1
