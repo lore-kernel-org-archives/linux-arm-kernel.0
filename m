@@ -1,59 +1,51 @@
-From: neil@fatboyfat.co.uk (Neil Greatorex)
-Date: Thu, 10 Apr 2014 23:15:07 +0100 (BST)
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <20140410220650.GA10540@obsidianresearch.com>
-References: <20140410181953.50ccfcc3@skate>
- <20140410165733.GB23104@obsidianresearch.com> <20140410200153.46669e0c@skate>
- <20140410201201.GA12661@obsidianresearch.com>
- <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
- <20140410220650.GA10540@obsidianresearch.com>
-Message-ID: <alpine.DEB.2.10.1404102313060.25712@vroombuntu>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 10 Apr 2014 17:40:05 -0500
+Subject: [PATCH v2 10/14] dma: edma: Simplify direction configuration
+ in edma_config_pset()
+In-Reply-To: <1396357575-30585-11-git-send-email-peter.ujfalusi@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-11-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <53471DC5.4090001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+On 04/01/2014 08:06 AM, Peter Ujfalusi wrote:
+> We only support DEV_TO_MEM or MEM_TO_DEV directions with edma driver and the
+> check for the direction has been already done in the function calling
+> edma_config_pset().
+> The error reporting is redundant and also the "else if ()" can be removed.
+> 
 
-On Thu, 10 Apr 2014, Jason Gunthorpe wrote:
+NAK. Please don't do this. I have been working on MEM_TO_MEM support as
+well so leave it as it is for future.
 
->> I took your attached patch and extended it a bit to print out how
->> long it took. The delays also need to be much longer for me. I also
->> fixed a small typo you made where the bit wasn't being set again to
->> bring the link back up. I've attached the diff to your patch, as
->> well as the combined patch (hope that makes sense).
->
-> Just to be clear you tried this alone without the above?
+Thanks,
+-Joel
 
-Yes I did.
-
->
-> Thanks for fixing the patch, I think it also confirms the theory.
->
-
-No problem!
-
-> IMHO, both approaches are required.
->
-> The first prevents messing up the PEX as was left by the bootloader
->
-> The second allows the driver to startup a PEX that wasn't enabled by
-> the bootloader, and recover from clock gating in the kernel (eg the
-> modular case)
->
-> Both seem valuable..
->
-> Ideally I'd like to see the clk driver turn off the PEX PHY when it
-> gates the clock, but I have no great idea how to accomplish that sort
-> of cross register space adventure...
->
-> Thomas, if we can figure out how to properly do __clk_is_enabled I
-> can probably send a proper patch?
-
-Let me know when you do and I will test it and add my Tested-by.
-
->
-> Thanks,
-> Jason
->
-
-Cheers,
-Neil
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/edma.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 855766672aa9..d954099650ae 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -372,14 +372,12 @@ static int edma_config_pset(struct dma_chan *chan, struct edmacc_param *pset,
+>  		src_cidx = cidx;
+>  		dst_bidx = 0;
+>  		dst_cidx = 0;
+> -	} else if (direction == DMA_DEV_TO_MEM)  {
+> +	} else {
+> +		/* DMA_DEV_TO_MEM */
+>  		src_bidx = 0;
+>  		src_cidx = 0;
+>  		dst_bidx = acnt;
+>  		dst_cidx = cidx;
+> -	} else {
+> -		dev_err(dev, "%s: direction not implemented yet\n", __func__);
+> -		return -EINVAL;
+>  	}
+>  
+>  	pset->opt = EDMA_TCC(EDMA_CHAN_SLOT(echan->ch_num));
+> 
