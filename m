@@ -1,139 +1,56 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 10 Apr 2014 11:04:07 -0500
-Subject: [PATCH RFC v5 2/2] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <1397042790-10636-3-git-send-email-s.nawrocki@samsung.com>
-References: <1397042790-10636-1-git-send-email-s.nawrocki@samsung.com>
- <1397042790-10636-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAL_JsqKDJ_yFxFYnrTtmzMPoxO2rmypiujybwbhUh35y1LS-Mw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 10 Apr 2014 17:34:33 +0200
+Subject: [PATCH V4 10/20] ARM: exynos: cpuidle: Move clock setup to pm.c
+In-Reply-To: <5346A958.1030302@linaro.org>
+References: <1397123751-1957-1-git-send-email-daniel.lezcano@linaro.org>
+ <1397123751-1957-11-git-send-email-daniel.lezcano@linaro.org>
+ <5346A367.2070107@samsung.com> <5346A958.1030302@linaro.org>
+Message-ID: <5346BA09.9020708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 9, 2014 at 6:26 AM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> This patch adds a helper function to configure clock parents and
-> rates as specified in clock-parents, clock-rates DT properties
-> for a consumer device and a call to it before driver is bound to
-> a device.
+On 10.04.2014 16:23, Daniel Lezcano wrote:
+> On 04/10/2014 03:57 PM, Tomasz Figa wrote:
+>> Hi Daniel,
+>>
+>> On 10.04.2014 11:55, Daniel Lezcano wrote:
+>>> One more step is moving the clock ratio setting at idle time in pm.c
+>>>
+>>> The macro names have been changed to be consistent with the other macros
+>>> name in the file.
+>>>
+>>> Note, the clock divider was working only when cpuidle was enabled
+>>> because it
+>>> was in its init routine. With this change, the clock divider is set in
+>>> the pm's
+>>> init routine, so it will also operate when the cpuidle driver is not
+>>> set, which
+>>> is good.
+>>>
+>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>> ---
+>>>   arch/arm/mach-exynos/cpuidle.c  |   54
+>>> ---------------------------------------
+>>>   arch/arm/mach-exynos/pm.c       |   35 +++++++++++++++++++++++++
+>>>   arch/arm/mach-exynos/regs-pmu.h |   19 ++++++++++++++
+>>>   3 files changed, 54 insertions(+), 54 deletions(-)
+>>
+>> Sorry that I didn't mention that before, but now I recall that there was
+>> already a similar patch moving this code to Exynos5250 clock driver,
+>> which is the best place for setup of any CMU registers and a step
+>> towards removing one more static IO mapping.
 >
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
-> Changes since v4:
->  - added note explaining how to skip setting parent and rate
->    of a clock,
->  - moved of_clk_dev_init() calls to the platform bus,
->  - added missing call to of_node_put(),
->  - dropped debug traces.
+> Yes, Bartlomiej mentioned it.
 >
-> Changes since v3:
->  - added detailed description of the assigned-clocks subnode,
->  - added missing 'static inline' to the function stub definition,
->  - clk-conf.c is now excluded when CONFIG_OF is not set,
->  - s/of_clk_device_setup/of_clk_device_init.
->
-> Changes since v2:
->  - edited in clock-bindings.txt, added note about 'assigned-clocks'
->    subnode which may be used to specify "global" clocks configuration
->    at a clock provider node,
->  - moved of_clk_device_setup() function declaration from clk-provider.h
->    to clk-conf.h so required function stubs are available when
->    CONFIG_COMMON_CLK is not enabled,
->
-> Changes since v1:
->  - the helper function to parse and set assigned clock parents and
->    rates made public so it is available to clock providers to call
->    directly;
->  - dropped the platform bus notification and call of_clk_device_setup()
->    is is now called from the driver core, rather than from the
->    notification callback;
->  - s/of_clk_get_list_entry/of_clk_get_by_property.
-> ---
->  .../devicetree/bindings/clock/clock-bindings.txt   |   44 ++++++++++
->  drivers/base/platform.c                            |    5 ++
->  drivers/clk/Makefile                               |    3 +
->  drivers/clk/clk-conf.c                             |   85 ++++++++++++++++++++
->  drivers/clk/clk.c                                  |   12 ++-
->  include/linux/clk/clk-conf.h                       |   19 +++++
->  6 files changed, 167 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/clk-conf.c
->  create mode 100644 include/linux/clk/clk-conf.h
->
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> index 700e7aa..93513fc 100644
-> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -132,3 +132,47 @@ clock signal, and a UART.
->    ("pll" and "pll-switched").
->  * The UART has its baud clock connected the external oscillator and its
->    register clock connected to the PLL clock (the "pll-switched" signal)
-> +
-> +==Assigned clock parents and rates==
-> +
-> +Some platforms require static initial configuration of parts of the clocks
-> +controller. Such a configuration can be specified in a clock consumer node
-> +through clock-parents and clock-rates DT properties. The former should
-> +contain a list of parent clocks in form of phandle and clock specifier pairs,
-> +the latter the list of assigned clock frequency values (one cell each).
-> +To skip setting parent or rate of a clock its corresponding entry should be
-> +set to 0, or can be omitted if it is not followed by any non-zero entry.
-> +
-> +    uart at a000 {
-> +        compatible = "fsl,imx-uart";
-> +        reg = <0xa000 0x1000>;
-> +        ...
-> +        clocks = <&clkcon 0>, <&clkcon 3>;
-> +        clock-names = "baud", "mux";
-> +
-> +        clock-parents = <0>, <&pll 1>;
-> +        clock-rates = <460800>;
+> Is it possible to merge this mentioned patch or to give a pointer to it
+> so I can integrate it into the patchset ?
 
-Is this the input frequency or serial baud rate? Looks like a baud
-rate, but the clock framework needs input (to the uart) frequency. I
-would say this should be clock-frequency and specify the max baud rate
-as is being done with i2c bindings. The uart driver should know how to
-convert between input clock freq and baud rate.
+http://marc.info/?l=linux-arm-kernel&m=138147021207626&w=2
 
-> +    };
-> +
-> +In this example the pll is set as parent of "mux" clock and frequency of "baud"
-> +clock is specified as 460800 Hz.
+I wonder if it still applies cleanly, though...
 
-I don't really like clock-parents. The parent information is part of
-the clock source, not the consumer.
-
-We've somewhat decided against having every single clock defined in DT
-and rather only describe a clock controller with leaf clocks to
-devices. That is not a hard rule, but for complex clock trees that is
-the norm. Doing something like this will require all levels of the
-clock tree to be described. You may have multiple layers of parents
-that have to be configured correctly. How are you configuring the rest
-of the tree?
-
-> +
-> +Configuring a clock's parent and rate through the device node that uses
-> +the clock can be done only for clocks that have a single user. Specifying
-> +conflicting parent or rate configuration in multiple consumer nodes for
-> +a shared clock is forbidden.
-> +
-> +Configuration of common clocks, which affect multiple consumer devices
-> +can be specified in a dedicated 'assigned-clocks' subnode of a clock
-> +provider node, e.g.:
-
-This seems like a work-around due to having clock-parents in the
-consumer node. If (I'm not convinced we should) we have a binding for
-parent config, it needs to be a single binding that works for both
-cases.
-
-> +
-> +    clkcon {
-> +        ...
-> +        #clock-cells = <1>;
-> +
-> +        assigned-clocks {
-> +            clocks = <&clkcon 16>, <&clkcon 17>;
-> +            clock-parents = <0>, <&clkcon 1>;
-> +            clock-rates = <200000>;
-> +        };
-> +    };
-
-Rob
+Best regards,
+Tomasz
