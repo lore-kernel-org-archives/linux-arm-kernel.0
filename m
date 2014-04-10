@@ -1,30 +1,33 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 10 Apr 2014 18:07:48 +0200
-Subject: Wrong SPI NOR model detected by mx6sl
-In-Reply-To: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
-References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
-Message-ID: <201404101807.48238.marex@denx.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Apr 2014 14:47:05 +0200
+Subject: [PATCH v2 5/5] ARM: sunxi: update the default ARCH_NR_GPIO for
+ sunxi arch
+In-Reply-To: <1397132747-13917-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397132747-13917-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397132747-13917-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140410124705.GT28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 10, 2014 at 05:49:18 PM, Fabio Estevam wrote:
-> Hi,
+On Thu, Apr 10, 2014 at 02:25:47PM +0200, Boris BREZILLON wrote:
+> The A31 SoC has PL and PM banks, we thus need to increase the default
+> ARCH_NR_GPIO when building for the sunxi architecture.
 > 
-> On the imx6sl-evk there is a m25p32 spi nor flash, but in the kernel
-> probe we get:
-> 
-> m25p80 spi0.0: found mr25h256, expected m25p32
-> m25p80 spi0.0: mr25h256 (32 Kbytes)
-> 
-> On the mx6qsabresd there is also a m25p32, which is correctly detected:
-> m25p80 spi0.0: m25p32 (4096 Kbytes)
-> 
-> Any ideas as to why mx6sl detects the wrong spi nor model?
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Can you share the JEDEC ID codes that both of the boards actually read from the 
-SPI NOR ? You can dump those in the m25p80.c driver . That'd be helpful, I 
-suspect some kind of an "offset" or "polarity inversion" in the SPI 
-communication causing this.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Best regards,
-Marek Vasut
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/03ded9ae/attachment.sig>
