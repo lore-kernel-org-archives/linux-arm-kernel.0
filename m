@@ -1,36 +1,61 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 19:06:11 +0900
-Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
+Date: Thu, 10 Apr 2014 19:06:16 +0900
+Subject: [PATCH 26/27] ARM: dts: exynos3250: Add power domain dt nodes
 In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
 References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397124377-16969-13-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397124377-16969-18-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hyunhee Kim <hyunhee.kim@samsung.com>
+From: Inki Dae <inki.dae@samsung.com>
 
-ARM CPU has its own PMU (Performance Monitoring Unit). This patch add PMU dt
-data to support PMU for CPU. Exynos3250 has four PMU interrupts.
+This patch add CAM/MFC/G3D/LCD0/ISP power domain nodes for Exynos3250.
 
-Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+[add CAM/MFC power domain node by Bartlomiej Zolnierkiewicz]
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+[add ISP power domain node by Bartlomiej Zolnierkiewicz]
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index ceed761..2f0ca32 100644
+index a61940f..192770a 100644
 --- a/arch/arm/boot/dts/exynos3250.dtsi
 +++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -280,4 +280,9 @@
- 		pinctrl-0 = <&i2c7_bus>;
- 		status = "disabled";
+@@ -82,6 +82,31 @@
+ 		reg = <0x10010000 0x400>;
  	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a7-pmu";
-+		interrupts = <0 18 0>, <0 19 0>, <0 20 0>, <0 21 0>;
+ 
++	pd_cam: cam-power-domain at 10023C00 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C00 0x20>;
 +	};
- };
++
++	pd_mfc: mfc-power-domain at 10023C40 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C40 0x20>;
++	};
++
++	pd_g3d: g3d-power-domain at 10023C60 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C60 0x20>;
++	};
++
++	pd_lcd0: lcd0-power-domain at 10023C80 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023C80 0x20>;
++	};
++
++	pd_isp: isp-power-domain at 10023CA0 {
++		compatible = "samsung,exynos4210-pd";
++		reg = <0x10023CA0 0x20>;
++	};
++
+ 	cmu: clock-controller at 10030000 {
+ 		compatible = "samsung,exynos3250-cmu";
+ 		reg = <0x10030000 0x20000>;
 -- 
 1.8.0
