@@ -1,36 +1,49 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 10 Apr 2014 21:17:46 +0200
-Subject: [PATCH 08/27] pinctrl: exynos: Add driver data for Exynos3250
-In-Reply-To: <CACRpkdYiFCHFifkpRwDhdAGqBrGTU5E4mfdGE8u1c=zrim17aA@mail.gmail.com>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>	<1397122124-15690-9-git-send-email-cw00.choi@samsung.com>
- <CACRpkdYiFCHFifkpRwDhdAGqBrGTU5E4mfdGE8u1c=zrim17aA@mail.gmail.com>
-Message-ID: <5346EE5A.3070408@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 10 Apr 2014 12:29:02 -0700
+Subject: [PATCH v5 5/8 fix] mtd: m25p80: use the SPI nor framework
+In-Reply-To: <20140410072509.GA24100@localhost>
+References: <1393238262-8622-6-git-send-email-b32955@freescale.com>
+ <1393574142-17234-1-git-send-email-b32955@freescale.com>
+ <20140409213749.GH32070@ld-irv-0074>
+ <20140410072509.GA24100@localhost>
+Message-ID: <20140410192902.GM32070@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 10, 2014 at 03:25:11PM +0800, Huang Shijie wrote:
+> On Wed, Apr 09, 2014 at 02:37:49PM -0700, Brian Norris wrote:
+> > >  config MTD_M25P80
+> > >  	tristate "Support most SPI Flash chips (AT26DF, M25P, W25X, ...)"
+> > > -	depends on SPI_MASTER
+> > > +	depends on SPI_MASTER && MTD_SPI_NOR_BASE
+> > >  	help
+> > >  	  This enables access to most modern SPI flash chips, used for
+> > >  	  program and data storage.   Series supported include Atmel AT26DF,
+> > 
+> > Now that M25P80 depends on MTD_SPI_NOR_BASE (which I proposed to rename
+> > to MTD_SPI_NOR a few hours ago), shouldn't we be updating everybody's
+> > defconfigs? As it stands, the defconfigs that use M25P80 will just drop
+> > it silently when built.
+> > 
+> > And if so, I'm not sure how this should be handled. Should defconfig
+> > patches be sent to their respective arch maintainers?
+> 
+> IMHO, we should create a patch or several patches to add the MTD_SPI_NOR
+> to the defconfigs.
 
-On 10.04.2014 20:42, Linus Walleij wrote:
-> On Thu, Apr 10, 2014 at 11:28 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->
->> From: Tomasz Figa <t.figa@samsung.com>
->>
->> This patch adds driver data (bank list and EINT layout) for Exynos3250
->> to pinctrl-exynos driver. Exynos3250 includes 158 multi-functional input/output
->> ports. There are 23 general port groups.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->
-> Ugh can Tomasz send out his patches himself, I get confused...
-> It was also sent two times, the second time with CC:s added.
-> Tomasz, shall I merge this?
+Yeah, I think that's best.
 
-I'm fine with this patch being sent by Chanwoo, although he should have 
-probably added his sign-off to the list, as the person sending it.
+> Another method is to select the MTD_SPI_NOR which we enable the MTD.
 
-Chanwoo, can you make sure that there is your sign-off on all the 
-patches from this series?
+I'm pretty sure it's a rule that drivers should not 'select' subsystems.
 
-Best regards,
-Tomasz
+> > Also, I think m25p80.c is no longer a "self-contained MTD device driver"
+> > and should be moved under drivers/mtd/spi-nor/.
+> If we move the m25p80.c to the drivers/mtd/spi-nor/, we also need to move
+> other drivers too.
+
+Which ones? I think it only makes sense to move those that depend on the
+same core code (i.e., spi-nor.c), or have a close relation to it (so
+Lee's st_spi_fsm.c is a candidate).
+
+Brian
