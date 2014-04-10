@@ -1,79 +1,25 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 15:01:32 +0200
-Subject: [PATCH 3/3] mmc: mmci: Put the device into low power state at system
- suspend
-In-Reply-To: <1397134892-20840-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397134892-20840-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397134892-20840-4-git-send-email-ulf.hansson@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Apr 2014 18:55:02 +0200
+Subject: [PATCH] pinctrl: capri: make Kconfig dependency more strict
+In-Reply-To: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdbqgqeJ2YDN+gsMfByR32D_wFOjPX-u7h2DhAYcLsnwwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For CONFIG_PM_SLEEP, the device were always left in full power state
-after system suspend.
+On Tue, Apr 1, 2014 at 10:10 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-We solely relied on a power domain to put it into low power state,
-which is an unreasonable requirement to put on SOCs to implement.
-Especially for those SOCs not supporting power domains at all.
+> This driver is only useful on BCM281xx, so let the driver depend on
+> ARCH_BCM_MOBILE but allow compile coverage testing.
+> The main benefit is that the driver isn't available to be selected for
+> machines that don't have the matching hardware.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Use pm_runtime_force_suspend|resume() as the system suspend callbacks,
-to resolve the issue.
+Sherman is renaming this driver so this patch does not apply.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |   33 ++-------------------------------
- 1 file changed, 2 insertions(+), 31 deletions(-)
+Please resubmit after the rename is upstream or something.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index eb23c89..a40bf70 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1759,36 +1759,6 @@ static int mmci_remove(struct amba_device *dev)
- 	return 0;
- }
- 
--#ifdef CONFIG_SUSPEND
--static int mmci_suspend(struct device *dev)
--{
--	struct amba_device *adev = to_amba_device(dev);
--	struct mmc_host *mmc = amba_get_drvdata(adev);
--
--	if (mmc) {
--		struct mmci_host *host = mmc_priv(mmc);
--		pm_runtime_get_sync(dev);
--		writel(0, host->base + MMCIMASK0);
--	}
--
--	return 0;
--}
--
--static int mmci_resume(struct device *dev)
--{
--	struct amba_device *adev = to_amba_device(dev);
--	struct mmc_host *mmc = amba_get_drvdata(adev);
--
--	if (mmc) {
--		struct mmci_host *host = mmc_priv(mmc);
--		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
--		pm_runtime_put(dev);
--	}
--
--	return 0;
--}
--#endif
--
- #ifdef CONFIG_PM
- static void mmci_save(struct mmci_host *host)
- {
-@@ -1856,7 +1826,8 @@ static int mmci_runtime_resume(struct device *dev)
- #endif
- 
- static const struct dev_pm_ops mmci_dev_pm_ops = {
--	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
-+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				pm_runtime_force_resume)
- 	SET_PM_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
- };
- 
--- 
-1.7.9.5
+Yours,
+Linus Walleij
