@@ -1,102 +1,132 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:20:51 +0200
-Subject: [PATCH V3 08/19] ARM: ux500: Convert to the common mmc DT bindings
- for highspeed mode
+Date: Thu, 10 Apr 2014 14:26:32 +0200
+Subject: [PATCH V3 00/19] mmc: mmci: Improve DT support
 In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
 References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397132462-8005-9-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAPDyKFpcoFvPE1fMHGs=hWnZ+zwYJ26yen3LFgdVZY-gfrr=DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmci host driver supports the common mmc DT parser, which enables
-us to use the use common names instead.
+On 10 April 2014 14:20, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Step by step, improve the DT support for the mmci host driver.
+>
+> This enables us to move the final pieces of platform data for mmci for ux500
+> into DT. We are then able to remove yet another machine specific file for ux500.
+>
+> This patchset needs to be merged together. I suggest we go through Russell's
+> ARM tree, since most of the patches are mmci specific which he maintains -
+> unless someone think there is a better alternative.
+>
+> I will thus seek acks from the SOC maintainers for the SOC specific patches.
+>
+> The goal is to queue this for 3.16, thus I might need to rebase the patches for
+> 3.15 rc[n]. Still I would appreciate any comments at this point.
+>
+> Changes in v3:
+>         - Adopting to review comments from Michal Simek for patch 2.
+>         - Rebased patches and added some acks/reviewed by tags.
+>
+> Changes in v2:
+>         - Adopting to review comments from Rob Herring and Linus Walleij. More
+>         or less causing each an every patch to be rebased.
+>         - Removed the patch for regulator for the db8500-prcmu from this
+>         patchset, since Mark Brown already queued it for 3.15.
+>
+> Ulf Hansson (19):
+>   mmc: mmci: Convert to the mmc gpio API
+>   mmc: mmci: Convert to devm functions
+>   mmc: mmci: Update DT documentation
+>   mmc: mmci: Add DT bindings for signal direction
+>   mmc: mmci: Add DT bindings for feedback clock pin
+>   mmc: mmci: Use the common mmc DT parser
+>   ARM: ux500: Add mmci signal directions and feeback clock in DT for
+>     href
+>   ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
+>   ARM: nomadik: Convert to the common mmc DT bindings for highspeed
+>     mode
+>   ARM: u300: Convert to the common mmc DT bindings for highspeed mode
+>   mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
+>   mmc: mmci: Enable MMC_CAP_CMD23
+>   ARM: ux500: Add the mmc capabilities flags to DT
+>   ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for
+>     href
+>   ARM: ux500: Remove redundant board file for mmci platform data
+>   mmc: mmci: Enforce DT for signal direction and feedback clock
+>   mmc: mmci: Enforce mmc capabilities through DT
+>   mmc: mmci: Enforce DMA configuration through DT
+>   mmc: mmci: Enforce max frequency configuration through DT
+>
+>  Documentation/devicetree/bindings/mmc/mmci.txt |   54 ++++-
+>  arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
+>  arch/arm/boot/dts/ste-href.dtsi                |   19 +-
+>  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
+>  arch/arm/boot/dts/ste-snowball.dts             |    4 +-
+>  arch/arm/boot/dts/ste-u300.dts                 |    4 +-
+>  arch/arm/mach-ux500/Makefile                   |    3 +-
+>  arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ---------------
+>  arch/arm/mach-ux500/board-mop500.h             |    5 -
+>  arch/arm/mach-ux500/cpu-db8500.c               |    4 -
+>  drivers/mmc/host/mmci.c                        |  265 +++++++-----------------
+>  drivers/mmc/host/mmci.h                        |   14 +-
+>  include/linux/amba/mmci.h                      |   42 ----
+>  13 files changed, 157 insertions(+), 433 deletions(-)
+>  delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
+>
+> --
+> 1.7.9.5
+>
+>
+>
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-ccu9540.dts  |    6 +++---
- arch/arm/boot/dts/ste-href.dtsi    |    8 ++++----
- arch/arm/boot/dts/ste-snowball.dts |    4 ++--
- 3 files changed, 9 insertions(+), 9 deletions(-)
+Some cut/paste errors below. Please ignore the patchset summary above,
+the below is the correct one.
 
-diff --git a/arch/arm/boot/dts/ste-ccu9540.dts b/arch/arm/boot/dts/ste-ccu9540.dts
-index 2295087..651c56d 100644
---- a/arch/arm/boot/dts/ste-ccu9540.dts
-+++ b/arch/arm/boot/dts/ste-ccu9540.dts
-@@ -38,8 +38,8 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <4>;
--			mmc-cap-sd-highspeed;
--			mmc-cap-mmc-highspeed;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 
- 			cd-gpios  = <&gpio7 6 0x4>; // 230
-@@ -63,7 +63,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 		        max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux2_reg>;
- 
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 46dce42..3f07c58 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -116,8 +116,8 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <4>;
--			mmc-cap-sd-highspeed;
--			mmc-cap-mmc-highspeed;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
- 			st,sig-dir-dat0;
- 			st,sig-dir-dat2;
- 			st,sig-dir-cmd;
-@@ -148,7 +148,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi2_default_mode>;
- 			pinctrl-1 = <&sdi2_sleep_mode>;
-@@ -161,7 +161,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 		        max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux2_reg>;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi4_default_mode>;
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index a2f632d..474ef832 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -156,7 +156,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <4>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 			vqmmc-supply = <&vmmci>;
- 			pinctrl-names = "default", "sleep";
-@@ -195,7 +195,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 		        max-frequency = <100000000>;
- 			bus-width = <8>;
--			mmc-cap-mmc-highspeed;
-+			cap-mmc-highspeed;
- 			vmmc-supply = <&ab8500_ldo_aux2_reg>;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi4_default_mode>;
--- 
-1.7.9.5
+Kind regards
+Ulf Hansson
+
+>
+>
+>
+> Ulf Hansson (19):
+>   mmc: mmci: Convert to the mmc gpio API
+>   mmc: mmci: Convert to devm functions
+>   mmc: mmci: Update DT documentation
+>   mmc: mmci: Add DT bindings for signal direction
+>   mmc: mmci: Add DT bindings for feedback clock pin
+>   mmc: mmci: Use the common mmc DT parser
+>   ARM: ux500: Add mmci signal directions and feeback clock in DT for
+>     href
+>   ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
+>   ARM: nomadik: Convert to the common mmc DT bindings for highspeed
+>     mode
+>   ARM: u300: Convert to the common mmc DT bindings for highspeed mode
+>   mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
+>   mmc: mmci: Enable MMC_CAP_CMD23
+>   ARM: ux500: Add the mmc capabilities flags to DT
+>   ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for
+>     href
+>   ARM: ux500: Remove redundant board file for mmci platform data
+>   mmc: mmci: Enforce DT for signal direction and feedback clock
+>   mmc: mmci: Enforce mmc capabilities through DT
+>   mmc: mmci: Enforce DMA configuration through DT
+>   mmc: mmci: Enforce max frequency configuration through DT
+>
+>  Documentation/devicetree/bindings/mmc/mmci.txt |   54 ++++-
+>  arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
+>  arch/arm/boot/dts/ste-href.dtsi                |   19 +-
+>  arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
+>  arch/arm/boot/dts/ste-snowball.dts             |    4 +-
+>  arch/arm/boot/dts/ste-u300.dts                 |    4 +-
+>  arch/arm/mach-ux500/Makefile                   |    3 +-
+>  arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ---------------
+>  arch/arm/mach-ux500/board-mop500.h             |    5 -
+>  arch/arm/mach-ux500/cpu-db8500.c               |    4 -
+>  drivers/mmc/host/mmci.c                        |  264 ++++++------------------
+>  drivers/mmc/host/mmci.h                        |   14 +-
+>  include/linux/amba/mmci.h                      |   42 ----
+>  13 files changed, 154 insertions(+), 435 deletions(-)
+>  delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
+>
+> --
+> 1.7.9.5
+>
