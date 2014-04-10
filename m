@@ -1,194 +1,148 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 10 Apr 2014 13:54:53 +0530
-Subject: [PATCH 3/6] ARM: EXYNOS: Migrate Exynos specific macros from plat to
- mach
+Date: Thu, 10 Apr 2014 13:54:55 +0530
+Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
 In-Reply-To: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
 References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1397118296-6846-4-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1397118296-6846-6-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move Exynos specific macros to mach-exynos from plat-samsung to avoid
-unnecessary dependency on plat based header files.
+From: Arnd Bergmann <arnd@arndb.de>
 
+This makes it possible to enable the exynos platform as part of a
+multiplatform kernel, in addition to keeping the single-platform
+Exynos support.
+sparsemem is currently not supported in multiplatform.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- arch/arm/mach-exynos/common.h            |   72 ++++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/cpu.h |   60 -------------------------
- 2 files changed, 72 insertions(+), 60 deletions(-)
+ arch/arm/Kconfig                  |   27 +++------------------------
+ arch/arm/configs/exynos_defconfig |    2 +-
+ arch/arm/mach-exynos/Kconfig      |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-exynos/Makefile     |    2 ++
+ arch/arm/plat-samsung/Makefile    |    3 +++
+ 5 files changed, 36 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 9ef3f83efaff..c1a2f2207af0 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -15,6 +15,75 @@
- #include <linux/reboot.h>
- #include <linux/of.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4422601059e8..9d459e9c396b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -828,34 +828,13 @@ config ARCH_S5PV210
+ 	help
+ 	  Samsung S5PV210/S5PC110 series based systems
  
-+#define EXYNOS4210_CPU_ID	0x43210000
-+#define EXYNOS4212_CPU_ID	0x43220000
-+#define EXYNOS4412_CPU_ID	0xE4412200
-+#define EXYNOS4_CPU_MASK	0xFFFE0000
-+
-+#define EXYNOS5250_SOC_ID	0x43520000
-+#define EXYNOS5420_SOC_ID	0xE5420000
-+#define EXYNOS5440_SOC_ID	0xE5440000
-+#define EXYNOS5_SOC_MASK	0xFFFFF000
-+
-+extern unsigned long samsung_cpu_id;
-+
-+#define IS_SAMSUNG_CPU(name, id, mask)		\
-+static inline int is_samsung_##name(void)	\
-+{						\
-+	return ((samsung_cpu_id & mask) == (id & mask));	\
-+}
-+
-+IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
-+IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
-+IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
-+IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
-+IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
-+IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
-+
-+#if defined(CONFIG_CPU_EXYNOS4210)
-+# define soc_is_exynos4210()	is_samsung_exynos4210()
-+#else
-+# define soc_is_exynos4210()	0
-+#endif
-+
-+#if defined(CONFIG_SOC_EXYNOS4212)
-+# define soc_is_exynos4212()	is_samsung_exynos4212()
-+#else
-+# define soc_is_exynos4212()	0
-+#endif
-+
-+#if defined(CONFIG_SOC_EXYNOS4412)
-+# define soc_is_exynos4412()	is_samsung_exynos4412()
-+#else
-+# define soc_is_exynos4412()	0
-+#endif
-+
-+#define EXYNOS4210_REV_0	(0x0)
-+#define EXYNOS4210_REV_1_0	(0x10)
-+#define EXYNOS4210_REV_1_1	(0x11)
-+
-+#if defined(CONFIG_SOC_EXYNOS5250)
-+# define soc_is_exynos5250()	is_samsung_exynos5250()
-+#else
-+# define soc_is_exynos5250()	0
-+#endif
-+
-+#if defined(CONFIG_SOC_EXYNOS5420)
-+# define soc_is_exynos5420()	is_samsung_exynos5420()
-+#else
-+# define soc_is_exynos5420()	0
-+#endif
-+
-+#if defined(CONFIG_SOC_EXYNOS5440)
-+# define soc_is_exynos5440()	is_samsung_exynos5440()
-+#else
-+# define soc_is_exynos5440()	0
-+#endif
-+
-+#define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
-+			  soc_is_exynos4412())
-+#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5420())
-+
- void mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1);
+-config ARCH_EXYNOS
++config ARCH_EXYNOS_SINGLE
+ 	bool "Samsung EXYNOS"
+-	select ARCH_HAS_BANDGAP
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_HAS_HOLES_MEMORYMODEL
+-	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_EXYNOS
+ 	select ARCH_SPARSEMEM_ENABLE
+-	select ARM_AMBA
+-	select ARM_GIC
+-	select CLKSRC_OF
+-	select COMMON_CLK
+-	select CPU_V7
+-	select GENERIC_CLOCKEVENTS
+-	select HAVE_ARM_SCU if SMP
+-	select HAVE_S3C2410_I2C if I2C
+-	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+-	select HAVE_S3C_RTC if RTC_CLASS
+-	select HAVE_SMP
+ 	select NEED_MACH_MEMORY_H
+-	select PINCTRL
+-	select PINCTRL_EXYNOS
+-	select PM_GENERIC_DOMAINS if PM_RUNTIME
+-	select S5P_DEV_MFC
+-	select SAMSUNG_DMADEV
+-	select SPARSE_IRQ
+-	select USE_OF
+ 	help
+-	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
++	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
  
- struct map_desc;
-@@ -63,4 +132,7 @@ struct exynos_pmu_conf {
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 4ce7b70ea901..103a676256cd 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -7,7 +7,7 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_ARCH_EXYNOS=y
++CONFIG_ARCH_EXYNOS_SINGLE=y
+ CONFIG_S3C_LOWLEVEL_UART_PORT=3
+ CONFIG_S3C24XX_PWM=y
+ CONFIG_ARCH_EXYNOS5=y
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 5c34dc26cec6..bc55af76a05f 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -7,6 +7,33 @@
  
- extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+ # Configuration options for the EXYNOS4
  
-+extern void s5p_init_cpu(void __iomem *cpuid_addr);
-+extern unsigned int samsung_rev(void);
++config ARCH_EXYNOS
++	bool "Samsung EXYNOS" if ARCH_MULTI_V7
++	select ARCH_HAS_BANDGAP
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_HOLES_MEMORYMODEL
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_AMBA
++	select ARM_GIC
++	select CLKSRC_OF
++	select COMMON_CLK
++	select CPU_V7
++	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_SCU if SMP
++	select HAVE_S3C2410_I2C if I2C
++	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select HAVE_S3C_RTC if RTC_CLASS
++	select HAVE_SMP
++	select PINCTRL
++	select PINCTRL_EXYNOS
++	select PM_GENERIC_DOMAINS if PM_RUNTIME
++	select S5P_DEV_MFC
++	select SAMSUNG_DMADEV
++	select SPARSE_IRQ
++	select USE_OF
++	help
++	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
 +
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index 930b4be832cd..5a237db9f9eb 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -43,16 +43,6 @@ extern unsigned long samsung_cpu_id;
- #define S5PV210_CPU_ID		0x43110000
- #define S5PV210_CPU_MASK	0xFFFFF000
+ if ARCH_EXYNOS
  
--#define EXYNOS4210_CPU_ID	0x43210000
--#define EXYNOS4212_CPU_ID	0x43220000
--#define EXYNOS4412_CPU_ID	0xE4412200
--#define EXYNOS4_CPU_MASK	0xFFFE0000
--
--#define EXYNOS5250_SOC_ID	0x43520000
--#define EXYNOS5420_SOC_ID	0xE5420000
--#define EXYNOS5440_SOC_ID	0xE5440000
--#define EXYNOS5_SOC_MASK	0xFFFFF000
--
- #define IS_SAMSUNG_CPU(name, id, mask)		\
- static inline int is_samsung_##name(void)	\
- {						\
-@@ -68,12 +58,6 @@ IS_SAMSUNG_CPU(s5p6440, S5P6440_CPU_ID, S5P64XX_CPU_MASK)
- IS_SAMSUNG_CPU(s5p6450, S5P6450_CPU_ID, S5P64XX_CPU_MASK)
- IS_SAMSUNG_CPU(s5pc100, S5PC100_CPU_ID, S5PC100_CPU_MASK)
- IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
--IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
--IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
--IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
--IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
--IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
--IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+ menu "SAMSUNG EXYNOS SoCs Support"
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index f6dcc256db56..24a8efe3d4bd 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -5,6 +5,8 @@
+ #
+ # Licensed under GPLv2
  
- #if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2412) || \
-     defined(CONFIG_CPU_S3C2416) || defined(CONFIG_CPU_S3C2440) || \
-@@ -126,50 +110,6 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
- # define soc_is_s5pv210()	0
- #endif
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
++
+ obj-y				:=
+ obj-m				:=
+ obj-n				:=
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 25c826ed3b65..5e5beaa9ae15 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -4,6 +4,9 @@
+ #
+ # Licensed under GPLv2
  
--#if defined(CONFIG_CPU_EXYNOS4210)
--# define soc_is_exynos4210()	is_samsung_exynos4210()
--#else
--# define soc_is_exynos4210()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS4212)
--# define soc_is_exynos4212()	is_samsung_exynos4212()
--#else
--# define soc_is_exynos4212()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS4412)
--# define soc_is_exynos4412()	is_samsung_exynos4412()
--#else
--# define soc_is_exynos4412()	0
--#endif
--
--#define EXYNOS4210_REV_0	(0x0)
--#define EXYNOS4210_REV_1_0	(0x10)
--#define EXYNOS4210_REV_1_1	(0x11)
--
--#if defined(CONFIG_SOC_EXYNOS5250)
--# define soc_is_exynos5250()	is_samsung_exynos5250()
--#else
--# define soc_is_exynos5250()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS5420)
--# define soc_is_exynos5420()	is_samsung_exynos5420()
--#else
--# define soc_is_exynos5420()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS5440)
--# define soc_is_exynos5440()	is_samsung_exynos5440()
--#else
--# define soc_is_exynos5440()	0
--#endif
--
--#define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
--			  soc_is_exynos4412())
--#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5420())
--
- #define IODESC_ENT(x) { (unsigned long)S3C24XX_VA_##x, __phys_to_pfn(S3C24XX_PA_##x), S3C24XX_SZ_##x, MT_DEVICE }
- 
- #ifndef KHZ
++ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
++ccflags-$(CONFIG_ARCH_EXYNOS)	+= -I$(srctree)/arch/arm/mach-exynos/include
++
+ obj-y				:=
+ obj-m				:=
+ obj-n				:= dummy.o
 -- 
 1.7.9.5
