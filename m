@@ -1,83 +1,47 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 10 Apr 2014 08:35:40 +0200
-Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
-In-Reply-To: <20140409162040.GA19743@obsidianresearch.com>
-References: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20140409061128.GC16465@1wt.eu> <20140409162040.GA19743@obsidianresearch.com>
-Message-ID: <20140410063540.GA25198@1wt.eu>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 10 Apr 2014 14:43:13 +0800
+Subject: [PATCH] staging: imx-drm-core: skip components whose parent device is
+ disabled
+Message-ID: <1397112193-15817-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+In a board setup which disables LDB device node completely by changing
+status to 'disabled', and only enables HDMI device, we're running into
+the problem that imx-drm master never succeeds in binding, and hence
+HDMI does not come up either.
 
-On Wed, Apr 09, 2014 at 10:20:40AM -0600, Jason Gunthorpe wrote:
-> On Wed, Apr 09, 2014 at 08:11:29AM +0200, Willy Tarreau wrote:
-> 
-> > OK I just got it by adding two printk() in pci-mvebu.c. Both functions
-> > mvebu_pcie_handle_iobase_change() and mvebu_pcie_handle_membase_change()
-> > do pass a size which is in fact a mask (size - 1) and not the real size.
-> > So the mbus is fed with an incorrect size which is off by one :
-> 
-> Yes, that is right. I tested my patch here and didn't see any problem,
-> but I realize now that the mbus code is bailing early due to this:
-> 
-> kernel: mvebu_mbus: cannot add window '4:e8', conflicts with another window
-> 
-> Which I've never got around to fixing.. (whole other story there)
-> 
-> Your patch looks fine, and it obviously needs to be sequenced before
-> mine. (Thomas/Jason C: how do you want to do this?)
-> 
-> Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+&ldb {
+	status = "disabled";
 
-OK, thank you. I've updated the attached patch with your better description.
+	lvds-channel at 1 {
+		...
+		status = "okay";
+	};
+};
 
-Cheers,
-Willy
+The imx-drm-core should really skip the LVDS channels no matter what
+lvds-channel's status is, if LDB device is disabled.  So let's give one
+more check on parent device availability before add the component.
 
--------------- next part --------------
->From f90886f625d95781a3302bbc025304635dd97e9c Mon Sep 17 00:00:00 2001
-From: Willy Tarreau <w@1wt.eu>
-Date: Wed, 9 Apr 2014 08:05:09 +0200
-Subject: pci: mvebu: fix off-by-one in the computed size of the mbus windows
-
-mvebu_pcie_handle_membase_change() and
-mvebu_pcie_handle_iobase_change() do not correctly compute the window
-size. PCI uses an inclusive start/end address pair, which requires a
-+1 when converting to size.
-
-This only worked because a bug in the mbus driver allowed it to
-silently accept and round up bogus sizes.
-
-Fix this by adding one to the computed size.
-
-Signed-off-by: Willy Tarreau <w@1wt.eu>
-Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- drivers/pci/host/pci-mvebu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 0e79665..eff0ab5 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -329,7 +329,7 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
- 	port->iowin_base = port->pcie->io.start + iobase;
- 	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
- 			    (port->bridge.iolimitupper << 16)) -
--			    iobase);
-+			    iobase) + 1;
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 4144a75..e494ef9 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -672,7 +672,8 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
  
- 	mvebu_mbus_add_window_remap_by_id(port->io_target, port->io_attr,
- 					  port->iowin_base, port->iowin_size,
-@@ -362,7 +362,7 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
- 	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
- 	port->memwin_size  =
- 		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
--		port->memwin_base;
-+		port->memwin_base + 1;
- 
- 	mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
- 				    port->memwin_base, port->memwin_size);
+ 		for_each_child_of_node(port, ep) {
+ 			remote = of_graph_get_remote_port_parent(ep);
+-			if (!remote || !of_device_is_available(remote)) {
++			if (!remote || !of_device_is_available(remote) ||
++			    !of_device_is_available(remote->parent)) {
+ 				of_node_put(remote);
+ 				continue;
+ 			}
 -- 
-1.7.12.2.21.g234cd45.dirty
+1.8.3.2
