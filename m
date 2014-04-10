@@ -1,49 +1,96 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 10 Apr 2014 12:29:02 -0700
-Subject: [PATCH v5 5/8 fix] mtd: m25p80: use the SPI nor framework
-In-Reply-To: <20140410072509.GA24100@localhost>
-References: <1393238262-8622-6-git-send-email-b32955@freescale.com>
- <1393574142-17234-1-git-send-email-b32955@freescale.com>
- <20140409213749.GH32070@ld-irv-0074>
- <20140410072509.GA24100@localhost>
-Message-ID: <20140410192902.GM32070@ld-irv-0074>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Thu, 10 Apr 2014 16:02:52 +0530
+Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
+ on/off
+In-Reply-To: <53465FB9.7070002@ti.com>
+References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+ <53465FB9.7070002@ti.com>
+Message-ID: <CAFp+6iHKT6wFBimhzEGVJRiY_y-2rAur_e-TPFS9=RTLckf-rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 03:25:11PM +0800, Huang Shijie wrote:
-> On Wed, Apr 09, 2014 at 02:37:49PM -0700, Brian Norris wrote:
-> > >  config MTD_M25P80
-> > >  	tristate "Support most SPI Flash chips (AT26DF, M25P, W25X, ...)"
-> > > -	depends on SPI_MASTER
-> > > +	depends on SPI_MASTER && MTD_SPI_NOR_BASE
-> > >  	help
-> > >  	  This enables access to most modern SPI flash chips, used for
-> > >  	  program and data storage.   Series supported include Atmel AT26DF,
-> > 
-> > Now that M25P80 depends on MTD_SPI_NOR_BASE (which I proposed to rename
-> > to MTD_SPI_NOR a few hours ago), shouldn't we be updating everybody's
-> > defconfigs? As it stands, the defconfigs that use M25P80 will just drop
-> > it silently when built.
-> > 
-> > And if so, I'm not sure how this should be handled. Should defconfig
-> > patches be sent to their respective arch maintainers?
-> 
-> IMHO, we should create a patch or several patches to add the MTD_SPI_NOR
-> to the defconfigs.
+Hi Kishon,
 
-Yeah, I think that's best.
 
-> Another method is to select the MTD_SPI_NOR which we enable the MTD.
+On Thu, Apr 10, 2014 at 2:39 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi.
+>
+> On Wednesday 09 April 2014 05:24 PM, Vivek Gautam wrote:
+>> Adding support to enable/disable VBUS hooked to a gpio
+>> to enable vbus supply on the port.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>
+>> Based on 'phy-exynos5-usbdrd' patches:
+>> [PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
+>> http://www.spinics.net/lists/linux-usb/msg105507.html
+>>
+>>  drivers/phy/phy-exynos5-usbdrd.c |   18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+>> index ff54a7c..5ca7485 100644
+>> --- a/drivers/phy/phy-exynos5-usbdrd.c
+>> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_address.h>
+>> +#include <linux/of_gpio.h>
+>>  #include <linux/phy/phy.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/mutex.h>
+>> @@ -176,6 +177,7 @@ struct exynos5_usbdrd_phy {
+>>       struct clk *ref_clk;
+>>       unsigned long ref_rate;
+>>       unsigned int refclk_reg;
+>> +     int gpio;
+>>  };
+>>
+>>  #define to_usbdrd_phy(inst) \
+>> @@ -460,6 +462,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+>>       if (!IS_ERR(phy_drd->usb30_sclk))
+>>               clk_prepare_enable(phy_drd->usb30_sclk);
+>>
+>> +     /* Toggle VBUS gpio - on */
+>> +     gpio_set_value(phy_drd->gpio, 1);
+>> +
+>>       /* Power-on PHY*/
+>>       inst->phy_cfg->phy_isol(inst, 0);
+>>
+>> @@ -476,6 +481,9 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+>>       /* Power-off the PHY */
+>>       inst->phy_cfg->phy_isol(inst, 1);
+>>
+>> +     /* Toggle VBUS gpio - off */
+>> +     gpio_set_value(phy_drd->gpio, 0);
+>> +
+>>       if (!IS_ERR(phy_drd->usb30_sclk))
+>>               clk_disable_unprepare(phy_drd->usb30_sclk);
+>>
+>> @@ -585,6 +593,16 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+>>
+>>       phy_drd->drv_data = drv_data;
+>>
+>> +     /* Get required GPIO for vbus */
+>> +     phy_drd->gpio = of_get_named_gpio(dev->of_node,
+>> +                                       "samsung,vbus-gpio", 0);
+>
+> Is this dt property documented somewhere?
+>> +     if (!gpio_is_valid(phy_drd->gpio))
+>> +             dev_dbg(dev, "no usbdrd-phy vbus gpio defined\n");
+>
+> No return here? Can the PHY be functional even without the VBUS?
 
-I'm pretty sure it's a rule that drivers should not 'select' subsystems.
+On few boards, the switch IC's enable may no be controlled by a GPIO,
+rather enabled by default.
+So in those cases we may not want to stop PHY probe, when the VBUS
+GPIO is not present.
 
-> > Also, I think m25p80.c is no longer a "self-contained MTD device driver"
-> > and should be moved under drivers/mtd/spi-nor/.
-> If we move the m25p80.c to the drivers/mtd/spi-nor/, we also need to move
-> other drivers too.
 
-Which ones? I think it only makes sense to move those that depend on the
-same core code (i.e., spi-nor.c), or have a close relation to it (so
-Lee's st_spi_fsm.c is a candidate).
-
-Brian
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
