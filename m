@@ -1,311 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 10 Apr 2014 08:46:03 +0000
-Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <CABuKBeKnEw38sQYwrkheoWetZZcPTJhKRsBK4a62FS6-6dRFTA@mail.gmail.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>	<1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>	<5345AD00.9020508@free-electrons.com>
- <CABuKBeKnEw38sQYwrkheoWetZZcPTJhKRsBK4a62FS6-6dRFTA@mail.gmail.com>
-Message-ID: <53465A4B.4040906@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 10 Apr 2014 10:51:09 +0200
+Subject: [PATCH] mx-drm: imx-tve: correct DDC property name to
+ 'ddc-i2c-bus'
+In-Reply-To: <1397110745-15731-1-git-send-email-shawn.guo@freescale.com>
+References: <1397110745-15731-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1397119869.3226.8.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2014 08:29, Matthias Brugger wrote:
-> 2014-04-09 22:26 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
->> Hi Matthias,
->>
->> On 09/04/2014 19:45, Matthias Brugger wrote:
->>> This adds a generic devicetree board file and a dtsi for boards
->>> based on the MT6589 SoCs from Mediatek.
->>>
->>> Apart from the generic parts (gic, clocks) the only component
->>> currently supported are the timers.
->>>
->>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>> ---
->>>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
->>>  arch/arm/Kconfig                                   |    2 +
->>>  arch/arm/Makefile                                  |    1 +
->>>  arch/arm/boot/dts/mtk6589.dtsi                     |  105 ++++++++++++++++++++
->>>  arch/arm/mach-mediatek/Kconfig                     |   14 +++
->>>  arch/arm/mach-mediatek/Makefile                    |    1 +
->>>  arch/arm/mach-mediatek/mediatek.c                  |   40 ++++++++
->>>  7 files changed, 164 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/mtk6589.dtsi
->>>  create mode 100644 arch/arm/mach-mediatek/Kconfig
->>>  create mode 100644 arch/arm/mach-mediatek/Makefile
->>>  create mode 100644 arch/arm/mach-mediatek/mediatek.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->>> index 0f01c9b..af48801 100644
->>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->>> @@ -67,6 +67,7 @@ linux       Linux-specific binding
->>>  lsi  LSI Corp. (LSI Logic)
->>>  marvell      Marvell Technology Group Ltd.
->>>  maxim        Maxim Integrated Products
->>> +mediatek     MediaTek Inc.
->>>  microchip    Microchip Technology Inc.
->>>  mosaixtech   Mosaix Technologies, Inc.
->>>  moxa Moxa
->>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> index 5db05f6a..04d46ec 100644
->>> --- a/arch/arm/Kconfig
->>> +++ b/arch/arm/Kconfig
->>> @@ -995,6 +995,8 @@ source "arch/arm/mach-mv78xx0/Kconfig"
->>>
->>>  source "arch/arm/mach-imx/Kconfig"
->>>
->>> +source "arch/arm/mach-mediatek/Kconfig"
->>> +
->>>  source "arch/arm/mach-mxs/Kconfig"
->>>
->>>  source "arch/arm/mach-netx/Kconfig"
->>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->>> index 41c1931..8ce9774 100644
->>> --- a/arch/arm/Makefile
->>> +++ b/arch/arm/Makefile
->>> @@ -170,6 +170,7 @@ machine-$(CONFIG_ARCH_MSM)                += msm
->>>  machine-$(CONFIG_ARCH_MV78XX0)               += mv78xx0
->>>  machine-$(CONFIG_ARCH_MVEBU)         += mvebu
->>>  machine-$(CONFIG_ARCH_MXC)           += imx
->>> +machine-$(CONFIG_ARCH_MEDIATEK)              += mediatek
->>>  machine-$(CONFIG_ARCH_MXS)           += mxs
->>>  machine-$(CONFIG_ARCH_NETX)          += netx
->>>  machine-$(CONFIG_ARCH_NOMADIK)               += nomadik
->>> diff --git a/arch/arm/boot/dts/mtk6589.dtsi b/arch/arm/boot/dts/mtk6589.dtsi
->>> new file mode 100644
->>> index 0000000..6dbb74f
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/mtk6589.dtsi
->>> @@ -0,0 +1,105 @@
->>> +/*
->>> + * Copyright (c) 2014 MundoReader S.L.
->>> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License as published by
->>> + * the Free Software Foundation; either version 2 of the License, or
->>> + * (at your option) any later version.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +
->>> +#include <dt-bindings/interrupt-controller/irq.h>
->>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->>> +#include "skeleton.dtsi"
->>> +
->>> +/ {
->>> +     compatible = "mediatek,mt6589";
->>> +     interrupt-parent = <&gic>;
->>> +
->>> +     cpus {
->>> +             #address-cells = <1>;
->>> +             #size-cells = <0>;
->>> +
->>> +             cpu at 0 {
->>> +                     device_type = "cpu";
->>> +                     compatible = "arm,cortex-a7";
->>> +                     next-level-cache = <&L2>;
->>> +                     reg = <0x0>;
->>> +             };
->>> +             cpu at 1 {
->>> +                     device_type = "cpu";
->>> +                     compatible = "arm,cortex-a7";
->>> +                     next-level-cache = <&L2>;
->>> +                     reg = <0x1>;
->>> +             };
->>> +             cpu at 2 {
->>> +                     device_type = "cpu";
->>> +                     compatible = "arm,cortex-a7";
->>> +                     next-level-cache = <&L2>;
->>> +                     reg = <0x2>;
->>> +             };
->>> +             cpu at 3 {
->>> +                     device_type = "cpu";
->>> +                     compatible = "arm,cortex-a7";
->>> +                     next-level-cache = <&L2>;
->>> +                     reg = <0x3>;
->>> +             };
->>> +
->>> +     };
->>> +
->>> +     clocks {
->>> +             #address-cells = <1>;
->>> +             #size-cells = <1>;
->>> +             ranges;
->>> +
->>> +             system_clk: system_clk {
->>> +                     compatible = "fixed-clock";
->>> +                     clock-frequency = <13000000>;
->>> +                     #clock-cells = <0>;
->>> +                     clock-output-names = "system_clk";
->>> +             };
->>
->> Is it really a fixed clock without any parent, or do you
->> declare it as a fixed clock because you don't have any clock
->> common framework support yet?
+Am Donnerstag, den 10.04.2014, 14:19 +0800 schrieb Shawn Guo:
+> Commit 62e3879 (imx-drm: imx-tve: Fix DDC I2C bus property) was trying
+> to use 'ddc-i2c-bus' as the DDC property name (we can see that from the
+> commit log), but unfortunately 'i2c-ddc-bus' which is a typo was
+> actually used in the code.  This results in some unnecessary
+> inconsistency and confusions, because all the documented DDC property
+> in device tree bindings use 'ddc-i2c-bus'.
 > 
-> I don't have any common clock framework support yet.
-
-So maybe you should provide one (even a very simple one).
-
-Pretending a clock is a fixed clock and ignoring its parents
-will be problematic when you will add the common clock framework
-support because the device tree is supposed to be stable and you won't
-be able to change it then.
-
-Thanks,
-
-Gregory
-
+>   Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+>   Documentation/devicetree/bindings/panel/simple-panel.txt
+>   Documentation/devicetree/bindings/video/dvi-connector.txt
 > 
->>
->>> +
->>> +             rtc_clk: rtc_clk {
->>> +                     compatible = "fixed-clock";
->>> +                     clock-frequency = <32000>;
->>> +                     #clock-cells = <0>;
->>> +                     clock-output-names = "rtc_clk";
->>> +             };
->>> +     };
->>> +
->>> +     soc {
->>> +             #address-cells = <1>;
->>> +             #size-cells = <1>;
->>> +             compatible = "simple-bus";
->>> +             clock-ranges;
->>> +             ranges;
->>> +
->>> +             gic: interrupt-controller at 10212000 {
->>> +                     compatible = "arm,cortex-a9-gic";
->>> +                     interrupt-controller;
->>> +                     #interrupt-cells = <3>;
->>> +                     reg = <0x10211000 0x1000>,
->>> +                           <0x10212000 0x1000>;
->>> +             };
->>> +
->>> +             L2: l2-cache-controller at 1020e000 {
->>> +                     compatible = "arm,pl310-cache";
->>> +                     reg = <0x1020e000 0x1000>;
->>> +                     cache-unified;
->>> +                     cache-level = <2>;
->>> +             };
->>> +
->>> +             timer: timer at 10008000 {
->>> +                     compatible = "mediatek,mtk6589-timer";
->>> +                     reg = <0x10008000 0x80>;
->>> +                     interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
->>> +                     clocks = <&system_clk>, <&rtc_clk>;
->>> +                     clock-names = "sys_clk", "rtc_clk";
->>> +             };
->>> +     };
->>> +};
->>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
->>> new file mode 100644
->>> index 0000000..c0139ca
->>> --- /dev/null
->>> +++ b/arch/arm/mach-mediatek/Kconfig
->>> @@ -0,0 +1,14 @@
->>> +config ARCH_MEDIATEK
->>> +     bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
->>> +     select ARCH_REQUIRE_GPIOLIB
->>> +     select ARM_GIC
->>> +     select CACHE_L2X0
->>> +     select HAVE_ARM_TWD if LOCAL_TIMERS
->>
->> LOCAL_TIMERS no longer exist
->>
->>> +     select HAVE_SMP
->>> +     select LOCAL_TIMERS if SMP
->> ditto
->>
->> so what about this instead:
->>
->>         select HAVE_ARM_TWD if SMP
->>
->>
->> The rest of this patch looks good.
->>
->> Thanks,
->>
->> Gregory
->>
->>> +     select COMMON_CLK
->>> +     select GENERIC_CLOCKEVENTS
->>> +     select MTK_TIMER
->>> +     select CLKSRC_MMIO
->>> +     help
->>> +       Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
->>> diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
->>> new file mode 100644
->>> index 0000000..43e619f
->>> --- /dev/null
->>> +++ b/arch/arm/mach-mediatek/Makefile
->>> @@ -0,0 +1 @@
->>> +obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
->>> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
->>> new file mode 100644
->>> index 0000000..f630403
->>> --- /dev/null
->>> +++ b/arch/arm/mach-mediatek/mediatek.c
->>> @@ -0,0 +1,40 @@
->>> +/*
->>> + * Device Tree support for Mediatek SoCs
->>> + *
->>> + * Copyright (c) 2014 MundoReader S.L.
->>> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License as published by
->>> + * the Free Software Foundation; either version 2 of the License, or
->>> + * (at your option) any later version.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +
->>> +#include <linux/kernel.h>
->>> +#include <linux/init.h>
->>> +#include <linux/of_platform.h>
->>> +#include <linux/irqchip.h>
->>> +#include <asm/mach/arch.h>
->>> +#include <asm/mach/map.h>
->>> +#include <asm/hardware/cache-l2x0.h>
->>> +
->>> +static void __init mediatek_dt_init(void)
->>> +{
->>> +     l2x0_of_init(0, ~0);
->>> +     of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->>> +}
->>> +
->>> +static const char * const mediatek_board_dt_compat[] = {
->>> +     "mediatek,mt6589",
->>> +     NULL,
->>> +};
->>> +
->>> +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
->>> +     .init_machine   = mediatek_dt_init,
->>> +     .dt_compat      = mediatek_board_dt_compat,
->>> +MACHINE_END
->>>
->>
->>
->> --
->> Gregory Clement, Free Electrons
->> Kernel, drivers, real-time and embedded Linux
->> development, consulting, training and support.
->> http://free-electrons.com
+> Let's fix it before the error spreads.
 > 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx53-mba53.dts | 2 +-
+>  drivers/staging/imx-drm/imx-tve.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> 
+> diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
+> index 7c8c129..a3431d7 100644
+> --- a/arch/arm/boot/dts/imx53-mba53.dts
+> +++ b/arch/arm/boot/dts/imx53-mba53.dts
+> @@ -244,7 +244,7 @@
+>  &tve {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_vga_sync_1>;
+> -	i2c-ddc-bus = <&i2c3>;
+> +	ddc-i2c-bus = <&i2c3>;
+>  	fsl,tve-mode = "vga";
+>  	fsl,hsync-pin = <4>;
+>  	fsl,vsync-pin = <6>;
+> diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
+> index 575533f..a23f4f7 100644
+> --- a/drivers/staging/imx-drm/imx-tve.c
+> +++ b/drivers/staging/imx-drm/imx-tve.c
+> @@ -582,7 +582,7 @@ static int imx_tve_bind(struct device *dev, struct device *master, void *data)
+>  	tve->dev = dev;
+>  	spin_lock_init(&tve->lock);
+>  
+> -	ddc_node = of_parse_phandle(np, "i2c-ddc-bus", 0);
+> +	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
+>  	if (ddc_node) {
+>  		tve->ddc = of_find_i2c_adapter_by_node(ddc_node);
+>  		of_node_put(ddc_node);
 
+Ouch, sorry.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
