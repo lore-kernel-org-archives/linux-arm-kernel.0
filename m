@@ -1,66 +1,91 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 10 Apr 2014 16:04:02 +0900
-Subject: [PATCH V3 4/5] mfd: palmas: support IRQ inversion at the board
- level
-In-Reply-To: <1393876300-3061-4-git-send-email-swarren@wwwdotorg.org>
-References: <1393876300-3061-1-git-send-email-swarren@wwwdotorg.org>
- <1393876300-3061-4-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAAVeFuJY67zdoHiZufxDbkaw=xt8YwxyDAwHW_T7UZeSOt35NA@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 10 Apr 2014 16:07:23 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790: link PCI USb devices to USB PHY
+In-Reply-To: <201404092318.26231.sergei.shtylyov@cogentembedded.com>
+References: <201404092318.26231.sergei.shtylyov@cogentembedded.com>
+Message-ID: <CANqRtoQeuT=Q9PRYNMqA079gjb1VkwgvcDmsWKxjzSVxcVfeWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen, any news about this patch? I'm waiting for it to be merged in
-order to resend some Tegra DTs, but still cannot see it in -next.
+Hi Sergei,
 
-Thanks,
-Alex.
+Thanks for this patch, good to see that the relationship between the
+USB Host and the PHY is described via DT.
 
-On Tue, Mar 4, 2014 at 4:51 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+This patch seems to cover USB0 and USB2 that both require special
+control in the PHY. How about USB1? Can you explain about the reason
+why you omit that?
+
+I somehow expected USB1 to be tied to the PHY via DT as well, this so
+the PHY driver can be able to disable the hardware if no ports are
+registered. In detail, I'm thinking that the register.bit
+UGCTL.CONNECT wants to be set to 0 by default but be set to 1 once one
+or more USB controllers are hooked up to the PHY.
+
+Cheers,
+
+/ magnus
+
+On Thu, Apr 10, 2014 at 4:18 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe the PCI USB devices that are behind the PCI bridges, adding necessary
+> links to the USB PHY device.
 >
-> Implement the new DT property ti,irq-externally-inverted, and add an
-> equivalent platform data field to match. This allows the driver to
-> correctly automatically configure the IRQ output polarity when the board
-> or SoC contains an inverter between the Palmas IRQ output and IRQ
-> controller input.
+> Based on the original work by Ben Dooks <ben.dooks@codethink.co.uk>.
 >
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
 > ---
-> v3:
-> * Use an IRQD flag to represent the data, rather than a custom DT property.
-> v2:
-> * Split V1's patch 1/2 into separate patches 1/3 and 2/3.
-> ---
->  drivers/mfd/palmas.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+> This patch is against 'renesas-devel-v3.14-20140408' tag of Simon Horman's
+> 'renesas.git' repo plus R8A7790/Lager PCI and USB PHY support patches posted
+> yesterday and day before. The patch requires the internal PCI and USB PHY
+> drivers (also already posted) in order to work...
 >
-> diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
-> index d280d789e55a..3281d4103e9d 100644
-> --- a/drivers/mfd/palmas.c
-> +++ b/drivers/mfd/palmas.c
-> @@ -292,7 +292,8 @@ static int palmas_set_pdata_irq_flag(struct i2c_client *i2c,
->                 return -EINVAL;
->         }
+>  arch/arm/boot/dts/r8a7790.dtsi |   28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
 >
-> -       pdata->irq_flags = irqd_get_trigger_type(irq_data);
-> +       pdata->irq_flags = irqd_get_trigger_type(irq_data) |
-> +                          irqd_get_src_dst_inverted(irq_data);
->         dev_info(&i2c->dev, "Irq flag is 0x%08x\n", pdata->irq_flags);
->         return 0;
->  }
-> @@ -447,6 +448,8 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
->                 reg = PALMAS_POLARITY_CTRL_INT_POLARITY;
->         else
->                 reg = 0;
-> +       if (pdata->irq_flags & IRQ_SRC_DST_INVERTED)
-> +               reg ^= PALMAS_POLARITY_CTRL_INT_POLARITY;
->         ret = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
->                         PALMAS_POLARITY_CTRL, PALMAS_POLARITY_CTRL_INT_POLARITY,
->                         reg);
-> --
-> 1.8.1.5
+> Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -841,6 +841,20 @@
+>                 bus-range = <0 0>;
+>                 #address-cells = <3>;
+>                 #size-cells = <2>;
+> +
+> +               pci at 0,1 {
+> +                       reg = <0x800 0 0 0 0>;
+> +                       device_type = "pci";
+> +                       phys = <&usbphy 0 0>;
+> +                       phy-names = "usb";
+> +               };
+> +
+> +               pci at 0,2 {
+> +                       reg = <0x1000 0 0 0 0>;
+> +                       device_type = "pci";
+> +                       phys = <&usbphy 0 0>;
+> +                       phy-names = "usb";
+> +               };
+>         };
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>         pci1: pci at ee0b0000 {
+> @@ -867,5 +881,19 @@
+>                 bus-range = <2 2>;
+>                 #address-cells = <3>;
+>                 #size-cells = <2>;
+> +
+> +               pci at 0,1 {
+> +                       reg = <0x800 0 0 0 0>;
+> +                       device_type = "pci";
+> +                       phys = <&usbphy 2 0>;
+> +                       phy-names = "usb";
+> +               };
+> +
+> +               pci at 0,2 {
+> +                       reg = <0x1000 0 0 0 0>;
+> +                       device_type = "pci";
+> +                       phys = <&usbphy 2 0>;
+> +                       phy-names = "usb";
+> +               };
+>         };
+>  };
