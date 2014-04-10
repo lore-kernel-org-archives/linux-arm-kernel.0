@@ -1,44 +1,36 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 19:06:15 +0900
-Subject: [PATCH 25/27] ARM: dts: exynos3250: Add RTC dt node
+Date: Thu, 10 Apr 2014 19:06:11 +0900
+Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
 In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
 References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397124377-16969-17-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397124377-16969-13-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+From: Hyunhee Kim <hyunhee.kim@samsung.com>
 
-This patch add rtc dt node for Real Time Clock (RTC) which operates with
-a backup battery when the system is off and performs the function of an alarm.
+ARM CPU has its own PMU (Performance Monitoring Unit). This patch add PMU dt
+data to support PMU for CPU. Exynos3250 has four PMU interrupts.
 
-Exynos3250's RTC has following rtc interrupt
-- ALARM_INT (alarm interrupt)
-- ALAREM_WK (alarm wake-up)
-
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index c8bd33cf..a61940f 100644
+index ceed761..2f0ca32 100644
 --- a/arch/arm/boot/dts/exynos3250.dtsi
 +++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -88,6 +88,13 @@
- 		#clock-cells = <1>;
+@@ -280,4 +280,9 @@
+ 		pinctrl-0 = <&i2c7_bus>;
+ 		status = "disabled";
  	};
- 
-+	rtc at 10070000 {
-+		compatible = "samsung,s3c6410-rtc";
-+		reg = <0x10070000 0x100>;
-+		interrupts = <0 73 0>, <0 74 0>;
-+		status = "disabled";
-+	};
 +
- 	gic: interrupt-controller at 10481000 {
- 		compatible = "arm,cortex-a7-gic";
- 		#interrupt-cells = <3>;
++	pmu {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <0 18 0>, <0 19 0>, <0 20 0>, <0 21 0>;
++	};
+ };
 -- 
 1.8.0
