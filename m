@@ -1,77 +1,165 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 10 Apr 2014 09:23:48 +0900
-Subject: [PATCH 1/2] usb: ehci-exynos: Return immediately from suspend if
- ehci_suspend fails
-In-Reply-To: <Pine.LNX.4.44L0.1404091430240.28384-100000@netrider.rowland.org>
-References: <1397016042-4451-1-git-send-email-gautam.vivek@samsung.com>
- <Pine.LNX.4.44L0.1404091430240.28384-100000@netrider.rowland.org>
-Message-ID: <001a01cf5453$243d9c70$6cb8d550$%han@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 10 Apr 2014 09:21:42 +0800
+Subject: [PATCH] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <CAOMZO5AuwgVijZ_SMYZBOxbq8dVtvUzcQ06TFmmDtiaEQJrYRw@mail.gmail.com>
+References: <1397044538-12676-1-git-send-email-festevam@gmail.com>
+ <20140409133422.GA2334@dragon>
+ <CAOMZO5CO8ucya8qmVXBo5kgRmuLqKGtpub07o1DuE9yh5LmmPQ@mail.gmail.com>
+ <20140409145936.GB2334@dragon>
+ <CAOMZO5AuwgVijZ_SMYZBOxbq8dVtvUzcQ06TFmmDtiaEQJrYRw@mail.gmail.com>
+Message-ID: <20140410012140.GC2334@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 10, 2014 3:32 AM, Alan Stern wrote:
-> On Wed, 9 Apr 2014, Vivek Gautam wrote:
+On Wed, Apr 09, 2014 at 12:28:50PM -0300, Fabio Estevam wrote:
+> Hi Shawn,
 > 
-> > Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
-> > adds a check for possible race between suspend and wakeup interrupt,
-> > and thereby it returns -EBUSY as error code if there's a wakeup
-> > interrupt.
-> > So the platform host controller should not proceed further with
-> > its suspend callback, rather should return immediately to avoid
-> > powering down the essential things, like phy.
-> >
-> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> > Cc: Alan Stern <stern@rowland.harvard.edu>
-> > Cc: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >
-> > Based on 'usb-next' branch of Greg's usb tree.
-> >
-> >  drivers/usb/host/ehci-exynos.c |    4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-> > index d1d8c47..a4550eb 100644
-> > --- a/drivers/usb/host/ehci-exynos.c
-> > +++ b/drivers/usb/host/ehci-exynos.c
-> > @@ -212,6 +212,8 @@ static int exynos_ehci_suspend(struct device *dev)
-> >  	int rc;
-> >
-> >  	rc = ehci_suspend(hcd, do_wakeup);
-> > +	if (rc)
-> > +		return rc;
-> >
-> >  	if (exynos_ehci->otg)
-> >  		exynos_ehci->otg->set_host(exynos_ehci->otg, &hcd->self);
-> > @@ -221,7 +223,7 @@ static int exynos_ehci_suspend(struct device *dev)
-> >
-> >  	clk_disable_unprepare(exynos_ehci->clk);
-> >
-> > -	return rc;
-> > +	return 0;
-> >  }
-> >
-> >  static int exynos_ehci_resume(struct device *dev)
+> On Wed, Apr 9, 2014 at 11:59 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
 > 
-> The first hunk of this patch is correct, but the second hunk isn't
-> needed.  A similar remark is true for the ehci-platform patch.
-
-Hi Alan,
-
-Do you mean the following?
-
-1st hunk
- +	if (rc)
- +		return rc;
-
-2nd hunk
- -	return rc;
- +	return 0;
-
-Currently, the 'rc' will be always 'zero'; however, I don't
-Have any objection, because the code might be  modified later.
-
-Best regards,
-Jingoo Han
+> > As long as you call clk_register_mux() to register a multiplexer, you
+> > have to ensure that clk_set_parent() call always works properly on it,
+> > no matter whether there is one actually calling into it right now.
 > 
-> Alan Stern
+> clk_register_mux() is not called for the ldb_di_sels multiplexer:
+
+Are you sure about that?  What are the following two calls in
+clk-imx6q.c doing then?
+
+	clk[ldb_di0_sel] = imx_clk_mux_flags(...);
+	clk[ldb_di1_sel] = imx_clk_mux_flags(...);
+
+> 
+> **** Clk name is lvds1_sel
+> ********* Calling clk_register_mux
+> **** Clk name is lvds2_sel
+> ********* Calling clk_register_mux
+> **** Clk name is step
+> ********* Calling clk_register_mux
+> **** Clk name is pll1_sw
+> ********* Calling clk_register_mux
+> **** Clk name is periph_pre
+> ********* Calling clk_register_mux
+> **** Clk name is periph2_pre
+> ********* Calling clk_register_mux
+> **** Clk name is periph_clk2_sel
+> ********* Calling clk_register_mux
+> **** Clk name is periph2_clk2_sel
+> ********* Calling clk_register_mux
+> **** Clk name is axi_sel
+> ********* Calling clk_register_mux
+> **** Clk name is esai_sel
+> ********* Calling clk_register_mux
+> **** Clk name is asrc_sel
+> ********* Calling clk_register_mux
+> **** Clk name is spdif_sel
+> ********* Calling clk_register_mux
+> **** Clk name is gpu2d_axi
+> ********* Calling clk_register_mux
+> **** Clk name is gpu3d_axi
+> ********* Calling clk_register_mux
+> **** Clk name is gpu2d_core_sel
+> ********* Calling clk_register_mux
+> **** Clk name is gpu3d_core_sel
+> ********* Calling clk_register_mux
+> **** Clk name is gpu3d_shader_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu1_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu2_sel
+> ********* Calling clk_register_mux
+> ********* Calling clk_register_mux
+> ********* Calling clk_register_mux
+
+Oh, why clk_register_mux() is being called without a clock name in above
+three?
+
+> **** Clk name is ipu1_di0_pre_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu1_di1_pre_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu2_di0_pre_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu2_di1_pre_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu1_di0_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu1_di1_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu2_di0_sel
+> ********* Calling clk_register_mux
+> **** Clk name is ipu2_di1_sel
+> ********* Calling clk_register_mux
+> **** Clk name is hsi_tx_sel
+> ********* Calling clk_register_mux
+> **** Clk name is pcie_axi_sel
+> ********* Calling clk_register_mux
+> **** Clk name is enfc_sel
+> ********* Calling clk_register_mux
+> **** Clk name is vdo_axi_sel
+> ********* Calling clk_register_mux
+> **** Clk name is vpu_axi_sel
+> ********* Calling clk_register_mux
+> **** Clk name is cko1_sel
+> ********* Calling clk_register_mux
+> **** Clk name is cko2_sel
+> ********* Calling clk_register_mux
+> **** Clk name is cko
+> ********* Calling clk_register_mux
+> ********* doing ldb clock switch
+
+For the record, here is my printk gives.
+
+*** clk_register_mux: lvds1_sel
+*** clk_register_mux: lvds2_sel
+*** clk_register_mux: step
+*** clk_register_mux: pll1_sw
+*** clk_register_mux: periph_pre
+*** clk_register_mux: periph2_pre
+*** clk_register_mux: periph_clk2_sel
+*** clk_register_mux: periph2_clk2_sel
+*** clk_register_mux: axi_sel
+*** clk_register_mux: esai_sel
+*** clk_register_mux: asrc_sel
+*** clk_register_mux: spdif_sel
+*** clk_register_mux: gpu2d_axi
+*** clk_register_mux: gpu3d_axi
+*** clk_register_mux: gpu2d_core_sel
+*** clk_register_mux: gpu3d_core_sel
+*** clk_register_mux: gpu3d_shader_sel
+*** clk_register_mux: ipu1_sel
+*** clk_register_mux: ipu2_sel
+*** clk_register_mux: ldb_di0_sel
+*** clk_register_mux: ldb_di1_sel
+*** clk_register_mux: ipu1_di0_pre_sel
+*** clk_register_mux: ipu1_di1_pre_sel
+*** clk_register_mux: ipu2_di0_pre_sel
+*** clk_register_mux: ipu2_di1_pre_sel
+*** clk_register_mux: ipu1_di0_sel
+*** clk_register_mux: ipu1_di1_sel
+*** clk_register_mux: ipu2_di0_sel
+*** clk_register_mux: ipu2_di1_sel
+*** clk_register_mux: hsi_tx_sel
+*** clk_register_mux: pcie_axi_sel
+*** clk_register_mux: enfc_sel
+*** clk_register_mux: vdo_axi_sel
+*** clk_register_mux: vpu_axi_sel
+*** clk_register_mux: cko1_sel
+*** clk_register_mux: cko2_sel
+*** clk_register_mux: cko
+
+> 
+> >
+> > Furthermore, some re-parenting happens in a way you may not be aware of.
+> > See commit e366fdd (clk: clk-mux: implement remuxing on set_rate), for
+> > example.
+> 
+> This commit does not affect us as we pass the CLK_SET_RATE_NO_REPARENT flag.
+
+You did not get my point.  This is just an example, and we happen to set
+this flag for now.  My point is that as long as you register a clk to
+clock framework, you do not have a way to stop one from calling clk
+API on the clock then.  This is how clk framework and API work, simple
+as it is.
+
+Shawn
