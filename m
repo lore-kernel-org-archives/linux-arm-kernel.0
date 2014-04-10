@@ -1,55 +1,72 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:20:56 +0200
-Subject: [PATCH V3 13/19] ARM: ux500: Add the mmc capabilities flags to DT
-In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397132462-8005-14-git-send-email-ulf.hansson@linaro.org>
+Date: Thu, 10 Apr 2014 15:59:36 +0200
+Subject: [PATCH] i2c: nomadik: Fixup system suspend
+Message-ID: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-href.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+For !CONFIG_PM_RUNTIME, the device were never put back into active
+state while resuming.
 
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 3f07c58..48ea4c1 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -118,6 +118,9 @@
- 			bus-width = <4>;
- 			cap-sd-highspeed;
- 			cap-mmc-highspeed;
-+			sd-uhs-sdr12;
-+			sd-uhs-sdr25;
-+			full-pwr-cycle;
- 			st,sig-dir-dat0;
- 			st,sig-dir-dat2;
- 			st,sig-dir-cmd;
-@@ -136,6 +139,7 @@
- 			arm,primecell-periphid = <0x10480180>;
- 			max-frequency = <100000000>;
- 			bus-width = <4>;
-+			non-removable;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi1_default_mode>;
- 			pinctrl-1 = <&sdi1_sleep_mode>;
-@@ -149,6 +153,7 @@
- 			max-frequency = <100000000>;
- 			bus-width = <8>;
- 			cap-mmc-highspeed;
-+			non-removable;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi2_default_mode>;
- 			pinctrl-1 = <&sdi2_sleep_mode>;
-@@ -162,6 +167,7 @@
- 		        max-frequency = <100000000>;
- 			bus-width = <8>;
- 			cap-mmc-highspeed;
-+			non-removable;
- 			vmmc-supply = <&ab8500_ldo_aux2_reg>;
- 			pinctrl-names = "default", "sleep";
- 			pinctrl-0 = <&sdi4_default_mode>;
+For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
+while we were about to handle it at suspend late, which is just too
+optimistic.
+
+Even if the driver uses pm_runtime_put_sync() after each tranfer to
+return it's runtime PM resources, there are no guarantees this will
+actually mean the device will inactivated. The reason is that the PM
+core will prevent runtime suspend during system suspend, and thus when
+a transfer occurs during the early phases of system suspend the device
+will be kept active after the transfer.
+
+To handle both issues above, use pm_runtime_force_suspend|resume() from
+the system suspend|resume callbacks.
+
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+
+Do note, this patch were sent during the previous kernel release cycle, as
+a part of another patchset on the PM core. Back then, it provided proof of
+concept, for the new runtime PM helper functions:
+pm_runtime_force_suspend|resume().
+
+---
+ drivers/i2c/busses/i2c-nomadik.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 28cbe1b..7d27eee 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -879,19 +879,19 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
+ #ifdef CONFIG_PM_SLEEP
+ static int nmk_i2c_suspend_late(struct device *dev)
+ {
+-	pinctrl_pm_select_sleep_state(dev);
++	int ret;
+ 
++	ret = pm_runtime_force_suspend(dev);
++	if (ret)
++		return ret;
++
++	pinctrl_pm_select_sleep_state(dev);
+ 	return 0;
+ }
+ 
+ static int nmk_i2c_resume_early(struct device *dev)
+ {
+-	/* First go to the default state */
+-	pinctrl_pm_select_default_state(dev);
+-	/* Then let's idle the pins until the next transfer happens */
+-	pinctrl_pm_select_idle_state(dev);
+-
+-	return 0;
++	return pm_runtime_force_resume(dev);
+ }
+ #endif
+ 
 -- 
 1.7.9.5
