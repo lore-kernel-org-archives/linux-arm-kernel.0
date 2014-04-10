@@ -1,68 +1,64 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 10 Apr 2014 14:52:51 +0530
-Subject: [PATCH 2/6] ARM: EXYNOS: Staticize exynos_subsys
-In-Reply-To: <534661C7.9090304@samsung.com>
-References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
- <1397118296-6846-3-git-send-email-sachin.kamat@linaro.org>
- <534661C7.9090304@samsung.com>
-Message-ID: <CAK9yfHwAM0d5JsrhKGP0gkrjQLxGFE0+oEjv26N5jsFnvYku9A@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 10 Apr 2014 18:28:19 +0900
+Subject: [PATCH 02/27] ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of
+ Exynos3250
+In-Reply-To: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397122124-15690-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+The non-secure SYSRAM is used for secondary CPU bring-up. This patch add
+IO mapping for non-scure SYSRAM.
 
-On 10 April 2014 14:47, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Sachin,
->
->
-> On 10.04.2014 10:24, Sachin Kamat wrote:
->>
->> 'exynos_subsys' is now local to this file. Make it static
->> and remove the declaration from header file.
->>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> ---
->>   arch/arm/mach-exynos/exynos.c            |    2 +-
->>   arch/arm/plat-samsung/include/plat/cpu.h |    1 -
->>   2 files changed, 1 insertion(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index 6a5fe18ec9b1..0ef42b9efd36 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -284,7 +284,7 @@ void __init exynos_init_io(void)
->>         of_scan_flat_dt(exynos_fdt_map_sysram, NULL);
->>   }
->>
->> -struct bus_type exynos_subsys = {
->> +static struct bus_type exynos_subsys = {
->>         .name           = "exynos-core",
->>         .dev_name       = "exynos-core",
->>   };
->> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h
->> b/arch/arm/plat-samsung/include/plat/cpu.h
->> index 5992b8dd9b89..930b4be832cd 100644
->> --- a/arch/arm/plat-samsung/include/plat/cpu.h
->> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
->> @@ -239,7 +239,6 @@ extern struct bus_type s3c2443_subsys;
->>   extern struct bus_type s3c6410_subsys;
->>   extern struct bus_type s5p64x0_subsys;
->>   extern struct bus_type s5pv210_subsys;
->> -extern struct bus_type exynos_subsys;
->>
->>   extern void (*s5pc1xx_idle)(void);
->>
->>
->
-> This struct and registration of it do not seem to be needed for anything
-> anymore. Would you consider removing it instead?
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c           | 12 ++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h |  1 +
+ 2 files changed, 13 insertions(+)
 
-I had considered removing that while I was doing other code consolidation
-of this file. However I found that without this, the system failed to boot. I
-did not look much into it then. Probably I can revisit it and if it
-doesn't cause
-any boot issue, will remove it.
-
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index b134868..cad3bfd 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -35,6 +35,15 @@
+ #define L2_AUX_VAL 0x7C470001
+ #define L2_AUX_MASK 0xC200ffff
+ 
++static struct map_desc exynos3250_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS3_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
+ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S3C_VA_SYS,
+@@ -275,6 +284,9 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+  */
+ static void __init exynos_map_io(void)
+ {
++	if (soc_is_exynos3250())
++		iotable_init(exynos3250_iodesc, ARRAY_SIZE(exynos3250_iodesc));
++
+ 	if (soc_is_exynos4())
+ 		iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+ 
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 7b046b5..a53981b 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -26,6 +26,7 @@
+ #define EXYNOS4_PA_SYSRAM0		0x02025000
+ #define EXYNOS4_PA_SYSRAM1		0x02020000
+ #define EXYNOS5_PA_SYSRAM		0x02020000
++#define EXYNOS3_PA_SYSRAM_NS		0x0205F000
+ #define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
+ #define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
+ #define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
 -- 
-With warm regards,
-Sachin
+1.8.0
