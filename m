@@ -1,82 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Apr 2014 11:41:20 +0100
-Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize
- gic from dt
-In-Reply-To: <254FD85F-0C8E-4D16-8207-5BA4E7FBDE65@gmail.com> (armdev's
- message of "Thu, 10 Apr 2014 11:30:41 +0100")
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
- <878urd33g4.fsf@approximate.cambridge.arm.com>
- <C136A675-6D64-42EE-918E-351A266946C5@gmail.com>
- <874n2132o8.fsf@approximate.cambridge.arm.com>
- <254FD85F-0C8E-4D16-8207-5BA4E7FBDE65@gmail.com>
-Message-ID: <87zjjt1n73.fsf@approximate.cambridge.arm.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 10 Apr 2014 11:36:30 -0500
+Subject: [PATCH v2 08/14] DMA: edma: Use different eventq for cyclic
+ channels
+In-Reply-To: <1396357575-30585-9-git-send-email-peter.ujfalusi@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5346C88E.8010504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10 2014 at 11:30:41 am BST, armdev <armdev.ftm@gmail.com> wrote:
-> On 10-Apr-2014, at 3:51 pm, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
->> On Thu, Apr 10 2014 at 11:09:02 am BST, armdev <armdev.ftm@gmail.com> wrote:
->>> On 10-Apr-2014, at 3:34 pm, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> 
->>>> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->>>>> This patch declare coretex-a7's irqchip to initialze gic from dt
->>>>> with "arm,cortex-a7-gic" data.
->>>>> 
->>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>>> ---
->>>>> drivers/irqchip/irq-gic.c | 1 +
->>>>> 1 file changed, 1 insertion(+)
->>>>> 
->>>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>>> index 4300b66..8e906e4 100644
->>>>> --- a/drivers/irqchip/irq-gic.c
->>>>> +++ b/drivers/irqchip/irq-gic.c
->>>>> @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->>>>> }
->>>>> IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
->>>>> IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
->>>>> +IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
->>>>> IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->>>>> IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->>>> 
->>>> Frankly, this patch adds no value. Are we going to add
->>>> "arm,cortex-a12-gic", "arm,cortex-a17-gic", "arm,cortex-a53-gic",
->>>> "arm,cortex-a57-gic"? And that's just to mention the ARM Ltd cores...
->>>> 
->>>> Instead, how about defining a generic "arm,gic" property, and mandate
->>>> that new DT files are using that? We can always use a more precise
->>>> compatible for quirks.
->>>> 
->>> 
->>> How about keeping it simple and tied to arm gic versions
->>> arm,gicv1, arm,gicv2, arm,gicv2ve
->> 
->> That's a variation on the same theme. As for GICv2, we don't need to
->> distinguish between having the Virtualization Extentions, the binding
->> already allows you to tell one from the other.
->> 
-> So if there be just 2 types of gic, it would be simple.
+On 04/01/2014 08:06 AM, Peter Ujfalusi wrote:
+> To improve latency with cyclic DMA operation it is preferred to
+> use different eventq/tc than the default which is used by all
+> other drivers (mmc, spi, i2c, etc).
+> When preparing the cyclic dma ask for non default queue for the
+> channel which is going to be used with cyclic mode.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/edma.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 1dd9e8806975..10048b40fac8 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -628,6 +628,9 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+>  		edesc->pset[i].opt |= TCINTEN;
+>  	}
+>  
+> +	/* Use different eventq/tc for cyclic DMA to reduce latency */
+> +	edma_request_non_default_queue(echan->ch_num);
+> +
+>  	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+>  }
+>  
+> 
 
-Not exactly. We just happen to support two revisions of the GIC
-architecture with the same binding. GICv3 has an entierely separate
-binding.
+Is there any way to guarantee that the non-default queue is of the
+highest priority, or in other words default queue is of lowest priority.
+I know you set queue 1 as default because by default 0 is higher
+priority. And then assigning non-default queue.
 
-> gicv1 - 2 address sets (gicc and gicd)
+When assigning default to Queue 1, it would be good to also call
+assign_priority_to_queue and set QUEPRI to 7 for Queue 1. Since 0, 2 and
+4 are all non-defaults.
 
-Yes.
-
-> gicv2 - 4 sets (gicc gicd gicv gich) and 1 maintenance interrupt. Right?
-
-No.
-
-The presence of the GICV, GICH and maintenance interrupt are indicative
-of the support for the Virtualization Extentions. GICv2 itself can
-perfectly be built without it.
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Thanks,
+-Joel
