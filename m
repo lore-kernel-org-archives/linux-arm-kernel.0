@@ -1,54 +1,83 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 10 Apr 2014 14:19:05 +0800
-Subject: [PATCH] mx-drm: imx-tve: correct DDC property name to 'ddc-i2c-bus'
-Message-ID: <1397110745-15731-1-git-send-email-shawn.guo@freescale.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Thu, 10 Apr 2014 08:35:40 +0200
+Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
+In-Reply-To: <20140409162040.GA19743@obsidianresearch.com>
+References: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20140409061128.GC16465@1wt.eu> <20140409162040.GA19743@obsidianresearch.com>
+Message-ID: <20140410063540.GA25198@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 62e3879 (imx-drm: imx-tve: Fix DDC I2C bus property) was trying
-to use 'ddc-i2c-bus' as the DDC property name (we can see that from the
-commit log), but unfortunately 'i2c-ddc-bus' which is a typo was
-actually used in the code.  This results in some unnecessary
-inconsistency and confusions, because all the documented DDC property
-in device tree bindings use 'ddc-i2c-bus'.
+Hi Jason,
 
-  Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-  Documentation/devicetree/bindings/panel/simple-panel.txt
-  Documentation/devicetree/bindings/video/dvi-connector.txt
+On Wed, Apr 09, 2014 at 10:20:40AM -0600, Jason Gunthorpe wrote:
+> On Wed, Apr 09, 2014 at 08:11:29AM +0200, Willy Tarreau wrote:
+> 
+> > OK I just got it by adding two printk() in pci-mvebu.c. Both functions
+> > mvebu_pcie_handle_iobase_change() and mvebu_pcie_handle_membase_change()
+> > do pass a size which is in fact a mask (size - 1) and not the real size.
+> > So the mbus is fed with an incorrect size which is off by one :
+> 
+> Yes, that is right. I tested my patch here and didn't see any problem,
+> but I realize now that the mbus code is bailing early due to this:
+> 
+> kernel: mvebu_mbus: cannot add window '4:e8', conflicts with another window
+> 
+> Which I've never got around to fixing.. (whole other story there)
+> 
+> Your patch looks fine, and it obviously needs to be sequenced before
+> mine. (Thomas/Jason C: how do you want to do this?)
+> 
+> Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-Let's fix it before the error spreads.
+OK, thank you. I've updated the attached patch with your better description.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Cheers,
+Willy
+
+-------------- next part --------------
+>From f90886f625d95781a3302bbc025304635dd97e9c Mon Sep 17 00:00:00 2001
+From: Willy Tarreau <w@1wt.eu>
+Date: Wed, 9 Apr 2014 08:05:09 +0200
+Subject: pci: mvebu: fix off-by-one in the computed size of the mbus windows
+
+mvebu_pcie_handle_membase_change() and
+mvebu_pcie_handle_iobase_change() do not correctly compute the window
+size. PCI uses an inclusive start/end address pair, which requires a
++1 when converting to size.
+
+This only worked because a bug in the mbus driver allowed it to
+silently accept and round up bogus sizes.
+
+Fix this by adding one to the computed size.
+
+Signed-off-by: Willy Tarreau <w@1wt.eu>
+Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- arch/arm/boot/dts/imx53-mba53.dts | 2 +-
- drivers/staging/imx-drm/imx-tve.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/pci/host/pci-mvebu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
-index 7c8c129..a3431d7 100644
---- a/arch/arm/boot/dts/imx53-mba53.dts
-+++ b/arch/arm/boot/dts/imx53-mba53.dts
-@@ -244,7 +244,7 @@
- &tve {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_vga_sync_1>;
--	i2c-ddc-bus = <&i2c3>;
-+	ddc-i2c-bus = <&i2c3>;
- 	fsl,tve-mode = "vga";
- 	fsl,hsync-pin = <4>;
- 	fsl,vsync-pin = <6>;
-diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
-index 575533f..a23f4f7 100644
---- a/drivers/staging/imx-drm/imx-tve.c
-+++ b/drivers/staging/imx-drm/imx-tve.c
-@@ -582,7 +582,7 @@ static int imx_tve_bind(struct device *dev, struct device *master, void *data)
- 	tve->dev = dev;
- 	spin_lock_init(&tve->lock);
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 0e79665..eff0ab5 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -329,7 +329,7 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 	port->iowin_base = port->pcie->io.start + iobase;
+ 	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+ 			    (port->bridge.iolimitupper << 16)) -
+-			    iobase);
++			    iobase) + 1;
  
--	ddc_node = of_parse_phandle(np, "i2c-ddc-bus", 0);
-+	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
- 	if (ddc_node) {
- 		tve->ddc = of_find_i2c_adapter_by_node(ddc_node);
- 		of_node_put(ddc_node);
+ 	mvebu_mbus_add_window_remap_by_id(port->io_target, port->io_attr,
+ 					  port->iowin_base, port->iowin_size,
+@@ -362,7 +362,7 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+ 	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
+ 	port->memwin_size  =
+ 		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+-		port->memwin_base;
++		port->memwin_base + 1;
+ 
+ 	mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+ 				    port->memwin_base, port->memwin_size);
 -- 
-1.8.3.2
+1.7.12.2.21.g234cd45.dirty
