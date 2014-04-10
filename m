@@ -1,100 +1,81 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 10 Apr 2014 13:54:54 +0530
-Subject: [PATCH 4/6] ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
+Date: Thu, 10 Apr 2014 13:54:56 +0530
+Subject: [PATCH 6/6] ARM: multi_v7_defconfig: Enable Exynos platform
 In-Reply-To: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
 References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1397118296-6846-5-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1397118296-6846-7-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos specific macros and declarations have been moved to
-mach-exynos. Inclusion of plat/cpu.h is no more necessary.
+Enable Exynos platform and its related IPs.
 
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |    1 -
- arch/arm/mach-exynos/exynos.c  |    2 --
- arch/arm/mach-exynos/hotplug.c |    2 --
- arch/arm/mach-exynos/platsmp.c |    2 --
- arch/arm/mach-exynos/pm.c      |    1 -
- arch/arm/mach-exynos/pmu.c     |    2 --
- 6 files changed, 10 deletions(-)
+ arch/arm/configs/multi_v7_defconfig |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index c57cae0e8779..3dd385ebf195 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -24,7 +24,6 @@
- #include <asm/unified.h>
- #include <asm/cpuidle.h>
- 
--#include <plat/cpu.h>
- #include <plat/pm.h>
- 
- #include <mach/map.h>
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 0ef42b9efd36..63a0ef714c70 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -26,8 +26,6 @@
- #include <asm/mach/map.h>
- #include <asm/memory.h>
- 
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "mfc.h"
- #include "regs-pmu.h"
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead530c6f8..884e83cfbfbb 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -19,8 +19,6 @@
- #include <asm/cp15.h>
- #include <asm/smp_plat.h>
- 
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "regs-pmu.h"
- 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 03e5e9f94705..c28cdb1c82cd 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -26,8 +26,6 @@
- #include <asm/smp_scu.h>
- #include <asm/firmware.h>
- 
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "regs-pmu.h"
- 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 15af0ceb0a66..ca672e24b5cd 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -26,7 +26,6 @@
- #include <asm/smp_scu.h>
- #include <asm/suspend.h>
- 
--#include <plat/cpu.h>
- #include <plat/pm-common.h>
- #include <plat/pll.h>
- #include <plat/regs-srom.h>
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 05c7ce15322a..fb0deda3b3a4 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -13,8 +13,6 @@
- #include <linux/kernel.h>
- #include <linux/bug.h>
- 
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "regs-pmu.h"
- 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47a2f7c..298057a0324c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -47,6 +47,7 @@ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
+ CONFIG_ARCH_STI=y
++CONFIG_ARCH_EXYNOS=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_ARCH_TEGRA=y
+@@ -71,6 +72,7 @@ CONFIG_PCI_MSI=y
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_SMP=y
++CONFIG_NR_CPUS=8
+ CONFIG_HIGHPTE=y
+ CONFIG_CMA=y
+ CONFIG_ARM_APPENDED_DTB=y
+@@ -153,6 +155,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_SAMSUNG=y
++CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+ CONFIG_SERIAL_SIRFSOC=y
+ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+ CONFIG_SERIAL_TEGRA=y
+@@ -176,6 +180,7 @@ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_EXYNOS5=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
+@@ -210,6 +215,7 @@ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
+ CONFIG_MFD_MAX8907=y
++CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65090=y
+ CONFIG_MFD_TPS6586X=y
+@@ -220,6 +226,8 @@ CONFIG_REGULATOR_AS3722=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_PALMAS=y
++CONFIG_REGULATOR_S2MPS11=y
++CONFIG_REGULATOR_S5M8767=y
+ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+ CONFIG_REGULATOR_TPS65090=y
+@@ -280,6 +288,8 @@ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+ CONFIG_MMC_MVSDIO=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
 -- 
 1.7.9.5
