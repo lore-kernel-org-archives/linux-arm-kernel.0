@@ -1,46 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Apr 2014 10:10:31 +0200
-Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
-In-Reply-To: <CAGb2v67+YNhw2MXSu9DTKSUfXH=v+uD7KEaxyiPezyf9CYtmPw@mail.gmail.com>
-References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
- <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
- <20140409151747.GH28585@lukather>
- <CAGb2v67+YNhw2MXSu9DTKSUfXH=v+uD7KEaxyiPezyf9CYtmPw@mail.gmail.com>
-Message-ID: <20140410081031.GM28585@lukather>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Thu, 10 Apr 2014 10:17:57 +0200
+Subject: [PATCH] pwm: i.MX: Avoid sample fifo overflow for i.MX pwm
+ version2
+In-Reply-To: <1397117111-19306-1-git-send-email-Ying.Liu@freescale.com>
+References: <1397117111-19306-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20140410101757.123a9fc1@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 12:27:32AM +0800, Chen-Yu Tsai wrote:
-> >> > Let me know if these changes are too intrusive.
-> >>
-> >> I wonder if we should do a separate driver for the new PIO controller.
-> >> Clearly it's a separate IP block, with it's own clock and reset controls.
-> >
-> > It's been merged together in the A23, hence why we did it like that.
+Hi,
+
+Liu Ying wrote:
+> The i.MX pwm version2 is embedded in several i.MX SoCs, such
+> as i.MX27, i.MX51 and i.MX6SL.  There are four 16bit sample
+> fifos in this IP, each of which determines the duty period
+> of a PWM waveform in one full cycle.  The IP spec mentions
+> that we should not write a fourth sample because the fifo
+> will become full and trigger a fifo write error(FWE) which
+> will prevent the PWM from starting once it is enabled.  In
+> order to avoid any sample fifo overflow issue, this patch
+> does software reset to clear all the sample fifos in the
+> very beginning of the pwm configuration function.
 > 
-> I'm not sure I understand. The clock gate and reset control are still separate,
-> are they not?
+> The fifo overflow issue can be reproduced by the following
+> commands on the i.MX6SL evk platform, assuming we use pwm2
+> for the debug LED which is driven by the pin HSIC_STROBE
+> and the maximal brightness is 255.
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 255 > /sys/class/leds/user/brightness
+> Here, FWE happens(PWMSR register reads 0x58) and the LED
+> can not be lighten.
+> 
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: linux-pwm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> ---
+>  drivers/pwm/pwm-imx.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> index cc47733..efdce53 100644
+> --- a/drivers/pwm/pwm-imx.c
+> +++ b/drivers/pwm/pwm-imx.c
+> @@ -38,6 +38,7 @@
+>  #define MX3_PWMCR_DBGEN			(1 << 22)
+>  #define MX3_PWMCR_CLKSRC_IPG_HIGH (2 << 16)
+>  #define MX3_PWMCR_CLKSRC_IPG      (1 << 16)
+> +#define MX3_PWMCR_SWR		  (1 << 3)
+>  #define MX3_PWMCR_EN              (1 << 0)
+>  
+>  struct imx_chip {
+> @@ -107,6 +108,12 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
+>  	unsigned long period_cycles, duty_cycles, prescale;
+>  	u32 cr;
+>  
+> +	/* do software reset in case fifo overflows */
+> +	writel(MX3_PWMCR_SWR, imx->mmio_base + MX3_PWMCR);
+> +	do {
+> +		cr = readl(imx->mmio_base + MX3_PWMCR);
+> +	} while (cr & MX3_PWMCR_SWR);
+> +
+>
+An endless loop polling a hardware bit is ALWAYS a bad idea!
 
-On the A31 the "regular" port controler handles PA to PH banks, while
-the R_PIO handles the PL and PM banks.
 
-On the A23, the regular port controler handles PA to PL banks, and the
-R_PIO and PM bank doesn't exist.
-
-So we're not quite in the same situation. The A31 is troublesome,
-while the A23 (except for the external interrupts), is pretty much
-what we've seen so far with the A10/A20/...
-
-Maxime
-
+Lothar Wa?mann
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/60765c7c/attachment.sig>
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
