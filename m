@@ -1,50 +1,79 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 10 Apr 2014 11:36:30 -0500
-Subject: [PATCH v2 08/14] DMA: edma: Use different eventq for cyclic
- channels
-In-Reply-To: <1396357575-30585-9-git-send-email-peter.ujfalusi@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
- <1396357575-30585-9-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5346C88E.8010504@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Apr 2014 15:01:32 +0200
+Subject: [PATCH 3/3] mmc: mmci: Put the device into low power state at system
+ suspend
+In-Reply-To: <1397134892-20840-1-git-send-email-ulf.hansson@linaro.org>
+References: <1397134892-20840-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1397134892-20840-4-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2014 08:06 AM, Peter Ujfalusi wrote:
-> To improve latency with cyclic DMA operation it is preferred to
-> use different eventq/tc than the default which is used by all
-> other drivers (mmc, spi, i2c, etc).
-> When preparing the cyclic dma ask for non default queue for the
-> channel which is going to be used with cyclic mode.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  drivers/dma/edma.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 1dd9e8806975..10048b40fac8 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -628,6 +628,9 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
->  		edesc->pset[i].opt |= TCINTEN;
->  	}
->  
-> +	/* Use different eventq/tc for cyclic DMA to reduce latency */
-> +	edma_request_non_default_queue(echan->ch_num);
-> +
->  	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
->  }
->  
-> 
+For CONFIG_PM_SLEEP, the device were always left in full power state
+after system suspend.
 
-Is there any way to guarantee that the non-default queue is of the
-highest priority, or in other words default queue is of lowest priority.
-I know you set queue 1 as default because by default 0 is higher
-priority. And then assigning non-default queue.
+We solely relied on a power domain to put it into low power state,
+which is an unreasonable requirement to put on SOCs to implement.
+Especially for those SOCs not supporting power domains at all.
 
-When assigning default to Queue 1, it would be good to also call
-assign_priority_to_queue and set QUEPRI to 7 for Queue 1. Since 0, 2 and
-4 are all non-defaults.
+Use pm_runtime_force_suspend|resume() as the system suspend callbacks,
+to resolve the issue.
 
-Thanks,
--Joel
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/mmc/host/mmci.c |   33 ++-------------------------------
+ 1 file changed, 2 insertions(+), 31 deletions(-)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index eb23c89..a40bf70 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1759,36 +1759,6 @@ static int mmci_remove(struct amba_device *dev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_SUSPEND
+-static int mmci_suspend(struct device *dev)
+-{
+-	struct amba_device *adev = to_amba_device(dev);
+-	struct mmc_host *mmc = amba_get_drvdata(adev);
+-
+-	if (mmc) {
+-		struct mmci_host *host = mmc_priv(mmc);
+-		pm_runtime_get_sync(dev);
+-		writel(0, host->base + MMCIMASK0);
+-	}
+-
+-	return 0;
+-}
+-
+-static int mmci_resume(struct device *dev)
+-{
+-	struct amba_device *adev = to_amba_device(dev);
+-	struct mmc_host *mmc = amba_get_drvdata(adev);
+-
+-	if (mmc) {
+-		struct mmci_host *host = mmc_priv(mmc);
+-		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
+-		pm_runtime_put(dev);
+-	}
+-
+-	return 0;
+-}
+-#endif
+-
+ #ifdef CONFIG_PM
+ static void mmci_save(struct mmci_host *host)
+ {
+@@ -1856,7 +1826,8 @@ static int mmci_runtime_resume(struct device *dev)
+ #endif
+ 
+ static const struct dev_pm_ops mmci_dev_pm_ops = {
+-	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				pm_runtime_force_resume)
+ 	SET_PM_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
+ };
+ 
+-- 
+1.7.9.5
