@@ -1,69 +1,34 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 10 Apr 2014 17:52:03 -0500
-Subject: [PATCH v2 00/14] dma: edma: Fixes for cyclic (audio) operation
-In-Reply-To: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <53472093.7040502@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 10 Apr 2014 18:01:31 -0500
+Subject: [PATCH] ARM: topology: Make it clear that all CPUs need to be
+ described
+In-Reply-To: <20140331093046.GA2245@e102568-lin.cambridge.arm.com>
+References: <1396016467-23257-1-git-send-email-broonie@kernel.org>
+ <20140331093046.GA2245@e102568-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqLj56d6Mb5Vjd4UnBvQ6myAc4j3moY+3EM9zgHxrNgHbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Mon, Mar 31, 2014 at 4:30 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Mar 28, 2014 at 02:21:07PM +0000, Mark Brown wrote:
+>> From: Mark Brown <broonie@linaro.org>
+>>
+>> The ARMv8 code will reject topologies that omit some CPUs (and it's not
+>> clear that it's ever sensible to do so). Update the binding document to
+>> make this clear.
+>>
+>> Since we're reformatting the text also fix incorrect grammar in the
+>> final "Any other configuration..." section by removing "consider".
+>
+> I think the commit log should be reworded, we update the bindings
+> because they are incomplete, not because ARMv8 code decided to reject
+> topologies that omit CPUs.
+>
+> Patch is ok with me, thanks:
+>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Other than patches 8/14 and 10/14 which I responded to, you could add my
-Acked-by, or add it to the series itself once you make the changes and
-drop 10.
+Applied for 3.15.
 
-Acked-by: Joel Fernandes <joelf@ti.com>
-
-Thanks,
--Joel
-
-On 04/01/2014 08:06 AM, Peter Ujfalusi wrote:
-> Hi,
-> 
-> This is basically a resend of the previous series:
-> https://lkml.org/lkml/2014/3/13/119
-> with removed ASoC patches (most of them are applied already).
-> 
-> Changes since v1:
-> - ASoC patches removed
-> - Comments from Andriy Shevchenko addressed
-> - patch added to fix cases when src/dst_maxburst is set to 0
-> 
-> Adding support for DMA pause/resume
-> Possibility to select non default event queue/TC for cyclic (audio) dma
-> channels: all devices using the eDMA via dmaengine was assigned to the default
-> EQ/TC (mmc, i2c, spi, etc, and audio). This is not optimal from system
-> performance point of view since sharing the same EQ/TC can cause latency spikes
-> for cyclic channels (long DMA transfers for MMC for example).
-> 
-> While debugging the edma to get things sorted out I noticed that the debug was
-> too verbose and the important information was hidden even when the we did not
-> asked for verbose dmaengine debug.
-> I have included some debug cleanups for the edma dmaengine driver also.
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (14):
->   platform_data: edma: Be precise with the paRAM struct
->   dma: edma: Correct the handling of src/dst_maxburst == 0
->   dma: edma: Add support for DMA_PAUSE/RESUME operation
->   dma: edma: Set DMA_CYCLIC capability flag
->   arm: common: edma: Select event queue 1 as default when booted with DT
->   arm: common: edma: Save the number of event queues/TCs
->   arm: common: edma: API to request non default queue for a channel
->   DMA: edma: Use different eventq for cyclic channels
->   dma: edma: Implement device_slave_caps callback
->   dma: edma: Simplify direction configuration in edma_config_pset()
->   dma: edma: Reduce debug print verbosity for non verbose debugging
->   dma: edma: Prefix debug prints where the text were identical in prep
->     callbacks
->   dma: edma: Add channel number to debug prints
->   dma: edma: Print the direction value as well when it is not supported
-> 
->  arch/arm/common/edma.c             | 34 +++++++++++++-
->  drivers/dma/edma.c                 | 96 +++++++++++++++++++++++++++++---------
->  include/linux/platform_data/edma.h | 20 ++++----
->  3 files changed, 119 insertions(+), 31 deletions(-)
-> 
+Rob
