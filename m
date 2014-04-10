@@ -1,16 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Apr 2014 16:47:14 -0700
-Subject: [PATCH 06/11] ARM: OMAP2+: Fix voltage scaling init for device tree
+Date: Thu, 10 Apr 2014 16:47:11 -0700
+Subject: [PATCH 03/11] ARM: OMAP3: Disable broken omap3_set_off_timings
+ function
 In-Reply-To: <1397173639-29587-1-git-send-email-tony@atomide.com>
 References: <1397173639-29587-1-git-send-email-tony@atomide.com>
-Message-ID: <1397173639-29587-7-git-send-email-tony@atomide.com>
+Message-ID: <1397173639-29587-4-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are currently disabling the init of voltage scaling
-for device tree. With the voltage scaling problems fixed
-for omap3 in general, there's no need to disable the voltage
-scaling init for device tree based booting.
+Commit c589eb3869a8 (ARM: OMAP3: VC: calculate ramp times)
+started using regulator slew rates for calculating the idle
+mode start-up times. This works fine for I2C4 controlled
+regulator scaling as the regulators are never completely
+turned off.
+
+For sys_off_mode pin controlled PMIC scripts, the slew rate
+based calculations won't work at all as the regulators are
+completely turned off and the start-up time is much longer.
+
+This means currently omap3_set_off_timings currently has
+zero chance of working on any real hardare. The current code
+is broken in at least the following ways:
+
+1. It attempts to use the default ULONG_MAX value for the
+   oscillator start-up value as we're currently never
+   initializing the start-up value.
+
+2. It relies on a magic number potentially set by the
+   bootloader for volsetup2 register.
+
+3. If no magic value is passed, it attempts to calculate
+   voltsetup2 register based on the regulator slew rate.
+   This won't work as there is roughly at least five
+   times the delay needed for turning on vdd1 and vdd2
+   regulators.
+
+4. It does duplicate register write to OMAP3_PRM_VOLTOFFSET
+
+5. It duplicates the code for omap_usec_to_32k unnecessarily
+
+6. It initialized global registers twice, once for each channel
+
+Let's just remove the broken code and call omap3_set_i2c_timings
+directly, we're better off with this function doing nothing until
+it's fixed. And otherwise further fixes to omap3_set_off_timings
+will be unreadable.
+
+And let's get rid of omap3_set_clksetup as that's not needed
+for off-idle controlled by I2C4 as in that case the oscillator
+is never shut down.
 
 Cc: Kevin Hilman <khilman@linaro.org>
 Cc: Nishanth Menon <nm@ti.com>
@@ -18,50 +56,101 @@ Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/pm.c | 28 ++++++++++++----------------
- 1 file changed, 12 insertions(+), 16 deletions(-)
+ arch/arm/mach-omap2/vc.c | 62 +-----------------------------------------------
+ 1 file changed, 1 insertion(+), 61 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index e1b4141..ccefd11 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -287,25 +287,21 @@ omap_postcore_initcall(omap2_common_pm_init);
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 3d5ba5d..dee4cee 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -292,12 +292,6 @@ static void __init omap3_vc_init_pmic_signaling(void)
+ 	omap3_vc_set_pmic_signaling(PWRDM_POWER_ON);
+ }
  
- int __init omap2_common_pm_late_init(void)
- {
--	/*
--	 * In the case of DT, the PMIC and SR initialization will be done using
--	 * a completely different mechanism.
--	 * Disable this part if a DT blob is available.
--	 */
--	if (!of_have_populated_dt()) {
+-/* Set oscillator setup time for omap3 */
+-static void omap3_set_clksetup(u32 usec, struct voltagedomain *voltdm)
+-{
+-	voltdm->write(omap_usec_to_32k(usec), OMAP3_PRM_CLKSETUP_OFFSET);
+-}
 -
--		/* Init the voltage layer */
--		omap_pmic_late_init();
--		omap_voltage_late_init();
-+	if (of_have_populated_dt()) {
-+		omap3_twl_init();
-+		omap4_twl_init();
-+	}
+ /**
+  * omap3_set_i2c_timings - sets i2c sleep timings for a channel
+  * @voltdm: channel to configure
+@@ -314,12 +308,6 @@ static void omap3_set_i2c_timings(struct voltagedomain *voltdm, bool off_mode)
+ 	unsigned long voltsetup1;
+ 	u32 tgt_volt;
  
--		/* Initialize the voltages */
--		omap3_init_voltages();
--		omap4_init_voltages();
-+	/* Init the voltage layer */
-+	omap_pmic_late_init();
-+	omap_voltage_late_init();
- 
--		/* Smartreflex device init */
--		omap_devinit_smartreflex();
-+	/* Initialize the voltages */
-+	omap3_init_voltages();
-+	omap4_init_voltages();
- 
+-	/*
+-	 * Oscillator is shut down only if we are using sys_off_mode pad,
+-	 * thus we set a minimal setup time here
+-	 */
+-	omap3_set_clksetup(1, voltdm);
+-
+ 	if (off_mode)
+ 		tgt_volt = voltdm->vc_param->off;
+ 	else
+@@ -356,61 +344,13 @@ static void omap3_set_i2c_timings(struct voltagedomain *voltdm, bool off_mode)
+  */
+ static void omap3_set_off_timings(struct voltagedomain *voltdm)
+ {
+-	unsigned long clksetup;
+-	unsigned long voltsetup2;
+-	unsigned long voltsetup2_old;
+-	u32 val;
+-	u32 tstart, tshut;
+-
+-	/* check if sys_off_mode is used to control off-mode voltages */
+-	val = voltdm->read(OMAP3_PRM_VOLTCTRL_OFFSET);
+-	if (!(val & OMAP3430_PRM_VOLTCTRL_SEL_OFF)) {
+-		/* No, omap is controlling them over I2C */
+-		omap3_set_i2c_timings(voltdm, true);
+-		return;
 -	}
-+	/* Smartreflex device init */
-+	omap_devinit_smartreflex();
+-
+-	omap_pm_get_oscillator(&tstart, &tshut);
+-	omap3_set_clksetup(tstart, voltdm);
+-
+-	clksetup = voltdm->read(OMAP3_PRM_CLKSETUP_OFFSET);
+-
+-	/* voltsetup 2 in us */
+-	voltsetup2 = voltdm->vc_param->on / voltdm->pmic->slew_rate;
+-
+-	/* convert to 32k clk cycles */
+-	voltsetup2 = DIV_ROUND_UP(voltsetup2 * 32768, 1000000);
+-
+-	voltsetup2_old = voltdm->read(OMAP3_PRM_VOLTSETUP2_OFFSET);
+-
+-	/*
+-	 * Update voltsetup2 if higher than current value (needed because
+-	 * we have multiple channels with different ramp times), also
+-	 * update voltoffset always to value recommended by TRM
+-	 */
+-	if (voltsetup2 > voltsetup2_old) {
+-		voltdm->write(voltsetup2, OMAP3_PRM_VOLTSETUP2_OFFSET);
+-		voltdm->write(clksetup - voltsetup2,
+-			OMAP3_PRM_VOLTOFFSET_OFFSET);
+-	} else
+-		voltdm->write(clksetup - voltsetup2_old,
+-			OMAP3_PRM_VOLTOFFSET_OFFSET);
+-
+-	/*
+-	 * omap is not controlling voltage scaling during off-mode,
+-	 * thus set voltsetup1 to 0
+-	 */
+-	voltdm->rmw(voltdm->vfsm->voltsetup_mask, 0,
+-		voltdm->vfsm->voltsetup_reg);
+-
+-	/* voltoffset must be clksetup minus voltsetup2 according to TRM */
+-	voltdm->write(clksetup - voltsetup2, OMAP3_PRM_VOLTOFFSET_OFFSET);
+ }
  
- 	/* cpufreq dummy device instantiation */
- 	omap_init_cpufreq();
+ static void __init omap3_vc_init_channel(struct voltagedomain *voltdm)
+ {
+ 	omap3_vc_init_pmic_signaling();
+ 	omap3_set_off_timings(voltdm);
++	omap3_set_i2c_timings(voltdm, true);
+ }
+ 
+ /**
 -- 
 1.8.1.1
