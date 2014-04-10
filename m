@@ -1,42 +1,46 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 10 Apr 2014 11:55:37 +0200
-Subject: [PATCH V4 06/20] ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
+Date: Thu, 10 Apr 2014 11:55:40 +0200
+Subject: [PATCH V4 09/20] ARM: exynos: cpuidle: Remove ifdef for scu_enable
 In-Reply-To: <1397123751-1957-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1397123751-1957-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1397123751-1957-7-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1397123751-1957-10-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function should be called only when the powerdown sequence fails.
-
-Even if the current code does not hurt, by moving this line, we have the same
-code than the one in pm.c.
+The scu_enable function is already a noop in the scu's header file is
+CONFIG_SMP=n, so no need to use these macros in the code.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/cpuidle.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/pm.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index cdfb1ae..6663349 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -134,11 +134,10 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
- 	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
- 		tmp |= S5P_CENTRAL_LOWPWR_CFG;
- 		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-+		/* Clear wakeup state register */
-+		__raw_writel(0x0, S5P_WAKEUP_STAT);
- 	}
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index aba577f..9773a00 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -244,7 +244,7 @@ static void exynos_pm_resume(void)
  
--	/* Clear wakeup state register */
--	__raw_writel(0x0, S5P_WAKEUP_STAT);
--
- 	return index;
- }
+ 	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
  
+-	if (IS_ENABLED(CONFIG_SMP) && !soc_is_exynos5250())
++	if (!soc_is_exynos5250())
+ 		scu_enable(S5P_VA_SCU);
+ 
+ early_wakeup:
+@@ -336,10 +336,8 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 
+ 	case CPU_PM_EXIT:
+ 		if (cpu == 0) {
+-#ifdef CONFIG_SMP
+ 			if (!soc_is_exynos5250())
+ 				scu_enable(S5P_VA_SCU);
+-#endif
+ 			exynos_cpu_restore_register();
+ 		}
+ 		break;
 -- 
 1.7.9.5
