@@ -1,45 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 10 Apr 2014 17:56:14 +0800
-Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
-In-Reply-To: <20140410081031.GM28585@lukather>
-References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
- <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
- <20140409151747.GH28585@lukather>
- <CAGb2v67+YNhw2MXSu9DTKSUfXH=v+uD7KEaxyiPezyf9CYtmPw@mail.gmail.com>
- <20140410081031.GM28585@lukather>
-Message-ID: <CAGb2v65xhEHS_qETZUWcjeaVQK1V84J4h1LzA7uTrtWS=7P8+Q@mail.gmail.com>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Thu, 10 Apr 2014 18:57:02 +0900
+Subject: [PATCH 02/27] ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of
+ Exynos3250
+In-Reply-To: <4172202.teSeEmypAU@wuerfel>
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+ <1397122124-15690-3-git-send-email-cw00.choi@samsung.com>
+ <4172202.teSeEmypAU@wuerfel>
+Message-ID: <002501cf54a3$38f50d60$aadf2820$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 4:10 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Apr 10, 2014 at 12:27:32AM +0800, Chen-Yu Tsai wrote:
->> >> > Let me know if these changes are too intrusive.
->> >>
->> >> I wonder if we should do a separate driver for the new PIO controller.
->> >> Clearly it's a separate IP block, with it's own clock and reset controls.
->> >
->> > It's been merged together in the A23, hence why we did it like that.
->>
->> I'm not sure I understand. The clock gate and reset control are still separate,
->> are they not?
->
-> On the A31 the "regular" port controler handles PA to PH banks, while
-> the R_PIO handles the PL and PM banks.
->
-> On the A23, the regular port controler handles PA to PL banks, and the
-> R_PIO and PM bank doesn't exist.
+Hi Arnd,
 
-On closer inspection of the user manual and the SDK code,
-there is no reset control for R_PIO in the A23, but there is
-still a APB0 gate. Also the register space is still at 0x01f02c00,
-the address space for R_PIO.
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Arnd Bergmann
+> Sent: Thursday, April 10, 2014 6:45 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: kgene.kim at samsung.com; t.figa at samsung.com; hyunhee.kim at samsung.com;
+> sw0312.kim at samsung.com; linux-kernel at vger.kernel.org;
+> yj44.cho at samsung.com; inki.dae at samsung.com; Chanwoo Choi;
+> kyungmin.park at samsung.com; linux-samsung-soc at vger.kernel.org
+> Subject: Re: [PATCH 02/27] ARM: EXYNOS: Add IO mapping for non-secure
+> SYSRAM of Exynos3250
+> 
+> On Thursday 10 April 2014 18:28:19 Chanwoo Choi wrote:
+> >
+> > The non-secure SYSRAM is used for secondary CPU bring-up. This patch
+> add
+> > IO mapping for non-scure SYSRAM.
+> >
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> I really don't want to see any further static mappings here. We had the
+> same discussion for the previous Exynos chip that was submitted, so
+> please
+> describe the SYSRAM in DT, and start thinking about the other static
+> mappings
+> that can be removed.
 
-I know the user manual lists the PL pins under the PIO controller,
-however the section doesn't list registers for them. It would seem
-they are still separate blocks. Also the kernel code never bothers
-to enable the R_PIO clock, possibly because it was enabled by U-boot.
+Sachin already submitted the DT support[1] for SYSRAM area.
 
-> So we're not quite in the same situation. The A31 is troublesome,
-> while the A23 (except for the external interrupts), is pretty much
-> what we've seen so far with the A10/A20/...
+[1] : http://www.spinics.net/lists/linux-samsung-soc/msg27647.html
+
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
