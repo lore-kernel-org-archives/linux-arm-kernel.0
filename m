@@ -1,25 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 18:55:02 +0200
-Subject: [PATCH] pinctrl: capri: make Kconfig dependency more strict
-In-Reply-To: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CACRpkdbqgqeJ2YDN+gsMfByR32D_wFOjPX-u7h2DhAYcLsnwwQ@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 10 Apr 2014 15:52:40 +0200
+Subject: [PATCH v3 1/7] pinctrl: sunxi: check clk_prepare_enable return value
+In-Reply-To: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397137966-30818-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 1, 2014 at 10:10 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+Check the clk_prepare_enable return value to avoid false positive probe.
 
-> This driver is only useful on BCM281xx, so let the driver depend on
-> ARCH_BCM_MOBILE but allow compile coverage testing.
-> The main benefit is that the driver isn't available to be selected for
-> machines that don't have the matching hardware.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/pinctrl/pinctrl-sunxi.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Sherman is renaming this driver so this patch does not apply.
-
-Please resubmit after the rename is upstream or something.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index f9fabe9..2d9ca1c 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -884,7 +884,9 @@ static int sunxi_pinctrl_probe(struct platform_device *pdev)
+ 		goto gpiochip_error;
+ 	}
+ 
+-	clk_prepare_enable(clk);
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		goto gpiochip_error;
+ 
+ 	pctl->irq = irq_of_parse_and_map(node, 0);
+ 	if (!pctl->irq) {
+-- 
+1.8.3.2
