@@ -1,72 +1,45 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 15:59:36 +0200
-Subject: [PATCH] i2c: nomadik: Fixup system suspend
-Message-ID: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
+Date: Thu, 10 Apr 2014 15:01:31 +0200
+Subject: [PATCH 2/3] mmc: mmci: Let runtime PM callbacks be available for
+ CONFIG_PM
+In-Reply-To: <1397134892-20840-1-git-send-email-ulf.hansson@linaro.org>
+References: <1397134892-20840-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1397134892-20840-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For !CONFIG_PM_RUNTIME, the device were never put back into active
-state while resuming.
+Convert to the SET_PM_RUNTIME_PM macro while defining the runtime PM
+callbacks. This means the callbacks becomes available for both
+CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME, which is needed to handle the
+combinations of these scenarios.
 
-For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
-while we were about to handle it at suspend late, which is just too
-optimistic.
-
-Even if the driver uses pm_runtime_put_sync() after each tranfer to
-return it's runtime PM resources, there are no guarantees this will
-actually mean the device will inactivated. The reason is that the PM
-core will prevent runtime suspend during system suspend, and thus when
-a transfer occurs during the early phases of system suspend the device
-will be kept active after the transfer.
-
-To handle both issues above, use pm_runtime_force_suspend|resume() from
-the system suspend|resume callbacks.
-
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
+ drivers/mmc/host/mmci.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Do note, this patch were sent during the previous kernel release cycle, as
-a part of another patchset on the PM core. Back then, it provided proof of
-concept, for the new runtime PM helper functions:
-pm_runtime_force_suspend|resume().
-
----
- drivers/i2c/busses/i2c-nomadik.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 28cbe1b..7d27eee 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -879,19 +879,19 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
- #ifdef CONFIG_PM_SLEEP
- static int nmk_i2c_suspend_late(struct device *dev)
- {
--	pinctrl_pm_select_sleep_state(dev);
-+	int ret;
- 
-+	ret = pm_runtime_force_suspend(dev);
-+	if (ret)
-+		return ret;
-+
-+	pinctrl_pm_select_sleep_state(dev);
- 	return 0;
- }
- 
- static int nmk_i2c_resume_early(struct device *dev)
- {
--	/* First go to the default state */
--	pinctrl_pm_select_default_state(dev);
--	/* Then let's idle the pins until the next transfer happens */
--	pinctrl_pm_select_idle_state(dev);
--
--	return 0;
-+	return pm_runtime_force_resume(dev);
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 0f10e3c..eb23c89 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1789,7 +1789,7 @@ static int mmci_resume(struct device *dev)
  }
  #endif
  
+-#ifdef CONFIG_PM_RUNTIME
++#ifdef CONFIG_PM
+ static void mmci_save(struct mmci_host *host)
+ {
+ 	unsigned long flags;
+@@ -1857,7 +1857,7 @@ static int mmci_runtime_resume(struct device *dev)
+ 
+ static const struct dev_pm_ops mmci_dev_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(mmci_suspend, mmci_resume)
+-	SET_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
++	SET_PM_RUNTIME_PM_OPS(mmci_runtime_suspend, mmci_runtime_resume, NULL)
+ };
+ 
+ static struct amba_id mmci_ids[] = {
 -- 
 1.7.9.5
