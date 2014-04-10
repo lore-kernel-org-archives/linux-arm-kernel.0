@@ -1,53 +1,48 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Thu, 10 Apr 2014 18:57:02 +0900
-Subject: [PATCH 02/27] ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of
- Exynos3250
-In-Reply-To: <4172202.teSeEmypAU@wuerfel>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-3-git-send-email-cw00.choi@samsung.com>
- <4172202.teSeEmypAU@wuerfel>
-Message-ID: <002501cf54a3$38f50d60$aadf2820$@samsung.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 10 Apr 2014 10:56:59 +0100
+Subject: [PATCH v2 06/12] ARM: mcpm: change max clusters to 4
+In-Reply-To: <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140410095650.GA5499@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Apr 08, 2014 at 04:00:46PM +0800, Haojian Zhuang wrote:
+> In order to support 4 clusters with 4 Cortex A15 Cores in each cluster,
+> enlarge maximum clusters from 2 to 4 in MCPM.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Arnd Bergmann
-> Sent: Thursday, April 10, 2014 6:45 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: kgene.kim at samsung.com; t.figa at samsung.com; hyunhee.kim at samsung.com;
-> sw0312.kim at samsung.com; linux-kernel at vger.kernel.org;
-> yj44.cho at samsung.com; inki.dae at samsung.com; Chanwoo Choi;
-> kyungmin.park at samsung.com; linux-samsung-soc at vger.kernel.org
-> Subject: Re: [PATCH 02/27] ARM: EXYNOS: Add IO mapping for non-secure
-> SYSRAM of Exynos3250
-> 
-> On Thursday 10 April 2014 18:28:19 Chanwoo Choi wrote:
-> >
-> > The non-secure SYSRAM is used for secondary CPU bring-up. This patch
-> add
-> > IO mapping for non-scure SYSRAM.
-> >
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> I really don't want to see any further static mappings here. We had the
-> same discussion for the previous Exynos chip that was submitted, so
-> please
-> describe the SYSRAM in DT, and start thinking about the other static
-> mappings
-> that can be removed.
-
-Sachin already submitted the DT support[1] for SYSRAM area.
-
-[1] : http://www.spinics.net/lists/linux-samsung-soc/msg27647.html
+CC Nico on mcpm patches please.  I'm happy to be CC'd as well.
 
 > 
-> 	Arnd
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/include/asm/mcpm.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> index 608516e..68f82cf 100644
+> --- a/arch/arm/include/asm/mcpm.h
+> +++ b/arch/arm/include/asm/mcpm.h
+> @@ -20,7 +20,7 @@
+>   * to consider dynamic allocation.
+>   */
+>  #define MAX_CPUS_PER_CLUSTER	4
+> -#define MAX_NR_CLUSTERS		2
+> +#define MAX_NR_CLUSTERS		4
+
+Because of the need for alignment to the biggest cacheline size in the
+system, the MCPM low-level locking structures consume a non-trivial
+amount of memory.
+
+Therefore, I'm not keen on the idea of simply increasing this #define
+every time a platform appears with a larger number of clusters.
+If hip04 is not built into the kernel, this just wastes memory.
+
+I'll leave it to Nico to decide whether we can increase the #define
+to 4 or whether this needs a proper fix now.  Ideally, we would have
+a way of choosing the maximum value required by the set of boards built
+into the kernel, or switch to dynamic allocation.
+
+Cheers
+---Dave
