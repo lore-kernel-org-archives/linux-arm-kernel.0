@@ -1,59 +1,37 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 10 Apr 2014 12:47:58 -0600
-Subject: [PATCH v4 3/3] arm64: Add APM X-Gene SoC RTC DTS entry
-In-Reply-To: <1397155678-26607-3-git-send-email-lho@apm.com>
-References: <1397155678-26607-1-git-send-email-lho@apm.com>
- <1397155678-26607-2-git-send-email-lho@apm.com>
- <1397155678-26607-3-git-send-email-lho@apm.com>
-Message-ID: <1397155678-26607-4-git-send-email-lho@apm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 10 Apr 2014 20:49:41 +0200
+Subject: [PATCH] i2c: nomadik: Fixup system suspend
+In-Reply-To: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
+References: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CACRpkdb8VJ_Qqype4uP_YJ5=RncJndFUZv_yDxmZwq5S=_yZ2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC RTC DTS entry
+On Thu, Apr 10, 2014 at 3:59 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+> For !CONFIG_PM_RUNTIME, the device were never put back into active
+> state while resuming.
+>
+> For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
+> while we were about to handle it at suspend late, which is just too
+> optimistic.
+>
+> Even if the driver uses pm_runtime_put_sync() after each tranfer to
+> return it's runtime PM resources, there are no guarantees this will
+> actually mean the device will inactivated. The reason is that the PM
+> core will prevent runtime suspend during system suspend, and thus when
+> a transfer occurs during the early phases of system suspend the device
+> will be kept active after the transfer.
+>
+> To handle both issues above, use pm_runtime_force_suspend|resume() from
+> the system suspend|resume callbacks.
+>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index 93f4b2d..4917f3b 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -257,6 +257,19 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x39>;
- 			};
-+
-+			rtcclk: rtcclk at 17000000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				reg = <0x0 0x17000000 0x0 0x2000>;
-+				reg-names = "csr-reg";
-+				csr-offset = <0xc>;
-+				csr-mask = <0x2>;
-+				enable-offset = <0x10>;
-+				enable-mask = <0x2>;
-+				clock-output-names = "rtcclk";
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -339,5 +352,13 @@
- 			phys = <&phy3 0>;
- 			phy-names = "sata-phy";
- 		};
-+
-+		rtc: rtc at 10510000 {
-+			compatible = "apm,xgene-rtc";
-+			reg = <0x0 0x10510000 0x0 0x400>;
-+			interrupts = <0x0 0x46 0x4>;
-+			#clock-cells = <1>;
-+			clocks = <&rtcclk 0>;
-+		};
- 	};
- };
--- 
-1.5.5
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
