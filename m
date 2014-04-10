@@ -1,21 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 18:11:18 +0200
-Subject: [PATCH 3/4] pinctrl: msm: Add documentation for pinctrl-apq8064
- binding
-In-Reply-To: <1396302597-31801-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1396302597-31801-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CACRpkdZbNzZwdh=2UkAOFiPZGRe0Yxu6paGwb_j9-4DViz2NJA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 10 Apr 2014 12:49:18 -0300
+Subject: Wrong SPI NOR model detected by mx6sl
+Message-ID: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 11:49 PM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
+Hi,
 
-> DT bindingdocumentation for qcom,apq8064-pinctrl driver.
->
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+On the imx6sl-evk there is a m25p32 spi nor flash, but in the kernel
+probe we get:
 
-No news in this binding. Patch applied for next.
+m25p80 spi0.0: found mr25h256, expected m25p32
+m25p80 spi0.0: mr25h256 (32 Kbytes)
 
-Yours,
-Linus Walleij
+On the mx6qsabresd there is also a m25p32, which is correctly detected:
+m25p80 spi0.0: m25p32 (4096 Kbytes)
+
+Any ideas as to why mx6sl detects the wrong spi nor model?
+
+Regards,
+
+Fabio Estevam
