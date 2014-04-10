@@ -1,24 +1,30 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 10 Apr 2014 12:31:39 -0700
-Subject: [PATCH v5 0/8] mtd: spi-nor: add a new framework for SPI NOR
-In-Reply-To: <20140410074253.GD4214@lee--X1>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
- <20140312081350.GC30808@shlinux2.ap.freescale.net>
- <20140313063940.GU31517@norris-Latitude-E6410>
- <20140409033603.GA32070@ld-irv-0074>
- <20140410074253.GD4214@lee--X1>
-Message-ID: <20140410193139.GN32070@ld-irv-0074>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 10 Apr 2014 21:34:46 +0200
+Subject: [PATCH 2/2] arm: use fixmap for text patching when text is RO
+In-Reply-To: <1396879071.3654.43.camel@linaro1.home>
+References: <1396646870-29695-1-git-send-email-rabin@rab.in>
+ <1396646870-29695-2-git-send-email-rabin@rab.in>
+ <1396879071.3654.43.camel@linaro1.home>
+Message-ID: <20140410193433.GA22746@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 08:42:53AM +0100, Lee Jones wrote:
-> Quick question, is there a chat medium for MTD? Somewhere for
-> quick-fire questions i.e. an IRC channel or similar?
+On Mon, Apr 07, 2014 at 02:57:51PM +0100, Jon Medhurst (Tixy) wrote:
+> How does fixmap cope with cache colouring? Looking at the implementation
+> it looks like it doesn't and so fixmap use on ARM is possibly buggy.
+> 
+> For the text patching case where we know there are no writeable mappings
+> [1] this should be OK if we used set_fixmap_nocache here, so long as we
+> also invalidated the dcache later for the proper virtual address.
 
-OFTC #mtd channel. It's noted at the bottom here:
+OK.  The dcache invalidation for the proper virtual address is btw
+already there via the call to flush_icache_range().
 
-  http://www.linux-mtd.infradead.org/mail.html
+> [1] Can we know there are no writeable mappings though, the ftrace code
+> modifying patches from Kees Cook have there own way of modifying text
+> code permissions.
 
-Many of us lurk there, but quickness varies :)
-
-Brian
+The ftrace patches does the modifications and the cache cleaning in
+stop_machine(), so there should not be any dirty cache lines from those
+writable mappings when we set up and write to these fixmaps.  Do you
+still see a problem?
