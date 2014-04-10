@@ -1,228 +1,64 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Apr 2014 16:47:16 -0700
-Subject: [PATCH 08/11] ARM: dts: Fix omap serial wake-up when booted with
- device tree
+Date: Thu, 10 Apr 2014 16:47:19 -0700
+Subject: [PATCH 11/11] pinctrl: single: Clear pin interrupts enabled by
+ bootloader
 In-Reply-To: <1397173639-29587-1-git-send-email-tony@atomide.com>
 References: <1397173639-29587-1-git-send-email-tony@atomide.com>
-Message-ID: <1397173639-29587-9-git-send-email-tony@atomide.com>
+Message-ID: <1397173639-29587-12-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've had deeper idle states working on omaps for few years now,
-but only in the legacy mode. When booted with device tree, the
-wake-up events did not have a chance to work until commit
-3e6cee1786a1 (pinctrl: single: Add support for wake-up interrupts)
-that recently got merged. In addition to that we also needed commit
-79d9701559a9 (of/irq: create interrupts-extended property) that's
-now also merged.
+Since we set up device wake-up interrupts as pinctrl-single
+interrupts, we now must use the standard request_irq and
+related functions to manage them.
 
-So let's fix the wake-up events for some selected omaps so devices
-booted in device tree mode won't just hang if deeper power states
-are enabled, and so systems can wake up from suspend to the serial
-port event.
+If the pin interrupts are enabled for some pins at boot,
+the wake-up events can show up as constantly pending
+at least on omaps and will hang the system unless the related
+device driver clears the event at the device.
 
-Note that there's no longer need to specify the wake-up bit in
-the pinctrl settings, the request_irq on the wake-up pin takes
-care of that.
+To fix this, let's clear the interrupt flags during init,
+and print out a warning so the board maintainers can update
+their drivers to do proper request_irq for the driver specific
+wake-up events.
 
-Note that there will be new harmless warnings in dmesg output
-without patch "of/platform: Fix no irq domain found errors when
-populating interrupts":
-
-https://lkml.org/lkml/2014/4/10/620
-
-Cc: devicetree at vger.kernel.org
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap3-evm-37xx.dts      |  9 +++++++++
- arch/arm/boot/dts/omap3-n900.dts          |  2 ++
- arch/arm/boot/dts/omap3.dtsi              |  6 +++---
- arch/arm/boot/dts/omap4-panda-common.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/omap4-sdp.dts           |  6 ++++++
- arch/arm/boot/dts/omap4.dtsi              |  6 +++---
- include/dt-bindings/pinctrl/omap.h        | 12 ++++++++++++
- 7 files changed, 50 insertions(+), 6 deletions(-)
+ drivers/pinctrl/pinctrl-single.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-evm-37xx.dts b/arch/arm/boot/dts/omap3-evm-37xx.dts
-index 4df68ad..9cba94b 100644
---- a/arch/arm/boot/dts/omap3-evm-37xx.dts
-+++ b/arch/arm/boot/dts/omap3-evm-37xx.dts
-@@ -89,7 +89,16 @@
- 	status = "disabled";
- };
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index de64596..ba1f4b1 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -808,6 +808,7 @@ static const struct pinconf_ops pcs_pinconf_ops = {
+ static int pcs_add_pin(struct pcs_device *pcs, unsigned offset,
+ 		unsigned pin_pos)
+ {
++	struct pcs_soc_data *pcs_soc = &pcs->socdata;
+ 	struct pinctrl_pin_desc *pin;
+ 	struct pcs_name *pn;
+ 	int i;
+@@ -819,6 +820,18 @@ static int pcs_add_pin(struct pcs_device *pcs, unsigned offset,
+ 		return -ENOMEM;
+ 	}
  
-+&uart1 {
-+	interrupts-extended = <&intc 72 &omap3_pmx_core OMAP3_UART1_RX>;
-+};
++	if (pcs_soc->irq_enable_mask) {
++		unsigned val;
 +
-+&uart2 {
-+	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
-+};
++		val = pcs->read(pcs->base + offset);
++		if (val & pcs_soc->irq_enable_mask) {
++			dev_dbg(pcs->dev, "irq enabled at boot for pin at %lx (%x), clearing\n",
++				(unsigned long)pcs->res->start + offset, val);
++			val &= ~pcs_soc->irq_enable_mask;
++			pcs->write(val, pcs->base + offset);
++		}
++	}
 +
- &uart3 {
-+	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
- };
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 0d34201..c5db0af 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -512,11 +512,13 @@
- };
- 
- &uart2 {
-+	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart2_pins>;
- };
- 
- &uart3 {
-+	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
- };
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a5fc83b..f61c76b 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -246,7 +246,7 @@
- 		uart1: serial at 4806a000 {
- 			compatible = "ti,omap3-uart";
- 			reg = <0x4806a000 0x2000>;
--			interrupts = <72>;
-+			interrupts-extended = <&intc 72>;
- 			dmas = <&sdma 49 &sdma 50>;
- 			dma-names = "tx", "rx";
- 			ti,hwmods = "uart1";
-@@ -256,7 +256,7 @@
- 		uart2: serial at 4806c000 {
- 			compatible = "ti,omap3-uart";
- 			reg = <0x4806c000 0x400>;
--			interrupts = <73>;
-+			interrupts-extended = <&intc 73>;
- 			dmas = <&sdma 51 &sdma 52>;
- 			dma-names = "tx", "rx";
- 			ti,hwmods = "uart2";
-@@ -266,7 +266,7 @@
- 		uart3: serial at 49020000 {
- 			compatible = "ti,omap3-uart";
- 			reg = <0x49020000 0x400>;
--			interrupts = <74>;
-+			interrupts-extended = <&intc 74>;
- 			dmas = <&sdma 53 &sdma 54>;
- 			dma-names = "tx", "rx";
- 			ti,hwmods = "uart3";
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 88c6a05..47bbc59 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -396,6 +396,21 @@
- 	usb-supply = <&vusb>;
- };
- 
-+&uart2 {
-+	interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
-+			       &omap4_pmx_core OMAP4_UART2_RX>;
-+};
-+
-+&uart3 {
-+	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
-+			       &omap4_pmx_core OMAP4_UART3_RX>;
-+};
-+
-+&uart4 {
-+	interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
-+			       &omap4_pmx_core OMAP4_UART4_RX>;
-+};
-+
- &usb_otg_hs {
- 	interface-type = <1>;
- 	mode = <3>;
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index dbc81fb..e3f3cfb 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -523,16 +523,22 @@
- };
- 
- &uart2 {
-+	interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
-+			       &omap4_pmx_core OMAP4_UART2_RX>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart2_pins>;
- };
- 
- &uart3 {
-+	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
-+			       &omap4_pmx_core OMAP4_UART3_RX>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins>;
- };
- 
- &uart4 {
-+	interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
-+			       &omap4_pmx_core OMAP4_UART4_RX>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart4_pins>;
- };
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index d3f8a6e..24ea9b9 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -288,7 +288,7 @@
- 		uart2: serial at 4806c000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806c000 0x100>;
--			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
- 		};
-@@ -296,7 +296,7 @@
- 		uart3: serial at 48020000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48020000 0x100>;
--			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
- 		};
-@@ -304,7 +304,7 @@
- 		uart4: serial at 4806e000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806e000 0x100>;
--			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
- 		};
-diff --git a/include/dt-bindings/pinctrl/omap.h b/include/dt-bindings/pinctrl/omap.h
-index b04528c..404ba7e 100644
---- a/include/dt-bindings/pinctrl/omap.h
-+++ b/include/dt-bindings/pinctrl/omap.h
-@@ -69,5 +69,17 @@
- #define OMAP5_WKUP_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0xc840) (val)
- #define DRA7XX_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x3400) (val)
- 
-+/*
-+ * Define some commonly used pins configured by the boards.
-+ * Note that some boards use alternative pins, so check
-+ * the schematics before using these.
-+ */
-+#define OMAP3_UART1_RX		0x152
-+#define OMAP3_UART2_RX		0x14a
-+#define OMAP3_UART3_RX		0x16e
-+#define OMAP4_UART2_RX		0xdc
-+#define OMAP4_UART3_RX		0x104
-+#define OMAP4_UART4_RX		0x11c
-+
- #endif
- 
+ 	pin = &pcs->pins.pa[i];
+ 	pn = &pcs->names[i];
+ 	sprintf(pn->name, "%lx.%d",
 -- 
 1.8.1.1
