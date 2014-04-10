@@ -1,74 +1,47 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 10 Apr 2014 10:22:34 +0200
-Subject: [PATCH 4/4] arm: mediatek: Add earlyprintk support for MT6589
-In-Reply-To: <CAL_JsqKq+D+c-qznP5aE3uyXf_YXyYzvoKRONAY7eXBkWcvqsw@mail.gmail.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
- <1397072736-10793-5-git-send-email-matthias.bgg@gmail.com>
- <CAL_JsqKq+D+c-qznP5aE3uyXf_YXyYzvoKRONAY7eXBkWcvqsw@mail.gmail.com>
-Message-ID: <CABuKBeK9QE8ZGx1AKa9Cr9GLdHDKW-+NBirWs=uekqKxMP65EQ@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 10 Apr 2014 13:54:50 +0530
+Subject: [PATCH 0/6] Further cleanup and enable multiplat build
+Message-ID: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-09 23:39 GMT+02:00 Rob Herring <robherring2@gmail.com>:
-> On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> ---
->>  arch/arm/Kconfig.debug            |   49 +++++++++++++++++++++++++++++++++++--
->>  arch/arm/include/debug/mediatek.S |   38 ++++++++++++++++++++++++++++
->>  2 files changed, 85 insertions(+), 2 deletions(-)
->>  create mode 100644 arch/arm/include/debug/mediatek.S
->>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 4a2fc0b..dc51495 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -797,6 +797,38 @@ choice
->>                   Say Y here if you want kernel low-level debugging support
->>                   on Ux500 based platforms.
->>
->> +       config DEBUG_MTK6589_UART0
->> +               depends on ARCH_MEDIATEK
->> +               bool "Mediatek mt6589 UART0"
->> +               select DEBUG_UART_MEDIATEK
->> +               help
->> +                 Say Y here if you want kernel low-level debugging support
->> +                 on Mediatek mt6589 based platforms.
->> +
->> +       config DEBUG_MTK6589_UART1
->> +               depends on ARCH_MEDIATEK
->> +               bool "Mediatek mt6589 UART1"
->> +               select DEBUG_UART_MEDIATEK
->> +               help
->> +                 Say Y here if you want kernel low-level debugging support
->> +                 on Mediatek mt6589 based platforms.
->> +
->> +       config DEBUG_MTK6589_UART2
->> +               depends on ARCH_MEDIATEK
->> +               bool "Mediatek mt6589 UART2"
->> +               select DEBUG_UART_MEDIATEK
->> +               help
->> +                 Say Y here if you want kernel low-level debugging support
->> +                 on Mediatek mt6589 based platforms.
->> +
->> +       config DEBUG_MTK6589_UART3
->> +               depends on ARCH_MEDIATEK
->> +               bool "Mediatek mt6589 UART3"
->> +               select DEBUG_UART_MEDIATEK
->> +               help
->> +                 Say Y here if you want kernel low-level debugging support
->> +                 on Mediatek mt6589 based platforms.
->> +
->
-> Do you really need all uarts defined? Only define what you have boards using.
->
-> Also, you have no uarts defined in your dts. Please add them there
-> (and any necessary serial driver) before adding debug functionality.
-> Otherwise, you can't actually boot a multi-platform kernel with this
-> series.
+This series is based on latest linux-next and depends on the
+following patches:
+ARM: EXYNOS: Consolidate Kconfig entries
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
 
-Up to now, there no serial driver exists. Should I skip this patch and
-re-submit it when the serial driver is integrated?
+Currently cpufreq driver build support has been disabled for
+multiplatform for Exynos until the generic CPUfreq driver support
+for Exynos gets merged. This (disabling) patch is available in PM tree.
+http://www.spinics.net/lists/cpufreq/msg09693.html
 
+Tested on Exynos4210, 4412, 5250 and 5420 based boards.
+
+Arnd Bergmann (1):
+  ARM: EXYNOS: Enable multi-platform build support
+
+Sachin Kamat (5):
+  ARM: EXYNOS: Remove duplicate lines in Makefile
+  ARM: EXYNOS: Staticize exynos_subsys
+  ARM: EXYNOS: Migrate Exynos specific macros from plat to mach
+  ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
+  ARM: multi_v7_defconfig: Enable Exynos platform
+
+ arch/arm/Kconfig                         |   27 ++---------
+ arch/arm/configs/exynos_defconfig        |    2 +-
+ arch/arm/configs/multi_v7_defconfig      |   10 +++++
+ arch/arm/mach-exynos/Kconfig             |   27 +++++++++++
+ arch/arm/mach-exynos/Makefile            |    9 ++--
+ arch/arm/mach-exynos/common.h            |   72 ++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/cpuidle.c           |    1 -
+ arch/arm/mach-exynos/exynos.c            |    4 +-
+ arch/arm/mach-exynos/hotplug.c           |    2 -
+ arch/arm/mach-exynos/platsmp.c           |    2 -
+ arch/arm/mach-exynos/pm.c                |    1 -
+ arch/arm/mach-exynos/pmu.c               |    2 -
+ arch/arm/plat-samsung/Makefile           |    3 ++
+ arch/arm/plat-samsung/include/plat/cpu.h |   61 -------------------------
+ 14 files changed, 120 insertions(+), 103 deletions(-)
 
 -- 
-motzblog.wordpress.com
+1.7.9.5
