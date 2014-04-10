@@ -1,130 +1,43 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 10 Apr 2014 15:53:04 +0100
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <6144916.rD76jOL8sv@wuerfel>
-References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <4506772.YFSM2m1eaP@wuerfel>
- <CAErSpo6u7kr+QdnhAXBo20izg-DNHR4zHT+kRvq34whp68RJCQ@mail.gmail.com>
- <6144916.rD76jOL8sv@wuerfel>
-Message-ID: <20140410145304.GS985@e106497-lin.cambridge.arm.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Thu, 10 Apr 2014 12:55:03 -0400
+Subject: [PATCH v3 1/3] pinctrl: Rename Broadcom Capri pinctrl driver
+In-Reply-To: <CACRpkdZ1Lt2JsMMWVMBgfS8ktkpeYzA3MiGmWB27Jwhw16UYYg@mail.gmail.com>
+References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
+ <1396478439-16586-1-git-send-email-syin@broadcom.com>
+ <1396478439-16586-2-git-send-email-syin@broadcom.com>
+ <CACRpkdZ1Lt2JsMMWVMBgfS8ktkpeYzA3MiGmWB27Jwhw16UYYg@mail.gmail.com>
+Message-ID: <20140410165503.GA23695@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 03:07:44PM +0100, Arnd Bergmann wrote:
-> On Thursday 10 April 2014 07:50:52 Bjorn Helgaas wrote:
-> > On Thu, Apr 10, 2014 at 2:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Wednesday 09 April 2014 21:48:14 Bjorn Helgaas wrote:
-> > >> On Wed, Apr 9, 2014 at 7:27 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> > >> > On Wed, Apr 09, 2014 at 08:02:41AM -0600, Bjorn Helgaas wrote:
-> > >> >> >>   struct pci_host_bridge {
-> > >> >> >>     int domain;
-> > >> >> >>     int node;
-> > >> >> >>     struct device *dev;
-> > >> >> >>     struct pci_ops *ops;
-> > >> >> >>     struct list_head resources;
-> > >> >> >>     void *sysdata;
-> > >> >> >>     struct pci_bus *bus;  /* filled in by core, not by arch */
-> > >> >> >>     ... /* other existing contents managed by core */
-> > >> >> >>   };
-> > >> >> >>
-> > >> >> >>   struct pci_bus *pci_scan_host_bridge(struct pci_host_bridge *bridge);
-> > >> >> >
-> > 
-> > I'm not sure I'm following you; you mean the arch-specific sysdata
-> > structure would contain a pointer to struct pci_host_bridge?
-> > 
-> > I have to admit that I'm not up on how other subsystems handle this
-> > sort of abstraction.  Do you have any pointers to good examples that I
-> > can study?
+On Thu, Apr 10, 2014 at 06:49:56PM +0200, Linus Walleij wrote:
+> On Thu, Apr 3, 2014 at 12:40 AM, Sherman Yin <syin@broadcom.com> wrote:
 > 
-> What I mean is like this:
+> > To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
+> > driver and its related CONFIG option are renamed to bcm281xx.
+> >
+> > Devicetree compatible string and binding documentation use
+> > "brcm,bcm11351-pinctrl" to match the machine binding here:
+> > Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+> >
+> > This driver supports pinctrl on BCM11130, BCM11140, BCM11351, BCM28145
+> > and BCM28155 SoCs.
+> >
+> > Signed-off-by: Sherman Yin <syin@broadcom.com>
+> > Reviewed-by: Matt Porter <mporter@linaro.org>
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> >  drivers/pinctrl/Kconfig                            |    8 +-
+> >  drivers/pinctrl/Makefile                           |    2 +-
+> >  .../{pinctrl-capri.c => pinctrl-bcm281xx.c}        | 1519 ++++++++++----------
 > 
-> /* generic structure */
-> struct pci_host_bridge {
->         int domain;
->         int node;
->         struct device *dev;
->         struct pci_ops *ops; 
->         struct list_head resources;
->         struct pci_bus *bus;  /* filled in by core, not by arch */
->         ... /* other existing contents managed by core */
-> };
+> This last version from apr 7 does not change
+> arch/arm/configs/bcm_defconfig:CONFIG_PINCTRL_CAPRI=y
 > 
-> /* arm specific structure */
-> struct pci_sys_data {
->         char            io_res_name[12];
->                                         /* Bridge swizzling                     */
->         u8              (*swizzle)(struct pci_dev *, u8 *);
->                                         /* IRQ mapping                          */
->         int             (*map_irq)(const struct pci_dev *, u8, u8);
->                                         /* Resource alignement requirements     */
->         void            (*add_bus)(struct pci_bus *bus);
->         void            (*remove_bus)(struct pci_bus *bus);
->         void            *private_data;  /* platform controller private data     */
-> 
-> 	/* not a pointer: */
-> 	struct pci_host_bridge bridge;
-> };
-> static inline struct pci_sys_data *to_pci_sys_data(struct pci_host_bridge *bridge)
-> {
-> 	return container_of(bridge, struct pci_sys_data, bridge);
-> }
-> 
-> /* arm specific, driver specific structure */
-> struct tegra_pcie {
->         void __iomem *pads;
->         void __iomem *afi;
-> 
->         struct clk *pex_clk;
->         struct clk *afi_clk;
->         struct clk *pll_e;
->         struct clk *cml_clk;
-> 
->         struct tegra_msi msi;
-> 
->         struct list_head ports;
->         unsigned int num_ports;
-> 
-> 	struct pci_sys_data sysdata;
-> };
-> static inline struct tegra_pcie *to_tegra_pcie(struct pci_sys_data *sysdata)
-> {
-> 	return container_of(sysdata, struct tegra_pcie, sysdata);
-> }
-> 
-> This mirrors how we treat devices: a pci_device has an embedded device,
-> and so on, in other subsystems we can have multiple layers.
-> 
-> In this example, the tegra pcie driver then allocates its own tegra_pcie
-> structure, fills out the fields it needs, and registers it with the
-> ARM architecture code, passing just the pci_sys_data pointer. That function
-> in turn passes a pointer to the embedded pci_host_bridge down to the
-> generic code. Ideally we should try to eliminate the architecture specific
-> portion here, but that is a later step.
+> Doesn't this mean that you render this platform without a pin
+> control driver and thus broken?
 
-So Arnd seems to agree with me: we should try to get out of architecture specific
-pci_sys_data and link the host bridge driver straight into the PCI core. The
-core then can call into arch code via pcibios_*() functions.
+The pinctrl device is not used in DT so having the driver
+disabled does not matter.
 
-Arnd, am I reading correctly into what you are saying?
-
-Liviu
-
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+-Matt
