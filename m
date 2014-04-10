@@ -1,33 +1,45 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:20:50 +0200
-Subject: [PATCH V3 07/19] ARM: ux500: Add mmci signal directions and feeback
- clock in DT for href
-In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397132462-8005-8-git-send-email-ulf.hansson@linaro.org>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Thu, 10 Apr 2014 15:58:02 +0530
+Subject: [PATCH v2 2/2] usb: ehci-platform: Return immediately from suspend if
+ ehci_suspend fails
+In-Reply-To: <1397125682-4955-1-git-send-email-gautam.vivek@samsung.com>
+References: <1397125682-4955-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1397125682-4955-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-href.dtsi |    4 ++++
- 1 file changed, 4 insertions(+)
+Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
+adds a check for possible race between suspend and wakeup interrupt,
+and thereby it returns -EBUSY as error code if there's a wakeup
+interrupt.
+So the platform host controller should not proceed further with
+its suspend callback, rather should return immediately to avoid
+powering down the essential things, like phy.
 
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 6cb9b68..46dce42 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -118,6 +118,10 @@
- 			bus-width = <4>;
- 			mmc-cap-sd-highspeed;
- 			mmc-cap-mmc-highspeed;
-+			st,sig-dir-dat0;
-+			st,sig-dir-dat2;
-+			st,sig-dir-cmd;
-+			st,sig-pin-fbclk;
- 			vmmc-supply = <&ab8500_ldo_aux3_reg>;
- 			vqmmc-supply = <&vmmci>;
- 			pinctrl-names = "default", "sleep";
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Hauke Mehrtens <hauke@hauke-m.de>
+Cc: Hans de Goede <hdegoede@redhat.com>
+---
+
+Changes from v1:
+-- Removed unnecessary change 'return 0'
+
+ drivers/usb/host/ehci-platform.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index b3a0e11..c7dd93a 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -303,6 +303,8 @@ static int ehci_platform_suspend(struct device *dev)
+ 	int ret;
+ 
+ 	ret = ehci_suspend(hcd, do_wakeup);
++	if (ret)
++		return ret;
+ 
+ 	if (pdata->power_suspend)
+ 		pdata->power_suspend(pdev);
 -- 
-1.7.9.5
+1.7.10.4
