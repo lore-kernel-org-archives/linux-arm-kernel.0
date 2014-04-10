@@ -1,66 +1,46 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 10 Apr 2014 11:55:51 +0200
-Subject: [PATCH V4 20/20] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle directory
+Date: Thu, 10 Apr 2014 11:55:48 +0200
+Subject: [PATCH V4 17/20] ARM: exynos: cpuidle: Move S5P_CHECK_SLEEP into pm.c
 In-Reply-To: <1397123751-1957-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1397123751-1957-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1397123751-1957-21-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1397123751-1957-18-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/Makefile                      |    1 -
- drivers/cpuidle/Kconfig.arm                        |    6 ++++++
- drivers/cpuidle/Makefile                           |    1 +
- .../cpuidle.c => drivers/cpuidle/cpuidle-exynos.c  |    0
- 4 files changed, 7 insertions(+), 1 deletion(-)
- rename arch/arm/mach-exynos/cpuidle.c => drivers/cpuidle/cpuidle-exynos.c (100%)
+This macro is only used there.
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index a656dbe..21bd364 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -16,7 +16,6 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-exynos/pm.c       |    3 ++-
+ arch/arm/mach-exynos/regs-pmu.h |    2 --
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index a943e97..aa23662 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -108,7 +108,8 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ 			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
+ 			(S5P_VA_SYSRAM + 0x20) : S5P_INFORM1))
  
- obj-$(CONFIG_PM_SLEEP)		+= pm.o sleep.o
- obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
--obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+-#define S5P_CHECK_AFTR 0xFCBA0D10
++#define S5P_CHECK_AFTR  0xFCBA0D10
++#define S5P_CHECK_SLEEP 0x00000BAD
  
- obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
+ /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+ static void exynos_set_wakeupmask(long mask)
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 35c4eb3..d7803c4 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -119,8 +119,6 @@
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
+ #define S5P_INT_LOCAL_PWR_EN			0x7
  
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index d988948..364c984 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -44,3 +44,9 @@ config ARM_AT91_CPUIDLE
- 	depends on ARCH_AT91
- 	help
- 	  Select this to enable cpuidle for AT91 processors
-+
-+config ARM_EXYNOS_CPUIDLE
-+	bool "Cpu Idle Driver for the Exynos processors"
-+	depends on ARCH_EXYNOS
-+	help
-+	  Select this to enable cpuidle for Exynos processors
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index f71ae1b..0d1540a 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
- obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
- obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
-+obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
- 
- ###############################################################################
- # POWERPC drivers
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/drivers/cpuidle/cpuidle-exynos.c
-similarity index 100%
-rename from arch/arm/mach-exynos/cpuidle.c
-rename to drivers/cpuidle/cpuidle-exynos.c
+-#define S5P_CHECK_SLEEP				0x00000BAD
+-
+ /* Only for EXYNOS4210 */
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	S5P_PMUREG(0x1154)
+ #define S5P_CMU_RESET_LCD1_LOWPWR	S5P_PMUREG(0x1174)
 -- 
 1.7.9.5
