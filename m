@@ -1,35 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Apr 2014 11:36:53 +0200
-Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <53465A4B.4040906@free-electrons.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
- <CABuKBeKnEw38sQYwrkheoWetZZcPTJhKRsBK4a62FS6-6dRFTA@mail.gmail.com>
- <53465A4B.4040906@free-electrons.com>
-Message-ID: <8724412.Xp2CkgARik@wuerfel>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 10 Apr 2014 18:37:16 +0900
+Subject: [PATCH 05/27] ARM: EXYNOS: Support secondary CPU boot of Exynos3250
+In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397122658-16013-6-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 April 2014 08:46:03 Gregory CLEMENT wrote:
-> >>
-> >> Is it really a fixed clock without any parent, or do you
-> >> declare it as a fixed clock because you don't have any clock
-> >> common framework support yet?
-> > 
-> > I don't have any common clock framework support yet.
-> 
-> So maybe you should provide one (even a very simple one).
-> 
-> Pretending a clock is a fixed clock and ignoring its parents
-> will be problematic when you will add the common clock framework
-> support because the device tree is supposed to be stable and you won't
-> be able to change it then.
+This patch fix the offset of CPU boot address and don't operate smc call
+of SMC_CMD_CPU1BOOT command for Exynos3250.
 
-But is this actually a problem here? The current device tree file
-will keep working even if the proper driver is there, you just need
-to update both the driver and the dts file in order to actually
-use the clocks at run-time.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/firmware.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-I guess it comes down to the question of whether we want to handle
-old kernels with new device trees again, which would be broken here.
-
-	Arnd
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 91a911d..8350007 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -30,10 +30,13 @@ static int exynos_do_idle(void)
+ 
+ static int exynos_cpu_boot(int cpu)
+ {
+-	if (soc_is_exynos4212())
++	if (soc_is_exynos3250())
++		goto out;
++	else if (soc_is_exynos4212())
+ 		exynos_smc(SMC_CMD_CPU1BOOT, 0, 0, 0);
+ 	else
+ 		exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
++out:
+ 	return 0;
+ }
+ 
+@@ -41,7 +44,7 @@ static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+ {
+ 	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+ 
+-	if (soc_is_exynos4212())
++	if (soc_is_exynos4212() || soc_is_exynos3250())
+ 		goto out;
+ 	else
+ 		boot_reg += 4*cpu;
+-- 
+1.8.0
