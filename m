@@ -1,134 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 10 Apr 2014 13:03:59 -0400 (EDT)
-Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8
- kernels
-In-Reply-To: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <alpine.LFD.2.11.1404101302380.980@knanqh.ubzr>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 10 Apr 2014 14:32:04 +0200
+Subject: [PATCH 2/6] ARM: EXYNOS: Staticize exynos_subsys
+In-Reply-To: <CAK9yfHwAM0d5JsrhKGP0gkrjQLxGFE0+oEjv26N5jsFnvYku9A@mail.gmail.com>
+References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
+ <1397118296-6846-3-git-send-email-sachin.kamat@linaro.org>
+ <534661C7.9090304@samsung.com>
+ <CAK9yfHwAM0d5JsrhKGP0gkrjQLxGFE0+oEjv26N5jsFnvYku9A@mail.gmail.com>
+Message-ID: <53468F44.3050109@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Apr 2014, Taras Kondratiuk wrote:
+On 10.04.2014 11:22, Sachin Kamat wrote:
+> Hi Tomasz,
+>
+> On 10 April 2014 14:47, Tomasz Figa <t.figa@samsung.com> wrote:
+>> Hi Sachin,
+>>
+>>
+>> On 10.04.2014 10:24, Sachin Kamat wrote:
+>>>
+>>> 'exynos_subsys' is now local to this file. Make it static
+>>> and remove the declaration from header file.
+>>>
+>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>> ---
+>>>    arch/arm/mach-exynos/exynos.c            |    2 +-
+>>>    arch/arm/plat-samsung/include/plat/cpu.h |    1 -
+>>>    2 files changed, 1 insertion(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>>> index 6a5fe18ec9b1..0ef42b9efd36 100644
+>>> --- a/arch/arm/mach-exynos/exynos.c
+>>> +++ b/arch/arm/mach-exynos/exynos.c
+>>> @@ -284,7 +284,7 @@ void __init exynos_init_io(void)
+>>>          of_scan_flat_dt(exynos_fdt_map_sysram, NULL);
+>>>    }
+>>>
+>>> -struct bus_type exynos_subsys = {
+>>> +static struct bus_type exynos_subsys = {
+>>>          .name           = "exynos-core",
+>>>          .dev_name       = "exynos-core",
+>>>    };
+>>> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h
+>>> b/arch/arm/plat-samsung/include/plat/cpu.h
+>>> index 5992b8dd9b89..930b4be832cd 100644
+>>> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+>>> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+>>> @@ -239,7 +239,6 @@ extern struct bus_type s3c2443_subsys;
+>>>    extern struct bus_type s3c6410_subsys;
+>>>    extern struct bus_type s5p64x0_subsys;
+>>>    extern struct bus_type s5pv210_subsys;
+>>> -extern struct bus_type exynos_subsys;
+>>>
+>>>    extern void (*s5pc1xx_idle)(void);
+>>>
+>>>
+>>
+>> This struct and registration of it do not seem to be needed for anything
+>> anymore. Would you consider removing it instead?
+>
+> I had considered removing that while I was doing other code consolidation
+> of this file. However I found that without this, the system failed to boot. I
+> did not look much into it then. Probably I can revisit it and if it
+> doesn't cause
+> any boot issue, will remove it.
+>
 
-> From: Nico Pitre <nico@fluxnic.net>
+Hmm, I don't see why it could break anything as I can't find any users 
+of it. Anyway I just tested removing this code on Exynos4412-trats2 
+board and didn't find any problems.
 
-Please use "Nicolas Pitre" as my full name.
-
-> All known BE8-capable systems have LE bootloaders, so we need to ensure
-> that the magic number and image start/end values are in little endian
-> format.
-> 
-> [ben.dooks at codethink.co.uk: from nico's original email on this subject]
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> [taras.kondratiuk at linaro.org: removed lds.S->lds rule, added target to extra-y]
-> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-> ---
-> Nico, should I add your Signed-off-by?
-
-Sure.
-
-> 
-> Discussion about the patch:
-> http://www.spinics.net/lists/arm-kernel/msg320670.html
-> 
-> Based on v3.14+ master commit 39de65aa2c3eee901db020a4f1396998e09602a3
-> 
->  arch/arm/boot/compressed/.gitignore     |    1 +
->  arch/arm/boot/compressed/Makefile       |    4 ++--
->  arch/arm/boot/compressed/head.S         |    7 ++++---
->  arch/arm/boot/compressed/vmlinux.lds.in |   14 ++++++++++++++
->  4 files changed, 21 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-> index 0714e03..6a26e7b 100644
-> --- a/arch/arm/boot/compressed/.gitignore
-> +++ b/arch/arm/boot/compressed/.gitignore
-> @@ -10,6 +10,7 @@ piggy.xzkern
->  piggy.lz4
->  vmlinux
->  vmlinux.lds
-> +vmlinux.lds.S
->  
->  # borrowed libfdt files
->  fdt.c
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 68c9183..8a80906 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -114,7 +114,7 @@ targets       := vmlinux vmlinux.lds \
->  # Make sure files are removed during clean
->  extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern piggy.lz4 \
->  		 lib1funcs.S ashldi3.S bswapsdi2.S $(libfdt) $(libfdt_hdrs) \
-> -		 hyp-stub.S
-> +		 hyp-stub.S vmlinux.lds.S
->  
->  ifeq ($(CONFIG_FUNCTION_TRACER),y)
->  ORIG_CFLAGS := $(KBUILD_CFLAGS)
-> @@ -199,7 +199,7 @@ CFLAGS_font.o := -Dstatic=
->  $(obj)/font.c: $(FONTC)
->  	$(call cmd,shipped)
->  
-> -$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile $(KCONFIG_CONFIG)
-> +$(obj)/vmlinux.lds.S: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile $(KCONFIG_CONFIG)
->  	@sed "$(SEDFLAGS)" < $< > $@
->  
->  $(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index 066b034..8ea1773 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -130,9 +130,10 @@ start:
->   THUMB(		adr	r12, BSYM(1f)	)
->   THUMB(		bx	r12		)
->  
-> -		.word	0x016f2818		@ Magic numbers to help the loader
-> -		.word	start			@ absolute load/run zImage address
-> -		.word	_edata			@ zImage end address
-> +		.word	_magic_sig	@ Magic numbers to help the loader
-> +		.word	_magic_start	@ absolute load/run zImage address
-> +		.word	_magic_end	@ zImage end address
-> +
->   THUMB(		.thumb			)
->  1:
->   ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
-> diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
-> index 4919f2a..6016223 100644
-> --- a/arch/arm/boot/compressed/vmlinux.lds.in
-> +++ b/arch/arm/boot/compressed/vmlinux.lds.in
-> @@ -7,6 +7,16 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +#define ZIMAGE_MAGIC(x) ( (((x) >> 24) & 0x000000ff) | \
-> +			  (((x) >>  8) & 0x0000ff00) | \
-> +			  (((x) <<  8) & 0x00ff0000) | \
-> +			  (((x) << 24) & 0xff000000) )
-> +#else
-> +#define ZIMAGE_MAGIC(x) (x)
-> +#endif
-> +
->  OUTPUT_ARCH(arm)
->  ENTRY(_start)
->  SECTIONS
-> @@ -57,6 +67,10 @@ SECTIONS
->    .pad			: { BYTE(0); . = ALIGN(8); }
->    _edata = .;
->  
-> +  _magic_sig = ZIMAGE_MAGIC(0x016f2818);
-> +  _magic_start = ZIMAGE_MAGIC(_start);
-> +  _magic_end = ZIMAGE_MAGIC(_edata);
-> +
->    . = BSS_START;
->    __bss_start = .;
->    .bss			: { *(.bss) }
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Best regards,
+Tomasz
