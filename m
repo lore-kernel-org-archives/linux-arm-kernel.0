@@ -1,36 +1,25 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 10 Apr 2014 10:21:01 +0200
-Subject: [PATCH v2 2/4] Documentation: dt: socfpga: add reset-cells property
+Date: Thu, 10 Apr 2014 10:21:02 +0200
+Subject: [PATCH v2 3/4] Documentation: dt: reset: move socfpga-reset
 In-Reply-To: <1397118063-21619-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1397118063-21619-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1397118063-21619-2-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1397118063-21619-3-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to use the reset-controller framework, the property
-	#reset-cells
-is mandatory.
+Instead of having the documentation for the socfpga-reset controller in a
+vendor specific directory, move it to the reset folder to all the other
+reset drivers.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/{arm/altera => reset}/socfpga-reset.txt | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/altera => reset}/socfpga-reset.txt (100%)
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
-index ecdb57d..32c1c8b 100644
---- a/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
-@@ -3,9 +3,11 @@ Altera SOCFPGA Reset Manager
- Required properties:
- - compatible : "altr,rst-mgr"
- - reg : Should contain 1 register ranges(address and length)
-+- #reset-cells: 1
- 
- Example:
- 	 rstmgr at ffd05000 {
-+		#reset-cells = <1>;
- 		compatible = "altr,rst-mgr";
- 		reg = <0xffd05000 0x1000>;
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt b/Documentation/devicetree/bindings/reset/socfpga-reset.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
+rename to Documentation/devicetree/bindings/reset/socfpga-reset.txt
 -- 
 1.9.1
