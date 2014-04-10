@@ -1,59 +1,49 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 18:37:15 +0900
-Subject: [PATCH 04/27] ARM: EXYNOS: Support secondary CPU boot of Exynos4212
+Date: Thu, 10 Apr 2014 18:37:17 +0900
+Subject: [PATCH 06/27] ARM: EXYNOS:: Enter a15 lowpower mode for Exynos3250
+ based on Cortex-a7
 In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
 References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397122658-16013-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397122658-16013-7-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+This patch decide proper lowpower mode of either a15 or a9 according to own ID
+from Main ID register.
 
-This patch fix the offset of CPU boot address and change parameter of smc call
-of SMC_CMD_CPU1BOOT command for Exynos4212.
-
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/firmware.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ arch/arm/mach-exynos/hotplug.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index 932129e..91a911d 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -18,6 +18,8 @@
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 5eead53..36d3db6 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -135,13 +135,20 @@ void __ref exynos_cpu_die(unsigned int cpu)
+ 	int primary_part = 0;
  
- #include <mach/map.h>
- 
-+#include <plat/cpu.h>
+ 	/*
+-	 * we're ready for shutdown now, so do it.
+-	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
++	 * we're ready for shutdown now, so do it. Exynos4 is A9 based
++	 * while Exynos5 is A15/Exynos7 is A7; check the CPU part
+ 	 * number by reading the Main ID register and then perform the
+ 	 * appropriate sequence for entering low power.
+ 	 */
+ 	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
+-	if ((primary_part & 0xfff0) == 0xc0f0)
 +
- #include "smc.h"
- 
- static int exynos_do_idle(void)
-@@ -28,14 +30,22 @@ static int exynos_do_idle(void)
- 
- static int exynos_cpu_boot(int cpu)
- {
--	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
-+	if (soc_is_exynos4212())
-+		exynos_smc(SMC_CMD_CPU1BOOT, 0, 0, 0);
-+	else
-+		exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
- 	return 0;
- }
- 
- static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
- {
--	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-+	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
- 
-+	if (soc_is_exynos4212())
-+		goto out;
-+	else
-+		boot_reg += 4*cpu;
-+out:
- 	__raw_writel(boot_addr, boot_reg);
- 	return 0;
- }
++	/*
++	 * Main ID register of Cortex series
++	 * - Cortex-a7  : 0x410F_C07x
++	 * - Cortex-a15 : 0x410F_C0Fx
++	 */
++	primary_part = primary_part & 0xfff0;
++	if (primary_part == 0xc0f0 || primary_part == 0xc070)
+ 		cpu_enter_lowpower_a15();
+ 	else
+ 		cpu_enter_lowpower_a9();
 -- 
 1.8.0
