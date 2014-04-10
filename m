@@ -1,46 +1,134 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 10 Apr 2014 11:27:52 -0400 (EDT)
-Subject: [PATCH v2 2/2] usb: ehci-platform: Return immediately from
- suspend if ehci_suspend fails
-In-Reply-To: <1397125682-4955-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <Pine.LNX.4.44L0.1404101127420.32351-100000@netrider.rowland.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Apr 2014 13:03:59 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: ensure header in LE format for BE8
+ kernels
+In-Reply-To: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+References: <1397147232-28516-1-git-send-email-taras.kondratiuk@linaro.org>
+Message-ID: <alpine.LFD.2.11.1404101302380.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Apr 2014, Vivek Gautam wrote:
+On Thu, 10 Apr 2014, Taras Kondratiuk wrote:
 
-> Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
-> adds a check for possible race between suspend and wakeup interrupt,
-> and thereby it returns -EBUSY as error code if there's a wakeup
-> interrupt.
-> So the platform host controller should not proceed further with
-> its suspend callback, rather should return immediately to avoid
-> powering down the essential things, like phy.
+> From: Nico Pitre <nico@fluxnic.net>
+
+Please use "Nicolas Pitre" as my full name.
+
+> All known BE8-capable systems have LE bootloaders, so we need to ensure
+> that the magic number and image start/end values are in little endian
+> format.
 > 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Hauke Mehrtens <hauke@hauke-m.de>
-> Cc: Hans de Goede <hdegoede@redhat.com>
+> [ben.dooks at codethink.co.uk: from nico's original email on this subject]
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> [taras.kondratiuk at linaro.org: removed lds.S->lds rule, added target to extra-y]
+> Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
 > ---
-> 
-> Changes from v1:
-> -- Removed unnecessary change 'return 0'
-> 
->  drivers/usb/host/ehci-platform.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index b3a0e11..c7dd93a 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -303,6 +303,8 @@ static int ehci_platform_suspend(struct device *dev)
->  	int ret;
->  
->  	ret = ehci_suspend(hcd, do_wakeup);
-> +	if (ret)
-> +		return ret;
->  
->  	if (pdata->power_suspend)
->  		pdata->power_suspend(pdev);
+> Nico, should I add your Signed-off-by?
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Sure.
+
+> 
+> Discussion about the patch:
+> http://www.spinics.net/lists/arm-kernel/msg320670.html
+> 
+> Based on v3.14+ master commit 39de65aa2c3eee901db020a4f1396998e09602a3
+> 
+>  arch/arm/boot/compressed/.gitignore     |    1 +
+>  arch/arm/boot/compressed/Makefile       |    4 ++--
+>  arch/arm/boot/compressed/head.S         |    7 ++++---
+>  arch/arm/boot/compressed/vmlinux.lds.in |   14 ++++++++++++++
+>  4 files changed, 21 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+> index 0714e03..6a26e7b 100644
+> --- a/arch/arm/boot/compressed/.gitignore
+> +++ b/arch/arm/boot/compressed/.gitignore
+> @@ -10,6 +10,7 @@ piggy.xzkern
+>  piggy.lz4
+>  vmlinux
+>  vmlinux.lds
+> +vmlinux.lds.S
+>  
+>  # borrowed libfdt files
+>  fdt.c
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 68c9183..8a80906 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -114,7 +114,7 @@ targets       := vmlinux vmlinux.lds \
+>  # Make sure files are removed during clean
+>  extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern piggy.lz4 \
+>  		 lib1funcs.S ashldi3.S bswapsdi2.S $(libfdt) $(libfdt_hdrs) \
+> -		 hyp-stub.S
+> +		 hyp-stub.S vmlinux.lds.S
+>  
+>  ifeq ($(CONFIG_FUNCTION_TRACER),y)
+>  ORIG_CFLAGS := $(KBUILD_CFLAGS)
+> @@ -199,7 +199,7 @@ CFLAGS_font.o := -Dstatic=
+>  $(obj)/font.c: $(FONTC)
+>  	$(call cmd,shipped)
+>  
+> -$(obj)/vmlinux.lds: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile $(KCONFIG_CONFIG)
+> +$(obj)/vmlinux.lds.S: $(obj)/vmlinux.lds.in arch/arm/boot/Makefile $(KCONFIG_CONFIG)
+>  	@sed "$(SEDFLAGS)" < $< > $@
+>  
+>  $(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 066b034..8ea1773 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -130,9 +130,10 @@ start:
+>   THUMB(		adr	r12, BSYM(1f)	)
+>   THUMB(		bx	r12		)
+>  
+> -		.word	0x016f2818		@ Magic numbers to help the loader
+> -		.word	start			@ absolute load/run zImage address
+> -		.word	_edata			@ zImage end address
+> +		.word	_magic_sig	@ Magic numbers to help the loader
+> +		.word	_magic_start	@ absolute load/run zImage address
+> +		.word	_magic_end	@ zImage end address
+> +
+>   THUMB(		.thumb			)
+>  1:
+>   ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
+> index 4919f2a..6016223 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.in
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.in
+> @@ -7,6 +7,16 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> +
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +#define ZIMAGE_MAGIC(x) ( (((x) >> 24) & 0x000000ff) | \
+> +			  (((x) >>  8) & 0x0000ff00) | \
+> +			  (((x) <<  8) & 0x00ff0000) | \
+> +			  (((x) << 24) & 0xff000000) )
+> +#else
+> +#define ZIMAGE_MAGIC(x) (x)
+> +#endif
+> +
+>  OUTPUT_ARCH(arm)
+>  ENTRY(_start)
+>  SECTIONS
+> @@ -57,6 +67,10 @@ SECTIONS
+>    .pad			: { BYTE(0); . = ALIGN(8); }
+>    _edata = .;
+>  
+> +  _magic_sig = ZIMAGE_MAGIC(0x016f2818);
+> +  _magic_start = ZIMAGE_MAGIC(_start);
+> +  _magic_end = ZIMAGE_MAGIC(_edata);
+> +
+>    . = BSS_START;
+>    __bss_start = .;
+>    .bss			: { *(.bss) }
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
