@@ -1,63 +1,59 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 20:20:10 +0900
-Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
-In-Reply-To: <002701cf54a6$f6593720$e30ba560$@samsung.com>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <1397124377-16969-13-git-send-email-cw00.choi@samsung.com>
- <002701cf54a6$f6593720$e30ba560$@samsung.com>
-Message-ID: <53467E6A.6040105@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Apr 2014 14:02:59 +0100
+Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to
+ initialize gic from dt
+In-Reply-To: <878urd33g4.fsf@approximate.cambridge.arm.com>
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+ <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
+ <878urd33g4.fsf@approximate.cambridge.arm.com>
+Message-ID: <20140410130259.GA4462@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/10/2014 07:23 PM, Chanho Park wrote:
-> Hi,
+On Thu, Apr 10, 2014 at 11:04:59AM +0100, Marc Zyngier wrote:
+> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> > This patch declare coretex-a7's irqchip to initialze gic from dt
+> > with "arm,cortex-a7-gic" data.
+> >
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  drivers/irqchip/irq-gic.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> > index 4300b66..8e906e4 100644
+> > --- a/drivers/irqchip/irq-gic.c
+> > +++ b/drivers/irqchip/irq-gic.c
+> > @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+> >  }
+> >  IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
+> >  IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
+> > +IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
+> >  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+> >  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
 > 
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Chanwoo Choi
->> Sent: Thursday, April 10, 2014 7:06 PM
->> To: kgene.kim at samsung.com; t.figa at samsung.com; linux-samsung-
->> soc at vger.kernel.org
->> Cc: hyunhee.kim at samsung.com; sw0312.kim at samsung.com; linux-
->> kernel at vger.kernel.org; yj44.cho at samsung.com; inki.dae at samsung.com;
->> cw00.choi at samsung.com; kyungmin.park at samsung.com; linux-arm-
->> kernel at lists.infradead.org
->> Subject: [PATCH 21/27] ARM: dts: exynos3250: Add PMU dt data
->>
->> From: Hyunhee Kim <hyunhee.kim@samsung.com>
->>
->> ARM CPU has its own PMU (Performance Monitoring Unit). This patch add
->> PMU dt
->> data to support PMU for CPU. Exynos3250 has four PMU interrupts.
->>
->> Signed-off-by: Hyunhee Kim <hyunhee.kim@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos3250.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250.dtsi
->> b/arch/arm/boot/dts/exynos3250.dtsi
->> index ceed761..2f0ca32 100644
->> --- a/arch/arm/boot/dts/exynos3250.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->> @@ -280,4 +280,9 @@
->>  		pinctrl-0 = <&i2c7_bus>;
->>  		status = "disabled";
->>  	};
->> +
->> +	pmu {
->> +		compatible = "arm,cortex-a7-pmu";
->> +		interrupts = <0 18 0>, <0 19 0>, <0 20 0>, <0 21 0>;
->> +	};
+> Frankly, this patch adds no value. Are we going to add
+> "arm,cortex-a12-gic", "arm,cortex-a17-gic", "arm,cortex-a53-gic",
+> "arm,cortex-a57-gic"? And that's just to mention the ARM Ltd cores...
 > 
-> As I know, the exynos3250 has two CPU cores. Why does it have four pmu
-> interrupts?
-> IMO it is sufficient it has only two interrupts.
+> Instead, how about defining a generic "arm,gic" property, and mandate
+> that new DT files are using that? We can always use a more precise
+> compatible for quirks.
 
-OK, I'll fix it using only two interrupt for dual-core.
+Nit: s/property/compatible/
 
-Best Regards,
-Chanwoo Choi
+As mentioned elsewhere, "arm,gic-v2" would seem to fit the bill (and we
+can have "arm,gic" or "arm,gic-v1" for v1).
+
+> Mark, what do you think? I think this has been discussed in the past
+> already.
+
+It's been repeatedly brought up and agreed on, it's just that no-one's
+implemented it. I agree that having an "arm,gic-v2" binding that people
+can place in their compatible list is a sensible thing to do, and I'd be
+happy to Ack patches implementing it.
+
+Cheers,
+Mark.
