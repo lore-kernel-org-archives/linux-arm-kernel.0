@@ -1,35 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Apr 2014 14:43:42 +0200
-Subject: [PATCH v2 3/5] pinctrl: sunxi: define A31 R_PIO pin functions
-In-Reply-To: <1397132747-13917-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397132747-13917-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397132747-13917-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140410124342.GR28585@lukather>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 10 Apr 2014 11:25:07 +0100
+Subject: [PATCH v2 08/12] ARM: dts: add hip04-d01 dts file
+In-Reply-To: <1396944052-9887-9-git-send-email-haojian.zhuang@linaro.org>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140410102507.GB5499@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 02:25:45PM +0200, Boris BREZILLON wrote:
-> The A31 SoC provides both PL and PM pio bank through the R_PIO block.
+On Tue, Apr 08, 2014 at 04:00:48PM +0800, Haojian Zhuang wrote:
+> Add hip04.dtsi & hip04-d01.dts file to support HiP04 SoC platform.
 > 
-> These pins all support gpio function and can bbe assigned to system
-> peripherals (like TWI, P2WI, JTAG, ...)
-> 
-> Add new compatible string to the DT bindings doc.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+[...]
 
-Thanks!
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> index df0a452..47c0a13 100644
+> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/6b7d17fb/attachment.sig>
+[...]
+
+> @@ -31,6 +35,14 @@ Example:
+>  		reboot-offset = <0x4>;
+>  	};
+>  
+> +
+> +Hisilicon MCPM Implementation
+> +
+> +Required Properties:
+> +- compatible: "hisilicon,hip04-mcpm"
+> +- reg: Register address and size.
+> +
+> +
+
+Unless you have a component in your hardware called "MCPM", this is
+describing a power controller peripheral.  If so, what is it?
+
+Cheers
+---Dave
