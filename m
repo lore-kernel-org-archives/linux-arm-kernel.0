@@ -1,48 +1,38 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 10 Apr 2014 10:56:59 +0100
-Subject: [PATCH v2 06/12] ARM: mcpm: change max clusters to 4
-In-Reply-To: <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
-References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
- <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20140410095650.GA5499@e103592.cambridge.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 10 Apr 2014 12:00:47 +0200
+Subject: [RFC PATCH v2] edac: synopsys: Added EDAC support for zynq ddr
+ ecc controller
+In-Reply-To: <5e0042b6-f169-4025-8fd7-9d70c2ed0cf6@AM1EHSMHS012.ehs.local>
+References: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
+ <20140408204047.GQ30077@pd.tnic> <534633C0.9090905@monstr.eu>
+ <20140410092144.GD29093@pd.tnic>
+ <5e0042b6-f169-4025-8fd7-9d70c2ed0cf6@AM1EHSMHS012.ehs.local>
+Message-ID: <20140410100047.GG29093@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 04:00:46PM +0800, Haojian Zhuang wrote:
-> In order to support 4 clusters with 4 Cortex A15 Cores in each cluster,
-> enlarge maximum clusters from 2 to 4 in MCPM.
+On Thu, Apr 10, 2014 at 11:49:57AM +0200, Michal Simek wrote:
+> I agree with you that we can use shorter name. I have checked this
+> with Punnaiah and I can't see any problem to have more edac drivers
+> in the system. For zynq there is primary ddr controller which is
+> target by this driver. Then we are talking about L2 in another thread.
+> Because zynq has programmable logic next to chip where you can add
+> soft memory controller (we have these hw designs) on the same bus then
+> there could be others edac drivers. I would say how many you like till
+> pins on the package.
 
-CC Nico on mcpm patches please.  I'm happy to be CC'd as well.
+I knew you were gonna say something like that! :-)
 
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/include/asm/mcpm.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-> index 608516e..68f82cf 100644
-> --- a/arch/arm/include/asm/mcpm.h
-> +++ b/arch/arm/include/asm/mcpm.h
-> @@ -20,7 +20,7 @@
->   * to consider dynamic allocation.
->   */
->  #define MAX_CPUS_PER_CLUSTER	4
-> -#define MAX_NR_CLUSTERS		2
-> +#define MAX_NR_CLUSTERS		4
+Then you'll have to check whether edac can even stomach more than one
+drivers in parallel. TTBOMK, no one has ever done this so far... Yadda
+yadda.
 
-Because of the need for alignment to the biggest cacheline size in the
-system, the MCPM low-level locking structures consume a non-trivial
-amount of memory.
+But before you do all that, you need to check whether edac is really
+what you're looking for, as I put it in my other mail.
 
-Therefore, I'm not keen on the idea of simply increasing this #define
-every time a platform appears with a larger number of clusters.
-If hip04 is not built into the kernel, this just wastes memory.
+-- 
+Regards/Gruss,
+    Boris.
 
-I'll leave it to Nico to decide whether we can increase the #define
-to 4 or whether this needs a proper fix now.  Ideally, we would have
-a way of choosing the maximum value required by the set of boards built
-into the kernel, or switch to dynamic allocation.
-
-Cheers
----Dave
+Sent from a fat crate under my desk. Formatting is fine.
+--
