@@ -1,33 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 10 Apr 2014 14:47:05 +0200
-Subject: [PATCH v2 5/5] ARM: sunxi: update the default ARCH_NR_GPIO for
- sunxi arch
-In-Reply-To: <1397132747-13917-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397132747-13917-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397132747-13917-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140410124705.GT28585@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Apr 2014 14:20:55 +0200
+Subject: [PATCH V3 12/19] mmc: mmci: Enable MMC_CAP_CMD23
+In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
+References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1397132462-8005-13-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 02:25:47PM +0200, Boris BREZILLON wrote:
-> The A31 SoC has PL and PM banks, we thus need to increase the default
-> ARCH_NR_GPIO when building for the sunxi architecture.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+This is pure software configuration, which mmci has been supporting for
+a while. Let's enable it as default so we can take benefit from it.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/mmc/host/mmci.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Thanks!
-Maxime
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index d21136c..41bc054 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1533,6 +1533,9 @@ static int mmci_probe(struct amba_device *dev,
+ 		mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+ 	}
+ 
++	/* We support these capabilities. */
++	mmc->caps |= MMC_CAP_CMD23;
++
+ 	if (variant->busy_detect) {
+ 		mmci_ops.card_busy = mmci_card_busy;
+ 		mmci_write_datactrlreg(host, MCI_ST_DPSM_BUSYMODE);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/03ded9ae/attachment.sig>
+1.7.9.5
