@@ -1,27 +1,39 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 10 Apr 2014 22:46:47 +0400
-Subject: [PATCH] ARM: shmobile: r8a7790: link PCI USb devices to USB PHY
-In-Reply-To: <534674B5.6080706@cogentembedded.com>
-References: <201404092318.26231.sergei.shtylyov@cogentembedded.com>
- <CANqRtoQeuT=Q9PRYNMqA079gjb1VkwgvcDmsWKxjzSVxcVfeWw@mail.gmail.com>
- <534674B5.6080706@cogentembedded.com>
-Message-ID: <5346E717.4040507@cogentembedded.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 10 Apr 2014 12:47:55 -0600
+Subject: [PATCH v4 0/3] rtc: Add APM X-Gene SoC RTC driver
+Message-ID: <1397155678-26607-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2014 02:38 PM, Sergei Shtylyov wrote:
+This patch adds support for the APM X-Gene SoC RTC driver.
 
->> Thanks for this patch, good to see that the relationship between the
->> USB Host and the PHY is described via DT.
+v4
+* Clean up un-needed read RTC_CCVR register in function xgene_rtc_set_alarm
+* Update suspend/resume functions to setup clock and IRQ accordingly
 
->> This patch seems to cover USB0 and USB2 that both require special
->> control in the PHY. How about USB1? Can you explain about the reason
->> why you omit that?
+v3
+* Remove #clock-cell from binding documentation
 
->     Because the driver does nothing for USB1 anyway.
+v2
+* Change function xgene_rtc_read_time to return rtc_valid_tm(tm) instead 0
 
-    Looks like I should have tested that last minute change: kernel oopses due 
-to NULL pointer dereference somewhere in phy_get() once it gets called for 
-EHCI on the channel #1. At least doesn't seem to be my mistake...
+v1
+* Initial version
 
-WBR, Sergei
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+Signed-off-by: Loc Ho <lho@apm.com>
+--
+Loc Ho (3):
+  Documentation: Add documentation for the APM X-Gene SoC RTC DTS
+    binding
+  rtc: Add APM X-Gene SoC RTC driver
+  arm64: Add APM X-Gene SoC RTC DTS entry
+
+ .../devicetree/bindings/rtc/xgene-rtc.txt          |   27 ++
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   21 ++
+ drivers/rtc/Kconfig                                |    9 +
+ drivers/rtc/Makefile                               |    1 +
+ drivers/rtc/rtc-xgene.c                            |  301 ++++++++++++++++++++
+ 5 files changed, 359 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/xgene-rtc.txt
+ create mode 100644 drivers/rtc/rtc-xgene.c
