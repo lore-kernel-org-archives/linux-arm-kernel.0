@@ -1,158 +1,78 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Apr 2014 14:20:59 +0200
-Subject: [PATCH V3 16/19] mmc: mmci: Enforce DT for signal direction and
- feedback clock
-In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397132462-8005-17-git-send-email-ulf.hansson@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 10 Apr 2014 17:38:46 +0530
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <53457AD4.8090708@ti.com>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <534412FD.5030308@ti.com> <20140409163330.GI27282@n2100.arm.linux.org.uk>
+ <53457AD4.8090708@ti.com>
+Message-ID: <534689CE.2070904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the option to provide signal direction configuration and
-feeback clock as platform data, enforce it through DT.
+On Wednesday 09 April 2014 10:22 PM, Santosh Shilimkar wrote:
+> On Wednesday 09 April 2014 12:33 PM, Russell King - ARM Linux wrote:
+>> On Tue, Apr 08, 2014 at 11:17:17AM -0400, Santosh Shilimkar wrote:
+>>> On Tuesday 08 April 2014 10:53 AM, Sekhar Nori wrote:
+>>>> On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
+>>>>> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
+>>>>>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+>>>>>> index f8b8dac..6b2a056 100644
+>>>>>> --- a/arch/arm/mach-omap2/omap4-common.c
+>>>>>> +++ b/arch/arm/mach-omap2/omap4-common.c
+>>>>>> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
+>>>>>>  
+>>>>>>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
+>>>>>>  }
+>>>>>> +
+>>>>>> +int __init am43xx_l2_cache_init(void)
+>>>>>> +{
+>>>>>> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
+>>>>>> +		       L310_AUX_CTRL_INSTR_PREFETCH;
+>>>>>
+>>>>> It would be good to documenting the difference between this and OMAP4,
+>>>>> and why you have chosen different values.
+>>>>
+>>>> There are two main differences:
+>>>>
+>>>> 1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
+>>>> not needed even in OMAP4 with latest kernel, but I am not sure if I can
+>>>> do this safely without breaking any usecase currently working with OMAP4.
+>>>>
+>>> Wrong. Shared bit is mandatory for the OMAP4. Its a SMP system
+>>> which needs that.
+>>
+>> Errr.  This bit affects the L2 cache behaviour for Normal memory, outer
+>> non-cacheable accesses - in other words, those performed to memory mapped
+>> via dma_alloc_coherent() or dma_alloc_writecombine().  It does not affect
+>> other types of mappings (other access types ignore the sharable attribute).
+>>
+>> When this bit is clear, accesses to such memory are:
+>>
+>> - read: cacheable, no allocate
+>> - write: write through, no write allocate
+>>
+>> what this means is that if there are no cache lines in the L2 cache
+>> corresponding with the physical address, then none will be allocated.
+>> However, if there are cache lines present, then they will be hit,
+>> read or updated as appropriate.
+>>
+>> This may matter before CMA where we had the memory returned by
+>> dma_alloc_coherent() and friends mapped as normal, cacheable mappings
+>> which could be speculatively prefetched, and therefore cache lines
+>> dragged into the L2 cache for these physical addresses.
+>>
+>> However, now that we're using CMA, this does not apply as we no longer
+>> have this aliasing mapping.
+>>
+>> So, with CMA enabled, it should be safe not to set this bit.
+>>
+> Agree. That should be safe now.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c   |   34 ++++++++++++++--------------------
- drivers/mmc/host/mmci.h   |   11 +++++++++++
- include/linux/amba/mmci.h |   16 ----------------
- 3 files changed, 25 insertions(+), 36 deletions(-)
+Since we cannot guarantee that CONFIG_DMA_CMA will always be enabled in
+kernel config, shall we take the safer route and keep the Shared
+attribute override bit enabled in L2C configuration?
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 41bc054..cac5f28 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1287,7 +1287,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		 * indicating signal direction for the signals in
- 		 * the SD/MMC bus and feedback-clock usage.
- 		 */
--		pwr |= host->plat->sigdir;
-+		pwr |= host->pwr_reg_add;
- 
- 		if (ios->bus_width == MMC_BUS_WIDTH_4)
- 			pwr &= ~MCI_ST_DATA74DIREN;
-@@ -1386,29 +1386,26 @@ static struct mmc_host_ops mmci_ops = {
- 	.start_signal_voltage_switch = mmci_sig_volt_switch,
- };
- 
--static void mmci_dt_populate_generic_pdata(struct device_node *np,
--					struct mmci_platform_data *pdata)
-+static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
- {
-+	struct mmci_host *host = mmc_priv(mmc);
-+	int ret = mmc_of_parse(mmc);
-+
-+	if (ret)
-+		return ret;
-+
- 	if (of_get_property(np, "st,sig-dir-dat0", NULL))
--		pdata->sigdir |= MCI_ST_DATA0DIREN;
-+		host->pwr_reg_add |= MCI_ST_DATA0DIREN;
- 	if (of_get_property(np, "st,sig-dir-dat2", NULL))
--		pdata->sigdir |= MCI_ST_DATA2DIREN;
-+		host->pwr_reg_add |= MCI_ST_DATA2DIREN;
- 	if (of_get_property(np, "st,sig-dir-dat31", NULL))
--		pdata->sigdir |= MCI_ST_DATA31DIREN;
-+		host->pwr_reg_add |= MCI_ST_DATA31DIREN;
- 	if (of_get_property(np, "st,sig-dir-dat74", NULL))
--		pdata->sigdir |= MCI_ST_DATA74DIREN;
-+		host->pwr_reg_add |= MCI_ST_DATA74DIREN;
- 	if (of_get_property(np, "st,sig-dir-cmd", NULL))
--		pdata->sigdir |= MCI_ST_CMDDIREN;
-+		host->pwr_reg_add |= MCI_ST_CMDDIREN;
- 	if (of_get_property(np, "st,sig-pin-fbclk", NULL))
--		pdata->sigdir |= MCI_ST_FBCLKEN;
--}
--
--static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
--{
--	int ret = mmc_of_parse(mmc);
--
--	if (ret)
--		return ret;
-+		host->pwr_reg_add |= MCI_ST_FBCLKEN;
- 
- 	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
- 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
-@@ -1440,9 +1437,6 @@ static int mmci_probe(struct amba_device *dev,
- 			return -ENOMEM;
- 	}
- 
--	if (np)
--		mmci_dt_populate_generic_pdata(np, plat);
--
- 	mmc = mmc_alloc_host(sizeof(struct mmci_host), &dev->dev);
- 	if (!mmc)
- 		return -ENOMEM;
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 8fc5814..347d942 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -13,6 +13,16 @@
- #define MCI_PWR_ON		0x03
- #define MCI_OD			(1 << 6)
- #define MCI_ROD			(1 << 7)
-+/*
-+ * The ST Micro version does not have ROD and reuse the voltage registers for
-+ * direction settings.
-+ */
-+#define MCI_ST_DATA2DIREN	(1 << 2)
-+#define MCI_ST_CMDDIREN		(1 << 3)
-+#define MCI_ST_DATA0DIREN	(1 << 4)
-+#define MCI_ST_DATA31DIREN	(1 << 5)
-+#define MCI_ST_FBCLKEN		(1 << 7)
-+#define MCI_ST_DATA74DIREN	(1 << 8)
- 
- #define MMCICLOCK		0x004
- #define MCI_CLK_ENABLE		(1 << 8)
-@@ -183,6 +193,7 @@ struct mmci_host {
- 	unsigned int		mclk;
- 	unsigned int		cclk;
- 	u32			pwr_reg;
-+	u32			pwr_reg_add;
- 	u32			clk_reg;
- 	u32			datactrl_reg;
- 	u32			busy_status;
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index 32a89cf..0d3ff95 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -6,19 +6,6 @@
- 
- #include <linux/mmc/host.h>
- 
--
--/*
-- * These defines is places here due to access is needed from machine
-- * configuration files. The ST Micro version does not have ROD and
-- * reuse the voltage registers for direction settings.
-- */
--#define MCI_ST_DATA2DIREN	(1 << 2)
--#define MCI_ST_CMDDIREN		(1 << 3)
--#define MCI_ST_DATA0DIREN	(1 << 4)
--#define MCI_ST_DATA31DIREN	(1 << 5)
--#define MCI_ST_FBCLKEN		(1 << 7)
--#define MCI_ST_DATA74DIREN	(1 << 8)
--
- /* Just some dummy forwarding */
- struct dma_chan;
- 
-@@ -45,8 +32,6 @@ struct dma_chan;
-  * @capabilities: the capabilities of the block as implemented in
-  * this platform, signify anything MMC_CAP_* from mmc/host.h
-  * @capabilities2: more capabilities, MMC_CAP2_* from mmc/host.h
-- * @sigdir: a bit field indicating for what bits in the MMC bus the host
-- * should enable signal direction indication.
-  * @dma_filter: function used to select an appropriate RX and TX
-  * DMA channel to be used for DMA, if and only if you're deploying the
-  * generic DMA engine
-@@ -69,7 +54,6 @@ struct mmci_platform_data {
- 	bool	cd_invert;
- 	unsigned long capabilities;
- 	unsigned long capabilities2;
--	u32 sigdir;
- 	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
- 	void *dma_rx_param;
- 	void *dma_tx_param;
--- 
-1.7.9.5
+Thanks,
+Sekhar
