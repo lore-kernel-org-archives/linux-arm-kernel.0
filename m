@@ -1,53 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 19:54:57 +0200
-Subject: [PATCH 1/2] GPIO: Add driver for Zynq GPIO controller
-In-Reply-To: <7da0486b-bbdd-445b-8a6d-b5bcb311d908@TX2EHSMHS036.ehs.local>
-References: <1395933906-2268-1-git-send-email-harinik@xilinx.com>
- <CAPDyKFo4R9izP=jcoU+jqd74Nbeh+-5A1T8c_=EL4cmzja_29A@mail.gmail.com>
- <7da0486b-bbdd-445b-8a6d-b5bcb311d908@TX2EHSMHS036.ehs.local>
-Message-ID: <CACRpkdbXx4Wpqg1ZiisQnVM7AaDWpA0TjWPD=YnYYBAr2kCrMw@mail.gmail.com>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Thu, 10 Apr 2014 13:56:23 -0400
+Subject: [PATCH v3 2/3] Update bcm_defconfig with new pinctrl CONFIG
+In-Reply-To: <1396478439-16586-3-git-send-email-syin@broadcom.com>
+References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
+ <1396478439-16586-1-git-send-email-syin@broadcom.com>
+ <1396478439-16586-3-git-send-email-syin@broadcom.com>
+Message-ID: <20140410175623.GC23695@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 7, 2014 at 9:00 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Mon, 2014-03-31 at 11:23AM +0200, Ulf Hansson wrote:
->> On 27 March 2014 16:25, Harini Katakam <harinik@xilinx.com> wrote:
-> [...]
->> > +static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
->> > +{
->> > +       struct platform_device *pdev = to_platform_device(dev);
->> > +       struct zynq_gpio *gpio = platform_get_drvdata(pdev);
->> > +
->> > +       clk_disable(gpio->clk);
->>
->> You should be able can use clk_disable_unprepare() here.
->>
->> > +
->> > +       return 0;
->> > +}
->> > +
->> > +static int __maybe_unused zynq_gpio_runtime_resume(struct device *dev)
->> > +{
->> > +       struct platform_device *pdev = to_platform_device(dev);
->> > +       struct zynq_gpio *gpio = platform_get_drvdata(pdev);
->> > +
->> > +       return clk_enable(gpio->clk);
->>
->> You should be able can use clk_prepare_enable() here.
->
-> Is there some common practice regarding this? As I understand it, we
-> want to ensure the clock to be gated during suspend, which should happen
-> with clk_disable(). Why would we also unprepare the clock? We are highly
-> likely to use it again once we resume.
+On Wed, Apr 02, 2014 at 03:40:38PM -0700, Sherman Yin wrote:
+> To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
+> driver and its related CONFIG option are renamed to bcm281xx.
+> 
+> This commit updates the defconfig that enables the pinctrl driver.
+> 
+> Signed-off-by: Sherman Yin <syin@broadcom.com>
+> Reviewed-by: Matt Porter <mporter@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-enable() is fastpath (e.g. in IRQs disabled context) whereas
-prepare() is slowpath() in normal, threaded context.
+Acked-by: Matt Porter <mporter@linaro.org>
 
-As [runtime]_suspend/resume happens in normal context you
-want to make sure clocks are both disabled/unprepared
-and prepared/enabled to make sure any clocks that can only
-be accessed in slowpath are also turned off/on.
-
-Yours,
-Linus Walleij
+> ---
+>  arch/arm/configs/bcm_defconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
+> index 2519d6d..b4d3013 100644
+> --- a/arch/arm/configs/bcm_defconfig
+> +++ b/arch/arm/configs/bcm_defconfig
+> @@ -125,7 +125,7 @@ CONFIG_CRC_ITU_T=y
+>  CONFIG_CRC7=y
+>  CONFIG_XZ_DEC=y
+>  CONFIG_AVERAGE=y
+> -CONFIG_PINCTRL_CAPRI=y
+> +CONFIG_PINCTRL_BCM281XX=y
+>  CONFIG_WATCHDOG=y
+>  CONFIG_BCM_KONA_WDT=y
+>  CONFIG_BCM_KONA_WDT_DEBUG=y
+> -- 
+> 1.7.9.5
+> 
