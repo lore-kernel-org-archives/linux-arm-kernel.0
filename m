@@ -1,78 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 10 Apr 2014 17:38:46 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <53457AD4.8090708@ti.com>
-References: <cover.1396605300.git.nsekhar@ti.com>
- <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
- <534412FD.5030308@ti.com> <20140409163330.GI27282@n2100.arm.linux.org.uk>
- <53457AD4.8090708@ti.com>
-Message-ID: <534689CE.2070904@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 10 Apr 2014 14:16:49 -0300
+Subject: Wrong SPI NOR model detected by mx6sl
+In-Reply-To: <201404101807.48238.marex@denx.de>
+References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
+ <201404101807.48238.marex@denx.de>
+Message-ID: <CAOMZO5CBV0tXhbBBFBO=T62nmCn9TenK8BgdAhT8r3b-30u6qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 April 2014 10:22 PM, Santosh Shilimkar wrote:
-> On Wednesday 09 April 2014 12:33 PM, Russell King - ARM Linux wrote:
->> On Tue, Apr 08, 2014 at 11:17:17AM -0400, Santosh Shilimkar wrote:
->>> On Tuesday 08 April 2014 10:53 AM, Sekhar Nori wrote:
->>>> On Friday 04 April 2014 03:48 PM, Russell King - ARM Linux wrote:
->>>>> On Fri, Apr 04, 2014 at 03:40:29PM +0530, Sekhar Nori wrote:
->>>>>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->>>>>> index f8b8dac..6b2a056 100644
->>>>>> --- a/arch/arm/mach-omap2/omap4-common.c
->>>>>> +++ b/arch/arm/mach-omap2/omap4-common.c
->>>>>> @@ -224,6 +224,14 @@ int __init omap4_l2_cache_init(void)
->>>>>>  
->>>>>>  	return omap_l2_cache_init(aux_ctrl, 0xc19fffff);
->>>>>>  }
->>>>>> +
->>>>>> +int __init am43xx_l2_cache_init(void)
->>>>>> +{
->>>>>> +	u32 aux_ctrl = L310_AUX_CTRL_DATA_PREFETCH |
->>>>>> +		       L310_AUX_CTRL_INSTR_PREFETCH;
->>>>>
->>>>> It would be good to documenting the difference between this and OMAP4,
->>>>> and why you have chosen different values.
->>>>
->>>> There are two main differences:
->>>>
->>>> 1) OMAP4 sets Shared attribute override enable bit. TBH, I think this is
->>>> not needed even in OMAP4 with latest kernel, but I am not sure if I can
->>>> do this safely without breaking any usecase currently working with OMAP4.
->>>>
->>> Wrong. Shared bit is mandatory for the OMAP4. Its a SMP system
->>> which needs that.
->>
->> Errr.  This bit affects the L2 cache behaviour for Normal memory, outer
->> non-cacheable accesses - in other words, those performed to memory mapped
->> via dma_alloc_coherent() or dma_alloc_writecombine().  It does not affect
->> other types of mappings (other access types ignore the sharable attribute).
->>
->> When this bit is clear, accesses to such memory are:
->>
->> - read: cacheable, no allocate
->> - write: write through, no write allocate
->>
->> what this means is that if there are no cache lines in the L2 cache
->> corresponding with the physical address, then none will be allocated.
->> However, if there are cache lines present, then they will be hit,
->> read or updated as appropriate.
->>
->> This may matter before CMA where we had the memory returned by
->> dma_alloc_coherent() and friends mapped as normal, cacheable mappings
->> which could be speculatively prefetched, and therefore cache lines
->> dragged into the L2 cache for these physical addresses.
->>
->> However, now that we're using CMA, this does not apply as we no longer
->> have this aliasing mapping.
->>
->> So, with CMA enabled, it should be safe not to set this bit.
->>
-> Agree. That should be safe now.
+Hi Marek,
 
-Since we cannot guarantee that CONFIG_DMA_CMA will always be enabled in
-kernel config, shall we take the safer route and keep the Shared
-attribute override bit enabled in L2C configuration?
+On Thu, Apr 10, 2014 at 1:07 PM, Marek Vasut <marex@denx.de> wrote:
+
+> Can you share the JEDEC ID codes that both of the boards actually read from the
+> SPI NOR ? You can dump those in the m25p80.c driver . That'd be helpful, I
+> suspect some kind of an "offset" or "polarity inversion" in the SPI
+> communication causing this.
+
+On mx6qsabresd:
+
+m25p80 spi0.0: JEDEC id: 0x202016
+m25p80 spi0.0: m25p32 (4096 Kbytes)
+
+On mx6sl-evk:
+
+m25p80 spi0.0: JEDEC id: 0x000000
+m25p80 spi0.0: found mr25h256, expected m25p32
+m25p80 spi0.0: mr25h256 (32 Kbytes)
+
+Will need to dump the SPI registers to understand why mx6sl behaves like this.
 
 Thanks,
-Sekhar
+
+Fabio Estevam
