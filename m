@@ -1,22 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 18:07:58 +0200
-Subject: [PATCH 1/4] pinctrl: msm: Correct interrupt code for TLMM v2
-In-Reply-To: <1396302597-31801-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1396302597-31801-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CACRpkdb3DD4r97jJbMV9d9=eZxFU8zSXu1eAGsM=ax+ebFDZ8g@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Apr 2014 14:20:54 +0200
+Subject: [PATCH V3 11/19] mmc: mmci: Mark the DT bindings for highspeed mode
+ as deprecated
+In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
+References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1397132462-8005-12-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 31, 2014 at 11:49 PM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
+The common mmc DT parser supports bindings for highspeed mode, thus
+there are no need for mmci to provide it's own versions for these. Mark
+them as deprecated in the documentation.
 
-> Acking interrupts are done differently between on v2 and v3, so add an extra
-> attribute to the pingroup struct to let the platform definitions control this.
-> Also make sure to start dual edge detection by detecting the rising edge.
->
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/mmc/mmci.txt |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Patch applied for fixes. Sorry for the delay.
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+index 2c8756f..03796cf 100644
+--- a/Documentation/devicetree/bindings/mmc/mmci.txt
++++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+@@ -15,8 +15,6 @@ Required properties:
+ Optional properties:
+ - arm,primecell-periphid : contains the PrimeCell Peripheral ID, it overrides
+                            the ID provided by the HW
+-- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
+-- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
+ - vqmmc-supply           : phandle to the regulator device tree node, mentioned
+                            as the VCCQ/VDD_IO supply in the eMMC/SD specs.
+ - st,sig-dir-dat0        : bus signal direction pin used for DAT[0].
+@@ -26,6 +24,10 @@ Optional properties:
+ - st,sig-dir-cmd         : cmd signal direction pin used for CMD.
+ - st,sig-pin-fbclk       : feedback clock signal pin used.
+ 
++Deprecated properties:
++- mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
++- mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
++
+ Example:
+ 
+ sdi0_per1 at 80126000 {
+@@ -42,8 +44,8 @@ sdi0_per1 at 80126000 {
+ 
+ 	max-frequency = <100000000>;
+ 	bus-width = <4>;
+-	mmc-cap-sd-highspeed;
+-	mmc-cap-mmc-highspeed;
++	cap-sd-highspeed;
++	cap-mmc-highspeed;
+ 	cd-gpios  = <&gpio2 31 0x4>; // 95
+ 	st,sig-dir-dat0;
+ 	st,sig-dir-dat2;
+-- 
+1.7.9.5
