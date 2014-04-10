@@ -1,45 +1,30 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 10 Apr 2014 15:58:02 +0530
-Subject: [PATCH v2 2/2] usb: ehci-platform: Return immediately from suspend if
- ehci_suspend fails
-In-Reply-To: <1397125682-4955-1-git-send-email-gautam.vivek@samsung.com>
-References: <1397125682-4955-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1397125682-4955-2-git-send-email-gautam.vivek@samsung.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 10 Apr 2014 18:07:48 +0200
+Subject: Wrong SPI NOR model detected by mx6sl
+In-Reply-To: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
+References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
+Message-ID: <201404101807.48238.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 'b8efdaf USB: EHCI: add check for wakeup/suspend race'
-adds a check for possible race between suspend and wakeup interrupt,
-and thereby it returns -EBUSY as error code if there's a wakeup
-interrupt.
-So the platform host controller should not proceed further with
-its suspend callback, rather should return immediately to avoid
-powering down the essential things, like phy.
+On Thursday, April 10, 2014 at 05:49:18 PM, Fabio Estevam wrote:
+> Hi,
+> 
+> On the imx6sl-evk there is a m25p32 spi nor flash, but in the kernel
+> probe we get:
+> 
+> m25p80 spi0.0: found mr25h256, expected m25p32
+> m25p80 spi0.0: mr25h256 (32 Kbytes)
+> 
+> On the mx6qsabresd there is also a m25p32, which is correctly detected:
+> m25p80 spi0.0: m25p32 (4096 Kbytes)
+> 
+> Any ideas as to why mx6sl detects the wrong spi nor model?
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Hauke Mehrtens <hauke@hauke-m.de>
-Cc: Hans de Goede <hdegoede@redhat.com>
----
+Can you share the JEDEC ID codes that both of the boards actually read from the 
+SPI NOR ? You can dump those in the m25p80.c driver . That'd be helpful, I 
+suspect some kind of an "offset" or "polarity inversion" in the SPI 
+communication causing this.
 
-Changes from v1:
--- Removed unnecessary change 'return 0'
-
- drivers/usb/host/ehci-platform.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index b3a0e11..c7dd93a 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -303,6 +303,8 @@ static int ehci_platform_suspend(struct device *dev)
- 	int ret;
- 
- 	ret = ehci_suspend(hcd, do_wakeup);
-+	if (ret)
-+		return ret;
- 
- 	if (pdata->power_suspend)
- 		pdata->power_suspend(pdev);
--- 
-1.7.10.4
+Best regards,
+Marek Vasut
