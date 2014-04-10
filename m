@@ -1,128 +1,90 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 18:28:25 +0900
-Subject: [PATCH 08/27] pinctrl: exynos: Add driver data for Exynos3250
+Date: Thu, 10 Apr 2014 18:32:41 +0900
+Subject: [PATCH 00/27] Support new Exynos3250 SoC based on Cortex-A7 dual
+ core
 In-Reply-To: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
 References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397122124-15690-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <53466539.8060100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+Dear all,
 
-This patch adds driver data (bank list and EINT layout) for Exynos3250
-to pinctrl-exynos driver. Exynos3250 includes 158 multi-functional input/output
-ports. There are 23 general port groups.
+Ignore this patchset because this patchset don't include all of patches.
+I'll send this patchset again right now.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/pinctrl/pinctrl-exynos.c  | 67 +++++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/pinctrl-samsung.c |  2 ++
- drivers/pinctrl/pinctrl-samsung.h |  1 +
- 3 files changed, 70 insertions(+)
+Sorry for my mistake.
 
-diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
-index 07c8130..9609c23 100644
---- a/drivers/pinctrl/pinctrl-exynos.c
-+++ b/drivers/pinctrl/pinctrl-exynos.c
-@@ -718,6 +718,73 @@ struct samsung_pin_ctrl s5pv210_pin_ctrl[] = {
- 	},
- };
- 
-+/* pin banks of exynos3250 pin-controller 0 */
-+static struct samsung_pin_bank exynos3250_pin_banks0[] = {
-+	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb",  0x08),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpc0", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x080, "gpc1", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0a0, "gpd0", 0x14),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0c0, "gpd1", 0x18),
-+};
-+
-+/* pin banks of exynos3250 pin-controller 1 */
-+static struct samsung_pin_bank exynos3250_pin_banks1[] = {
-+	EXYNOS_PIN_BANK_EINTN(8, 0x120, "gpe0"),
-+	EXYNOS_PIN_BANK_EINTN(8, 0x140, "gpe1"),
-+	EXYNOS_PIN_BANK_EINTN(3, 0x180, "gpe2"),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpk0", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x060, "gpk1", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x080, "gpk2", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0c0, "gpl0", 0x18),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x260, "gpm0", 0x24),
-+	EXYNOS_PIN_BANK_EINTG(7, 0x280, "gpm1", 0x28),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x2a0, "gpm2", 0x2c),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x2c0, "gpm3", 0x30),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x2e0, "gpm4", 0x34),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xc00, "gpx0", 0x00),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xc20, "gpx1", 0x04),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xc40, "gpx2", 0x08),
-+	EXYNOS_PIN_BANK_EINTW(8, 0xc60, "gpx3", 0x0c),
-+};
-+
-+/*
-+ * Samsung pinctrl driver data for Exynos3250 SoC. Exynos3250 SoC includes
-+ * two gpio/pin-mux/pinconfig controllers.
-+ */
-+struct samsung_pin_ctrl exynos3250_pin_ctrl[] = {
-+	{
-+		/* pin-controller instance 0 data */
-+		.pin_banks	= exynos3250_pin_banks0,
-+		.nr_banks	= ARRAY_SIZE(exynos3250_pin_banks0),
-+		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
-+		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
-+		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
-+		.svc		= EXYNOS_SVC_OFFSET,
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos3250-gpio-ctrl0",
-+	}, {
-+		/* pin-controller instance 1 data */
-+		.pin_banks	= exynos3250_pin_banks1,
-+		.nr_banks	= ARRAY_SIZE(exynos3250_pin_banks1),
-+		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
-+		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
-+		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
-+		.weint_con	= EXYNOS_WKUP_ECON_OFFSET,
-+		.weint_mask	= EXYNOS_WKUP_EMASK_OFFSET,
-+		.weint_pend	= EXYNOS_WKUP_EPEND_OFFSET,
-+		.svc		= EXYNOS_SVC_OFFSET,
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.eint_wkup_init = exynos_eint_wkup_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
-+		.label		= "exynos3250-gpio-ctrl1",
-+	},
-+};
-+
- /* pin banks of exynos4210 pin-controller 0 */
- static struct samsung_pin_bank exynos4210_pin_banks0[] = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
-diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-index 0324d4c..3e61d0f 100644
---- a/drivers/pinctrl/pinctrl-samsung.c
-+++ b/drivers/pinctrl/pinctrl-samsung.c
-@@ -1114,6 +1114,8 @@ static struct syscore_ops samsung_pinctrl_syscore_ops = {
- 
- static const struct of_device_id samsung_pinctrl_dt_match[] = {
- #ifdef CONFIG_PINCTRL_EXYNOS
-+	{ .compatible = "samsung,exynos3250-pinctrl",
-+		.data = (void *)exynos3250_pin_ctrl },
- 	{ .compatible = "samsung,exynos4210-pinctrl",
- 		.data = (void *)exynos4210_pin_ctrl },
- 	{ .compatible = "samsung,exynos4x12-pinctrl",
-diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
-index bab9c21..b3e41fa 100644
---- a/drivers/pinctrl/pinctrl-samsung.h
-+++ b/drivers/pinctrl/pinctrl-samsung.h
-@@ -251,6 +251,7 @@ struct samsung_pmx_func {
- };
- 
- /* list of all exported SoC specific data */
-+extern struct samsung_pin_ctrl exynos3250_pin_ctrl[];
- extern struct samsung_pin_ctrl exynos4210_pin_ctrl[];
- extern struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
- extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
--- 
-1.8.0
+Best Regards,
+Chanwoo Choi
+
+On 04/10/2014 06:28 PM, Chanwoo Choi wrote:
+> This patchset support new Exynos3250 Samsung SoC based on Cortex-A7 dual core.
+> Exynos3250 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
+> for Smartphone. It is desigend with the 28nm low-power high-K metal gate process
+> and provides the best performance features.
+> 
+> This patchset include some patches such as:
+> - Support secondary CPU of Exynos3250 (cpu up/down)
+> - Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/pwm/amba
+> - Support the gpio control for Exynos3250 using pinctrl
+> - Support the clock control for Exynos3250 using common clk framework
+> 
+> Chanwoo Choi (11):
+>   ARM: EXYNOS: Add Exynos3250 SoC ID
+>   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of Exynos3250
+>   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+>   ARM: EXYNOS: Support secondary CPU boot of Exynos3250
+>   ARM: EXYNOS:: Enter a15 lowpower mode for Exynos3250 based on Cortex-a7
+>   irqchip: Declare cortex-a7's irqchip to initialize gic from dt
+>   ARM: dts: exynos3250: Add default interrupt-parent connected with GIC
+>   ARM: dts: exynos3250: Add uart dt node to support seiral ports
+>   ARM: dts: exynos3250: Add MCT dt node
+>   ARM: dts: exynos3250: Add ADC dt node to read analog raw data
+>   ARM: dts: exynos3250: Add CPUs dt node for Exynos3250
+> 
+> Hyunhee Kim (1):
+>   ARM: dts: exynos3250: Add PMU dt data
+> 
+> Inki Dae (2):
+>   ARM: dts: exynos3250: Add i2c dt node
+>   ARM: dts: exynos3250: Add power domain dt nodes
+> 
+> Kyungmin Park (2):
+>   ARM: EXYNOS: Support secondary CPU boot of Exynos4212
+>   ARM: dts: exynos3250: Add Mobile Storage Host Card
+> 
+> Tomasz Figa (11):
+>   pinctrl: exynos: Add driver data for Exynos3250
+>   clk: samsung: exynos3250: Add clocks using common clock framework
+>   ARM: dts: exynos3250: Add new exynos3250.dtsi file
+>   ARM: dts: exynos3250: Add GIC dt node for Exynos3250
+>   ARM: dts: exynos3250: Add pin control device tree data
+>   ARM: dts: exynos3250: Add device tree nodes for clock controllers
+>   ARM: dts: exynos3250: Move definitions of external clocks to SoC dtsi
+>   ARM: dts: exynos3250: Add amba and pdma dt node
+>   ARM: dts: exynos3250: Add spi dt node to support spi bus
+>   ARM: dts: exynos3250: Add pwm dt node to support PWM Timer
+>   ARM: dts: exynos3250: Add RTC dt node
+> 
+>  arch/arm/boot/dts/exynos3250-pinctrl.dtsi | 477 ++++++++++++++++++
+>  arch/arm/boot/dts/exynos3250.dtsi         | 410 ++++++++++++++++
+>  arch/arm/mach-exynos/Kconfig              |  22 +
+>  arch/arm/mach-exynos/exynos.c             |  18 +
+>  arch/arm/mach-exynos/firmware.c           |  17 +-
+>  arch/arm/mach-exynos/hotplug.c            |  13 +-
+>  arch/arm/mach-exynos/include/mach/map.h   |   2 +
+>  arch/arm/plat-samsung/include/plat/cpu.h  |  10 +
+>  drivers/clk/samsung/Makefile              |   1 +
+>  drivers/clk/samsung/clk-exynos3250.c      | 785 ++++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic.c                 |   1 +
+>  drivers/pinctrl/pinctrl-exynos.c          |  67 +++
+>  drivers/pinctrl/pinctrl-samsung.c         |   2 +
+>  drivers/pinctrl/pinctrl-samsung.h         |   1 +
+>  include/dt-bindings/clock/exynos3250.h    | 256 ++++++++++
+>  15 files changed, 2077 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+>  create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
+>  create mode 100644 drivers/clk/samsung/clk-exynos3250.c
+>  create mode 100644 include/dt-bindings/clock/exynos3250.h
+> 
