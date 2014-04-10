@@ -1,96 +1,68 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Thu, 10 Apr 2014 16:02:52 +0530
-Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
- on/off
-In-Reply-To: <53465FB9.7070002@ti.com>
-References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
- <53465FB9.7070002@ti.com>
-Message-ID: <CAFp+6iHKT6wFBimhzEGVJRiY_y-2rAur_e-TPFS9=RTLckf-rA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Apr 2014 13:03:48 +0100
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <534686DF.7070207@ti.com>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
+Message-ID: <20140410120348.GK27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Thu, Apr 10, 2014 at 05:26:15PM +0530, Sekhar Nori wrote:
+> On Wednesday 09 April 2014 09:53 PM, Russell King - ARM Linux wrote:
+> > That is required because as part of the enable sequence, we write to the
+> > lockdown registers to clear out anything that may be there before we
+> > enable the L2 cache.  If we didn't set the NS lockdown bit, then we
+> > would need the secure monitor to do it for us.
+> 
+> And I realized yesterday that the only reason L2C is working on AM437x
+> is because AM437x ROM is setting these bits up for us.
+> 
+> > Both of these bits should be managed within the L2C code rather than by
+> > platforms.
+> 
+> The current L2C code is not managing the NS_LOCKDOWN bit. I can take a
+> shot at adding this support unless you are already looking at it.
 
+True, and I'm aware that it's missing.  So... how about this on top
+of my series so far.  We can deal with L310_AUX_CTRL_NS_INT_CTRL when
+the need to access those registers arises (if/when the edac driver
+is submitted.)
 
-On Thu, Apr 10, 2014 at 2:39 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi.
->
-> On Wednesday 09 April 2014 05:24 PM, Vivek Gautam wrote:
->> Adding support to enable/disable VBUS hooked to a gpio
->> to enable vbus supply on the port.
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>
->> Based on 'phy-exynos5-usbdrd' patches:
->> [PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
->> http://www.spinics.net/lists/linux-usb/msg105507.html
->>
->>  drivers/phy/phy-exynos5-usbdrd.c |   18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
->> index ff54a7c..5ca7485 100644
->> --- a/drivers/phy/phy-exynos5-usbdrd.c
->> +++ b/drivers/phy/phy-exynos5-usbdrd.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->> +#include <linux/of_gpio.h>
->>  #include <linux/phy/phy.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/mutex.h>
->> @@ -176,6 +177,7 @@ struct exynos5_usbdrd_phy {
->>       struct clk *ref_clk;
->>       unsigned long ref_rate;
->>       unsigned int refclk_reg;
->> +     int gpio;
->>  };
->>
->>  #define to_usbdrd_phy(inst) \
->> @@ -460,6 +462,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
->>       if (!IS_ERR(phy_drd->usb30_sclk))
->>               clk_prepare_enable(phy_drd->usb30_sclk);
->>
->> +     /* Toggle VBUS gpio - on */
->> +     gpio_set_value(phy_drd->gpio, 1);
->> +
->>       /* Power-on PHY*/
->>       inst->phy_cfg->phy_isol(inst, 0);
->>
->> @@ -476,6 +481,9 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
->>       /* Power-off the PHY */
->>       inst->phy_cfg->phy_isol(inst, 1);
->>
->> +     /* Toggle VBUS gpio - off */
->> +     gpio_set_value(phy_drd->gpio, 0);
->> +
->>       if (!IS_ERR(phy_drd->usb30_sclk))
->>               clk_disable_unprepare(phy_drd->usb30_sclk);
->>
->> @@ -585,6 +593,16 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
->>
->>       phy_drd->drv_data = drv_data;
->>
->> +     /* Get required GPIO for vbus */
->> +     phy_drd->gpio = of_get_named_gpio(dev->of_node,
->> +                                       "samsung,vbus-gpio", 0);
->
-> Is this dt property documented somewhere?
->> +     if (!gpio_is_valid(phy_drd->gpio))
->> +             dev_dbg(dev, "no usbdrd-phy vbus gpio defined\n");
->
-> No return here? Can the PHY be functional even without the VBUS?
-
-On few boards, the switch IC's enable may no be controlled by a GPIO,
-rather enabled by default.
-So in those cases we may not want to stop PHY probe, when the VBUS
-GPIO is not present.
-
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index c0f9a81a2d32..4a494cde8367 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -213,8 +213,6 @@ static int __init omap_l2_cache_init(void)
+ 
+ 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+ 	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
+-		   L310_AUX_CTRL_NS_LOCKDOWN |
+-		   L310_AUX_CTRL_NS_INT_CTRL |
+ 		   L2C_AUX_CTRL_SHARED_OVERRIDE |
+ 		   L310_AUX_CTRL_DATA_PREFETCH |
+ 		   L310_AUX_CTRL_INSTR_PREFETCH;
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 98796b789eb9..837f384c1d51 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -776,6 +776,13 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+ 	}
+ 
++	/*
++	 * Always enable non-secure access to the lockdown registers -
++	 * we write to them as part of the L2C enable sequence so they
++	 * need to be accessible.
++	 */
++	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
++
+ 	l2c_enable(base, aux, num_lock);
+ 
+ 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
