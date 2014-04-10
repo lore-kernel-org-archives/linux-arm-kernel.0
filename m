@@ -1,64 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Apr 2014 10:51:15 +0100
-Subject: [PATCH 06/27] ARM: EXYNOS:: Enter a15 lowpower mode for
- Exynos3250 based on Cortex-a7
-In-Reply-To: <1397122124-15690-7-git-send-email-cw00.choi@samsung.com>
- (Chanwoo Choi's message of "Thu, 10 Apr 2014 10:28:23 +0100")
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-7-git-send-email-cw00.choi@samsung.com>
-Message-ID: <87d2gp3430.fsf@approximate.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 10 Apr 2014 11:55:31 +0200
+Subject: [PATCH V4 00/20] ARM: exynos: cpuidle: Move the driver to
+ drivers/cpuidle
+Message-ID: <1397123751-1957-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10 2014 at 10:28:23 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch decide proper lowpower mode of either a15 or a9 according to own ID
-> from Main ID register.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/hotplug.c | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..36d3db6 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -135,13 +135,20 @@ void __ref exynos_cpu_die(unsigned int cpu)
->  	int primary_part = 0;
->  
->  	/*
-> -	 * we're ready for shutdown now, so do it.
-> -	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
-> +	 * we're ready for shutdown now, so do it. Exynos4 is A9 based
-> +	 * while Exynos5 is A15/Exynos7 is A7; check the CPU part
->  	 * number by reading the Main ID register and then perform the
->  	 * appropriate sequence for entering low power.
->  	 */
->  	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
+Changelog:
 
-While you're touching that code, how about using:
+V4:
+	* Took into account Tomasz's comments
+		* Fixed missing call in for central suspend
+		* Passed parameter to the wakeup mask function
+		* Moved wakeup mask, boot vector and aftr state into a single
+		function
+		* Used this function as callback for platform data
+		* Moved S5P_CHECK_AFTR/S5P_CHECK_SLEEP into pm.c
+		* Set boot vector only one time
+	* Splitted some patches to make them more readable
+V3:
+	* Added patch   : "ARM: exynos: cpuidle: Disable cpuidle for 5440"
+	* Removed patch : "ARM: exynos: config: Enable cpuidle"
+	* Removed default ARM_EXYNOS4210_CPUIDLE=y
+	* Added comment about bug fix side effect 'for_each_possible_cpu'
+V2: 
+	* Added comment in changelog for calls order (5/17)
+	* Call the powerdown only for cpu0 in the pm notifier
+	* Set the pm notifier for all boards
 
-      primary_part = read_cpuid(CPUID_ID);
+V1: initial post
 
-> -	if ((primary_part & 0xfff0) == 0xc0f0)
-> +
-> +	/*
-> +	 * Main ID register of Cortex series
-> +	 * - Cortex-a7  : 0x410F_C07x
-> +	 * - Cortex-a15 : 0x410F_C0Fx
-> +	 */
-> +	primary_part = primary_part & 0xfff0;
-> +	if (primary_part == 0xc0f0 || primary_part == 0xc070)
+This patchset relies on the cpm_pm notifier to initiate the powerdown sequence
+operations from pm.c instead cpuidle.c. Thus the cpuidle driver is no longer
+dependent from arch specific code as everything is called from the pm.c file.
 
-ARM_CPU_PART_CORTEX_A15, ARM_CPU_PART_CORTEX_A7
+The patchset applies on top of linux-samsung/for-next.
 
->  		cpu_enter_lowpower_a15();
->  	else
->  		cpu_enter_lowpower_a9();
+Tested on exynos4: 4210
+Tested on exynos5: 5250 (without AFTR)
 
-Thanks,
 
-	M.
+Daniel Lezcano (20):
+  ARM: exynos: cpuidle: Prevent forward declaration
+  ARM: exynos: cpuidle: Use cpuidle_register
+  ARM: exynos: cpuidle: Change function name prefix
+  ARM: exynos: cpuidle: Encapsulate register access inside a function
+  ARM: exynos: cpuidle: Move some code inside the idle_finisher
+  ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
+  ARM: exynos: cpuidle: Use the cpu_pm notifier
+  ARM: exynos: cpuidle: Move scu_enable in the cpu_pm notifier
+  ARM: exynos: cpuidle: Remove ifdef for scu_enable
+  ARM: exynos: cpuidle: Move clock setup to pm.c
+  ARM: exynos: cpuidle: Pass wakeup mask parameter to function
+  ARM: exynos: cpuidle: Encapsulate boot vector code into a function
+  ARM: exynos: cpuidle: Disable cpuidle for 5440
+  ARM: exynos: cpuidle: Encapsulate the AFTR code into a function
+  ARM: exynos: cpuidle: Move the AFTR state function into pm.c
+  ARM: exynos: cpuidle: Move the power sequence call in the cpu_pm
+    notifier
+  ARM: exynos: cpuidle: Move S5P_CHECK_SLEEP into pm.c
+  ARM: exynos: cpuidle: Pass the AFTR callback to the platform_data
+  ARM: exynos: cpuidle: Cleanup all unneeded headers from cpuidle.c
+  ARM: exynos: cpuidle: Move the driver to drivers/cpuidle directory
+
+ arch/arm/mach-exynos/Makefile    |    1 -
+ arch/arm/mach-exynos/common.h    |    1 +
+ arch/arm/mach-exynos/cpuidle.c   |  255 --------------------------------------
+ arch/arm/mach-exynos/exynos.c    |    8 +-
+ arch/arm/mach-exynos/pm.c        |  187 +++++++++++++++++++++++-----
+ arch/arm/mach-exynos/regs-pmu.h  |   21 +++-
+ drivers/cpuidle/Kconfig.arm      |    6 +
+ drivers/cpuidle/Makefile         |    1 +
+ drivers/cpuidle/cpuidle-exynos.c |   98 +++++++++++++++
+ 9 files changed, 289 insertions(+), 289 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/cpuidle.c
+ create mode 100644 drivers/cpuidle/cpuidle-exynos.c
+
 -- 
-Jazz is not dead. It just smells funny.
+1.7.9.5
