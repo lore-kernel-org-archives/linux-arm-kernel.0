@@ -1,171 +1,228 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Apr 2014 16:47:18 -0700
-Subject: [PATCH 10/11] mfd: twl-core: Fix idle mode signaling for omaps when
- booted with device tree
+Date: Thu, 10 Apr 2014 16:47:16 -0700
+Subject: [PATCH 08/11] ARM: dts: Fix omap serial wake-up when booted with
+ device tree
 In-Reply-To: <1397173639-29587-1-git-send-email-tony@atomide.com>
 References: <1397173639-29587-1-git-send-email-tony@atomide.com>
-Message-ID: <1397173639-29587-11-git-send-email-tony@atomide.com>
+Message-ID: <1397173639-29587-9-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I noticed a regression where the omap sys_clkreq signal will never
-trigger for omap3 when booted with device tree while it triggers
-when booted in legacy mode. This means voltage scaling does not
-do anything when booted with device tree.
+We've had deeper idle states working on omaps for few years now,
+but only in the legacy mode. When booted with device tree, the
+wake-up events did not have a chance to work until commit
+3e6cee1786a1 (pinctrl: single: Add support for wake-up interrupts)
+that recently got merged. In addition to that we also needed commit
+79d9701559a9 (of/irq: create interrupts-extended property) that's
+now also merged.
 
-Turns out the reason is we fail to initialize the SmartReflex
-enable bit in twl4030 with the following error:
+So let's fix the wake-up events for some selected omaps so devices
+booted in device tree mode won't just hang if deeper power states
+are enabled, and so systems can wake up from suspend to the serial
+port event.
 
-twl: not initialized
+Note that there's no longer need to specify the wake-up bit in
+the pinctrl settings, the request_irq on the wake-up pin takes
+care of that.
 
-And that happens because we are wrongly tinkering with the twl4030
-registers in arch/arm/mach-omap2/omap_twl.c before the driver is
-initialized. Looking at the the SmartReflex bit enable code in
-omap_twl.c, we need to always set it.
+Note that there will be new harmless warnings in dmesg output
+without patch "of/platform: Fix no irq domain found errors when
+populating interrupts":
 
-So let's fix the issue by always enabling the twl4030 SmartReflex
-bit in the drivers/mfd/twl-core.c probe, and drop the related
-code in omap_twl.c.
+https://lkml.org/lkml/2014/4/10/620
 
-Note that we still have some twl4030 tinkering left in omap_twl.c
-for the twl6030 case, but that's a different patch.
-
+Cc: devicetree at vger.kernel.org
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
 Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Lee Jones <lee.jones@linaro.org>
 Cc: Nishanth Menon <nm@ti.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_twl.c | 60 ------------------------------------------
- drivers/mfd/twl-core.c         | 15 +++++++++++
- 2 files changed, 15 insertions(+), 60 deletions(-)
+ arch/arm/boot/dts/omap3-evm-37xx.dts      |  9 +++++++++
+ arch/arm/boot/dts/omap3-n900.dts          |  2 ++
+ arch/arm/boot/dts/omap3.dtsi              |  6 +++---
+ arch/arm/boot/dts/omap4-panda-common.dtsi | 15 +++++++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts           |  6 ++++++
+ arch/arm/boot/dts/omap4.dtsi              |  6 +++---
+ include/dt-bindings/pinctrl/omap.h        | 12 ++++++++++++
+ 7 files changed, 50 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index 615e5b1..6bf6267 100644
---- a/arch/arm/mach-omap2/omap_twl.c
-+++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -46,15 +46,8 @@
+diff --git a/arch/arm/boot/dts/omap3-evm-37xx.dts b/arch/arm/boot/dts/omap3-evm-37xx.dts
+index 4df68ad..9cba94b 100644
+--- a/arch/arm/boot/dts/omap3-evm-37xx.dts
++++ b/arch/arm/boot/dts/omap3-evm-37xx.dts
+@@ -89,7 +89,16 @@
+ 	status = "disabled";
+ };
  
- static bool is_offset_valid;
- static u8 smps_offset;
--/*
-- * Flag to ensure Smartreflex bit in TWL
-- * being cleared in board file is not overwritten.
-- */
--static bool __initdata twl_sr_enable_autoinit;
- 
--#define TWL4030_DCDC_GLOBAL_CFG        0x06
- #define REG_SMPS_OFFSET         0xE0
--#define SMARTREFLEX_ENABLE     BIT(3)
- 
- static unsigned long twl4030_vsel_to_uv(const u8 vsel)
- {
-@@ -251,18 +244,6 @@ int __init omap3_twl_init(void)
- 	if (!cpu_is_omap34xx())
- 		return -ENODEV;
- 
--	/*
--	 * The smartreflex bit on twl4030 specifies if the setting of voltage
--	 * is done over the I2C_SR path. Since this setting is independent of
--	 * the actual usage of smartreflex AVS module, we enable TWL SR bit
--	 * by default irrespective of whether smartreflex AVS module is enabled
--	 * on the OMAP side or not. This is because without this bit enabled,
--	 * the voltage scaling through vp forceupdate/bypass mechanism of
--	 * voltage scaling will not function on TWL over I2C_SR.
--	 */
--	if (!twl_sr_enable_autoinit)
--		omap3_twl_set_sr_bit(true);
--
- 	voltdm = voltdm_lookup("mpu_iva");
- 	omap_voltage_register_pmic(voltdm, &omap3_mpu_pmic);
- 
-@@ -271,44 +252,3 @@ int __init omap3_twl_init(void)
- 
- 	return 0;
- }
--
--/**
-- * omap3_twl_set_sr_bit() - Set/Clear SR bit on TWL
-- * @enable: enable SR mode in twl or not
-- *
-- * If 'enable' is true, enables Smartreflex bit on TWL 4030 to make sure
-- * voltage scaling through OMAP SR works. Else, the smartreflex bit
-- * on twl4030 is cleared as there are platforms which use OMAP3 and T2 but
-- * use Synchronized Scaling Hardware Strategy (ENABLE_VMODE=1) and Direct
-- * Strategy Software Scaling Mode (ENABLE_VMODE=0), for setting the voltages,
-- * in those scenarios this bit is to be cleared (enable = false).
-- *
-- * Returns 0 on success, error is returned if I2C read/write fails.
-- */
--int __init omap3_twl_set_sr_bit(bool enable)
--{
--	u8 temp;
--	int ret;
--	if (twl_sr_enable_autoinit)
--		pr_warning("%s: unexpected multiple calls\n", __func__);
--
--	ret = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
--			      TWL4030_DCDC_GLOBAL_CFG);
--	if (ret)
--		goto err;
--
--	if (enable)
--		temp |= SMARTREFLEX_ENABLE;
--	else
--		temp &= ~SMARTREFLEX_ENABLE;
--
--	ret = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
--			       TWL4030_DCDC_GLOBAL_CFG);
--	if (!ret) {
--		twl_sr_enable_autoinit = true;
--		return 0;
--	}
--err:
--	pr_err("%s: Error access to TWL4030 (%d)\n", __func__, ret);
--	return ret;
--}
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index ed71832..ad7d04f 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -98,7 +98,11 @@
- #define TWL4030_BASEADD_BACKUP		0x0014
- #define TWL4030_BASEADD_INT		0x002E
- #define TWL4030_BASEADD_PM_MASTER	0x0036
++&uart1 {
++	interrupts-extended = <&intc 72 &omap3_pmx_core OMAP3_UART1_RX>;
++};
 +
- #define TWL4030_BASEADD_PM_RECEIVER	0x005B
-+#define TWL4030_DCDC_GLOBAL_CFG		0x06
-+#define SMARTREFLEX_ENABLE		BIT(3)
++&uart2 {
++	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
++};
 +
- #define TWL4030_BASEADD_RTC		0x001C
- #define TWL4030_BASEADD_SECURED_REG	0x0000
+ &uart3 {
++	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 0d34201..c5db0af 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -512,11 +512,13 @@
+ };
  
-@@ -1204,6 +1208,11 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 	 * Disable TWL4030/TWL5030 I2C Pull-up on I2C1 and I2C4(SR) interface.
- 	 * Program I2C_SCL_CTRL_PU(bit 0)=0, I2C_SDA_CTRL_PU (bit 2)=0,
- 	 * SR_I2C_SCL_CTRL_PU(bit 4)=0 and SR_I2C_SDA_CTRL_PU(bit 6)=0.
-+	 *
-+	 * Also, always enable SmartReflex bit as that's needed for omaps to
-+	 * to do anything over I2C4 for voltage scaling even if SmartReflex
-+	 * is disabled. Without the SmartReflex bit omap sys_clkreq idle
-+	 * signal will never trigger for retention idle.
- 	 */
- 	if (twl_class_is_4030()) {
- 		u8 temp;
-@@ -1212,6 +1221,12 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 		temp &= ~(SR_I2C_SDA_CTRL_PU | SR_I2C_SCL_CTRL_PU | \
- 			I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
- 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+ &uart2 {
++	interrupts-extended = <&intc 73 &omap3_pmx_core OMAP3_UART2_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart2_pins>;
+ };
+ 
+ &uart3 {
++	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index a5fc83b..f61c76b 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -246,7 +246,7 @@
+ 		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap3-uart";
+ 			reg = <0x4806a000 0x2000>;
+-			interrupts = <72>;
++			interrupts-extended = <&intc 72>;
+ 			dmas = <&sdma 49 &sdma 50>;
+ 			dma-names = "tx", "rx";
+ 			ti,hwmods = "uart1";
+@@ -256,7 +256,7 @@
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap3-uart";
+ 			reg = <0x4806c000 0x400>;
+-			interrupts = <73>;
++			interrupts-extended = <&intc 73>;
+ 			dmas = <&sdma 51 &sdma 52>;
+ 			dma-names = "tx", "rx";
+ 			ti,hwmods = "uart2";
+@@ -266,7 +266,7 @@
+ 		uart3: serial at 49020000 {
+ 			compatible = "ti,omap3-uart";
+ 			reg = <0x49020000 0x400>;
+-			interrupts = <74>;
++			interrupts-extended = <&intc 74>;
+ 			dmas = <&sdma 53 &sdma 54>;
+ 			dma-names = "tx", "rx";
+ 			ti,hwmods = "uart3";
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 88c6a05..47bbc59 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -396,6 +396,21 @@
+ 	usb-supply = <&vusb>;
+ };
+ 
++&uart2 {
++	interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART2_RX>;
++};
 +
-+		twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &temp,
-+				TWL4030_DCDC_GLOBAL_CFG);
-+		temp |= SMARTREFLEX_ENABLE;
-+		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, temp,
-+				 TWL4030_DCDC_GLOBAL_CFG);
- 	}
++&uart3 {
++	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART3_RX>;
++};
++
++&uart4 {
++	interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART4_RX>;
++};
++
+ &usb_otg_hs {
+ 	interface-type = <1>;
+ 	mode = <3>;
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index dbc81fb..e3f3cfb 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -523,16 +523,22 @@
+ };
  
- 	if (node) {
+ &uart2 {
++	interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART2_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart2_pins>;
+ };
+ 
+ &uart3 {
++	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART3_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
+ 
+ &uart4 {
++	interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH
++			       &omap4_pmx_core OMAP4_UART4_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart4_pins>;
+ };
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index d3f8a6e..24ea9b9 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -288,7 +288,7 @@
+ 		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806c000 0x100>;
+-			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -296,7 +296,7 @@
+ 		uart3: serial at 48020000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x48020000 0x100>;
+-			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 		};
+@@ -304,7 +304,7 @@
+ 		uart4: serial at 4806e000 {
+ 			compatible = "ti,omap4-uart";
+ 			reg = <0x4806e000 0x100>;
+-			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+ 		};
+diff --git a/include/dt-bindings/pinctrl/omap.h b/include/dt-bindings/pinctrl/omap.h
+index b04528c..404ba7e 100644
+--- a/include/dt-bindings/pinctrl/omap.h
++++ b/include/dt-bindings/pinctrl/omap.h
+@@ -69,5 +69,17 @@
+ #define OMAP5_WKUP_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0xc840) (val)
+ #define DRA7XX_CORE_IOPAD(pa, val)	OMAP_IOPAD_OFFSET((pa), 0x3400) (val)
+ 
++/*
++ * Define some commonly used pins configured by the boards.
++ * Note that some boards use alternative pins, so check
++ * the schematics before using these.
++ */
++#define OMAP3_UART1_RX		0x152
++#define OMAP3_UART2_RX		0x14a
++#define OMAP3_UART3_RX		0x16e
++#define OMAP4_UART2_RX		0xdc
++#define OMAP4_UART3_RX		0x104
++#define OMAP4_UART4_RX		0x11c
++
+ #endif
+ 
 -- 
 1.8.1.1
