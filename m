@@ -1,81 +1,294 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 10 Apr 2014 13:54:56 +0530
-Subject: [PATCH 6/6] ARM: multi_v7_defconfig: Enable Exynos platform
-In-Reply-To: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
-References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1397118296-6846-7-git-send-email-sachin.kamat@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 10 Apr 2014 10:29:48 +0200
+Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <5345AD00.9020508@free-electrons.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
+ <5345AD00.9020508@free-electrons.com>
+Message-ID: <CABuKBeKnEw38sQYwrkheoWetZZcPTJhKRsBK4a62FS6-6dRFTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Exynos platform and its related IPs.
+2014-04-09 22:26 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+> Hi Matthias,
+>
+> On 09/04/2014 19:45, Matthias Brugger wrote:
+>> This adds a generic devicetree board file and a dtsi for boards
+>> based on the MT6589 SoCs from Mediatek.
+>>
+>> Apart from the generic parts (gic, clocks) the only component
+>> currently supported are the timers.
+>>
+>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>  .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+>>  arch/arm/Kconfig                                   |    2 +
+>>  arch/arm/Makefile                                  |    1 +
+>>  arch/arm/boot/dts/mtk6589.dtsi                     |  105 ++++++++++++++++++++
+>>  arch/arm/mach-mediatek/Kconfig                     |   14 +++
+>>  arch/arm/mach-mediatek/Makefile                    |    1 +
+>>  arch/arm/mach-mediatek/mediatek.c                  |   40 ++++++++
+>>  7 files changed, 164 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/mtk6589.dtsi
+>>  create mode 100644 arch/arm/mach-mediatek/Kconfig
+>>  create mode 100644 arch/arm/mach-mediatek/Makefile
+>>  create mode 100644 arch/arm/mach-mediatek/mediatek.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> index 0f01c9b..af48801 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -67,6 +67,7 @@ linux       Linux-specific binding
+>>  lsi  LSI Corp. (LSI Logic)
+>>  marvell      Marvell Technology Group Ltd.
+>>  maxim        Maxim Integrated Products
+>> +mediatek     MediaTek Inc.
+>>  microchip    Microchip Technology Inc.
+>>  mosaixtech   Mosaix Technologies, Inc.
+>>  moxa Moxa
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 5db05f6a..04d46ec 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -995,6 +995,8 @@ source "arch/arm/mach-mv78xx0/Kconfig"
+>>
+>>  source "arch/arm/mach-imx/Kconfig"
+>>
+>> +source "arch/arm/mach-mediatek/Kconfig"
+>> +
+>>  source "arch/arm/mach-mxs/Kconfig"
+>>
+>>  source "arch/arm/mach-netx/Kconfig"
+>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+>> index 41c1931..8ce9774 100644
+>> --- a/arch/arm/Makefile
+>> +++ b/arch/arm/Makefile
+>> @@ -170,6 +170,7 @@ machine-$(CONFIG_ARCH_MSM)                += msm
+>>  machine-$(CONFIG_ARCH_MV78XX0)               += mv78xx0
+>>  machine-$(CONFIG_ARCH_MVEBU)         += mvebu
+>>  machine-$(CONFIG_ARCH_MXC)           += imx
+>> +machine-$(CONFIG_ARCH_MEDIATEK)              += mediatek
+>>  machine-$(CONFIG_ARCH_MXS)           += mxs
+>>  machine-$(CONFIG_ARCH_NETX)          += netx
+>>  machine-$(CONFIG_ARCH_NOMADIK)               += nomadik
+>> diff --git a/arch/arm/boot/dts/mtk6589.dtsi b/arch/arm/boot/dts/mtk6589.dtsi
+>> new file mode 100644
+>> index 0000000..6dbb74f
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/mtk6589.dtsi
+>> @@ -0,0 +1,105 @@
+>> +/*
+>> + * Copyright (c) 2014 MundoReader S.L.
+>> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <dt-bindings/interrupt-controller/irq.h>
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include "skeleton.dtsi"
+>> +
+>> +/ {
+>> +     compatible = "mediatek,mt6589";
+>> +     interrupt-parent = <&gic>;
+>> +
+>> +     cpus {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a7";
+>> +                     next-level-cache = <&L2>;
+>> +                     reg = <0x0>;
+>> +             };
+>> +             cpu at 1 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a7";
+>> +                     next-level-cache = <&L2>;
+>> +                     reg = <0x1>;
+>> +             };
+>> +             cpu at 2 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a7";
+>> +                     next-level-cache = <&L2>;
+>> +                     reg = <0x2>;
+>> +             };
+>> +             cpu at 3 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a7";
+>> +                     next-level-cache = <&L2>;
+>> +                     reg = <0x3>;
+>> +             };
+>> +
+>> +     };
+>> +
+>> +     clocks {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             ranges;
+>> +
+>> +             system_clk: system_clk {
+>> +                     compatible = "fixed-clock";
+>> +                     clock-frequency = <13000000>;
+>> +                     #clock-cells = <0>;
+>> +                     clock-output-names = "system_clk";
+>> +             };
+>
+> Is it really a fixed clock without any parent, or do you
+> declare it as a fixed clock because you don't have any clock
+> common framework support yet?
 
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+I don't have any common clock framework support yet.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47a2f7c..298057a0324c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -47,6 +47,7 @@ CONFIG_ARCH_SPEAR13XX=y
- CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- CONFIG_ARCH_STI=y
-+CONFIG_ARCH_EXYNOS=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_SIRF=y
- CONFIG_ARCH_TEGRA=y
-@@ -71,6 +72,7 @@ CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
- CONFIG_SMP=y
-+CONFIG_NR_CPUS=8
- CONFIG_HIGHPTE=y
- CONFIG_CMA=y
- CONFIG_ARM_APPENDED_DTB=y
-@@ -153,6 +155,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_SAMSUNG=y
-+CONFIG_SERIAL_SAMSUNG_CONSOLE=y
- CONFIG_SERIAL_SIRFSOC=y
- CONFIG_SERIAL_SIRFSOC_CONSOLE=y
- CONFIG_SERIAL_TEGRA=y
-@@ -176,6 +180,7 @@ CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
-+CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_SIRF=y
- CONFIG_I2C_TEGRA=y
-@@ -210,6 +215,7 @@ CONFIG_MFD_AS3722=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_SPI=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65090=y
- CONFIG_MFD_TPS6586X=y
-@@ -220,6 +226,8 @@ CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_PALMAS=y
-+CONFIG_REGULATOR_S2MPS11=y
-+CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS51632=y
- CONFIG_REGULATOR_TPS62360=y
- CONFIG_REGULATOR_TPS65090=y
-@@ -280,6 +288,8 @@ CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_MVSDIO=y
-+CONFIG_MMC_DW=y
-+CONFIG_MMC_DW_EXYNOS=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
+>
+>> +
+>> +             rtc_clk: rtc_clk {
+>> +                     compatible = "fixed-clock";
+>> +                     clock-frequency = <32000>;
+>> +                     #clock-cells = <0>;
+>> +                     clock-output-names = "rtc_clk";
+>> +             };
+>> +     };
+>> +
+>> +     soc {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <1>;
+>> +             compatible = "simple-bus";
+>> +             clock-ranges;
+>> +             ranges;
+>> +
+>> +             gic: interrupt-controller at 10212000 {
+>> +                     compatible = "arm,cortex-a9-gic";
+>> +                     interrupt-controller;
+>> +                     #interrupt-cells = <3>;
+>> +                     reg = <0x10211000 0x1000>,
+>> +                           <0x10212000 0x1000>;
+>> +             };
+>> +
+>> +             L2: l2-cache-controller at 1020e000 {
+>> +                     compatible = "arm,pl310-cache";
+>> +                     reg = <0x1020e000 0x1000>;
+>> +                     cache-unified;
+>> +                     cache-level = <2>;
+>> +             };
+>> +
+>> +             timer: timer at 10008000 {
+>> +                     compatible = "mediatek,mtk6589-timer";
+>> +                     reg = <0x10008000 0x80>;
+>> +                     interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+>> +                     clocks = <&system_clk>, <&rtc_clk>;
+>> +                     clock-names = "sys_clk", "rtc_clk";
+>> +             };
+>> +     };
+>> +};
+>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+>> new file mode 100644
+>> index 0000000..c0139ca
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mediatek/Kconfig
+>> @@ -0,0 +1,14 @@
+>> +config ARCH_MEDIATEK
+>> +     bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
+>> +     select ARCH_REQUIRE_GPIOLIB
+>> +     select ARM_GIC
+>> +     select CACHE_L2X0
+>> +     select HAVE_ARM_TWD if LOCAL_TIMERS
+>
+> LOCAL_TIMERS no longer exist
+>
+>> +     select HAVE_SMP
+>> +     select LOCAL_TIMERS if SMP
+> ditto
+>
+> so what about this instead:
+>
+>         select HAVE_ARM_TWD if SMP
+>
+>
+> The rest of this patch looks good.
+>
+> Thanks,
+>
+> Gregory
+>
+>> +     select COMMON_CLK
+>> +     select GENERIC_CLOCKEVENTS
+>> +     select MTK_TIMER
+>> +     select CLKSRC_MMIO
+>> +     help
+>> +       Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
+>> diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+>> new file mode 100644
+>> index 0000000..43e619f
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mediatek/Makefile
+>> @@ -0,0 +1 @@
+>> +obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
+>> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+>> new file mode 100644
+>> index 0000000..f630403
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mediatek/mediatek.c
+>> @@ -0,0 +1,40 @@
+>> +/*
+>> + * Device Tree support for Mediatek SoCs
+>> + *
+>> + * Copyright (c) 2014 MundoReader S.L.
+>> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/init.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/irqchip.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach/map.h>
+>> +#include <asm/hardware/cache-l2x0.h>
+>> +
+>> +static void __init mediatek_dt_init(void)
+>> +{
+>> +     l2x0_of_init(0, ~0);
+>> +     of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
+>> +
+>> +static const char * const mediatek_board_dt_compat[] = {
+>> +     "mediatek,mt6589",
+>> +     NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
+>> +     .init_machine   = mediatek_dt_init,
+>> +     .dt_compat      = mediatek_board_dt_compat,
+>> +MACHINE_END
+>>
+>
+>
+> --
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+
+
+
 -- 
-1.7.9.5
+motzblog.wordpress.com
