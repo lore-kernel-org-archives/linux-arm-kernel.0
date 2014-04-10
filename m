@@ -1,43 +1,35 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Thu, 10 Apr 2014 13:56:23 -0400
-Subject: [PATCH v3 2/3] Update bcm_defconfig with new pinctrl CONFIG
-In-Reply-To: <1396478439-16586-3-git-send-email-syin@broadcom.com>
-References: <1390509887-19278-1-git-send-email-syin@broadcom.com>
- <1396478439-16586-1-git-send-email-syin@broadcom.com>
- <1396478439-16586-3-git-send-email-syin@broadcom.com>
-Message-ID: <20140410175623.GC23695@beef>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 10 Apr 2014 14:25:47 +0200
+Subject: [PATCH v2 5/5] ARM: sunxi: update the default ARCH_NR_GPIO for sunxi
+ arch
+In-Reply-To: <1397132747-13917-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397132747-13917-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397132747-13917-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 02, 2014 at 03:40:38PM -0700, Sherman Yin wrote:
-> To be consistent with other Broadcom drivers, the Broadcom Capri pinctrl
-> driver and its related CONFIG option are renamed to bcm281xx.
-> 
-> This commit updates the defconfig that enables the pinctrl driver.
-> 
-> Signed-off-by: Sherman Yin <syin@broadcom.com>
-> Reviewed-by: Matt Porter <mporter@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+The A31 SoC has PL and PM banks, we thus need to increase the default
+ARCH_NR_GPIO when building for the sunxi architecture.
 
-Acked-by: Matt Porter <mporter@linaro.org>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> ---
->  arch/arm/configs/bcm_defconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-> index 2519d6d..b4d3013 100644
-> --- a/arch/arm/configs/bcm_defconfig
-> +++ b/arch/arm/configs/bcm_defconfig
-> @@ -125,7 +125,7 @@ CONFIG_CRC_ITU_T=y
->  CONFIG_CRC7=y
->  CONFIG_XZ_DEC=y
->  CONFIG_AVERAGE=y
-> -CONFIG_PINCTRL_CAPRI=y
-> +CONFIG_PINCTRL_BCM281XX=y
->  CONFIG_WATCHDOG=y
->  CONFIG_BCM_KONA_WDT=y
->  CONFIG_BCM_KONA_WDT_DEBUG=y
-> -- 
-> 1.7.9.5
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 503da0a..fe915ea 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1628,9 +1628,9 @@ config ARCH_NR_GPIO
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+ 	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || SOC_DRA7XX || ARCH_S3C24XX || ARCH_S3C64XX
++	default 416 if ARCH_SUNXI
+ 	default 392 if ARCH_U8500
+ 	default 352 if ARCH_VT8500
+-	default 288 if ARCH_SUNXI
+ 	default 264 if MACH_H4700
+ 	default 0
+ 	help
+-- 
+1.8.3.2
