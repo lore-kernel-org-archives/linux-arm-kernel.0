@@ -1,67 +1,46 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 10 Apr 2014 10:15:10 +0200
-Subject: [PATCH] ARM: dts: imx53-tx53: add IPU DI ports and endpoints
-In-Reply-To: <1397114395-19587-1-git-send-email-shawn.guo@freescale.com>
-References: <1397114395-19587-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140410101510.4ee33e64@ipc1.ka-ro>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Apr 2014 10:10:31 +0200
+Subject: [PATCH 00/15] ARM: sunxi: add A31 PL pins support
+In-Reply-To: <CAGb2v67+YNhw2MXSu9DTKSUfXH=v+uD7KEaxyiPezyf9CYtmPw@mail.gmail.com>
+References: <1397051478-4113-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGb2v66XCN2ar1wj+a1+ZwdcdJ3gzJ+nDiO9bu52OwK+mBB_Hg@mail.gmail.com>
+ <20140409151747.GH28585@lukather>
+ <CAGb2v67+YNhw2MXSu9DTKSUfXH=v+uD7KEaxyiPezyf9CYtmPw@mail.gmail.com>
+Message-ID: <20140410081031.GM28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Shawn Guo wrote:
-> With the recent imx-drm device tree binding changes, we need to add IPU
-> DI ports and endpoints for adapting.
+On Thu, Apr 10, 2014 at 12:27:32AM +0800, Chen-Yu Tsai wrote:
+> >> > Let me know if these changes are too intrusive.
+> >>
+> >> I wonder if we should do a separate driver for the new PIO controller.
+> >> Clearly it's a separate IP block, with it's own clock and reset controls.
+> >
+> > It's been merged together in the A23, hence why we did it like that.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/boot/dts/imx53-tx53-x03x.dts | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> index 0217dde3..3b73e81 100644
-> --- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> +++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> @@ -25,12 +25,17 @@
->  	soc {
->  		display: display at di0 {
->  			compatible = "fsl,imx-parallel-display";
-> -			crtcs = <&ipu 0>;
->  			interface-pix-fmt = "rgb24";
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&pinctrl_rgb24_vga1>;
->  			status = "okay";
->  
-> +			port {
-> +				display0_in: endpoint {
-> +					remote-endpoint = <&ipu_di0_disp0>;
-> +				};
-> +			};
-> +
->  			display-timings {
->  				VGA {
->  					clock-frequency = <25200000>;
-> @@ -293,6 +298,10 @@
->  	};
->  };
->  
-> +&ipu_di0_disp0 {
-> +	remote-endpoint = <&display0_in>;
-> +};
-> +
->  &kpp {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_kpp>;
+> I'm not sure I understand. The clock gate and reset control are still separate,
+> are they not?
 
-Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
+On the A31 the "regular" port controler handles PA to PH banks, while
+the R_PIO handles the PL and PM banks.
+
+On the A23, the regular port controler handles PA to PL banks, and the
+R_PIO and PM bank doesn't exist.
+
+So we're not quite in the same situation. The A31 is troublesome,
+while the A23 (except for the external interrupts), is pretty much
+what we've seen so far with the A10/A20/...
+
+Maxime
 
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140410/60765c7c/attachment.sig>
