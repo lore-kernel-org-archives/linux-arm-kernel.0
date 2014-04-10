@@ -1,52 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 10 Apr 2014 08:53:46 +0200
-Subject: [PATCH v2] bus: mvebu-mbus: Avoid setting an undefined window size
-In-Reply-To: <20140409162040.GA19743@obsidianresearch.com>
-References: <1397000654-10849-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <20140409061128.GC16465@1wt.eu>
- <20140409162040.GA19743@obsidianresearch.com>
-Message-ID: <20140410085346.784631f9@skate>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 10 Apr 2014 14:57:16 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable cpufreq and CMA support
+Message-ID: <1397113036-16228-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+ - Enable imx6 cpufreq support with ondemand governor
+ - Enable CMA support so that device like 1080p HDMI can work
+ - Run savedefconfig
 
-On Wed, 9 Apr 2014 10:20:40 -0600, Jason Gunthorpe wrote:
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-> > OK I just got it by adding two printk() in pci-mvebu.c. Both functions
-> > mvebu_pcie_handle_iobase_change() and mvebu_pcie_handle_membase_change()
-> > do pass a size which is in fact a mask (size - 1) and not the real size.
-> > So the mbus is fed with an incorrect size which is off by one :
-> 
-> Yes, that is right. I tested my patch here and didn't see any problem,
-> but I realize now that the mbus code is bailing early due to this:
-> 
-> kernel: mvebu_mbus: cannot add window '4:e8', conflicts with another window
-> 
-> Which I've never got around to fixing.. (whole other story there)
-> 
-> Your patch looks fine, and it obviously needs to be sequenced before
-> mine. (Thomas/Jason C: how do you want to do this?)
-
-What I can propose is that I accumulate in a branch all the patches
-needed to solve the various PCIe/Mbus problems we've identified:
-
- * Your patch adding warnings to the mvebu-mbus driver
- * Willy's patch fixing the off-by-one on the size
- * Neil's patch fixing the MSI teardown function
- * My two patches fixing the rest of the MSI logic
- * And patches to come for the link problem, and the cutting of
-   non-power-of-two BARs into power-of-two windows
-
-This way, everybody will be able to test than in his specific
-hardware situations, the patches are solving all the problems. Then I
-can take care of formally submitting those patches to the relevant
-maintainers, of course keeping the authorship as appropriate.
-
-How does that sound?
-
-Thomas
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 51b7fab..0e00528 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -46,7 +46,11 @@ CONFIG_VMSPLIT_2G=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
++CONFIG_CMA=y
+ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_ARM_IMX6Q_CPUFREQ=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_BINFMT_MISC=m
+@@ -72,6 +76,7 @@ CONFIG_RFKILL_INPUT=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_STANDALONE is not set
++CONFIG_DMA_CMA=y
+ CONFIG_IMX_WEIM=y
+ CONFIG_CONNECTOR=y
+ CONFIG_MTD=y
+@@ -249,7 +254,6 @@ CONFIG_DRM_IMX_LDB=y
+ CONFIG_DRM_IMX_IPUV3_CORE=y
+ CONFIG_DRM_IMX_IPUV3=y
+ CONFIG_DRM_IMX_HDMI=y
+-CONFIG_COMMON_CLK_DEBUG=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_PWM=y
+ CONFIG_PWM_IMX=y
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.2
