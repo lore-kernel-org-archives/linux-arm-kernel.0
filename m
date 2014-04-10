@@ -1,37 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Apr 2014 20:49:41 +0200
-Subject: [PATCH] i2c: nomadik: Fixup system suspend
-In-Reply-To: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397138376-28427-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkdb8VJ_Qqype4uP_YJ5=RncJndFUZv_yDxmZwq5S=_yZ2g@mail.gmail.com>
+From: armdev.ftm@gmail.com (armdev)
+Date: Thu, 10 Apr 2014 15:39:02 +0530
+Subject: [PATCH 07/27] irqchip: Declare cortex-a7's irqchip to initialize
+ gic from dt
+In-Reply-To: <878urd33g4.fsf@approximate.cambridge.arm.com>
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+ <1397122124-15690-8-git-send-email-cw00.choi@samsung.com>
+ <878urd33g4.fsf@approximate.cambridge.arm.com>
+Message-ID: <C136A675-6D64-42EE-918E-351A266946C5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 3:59 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-> For !CONFIG_PM_RUNTIME, the device were never put back into active
-> state while resuming.
->
-> For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
-> while we were about to handle it at suspend late, which is just too
-> optimistic.
->
-> Even if the driver uses pm_runtime_put_sync() after each tranfer to
-> return it's runtime PM resources, there are no guarantees this will
-> actually mean the device will inactivated. The reason is that the PM
-> core will prevent runtime suspend during system suspend, and thus when
-> a transfer occurs during the early phases of system suspend the device
-> will be kept active after the transfer.
->
-> To handle both issues above, use pm_runtime_force_suspend|resume() from
-> the system suspend|resume callbacks.
->
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On 10-Apr-2014, at 3:34 pm, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> On Thu, Apr 10 2014 at 10:28:24 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patch declare coretex-a7's irqchip to initialze gic from dt
+>> with "arm,cortex-a7-gic" data.
+>> 
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> drivers/irqchip/irq-gic.c | 1 +
+>> 1 file changed, 1 insertion(+)
+>> 
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index 4300b66..8e906e4 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -1069,6 +1069,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>> }
+>> IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
+>> IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
+>> +IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
+>> IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+>> IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+> 
+> Frankly, this patch adds no value. Are we going to add
+> "arm,cortex-a12-gic", "arm,cortex-a17-gic", "arm,cortex-a53-gic",
+> "arm,cortex-a57-gic"? And that's just to mention the ARM Ltd cores...
+> 
+> Instead, how about defining a generic "arm,gic" property, and mandate
+> that new DT files are using that? We can always use a more precise
+> compatible for quirks.
+> 
 
-Yours,
-Linus Walleij
+How about keeping it simple and tied to arm gic versions
+arm,gicv1, arm,gicv2, arm,gicv2ve
+
+> Mark, what do you think? I think this has been discussed in the past
+> already.
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
