@@ -1,43 +1,68 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 10 Apr 2014 11:21:44 +0200
-Subject: [RFC PATCH v2] edac: synopsys: Added EDAC support for zynq ddr
- ecc controller
-In-Reply-To: <534633C0.9090905@monstr.eu>
-References: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
- <20140408204047.GQ30077@pd.tnic> <534633C0.9090905@monstr.eu>
-Message-ID: <20140410092144.GD29093@pd.tnic>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 10 Apr 2014 14:52:51 +0530
+Subject: [PATCH 2/6] ARM: EXYNOS: Staticize exynos_subsys
+In-Reply-To: <534661C7.9090304@samsung.com>
+References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
+ <1397118296-6846-3-git-send-email-sachin.kamat@linaro.org>
+ <534661C7.9090304@samsung.com>
+Message-ID: <CAK9yfHwAM0d5JsrhKGP0gkrjQLxGFE0+oEjv26N5jsFnvYku9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 08:01:36AM +0200, Michal Simek wrote:
-> Just add it to Zynq maintainer fragment as we are doing for non
-> zynq/xilinx drivers.
+Hi Tomasz,
 
-Yep, as a file pattern F:
+On 10 April 2014 14:47, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Sachin,
+>
+>
+> On 10.04.2014 10:24, Sachin Kamat wrote:
+>>
+>> 'exynos_subsys' is now local to this file. Make it static
+>> and remove the declaration from header file.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> ---
+>>   arch/arm/mach-exynos/exynos.c            |    2 +-
+>>   arch/arm/plat-samsung/include/plat/cpu.h |    1 -
+>>   2 files changed, 1 insertion(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index 6a5fe18ec9b1..0ef42b9efd36 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -284,7 +284,7 @@ void __init exynos_init_io(void)
+>>         of_scan_flat_dt(exynos_fdt_map_sysram, NULL);
+>>   }
+>>
+>> -struct bus_type exynos_subsys = {
+>> +static struct bus_type exynos_subsys = {
+>>         .name           = "exynos-core",
+>>         .dev_name       = "exynos-core",
+>>   };
+>> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h
+>> b/arch/arm/plat-samsung/include/plat/cpu.h
+>> index 5992b8dd9b89..930b4be832cd 100644
+>> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+>> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+>> @@ -239,7 +239,6 @@ extern struct bus_type s3c2443_subsys;
+>>   extern struct bus_type s3c6410_subsys;
+>>   extern struct bus_type s5p64x0_subsys;
+>>   extern struct bus_type s5pv210_subsys;
+>> -extern struct bus_type exynos_subsys;
+>>
+>>   extern void (*s5pc1xx_idle)(void);
+>>
+>>
+>
+> This struct and registration of it do not seem to be needed for anything
+> anymore. Would you consider removing it instead?
 
-> At least the is the first time when someone saying that only some
-> functions should be documented.
-
-I don't see the need to document simple functions which are *obvious*.
-But if you want to do that, I'm not going to stop you so be my guest.
-
-
-> I don't think this is good to do. When we remove this prefix entirely
-> it is bigger chance that the same function name will be used by
-> another driver. It is not a problem with linking but the same
-> functions names will be listed in System.map which will complicate
-> debugging.
-
-Ok, fair enough. You probably still want to make them shorter, though,
-so that your code doesn't have to be line-broken too much. For example,
-since we only load a single edac driver per system, you can shorten the
-prefix to "edac_" only.
-
-Thanks.
+I had considered removing that while I was doing other code consolidation
+of this file. However I found that without this, the system failed to boot. I
+did not look much into it then. Probably I can revisit it and if it
+doesn't cause
+any boot issue, will remove it.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+With warm regards,
+Sachin
