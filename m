@@ -1,49 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 10 Apr 2014 11:50:18 +0200
-Subject: [PATCH] memory: mvebu-devbus: fix the conversion of the bus width
-Message-ID: <1397123418-16905-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 10 Apr 2014 11:49:57 +0200
+Subject: [RFC PATCH v2] edac: synopsys: Added EDAC support for zynq ddr
+ ecc controller
+In-Reply-To: <20140410092144.GD29093@pd.tnic>
+References: <1220b715-6fc2-42ed-8393-b9859fc0deb9@TX2EHSMHS021.ehs.local>
+ <20140408204047.GQ30077@pd.tnic> <534633C0.9090905@monstr.eu>
+ <20140410092144.GD29093@pd.tnic>
+Message-ID: <5e0042b6-f169-4025-8fd7-9d70c2ed0cf6@AM1EHSMHS012.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the Armada 370 and Armada XP datasheets, the part of the
-Device Bus register that configure the bus width should contain 0 for
-a 8 bits bus width, and 1 for a 16 bits bus width (other values are
-unsupported/reserved).
+On 04/10/2014 11:21 AM, Borislav Petkov wrote:
+> On Thu, Apr 10, 2014 at 08:01:36AM +0200, Michal Simek wrote:
+>> Just add it to Zynq maintainer fragment as we are doing for non
+>> zynq/xilinx drivers.
+> 
+> Yep, as a file pattern F:
 
-However, the current conversion done in the driver to convert from a
-bus width in bits to the value expected by the register leads to
-setting the register to 1 for a 8 bits bus, and 2 for a 16 bits bus.
+yep.
 
-This commit fixes that by adjusting the conversion logic.
+>> At least the is the first time when someone saying that only some
+>> functions should be documented.
+> 
+> I don't see the need to document simple functions which are *obvious*.
+> But if you want to do that, I'm not going to stop you so be my guest.
 
-This patch fixes a bug that was introduced in
-3edad321b1bd2e6c8b5f38146c115c8982438f06 ('drivers: memory: Introduce
-Marvell EBU Device Bus driver'), which was merged in v3.11.
+ok. thanks.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: stable at vger.kernel.org
----
- drivers/memory/mvebu-devbus.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
-index 110c036..b82cdf1 100644
---- a/drivers/memory/mvebu-devbus.c
-+++ b/drivers/memory/mvebu-devbus.c
-@@ -108,8 +108,12 @@ static int devbus_set_timing_params(struct devbus *devbus,
- 			node->full_name);
- 		return err;
- 	}
--	/* Convert bit width to byte width */
--	r.bus_width /= 8;
-+
-+	/*
-+	 * The bus width is encoded into the register as 0 for 8 bits,
-+	 * and 1 for 16 bits, so we do the necessary conversion here.
-+	 */
-+	r.bus_width = (r.bus_width / 8) - 1;
- 
- 	err = get_timing_param_ps(devbus, node, "devbus,badr-skew-ps",
- 				 &r.badr_skew);
--- 
-1.8.3.2
+>> I don't think this is good to do. When we remove this prefix entirely
+>> it is bigger chance that the same function name will be used by
+>> another driver. It is not a problem with linking but the same
+>> functions names will be listed in System.map which will complicate
+>> debugging.
+> 
+> Ok, fair enough. You probably still want to make them shorter, though,
+> so that your code doesn't have to be line-broken too much. For example,
+> since we only load a single edac driver per system, you can shorten the
+> prefix to "edac_" only.
+
+I agree with you that we can use shorter name.
+I have checked this with Punnaiah and I can't see any problem to have
+more edac drivers in the system.
+For zynq there is primary ddr controller which is target by this driver.
+Then we are talking about L2 in another thread.
+Because zynq has programmable logic next to chip where you can add
+soft memory controller (we have these hw designs) on the same bus
+then there could be others edac drivers.
+I would say how many you like till pins on the package.
+
+Thanks,
+Michal
