@@ -1,75 +1,68 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 19:06:13 +0900
-Subject: [PATCH 23/27] ARM: dts: exynos3250: Add spi dt node to support spi bus
+Date: Thu, 10 Apr 2014 19:06:09 +0900
+Subject: [PATCH 19/27] ARM: dts: exynos3250: Add Mobile Storage Host Card
 In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
 References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397124377-16969-15-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397124377-16969-11-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-This patch add spi dt node to support SPI (Serial Peripheral Interface) bus.
-SPI in Exynos3250 transfers serial data by using various peripherals. Exynos3250
-has two independent interface (spi0/1).
+This patch add MSHC (Mobile Storage Host Controller) dt node which is an
+interface between the system and SD/MMC card. mshc dt node is used for dw_mmc
+device driver to operate SD/MMC card.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+[Modify the sdr/ddr timing for eMMC by Jaehoon Chung]
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index b8e5ae13..03e7931 100644
+index a16c3ea..587a124 100644
 --- a/arch/arm/boot/dts/exynos3250.dtsi
 +++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -30,6 +30,8 @@
+@@ -28,6 +28,8 @@
+ 	aliases {
+ 		pinctrl0 = &pinctrl_0;
  		pinctrl1 = &pinctrl_1;
- 		mshc0 = &mshc_0;
- 		mshc1 = &mshc_1;
-+		spi0 = &spi_0;
-+		spi1 = &spi_1;
++		mshc0 = &mshc_0;
++		mshc1 = &mshc_1;
  		i2c0 = &i2c_0;
  		i2c1 = &i2c_1;
  		i2c2 = &i2c_2;
-@@ -311,6 +313,38 @@
- 		status = "disabled";
+@@ -92,6 +94,30 @@
+ 		interrupts = <0 240 0>;
  	};
  
-+	spi_0: spi at 13920000 {
-+		compatible = "samsung,exynos4210-spi";
-+		reg = <0x13920000 0x100>;
-+		interrupts = <0 121 0>;
-+		dmas = <&pdma0 7>, <&pdma0 6>;
-+		dma-names = "tx", "rx";
++	mshc_0: mshc at 12510000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12510000 0x1000>;
++		interrupts = <0 142 0>;
++		clocks = <&cmu CLK_SDMMC0>, <&cmu CLK_SCLK_MMC0>;
++		clock-names = "biu", "ciu";
++		fifo-depth = <0x80>;
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		clocks = <&cmu CLK_SPI0>, <&cmu CLK_SCLK_SPI0>;
-+		clock-names = "spi", "spi_busclk0";
-+		samsung,spi-src-clk = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&spi0_bus>;
 +		status = "disabled";
 +	};
 +
-+	spi_1: spi at 13930000 {
-+		compatible = "samsung,exynos4210-spi";
-+		reg = <0x13930000 0x100>;
-+		interrupts = <0 122 0>;
-+		dmas = <&pdma1 7>, <&pdma1 6>;
-+		dma-names = "tx", "rx";
++	mshc_1: mshc at 12520000 {
++		compatible = "samsung,exynos5250-dw-mshc";
++		reg = <0x12520000 0x1000>;
++		interrupts = <0 143 0>;
++		clocks = <&cmu CLK_SDMMC1>, <&cmu CLK_SCLK_MMC1>;
++		clock-names = "biu", "ciu";
++		fifo-depth = <0x80>;
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		clocks = <&cmu CLK_SPI1>, <&cmu CLK_SCLK_SPI1>;
-+		clock-names = "spi", "spi_busclk0";
-+		samsung,spi-src-clk = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&spi1_bus>;
 +		status = "disabled";
 +	};
 +
- 	pmu {
- 		compatible = "arm,cortex-a7-pmu";
- 		interrupts = <0 18 0>, <0 19 0>, <0 20 0>, <0 21 0>;
+ 	adc: adc at 126C0000 {
+ 		compatible = "samsung,exynos-adc-v2";
+ 		reg = <0x126C0000 0x100>, <0x10020718 0x4>;
 -- 
 1.8.0
