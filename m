@@ -1,142 +1,84 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 10 Apr 2014 15:52:44 +0200
-Subject: [PATCH v3 5/7] pinctrl: sunxi: define A31 R_PIO pin functions
-In-Reply-To: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397137966-30818-6-git-send-email-boris.brezillon@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 10 Apr 2014 13:07:32 +0100
+Subject: [PATCH 06/27] ARM: EXYNOS:: Enter a15 lowpower mode for
+ Exynos3250 based on Cortex-a7
+In-Reply-To: <534678E1.2000005@samsung.com> (Chanwoo Choi's message of "Thu,
+ 10 Apr 2014 11:56:33 +0100")
+References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
+ <1397122124-15690-7-git-send-email-cw00.choi@samsung.com>
+ <87d2gp3430.fsf@approximate.cambridge.arm.com>
+ <534678E1.2000005@samsung.com>
+Message-ID: <87mwft1j7f.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 SoC provides both PL and PM pio bank through the R_PIO block.
+On Thu, Apr 10 2014 at 11:56:33 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> On 04/10/2014 06:51 PM, Marc Zyngier wrote:
+>> On Thu, Apr 10 2014 at 10:28:23 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>> This patch decide proper lowpower mode of either a15 or a9 according to own ID
+>>> from Main ID register.
+>>>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos/hotplug.c | 13 ++++++++++---
+>>>  1 file changed, 10 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+>>> index 5eead53..36d3db6 100644
+>>> --- a/arch/arm/mach-exynos/hotplug.c
+>>> +++ b/arch/arm/mach-exynos/hotplug.c
+>>> @@ -135,13 +135,20 @@ void __ref exynos_cpu_die(unsigned int cpu)
+>>>  	int primary_part = 0;
+>>>  
+>>>  	/*
+>>> -	 * we're ready for shutdown now, so do it.
+>>> -	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
+>>> +	 * we're ready for shutdown now, so do it. Exynos4 is A9 based
+>>> +	 * while Exynos5 is A15/Exynos7 is A7; check the CPU part
+>>>  	 * number by reading the Main ID register and then perform the
+>>>  	 * appropriate sequence for entering low power.
+>>>  	 */
+>>>  	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
+>> 
+>> While you're touching that code, how about using:
+>> 
+>>       primary_part = read_cpuid(CPUID_ID);
+>
+> Or, 
+> I suggest read_cpuid_part_number() instead of assembler directly.
+>
+> 	primary_part = read_cpuid_part_number();
 
-These pins all support gpio function and can bbe assigned to system
-peripherals (like TWI, P2WI, JTAG, ...)
+Yup, even better.
 
-Add new compatible string to the DT bindings doc.
+>> 
+>>> -	if ((primary_part & 0xfff0) == 0xc0f0)
+>>> +
+>>> +	/*
+>>> +	 * Main ID register of Cortex series
+>>> +	 * - Cortex-a7  : 0x410F_C07x
+>>> +	 * - Cortex-a15 : 0x410F_C0Fx
+>>> +	 */
+>>> +	primary_part = primary_part & 0xfff0;
+>>> +	if (primary_part == 0xc0f0 || primary_part == 0xc070)
+>> 
+>> ARM_CPU_PART_CORTEX_A15, ARM_CPU_PART_CORTEX_A7
+>
+> OK I'll use this defined constant as following:
+>
+> 	switch (primary_part)
+> 	case ARM_CPU_PART_CORTEX_A7:
+> 	case ARM_CPU_PART_CORTEX_A15:
+> 		cpu_enter_lowpower_a15();
+> 		break;
+> 	default:
+> 		cpu_enter_lowpower_a9();
+> 		break;
+> 	}
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |  1 +
- drivers/pinctrl/pinctrl-sunxi-pins.h               | 74 ++++++++++++++++++++++
- drivers/pinctrl/pinctrl-sunxi.c                    |  1 +
- 3 files changed, 76 insertions(+)
+Looks good.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index f5da7e3..d8d0656 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -11,6 +11,7 @@ Required properties:
-   "allwinner,sun5i-a10s-pinctrl"
-   "allwinner,sun5i-a13-pinctrl"
-   "allwinner,sun6i-a31-pinctrl"
-+  "allwinner,sun6i-a31-r-pinctrl"
-   "allwinner,sun7i-a20-pinctrl"
- - reg: Should contain the register physical address and length for the
-   pin controller.
-diff --git a/drivers/pinctrl/pinctrl-sunxi-pins.h b/drivers/pinctrl/pinctrl-sunxi-pins.h
-index 3d60669..51100ca 100644
---- a/drivers/pinctrl/pinctrl-sunxi-pins.h
-+++ b/drivers/pinctrl/pinctrl-sunxi-pins.h
-@@ -2820,6 +2820,74 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
- 		  SUNXI_FUNCTION(0x2, "nand1")),	/* CE3 */
- };
- 
-+static const struct sunxi_desc_pin sun6i_a31_r_pins[] = {
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL0,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SCK */
-+		  SUNXI_FUNCTION(0x3, "s_p2wi")),	/* SCK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL1,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SDA */
-+		  SUNXI_FUNCTION(0x3, "s_p2wi")),	/* SDA */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL2,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart")),	/* TX */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL3,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart")),	/* RX */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL4,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_ir")),		/* RX */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL5,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* MS */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL6,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* CK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL7,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* DO */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PL8,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "s_jtag")),	/* DI */
-+	/* Hole */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM0,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM1,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM2,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "1wire")),
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM3,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM4,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM5,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM6,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN_PM7,
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "rtc")),		/* CLKO */
-+};
-+
- static const struct sunxi_desc_pin sun7i_a20_pins[] = {
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN_PA0,
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
-@@ -3855,6 +3923,12 @@ static const struct sunxi_pinctrl_desc sun6i_a31_pinctrl_data = {
- 	.npins = ARRAY_SIZE(sun6i_a31_pins),
- };
- 
-+static const struct sunxi_pinctrl_desc sun6i_a31_r_pinctrl_data = {
-+	.pins = sun6i_a31_r_pins,
-+	.npins = ARRAY_SIZE(sun6i_a31_r_pins),
-+	.pin_base = PL_BASE,
-+};
-+
- static const struct sunxi_pinctrl_desc sun7i_a20_pinctrl_data = {
- 	.pins = sun7i_a20_pins,
- 	.npins = ARRAY_SIZE(sun7i_a20_pins),
-diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
-index 6db1c9e..17b5f80 100644
---- a/drivers/pinctrl/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/pinctrl-sunxi.c
-@@ -677,6 +677,7 @@ static struct of_device_id sunxi_pinctrl_match[] = {
- 	{ .compatible = "allwinner,sun5i-a10s-pinctrl", .data = (void *)&sun5i_a10s_pinctrl_data },
- 	{ .compatible = "allwinner,sun5i-a13-pinctrl", .data = (void *)&sun5i_a13_pinctrl_data },
- 	{ .compatible = "allwinner,sun6i-a31-pinctrl", .data = (void *)&sun6i_a31_pinctrl_data },
-+	{ .compatible = "allwinner,sun6i-a31-r-pinctrl", .data = (void *)&sun6i_a31_r_pinctrl_data },
- 	{ .compatible = "allwinner,sun7i-a20-pinctrl", .data = (void *)&sun7i_a20_pinctrl_data },
- 	{}
- };
+	M.
 -- 
-1.8.3.2
+Jazz is not dead. It just smells funny.
