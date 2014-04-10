@@ -1,82 +1,66 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 19:56:33 +0900
-Subject: [PATCH 06/27] ARM: EXYNOS:: Enter a15 lowpower mode for Exynos3250
- based on Cortex-a7
-In-Reply-To: <87d2gp3430.fsf@approximate.cambridge.arm.com>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-7-git-send-email-cw00.choi@samsung.com>
- <87d2gp3430.fsf@approximate.cambridge.arm.com>
-Message-ID: <534678E1.2000005@samsung.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Thu, 10 Apr 2014 16:37:04 +0530
+Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
+ on/off
+In-Reply-To: <53453F2E.40606@samsung.com>
+References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+ <534538F6.2010009@samsung.com>
+ <CAFp+6iHf5Ndt3yNbdAaayXi08-A54Sk8LDTiASm4RTw09GuWvg@mail.gmail.com>
+ <53453F2E.40606@samsung.com>
+Message-ID: <CAFp+6iEktKhksj8-SaDr3Ep7iFf+cyp4-xNmw9DrmmiV5J6wyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2014 06:51 PM, Marc Zyngier wrote:
-> On Thu, Apr 10 2014 at 10:28:23 am BST, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch decide proper lowpower mode of either a15 or a9 according to own ID
->> from Main ID register.
+Hi,
+
+
+On Wed, Apr 9, 2014 at 6:08 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi,
+>
+>
+> On 09.04.2014 14:24, Vivek Gautam wrote:
 >>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos/hotplug.c | 13 ++++++++++---
->>  1 file changed, 10 insertions(+), 3 deletions(-)
+>> Hi Sylwester,
 >>
->> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
->> index 5eead53..36d3db6 100644
->> --- a/arch/arm/mach-exynos/hotplug.c
->> +++ b/arch/arm/mach-exynos/hotplug.c
->> @@ -135,13 +135,20 @@ void __ref exynos_cpu_die(unsigned int cpu)
->>  	int primary_part = 0;
->>  
->>  	/*
->> -	 * we're ready for shutdown now, so do it.
->> -	 * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
->> +	 * we're ready for shutdown now, so do it. Exynos4 is A9 based
->> +	 * while Exynos5 is A15/Exynos7 is A7; check the CPU part
->>  	 * number by reading the Main ID register and then perform the
->>  	 * appropriate sequence for entering low power.
->>  	 */
->>  	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
-> 
-> While you're touching that code, how about using:
-> 
->       primary_part = read_cpuid(CPUID_ID);
+>>
+>> On Wed, Apr 9, 2014 at 5:41 PM, Sylwester Nawrocki
+>> <s.nawrocki@samsung.com> wrote:
+>>>
+>>> Hi Vivek,
+>>>
+>>> On 09/04/14 13:54, Vivek Gautam wrote:
+>>>>
+>>>> Adding support to enable/disable VBUS hooked to a gpio
+>>>> to enable vbus supply on the port.
+>>>
+>>>
+>>> Does the GPIO control a fixed voltage regulator ? If so, shouldn't
+>>> it be modelled by the regulator API instead ?
+>>
+>>
+>> No, this GPIO controls a 'current limiting power distribution switch',
+>> which gives the output vbus to usb controller.
+>> Should i model this as a fixed regulator ?
+>
+>
+> If I understand this correctly, this is just a switch that lets you control
+> whether vbus is provided to the USB connector or not. If so, this doesn't
+> look like an Exynos-specific thing at all and should rather be modeled on
+> higher level.
 
-Or, 
-I suggest read_cpuid_part_number() instead of assembler directly.
+You are right. The Vbus to the USB connector is given through this a
+switch which current limiting capabilities.
+This switch just provides the 5V at its input to its output based on
+the state of Enable pin
+(which is the GPIO we are talking in this patch).
 
-	primary_part = read_cpuid_part_number();
+So can you please suggest on how this should be handled ?
 
-> 
->> -	if ((primary_part & 0xfff0) == 0xc0f0)
->> +
->> +	/*
->> +	 * Main ID register of Cortex series
->> +	 * - Cortex-a7  : 0x410F_C07x
->> +	 * - Cortex-a15 : 0x410F_C0Fx
->> +	 */
->> +	primary_part = primary_part & 0xfff0;
->> +	if (primary_part == 0xc0f0 || primary_part == 0xc070)
-> 
-> ARM_CPU_PART_CORTEX_A15, ARM_CPU_PART_CORTEX_A7
-
-OK I'll use this defined constant as following:
-
-	switch (primary_part)
-	case ARM_CPU_PART_CORTEX_A7:
-	case ARM_CPU_PART_CORTEX_A15:
-		cpu_enter_lowpower_a15();
-		break;
-	default:
-		cpu_enter_lowpower_a9();
-		break;
-	}
-
-> 
->>  		cpu_enter_lowpower_a15();
->>  	else
->>  		cpu_enter_lowpower_a9();
-> 
-
-Best Regards,
-Chanwoo Choi
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+>
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
