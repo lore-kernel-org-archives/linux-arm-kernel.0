@@ -1,64 +1,183 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 10 Apr 2014 19:06:00 +0900
-Subject: [PATCH 10/27] ARM: dts: exynos3250: Add new exynos3250.dtsi file
-In-Reply-To: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1397124377-16969-2-git-send-email-cw00.choi@samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Apr 2014 14:20:49 +0200
+Subject: [PATCH V3 06/19] mmc: mmci: Use the common mmc DT parser
+In-Reply-To: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
+References: <1397132462-8005-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1397132462-8005-7-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+Let mmci DT parser only handle the specific bindings related to mmci
+and extend the DT support by converting to the common mmc DT parser.
 
-This patch add new exynos3250.dtsi to support Exynos3250 SoC and includes
-chipid/sys_reg dt node.
+While both DT and platform data exist, DT takes precedence. If there
+are supplied DT data, the card detect and write protect GPIOS are
+enforced to be provided through it.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
+ drivers/mmc/host/mmci.c |   92 +++++++++++++++++------------------------------
+ 1 file changed, 33 insertions(+), 59 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-new file mode 100644
-index 0000000..3c8cee6
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -0,0 +1,34 @@
-+/*
-+ * Samsung's Exynos3250 SoC device tree source
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Samsung's Exynos3250 SoC device nodes are listed in this file. Exynos3250
-+ * based board files can include this file and provide values for board specfic
-+ * bindings.
-+ *
-+ * Note: This file does not include device nodes for all the controllers in
-+ * Exynos3250 SoC. As device tree coverage for Exynos3250 increases, additional
-+ * nodes can be added to this file.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 173e7de..d21136c 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1386,12 +1386,9 @@ static struct mmc_host_ops mmci_ops = {
+ 	.start_signal_voltage_switch = mmci_sig_volt_switch,
+ };
+ 
+-#ifdef CONFIG_OF
+ static void mmci_dt_populate_generic_pdata(struct device_node *np,
+ 					struct mmci_platform_data *pdata)
+ {
+-	int bus_width = 0;
+-
+ 	if (of_get_property(np, "st,sig-dir-dat0", NULL))
+ 		pdata->sigdir |= MCI_ST_DATA0DIREN;
+ 	if (of_get_property(np, "st,sig-dir-dat2", NULL))
+@@ -1404,46 +1401,22 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
+ 		pdata->sigdir |= MCI_ST_CMDDIREN;
+ 	if (of_get_property(np, "st,sig-pin-fbclk", NULL))
+ 		pdata->sigdir |= MCI_ST_FBCLKEN;
++}
+ 
+-	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
+-	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
+-
+-	if (of_get_property(np, "cd-inverted", NULL))
+-		pdata->cd_invert = true;
+-	else
+-		pdata->cd_invert = false;
++static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
++{
++	int ret = mmc_of_parse(mmc);
+ 
+-	of_property_read_u32(np, "max-frequency", &pdata->f_max);
+-	if (!pdata->f_max)
+-		pr_warn("%s has no 'max-frequency' property\n", np->full_name);
++	if (ret)
++		return ret;
+ 
+ 	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+-		pdata->capabilities |= MMC_CAP_MMC_HIGHSPEED;
++		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
+ 	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
+-		pdata->capabilities |= MMC_CAP_SD_HIGHSPEED;
++		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
+ 
+-	of_property_read_u32(np, "bus-width", &bus_width);
+-	switch (bus_width) {
+-	case 0 :
+-		/* No bus-width supplied. */
+-		break;
+-	case 4 :
+-		pdata->capabilities |= MMC_CAP_4_BIT_DATA;
+-		break;
+-	case 8 :
+-		pdata->capabilities |= MMC_CAP_8_BIT_DATA;
+-		break;
+-	default :
+-		pr_warn("%s: Unsupported bus width\n", np->full_name);
+-	}
+-}
+-#else
+-static void mmci_dt_populate_generic_pdata(struct device_node *np,
+-					struct mmci_platform_data *pdata)
+-{
+-	return;
++	return 0;
+ }
+-#endif
+ 
+ static int mmci_probe(struct amba_device *dev,
+ 	const struct amba_id *id)
+@@ -1474,6 +1447,10 @@ static int mmci_probe(struct amba_device *dev,
+ 	if (!mmc)
+ 		return -ENOMEM;
+ 
++	ret = mmci_of_parse(np, mmc);
++	if (ret)
++		goto host_free;
 +
-+#include "skeleton.dtsi"
-+
-+/ {
-+	compatible = "samsung,exynos3250";
-+
-+	chipid at 10000000 {
-+		compatible = "samsung,exynos4210-chipid";
-+		reg = <0x10000000 0x100>;
-+	};
-+
-+	sys_reg: syscon at 10010000 {
-+		compatible = "samsung,exynos3-sysreg", "syscon";
-+		reg = <0x10010000 0x400>;
-+	};
-+};
+ 	host = mmc_priv(mmc);
+ 	host->mmc = mmc;
+ 
+@@ -1526,14 +1503,15 @@ static int mmci_probe(struct amba_device *dev,
+ 	else
+ 		mmc->f_min = DIV_ROUND_UP(host->mclk, 512);
+ 	/*
+-	 * If the platform data supplies a maximum operating
+-	 * frequency, this takes precedence. Else, we fall back
+-	 * to using the module parameter, which has a (low)
+-	 * default value in case it is not specified. Either
+-	 * value must not exceed the clock rate into the block,
+-	 * of course.
++	 * If no maximum operating frequency is supplied, fall back to use
++	 * the module parameter, which has a (low) default value in case it
++	 * is not specified. Either value must not exceed the clock rate into
++	 * the block, of course. Also note that DT takes precedence over
++	 * platform data.
+ 	 */
+-	if (plat->f_max)
++	if (mmc->f_max)
++		mmc->f_max = min(host->mclk, mmc->f_max);
++	else if (plat->f_max)
+ 		mmc->f_max = min(host->mclk, plat->f_max);
+ 	else
+ 		mmc->f_max = min(host->mclk, fmax);
+@@ -1546,11 +1524,14 @@ static int mmci_probe(struct amba_device *dev,
+ 	else if (plat->ocr_mask)
+ 		dev_warn(mmc_dev(mmc), "Platform OCR mask is ignored\n");
+ 
+-	mmc->caps = plat->capabilities;
+-	mmc->caps2 = plat->capabilities2;
+-	if (!plat->cd_invert)
+-		mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+-	mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
++	/* DT takes precedence over platform data. */
++	mmc->caps = np ? mmc->caps : plat->capabilities;
++	mmc->caps2 = np ? mmc->caps2 : plat->capabilities2;
++	if (!np) {
++		if (!plat->cd_invert)
++			mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
++		mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
++	}
+ 
+ 	if (variant->busy_detect) {
+ 		mmci_ops.card_busy = mmci_card_busy;
+@@ -1562,7 +1543,7 @@ static int mmci_probe(struct amba_device *dev,
+ 	mmc->ops = &mmci_ops;
+ 
+ 	/* We support these PM capabilities. */
+-	mmc->pm_caps = MMC_PM_KEEP_POWER;
++	mmc->pm_caps |= MMC_PM_KEEP_POWER;
+ 
+ 	/*
+ 	 * We can do SGIO
+@@ -1599,20 +1580,13 @@ static int mmci_probe(struct amba_device *dev,
+ 	writel(0, host->base + MMCIMASK1);
+ 	writel(0xfff, host->base + MMCICLEAR);
+ 
+-	if (plat->gpio_cd == -EPROBE_DEFER) {
+-		ret = -EPROBE_DEFER;
+-		goto clk_disable;
+-	}
+-	if (gpio_is_valid(plat->gpio_cd)) {
++	/* If DT, cd/wp gpios must be supplied through it. */
++	if (!np && gpio_is_valid(plat->gpio_cd)) {
+ 		ret = mmc_gpio_request_cd(mmc, plat->gpio_cd, 0);
+ 		if (ret)
+ 			goto clk_disable;
+ 	}
+-	if (plat->gpio_wp == -EPROBE_DEFER) {
+-		ret = -EPROBE_DEFER;
+-		goto clk_disable;
+-	}
+-	if (gpio_is_valid(plat->gpio_wp)) {
++	if (!np && gpio_is_valid(plat->gpio_wp)) {
+ 		ret = mmc_gpio_request_ro(mmc, plat->gpio_wp);
+ 		if (ret)
+ 			goto clk_disable;
 -- 
-1.8.0
+1.7.9.5
