@@ -1,33 +1,54 @@
-From: steve.ulrich@broadcom.com (Steve (Steven) Ulrich)
-Date: Fri, 11 Apr 2014 02:49:46 +0000
-Subject: Increasing PAGE_SIZE to 64K - corresponding changes to ELF
- alignment also required?
-Message-ID: <2E04E1E197F7C940977E5203F2F1978220F63031@SJEXCHMB06.corp.ad.broadcom.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 10 Apr 2014 19:54:41 -0700
+Subject: [PATCH] PM / devfreq: Use freq_table for available_frequencies
+Message-ID: <1397184881-12223-1-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Some devices use freq_table instead of OPP. For those devices, the
+available_frequencies file shows up empty. Fix that by using freq_table to
+generate the available_frequencies data when OPP is not present.
 
-I am in the process of porting a set of kernel patches from a customized 3.2.26 kernel to a 3.6.5 kernel, to change the default page size from 4K to 64K.  I've got the kernel booting through its own initialization, and have reached the point where the kernel is trying to load init.  I'm encountering errors that I suspect are due to text and data segment alignment issues, and would appreciate some feedback/thoughts/comments.
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+---
+ drivers/devfreq/devfreq.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-In  fs/binfmt_elf.c, the following logic is present:
-
-static unsigned long elf_map(struct file *filep, unsigned long addr,
-                struct elf_phdr *eppnt, int prot, int type,
-                unsigned long total_size)
-{
-        unsigned long map_addr;
-        unsigned long size = eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr);  /*  ELF_PAGEOFFSET() gets the 0xffff bits of the p_vaddr from the ELF header */
-        unsigned long off = eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr);
-
-        addr = ELF_PAGESTART(addr);
-        size = ELF_PAGEALIGN(size);
-
-These values are subsequently used in a call to vm_mmap(), which is failing due to issues with the computed offset.  From my read of this code, it appears that the code is assuming that the various segments of the ELF file are alignable to the kernel's page size.  My (relatively unmodified) toolchain is using the typical "0x8000" alignment for the start of the text segment, and I suspect that this is the underlying problem.  This value is a multiple of the standard 4K page size, but won't work for my new 64K pages. 
-
-I am experimenting with using "-Ttext-segment 0x10000 -z max-page-size=0x10000" to coerce the my ELF file segments to 64K boundaries, but feel like this might be a less-than-ideal solution.  
-
-For those more familiar with ARM ELF and page alignment issues, does it seem that I'll need to align my ELF segments to 64K boundaries in order to get successful vm_mmap() operations?  Or, are there other strategies that can give me correct ELF loading, but without changing the default alignments of the toolchain?
-
-Thanks in advance,
-Steve Ulrich
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index 2042ec3..a715d15 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -912,19 +912,26 @@ static ssize_t available_frequencies_show(struct device *d,
+ 	struct devfreq *df = to_devfreq(d);
+ 	struct device *dev = df->dev.parent;
+ 	struct dev_pm_opp *opp;
++	unsigned int i = 0, max_state = df->profile->max_state;
++	bool use_opp;
+ 	ssize_t count = 0;
+ 	unsigned long freq = 0;
+ 
+ 	rcu_read_lock();
++	use_opp = dev_pm_opp_get_opp_count(dev) > 0;
+ 	do {
+-		opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+-		if (IS_ERR(opp))
+-			break;
++		if (use_opp) {
++			opp = dev_pm_opp_find_freq_ceil(dev, &freq);
++			if (IS_ERR(opp))
++				break;
++		} else {
++			freq = df->profile->freq_table[i++];
++		}
+ 
+ 		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
+ 				   "%lu ", freq);
+ 		freq++;
+-	} while (1);
++	} while (use_opp || (!use_opp && i < max_state));
+ 	rcu_read_unlock();
+ 
+ 	/* Truncate the trailing space */
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
