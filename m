@@ -1,30 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Apr 2014 10:41:54 +0200
-Subject: [PATCH 03/27] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
-In-Reply-To: <53474D66.7020605@samsung.com>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <20140411014858.GC14934@quad.lixom.net> <53474D66.7020605@samsung.com>
-Message-ID: <5435579.0l6Y80MnUs@wuerfel>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 11 Apr 2014 14:13:31 +0530
+Subject: [PATCH v2 07/14] arm: common: edma: API to request non default
+ queue for a channel
+In-Reply-To: <1396357575-30585-8-git-send-email-peter.ujfalusi@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-8-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5347AB33.8000606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 April 2014 11:03:18 Chanwoo Choi wrote:
-> On 04/11/2014 10:48 AM, Olof Johansson wrote:
-> > On Thu, Apr 10, 2014 at 06:37:14PM +0900, Chanwoo Choi wrote:
-> >> This patch add memory mapping for PMU (Power Management Unit) which is used
-> >> for power control of Exynos3250.
-> >>
-> >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > 
-> > Signed-off-by is in the wrong order, if Kyungmin wrote the patch and you're
-> > just posting it...
+On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
+> When using eDMA3 via dmaengine all dma channels will use the default queue.
+> Since during request time we do not have means to change this it need to be done
+> later, before the DMA has been started.
+> With the added function it is possible to move the channel to a non default
+> queue if it is possible, otherwise (when only one EQ/TC is available for the CC)
+> the default queue is going to be used.
+> For example: For optimal system performance the audio (cyclic) DMA should
+> be placed to a separate queue which is different than what the rest of the
+> system is using.
 > 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  arch/arm/common/edma.c             | 27 +++++++++++++++++++++++++++
+>  include/linux/platform_data/edma.h |  2 ++
+>  2 files changed, 29 insertions(+)
 > 
-> No, I implemented this patch and posted it.
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index be267b2080be..eaf6dd19f082 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -712,6 +712,33 @@ int edma_alloc_channel(int channel,
+>  }
+>  EXPORT_SYMBOL(edma_alloc_channel);
+>  
+> +/**
+> + * edma_request_non_default_queue - try to map the channel to non default queue
+> + * @channel: dma channel returned from edma_alloc_channel()
+> + *
+> + * For certain type of applications like audio it is preferred to not use the
+> + * default event queue/tc to avoid eDMA caused latency.
+> + *
+> + * This function will iterate through the event queues available for the CC and
+> + * picks the first EQ/TC which is not set as the default for the CC
+> + */
+> +void edma_request_non_default_queue(int channel)
+> +{
+> +	unsigned ctlr = EDMA_CTLR(channel);
+> +	enum dma_event_q eventq_no = EVENTQ_DEFAULT;
+> +	int i;
+> +
+> +	for (i = 0; i < edma_cc[ctlr]->num_tc; i++) {
+> +		if (i != edma_cc[ctlr]->default_queue) {
+> +			eventq_no = i;
+> +			break;
+> +		}
+> +	}
+> +
+> +	channel = EDMA_CHAN_SLOT(channel);
+> +	map_dmach_queue(ctlr, channel, eventq_no);
+> +}
+> +EXPORT_SYMBOL(edma_request_non_default_queue);
 
-What did Kyungmin do then? If you submitted the patch to him, and he
-sent it back to you, you should be listed twice, although you could
-just as easily leave him out.
+With this API, the caller cannot be sure of what the final affect on the
+channel will be. It depends a lot on what the default queue setting is.
+And that can change independent of this API.
 
-	Arnd
+I am not an expert in dmaengine, but it looks like we are trying to
+workaround the fact that dmaengine does not support multiple transfer
+priorities for a dma_chan. If yes, it will be better to add support for
+doing this in dmaengine core itself. A generic priority space could be
+supported which each DMA device can then map to its hardware support.
+
+Thanks,
+Sekhar
