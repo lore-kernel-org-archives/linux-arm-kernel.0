@@ -1,61 +1,27 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 Apr 2014 16:00:12 +0200
-Subject: [PATCH] ARM: imx: propagate DI clock changes up the clock tree
- to PLL5
-In-Reply-To: <CAJ+vNU0V_vXDOvergiQ2q00EFL46kGFJCvqCS=hdW5x=0rjN5Q@mail.gmail.com>
-References: <E1WXuag-0007Gs-Ku@rmk-PC.arm.linux.org.uk>
- <CAJ+vNU1uzKCZxjsr+inuOi_VJbs+iR14uqXKOCr_32ZS__HrZQ@mail.gmail.com>
- <CAJ+vNU0V_vXDOvergiQ2q00EFL46kGFJCvqCS=hdW5x=0rjN5Q@mail.gmail.com>
-Message-ID: <1397224812.4577.10.camel@weser.hi.pengutronix.de>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 11 Apr 2014 14:29:30 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 6/9] regulator: AXP20x: Add support
+ for regulators subsystem
+In-Reply-To: <20140411122345.GD28800@sirena.org.uk>
+References: <1397209093-10077-1-git-send-email-carlo@caione.org>
+ <1397209093-10077-7-git-send-email-carlo@caione.org>
+ <20140411122345.GD28800@sirena.org.uk>
+Message-ID: <CAOQ7t2Y8tN6i7MtT_QkrxZsLzJi-53MmUcC9c1GJscreniStXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+On Fri, Apr 11, 2014 at 2:23 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Apr 11, 2014 at 11:38:10AM +0200, Carlo Caione wrote:
+>> AXP202 and AXP209 come with two synchronous step-down DC-DCs and five
+>> LDOs. This patch introduces basic support for those regulators.
+>
+> Applied, thanks, but I had to resolve some trivial add/add conflicts
+> with the Broadcom regulator driver Makefile and Kconfig additions -
+> please remember to submit patches against current code.
 
-Am Donnerstag, den 10.04.2014, 21:48 -0700 schrieb Tim Harvey:
-> On Thu, Apr 10, 2014 at 9:31 PM, Tim Harvey <tharvey@gateworks.com> wrote:
-> > On Wed, Apr 9, 2014 at 8:39 AM, Russell King
-> > <rmk+kernel@arm.linux.org.uk> wrote:
-> >> Allows clk_set_rate() on the DI clocks to propagate up to PLL5.
-> >>
-> >> This allows imx-drm to produce the exact clock rate required with no
-> >> modulation due to the fractional divider.  Modulation of the clock rate
-> >> can and does prevent TVs from locking to the HDMI signal - they will
-> >> report no signal rather than trying to lock to such a signal.
-> >>
-> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >> ---
-> >> I still have this patch which is required so that imx-drm is capable of
-> >> producing HDMI clocks which are close enough to the HDMI defined
-> >> frequencies such that TVs and similar can recognise the signal.  Without
-> >> this, I don't get any kind of output on my TV desite imx-drm being set
-> >> to the correct mode.  I have proven that this is because the HDMI clock
-> >> is *very* wrong without this patch.
-> >>
-> >>  arch/arm/mach-imx/clk-imx6q.c | 12 ++++++------
-> >>  1 file changed, 6 insertions(+), 6 deletions(-)
-> >>
-> >
-> > Hi Russell,
-> >
-> > This fixed HDMI on the boards I'm testing it on (Gateworks Ventana).
-> > Without it I encounter the same issue you describe above.
-> >
-> > Tested-by: Tim Harvey <tharvey@gateworks.com>
-> >
-> > Tim
-> 
-> I neglected to mention that even after this patch I do see an issue
-> where the monitor does not sync if plugged in on board powerup.  The
-> following is what I see with DEBUG enabled in imx-hdmi:
-> 
-I think this is fallout from how we handle the EDID fetch on startup. We
-have patches lying around to fix this. Will post them in a minute.
+Sorry, I'll do next time.
 
-Regards,
-Lucas
+Thank you,
+
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Carlo Caione
