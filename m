@@ -1,62 +1,41 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 11 Apr 2014 11:50:38 +0300
-Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
- default when booted with DT
-In-Reply-To: <5347A4FD.1030803@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
- <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
- <5347A4FD.1030803@ti.com>
-Message-ID: <5347ACDE.7040407@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 11 Apr 2014 10:51:37 +0200
+Subject: [PATCH 12/27] ARM: dts: exynos3250: Add default interrupt-parent
+ connected with GIC
+In-Reply-To: <53477347.1080603@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397124377-16969-4-git-send-email-cw00.choi@samsung.com>
+ <20140411040050.GD14934@quad.lixom.net> <53477347.1080603@samsung.com>
+Message-ID: <5347AD19.7080905@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2014 11:17 AM, Sekhar Nori wrote:
-> On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
->> Use the EVENTQ_1 for default and leave the EVENTQ_0 to be used by high
->> priority channels, like audio.
+Hi Chanwoo,
+
+On 11.04.2014 06:44, Chanwoo Choi wrote:
+> Hi,
+>
+> On 04/11/2014 01:00 PM, Olof Johansson wrote:
+>> On Thu, Apr 10, 2014 at 07:06:02PM +0900, Chanwoo Choi wrote:
+>>> This patch add interrupt-parent node to connected with GIC.
+>>> All interrupt-related dt nodes need default interrupt-parent node.
+>>>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 >>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-> 
->> ---
->>  arch/arm/common/edma.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
->> index 86a8b263278f..19520e2519d9 100644
->> --- a/arch/arm/common/edma.c
->> +++ b/arch/arm/common/edma.c
->> @@ -1546,7 +1546,8 @@ static int edma_of_parse_dt(struct device *dev,
->>  
->>  	pdata->queue_priority_mapping = queue_priority_map;
->>  
->> -	pdata->default_queue = 0;
->> +	/* select queue 1 as default */
-> 
-> It will be nice to expand the comment with explanation of why this is
-> being chosen as default (lower priority queue by default for typical
-> bulk data transfer).
+>> There's no point in splitting these off in separate patches; fold them
+>> into one patch that introduces the SoC dtsi, please.
+>
+> OK, I will consolidate following two patches into one patch.
+>
+> [PATCH 11/27] ARM: dts: exynos3250: Add GIC dt node for Exynos3250
+> [PATCH 12/27] ARM: dts: exynos3250: Add default interrupt-parent connected with GIC
+>
 
-Yes, extended comment is a good idea.
+I believe the intention was to squash all the patches related to 
+exynos3250.dtsi into a single patch called "ARM: dts: Add device tree 
+sources for Exynos3250". To retain authorship information, signed-off-by 
+tags should be merged from all those patches too.
 
-For the next version I think I'm going to change the code around default
-TC/Queue and the non default queue selection, mostly based on Joel's comment:
-
-EVENTQ_1 as default queue.
-Set the EVENTQ_1 priority to 7
-EVENTQ_0 priority is going to stay 0 and EVENTQ_2 as 2
-
-Add new member to struct edma, like high_pri_queue.
-When we set the queue priorities in edma_probe() we look for the highest
-priority queue and save the number in high_pri_queue.
-
-I will rename the edma_request_non_default_queue() to
-edma_request_high_pri_queue() and it will assign the channel to the high
-priority queue.
-
-I think this way it is going to be more explicit and IMHO a bit more safer in
-a sense the we are going to get high priority when we ask for it.
-
--- 
-P?ter
+Best regards,
+Tomasz
