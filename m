@@ -1,82 +1,61 @@
-From: tthayer@altera.com (Thor Thayer)
-Date: Fri, 11 Apr 2014 09:43:34 -0500
-Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
- controller
-In-Reply-To: <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
-References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
- <1396907649-20212-2-git-send-email-tthayer@altera.com>
- <20140408133818.GB16054@pengutronix.de>
- <1396967390.23349.15.camel@dinh-ubuntu>
- <20140408143327.GC16054@pengutronix.de>
- <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
- <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
-Message-ID: <1397227414.8304.6.camel@dinh-ubuntu>
+From: sammy@sammy.net (Sam Creasey)
+Date: Fri, 11 Apr 2014 10:39:01 -0400
+Subject: [PATCH v2 00/12] scsi/NCR5380: fix debugging macros and #include
+ structure
+In-Reply-To: <20140319123516.542623278@telegraphics.com.au>
+References: <20140319123516.542623278@telegraphics.com.au>
+Message-ID: <20140411143900.GG21346@anhedonia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-08 at 13:52 -0500, Rob Herring wrote:
-> On Tue, Apr 8, 2014 at 11:02 AM, delicious quinoa
-> <delicious.quinoa@gmail.com> wrote:
-> > On Tue, Apr 8, 2014 at 9:33 AM, Steffen Trumtrar
-> > <s.trumtrar@pengutronix.de> wrote:
-> >> On Tue, Apr 08, 2014 at 09:29:50AM -0500, Thor Thayer wrote:
-> >>> On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
-> >>> > Hi!
-> >>> >
-> >>> > On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
-> >>> > > From: Thor Thayer <tthayer@altera.com>
-> >>> > >
-> >>> > > Addition of the Altera SDRAM controller bindings and device
-> >>> > > tree changes to the Altera SoC project.
-> >>> > >
-> >>> [snip]
-> >>> > > +
-> >>> > > +Required properties:
-> >>> > > +- compatible : "altr,sdr-ctl", "syscon";
-> >>> > > +                Note that syscon is invoked for this device to support the FPGA
-> >>> > > +         bridge driver, EDAC driver and other devices that share the
-> >>> > > +         registers.
-> >>> > > +- reg : Should contain 1 register ranges(address and length)
-> >>> >
-> >>> > I haven't really thought this through, but why would the FPGA bridge driver
-> >>> > access the sdram controller? For releasing the resets in fpgaportrst ? Or is
-> >>> > there more?
-> >>>
-> >>> Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
-> >>> path. Our SDRAM controller allows FPGA master access to the SDRAM.
-> >>>
-> >>
-> >> Yes. But what you have to do to enable the path is let the FPGA port you use
-> >> out of reset. And that is it as far as I can see. The rest happens in the
-> >> bitstream. Or is there more to enable the path?
-> >> The FPGA2SDRAM bridge is the one I didn't use as of yet, so if I miss something
-> >> please elaborate.
-> >
-> > Hi Steffen,
-> >
-> > The sdram controller is used by two drivers.  That's why we want to
-> > specify "syscon" here.  The other driver is the FPGA bridge driver.
-> > Its functionality is very separate from what this driver is doing (we
-> > are not enabling the bridge in this driver; we are enabling the
-> > monitoring and resetting the interrupt bit of the EDAC).  We wanted to
-> > specify "syscon" her so that we don't have to have to change it for
-> > the other driver.
+Acked-by: Sam Creasey <sammy@sammy.net>
+
+On Wed, Mar 19, 2014 at 11:35:16PM +1100, Finn Thain wrote:
 > 
-> But are there actually overlapping registers which are accessed by
-> both drivers and need the protection of regmap?
+> This patch series addresses several issues with NCR5380 drivers:
 > 
-> Perhaps MFD is more appropriate than syscon?
-
-Hi Rob,
-
-We are accessing bits in the SDRAM Controller's Control register which
-has other bits that configure the SDRAM controller. Since this main
-control register may be accessed by other drivers (more likely for
-reading the current SDRAM configuration setup than for writing), the
-syscon still seems like an appropriate use.
-
-Thor
-
-
+> 1. The complex network of #include directives.
 > 
-> Rob
+> 2. Three inconsistent implementations of the core driver all attempting
+>    to share the same macro definitions in NCR5380.h.
+> 
+> 3. Broken debugging code.
+> 
+> In the past these issues have led to compiler warnings and ugly hacks to
+> fix build failures.
+> 
+> This patch series fixes the debugging code by reducing the divergence
+> between the various core driver implementations.
+> 
+> The final two patches in the series further reduce divergence by refactoring
+> sun3_scsi.c and sun3_scsi_vme.c so that they follow the same structure as
+> the other NCR5380 drivers.
+> 
+> By the end of this patch series over 800 net lines of code have been
+> removed. This is mostly duplicated code that's easily eliminated once the
+> debugging code is made consistent (and some dead code is removed).
+> 
+> Better uniformity and less duplication should assist future work such as
+> modernization and trivial clean-up.
+> 
+> To make code review easier I've tried to keep these patches succinct and
+> free of extraneous changes. Though I did run checkpatch.pl, I've ignored
+> whitespace issues in existing code. I will send separate patches for
+> whitespace clean-up of NCR5380 drivers.
+> 
+> All NCR5380 drivers have been compile-tested with this patch series:
+>   arm/cumana_1.c
+>   arm/oak.c
+>   atari_scsi.c
+>   dmx3191d.c
+>   dtc.c
+>   g_NCR5380.c
+>   g_NCR5380_mmio.c
+>   mac_scsi.c
+>   pas16.c
+>   sun3_scsi.c
+>   sun3_scsi_vme.c
+>   t128.c
+> 
+> I've successfully regression tested this patch series using mac_scsi on a 
+> PowerBook 180. The debugging macros are now usable again.
