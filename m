@@ -1,58 +1,70 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 11 Apr 2014 12:39:40 +0200
-Subject: [PATCH v2 1/2] ARM : DMA : remove useless information about DMA
-In-Reply-To: <1397203252-22977-2-git-send-email-sdu.liu@huawei.com>
-References: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
- <1397203252-22977-2-git-send-email-sdu.liu@huawei.com>
-Message-ID: <5347C66C.2040304@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 11 Apr 2014 12:39:58 +0200
+Subject: [PATCH V5 03/20] ARM: exynos: cpuidle: Use cpuidle_register
+In-Reply-To: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1397212815-16068-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Use the cpuidle generic function 'cpuidle_register'. That saves us from some
+extra lines of code and unneeded variables.
 
-On 2014-04-11 10:00, Liu Hua wrote:
-> Because commit e9da6e9905e6 has remove custom consistent dma
-> region. So the related variable and document should be removed
->
-> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
+A side effect of this change is a bug fix where before the cpuidle driver was
+registered for each_online_cpu and now it is for each_possible_cpu.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-exynos/cpuidle.c |   18 ++----------------
+ 1 file changed, 2 insertions(+), 16 deletions(-)
 
-> ---
->   Documentation/arm/memory.txt  | 4 ----
->   arch/arm/include/asm/memory.h | 2 --
->   2 files changed, 6 deletions(-)
->
-> diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-> index 4bfb9ff..8a361c0 100644
-> --- a/Documentation/arm/memory.txt
-> +++ b/Documentation/arm/memory.txt
-> @@ -44,10 +44,6 @@ fffe0000	fffe7fff	ITCM mapping area for platforms with
->   fff00000	fffdffff	Fixmap mapping region.  Addresses provided
->   				by fix_to_virt() will be located here.
->   
-> -ffc00000	ffefffff	DMA memory mapping region.  Memory returned
-> -				by the dma_alloc_xxx functions will be
-> -				dynamically mapped here.
-> -
->   ff000000	ffbfffff	Reserved for future expansion of DMA
->   				mapping region.
->   
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 02fa255..2b75146 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -83,8 +83,6 @@
->    */
->   #define IOREMAP_MAX_ORDER	24
->   
-> -#define CONSISTENT_END		(0xffe00000UL)
-> -
->   #else /* CONFIG_MMU */
->   
->   /*
-
-Best regards
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index 17df0d8..61e1481 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -40,8 +40,6 @@
+ 
+ #define S5P_CHECK_AFTR		0xFCBA0D10
+ 
+-static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+-
+ /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+ static void exynos4_set_wakeupmask(void)
+ {
+@@ -160,29 +158,17 @@ static struct cpuidle_driver exynos4_idle_driver = {
+ 
+ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ {
+-	int cpu_id, ret;
+-	struct cpuidle_device *device;
++	int ret;
+ 
+ 	if (soc_is_exynos5440())
+ 		exynos4_idle_driver.state_count = 1;
+ 
+-	ret = cpuidle_register_driver(&exynos4_idle_driver);
++	ret = cpuidle_register(&exynos4_idle_driver, NULL);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
+ 		return ret;
+ 	}
+ 
+-	for_each_online_cpu(cpu_id) {
+-		device = &per_cpu(exynos4_cpuidle_device, cpu_id);
+-		device->cpu = cpu_id;
+-
+-		ret = cpuidle_register_device(device);
+-		if (ret) {
+-			dev_err(&pdev->dev, "failed to register cpuidle device\n");
+-			return ret;
+-		}
+-	}
+-
+ 	return 0;
+ }
+ 
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.7.9.5
