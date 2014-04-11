@@ -1,62 +1,200 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 11 Apr 2014 18:16:41 +0530
-Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
- default when booted with DT
-In-Reply-To: <5347DEDA.2060008@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
- <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
- <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com>
- <5347AE49.5020109@ti.com> <5347B7F8.2000508@ti.com>
- <20140411094217.GA32284@intel.com> <5347D2CC.4030407@ti.com>
- <20140411113154.GB32284@intel.com> <5347DEDA.2060008@ti.com>
-Message-ID: <20140411124641.GC32284@intel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 11 Apr 2014 15:08:14 +0200
+Subject: [PATCH RFC v5 2/2] clk: Add handling of clk parent and rate
+ assigned from DT
+In-Reply-To: <5347DF4D.5000005@samsung.com>
+References: <1397042790-10636-1-git-send-email-s.nawrocki@samsung.com>
+ <CAL_JsqKDJ_yFxFYnrTtmzMPoxO2rmypiujybwbhUh35y1LS-Mw@mail.gmail.com>
+ <5347DF4D.5000005@samsung.com>
+Message-ID: <3915682.bldtqrJ6U5@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 03:23:54PM +0300, Peter Ujfalusi wrote:
-> On 04/11/2014 02:31 PM, Vinod Koul wrote:
+On Friday 11 April 2014 14:25:49 Sylwester Nawrocki wrote:
+> On 10/04/14 18:04, Rob Herring wrote:
+> > On Wed, Apr 9, 2014 at 6:26 AM, Sylwester Nawrocki wrote:
+> >> This patch adds a helper function to configure clock parents and
+> >> rates as specified in clock-parents, clock-rates DT properties
+> >> for a consumer device and a call to it before driver is bound to
+> >> a device.
+> >> 
+> >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >> ---
 > 
-> >> I would say that it is channel based config. I don't see the reason why would
-> >> one mix different priorities on a configured channel between descriptors.
-> >>
-> >>> If not then we can add this in dma_slave_config ?
-> >>
-> >> So adding to the struct for example:
-> >> bool high_priority;
+> [...]
+> 
+> >> ---
+> >> 
+> >>  .../devicetree/bindings/clock/clock-bindings.txt   |   44 ++++++++++
+> >>  drivers/base/platform.c                            |    5 ++
+> >>  drivers/clk/Makefile                               |    3 +
+> >>  drivers/clk/clk-conf.c                             |   85 ++++++++++++++
+> >>  drivers/clk/clk.c                                  |   12 ++-
+> >>  include/linux/clk/clk-conf.h                       |   19 +++++
+> >>  6 files changed, 167 insertions(+), 1 deletion(-)
+> >>  create mode 100644 drivers/clk/clk-conf.c
+> >>  create mode 100644 include/linux/clk/clk-conf.h
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >> b/Documentation/devicetree/bindings/clock/clock-bindings.txt index
+> >> 700e7aa..93513fc 100644
+> >> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> >> @@ -132,3 +132,47 @@ clock signal, and a UART.
+> >>    ("pll" and "pll-switched").
+> >>  * The UART has its baud clock connected the external oscillator and its
+> >>    register clock connected to the PLL clock (the "pll-switched" signal)
+> >> +
+> >> +==Assigned clock parents and rates==
+> >> +
+> >> +Some platforms require static initial configuration of parts of the
+> >> clocks
+> >> +controller. Such a configuration can be specified in a clock consumer
+> >> node
+> >> +through clock-parents and clock-rates DT properties. The former should
+> >> +contain a list of parent clocks in form of phandle and clock specifier
+> >> pairs,
+> >> +the latter the list of assigned clock frequency values (one cell each).
+> >> +To skip setting parent or rate of a clock its corresponding entry should
+> >> be
+> >> +set to 0, or can be omitted if it is not followed by any non-zero entry.
+> >> +
+> >> +    uart at a000 {
+> >> +        compatible = "fsl,imx-uart";
+> >> +        reg = <0xa000 0x1000>;
+> >> +        ...
+> >> +        clocks = <&clkcon 0>, <&clkcon 3>;
+> >> +        clock-names = "baud", "mux";
+> >> +
+> >> +        clock-parents = <0>, <&pll 1>;
+> >> +        clock-rates = <460800>;
 > > 
-> > In designware controller, we can have channel priorties from 0 to 7 which IIRC 7
-> > being highest. So bool wont work. unsigned int/u8 would be good.
+> > Is this the input frequency or serial baud rate? Looks like a baud
+> > rate, but the clock framework needs input (to the uart) frequency. I
+> > would say this should be clock-frequency and specify the max baud rate
+> > as is being done with i2c bindings. The uart driver should know how to
+> > convert between input clock freq and baud rate.
 > 
-> I see. But from a generic code what number should one pass if we want to get
-> the highest priority? With eDMA3 we essentially have three levels (see later)
-> so if we receive 7 as priority what shall we do? Just treat as highest? But if
-> we receive 4, which is somewhere in the middle for designware it is still
-> means highest for us.
-> 
-> I see this too small step partitioning in common code a bit problematic when
-> it comes to how to interpret the 'magic numbers'.
-> Also how all the driver in the system will decide the priority number? I'm
-> sure they will pick something conveniently average for themselves and I
-> imagine audio would try to pick something which is bigger than the numbers
-> others have taken...
-> 
-> > How about your controller, is it binary?
-> 
-> We also have priority from 0 to 7, 0 being the highest priority. We have 3
-> Transfer Controllers/Event Queues and we can set the priority for the TC/EQ
-> and assign the given channel to the desired TC/EQ.
-> So in reality we have 3 priorities to choose from in my view since we only
-> have 3 TC/EQ in eDMA3 (of AM335x/AM447x) on other SoCs we can have different
-> number of TC/EQ.
+> This UART example is not quite representative for the issues I have been
+> trying to address with this patch set. There is a need to set (an initial)
+> input clock frequency. E.g. in case of multimedia devices there may be
+> a need to set clock parent and frequency of an input clock to multiple IP
+> blocks, so they are clocked synchronously and data is carried properly
+> across a whole processing chain. Thus there may not be even clock output
+> in an IP block, but still input clock needs to be set. IIUC there is
+> similar issue with audio, where it is difficult to calculate the clock
+> frequencies/determine parent clocks in individual drivers algorithmically.
 
-I think the number shouldn't be viewed in absolute terms. If we decide that (lets
-say) 0-7, then any controller should map 0 to lowest and 7 to highest.
+Just to be used as an example, this is how the SMIA++ sensor driver computes 
+the PLL parameters automatically based on the input frequency, desired output 
+frequency and various hardware limits.
 
-For your case you can do this and then intermediate numbers would be medium
-priority. Such a system might work well...
+http://lxr.free-electrons.com/source/drivers/media/i2c/smiapp-pll.c
 
-Also how would a client driver know which priority to use? Would it come from
-DT?
+See the code complexity and keep in mind that it only handles a single device 
+with a single set of constraints and a single parent. If we add several 
+devices to the mix, as well as selectable parents, there would indeed probably 
+be no sane way to configure the clocks algorithmically.
+
+> >> +    };
+> >> +
+> >> +In this example the pll is set as parent of "mux" clock and frequency
+> >> of "baud"
+> >> +clock is specified as 460800 Hz.
+> > 
+> > I don't really like clock-parents. The parent information is part of
+> > the clock source, not the consumer.
+> 
+> I'm not sure we must always consider the parent information as property
+> of a clock source. If for example we expose a structure like below as
+> single clock object, supporting clock gating, parent and frequency
+> setting the parent setting is still accessible from within a device
+> driver. And clock parent selection may depend on a system configuration
+> not immediately obvious from within a single device driver perspective.
+> 
+>                          MUX
+>                        ,-------.     DIVIDER      GATE
+> common clk source 1 -->|--.    |   ,--------.   ,--------.
+>                        |   \   |   |        |   |        |
+> common clk source 2 -->|-   '--|-->|        |-->|        |--> consumer
+>        ...             |       |   |        |   |        |
+> common clk source N -->|-      |   '--------'   '--------'
+>                        '-------'
+> 
+> > We've somewhat decided against having every single clock defined in DT
+> > and rather only describe a clock controller with leaf clocks to
+> > devices. That is not a hard rule, but for complex clock trees that is
+> > the norm. Doing something like this will require all levels of the
+> > clock tree to be described. You may have multiple layers of parents
+> > that have to be configured correctly. How are you configuring the rest
+> > of the tree?
+> 
+> I believe even clock controllers where clocks are represented as flat
+> array often describe the clock tree entirely by parenthood, the tree
+> structure is just not obvious from the DT binding.
+> In addition, there seems to be appearing more and more clock controller
+> DT bindings describing their clocks individually.
+> 
+> >> +Configuring a clock's parent and rate through the device node that uses
+> >> +the clock can be done only for clocks that have a single user.
+> >> Specifying
+> >> +conflicting parent or rate configuration in multiple consumer nodes for
+> >> +a shared clock is forbidden.
+> >> +
+> >> +Configuration of common clocks, which affect multiple consumer devices
+> >> +can be specified in a dedicated 'assigned-clocks' subnode of a clock
+> >> +provider node, e.g.:
+> >
+> > This seems like a work-around due to having clock-parents in the
+> > consumer node. If (I'm not convinced we should) we have a binding for
+> > parent config, it needs to be a single binding that works for both
+> > cases.
+> 
+> When this issue was first raised during an ARM kernel summit it was
+> proposed to add 'assigned' prefix to DT properties for such bindings.
+> 
+> How about separate properties for the default clock configuration,
+> e.g. assigned-clocks/assigned-clock-parents/assigned-clock-rates ?
+> So a clock provider would look like:
+> 
+>     clkcon {
+>         ...
+>         #clock-cells = <1>;
+> 
+>         assigned-clocks = <&clkcon 16>, <&clkcon 17>;
+>         assigned-clock-parents = <0>, <&clkcon 1>;
+>         assigned-clock-rates = <200000>;
+>     };
+> 
+> And a consumer device node:
+> 
+>     uart at a000 {
+>         compatible = "fsl,imx-uart";
+>         reg = <0xa000 0x1000>;
+>         ...
+>         clocks = <&clkcon 0>;
+>         clock-names = "baud";
+> 
+>         assigned-clocks = <&clkcon 3>, <&clkcon 0>;
+>         assigned-clock-parents = <&pll 1>;
+>         assigned-clock-rates = <0>, <460800>;
+> };
+> 
+> ?
+> 
+> >> +
+> >> +    clkcon {
+> >> +        ...
+> >> +        #clock-cells = <1>;
+> >> +
+> >> +        assigned-clocks {
+> >> +            clocks = <&clkcon 16>, <&clkcon 17>;
+> >> +            clock-parents = <0>, <&clkcon 1>;
+> >> +            clock-rates = <200000>;
+> >> +        };
+> >> +    };
 
 -- 
-~Vinod
+Regards,
+
+Laurent Pinchart
