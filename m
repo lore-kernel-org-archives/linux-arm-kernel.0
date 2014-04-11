@@ -1,56 +1,37 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 11 Apr 2014 20:25:59 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140411.140044.1787758980997246871.davem@davemloft.net>
-References: <20140411153041.GQ16119@n2100.arm.linux.org.uk>
- <20140411172456.GA20506@redhat.com> <20140411173853.GA21370@redhat.com>
- <20140411.140044.1787758980997246871.davem@davemloft.net>
-Message-ID: <20140411182559.GA23105@redhat.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 11 Apr 2014 18:27:57 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: fix missing braces in _init()
+In-Reply-To: <1394788517-15014-1-git-send-email-rnayak@ti.com>
+References: <1394788517-15014-1-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.02.1404111827410.14347@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11, David Miller wrote:
->
-> From: Oleg Nesterov <oleg@redhat.com>
-> Date: Fri, 11 Apr 2014 19:38:53 +0200
->
-> > And perhaps the patch is not complete. "if (vma)" is not enough, a probed
-> > task can mmap something else at this vaddr.
-> >
-> > copy_to_user_page() should only change the contents of area->page, so memcpy
-> > should be fine. But I am not sure that flush_icache_user_range() or
-> > flush_ptrace_access() is always safe on every arch if "struct page *page"
-> > doesn't match vma.
->
-> The architectures want the VMA for two reasons:
->
-> 1) To get at the 'mm'.  The 'mm' is absolutely essential so that we can look
->    at the MM cpumask and therefore determine what cpus this address space has
->    executed upon, and therefore what cpus need the flush broadcast to.
->
-> 2) To determine if the VMA is executable, in order to avoid the I-cache flush
->    if possible.
+On Fri, 14 Mar 2014, Rajendra Nayak wrote:
 
-Yes, thanks, this is clear.
+> From: Suman Anna <s-anna@ti.com>
+> 
+> Bug was introduced by commit 'f92d959: ARM: OMAP2+: hwmod:
+> Extract no-idle and no-reset info from DT'
+> 
+> There were 2 versions of the patch posted which resulted in the above
+> commit. While v1 [1] had the bug, v2 [2] had it fixed.
+> However v1 apparently seemed to have been pulled in by mistake
+> introducing the bug.
+> 
+> Given of_find_property() does return NULL when the node passed is
+> NULL, it did not introduce any functional issues as such, just the
+> fact that the second if check was executed unnecessarily.
+> 
+> [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg94220.html
+> [2] http://www.spinics.net/lists/linux-omap/msg98490.html
+> 
+> Cc: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 
-> I think you can get at the 'mm' trivially in this uprobes path,
+Thanks, queued for v3.15-rc.
 
-sure, it is always current->mm.
 
-> and we can just
-> as well assume that the VMA is executable since this thing is always writing
-> instructions.
-
-yes.
-
-> So we could create a __copy_to_user_page() that takes an 'mm' and a boolean
-> 'executable' which uprobes could unconditionally set true, and copy_to_user_page()
-> would then be implemented in terms of __copy_to_user_page().
-
-This needs a lot of per-arch changes. Plus, it seems, in general VM_EXEC
-is not the only thing __copy_to_user_page() should take into account...
-
-But at least we are starting to agree that we need something else ;)
-
-Oleg.
+- Paul
