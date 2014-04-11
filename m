@@ -1,140 +1,69 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 11 Apr 2014 11:21:53 +0200
-Subject: [PATCH RESEND 1/5] pinctrl: allows not to define the
- get_group_pins operation
-In-Reply-To: <1397135274-10764-2-git-send-email-antoine.tenart@free-electrons.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Fri, 11 Apr 2014 11:21:57 +0200
+Subject: [PATCH RESEND 2/5] pinctrl: berlin: add a pinctrl driver for
+ Marvell Berlin SoCs
+In-Reply-To: <20140411162716.74e739e1@xhacker>
 References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397135274-10764-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <5347B431.5060506@gmail.com>
+ <1397135274-10764-3-git-send-email-antoine.tenart@free-electrons.com>
+ <20140411144431.04fb148d@xhacker> <20140411081839.GB20147@kwain>
+ <20140411162716.74e739e1@xhacker>
+Message-ID: <20140411092157.GD20147@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2014 03:07 PM, Antoine T?nart wrote:
-> When using a group only pinctrl driver, which does not have any
-> information on the pins it is useless to define a get_group_pins
-> always returning an empty list of pins.
->
-> When not using get_group_pin[1], a driver must implement it so
-> pins = NULL and num_pins = 0. This patch makes it the default
-> behaviour if not defined in the pinctrl driver when used in
-> pinmux enable and disable funtions and in pinctrl_groups_show.
->
-> It also adds a check in pinctrl_get_group_pins and return -EINVAL if
-> not defined. This function is called in the gpiolib when adding when
-> pingroup range. It cannot be used if no group is defined, so this seams
-> reasonable.
+Jisheng,
 
-I don't have a strong opinion about making pins optional for pinctrl
-drivers. I'll leave it for Linus to decide on it.
+On Fri, Apr 11, 2014 at 04:27:16PM +0800, Jisheng Zhang wrote:
+> Hi Antoine,
+> 
+> On Fri, 11 Apr 2014 01:18:39 -0700
+> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+> 
+> > Hi Jisheng,
+> > 
+> > On Fri, Apr 11, 2014 at 02:44:31PM +0800, Jisheng Zhang wrote:
+> > > On Thu, 10 Apr 2014 06:07:51 -0700
+> > > Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+> > > 
+> > > ...
+> > > > +static int berlin_pinmux_enable(struct pinctrl_dev *pctrl_dev,
+> > > > +                               unsigned function,
+> > > > +                               unsigned group)
+> > > > +{
+> > > > +       struct berlin_pinctrl *pctrl =
+> > > > pinctrl_dev_get_drvdata(pctrl_dev);
+> > > > +       struct berlin_pinctrl_group *group_desc = pctrl->groups + group;
+> > > > +       struct berlin_pinctrl_function *function_desc =
+> > > > +               pctrl->functions + function;
+> > > > +       unsigned long flags;
+> > > > +       u32 regval;
+> > > > +
+> > > > +       spin_lock_irqsave(&pctrl->lock, flags);
+> > > > +
+> > > > +       regval = readl(group_desc->reg);
+> > > > +       regval &= group_desc->mask;
+> > > > +       regval |= function_desc->muxval << group_desc->lsb;
+> > > > +       writel(regval, group_desc->reg);
+> > > 
+> > > Could we use relaxed version instead?
+> > 
+> > We could, but this is not a performance issue here at all, so I guess we can
+> > keep writel().
+> 
+> Yes it's not a performance issue here but an issue for the system which is doing
+> PL310 L2 cache maintenance. If pinmux operation hold the l2x0_lock due to writel()
+> the important video/audio process which is cleaning PL310 cache must wait, thus
+> cause jitter. So I'd like relaxed version if we can. Then I don't need to add this
+> patch to mainline kernel when we upgrade internal tree.
 
-But have you checked all the other places pins are referred to?
+I'm not sure I got that. As I understand it, you will need to play video/audio
+*while* configuring the pinmux. But the pinmuxing configuration is done at boot
+time, and I don't think a video/audio is being played then. So I'm not certain a
+jitter will appear. What do you think ?
 
-One place that jumps into my mind would be the DEBUGFS files...
+Antoine
 
-Sebastian
-
-> [1] get_group_pin(struct pinctrl_dev *pctldev,
-> 		  unsigned selector,
-> 		  const unsigned **pins,
-> 		  unsigned *num_pins);
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->   drivers/pinctrl/core.c   | 17 ++++++++++-------
->   drivers/pinctrl/pinmux.c | 23 +++++++++++++----------
->   2 files changed, 23 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-> index c0fe6091566a..e09474ecde23 100644
-> --- a/drivers/pinctrl/core.c
-> +++ b/drivers/pinctrl/core.c
-> @@ -468,6 +468,9 @@ int pinctrl_get_group_pins(struct pinctrl_dev *pctldev, const char *pin_group,
->   	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
->   	int gs;
->
-> +	if (!pctlops->get_group_pins)
-> +		return -EINVAL;
-> +
->   	gs = pinctrl_get_group_selector(pctldev, pin_group);
->   	if (gs < 0)
->   		return gs;
-> @@ -1362,15 +1365,16 @@ static int pinctrl_groups_show(struct seq_file *s, void *what)
->
->   	seq_puts(s, "registered pin groups:\n");
->   	while (selector < ngroups) {
-> -		const unsigned *pins;
-> -		unsigned num_pins;
-> +		const unsigned *pins = NULL;
-> +		unsigned num_pins = 0;
->   		const char *gname = ops->get_group_name(pctldev, selector);
->   		const char *pname;
-> -		int ret;
-> +		int ret = 0;
->   		int i;
->
-> -		ret = ops->get_group_pins(pctldev, selector,
-> -					  &pins, &num_pins);
-> +		if (ops->get_group_pins)
-> +			ret = ops->get_group_pins(pctldev, selector,
-> +						  &pins, &num_pins);
->   		if (ret)
->   			seq_printf(s, "%s [ERROR GETTING PINS]\n",
->   				   gname);
-> @@ -1694,8 +1698,7 @@ static int pinctrl_check_ops(struct pinctrl_dev *pctldev)
->
->   	if (!ops ||
->   	    !ops->get_groups_count ||
-> -	    !ops->get_group_name ||
-> -	    !ops->get_group_pins)
-> +	    !ops->get_group_name)
->   		return -EINVAL;
->
->   	if (ops->dt_node_to_map && !ops->dt_free_map)
-> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-> index 9248ce4efed4..051e8592990e 100644
-> --- a/drivers/pinctrl/pinmux.c
-> +++ b/drivers/pinctrl/pinmux.c
-> @@ -391,14 +391,16 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
->   	struct pinctrl_dev *pctldev = setting->pctldev;
->   	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
->   	const struct pinmux_ops *ops = pctldev->desc->pmxops;
-> -	int ret;
-> -	const unsigned *pins;
-> -	unsigned num_pins;
-> +	int ret = 0;
-> +	const unsigned *pins = NULL;
-> +	unsigned num_pins = 0;
->   	int i;
->   	struct pin_desc *desc;
->
-> -	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
-> -				      &pins, &num_pins);
-> +	if (pctlops->get_group_pins)
-> +		ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
-> +					      &pins, &num_pins);
-> +
->   	if (ret) {
->   		const char *gname;
->
-> @@ -470,14 +472,15 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
->   	struct pinctrl_dev *pctldev = setting->pctldev;
->   	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
->   	const struct pinmux_ops *ops = pctldev->desc->pmxops;
-> -	int ret;
-> -	const unsigned *pins;
-> -	unsigned num_pins;
-> +	int ret = 0;
-> +	const unsigned *pins = NULL;
-> +	unsigned num_pins = 0;
->   	int i;
->   	struct pin_desc *desc;
->
-> -	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
-> -				      &pins, &num_pins);
-> +	if (pctlops->get_group_pins)
-> +		ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
-> +					      &pins, &num_pins);
->   	if (ret) {
->   		const char *gname;
->
->
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
