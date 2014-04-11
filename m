@@ -1,67 +1,120 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 11 Apr 2014 15:39:12 +0400
-Subject: [PATCH] ARM: shmobile: r8a7790: link PCI USb devices to USB PHY
-In-Reply-To: <CANqRtoSub2TULO2rURiODz1VFXNUqe5gi488mkPtq_F+Oje2cQ@mail.gmail.com>
-References: <201404092318.26231.sergei.shtylyov@cogentembedded.com>	<CANqRtoQeuT=Q9PRYNMqA079gjb1VkwgvcDmsWKxjzSVxcVfeWw@mail.gmail.com>	<534674B5.6080706@cogentembedded.com>	<5346E717.4040507@cogentembedded.com>
- <CANqRtoSub2TULO2rURiODz1VFXNUqe5gi488mkPtq_F+Oje2cQ@mail.gmail.com>
-Message-ID: <5347D460.3070803@cogentembedded.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 11 Apr 2014 17:01:54 +0530
+Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
+ default when booted with DT
+In-Reply-To: <5347D2CC.4030407@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+ <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com>
+ <5347AE49.5020109@ti.com> <5347B7F8.2000508@ti.com>
+ <20140411094217.GA32284@intel.com> <5347D2CC.4030407@ti.com>
+Message-ID: <20140411113154.GB32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.04.2014 9:48, Magnus Damm wrote:
+On Fri, Apr 11, 2014 at 02:32:28PM +0300, Peter Ujfalusi wrote:
+> Hi Vinod,
+> 
+> On 04/11/2014 12:42 PM, Vinod Koul wrote:
+> > On Fri, Apr 11, 2014 at 12:38:00PM +0300, Peter Ujfalusi wrote:
+> >> On 04/11/2014 11:56 AM, Sekhar Nori wrote:
+> >>> On Friday 11 April 2014 02:20 PM, Peter Ujfalusi wrote:
+> >>>> On 04/11/2014 11:17 AM, Sekhar Nori wrote:
+> >>>>> On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
+> >>>>>> Use the EVENTQ_1 for default and leave the EVENTQ_0 to be used by high
+> >>>>>> priority channels, like audio.
+> >>>>>>
+> >>>>>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> >>>>>
+> >>>>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+> >>>>>
+> >>>>>> ---
+> >>>>>>  arch/arm/common/edma.c | 3 ++-
+> >>>>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>>>>>
+> >>>>>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> >>>>>> index 86a8b263278f..19520e2519d9 100644
+> >>>>>> --- a/arch/arm/common/edma.c
+> >>>>>> +++ b/arch/arm/common/edma.c
+> >>>>>> @@ -1546,7 +1546,8 @@ static int edma_of_parse_dt(struct device *dev,
+> >>>>>>  
+> >>>>>>  	pdata->queue_priority_mapping = queue_priority_map;
+> >>>>>>  
+> >>>>>> -	pdata->default_queue = 0;
+> >>>>>> +	/* select queue 1 as default */
+> >>>>>
+> >>>>> It will be nice to expand the comment with explanation of why this is
+> >>>>> being chosen as default (lower priority queue by default for typical
+> >>>>> bulk data transfer).
+> >>>>
+> >>>> Yes, extended comment is a good idea.
+> >>>>
+> >>>> For the next version I think I'm going to change the code around default
+> >>>> TC/Queue and the non default queue selection, mostly based on Joel's comment:
+> >>>>
+> >>>> EVENTQ_1 as default queue.
+> >>>> Set the EVENTQ_1 priority to 7
+> >>>> EVENTQ_0 priority is going to stay 0 and EVENTQ_2 as 2
+> >>>>
+> >>>> Add new member to struct edma, like high_pri_queue.
+> >>>> When we set the queue priorities in edma_probe() we look for the highest
+> >>>> priority queue and save the number in high_pri_queue.
+> >>>>
+> >>>> I will rename the edma_request_non_default_queue() to
+> >>>> edma_request_high_pri_queue() and it will assign the channel to the high
+> >>>> priority queue.
+> >>>>
+> >>>> I think this way it is going to be more explicit and IMHO a bit more safer in
+> >>>> a sense the we are going to get high priority when we ask for it.
+> >>>
+> >>> Sounds much better. I had posted some ideas about adding support for
+> >>> channel priority in the core code but we can leave that for Vinod and
+> >>> Dan to say if they really see a need for that.
+> > Is it part of this series?
+> 
+> No, it is not. The original series tackled the DMA queue selection within the
+> edma driver stack. It was selecting high priority channel for cyclic (audio)
+> use only, all other DMA channels were executed on a lower priority queue.
+> 
+> >> If we do it via the dmaengine core I think it would be better to have a new
+> >> flag to be passed to dmaengine_prep_dma_*().
+> >> We could have for example:
+> >> DMA_PREP_HIGH_PRI as flag to indicate that we need high priority DMA if it is
+> >> possible.
+> >> We can watch for this flag in the edma driver and act accordingly.
+> >> ALSA's dmaengine_pcm_prepare_and_submit() could set this flag unconditionally
+> >> since audio should be treated in this way if the DMA IP can do this.
+> >
+> > Will the priority be different for each descriptor or would be based on channel
+> > usage.
+> 
+> I would say that it is channel based config. I don't see the reason why would
+> one mix different priorities on a configured channel between descriptors.
+> 
+> > If not then we can add this in dma_slave_config ?
+> 
+> So adding to the struct for example:
+> bool high_priority;
 
->>>> Thanks for this patch, good to see that the relationship between the
->>>> USB Host and the PHY is described via DT.
+In designware controller, we can have channel priorties from 0 to 7 which IIRC 7
+being highest. So bool wont work. unsigned int/u8 would be good. How about your
+controller, is it binary?
 
->>>> This patch seems to cover USB0 and USB2 that both require special
->>>> control in the PHY. How about USB1? Can you explain about the reason
->>>> why you omit that?
+-- 
+~Vinod
 
->>>      Because the driver does nothing for USB1 anyway.
+> 
+> I'm not sure if it helps if we have let's say three priority level like, low,
+> normal and high.
+> I don't think that any client would ask for low priority instead using the
+> normal priority.
+> 
+> > I can forsee its usage on slave controllers, so yes its useful :)
+> 
+> True I'm sure it is going to be used as soon as it is available if the HW
+> supports priorities.
+> 
+> -- 
+> P?ter
 
->>     Looks like I should have tested that last minute change: kernel oopses
->> due to NULL pointer dereference somewhere in phy_get() once it gets called
->> for EHCI on the channel #1. At least doesn't seem to be my mistake...
-
-> No worries, thanks for looking into fixing that.
-
-> Regarding the USB ports on R-Car Gen2 in general and especially USB1,
-> it is my impression that even though there is no USB controller
-> selection available for USB1 I still believe the UGCTL.CONNECT bit
-> shall be used for power management purpose.
-
-    I don't think so. As I said the EHCI driver happily works without touching 
-this bit.
-
-> I may of course be wrong, but since the PHY hardware is shared between
-> USB0, USB1 and USB2
-
-    I believe it's a wrong impression (which probably my and Valentine's PHY 
-drivers have created). The PHY actually belongs to USBHS only; UGCTRL2 
-register is some kind of ad-hockery in this PHY.
-
-> it makes sense to have some kind of usage counter
-
-    Generic PHY core already maintains such counters for phy_{init|exit}() and 
-phy_power_{on|off}() calls.
-
-> and manage the hardware enable bit based on registered users somehow.
-> There is no need to manage this bit at this point IMO, but in the
-> future we may want to add such handling to improve power management.
-
-    I handle this bit but only for USBHS. What is actually necessary for all 
-USB controllers is enabling the USBHS clocks in order for UGCTRL2 to work.
-
-> And that can only happen if DT is used to connect all USB controllers
-> with the PHY, so please make sure to describe the complete
-> dependencies in DT.
-
-    I cannnot represent USBHS in the device tree yet. I think I can represent 
-xHCI there but I was told it needs the firmware in order to work -- which we 
-don't have, so I'm not sure about xHCI testing.
-
-> Thanks,
-
-> / magnus
-
-WBR, Sergei
+-- 
