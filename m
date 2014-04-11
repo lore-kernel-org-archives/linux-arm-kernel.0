@@ -1,43 +1,60 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 11 Apr 2014 17:07:32 +0200
-Subject: [PATCH v4 3/7] driver: reset: sti: add keyscan for stih416
+Date: Fri, 11 Apr 2014 17:07:35 +0200
+Subject: [PATCH v4 6/7] ARM: STi: DT: add keyscan for stih41x-b2000
 In-Reply-To: <1397228856-9218-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1397228856-9218-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1397228856-9218-4-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1397228856-9218-7-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add keyscan reset on stih416 reset controller.
+Add keyscan setup for stih415/h416 b2000.
+Both have same raw/column lines number, debounce time and keymap.
 
 Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- drivers/reset/sti/reset-stih416.c                     | 1 +
- include/dt-bindings/reset-controller/stih416-resets.h | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/stih41x-b2000.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
-index fe3bf02..5fc9870 100644
---- a/drivers/reset/sti/reset-stih416.c
-+++ b/drivers/reset/sti/reset-stih416.c
-@@ -104,6 +104,7 @@ static const struct syscfg_reset_channel_data stih416_softresets[] = {
- 	[STIH416_COMPO_A_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 4),
- 	[STIH416_VP8_DEC_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 10),
- 	[STIH416_VTG_MAIN_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 16),
-+	[STIH416_KEYSCAN_SOFTRESET] = STIH416_SRST_LPM(LPM_SYSCFG_1, 8),
+diff --git a/arch/arm/boot/dts/stih41x-b2000.dtsi b/arch/arm/boot/dts/stih41x-b2000.dtsi
+index bf65c49..403bf1b 100644
+--- a/arch/arm/boot/dts/stih41x-b2000.dtsi
++++ b/arch/arm/boot/dts/stih41x-b2000.dtsi
+@@ -6,6 +6,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * publishhed by the Free Software Foundation.
+  */
++#include <dt-bindings/input/input.h>
+ / {
+ 
+ 	memory{
+@@ -68,5 +69,27 @@
+ 			snps,reset-active-low;
+ 			snps,reset-delays-us 	= <0 10000 10000>;
+ 		};
++
++		keyscan: keyscan at fe4b0000 {
++			keypad,num-rows = <4>;
++			keypad,num-columns = <4>;
++			st,debounce-us = <5000>;
++			linux,keymap = < MATRIX_KEY(0x00, 0x00, KEY_F13)
++					 MATRIX_KEY(0x00, 0x01, KEY_F9)
++					 MATRIX_KEY(0x00, 0x02, KEY_F5)
++					 MATRIX_KEY(0x00, 0x03, KEY_F1)
++					 MATRIX_KEY(0x01, 0x00, KEY_F14)
++					 MATRIX_KEY(0x01, 0x01, KEY_F10)
++					 MATRIX_KEY(0x01, 0x02, KEY_F6)
++					 MATRIX_KEY(0x01, 0x03, KEY_F2)
++					 MATRIX_KEY(0x02, 0x00, KEY_F15)
++					 MATRIX_KEY(0x02, 0x01, KEY_F11)
++					 MATRIX_KEY(0x02, 0x02, KEY_F7)
++					 MATRIX_KEY(0x02, 0x03, KEY_F3)
++					 MATRIX_KEY(0x03, 0x00, KEY_F16)
++					 MATRIX_KEY(0x03, 0x01, KEY_F12)
++					 MATRIX_KEY(0x03, 0x02, KEY_F8)
++					 MATRIX_KEY(0x03, 0x03, KEY_F4) >;
++		};
+ 	};
  };
- 
- static struct syscfg_reset_controller_data stih416_powerdown_controller = {
-diff --git a/include/dt-bindings/reset-controller/stih416-resets.h b/include/dt-bindings/reset-controller/stih416-resets.h
-index 2127743..fcf9af1 100644
---- a/include/dt-bindings/reset-controller/stih416-resets.h
-+++ b/include/dt-bindings/reset-controller/stih416-resets.h
-@@ -46,5 +46,6 @@
- #define STIH416_COMPO_A_SOFTRESET	25
- #define STIH416_VP8_DEC_SOFTRESET	26
- #define STIH416_VTG_MAIN_SOFTRESET	27
-+#define STIH416_KEYSCAN_SOFTRESET	28
- 
- #endif /* _DT_BINDINGS_RESET_CONTROLLER_STIH416 */
 -- 
 1.9.1
