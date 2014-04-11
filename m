@@ -1,54 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 11 Apr 2014 12:23:14 +0200
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
-References: <20140410181953.50ccfcc3@skate>
- <20140410165733.GB23104@obsidianresearch.com>
- <20140410200153.46669e0c@skate>
- <20140410201201.GA12661@obsidianresearch.com>
- <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
-Message-ID: <20140411122314.220614bf@skate>
+From: luxiangyu@huawei.com (Lu Xiangyu)
+Date: Fri, 11 Apr 2014 18:16:24 +0800
+Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
+Message-ID: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Neil Greatorex,
+From: Xiangyu Lu <luxiangyu@huawei.com>
 
-On Thu, 10 Apr 2014 22:56:00 +0100 (BST), Neil Greatorex wrote:
-> > In any event, turning on the clock should almost certainly be
-> > accompanied by a phy reset sequence to get both link ends on the same
-> > page.
-> >
-> > Attached is a rough, untested patch along those lines.
-> >
-> 
-> I took your attached patch and extended it a bit to print out how long it 
-> took. The delays also need to be much longer for me. I also fixed a small 
-> typo you made where the bit wasn't being set again to bring the link back 
-> up. I've attached the diff to your patch, as well as the combined patch 
-> (hope that makes sense).
+In big-endian systems, "%1" get the most significant part of the value, cause
+the instruction to get the wrong result.
 
-I managed to reproduce the problem of the PCIe device not being
-detected on Mirabox when earlyprintk is disabled.
+When viewing ftrace record in big-endian ARM systems, we found that
+the timestamp errors:
 
-However, the proposed patch doesn't seem to work:
+swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
+events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
+swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
+swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
+swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
+swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
 
-mvebu-pcie pcie-controller.3: PCIe0.0: performing link reset
-mvebu-pcie pcie-controller.3: PCIe0.0: link went down after 100 tries
-mvebu-pcie pcie-controller.3: PCIe0.0: link came back up after 0 tries
+When viewed ftrace records, it will call the do_div(n, base) function, which
+achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
+do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
 
-It waits hundred times for the link to go down, but it never goes down,
-and then it doesn't wait at all to go up... because it never went down.
+Cc: <stable@vger.kernel.org> # 2.6.20+
+Signed-off-by: Alex Wu <wuquanming@huawei.com>
+Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
+---
+ arch/arm/include/asm/div64.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Moreover, I am not entirely convinced that a PHY reset is needed here.
-In my tests, doing just a wait after setting the local dev number was
-sufficient. The fact is works with earlyprintk also indicates that we
-don't need to do any specific action with the PHY, just to wait a bit
-of time. I am worried that resetting the PHY might actually take more
-time than what is needed, and may have other consequences that we don't
-necessarily understand at this point.
-
-Thomas
+diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+index 191ada6..662c7bd 100644
+--- a/arch/arm/include/asm/div64.h
++++ b/arch/arm/include/asm/div64.h
+@@ -156,7 +156,7 @@
+ 		/* Select the best insn combination to perform the   */	\
+ 		/* actual __m * __n / (__p << 64) operation.         */	\
+ 		if (!__c) {						\
+-			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
++			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
+ 				"mov	%Q0, #0"			\
+ 				: "=&r" (__res)				\
+ 				: "r" (__m), "r" (__n)			\
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
