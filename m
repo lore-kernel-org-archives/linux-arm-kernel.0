@@ -1,53 +1,72 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 11 Apr 2014 14:48:42 +0900
-Subject: [PATCH] ARM: shmobile: r8a7790: link PCI USb devices to USB PHY
-In-Reply-To: <5346E717.4040507@cogentembedded.com>
-References: <201404092318.26231.sergei.shtylyov@cogentembedded.com>
- <CANqRtoQeuT=Q9PRYNMqA079gjb1VkwgvcDmsWKxjzSVxcVfeWw@mail.gmail.com>
- <534674B5.6080706@cogentembedded.com>
- <5346E717.4040507@cogentembedded.com>
-Message-ID: <CANqRtoSub2TULO2rURiODz1VFXNUqe5gi488mkPtq_F+Oje2cQ@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 11 Apr 2014 15:07:14 +0900
+Subject: [PATCH 03/10] ARM: EXYNOS: Move SYSREG definition into sys-reg
+ specific file
+In-Reply-To: <533BF433.6000209@samsung.com>
+References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
+ <1396425058-4012-4-git-send-email-pankaj.dubey@samsung.com>
+ <533BF433.6000209@samsung.com>
+Message-ID: <53478692.3020406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 04/02/2014 08:27 PM, Sylwester Nawrocki wrote:
+> Hi,
+>
+> On 02/04/14 09:50, Pankaj Dubey wrote:
+>> From: Young-Gun Jang <yg1004.jang@samsung.com>
+>>
+>> While making PMU (Power Mengement Unit) implementation device tree based,
+>> there are few offsets related with SYSREG present in regs-pmu.h, so let's
+>> make a new header file "regs-sys.h" to keep all such SYSREG related
+>> register definition and remove them from "regs-pmu.h"
+>>
+>> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/exynos.c   |    1 +
+>>   arch/arm/mach-exynos/pm.c       |    1 +
+>>   arch/arm/mach-exynos/regs-pmu.h |    3 ---
+>>   arch/arm/mach-exynos/regs-sys.h |   22 ++++++++++++++++++++++
+>>   4 files changed, 24 insertions(+), 3 deletions(-)
+>>   create mode 100644 arch/arm/mach-exynos/regs-sys.h
+> [...]
+>> diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
+>> new file mode 100644
+>> index 0000000..84332b0
+>> --- /dev/null
+>> +++ b/arch/arm/mach-exynos/regs-sys.h
+>> @@ -0,0 +1,22 @@
+>> +/*
+>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>> + *             http://www.samsung.com
+>> + *
+>> + * EXYNOS - system register definition
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#ifndef __ASM_ARCH_REGS_SYS_H
+>> +#define __ASM_ARCH_REGS_SYS_H __FILE__
+>> +
+>> +#include <mach/map.h>
+>> +
+>> +#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
+>> +
+>> +/* For EXYNOS5 */
+>> +#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
+> Can this be defined as a regular register offset in a header file
+> placed at include/linux/mfd/syscon/ ? I.e. can the mfd syscon driver be
+> used instead of these hacks ?
+>
+No. As currently SysRegs are being accessed via iodesc table and not via DT,
+it has dependency on "mach/map.h".
+We separated these definitions from "regs-pmu.h" as it does not belong to EXYNOS 
+PMU IP.
+But this can be done once we make some way of accessing SysReg register sets via DT.
 
-On Fri, Apr 11, 2014 at 3:46 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 04/10/2014 02:38 PM, Sergei Shtylyov wrote:
->
->>> Thanks for this patch, good to see that the relationship between the
->>> USB Host and the PHY is described via DT.
->
->
->>> This patch seems to cover USB0 and USB2 that both require special
->>> control in the PHY. How about USB1? Can you explain about the reason
->>> why you omit that?
->
->
->>     Because the driver does nothing for USB1 anyway.
->
->
->    Looks like I should have tested that last minute change: kernel oopses
-> due to NULL pointer dereference somewhere in phy_get() once it gets called
-> for EHCI on the channel #1. At least doesn't seem to be my mistake...
-
-No worries, thanks for looking into fixing that.
-
-Regarding the USB ports on R-Car Gen2 in general and especially USB1,
-it is my impression that even though there is no USB controller
-selection available for USB1 I still believe the UGCTL.CONNECT bit
-shall be used for power management purpose.
-
-I may of course be wrong, but since the PHY hardware is shared between
-USB0, USB1 and USB2 it makes sense to have some kind of usage counter
-and manage the hardware enable bit based on registered users somehow.
-There is no need to manage this bit at this point IMO, but in the
-future we may want to add such handling to improve power management.
-And that can only happen if DT is used to connect all USB controllers
-with the PHY, so please make sure to describe the complete
-dependencies in DT.
-
-Thanks,
-
-/ magnus
+-- 
+Best Regards,
+Pankaj Dubey
