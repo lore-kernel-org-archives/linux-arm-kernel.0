@@ -1,190 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 11 Apr 2014 17:26:43 +0200
-Subject: [PATCH 3/4] PM / Domains: Remove the pm_genpd_add|remove_callbacks
- APIs
-In-Reply-To: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397230004-22306-4-git-send-email-ulf.hansson@linaro.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 11 Apr 2014 23:30:33 +0800
+Subject: [PATCH] gpio/at91: free GPIO after configuring as input
+In-Reply-To: <1397226249-3922-1-git-send-email-alexanders83@web.de>
+References: <1397226249-3922-1-git-send-email-alexanders83@web.de>
+Message-ID: <A08D29A3-2690-46C1-A317-41B17F365A81@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no users of these APIs. To simplify the generic power domain
-let's remove them.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/base/power/domain.c |  106 -------------------------------------------
- include/linux/pm_domain.h   |   20 --------
- 2 files changed, 126 deletions(-)
+On Apr 11, 2014, at 10:24 PM, Alexander Stein <alexanders83@web.de> wrote:
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 1462b2a..06d86f3 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1731,112 +1731,6 @@ int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- }
- 
- /**
-- * pm_genpd_add_callbacks - Add PM domain callbacks to a given device.
-- * @dev: Device to add the callbacks to.
-- * @ops: Set of callbacks to add.
-- * @td: Timing data to add to the device along with the callbacks (optional).
-- *
-- * Every call to this routine should be balanced with a call to
-- * __pm_genpd_remove_callbacks() and they must not be nested.
-- */
--int pm_genpd_add_callbacks(struct device *dev, struct gpd_dev_ops *ops,
--			   struct gpd_timing_data *td)
--{
--	struct generic_pm_domain_data *gpd_data_new, *gpd_data = NULL;
--	int ret = 0;
--
--	if (!(dev && ops))
--		return -EINVAL;
--
--	gpd_data_new = __pm_genpd_alloc_dev_data(dev);
--	if (!gpd_data_new)
--		return -ENOMEM;
--
--	pm_runtime_disable(dev);
--	device_pm_lock();
--
--	ret = dev_pm_get_subsys_data(dev);
--	if (ret)
--		goto out;
--
--	spin_lock_irq(&dev->power.lock);
--
--	if (dev->power.subsys_data->domain_data) {
--		gpd_data = to_gpd_data(dev->power.subsys_data->domain_data);
--	} else {
--		gpd_data = gpd_data_new;
--		dev->power.subsys_data->domain_data = &gpd_data->base;
--	}
--	gpd_data->refcount++;
--	gpd_data->ops = *ops;
--	if (td)
--		gpd_data->td = *td;
--
--	spin_unlock_irq(&dev->power.lock);
--
-- out:
--	device_pm_unlock();
--	pm_runtime_enable(dev);
--
--	if (gpd_data != gpd_data_new)
--		__pm_genpd_free_dev_data(dev, gpd_data_new);
--
--	return ret;
--}
--EXPORT_SYMBOL_GPL(pm_genpd_add_callbacks);
--
--/**
-- * __pm_genpd_remove_callbacks - Remove PM domain callbacks from a given device.
-- * @dev: Device to remove the callbacks from.
-- * @clear_td: If set, clear the device's timing data too.
-- *
-- * This routine can only be called after pm_genpd_add_callbacks().
-- */
--int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td)
--{
--	struct generic_pm_domain_data *gpd_data = NULL;
--	bool remove = false;
--	int ret = 0;
--
--	if (!(dev && dev->power.subsys_data))
--		return -EINVAL;
--
--	pm_runtime_disable(dev);
--	device_pm_lock();
--
--	spin_lock_irq(&dev->power.lock);
--
--	if (dev->power.subsys_data->domain_data) {
--		gpd_data = to_gpd_data(dev->power.subsys_data->domain_data);
--		gpd_data->ops = (struct gpd_dev_ops){ NULL };
--		if (clear_td)
--			gpd_data->td = (struct gpd_timing_data){ 0 };
--
--		if (--gpd_data->refcount == 0) {
--			dev->power.subsys_data->domain_data = NULL;
--			remove = true;
--		}
--	} else {
--		ret = -EINVAL;
--	}
--
--	spin_unlock_irq(&dev->power.lock);
--
--	device_pm_unlock();
--	pm_runtime_enable(dev);
--
--	if (ret)
--		return ret;
--
--	dev_pm_put_subsys_data(dev);
--	if (remove)
--		__pm_genpd_free_dev_data(dev, gpd_data);
--
--	return 0;
--}
--EXPORT_SYMBOL_GPL(__pm_genpd_remove_callbacks);
--
--/**
-  * pm_genpd_attach_cpuidle - Connect the given PM domain with cpuidle.
-  * @genpd: PM domain to be connected with cpuidle.
-  * @state: cpuidle state this domain can disable/enable.
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 04473d4..983efdc 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -108,7 +108,6 @@ struct gpd_timing_data {
- 
- struct generic_pm_domain_data {
- 	struct pm_domain_data base;
--	struct gpd_dev_ops ops;
- 	struct gpd_timing_data td;
- 	struct notifier_block nb;
- 	struct mutex lock;
-@@ -151,10 +150,6 @@ extern int pm_genpd_add_subdomain_names(const char *master_name,
- 					const char *subdomain_name);
- extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- 				     struct generic_pm_domain *target);
--extern int pm_genpd_add_callbacks(struct device *dev,
--				  struct gpd_dev_ops *ops,
--				  struct gpd_timing_data *td);
--extern int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td);
- extern int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int state);
- extern int pm_genpd_name_attach_cpuidle(const char *name, int state);
- extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
-@@ -217,16 +212,6 @@ static inline int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- {
- 	return -ENOSYS;
- }
--static inline int pm_genpd_add_callbacks(struct device *dev,
--					 struct gpd_dev_ops *ops,
--					 struct gpd_timing_data *td)
--{
--	return -ENOSYS;
--}
--static inline int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td)
--{
--	return -ENOSYS;
--}
- static inline int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int st)
- {
- 	return -ENOSYS;
-@@ -281,11 +266,6 @@ static inline int pm_genpd_name_add_device(const char *domain_name,
- 	return __pm_genpd_name_add_device(domain_name, dev, NULL);
- }
- 
--static inline int pm_genpd_remove_callbacks(struct device *dev)
--{
--	return __pm_genpd_remove_callbacks(dev, true);
--}
--
- #ifdef CONFIG_PM_GENERIC_DOMAINS_RUNTIME
- extern void genpd_queue_power_off_work(struct generic_pm_domain *genpd);
- extern void pm_genpd_poweroff_unused(void);
--- 
-1.7.9.5
+> 
+> If the GPIO stays requested a device driver can't request it again.
+> e.g. Without this patch the ads7846 driver returns the following error:
+> ads7846 spi32766.3: failed to request/setup pendown GPIO15: -16
+> ads7846: probe of spi32766.3 failed with error -16
+> 
+> /sys/kernel/debug/gpio shows this:
+> GPIOs 0-31, platform/fffff200.gpio, fffff200.gpio:
+> [/ahb/apb/pinctrl at fffff200/gpio at fffff200] GPIOfffff200.gpio15: [gpio] set
+> 
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+> I'm aware that it makes sense this GPIO is/stays requested, but either the
+> pinctl or device driver have to be adjusted as both can't request this GPIO.
+> I think the latter shouldn't change.
+> 
+> drivers/pinctrl/pinctrl-at91.c | 2 ++
+> 1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index d990e33..63176f2 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1493,6 +1493,8 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
+> 	if (ret)
+> 		return ret;
+> 
+> +	gpio_free(pin);
+> +
+
+NACK it the whole key point the gpio use as a IRQ so the irq generic code request it
+> 	return 0;
+> }
+> 
+> -- 
+> 1.9.2
+> 
