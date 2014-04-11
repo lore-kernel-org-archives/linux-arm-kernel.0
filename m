@@ -1,65 +1,58 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 11 Apr 2014 17:03:07 +0200
-Subject: [PATCH 0/5] GPIO OMAP driver changes for v3.16
-In-Reply-To: <20140410212202.GF15736@drone.musicnaut.iki.fi>
-References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
- <CACRpkdarYt4tAD9WMDu6Me+dhipVyDHMpgF-AQ8SDNKMmhSjsA@mail.gmail.com>
- <20140410193048.GE15736@drone.musicnaut.iki.fi>
- <CABxcv=miFY3gE6HOU5ovWwCzgC6Un3ANh_Weh_bPCb7OoYQ+pA@mail.gmail.com>
- <20140410212202.GF15736@drone.musicnaut.iki.fi>
-Message-ID: <CABxcv=k9fNauvoF6No_GGhfVVgOvyd-Dgw2YLkGGfPoXfMd=FQ@mail.gmail.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Fri, 11 Apr 2014 17:07:29 +0200
+Subject: [PATCH v4 0/7] Add ST Keyscan driver
+Message-ID: <1397228856-9218-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Aaro,
 
-On Thu, Apr 10, 2014 at 11:22 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
-> Hi,
->
-> On Thu, Apr 10, 2014 at 10:17:44PM +0200, Javier Martinez Canillas wrote:
->> > The same happens also on Nokia 770:
->> >
->> > [    0.118896] genirq: Setting trigger mode 0 for irq 128 failed (gpio_irq_type+0x0/0x220)
->>
->> I don't have those errors when booting on my DM3730 IGEPv2 board but
->> it seems that for some reason on omap1  __irq_set_trigger() complains
->> when IRQ_TYPE_NONE is used as a default flag when calling
->> gpiochip_irqchip_add()
->>
->> Could you please test the following patch and tell me if your board
->> still works and makes the errors go away?
->
-> Now it complains about mode 8...
->
-> [    0.118835] genirq: Setting trigger mode 8 for irq 128 failed (gpio_irq_type
-> +0x0/0x220)
->
-> A.
->
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index 8cc9e91..5bc8aec 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -1122,7 +1122,7 @@ static int omap_gpio_chip_init(struct gpio_bank *bank)
->>
->>         ret = gpiochip_irqchip_add(&bank->chip, &gpio_irq_chip,
->>                                    irq_base, gpio_irq_handler,
->> -                                  IRQ_TYPE_NONE);
->> +                                  IRQ_TYPE_LEVEL_LOW);
->>
->>         if (ret) {
->>                 dev_err(bank->dev, "Couldn't add irqchip to gpiochip
->> %d\n", ret);
->>
->> Best regards,
->> Javier
+Changes in v4:
+- add reset controller management
+- rename 'st,debounce_us' into 'st,debounce-us' in dt binding
 
-Thanks for testing. Unfortunately I'm out of ideas on why that error
-could be shown and I don't have a way to further debug it without an
-omap1 board. I wonder why that pr_err() message is shown or why it is
-still working when an error happens.
+Changes in v3: (bad manipulation)
 
-Maybe Linus or Santosh could give us a hint on what is happening here.
+Changes in v2:
+- use standard format for matrix keymap
+- suppress __exit mark for keyscan_remove()
+- Call to keyscan_stop() shoudl go into keyscan_close() implementation
+- use of SIMPLE_DEV_PM_OPS()
+- rename compatibility name into "st,sti-keyscan"
+- suppress platform data management
+- omit vendor information
+- cosmetic change and renaming
 
-Best regards,
-Javier
+The goal of this series is to add ST Keyscan support to ST SoCs.
+The DT definition is added for STiH415 and STiH416 SoCs on
+B2000 board.
+
+
+Gabriel Fernandez (7):
+  drivers: input: keyboard: st-keyscan: add keyscan driver
+  driver: reset: sti: add keyscan for stih415
+  driver: reset: sti: add keyscan for stih416
+  ARM: STi: DT: add keyscan for stih415
+  ARM: STi: DT: add keyscan for stih416
+  ARM: STi: DT: add keyscan for stih41x-b2000
+  ARM: multi_v7_defconfig: add ST Keyscan driver
+
+ .../devicetree/bindings/input/st-keyscan.txt       |  60 +++++
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             |  16 ++
+ arch/arm/boot/dts/stih415.dtsi                     |  12 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             |  16 ++
+ arch/arm/boot/dts/stih416.dtsi                     |  12 +
+ arch/arm/boot/dts/stih41x-b2000.dtsi               |  23 ++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ drivers/input/keyboard/Kconfig                     |  12 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/st-keyscan.c                | 260 +++++++++++++++++++++
+ drivers/reset/sti/reset-stih415.c                  |   1 +
+ drivers/reset/sti/reset-stih416.c                  |   1 +
+ .../dt-bindings/reset-controller/stih415-resets.h  |   1 +
+ .../dt-bindings/reset-controller/stih416-resets.h  |   1 +
+ 14 files changed, 417 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/st-keyscan.txt
+ create mode 100644 drivers/input/keyboard/st-keyscan.c
+
+-- 
+1.9.1
