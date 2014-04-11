@@ -1,59 +1,83 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 11 Apr 2014 10:31:05 +0900
-Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
-In-Reply-To: <5032959.JQvlxpLHiQ@wuerfel>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-2-git-send-email-cw00.choi@samsung.com>
- <5032959.JQvlxpLHiQ@wuerfel>
-Message-ID: <534745D9.30604@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 10 Apr 2014 18:44:24 -0700
+Subject: [PATCH 04/27] ARM: EXYNOS: Support secondary CPU boot of
+ Exynos4212
+In-Reply-To: <1397122658-16013-5-git-send-email-cw00.choi@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397122658-16013-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20140411014424.GA14934@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/10/2014 06:43 PM, Arnd Bergmann wrote:
-> On Thursday 10 April 2014 18:28:18 Chanwoo Choi wrote:
->> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
->> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
->> dual cores and has a target speed of 1.0GHz.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
->>  arch/arm/mach-exynos/exynos.c            |  1 +
->>  arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
->>  3 files changed, 33 insertions(+)
->>
->> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->> index fc8bf18..6da8a68 100644
->> --- a/arch/arm/mach-exynos/Kconfig
->> +++ b/arch/arm/mach-exynos/Kconfig
->> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
->>  
->>  menu "SAMSUNG EXYNOS SoCs Support"
->>  
->> +config ARCH_EXYNOS3
->> +	bool "SAMSUNG EXYNOS3"
->> +	select ARM_AMBA
->> +	select CLKSRC_OF
->> +	select HAVE_ARM_SCU if SMP
->> +	select HAVE_SMP
->> +	select PINCTRL
->> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
->> +	help
->> +	  Samsung EXYNOS3 SoCs based systems
->> +
+On Thu, Apr 10, 2014 at 06:37:15PM +0900, Chanwoo Choi wrote:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> Isn't S5PV210 also called an Exynos3 these days? Are we going to get
-> any conflicts here when merging that code into Exynos as Tomasz has
-> suggested in the past?
+> This patch fix the offset of CPU boot address and change parameter of smc call
+> of SMC_CMD_CPU1BOOT command for Exynos4212.
+> 
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/firmware.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+> index 932129e..91a911d 100644
+> --- a/arch/arm/mach-exynos/firmware.c
+> +++ b/arch/arm/mach-exynos/firmware.c
+> @@ -18,6 +18,8 @@
+>  
+>  #include <mach/map.h>
+>  
+> +#include <plat/cpu.h>
+> +
+>  #include "smc.h"
+>  
+>  static int exynos_do_idle(void)
+> @@ -28,14 +30,22 @@ static int exynos_do_idle(void)
+>  
+>  static int exynos_cpu_boot(int cpu)
+>  {
+> -	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+> +	if (soc_is_exynos4212())
+> +		exynos_smc(SMC_CMD_CPU1BOOT, 0, 0, 0);
+> +	else
+> +		exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
 
-I knew. But, S5PV210/S5PC110 has not yet included in Exynos3 category on mainline.
-Need opinion of Exynos SoC Maintainer to clear this ambiguous stuff.
+	/* <explain why you need this special case on 4212> */
+	if (soc_is_exynos4212())
+		cpu = 0;
 
-Dear Kukjin and Tomasz,
-I need your opinion about this patch.
+...and then do the call as before.
 
-Best Regards,
-Chanwoo Choi
+
+>  	return 0;
+>  }
+>  
+>  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+>  {
+> -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+> +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+>  
+> +	if (soc_is_exynos4212())
+> +		goto out;
+> +	else
+> +		boot_reg += 4*cpu;
+
+	if (!soc_is_exynos4212())
+		boot_reg += 4 * cpu;
+
+That way you avoid a goto, especially since the "goto out" isn't actually
+an "out", it's still doing stuff at the end of the funciton.
+
+> +out:
+>  	__raw_writel(boot_addr, boot_reg);
+>  	return 0;
+>  }
+> -- 
+> 1.8.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
