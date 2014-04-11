@@ -1,96 +1,111 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 11 Apr 2014 13:03:06 -0700
-Subject: [PATCH 2/5] arm64: dts: APM X-Gene SoC Ethernet device tree nodes
-In-Reply-To: <1390582906.12454.26.camel@deneb.redhat.com>
-References: <1387597376-29303-1-git-send-email-isubramanian@apm.com>
- <1387597376-29303-3-git-send-email-isubramanian@apm.com>
- <1390582906.12454.26.camel@deneb.redhat.com>
-Message-ID: <CAKh23FmGYGkCbeh4DbL4_NO6ypkw4F70J0X__KxFyHTo-=WtKg@mail.gmail.com>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 11 Apr 2014 15:16:54 -0500
+Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
+ default when booted with DT
+In-Reply-To: <20140411094217.GA32284@intel.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+ <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com> <5347AE49.5020109@ti.com>
+ <5347B7F8.2000508@ti.com> <20140411094217.GA32284@intel.com>
+Message-ID: <53484DB6.4080806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-Thanks for the review comment and I apologize for not replying sooner.
-
-We are completely redesigning the ethernet driver to make it simple
-and cleaner and will be posted shortly.
-
-Please find my response by searching for isubrama:
-
-Thanks,
-Iyappan
-
-On Fri, Jan 24, 2014 at 9:01 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Fri, 2013-12-20 at 19:42 -0800, Iyappan Subramanian wrote:
->> Device tree files for APM X-Gene SoC Ethernet.
->>
->> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
->> Signed-off-by: Ravi Patel <rapatel@apm.com>
->> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
->> ---
->>  arch/arm64/boot/dts/apm-mustang.dts |    8 ++++++++
->>  arch/arm64/boot/dts/apm-storm.dtsi  |   19 +++++++++++++++++++
->>  2 files changed, 27 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
->> index 1247ca1..ccb2771 100644
->> --- a/arch/arm64/boot/dts/apm-mustang.dts
->> +++ b/arch/arm64/boot/dts/apm-mustang.dts
->> @@ -17,6 +17,10 @@
->>       model = "APM X-Gene Mustang board";
->>       compatible = "apm,mustang", "apm,xgene-storm";
->>
->> +        aliases {
->> +                ethernet0 = &menet;
->> +        };
->> +
->>       chosen { };
->>
->>       memory {
->> @@ -24,3 +28,7 @@
->>               reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
->>       };
->>  };
->> +
->> +&menet {
->> +        status = "ok";
->> +};
->> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
->> index f64f946..9c7b8cd 100644
->> --- a/arch/arm64/boot/dts/apm-storm.dtsi
->> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
->> @@ -204,5 +204,24 @@
->>                       #clock-cells = <1>;
->>                       clocks = <&qmlclk 0>;
->>               };
->> +
->> +             menet: ethernet at 17020000 {
->> +                     compatible = "apm,xgene-enet";
->> +                     status = "disabled";
->> +                     reg = <0x0 0x17020000 0x0 0x30>,
->> +                           <0x0 0x17020000 0x0 0x10000>,
->> +                           <0x0 0x17020000 0x0 0x20>;
->> +                     slave-name = "RGMII";
->> +                     interrupts = <0x0 0x38 0x4>,
->> +                                  <0x0 0x39 0x4>,
->> +                                  <0x0 0x3a 0x4>;
->> +                     #clock-cells = <1>;
->> +                     clocks = <&eth8clk 0>;
->> +                     local-mac-address = <0x0 0x11 0x3a 0x8a 0x5a 0x78>;
+On 04/11/2014 04:42 AM, Vinod Koul wrote:> On Fri, Apr 11, 2014 at
+12:38:00PM +0300, Peter Ujfalusi wrote:
+>> On 04/11/2014 11:56 AM, Sekhar Nori wrote:
+>>> On Friday 11 April 2014 02:20 PM, Peter Ujfalusi wrote:
+>>>> On 04/11/2014 11:17 AM, Sekhar Nori wrote:
+>>>>> On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
+>>>>>> Use the EVENTQ_1 for default and leave the EVENTQ_0 to be used by
+high
+>>>>>> priority channels, like audio.
+>>>>>>
+>>>>>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>>>>>
+>>>>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>>>>>
+>>>>>> ---
+>>>>>>  arch/arm/common/edma.c | 3 ++-
+>>>>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>>>>>> index 86a8b263278f..19520e2519d9 100644
+>>>>>> --- a/arch/arm/common/edma.c
+>>>>>> +++ b/arch/arm/common/edma.c
+>>>>>> @@ -1546,7 +1546,8 @@ static int edma_of_parse_dt(struct device *dev,
+>>>>>>
+>>>>>>  	pdata->queue_priority_mapping = queue_priority_map;
+>>>>>>
+>>>>>> -	pdata->default_queue = 0;
+>>>>>> +	/* select queue 1 as default */
+>>>>>
+>>>>> It will be nice to expand the comment with explanation of why this is
+>>>>> being chosen as default (lower priority queue by default for typical
+>>>>> bulk data transfer).
+>>>>
+>>>> Yes, extended comment is a good idea.
+>>>>
+>>>> For the next version I think I'm going to change the code around
+default
+>>>> TC/Queue and the non default queue selection, mostly based on
+Joel's comment:
+>>>>
+>>>> EVENTQ_1 as default queue.
+>>>> Set the EVENTQ_1 priority to 7
+>>>> EVENTQ_0 priority is going to stay 0 and EVENTQ_2 as 2
+>>>>
+>>>> Add new member to struct edma, like high_pri_queue.
+>>>> When we set the queue priorities in edma_probe() we look for the
+highest
+>>>> priority queue and save the number in high_pri_queue.
+>>>>
+>>>> I will rename the edma_request_non_default_queue() to
+>>>> edma_request_high_pri_queue() and it will assign the channel to the
+high
+>>>> priority queue.
+>>>>
+>>>> I think this way it is going to be more explicit and IMHO a bit
+more safer in
+>>>> a sense the we are going to get high priority when we ask for it.
+>>>
+>>> Sounds much better. I had posted some ideas about adding support for
+>>> channel priority in the core code but we can leave that for Vinod and
+>>> Dan to say if they really see a need for that.
+> Is it part of this series?
 >
-> Shouldn't this be a byte string?:
-isubrama:
-Agree.  I changed the driver.
+>> If we do it via the dmaengine core I think it would be better to have
+a new
+>> flag to be passed to dmaengine_prep_dma_*().
+>> We could have for example:
+>> DMA_PREP_HIGH_PRI as flag to indicate that we need high priority DMA
+if it is
+>> possible.
+>> We can watch for this flag in the edma driver and act accordingly.
+>> ALSA's dmaengine_pcm_prepare_and_submit() could set this flag
+unconditionally
+>> since audio should be treated in this way if the DMA IP can do this.
+> Will the priority be different for each descriptor or would be based
+on channel
+> usage. If not then we can add this in dma_slave_config ?
 >
->                         local-mac-address = [ 00 11 3a 8a 5a 78 ];
+> I can forsee its usage on slave controllers, so yes its useful :)
 >
->> +                     max-frame-size = <0x233a>;
->> +                     devid = <8>;
->> +                     phyid = <3>;
->> +                     phy-mode = "rgmii";
->> +             };
->>       };
->>  };
->
->
+
+I agree, a better place to do this would be in the config stage, since
+we can set in stone (for EDMA atleast) that the channel has a certain
+priority.
+
+I can see where per-desc priority may help, such as a case where 2 users
+of the same channel want to submit different priority desc. For EDMA
+hardware though, there is no such support and the priority mapping is
+from channel->queue.
+
+One way to add per-desc support would be to change the priority of the
+channel itself for every desc issued, based on the priority stored in
+the desc itself which would be stored in the prep stage. But currently
+we don't have such a usecase of changing priorities based on desc.
+
+thanks,
+
+-Joel
