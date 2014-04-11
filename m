@@ -1,41 +1,56 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 11 Apr 2014 12:40:02 +0200
-Subject: [PATCH V5 07/20] ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
+Date: Fri, 11 Apr 2014 12:40:08 +0200
+Subject: [PATCH V5 13/20] ARM: exynos: cpuidle: Disable cpuidle for 5440
 In-Reply-To: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1397212815-16068-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1397212815-16068-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function should be called only when the powerdown sequence fails.
+There is no point to register the cpuidle driver for the 5440 as it has only
+one WFI state which is the default idle function when the cpuidle driver is
+disabled.
 
-Even if the current code does not hurt, by moving this line, we have the same
-code than the one in pm.c.
+By disabling cpuidle we prevent to enter to the governor computation for
+nothing, thus saving a lot of processing time.
+
+The only drawback is the statistic via sysfs on this state which is lost but
+it is meaningless and it could be retrieved from the ftrace easily.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/cpuidle.c |    3 ---
+ arch/arm/mach-exynos/exynos.c  |    3 +++
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 4d8bcfd..346c2d0 100644
+index f66ee4d..95313ea 100644
 --- a/arch/arm/mach-exynos/cpuidle.c
 +++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -115,11 +115,10 @@ static int exynos_enter_core0_aftr(struct cpuidle_device *dev,
- 	if (!(tmp & S5P_CENTRAL_LOWPWR_CFG)) {
- 		tmp |= S5P_CENTRAL_LOWPWR_CFG;
- 		__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-+		/* Clear wakeup state register */
-+		__raw_writel(0x0, S5P_WAKEUP_STAT);
- 	}
+@@ -133,9 +133,6 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+ {
+ 	int ret;
  
--	/* Clear wakeup state register */
--	__raw_writel(0x0, S5P_WAKEUP_STAT);
+-	if (soc_is_exynos5440())
+-		exynos_idle_driver.state_count = 1;
 -
- 	return index;
+ 	ret = cpuidle_register(&exynos_idle_driver, NULL);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index b567361..fe8dac8 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -227,6 +227,9 @@ static struct platform_device exynos_cpuidle = {
+ 
+ void __init exynos_cpuidle_init(void)
+ {
++	if (soc_is_exynos5440())
++		return;
++
+ 	platform_device_register(&exynos_cpuidle);
  }
  
 -- 
