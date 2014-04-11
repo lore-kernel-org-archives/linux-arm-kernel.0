@@ -1,113 +1,46 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 11 Apr 2014 12:40:10 +0200
-Subject: [PATCH V5 15/20] ARM: exynos: cpuidle: Move the AFTR state function
- into pm.c
+Date: Fri, 11 Apr 2014 12:40:05 +0200
+Subject: [PATCH V5 10/20] ARM: exynos: cpuidle: Remove ifdef for scu_enable
 In-Reply-To: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1397212815-16068-16-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1397212815-16068-11-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove depedency on pm code, let's move the 'exynos_enter_aftr'
-function into the pm.c file as well as the other helper functions.
+The scu_enable function is already a noop in the scu's header file is
+CONFIG_SMP=n, so no need to use these macros in the code.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/common.h  |    1 +
- arch/arm/mach-exynos/cpuidle.c |   29 -----------------------------
- arch/arm/mach-exynos/pm.c      |   29 +++++++++++++++++++++++++++++
- 3 files changed, 30 insertions(+), 29 deletions(-)
+ arch/arm/mach-exynos/pm.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 9ef3f83..30123a0 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -62,5 +62,6 @@ struct exynos_pmu_conf {
- };
- 
- extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-+extern void exynos_enter_aftr(void);
- 
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index fe35fba..e6d813d 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -30,35 +30,6 @@
- #include "common.h"
- #include "regs-pmu.h"
- 
--#define REG_DIRECTGO_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
--			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
--			(S5P_VA_SYSRAM + 0x24) : S5P_INFORM0))
--#define REG_DIRECTGO_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
--			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
--			(S5P_VA_SYSRAM + 0x20) : S5P_INFORM1))
--
--#define S5P_CHECK_AFTR		0xFCBA0D10
--
--/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
--static void exynos_set_wakeupmask(long mask)
--{
--	__raw_writel(mask, S5P_WAKEUP_MASK);
--}
--
--static void exynos_cpu_set_boot_vector(long flags)
--{
--	__raw_writel(virt_to_phys(exynos_cpu_resume), REG_DIRECTGO_ADDR);
--	__raw_writel(flags, REG_DIRECTGO_FLAG);
--}
--
--static void exynos_enter_aftr(void)
--{
--	exynos_set_wakeupmask(0x0000ff3e);
--	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
--	/* Set value of power down register for aftr mode */
--	exynos_sys_powerdown_conf(SYS_AFTR);
--}
--
- static int idle_finisher(unsigned long flags)
- {
- 	exynos_enter_aftr();
 diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 9773a00..50b6b4d 100644
+index aba577f..9773a00 100644
 --- a/arch/arm/mach-exynos/pm.c
 +++ b/arch/arm/mach-exynos/pm.c
-@@ -101,6 +101,35 @@ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
- 	return -ENOENT;
- }
+@@ -244,7 +244,7 @@ static void exynos_pm_resume(void)
  
-+#define EXYNOS_BOOT_VECTOR_ADDR	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-+			S5P_INFORM7 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-+			(S5P_VA_SYSRAM + 0x24) : S5P_INFORM0))
-+#define EXYNOS_BOOT_VECTOR_FLAG	(samsung_rev() == EXYNOS4210_REV_1_1 ? \
-+			S5P_INFORM6 : (samsung_rev() == EXYNOS4210_REV_1_0 ? \
-+			(S5P_VA_SYSRAM + 0x20) : S5P_INFORM1))
-+
-+#define S5P_CHECK_AFTR 0xFCBA0D10
-+
-+/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
-+static void exynos_set_wakeupmask(long mask)
-+{
-+	__raw_writel(mask, S5P_WAKEUP_MASK);
-+}
-+
-+static void exynos_cpu_set_boot_vector(long flags)
-+{
-+	__raw_writel(virt_to_phys(exynos_cpu_resume), EXYNOS_BOOT_VECTOR_ADDR);
-+	__raw_writel(flags, EXYNOS_BOOT_VECTOR_FLAG);
-+}
-+
-+void exynos_enter_aftr(void)
-+{
-+	exynos_set_wakeupmask(0x0000ff3e);
-+	exynos_cpu_set_boot_vector(S5P_CHECK_AFTR);
-+	/* Set value of power down register for aftr mode */
-+	exynos_sys_powerdown_conf(SYS_AFTR);
-+}
-+
- /* For Cortex-A9 Diagnostic and Power control register */
- static unsigned int save_arm_register[2];
+ 	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
  
+-	if (IS_ENABLED(CONFIG_SMP) && !soc_is_exynos5250())
++	if (!soc_is_exynos5250())
+ 		scu_enable(S5P_VA_SCU);
+ 
+ early_wakeup:
+@@ -336,10 +336,8 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+ 
+ 	case CPU_PM_EXIT:
+ 		if (cpu == 0) {
+-#ifdef CONFIG_SMP
+ 			if (!soc_is_exynos5250())
+ 				scu_enable(S5P_VA_SCU);
+-#endif
+ 			exynos_cpu_restore_register();
+ 		}
+ 		break;
 -- 
 1.7.9.5
