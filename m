@@ -1,40 +1,50 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 Apr 2014 13:47:01 +0530
-Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
- default when booted with DT
-In-Reply-To: <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
- <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5347A4FD.1030803@ti.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Fri, 11 Apr 2014 10:18:39 +0200
+Subject: [PATCH RESEND 2/5] pinctrl: berlin: add a pinctrl driver for
+ Marvell Berlin SoCs
+In-Reply-To: <20140411144431.04fb148d@xhacker>
+References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397135274-10764-3-git-send-email-antoine.tenart@free-electrons.com>
+ <20140411144431.04fb148d@xhacker>
+Message-ID: <20140411081839.GB20147@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
-> Use the EVENTQ_1 for default and leave the EVENTQ_0 to be used by high
-> priority channels, like audio.
+Hi Jisheng,
+
+On Fri, Apr 11, 2014 at 02:44:31PM +0800, Jisheng Zhang wrote:
+> On Thu, 10 Apr 2014 06:07:51 -0700
+> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-> ---
->  arch/arm/common/edma.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> ...
+> > +static int berlin_pinmux_enable(struct pinctrl_dev *pctrl_dev,
+> > +                               unsigned function,
+> > +                               unsigned group)
+> > +{
+> > +       struct berlin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctrl_dev);
+> > +       struct berlin_pinctrl_group *group_desc = pctrl->groups + group;
+> > +       struct berlin_pinctrl_function *function_desc =
+> > +               pctrl->functions + function;
+> > +       unsigned long flags;
+> > +       u32 regval;
+> > +
+> > +       spin_lock_irqsave(&pctrl->lock, flags);
+> > +
+> > +       regval = readl(group_desc->reg);
+> > +       regval &= group_desc->mask;
+> > +       regval |= function_desc->muxval << group_desc->lsb;
+> > +       writel(regval, group_desc->reg);
 > 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index 86a8b263278f..19520e2519d9 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -1546,7 +1546,8 @@ static int edma_of_parse_dt(struct device *dev,
->  
->  	pdata->queue_priority_mapping = queue_priority_map;
->  
-> -	pdata->default_queue = 0;
-> +	/* select queue 1 as default */
+> Could we use relaxed version instead?
 
-It will be nice to expand the comment with explanation of why this is
-being chosen as default (lower priority queue by default for typical
-bulk data transfer).
+We could, but this is not a performance issue here at all, so I guess we can
+keep writel().
 
-Thanks,
-Sekhar
+Thanks for the feedback !
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
