@@ -1,61 +1,64 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 11 Apr 2014 15:14:42 +0200
-Subject: [RFC PATCH] edac: add support for ARM PL310 L2 cache parity
-In-Reply-To: <53466DBF.7030606@monstr.eu>
-References: <1393770760-32550-1-git-send-email-punnaia@xilinx.com>
- <a1a9e47a-069c-4285-9899-d5a58cf532c2@CO9EHSMHS003.ehs.local>
- <20140409113246.GA8778@pd.tnic>
- <CAL_Jsq+gszc+R_BrLtHKEBGYd=3T+sE1d+-HoF9aYZt6C2k5-g@mail.gmail.com>
- <20140409151932.GK6529@pd.tnic>
- <CAHLkNHJTA5bGD1zAfzE2JrDFAWvmgYyYjir+4vR-d9Fe2-E48g@mail.gmail.com>
- <20140409174701.GO6529@pd.tnic> <53463641.1030800@monstr.eu>
- <20140410090246.GC29093@pd.tnic> <53466DBF.7030606@monstr.eu>
-Message-ID: <20140411131442.GA11636@pd.tnic>
+From: sajjan.linux@gmail.com (Vikas Sajjan)
+Date: Fri, 11 Apr 2014 18:46:06 +0530
+Subject: [PATCH v2 0/3] Add initial support of PMU for exynos5260
+In-Reply-To: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CAGm_ybhk8FdBy_U2jJfY0d=dC-dJDcXnkFexr3q_LCLXUVxtHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 12:09:03PM +0200, Michal Simek wrote:
-> The question here is. This driver is just reporting problem through
-> edac interface which is counting that errors and provide an unified
-> way how to report problems.
+ Hi,
 
-Yes, normally you can use edac for reporting and error counting. But,
-if, as I said earlier, it is easier to solve your issue of having two
-entities touch one hardware and synchronizing around it is too much,
-just for this one case, you can simply report the errors with simple
-printk, without the edac interface.
+ Any comments on this series.
 
-This is why I was asking the practical question of why do you even need
-the edac interface? If it is only for reporting, use printk and solve
-the problem of having two drivers.
 
-> Maybe as you said we don't need to use edac interface at all but by
-> design because every error means that there is the problem and error
-> should be reported and system should be reset because we just don't
-> know where the problem is. We know that we have a problem.
+On Mon, Mar 17, 2014 at 6:39 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> From: Vikas Sajjan <vikas.sajjan@linaro.org>
 >
-> The question also is if we should execute any code because the problem
-> can be with instructions and system should just reset.
+> 1) Added initial PMU support for exynos5260
 >
-> Isn't there any security issue that even executing any code is a
-> problem?
-
-Well, this is up to you to answer. If an UE (Uncorrectable Error) causes
-data to get corrupted on your system, which, as a result, corrupts
-visible state which lands on storage, you definitely want to stop
-executing any code. x86 deals very rigorously with errors like those
-by running an exception handler, on AMD there's also this thing called
-syncflood which stops any execution and a warm reset happens.
-
-So you have to think hard what those UEs cause on your systems and only
-then act accordingly. If something bad like the above happens, the last
-thing you want to do is report them to dmesg.
-
-HTH.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+> 2) Added S2R(single CPU) support on exynos5260
+>
+> 3) Added PMU mapping via DT.
+>
+> rebased on
+> 1) kgene tree for-next branch
+> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+>
+> 2) Rahul's patches for basic support of exynos5260
+> http://www.spinics.net/lists/linux-samsung-soc/msg27282.html
+>
+> 3) Rahul's clk patches http://www.spinics.net/lists/linux-samsung-soc/msg27275.html
+>
+> 4) Tomasz Figa's http://permalink.gmane.org/gmane.linux.ports.arm.kernel/299340
+>
+> Changes since v1:
+>                -- Addressed Tomasz Figa's comments.
+>                -- removed CMU patch
+>                -- Added PMU mapping via DT
+>
+> Vikas Sajjan (3):
+>   ARM: EXYNOS: Map PMU address through DT
+>   ARM: EXYNOS: Add initial support of PMU for Exynos5260
+>   arm: exynos5260: add support for S2R
+>
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |    5 +-
+>  arch/arm/boot/dts/exynos4.dtsi                     |    5 +
+>  arch/arm/boot/dts/exynos5260.dtsi                  |    5 +
+>  arch/arm/mach-exynos/common.c                      |   51 ++--
+>  arch/arm/mach-exynos/common.h                      |   26 +++
+>  arch/arm/mach-exynos/include/mach/map.h            |    3 -
+>  arch/arm/mach-exynos/pm.c                          |   96 ++++++--
+>  arch/arm/mach-exynos/pmu.c                         |  238 +++++++++++++++++++
+>  arch/arm/mach-exynos/regs-pmu.h                    |  244 ++++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
+>  10 files changed, 637 insertions(+), 44 deletions(-)
+>
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
