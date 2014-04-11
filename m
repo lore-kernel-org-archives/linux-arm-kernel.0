@@ -1,49 +1,46 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 11 Apr 2014 23:30:33 +0800
-Subject: [PATCH] gpio/at91: free GPIO after configuring as input
-In-Reply-To: <1397226249-3922-1-git-send-email-alexanders83@web.de>
-References: <1397226249-3922-1-git-send-email-alexanders83@web.de>
-Message-ID: <A08D29A3-2690-46C1-A317-41B17F365A81@jcrosoft.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Fri, 11 Apr 2014 16:35:11 +0200
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <CAA3XUr0-KqtBw0WCFvws8g5ChK49d+X+7Un9ngq1UZg-oROx+A@mail.gmail.com>
+References: <20140409184507.GA1058@redhat.com>
+ <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
+ <5347655B.3080307@linaro.org>
+ <20140411.003636.272212797007496394.davem@davemloft.net>
+ <CAA3XUr0-KqtBw0WCFvws8g5ChK49d+X+7Un9ngq1UZg-oROx+A@mail.gmail.com>
+Message-ID: <20140411143511.GA26569@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/11, Victor Kamensky wrote:
+>
+> On 10 April 2014 21:36, David Miller <davem@davemloft.net> wrote:
+> > You really need to pass the proper VMA down to the call site
+> > rather than pass NULL, that's extremely ugly and totally
+> > unnecesary.
+>
+> Agreed that VMA is really needed.
 
-On Apr 11, 2014, at 10:24 PM, Alexander Stein <alexanders83@web.de> wrote:
+I do not ;) but I am still trying to finish my email...
 
+> index 04709b6..1ae4563 100644
+> --- a/kernel/events/uprobes.c
+> +++ b/kernel/events/uprobes.c
+> @@ -117,6 +117,7 @@ struct xol_area {
+>       * the vma go away, and we must handle that reasonably gracefully.
+>       */
+>      unsigned long         vaddr;        /* Page(s) of instruction slots */
+> +    struct vm_area_struct    *vma;        /* VMA that holds above address */
+>  };
 > 
-> If the GPIO stays requested a device driver can't request it again.
-> e.g. Without this patch the ads7846 driver returns the following error:
-> ads7846 spi32766.3: failed to request/setup pendown GPIO15: -16
-> ads7846: probe of spi32766.3 failed with error -16
+>  /*
+> @@ -1150,6 +1151,7 @@ static int xol_add_vma(struct mm_struct *mm,
+> struct xol_area *area)
 > 
-> /sys/kernel/debug/gpio shows this:
-> GPIOs 0-31, platform/fffff200.gpio, fffff200.gpio:
-> [/ahb/apb/pinctrl at fffff200/gpio at fffff200] GPIOfffff200.gpio15: [gpio] set
-> 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-> ---
-> I'm aware that it makes sense this GPIO is/stays requested, but either the
-> pinctl or device driver have to be adjusted as both can't request this GPIO.
-> I think the latter shouldn't change.
-> 
-> drivers/pinctrl/pinctrl-at91.c | 2 ++
-> 1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index d990e33..63176f2 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1493,6 +1493,8 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
-> 	if (ret)
-> 		return ret;
-> 
-> +	gpio_free(pin);
-> +
+>      ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
+>                  VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
+> +    area->vma = find_vma(mm, area->vaddr);
 
-NACK it the whole key point the gpio use as a IRQ so the irq generic code request it
-> 	return 0;
-> }
-> 
-> -- 
-> 1.9.2
-> 
+No, this can't work. This vma can be unmapped/freed/etc.
+
+Oleg.
