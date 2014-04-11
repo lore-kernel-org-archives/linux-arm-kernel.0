@@ -1,53 +1,82 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 11 Apr 2014 19:38:53 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140411172456.GA20506@redhat.com>
-References: <20140409184507.GA1058@redhat.com>
- <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
- <5347655B.3080307@linaro.org>
- <20140411.003636.272212797007496394.davem@davemloft.net>
- <20140411145625.GA27493@redhat.com> <20140411152207.GA28188@redhat.com>
- <20140411153041.GQ16119@n2100.arm.linux.org.uk>
- <20140411172456.GA20506@redhat.com>
-Message-ID: <20140411173853.GA21370@redhat.com>
+From: sriku.linux@gmail.com (Srikanth Thokala)
+Date: Fri, 11 Apr 2014 23:10:59 +0530
+Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
+ possible
+In-Reply-To: <1394127555.4582.1.camel@weser.hi.pengutronix.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-3-git-send-email-l.stach@pengutronix.de>
+ <5318B232.2020507@wwwdotorg.org>
+ <1394127555.4582.1.camel@weser.hi.pengutronix.de>
+Message-ID: <CA+mB=1JCjDMzTuctvSQgjNhBnkyUPC2ooAzJOX_PC5L1gAau8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11, Oleg Nesterov wrote:
+Hi Lucas/Tanmay,
+
+On Thu, Mar 6, 2014 at 11:09 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Donnerstag, den 06.03.2014, 10:36 -0700 schrieb Stephen Warren:
+>> On 03/05/2014 06:25 AM, Lucas Stach wrote:
+>> > This is the recommended method of doing the IRQ
+>> > mapping. For old devicetrees we fall back to the
+>> > previous practice.
+>>
+>> Tested-by: Stephen Warren <swarren@nvidia.com>
+>>
+>> I tested both with and without patch 1/6, and the PCIe-based NIC on
+>> Beaver worked fine either way. Without patch 1/6, I do see:
+>>
+>> pci 0000:00:01.0: of_irq_parse_pci() failed with rc=-22
+>>
+>> ... but that seems reasonable given that the DT that of_irq_parse_pci()
+>> parses is missing, and did correctly trigger the fallback path, so
+>> everything still worked.
 >
-> +static void arch_uprobe_copy_ixol(struct xol_area *area, unsigned long vaddr,
-> +				 	struct arch_uprobe *auprobe)
-> +{
-> +#ifndef ARCH_UPROBE_XXX
-> +	copy_to_page(area->page, vaddr, &auprobe->ixol, sizeof(&auprobe->ixol));
-> +	/*
-> +	 * We probably need flush_icache_user_range() but it needs vma.
-> +	 * If this doesn't work define ARCH_UPROBE_XXX.
-> +	 */
-> +	flush_dcache_page(area->page);
-> +#else
-> +	struct mm_struct *mm = current->mm;
-> +	struct vm_area_struct *vma;
-> +
-> +	down_read(&mm->mmap_sem);
-> +	vma = find_exact_vma(mm, area->vaddr, area->vaddr + PAGE_SIZE);
-> +	if (vma) {
-> +		void *kaddr = kmap_atomic(area->page);
-> +		copy_to_user_page(vma, area->page,
-> +					vaddr, kaddr + (vaddr & ~PAGE_MASK),
-> +					&auprobe->ixol, sizeof(&auprobe->ixol));
-> +		kunmap_atomic(kaddr);
-> +	}
-> +	up_read(&mm->mmap_sem);
-> +#endif
+> Yes, this should be normal. It spits this error for old DTs, but keeps
+> doing the right thing. I'm not sure if we should downgrade this to info
+> or dbg.
 
-And perhaps the patch is not complete. "if (vma)" is not enough, a probed
-task can mmap something else at this vaddr.
+I see this error too on my setup (Xilinx PCIe Root Complex Driver),
+https://lkml.org/lkml/2014/3/3/183
 
-copy_to_user_page() should only change the contents of area->page, so memcpy
-should be fine. But I am not sure that flush_icache_user_range() or
-flush_ptrace_access() is always safe on every arch if "struct page *page"
-doesn't match vma.
+After digging into it, I see I need to override the API
+pcibios_get_phb_of_node()
+to pass my device node.  Is this the only possible way?
 
-Oleg.
+>From the discussion in this thread, I feel am missing something in the dt node.
+Below is my dt node, please let me know if you see any issues.
+
++++++++++++++++++++++++
+pcie{
+   reg = <XXXX>;
+   ranges = <YYYY>;
+   interrupts = <0 52 4>;
+
+   pcie_intc: interrupt-controller {
+       interrupt-controller;
+       #address-cells = <0>;
+       #interrupt-cells = <1>;
+   }
+
+   interrupt-map-mask = <0 0 0 7>;
+   interrupt-map = <0 0 0 1 &pcie_intc 1>,
+                          <0 0 0 2 &pcie_intc 2>,
+                          <0 0 0 3 &pcie_intc 3>,
+                          <0 0 0 4 &pcie_intc 4>;
+};
+
+Thanks in advance,
+Srikanth.
+
+>
+> Regards,
+> Lucas
+> --
+> Pengutronix e.K.                           | Lucas Stach                 |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
