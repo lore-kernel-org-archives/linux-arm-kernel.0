@@ -1,40 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 11 Apr 2014 15:19:41 -0700
-Subject: [PATCH] i2c: s3c2410: resume race fix
-Message-ID: <1397254781-23833-1-git-send-email-dianders@chromium.org>
+From: cwchoi00@gmail.com (=?UTF-8?B?7LWc7LCs7Jqw?=)
+Date: Sat, 12 Apr 2014 07:49:22 +0900
+Subject: [PATCH] iio: adc: exynos_adc: Control special clock of ADC to
+ support Exynos3250 ADC
+In-Reply-To: <5347BE67.1080209@samsung.com>
+References: <1397181640-18513-1-git-send-email-cw00.choi@samsung.com>
+ <5347BE67.1080209@samsung.com>
+Message-ID: <CAGTfZH1t9QEZk5qaDRnGkeMatwtTXFq5SGgR27-4nXhdzKU-Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olof Johansson <olof@lixom.net>
+Hi Sylwester,
 
-Don't unmark the device as suspended until after it's been re-setup.
+On Fri, Apr 11, 2014 at 7:05 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> Hi Chanwoo,
+>
+> On 11/04/14 04:00, Chanwoo Choi wrote:
+>> This patch control special clock for ADC in Exynos series's FSYS block.
+>> If special clock of ADC is registerd on clock list of common clk framework,
+>> Exynos ADC drvier have to control this clock.
+>>
+>> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+>> - 'adc' clock: bus clock for ADC
+>>
+>> Exynos3250 has additional 'sclk_tsadc' clock as following:
+>> - 'sclk_tsadc' clock: special clock for ADC which provide clock to internal ADC
+>>
+>> Exynos 4210/4212/4412 and Exynos5250/5420 has not included 'sclk_tsadc' clock
+>> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included 'sclk_tsadc'
+>> clock in FSYS_BLK.
+>
+> I think a new compatible should be added for the ADC device for Exynos3250
+> and the required clocks should be handled properly, based on compatible
+> value. This could be handled, e.g. through some flags in driver's data
+> selected based on the compatible property value.
 
-The main race would be w.r.t. an i2c driver that gets resumed at the same
-time (asyncronously), that is allowed to do a transfer since suspended
-is set to 0 before reinit, but really should have seen the -EIO return
-instead.
+OK, I'll consider new patch using new compatible string according to
+your comment.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/i2c/busses/i2c-s3c2410.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> And the new clocks should be documented in Documentation/devicetree/bindings
+> /arm/samsung/exynos-adc.txt.
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index ae44910..bb3a996 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1276,10 +1276,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
- 
--	i2c->suspended = 0;
- 	clk_prepare_enable(i2c->clk);
- 	s3c24xx_i2c_init(i2c);
- 	clk_disable_unprepare(i2c->clk);
-+	i2c->suspended = 0;
- 
- 	return 0;
- }
--- 
-1.9.1.423.g4596e3a
+OK, I'll modify it. Thanks,
+
+Best Regards,
+Chanwoo Choi
