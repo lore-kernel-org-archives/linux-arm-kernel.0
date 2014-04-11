@@ -1,67 +1,131 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 Apr 2014 15:23:49 +0200
-Subject: [PATCH 1/2] ARM: dt-binding: fix GIC example
-In-Reply-To: <CAL_Jsq+-8hmKf31nX7rbhZ6EBXAycWS3THHRz-ZLt1RXqWnjVA@mail.gmail.com>
-References: <1396023951-32383-1-git-send-email-l.stach@pengutronix.de>
- <CAL_Jsq+_+B=TKMQ2ULkXiBJGTNmGGLkB1xjKNJkF1BK_4TRXkg@mail.gmail.com>
- <1397211012.4577.5.camel@weser.hi.pengutronix.de>
- <CAL_Jsq+-8hmKf31nX7rbhZ6EBXAycWS3THHRz-ZLt1RXqWnjVA@mail.gmail.com>
-Message-ID: <1397222629.4577.7.camel@weser.hi.pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 11 Apr 2014 15:35:06 +0200
+Subject: [PATCH RESEND 2/5] pinctrl: berlin: add a pinctrl driver for
+ Marvell Berlin SoCs
+In-Reply-To: <20140411123737.GA5903@kwain>
+References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397135274-10764-3-git-send-email-antoine.tenart@free-electrons.com>
+ <5347AFF4.3050607@gmail.com> <20140411123737.GA5903@kwain>
+Message-ID: <5347EF8A.8040600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 11.04.2014, 08:20 -0500 schrieb Rob Herring:
-> On Fri, Apr 11, 2014 at 5:10 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > Hi Rob,
-> >
-> > Am Donnerstag, den 10.04.2014, 10:21 -0500 schrieb Rob Herring:
-> >> On Fri, Mar 28, 2014 at 11:25 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> >> > From: Tim Harvey <tharvey@gateworks.com>
-> >> >
-> >> > When using interrupt-maps, the size of a map entry is #address-cells +
-> >>
-> >> Plus what? You mean ", and "?
-> >>
-> > Urgh, I obviously messed this up while editing the commit message in the
-> > last minute. It should have been something along the lines of:
-> >
-> > When using interrupt-maps, the size of a map entry is #address-cells +
-> > #interrupt-cells. address-cells should be 0 as this offset is not used
-> > in the GIC.
-> >
-> > As #address-cells = <0> is the same as not specifying the
-> > property, simply remove it.
-> >
-> > Can you edit this while applying, or should I send a new patch?
-> 
-> I'll fix it up and apply.
-> 
-Thanks.
+On 04/11/2014 02:37 PM, Antoine T?nart wrote:
+> On Fri, Apr 11, 2014 at 11:03:48AM +0200, Sebastian Hesselbarth wrote:
+>> On 04/10/2014 03:07 PM, Antoine T?nart wrote:
+>>> The Marvell Berlin boards have a group based pinmuxing mechanism. This
+>>> driver adds the support for the BG2CD, BG2 and BG2Q. We actually do not
+>>> need any information about the pins here and only have the definition
+>>> of the groups.
+>>
+[...]
+>>> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+>>> index 4b835880cf80..fd5a01d4475f 100644
+>>> --- a/drivers/pinctrl/Makefile
+>>> +++ b/drivers/pinctrl/Makefile
+>>> @@ -21,6 +21,7 @@ obj-$(CONFIG_PINCTRL_BF60x)	+= pinctrl-adi2-bf60x.o
+>>>   obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
+>>>   obj-$(CONFIG_PINCTRL_BCM2835)	+= pinctrl-bcm2835.o
+>>>   obj-$(CONFIG_PINCTRL_BAYTRAIL)	+= pinctrl-baytrail.o
+>>> +obj-$(CONFIG_PINCTRL_BERLIN)	+= pinctrl-berlin.o
+>>
+>> Please split the driver into common and soc-specific parts, and if
+>> you do please put it into a subfolder berlin, too.
+>
+> The only SoC specific part is the group structure. I'll need to have
+> functions in each SoC specific part calling ... only the common ones.
+> Do you have a better solution in mind ?
 
-> >
-> >> > address-cells should be 0 as this is not used.
-> >> >
-> >> > As #address-cells = <0> is the same as not specifying the
-> >> > property, simply remove it.
-> >> >
-> >> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> >> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> >>
-> >> Did this get applied? I can't seem to find patch 2.
-> >>
-> > As Shawn pointed out patch 2 got applied through the imx tree as it
-> > fixes a real bug there.
-> 
-> It was highlighted that other instances beyond iMX were wrong. Please
-> fix those as well.
+We have a similar structure for mvebu, control is common, structure is
+not. You'll have one common driver to register pinctrl and switch a
+specific mux, and one file for each SoC holding the group structure
+and function table.
 
-Oh, I wasn't aware of that. Will send patches.
+If bg2 and bg2cd have the same group layout but different functions
+assigned to it, you can either strictly separate by SoC or separate
+by similarity. Have a look at e.g. pinctrl/mvebu/pinctrl-kirkwood.c,
+although SoCs are different with respect to individual functions, we
+have a variant mask to determine if a specific function is available
+on that SoC.
 
-Regards,
-Lucas
+But if bg2 and bg2cd are _very_ different from the functions assigned
+to each group, I'd rather have two separate files, too.
 
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Basically, folder structure will look like this:
+drivers/pinctrl
+   +- berlin/
+      +- common.c : common code (pinctrl register, pinmux)
+      +- common.h : common include (group structure, common callbacks)
+      +- bg2.c    : BG2 specific group/function tables
+      +- bg2cd.c  : BG2CD specific group/function tables
+      +- bg2q.c   : BG2Q specific group/function tables
+      +- ...
+
+(BTW, as we know we are beneath drivers/pinctrl, drop the pinctrl-
+prefix)
+
+If we consider bg2cd as a variant of bg2, join the two files above
+and have a variant mask as we have for Kirkwood.
+
+[...]
+>>> +	function_name = kzalloc(strlen(group_name) + 7, GFP_KERNEL);
+>>> +	if (!function_name)
+>>> +		return -ENOMEM;
+>>> +	snprintf(function_name, strlen(group_name) + 7, "%s_mode%d", group_name,
+>>> +			function);
+>>
+>> With proper mode tables above, this can refer to a const char* and you
+>> can get rid of allocation here. Also, below you already allocated
+>> function_names, how is this one different from the below?
+>
+> The one below is used to describe the available functions for a given group
+> while this one describe a function found in the device tree. It is used to check
+> the function we want to use in the device is provided by the driver. The
+
+Ah, ok. With numeric values for marvell,function and proper function 
+tables for each of the groups, you can just look up the group and loop
+over the available functions. Or if you prefer strings, give a proper
+name to each function in the table and use that string as DT match.
+
+> function name used here may not actually exist. We could check the function
+> actually exists here (and find the previously allocated function name), but this
+> check is handled by the pinctrl framework. This would end up in a different
+> behaviour than the expected one, imho.
+[...]
+>>> +static int berlin_pinctrl_build_state(struct platform_device *pdev,
+>>> +			      struct berlin_pinctrl_reg_base *bases,
+>>> +			      unsigned nbases)
+>>> +{
+>>> +	struct berlin_pinctrl *pctrl = platform_get_drvdata(pdev);
+>>> +	int i, j, cur_fct = 0;
+>>> +
+>>> +	pctrl->ngroups = pctrl->desc->ngroups;
+>>> +	pctrl->nfunctions = 0;
+>>> +
+>>> +	for (i = 0; i < pctrl->ngroups; i++) {
+>>> +		struct berlin_desc_group const *desc = pctrl->desc->groups + i;
+>>> +		pctrl->nfunctions += NFCTS(desc->bit_width);
+>>> +	}
+>>
+>> As you need desc later on, make it global to this function. Then you
+>> can also walk through it with desc++
+>>
+>> desc = pctrl->desc->groups;
+>> for (i = 0; i < pctl->ngroups; i++, desc++)
+>> 	pctrl->nfunctions = ...
+>>
+>> Having said that, the above assumes that each function is unique
+>> but IIRC the idea of the function table was to group pins/groups
+>> with the same function, e.g. function "gpio", groups 1,7,25,...
+>
+> Most of the functions you can use on the Berlin they will be unique and would
+> only be used in one group, except for the 'gpio' one.
+
+Yeah, I had a similar discussion about it back then for mvebu. IIRC, the
+correct answer is: Have a list of functions with groups assigned to it
+no matter if there is only one group per function (or 40 per function as
+it will be for gpio).
+
+Maybe Linus can give an update on how to deal with it?
+
+Sebastian
