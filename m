@@ -1,35 +1,38 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 11 Apr 2014 12:24:49 -0700
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140411.145842.716571171033099617.davem@davemloft.net>
-References: <CA+55aFwPR1XLRKiYya5wwxwbdnA_qiB4fZPL0i7+L4mpmzk5qA@mail.gmail.com>
- <20140411.141911.2103972187575537634.davem@davemloft.net>
- <CA+55aFwDKOs2XXVCsCi_tCSVTHt93uqzv-0qGEzRW6rCk0h9rw@mail.gmail.com>
- <20140411.145842.716571171033099617.davem@davemloft.net>
-Message-ID: <CA+55aFxKGwMNGfXVeN78q54k1mmbm_0igaGAj2t35YWhsFfUsg@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 11 Apr 2014 12:41:02 -0700
+Subject: [PATCH v2 1/5] ARM: zynq: DT: Add 'clock-latency' property
+In-Reply-To: <53423BB6.7010508@monstr.eu>
+References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1396653256-28397-2-git-send-email-soren.brinkmann@xilinx.com>
+ <53423BB6.7010508@monstr.eu>
+Message-ID: <34776df5-5255-4d58-a5ab-83f2017e16fc@AM1EHSMHS018.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 11:58 AM, David Miller <davem@davemloft.net> wrote:
->
-> Since we do most of the cache flushing stuff during normal operations
-> at the PTE modification point, perhaps a piece of page state could be
-> used to handle this.  We already use such a thing for D-cache alias
-> flushing.
+On Mon, 2014-04-07 at 07:46AM +0200, Michal Simek wrote:
+> On 04/05/2014 01:14 AM, Soren Brinkmann wrote:
+> > Specify the 'clock-latency' property to avoid certain cpufreq governors
+> > from refusing to work with the following error:
+> >   ondemand governor failed, too long transition latency of HW, fallback to performance governor
+> > 
+> > Reported-by: Mike Looijmans <mike.looijmans@topic.nl>
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > Tested-by: Mike Looijmans <mike.looijmans@topic.nl>
+> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> > ---
+> > This is a fix from our vendor tree
+> > 
+> > Changes in v2:
+> >  - This patch has been added
+> > 
+> > ---
+> >  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+> >  1 file changed, 1 insertion(+)
+> 
+> Applied to zynq-dt.
 
-So looking at the powerpc code, I thought ppc already did this, but it
-seems to do something different: it lazily does the icache flush at
-page fault time if the page has been marked by dcache flush (with the
-PG_arch_1 bit indicating whether the page is coherent in the I$).
+Actually, this should probably go in as fix into the current (3.15)
+release cycle.
 
-But I don't see it trying to actually flush the icache of already
-mapped processes when modifying the dcache.
-
-So while we *could* do that, apparently no architecture does this.
-Even the one architecture that I thought did it doesn'r really try to
-make things globally coherent.
-
-(My "analysis" was mainly using "git grep", so maybe I missed something).
-
-           Linus
+	Thanks,
+	S?ren
