@@ -1,64 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Apr 2014 16:47:19 -0700
-Subject: [PATCH 11/11] pinctrl: single: Clear pin interrupts enabled by
- bootloader
-In-Reply-To: <1397173639-29587-1-git-send-email-tony@atomide.com>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
-Message-ID: <1397173639-29587-12-git-send-email-tony@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 11 Apr 2014 02:14:02 +0200
+Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
+In-Reply-To: <alpine.LFD.2.11.1404091504240.28063@knanqh.ubzr>
+References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <alpine.LFD.2.11.1404091504240.28063@knanqh.ubzr>
+Message-ID: <1442455.pP6sroyjMG@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we set up device wake-up interrupts as pinctrl-single
-interrupts, we now must use the standard request_irq and
-related functions to manage them.
+On Wednesday 09 April 2014 15:05:26 Nicolas Pitre wrote:
+> On Wed, 9 Apr 2014, Laurent Pinchart wrote:
+> > Hello,
+> > 
+> > (Resending due to a typo in an e-mail address that caused LAKML to reject
+> > the mails. Sorry about the noise.)
+> > 
+> > This patch set reworks Ezequiel Garcia's previous fix [1] of an out of
+> > vmalloc space bug on PXA2[57]x platforms caused by an attempt to map the
+> > start of physical uncached outside of the vmalloc space.
+> > 
+> > This first three patches perform a couple of cleanups, and the last patch
+> > fixes the problem. I've decided to map the memory at address 0xfe000000 to
+> > minimize changes to the code, but this causes a bit of fragmentation of
+> > vmalloc space. I could map it to the very end of vmalloc space
+> > (0xfef00000)
+> > instead if preferred, which would involve replacing a mov by an ldr in
+> > pxa2[57]x_finish_suspend and pm_enter_standby_start.
+> > 
+> > I've tested the patch set on a PXA270-based system.
+> 
+> For those patches:
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-If the pin interrupts are enabled for some pins at boot,
-the wake-up events can show up as constantly pending
-at least on omaps and will hang the system unless the related
-device driver clears the event at the device.
+Thank you.
 
-To fix this, let's clear the interrupt flags during init,
-and print out a warning so the board maintainers can update
-their drivers to do proper request_irq for the driver specific
-wake-up events.
+MAINTAINERS lists three maintainers for the PXA architecture, and two git 
+trees that seem to be either dead or even deleted. Who picks up patches for 
+PXA ? Should I send a pull request ?
 
-Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/pinctrl/pinctrl-single.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> > [1] https://lkml.org/lkml/2013/11/28/474
+> > 
+> > Ezequiel Garcia (1):
+> >   ARM: pxa: Move iotable mapping inside vmalloc region
+> > 
+> > Laurent Pinchart (3):
+> >   ARM: pxa: Don't hardcode addresses and size in map_desc tables
+> >   ARM: pxa: Move UNCACHED_PHYS_0 mapping from generic.c to pxa2[57]x.c
+> >   ARM: pxa: pxa27x: Don't map IMEMC region statically
+> >  
+> >  arch/arm/mach-pxa/generic.c               | 11 +++--------
+> >  arch/arm/mach-pxa/include/mach/hardware.h |  4 ++--
+> >  arch/arm/mach-pxa/pxa25x.c                |  7 ++++++-
+> >  arch/arm/mach-pxa/pxa27x.c                | 10 +++++-----
+> >  arch/arm/mach-pxa/pxa3xx.c                |  2 +-
+> >  5 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index de64596..ba1f4b1 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -808,6 +808,7 @@ static const struct pinconf_ops pcs_pinconf_ops = {
- static int pcs_add_pin(struct pcs_device *pcs, unsigned offset,
- 		unsigned pin_pos)
- {
-+	struct pcs_soc_data *pcs_soc = &pcs->socdata;
- 	struct pinctrl_pin_desc *pin;
- 	struct pcs_name *pn;
- 	int i;
-@@ -819,6 +820,18 @@ static int pcs_add_pin(struct pcs_device *pcs, unsigned offset,
- 		return -ENOMEM;
- 	}
- 
-+	if (pcs_soc->irq_enable_mask) {
-+		unsigned val;
-+
-+		val = pcs->read(pcs->base + offset);
-+		if (val & pcs_soc->irq_enable_mask) {
-+			dev_dbg(pcs->dev, "irq enabled at boot for pin at %lx (%x), clearing\n",
-+				(unsigned long)pcs->res->start + offset, val);
-+			val &= ~pcs_soc->irq_enable_mask;
-+			pcs->write(val, pcs->base + offset);
-+		}
-+	}
-+
- 	pin = &pcs->pins.pa[i];
- 	pn = &pcs->names[i];
- 	sprintf(pn->name, "%lx.%d",
 -- 
-1.8.1.1
+Regards,
+
+Laurent Pinchart
