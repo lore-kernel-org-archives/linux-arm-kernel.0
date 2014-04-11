@@ -1,68 +1,51 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Fri, 11 Apr 2014 17:00:49 +0200
-Subject: [PATCH v3 0/7] Add ST Keyscan driver
-In-Reply-To: <1397226820-5604-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1397226820-5604-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <CAG374jD4qi-T=yXN8oagg+275QRSm_UeNmH2c=fROkzvz11XHw@mail.gmail.com>
+From: albert.aribaud@free.fr (Albert ARIBAUD)
+Date: Fri, 11 Apr 2014 17:02:26 +0200
+Subject: Marvell Orion5x boards with PCIe, and DT conversion
+In-Reply-To: <20140411155735.109c5d04@skate>
+References: <20140411155735.109c5d04@skate>
+Message-ID: <53480402.5030101@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry,  don't review this v3 version, i made mistake...
+Le 11/04/2014 15:57, Thomas Petazzoni a ?crit :
+> Hello all,
+>
+> I am contacting you because you are all maintainers/contributors to
+> Marvell Orion5x boards supported in the Linux kernel.
+>
+> I am currently converting the mach-orion5x to the Device Tree. I have
+> two Orion5x boards, so I was able to test most of the interfaces myself.
+>
+> However, one interface I'm not able to test is the PCI Express one, and
+> therefore I wanted to let you know if one of you still has a working
+> Orion5x board that has a PCI Express interface that is actually usable.
+>
+> Note that Orion5x SOCs have both a classical PCI interface and a PCI
+> Express interface. On one of my board, I have the classical PCI
+> interface, so I can easily test this. However, I don't have a board
+> with the PCI Express interface.
+>
+> Moreover, I will be sending in the near future a set of patches
+> converting many of the boards to the Device Tree, so if you still have
+> those boards and are willing to test the conversion, it would be very
+> useful.
 
-i prepare a v4 version.
+Hi Thomas,
 
-Best regards.
+I'll gladly test these patches on my faithful Orion ED Mini V2. Not sure 
+if it uses PCIe, but I suspect it does not.
 
-Gabriel
+How does this play out with U-Boot? I mean, I know that you can produce 
+a kernel which embeds the device tree and will load without U-Boot 
+knowing anything about them, but OTOH, U-Boot has some support for DTs, 
+and could possibly use the DT files too.
 
-On 11 April 2014 16:33, Gabriel FERNANDEZ <gabriel.fernandez@st.com> wrote:
-> Changes in v3:
-> - add reset controller management
-> - rename 'st,debounce_us' into 'st,debounce-us' in dt binding
+> Thanks a lot,
 >
-> Changes in v2:
-> - use standard format for matrix keymap
-> - suppress __exit mark for keyscan_remove()
-> - Call to keyscan_stop() shoudl go into keyscan_close() implementation
-> - use of SIMPLE_DEV_PM_OPS()
-> - rename compatibility name into "st,sti-keyscan"
-> - suppress platform data management
-> - omit vendor information
-> - cosmetic change and renaming
->
-> The goal of this series is to add ST Keyscan support to ST SoCs.
-> The DT definition is added for STiH415 and STiH416 SoCs on
-> B2000 board.
->
-> Gabriel Fernandez (5):
->   drivers: input: keyboard: st-keyscan: add keyscan driver
->   ARM: STi: DT: add keyscan for stih415
->   ARM: STi: DT: add keyscan for stih416
->   ARM: STi: DT: add keyscan for stih41x-b2000
->   ARM: multi_v7_defconfig: add ST Keyscan driver
->
-> Giuseppe CONDORELLI (2):
->   driver: reset: sti: add keyscan for stih415
->   driver: reset: sti: add keyscan for stih416
->
->  .../devicetree/bindings/input/st-keyscan.txt       |  60 +++++
->  arch/arm/boot/dts/stih415-pinctrl.dtsi             |  16 ++
->  arch/arm/boot/dts/stih415.dtsi                     |  12 +
->  arch/arm/boot/dts/stih416-pinctrl.dtsi             |  16 ++
->  arch/arm/boot/dts/stih416.dtsi                     |  12 +
->  arch/arm/boot/dts/stih41x-b2000.dtsi               |  23 ++
->  arch/arm/configs/multi_v7_defconfig                |   1 +
->  drivers/input/keyboard/Kconfig                     |  12 +
->  drivers/input/keyboard/Makefile                    |   1 +
->  drivers/input/keyboard/st-keyscan.c                | 260 +++++++++++++++++++++
->  drivers/reset/sti/reset-stih415.c                  |   1 +
->  drivers/reset/sti/reset-stih416.c                  |   1 +
->  .../dt-bindings/reset-controller/stih415-resets.h  |   1 +
->  .../dt-bindings/reset-controller/stih416-resets.h  |   1 +
->  14 files changed, 417 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/st-keyscan.txt
->  create mode 100644 drivers/input/keyboard/st-keyscan.c
->
-> --
-> 1.9.1
->
+> Thomas
+
+Thanks to you!
+
+Amicalement,
+-- 
+Albert.
