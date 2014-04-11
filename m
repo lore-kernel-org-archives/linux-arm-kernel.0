@@ -1,45 +1,37 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 11 Apr 2014 15:04:32 +0200
-Subject: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add AXP209 support to
- various boards
-In-Reply-To: <20140411122901.GE28800@sirena.org.uk>
-References: <1397209093-10077-8-git-send-email-carlo@caione.org>
- <20140411122901.GE28800@sirena.org.uk>
-Message-ID: <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 11 Apr 2014 16:59:38 +0200
+Subject: [PATCH 4/6] ARM: dts: vybrid: drop address and size cells from GIC
+ node
+In-Reply-To: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
+References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1397228380-7352-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 2:29 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Apr 11, 2014 at 11:38:11AM +0200, Carlo Caione wrote:
->
->> In all the DTs the min and max microvolt allowed for each regulator are actually
->> the min and max voltage possible for the regulator itself. This is not safe but
->> we do not have the ranges allowed for each board and the original Allwinner
->> driver does exactly this way.
->
-> Is there any code in their kernel which varies the supply voltages?  If
-> there isn't then simply omitting the voltage ranges is the best option,
-> leaving the supplies fixed.  If there is then the range it uses is a
-> good starting point.  In general supplies will be fixed voltage on a
-> given board unless there is a specific reason to vary them.
+This is likely a copy-and-paste error from the
+ARM GIC documentation, that has already been fixed.
 
-The supply voltage (ipsout) for the regulators is fixed and AFAIK
-there is no code for changing it.
-I'll omit the voltage ranges then.
+address-cells should have been set to 0, as with the size
+cells. As having those properties set to 0 is the
+same thing as not specifying them, drop them completely.
 
->> +                             regulators {
->> +                                     compatible = "x-powers,axp20x-reg";
->
-> This compatible isn't part of the driver.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/vf610.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
-Yes I know. The problem here is that in v4 I had to fill in the field
-.of_compatible of the mfd_cell with "x-powers,axp20x-reg". This
-because the regulator_dev_lookup() checks for dev->of_node when
-looking for the supply so I needed the compatible string in the DT to
-have the dev->of_node filled in by mfd_add_device().
-What do you suggest? Modify the regulator driver?
-
-Thank you,
-
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 804873367669..bb78e901ed5d 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -72,8 +72,6 @@
+ 			intc: interrupt-controller at 40002000 {
+ 				compatible = "arm,cortex-a9-gic";
+ 				#interrupt-cells = <3>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+ 				interrupt-controller;
+ 				reg = <0x40003000 0x1000>,
+ 				      <0x40002100 0x100>;
 -- 
-Carlo Caione
+1.9.1
