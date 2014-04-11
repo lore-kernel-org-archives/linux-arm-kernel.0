@@ -1,72 +1,77 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 11 Apr 2014 15:07:14 +0900
-Subject: [PATCH 03/10] ARM: EXYNOS: Move SYSREG definition into sys-reg
- specific file
-In-Reply-To: <533BF433.6000209@samsung.com>
-References: <1396425058-4012-1-git-send-email-pankaj.dubey@samsung.com>
- <1396425058-4012-4-git-send-email-pankaj.dubey@samsung.com>
- <533BF433.6000209@samsung.com>
-Message-ID: <53478692.3020406@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 11 Apr 2014 14:54:51 +0900
+Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
+In-Reply-To: <CAK9yfHzZEh8m2y77DrqHtEFEMnwC_NBMUk=H+MP6oSV5PWArTQ@mail.gmail.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
+ <CAK9yfHzZEh8m2y77DrqHtEFEMnwC_NBMUk=H+MP6oSV5PWArTQ@mail.gmail.com>
+Message-ID: <534783AB.2070601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2014 08:27 PM, Sylwester Nawrocki wrote:
-> Hi,
->
-> On 02/04/14 09:50, Pankaj Dubey wrote:
->> From: Young-Gun Jang <yg1004.jang@samsung.com>
->>
->> While making PMU (Power Mengement Unit) implementation device tree based,
->> there are few offsets related with SYSREG present in regs-pmu.h, so let's
->> make a new header file "regs-sys.h" to keep all such SYSREG related
->> register definition and remove them from "regs-pmu.h"
->>
->> Signed-off-by: Young-Gun Jang <yg1004.jang@samsung.com>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   arch/arm/mach-exynos/exynos.c   |    1 +
->>   arch/arm/mach-exynos/pm.c       |    1 +
->>   arch/arm/mach-exynos/regs-pmu.h |    3 ---
->>   arch/arm/mach-exynos/regs-sys.h |   22 ++++++++++++++++++++++
->>   4 files changed, 24 insertions(+), 3 deletions(-)
->>   create mode 100644 arch/arm/mach-exynos/regs-sys.h
-> [...]
->> diff --git a/arch/arm/mach-exynos/regs-sys.h b/arch/arm/mach-exynos/regs-sys.h
->> new file mode 100644
->> index 0000000..84332b0
->> --- /dev/null
->> +++ b/arch/arm/mach-exynos/regs-sys.h
->> @@ -0,0 +1,22 @@
->> +/*
->> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
->> + *             http://www.samsung.com
->> + *
->> + * EXYNOS - system register definition
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#ifndef __ASM_ARCH_REGS_SYS_H
->> +#define __ASM_ARCH_REGS_SYS_H __FILE__
->> +
->> +#include <mach/map.h>
->> +
->> +#define S5P_SYSREG(x)                          (S3C_VA_SYS + (x))
->> +
->> +/* For EXYNOS5 */
->> +#define EXYNOS5_SYS_I2C_CFG                    S5P_SYSREG(0x0234)
-> Can this be defined as a regular register offset in a header file
-> placed at include/linux/mfd/syscon/ ? I.e. can the mfd syscon driver be
-> used instead of these hacks ?
->
-No. As currently SysRegs are being accessed via iodesc table and not via DT,
-it has dependency on "mach/map.h".
-We separated these definitions from "regs-pmu.h" as it does not belong to EXYNOS 
-PMU IP.
-But this can be done once we make some way of accessing SysReg register sets via DT.
+Hi Sachin,
 
--- 
+On 04/11/2014 12:56 PM, Sachin Kamat wrote:
+> Hi Chanwoo,
+> 
+> On 10 April 2014 15:07, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
+>> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
+>> dual cores and has a target speed of 1.0GHz.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
+>>  arch/arm/mach-exynos/exynos.c            |  1 +
+>>  arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
+>>  3 files changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>> index fc8bf18..6da8a68 100644
+>> --- a/arch/arm/mach-exynos/Kconfig
+>> +++ b/arch/arm/mach-exynos/Kconfig
+>> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
+>>
+>>  menu "SAMSUNG EXYNOS SoCs Support"
+>>
+>> +config ARCH_EXYNOS3
+>> +       bool "SAMSUNG EXYNOS3"
+>> +       select ARM_AMBA
+>> +       select CLKSRC_OF
+>> +       select HAVE_ARM_SCU if SMP
+>> +       select HAVE_SMP
+>> +       select PINCTRL
+>> +       select PM_GENERIC_DOMAINS if PM_RUNTIME
+>> +       help
+>> +         Samsung EXYNOS3 SoCs based systems
+>> +
+>>  config ARCH_EXYNOS4
+>>         bool "SAMSUNG EXYNOS4"
+>>         default y
+>> @@ -41,6 +52,17 @@ config ARCH_EXYNOS5
+>>
+>>  comment "EXYNOS SoCs"
+>>
+>> +config SOC_EXYNOS3250
+>> +       bool "SAMSUNG EXYNOS3250"
+>> +       default y
+>> +       depends on ARCH_EXYNOS3
+>> +       select ARCH_HAS_BANDGAP
+>> +       select ARM_CPU_SUSPEND if PM
+>> +       select PINCTRL_EXYNOS
+>> +       select SAMSUNG_DMADEV
+>> +       help
+>> +         Enable EXYNOS3250 CPU support
+> 
+> There is a Kconfig consolidation patch submitted by me [1]. Please base your
+> code on that one to avoid merge conflicts.
+> 
+> [1] http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
+> 
+
+Your patch is applied? I can't find merged patch on linux-samsung.git and arm-soc.git.
+If this patch is applied, I will rebase this patchset. Thanks.
+
 Best Regards,
-Pankaj Dubey
+Chanwoo Choi
