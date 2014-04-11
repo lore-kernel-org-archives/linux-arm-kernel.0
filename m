@@ -1,43 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 Apr 2014 13:09:08 +0100
-Subject: [PATCH v4 1/9] mfd: AXP20x: Add mfd driver for AXP20x PMIC
-In-Reply-To: <235623053.nj0gFkxyW5@wuerfel>
-References: <1397209093-10077-1-git-send-email-carlo@caione.org>
- <1397209093-10077-2-git-send-email-carlo@caione.org>
- <235623053.nj0gFkxyW5@wuerfel>
-Message-ID: <20140411120908.GC28800@sirena.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 11 Apr 2014 09:09:39 -0300
+Subject: [PATCH] ARM: dts: imx6sl-evk: Add an entry for
+ MX6SL_PAD_ECSPI1_SS0__GPIO4_IO11
+Message-ID: <1397218179-3533-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 01:25:03PM +0200, Arnd Bergmann wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> Why do you have to enumerate the interrupts here? Can't you just
-> put all the numbers into the DT nodes of the devices using them?
+In case the bootloader has incorrectly configured the ALT mode of 
+MX6SL_PAD_ECSPI1_SS0 pad, we end up with the following probe error:
 
-> In general, I would say that the mfd driver should not care about
-> what is connected to it.
+m25p80 spi0.0: found mr25h256, expected m25p32
+m25p80 spi0.0: mr25h256 (32 Kbytes)
 
-This then means that all the machines using the device need to define
-the interrupt table and have the MFD cells represented in the DT which
-means encoding Linux abstractions into the DT.
+In order to avoid this issue, add an entry for MX6SL_PAD_ECSPI1_SS0 pad, so
+that kernel configures the ECSPI chip select as GPIO functionality, which
+results in correct SPI NOR probe.
 
-In cases where the device is also used with ACPI or platform data that's
-a definite issue since they have different idioms.  That applies less to
-PMICs tightly bound to particular SoCs but is an issue in general, not
-all the world is DT.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-evk.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-There's also issues here with us changing our subsystems.  Things like
-clocks are a bit indistinct at present, they're sort of floating between
-clock and other subsystems.  We've also done things like invent extcon,
-making completely new subdevices.  Keeping the data out of DT avoids
-problems when this happens.  The balance changes a bit if there are
-clearly reusable IPs within the device but sadly hardware designers
-don't always give us that and even then sometimes we don't want to use
-them like that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/a6e837c1/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 864d8df..a8d9a93 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -282,6 +282,7 @@
+ 				MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO	0x100b1
+ 				MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI	0x100b1
+ 				MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK	0x100b1
++				MX6SL_PAD_ECSPI1_SS0__GPIO4_IO11	0x80000000
+ 			>;
+ 		};
+ 
+-- 
+1.8.3.2
