@@ -1,23 +1,23 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 11 Apr 2014 08:54:44 -0700
-Subject: [PATCH 3/6] ARM: dts: zynq: drop address cells from GIC node
-In-Reply-To: <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
-References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
- <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
-Message-ID: <f0de762f-56b3-4894-aa78-7ca3c88b9e28@AM1EHSMHS004.ehs.local>
+From: neil@fatboyfat.co.uk (Neil Greatorex)
+Date: Fri, 11 Apr 2014 16:57:04 +0100 (BST)
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <20140411163228.4214645c@skate>
+References: <20140410181953.50ccfcc3@skate> <20140411163228.4214645c@skate>
+Message-ID: <alpine.DEB.2.10.1404111653030.24288@vroombuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-04-11 at 04:59PM +0200, Lucas Stach wrote:
-> This is likely a copy-and-paste error from the
-> ARM GIC documentation, that has already been fixed.
-> 
-> address-cells should have been set to 0, as with the size
-> cells. As having those properties set to 0 is the
-> same thing as not specifying them, drop them completely.
+Thomas,
 
-Isn't this property inherited from the parent node, requiring to
-actually set them to 0 to comply with the docs?
+On Fri, 11 Apr 2014, Thomas Petazzoni wrote:
 
-	Thanks,
-	S?ren
+> Can everybody test these patches, and confirm that they solve all the
+> outstanding problems?
+
+PCIe now works well for me on my Mirabox / i350 combination with this 
+patch set. Thanks!
+
+Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
+
+Cheers,
+Neil
