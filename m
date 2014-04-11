@@ -1,45 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Apr 2014 10:12:30 +0200
-Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
-In-Reply-To: <53479545.4050707@samsung.com>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <53478C75.60302@samsung.com> <53479545.4050707@samsung.com>
-Message-ID: <4735652.2Yh9suVdiT@wuerfel>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Fri, 11 Apr 2014 10:12:59 +0200
+Subject: [PATCH RESEND 4/5] Documentation: add the Marvell Berlin pinctrl
+ documentation
+In-Reply-To: <20140411143318.67e55a17@xhacker>
+References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397135274-10764-5-git-send-email-antoine.tenart@free-electrons.com>
+ <20140411143318.67e55a17@xhacker>
+Message-ID: <20140411081259.GA20147@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 April 2014 16:09:57 Chanwoo Choi wrote:
-> On 04/11/2014 03:32 PM, Chanwoo Choi wrote:
-> >>>  
-> >>> +#if defined(CONFIG_SOC_EXYNOS3250)
-> >>> +# define soc_is_exynos3250()    is_samsung_exynos3250()
-> >>> +#else
-> >>> +# define soc_is_exynos3250()    0
-> >>> +#endif
-> >>
-> >> In general, I think we have too much code littered with soc_is_<foo>() going
-> >> on, so please try to avoid adding more for this SoC. Especially in cases where
-> >> you just want to bail out of certain features where we might already have
-> >> function pointers to control if a function is called or not, such as the
-> >> firmware interfaces.
-> >>
-> > 
-> > Do you prefer dt helper function such as following function instead of new soc_is_xx() ?
-> > - of_machine_is_compatible("samsung,exynos3250")
-> > 
+Hi Jisheng,
+
+On Fri, Apr 11, 2014 at 02:33:18PM +0800, Jisheng Zhang wrote:
+> On Thu, 10 Apr 2014 06:07:53 -0700
+> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+> > +Required subnode-properties:
+> > +- berlin,group: a string describing the group's name.
+> > +- berlin,function: the function used to mux the group.
 > 
-> I think of_machine_is_compatible() is not proper alternative method.
-> of_machine_is_compatible can be only used if CONFIG_OF is enabled.
-> 
+> Would it be better to s/function/mode? Because in mrvl internal technology
+> discussion and docs, we usually say "set pinmux Gy as mode z".
 
-CONFIG_OF is enabled by definition, that wouldn't be a problem. However,
-of_machine_is_compatible() doesn't solve the problem that Olof mentioned,
-you still make runtime-decisions based on the SoC ID, which you should not.
+The pinctrl framework uses 'function', so I guess it's better not to introduce
+an other keyword that may confuse people. But I agree this is not what's used in
+the Marvell's docs. What do you think about we mention it in this documentation ?
 
-Instead, the code should be restructured so it doesn't have to know which
-SoC is being used. If some machines work differently from others, that should
-be local knowledge within the device driver, and it can use for instance
-a DT property of the device node that describes the register set the driver
-is using.
+Thanks for the feedback !
 
-	Arnd
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
