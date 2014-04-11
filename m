@@ -1,48 +1,45 @@
-From: sdu.liu@huawei.com (Liu Hua)
-Date: Fri, 11 Apr 2014 16:00:51 +0800
-Subject: [PATCH v2 1/2] ARM : DMA : remove useless information about DMA
-In-Reply-To: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
-References: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
-Message-ID: <1397203252-22977-2-git-send-email-sdu.liu@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Apr 2014 10:12:30 +0200
+Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
+In-Reply-To: <53479545.4050707@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <53478C75.60302@samsung.com> <53479545.4050707@samsung.com>
+Message-ID: <4735652.2Yh9suVdiT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because commit e9da6e9905e6 has remove custom consistent dma
-region. So the related variable and document should be removed
+On Friday 11 April 2014 16:09:57 Chanwoo Choi wrote:
+> On 04/11/2014 03:32 PM, Chanwoo Choi wrote:
+> >>>  
+> >>> +#if defined(CONFIG_SOC_EXYNOS3250)
+> >>> +# define soc_is_exynos3250()    is_samsung_exynos3250()
+> >>> +#else
+> >>> +# define soc_is_exynos3250()    0
+> >>> +#endif
+> >>
+> >> In general, I think we have too much code littered with soc_is_<foo>() going
+> >> on, so please try to avoid adding more for this SoC. Especially in cases where
+> >> you just want to bail out of certain features where we might already have
+> >> function pointers to control if a function is called or not, such as the
+> >> firmware interfaces.
+> >>
+> > 
+> > Do you prefer dt helper function such as following function instead of new soc_is_xx() ?
+> > - of_machine_is_compatible("samsung,exynos3250")
+> > 
+> 
+> I think of_machine_is_compatible() is not proper alternative method.
+> of_machine_is_compatible can be only used if CONFIG_OF is enabled.
+> 
 
-Signed-off-by: Liu Hua <sdu.liu@huawei.com>
----
- Documentation/arm/memory.txt  | 4 ----
- arch/arm/include/asm/memory.h | 2 --
- 2 files changed, 6 deletions(-)
+CONFIG_OF is enabled by definition, that wouldn't be a problem. However,
+of_machine_is_compatible() doesn't solve the problem that Olof mentioned,
+you still make runtime-decisions based on the SoC ID, which you should not.
 
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 4bfb9ff..8a361c0 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -44,10 +44,6 @@ fffe0000	fffe7fff	ITCM mapping area for platforms with
- fff00000	fffdffff	Fixmap mapping region.  Addresses provided
- 				by fix_to_virt() will be located here.
- 
--ffc00000	ffefffff	DMA memory mapping region.  Memory returned
--				by the dma_alloc_xxx functions will be
--				dynamically mapped here.
--
- ff000000	ffbfffff	Reserved for future expansion of DMA
- 				mapping region.
- 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 02fa255..2b75146 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -83,8 +83,6 @@
-  */
- #define IOREMAP_MAX_ORDER	24
- 
--#define CONSISTENT_END		(0xffe00000UL)
--
- #else /* CONFIG_MMU */
- 
- /*
--- 
-1.9.0
+Instead, the code should be restructured so it doesn't have to know which
+SoC is being used. If some machines work differently from others, that should
+be local knowledge within the device driver, and it can use for instance
+a DT property of the device node that describes the register set the driver
+is using.
+
+	Arnd
