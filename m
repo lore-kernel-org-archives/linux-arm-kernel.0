@@ -1,45 +1,35 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 11 Apr 2014 11:26:54 +0200
-Subject: [linux-sunxi] Re: [PATCH v3 01/10] mfd: AXP20x: Add mfd driver
- for AXP20x PMIC
-In-Reply-To: <20140328092154.GF17779@lee--X1>
-References: <1395955764-18103-1-git-send-email-carlo@caione.org>
- <1395955764-18103-2-git-send-email-carlo@caione.org>
- <20140328092154.GF17779@lee--X1>
-Message-ID: <CAOQ7t2a4FbkuboTJWT=rpAVnq6a_mo7j58Dr9Rkg_yiHCuzbBQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 11 Apr 2014 10:28:56 +0100
+Subject: [PATCH v4 2/3] rtc: Add APM X-Gene SoC RTC driver
+In-Reply-To: <CAPw-ZTns1EOT0inn0hq0Xh+CdjMkxhOkvL+_BnRThnm7HQC=BQ@mail.gmail.com>
+References: <1397155678-26607-1-git-send-email-lho@apm.com>
+ <1397155678-26607-2-git-send-email-lho@apm.com>
+ <1397155678-26607-3-git-send-email-lho@apm.com>
+ <20140410224244.GH6518@sirena.org.uk>
+ <CAPw-ZTns1EOT0inn0hq0Xh+CdjMkxhOkvL+_BnRThnm7HQC=BQ@mail.gmail.com>
+Message-ID: <20140411092856.GL6518@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 28, 2014 at 10:21 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Apr 10, 2014 at 09:22:43PM -0700, Loc Ho wrote:
 
-[...]
+> I was modeled after driver rtc-coh901331.c. It seems like all I need
+> here is to call clk_disable_unprepare() instead clk_disable for
+> suspend. For resume, call clk_prepare_disable() instead clk_enable().
+> No need to split them up. Am I correct?
 
->> +static struct resource axp20x_pek_resources[] = {
->> +     {
->> +             .name   = "PEK_DBR",
->> +             .start  = AXP20X_IRQ_PEK_RIS_EDGE,
->> +             .end    = AXP20X_IRQ_PEK_RIS_EDGE,
->> +             .flags  = IORESOURCE_IRQ,
->> +     }, {
->> +             .name   = "PEK_DBF",
->> +             .start  = AXP20X_IRQ_PEK_FAL_EDGE,
->> +             .end    = AXP20X_IRQ_PEK_FAL_EDGE,
->> +             .flags  = IORESOURCE_IRQ,
->> +     },
->> +};
->
-> Have you considered doing this in the Device Tree? It's a lot less
-> code/overhead.
+Yes, the only reason the two operations are split is to support enabling
+and disabling in interrupt context but you're not doing that.
 
-Hi Lee,
-in v4 (I will send it soon) I left this code in since the resources
-are well managed by the MFD core and adding it in the DT results in
-pretty much the same code/overhead (atm the input device is not
-present in the DT).
-If you really think that it is the case to move the code in the DT,
-please comment it in the v4.
+> Given that Andrew Morton applied v2, should I post an patch against v2
+> going forward?
 
-Thanks,
-
--- 
-Carlo Caione
+Yes, once something has been applied you should only be sending
+incremental patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/f3325293/attachment.sig>
