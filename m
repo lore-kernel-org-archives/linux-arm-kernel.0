@@ -1,35 +1,56 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 11 Apr 2014 11:24:58 -0700
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Fri, 11 Apr 2014 20:25:59 +0200
 Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
  cache flushing
-In-Reply-To: <20140411.141911.2103972187575537634.davem@davemloft.net>
-References: <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
- <20140411.140213.521479030434404328.davem@davemloft.net>
- <CA+55aFwPR1XLRKiYya5wwxwbdnA_qiB4fZPL0i7+L4mpmzk5qA@mail.gmail.com>
- <20140411.141911.2103972187575537634.davem@davemloft.net>
-Message-ID: <CA+55aFwDKOs2XXVCsCi_tCSVTHt93uqzv-0qGEzRW6rCk0h9rw@mail.gmail.com>
+In-Reply-To: <20140411.140044.1787758980997246871.davem@davemloft.net>
+References: <20140411153041.GQ16119@n2100.arm.linux.org.uk>
+ <20140411172456.GA20506@redhat.com> <20140411173853.GA21370@redhat.com>
+ <20140411.140044.1787758980997246871.davem@davemloft.net>
+Message-ID: <20140411182559.GA23105@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 11:19 AM, David Miller <davem@davemloft.net> wrote:
+On 04/11, David Miller wrote:
 >
-> The vm_flags check is about "could it have gotten into the I-cache
-> via this VMA".
+> From: Oleg Nesterov <oleg@redhat.com>
+> Date: Fri, 11 Apr 2014 19:38:53 +0200
+>
+> > And perhaps the patch is not complete. "if (vma)" is not enough, a probed
+> > task can mmap something else at this vaddr.
+> >
+> > copy_to_user_page() should only change the contents of area->page, so memcpy
+> > should be fine. But I am not sure that flush_icache_user_range() or
+> > flush_ptrace_access() is always safe on every arch if "struct page *page"
+> > doesn't match vma.
+>
+> The architectures want the VMA for two reasons:
+>
+> 1) To get at the 'mm'.  The 'mm' is absolutely essential so that we can look
+>    at the MM cpumask and therefore determine what cpus this address space has
+>    executed upon, and therefore what cpus need the flush broadcast to.
+>
+> 2) To determine if the VMA is executable, in order to avoid the I-cache flush
+>    if possible.
 
-.. and that's obviously complete bullshit and wrong. Which is my point.
+Yes, thanks, this is clear.
 
-Now, it's possible that doing things right is just too much work for
-architectures that don't even matter, but dammit, it's still wrong. If
-you change a page, and it's executably mapped into some other vma, the
-icache is possibly stale there. The whole _point_ of our cache
-flushing is to make caches coherent, and anything that uses "vma" to
-do so is *wrong*.
+> I think you can get at the 'mm' trivially in this uprobes path,
 
-So your argument makes no sense. You're just re-stating that "it's
-wrong", but you're re-stating it in a way that makes it sounds like it
-could be right.
+sure, it is always current->mm.
 
-The "this page has been mapped executably" approach, in contrast, is
-*correct*. It has a chance in hell of actually making caches coherent.
+> and we can just
+> as well assume that the VMA is executable since this thing is always writing
+> instructions.
 
-             Linus
+yes.
+
+> So we could create a __copy_to_user_page() that takes an 'mm' and a boolean
+> 'executable' which uprobes could unconditionally set true, and copy_to_user_page()
+> would then be implemented in terms of __copy_to_user_page().
+
+This needs a lot of per-arch changes. Plus, it seems, in general VM_EXEC
+is not the only thing __copy_to_user_page() should take into account...
+
+But at least we are starting to agree that we need something else ;)
+
+Oleg.
