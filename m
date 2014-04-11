@@ -1,22 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 11 Apr 2014 09:11:23 -0300
-Subject: Wrong SPI NOR model detected by mx6sl
-In-Reply-To: <201404111359.26723.marex@denx.de>
-References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
- <20140411002635.GB3837@localhost.localdomain>
- <CAOMZO5CzMyB=boSO+1QeJbw0yYsa1mME-sMVb6yocJAfnErksA@mail.gmail.com>
- <201404111359.26723.marex@denx.de>
-Message-ID: <CAOMZO5D37M0zNaYp8OWGrvKkfih-qMw=O9JSs5Tj60ZGPbuMAQ@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 11 Apr 2014 14:15:52 +0200
+Subject: [PATCH] ARM: dts: imx6sl-evk: Add an entry for
+ MX6SL_PAD_ECSPI1_SS0__GPIO4_IO11
+In-Reply-To: <1397218179-3533-1-git-send-email-festevam@gmail.com>
+References: <1397218179-3533-1-git-send-email-festevam@gmail.com>
+Message-ID: <201404111415.52225.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 8:59 AM, Marek Vasut <marex@denx.de> wrote:
->
-> This means there's also a pinmux issue in kernel, did you fix it in kernel as
-> well please ?
+On Friday, April 11, 2014 at 02:09:39 PM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> In case the bootloader has incorrectly configured the ALT mode of
+> MX6SL_PAD_ECSPI1_SS0 pad, we end up with the following probe error:
+> 
+> m25p80 spi0.0: found mr25h256, expected m25p32
+> m25p80 spi0.0: mr25h256 (32 Kbytes)
+> 
+> In order to avoid this issue, add an entry for MX6SL_PAD_ECSPI1_SS0 pad, so
+> that kernel configures the ECSPI chip select as GPIO functionality, which
+> results in correct SPI NOR probe.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6sl-evk.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts
+> b/arch/arm/boot/dts/imx6sl-evk.dts index 864d8df..a8d9a93 100644
+> --- a/arch/arm/boot/dts/imx6sl-evk.dts
+> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+> @@ -282,6 +282,7 @@
+>  				MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO	0x100b1
+>  				MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI	0x100b1
+>  				MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK	0x100b1
+> +				MX6SL_PAD_ECSPI1_SS0__GPIO4_IO11	
+0x80000000
 
-Just sent the patch.
+Doesn't 0x80000000 mean "do not configure this pin, leave it as it was 
+configured before" ?
 
-Regards,
-
-Fabio Estevam
+Best regards,
+Marek Vasut
