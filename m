@@ -1,39 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 11 Apr 2014 18:09:46 +0000 (UTC)
-Subject: [PATCH] ARM: AM33xx: hwmod: Add INIT_NO_IDLE flag for debugss
- hwmod
-In-Reply-To: <alpine.DEB.2.02.1404111800430.14347@utopia.booyaka.com>
-References: <1397022467-6166-1-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1404111800430.14347@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1404111807210.14347@utopia.booyaka.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 11 Apr 2014 11:11:33 -0700
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140411.140213.521479030434404328.davem@davemloft.net>
+References: <20140411153041.GQ16119@n2100.arm.linux.org.uk>
+ <20140411172456.GA20506@redhat.com>
+ <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
+ <20140411.140213.521479030434404328.davem@davemloft.net>
+Message-ID: <CA+55aFwPR1XLRKiYya5wwxwbdnA_qiB4fZPL0i7+L4mpmzk5qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Apr 2014, Paul Walmsley wrote:
+On Fri, Apr 11, 2014 at 11:02 AM, David Miller <davem@davemloft.net> wrote:
+>
+> It's not enough, we need to have the 'mm' so we can know what cpu's this
+> address space has executed upon, and therefore what cpus need the broadcast
+> flush.
 
-> On Wed, 9 Apr 2014, Lokesh Vutla wrote:
-> 
-> > During boot, when hwmod tries to cut clocks for debugss it always
-> > gets stuck in transition state and throws the following warning:
-> > 
-> > [    0.139581] omap_hwmod: debugss: _wait_target_disable failed
-> > 
-> > As per the information provided by folks, clocks to debugss cannot be cut.
-> > So adding HWMOD_INIT_NO_IDLE flag to debugss hwmod.
-> > 
-> > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> 
-> Thanks, queued for v3.15-rc.
+Ok. But still, it shouldn't need "vma".
 
-Hmmm.  On second thought, this doesn't look like the right fix.  Could 
-you please comment on the issues raised here:
+> See my other reply, we can just make a __copy_to_user_page() that takes 'mm'
+> and a boolean 'executable' which uprobes can unconditionally pass as true.
 
-https://patchwork.kernel.org/patch/2212111/
+Sure, that doesn't look disgusting. That said, I thought at least one
+architecture (powerpc) did more than just check the executable bit: I
+think somebody actually does a page-per-page "has this been mapped
+executably" thing because their icache flush is *so* expensive. So
+that boolean "executable" bit is potentially architecture-specific.
 
-Looks to me like there should be at least one device driver, either for 
-the entire DEBUGSS, or for the individual IP blocks inside the DEBUGSS.
+And quite frankly, using the "vma->vm_flags" sounds potentially
+*incorrect* to me, since it really isn't about the vma. If you change
+a page through a non-executable vma, you'd want to flush the icache
+entry for that page mapped in a totally different vma. So I really get
+the feeling that passing in "vma" is actively *wrong*. The vma
+interface really makes little to no sense.
 
-Dropping this patch for now.
+Hmm?
 
-
-- Paul
+            Linus
