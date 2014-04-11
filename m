@@ -1,44 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 Apr 2014 17:31:21 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <20140411112500.GM27282@n2100.arm.linux.org.uk>
-References: <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
- <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
- <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
- <53469C29.8050906@ti.com> <20140410134028.GL27282@n2100.arm.linux.org.uk>
- <53477EC5.5080400@ti.com> <20140411112500.GM27282@n2100.arm.linux.org.uk>
-Message-ID: <5347D991.1030004@ti.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 11 Apr 2014 14:03:06 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 1/9] mfd: AXP20x: Add mfd driver for
+ AXP20x PMIC
+In-Reply-To: <235623053.nj0gFkxyW5@wuerfel>
+References: <1397209093-10077-1-git-send-email-carlo@caione.org>
+ <1397209093-10077-2-git-send-email-carlo@caione.org>
+ <235623053.nj0gFkxyW5@wuerfel>
+Message-ID: <CAOQ7t2bkshF3C0=R-fx1=u379txBN1gXOTUocBSwTkLonk-rnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 April 2014 04:55 PM, Russell King - ARM Linux wrote:
-> On Fri, Apr 11, 2014 at 11:03:57AM +0530, Sekhar Nori wrote:
->> Here is a revised patch which is just an extension of your patch 
->> with L2C-220 case handled. I dont really have L2C-220 hardware so even 
->> if you want to handle that at a later time, it would be perfectly okay 
->> with me.
-> 
-> This is what I came up with, which of course is very similar to yours.
-> I think the only difference is that I'm allowing the state of the NS
-> access bits to be preserved by the OMAP code, getting OMAP closer to
-> the target of a ~0 mask.  The only bits which are clear in the mask
-> passed into the L2 code by OMAP now are:
+On Fri, Apr 11, 2014 at 1:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 11 April 2014 11:38:05 Carlo Caione wrote:
+>> +#define AXP20X_IRQ(_irq, _off, _mask) \
+>> +       [AXP20X_IRQ_##_irq] = { .reg_offset = (_off), .mask = BIT(_mask) }
+>> +
+>> +static const struct regmap_irq axp20x_regmap_irqs[] = {
+>> +       AXP20X_IRQ(ACIN_OVER_V,         0, 7),
+>> +       AXP20X_IRQ(ACIN_PLUGIN,         0, 6),
+>> +       AXP20X_IRQ(ACIN_REMOVAL,        0, 5),
+>> +       AXP20X_IRQ(VBUS_OVER_V,         0, 4),
+>> +       AXP20X_IRQ(VBUS_PLUGIN,         0, 3),
+>> +       AXP20X_IRQ(VBUS_REMOVAL,        0, 2),
+>> +       AXP20X_IRQ(VBUS_V_LOW,          0, 1),
+>> +       AXP20X_IRQ(BATT_PLUGIN,         1, 7),
+>> +       AXP20X_IRQ(BATT_REMOVAL,        1, 6),
+>> +       AXP20X_IRQ(BATT_ENT_ACT_MODE,   1, 5),
+>> +       AXP20X_IRQ(BATT_EXIT_ACT_MODE,  1, 4),
+>> +       AXP20X_IRQ(CHARG,               1, 3),
+>> +       AXP20X_IRQ(CHARG_DONE,          1, 2),
+>> +       AXP20X_IRQ(BATT_TEMP_HIGH,      1, 1),
+>
+> Why do you have to enumerate the interrupts here? Can't you just
+> put all the numbers into the DT nodes of the devices using them?
+>
+> In general, I would say that the mfd driver should not care about
+> what is connected to it.
 
-Thanks for sending the patch. I will use it to rebase the $subject
-series against.
+I need this for the regmap irq chip (to be used in regmap_add_irq_chip()).
+I'm not sure if you are suggesting to get rid of the irq chip.
 
-> 
-> - L310_AUX_CTRL_INSTR_PREFETCH
-> - L310_AUX_CTRL_DATA_PREFETCH
-> - L310_AUX_CTRL_CACHE_REPLACE_RR
-> - L2C_AUX_CTRL_SHARED_OVERRIDE
-> - L2C_AUX_CTRL_PARITY_ENABLE
-> 
-> It sounds like we can kill L310_AUX_CTRL_CACHE_REPLACE_RR as well since
-> that's already set for us (and fwir is the power-on-reset default too.)
+br,
 
-Thanks right.
-
-Thanks,
-Sekhar
+-- 
+Carlo Caione
