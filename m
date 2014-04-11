@@ -1,32 +1,73 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 11 Apr 2014 13:50:33 +0900
-Subject: [PATCH 15/27] ARM: dts: exynos3250: Add uart dt node to support
- seiral ports
-In-Reply-To: <CAK9yfHxdeJarGCYgLADpxYS3BtxLt6hg0NJBrdYqrcKctFqU1g@mail.gmail.com>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <1397124377-16969-7-git-send-email-cw00.choi@samsung.com>
- <CAK9yfHxdeJarGCYgLADpxYS3BtxLt6hg0NJBrdYqrcKctFqU1g@mail.gmail.com>
-Message-ID: <53477499.3030901@samsung.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 11 Apr 2014 15:01:09 +1000
+Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
+In-Reply-To: <6459805.ygy4tBNDNz@wuerfel>
+References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
+ <6144916.rD76jOL8sv@wuerfel>
+ <20140410145304.GS985@e106497-lin.cambridge.arm.com>
+ <6459805.ygy4tBNDNz@wuerfel>
+Message-ID: <1397192469.19518.11.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2014-04-10 at 22:46 +0200, Arnd Bergmann wrote:
 
-On 04/11/2014 01:03 PM, Sachin Kamat wrote:
-> On 10 April 2014 15:36, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch add UART dt node for Exynos3250. Exynos3250 uses same UART IP
->> of Exynos4 SoC and has only two independent channels.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> [Fix incorrect clock id by Tomasz Figa]
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
+> Half of it ;-)
 > 
-> typo in patch subject: s/seiral/serial
+> I think it would be better to not have an architecture specific data
+> structure, just like it would be better not to have architecture specific
+> pcibios_* functions that get called by the PCI core. Note that the
+> architecture specific functions are the ones that rely on the architecture
+> specific data structures as well. If they only use the common fields,
+> it should also be possible to share the code.
+
+I don't understand... we'll never get rid of architecture specific hooks
+in one form or another.
+
+We'll always need to some things in an architecture or host-bridge
+specific way. Now if you don't want to call them arch hooks, then call
+them host bridge ops, but they are needed and thus they will need some
+kind of architecture specific extension to the base host bridge 
+structure.
+
+EEH is one big nasty example on powerpc.
+
+Another random one that happens to be hot in my brain right now because
+we just finished debugging it: On powernv, we are just fixing a series
+of bugs caused by the generic code trying to do hot resets on PCIe "by
+hand" by directly toggling the secondary reset register in bridges.
+
+Well, on our root complexes, this triggers a link loss which triggers
+a fatal EEH "ER_all" interrupt which we escalate into a fence and all
+hell breaks loose.
+
+We need to mask some error traps in the hardware before doing something
+that can cause an intentional link loss... and unmask them when done.
+(Among other things, there are other issues on P7 with hot reset).
+
+So hot reset must be an architecture hook.
+
+PERST (fundamental reset) can *only* be a hook. The way to generate a
+PERST is not specified. In fact, on our machines, we have special GPIOs
+we can use to generate PERST on individual slots below a PLX bridge
+and a different methods for slots directly on a PHB.
+
+Eventually most of those hooks land into firmware, and as such it's akin
+to ACPI which also keeps a separate state structure and a pile of hooks.
+
+> I also don't realistically think we can get there on a lot of architectures
+> any time soon. Note that most architectures only have one PCI host
+> implementation, so the architecture structure is the same as the host
+> driver structure anyway.
 > 
-
-I'll fix it. Thanks.
-
-Best Regards,
-Chanwoo Choi
+> For architectures like powerpc and arm that have people actively working
+> on them, we have a chance to clean up that code in the way we want it
+> (if we can agree on the direction), but it's still not trivial to do.
+> 
+> Speaking of arm32 in particular, I think we will end up with a split
+> approach: modern platforms (multiplatform, possibly all DT based) using
+> PCI core infrastructure directly and no architecture specific PCI
+> code on the one side, and a variation of today's code for the legacy
+> platforms on the other.
+> 
+> 	Arnd
