@@ -1,9 +1,9 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 Apr 2014 16:59:39 +0200
-Subject: [PATCH 5/6] ARM: dts: ste-dbx: drop address cells from GIC node
+Date: Fri, 11 Apr 2014 16:59:37 +0200
+Subject: [PATCH 3/6] ARM: dts: zynq: drop address cells from GIC node
 In-Reply-To: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
 References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1397228380-7352-5-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,20 +16,20 @@ same thing as not specifying them, drop them completely.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 1 -
+ arch/arm/boot/dts/zynq-7000.dtsi | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index e41eedca3ce3..c73414d3fe50 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -24,7 +24,6 @@
- 		intc: interrupt-controller at a0411000 {
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 511180769af5..3f277c2bc19c 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -57,7 +57,6 @@
+ 		intc: interrupt-controller at f8f01000 {
  			compatible = "arm,cortex-a9-gic";
  			#interrupt-cells = <3>;
 -			#address-cells = <1>;
  			interrupt-controller;
- 			reg = <0xa0411000 0x1000>,
- 			      <0xa0410100 0x100>;
+ 			reg = <0xF8F01000 0x1000>,
+ 			      <0xF8F00100 0x100>;
 -- 
 1.9.1
