@@ -1,37 +1,82 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 11 Apr 2014 16:40:26 +0200
-Subject: [PATCH] ARM: moxart: add select CLKSRC_OF to ARCH_MOXART
-Message-ID: <1397227226-20763-1-git-send-email-jonas.jensen@gmail.com>
+From: tthayer@altera.com (Thor Thayer)
+Date: Fri, 11 Apr 2014 09:49:53 -0500
+Subject: [PATCH 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
+References: <1396907649-20212-1-git-send-email-tthayer@altera.com>
+ <1396907649-20212-2-git-send-email-tthayer@altera.com>
+ <20140408133818.GB16054@pengutronix.de>
+ <1396967390.23349.15.camel@dinh-ubuntu>
+ <20140408143327.GC16054@pengutronix.de>
+ <CANk1AXR0bDENDV673M-AVXNWHmGuee5SGc+ZnPqdBdEBwJXQXQ@mail.gmail.com>
+ <CAL_JsqJRweynpCA7LMFU4wfa71XzjGC3b8H9XKJpogf5H93h_A@mail.gmail.com>
+Message-ID: <1397227793.3054.1.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLKSRC_OF was recently removed from options selected by
-ARCH_MULTIPLATFORM, breaking boot on MOXA ART SoCs.
+On Tue, 2014-04-08 at 13:52 -0500, Rob Herring wrote:
+> On Tue, Apr 8, 2014 at 11:02 AM, delicious quinoa
+> <delicious.quinoa@gmail.com> wrote:
+> > On Tue, Apr 8, 2014 at 9:33 AM, Steffen Trumtrar
+> > <s.trumtrar@pengutronix.de> wrote:
+> >> On Tue, Apr 08, 2014 at 09:29:50AM -0500, Thor Thayer wrote:
+> >>> On Tue, 2014-04-08 at 15:38 +0200, Steffen Trumtrar wrote:
+> >>> > Hi!
+> >>> >
+> >>> > On Mon, Apr 07, 2014 at 04:54:07PM -0500, tthayer at altera.com wrote:
+> >>> > > From: Thor Thayer <tthayer@altera.com>
+> >>> > >
+> >>> > > Addition of the Altera SDRAM controller bindings and device
+> >>> > > tree changes to the Altera SoC project.
+> >>> > >
+> >>> [snip]
+> >>> > > +
+> >>> > > +Required properties:
+> >>> > > +- compatible : "altr,sdr-ctl", "syscon";
+> >>> > > +                Note that syscon is invoked for this device to support the FPGA
+> >>> > > +         bridge driver, EDAC driver and other devices that share the
+> >>> > > +         registers.
+> >>> > > +- reg : Should contain 1 register ranges(address and length)
+> >>> >
+> >>> > I haven't really thought this through, but why would the FPGA bridge driver
+> >>> > access the sdram controller? For releasing the resets in fpgaportrst ? Or is
+> >>> > there more?
+> >>>
+> >>> Hi Steffan. No, not for resets. We need to enable the FPGA to SDRAM
+> >>> path. Our SDRAM controller allows FPGA master access to the SDRAM.
+> >>>
+> >>
+> >> Yes. But what you have to do to enable the path is let the FPGA port you use
+> >> out of reset. And that is it as far as I can see. The rest happens in the
+> >> bitstream. Or is there more to enable the path?
+> >> The FPGA2SDRAM bridge is the one I didn't use as of yet, so if I miss something
+> >> please elaborate.
+> >
+> > Hi Steffen,
+> >
+> > The sdram controller is used by two drivers.  That's why we want to
+> > specify "syscon" here.  The other driver is the FPGA bridge driver.
+> > Its functionality is very separate from what this driver is doing (we
+> > are not enabling the bridge in this driver; we are enabling the
+> > monitoring and resetting the interrupt bit of the EDAC).  We wanted to
+> > specify "syscon" her so that we don't have to have to change it for
+> > the other driver.
+> 
+> But are there actually overlapping registers which are accessed by
+> both drivers and need the protection of regmap?
+> 
+> Perhaps MFD is more appropriate than syscon?
 
-Add it to options selected by ARCH_MOXART.
+Hi Rob,
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+We are accessing bits in the SDRAM Controller's Configuration register which
+has other bits that configure the SDRAM controller. Since this main
+configuration register may be accessed by other drivers (more likely for
+reading the current SDRAM configuration setup than for writing), the
+syscon still seems like an appropriate use.
 
-Notes:
-    see "Merge tag 'cleanup-3.15' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc" dfc25e4503aef6b82a1de4a0fbe19aafa8648fbe
-    
-    Applies to next-20140409
+Thor
 
- arch/arm/mach-moxart/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
-index 82a4ba8..7b320c6 100644
---- a/arch/arm/mach-moxart/Kconfig
-+++ b/arch/arm/mach-moxart/Kconfig
-@@ -2,6 +2,7 @@ config ARCH_MOXART
- 	bool "MOXA ART SoC" if ARCH_MULTI_V4
- 	select CPU_FA526
- 	select ARM_DMA_MEM_BUFFERABLE
-+	select CLKSRC_OF
- 	select CLKSRC_MMIO
- 	select GENERIC_IRQ_CHIP
- 	select ARCH_REQUIRE_GPIOLIB
--- 
-1.8.2.1
+> 
+> Rob
