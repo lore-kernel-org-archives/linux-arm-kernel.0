@@ -1,34 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Apr 2014 17:00:29 +0100
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140411153249.GZ11096@twins.programming.kicks-ass.net>
-References: <20140409184507.GA1058@redhat.com>
- <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
- <5347655B.3080307@linaro.org>
- <20140411.003636.272212797007496394.davem@davemloft.net>
- <20140411145625.GA27493@redhat.com> <20140411152207.GA28188@redhat.com>
- <20140411153249.GZ11096@twins.programming.kicks-ass.net>
-Message-ID: <20140411160028.GR16119@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 11 Apr 2014 17:18:13 +0100
+Subject: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add AXP209 support to
+ various boards
+In-Reply-To: <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
+References: <1397209093-10077-8-git-send-email-carlo@caione.org>
+ <20140411122901.GE28800@sirena.org.uk>
+ <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
+Message-ID: <20140411161813.GF28800@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 05:32:49PM +0200, Peter Zijlstra wrote:
-> On Fri, Apr 11, 2014 at 05:22:07PM +0200, Oleg Nesterov wrote:
-> > And I am just curious, why arm's copy_to_user_page() disables premption
-> > before memcpy?
-> 
-> Without looking, I suspect its because the VIVT caches, they need to get
-> shot down on every context switch.
+On Fri, Apr 11, 2014 at 03:04:32PM +0200, Carlo Caione wrote:
+> On Fri, Apr 11, 2014 at 2:29 PM, Mark Brown <broonie@kernel.org> wrote:
 
-So... let's think about that for a moment... if we have a preemption event,
-then that's a context switch, which means...
+> >> +                             regulators {
+> >> +                                     compatible = "x-powers,axp20x-reg";
 
-No, this is obviously not the reason, because such an event on a fully
-VIVT system would result in the caches being flushed, meaning that we
-wouldn't need to do anything if we could be predicably preempted at that
-point.
+> > This compatible isn't part of the driver.
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> Yes I know. The problem here is that in v4 I had to fill in the field
+> .of_compatible of the mfd_cell with "x-powers,axp20x-reg". This
+> because the regulator_dev_lookup() checks for dev->of_node when
+> looking for the supply so I needed the compatible string in the DT to
+> have the dev->of_node filled in by mfd_add_device().
+> What do you suggest? Modify the regulator driver?
+
+You're looking for regulator_bulk_register_supply_alias() in the MFD
+driver (via parent_supplies in the MFD cell probably).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/7b11da57/attachment.sig>
