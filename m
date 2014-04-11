@@ -1,29 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 10 Apr 2014 19:24:25 -0500
-Subject: [PATCH] ARM: topology: Make it clear that all CPUs need to be
- described
-In-Reply-To: <20140410231808.GJ6518@sirena.org.uk>
-References: <1396016467-23257-1-git-send-email-broonie@kernel.org>
- <20140331093046.GA2245@e102568-lin.cambridge.arm.com>
- <CAL_JsqLj56d6Mb5Vjd4UnBvQ6myAc4j3moY+3EM9zgHxrNgHbw@mail.gmail.com>
- <20140410231808.GJ6518@sirena.org.uk>
-Message-ID: <CAL_Jsq+K-JrkzfsNqjwNgksgBL_M1v6BNSdXiMc+jN9JoD=X=g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Apr 2014 20:31:11 -0400 (EDT)
+Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
+In-Reply-To: <1442455.pP6sroyjMG@avalon>
+References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <alpine.LFD.2.11.1404091504240.28063@knanqh.ubzr> <1442455.pP6sroyjMG@avalon>
+Message-ID: <alpine.LFD.2.11.1404102024200.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 6:18 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Apr 10, 2014 at 06:01:31PM -0500, Rob Herring wrote:
->> On Mon, Mar 31, 2014 at 4:30 AM, Lorenzo Pieralisi
->
->> > Patch is ok with me, thanks:
->
->> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
->> Applied for 3.15.
->
-> Catalin already sent this to Linus I think unless I got my patches
-> confused.
+On Fri, 11 Apr 2014, Laurent Pinchart wrote:
 
-Yes, you're right.
+> On Wednesday 09 April 2014 15:05:26 Nicolas Pitre wrote:
+> > On Wed, 9 Apr 2014, Laurent Pinchart wrote:
+> > > Hello,
+> > > 
+> > > (Resending due to a typo in an e-mail address that caused LAKML to reject
+> > > the mails. Sorry about the noise.)
+> > > 
+> > > This patch set reworks Ezequiel Garcia's previous fix [1] of an out of
+> > > vmalloc space bug on PXA2[57]x platforms caused by an attempt to map the
+> > > start of physical uncached outside of the vmalloc space.
+> > > 
+> > > This first three patches perform a couple of cleanups, and the last patch
+> > > fixes the problem. I've decided to map the memory at address 0xfe000000 to
+> > > minimize changes to the code, but this causes a bit of fragmentation of
+> > > vmalloc space. I could map it to the very end of vmalloc space
+> > > (0xfef00000)
+> > > instead if preferred, which would involve replacing a mov by an ldr in
+> > > pxa2[57]x_finish_suspend and pm_enter_standby_start.
+> > > 
+> > > I've tested the patch set on a PXA270-based system.
+> > 
+> > For those patches:
+> > 
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+> Thank you.
+> 
+> MAINTAINERS lists three maintainers for the PXA architecture, and two git 
+> trees that seem to be either dead or even deleted. Who picks up patches for 
+> PXA ? Should I send a pull request ?
 
-Rob
+If no one else answers, then just send a pull request to the ARM-SOC 
+team (arm at kernel.org) and CC the linux-arm-kernel mailing list.
+
+
+Nicolas
