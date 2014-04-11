@@ -1,91 +1,140 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Fri, 11 Apr 2014 08:23:42 +0200
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <20140410234000.GA18443@obsidianresearch.com>
-References: <20140410181953.50ccfcc3@skate> <20140410171000.GF25890@1wt.eu>
- <20140410200222.27cab16e@skate> <20140410231336.GC30855@1wt.eu>
- <20140410234000.GA18443@obsidianresearch.com>
-Message-ID: <20140411062342.GG30855@1wt.eu>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 11 Apr 2014 15:32:21 +0900
+Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
+In-Reply-To: <20140411014650.GB14934@quad.lixom.net>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
+ <20140411014650.GB14934@quad.lixom.net>
+Message-ID: <53478C75.60302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Hi,
 
-On Thu, Apr 10, 2014 at 05:40:00PM -0600, Jason Gunthorpe wrote:
-> The windows are tied to the PCI core, not to the using driver
-> module. So they will only changed based on rescan an dynamic resource
-> assignment in the PCI core. PCI rescan has a 'memory' of the last
-> bridge windows and won't make dramtic changes, so expect the windows
-> to fairly sticky.
-
-OK.
-
-> > If we have to keep them forever, then maybe a further improvement
-> > will consist in merging adjacent windows which sum up as a power of
-> > two (eg: #10 and #11 may be merged).
+On 04/11/2014 10:46 AM, Olof Johansson wrote:
+> On Thu, Apr 10, 2014 at 06:37:12PM +0900, Chanwoo Choi wrote:
+>> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
+>> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
+>> dual cores and has a target speed of 1.0GHz.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
+>>  arch/arm/mach-exynos/exynos.c            |  1 +
+>>  arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
+>>  3 files changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>> index fc8bf18..6da8a68 100644
+>> --- a/arch/arm/mach-exynos/Kconfig
+>> +++ b/arch/arm/mach-exynos/Kconfig
+>> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
+>>  
+>>  menu "SAMSUNG EXYNOS SoCs Support"
+>>  
+>> +config ARCH_EXYNOS3
+>> +	bool "SAMSUNG EXYNOS3"
+>> +	select ARM_AMBA
+>> +	select CLKSRC_OF
+>> +	select HAVE_ARM_SCU if SMP
+>> +	select HAVE_SMP
+>> +	select PINCTRL
+>> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
+>> +	help
+>> +	  Samsung EXYNOS3 SoCs based systems
+>> +
+>>  config ARCH_EXYNOS4
+>>  	bool "SAMSUNG EXYNOS4"
+>>  	default y
+>> @@ -41,6 +52,17 @@ config ARCH_EXYNOS5
+>>  
+>>  comment "EXYNOS SoCs"
+>>  
+>> +config SOC_EXYNOS3250
+>> +	bool "SAMSUNG EXYNOS3250"
+>> +	default y
+>> +	depends on ARCH_EXYNOS3
+>> +	select ARCH_HAS_BANDGAP
+>> +	select ARM_CPU_SUSPEND if PM
+>> +	select PINCTRL_EXYNOS
+>> +	select SAMSUNG_DMADEV
+>> +	help
+>> +	  Enable EXYNOS3250 CPU support
+>> +
+>>  config CPU_EXYNOS4210
+>>  	bool "SAMSUNG EXYNOS4210"
+>>  	default y
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index b32a907..b134868 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -370,6 +370,7 @@ static void __init exynos_dt_machine_init(void)
+>>  }
+>>  
+>>  static char const *exynos_dt_compat[] __initconst = {
+>> +	"samsung,exynos3250",
 > 
-> 0x1b00000 - 0x1800000 = 0x300000 which is not a power of two..
+> Please consider samsung,exynos3 instead, so you don't have to update this table
+> for every SoC. We've talked about this before..
 
-Of course you're right. It was late last night, and I was having
-a hard time thinking the addresses were not inclusive so in my
-mind it was 0x18..0x1b inclusive, thus 4MB... Never mind.
+This patchset included only exynos3250.dtsi without exynos3.dtsi.
+So, I added only "samsung,exynos3250" compatible name.
 
-> > I tried to add a 3rd NIC in the mix (broadcom tg3), which caused the
-> > myri10ge to fail to load for an obscure reason after loading igb
-> > properly :
+Do you prefer to add SoC version as following?
++       "samsung,exynos3",
++       "samsung,exynos3250",
+
+or ?
++       "samsung,exynos3",
+
 > 
-> Oh, this looks a lot like what Thomas reported with his 5 NICs.
+>>  	"samsung,exynos4",
+>>  	"samsung,exynos4210",
+>>  	"samsung,exynos4212",
+>> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+>> index 5992b8d..3d808f6b 100644
+>> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+>> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+>> @@ -43,6 +43,9 @@ extern unsigned long samsung_cpu_id;
+>>  #define S5PV210_CPU_ID		0x43110000
+>>  #define S5PV210_CPU_MASK	0xFFFFF000
+>>  
+>> +#define EXYNOS3250_SOC_ID       0xE3472000
+>> +#define EXYNOS3_SOC_MASK        0xFFFFF000
+>> +
+>>  #define EXYNOS4210_CPU_ID	0x43210000
+>>  #define EXYNOS4212_CPU_ID	0x43220000
+>>  #define EXYNOS4412_CPU_ID	0xE4412200
+>> @@ -68,6 +71,7 @@ IS_SAMSUNG_CPU(s5p6440, S5P6440_CPU_ID, S5P64XX_CPU_MASK)
+>>  IS_SAMSUNG_CPU(s5p6450, S5P6450_CPU_ID, S5P64XX_CPU_MASK)
+>>  IS_SAMSUNG_CPU(s5pc100, S5PC100_CPU_ID, S5PC100_CPU_MASK)
+>>  IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
+>> +IS_SAMSUNG_CPU(exynos3250, EXYNOS3250_SOC_ID, EXYNOS3_SOC_MASK)
+>>  IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+>>  IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+>>  IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+>> @@ -126,6 +130,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>>  # define soc_is_s5pv210()	0
+>>  #endif
+>>  
+>> +#if defined(CONFIG_SOC_EXYNOS3250)
+>> +# define soc_is_exynos3250()    is_samsung_exynos3250()
+>> +#else
+>> +# define soc_is_exynos3250()    0
+>> +#endif
 > 
-> I really wonder what could be going on here.....
-
-I don't know but I have the hardware to easily reproduce it, if we want
-to add printks again.
-
-> > Ah, interestingly if I load the NICs in the opposite order, they all load
-> > properly (myri10ge, igb, r8169) :
+> In general, I think we have too much code littered with soc_is_<foo>() going
+> on, so please try to avoid adding more for this SoC. Especially in cases where
+> you just want to bail out of certain features where we might already have
+> function pointers to control if a function is called or not, such as the
+> firmware interfaces.
 > 
-> Load the NICs means insmod the driver ?
 
-Yes.
+Do you prefer dt helper function such as following function instead of new soc_is_xx() ?
+- of_machine_is_compatible("samsung,exynos3250")
 
-> That is repeatable?
+If you are OK, I'll use of_machine_is_compatible() instead of soc_is_xx().
 
-Yes, 100% it seems.
-
-> Certainly spooky, and suggests a kernel bug.....
-> 
-> It would be interesting to see what register values the driver is
-> getting back, is it all 0xF? 
-
-That's what I suspected from the -1, but since the driver says "or 16MB"
-and one of the windows is 16MB, I'm still confused, I need to add some
-printk there.
-
-> I wonder if something is going wrong with the config write to enable
-> the memory decoder. That is triggered by the driver...
-
-Thomas told me that the mbus driver is able to suggest a different
-start address for the PCI windows. Maybe we fall in this case and the
-driver doesn't expect this and uses a different register for the start
-address.
-
-> > So overall, it's a big Ack from my side considering the huge
-> > improvements, let's retry tomorrow with the link up workaround/fix
-> > to see if the detection issue is related. Great work!
-> 
-> Seems very likely to me, if the modified patch from Neil fixes it for
-> you too then we need to get that into mergable shape too!
-
-I can confirm that simply commenting out clk_disable_unprepare(clk)
-fixes this problem, so yes it's the same issue. Just tried Neil's
-modified patch and it works fine as well. So yes, we're making a lot
-of progress.
-
-Just in case anyone is interested, this is the NIC I'm using, both
-on the mirabox and on the XP-GP ; it was worth an acquisition
-considering how many corner cases it triggers in the kernel code :
-
-  http://www.jetway.com.tw/jw/ipcboard_view.asp?productid=873&proname=ADMPEIDLA
-
-Cheers,
-Willy
+Best Regards,
+Chanwoo Choi
