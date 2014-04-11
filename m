@@ -1,37 +1,78 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 11 Apr 2014 19:39:06 +0300
-Subject: [GIT PULL] remoteproc cleanups for 3.15
-Message-ID: <CAK=WgbYgnu38wGr3gGg_k5ULguQHYPitJyoyb-QO0z3CwCrAUw@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 11 Apr 2014 22:13:27 +0530
+Subject: [PATCH v2 03/14] dma: edma: Add support for DMA_PAUSE/RESUME
+ operation
+In-Reply-To: <1396357575-30585-4-git-send-email-peter.ujfalusi@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20140411164327.GD32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit cfbf8d4857c26a8a307fb7cd258074c9dcd8c691:
+On Tue, Apr 01, 2014 at 04:06:04PM +0300, Peter Ujfalusi wrote:
+> Pause/Resume can be used by the audio stack when the stream is paused/resumed
+> The edma platform code has support for this and the legacy audio stack used
+> this.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/edma.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 2742867fd1e6..7891378a03f0 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -240,6 +240,26 @@ static int edma_slave_config(struct edma_chan *echan,
+>  	return 0;
+>  }
+>  
+> +static int edma_dma_pause(struct edma_chan *echan)
+> +{
+> +	/* Pause/Resume only allowed with cyclic mode */
+> +	if (!echan->edesc->cyclic)
+> +		return -EINVAL;
+why this artificial restriction? The driver can do pause even for non cyclic
+cases too? Yes the usage is in cyclic context but why should we limit any future
+work on this?
 
-  Linux 3.14-rc4 (2014-02-23 17:40:03 -0800)
+-- 
+~Vinod
+> +
+> +	edma_pause(echan->ch_num);
+> +	return 0;
+> +}
+> +
+> +static int edma_dma_resume(struct edma_chan *echan)
+> +{
+> +	/* Pause/Resume only allowed with cyclic mode */
+> +	if (!echan->edesc->cyclic)
+> +		return -EINVAL;
+> +
+> +	edma_resume(echan->ch_num);
+> +	return 0;
+> +}
+> +
+>  static int edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>  			unsigned long arg)
+>  {
+> @@ -255,6 +275,14 @@ static int edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>  		config = (struct dma_slave_config *)arg;
+>  		ret = edma_slave_config(echan, config);
+>  		break;
+> +	case DMA_PAUSE:
+> +		ret = edma_dma_pause(echan);
+> +		break;
+> +
+> +	case DMA_RESUME:
+> +		ret = edma_dma_resume(echan);
+> +		break;
+> +
+>  	default:
+>  		ret = -ENOSYS;
+>  	}
+> -- 
+> 1.9.1
+> 
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-tags/remoteproc-3.15-cleanups
-
-for you to fetch changes up to bd88acba5f9809af48f66267bb16024b9e33cf2b:
-
-  remoteproc/ste_modem: staticize local symbols (2014-02-24 11:16:16 +0200)
-
-----------------------------------------------------------------
-Several remoteproc cleanup patches coming from Jingoo Han, Julia
-Lawall and Uwe Kleine-K?nig.
-
-----------------------------------------------------------------
-Jingoo Han (1):
-      remoteproc/ste_modem: staticize local symbols
-
-Julia Lawall (1):
-      remoteproc/davinci: simplify use of devm_ioremap_resource
-
-Uwe Kleine-K?nig (1):
-      remoteproc/davinci: drop needless devm_clk_put
-
- drivers/remoteproc/da8xx_remoteproc.c | 16 +---------------
- drivers/remoteproc/ste_modem_rproc.c  |  4 ++--
- 2 files changed, 3 insertions(+), 17 deletions(-)
+-- 
