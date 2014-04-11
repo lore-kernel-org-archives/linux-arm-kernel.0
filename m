@@ -1,36 +1,97 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 11 Apr 2014 17:18:13 +0100
-Subject: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add AXP209 support to
- various boards
-In-Reply-To: <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
-References: <1397209093-10077-8-git-send-email-carlo@caione.org>
- <20140411122901.GE28800@sirena.org.uk>
- <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
-Message-ID: <20140411161813.GF28800@sirena.org.uk>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Fri, 11 Apr 2014 18:22:43 +0200
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <CAA3XUr0b7W1K85f0kzvodNEpFjhK0XY8AVFTnYzAKOnvCY=JPw@mail.gmail.com>
+References: <20140409184507.GA1058@redhat.com>
+ <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
+ <5347655B.3080307@linaro.org>
+ <20140411.003636.272212797007496394.davem@davemloft.net>
+ <20140411145625.GA27493@redhat.com>
+ <CAA3XUr0b7W1K85f0kzvodNEpFjhK0XY8AVFTnYzAKOnvCY=JPw@mail.gmail.com>
+Message-ID: <20140411162243.GA30386@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 03:04:32PM +0200, Carlo Caione wrote:
-> On Fri, Apr 11, 2014 at 2:29 PM, Mark Brown <broonie@kernel.org> wrote:
+On 04/11, Victor Kamensky wrote:
+>
+> On 11 April 2014 07:56, Oleg Nesterov <oleg@redhat.com> wrote:
+> >
+> >         1. First of all, we do not know vma.
+> >
+> >            OK, we can down_read(mmap_sem) and do find_vma() of course.
+> >            This is a bit unfortunate, especially because the architectures
+> >            we currently support do not need this.
+>
+> Question, maybe silly one but I don't know the answer, why can't we just do
+> look up for vma once and cache results in place like xol_area (along with
+> xol_area.vaddr) and use it all the time. IOW under what circumstances
+> vma for xol area can disappear change so we need constant lookup for it?
+> Comment in xol_area
+>
+> >    /*
+> >    * We keep the vma's vm_start rather than a pointer to the vma
+> >     * itself.  The probed process or a naughty kernel module could make
+> >     * the vma go away, and we must handle that reasonably gracefully.
+> >     */
+> >     unsigned long         vaddr;        /* Page(s) of instruction slots */
+>
+> alludes to some of those conditions, but I don't quite follow.
+> Should not we go after "probed process" ability to unmap xol area.
+> xol area is like vdso,
 
-> >> +                             regulators {
-> >> +                                     compatible = "x-powers,axp20x-reg";
+But it is not like vdso. And (unlike vsyscall page) vdso can be unmapped
+too (unless it is FIX_VDSO).
 
-> > This compatible isn't part of the driver.
+> mmap call should ignore
+> those..
 
-> Yes I know. The problem here is that in v4 I had to fill in the field
-> .of_compatible of the mfd_cell with "x-powers,axp20x-reg". This
-> because the regulator_dev_lookup() checks for dev->of_node when
-> looking for the supply so I needed the compatible string in the DT to
-> have the dev->of_node filled in by mfd_add_device().
-> What do you suggest? Modify the regulator driver?
+This is not that simple, this means more ugly uprobe_ hooks in mm/.
+And I think we simply do not want/need this.
 
-You're looking for regulator_bulk_register_supply_alias() in the MFD
-driver (via parent_supplies in the MFD cell probably).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/7b11da57/attachment.sig>
+I didn't write the comment above, but "reasonably gracefully" should mean
+"we should not allow unmap/remap/etc(xol_area) crash the kernel, the task
+can crashif it does this, we do not care".
+
+The same for vdso, except in this case the kernel can simply forget about
+this area after it does setup_additional_pages().
+
+> >         2. The problem is, it would be very nice to remove this vma, or
+> >            at least hide it somehow from find_vma/etc. This is the special
+> >            mapping we do not want to expose to user-space.
+> >
+> >            In fact I even have the patches which remove this vma, but they
+> >            do not work with compat tasks unfortunately.
+>
+> I don't think it is right route. Xol area as well as vdso, signal page, etc
+> should be visible as regular VMAs. There are other aspects of the system
+> where they needed. Like core file collection - I would like to have
+> xol area present in my core file if traced process crashed.
+
+It must never crash in xol_area, or we have a kernel bug. (we do have such
+a bug which I am trying to fix right now ;)
+
+> /porc/<pid>/maps - I would like to see my memory layout through
+> this interface and I would like to see xol area there because I
+> can see xol area addresses by some other means.
+
+But it is not "your memory", to some degree. I mean, it would be nice if
+it was not.
+
+This should be more like vsyscall page. And indeed, we can move this into
+FIXMAP area. The only problem, 32bit task can't use this area in 64-bit
+machine.
+
+> Appeal of copy_to_user_page approach is that I don't need to know
+> how to handle sync up of icache and dcache on that architecture,
+
+Yes, sure, this is true.
+
+> it is
+> already done by someone else when they programmed basic ptrace
+> breakpoint write behavior.
+
+Yes, but (rightly or not) I still think that uprobes differs from ptrace.
+Perhaps we do not have other choice though.
+
+Oleg.
