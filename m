@@ -1,45 +1,34 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 11 Apr 2014 18:00:53 +0200
-Subject: [PATCH] ARM: dts: Fix PL330 MDMA clock assignment for Exynos4x12
-In-Reply-To: <1397226211-29775-1-git-send-email-s.nawrocki@samsung.com>
-References: <1397226211-29775-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <534811B5.10906@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Apr 2014 17:00:29 +0100
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140411153249.GZ11096@twins.programming.kicks-ass.net>
+References: <20140409184507.GA1058@redhat.com>
+ <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
+ <5347655B.3080307@linaro.org>
+ <20140411.003636.272212797007496394.davem@davemloft.net>
+ <20140411145625.GA27493@redhat.com> <20140411152207.GA28188@redhat.com>
+ <20140411153249.GZ11096@twins.programming.kicks-ass.net>
+Message-ID: <20140411160028.GR16119@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On Fri, Apr 11, 2014 at 05:32:49PM +0200, Peter Zijlstra wrote:
+> On Fri, Apr 11, 2014 at 05:22:07PM +0200, Oleg Nesterov wrote:
+> > And I am just curious, why arm's copy_to_user_page() disables premption
+> > before memcpy?
+> 
+> Without looking, I suspect its because the VIVT caches, they need to get
+> shot down on every context switch.
 
-On 11.04.2014 16:23, Sylwester Nawrocki wrote:
-> Exynos4212/4412 has different clock for the PL330 MDMA, ensure
-> the clock is properly assigned for these newer SoCs.
->
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos4x12.dtsi |    6 ++++++
->   1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index c4a9306..19589c6 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -243,4 +243,10 @@
->   		clock-names = "biu", "ciu";
->   		status = "disabled";
->   	};
-> +
-> +	amba {
-> +		mdma at 12850000 {
-> +			clocks = <&clock CLK_MDMA2>;
-> +		};
-> +	};
->   };
->
+So... let's think about that for a moment... if we have a preemption event,
+then that's a context switch, which means...
 
-Since the ID for CLK_MDMA2 was added mistakenly, instead of reusing 
-CLK_MDMA and it was not used by any device tree files anyway, I believe 
-the better fix would be to simply change the clock definition in Exynos 
-4 clock driver to use CLK_MDMA for both SoC families.
+No, this is obviously not the reason, because such an event on a fully
+VIVT system would result in the caches being flushed, meaning that we
+wouldn't need to do anything if we could be predicably preempted at that
+point.
 
-Best regards,
-Tomasz
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
