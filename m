@@ -1,177 +1,32 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 11 Apr 2014 17:26:44 +0200
-Subject: [PATCH 4/4] PM / Domains: Remove system PM callbacks from gpd_dev_ops
-In-Reply-To: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
-References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1397230004-22306-5-git-send-email-ulf.hansson@linaro.org>
+From: alexanders83@web.de (Alexander Stein)
+Date: Fri, 11 Apr 2014 17:35:37 +0200
+Subject: [PATCH] pinctrl/at91: Fix pin_to_mask
+Message-ID: <1397230537-8727-1-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There no users of these callbacks, let's simplify the generic power
-domain by removing them.
+We need first to reduce the pin number to only a GPIO bank before we can
+create the mask.
+Otherwise only GPIO bank 0 has correct masks as the bits in the other
+banks are shifted out of range.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Alexander Stein <alexanders83@web.de>
 ---
- drivers/base/power/domain.c |   64 ++++++-------------------------------------
- include/linux/pm_domain.h   |    8 ------
- 2 files changed, 8 insertions(+), 64 deletions(-)
+ drivers/pinctrl/pinctrl-at91.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 06d86f3..e155023 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -761,46 +761,6 @@ static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
- 	return GENPD_DEV_CALLBACK(genpd, bool, active_wakeup, dev);
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 63176f2..6669e13 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -316,7 +316,7 @@ static inline int pin_to_bank(unsigned pin)
+ 
+ static unsigned pin_to_mask(unsigned int pin)
+ {
+-	return 1 << pin;
++	return 1 << (pin % MAX_NB_GPIO_PER_BANK);
  }
  
--static int genpd_suspend_dev(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, suspend, dev);
--}
--
--static int genpd_suspend_late(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, suspend_late, dev);
--}
--
--static int genpd_resume_early(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, resume_early, dev);
--}
--
--static int genpd_resume_dev(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, resume, dev);
--}
--
--static int genpd_freeze_dev(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, freeze, dev);
--}
--
--static int genpd_freeze_late(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, freeze_late, dev);
--}
--
--static int genpd_thaw_early(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, thaw_early, dev);
--}
--
--static int genpd_thaw_dev(struct generic_pm_domain *genpd, struct device *dev)
--{
--	return GENPD_DEV_CALLBACK(genpd, int, thaw, dev);
--}
--
- /**
-  * pm_genpd_sync_poweroff - Synchronously power off a PM domain and its masters.
-  * @genpd: PM domain to power off, if possible.
-@@ -982,7 +942,7 @@ static int pm_genpd_suspend(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_suspend_dev(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_suspend(dev);
- }
- 
- /**
-@@ -1003,7 +963,7 @@ static int pm_genpd_suspend_late(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_suspend_late(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_suspend_late(dev);
- }
- 
- /**
-@@ -1090,7 +1050,7 @@ static int pm_genpd_resume_early(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_resume_early(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_resume_early(dev);
- }
- 
- /**
-@@ -1111,7 +1071,7 @@ static int pm_genpd_resume(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_resume_dev(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_resume(dev);
- }
- 
- /**
-@@ -1132,7 +1092,7 @@ static int pm_genpd_freeze(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_freeze_dev(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_freeze(dev);
- }
- 
- /**
-@@ -1154,7 +1114,7 @@ static int pm_genpd_freeze_late(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_freeze_late(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_freeze_late(dev);
- }
- 
- /**
-@@ -1218,7 +1178,7 @@ static int pm_genpd_thaw_early(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_thaw_early(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_thaw_early(dev);
- }
- 
- /**
-@@ -1239,7 +1199,7 @@ static int pm_genpd_thaw(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	return genpd->suspend_power_off ? 0 : genpd_thaw_dev(genpd, dev);
-+	return genpd->suspend_power_off ? 0 : pm_generic_thaw(dev);
- }
- 
- /**
-@@ -1947,14 +1907,6 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
- 	genpd->domain.ops.complete = pm_genpd_complete;
- 	genpd->dev_ops.save_state = pm_genpd_default_save_state;
- 	genpd->dev_ops.restore_state = pm_genpd_default_restore_state;
--	genpd->dev_ops.suspend = pm_generic_suspend;
--	genpd->dev_ops.suspend_late = pm_generic_suspend_late;
--	genpd->dev_ops.resume_early = pm_generic_resume_early;
--	genpd->dev_ops.resume = pm_generic_resume;
--	genpd->dev_ops.freeze = pm_generic_freeze;
--	genpd->dev_ops.freeze_late = pm_generic_freeze_late;
--	genpd->dev_ops.thaw_early = pm_generic_thaw_early;
--	genpd->dev_ops.thaw = pm_generic_thaw;
- 	mutex_lock(&gpd_list_lock);
- 	list_add(&genpd->gpd_list_node, &gpd_list);
- 	mutex_unlock(&gpd_list_lock);
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 983efdc..87810a7 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -35,14 +35,6 @@ struct gpd_dev_ops {
- 	int (*stop)(struct device *dev);
- 	int (*save_state)(struct device *dev);
- 	int (*restore_state)(struct device *dev);
--	int (*suspend)(struct device *dev);
--	int (*suspend_late)(struct device *dev);
--	int (*resume_early)(struct device *dev);
--	int (*resume)(struct device *dev);
--	int (*freeze)(struct device *dev);
--	int (*freeze_late)(struct device *dev);
--	int (*thaw_early)(struct device *dev);
--	int (*thaw)(struct device *dev);
- 	bool (*active_wakeup)(struct device *dev);
- };
- 
+ static void at91_mux_disable_interrupt(void __iomem *pio, unsigned mask)
 -- 
-1.7.9.5
+1.9.2
