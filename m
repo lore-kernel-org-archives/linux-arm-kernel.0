@@ -1,48 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 10 Apr 2014 20:31:11 -0400 (EDT)
-Subject: [PATCH v3 0/4] ARM: pxa: Fix out of vmalloc space bug
-In-Reply-To: <1442455.pP6sroyjMG@avalon>
-References: <1397066897-31826-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <alpine.LFD.2.11.1404091504240.28063@knanqh.ubzr> <1442455.pP6sroyjMG@avalon>
-Message-ID: <alpine.LFD.2.11.1404102024200.980@knanqh.ubzr>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Fri, 11 Apr 2014 08:26:37 +0800
+Subject: Wrong SPI NOR model detected by mx6sl
+In-Reply-To: <CAOMZO5CBV0tXhbBBFBO=T62nmCn9TenK8BgdAhT8r3b-30u6qg@mail.gmail.com>
+References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
+ <201404101807.48238.marex@denx.de>
+ <CAOMZO5CBV0tXhbBBFBO=T62nmCn9TenK8BgdAhT8r3b-30u6qg@mail.gmail.com>
+Message-ID: <20140411002635.GB3837@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Apr 2014, Laurent Pinchart wrote:
-
-> On Wednesday 09 April 2014 15:05:26 Nicolas Pitre wrote:
-> > On Wed, 9 Apr 2014, Laurent Pinchart wrote:
-> > > Hello,
-> > > 
-> > > (Resending due to a typo in an e-mail address that caused LAKML to reject
-> > > the mails. Sorry about the noise.)
-> > > 
-> > > This patch set reworks Ezequiel Garcia's previous fix [1] of an out of
-> > > vmalloc space bug on PXA2[57]x platforms caused by an attempt to map the
-> > > start of physical uncached outside of the vmalloc space.
-> > > 
-> > > This first three patches perform a couple of cleanups, and the last patch
-> > > fixes the problem. I've decided to map the memory at address 0xfe000000 to
-> > > minimize changes to the code, but this causes a bit of fragmentation of
-> > > vmalloc space. I could map it to the very end of vmalloc space
-> > > (0xfef00000)
-> > > instead if preferred, which would involve replacing a mov by an ldr in
-> > > pxa2[57]x_finish_suspend and pm_enter_standby_start.
-> > > 
-> > > I've tested the patch set on a PXA270-based system.
-> > 
-> > For those patches:
-> > 
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
+On Thu, Apr 10, 2014 at 02:16:49PM -0300, Fabio Estevam wrote:
+> Hi Marek,
 > 
-> Thank you.
+> On Thu, Apr 10, 2014 at 1:07 PM, Marek Vasut <marex@denx.de> wrote:
 > 
-> MAINTAINERS lists three maintainers for the PXA architecture, and two git 
-> trees that seem to be either dead or even deleted. Who picks up patches for 
-> PXA ? Should I send a pull request ?
+> > Can you share the JEDEC ID codes that both of the boards actually read from the
+> > SPI NOR ? You can dump those in the m25p80.c driver . That'd be helpful, I
+> > suspect some kind of an "offset" or "polarity inversion" in the SPI
+> > communication causing this.
+> 
+> On mx6qsabresd:
+> 
+> m25p80 spi0.0: JEDEC id: 0x202016
+> m25p80 spi0.0: m25p32 (4096 Kbytes)
+> 
+> On mx6sl-evk:
+> 
+> m25p80 spi0.0: JEDEC id: 0x000000
+It seems the kernel can not read out anything from the NOR.
+Please check the pinctrl or the schematic.
 
-If no one else answers, then just send a pull request to the ARM-SOC 
-team (arm at kernel.org) and CC the linux-arm-kernel mailing list.
+> m25p80 spi0.0: found mr25h256, expected m25p32
+> m25p80 spi0.0: mr25h256 (32 Kbytes)
+> 
+> Will need to dump the SPI registers to understand why mx6sl behaves like this.
+i am not in the office today, else i can test the imx6sl-evk.
 
 
-Nicolas
+thanks
+Huang Shijie
