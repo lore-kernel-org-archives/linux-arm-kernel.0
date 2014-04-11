@@ -1,40 +1,124 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 11 Apr 2014 16:24:09 +0200
-Subject: [PATCH] gpio/at91: free GPIO after configuring as input
-Message-ID: <1397226249-3922-1-git-send-email-alexanders83@web.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 11 Apr 2014 16:25:03 +0200
+Subject: [PATCH] ARM: dts: Add rear camera nodes for Exynos4412 Trats2 board
+Message-ID: <1397226303-29844-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the GPIO stays requested a device driver can't request it again.
-e.g. Without this patch the ads7846 driver returns the following error:
-ads7846 spi32766.3: failed to request/setup pendown GPIO15: -16
-ads7846: probe of spi32766.3 failed with error -16
+This patch enables the rear facing camera (s5c73m3) on TRATS2 board
+by adding the I2C0 bus controller, s5c73m3 sensor, MIPI CSI-2 receiver
+and the sensor's voltage regulator supply nodes.
 
-/sys/kernel/debug/gpio shows this:
-GPIOs 0-31, platform/fffff200.gpio, fffff200.gpio:
-[/ahb/apb/pinctrl at fffff200/gpio at fffff200] GPIOfffff200.gpio15: [gpio] set
-
-Signed-off-by: Alexander Stein <alexanders83@web.de>
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
-I'm aware that it makes sense this GPIO is/stays requested, but either the
-pinctl or device driver have to be adjusted as both can't request this GPIO.
-I think the latter shouldn't change.
+ arch/arm/boot/dts/exynos4412-trats2.dts |   72 +++++++++++++++++++++++++++++--
+ 1 file changed, 69 insertions(+), 3 deletions(-)
 
- drivers/pinctrl/pinctrl-at91.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index d990e33..63176f2 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1493,6 +1493,8 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
- 	if (ret)
- 		return ret;
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index a55961a..cd45077 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -80,7 +80,24 @@
+ 			enable-active-high;
+ 		};
  
-+	gpio_free(pin);
+-		/* More to come */
++		cam_af_reg: voltage-regulator-3 {
++			compatible = "regulator-fixed";
++			regulator-name = "CAM_AF";
++			regulator-min-microvolt = <2800000>;
++			regulator-max-microvolt = <2800000>;
++			gpio = <&gpm0 4 0>;
++			enable-active-high;
++		};
 +
- 	return 0;
- }
++		cam_isp_core_reg: voltage-regulator-4 {
++			compatible = "regulator-fixed";
++			regulator-name = "CAM_ISP_CORE_1.2V_EN";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++			gpio = <&gpm0 3 0>;
++			enable-active-high;
++			regulator-always-on;
++		};
+ 	};
  
+ 	gpio-keys {
+@@ -140,6 +157,38 @@
+ 		};
+ 	};
+ 
++	i2c_0: i2c at 13860000 {
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-slave-addr = <0x10>;
++		samsung,i2c-max-bus-freq = <400000>;
++		pinctrl-0 = <&i2c0_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		s5c73m3 at 3c {
++			compatible = "samsung,s5c73m3";
++			reg = <0x3c>;
++			standby-gpios = <&gpm0 1 1>;   /* ISP_STANDBY */
++			xshutdown-gpios = <&gpf1 3 1>; /* ISP_RESET */
++			vdd-int-supply = <&buck9_reg>;
++			vddio-cis-supply = <&ldo9_reg>;
++			vdda-supply = <&ldo17_reg>;
++			vddio-host-supply = <&ldo18_reg>;
++			vdd-af-supply = <&cam_af_reg>;
++			vdd-reg-supply = <&cam_io_reg>;
++			clock-frequency = <24000000>;
++			/* CAM_A_CLKOUT */
++			clocks = <&camera 0>;
++			clock-names = "cis_extclk";
++			port {
++				s5c73m3_ep: endpoint {
++					remote-endpoint = <&csis0_ep>;
++					data-lanes = <1 2 3 4>;
++				};
++			};
++		};
++	};
++
+ 	i2c at 138D0000 {
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-slave-addr = <0x10>;
+@@ -586,8 +635,8 @@
+ 		status = "okay";
+ 	};
+ 
+-	camera {
+-		pinctrl-0 = <&cam_port_b_clk_active>;
++	camera: camera {
++		pinctrl-0 = <&cam_port_a_clk_active &cam_port_b_clk_active>;
+ 		pinctrl-names = "default";
+ 		status = "okay";
+ 
+@@ -607,6 +656,23 @@
+ 			status = "okay";
+ 		};
+ 
++		csis_0: csis at 11880000 {
++			status = "okay";
++			vddcore-supply = <&ldo8_reg>;
++			vddio-supply = <&ldo10_reg>;
++			clock-frequency = <176000000>;
++
++			/* Camera C (3) MIPI CSI-2 (CSIS0) */
++			port at 3 {
++				reg = <3>;
++				csis0_ep: endpoint {
++					remote-endpoint = <&s5c73m3_ep>;
++					data-lanes = <1 2 3 4>;
++					samsung,csis-hs-settle = <12>;
++				};
++			};
++		};
++
+ 		csis_1: csis at 11890000 {
+ 			vddcore-supply = <&ldo8_reg>;
+ 			vddio-supply = <&ldo10_reg>;
 -- 
-1.9.2
+1.7.9.5
