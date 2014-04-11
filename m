@@ -1,86 +1,69 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Fri, 11 Apr 2014 11:09:36 +0200
-Subject: [PATCH RESEND 5/5] ARM: dts: berlin: add the pinctrl node and
- muxing setup for uarts
-In-Reply-To: <20140411081859.GL10240@lunn.ch>
-References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397135274-10764-6-git-send-email-antoine.tenart@free-electrons.com>
- <20140411081859.GL10240@lunn.ch>
-Message-ID: <20140411090936.GC20147@kwain>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 11 Apr 2014 11:11:49 +0200
+Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <87ha6136dz.fsf@approximate.cambridge.arm.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
+ <CAL_JsqJowqV2bsxE2VeYXQQSj4_L_KcH+C_dD=ZUvC=1crN4dA@mail.gmail.com>
+ <87ha6136dz.fsf@approximate.cambridge.arm.com>
+Message-ID: <CABuKBeKLexBsTwF-nX15AYfLNA9bFDRm2XyeLpwQg9+3m6Xf=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+2014-04-10 11:01 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
+> A couple of things on top of Rob's comments:
+>
+> On Wed, Apr 09 2014 at 10:50:33 pm BST, Rob Herring <robherring2@gmail.com> wrote:
+>> On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+>>> This adds a generic devicetree board file and a dtsi for boards
+>>> based on the MT6589 SoCs from Mediatek.
+>>>
+>>> Apart from the generic parts (gic, clocks) the only component
+>>> currently supported are the timers.
+>>>
+>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>
+> [...]
+>
+>>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+>>> new file mode 100644
+>>> index 0000000..c0139ca
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-mediatek/Kconfig
+>>> @@ -0,0 +1,14 @@
+>>> +config ARCH_MEDIATEK
+>>> +       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
+>>> +       select ARCH_REQUIRE_GPIOLIB
+>>
+>> Then where is your GPIO driver?
+>>
+>>> +       select ARM_GIC
+>>> +       select CACHE_L2X0
+>>> +       select HAVE_ARM_TWD if LOCAL_TIMERS
+>
+> Hell no! ;-) ARM_ARCH_TIMER is the way (please also add the missing
+> node).
 
-On Fri, Apr 11, 2014 at 10:18:59AM +0200, Andrew Lunn wrote:
-> On Thu, Apr 10, 2014 at 03:07:54PM +0200, Antoine T?nart wrote:
-> > The uart0 pinmux configuration is in the dtsi because uart0 will always
-> > use uart0-pmux to work, no other possibility. Same thing for uart1.
-> > 
-> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/berlin2.dtsi   | 20 ++++++++++++++++++++
-> >  arch/arm/boot/dts/berlin2cd.dtsi | 13 +++++++++++++
-> >  arch/arm/boot/dts/berlin2q.dtsi  | 20 ++++++++++++++++++++
-> >  3 files changed, 53 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-> > index 56a1af2f1052..43eb90c36050 100644
-> > --- a/arch/arm/boot/dts/berlin2.dtsi
-> > +++ b/arch/arm/boot/dts/berlin2.dtsi
-> > @@ -176,6 +176,22 @@
-> >  			};
-> >  		};
-> >  
-> > +		pinctrl: pinctrl at 0 {
-> > +			compatible = "marvell,berlin2-pinctrl";
-> > +			reg = <0xea0000 0x08>, <0xfc0000 0x44>;
-> > +			reg-names = "global_base", "apb_base";
-> > +
-> > +			uart0_pmux: uart0-pmux {
-> > +				berlin,group = "GSM4";
-> > +				berlin,function = <0>;
-> > +			};
-> > +
-> > +			uart1_pmux: uart1-pmux {
-> > +				berlin,group = "GSM5";
-> > +				berlin,function = <1>;
-> 
-> Hi Antoine
-> 
-> This very much looks like black magic.
-> 
-> I assume the data sheet is not available? So i think you need to
-> document all possible combinations of values of group and function.
-> Maybe you can add a file in
-> 
-> arch/arm/boot/dts/include/dt-bindings/pinctrl/
-> 
-> with something like
-> 
-> #define GSM4_UART0	0
-> #define GSM5_UART1	1
-> #define GSM12_UART0	1
-> #define GSM12_IrDA0	1
-> #define GSM12_GPIO	2
+I considered this, but the timer wasn't able to get it's clock frequency:
+"Architected timer frequency not available
+Division by zero in kernel."
 
-Groups' functions are not the same between BG2/BG2CD and BG2Q so multiple
-headers would be needed which may not be a good thing. Some platforms use black
-magic, and we can find a pinmux configuration for OMAP looking like:
+>
+>>> +       select HAVE_SMP
+>>
+>> Not needed now (going into 3.15).
+>>
+>>> +       select LOCAL_TIMERS if SMP
+>
+> No, A7 always have the arch timers.
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny.
 
-0x128 (PIN_INPUT_PULLUP | MUX_MODE0)
 
-Weel, we could explicitly define the functions in the driver itself and use in
-the dt something like:
-
-berlin,group = "GSM4";
-berlin,function = "uart0";
-
-This is what's done on the sunxi's pinctrl.
-
-Antoine
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+motzblog.wordpress.com
