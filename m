@@ -1,40 +1,28 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 10 Apr 2014 21:31:21 -0700
-Subject: [PATCH] ARM: imx: propagate DI clock changes up the clock tree to
- PLL5
-In-Reply-To: <E1WXuag-0007Gs-Ku@rmk-PC.arm.linux.org.uk>
-References: <E1WXuag-0007Gs-Ku@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAJ+vNU1uzKCZxjsr+inuOi_VJbs+iR14uqXKOCr_32ZS__HrZQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 11 Apr 2014 00:36:36 -0400 (EDT)
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <5347655B.3080307@linaro.org>
+References: <20140409184507.GA1058@redhat.com>
+ <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
+ <5347655B.3080307@linaro.org>
+Message-ID: <20140411.003636.272212797007496394.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 9, 2014 at 8:39 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Allows clk_set_rate() on the DI clocks to propagate up to PLL5.
->
-> This allows imx-drm to produce the exact clock rate required with no
-> modulation due to the fractional divider.  Modulation of the clock rate
-> can and does prevent TVs from locking to the HDMI signal - they will
-> report no signal rather than trying to lock to such a signal.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> I still have this patch which is required so that imx-drm is capable of
-> producing HDMI clocks which are close enough to the HDMI defined
-> frequencies such that TVs and similar can recognise the signal.  Without
-> this, I don't get any kind of output on my TV desite imx-drm being set
-> to the correct mode.  I have proven that this is because the HDMI clock
-> is *very* wrong without this patch.
->
->  arch/arm/mach-imx/clk-imx6q.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
+From: David Long <dave.long@linaro.org>
+Date: Thu, 10 Apr 2014 23:45:31 -0400
 
-Hi Russell,
+> Replace memcpy and dcache flush in generic uprobes with a call to
+> copy_to_user_page(), which will do a proper flushing of kernel and
+> user cache.  Also modify the inmplementation of copy_to_user_page
+> to assume a NULL vma pointer means the user icache corresponding
+> to this right is stale and needs to be flushed.  Note that this patch
+> does not fix copy_to_user page for the sh, alpha, sparc, or mips
+> architectures (which do not currently support uprobes).
+> 
+> Signed-off-by: David A. Long <dave.long@linaro.org>
 
-This fixed HDMI on the boards I'm testing it on (Gateworks Ventana).
-Without it I encounter the same issue you describe above.
-
-Tested-by: Tim Harvey <tharvey@gateworks.com>
-
-Tim
+You really need to pass the proper VMA down to the call site
+rather than pass NULL, that's extremely ugly and totally
+unnecesary.
