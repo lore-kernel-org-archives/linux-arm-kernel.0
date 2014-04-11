@@ -1,86 +1,44 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 11 Apr 2014 08:57:25 +0200
-Subject: [PATCH 1/2] GPIO: Add driver for Zynq GPIO controller
-In-Reply-To: <CACRpkdbk0Ru=txcF3DGBDD=CitqHYFR8w-1fUDR9wSinQBQyvw@mail.gmail.com>
-References: <1395933906-2268-1-git-send-email-harinik@xilinx.com>
- <CACRpkdbU35xG1QtagB+9e9vxvehf1UQFaF4PikJhsPNAMw=D1Q@mail.gmail.com>
- <CAFcVECJsEp_s2V5=oK_UJahGRUpWYWMCxTMxqdpX+O0qebP41A@mail.gmail.com>
- <CACRpkdZEFsJubRVwCp6nTie7s7+DZOym6SWsA2ZynN_devi-2Q@mail.gmail.com>
- <533BA67B.6070905@monstr.eu>
- <CACRpkdbk0Ru=txcF3DGBDD=CitqHYFR8w-1fUDR9wSinQBQyvw@mail.gmail.com>
-Message-ID: <53479255.4070206@monstr.eu>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Apr 2014 08:04:14 +0100
+Subject: [PATCH v5 5/8 fix] mtd: m25p80: use the SPI nor framework
+In-Reply-To: <20140411003203.GC3837@localhost.localdomain>
+References: <1393238262-8622-6-git-send-email-b32955@freescale.com>
+ <1393574142-17234-1-git-send-email-b32955@freescale.com>
+ <20140409213749.GH32070@ld-irv-0074>
+ <20140410072509.GA24100@localhost>
+ <20140410192902.GM32070@ld-irv-0074>
+ <20140411003203.GC3837@localhost.localdomain>
+Message-ID: <20140411070414.GA9801@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2014 07:52 PM, Linus Walleij wrote:
-> On Wed, Apr 2, 2014 at 7:56 AM, Michal Simek <monstr@monstr.eu> wrote:
->> On 03/31/2014 10:22 AM, Linus Walleij wrote:
->>> On Sat, Mar 29, 2014 at 5:44 AM, Harini Katakam
->>> <harinikatakamlinux@gmail.com> wrote:
->>>> On Sat, Mar 29, 2014 at 3:20 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>>> On Thu, Mar 27, 2014 at 4:25 PM, Harini Katakam <harinik@xilinx.com> wrote:
->>>
->>>>>> +/* Read/Write access to the GPIO PS registers */
->>>>>> +static inline u32 zynq_gpio_readreg(void __iomem *offset)
->>>>>> +{
->>>>>> +       return readl_relaxed(offset);
->>>>>> +}
->>>>>> +
->>>>>> +static inline void zynq_gpio_writereg(void __iomem *offset, u32 val)
->>>>>> +{
->>>>>> +       writel_relaxed(val, offset);
->>>>>> +}
->>>>>
->>>>> I think this is unnecessary and confusing indirection.
->>>>> Just use the readl_relaxed/writel_relaxed functions directly in
->>>>> the code.
->>>>>
->>>>
->>>> This is just to be flexible.
->>>
->>> Define exactly what you mean with "flexible" in this context. I
->>> only see unnecessary overhead and hard-to-read code.
->>
->> We have just passed this discussion for watchdog driver
->> here: https://lkml.org/lkml/2014/4/1/843
->>
->> Are you ok with doing it in this way?
+On Fri, 11 Apr 2014, Huang Shijie wrote:
+
+> On Thu, Apr 10, 2014 at 12:29:02PM -0700, Brian Norris wrote:
+> > > IMHO, we should create a patch or several patches to add the MTD_SPI_NOR
+> > > to the defconfigs.
+> > 
+> > Yeah, I think that's best.
+> I will create a patch when i back to office.
+> Or you can create it yourself.
 > 
-> No :-)
+> > 
+> > > > Also, I think m25p80.c is no longer a "self-contained MTD device driver"
+> > > > and should be moved under drivers/mtd/spi-nor/.
+> > > If we move the m25p80.c to the drivers/mtd/spi-nor/, we also need to move
+> > > other drivers too.
+> > 
+> > Which ones? I think it only makes sense to move those that depend on the
+> > same core code (i.e., spi-nor.c), or have a close relation to it (so
+> > Lee's st_spi_fsm.c is a candidate).
 > 
-> Subsystem maintainers do not necessarily agree on such issues.
+> yes, i mean the st_spi_fsm.c and other drivers which will use the
+> spi-nor core code in the future.
 
-I think your sentence is right.  :-)
-But what to do to convince you to agree with it?
-We can use readl/writel directly (or relaxed versions) but it will
-just end up that we will have a patch in our xilinx git tree
-which won't be in the mainline.
-
-Having central point for IO access functions it not an unused technique.
-I was able to find out some cases in drivers/gpio/
-gpio-bt8xx.c, gpio-msm-v1.c, gpio-tegra.c, gpio-xilinx.c (almost similar reason
-here :-))
-and just one in pinctrl-spear.h.
-But I have to admit most of gpio/pinmux drivers are using them directly
-but on the other hand they are not FPGA based. :-)
-
-BTW: Shouldn't be __raw_ versions replaced by _relaxed?
-
-Thanks,
-Michal
++1 - happy with this.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/be9bda66/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
