@@ -1,39 +1,40 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 10 Apr 2014 21:22:43 -0700
-Subject: [PATCH v4 2/3] rtc: Add APM X-Gene SoC RTC driver
-In-Reply-To: <20140410224244.GH6518@sirena.org.uk>
-References: <1397155678-26607-1-git-send-email-lho@apm.com>
- <1397155678-26607-2-git-send-email-lho@apm.com>
- <1397155678-26607-3-git-send-email-lho@apm.com>
- <20140410224244.GH6518@sirena.org.uk>
-Message-ID: <CAPw-ZTns1EOT0inn0hq0Xh+CdjMkxhOkvL+_BnRThnm7HQC=BQ@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 10 Apr 2014 21:31:21 -0700
+Subject: [PATCH] ARM: imx: propagate DI clock changes up the clock tree to
+ PLL5
+In-Reply-To: <E1WXuag-0007Gs-Ku@rmk-PC.arm.linux.org.uk>
+References: <E1WXuag-0007Gs-Ku@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAJ+vNU1uzKCZxjsr+inuOi_VJbs+iR14uqXKOCr_32ZS__HrZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
+On Wed, Apr 9, 2014 at 8:39 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Allows clk_set_rate() on the DI clocks to propagate up to PLL5.
 >
->> +     if (device_may_wakeup(&pdev->dev)) {
->> +             if (!enable_irq_wake(irq))
->> +                     pdata->irq_wake = 1;
->> +     } else {
->> +             pdata->irq_enabled = xgene_rtc_alarm_irq_enabled(dev);
->> +             xgene_rtc_alarm_irq_enable(dev, 0);
->> +             clk_disable(pdata->clk);
->> +     }
->> +     clk_unprepare(pdata->clk);
+> This allows imx-drm to produce the exact clock rate required with no
+> modulation due to the fractional divider.  Modulation of the clock rate
+> can and does prevent TVs from locking to the HDMI signal - they will
+> report no signal rather than trying to lock to such a signal.
 >
-> This will unconditionally unprepare the clock even if it wasn't disabled
-> which looks like a bug - I would have expected the disable to be a
-> clk_disable_unprepare() instead?  Similarly for the resume path.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> I still have this patch which is required so that imx-drm is capable of
+> producing HDMI clocks which are close enough to the HDMI defined
+> frequencies such that TVs and similar can recognise the signal.  Without
+> this, I don't get any kind of output on my TV desite imx-drm being set
+> to the correct mode.  I have proven that this is because the HDMI clock
+> is *very* wrong without this patch.
+>
+>  arch/arm/mach-imx/clk-imx6q.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 >
 
-I was modeled after driver rtc-coh901331.c. It seems like all I need
-here is to call clk_disable_unprepare() instead clk_disable for
-suspend. For resume, call clk_prepare_disable() instead clk_enable().
-No need to split them up. Am I correct?
+Hi Russell,
 
-Given that Andrew Morton applied v2, should I post an patch against v2
-going forward?
+This fixed HDMI on the boards I'm testing it on (Gateworks Ventana).
+Without it I encounter the same issue you describe above.
 
--Loc
+Tested-by: Tim Harvey <tharvey@gateworks.com>
+
+Tim
