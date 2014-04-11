@@ -1,56 +1,45 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 11 Apr 2014 16:33:27 +0200
-Subject: [PATCH v3 0/7] Add ST Keyscan driver
-Message-ID: <1397226820-5604-1-git-send-email-gabriel.fernandez@linaro.org>
+Date: Fri, 11 Apr 2014 16:33:32 +0200
+Subject: [PATCH v3 3/7] driver: reset: sti: add keyscan for stih416
+In-Reply-To: <1397226820-5604-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1397226820-5604-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1397226820-5604-6-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v3:
-- add reset controller management
-- rename 'st,debounce_us' into 'st,debounce-us' in dt binding
+From: Giuseppe CONDORELLI <giuseppe.condorelli@st.com>
 
-Changes in v2:
-- use standard format for matrix keymap
-- suppress __exit mark for keyscan_remove()
-- Call to keyscan_stop() shoudl go into keyscan_close() implementation
-- use of SIMPLE_DEV_PM_OPS()
-- rename compatibility name into "st,sti-keyscan"
-- suppress platform data management
-- omit vendor information
-- cosmetic change and renaming
+Add keyscan reset on stih416 reset controller.
 
-The goal of this series is to add ST Keyscan support to ST SoCs.
-The DT definition is added for STiH415 and STiH416 SoCs on
-B2000 board.
+Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ drivers/reset/sti/reset-stih416.c                     | 1 +
+ include/dt-bindings/reset-controller/stih416-resets.h | 1 +
+ 2 files changed, 2 insertions(+)
 
-Gabriel Fernandez (5):
-  drivers: input: keyboard: st-keyscan: add keyscan driver
-  ARM: STi: DT: add keyscan for stih415
-  ARM: STi: DT: add keyscan for stih416
-  ARM: STi: DT: add keyscan for stih41x-b2000
-  ARM: multi_v7_defconfig: add ST Keyscan driver
-
-Giuseppe CONDORELLI (2):
-  driver: reset: sti: add keyscan for stih415
-  driver: reset: sti: add keyscan for stih416
-
- .../devicetree/bindings/input/st-keyscan.txt       |  60 +++++
- arch/arm/boot/dts/stih415-pinctrl.dtsi             |  16 ++
- arch/arm/boot/dts/stih415.dtsi                     |  12 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi             |  16 ++
- arch/arm/boot/dts/stih416.dtsi                     |  12 +
- arch/arm/boot/dts/stih41x-b2000.dtsi               |  23 ++
- arch/arm/configs/multi_v7_defconfig                |   1 +
- drivers/input/keyboard/Kconfig                     |  12 +
- drivers/input/keyboard/Makefile                    |   1 +
- drivers/input/keyboard/st-keyscan.c                | 260 +++++++++++++++++++++
- drivers/reset/sti/reset-stih415.c                  |   1 +
- drivers/reset/sti/reset-stih416.c                  |   1 +
- .../dt-bindings/reset-controller/stih415-resets.h  |   1 +
- .../dt-bindings/reset-controller/stih416-resets.h  |   1 +
- 14 files changed, 417 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/st-keyscan.txt
- create mode 100644 drivers/input/keyboard/st-keyscan.c
-
+diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
+index fe3bf02..5fc9870 100644
+--- a/drivers/reset/sti/reset-stih416.c
++++ b/drivers/reset/sti/reset-stih416.c
+@@ -104,6 +104,7 @@ static const struct syscfg_reset_channel_data stih416_softresets[] = {
+ 	[STIH416_COMPO_A_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 4),
+ 	[STIH416_VP8_DEC_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 10),
+ 	[STIH416_VTG_MAIN_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 16),
++	[STIH416_KEYSCAN_SOFTRESET] = STIH416_SRST_LPM(LPM_SYSCFG_1, 8),
+ };
+ 
+ static struct syscfg_reset_controller_data stih416_powerdown_controller = {
+diff --git a/include/dt-bindings/reset-controller/stih416-resets.h b/include/dt-bindings/reset-controller/stih416-resets.h
+index 2127743..fcf9af1 100644
+--- a/include/dt-bindings/reset-controller/stih416-resets.h
++++ b/include/dt-bindings/reset-controller/stih416-resets.h
+@@ -46,5 +46,6 @@
+ #define STIH416_COMPO_A_SOFTRESET	25
+ #define STIH416_VP8_DEC_SOFTRESET	26
+ #define STIH416_VTG_MAIN_SOFTRESET	27
++#define STIH416_KEYSCAN_SOFTRESET	28
+ 
+ #endif /* _DT_BINDINGS_RESET_CONTROLLER_STIH416 */
 -- 
 1.9.1
