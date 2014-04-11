@@ -1,107 +1,126 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Apr 2014 08:14:45 -0700
-Subject: [PATCH 04/11] ARM: OMAP3: Fix voltage control for deeper idle
- states
-In-Reply-To: <1397173639-29587-5-git-send-email-tony@atomide.com>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-5-git-send-email-tony@atomide.com>
-Message-ID: <20140411151445.GA5350@atomide.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Fri, 11 Apr 2014 07:55:38 -0700
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <CAA3XUr0-KqtBw0WCFvws8g5ChK49d+X+7Un9ngq1UZg-oROx+A@mail.gmail.com>
+References: <20140409184507.GA1058@redhat.com>
+ <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
+ <5347655B.3080307@linaro.org>
+ <20140411.003636.272212797007496394.davem@davemloft.net>
+ <CAA3XUr0-KqtBw0WCFvws8g5ChK49d+X+7Un9ngq1UZg-oROx+A@mail.gmail.com>
+Message-ID: <CAA3XUr2nmokLTXmjSWQ3Tpidz1Cytgs2cBT6otqFtGgBf0SmKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140410 16:52]:
-> @@ -220,8 +220,18 @@ static inline u32 omap_usec_to_32k(u32 usec)
->  	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
->  }
->  
-> +struct omap3_vc_config {
-> +	u32 clksetup;
-> +	u32 voltsetup1;
-> +	u32 voltsetup2;
-> +	u32 voltctrl;
-> +};
-
-It seems we can keep just voltsetup1 and voltsetup2 here. The
-others need to be initialized just once it seems.
-
->  static void omap3_set_off_timings(struct voltagedomain *voltdm)
+On 11 April 2014 07:26, Victor Kamensky <victor.kamensky@linaro.org> wrote:
+> On 10 April 2014 21:36, David Miller <davem@davemloft.net> wrote:
+>> From: David Long <dave.long@linaro.org>
+>> Date: Thu, 10 Apr 2014 23:45:31 -0400
+>>
+>>> Replace memcpy and dcache flush in generic uprobes with a call to
+>>> copy_to_user_page(), which will do a proper flushing of kernel and
+>>> user cache.  Also modify the inmplementation of copy_to_user_page
+>>> to assume a NULL vma pointer means the user icache corresponding
+>>> to this right is stale and needs to be flushed.  Note that this patch
+>>> does not fix copy_to_user page for the sh, alpha, sparc, or mips
+>>> architectures (which do not currently support uprobes).
+>>>
+>>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>>
+>> You really need to pass the proper VMA down to the call site
+>> rather than pass NULL, that's extremely ugly and totally
+>> unnecesary.
+>
+> Agreed that VMA is really needed.
+>
+> Here is variant that I tried while waiting for Oleg's response:
+>
+> From 4a6a9043e0910041dd8842835a528cbdc39fad34 Mon Sep 17 00:00:00 2001
+> From: Victor Kamensky <victor.kamensky@linaro.org>
+> Date: Thu, 10 Apr 2014 17:06:39 -0700
+> Subject: [PATCH] uprobes: use copy_to_user_page function to copy instr to xol
+>  area
+>
+> Use copy_to_user_page function to copy instruction into xol area.
+> copy_to_user_page function guarantee that all caches are correctly
+> flushed during such write (including icache as well if needed).
+>
+> Because copy_to_user_page needs vm_area_struct, vma
+> field was added into struct xol_area. It holds cached vma value
+> for xol_area.
+>
+> Also using copy_to_user_page we make sure that we use the same
+> code that ptrace write code uses.
+>
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+> ---
+>  kernel/events/uprobes.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+> index 04709b6..1ae4563 100644
+> --- a/kernel/events/uprobes.c
+> +++ b/kernel/events/uprobes.c
+> @@ -117,6 +117,7 @@ struct xol_area {
+>       * the vma go away, and we must handle that reasonably gracefully.
+>       */
+>      unsigned long         vaddr;        /* Page(s) of instruction slots */
+> +    struct vm_area_struct    *vma;        /* VMA that holds above address */
+>  };
+>
+>  /*
+> @@ -1150,6 +1151,7 @@ static int xol_add_vma(struct mm_struct *mm,
+> struct xol_area *area)
+>
+>      ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
+>                  VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
+> +    area->vma = find_vma(mm, area->vaddr);
+>      if (ret)
+>          goto fail;
+>
+> @@ -1287,6 +1289,7 @@ static unsigned long xol_get_insn_slot(struct
+> uprobe *uprobe)
 >  {
-> +	struct omap3_vc_config *c = omap3_vc_timings;
-> +	u32 tstart, tshut, voltoffset;
-> +
-> +	if (c->clksetup)
-> +		return;
-> +
-> +	omap_pm_get_oscillator(&tstart, &tshut);
-> +	if (tstart == ULONG_MAX) {
-> +		pr_debug("PM: oscillator start-up time not initialized, using 10ms\n");
-> +		c->clksetup = omap_usec_to_32k(10000);
-> +	} else {
-> +		c->clksetup = omap_usec_to_32k(tstart);
-> +	}
-> +
-> +	/*
-> +	 * For twl4030 errata 27, we need to allow minimum ~488.32 us wait to
-> +	 * switch from HFCLKIN to internal oscillator. That means timings
-> +	 * have voltoffset fixed to 0xa in rounded up 32 KiHz cycles. And
-> +	 * that means we can calculate the value based on the oscillator
-> +	 * start-up time since voltoffset2 = clksetup - voltoffset.
-> +	 */
-> +	voltoffset = omap_usec_to_32k(488);
-> +	c->voltsetup2 = c->clksetup - voltoffset;
-> +	voltdm->write(voltoffset, OMAP3_PRM_VOLTOFFSET_OFFSET);
+>      struct xol_area *area;
+>      unsigned long xol_vaddr;
+> +    void *xol_page_kaddr;
+>
+>      area = get_xol_area();
+>      if (!area)
+> @@ -1297,8 +1300,11 @@ static unsigned long xol_get_insn_slot(struct
+> uprobe *uprobe)
+>          return 0;
+>
+>      /* Initialize the slot */
+> -    copy_to_page(area->page, xol_vaddr,
+> -            &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
+> +    xol_page_kaddr = kmap_atomic(area->page);
+> +    copy_to_user_page(area->vma, area->page, xol_vaddr,
+> +              xol_page_kaddr + (xol_vaddr & ~PAGE_MASK),
+> +              &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
+> +    kunmap_atomic(xol_page_kaddr);
+>      /*
+>       * We probably need flush_icache_user_range() but it needs vma.
+>       * This should work on supported architectures too.
 
-And here we're missing a write to clksetup, without that the off idle
-timings are not correct.. Below is an incremental diff on top of this
-patch.
+Above comment and following call to 'flush_dcache_page(area->page);'
+should be removed of course. Just noticed that ...
 
-Regards,
+Thanks,
+Victor
 
-Tony
-
-8< -------------------------------
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -221,10 +221,8 @@ static inline u32 omap_usec_to_32k(u32 usec)
- }
- 
- struct omap3_vc_config {
--	u32 clksetup;
- 	u32 voltsetup1;
- 	u32 voltsetup2;
--	u32 voltctrl;
- };
- 
- static struct omap3_vc_config omap3_vc_timings[2];
-@@ -368,17 +366,17 @@ static void omap3_set_i2c_timings(struct voltagedomain *voltdm)
- static void omap3_set_off_timings(struct voltagedomain *voltdm)
- {
- 	struct omap3_vc_config *c = omap3_vc_timings;
--	u32 tstart, tshut, voltoffset;
-+	u32 tstart, tshut, clksetup, voltoffset;
- 
--	if (c->clksetup)
-+	if (c->voltsetup2)
- 		return;
- 
- 	omap_pm_get_oscillator(&tstart, &tshut);
- 	if (tstart == ULONG_MAX) {
- 		pr_debug("PM: oscillator start-up time not initialized, using 10ms\n");
--		c->clksetup = omap_usec_to_32k(10000);
-+		clksetup = omap_usec_to_32k(10000);
- 	} else {
--		c->clksetup = omap_usec_to_32k(tstart);
-+		clksetup = omap_usec_to_32k(tstart);
- 	}
- 
- 	/*
-@@ -389,7 +387,8 @@ static void omap3_set_off_timings(struct voltagedomain *voltdm)
- 	 * start-up time since voltoffset2 = clksetup - voltoffset.
- 	 */
- 	voltoffset = omap_usec_to_32k(488);
--	c->voltsetup2 = c->clksetup - voltoffset;
-+	c->voltsetup2 = clksetup - voltoffset;
-+	voltdm->write(clksetup, OMAP3_PRM_CLKSETUP_OFFSET);
- 	voltdm->write(voltoffset, OMAP3_PRM_VOLTOFFSET_OFFSET);
- }
- 
+> --
+> 1.8.1.4
+>
+> Now while waiting for Oleg's response I am trying to run some performance
+> tests between different solution to understand situation better.
+>
+> One of my concerns was ARM smp function call that
+> could be reached from copy_to_user_page. But I have hard time
+> finding CPU that really doing it ... It does not look such call
+> will happen on relatively modern ARM CPUs (tried Arndale,
+> and Pandaboard ES). So my issues with use
+> of copy_to_user_page are quite elevated.
+>
+> Thanks,
+> Victor
