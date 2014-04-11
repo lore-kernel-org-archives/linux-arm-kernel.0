@@ -1,50 +1,43 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 11 Apr 2014 12:57:47 +0100
-Subject: [patch] clk: vexpress: NULL dereference on error path
-In-Reply-To: <20140411115118.GQ4963@mwanda>
-References: <20131107080844.GR21844@elgon.mountain>
- <1383914574.3226.0.camel@hornet> <1383914641.3226.1.camel@hornet>
- <20140411115118.GQ4963@mwanda>
-Message-ID: <1397217467.3549.92.camel@hornet>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 11 Apr 2014 13:59:26 +0200
+Subject: Wrong SPI NOR model detected by mx6sl
+In-Reply-To: <CAOMZO5CzMyB=boSO+1QeJbw0yYsa1mME-sMVb6yocJAfnErksA@mail.gmail.com>
+References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
+ <20140411002635.GB3837@localhost.localdomain>
+ <CAOMZO5CzMyB=boSO+1QeJbw0yYsa1mME-sMVb6yocJAfnErksA@mail.gmail.com>
+Message-ID: <201404111359.26723.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-04-11 at 12:51 +0100, Dan Carpenter wrote:
-> On Fri, Nov 08, 2013 at 12:44:01PM +0000, Pawel Moll wrote:
-> > On Fri, 2013-11-08 at 12:42 +0000, Pawel Moll wrote:
-> > > On Thu, 2013-11-07 at 08:08 +0000, Dan Carpenter wrote:
-> > > > If the allocation fails then we dereference the NULL in the error path.
-> > > > Just return directly.
-> > > > 
-> > > > Fixes: ed27ff1db869 ('clk: Versatile Express clock generators ("osc") driver')
-> > > > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> > > > 
-> > > > diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-> > > > index 2dc8b41..a535c7b 100644
-> > > > --- a/drivers/clk/versatile/clk-vexpress-osc.c
-> > > > +++ b/drivers/clk/versatile/clk-vexpress-osc.c
-> > > > @@ -102,7 +102,7 @@ void __init vexpress_osc_of_setup(struct device_node *node)
-> > > >  
-> > > >  	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
-> > > >  	if (!osc)
-> > > > -		goto error;
-> > > > +		return;
-> > > >  
-> > > >  	osc->func = vexpress_config_func_get_by_node(node);
-> > > >  	if (!osc->func) {
-> > > 
-> > > Well spotted, thanks!
-> > > 
-> > > Will get it queued with other vexpress clk changes.
+On Friday, April 11, 2014 at 01:43:50 PM, Fabio Estevam wrote:
+> On Thu, Apr 10, 2014 at 9:26 PM, Huang Shijie <shijie8@gmail.com> wrote:
+> > On Thu, Apr 10, 2014 at 02:16:49PM -0300, Fabio Estevam wrote:
+> >> Hi Marek,
+> >> 
+> >> On Thu, Apr 10, 2014 at 1:07 PM, Marek Vasut <marex@denx.de> wrote:
+> >> > Can you share the JEDEC ID codes that both of the boards actually read
+> >> > from the SPI NOR ? You can dump those in the m25p80.c driver . That'd
+> >> > be helpful, I suspect some kind of an "offset" or "polarity
+> >> > inversion" in the SPI communication causing this.
+> >> 
+> >> On mx6qsabresd:
+> >> 
+> >> m25p80 spi0.0: JEDEC id: 0x202016
+> >> m25p80 spi0.0: m25p32 (4096 Kbytes)
+> >> 
+> >> On mx6sl-evk:
+> >> 
+> >> m25p80 spi0.0: JEDEC id: 0x000000
 > > 
-> > Having said that - Mike, it's a bug fix. If you can still get it into
-> > the current merge window, please do:
-> > 
-> > Acked-by: Pawel Moll <pawel.moll@arm.com>
-> > 
+> > It seems the kernel can not read out anything from the NOR.
+> > Please check the pinctrl or the schematic.
 > 
-> Heh.  Let's try again to get this merged.  :P
+> Yes, there was a pinmux issue in U-boot and I have fixed it.
+> 
+> SPI NOR is properly detected in U-boot and kernel now.
 
-Right, my fault, haven't followed this up with Mike, sorry.
+This means there's also a pinmux issue in kernel, did you fix it in kernel as 
+well please ?
 
-Pawel
+Best regards,
+Marek Vasut
