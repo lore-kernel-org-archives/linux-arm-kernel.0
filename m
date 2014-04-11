@@ -1,101 +1,255 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 11 Apr 2014 19:28:08 +0200
-Subject: [PATCH] gpio/at91: free GPIO after configuring as input
-In-Reply-To: <4406073.7Z2odFudGD@kongar>
-References: <1397226249-3922-1-git-send-email-alexanders83@web.de>
- <A08D29A3-2690-46C1-A317-41B17F365A81@jcrosoft.com>
- <4406073.7Z2odFudGD@kongar>
-Message-ID: <CABxcv=mdy_PmzgRN7SmBppS=8rDcP+jX0q1EwduwR0QOW=JWgg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 11 Apr 2014 12:28:52 -0500
+Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
+ probe and defer if needed
+In-Reply-To: <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
+References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
+ <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
+ <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 5:45 PM, Alexander Stein <alexanders83@web.de> wrote:
-> I'm CC'ing some input guys if this can't be solved in the pinctrl/irq side.
+On Fri, Mar 21, 2014 at 9:46 AM, Jean-Jacques Hiblot
+<jjhiblot@traphandler.com> wrote:
+> The goal of this patch is to allow drivers to be probed even if at the time of
+> the DT parsing some of their IRQ ressources are not available yet.
 >
-> On Friday 11 April 2014, 23:30:33 wrote Jean-Christophe PLAGNIOL-VILLARD:
->>
->> On Apr 11, 2014, at 10:24 PM, Alexander Stein <alexanders83@web.de> wrote:
->>
->> >
->> > If the GPIO stays requested a device driver can't request it again.
->> > e.g. Without this patch the ads7846 driver returns the following error:
->> > ads7846 spi32766.3: failed to request/setup pendown GPIO15: -16
->> > ads7846: probe of spi32766.3 failed with error -16
->> >
->> > /sys/kernel/debug/gpio shows this:
->> > GPIOs 0-31, platform/fffff200.gpio, fffff200.gpio:
->> > [/ahb/apb/pinctrl at fffff200/gpio at fffff200] GPIOfffff200.gpio15: [gpio] set
->> >
->> > Signed-off-by: Alexander Stein <alexanders83@web.de>
->> > ---
->> > I'm aware that it makes sense this GPIO is/stays requested, but either the
->> > pinctl or device driver have to be adjusted as both can't request this GPIO.
->> > I think the latter shouldn't change.
->> >
->> > drivers/pinctrl/pinctrl-at91.c | 2 ++
->> > 1 file changed, 2 insertions(+)
->> >
->> > diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
->> > index d990e33..63176f2 100644
->> > --- a/drivers/pinctrl/pinctrl-at91.c
->> > +++ b/drivers/pinctrl/pinctrl-at91.c
->> > @@ -1493,6 +1493,8 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
->> >     if (ret)
->> >             return ret;
->> >
->> > +   gpio_free(pin);
->> > +
->>
->> NACK it the whole key point the gpio use as a IRQ so the irq generic code request it
->> >     return 0;
->> > }
->> >
->>
+> In the current situation, the IRQ resources of a platform device are filled from
+> the DT at the time the device is created (of_device_alloc()). The drawback of
+> this is that a device sitting close to the top of the DT (ahb for example) but
+> depending on ressources that are initialized later (IRQ domain dynamically
+> created for example) will fail to probe because the ressources don't exist
+> at this time.
 
-The problem is that the GPIO and IRQ subsystems are somehow related
-but completely independent. A GPIO pin used as an IRQ line is
-completely orthogonal to requesting a GPIO pin.
+s/ressources/resources/
 
-Is true that here is a common pattern in the kernel that is:
+>
+> This patch fills the resource structure only before the device is probed and
+> will defer the probe if the IRQ resource is not yet available.
+>
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>  drivers/base/platform.c     |   5 ++
+>  drivers/of/platform.c       | 114 ++++++++++++++++++++++++++++++++++----------
+>  include/linux/device.h      |   1 +
+>  include/linux/of_platform.h |  10 ++++
+>  4 files changed, 105 insertions(+), 25 deletions(-)
+>
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index bc78848..cee9b8d 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -481,6 +481,10 @@ static int platform_drv_probe(struct device *_dev)
+>         struct platform_device *dev = to_platform_device(_dev);
+>         int ret;
+>
+> +       ret = of_platform_device_prepare(dev);
+> +       if (ret)
+> +               goto error;
+> +
+>         if (ACPI_HANDLE(_dev))
+>                 acpi_dev_pm_attach(_dev, true);
+>
+> @@ -488,6 +492,7 @@ static int platform_drv_probe(struct device *_dev)
+>         if (ret && ACPI_HANDLE(_dev))
+>                 acpi_dev_pm_detach(_dev, true);
+>
+> +error:
+>         if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
+>                 dev_warn(_dev, "probe deferral not supported\n");
+>                 ret = -ENXIO;
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 404d1da..ba6be4a 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -141,41 +141,17 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>                                   struct device *parent)
+>  {
+>         struct platform_device *dev;
+> -       int rc, i, num_reg = 0, num_irq;
+> -       struct resource *res, temp_res;
+>
+>         dev = platform_device_alloc("", -1);
+>         if (!dev)
+>                 return NULL;
+>
+> -       /* count the io and irq resources */
+> -       if (of_can_translate_address(np))
+> -               while (of_address_to_resource(np, num_reg, &temp_res) == 0)
+> -                       num_reg++;
+> -       num_irq = of_irq_count(np);
+> -
+> -       /* Populate the resource table */
+> -       if (num_irq || num_reg) {
+> -               res = kzalloc(sizeof(*res) * (num_irq + num_reg), GFP_KERNEL);
+> -               if (!res) {
+> -                       platform_device_put(dev);
+> -                       return NULL;
+> -               }
+> -
+> -               dev->num_resources = num_reg + num_irq;
+> -               dev->resource = res;
+> -               for (i = 0; i < num_reg; i++, res++) {
+> -                       rc = of_address_to_resource(np, i, res);
+> -                       WARN_ON(rc);
+> -               }
+> -               WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+> -       }
+> -
+>         dev->dev.of_node = of_node_get(np);
+>  #if defined(CONFIG_MICROBLAZE)
+>         dev->dev.dma_mask = &dev->archdata.dma_mask;
+>  #endif
+>         dev->dev.parent = parent;
+> +       dev->dev.of_device = 1;
+>
+>         if (bus_id)
+>                 dev_set_name(&dev->dev, "%s", bus_id);
+> @@ -233,6 +209,94 @@ static struct platform_device *of_platform_device_create_pdata(
+>         return dev;
+>  }
+>
+> +static int of_reg_count(struct device_node *np)
 
-gpio_request(gpio,...);
-gpio_direction_input()
-request[_threaded]_irq(gpio_to_irq(gpio), ...);
+This belongs in of/address.c. It can be more efficiently written as:
 
-But one should not assume that requesting a GPIO to be used as an IRQ
-line implies requesting the GPIO first. It is completely legal to only
-request the IRQ without requesting the GPIO before.
+int of_reg_count(struct device_node *dev)
+{
+const __be32 *prop;
+unsigned int psize;
+struct device_node *parent;
+struct of_bus *bus;
+int na, ns;
 
-Of course at a hardware level the pin has to be configured as input if
-needed by the chip controller and also a following call to
-gpio_request() as output should not be supported.
+/* Get parent & match bus type */
+parent = of_get_parent(dev);
+if (!parent)
+  return 0;
+bus = of_match_bus(parent);
+bus->count_cells(dev, &na, &ns);
+of_node_put(parent);
+if (!OF_CHECK_COUNTS(na, ns))
+  return 0;
 
-After a long discussion the agreement is that the driver should be
-able to setup as a hw level if another driver wants to use a GPIO pin
-as an IRQ line but not requesting the GPIO. So, I think that is wrong
-to call gpio_request() and gpio_direction_input() on a irq_domain_ops
-.xlate() function handler since by doing that a subsequent call to
-gpio_request() is failing like you are reporting.
+/* Get "reg" or "assigned-addresses" property */
+prop = of_get_property(dev, bus->addresses, &psize);
+if (!prop)
+  return 0;
+psize /= 4;
 
-The GPIO subsystem has a new gpio_lock_as_irq() helper function to
-mark a GPIO pin as already used as a IRQ line and only allowing to
-request a GPIO as input if is already marked as an IRQ.
+return psize / (na + ns);
+}
 
-Please take a look to commit 2f56e0a ("gpio/omap: use gpiolib API to
-mark a GPIO used as an IRQ") for an example on how to use this helper
-function.
 
-Also, there is a new GPIOLIB_IRQCHIP infrastructure in gpiolib that
-are a set of helper functions to associate an IRQ chip to a GPIO
-controller. This should cover the most common use case and most
-probably this driver and can be converted to use it.
+> +{
+> +       int nreg = 0;
+> +       if (of_can_translate_address(np)) {
+> +               struct resource temp_res;
+> +               while (of_address_to_resource(np, nreg, &temp_res) == 0)
+> +                       nreg++;
+> +       }
+> +       return nreg;
+> +}
+> +
+> +int of_platform_device_prepare(struct platform_device *dev)
+> +{
+> +       struct device_node *np;
+> +       int i, irq_index;
+> +       struct resource *res;
+> +
+> +       /*
+> +        * This function applies only devices described in the DT and
+> +        * created by of_device_alloc().
+> +        * Other platform devices have their ressources already populated.
+> +        */
+> +       np = dev->dev.of_node;
+> +       if (!np || !dev->dev.of_device)
+> +               return 0;
+> +
+> +       /* Populate the resource table */
+> +       if (!dev->resource) {
+> +               int rc, nreg = 0, nirq;
+> +               /* count the io and irq resources */
+> +               nreg = of_reg_count(np);
+> +               nirq = of_irq_count(np);
 
-Please refer to commits:
+I think of_irq_count should be changed to return errors from
+of_irq_parse_one. It's complicated by the fact you want to distinguish
+checking the index is too big versus all other errors.
 
-1425052 ("gpio: add IRQ chip helpers in gpiolib")
-e0bc34a ("pinctrl: nomadik: convert driver to use gpiolib irqchip")
+> +
+> +               if (!nirq && !nreg)
+> +                       return 0;
+> +
+> +               res = kzalloc(sizeof(*res) * (nirq + nreg), GFP_KERNEL);
+> +               if (!res)
+> +                       return -ENOMEM;
+> +
+> +               dev->resource = res;
+> +               dev->num_resources = nreg + nirq;
+> +
+> +               for (i = 0; i < nreg; i++, res++) {
+> +                       rc = of_address_to_resource(np, i, res);
+> +                       if (WARN_ON(rc)) {
+> +                               /* THIS IS BAD; don't try to defer probing */
+> +                               dev->num_resources = 0;
+> +                               dev->resource = NULL;
+> +                               kfree(res);
 
-for an example on how to use it.
+You are incrementing res, so this kfree is wrong. Using "res + i"
+instead would work, but...
 
-Thanks a lot and best regards,
-Javier
+> +                               return rc;
+> +                       }
+> +               }
+> +
+> +               if (!rc && of_irq_to_resource_table(np, res, nirq) != nirq)
+
+...then res needs to change here.
+
+Doesn't this give a rc may not be initialized warning? You don't need
+to check rc. You need to check !nirq instead.
+
+> +                       /*
+> +                        * Not all irqs can be translated. redo the irq
+> +                        * resources to check if the probe can be deferred
+> +                        */
+> +                       goto redo_irq_resources;
+> +
+> +               return 0;
+
+But then, you don't really need any of this. You can just fall-thru
+and the code below will work.
+
+> +       }
+> +
+> +redo_irq_resources:
+> +       /* See which IRQ resources need to be redone */
+> +       irq_index = 0;
+> +       for (i = 0, res = dev->resource; i < dev->num_resources; i++, res++) {
+> +               if (!res->flags) {
+> +                       int rc;
+> +                       /*
+> +                        * If the IRQ can't be translated to a resource, check
+> +                        * if its IRQ domain exists.
+> +                        */
+> +                       rc = of_irq_to_resource(np, irq_index, res);
+> +                       if (!rc) {
+> +                               if (of_find_irq_domain(np, irq_index) == NULL)
+> +                                       return -EPROBE_DEFER;
+> +                               return rc;
+> +                       }
+
+I would move this check into of_irq_to_resource_table and also make it
+skip entries with IORESOURCE_IRQ set. Then this can become:
+
+for (i = 0, res = dev->resource; i < dev->num_resources; i++, res++) {
+  if (resource_type(res) != IORESOURCE_MEM)
+    break;
+}
+rc = of_irq_to_resource_table(np, res, dev->num_resources - i);
+return (rc < 0) ? rc : 0;
+
+
+Rob
