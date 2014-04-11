@@ -1,51 +1,23 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 11 Apr 2014 17:45:31 +0200
-Subject: [PATCH] gpio/at91: free GPIO after configuring as input
-In-Reply-To: <A08D29A3-2690-46C1-A317-41B17F365A81@jcrosoft.com>
-References: <1397226249-3922-1-git-send-email-alexanders83@web.de>
- <A08D29A3-2690-46C1-A317-41B17F365A81@jcrosoft.com>
-Message-ID: <4406073.7Z2odFudGD@kongar>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 11 Apr 2014 08:54:44 -0700
+Subject: [PATCH 3/6] ARM: dts: zynq: drop address cells from GIC node
+In-Reply-To: <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
+References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
+ <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <f0de762f-56b3-4894-aa78-7ca3c88b9e28@AM1EHSMHS004.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm CC'ing some input guys if this can't be solved in the pinctrl/irq side.
+On Fri, 2014-04-11 at 04:59PM +0200, Lucas Stach wrote:
+> This is likely a copy-and-paste error from the
+> ARM GIC documentation, that has already been fixed.
+> 
+> address-cells should have been set to 0, as with the size
+> cells. As having those properties set to 0 is the
+> same thing as not specifying them, drop them completely.
 
-On Friday 11 April 2014, 23:30:33 wrote Jean-Christophe PLAGNIOL-VILLARD:
-> 
-> On Apr 11, 2014, at 10:24 PM, Alexander Stein <alexanders83@web.de> wrote:
-> 
-> > 
-> > If the GPIO stays requested a device driver can't request it again.
-> > e.g. Without this patch the ads7846 driver returns the following error:
-> > ads7846 spi32766.3: failed to request/setup pendown GPIO15: -16
-> > ads7846: probe of spi32766.3 failed with error -16
-> > 
-> > /sys/kernel/debug/gpio shows this:
-> > GPIOs 0-31, platform/fffff200.gpio, fffff200.gpio:
-> > [/ahb/apb/pinctrl at fffff200/gpio at fffff200] GPIOfffff200.gpio15: [gpio] set
-> > 
-> > Signed-off-by: Alexander Stein <alexanders83@web.de>
-> > ---
-> > I'm aware that it makes sense this GPIO is/stays requested, but either the
-> > pinctl or device driver have to be adjusted as both can't request this GPIO.
-> > I think the latter shouldn't change.
-> > 
-> > drivers/pinctrl/pinctrl-at91.c | 2 ++
-> > 1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> > index d990e33..63176f2 100644
-> > --- a/drivers/pinctrl/pinctrl-at91.c
-> > +++ b/drivers/pinctrl/pinctrl-at91.c
-> > @@ -1493,6 +1493,8 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
-> > 	if (ret)
-> > 		return ret;
-> > 
-> > +	gpio_free(pin);
-> > +
-> 
-> NACK it the whole key point the gpio use as a IRQ so the irq generic code request it
-> > 	return 0;
-> > }
-> > 
-> 
+Isn't this property inherited from the parent node, requiring to
+actually set them to 0 to comply with the docs?
+
+	Thanks,
+	S?ren
