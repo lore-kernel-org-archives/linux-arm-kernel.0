@@ -1,71 +1,44 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 11 Apr 2014 16:33:29 +0200
-Subject: [PATCH v3 2/7] ARM: STi: DT: add keyscan for stih415
+Date: Fri, 11 Apr 2014 16:33:38 +0200
+Subject: [PATCH v3 6/7] driver: reset: sti: add keyscan for stih415
 In-Reply-To: <1397226820-5604-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1397226820-5604-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1397226820-5604-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1397226820-5604-12-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add keyscan support for stih415.
-It is put disabled by default because it is not enabled on all boards
-Also there are PIOs conflict with already claimed lines.
+From: Giuseppe CONDORELLI <giuseppe.condorelli@st.com>
+
+Add keyscan reset on stih415 reset controller.
 
 Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/boot/dts/stih415-pinctrl.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/stih415.dtsi         | 12 ++++++++++++
- 2 files changed, 28 insertions(+)
+ drivers/reset/sti/reset-stih415.c                     | 1 +
+ include/dt-bindings/reset-controller/stih415-resets.h | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-index f09fb10..caeac7e 100644
---- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-@@ -102,6 +102,22 @@
- 				};
- 			};
- 
-+			keyscan {
-+				pinctrl_keyscan: keyscan {
-+					st,pins {
-+						keyin0 = <&PIO0 2 ALT2 IN>;
-+						keyin1 = <&PIO0 3 ALT2 IN>;
-+						keyin2 = <&PIO0 4 ALT2 IN>;
-+						keyin3 = <&PIO2 6 ALT2 IN>;
-+
-+						keyout0 = <&PIO1 6 ALT2 OUT>;
-+						keyout1 = <&PIO1 7 ALT2 OUT>;
-+						keyout2 = <&PIO0 6 ALT2 OUT>;
-+						keyout3 = <&PIO2 7 ALT2 OUT>;
-+					};
-+				};
-+			};
-+
- 			sbc_i2c0 {
- 				pinctrl_sbc_i2c0_default: sbc_i2c0-default {
- 					st,pins {
-diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
-index d89064c..ba0905c 100644
---- a/arch/arm/boot/dts/stih415.dtsi
-+++ b/arch/arm/boot/dts/stih415.dtsi
-@@ -206,5 +206,17 @@
- 			pinctrl-0	= <&pinctrl_ir>;
- 			resets		= <&softreset STIH415_IRB_SOFTRESET>;
- 		};
-+
-+		keyscan: keyscan at fe4b0000 {
-+			compatible = "st,sti-keyscan";
-+			status = "disabled";
-+			reg = <0xfe4b0000 0x2000>;
-+			interrupts = <GIC_SPI 212 IRQ_TYPE_NONE>;
-+			clocks = <&CLK_SYSIN>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_keyscan>;
-+			resets	= <&powerdown STIH415_KEYSCAN_POWERDOWN>,
-+				  <&softreset STIH415_KEYSCAN_SOFTRESET>;
-+		};
- 	};
+diff --git a/drivers/reset/sti/reset-stih415.c b/drivers/reset/sti/reset-stih415.c
+index e6f6c41..c93fd26 100644
+--- a/drivers/reset/sti/reset-stih415.c
++++ b/drivers/reset/sti/reset-stih415.c
+@@ -73,6 +73,7 @@ static const struct syscfg_reset_channel_data stih415_softresets[] = {
+ 	[STIH415_USB0_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 9),
+ 	[STIH415_USB1_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 10),
+ 	[STIH415_USB2_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 11),
++	[STIH415_KEYSCAN_SOFTRESET] = STIH415_SRST_LPM(LPM_SYSCFG_1, 8),
  };
+ 
+ static struct syscfg_reset_controller_data stih415_powerdown_controller = {
+diff --git a/include/dt-bindings/reset-controller/stih415-resets.h b/include/dt-bindings/reset-controller/stih415-resets.h
+index c2f8a66..c2329fe 100644
+--- a/include/dt-bindings/reset-controller/stih415-resets.h
++++ b/include/dt-bindings/reset-controller/stih415-resets.h
+@@ -22,5 +22,6 @@
+ #define STIH415_USB0_SOFTRESET		3
+ #define STIH415_USB1_SOFTRESET		4
+ #define STIH415_USB2_SOFTRESET		5
++#define STIH415_KEYSCAN_SOFTRESET	6
+ 
+ #endif /* _DT_BINDINGS_RESET_CONTROLLER_STIH415 */
 -- 
 1.9.1
