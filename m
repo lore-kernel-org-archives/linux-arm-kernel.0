@@ -1,9 +1,10 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 Apr 2014 16:59:37 +0200
-Subject: [PATCH 3/6] ARM: dts: zynq: drop address cells from GIC node
+Date: Fri, 11 Apr 2014 16:59:36 +0200
+Subject: [PATCH 2/6] ARM: dts: highbank,
+ ecx-2000: drop address and size cells from GIC node
 In-Reply-To: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
 References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1397228380-7352-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,20 +17,35 @@ same thing as not specifying them, drop them completely.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/zynq-7000.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/ecx-2000.dts | 2 --
+ arch/arm/boot/dts/highbank.dts | 2 --
+ 2 files changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 511180769af5..3f277c2bc19c 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -57,7 +57,6 @@
- 		intc: interrupt-controller at f8f01000 {
- 			compatible = "arm,cortex-a9-gic";
+diff --git a/arch/arm/boot/dts/ecx-2000.dts b/arch/arm/boot/dts/ecx-2000.dts
+index 2ccbb57fbfa8..cdb7b264b7fb 100644
+--- a/arch/arm/boot/dts/ecx-2000.dts
++++ b/arch/arm/boot/dts/ecx-2000.dts
+@@ -94,8 +94,6 @@
+ 		intc: interrupt-controller at fff11000 {
+ 			compatible = "arm,cortex-a15-gic";
  			#interrupt-cells = <3>;
+-			#size-cells = <0>;
 -			#address-cells = <1>;
  			interrupt-controller;
- 			reg = <0xF8F01000 0x1000>,
- 			      <0xF8F00100 0x100>;
+ 			interrupts = <1 9 0xf04>;
+ 			reg = <0xfff11000 0x1000>,
+diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
+index ed14aeac0566..85e1a05b8a9c 100644
+--- a/arch/arm/boot/dts/highbank.dts
++++ b/arch/arm/boot/dts/highbank.dts
+@@ -109,8 +109,6 @@
+ 		intc: interrupt-controller at fff11000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			#interrupt-cells = <3>;
+-			#size-cells = <0>;
+-			#address-cells = <1>;
+ 			interrupt-controller;
+ 			reg = <0xfff11000 0x1000>,
+ 			      <0xfff10100 0x100>;
 -- 
 1.9.1
