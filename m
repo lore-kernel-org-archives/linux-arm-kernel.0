@@ -1,52 +1,89 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 Apr 2014 12:10:12 +0200
-Subject: [PATCH 1/2] ARM: dt-binding: fix GIC example
-In-Reply-To: <CAL_Jsq+_+B=TKMQ2ULkXiBJGTNmGGLkB1xjKNJkF1BK_4TRXkg@mail.gmail.com>
-References: <1396023951-32383-1-git-send-email-l.stach@pengutronix.de>
- <CAL_Jsq+_+B=TKMQ2ULkXiBJGTNmGGLkB1xjKNJkF1BK_4TRXkg@mail.gmail.com>
-Message-ID: <1397211012.4577.5.camel@weser.hi.pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 11 Apr 2014 15:49:46 +0530
+Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
+ default when booted with DT
+In-Reply-To: <20140411094217.GA32284@intel.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+ <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com> <5347AE49.5020109@ti.com>
+ <5347B7F8.2000508@ti.com> <20140411094217.GA32284@intel.com>
+Message-ID: <5347C1C2.6070304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Friday 11 April 2014 03:12 PM, Vinod Koul wrote:
+> On Fri, Apr 11, 2014 at 12:38:00PM +0300, Peter Ujfalusi wrote:
+>> On 04/11/2014 11:56 AM, Sekhar Nori wrote:
+>>> On Friday 11 April 2014 02:20 PM, Peter Ujfalusi wrote:
+>>>> On 04/11/2014 11:17 AM, Sekhar Nori wrote:
+>>>>> On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
+>>>>>> Use the EVENTQ_1 for default and leave the EVENTQ_0 to be used by high
+>>>>>> priority channels, like audio.
+>>>>>>
+>>>>>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>>>>>
+>>>>> Acked-by: Sekhar Nori <nsekhar@ti.com>
+>>>>>
+>>>>>> ---
+>>>>>>  arch/arm/common/edma.c | 3 ++-
+>>>>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+>>>>>> index 86a8b263278f..19520e2519d9 100644
+>>>>>> --- a/arch/arm/common/edma.c
+>>>>>> +++ b/arch/arm/common/edma.c
+>>>>>> @@ -1546,7 +1546,8 @@ static int edma_of_parse_dt(struct device *dev,
+>>>>>>  
+>>>>>>  	pdata->queue_priority_mapping = queue_priority_map;
+>>>>>>  
+>>>>>> -	pdata->default_queue = 0;
+>>>>>> +	/* select queue 1 as default */
+>>>>>
+>>>>> It will be nice to expand the comment with explanation of why this is
+>>>>> being chosen as default (lower priority queue by default for typical
+>>>>> bulk data transfer).
+>>>>
+>>>> Yes, extended comment is a good idea.
+>>>>
+>>>> For the next version I think I'm going to change the code around default
+>>>> TC/Queue and the non default queue selection, mostly based on Joel's comment:
+>>>>
+>>>> EVENTQ_1 as default queue.
+>>>> Set the EVENTQ_1 priority to 7
+>>>> EVENTQ_0 priority is going to stay 0 and EVENTQ_2 as 2
+>>>>
+>>>> Add new member to struct edma, like high_pri_queue.
+>>>> When we set the queue priorities in edma_probe() we look for the highest
+>>>> priority queue and save the number in high_pri_queue.
+>>>>
+>>>> I will rename the edma_request_non_default_queue() to
+>>>> edma_request_high_pri_queue() and it will assign the channel to the high
+>>>> priority queue.
+>>>>
+>>>> I think this way it is going to be more explicit and IMHO a bit more safer in
+>>>> a sense the we are going to get high priority when we ask for it.
+>>>
+>>> Sounds much better. I had posted some ideas about adding support for
+>>> channel priority in the core code but we can leave that for Vinod and
+>>> Dan to say if they really see a need for that.
+> Is it part of this series?
 
-Am Donnerstag, den 10.04.2014, 10:21 -0500 schrieb Rob Herring:
-> On Fri, Mar 28, 2014 at 11:25 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > From: Tim Harvey <tharvey@gateworks.com>
-> >
-> > When using interrupt-maps, the size of a map entry is #address-cells +
+No, the current series has an EDMA specific way of managing priority.
+
 > 
-> Plus what? You mean ", and "?
-> 
-Urgh, I obviously messed this up while editing the commit message in the
-last minute. It should have been something along the lines of:
+>> If we do it via the dmaengine core I think it would be better to have a new
+>> flag to be passed to dmaengine_prep_dma_*().
+>> We could have for example:
+>> DMA_PREP_HIGH_PRI as flag to indicate that we need high priority DMA if it is
+>> possible.
+>> We can watch for this flag in the edma driver and act accordingly.
+>> ALSA's dmaengine_pcm_prepare_and_submit() could set this flag unconditionally
+>> since audio should be treated in this way if the DMA IP can do this.
+> Will the priority be different for each descriptor or would be based on channel
+> usage. If not then we can add this in dma_slave_config ?
 
-When using interrupt-maps, the size of a map entry is #address-cells +
-#interrupt-cells. address-cells should be 0 as this offset is not used
-in the GIC.
+The priority will be per-channel not per-transaction (at least for the
+use case we are talking about here).
 
-As #address-cells = <0> is the same as not specifying the
-property, simply remove it.
-
-Can you edit this while applying, or should I send a new patch?
-
-> > address-cells should be 0 as this is not used.
-> >
-> > As #address-cells = <0> is the same as not specifying the
-> > property, simply remove it.
-> >
-> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> 
-> Did this get applied? I can't seem to find patch 2.
-> 
-As Shawn pointed out patch 2 got applied through the imx tree as it
-fixes a real bug there.
-
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Sekhar
