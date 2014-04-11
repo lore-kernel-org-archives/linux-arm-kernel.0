@@ -1,141 +1,234 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 Apr 2014 11:03:57 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <20140410134028.GL27282@n2100.arm.linux.org.uk>
-References: <cover.1396605300.git.nsekhar@ti.com>
- <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
- <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
- <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
- <53469C29.8050906@ti.com> <20140410134028.GL27282@n2100.arm.linux.org.uk>
-Message-ID: <53477EC5.5080400@ti.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 11 Apr 2014 15:00:30 +0900
+Subject: [RFC PATCH 1/2] drivers: mfd: Add support of exynos-pmu driver
+In-Reply-To: <4187440.t3CeqIPlpy@amdc1032>
+References: <1396427085-4696-1-git-send-email-pankaj.dubey@samsung.com>
+ <1396427085-4696-2-git-send-email-pankaj.dubey@samsung.com>
+ <4187440.t3CeqIPlpy@amdc1032>
+Message-ID: <534784FE.6090107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 April 2014 07:10 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 10, 2014 at 06:57:05PM +0530, Sekhar Nori wrote:
->> On Thursday 10 April 2014 05:46 PM, Sekhar Nori wrote:
->>> This will work. NS_LOCKDOWN is required for L2C-220 as well and so I was
->>> thinking about adding a new l2c220_enable() which will set the
->>> NS_LOCKDOWN and then call l2c_enable()
+Hi Bartlomiej,
+
+Thanks for review.
+
+On 04/03/2014 08:56 PM, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
+>
+> On Wednesday, April 02, 2014 05:24:44 PM Pankaj Dubey wrote:
+>> From: Younggun Jang <yg1004.jang@samsung.com>
 >>
->> Here is a patch for what I was saying above.
->>
->> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
->> index c47ac8f..dc9e03b 100644
->> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
->> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
->> @@ -105,6 +105,8 @@
->>  #define L2X0_AUX_CTRL_DIRTY_LATENCY_MASK	(7 << 9)
->>  #define L2X0_AUX_CTRL_ASSOC_SHIFT		13
->>  #define L2X0_AUX_CTRL_ASSOC_MASK		(15 << 13)
->> +/* L2C-220/310 common bits */
->> +#define L2C_AUX_CTRL_NS_LOCKDOWN		BIT(26)
->>  /* L2C-210 specific bits */
->>  #define L210_AUX_CTRL_WRAP_DISABLE		BIT(12)
->>  #define L210_AUX_CTRL_WA_OVERRIDE		BIT(23)
->> @@ -113,7 +115,6 @@
->>  #define L220_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
->>  #define L220_AUX_CTRL_FWA_SHIFT			23
->>  #define L220_AUX_CTRL_FWA_MASK			(3 << 23)
->> -#define L220_AUX_CTRL_NS_LOCKDOWN		BIT(26)
->>  #define L220_AUX_CTRL_NS_INT_CTRL		BIT(27)
->>  /* L2C-310 specific bits */
->>  #define L310_AUX_CTRL_FULL_LINE_ZERO		BIT(0)	/* R2P0+ */
->> @@ -122,7 +123,6 @@
->>  #define L310_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
->>  #define L310_AUX_CTRL_ASSOCIATIVITY_16		BIT(16)
->>  #define L310_AUX_CTRL_CACHE_REPLACE_RR		BIT(25)	/* R2P0+ */
->> -#define L310_AUX_CTRL_NS_LOCKDOWN		BIT(26)
-> 
-> NAK.  The reason for this split is because the NS lockdown bit is *not*
-> on L2C-210, and so it does not deserve to be a "common" bit - because it
-> isn't common to all variants.
+>> This driver is mainly used for setting misc bits of register from PMU IP
+>> of Exynos SoC which will be required to configure before Suspend/Resume.
+>> Currently all these settings are done in "arch/arm/mach-exynos/pmu.c" but
+>> moving ahead for ARM64 based SoC support, there is a need of DT based
+>> implementation of PMU driver.
+> PMU support for ARM32 EXYNOS SoCs is heavily SoC dependent and there
+> is very little code shared between diffirent SoCs.  Unless PMU setup
+> for Samsung ARM64 SoCs is similar to some existing ARM32 EXYNOS SoCs
+> it may be better to just add a separate PMU driver for Samsung ARM64
+> SoCs. IOW it would be best to show that this patch series is really
+> useful before merging it.
 
-Okay.
+We think it will be useful, but I will consider your point of making driver
+which should have common piece of code to address various EXYNOS SoCs.
+We are working on it, once it takes some proper shape I will post details here.
 
-> 
->> @@ -764,7 +776,7 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
->>  			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
->>  	}
->>  
->> -	l2c_enable(base, aux, num_lock);
->> +	l2c220_enable(base, aux, num_lock);
-> 
-> My first reaction to this is to say NAK again - I don't want to create
-> a multi-layered maze of X calls Y calls Z.  Who's to say that The 220
-> won't need to do something different from 310 in the future?
+>
+> When it comes to the current patches it would be better to do changes
+> converting PMU support to be a platform driver first for the existing
+> arch/arm/mach-exynos/pmu.c file and then move+rename this file in
+> the separate patch.  Currently the code changes are done at the same
+> time as the code movement which makes them difficult to review/verify.
 
-Here is a revised patch which is just an extension of your patch 
-with L2C-220 case handled. I dont really have L2C-220 hardware so even 
-if you want to handle that at a later time, it would be perfectly okay 
-with me.
+OK, will do as you suggested in next version.
 
-Thanks,
-Sekhar
+> There are also some minor issues with the new code:
+>
+> [...]
+>
+>> diff --git a/drivers/mfd/exynos-pmu.c b/drivers/mfd/exynos-pmu.c
+>> new file mode 100644
+>> index 0000000..24abd9b
+>> --- /dev/null
+>> +++ b/drivers/mfd/exynos-pmu.c
+>> @@ -0,0 +1,534 @@
+>> +/*
+>> + * Copyright (c) 2014-2015 Samsung Electronics Co., Ltd.
+>> + *		http://www.samsung.com/
+> 2015?
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 6b2a056..34cafe0 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -216,8 +216,6 @@ int __init omap4_l2_cache_init(void)
- {
- 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
- 	u32 aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
--		       L310_AUX_CTRL_NS_LOCKDOWN |
--		       L310_AUX_CTRL_NS_INT_CTRL |
- 		       L2C_AUX_CTRL_SHARED_OVERRIDE |
- 		       L310_AUX_CTRL_DATA_PREFETCH |
- 		       L310_AUX_CTRL_INSTR_PREFETCH;
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index b1f103d..72f41fa 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -498,11 +498,23 @@ static void l2c220_sync(void)
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
-+static void __init l2c220_enable(void __iomem *base, u32 aux, unsigned num_lock)
-+{
-+	/*
-+	 * Always enable non-secure access to the lockdown registers -
-+	 * we write to them as part of the L2C enable sequence so they
-+	 * need to be accessible.
-+	 */
-+	aux |= L220_AUX_CTRL_NS_LOCKDOWN;
-+
-+	l2c_enable(base, aux, num_lock);
-+}
-+
- static const struct l2c_init_data l2c220_data = {
- 	.type = "L2C-220",
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
--	.enable = l2c_enable,
-+	.enable = l2c220_enable,
- 	.outer_cache = {
- 		.inv_range = l2c220_inv_range,
- 		.clean_range = l2c220_clean_range,
-@@ -764,6 +776,13 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
- 	}
- 
-+	/*
-+	 * Always enable non-secure access to the lockdown registers -
-+	 * we write to them as part of the L2C enable sequence so they
-+	 * need to be accessible.
-+	 */
-+	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
-+
- 	l2c_enable(base, aux, num_lock);
- 
- 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
-@@ -1027,7 +1046,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
- 	.of_parse = l2x0_of_parse,
--	.enable = l2c_enable,
-+	.enable = l2c220_enable,
- 	.outer_cache = {
- 		.inv_range   = l2c220_inv_range,
- 		.clean_range = l2c220_clean_range,
+Will fix this.
+
+> [...]
+>
+>> +static int __init exynos4210_pmu_init(void)
+>> +{
+>> +	exynos_pmu_config = exynos4210_pmu_config;
+>> +	pmu_data->pmu_id = PMU_EXYNOS4210;
+>> +	pr_info("EXYNOS4210 PMU Initialize\n");
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init exynos4212_pmu_init(void)
+>> +{
+>> +	exynos_pmu_config = exynos4x12_pmu_config;
+>> +	pmu_data->pmu_id = PMU_EXYNOS4212;
+>> +	pr_info("EXYNOS4x12 PMU Initialize\n");
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init exynos4412_pmu_init(void)
+>> +{
+>> +	exynos_pmu_config = exynos4x12_pmu_config;
+>> +	pmu_data->pmu_id = PMU_EXYNOS4412;
+>> +	pr_info("EXYNOS4412 PMU Initialize\n");
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init exynos5250_pmu_init(void)
+>> +{
+>> +	unsigned int value;
+>> +
+>> +	/*
+>> +	 * When SYS_WDTRESET is set, watchdog timer reset request
+>> +	 * is ignored by power management unit.
+>> +	 */
+>> +	value = __raw_readl(pmu_data->regs + EXYNOS5_AUTO_WDTRESET_DISABLE);
+>> +	value &= ~EXYNOS5_SYS_WDTRESET;
+>> +	__raw_writel(value, pmu_data->regs + EXYNOS5_AUTO_WDTRESET_DISABLE);
+>> +
+>> +	value = __raw_readl(pmu_data->regs + EXYNOS5_MASK_WDTRESET_REQUEST);
+>> +	value &= ~EXYNOS5_SYS_WDTRESET;
+>> +	__raw_writel(value, pmu_data->regs + EXYNOS5_MASK_WDTRESET_REQUEST);
+>> +
+>> +	exynos_pmu_config = exynos5250_pmu_config;
+>> +	pmu_data->pmu_id = PMU_EXYNOS5250;
+>> +	pr_info("EXYNOS5250 PMU Initialize\n");
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * PMU platform driver and devicetree bindings.
+>> + */
+>> +static struct of_device_id exynos_pmu_of_device_ids[] = {
+>> +	{
+>> +		.compatible = "samsung,exynos4210-pmu",
+>> +		.data = (void *)exynos4210_pmu_init
+>> +	},
+>> +	{
+>> +		.compatible = "samsung,exynos4212-pmu",
+>> +		.data = (void *)exynos4212_pmu_init
+>> +	},
+>> +	{
+>> +		.compatible = "samsung,exynos4412-pmu",
+>> +		.data = (void *)exynos4412_pmu_init
+>> +	},
+>> +	{
+>> +		.compatible = "samsung,exynos5250-pmu",
+>> +		.data = (void *)exynos5250_pmu_init
+>> +	},
+>> +	{},
+>> +};
+>> +
+>> +static int exynos_pmu_probe(struct platform_device *pdev)
+>> +{
+>> +	const struct of_device_id *match;
+>> +	exynos_pmu_init_t exynos_pmu_init;
+>> +	struct resource *res;
+>> +
+>> +	pmu_data = devm_kzalloc(&pdev->dev,
+>> +			sizeof(struct exynos_pmu_data), GFP_KERNEL);
+>> +	if (!pmu_data) {
+>> +		dev_err(&pdev->dev, "exynos_pmu driver probe failed\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	pmu_data->dev = &pdev->dev;
+>> +
+>> +	match = of_match_node(exynos_pmu_of_device_ids, pdev->dev.of_node);
+>> +	exynos_pmu_init = match->data;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	pmu_data->regs = devm_ioremap_resource(&pdev->dev, res);
+> devm_ioremap_resouce() return value should be checked for errors with
+>
+> if (IS_ERR(pmu_data->regs))
+> 	return PTR_ERR(pmu_data->regs);
+Will take care.
+>> +
+>> +	exynos_pmu_init();
+> exynos*_pmu_init() methods should be void as they always return 0 and
+> the return value is ignored anyway.
+>
+> Also they cannot be marked with __init as the driver probe function
+> itself is not marked with __init (it cannot be beacuse of possibility
+> of doing unbind/bind through sysfs).
+Will take care.
+>> +
+>> +	return 0;
+>> +};
+>> +
+>> +static int exynos_pmu_remove(struct platform_device *pdev)
+>> +{
+>> +	exynos_pmu_config = NULL;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct platform_driver exynos_pmu_driver = {
+>> +	.driver  = {
+>> +		.name   = "exynos-pmu",
+>> +		.of_match_table = exynos_pmu_of_device_ids,
+>> +	},
+>> +	.probe = exynos_pmu_probe,
+>> +	.remove = exynos_pmu_remove,
+>> +};
+>> +
+>> +static int __init exynos_pmu_driver_init(void)
+>> +{
+>> +	return platform_driver_register(&exynos_pmu_driver);
+>> +}
+>> +arch_initcall(exynos_pmu_driver_init);
+>> +
+>> +MODULE_AUTHOR("Younggun Jang <yg1004.jang@samsung.com");
+>> +MODULE_DESCRIPTION("Exynos PMU driver");
+>> +MODULE_LICENSE("GPL v2");
+> This driver can be build as module now but:
+> - exynos_sys_powerdown_conf() is not exported
+> - there is no exynos_pmu_driver_exit()
+OK, will take care.
+> Also it is not clear what happens if exynos_sys_powerdown_conf() is called
+> while there are no platform devices binded to a driver but driver itself is
+> loaded.
+>
+> [...]
+>
+>> diff --git a/include/linux/mfd/samsung/exynos-regs-pmu.h b/include/linux/mfd/samsung/exynos-regs-pmu.h
+>> new file mode 100644
+>> index 0000000..ed8259d
+>> --- /dev/null
+>> +++ b/include/linux/mfd/samsung/exynos-regs-pmu.h
+>> @@ -0,0 +1,308 @@
+>> +/*
+>> + * Copyright (c) 2014-2015 Samsung Electronics Co., Ltd.
+> 2015?
+I will change.
+>
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+>
+
+
+-- 
+Best Regards,
+Pankaj Dubey
