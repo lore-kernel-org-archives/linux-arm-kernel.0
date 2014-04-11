@@ -1,38 +1,38 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 11 Apr 2014 12:41:02 -0700
-Subject: [PATCH v2 1/5] ARM: zynq: DT: Add 'clock-latency' property
-In-Reply-To: <53423BB6.7010508@monstr.eu>
-References: <1396653256-28397-1-git-send-email-soren.brinkmann@xilinx.com>
- <1396653256-28397-2-git-send-email-soren.brinkmann@xilinx.com>
- <53423BB6.7010508@monstr.eu>
-Message-ID: <34776df5-5255-4d58-a5ab-83f2017e16fc@AM1EHSMHS018.ehs.local>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 11 Apr 2014 14:57:48 -0500
+Subject: [PATCH v2 10/14] dma: edma: Simplify direction configuration
+ in edma_config_pset()
+In-Reply-To: <53478E0E.8040709@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-11-git-send-email-peter.ujfalusi@ti.com>
+ <53471DC5.4090001@ti.com> <53478E0E.8040709@ti.com>
+Message-ID: <5348493C.8040408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-04-07 at 07:46AM +0200, Michal Simek wrote:
-> On 04/05/2014 01:14 AM, Soren Brinkmann wrote:
-> > Specify the 'clock-latency' property to avoid certain cpufreq governors
-> > from refusing to work with the following error:
-> >   ondemand governor failed, too long transition latency of HW, fallback to performance governor
-> > 
-> > Reported-by: Mike Looijmans <mike.looijmans@topic.nl>
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > Tested-by: Mike Looijmans <mike.looijmans@topic.nl>
-> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> > ---
-> > This is a fix from our vendor tree
-> > 
-> > Changes in v2:
-> >  - This patch has been added
-> > 
-> > ---
-> >  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
-> >  1 file changed, 1 insertion(+)
+On 04/11/2014 01:39 AM, Peter Ujfalusi wrote:
+> On 04/11/2014 01:40 AM, Joel Fernandes wrote:
+>> On 04/01/2014 08:06 AM, Peter Ujfalusi wrote:
+>>> We only support DEV_TO_MEM or MEM_TO_DEV directions with edma driver and the
+>>> check for the direction has been already done in the function calling
+>>> edma_config_pset().
+>>> The error reporting is redundant and also the "else if ()" can be removed.
+>>>
+>>
+>> NAK. Please don't do this. I have been working on MEM_TO_MEM support as
+>> well so leave it as it is for future.
 > 
-> Applied to zynq-dt.
+> Sure. It is still valid to say that the error else {} will never going to
+> happen since you have the same check in the calling function and they already
+> filtered the non implemented direction.
+> 
 
-Actually, this should probably go in as fix into the current (3.15)
-release cycle.
+That's true. Though the patch removes the else if which would mean more
+work later ;)
 
-	Thanks,
-	S?ren
+> I'll leave this out from v3.
+
+Thanks.
+
+Regards,
+-Joel
