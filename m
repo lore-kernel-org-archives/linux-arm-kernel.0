@@ -1,22 +1,35 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 11 Apr 2014 14:16:05 +0200
-Subject: Wrong SPI NOR model detected by mx6sl
-In-Reply-To: <CAOMZO5D37M0zNaYp8OWGrvKkfih-qMw=O9JSs5Tj60ZGPbuMAQ@mail.gmail.com>
-References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
- <201404111359.26723.marex@denx.de>
- <CAOMZO5D37M0zNaYp8OWGrvKkfih-qMw=O9JSs5Tj60ZGPbuMAQ@mail.gmail.com>
-Message-ID: <201404111416.06009.marex@denx.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 11 Apr 2014 09:18:03 -0300
+Subject: [PATCH] ARM: dts: imx6sl-evk: Add an entry for
+ MX6SL_PAD_ECSPI1_SS0__GPIO4_IO11
+In-Reply-To: <201404111415.52225.marex@denx.de>
+References: <1397218179-3533-1-git-send-email-festevam@gmail.com>
+ <201404111415.52225.marex@denx.de>
+Message-ID: <CAOMZO5D9MefK0f05vtok2AfLuBCQs9_Eb+wkRdsBF0qPH6=KYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 11, 2014 at 02:11:23 PM, Fabio Estevam wrote:
-> On Fri, Apr 11, 2014 at 8:59 AM, Marek Vasut <marex@denx.de> wrote:
-> > This means there's also a pinmux issue in kernel, did you fix it in
-> > kernel as well please ?
-> 
-> Just sent the patch.
+On Fri, Apr 11, 2014 at 9:15 AM, Marek Vasut <marex@denx.de> wrote:
 
-Thanks
+>> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts
+>> b/arch/arm/boot/dts/imx6sl-evk.dts index 864d8df..a8d9a93 100644
+>> --- a/arch/arm/boot/dts/imx6sl-evk.dts
+>> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+>> @@ -282,6 +282,7 @@
+>>                               MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO      0x100b1
+>>                               MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI      0x100b1
+>>                               MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK      0x100b1
+>> +                             MX6SL_PAD_ECSPI1_SS0__GPIO4_IO11
+> 0x80000000
+>
+> Doesn't 0x80000000 mean "do not configure this pin, leave it as it was
+> configured before" ?
 
-Best regards,
-Marek Vasut
+For the PAD settings, yes, but here I am interested in setting the ALT
+mode to GPIO.
+
+It is OK to leave the PAD settings as is for the GPIO.
+
+Regards,
+
+Fabio Estevam
