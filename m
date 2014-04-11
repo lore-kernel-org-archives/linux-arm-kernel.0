@@ -1,46 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 11 Apr 2014 10:58:42 -0500
-Subject: [PATCH 1/6] ARM: dts: keystone: drop address and size cells from
- GIC node
-In-Reply-To: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
-References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <CAL_JsqJx-+7t237K+xsUtF7UifknJ3EV+2ujMNrp8wMA8Ns6jw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 11 Apr 2014 18:00:53 +0200
+Subject: [PATCH] ARM: dts: Fix PL330 MDMA clock assignment for Exynos4x12
+In-Reply-To: <1397226211-29775-1-git-send-email-s.nawrocki@samsung.com>
+References: <1397226211-29775-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <534811B5.10906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 9:59 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> This is likely a copy-and-paste error from the
-> ARM GIC documentation, that has already been fixed.
+Hi Sylwester,
+
+On 11.04.2014 16:23, Sylwester Nawrocki wrote:
+> Exynos4212/4412 has different clock for the PL330 MDMA, ensure
+> the clock is properly assigned for these newer SoCs.
 >
-> address-cells should have been set to 0, as with the size
-> cells. As having those properties set to 0 is the
-> same thing as not specifying them, drop them completely.
->
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-
-Thanks for doing this. For the series:
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-Rob
-
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/keystone.dtsi | 2 --
->  1 file changed, 2 deletions(-)
+>   arch/arm/boot/dts/exynos4x12.dtsi |    6 ++++++
+>   1 file changed, 6 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-> index 90823eb90c1b..d0b0266d8922 100644
-> --- a/arch/arm/boot/dts/keystone.dtsi
-> +++ b/arch/arm/boot/dts/keystone.dtsi
-> @@ -28,8 +28,6 @@
->         gic: interrupt-controller {
->                 compatible = "arm,cortex-a15-gic";
->                 #interrupt-cells = <3>;
-> -               #size-cells = <0>;
-> -               #address-cells = <1>;
->                 interrupt-controller;
->                 reg = <0x0 0x02561000 0x0 0x1000>,
->                       <0x0 0x02562000 0x0 0x2000>,
-> --
-> 1.9.1
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index c4a9306..19589c6 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -243,4 +243,10 @@
+>   		clock-names = "biu", "ciu";
+>   		status = "disabled";
+>   	};
+> +
+> +	amba {
+> +		mdma at 12850000 {
+> +			clocks = <&clock CLK_MDMA2>;
+> +		};
+> +	};
+>   };
 >
+
+Since the ID for CLK_MDMA2 was added mistakenly, instead of reusing 
+CLK_MDMA and it was not used by any device tree files anyway, I believe 
+the better fix would be to simply change the clock definition in Exynos 
+4 clock driver to use CLK_MDMA for both SoC families.
+
+Best regards,
+Tomasz
