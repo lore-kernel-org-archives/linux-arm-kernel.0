@@ -1,40 +1,54 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Fri, 11 Apr 2014 18:47:11 +0530
-Subject: [PATCH V2 0/3] Add PMU and S2R support for exynos5420
-In-Reply-To: <1395900785-11334-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1395900785-11334-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAGm_ybhWjc7=OUJ5BTvQ-K6S_RwYVgGV8+vi6iUgKEJb0qSymw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 11 Apr 2014 08:20:47 -0500
+Subject: [PATCH 1/2] ARM: dt-binding: fix GIC example
+In-Reply-To: <1397211012.4577.5.camel@weser.hi.pengutronix.de>
+References: <1396023951-32383-1-git-send-email-l.stach@pengutronix.de>
+ <CAL_Jsq+_+B=TKMQ2ULkXiBJGTNmGGLkB1xjKNJkF1BK_4TRXkg@mail.gmail.com>
+ <1397211012.4577.5.camel@weser.hi.pengutronix.de>
+Message-ID: <CAL_Jsq+-8hmKf31nX7rbhZ6EBXAycWS3THHRz-ZLt1RXqWnjVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi,
+On Fri, Apr 11, 2014 at 5:10 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Hi Rob,
+>
+> Am Donnerstag, den 10.04.2014, 10:21 -0500 schrieb Rob Herring:
+>> On Fri, Mar 28, 2014 at 11:25 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+>> > From: Tim Harvey <tharvey@gateworks.com>
+>> >
+>> > When using interrupt-maps, the size of a map entry is #address-cells +
+>>
+>> Plus what? You mean ", and "?
+>>
+> Urgh, I obviously messed this up while editing the commit message in the
+> last minute. It should have been something along the lines of:
+>
+> When using interrupt-maps, the size of a map entry is #address-cells +
+> #interrupt-cells. address-cells should be 0 as this offset is not used
+> in the GIC.
+>
+> As #address-cells = <0> is the same as not specifying the
+> property, simply remove it.
+>
+> Can you edit this while applying, or should I send a new patch?
 
- Any comments on this series.
+I'll fix it up and apply.
 
-On Thu, Mar 27, 2014 at 11:43 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> rebased on kgene tree for-next branch
-> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
 >
-> changes since v1:
->         - Addressed comments from Tomasz figa.
->         - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
->
-> Abhilash Kesavan (1):
->   ARM: dts: Add node for GPIO keys on SMDK5420
->
-> Vikas Sajjan (2):
->   ARM: EXYNOS5: Add PMU settings for exynos5420
->   ARM: EXYNOS5: Support Suspend-to-RAM on EXYNOS5420
->
->  arch/arm/boot/dts/exynos5420-smdk5420.dts    |   11 +
->  arch/arm/mach-exynos/common.h                |   10 +
->  arch/arm/mach-exynos/pm.c                    |  148 +++++++++++--
->  arch/arm/mach-exynos/pmu.c                   |  307 ++++++++++++++++++++++++++
->  arch/arm/mach-exynos/regs-pmu.h              |  230 +++++++++++++++++++
->  arch/arm/plat-samsung/include/plat/map-s5p.h |    2 +
->  drivers/clk/samsung/clk-exynos5420.c         |   32 +++
->  7 files changed, 722 insertions(+), 18 deletions(-)
->
-> --
-> 1.7.9.5
->
+>> > address-cells should be 0 as this is not used.
+>> >
+>> > As #address-cells = <0> is the same as not specifying the
+>> > property, simply remove it.
+>> >
+>> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+>>
+>> Did this get applied? I can't seem to find patch 2.
+>>
+> As Shawn pointed out patch 2 got applied through the imx tree as it
+> fixes a real bug there.
+
+It was highlighted that other instances beyond iMX were wrong. Please
+fix those as well.
+
+Rob
