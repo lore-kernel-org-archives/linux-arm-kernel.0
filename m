@@ -1,103 +1,141 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 11 Apr 2014 14:14:01 +0900
-Subject: [PATCH 04/27] ARM: EXYNOS: Support secondary CPU boot of
- Exynos4212
-In-Reply-To: <20140411014424.GA14934@quad.lixom.net>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <1397122658-16013-5-git-send-email-cw00.choi@samsung.com>
- <20140411014424.GA14934@quad.lixom.net>
-Message-ID: <53477A19.6070509@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 11 Apr 2014 11:03:57 +0530
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <20140410134028.GL27282@n2100.arm.linux.org.uk>
+References: <cover.1396605300.git.nsekhar@ti.com>
+ <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
+ <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
+ <53469C29.8050906@ti.com> <20140410134028.GL27282@n2100.arm.linux.org.uk>
+Message-ID: <53477EC5.5080400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/11/2014 10:44 AM, Olof Johansson wrote:
-> On Thu, Apr 10, 2014 at 06:37:15PM +0900, Chanwoo Choi wrote:
->> From: Kyungmin Park <kyungmin.park@samsung.com>
+On Thursday 10 April 2014 07:10 PM, Russell King - ARM Linux wrote:
+> On Thu, Apr 10, 2014 at 06:57:05PM +0530, Sekhar Nori wrote:
+>> On Thursday 10 April 2014 05:46 PM, Sekhar Nori wrote:
+>>> This will work. NS_LOCKDOWN is required for L2C-220 as well and so I was
+>>> thinking about adding a new l2c220_enable() which will set the
+>>> NS_LOCKDOWN and then call l2c_enable()
 >>
->> This patch fix the offset of CPU boot address and change parameter of smc call
->> of SMC_CMD_CPU1BOOT command for Exynos4212.
+>> Here is a patch for what I was saying above.
 >>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos/firmware.c | 14 ++++++++++++--
->>  1 file changed, 12 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
->> index 932129e..91a911d 100644
->> --- a/arch/arm/mach-exynos/firmware.c
->> +++ b/arch/arm/mach-exynos/firmware.c
->> @@ -18,6 +18,8 @@
->>  
->>  #include <mach/map.h>
->>  
->> +#include <plat/cpu.h>
->> +
->>  #include "smc.h"
->>  
->>  static int exynos_do_idle(void)
->> @@ -28,14 +30,22 @@ static int exynos_do_idle(void)
->>  
->>  static int exynos_cpu_boot(int cpu)
->>  {
->> -	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
->> +	if (soc_is_exynos4212())
->> +		exynos_smc(SMC_CMD_CPU1BOOT, 0, 0, 0);
->> +	else
->> +		exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+>> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+>> index c47ac8f..dc9e03b 100644
+>> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+>> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+>> @@ -105,6 +105,8 @@
+>>  #define L2X0_AUX_CTRL_DIRTY_LATENCY_MASK	(7 << 9)
+>>  #define L2X0_AUX_CTRL_ASSOC_SHIFT		13
+>>  #define L2X0_AUX_CTRL_ASSOC_MASK		(15 << 13)
+>> +/* L2C-220/310 common bits */
+>> +#define L2C_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+>>  /* L2C-210 specific bits */
+>>  #define L210_AUX_CTRL_WRAP_DISABLE		BIT(12)
+>>  #define L210_AUX_CTRL_WA_OVERRIDE		BIT(23)
+>> @@ -113,7 +115,6 @@
+>>  #define L220_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
+>>  #define L220_AUX_CTRL_FWA_SHIFT			23
+>>  #define L220_AUX_CTRL_FWA_MASK			(3 << 23)
+>> -#define L220_AUX_CTRL_NS_LOCKDOWN		BIT(26)
+>>  #define L220_AUX_CTRL_NS_INT_CTRL		BIT(27)
+>>  /* L2C-310 specific bits */
+>>  #define L310_AUX_CTRL_FULL_LINE_ZERO		BIT(0)	/* R2P0+ */
+>> @@ -122,7 +123,6 @@
+>>  #define L310_AUX_CTRL_EXCLUSIVE_CACHE		BIT(12)
+>>  #define L310_AUX_CTRL_ASSOCIATIVITY_16		BIT(16)
+>>  #define L310_AUX_CTRL_CACHE_REPLACE_RR		BIT(25)	/* R2P0+ */
+>> -#define L310_AUX_CTRL_NS_LOCKDOWN		BIT(26)
 > 
-> 	/* <explain why you need this special case on 4212> */
+> NAK.  The reason for this split is because the NS lockdown bit is *not*
+> on L2C-210, and so it does not deserve to be a "common" bit - because it
+> isn't common to all variants.
 
-It's better to ask system lsi person. We don't know it well.
-I got the guide about secondary boot from system lsi.
-But, this patch was completely tested.
+Okay.
 
-> 	if (soc_is_exynos4212())
-> 		cpu = 0;
 > 
-> ...and then do the call as before.
+>> @@ -764,7 +776,7 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>>  			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+>>  	}
+>>  
+>> -	l2c_enable(base, aux, num_lock);
+>> +	l2c220_enable(base, aux, num_lock);
+> 
+> My first reaction to this is to say NAK again - I don't want to create
+> a multi-layered maze of X calls Y calls Z.  Who's to say that The 220
+> won't need to do something different from 310 in the future?
 
-OK, I'll modify it as following:
+Here is a revised patch which is just an extension of your patch 
+with L2C-220 case handled. I dont really have L2C-220 hardware so even 
+if you want to handle that at a later time, it would be perfectly okay 
+with me.
 
- static int exynos_cpu_boot(int cpu)
+Thanks,
+Sekhar
+
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 6b2a056..34cafe0 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -216,8 +216,6 @@ int __init omap4_l2_cache_init(void)
  {
-+       if (soc_is_exynos4212())
-+               cpu = 0;
-+
-        exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
-        return 0;
+ 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+ 	u32 aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
+-		       L310_AUX_CTRL_NS_LOCKDOWN |
+-		       L310_AUX_CTRL_NS_INT_CTRL |
+ 		       L2C_AUX_CTRL_SHARED_OVERRIDE |
+ 		       L310_AUX_CTRL_DATA_PREFETCH |
+ 		       L310_AUX_CTRL_INSTR_PREFETCH;
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b1f103d..72f41fa 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -498,11 +498,23 @@ static void l2c220_sync(void)
+ 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
  }
-
-> 
-> 
->>  	return 0;
->>  }
->>  
->>  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
->>  {
->> -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
->> +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
->>  
->> +	if (soc_is_exynos4212())
->> +		goto out;
->> +	else
->> +		boot_reg += 4*cpu;
-> 
-> 	if (!soc_is_exynos4212())
-> 		boot_reg += 4 * cpu;
-> 
-> That way you avoid a goto, especially since the "goto out" isn't actually
-> an "out", it's still doing stuff at the end of the funciton.
-> 
-
-OK, I'll remove goto statement and then modify it as your comment.
-
--       void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
-+       void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+ 
++static void __init l2c220_enable(void __iomem *base, u32 aux, unsigned num_lock)
++{
++	/*
++	 * Always enable non-secure access to the lockdown registers -
++	 * we write to them as part of the L2C enable sequence so they
++	 * need to be accessible.
++	 */
++	aux |= L220_AUX_CTRL_NS_LOCKDOWN;
 +
-+       if (!soc_is_exynos4212())
-+               boot_reg += 4*cpu;
-
-Best Regards,
-Chanwoo Choi
++	l2c_enable(base, aux, num_lock);
++}
++
+ static const struct l2c_init_data l2c220_data = {
+ 	.type = "L2C-220",
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 1,
+-	.enable = l2c_enable,
++	.enable = l2c220_enable,
+ 	.outer_cache = {
+ 		.inv_range = l2c220_inv_range,
+ 		.clean_range = l2c220_clean_range,
+@@ -764,6 +776,13 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
+ 	}
+ 
++	/*
++	 * Always enable non-secure access to the lockdown registers -
++	 * we write to them as part of the L2C enable sequence so they
++	 * need to be accessible.
++	 */
++	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
++
+ 	l2c_enable(base, aux, num_lock);
+ 
+ 	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
+@@ -1027,7 +1046,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
+ 	.way_size_0 = SZ_8K,
+ 	.num_lock = 1,
+ 	.of_parse = l2x0_of_parse,
+-	.enable = l2c_enable,
++	.enable = l2c220_enable,
+ 	.outer_cache = {
+ 		.inv_range   = l2c220_inv_range,
+ 		.clean_range = l2c220_clean_range,
