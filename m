@@ -1,61 +1,108 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Apr 2014 10:43:30 +0100
-Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <CABuKBeKLexBsTwF-nX15AYfLNA9bFDRm2XyeLpwQg9+3m6Xf=w@mail.gmail.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
- <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
- <CAL_JsqJowqV2bsxE2VeYXQQSj4_L_KcH+C_dD=ZUvC=1crN4dA@mail.gmail.com>
- <87ha6136dz.fsf@approximate.cambridge.arm.com>
- <CABuKBeKLexBsTwF-nX15AYfLNA9bFDRm2XyeLpwQg9+3m6Xf=w@mail.gmail.com>
-Message-ID: <5347B942.2040703@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 11 Apr 2014 11:44:39 +0200
+Subject: [PATCH v4 3/5] sched: powerpc: create a dedicated topology table
+In-Reply-To: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
+References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1397209481-28542-4-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/14 10:11, Matthias Brugger wrote:
-> 2014-04-10 11:01 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
->> A couple of things on top of Rob's comments:
->>
->> On Wed, Apr 09 2014 at 10:50:33 pm BST, Rob Herring <robherring2@gmail.com> wrote:
->>> On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->>>> This adds a generic devicetree board file and a dtsi for boards
->>>> based on the MT6589 SoCs from Mediatek.
->>>>
->>>> Apart from the generic parts (gic, clocks) the only component
->>>> currently supported are the timers.
->>>>
->>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>
->> [...]
->>
->>>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
->>>> new file mode 100644
->>>> index 0000000..c0139ca
->>>> --- /dev/null
->>>> +++ b/arch/arm/mach-mediatek/Kconfig
->>>> @@ -0,0 +1,14 @@
->>>> +config ARCH_MEDIATEK
->>>> +       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
->>>> +       select ARCH_REQUIRE_GPIOLIB
->>>
->>> Then where is your GPIO driver?
->>>
->>>> +       select ARM_GIC
->>>> +       select CACHE_L2X0
->>>> +       select HAVE_ARM_TWD if LOCAL_TIMERS
->>
->> Hell no! ;-) ARM_ARCH_TIMER is the way (please also add the missing
->> node).
-> 
-> I considered this, but the timer wasn't able to get it's clock frequency:
-> "Architected timer frequency not available
-> Division by zero in kernel."
+Create a dedicated topology table for handling asymetric feature of powerpc.
 
-This is because your bootloader/firmware is utterly broken, and doesn't
-set CNTFRQ (it must be set on all CPUs, from secure mode). As a
-*workaround*, you can set the timer frequency in the timer node, but
-that's just a hack, and will prevent virtual machines from running on
-such hardware.
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+---
+ arch/powerpc/kernel/smp.c | 31 +++++++++++++++++++++++--------
+ include/linux/sched.h     |  2 --
+ kernel/sched/core.c       |  6 ------
+ 3 files changed, 23 insertions(+), 16 deletions(-)
 
-	M.
+diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+index ac2621a..c9cade5 100644
+--- a/arch/powerpc/kernel/smp.c
++++ b/arch/powerpc/kernel/smp.c
+@@ -755,6 +755,28 @@ int setup_profiling_timer(unsigned int multiplier)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_SCHED_SMT
++/* cpumask of CPUs with asymetric SMT dependancy */
++static const int powerpc_smt_flags(void)
++{
++	int flags = SD_SHARE_CPUPOWER | SD_SHARE_PKG_RESOURCES;
++
++	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
++		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
++		flags |= SD_ASYM_PACKING;
++	}
++	return flags;
++}
++#endif
++
++static struct sched_domain_topology_level powerpc_topology[] = {
++#ifdef CONFIG_SCHED_SMT
++	{ cpu_smt_mask, powerpc_smt_flags, SD_INIT_NAME(SMT) },
++#endif
++	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
++	{ NULL, },
++};
++
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+ 	cpumask_var_t old_mask;
+@@ -779,15 +801,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ 	dump_numa_cpu_topology();
+ 
+-}
++	set_sched_topology(powerpc_topology);
+ 
+-int arch_sd_sibling_asym_packing(void)
+-{
+-	if (cpu_has_feature(CPU_FTR_ASYM_SMT)) {
+-		printk_once(KERN_INFO "Enabling Asymmetric SMT scheduling\n");
+-		return SD_ASYM_PACKING;
+-	}
+-	return 0;
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 3161701..7df3ca2 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -872,8 +872,6 @@ enum cpu_idle_type {
+ #define SD_OVERLAP		0x2000	/* sched_domains of this level overlap */
+ #define SD_NUMA			0x4000	/* cross-node balancing */
+ 
+-extern int __weak arch_sd_sibiling_asym_packing(void);
+-
+ #ifdef CONFIG_SCHED_SMT
+ static inline const int cpu_smt_flags(void)
+ {
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index b15b994..3743a6c 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5830,11 +5830,6 @@ static void init_sched_groups_power(int cpu, struct sched_domain *sd)
+ 	atomic_set(&sg->sgp->nr_busy_cpus, sg->group_weight);
+ }
+ 
+-int __weak arch_sd_sibling_asym_packing(void)
+-{
+-       return 0*SD_ASYM_PACKING;
+-}
+-
+ /*
+  * Initializers for schedule domains
+  * Non-inlined to reduce accumulated stack pressure in build_sched_domains()
+@@ -6015,7 +6010,6 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
+ 	if (sd->flags & SD_SHARE_CPUPOWER) {
+ 		sd->imbalance_pct = 110;
+ 		sd->smt_gain = 1178; /* ~15% */
+-		sd->flags |= arch_sd_sibling_asym_packing();
+ 
+ 	} else if (sd->flags & SD_SHARE_PKG_RESOURCES) {
+ 		sd->imbalance_pct = 117;
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
