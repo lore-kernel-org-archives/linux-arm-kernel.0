@@ -1,69 +1,29 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Fri, 11 Apr 2014 11:21:57 +0200
-Subject: [PATCH RESEND 2/5] pinctrl: berlin: add a pinctrl driver for
- Marvell Berlin SoCs
-In-Reply-To: <20140411162716.74e739e1@xhacker>
-References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397135274-10764-3-git-send-email-antoine.tenart@free-electrons.com>
- <20140411144431.04fb148d@xhacker> <20140411081839.GB20147@kwain>
- <20140411162716.74e739e1@xhacker>
-Message-ID: <20140411092157.GD20147@kwain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Apr 2014 11:21:59 +0200
+Subject: [PATCH 1/4] clocksource: Add support for the Mediatek SoCs
+In-Reply-To: <CABuKBeKr77qJwusoTgjR2yOspWbi6Exvt5i8WPc5tjd7fez-YA@mail.gmail.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <CAOesGMg2zvPPeyqTvztiNKVJzWP5PsNs2pkXKMaS+CfXHgO0rQ@mail.gmail.com>
+ <CABuKBeKr77qJwusoTgjR2yOspWbi6Exvt5i8WPc5tjd7fez-YA@mail.gmail.com>
+Message-ID: <129772722.mXH1xx9vCv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jisheng,
-
-On Fri, Apr 11, 2014 at 04:27:16PM +0800, Jisheng Zhang wrote:
-> Hi Antoine,
+On Friday 11 April 2014 11:07:35 Matthias Brugger wrote:
+> >
+> > Of course, you'll still need these for the A9-based platforms, so the
+> > driver might very well be needed anyway. Some of the earlier patches
+> > seem to be for A7-based systems so I'm not sure what you're primarily
+> > working on here. 
 > 
-> On Fri, 11 Apr 2014 01:18:39 -0700
-> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+> I'm working on a Cortex-A7 based platform. But ARM_ARCH_TIMER seems to
+> get no clocking.
+> Initializing the timer fails with:
+> Architected timer frequency not available
 > 
-> > Hi Jisheng,
-> > 
-> > On Fri, Apr 11, 2014 at 02:44:31PM +0800, Jisheng Zhang wrote:
-> > > On Thu, 10 Apr 2014 06:07:51 -0700
-> > > Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
-> > > 
-> > > ...
-> > > > +static int berlin_pinmux_enable(struct pinctrl_dev *pctrl_dev,
-> > > > +                               unsigned function,
-> > > > +                               unsigned group)
-> > > > +{
-> > > > +       struct berlin_pinctrl *pctrl =
-> > > > pinctrl_dev_get_drvdata(pctrl_dev);
-> > > > +       struct berlin_pinctrl_group *group_desc = pctrl->groups + group;
-> > > > +       struct berlin_pinctrl_function *function_desc =
-> > > > +               pctrl->functions + function;
-> > > > +       unsigned long flags;
-> > > > +       u32 regval;
-> > > > +
-> > > > +       spin_lock_irqsave(&pctrl->lock, flags);
-> > > > +
-> > > > +       regval = readl(group_desc->reg);
-> > > > +       regval &= group_desc->mask;
-> > > > +       regval |= function_desc->muxval << group_desc->lsb;
-> > > > +       writel(regval, group_desc->reg);
-> > > 
-> > > Could we use relaxed version instead?
-> > 
-> > We could, but this is not a performance issue here at all, so I guess we can
-> > keep writel().
-> 
-> Yes it's not a performance issue here but an issue for the system which is doing
-> PL310 L2 cache maintenance. If pinmux operation hold the l2x0_lock due to writel()
-> the important video/audio process which is cleaning PL310 cache must wait, thus
-> cause jitter. So I'd like relaxed version if we can. Then I don't need to add this
-> patch to mainline kernel when we upgrade internal tree.
+> That's why I use the SoC timer.
 
-I'm not sure I got that. As I understand it, you will need to play video/audio
-*while* configuring the pinmux. But the pinmuxing configuration is done at boot
-time, and I don't think a video/audio is being played then. So I'm not certain a
-jitter will appear. What do you think ?
+Are you sure you're not just missing a "clock-frequency" property
+in your DT node for the timer?
 
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
