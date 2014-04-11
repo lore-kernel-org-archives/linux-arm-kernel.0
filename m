@@ -1,10 +1,9 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 11 Apr 2014 16:59:38 +0200
-Subject: [PATCH 4/6] ARM: dts: vybrid: drop address and size cells from GIC
- node
+Date: Fri, 11 Apr 2014 16:59:39 +0200
+Subject: [PATCH 5/6] ARM: dts: ste-dbx: drop address cells from GIC node
 In-Reply-To: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
 References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1397228380-7352-4-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1397228380-7352-5-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +16,20 @@ same thing as not specifying them, drop them completely.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/vf610.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 804873367669..bb78e901ed5d 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -72,8 +72,6 @@
- 			intc: interrupt-controller at 40002000 {
- 				compatible = "arm,cortex-a9-gic";
- 				#interrupt-cells = <3>;
--				#address-cells = <1>;
--				#size-cells = <1>;
- 				interrupt-controller;
- 				reg = <0x40003000 0x1000>,
- 				      <0x40002100 0x100>;
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index e41eedca3ce3..c73414d3fe50 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -24,7 +24,6 @@
+ 		intc: interrupt-controller at a0411000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			#interrupt-cells = <3>;
+-			#address-cells = <1>;
+ 			interrupt-controller;
+ 			reg = <0xa0411000 0x1000>,
+ 			      <0xa0410100 0x100>;
 -- 
 1.9.1
