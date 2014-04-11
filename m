@@ -1,76 +1,77 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 Apr 2014 14:13:31 +0530
-Subject: [PATCH v2 07/14] arm: common: edma: API to request non default
- queue for a channel
-In-Reply-To: <1396357575-30585-8-git-send-email-peter.ujfalusi@ti.com>
-References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
- <1396357575-30585-8-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5347AB33.8000606@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 11 Apr 2014 10:49:14 +0200
+Subject: [PATCH V4 10/20] ARM: exynos: cpuidle: Move clock setup to pm.c
+In-Reply-To: <5347A816.4020609@linaro.org>
+References: <1397123751-1957-1-git-send-email-daniel.lezcano@linaro.org>
+ <1397123751-1957-11-git-send-email-daniel.lezcano@linaro.org>
+ <5346A367.2070107@samsung.com> <5346A958.1030302@linaro.org>
+ <5346BA09.9020708@samsung.com> <5347A816.4020609@linaro.org>
+Message-ID: <5347AC8A.7090006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
-> When using eDMA3 via dmaengine all dma channels will use the default queue.
-> Since during request time we do not have means to change this it need to be done
-> later, before the DMA has been started.
-> With the added function it is possible to move the channel to a non default
-> queue if it is possible, otherwise (when only one EQ/TC is available for the CC)
-> the default queue is going to be used.
-> For example: For optimal system performance the audio (cyclic) DMA should
-> be placed to a separate queue which is different than what the rest of the
-> system is using.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  arch/arm/common/edma.c             | 27 +++++++++++++++++++++++++++
->  include/linux/platform_data/edma.h |  2 ++
->  2 files changed, 29 insertions(+)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index be267b2080be..eaf6dd19f082 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -712,6 +712,33 @@ int edma_alloc_channel(int channel,
->  }
->  EXPORT_SYMBOL(edma_alloc_channel);
->  
-> +/**
-> + * edma_request_non_default_queue - try to map the channel to non default queue
-> + * @channel: dma channel returned from edma_alloc_channel()
-> + *
-> + * For certain type of applications like audio it is preferred to not use the
-> + * default event queue/tc to avoid eDMA caused latency.
-> + *
-> + * This function will iterate through the event queues available for the CC and
-> + * picks the first EQ/TC which is not set as the default for the CC
-> + */
-> +void edma_request_non_default_queue(int channel)
-> +{
-> +	unsigned ctlr = EDMA_CTLR(channel);
-> +	enum dma_event_q eventq_no = EVENTQ_DEFAULT;
-> +	int i;
-> +
-> +	for (i = 0; i < edma_cc[ctlr]->num_tc; i++) {
-> +		if (i != edma_cc[ctlr]->default_queue) {
-> +			eventq_no = i;
-> +			break;
-> +		}
-> +	}
-> +
-> +	channel = EDMA_CHAN_SLOT(channel);
-> +	map_dmach_queue(ctlr, channel, eventq_no);
-> +}
-> +EXPORT_SYMBOL(edma_request_non_default_queue);
+On 11.04.2014 10:30, Daniel Lezcano wrote:
+> On 04/10/2014 05:34 PM, Tomasz Figa wrote:
+>> On 10.04.2014 16:23, Daniel Lezcano wrote:
+>>> On 04/10/2014 03:57 PM, Tomasz Figa wrote:
+>>>> Hi Daniel,
+>>>>
+>>>> On 10.04.2014 11:55, Daniel Lezcano wrote:
+>>>>> One more step is moving the clock ratio setting at idle time in pm.c
+>>>>>
+>>>>> The macro names have been changed to be consistent with the other
+>>>>> macros
+>>>>> name in the file.
+>>>>>
+>>>>> Note, the clock divider was working only when cpuidle was enabled
+>>>>> because it
+>>>>> was in its init routine. With this change, the clock divider is set in
+>>>>> the pm's
+>>>>> init routine, so it will also operate when the cpuidle driver is not
+>>>>> set, which
+>>>>> is good.
+>>>>>
+>>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>>>> ---
+>>>>>   arch/arm/mach-exynos/cpuidle.c  |   54
+>>>>> ---------------------------------------
+>>>>>   arch/arm/mach-exynos/pm.c       |   35 +++++++++++++++++++++++++
+>>>>>   arch/arm/mach-exynos/regs-pmu.h |   19 ++++++++++++++
+>>>>>   3 files changed, 54 insertions(+), 54 deletions(-)
+>>>>
+>>>> Sorry that I didn't mention that before, but now I recall that there
+>>>> was
+>>>> already a similar patch moving this code to Exynos5250 clock driver,
+>>>> which is the best place for setup of any CMU registers and a step
+>>>> towards removing one more static IO mapping.
+>>>
+>>> Yes, Bartlomiej mentioned it.
+>>>
+>>> Is it possible to merge this mentioned patch or to give a pointer to it
+>>> so I can integrate it into the patchset ?
+>>
+>> http://marc.info/?l=linux-arm-kernel&m=138147021207626&w=2
+>>
+>> I wonder if it still applies cleanly, though...
+>
+> Ok, if I refer to the date, this patch has been lost in the limbus. So I
+> can integrate it with my patchset without conflicting with any tree.
+> Right ?
+>
 
-With this API, the caller cannot be sure of what the final affect on the
-channel will be. It depends a lot on what the default queue setting is.
-And that can change independent of this API.
+As I suspected, it doesn't apply onto current sources. I have attached a 
+rebased version. Feel free to send it as a part of next version of your 
+series.
 
-I am not an expert in dmaengine, but it looks like we are trying to
-workaround the fact that dmaengine does not support multiple transfer
-priorities for a dma_chan. If yes, it will be better to add support for
-doing this in dmaengine core itself. A generic priority space could be
-supported which each DMA device can then map to its hardware support.
-
-Thanks,
-Sekhar
+Best regards,
+Tomasz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-EXYNOS-Move-arm-core-power-down-clock-to-exynos5.patch
+Type: text/x-patch
+Size: 6226 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/1ad9e7d6/attachment.bin>
