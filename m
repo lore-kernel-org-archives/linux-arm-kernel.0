@@ -1,42 +1,45 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 11 Apr 2014 08:42:53 -0700
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140411145625.GA27493@redhat.com>
-References: <20140409184507.GA1058@redhat.com>
- <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
- <5347655B.3080307@linaro.org>
- <20140411.003636.272212797007496394.davem@davemloft.net>
- <20140411145625.GA27493@redhat.com>
-Message-ID: <CA+55aFzqxmJOaMmGCbhYyYFXC_ok18dsD8c7EwUFeJ_g2d04Xw@mail.gmail.com>
+From: alexanders83@web.de (Alexander Stein)
+Date: Fri, 11 Apr 2014 17:45:02 +0200
+Subject: [PATCH] pinctrl/at91: Fix pin_to_mask
+In-Reply-To: <075734B2-F667-47DE-A813-8371456A31B9@jcrosoft.com>
+References: <1397230537-8727-1-git-send-email-alexanders83@web.de>
+ <075734B2-F667-47DE-A813-8371456A31B9@jcrosoft.com>
+Message-ID: <21196207.LSji5uQPhJ@kongar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 7:56 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> First of all: I do not pretend I really understand the problems with
-> icache/etc coherency and how flush_icache_range() actually works on
-> alpha. Help.
+On Friday 11 April 2014, 23:42:19 wrote Jean-Christophe PLAGNIOL-VILLARD:
+> 
+> On Apr 11, 2014, at 11:35 PM, Alexander Stein <alexanders83@web.de> wrote:
+> 
+> > 
+> > We need first to reduce the pin number to only a GPIO bank before we can
+> > create the mask.
+> > Otherwise only GPIO bank 0 has correct masks as the bits in the other
+> > banks are shifted out of range.
+> > 
+> > Signed-off-by: Alexander Stein <alexanders83@web.de>
+> > ---
+> > drivers/pinctrl/pinctrl-at91.c | 2 +-
+> > 1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> > index 63176f2..6669e13 100644
+> > --- a/drivers/pinctrl/pinctrl-at91.c
+> > +++ b/drivers/pinctrl/pinctrl-at91.c
+> > @@ -316,7 +316,7 @@ static inline int pin_to_bank(unsigned pin)
+> > 
+> > static unsigned pin_to_mask(unsigned int pin)
+> > {
+> > -	return 1 << pin;
+> > +	return 1 << (pin % MAX_NB_GPIO_PER_BANK);
+> > }
+> no need pin_to_mask is already called with it
 
-According to the alpha architecture rules, the instruction cache can
-be completely virtual, and is not only not coherent with the data
-cache, it's not even necessarily coherent with TLB mapping changes (ie
-it's purely virtual, and you need to flush it if you change
-instruction mappings). The virtual caches do have an address space
-number, so you can have multiple separate virtual address spaces.
+But this only true for the call within at91_pinconf_set, but not for those in
+at91_gpio_dbg_show
+at91_pmx_enable
+at91_pmx_disable
 
-The way to flush it is with the "imb" instruction (which is not
-actually an instruction at all, it's a jump to PAL-code, alpha's
-"explicit microcode")
-
-That means that when you modify data that could be code, you do need
-to do an "imb" _and_ you do need to do it cross-cpu even for
-thread-local cases in case your thread migrates to another CPU with
-stale I$ data (the ASN will be the same). You can use the usual VM
-cpu-mask to tell which other CPU's you'd need to do it on, though.
-
-But alpha does not need page or addr/len, because "imb" is "make the
-whole instruction cache coherent".
-
-Your patch looks correct for alpha, afaik.
-
-               Linus
+Regards,
+Alexander
