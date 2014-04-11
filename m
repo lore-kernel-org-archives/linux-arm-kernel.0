@@ -1,96 +1,107 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 11 Apr 2014 21:10:21 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: OMAP hwmod and clock fixes for v3.15-rc
-Message-ID: <alpine.DEB.2.02.1404112109320.5758@utopia.booyaka.com>
+From: ddutile@redhat.com (Don Dutile)
+Date: Fri, 11 Apr 2014 17:37:11 -0400
+Subject: [PATCH_v8 0/2] arm64: Add audit support
+In-Reply-To: <1394862548-29060-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705767-12423-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394862548-29060-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <53486087.9060304@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On 03/15/2014 01:49 AM, AKASHI Takahiro wrote:
+> (Please apply this patch after my ftrace patch to resolve some conflict
+> on arm64/kernel/ptrace.c, functionally it doesn't depend on ftrace though)
+>
+> This patchset adds system call audit support on arm64.
+> Both 32-bit (AUDIT_ARCH_ARM) and 64-bit tasks (AUDIT_ARCH_AARCH64)
+> are supported. Since arm64 has the exact same set of system calls
+> on LE and BE, we don't care about endianness (or more specifically
+> __AUDIT_ARCH_64BIT bit in AUDIT_ARCH_*).
+>
+> There are some prerequisites for this patch to work correctly:
+> * "audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL" patch
+> * "audit: generic compat system call audit support" patch
+> * "arm64: __NR_* definitions for compat syscalls" patch from Catalin
+> * "arm64: make a single hook to syscall_trace() for all syscall features" patch
+> * "arm64: split syscall_trace() into separate functions for enter/exit" patch
+> * "arm64: Add regs_return_value() in syscall.h" patch
+> * "arm64: is_compat_task is defined both in asm/compat.h and
+>     linux/compat.h" patch
+> * userspace audit tool (v2.3.2 + my patch for arm64)
+>
+and the 2/2 patch won't apply to arch/arm64/kernel/ptrace.c
+without the patch from  [PATCH v7 7/7] arm64: ftrace: Add system call tracepoint;
+My question: do you need all 7 patches from arm64: Add ftrace support
+as well for this audit patch to work, or just this 7/7 patch ?
 
-Hi Tony,
 
-The following changes since commit 9e897e13bd46fa03485468609741974259a8c573:
-
-  Merge branch 'for-linus' of git://git.open-osd.org/linux-open-osd (2014-04-10 14:33:02 -0700)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.15-rc/omap-fixes-a
-
-for you to fetch changes up to 3d36ad7e7a9be0d130c862727a052ed279046437:
-
-  ARM: OMAP2+: hwmod: fix missing braces in _init() (2014-04-11 12:29:09 -0600)
-
-- ----------------------------------------------------------------
-OMAP hwmod and clock fixes for v3.15-rc
-
-A few OMAP hwmod and clock fixes for v3.15-rc.  Probably the most useful
-fix is the AM43xx DPLL patch.
-
-Basic build, boot, and PM test results are here:
-
-http://www.pwsan.com/omap/testlogs/prcm-fixes-a-v3.15-rc/20140411130021/
-
-- ----------------------------------------------------------------
-Roger Quadros (1):
-      ARM: OMAP3: hwmod data: Correct clock domains for USB modules
-
-Suman Anna (1):
-      ARM: OMAP2+: hwmod: fix missing braces in _init()
-
-Tomi Valkeinen (1):
-      ARM: AM43xx: fix dpll init in bypass mode
-
- arch/arm/mach-omap2/clkt_dpll.c            | 4 ++--
- arch/arm/mach-omap2/omap_hwmod.c           | 3 ++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 4 ++--
- 3 files changed, 6 insertions(+), 5 deletions(-)
-
-vmlinux object size
-(delta in bytes from prcm-fixes-a-v3.15-rc-base (9e897e13bd46fa03485468609741974259a8c573)):
-   text     data      bss    total  kernel
-      0        0        0        0  omap1_defconfig
-      0        0        0        0  omap1_defconfig_1510innovator_only
-      0        0        0        0  omap1_defconfig_5912osk_only
-      0       +8        0       +8  multi_v7_defconfig
-     -4       +8        0       +4  omap2plus_defconfig
-      0        0        0        0  omap2plus_defconfig_2430sdp_only
-      0        0        0        0  omap2plus_defconfig_am33xx_only
-   +112        0        0     +112  omap2plus_defconfig_am43xx_only
-     -4       +8        0       +4  omap2plus_defconfig_cpupm
-     -4        0        0       -4  omap2plus_defconfig_dra7xx_only
-    +12      +16        0      +28  omap2plus_defconfig_n800_multi_omap2xxx
-    +12       -8        0       +4  omap2plus_defconfig_n800_only_a
-     -4       +8        0       +4  omap2plus_defconfig_no_pm
-     -4        0        0       -4  omap2plus_defconfig_omap2_4_only
-     -4       +8        0       +4  omap2plus_defconfig_omap3_4_only
-     -4      -24        0      -28  omap2plus_defconfig_omap5_only
-    -16        0      +16        0  rmk_omap3430_ldp_allnoconfig
-    +16      +16        0      +32  rmk_omap3430_ldp_oldconfig
-     -8        0       +8        0  rmk_omap4430_sdp_allnoconfig
-    +16      +16        0      +32  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from prcm-fixes-a-v3.15-rc-base (9e897e13bd46fa03485468609741974259a8c573))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJTSFkWAAoJEMePsQ0LvSpL+E4QAJoFPAL0ld6ZGMMsYEcVjMjS
-aTxIIFH7dnbqhohvn1bhSCPrBxlSCWqsSYbfsxv8/QiIziFBh8bSni0lyvIvvs3+
-gq84aHFBs2+nKLPtoAEvEvFXDcAkPILKYCIBAl16hhfRxsKfODqJQHUjP+2eW8j0
-+u+v9meCXF/fijgAgQ21gSWQrcuwrxGb088sJoAMSjFmZP3lmjTNWUCgEloRam7m
-Xh+/zr3sqRjXWPxQ8nXGmjGWcyTPpF4S3nApRwOM3mI0HBxTNDiJ0VlceiWKUDBt
-WYCx17+T9Ny4Zy5Y35PRkxIfeHrggDO+6InBdmyNMZs/ampqAA53jqWu16NIaKPK
-XkfnMwlNhJnJvf58Dc3+Ol57NY7Vnmfd1DY0MiKvImhhxmsf1r/N6WO7DhszA3qY
-48s3q4OBWFQyA+b1ZAJF6m513nXIpPKduCj4T+dyGFmyesLrKcKReEJ19aQFYkkn
-TWTFzraKM/cVqOJDNpy6FWf2gICZY53aF1jCUroiT3MxESg/oAcCyWQUFQ0y+IAp
-HcVey7G3e7boySgMEvOeaUXHY8+c0B2cj9W+35mMBS9mnlhQghiyIalZIvQE9M6F
-8rbKB3vujPFxd9VIEfXngnhQLdMs5Wuoqaq/qUJlH/P5Tn4CKMXV7d7wHPNy+AGG
-qL27Wn1zW5K7lwWNkEo0
-=pexL
------END PGP SIGNATURE-----
+> Please review them as well for better understandings.
+>
+> This code was tested on both 32-bit and 64-bit LE userland
+> in the following two ways:
+> 1) basic operations with auditctl/autrace
+>    # auditctl -a exit,always -S openat -F path=/etc/inittab
+>    # auditctl -a exit,always -F dir=/tmp -F perm=rw
+>    # auditctl -a task,always
+>    # autrace /bin/ls
+>      by comparing output from autrace with one from strace
+>
+> 2) audit-test-code (+ my workarounds for arm/arm64)
+>    by running "audit-tool", "filter" and "syscalls" test categories.
+>
+> Changes v7 -> v8:
+> * aligned with the change in "audit: generic compat system call audit
+>    support" v5 [1/2]
+> * aligned with the change in "arm64: split syscall_trace() into separate
+>    functions for enter/exit" v5 [2/2]
+>
+> Changes v6 -> v7:
+> * changed an include file in syscall.h from <linux/audit.h> to
+>    <uapi/linux/audit.h> [1/2]
+> * aligned with the patch, "arm64: split syscall_trace() into separate
+>    functions for enter/exit" [2/2]
+>
+> Changes v5 -> v6:
+> * removed and put "arm64: Add regs_return_value() in syscall.h" patch into
+>    a separate set
+> * aligned with the change in "arm64: make a single hook to syscall_trace()
+>    for all syscall features" v3 [1/2]
+>
+> Changes v4 -> v5:
+> * rebased to 3.14-rcX
+> * added a guard against TIF_SYSCALL_AUDIT [3/3]
+> * aligned with the change in "arm64: make a single hook to syscall_trace()
+>    for all syscall features" v2 [3/3]
+>
+> Changes v3 -> v4:
+> * Modified to sync with the patch, "make a single hook to syscall_trace()
+>    for all syscall features"
+> * aligned with "audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL" patch
+>
+> Changes v2 -> v3:
+> * Remove asm/audit.h.
+>    See "generic compat syscall audit support" patch v4
+> * Remove endianness dependency, ie. AUDIT_ARCH_ARMEB/AARCH64EB.
+> * Remove kernel/syscalls/Makefile which was used to create unistd32.h.
+>    See Catalin's "Add __NR_* definitions for compat syscalls" patch
+>
+> Changes v1 -> v2:
+> * Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
+>    Please note that a required header, unistd_32.h, is automatically
+>    generated from unistd32.h.
+> * Refer to regs->orig_x0 instead of regs->x0 as the first argument of
+>    system call in audit_syscall_entry() [6/6]
+> * Include "Add regs_return_value() in syscall.h" patch [2/6],
+>    which was not intentionally included in v1 because it could be added
+>    by "kprobes support".
+>
+> AKASHI Takahiro (2):
+>    arm64: Add audit support
+>    arm64: audit: Add audit hook in syscall_trace_enter/exit()
+>
+>   arch/arm64/Kconfig               |  2 ++
+>   arch/arm64/include/asm/syscall.h | 15 +++++++++++++++
+>   arch/arm64/kernel/ptrace.c       |  7 +++++++
+>   include/uapi/linux/audit.h       |  1 +
+>   4 files changed, 25 insertions(+)
+>
