@@ -1,27 +1,42 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 11 Apr 2014 11:03:18 +0900
-Subject: [PATCH 03/27] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
-In-Reply-To: <20140411014858.GC14934@quad.lixom.net>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <1397122658-16013-4-git-send-email-cw00.choi@samsung.com>
- <20140411014858.GC14934@quad.lixom.net>
-Message-ID: <53474D66.7020605@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 10 Apr 2014 23:09:41 -0300
+Subject: Wrong SPI NOR model detected by mx6sl
+In-Reply-To: <20140411002635.GB3837@localhost.localdomain>
+References: <CAOMZO5DR00ea=zfr+eM0uh2L5a6QB93g8X48JNkXZZc4UavdZA@mail.gmail.com>
+ <201404101807.48238.marex@denx.de>
+ <CAOMZO5CBV0tXhbBBFBO=T62nmCn9TenK8BgdAhT8r3b-30u6qg@mail.gmail.com>
+ <20140411002635.GB3837@localhost.localdomain>
+Message-ID: <CAOMZO5BG+m=nfJWnE0epH6hmvkJZ-YSgfLpXrcobKGbL2WH5Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2014 10:48 AM, Olof Johansson wrote:
-> On Thu, Apr 10, 2014 at 06:37:14PM +0900, Chanwoo Choi wrote:
->> This patch add memory mapping for PMU (Power Management Unit) which is used
->> for power control of Exynos3250.
+Hi Huang,
+
+On Thu, Apr 10, 2014 at 9:26 PM, Huang Shijie <shijie8@gmail.com> wrote:
+> On Thu, Apr 10, 2014 at 02:16:49PM -0300, Fabio Estevam wrote:
+>> Hi Marek,
 >>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Signed-off-by is in the wrong order, if Kyungmin wrote the patch and you're
-> just posting it...
+>> On Thu, Apr 10, 2014 at 1:07 PM, Marek Vasut <marex@denx.de> wrote:
+>>
+>> > Can you share the JEDEC ID codes that both of the boards actually read from the
+>> > SPI NOR ? You can dump those in the m25p80.c driver . That'd be helpful, I
+>> > suspect some kind of an "offset" or "polarity inversion" in the SPI
+>> > communication causing this.
+>>
+>> On mx6qsabresd:
+>>
+>> m25p80 spi0.0: JEDEC id: 0x202016
+>> m25p80 spi0.0: m25p32 (4096 Kbytes)
+>>
+>> On mx6sl-evk:
+>>
+>> m25p80 spi0.0: JEDEC id: 0x000000
+> It seems the kernel can not read out anything from the NOR.
+> Please check the pinctrl or the schematic.
 
+I also tried FSL 3.10 kernel and U-boot and also get 0x0000 as JEDEC
+response on these cases.
 
-No, I implemented this patch and posted it.
+Regards,
 
-Best Regards,
-Chanwoo Choi
+Fabio Estevam
