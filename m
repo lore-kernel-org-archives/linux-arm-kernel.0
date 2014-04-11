@@ -1,73 +1,103 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 11 Apr 2014 15:01:09 +1000
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <6459805.ygy4tBNDNz@wuerfel>
-References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <6144916.rD76jOL8sv@wuerfel>
- <20140410145304.GS985@e106497-lin.cambridge.arm.com>
- <6459805.ygy4tBNDNz@wuerfel>
-Message-ID: <1397192469.19518.11.camel@pasglop>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 11 Apr 2014 14:14:01 +0900
+Subject: [PATCH 04/27] ARM: EXYNOS: Support secondary CPU boot of
+ Exynos4212
+In-Reply-To: <20140411014424.GA14934@quad.lixom.net>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397122658-16013-5-git-send-email-cw00.choi@samsung.com>
+ <20140411014424.GA14934@quad.lixom.net>
+Message-ID: <53477A19.6070509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-04-10 at 22:46 +0200, Arnd Bergmann wrote:
+Hi,
 
-> Half of it ;-)
+On 04/11/2014 10:44 AM, Olof Johansson wrote:
+> On Thu, Apr 10, 2014 at 06:37:15PM +0900, Chanwoo Choi wrote:
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> This patch fix the offset of CPU boot address and change parameter of smc call
+>> of SMC_CMD_CPU1BOOT command for Exynos4212.
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/firmware.c | 14 ++++++++++++--
+>>  1 file changed, 12 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+>> index 932129e..91a911d 100644
+>> --- a/arch/arm/mach-exynos/firmware.c
+>> +++ b/arch/arm/mach-exynos/firmware.c
+>> @@ -18,6 +18,8 @@
+>>  
+>>  #include <mach/map.h>
+>>  
+>> +#include <plat/cpu.h>
+>> +
+>>  #include "smc.h"
+>>  
+>>  static int exynos_do_idle(void)
+>> @@ -28,14 +30,22 @@ static int exynos_do_idle(void)
+>>  
+>>  static int exynos_cpu_boot(int cpu)
+>>  {
+>> -	exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+>> +	if (soc_is_exynos4212())
+>> +		exynos_smc(SMC_CMD_CPU1BOOT, 0, 0, 0);
+>> +	else
+>> +		exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
 > 
-> I think it would be better to not have an architecture specific data
-> structure, just like it would be better not to have architecture specific
-> pcibios_* functions that get called by the PCI core. Note that the
-> architecture specific functions are the ones that rely on the architecture
-> specific data structures as well. If they only use the common fields,
-> it should also be possible to share the code.
+> 	/* <explain why you need this special case on 4212> */
 
-I don't understand... we'll never get rid of architecture specific hooks
-in one form or another.
+It's better to ask system lsi person. We don't know it well.
+I got the guide about secondary boot from system lsi.
+But, this patch was completely tested.
 
-We'll always need to some things in an architecture or host-bridge
-specific way. Now if you don't want to call them arch hooks, then call
-them host bridge ops, but they are needed and thus they will need some
-kind of architecture specific extension to the base host bridge 
-structure.
-
-EEH is one big nasty example on powerpc.
-
-Another random one that happens to be hot in my brain right now because
-we just finished debugging it: On powernv, we are just fixing a series
-of bugs caused by the generic code trying to do hot resets on PCIe "by
-hand" by directly toggling the secondary reset register in bridges.
-
-Well, on our root complexes, this triggers a link loss which triggers
-a fatal EEH "ER_all" interrupt which we escalate into a fence and all
-hell breaks loose.
-
-We need to mask some error traps in the hardware before doing something
-that can cause an intentional link loss... and unmask them when done.
-(Among other things, there are other issues on P7 with hot reset).
-
-So hot reset must be an architecture hook.
-
-PERST (fundamental reset) can *only* be a hook. The way to generate a
-PERST is not specified. In fact, on our machines, we have special GPIOs
-we can use to generate PERST on individual slots below a PLX bridge
-and a different methods for slots directly on a PHB.
-
-Eventually most of those hooks land into firmware, and as such it's akin
-to ACPI which also keeps a separate state structure and a pile of hooks.
-
-> I also don't realistically think we can get there on a lot of architectures
-> any time soon. Note that most architectures only have one PCI host
-> implementation, so the architecture structure is the same as the host
-> driver structure anyway.
+> 	if (soc_is_exynos4212())
+> 		cpu = 0;
 > 
-> For architectures like powerpc and arm that have people actively working
-> on them, we have a chance to clean up that code in the way we want it
-> (if we can agree on the direction), but it's still not trivial to do.
+> ...and then do the call as before.
+
+OK, I'll modify it as following:
+
+ static int exynos_cpu_boot(int cpu)
+ {
++       if (soc_is_exynos4212())
++               cpu = 0;
++
+        exynos_smc(SMC_CMD_CPU1BOOT, cpu, 0, 0);
+        return 0;
+ }
+
 > 
-> Speaking of arm32 in particular, I think we will end up with a split
-> approach: modern platforms (multiplatform, possibly all DT based) using
-> PCI core infrastructure directly and no architecture specific PCI
-> code on the one side, and a variation of today's code for the legacy
-> platforms on the other.
 > 
-> 	Arnd
+>>  	return 0;
+>>  }
+>>  
+>>  static int exynos_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+>>  {
+>> -	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
+>> +	void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
+>>  
+>> +	if (soc_is_exynos4212())
+>> +		goto out;
+>> +	else
+>> +		boot_reg += 4*cpu;
+> 
+> 	if (!soc_is_exynos4212())
+> 		boot_reg += 4 * cpu;
+> 
+> That way you avoid a goto, especially since the "goto out" isn't actually
+> an "out", it's still doing stuff at the end of the funciton.
+> 
+
+OK, I'll remove goto statement and then modify it as your comment.
+
+-       void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c + 4*cpu;
++       void __iomem *boot_reg = S5P_VA_SYSRAM_NS + 0x1c;
++
++       if (!soc_is_exynos4212())
++               boot_reg += 4*cpu;
+
+Best Regards,
+Chanwoo Choi
