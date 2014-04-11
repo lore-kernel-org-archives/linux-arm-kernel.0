@@ -1,93 +1,50 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 11 Apr 2014 15:07:26 +0900
-Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
-In-Reply-To: <CAK9yfHyDLq6W_Vhuxg3zhvwBq6tHaN_BEG39WUcQMYxOBqnidg@mail.gmail.com>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
- <CAK9yfHzZEh8m2y77DrqHtEFEMnwC_NBMUk=H+MP6oSV5PWArTQ@mail.gmail.com>
- <534783AB.2070601@samsung.com>
- <CAK9yfHyDLq6W_Vhuxg3zhvwBq6tHaN_BEG39WUcQMYxOBqnidg@mail.gmail.com>
-Message-ID: <5347869E.9070504@samsung.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Fri, 11 Apr 2014 08:12:02 +0200
+Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
+In-Reply-To: <20140408233306.GJ27820@type.youpi.perso.aquilenet.fr>
+References: <20140331122323.GC6044@type.bordeaux.inria.fr>
+ <20140407021015.GA8518@core.coreip.homeip.net>
+ <20140407075423.GZ7179@type.wlan.youpi.perso.aquilenet.fr>
+ <20140408083940.GA22855@core.coreip.homeip.net>
+ <20140408233306.GJ27820@type.youpi.perso.aquilenet.fr>
+Message-ID: <20140411061202.GA8321@type>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+Hello,
 
-On 04/11/2014 02:56 PM, Sachin Kamat wrote:
-> Hi Chanwoo,
-> 
-> On 11 April 2014 11:24, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> Hi Sachin,
->>
->> On 04/11/2014 12:56 PM, Sachin Kamat wrote:
->>> Hi Chanwoo,
->>>
->>> On 10 April 2014 15:07, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->>>> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
->>>> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
->>>> dual cores and has a target speed of 1.0GHz.
->>>>
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>>  arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
->>>>  arch/arm/mach-exynos/exynos.c            |  1 +
->>>>  arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
->>>>  3 files changed, 33 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->>>> index fc8bf18..6da8a68 100644
->>>> --- a/arch/arm/mach-exynos/Kconfig
->>>> +++ b/arch/arm/mach-exynos/Kconfig
->>>> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
->>>>
->>>>  menu "SAMSUNG EXYNOS SoCs Support"
->>>>
->>>> +config ARCH_EXYNOS3
->>>> +       bool "SAMSUNG EXYNOS3"
->>>> +       select ARM_AMBA
->>>> +       select CLKSRC_OF
->>>> +       select HAVE_ARM_SCU if SMP
->>>> +       select HAVE_SMP
->>>> +       select PINCTRL
->>>> +       select PM_GENERIC_DOMAINS if PM_RUNTIME
->>>> +       help
->>>> +         Samsung EXYNOS3 SoCs based systems
->>>> +
->>>>  config ARCH_EXYNOS4
->>>>         bool "SAMSUNG EXYNOS4"
->>>>         default y
->>>> @@ -41,6 +52,17 @@ config ARCH_EXYNOS5
->>>>
->>>>  comment "EXYNOS SoCs"
->>>>
->>>> +config SOC_EXYNOS3250
->>>> +       bool "SAMSUNG EXYNOS3250"
->>>> +       default y
->>>> +       depends on ARCH_EXYNOS3
->>>> +       select ARCH_HAS_BANDGAP
->>>> +       select ARM_CPU_SUSPEND if PM
->>>> +       select PINCTRL_EXYNOS
->>>> +       select SAMSUNG_DMADEV
->>>> +       help
->>>> +         Enable EXYNOS3250 CPU support
->>>
->>> There is a Kconfig consolidation patch submitted by me [1]. Please base your
->>> code on that one to avoid merge conflicts.
->>>
->>> [1] http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
->>>
->>
->> Your patch is applied? I can't find merged patch on linux-samsung.git and arm-soc.git.
->> If this patch is applied, I will rebase this patchset. Thanks.
-> 
-> This patch hasn't been merged yet but has been agreed upon by Kukjin,
-> Tomasz and others.
-> You may follow the mailing list for details.
-> 
+I'm sorry this went out with a few mistakes.
 
-OK, I checked mailied list for your patch.
-As my previous reply, if your patch is merged, I'll rebase it.
+Samuel Thibault, le Wed 09 Apr 2014 01:33:06 +0200, a ?crit :
+> Dmitry Torokhov, le Tue 08 Apr 2014 01:39:40 -0700, a ?crit :
+> > It is not about the VT, I am talking about pure input core. If I
+> > repurpose CapsLock LED for my WiFi indicator I do not want to go into
+> > other programs and teach them that they should stay away from trying to
+> > control this LED.
+> 
+> Err, but even without talking about repurposing Capslock LED for WiFi...
+> How is managed the conflict between the normal capslock behavior and
+> other programs' action on the underlying input device?  I don't think
+> this patch does not introduce the problem.
 
-Thanks,
-Chanwoo Choi
+I of course meant "I don't think this patch introduces the problem".
+
+> How to decide which one to prioritize?
+> 
+> Is it just because console-setup happens to repurpose the capslock LED
+> key that applications should suddenly not have capslock LED control
+> at all?  That's contradictory with the use case you have given.
+
+Oops, not the use case you have given, but a typical use-case of wanting
+to use a program which does nice things with the capslock LED, and then
+having to teach console-setup not to repurpose the capslock LED.
+
+> That
+> leads me into believing that we should not try to push a hard rule, and
+> just let the user manage what accesses it.  We could indeed make the VT
+> always take priority, but then that would probably break some existing
+> applications.
+
+Such as the example above, with the capslock LED.
+
+Samuel
