@@ -1,126 +1,86 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Fri, 11 Apr 2014 07:55:38 -0700
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <CAA3XUr0-KqtBw0WCFvws8g5ChK49d+X+7Un9ngq1UZg-oROx+A@mail.gmail.com>
-References: <20140409184507.GA1058@redhat.com>
- <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
- <5347655B.3080307@linaro.org>
- <20140411.003636.272212797007496394.davem@davemloft.net>
- <CAA3XUr0-KqtBw0WCFvws8g5ChK49d+X+7Un9ngq1UZg-oROx+A@mail.gmail.com>
-Message-ID: <CAA3XUr2nmokLTXmjSWQ3Tpidz1Cytgs2cBT6otqFtGgBf0SmKw@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 11 Apr 2014 15:57:39 +0100
+Subject: [PATCH v2 06/12] ARM: mcpm: change max clusters to 4
+In-Reply-To: <alpine.LFD.2.11.1404102203590.980@knanqh.ubzr>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140410095650.GA5499@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404102203590.980@knanqh.ubzr>
+Message-ID: <20140411145732.GA4417@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 April 2014 07:26, Victor Kamensky <victor.kamensky@linaro.org> wrote:
-> On 10 April 2014 21:36, David Miller <davem@davemloft.net> wrote:
->> From: David Long <dave.long@linaro.org>
->> Date: Thu, 10 Apr 2014 23:45:31 -0400
->>
->>> Replace memcpy and dcache flush in generic uprobes with a call to
->>> copy_to_user_page(), which will do a proper flushing of kernel and
->>> user cache.  Also modify the inmplementation of copy_to_user_page
->>> to assume a NULL vma pointer means the user icache corresponding
->>> to this right is stale and needs to be flushed.  Note that this patch
->>> does not fix copy_to_user page for the sh, alpha, sparc, or mips
->>> architectures (which do not currently support uprobes).
->>>
->>> Signed-off-by: David A. Long <dave.long@linaro.org>
->>
->> You really need to pass the proper VMA down to the call site
->> rather than pass NULL, that's extremely ugly and totally
->> unnecesary.
->
-> Agreed that VMA is really needed.
->
-> Here is variant that I tried while waiting for Oleg's response:
->
-> From 4a6a9043e0910041dd8842835a528cbdc39fad34 Mon Sep 17 00:00:00 2001
-> From: Victor Kamensky <victor.kamensky@linaro.org>
-> Date: Thu, 10 Apr 2014 17:06:39 -0700
-> Subject: [PATCH] uprobes: use copy_to_user_page function to copy instr to xol
->  area
->
-> Use copy_to_user_page function to copy instruction into xol area.
-> copy_to_user_page function guarantee that all caches are correctly
-> flushed during such write (including icache as well if needed).
->
-> Because copy_to_user_page needs vm_area_struct, vma
-> field was added into struct xol_area. It holds cached vma value
-> for xol_area.
->
-> Also using copy_to_user_page we make sure that we use the same
-> code that ptrace write code uses.
->
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> ---
->  kernel/events/uprobes.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-> index 04709b6..1ae4563 100644
-> --- a/kernel/events/uprobes.c
-> +++ b/kernel/events/uprobes.c
-> @@ -117,6 +117,7 @@ struct xol_area {
->       * the vma go away, and we must handle that reasonably gracefully.
->       */
->      unsigned long         vaddr;        /* Page(s) of instruction slots */
-> +    struct vm_area_struct    *vma;        /* VMA that holds above address */
->  };
->
->  /*
-> @@ -1150,6 +1151,7 @@ static int xol_add_vma(struct mm_struct *mm,
-> struct xol_area *area)
->
->      ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
->                  VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
-> +    area->vma = find_vma(mm, area->vaddr);
->      if (ret)
->          goto fail;
->
-> @@ -1287,6 +1289,7 @@ static unsigned long xol_get_insn_slot(struct
-> uprobe *uprobe)
->  {
->      struct xol_area *area;
->      unsigned long xol_vaddr;
-> +    void *xol_page_kaddr;
->
->      area = get_xol_area();
->      if (!area)
-> @@ -1297,8 +1300,11 @@ static unsigned long xol_get_insn_slot(struct
-> uprobe *uprobe)
->          return 0;
->
->      /* Initialize the slot */
-> -    copy_to_page(area->page, xol_vaddr,
-> -            &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
-> +    xol_page_kaddr = kmap_atomic(area->page);
-> +    copy_to_user_page(area->vma, area->page, xol_vaddr,
-> +              xol_page_kaddr + (xol_vaddr & ~PAGE_MASK),
-> +              &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
-> +    kunmap_atomic(xol_page_kaddr);
->      /*
->       * We probably need flush_icache_user_range() but it needs vma.
->       * This should work on supported architectures too.
+On Thu, Apr 10, 2014 at 10:39:04PM -0400, Nicolas Pitre wrote:
+> On Thu, 10 Apr 2014, Dave Martin wrote:
+> 
+> > On Tue, Apr 08, 2014 at 04:00:46PM +0800, Haojian Zhuang wrote:
+> > > In order to support 4 clusters with 4 Cortex A15 Cores in each cluster,
+> > > enlarge maximum clusters from 2 to 4 in MCPM.
+> > 
+> > CC Nico on mcpm patches please.  I'm happy to be CC'd as well.
+> 
+> Indeed.
+> 
+> > > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> > > ---
+> > >  arch/arm/include/asm/mcpm.h | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> > > index 608516e..68f82cf 100644
+> > > --- a/arch/arm/include/asm/mcpm.h
+> > > +++ b/arch/arm/include/asm/mcpm.h
+> > > @@ -20,7 +20,7 @@
+> > >   * to consider dynamic allocation.
+> > >   */
+> > >  #define MAX_CPUS_PER_CLUSTER	4
+> > > -#define MAX_NR_CLUSTERS		2
+> > > +#define MAX_NR_CLUSTERS		4
+> > 
+> > Because of the need for alignment to the biggest cacheline size in the
+> > system, the MCPM low-level locking structures consume a non-trivial
+> > amount of memory.
+> > 
+> > Therefore, I'm not keen on the idea of simply increasing this #define
+> > every time a platform appears with a larger number of clusters.
+> > If hip04 is not built into the kernel, this just wastes memory.
+> > 
+> > I'll leave it to Nico to decide whether we can increase the #define
+> > to 4 or whether this needs a proper fix now.  Ideally, we would have
+> > a way of choosing the maximum value required by the set of boards built
+> > into the kernel, or switch to dynamic allocation.
+> 
+> I think we should go with the ability to select a maximum based on the 
+> configured platforms. That could be as simple as having a 
+> CONFIG_MCPM_QUAD_CLUSTER symbol to be selected by those platforms that 
+> need it.
 
-Above comment and following call to 'flush_dcache_page(area->page);'
-should be removed of course. Just noticed that ...
+Yes, that could work.
 
-Thanks,
-Victor
+We could use a similar approach for __CACHE_WRITEBACK_ORDER, but at
+the moment we are not aware of a platform that contains caches with
+lines larger than 64 bytes.  We shouldn't address that until/unless
+it's needed.
 
-> --
-> 1.8.1.4
->
-> Now while waiting for Oleg's response I am trying to run some performance
-> tests between different solution to understand situation better.
->
-> One of my concerns was ARM smp function call that
-> could be reached from copy_to_user_page. But I have hard time
-> finding CPU that really doing it ... It does not look such call
-> will happen on relatively modern ARM CPUs (tried Arndale,
-> and Pandaboard ES). So my issues with use
-> of copy_to_user_page are quite elevated.
->
-> Thanks,
-> Victor
+> The memory usage is still relatively low: 4 clusters containing 6 
+> independent cache lines each, so for a 64-byte cache line this means 
+> 1536 bytes.  That is rather insignificant compared to the amount of 
+> memory fitted to typical multi-cluster systems, especially quad cluster 
+> systems.  Unless there is yet more expansion of clusters and/or CPUs per 
+> cluster to come amongst MCPM users, I don't think we've yet reached the 
+> tipping point where the complexity of dynamic memory allocation for this 
+> is worth it.
+
+I agree with this.  If we se 16 clusters somewhere, it might be time to
+rethink, but dynamic allocation seems like overkill for 4.
+
+> However, changing MAX_NR_CLUSTERS cannot be done without also modifying 
+> the code in bL_switcher_init() or the b.L switcher won't work anymore on 
+> dual cluster systems as soon as a quad cluster system is configured in. 
+> Simply removing the test against MAX_NR_CLUSTERS should be sufficient as 
+> there is already a runtime validation test in bL_switcher_halve_cpus().
+
+Agreed, that will need some attention, but it doesn't sound too painful.
+
+Cheers
+---Dave
