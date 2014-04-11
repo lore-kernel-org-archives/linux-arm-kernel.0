@@ -1,105 +1,160 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Apr 2014 10:36:06 +0200
-Subject: [PATCH v7 4/6] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <1397192469.19518.11.camel@pasglop>
-References: <1394811272-1547-5-git-send-email-Liviu.Dudau@arm.com>
- <6459805.ygy4tBNDNz@wuerfel> <1397192469.19518.11.camel@pasglop>
-Message-ID: <5745677.MbvfSQPiZ9@wuerfel>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 11 Apr 2014 10:39:17 +0200
+Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
+In-Reply-To: <53478C75.60302@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
+ <20140411014650.GB14934@quad.lixom.net> <53478C75.60302@samsung.com>
+Message-ID: <5347AA35.4010504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 April 2014 15:01:09 Benjamin Herrenschmidt wrote:
-> On Thu, 2014-04-10 at 22:46 +0200, Arnd Bergmann wrote:
-> 
-> > Half of it ;-)
-> > 
-> > I think it would be better to not have an architecture specific data
-> > structure, just like it would be better not to have architecture specific
-> > pcibios_* functions that get called by the PCI core. Note that the
-> > architecture specific functions are the ones that rely on the architecture
-> > specific data structures as well. If they only use the common fields,
-> > it should also be possible to share the code.
-> 
-> I don't understand... we'll never get rid of architecture specific hooks
-> in one form or another.
-> 
-> We'll always need to some things in an architecture or host-bridge
-> specific way. Now if you don't want to call them arch hooks, then call
-> them host bridge ops, but they are needed and thus they will need some
-> kind of architecture specific extension to the base host bridge 
-> structure.
+On 11.04.2014 08:32, Chanwoo Choi wrote:
+> Hi,
+>
+> On 04/11/2014 10:46 AM, Olof Johansson wrote:
+>> On Thu, Apr 10, 2014 at 06:37:12PM +0900, Chanwoo Choi wrote:
+>>> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
+>>> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
+>>> dual cores and has a target speed of 1.0GHz.
+>>>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>>   arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
+>>>   arch/arm/mach-exynos/exynos.c            |  1 +
+>>>   arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
+>>>   3 files changed, 33 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>>> index fc8bf18..6da8a68 100644
+>>> --- a/arch/arm/mach-exynos/Kconfig
+>>> +++ b/arch/arm/mach-exynos/Kconfig
+>>> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
+>>>
+>>>   menu "SAMSUNG EXYNOS SoCs Support"
+>>>
+>>> +config ARCH_EXYNOS3
+>>> +	bool "SAMSUNG EXYNOS3"
+>>> +	select ARM_AMBA
+>>> +	select CLKSRC_OF
+>>> +	select HAVE_ARM_SCU if SMP
+>>> +	select HAVE_SMP
+>>> +	select PINCTRL
+>>> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
+>>> +	help
+>>> +	  Samsung EXYNOS3 SoCs based systems
+>>> +
+>>>   config ARCH_EXYNOS4
+>>>   	bool "SAMSUNG EXYNOS4"
+>>>   	default y
+>>> @@ -41,6 +52,17 @@ config ARCH_EXYNOS5
+>>>
+>>>   comment "EXYNOS SoCs"
+>>>
+>>> +config SOC_EXYNOS3250
+>>> +	bool "SAMSUNG EXYNOS3250"
+>>> +	default y
+>>> +	depends on ARCH_EXYNOS3
+>>> +	select ARCH_HAS_BANDGAP
+>>> +	select ARM_CPU_SUSPEND if PM
+>>> +	select PINCTRL_EXYNOS
+>>> +	select SAMSUNG_DMADEV
+>>> +	help
+>>> +	  Enable EXYNOS3250 CPU support
+>>> +
+>>>   config CPU_EXYNOS4210
+>>>   	bool "SAMSUNG EXYNOS4210"
+>>>   	default y
+>>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>>> index b32a907..b134868 100644
+>>> --- a/arch/arm/mach-exynos/exynos.c
+>>> +++ b/arch/arm/mach-exynos/exynos.c
+>>> @@ -370,6 +370,7 @@ static void __init exynos_dt_machine_init(void)
+>>>   }
+>>>
+>>>   static char const *exynos_dt_compat[] __initconst = {
+>>> +	"samsung,exynos3250",
+>>
+>> Please consider samsung,exynos3 instead, so you don't have to update this table
+>> for every SoC. We've talked about this before..
+>
+> This patchset included only exynos3250.dtsi without exynos3.dtsi.
+> So, I added only "samsung,exynos3250" compatible name.
 
-Absolutely right. The thing I'd like to get rid of in the long run
-is global functions defined in the architecture code that are called
-by core code for host bridge specific functionality. In a lot of
-cases, they should not be needed if we can express the same things
-in a generic way. In other cases, we can use function pointers that
-are set at the time that the host bridge is registered.
+There is no direct relation between dts file names and compatible string 
+(although usually they correspond). You don't need exynos3.dtsi (at 
+least until another SoC from this family shows up).
 
-> EEH is one big nasty example on powerpc.
-> 
-> Another random one that happens to be hot in my brain right now because
-> we just finished debugging it: On powernv, we are just fixing a series
-> of bugs caused by the generic code trying to do hot resets on PCIe "by
-> hand" by directly toggling the secondary reset register in bridges.
-> 
-> Well, on our root complexes, this triggers a link loss which triggers
-> a fatal EEH "ER_all" interrupt which we escalate into a fence and all
-> hell breaks loose.
-> 
-> We need to mask some error traps in the hardware before doing something
-> that can cause an intentional link loss... and unmask them when done.
-> (Among other things, there are other issues on P7 with hot reset).
-> 
-> So hot reset must be an architecture hook.
+>
+> Do you prefer to add SoC version as following?
+> +       "samsung,exynos3",
+> +       "samsung,exynos3250",
+>
+> or ?
+> +       "samsung,exynos3",
 
-This sounds to me very much host bridge specific, not architecture specific.
-If you have the same host bridge in an ARM system, you'd want the same
-things to happen, and if you have another host bridge on PowerPC, you
-probably don't want that code to be called.
+This is actually a good question. If adding exynos3 anyway, it probably 
+wouldn't hurt to add exynos3250 anyway, to avoid adding it in future if 
+some SoC specific quirks show up, especially when both of compatible 
+strings need to be documented anyway.
 
-> PERST (fundamental reset) can *only* be a hook. The way to generate a
-> PERST is not specified. In fact, on our machines, we have special GPIOs
-> we can use to generate PERST on individual slots below a PLX bridge
-> and a different methods for slots directly on a PHB.
-> 
-> Eventually most of those hooks land into firmware, and as such it's akin
-> to ACPI which also keeps a separate state structure and a pile of hooks.
+>
+>>
+>>>   	"samsung,exynos4",
+>>>   	"samsung,exynos4210",
+>>>   	"samsung,exynos4212",
+>>> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+>>> index 5992b8d..3d808f6b 100644
+>>> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+>>> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+>>> @@ -43,6 +43,9 @@ extern unsigned long samsung_cpu_id;
+>>>   #define S5PV210_CPU_ID		0x43110000
+>>>   #define S5PV210_CPU_MASK	0xFFFFF000
+>>>
+>>> +#define EXYNOS3250_SOC_ID       0xE3472000
+>>> +#define EXYNOS3_SOC_MASK        0xFFFFF000
+>>> +
+>>>   #define EXYNOS4210_CPU_ID	0x43210000
+>>>   #define EXYNOS4212_CPU_ID	0x43220000
+>>>   #define EXYNOS4412_CPU_ID	0xE4412200
+>>> @@ -68,6 +71,7 @@ IS_SAMSUNG_CPU(s5p6440, S5P6440_CPU_ID, S5P64XX_CPU_MASK)
+>>>   IS_SAMSUNG_CPU(s5p6450, S5P6450_CPU_ID, S5P64XX_CPU_MASK)
+>>>   IS_SAMSUNG_CPU(s5pc100, S5PC100_CPU_ID, S5PC100_CPU_MASK)
+>>>   IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
+>>> +IS_SAMSUNG_CPU(exynos3250, EXYNOS3250_SOC_ID, EXYNOS3_SOC_MASK)
+>>>   IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+>>>   IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+>>>   IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+>>> @@ -126,6 +130,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>>>   # define soc_is_s5pv210()	0
+>>>   #endif
+>>>
+>>> +#if defined(CONFIG_SOC_EXYNOS3250)
+>>> +# define soc_is_exynos3250()    is_samsung_exynos3250()
+>>> +#else
+>>> +# define soc_is_exynos3250()    0
+>>> +#endif
+>>
+>> In general, I think we have too much code littered with soc_is_<foo>() going
+>> on, so please try to avoid adding more for this SoC. Especially in cases where
+>> you just want to bail out of certain features where we might already have
+>> function pointers to control if a function is called or not, such as the
+>> firmware interfaces.
+>>
+>
+> Do you prefer dt helper function such as following function instead of new soc_is_xx() ?
+> - of_machine_is_compatible("samsung,exynos3250")
+>
+> If you are OK, I'll use of_machine_is_compatible() instead of soc_is_xx().
 
-On PowerPC, there are currently a bunch of platform specific callbacks
-in the ppc_md: pcibios_after_init, pci_exclude_device,
-pcibios_fixup_resources, pcibios_fixup_bus, pcibios_enable_device_hook,
-pcibios_fixup_phb, pcibios_window_alignment, and possibly some more.
-There is some architecture specific code that gets called by the
-PCI core, with the main purpose of calling into these.
+First of all, there is still a lot of code in mach-exynos/ using the 
+soc_is_xx() macros, so having some SoCs use them and other SoCs use 
+of_machine_is_compatible() wouldn't make the code cleaner.
 
-On ARM32, we have a similar set of callbacks in the architecture
-private pci_sys_data: swizzle, map_irq, align_resource, add_bus,
-remove_bus, and some more callbacks for setup in the hw_pci
-structure that is used at initialization time: setup, scan,
-preinit, postinit. Again, these are called from architecture
-specific code that gets called by the PCI core.
+For now, I wouldn't mind adding soc_is_exynos3250(), but in general such 
+code surrounded with if (soc_is_xx()) blocks should be reworked to use 
+something better, for example function pointers, as Olof suggested.
 
-I'm sure some of the other architectures have similar things, most
-of them probably less verbose because there is fewer variability
-between subarchitectures.
-
-I think a nice way to deal with these in the long run would be
-to have a generic 'struct pci_host_bridge_ops' that can be defined
-by the architecture or the platform, or a particular host bridge
-driver. We'd have to define exactly which function pointers would
-go in there, but a good start would be the set of functions that
-are today provided by each architecture. The reset method you describe
-above would also fit well into this.
-
-A host bridge driver can fill out the pointers with its own functions,
-or put platform or architecture specific function pointers in there,
-that get called by the PCI core. There are multiple ways to deal with
-default implementations here, one way would be that the core just
-falls back to a generic implementation (which is currently the __weak
-function) if it sees a NULL pointer. Another way would be to require
-each driver to either fill out all pointers or none of them, in which
-case we would use a default pci_host_bridge_ops struct that contains
-the pointers to the global pcibios_*() functions.
-
-	Arnd
+Best regards,
+Tomasz
