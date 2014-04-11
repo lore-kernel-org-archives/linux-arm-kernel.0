@@ -1,82 +1,115 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 11 Apr 2014 11:53:03 +0200
-Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <5347B942.2040703@arm.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
- <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
- <CAL_JsqJowqV2bsxE2VeYXQQSj4_L_KcH+C_dD=ZUvC=1crN4dA@mail.gmail.com>
- <87ha6136dz.fsf@approximate.cambridge.arm.com>
- <CABuKBeKLexBsTwF-nX15AYfLNA9bFDRm2XyeLpwQg9+3m6Xf=w@mail.gmail.com>
- <5347B942.2040703@arm.com>
-Message-ID: <20140411095303.GV28585@lukather>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 11 Apr 2014 12:05:27 +0200
+Subject: [PATCH] iio: adc: exynos_adc: Control special clock of ADC to
+ support Exynos3250 ADC
+In-Reply-To: <1397181640-18513-1-git-send-email-cw00.choi@samsung.com>
+References: <1397181640-18513-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5347BE67.1080209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 10:43:30AM +0100, Marc Zyngier wrote:
-> On 11/04/14 10:11, Matthias Brugger wrote:
-> > 2014-04-10 11:01 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
-> >> A couple of things on top of Rob's comments:
-> >>
-> >> On Wed, Apr 09 2014 at 10:50:33 pm BST, Rob Herring <robherring2@gmail.com> wrote:
-> >>> On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> >>>> This adds a generic devicetree board file and a dtsi for boards
-> >>>> based on the MT6589 SoCs from Mediatek.
-> >>>>
-> >>>> Apart from the generic parts (gic, clocks) the only component
-> >>>> currently supported are the timers.
-> >>>>
-> >>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> >>
-> >> [...]
-> >>
-> >>>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
-> >>>> new file mode 100644
-> >>>> index 0000000..c0139ca
-> >>>> --- /dev/null
-> >>>> +++ b/arch/arm/mach-mediatek/Kconfig
-> >>>> @@ -0,0 +1,14 @@
-> >>>> +config ARCH_MEDIATEK
-> >>>> +       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
-> >>>> +       select ARCH_REQUIRE_GPIOLIB
-> >>>
-> >>> Then where is your GPIO driver?
-> >>>
-> >>>> +       select ARM_GIC
-> >>>> +       select CACHE_L2X0
-> >>>> +       select HAVE_ARM_TWD if LOCAL_TIMERS
-> >>
-> >> Hell no! ;-) ARM_ARCH_TIMER is the way (please also add the missing
-> >> node).
-> > 
-> > I considered this, but the timer wasn't able to get it's clock frequency:
-> > "Architected timer frequency not available
-> > Division by zero in kernel."
+Hi Chanwoo,
+
+On 11/04/14 04:00, Chanwoo Choi wrote:
+> This patch control special clock for ADC in Exynos series's FSYS block.
+> If special clock of ADC is registerd on clock list of common clk framework,
+> Exynos ADC drvier have to control this clock.
 > 
-> This is because your bootloader/firmware is utterly broken, and doesn't
-> set CNTFRQ (it must be set on all CPUs, from secure mode). As a
-> *workaround*, you can set the timer frequency in the timer node, but
-> that's just a hack, and will prevent virtual machines from running on
-> such hardware.
+> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+> - 'adc' clock: bus clock for ADC
+> 
+> Exynos3250 has additional 'sclk_tsadc' clock as following:
+> - 'sclk_tsadc' clock: special clock for ADC which provide clock to internal ADC
+> 
+> Exynos 4210/4212/4412 and Exynos5250/5420 has not included 'sclk_tsadc' clock
+> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included 'sclk_tsadc'
+> clock in FSYS_BLK.
 
-Is it?
+I think a new compatible should be added for the ADC device for Exynos3250
+and the required clocks should be handled properly, based on compatible
+value. This could be handled, e.g. through some flags in driver's data
+selected based on the compatible property value.
 
->From what I understood from ARM's ARM, CNTFRQ must be set during the
-system boot, but even though the arch timer driver can fetch the
-frequency from clock-frequency, I don't see anywhere that it actually
-writes to CNTFRQ whatever it retrieved.
+And the new clocks should be documented in Documentation/devicetree/bindings
+/arm/samsung/exynos-adc.txt.
 
-But I'm probably missing something here...
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Cc: linux-iio at vger.kernel.org
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/iio/adc/exynos_adc.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+> index d25b262..4cd1975 100644
+> --- a/drivers/iio/adc/exynos_adc.c
+> +++ b/drivers/iio/adc/exynos_adc.c
+> @@ -88,6 +88,7 @@ struct exynos_adc {
+>  	void __iomem		*regs;
+>  	void __iomem		*enable_reg;
+>  	struct clk		*clk;
+> +	struct clk		*sclk;
+>  	unsigned int		irq;
+>  	struct regulator	*vdd;
+>  
+> @@ -308,6 +309,13 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>  		goto err_irq;
+>  	}
+>  
+> +	info->sclk = devm_clk_get(&pdev->dev, "sclk_tsadc");
+> +	if (IS_ERR(info->sclk)) {
+> +		dev_warn(&pdev->dev, "failed getting sclk clock, err = %ld\n",
+> +							PTR_ERR(info->sclk));
+> +		info->sclk = NULL;
+> +	}
+> +
+>  	info->vdd = devm_regulator_get(&pdev->dev, "vdd");
+>  	if (IS_ERR(info->vdd)) {
+>  		dev_err(&pdev->dev, "failed getting regulator, err = %ld\n",
+> @@ -341,6 +349,7 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>  		goto err_iio_dev;
+>  
+>  	clk_prepare_enable(info->clk);
+> +	clk_prepare_enable(info->sclk);
+>  
+>  	exynos_adc_hw_init(info);
+>  
+> @@ -357,6 +366,7 @@ err_of_populate:
+>  				exynos_adc_remove_devices);
+>  	regulator_disable(info->vdd);
+>  	clk_disable_unprepare(info->clk);
+> +	clk_disable_unprepare(info->sclk);
+>  err_iio_dev:
+>  	iio_device_unregister(indio_dev);
+>  err_irq:
+> @@ -373,6 +383,7 @@ static int exynos_adc_remove(struct platform_device *pdev)
+>  				exynos_adc_remove_devices);
+>  	regulator_disable(info->vdd);
+>  	clk_disable_unprepare(info->clk);
+> +	clk_disable_unprepare(info->sclk);
+>  	writel(0, info->enable_reg);
+>  	iio_device_unregister(indio_dev);
+>  	free_irq(info->irq, info);
+> @@ -398,6 +409,7 @@ static int exynos_adc_suspend(struct device *dev)
+>  	}
+>  
+>  	clk_disable_unprepare(info->clk);
+> +	clk_disable_unprepare(info->sclk);
+>  	writel(0, info->enable_reg);
+>  	regulator_disable(info->vdd);
+>  
+> @@ -416,6 +428,7 @@ static int exynos_adc_resume(struct device *dev)
+>  
+>  	writel(1, info->enable_reg);
+>  	clk_prepare_enable(info->clk);
+> +	clk_prepare_enable(info->sclk);
+>  
+>  	exynos_adc_hw_init(info);
+>  
+> 
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/b636ad7c/attachment.sig>
+Regards,
+Sylwester
