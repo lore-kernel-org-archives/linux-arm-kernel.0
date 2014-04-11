@@ -1,36 +1,40 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Fri, 11 Apr 2014 10:12:59 +0200
-Subject: [PATCH RESEND 4/5] Documentation: add the Marvell Berlin pinctrl
- documentation
-In-Reply-To: <20140411143318.67e55a17@xhacker>
-References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397135274-10764-5-git-send-email-antoine.tenart@free-electrons.com>
- <20140411143318.67e55a17@xhacker>
-Message-ID: <20140411081259.GA20147@kwain>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 11 Apr 2014 13:47:01 +0530
+Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
+ default when booted with DT
+In-Reply-To: <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5347A4FD.1030803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
-
-On Fri, Apr 11, 2014 at 02:33:18PM +0800, Jisheng Zhang wrote:
-> On Thu, 10 Apr 2014 06:07:53 -0700
-> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
-> > +Required subnode-properties:
-> > +- berlin,group: a string describing the group's name.
-> > +- berlin,function: the function used to mux the group.
+On Tuesday 01 April 2014 06:36 PM, Peter Ujfalusi wrote:
+> Use the EVENTQ_1 for default and leave the EVENTQ_0 to be used by high
+> priority channels, like audio.
 > 
-> Would it be better to s/function/mode? Because in mrvl internal technology
-> discussion and docs, we usually say "set pinmux Gy as mode z".
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-The pinctrl framework uses 'function', so I guess it's better not to introduce
-an other keyword that may confuse people. But I agree this is not what's used in
-the Marvell's docs. What do you think about we mention it in this documentation ?
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Thanks for the feedback !
+> ---
+>  arch/arm/common/edma.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index 86a8b263278f..19520e2519d9 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -1546,7 +1546,8 @@ static int edma_of_parse_dt(struct device *dev,
+>  
+>  	pdata->queue_priority_mapping = queue_priority_map;
+>  
+> -	pdata->default_queue = 0;
+> +	/* select queue 1 as default */
 
-Antoine
+It will be nice to expand the comment with explanation of why this is
+being chosen as default (lower priority queue by default for typical
+bulk data transfer).
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Sekhar
