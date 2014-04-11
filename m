@@ -1,40 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Apr 2014 15:16:09 +0200
-Subject: [PATCH v4 1/9] mfd: AXP20x: Add mfd driver for AXP20x PMIC
-In-Reply-To: <20140411120908.GC28800@sirena.org.uk>
-References: <1397209093-10077-1-git-send-email-carlo@caione.org>
- <235623053.nj0gFkxyW5@wuerfel> <20140411120908.GC28800@sirena.org.uk>
-Message-ID: <4702508.rsJyuQngOj@wuerfel>
+From: sajjan.linux@gmail.com (Vikas Sajjan)
+Date: Fri, 11 Apr 2014 18:47:11 +0530
+Subject: [PATCH V2 0/3] Add PMU and S2R support for exynos5420
+In-Reply-To: <1395900785-11334-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1395900785-11334-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CAGm_ybhWjc7=OUJ5BTvQ-K6S_RwYVgGV8+vi6iUgKEJb0qSymw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 April 2014 13:09:08 Mark Brown wrote:
-> On Fri, Apr 11, 2014 at 01:25:03PM +0200, Arnd Bergmann wrote:
-> 
-> > Why do you have to enumerate the interrupts here? Can't you just
-> > put all the numbers into the DT nodes of the devices using them?
-> 
-> > In general, I would say that the mfd driver should not care about
-> > what is connected to it.
-> 
-> This then means that all the machines using the device need to define
-> the interrupt table and have the MFD cells represented in the DT which
-> means encoding Linux abstractions into the DT.
-> 
-> In cases where the device is also used with ACPI or platform data that's
-> a definite issue since they have different idioms.  That applies less to
-> PMICs tightly bound to particular SoCs but is an issue in general, not
-> all the world is DT.
-> 
-> There's also issues here with us changing our subsystems.  Things like
-> clocks are a bit indistinct at present, they're sort of floating between
-> clock and other subsystems.  We've also done things like invent extcon,
-> making completely new subdevices.  Keeping the data out of DT avoids
-> problems when this happens.  The balance changes a bit if there are
-> clearly reusable IPs within the device but sadly hardware designers
-> don't always give us that and even then sometimes we don't want to use
-> them like that.
+ Hi,
 
-Ok, fair enough.
+ Any comments on this series.
 
-	Arnd
+On Thu, Mar 27, 2014 at 11:43 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> rebased on kgene tree for-next branch
+> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+>
+> changes since v1:
+>         - Addressed comments from Tomasz figa.
+>         - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
+>
+> Abhilash Kesavan (1):
+>   ARM: dts: Add node for GPIO keys on SMDK5420
+>
+> Vikas Sajjan (2):
+>   ARM: EXYNOS5: Add PMU settings for exynos5420
+>   ARM: EXYNOS5: Support Suspend-to-RAM on EXYNOS5420
+>
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts    |   11 +
+>  arch/arm/mach-exynos/common.h                |   10 +
+>  arch/arm/mach-exynos/pm.c                    |  148 +++++++++++--
+>  arch/arm/mach-exynos/pmu.c                   |  307 ++++++++++++++++++++++++++
+>  arch/arm/mach-exynos/regs-pmu.h              |  230 +++++++++++++++++++
+>  arch/arm/plat-samsung/include/plat/map-s5p.h |    2 +
+>  drivers/clk/samsung/clk-exynos5420.c         |   32 +++
+>  7 files changed, 722 insertions(+), 18 deletions(-)
+>
+> --
+> 1.7.9.5
+>
