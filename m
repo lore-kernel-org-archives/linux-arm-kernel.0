@@ -1,86 +1,90 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 11 Apr 2014 16:04:05 +0800
-Subject: [PATCH 2/4] ARM: dts: imx6: define input clocks to CCM block
+Date: Fri, 11 Apr 2014 16:04:07 +0800
+Subject: [PATCH 4/4] ARM: dts: imx6: use generic name for fixed-clock nodes
 In-Reply-To: <1397203447-22965-1-git-send-email-shawn.guo@freescale.com>
 References: <1397203447-22965-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1397203447-22965-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1397203447-22965-5-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inspired by commit 1771b10 (clk: respect the clock dependencies in
-of_clk_init), we should define the input clocks to CCM block to reflect
-the dependencies on those fixed rate clocks.
+Per device tree spec, we should use generic name for device node when
+possible.  Let's do that for the fixed-clock nodes, and use property
+clock-output-names to define the name for clock.
+
+While at it, let's drop those unneeded imx specific compatible string
+for these fixed rate clocks.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 8 +++++---
- arch/arm/boot/dts/imx6sl.dtsi  | 6 ++++--
- 2 files changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 18 ++++++++++++------
+ arch/arm/boot/dts/imx6sl.dtsi  |  8 ++++++--
+ 2 files changed, 18 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 8ee6361..2a35b08 100644
+index 2a35b08..400f75c 100644
 --- a/arch/arm/boot/dts/imx6qdl.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -57,19 +57,19 @@
+@@ -57,22 +57,28 @@
  		#address-cells = <1>;
  		#size-cells = <0>;
  
--		ckil {
-+		ckil: ckil {
- 			compatible = "fsl,imx-ckil", "fixed-clock";
+-		ckil: ckil {
+-			compatible = "fsl,imx-ckil", "fixed-clock";
++		ckil: clock at 0 {
++			compatible = "fixed-clock";
++			reg = <0>;
  			#clock-cells = <0>;
  			clock-frequency = <32768>;
++			clock-output-names = "ckil";
  		};
  
--		ckih1 {
-+		ckih1: ckih1 {
- 			compatible = "fsl,imx-ckih1", "fixed-clock";
+-		ckih1: ckih1 {
+-			compatible = "fsl,imx-ckih1", "fixed-clock";
++		ckih1: clock at 1 {
++			compatible = "fixed-clock";
++			reg = <1>;
  			#clock-cells = <0>;
  			clock-frequency = <0>;
++			clock-output-names = "ckih1";
  		};
  
--		osc {
-+		osc: osc {
- 			compatible = "fsl,imx-osc", "fixed-clock";
+-		osc: osc {
+-			compatible = "fsl,imx-osc", "fixed-clock";
++		osc: clock at 2 {
++			compatible = "fixed-clock";
++			reg = <2>;
  			#clock-cells = <0>;
  			clock-frequency = <24000000>;
-@@ -483,6 +483,8 @@
- 				interrupts = <0 87 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 88 IRQ_TYPE_LEVEL_HIGH>;
- 				#clock-cells = <1>;
-+				clocks = <&ckil>, <&ckih1>, <&osc>;
-+				clock-names = "ckil", "ckih1", "osc";
- 			};
++			clock-output-names = "osc";
+ 		};
+ 	};
  
- 			anatop: anatop at 020c8000 {
 diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index ebaad63..a6d3afb 100644
+index a6d3afb..275eb30 100644
 --- a/arch/arm/boot/dts/imx6sl.dtsi
 +++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -79,13 +79,13 @@
+@@ -79,16 +79,20 @@
  		#address-cells = <1>;
  		#size-cells = <0>;
  
--		ckil {
-+		ckil: ckil {
+-		ckil: ckil {
++		ckil: clock at 0 {
  			compatible = "fixed-clock";
++			reg = <0>;
  			#clock-cells = <0>;
  			clock-frequency = <32768>;
++			clock-output-names = "ckil";
  		};
  
--		osc {
-+		osc: osc {
+-		osc: osc {
++		osc: clock at 1 {
  			compatible = "fixed-clock";
++			reg = <1>;
  			#clock-cells = <0>;
  			clock-frequency = <24000000>;
-@@ -427,6 +427,8 @@
- 				interrupts = <0 87 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 88 IRQ_TYPE_LEVEL_HIGH>;
- 				#clock-cells = <1>;
-+				clocks = <&ckil>, <&osc>;
-+				clock-names = "ckil", "osc";
- 			};
++			clock-output-names = "osc";
+ 		};
+ 	};
  
- 			anatop: anatop at 020c8000 {
 -- 
 1.8.3.2
