@@ -1,31 +1,43 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 11 Apr 2014 17:07:36 +0200
-Subject: [PATCH v4 7/7] ARM: multi_v7_defconfig: add ST Keyscan driver
+Date: Fri, 11 Apr 2014 17:07:32 +0200
+Subject: [PATCH v4 3/7] driver: reset: sti: add keyscan for stih416
 In-Reply-To: <1397228856-9218-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1397228856-9218-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1397228856-9218-8-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1397228856-9218-4-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds KEYBOARD_ST_KEYSCAN config
+Add keyscan reset on stih416 reset controller.
 
+Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/reset/sti/reset-stih416.c                     | 1 +
+ include/dt-bindings/reset-controller/stih416-resets.h | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47..4f0dce1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -143,6 +143,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
- CONFIG_KEYBOARD_SPEAR=y
-+CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_MISC=y
+diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
+index fe3bf02..5fc9870 100644
+--- a/drivers/reset/sti/reset-stih416.c
++++ b/drivers/reset/sti/reset-stih416.c
+@@ -104,6 +104,7 @@ static const struct syscfg_reset_channel_data stih416_softresets[] = {
+ 	[STIH416_COMPO_A_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 4),
+ 	[STIH416_VP8_DEC_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 10),
+ 	[STIH416_VTG_MAIN_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 16),
++	[STIH416_KEYSCAN_SOFTRESET] = STIH416_SRST_LPM(LPM_SYSCFG_1, 8),
+ };
+ 
+ static struct syscfg_reset_controller_data stih416_powerdown_controller = {
+diff --git a/include/dt-bindings/reset-controller/stih416-resets.h b/include/dt-bindings/reset-controller/stih416-resets.h
+index 2127743..fcf9af1 100644
+--- a/include/dt-bindings/reset-controller/stih416-resets.h
++++ b/include/dt-bindings/reset-controller/stih416-resets.h
+@@ -46,5 +46,6 @@
+ #define STIH416_COMPO_A_SOFTRESET	25
+ #define STIH416_VP8_DEC_SOFTRESET	26
+ #define STIH416_VTG_MAIN_SOFTRESET	27
++#define STIH416_KEYSCAN_SOFTRESET	28
+ 
+ #endif /* _DT_BINDINGS_RESET_CONTROLLER_STIH416 */
 -- 
 1.9.1
