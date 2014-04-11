@@ -1,28 +1,31 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 11 Apr 2014 15:08:49 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <5347655B.3080307@linaro.org>
-References: <1397023132-10313-1-git-send-email-victor.kamensky@linaro.org>
- <1397023132-10313-2-git-send-email-victor.kamensky@linaro.org>
- <20140409184507.GA1058@redhat.com>
- <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
- <5347655B.3080307@linaro.org>
-Message-ID: <20140411130849.GA22807@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Apr 2014 15:06:17 +0200
+Subject: [PATCH v3 2/7] pinctrl: sunxi: disable clk when failing to probe
+ pin controller
+In-Reply-To: <1397137966-30818-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397137966-30818-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140411130617.GY28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10, David Long wrote:
->
->  static void copy_to_page(struct page *page, unsigned long vaddr, const void *src, int len)
->  {
->  	void *kaddr = kmap_atomic(page);
-> -	memcpy(kaddr + (vaddr & ~PAGE_MASK), src, len);
-> +	copy_to_user_page(NULL, page, vaddr, kaddr + (vaddr & ~PAGE_MASK), src, len);
+On Thu, Apr 10, 2014 at 03:52:41PM +0200, Boris BREZILLON wrote:
+> Disable the clk when failing to probe the pin controller device.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-No, no, this is not what we want... And I do not think we should change
-copy_to_user_page().
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I'll write another email...
+Thanks!
 
-Oleg.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140411/6ee41605/attachment.sig>
