@@ -1,50 +1,91 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Fri, 11 Apr 2014 08:12:02 +0200
-Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
-In-Reply-To: <20140408233306.GJ27820@type.youpi.perso.aquilenet.fr>
-References: <20140331122323.GC6044@type.bordeaux.inria.fr>
- <20140407021015.GA8518@core.coreip.homeip.net>
- <20140407075423.GZ7179@type.wlan.youpi.perso.aquilenet.fr>
- <20140408083940.GA22855@core.coreip.homeip.net>
- <20140408233306.GJ27820@type.youpi.perso.aquilenet.fr>
-Message-ID: <20140411061202.GA8321@type>
+From: w@1wt.eu (Willy Tarreau)
+Date: Fri, 11 Apr 2014 08:23:42 +0200
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <20140410234000.GA18443@obsidianresearch.com>
+References: <20140410181953.50ccfcc3@skate> <20140410171000.GF25890@1wt.eu>
+ <20140410200222.27cab16e@skate> <20140410231336.GC30855@1wt.eu>
+ <20140410234000.GA18443@obsidianresearch.com>
+Message-ID: <20140411062342.GG30855@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Jason,
 
-I'm sorry this went out with a few mistakes.
+On Thu, Apr 10, 2014 at 05:40:00PM -0600, Jason Gunthorpe wrote:
+> The windows are tied to the PCI core, not to the using driver
+> module. So they will only changed based on rescan an dynamic resource
+> assignment in the PCI core. PCI rescan has a 'memory' of the last
+> bridge windows and won't make dramtic changes, so expect the windows
+> to fairly sticky.
 
-Samuel Thibault, le Wed 09 Apr 2014 01:33:06 +0200, a ?crit :
-> Dmitry Torokhov, le Tue 08 Apr 2014 01:39:40 -0700, a ?crit :
-> > It is not about the VT, I am talking about pure input core. If I
-> > repurpose CapsLock LED for my WiFi indicator I do not want to go into
-> > other programs and teach them that they should stay away from trying to
-> > control this LED.
+OK.
+
+> > If we have to keep them forever, then maybe a further improvement
+> > will consist in merging adjacent windows which sum up as a power of
+> > two (eg: #10 and #11 may be merged).
 > 
-> Err, but even without talking about repurposing Capslock LED for WiFi...
-> How is managed the conflict between the normal capslock behavior and
-> other programs' action on the underlying input device?  I don't think
-> this patch does not introduce the problem.
+> 0x1b00000 - 0x1800000 = 0x300000 which is not a power of two..
 
-I of course meant "I don't think this patch introduces the problem".
+Of course you're right. It was late last night, and I was having
+a hard time thinking the addresses were not inclusive so in my
+mind it was 0x18..0x1b inclusive, thus 4MB... Never mind.
 
-> How to decide which one to prioritize?
+> > I tried to add a 3rd NIC in the mix (broadcom tg3), which caused the
+> > myri10ge to fail to load for an obscure reason after loading igb
+> > properly :
 > 
-> Is it just because console-setup happens to repurpose the capslock LED
-> key that applications should suddenly not have capslock LED control
-> at all?  That's contradictory with the use case you have given.
+> Oh, this looks a lot like what Thomas reported with his 5 NICs.
+> 
+> I really wonder what could be going on here.....
 
-Oops, not the use case you have given, but a typical use-case of wanting
-to use a program which does nice things with the capslock LED, and then
-having to teach console-setup not to repurpose the capslock LED.
+I don't know but I have the hardware to easily reproduce it, if we want
+to add printks again.
 
-> That
-> leads me into believing that we should not try to push a hard rule, and
-> just let the user manage what accesses it.  We could indeed make the VT
-> always take priority, but then that would probably break some existing
-> applications.
+> > Ah, interestingly if I load the NICs in the opposite order, they all load
+> > properly (myri10ge, igb, r8169) :
+> 
+> Load the NICs means insmod the driver ?
 
-Such as the example above, with the capslock LED.
+Yes.
 
-Samuel
+> That is repeatable?
+
+Yes, 100% it seems.
+
+> Certainly spooky, and suggests a kernel bug.....
+> 
+> It would be interesting to see what register values the driver is
+> getting back, is it all 0xF? 
+
+That's what I suspected from the -1, but since the driver says "or 16MB"
+and one of the windows is 16MB, I'm still confused, I need to add some
+printk there.
+
+> I wonder if something is going wrong with the config write to enable
+> the memory decoder. That is triggered by the driver...
+
+Thomas told me that the mbus driver is able to suggest a different
+start address for the PCI windows. Maybe we fall in this case and the
+driver doesn't expect this and uses a different register for the start
+address.
+
+> > So overall, it's a big Ack from my side considering the huge
+> > improvements, let's retry tomorrow with the link up workaround/fix
+> > to see if the detection issue is related. Great work!
+> 
+> Seems very likely to me, if the modified patch from Neil fixes it for
+> you too then we need to get that into mergable shape too!
+
+I can confirm that simply commenting out clk_disable_unprepare(clk)
+fixes this problem, so yes it's the same issue. Just tried Neil's
+modified patch and it works fine as well. So yes, we're making a lot
+of progress.
+
+Just in case anyone is interested, this is the NIC I'm using, both
+on the mirabox and on the XP-GP ; it was worth an acquisition
+considering how many corner cases it triggers in the kernel code :
+
+  http://www.jetway.com.tw/jw/ipcboard_view.asp?productid=873&proname=ADMPEIDLA
+
+Cheers,
+Willy
