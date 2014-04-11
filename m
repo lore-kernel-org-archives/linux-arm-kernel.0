@@ -1,61 +1,37 @@
-From: sammy@sammy.net (Sam Creasey)
-Date: Fri, 11 Apr 2014 10:39:01 -0400
-Subject: [PATCH v2 00/12] scsi/NCR5380: fix debugging macros and #include
- structure
-In-Reply-To: <20140319123516.542623278@telegraphics.com.au>
-References: <20140319123516.542623278@telegraphics.com.au>
-Message-ID: <20140411143900.GG21346@anhedonia>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri, 11 Apr 2014 16:40:26 +0200
+Subject: [PATCH] ARM: moxart: add select CLKSRC_OF to ARCH_MOXART
+Message-ID: <1397227226-20763-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Sam Creasey <sammy@sammy.net>
+CLKSRC_OF was recently removed from options selected by
+ARCH_MULTIPLATFORM, breaking boot on MOXA ART SoCs.
 
-On Wed, Mar 19, 2014 at 11:35:16PM +1100, Finn Thain wrote:
-> 
-> This patch series addresses several issues with NCR5380 drivers:
-> 
-> 1. The complex network of #include directives.
-> 
-> 2. Three inconsistent implementations of the core driver all attempting
->    to share the same macro definitions in NCR5380.h.
-> 
-> 3. Broken debugging code.
-> 
-> In the past these issues have led to compiler warnings and ugly hacks to
-> fix build failures.
-> 
-> This patch series fixes the debugging code by reducing the divergence
-> between the various core driver implementations.
-> 
-> The final two patches in the series further reduce divergence by refactoring
-> sun3_scsi.c and sun3_scsi_vme.c so that they follow the same structure as
-> the other NCR5380 drivers.
-> 
-> By the end of this patch series over 800 net lines of code have been
-> removed. This is mostly duplicated code that's easily eliminated once the
-> debugging code is made consistent (and some dead code is removed).
-> 
-> Better uniformity and less duplication should assist future work such as
-> modernization and trivial clean-up.
-> 
-> To make code review easier I've tried to keep these patches succinct and
-> free of extraneous changes. Though I did run checkpatch.pl, I've ignored
-> whitespace issues in existing code. I will send separate patches for
-> whitespace clean-up of NCR5380 drivers.
-> 
-> All NCR5380 drivers have been compile-tested with this patch series:
->   arm/cumana_1.c
->   arm/oak.c
->   atari_scsi.c
->   dmx3191d.c
->   dtc.c
->   g_NCR5380.c
->   g_NCR5380_mmio.c
->   mac_scsi.c
->   pas16.c
->   sun3_scsi.c
->   sun3_scsi_vme.c
->   t128.c
-> 
-> I've successfully regression tested this patch series using mac_scsi on a 
-> PowerBook 180. The debugging macros are now usable again.
+Add it to options selected by ARCH_MOXART.
+
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
+
+Notes:
+    see "Merge tag 'cleanup-3.15' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc" dfc25e4503aef6b82a1de4a0fbe19aafa8648fbe
+    
+    Applies to next-20140409
+
+ arch/arm/mach-moxart/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
+index 82a4ba8..7b320c6 100644
+--- a/arch/arm/mach-moxart/Kconfig
++++ b/arch/arm/mach-moxart/Kconfig
+@@ -2,6 +2,7 @@ config ARCH_MOXART
+ 	bool "MOXA ART SoC" if ARCH_MULTI_V4
+ 	select CPU_FA526
+ 	select ARM_DMA_MEM_BUFFERABLE
++	select CLKSRC_OF
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+ 	select ARCH_REQUIRE_GPIOLIB
+-- 
+1.8.2.1
