@@ -1,56 +1,70 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 10 Apr 2014 20:55:01 -0700
-Subject: [PATCH] ARM: dts: imx6q-gw5xxx: remove dead 'crtcs' property
-In-Reply-To: <1397114815-19694-1-git-send-email-shawn.guo@freescale.com>
-References: <1397114815-19694-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <CAJ+vNU2Ryzcg_CyaHqj0kTsjarrNvxwF+Kw-Xf_5VLxkTp+EOQ@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Fri, 11 Apr 2014 09:26:26 +0530
+Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
+In-Reply-To: <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAK9yfHzZEh8m2y77DrqHtEFEMnwC_NBMUk=H+MP6oSV5PWArTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 12:26 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> Since commit (655b43c staging: imx-drm-core: Use OF graph to find
-> components and connections between encoder and crtcs), 'crtcs' becomes a
-> dead property.  Remove it.
+Hi Chanwoo,
+
+On 10 April 2014 15:07, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
+> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
+> dual cores and has a target speed of 1.0GHz.
 >
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/imx6q-gw5400-a.dts  | 3 ---
->  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 ---
->  2 files changed, 6 deletions(-)
+>  arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
+>  arch/arm/mach-exynos/exynos.c            |  1 +
+>  arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
+>  3 files changed, 33 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-> index 902f983..e51bb3f 100644
-> --- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
-> +++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-> @@ -487,9 +487,6 @@
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index fc8bf18..6da8a68 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
 >
->  &ldb {
->         status = "okay";
-> -       lvds-channel at 0 {
-> -               crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-> -       };
->  };
+>  menu "SAMSUNG EXYNOS SoCs Support"
 >
->  &pcie {
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> index 8e99c9a..035d3a8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> @@ -436,9 +436,6 @@
+> +config ARCH_EXYNOS3
+> +       bool "SAMSUNG EXYNOS3"
+> +       select ARM_AMBA
+> +       select CLKSRC_OF
+> +       select HAVE_ARM_SCU if SMP
+> +       select HAVE_SMP
+> +       select PINCTRL
+> +       select PM_GENERIC_DOMAINS if PM_RUNTIME
+> +       help
+> +         Samsung EXYNOS3 SoCs based systems
+> +
+>  config ARCH_EXYNOS4
+>         bool "SAMSUNG EXYNOS4"
+>         default y
+> @@ -41,6 +52,17 @@ config ARCH_EXYNOS5
 >
->  &ldb {
->         status = "okay";
-> -       lvds-channel at 0 {
-> -               crtcs = <&ipu1 0>, <&ipu1 1>;
-> -       };
->  };
+>  comment "EXYNOS SoCs"
 >
->  &pcie {
-> --
-> 1.8.3.2
->
->
+> +config SOC_EXYNOS3250
+> +       bool "SAMSUNG EXYNOS3250"
+> +       default y
+> +       depends on ARCH_EXYNOS3
+> +       select ARCH_HAS_BANDGAP
+> +       select ARM_CPU_SUSPEND if PM
+> +       select PINCTRL_EXYNOS
+> +       select SAMSUNG_DMADEV
+> +       help
+> +         Enable EXYNOS3250 CPU support
 
-Acked-by: Tim Harvey <tharvey@gateworks.com>
+There is a Kconfig consolidation patch submitted by me [1]. Please base your
+code on that one to avoid merge conflicts.
 
-Tim
+[1] http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
+
+-- 
+With warm regards,
+Sachin
