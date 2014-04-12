@@ -1,72 +1,89 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 12 Apr 2014 12:09:34 +0200
-Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
-In-Reply-To: <20140408083940.GA22855@core.coreip.homeip.net>
-References: <20140331122323.GC6044@type.bordeaux.inria.fr>
- <20140407021015.GA8518@core.coreip.homeip.net>
- <20140407075423.GZ7179@type.wlan.youpi.perso.aquilenet.fr>
- <20140408083940.GA22855@core.coreip.homeip.net>
-Message-ID: <20140412100934.GA7196@amd.pavel.ucw.cz>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Sat, 12 Apr 2014 13:21:32 +0300
+Subject: [PATCH 00/55]: ARM: OMAP2+: PRCM move to drivers
+In-Reply-To: <20140401171325.GA28041@atomide.com>
+References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+ <20140331220903.GA11328@atomide.com> <533A7A23.8020606@ti.com>
+ <20140401171325.GA28041@atomide.com>
+Message-ID: <534913AC.8060402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 04/01/2014 08:13 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [140401 01:38]:
+>> On 04/01/2014 01:09 AM, Tony Lindgren wrote:
+>>>
+>>> We don't want to make access to these registers available without
+>>> proper frameworks as that will lead into misuse by various drivers.
+>>> And cleaning up that mess later in is a huge pain.
+>>
+>> Currently, only thing that requires access to the register offsets
+>> is basically all the legacy clock data still in the kernel (when can
+>> we get rid of this, I have posted patches for it already?) and also
+>> the clockdomain / powerdomain data. I can work on getting
+>> clockdomain + powerdomain data to DT format if this would be
+>> preferred, then we can remove these data files also. Alternatively I
+>> can just move all these defines to the C files which actually use
+>> them.
+>
+> With display support getting merged hopefully we can retry
+> dropping omap3 legacy booting as long as we get the missing
+> boards working.
+>
+> I don't know how urgent of an issue the clock and power domains
+> are for the data compared to clocks and muxes. But if it allows us
+> to easily add support for new SoC variants, then yes it makes sense.
+>
+> But in any case the defines should be private to the code claiming
+> the PRCM register area.
+>
+>> So, basically you are proposing to add a regmap or regmap like API
+>> for the PRCM, which would provide access to a subset of registers
+>> only outside the PRCM driver? Some functions provided by PRCM spawn
+>> to multiple registers (like clocks), and the ranges have holes, and
+>> would require finetuning a register / bit level access map (some
+>> registers may contain functions for several drivers.)
+>
+> Yeah something like that as that allows implementing the Linux
+> generic frameworks where the code really should be. And does not
+> require exporting tons of custom functions.
+>
+>>> 2. Have the core PRCM driver(s) claim some of the regmap ranges
+>>>
+>>> Some PRCM features can potentially be implemented using existing
+>>> Linux generic frameworks where possible for clocks, regulators, reset
+>>> drivers etc. That way you can keep the register defines for these
+>>> ranges private to the core PRCM driver(s). Ideally with no need
+>>> to add _any_ custom exported functions here.
+>>
+>> There is separate work ongoing for reset driver, and for VC/VP,
+>> there has been some regulator related work. But yes, mostly this
+>> approach should be fine.
+>
+> OK cool.
+>
+>>> 3. Have the other drivers claim some regmap ranges
+>>>
+>>> The register ranges that are clearly owned by some driver should
+>>> be claimed by those drivers. Then the defines for those registers
+>>> can stay private to that driver. Some drivers that can probably
+>>> own some PRCM ranges are clock drivers and voltage related drivers.
+>>
+>> Yeah, this sounds reasonable.
 
-> > > > This permits to reassign keyboard LEDs to something else than keyboard "leds"
-> > > > state, by adding keyboard led and modifier triggers connected to a series
-> > > > of VT input LEDs, themselves connected to VT input triggers, which
-> > > > per-input device LEDs use by default.  Userland can thus easily change the LED
-> > > > behavior of (a priori) all input devices, or of particular input devices.
-> > > > 
-> > > 
-> > > I still have the same concern that I believe I already mentioned a while
-> > > ago: how do we reconcile the LED control via triggers with LED control
-> > > done through event devices?
+Hi all,
 
-I think we should deprecate LED controls using event devices. We have
-nice API for LEDs, and it is not in input.
+Just letting you know, that I created a kind of v2 for this set, however 
+I am not going to post it publicly before the pre-reqs for this set are 
+covered, basically the OMAP2 clock DT set. CM/PRM cleanup set is 
+outdated with this series though (I'll post a note on it separately) and 
+its contents are merged to this latest re-work.
 
+The latest wip branch is available publicly if someone is interested:
 
+https://github.com/t-kristo/linux-pm/tree/3.14-rc4-cm-prm-driver-wip
 
+I also added Tony's vc fixes set to this branch and removed the direct 
+prm register accesses added there.
 
-> > > Currently, as far as I can see, they will be
-> > > clashing with each other. I.e. if I remap my capslock led to be the new
-> > > shiftlock and then userspace writes EV_LED/LED_CAPSL it would light up
-> > > my new "shift lock", right?
-> > 
-> > Well, yes, sure, if you shoot in your foot it will hurt :) (although
-> > here the damage is really small, it is just LED lighting or not).
-> 
-> This is not about amount of damage but the overall correctness of the
-> implementation. I'd rather not have a solution with known holes, if
-> possible.
-
-I'd say that applications using direct EV_LED interface should just
-stop doing it. Yes, you can probably use led API and still toggle the
-led using gpio api behind leds back (not tested, perhaps there are
-interlocks that prevent that)... and it is same situation with
-EV_LED. We should just teach applications not to do that.
-
-Would solution where EV_LED would be ignored when there's non-default
-trigger selected work for you?
-
-> > My goal, at the beginning, was to be able to fix the console-setup
-> > bug.  That was that console-setup wants to use, for the capslock key,
-> > something else than the capslock mechanism hard-wired in the kernel,
-> > so as to get way more fine-grain control over how caps is handled.
-> > But then the capslock LED would not lit any more.  By remapping the
-> > VT-level capslock led to the foo-lock used by console-setup, one gets
-> > back capslock LEDs of all keyboards working back as expected by the
-> > user.  I also use it for getting a group LED, just like I have on X,
-> > to know which keyboard layout group I am in.  People using non-latin
-> > layouts really need that.
-> 
-> I understand the desire, however I still wonder if we should be
-> extending legacy VT given that David wants to move it all to
-> userspace.
-
-It looks like legacy VT is going to stay here for long long time...
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-Tero
