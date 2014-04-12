@@ -1,73 +1,33 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Sat, 12 Apr 2014 13:56:16 +0100
-Subject: [PATCH v4 0/5] rework sched_domain topology description
-In-Reply-To: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
-References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <534937F0.3020702@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 12 Apr 2014 07:52:51 -0700
+Subject: [PATCH 00/55]: ARM: OMAP2+: PRCM move to drivers
+In-Reply-To: <534913AC.8060402@ti.com>
+References: <1396278994-12624-1-git-send-email-t-kristo@ti.com>
+ <20140331220903.GA11328@atomide.com> <533A7A23.8020606@ti.com>
+ <20140401171325.GA28041@atomide.com> <534913AC.8060402@ti.com>
+Message-ID: <20140412145251.GA32292@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/14 10:44, Vincent Guittot wrote:
-> This patchset was previously part of the larger tasks packing patchset [1].
-> I have splitted the latter in 3 different patchsets (at least) to make the
-> thing easier.
-> -configuration of sched_domain topology (this patchset)
-> -update and consolidation of cpu_power
-> -tasks packing algorithm
->
-> Based on Peter Z's proposal [2][3], this patchset modifies the way to configure
-> the sched_domain level in order to let architectures to add specific level like
-> the current BOOK level or the proposed power gating level for ARM architecture.
->
-> [1] https://lkml.org/lkml/2013/10/18/121
-> [2] https://lkml.org/lkml/2013/11/5/239
-> [3] https://lkml.org/lkml/2013/11/5/449
+* Tero Kristo <t-kristo@ti.com> [140412 03:25]:
+> 
+> Just letting you know, that I created a kind of v2 for this set,
+> however I am not going to post it publicly before the pre-reqs for
+> this set are covered, basically the OMAP2 clock DT set. CM/PRM
+> cleanup set is outdated with this series though (I'll post a note on
+> it separately) and its contents are merged to this latest re-work.
+> 
+> The latest wip branch is available publicly if someone is interested:
+> 
+> https://github.com/t-kristo/linux-pm/tree/3.14-rc4-cm-prm-driver-wip
+> 
+> I also added Tony's vc fixes set to this branch and removed the
+> direct prm register accesses added there.
 
-Hi Vincent,
+Well let's merge the fixes first. Sounds like the prm register access
+changes for the vc can be merged already so care to post those
+changes against v3.14 or v3.15-rc1 separately?
 
-given the discussion we had for v1-v3 and a short boot test of v4:
+Regards,
 
-For patch 1/5, 4/5, 5/5 on ARM TC2 (heterogeneous dual socket w/o SMT 
-machine):
-
-Reviewed-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-Tested-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-
-Cheers,
-
--- Dietmar
-
->
-> Change since v3:
-> - remove last patch which was adding SD_SHARE_POWER_DOMAIN for powerpc's SMT
->    level
->
-> Change since v2:
-> - remove patch 1 as it has been already applied to metag tree for v3.15
-> - updates some commit messages
-> - add new flag description in TOPOLOGY_SD_FLAGS description
->
-> Change since v1:
-> - move sched_domains_curr_level back under #ifdef CONFIG_NUMA
-> - use function pointer to set flag instead of a plain value.
-> - add list of tunable flags in the commit message of patch 2
-> - add SD_SHARE_POWER_DOMAIN flag for powerpc's SMT level
->
-> Vincent Guittot (5):
->    sched: rework of sched_domain topology definition
->    sched: s390: create a dedicated topology table
->    sched: powerpc: create a dedicated topology table
->    sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
->    sched: ARM: create a dedicated scheduler topology table
->
->   arch/arm/kernel/topology.c       |  26 +++++
->   arch/ia64/include/asm/topology.h |  24 ----
->   arch/powerpc/kernel/smp.c        |  31 +++--
->   arch/s390/include/asm/topology.h |  13 +--
->   arch/s390/kernel/topology.c      |  20 ++++
->   arch/tile/include/asm/topology.h |  33 ------
->   include/linux/sched.h            |  49 +++++++-
->   include/linux/topology.h         | 128 +++-----------------
->   kernel/sched/core.c              | 244 ++++++++++++++++++++-------------------
->   9 files changed, 255 insertions(+), 313 deletions(-)
->
+Tony
