@@ -1,49 +1,36 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Sat, 12 Apr 2014 13:22:54 +0300
-Subject: [PATCH 00/18] ARM: OMAP2+: CM/PRM cleanup set
-In-Reply-To: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-References: <1393949958-816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <534913FE.1020802@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sat, 12 Apr 2014 14:31:28 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAzLzRdIEFMU0E6IHNvdW5kL2F0bWVsL2FjOTdjLmM6IEFk?=
+ =?UTF-8?B?ZCBkZXZpY2UgdHJlZSBzdXBwb3J0?=
+In-Reply-To: <1397293707-26890-4-git-send-email-alexanders83@web.de>
+References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+ <1397293707-26890-4-git-send-email-alexanders83@web.de>
+Message-ID: <1397298688.295112408@f331.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/2014 06:19 PM, Tero Kristo wrote:
-> Hi,
->
-> This set cleans up the CM/PRM codebase a bit, removing the need for direct
-> CM/PRM register access macros outside CM/PRM drivers. This is done in
-> preparation to isolate these drivers into its own driver directory.
-> Currently my plan is to create a single PRCM driver, which will contain
-> both, and as such, CM/PRM inter-access is not removed in this set.
->
-> This set is built on top of the OMAP2 DT clock conversion set, but most
-> of the patches can also be standalone if need be.
->
-> Testing done:
-> - omap2 : none (any feedback welcome)
-> - omap3-beagle : boot, suspend-resume (RET), suspend-resume (OFF)
-> - omap4-panda-es : boot, suspend-resume (RET)
->
-> Branch also available here:
-> tree: https://github.com/t-kristo/linux-pm.git
-> branch: 3.14-rc4-cm-prm-cleanup
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Sat, 12 Apr 2014 11:08:26 +0200 ?? Alexander Stein <alexanders83@web.de>:
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+>  .../devicetree/bindings/sound/atmel_ac97c.txt      | 20 +++++++++
+>  sound/atmel/ac97c.c                                | 52 ++++++++++++++++++++--
+>  2 files changed, 69 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/atmel_ac97c.txt b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> new file mode 100644
+> index 0000000..9839403
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> @@ -0,0 +1,20 @@
+> +* Atmel AC97 controller
+> +
+> +Required properties:
+> +  - compatible: "atmel,atmel_ac97c"
+> +  - reg: Address and length of the register set for the device
+> +  - interrupts: Should contain AC97 interrupt
+> +  - atmel,reset-pin: GPIO for resetting the codec
 
-Hi,
+Why standard "gpios" property cannot be used here?
 
-This work is outdated and is preceded by the stuff here (for the 
-interested parties):
-
-https://github.com/t-kristo/linux-pm/tree/3.14-rc4-cm-prm-driver-wip
-
-I'll be posting small sets of patches out of here once the pre-reqs for 
-the WIP branch are covered.
-
--Tero
+---
