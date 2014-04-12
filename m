@@ -1,79 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 12 Apr 2014 08:02:05 -0700
-Subject: [PATCH 02/11] ARM: OMAP3: Fix idle mode signaling for sys_clkreq
- and sys_off_mode
-In-Reply-To: <5348FFFA.5040207@ti.com>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-3-git-send-email-tony@atomide.com>
- <5348FFFA.5040207@ti.com>
-Message-ID: <20140412150205.GB32292@atomide.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 12 Apr 2014 18:28:57 +0200
+Subject: [REGRESSION, BISECTED] mvneta broken in 3.14 on RN2120,
+ RN102 and RN104 after e3a8786c10e7
+Message-ID: <87k3au8qba.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [140412 02:01]:
-> On 04/11/2014 02:47 AM, Tony Lindgren wrote:>
-> > @@ -282,6 +283,7 @@ void omap_sram_idle(void)
-> >
-> >   	/* CORE */
-> >   	if (core_next_state < PWRDM_POWER_ON) {
-> > +		omap3_vc_set_pmic_signaling(core_next_state);
-> >   		if (core_next_state == PWRDM_POWER_OFF) {
-> >   			omap3_core_save_context();
-> >   			omap3_cm_save_context();
-> 
-> I think this implementation is sub-optimal, as it only scales
-> voltages if core is entering idle state. MPU only idle is possible,
-> however you do not scale voltages in this case.
+Hi Thomas,
 
-Hmm that's same as PWRDM_POWER_RET? That's working too.
-Or do you have something else in mind that I'm not aware
-of?
- 
-> > @@ -220,6 +220,78 @@ static inline u32 omap_usec_to_32k(u32 usec)
-> >   	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
-> >   }
-> >
-> > +void omap3_vc_set_pmic_signaling(int core_next_state)
-> > +{
-> > +	u32 voltctrl;
-> > +
-> > +	voltctrl = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
-> > +					  OMAP3_PRM_VOLTCTRL_OFFSET);
-> 
-> Just a note here, I am currently working on trying to get rid of all
-> the direct prm_read/write calls outside PRCM drivers, this and rest
-> should use voltdm->read/write.
+Network is broken w/ 3.14 kernel on Netgear ReadyNAS 102 (the SoC is
+an Armada 370 using mvneta driver and rgmii phy): nothing sent, nothing
+received from the interface. This came as a surprise (it was reported by
+two users) as 3.14-rc8 was ok on my side.
 
-OK, sounds like you already have a patch for that in your
-3.14-rc4-cm-prm-driver-wip branch?
+I also checked on a ReadyNAS 104 (Armada 370 using mvneta driver and
+rgmii phy for both interfaces) and a ReadyNAS 2120 (Armada XP using
+mvneta driver and rgmii phy for both interfaces). They are both
+affected too.
 
-Let's do the fixes first, then it's going to be a lot easier for
-us to test the rest of the PRMC changes.
- 
-> > +	/*
-> > +	 * By default let's use I2C4 signaling for retention idle
-> > +	 * and sys_off_mode pin signaling for off idle. This way we
-> > +	 * have sys_clk_req pin go down for retention and both
-> > +	 * sys_clk_req and sys_off_mode pins will go down for off
-> > +	 * idle. And we can also scale voltages to zero for off-idle.
-> > +	 * Note that no actual voltage scaling will happen unless the
-> > +	 * board specific twl4030 PMIC scripts are loaded.
-> > +	 */
-> > +	val = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
-> > +				     OMAP3_PRM_VOLTCTRL_OFFSET);
-> 
-> Why not use the I2C4 signalling for off-mode? This way the voltages
-> can be scaled to 0.6V even without any board specific scripts.
+A short bisect session pointed e3a8786c10e7 (net: mvneta: fix usage as a
+module on RGMII configurations). Reverting it put things back in order
+on those three devices.
 
-Using I2C4 works too, we're just missing a place to set
-and clear OMAP3430_PRM_VOLTCTRL_SEL_OFF bit currently. Sounds
-like eventually we should allow changing it dynamically somewhere.
+I took a quick look at e3a8786c10e7 commit and did some tests to narrow
+the root cause (I do not have A370 functional specification doc at hand
+today so I was not able to check mvneta details):
 
-But for now, SEL_OFF should be enabled as it allows debugging PM
-by looking at the sys_clkreq and sys_off_mode pins no matter if
-there are board specific scripts or not. The sys_off_mode won't
-toggle if things are configured to use I2C4, which is confusing.
+    -}
+    -
+     /* Start the Ethernet port RX and TX activity */
+     static void mvneta_port_up(struct mvneta_port *pp)
+     {
+    @@ -2756,12 +2728,15 @@ static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
+            mvreg_write(pp, MVNETA_UNIT_INTR_CAUSE, 0);
+     
+            if (phy_mode == PHY_INTERFACE_MODE_SGMII)
+    -               mvneta_port_sgmii_config(pp);
+    +               mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
+    +       else
+    +               mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_RGMII_SERDES_PROTO);
 
-Regards,
 
-Tony
+I built a first kernel with the 'else' branch above removed (rationale:
+SERDES config was not set for RGMII prior to the patch). The issue
+remained.
+     
+    -       mvneta_gmac_rgmii_set(pp, 1);
+    +       val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+    +
+    +       val |= MVNETA_GMAC2_PCS_ENABLE | MVNETA_GMAC2_PORT_RGMII;
+
+I removed MVNETA_GMAC2_PCS_ENABLE flag setting (rationale: it was only
+done for SGMII prior to the patch and all my platforms have RGMII
+connected PHY). *The issue disappeared on all 3 NAS with that simple
+change*.
+
+Some additional notes:
+ - you tested w/ mvneta as a module. Did you test w/ mvneta driver
+   built in the kernel? This is what I have on my side.
+ - e3a8786c10e7 is in 3.13.9 kernel and possibly previous ones: I can
+   confirm 3.13.9 is also broken for me.
+ - I initially thought the issue was specific to A370 (some differences
+   in mvneta logic?) as all your tests had been done on AXP. This is the
+   reason I also checked the RN2120 (mv78230) and it is impacted.
+
+Any idea is welcome.
+
+Cheers,
+
+a+
