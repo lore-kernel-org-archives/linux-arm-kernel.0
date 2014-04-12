@@ -1,49 +1,49 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 12 Apr 2014 16:55:49 -0400 (EDT)
-Subject: [PATCH v2 4/4] drivers: net: Add APM X-Gene SoC ethernet
- driver support.
-In-Reply-To: <1397271984-23405-5-git-send-email-isubramanian@apm.com>
-References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
- <1397271984-23405-5-git-send-email-isubramanian@apm.com>
-Message-ID: <20140412.165549.1068958710661824002.davem@davemloft.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 12 Apr 2014 23:25:52 +0200
+Subject: [PATCHv2 0/7] Add Allwinner SoCs PWM support
+Message-ID: <1397337959-12408-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Fri, 11 Apr 2014 20:06:24 -0700
+Hi,
 
-> This patch adds network driver for APM X-Gene SoC ethernet.
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Ravi Patel <rapatel@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+This patch set adds support for the PWM controller found on the Allwinner SoCs.
 
-This driver is going to take a long to review and get to the point
-where it can be integrated upstream, I'm just trying to set your
-expectations properly.
+The first patch adds the driver itself.
+The second patch adds the DT binding documentation
+The third patch adds the bindings to the sun7i-a20 DTS include.
+And finally, the la patch adds support for the PWMs to the cubietruck which is
+the board I used to test.
 
-> +inline void set_desc(struct xgene_enet_desc *desc, enum desc_info_index index,
-> +		     u64 val)
-> +{
+Changes in v2:
+ - changed the compatible string
+ - documented the clocks property
+ - Added support in the A10 dtsi
+ - split the patch adding pinctrl
+ - a few cosmetic changes (removed empty lines, PWM_PRESCAL_MASK, ...)
+ - fixed the period register calculation (the period is actually N + 1 cycles)
+   so write prd - 1
+ - properly locked accesses to PWM_CTRL_REG with a mutex
 
-The "inline" tag is not necessary, let the compiler figure it out.
+Alexandre Belloni (7):
+  pwm: Add Allwinner SoC support
+  pwm: sunxi: document OF bindings
+  ARM: sun4i: dt: add pinmux configuration for the PWM
+  ARM: sun4i: dt: add PWM support
+  ARM: sun7i: dt: add pinmux configuration for the PWM
+  ARM: sun7i: dt: add PWM support
+  ARM: sunxi: dt: add PWM support for the cubietruck
 
-> +	u8 word_index = desc_info[index].word_index;
-> +	u8 start_bit = desc_info[index].start_bit;
-> +	u8 len = desc_info[index].len;
-> +
-> +	u64 mask = GENMASK_ULL((start_bit + len - 1), start_bit);
-> +	((u64 *)desc)[word_index] = (((u64 *)desc)[word_index] & ~mask)
-> +	    | (((u64) val << start_bit) & mask);
+ .../devicetree/bindings/pwm/pwm-sunxi.txt          |  20 ++
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |  22 ++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   6 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  22 ++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-sunxi.c                            | 345 +++++++++++++++++++++
+ 7 files changed, 425 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+ create mode 100644 drivers/pwm/pwm-sunxi.c
 
-This looks horrible for several reasons.
-
-First of all, do not put empty lines in the middle of a set of
-local variable declarations.
-
-But do put a single empty line after the last local variable, and
-before the actual code of the function starts.
-
-Get rid of all of this excessive casting.  Tell the compiler what you're
-actually doing, pass 'desc' in as "void *" and use local "u64 *" pointers
-(to which 'desc' is assigned to) if you must.
+-- 
+1.8.3.2
