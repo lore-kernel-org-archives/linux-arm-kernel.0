@@ -1,40 +1,24 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Sat, 12 Apr 2014 01:04:58 -0700
-Subject: [PATCH] ARM: imx: propagate DI clock changes up the clock tree to
- PLL5
-In-Reply-To: <1397224812.4577.10.camel@weser.hi.pengutronix.de>
-References: <E1WXuag-0007Gs-Ku@rmk-PC.arm.linux.org.uk>
- <CAJ+vNU1uzKCZxjsr+inuOi_VJbs+iR14uqXKOCr_32ZS__HrZQ@mail.gmail.com>
- <CAJ+vNU0V_vXDOvergiQ2q00EFL46kGFJCvqCS=hdW5x=0rjN5Q@mail.gmail.com>
- <1397224812.4577.10.camel@weser.hi.pengutronix.de>
-Message-ID: <CAJ+vNU1GmrR7L+H9gGPjEDzQdKeCsB5Z08T7Ex6TXT_qD_pgAQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 12 Apr 2014 14:14:44 +0530
+Subject: ARM: Zynq: CPUFreq issues in setting frequencies (Was: Re: Help about
+ PetaLinux)
+Message-ID: <CAOh2x=n5NzPCMiZfWhQ4tFhPE+4TA_tqsOkkeeA87Q0VqECXog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 7:00 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Hi Tim,
->
-> I think this is fallout from how we handle the EDID fetch on startup. We
-> have patches lying around to fix this. Will post them in a minute.
->
-> Regards,
-> Lucas
+On Sat, Apr 12, 2014 at 3:02 AM, Mokhtar Bouain
+<mokhtar.bouain@gmail.com> wrote:
+> Hi Viresh,
+> Please, I have a problem with the PetaLinux and Zynq board.
+> I posted my probem here :
+> http://forums.xilinx.com/t5/Embedded-Linux/clk-set-rate-failed-to-set-i2c0-aper-rate-zc702-board-and/td-p/438352
+> There is a member of the xilinx forum who you mentioned that you found the
+> solution.
+> Can you help me please?
 
-Lucas,
+Hi Mokhtar,
 
-I applied your 4 patches, but that didn't resolve my situation where
-the display isn't enabled when connected on board powerup. It appears
-that imx_hdmi_poweron() isn't called in this case.
+I don't have a clue what's going on here as I haven't been looking
+at platform internals at all..
 
-It looks like the issue is that when drm_helper_hpd_irq_event is
-called from the first imx_hdmi_irq polling is not yet enabled and thus
-it doesn't call the other helpers which would end up calling
-imx_hdmi_poweron. Polling gets enabled at the very end of
-imx_drm_driver_load which is after the irq is requested, fired, and
-serviced.
-
-I'm not clear what the right solution is - should the poll be enabled
-earlier, or should imx_hdmi_encoder_dpms(...) be called someplace at
-registration?
-
-Tim
+Soren/Michal are probably working on those things, they might help.
