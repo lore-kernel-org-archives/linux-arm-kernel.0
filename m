@@ -1,76 +1,25 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 12 Apr 2014 18:31:12 +0200
-Subject: [REGRESSION,BISECTED] mvneta broken in 3.14 on RN2120, RN102
- and RN104 after e3a8786c10e7
-In-Reply-To: <87k3au8qba.fsf@natisbad.org>
-References: <87k3au8qba.fsf@natisbad.org>
-Message-ID: <20140412183112.7ca31cb6@skate>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 12 Apr 2014 10:44:48 -0700
+Subject: [PATCH v2] watchdog: imx2_wdt: convert to watchdog core api
+In-Reply-To: <1397199434-6551-1-git-send-email-agust@denx.de>
+References: <1397199434-6551-1-git-send-email-agust@denx.de>
+Message-ID: <53497B90.3010802@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnaud Ebalard,
+On 04/10/2014 11:57 PM, Anatolij Gustschin wrote:
+> Convert the imx2_wdt driver to the new watchdog core api.
+>
+> Signed-off-by: Anatolij Gustschin <agust@denx.de>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
+> ---
+> NOTE: This patch applies on top of the imx2_wdt regmap-mmio support
+> patch series http://comments.gmane.org/gmane.linux.kernel/1677735
+>
+> Changes since first version:
+>   - simplify return in imx2_wdt_is_running()
+>   - fix "WARNING: quoted string split across lines"
+>
 
-On Sat, 12 Apr 2014 18:28:57 +0200, Arnaud Ebalard wrote:
-
-> Network is broken w/ 3.14 kernel on Netgear ReadyNAS 102 (the SoC is
-> an Armada 370 using mvneta driver and rgmii phy): nothing sent, nothing
-> received from the interface. This came as a surprise (it was reported by
-> two users) as 3.14-rc8 was ok on my side.
-> 
-> I also checked on a ReadyNAS 104 (Armada 370 using mvneta driver and
-> rgmii phy for both interfaces) and a ReadyNAS 2120 (Armada XP using
-> mvneta driver and rgmii phy for both interfaces). They are both
-> affected too.
-> 
-> A short bisect session pointed e3a8786c10e7 (net: mvneta: fix usage as a
-> module on RGMII configurations). Reverting it put things back in order
-> on those three devices.
-> 
-> I took a quick look at e3a8786c10e7 commit and did some tests to narrow
-> the root cause (I do not have A370 functional specification doc at hand
-> today so I was not able to check mvneta details):
-> 
->     -}
->     -
->      /* Start the Ethernet port RX and TX activity */
->      static void mvneta_port_up(struct mvneta_port *pp)
->      {
->     @@ -2756,12 +2728,15 @@ static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
->             mvreg_write(pp, MVNETA_UNIT_INTR_CAUSE, 0);
->      
->             if (phy_mode == PHY_INTERFACE_MODE_SGMII)
->     -               mvneta_port_sgmii_config(pp);
->     +               mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
->     +       else
->     +               mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_RGMII_SERDES_PROTO);
-> 
-> 
-> I built a first kernel with the 'else' branch above removed (rationale:
-> SERDES config was not set for RGMII prior to the patch). The issue
-> remained.
->      
->     -       mvneta_gmac_rgmii_set(pp, 1);
->     +       val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
->     +
->     +       val |= MVNETA_GMAC2_PCS_ENABLE | MVNETA_GMAC2_PORT_RGMII;
-> 
-> I removed MVNETA_GMAC2_PCS_ENABLE flag setting (rationale: it was only
-> done for SGMII prior to the patch and all my platforms have RGMII
-> connected PHY). *The issue disappeared on all 3 NAS with that simple
-> change*.
-
-Yes, issue known. See https://bugzilla.kernel.org/show_bug.cgi?id=73401.
-
-Unfortunately, at this point I don't have enough informations to fix
-both issues: the issue you're having, and the issue of using mvneta as
-a module. Since the issue you're having is much more problematic, I'll
-send a patch to revert my patch, until I have enough informations to
-fix the problem in a proper way.
-
-Thanks for your report!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
