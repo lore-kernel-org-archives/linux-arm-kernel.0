@@ -1,129 +1,53 @@
 From: alexanders83@web.de (Alexander Stein)
-Date: Sat, 12 Apr 2014 11:08:26 +0200
-Subject: [PATCH 3/4] ALSA: sound/atmel/ac97c.c: Add device tree support
+Date: Sat, 12 Apr 2014 11:08:27 +0200
+Subject: [PATCH 4/4] ARM: at91/dt: sam9263: Add ac97 device node
 In-Reply-To: <1397293707-26890-1-git-send-email-alexanders83@web.de>
 References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
-Message-ID: <1397293707-26890-4-git-send-email-alexanders83@web.de>
+Message-ID: <1397293707-26890-5-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Alexander Stein <alexanders83@web.de>
 ---
- .../devicetree/bindings/sound/atmel_ac97c.txt      | 20 +++++++++
- sound/atmel/ac97c.c                                | 52 ++++++++++++++++++++--
- 2 files changed, 69 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+ arch/arm/boot/dts/at91sam9263.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel_ac97c.txt b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
-new file mode 100644
-index 0000000..9839403
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
-@@ -0,0 +1,20 @@
-+* Atmel AC97 controller
-+
-+Required properties:
-+  - compatible: "atmel,atmel_ac97c"
-+  - reg: Address and length of the register set for the device
-+  - interrupts: Should contain AC97 interrupt
-+  - atmel,reset-pin: GPIO for resetting the codec
-+Optional properties:
-+  - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
-+
-+Example:
-+sound at fffa0000 {
-+	compatible = "atmel,atmel_ac97c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ac97>;
-+	reg = <0xfffa0000 0x4000>;
-+	interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
-+
-+	atmel,reset-pin = <&pioC 29 GPIO_ACTIVE_LOW>;
-+};
-diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
-index 9a13875..b84432b 100644
---- a/sound/atmel/ac97c.c
-+++ b/sound/atmel/ac97c.c
-@@ -22,6 +22,9 @@
- #include <linux/gpio.h>
- #include <linux/types.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_device.h>
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index fece866..34db6d8 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -395,6 +395,16 @@
+ 					};
+ 				};
  
- #include <sound/core.h>
- #include <sound/initval.h>
-@@ -901,6 +904,47 @@ static void atmel_ac97c_reset(struct atmel_ac97c *chip)
- 	}
- }
++				ac97 {
++					pinctrl_ac97: ac97-0 {
++						atmel,pins =
++							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB12 periph A AC97FS pin */
++							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB13 periph A AC97CK pin */
++							 AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB14 periph A AC97TX pin */
++							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB14 periph A AC97RX pin */
++					};
++				};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+@@ -506,6 +516,15 @@
+ 				status = "disabled";
+ 			};
  
-+#ifdef CONFIG_OF
-+static const struct of_device_id atmel_ac97c_dt_ids[] = {
-+	{ .compatible = "atmel,atmel_ac97c", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, atmel_ac97c_dt_ids);
++			ac97: sound at fffa0000 {
++				compatible = "atmel,atmel_ac97c";
++				reg = <0xfffa0000 0x4000>;
++				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_ac97>;
++				status = "disabled";
++			};
 +
-+static struct ac97c_platform_data *atmel_ac97c_probe_dt(struct device *dev)
-+{
-+	struct ac97c_platform_data *pdata;
-+	struct device_node *node = dev->of_node;
-+	const struct of_device_id *match;
-+
-+	if (!node) {
-+		dev_err(dev, "Device does not have associated DT data\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	match = of_match_device(atmel_ac97c_dt_ids, dev);
-+	if (!match) {
-+		dev_err(dev, "Unknown device model\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return ERR_PTR(-ENOMEM);
-+
-+	pdata->reset_pin = of_get_named_gpio(dev->of_node,
-+					     "atmel,reset-pin", 0);
-+
-+	return pdata;
-+}
-+#else
-+static struct ac97c_platform_data *atmel_ac97c_probe_dt(struct device *dev)
-+{
-+	dev_err(dev, "no platform data defined\n");
-+	return ERR_PTR(-ENXIO);
-+}
-+#endif
-+
- static int atmel_ac97c_probe(struct platform_device *pdev)
- {
- 	struct snd_card			*card;
-@@ -921,10 +965,11 @@ static int atmel_ac97c_probe(struct platform_device *pdev)
- 		return -ENXIO;
- 	}
- 
--	pdata = pdev->dev.platform_data;
-+	pdata = dev_get_platdata(&pdev->dev);
- 	if (!pdata) {
--		dev_dbg(&pdev->dev, "no platform data\n");
--		return -ENXIO;
-+		pdata = atmel_ac97c_probe_dt(&pdev->dev);
-+		if (IS_ERR(pdata))
-+			return PTR_ERR(pdata);
- 	}
- 
- 	irq = platform_get_irq(pdev, 0);
-@@ -1208,6 +1253,7 @@ static struct platform_driver atmel_ac97c_driver = {
- 		.name	= "atmel_ac97c",
- 		.owner	= THIS_MODULE,
- 		.pm	= ATMEL_AC97C_PM_OPS,
-+		.of_match_table = of_match_ptr(atmel_ac97c_dt_ids),
- 	},
- };
- module_platform_driver(atmel_ac97c_driver);
+ 			macb0: ethernet at fffbc000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xfffbc000 0x100>;
 -- 
 1.9.2
