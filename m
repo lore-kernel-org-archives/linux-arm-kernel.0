@@ -1,93 +1,49 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 12 Apr 2014 11:55:03 -0700
-Subject: [PATCH v2 2/4] Documentation: dts: Add bindings for APM X-Gene
- SoC ethernet driver
-In-Reply-To: <1397271984-23405-3-git-send-email-isubramanian@apm.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 12 Apr 2014 16:55:49 -0400 (EDT)
+Subject: [PATCH v2 4/4] drivers: net: Add APM X-Gene SoC ethernet
+ driver support.
+In-Reply-To: <1397271984-23405-5-git-send-email-isubramanian@apm.com>
 References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
- <1397271984-23405-3-git-send-email-isubramanian@apm.com>
-Message-ID: <CAGVrzcbFHbZBaN1GsxViHaWsttU==2+9cf5mNRGwj9nbNxesVA@mail.gmail.com>
+ <1397271984-23405-5-git-send-email-isubramanian@apm.com>
+Message-ID: <20140412.165549.1068958710661824002.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-11 20:06 GMT-07:00 Iyappan Subramanian <isubramanian@apm.com>:
-> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
->
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Fri, 11 Apr 2014 20:06:24 -0700
+
+> This patch adds network driver for APM X-Gene SoC ethernet.
+> 
 > Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 > Signed-off-by: Ravi Patel <rapatel@apm.com>
 > Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> ---
->  .../devicetree/bindings/net/apm-xgene-enet.txt     |   46 ++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> new file mode 100644
-> index 0000000..0c983e8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> @@ -0,0 +1,46 @@
-> +APM X-Gene SoC Ethernet nodes
-> +
-> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
-> +APM X-Gene SoC.
-> +
-> +Required properties:
-> +- compatible           : Should be "apm,xgene-enet"
-> +- reg                  : First resource is the ethernet base register set
-> +                         Second resource is the ring base register set
-> +                         Third resource is the ring command register set
-> +- interrupts           : Ethernet main interrupt
-> +- clocks               : Reference to the clock entry.
-> +- local-mac-address    : Ethernet MAC address.
-> +- phy-addr             : Ethernet MII phy address.
-> +- phy-mode             : Ethernet MII mode.
-> +
-> +Optional properties:
-> +- status               : Should be "ok" or "disabled" for enabled/disabled.
-> +                         Default is "ok".
-> +
-> +Example:
-> +       menetclk: menetclk {
-> +               compatible = "apm,xgene-device-clock";
-> +               clock-output-names = "menetclk";
-> +               status = "ok";
-> +       };
-> +
-> +       menet: ethernet at 17020000 {
-> +               compatible = "apm,xgene-enet";
-> +               status = "disabled";
-> +               reg = <0x0 0x17020000 0x0 0xd100>,
-> +                     <0x0 0X17030000 0x0 0X400>,
-> +                     <0x0 0X10000000 0x0 0X200>;
-> +               interrupts = <0x0 0x3c 0x4>;
-> +               clocks = <&menetclk 0>;
-> +               local-mac-address = [00 01 73 00 00 01];
-> +               phy-addr = <3>;
 
-An Ethernet PHY node needs to follow the ePAPR recommended
-representation, which is not this one. Please refer to
-Documentation/devicetree/bindinsg/net/phy.txt for examples on how to
-do this properly.
+This driver is going to take a long to review and get to the point
+where it can be integrated upstream, I'm just trying to set your
+expectations properly.
 
-> +               phy-mode = "rgmii";
-> +       };
+> +inline void set_desc(struct xgene_enet_desc *desc, enum desc_info_index index,
+> +		     u64 val)
+> +{
+
+The "inline" tag is not necessary, let the compiler figure it out.
+
+> +	u8 word_index = desc_info[index].word_index;
+> +	u8 start_bit = desc_info[index].start_bit;
+> +	u8 len = desc_info[index].len;
 > +
-> +
-> +/* Board-specific peripheral configurations */
-> +
-> +&menet {
-> +        status = "ok";
-> +};
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +	u64 mask = GENMASK_ULL((start_bit + len - 1), start_bit);
+> +	((u64 *)desc)[word_index] = (((u64 *)desc)[word_index] & ~mask)
+> +	    | (((u64) val << start_bit) & mask);
 
+This looks horrible for several reasons.
 
+First of all, do not put empty lines in the middle of a set of
+local variable declarations.
 
--- 
-Florian
+But do put a single empty line after the last local variable, and
+before the actual code of the function starts.
+
+Get rid of all of this excessive casting.  Tell the compiler what you're
+actually doing, pass 'desc' in as "void *" and use local "u64 *" pointers
+(to which 'desc' is assigned to) if you must.
