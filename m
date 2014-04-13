@@ -1,36 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Apr 2014 17:41:18 +0200
-Subject: [PATCH 20/29] ARM: orion5x: convert edmini_v2 to DT pinctrl
-In-Reply-To: <20140413152605.GB10033@lunn.ch>
+Date: Sun, 13 Apr 2014 17:43:41 +0200
+Subject: [PATCH 21/29] ARM: orion5x: use DT to describe I2C devices on
+ edmini_v2
+In-Reply-To: <20140413152840.GC10033@lunn.ch>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140413152605.GB10033@lunn.ch>
-Message-ID: <20140413174118.6b7304d4@skate>
+ <1397400006-4315-22-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140413152840.GC10033@lunn.ch>
+Message-ID: <20140413174341.070a225b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Andrew Lunn,
 
-On Sun, 13 Apr 2014 17:26:05 +0200, Andrew Lunn wrote:
+On Sun, 13 Apr 2014 17:28:40 +0200, Andrew Lunn wrote:
 
-> One of the things Sebastian did as part of his Kirkwood DT cleanup was
-> sort pinctrl nodes by label, instead of mpp number. We should probably
-> discuss this and come to a conclusion before converting Orion5x
-> platforms.
+> > +			i2c at 11000 {
+> > +				status = "okay";
+> > +				clock-frequency = <100000>;
+> > +				#address-cells = <1>;
+> > +
+> > +				rtc at 32 {
+> > +					compatible = "rs5c372a";
+> 
+> Hi Thomas
+> 
+> This should have a vendor prefix.
 
-Sorting by label may be a good idea, because sorting by MPP does not
-necessarily make a lot of sense when some pinctrl configurations
-include several pins. Like how would you sort:
+Ok, I was afraid this would have required adding an explicit DT binding
+to the RTC driver, but that's not the case: of_modalias_node() strips
+the vendor part of the compatible string.
 
-config-foo {
-	marvell,pins = "mpp2";
-	...
-};
-
-config-bar {
-	marvell,pins = "mpp1", "mpp13";
-	...
-};
+Will fix for the next version, thanks.
 
 Thomas
 -- 
