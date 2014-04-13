@@ -1,30 +1,44 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Apr 2014 18:53:04 +0200
-Subject: [PATCH 26/29] ARM: orion5x: convert RD-88F5182 to Device Tree
-In-Reply-To: <20140413155949.GG10033@lunn.ch>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-27-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140413154715.GE10033@lunn.ch> <20140413175658.64b65a76@skate>
- <20140413155949.GG10033@lunn.ch>
-Message-ID: <20140413185304.358c1c42@skate>
+Date: Sun, 13 Apr 2014 18:55:20 +0200
+Subject: Marvell Orion5x boards with PCIe, and DT conversion
+In-Reply-To: <53480402.5030101@free.fr>
+References: <20140411155735.109c5d04@skate>
+	<53480402.5030101@free.fr>
+Message-ID: <20140413185520.5f9e7165@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Dear Albert ARIBAUD,
 
-On Sun, 13 Apr 2014 17:59:49 +0200, Andrew Lunn wrote:
+On Fri, 11 Apr 2014 17:02:26 +0200, Albert ARIBAUD wrote:
 
-> I hope kirkwood will complete its move soon. I have Openrd in a state
-> it can move to mvebu, So that only leaves netxbig_v2.c.
+> I'll gladly test these patches on my faithful Orion ED Mini V2. Not sure 
+> if it uses PCIe, but I suspect it does not.
 
-Nice, that would be a good move. Regarding netxbig_v2.c, looks like I
-need to revive
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/188443.html.
+Thanks for the proposal. Unfortunately, it turns out that the Orion ED
+Mini V2 is one of the two boards I already have, so I can test on this
+one. However, it would definitely be useful to have your testing and
+feedback.
 
-On the mach-dove front, what is preventing the removal of the old style
-cm-a510.c and dove-db-setup.c, since I see there are Device Tree for
-those platforms? Maybe they are not complete? Maybe the biggest problem
-is testing PCIe?
+I've posted the patch series on LAKML just a few hours ago, you can
+also grab the code from:
+
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/3.15/orion
+
+In this branch, Orion ED Mini v2 is fully converted to the Device Tree.
+
+> How does this play out with U-Boot? I mean, I know that you can produce 
+> a kernel which embeds the device tree and will load without U-Boot 
+> knowing anything about them, but OTOH, U-Boot has some support for DTs, 
+> and could possibly use the DT files too.
+
+For now, I'm using the U-Boot included with the boards, so it does not
+have FDT support, which means I'm using appended DTBs.
+
+Do you know if UART booting works for Orion boards? If not, what is the
+recovery mechanism if you screw up while reflashing U-Boot?
+
+Thanks!
 
 Thomas
 -- 
