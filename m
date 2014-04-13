@@ -1,22 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 13 Apr 2014 17:59:49 +0200
-Subject: [PATCH 26/29] ARM: orion5x: convert RD-88F5182 to Device Tree
-In-Reply-To: <20140413175658.64b65a76@skate>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-27-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140413154715.GE10033@lunn.ch> <20140413175658.64b65a76@skate>
-Message-ID: <20140413155949.GG10033@lunn.ch>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 13 Apr 2014 12:42:55 -0400 (EDT)
+Subject: [PATCH v2 1/2] ARM : DMA : remove useless information about
+ DMA
+In-Reply-To: <534A7EA7.5090900@huawei.com>
+References: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
+ <1397203252-22977-2-git-send-email-sdu.liu@huawei.com>
+ <alpine.LFD.2.11.1404112252050.980@knanqh.ubzr> <5348C040.1060305@huawei.com>
+ <alpine.LFD.2.11.1404121031170.980@knanqh.ubzr>
+ <534A7EA7.5090900@huawei.com>
+Message-ID: <alpine.LFD.2.11.1404131240150.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> To be honest, I find it pretty useless to have half of the Kirkwood
-> and Dove support in mach-mvebu, and half still in
-> mach-kirkwood/mach-dove, because it doesn't allow to remove any of the
-> legacy code in mach-kirkwood and mach-dove. But oh, well, I guess it's
-> only a temporary situation, until more boards are converted, or their
-> support simply removed.
+On Sun, 13 Apr 2014, Liu hua wrote:
 
-I hope kirkwood will complete its move soon. I have Openrd in a state
-it can move to mvebu, So that only leaves netxbig_v2.c.
+> On 2014/4/12 22:32, Nicolas Pitre write:
+> > On Sat, 12 Apr 2014, Liu hua wrote:
+> > 
+> >> Hi Nicolas,
+> >>
+> >> Your version is better. you tell me this in the former letters.
+> >> So I am very sorry to forget to check that.
+> >>
+> >> May be I should remake this second patch to fit your change. What do
+> >> you think about that patch?
+> > 
+> > You may simply drop your first patch and only keep the other two.
+> > 
+> Sure. But your patch and my second one both change Document/arm/memory.txt.
+> I am afraid there will be conflicts when someone tests my patch before
+> yours getting into the mainline.
 
-   Andrew
+That's still an easy conflict to fix.  And it is likely that git will 
+fix it automatically.
+
+
+Nicolas
