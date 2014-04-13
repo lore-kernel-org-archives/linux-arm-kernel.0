@@ -1,102 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Apr 2014 16:39:42 +0200
-Subject: [PATCH 05/29] memory: mvebu-devbus: use ARMADA_ prefix in defines
+Date: Sun, 13 Apr 2014 16:39:45 +0200
+Subject: [PATCH 08/29] ARM: orion5x: move interrupt controller node into ocp
 In-Reply-To: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397400006-4315-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397400006-4315-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu-devbus driver currently only supports the Armada 370/XP
-family, but it can also cover the Orion5x family. However, the Orion5x
-family has a different organization of the register. Therefore, in
-preparation to the introduction of Orion5x support, we rename the
-Armada 370/XP specific definitions to have an ARMADA_ prefix.
+The interrupt controller node was located outside of the ocp at f1000000
+node, which doesn't make much sense: like any other device, the
+interrupt controller has registers located in the "Internal Registers
+Window", so it is much more logical to have it under the ocp at f1000000
+node.
+
+It is even more important as we are going to move Orion5x to use the
+Device Tree binding of the mvebu-mbus driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/orion5x.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
-index b82cdf1..84746e3 100644
---- a/drivers/memory/mvebu-devbus.c
-+++ b/drivers/memory/mvebu-devbus.c
-@@ -30,19 +30,19 @@
- #include <linux/platform_device.h>
+diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+index 174d892..da57fb9 100644
+--- a/arch/arm/boot/dts/orion5x.dtsi
++++ b/arch/arm/boot/dts/orion5x.dtsi
+@@ -17,13 +17,6 @@
+ 		gpio0 = &gpio0;
+ 	};
  
- /* Register definitions */
--#define DEV_WIDTH_BIT		30
--#define BADR_SKEW_BIT		28
--#define RD_HOLD_BIT		23
--#define ACC_NEXT_BIT		17
--#define RD_SETUP_BIT		12
--#define ACC_FIRST_BIT		6
-+#define ARMADA_DEV_WIDTH_BIT		30
-+#define ARMADA_BADR_SKEW_BIT		28
-+#define ARMADA_RD_HOLD_BIT		23
-+#define ARMADA_ACC_NEXT_BIT		17
-+#define ARMADA_RD_SETUP_BIT		12
-+#define ARMADA_ACC_FIRST_BIT		6
+-	intc: interrupt-controller {
+-		compatible = "marvell,orion-intc";
+-		interrupt-controller;
+-		#interrupt-cells = <1>;
+-		reg = <0xf1020200 0x08>;
+-	};
+-
+ 	ocp at f1000000 {
+ 		compatible = "simple-bus";
+ 		ranges = <0x00000000 0xf1000000 0x4000000
+@@ -79,6 +72,13 @@
+ 			status = "disabled";
+ 		};
  
--#define SYNC_ENABLE_BIT		24
--#define WR_HIGH_BIT		16
--#define WR_LOW_BIT		8
-+#define ARMADA_SYNC_ENABLE_BIT		24
-+#define ARMADA_WR_HIGH_BIT		16
-+#define ARMADA_WR_LOW_BIT		8
- 
--#define READ_PARAM_OFFSET	0x0
--#define WRITE_PARAM_OFFSET	0x4
-+#define ARMADA_READ_PARAM_OFFSET	0x0
-+#define ARMADA_WRITE_PARAM_OFFSET	0x4
- 
- struct devbus_read_params {
- 	u32 bus_width;
-@@ -171,31 +171,31 @@ static int devbus_set_timing_params(struct devbus *devbus,
- 		return err;
- 
- 	/* Set read timings */
--	value = r.bus_width << DEV_WIDTH_BIT |
--		r.badr_skew << BADR_SKEW_BIT |
--		r.rd_hold   << RD_HOLD_BIT   |
--		r.acc_next  << ACC_NEXT_BIT  |
--		r.rd_setup  << RD_SETUP_BIT  |
--		r.acc_first << ACC_FIRST_BIT |
-+	value = r.bus_width << ARMADA_DEV_WIDTH_BIT |
-+		r.badr_skew << ARMADA_BADR_SKEW_BIT |
-+		r.rd_hold   << ARMADA_RD_HOLD_BIT   |
-+		r.acc_next  << ARMADA_ACC_NEXT_BIT  |
-+		r.rd_setup  << ARMADA_RD_SETUP_BIT  |
-+		r.acc_first << ARMADA_ACC_FIRST_BIT |
- 		r.turn_off;
- 
- 	dev_dbg(devbus->dev, "read parameters register 0x%p = 0x%x\n",
--		devbus->base + READ_PARAM_OFFSET,
-+		devbus->base + ARMADA_READ_PARAM_OFFSET,
- 		value);
- 
--	writel(value, devbus->base + READ_PARAM_OFFSET);
-+	writel(value, devbus->base + ARMADA_READ_PARAM_OFFSET);
- 
- 	/* Set write timings */
--	value = w.sync_enable  << SYNC_ENABLE_BIT |
--		w.wr_low       << WR_LOW_BIT      |
--		w.wr_high      << WR_HIGH_BIT     |
-+	value = w.sync_enable  << ARMADA_SYNC_ENABLE_BIT |
-+		w.wr_low       << ARMADA_WR_LOW_BIT      |
-+		w.wr_high      << ARMADA_WR_HIGH_BIT     |
- 		w.ale_wr;
- 
- 	dev_dbg(devbus->dev, "write parameters register: 0x%p = 0x%x\n",
--		devbus->base + WRITE_PARAM_OFFSET,
-+		devbus->base + ARMADA_WRITE_PARAM_OFFSET,
- 		value);
- 
--	writel(value, devbus->base + WRITE_PARAM_OFFSET);
-+	writel(value, devbus->base + ARMADA_WRITE_PARAM_OFFSET);
- 
- 	return 0;
- }
++		intc: interrupt-controller@20200 {
++			compatible = "marvell,orion-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			reg = <0x20200 0x08>;
++		};
++
+ 		wdt at 20300 {
+ 			compatible = "marvell,orion-wdt";
+ 			reg = <0x20300 0x28>;
 -- 
 1.8.3.2
