@@ -1,54 +1,102 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Apr 2014 16:39:47 +0200
-Subject: [PATCH 10/29] ARM: orion5x: use existing dt-bindings include for
- Device Tree files
+Date: Sun, 13 Apr 2014 16:39:42 +0200
+Subject: [PATCH 05/29] memory: mvebu-devbus: use ARMADA_ prefix in defines
 In-Reply-To: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397400006-4315-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397400006-4315-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The orion5x-lacie-ethernet-disk-mini-v2.dts can benefit from using
-gpio.h and input.h dt-bindings headers to replace hardcoded values by
-more meaningful macros.
+The mvebu-devbus driver currently only supports the Armada 370/XP
+family, but it can also cover the Orion5x family. However, the Orion5x
+family has a different organization of the register. Therefore, in
+preparation to the introduction of Orion5x support, we rename the
+Armada 370/XP specific definitions to have an ARMADA_ prefix.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-index 0245bb3..24f1ce7 100644
---- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-+++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-@@ -8,6 +8,8 @@
+diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
+index b82cdf1..84746e3 100644
+--- a/drivers/memory/mvebu-devbus.c
++++ b/drivers/memory/mvebu-devbus.c
+@@ -30,19 +30,19 @@
+ #include <linux/platform_device.h>
  
- /dts-v1/;
+ /* Register definitions */
+-#define DEV_WIDTH_BIT		30
+-#define BADR_SKEW_BIT		28
+-#define RD_HOLD_BIT		23
+-#define ACC_NEXT_BIT		17
+-#define RD_SETUP_BIT		12
+-#define ACC_FIRST_BIT		6
++#define ARMADA_DEV_WIDTH_BIT		30
++#define ARMADA_BADR_SKEW_BIT		28
++#define ARMADA_RD_HOLD_BIT		23
++#define ARMADA_ACC_NEXT_BIT		17
++#define ARMADA_RD_SETUP_BIT		12
++#define ARMADA_ACC_FIRST_BIT		6
  
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include "orion5x.dtsi"
+-#define SYNC_ENABLE_BIT		24
+-#define WR_HIGH_BIT		16
+-#define WR_LOW_BIT		8
++#define ARMADA_SYNC_ENABLE_BIT		24
++#define ARMADA_WR_HIGH_BIT		16
++#define ARMADA_WR_LOW_BIT		8
  
- / {
-@@ -40,8 +42,8 @@
- 		#size-cells = <0>;
- 		button at 1 {
- 			label = "Power-on Switch";
--			linux,code = <116>; /* KEY_POWER */
--			gpios = <&gpio0 18 0>;
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
+-#define READ_PARAM_OFFSET	0x0
+-#define WRITE_PARAM_OFFSET	0x4
++#define ARMADA_READ_PARAM_OFFSET	0x0
++#define ARMADA_WRITE_PARAM_OFFSET	0x4
  
-@@ -50,7 +52,7 @@
+ struct devbus_read_params {
+ 	u32 bus_width;
+@@ -171,31 +171,31 @@ static int devbus_set_timing_params(struct devbus *devbus,
+ 		return err;
  
- 		led at 1 {
- 			label = "power:blue";
--			gpios = <&gpio0 16 1>;
-+			gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
+ 	/* Set read timings */
+-	value = r.bus_width << DEV_WIDTH_BIT |
+-		r.badr_skew << BADR_SKEW_BIT |
+-		r.rd_hold   << RD_HOLD_BIT   |
+-		r.acc_next  << ACC_NEXT_BIT  |
+-		r.rd_setup  << RD_SETUP_BIT  |
+-		r.acc_first << ACC_FIRST_BIT |
++	value = r.bus_width << ARMADA_DEV_WIDTH_BIT |
++		r.badr_skew << ARMADA_BADR_SKEW_BIT |
++		r.rd_hold   << ARMADA_RD_HOLD_BIT   |
++		r.acc_next  << ARMADA_ACC_NEXT_BIT  |
++		r.rd_setup  << ARMADA_RD_SETUP_BIT  |
++		r.acc_first << ARMADA_ACC_FIRST_BIT |
+ 		r.turn_off;
+ 
+ 	dev_dbg(devbus->dev, "read parameters register 0x%p = 0x%x\n",
+-		devbus->base + READ_PARAM_OFFSET,
++		devbus->base + ARMADA_READ_PARAM_OFFSET,
+ 		value);
+ 
+-	writel(value, devbus->base + READ_PARAM_OFFSET);
++	writel(value, devbus->base + ARMADA_READ_PARAM_OFFSET);
+ 
+ 	/* Set write timings */
+-	value = w.sync_enable  << SYNC_ENABLE_BIT |
+-		w.wr_low       << WR_LOW_BIT      |
+-		w.wr_high      << WR_HIGH_BIT     |
++	value = w.sync_enable  << ARMADA_SYNC_ENABLE_BIT |
++		w.wr_low       << ARMADA_WR_LOW_BIT      |
++		w.wr_high      << ARMADA_WR_HIGH_BIT     |
+ 		w.ale_wr;
+ 
+ 	dev_dbg(devbus->dev, "write parameters register: 0x%p = 0x%x\n",
+-		devbus->base + WRITE_PARAM_OFFSET,
++		devbus->base + ARMADA_WRITE_PARAM_OFFSET,
+ 		value);
+ 
+-	writel(value, devbus->base + WRITE_PARAM_OFFSET);
++	writel(value, devbus->base + ARMADA_WRITE_PARAM_OFFSET);
+ 
+ 	return 0;
+ }
 -- 
 1.8.3.2
