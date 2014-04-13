@@ -1,43 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 13 Apr 2014 11:35:40 -0300
-Subject: [PATCH v3 1/3] ARM: dts: imx27-pdk: Keep the dt nodes sorted
-Message-ID: <1397399742-3577-1-git-send-email-festevam@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 13 Apr 2014 16:39:38 +0200
+Subject: [PATCH 01/29] ARM: orion5x: fix target ID for crypto SRAM window
+In-Reply-To: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397400006-4315-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+In commit 4ca2c04085a1caa903e92a5fc0da25362150aac2 ('ARM: orion5x:
+Move to ID based window creation'), the mach-orion5x code was changed
+to use the new mvebu-mbus API. However, in the process, a mistake was
+made on the crypto SRAM window target ID: it should have been 0x9
+(verified in the datasheet) and not 0x0.
 
-For better readability keep the dt nodes sorted.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: stable at vger.kernel.org
 ---
-Changes since v2:
-- None
-Changes since v1:
-- Newly introduced
+This should be backported to stable all the way to v3.12.
 
- arch/arm/boot/dts/imx27-pdk.dts | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-orion5x/common.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-index 28c83bc..bd95265 100644
---- a/arch/arm/boot/dts/imx27-pdk.dts
-+++ b/arch/arm/boot/dts/imx27-pdk.dts
-@@ -21,11 +21,12 @@
- 	};
- };
+diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+index f565f99..7548db2 100644
+--- a/arch/arm/mach-orion5x/common.h
++++ b/arch/arm/mach-orion5x/common.h
+@@ -21,7 +21,7 @@ struct mv_sata_platform_data;
+ #define ORION_MBUS_DEVBUS_BOOT_ATTR   0x0f
+ #define ORION_MBUS_DEVBUS_TARGET(cs)  0x01
+ #define ORION_MBUS_DEVBUS_ATTR(cs)    (~(1 << cs))
+-#define ORION_MBUS_SRAM_TARGET        0x00
++#define ORION_MBUS_SRAM_TARGET        0x09
+ #define ORION_MBUS_SRAM_ATTR          0x00
  
--&uart1 {
--	fsl,uart-has-rtscts;
-+
-+&fec {
- 	status = "okay";
- };
- 
--&fec {
-+&uart1 {
-+	fsl,uart-has-rtscts;
- 	status = "okay";
- };
+ /*
 -- 
 1.8.3.2
