@@ -1,17 +1,76 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 13 Apr 2014 15:25:53 +0800
-Subject: [PATCH v3] ARM: dts: i.MX: Use single naming style for i.MX WEIM
- device
-In-Reply-To: <1397056096-29233-1-git-send-email-shc_work@mail.ru>
-References: <1397056096-29233-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140413072551.GA24180@dragon>
+Date: Sun, 13 Apr 2014 15:31:47 +0800
+Subject: [PATCH v2 3/3] ARM: dts: imx27-pdk: Pass the FEC pin configuration
+In-Reply-To: <1397069722-14778-3-git-send-email-festevam@gmail.com>
+References: <1397069722-14778-1-git-send-email-festevam@gmail.com>
+ <1397069722-14778-3-git-send-email-festevam@gmail.com>
+Message-ID: <20140413073146.GB24180@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 07:08:16PM +0400, Alexander Shiyan wrote:
-> This patch converts all i.MX WEIM users to use single naming style
-> for devices.
+On Wed, Apr 09, 2014 at 03:55:22PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Provide an entry for the FEC pin muxing.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Keep the iomuxc node at the bottom
+> 
+>  arch/arm/boot/dts/imx27-pdk.dts | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
+> index e0f4213..97ee781 100644
+> --- a/arch/arm/boot/dts/imx27-pdk.dts
+> +++ b/arch/arm/boot/dts/imx27-pdk.dts
+> @@ -23,6 +23,9 @@
+>  
+>  
+>  &fec {
+> +	phy-mode = "mii";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec>;
+>  	status = "okay";
+>  };
+>  
+> @@ -43,5 +46,28 @@
+>  				MX27_PAD_UART1_RTS__UART1_RTS 0x0
+>  			>;
+>  		};
+> +
+> +		pinctrl_fec: fecgrp {
 
-Applied, thanks.
+I prefer to sort these pinctrl nodes alphabetically under &iomuxc.
+
+Shawn
+
+> +			fsl,pins = <
+> +				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
+> +				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
+> +				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
+> +				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
+> +				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
+> +				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
+> +				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
+> +				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
+> +				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
+> +				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
+> +				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
+> +				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
+> +				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
+> +				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
+> +				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
+> +				MX27_PAD_ATA_DATA13__FEC_COL 0x0
+> +				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
+> +				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
+> +			>;
+> +		};
+>  	};
+>  };
+> -- 
+> 1.8.3.2
+> 
+> 
+> 
