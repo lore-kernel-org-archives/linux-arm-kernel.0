@@ -1,30 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Apr 2014 18:58:55 +0200
-Subject: Marvell Orion5x boards with PCIe, and DT conversion
-In-Reply-To: <5348A96D.7060909@free.fr>
-References: <20140411155735.109c5d04@skate> <53480402.5030101@free.fr>
- <5348A96D.7060909@free.fr>
-Message-ID: <20140413185855.6e6dd6ac@skate>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 13 Apr 2014 18:59:34 +0200
+Subject: [PATCH 26/29] ARM: orion5x: convert RD-88F5182 to Device Tree
+In-Reply-To: <20140413185304.358c1c42@skate>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-27-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140413154715.GE10033@lunn.ch> <20140413175658.64b65a76@skate>
+ <20140413155949.GG10033@lunn.ch> <20140413185304.358c1c42@skate>
+Message-ID: <534AC276.70009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chris Moore,
+On 04/13/2014 06:53 PM, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
+> 
+> On Sun, 13 Apr 2014 17:59:49 +0200, Andrew Lunn wrote:
+> 
+>> I hope kirkwood will complete its move soon. I have Openrd in a state
+>> it can move to mvebu, So that only leaves netxbig_v2.c.
+> 
+> Nice, that would be a good move. Regarding netxbig_v2.c, looks like I
+> need to revive
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/188443.html.
+> 
+> On the mach-dove front, what is preventing the removal of the old style
+> cm-a510.c and dove-db-setup.c, since I see there are Device Tree for
+> those platforms? Maybe they are not complete? Maybe the biggest problem
+> is testing PCIe?
 
-On Sat, 12 Apr 2014 04:48:13 +0200, Chris Moore wrote:
+cm-a510 and dove-db have never seen any love since we moved to DT. The
+board files basically only add serial devices nothing more. Nobody
+complained about it and I guess we'll just drop support for them.
 
-> I have a Buffalo LinkStation Pro Duo in the cupboard.
-> I have never hacked it but I believe it is based on Orion5x.
-> If I can find an active serial port on the motherboard, I could test it.
+Consider mach-dove deprecated and dying.
 
-Ah, that would be interesting. This machine is supported by
-kurobox_pro-setup.c, but apparently it indeed does not have PCI.
-Anyway, I'll try to convert this machine to DT, so if you could test
-the result that would be very nice.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Sebastian
