@@ -1,178 +1,50 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 13 Apr 2014 22:48:48 +0200 (CEST)
-Subject: [PATCH] arm: edma: Fix xbar mapping
-Message-ID: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 14 Apr 2014 01:30:38 +0200
+Subject: [PATCH V2 0/3] Add PMU and S2R support for exynos5420
+In-Reply-To: <CAGm_ybhWjc7=OUJ5BTvQ-K6S_RwYVgGV8+vi6iUgKEJb0qSymw@mail.gmail.com>
+References: <1395900785-11334-1-git-send-email-vikas.sajjan@samsung.com>
+ <CAGm_ybhWjc7=OUJ5BTvQ-K6S_RwYVgGV8+vi6iUgKEJb0qSymw@mail.gmail.com>
+Message-ID: <534B1E1E.7040001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject: arm: edma: Fix xbar mapping
-From: Thomas Gleixner <tglx@linutronix.de>
-Date: Sun, 13 Apr 2014 20:44:46 +0200
+Hi Vikas,
 
-This is another great example of trainwreck engineering:
+Will review on Tuesday, when back at work. Same for the other series 
+from you.
 
-commit 2646a0e529 (ARM: edma: Add EDMA crossbar event mux support)
-added support for using EDMA on peripherals which have no direct EDMA
-event mapping.
+Best regards,
+Tomasz
 
-The code compiles and does not explode in your face, but that's it.
-
-1) Reading an u16 array from an u32 device tree array simply does not
-   work. Even if the function is named "edma_of_read_u32_to_s16_array".
-
-   It merily calls of_property_read_u16_array. So the resulting 16bit
-   array will have every other entry = 0.
-
-2) The DT entry for the xbar registers related to xbar has length 0x10
-   instead of the real length: 0xfd0 - 0xf90 = 0x40.
-
-   Not a real problem as it does not cross a page boundary, but
-   wrong nevertheless.
-
-3) But none of this matters as the mapping never happens:
-
-   After reading nonsense edma_of_read_u32_to_s16_array() invalidates
-   the first array entry pair, so nobody can ever notice the
-   braindamage by immediate explosion.
-
-Seems the QA criteria for this code was solely not to explode when
-someone adds edma-xbar-event-map entries to the DT. Goal achieved,
-congratulations!
-
-Not really helpful if someone wants to use edma on a device which
-requires a xbar mapping.
-
-Fix the issues by:
-
-- annotating the device tree entry with "/bits/ 16" as documented in
-  the of_property_read_u16_array kernel doc
-
-- make the size of the xbar register mapping correct
-
-- invalidating the end of the array and not the start
-
-This convoluted mess wants to be completely rewritten as there is no
-point to keep the xbar_chan array memory and the iomapping of the xbar
-regs around forever. Marking the xbar mapped channels as used should
-be done right there.
-
-But that's a different issue and this patch is small enough to make it
-work and allows a simple backport for stable.
-
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
----
- Documentation/devicetree/bindings/dma/ti-edma.txt |    4 -
- arch/arm/boot/dts/am33xx.dtsi                     |    2 
- arch/arm/common/edma.c                            |   48 ++++++----------------
- 3 files changed, 18 insertions(+), 36 deletions(-)
-
-Index: linux-2.6/Documentation/devicetree/bindings/dma/ti-edma.txt
-===================================================================
---- linux-2.6.orig/Documentation/devicetree/bindings/dma/ti-edma.txt
-+++ linux-2.6/Documentation/devicetree/bindings/dma/ti-edma.txt
-@@ -29,6 +29,6 @@ edma: edma at 49000000 {
- 	dma-channels = <64>;
- 	ti,edma-regions = <4>;
- 	ti,edma-slots = <256>;
--	ti,edma-xbar-event-map = <1 12
--				  2 13>;
-+	ti,edma-xbar-event-map = /bits/ 16 <1 12
-+				  	    2 13>;
- };
-Index: linux-2.6/arch/arm/boot/dts/am33xx.dtsi
-===================================================================
---- linux-2.6.orig/arch/arm/boot/dts/am33xx.dtsi
-+++ linux-2.6/arch/arm/boot/dts/am33xx.dtsi
-@@ -144,7 +144,7 @@
- 			compatible = "ti,edma3";
- 			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
- 			reg =	<0x49000000 0x10000>,
--				<0x44e10f90 0x10>;
-+				<0x44e10f90 0x40>;
- 			interrupts = <12 13 14>;
- 			#dma-cells = <1>;
- 			dma-channels = <64>;
-Index: linux-2.6/arch/arm/common/edma.c
-===================================================================
---- linux-2.6.orig/arch/arm/common/edma.c
-+++ linux-2.6/arch/arm/common/edma.c
-@@ -1423,55 +1423,38 @@ EXPORT_SYMBOL(edma_clear_event);
- 
- #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_DMADEVICES)
- 
--static int edma_of_read_u32_to_s16_array(const struct device_node *np,
--					 const char *propname, s16 *out_values,
--					 size_t sz)
-+static int edma_xbar_event_map(struct device *dev, struct device_node *node,
-+			       struct edma_soc_info *pdata, size_t sz)
- {
--	int ret;
--
--	ret = of_property_read_u16_array(np, propname, out_values, sz);
--	if (ret)
--		return ret;
--
--	/* Terminate it */
--	*out_values++ = -1;
--	*out_values++ = -1;
--
--	return 0;
--}
--
--static int edma_xbar_event_map(struct device *dev,
--			       struct device_node *node,
--			       struct edma_soc_info *pdata, int len)
--{
--	int ret, i;
-+	const char pname[] = "ti,edma-xbar-event-map";
- 	struct resource res;
- 	void __iomem *xbar;
--	const s16 (*xbar_chans)[2];
-+	s16 (*xbar_chans)[2];
-+	size_t nelm = sz / sizeof(s16);
- 	u32 shift, offset, mux;
-+	int ret, i;
- 
--	xbar_chans = devm_kzalloc(dev,
--				  len/sizeof(s16) + 2*sizeof(s16),
--				  GFP_KERNEL);
-+	xbar_chans = devm_kzalloc(dev, (nelm + 2) * sizeof(s16), GFP_KERNEL);
- 	if (!xbar_chans)
- 		return -ENOMEM;
- 
- 	ret = of_address_to_resource(node, 1, &res);
- 	if (ret)
--		return -EIO;
-+		return -ENOMEM;
- 
- 	xbar = devm_ioremap(dev, res.start, resource_size(&res));
- 	if (!xbar)
- 		return -ENOMEM;
- 
--	ret = edma_of_read_u32_to_s16_array(node,
--					    "ti,edma-xbar-event-map",
--					    (s16 *)xbar_chans,
--					    len/sizeof(u32));
-+	ret = of_property_read_u16_array(node, pname, (u16 *)xbar_chans, nelm);
- 	if (ret)
- 		return -EIO;
- 
--	for (i = 0; xbar_chans[i][0] != -1; i++) {
-+	/* Invalidate last entry for the other user of this mess */
-+	nelm >>= 1;
-+	xbar_chans[nelm][0] = xbar_chans[nelm][1] = -1;
-+
-+	for (i = 0; i < nelm; i++) {
- 		shift = (xbar_chans[i][1] & 0x03) << 3;
- 		offset = xbar_chans[i][1] & 0xfffffffc;
- 		mux = readl(xbar + offset);
-@@ -1480,8 +1463,7 @@ static int edma_xbar_event_map(struct de
- 		writel(mux, (xbar + offset));
- 	}
- 
--	pdata->xbar_chans = xbar_chans;
--
-+	pdata->xbar_chans = (const s16 (*)[2]) xbar_chans;
- 	return 0;
- }
- 
+On 11.04.2014 15:17, Vikas Sajjan wrote:
+>   Hi,
+>
+>   Any comments on this series.
+>
+> On Thu, Mar 27, 2014 at 11:43 AM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>> rebased on kgene tree for-next branch
+>> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+>>
+>> changes since v1:
+>>          - Addressed comments from Tomasz figa.
+>>          - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
+>>
+>> Abhilash Kesavan (1):
+>>    ARM: dts: Add node for GPIO keys on SMDK5420
+>>
+>> Vikas Sajjan (2):
+>>    ARM: EXYNOS5: Add PMU settings for exynos5420
+>>    ARM: EXYNOS5: Support Suspend-to-RAM on EXYNOS5420
+>>
+>>   arch/arm/boot/dts/exynos5420-smdk5420.dts    |   11 +
+>>   arch/arm/mach-exynos/common.h                |   10 +
+>>   arch/arm/mach-exynos/pm.c                    |  148 +++++++++++--
+>>   arch/arm/mach-exynos/pmu.c                   |  307 ++++++++++++++++++++++++++
+>>   arch/arm/mach-exynos/regs-pmu.h              |  230 +++++++++++++++++++
+>>   arch/arm/plat-samsung/include/plat/map-s5p.h |    2 +
+>>   drivers/clk/samsung/clk-exynos5420.c         |   32 +++
+>>   7 files changed, 722 insertions(+), 18 deletions(-)
+>>
+>> --
+>> 1.7.9.5
+>>
