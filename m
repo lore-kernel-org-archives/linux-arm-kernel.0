@@ -1,129 +1,293 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Apr 2014 16:39:37 +0200
-Subject: [PATCH 00/29] ARM: orion5x: big step towards DT conversion
-Message-ID: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Sun, 13 Apr 2014 16:39:40 +0200
+Subject: [PATCH 03/29] clk: mvebu: add Orion5x clock driver
+In-Reply-To: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397400006-4315-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds a core clock driver for the Orion5x SoC, with support
+for the tclk, the CPU frequency and the DDR frequency. All the details
+about the Sample-At-Reset register were extracted from the U-Boot
+sources for Orion5x.
 
-This set of patches make a big step towards converting mach-orion5x to
-use the Device Tree: one board (edmini_v2) is fully converted and two
-other boards are almost fully converted (rd88f5182 and d2-net).
+Note that Orion5x does not have gatable clocks, so this core clock
+driver is sufficient to support clocking on Orion5x platforms.
 
-Summary of the patches:
-
- * PATCH 1 is a fix for a MBus window target ID that was wrong since
-   v3.12, so it should be pushed to stable.
-
- * PATCH 2 adds the Orion pinctrl driver.
-
- * PATCH 3 adds the Orion clock driver.
-
- * PATCH 4 to 7 adds Orion support to the mvebu-devbus driver. PATCH 4
-   was already sent as a fix for the mvebu-devbus driver.
-
- * PATCH 5 to 19 improve the DT conversion of Orion5x, by converting
-   it to use the MBus DT binding, the pinctrl, timer described in the
-   Device Tree, etc.
-
- * PATCH 20 to 25 finish the conversion of the edmini_v2 platform to
-   Device Tree.
-
- * PATCH 26 and 27 convert two other platforms to the Device Tree.
-
- * PATCH 28 and 29 remove some code in plat-orion/ that is now useless
-   after this patch series.
-
-This code has been test on Marvell RD-88F5182 and LaCie edmini_v2. The
-conversion of LaCie d2-net was done without testing, due to the lack
-of hardware.
-
-This set of patches is based on the latest Linus master (so it should
-be closed to something based on the upcoming 3.15-rc1), and it also
-available at:
-
-  https://github.com/MISL-EBU-System-SW/mainline-public/tree/3.15/orion
-
-Review, comments, testing welcome.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (29):
-  ARM: orion5x: fix target ID for crypto SRAM window
-  pinctrl: mvebu: new driver for Orion platforms
-  clk: mvebu: add Orion5x clock driver
-  memory: mvebu-devbus: fix the conversion of the bus width
-  memory: mvebu-devbus: use ARMADA_ prefix in defines
-  memory: mvebu-devbus: split functions
-  memory: mvebu-devbus: add Orion5x support
-  ARM: orion5x: move interrupt controller node into ocp
-  ARM: orion5x: switch to preprocessor includes in DT
-  ARM: orion5x: use existing dt-bindings include for Device Tree files
-  ARM: orion5x: convert DT to use the mvebu-mbus driver
-  ARM: orion5x: add interrupt for Ethernet in Device Tree
-  ARM: orion5x: switch to use the clock driver for DT platforms
-  ARM: orion: switch to a per-platform handle_irq() function
-  ARM: orion5x: switch to DT interrupts and timer
-  ARM: orion5x: enable pinctrl driver at SoC level
-  ARM: orion5x: update I2C description at SoC level
-  ARM: orion5x: add Device Bus description at SoC level
-  ARM: orion5x: add standard pinctrl configs for sata0 and sata1
-  ARM: orion5x: convert edmini_v2 to DT pinctrl
-  ARM: orion5x: use DT to describe I2C devices on edmini_v2
-  ARM: orion5x: use DT to describe EHCI on edmini_v2
-  ARM: orion5x: use DT to describe NOR on edmini_v2
-  ARM: orion5x: keep TODO list in edmini_v2 DT
-  ARM: orion5x: remove unneeded code for edmini_v2
-  ARM: orion5x: convert RD-88F5182 to Device Tree
-  ARM: orion5x: convert d2net to Device Tree
-  ARM: orion: remove no longer needed DT IRQ code
-  ARM: orion: remove no longer needed gpio DT code
-
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
  .../devicetree/bindings/clock/mvebu-core-clock.txt |   8 +
- .../bindings/memory-controllers/mvebu-devbus.txt   |  25 +-
- .../bindings/pinctrl/marvell,orion-pinctrl.txt     |  91 +++++
- arch/arm/boot/dts/Makefile                         |   4 +-
- arch/arm/boot/dts/orion5x-lacie-d2-network.dts     | 234 +++++++++++++
- .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 128 +++++++-
- arch/arm/boot/dts/orion5x-mv88f5182.dtsi           |  45 +++
- arch/arm/boot/dts/orion5x-rd88f5182-nas.dts        | 155 +++++++++
- arch/arm/boot/dts/orion5x.dtsi                     | 287 +++++++++-------
- arch/arm/mach-dove/irq.c                           |  36 ++
- arch/arm/mach-kirkwood/irq.c                       |  36 ++
- arch/arm/mach-orion5x/Kconfig                      |  32 +-
- arch/arm/mach-orion5x/Makefile                     |   5 +-
- arch/arm/mach-orion5x/board-d2net.c                | 109 ++++++
- arch/arm/mach-orion5x/board-dt.c                   |  23 +-
- arch/arm/mach-orion5x/board-rd88f5182.c            | 116 +++++++
- arch/arm/mach-orion5x/common.h                     |   9 +-
- arch/arm/mach-orion5x/d2net-setup.c                | 365 ---------------------
- arch/arm/mach-orion5x/edmini_v2-setup.c            | 169 ----------
- arch/arm/mach-orion5x/irq.c                        |  28 ++
- arch/arm/plat-orion/gpio.c                         |  48 ---
- arch/arm/plat-orion/include/plat/irq.h             |   1 -
- arch/arm/plat-orion/include/plat/orion-gpio.h      |   1 -
- arch/arm/plat-orion/irq.c                          |  77 -----
  drivers/clk/mvebu/Kconfig                          |   4 +
  drivers/clk/mvebu/Makefile                         |   1 +
- drivers/clk/mvebu/orion.c                          | 212 ++++++++++++
- drivers/memory/mvebu-devbus.c                      | 209 ++++++++----
- drivers/pinctrl/mvebu/Kconfig                      |   4 +
- drivers/pinctrl/mvebu/Makefile                     |   1 +
- drivers/pinctrl/mvebu/pinctrl-orion.c              | 261 +++++++++++++++
- 31 files changed, 1830 insertions(+), 894 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
- create mode 100644 arch/arm/boot/dts/orion5x-lacie-d2-network.dts
- create mode 100644 arch/arm/boot/dts/orion5x-mv88f5182.dtsi
- create mode 100644 arch/arm/boot/dts/orion5x-rd88f5182-nas.dts
- create mode 100644 arch/arm/mach-orion5x/board-d2net.c
- create mode 100644 arch/arm/mach-orion5x/board-rd88f5182.c
- delete mode 100644 arch/arm/mach-orion5x/d2net-setup.c
- delete mode 100644 arch/arm/mach-orion5x/edmini_v2-setup.c
+ drivers/clk/mvebu/orion.c                          | 212 +++++++++++++++++++++
+ 4 files changed, 225 insertions(+)
  create mode 100644 drivers/clk/mvebu/orion.c
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-orion.c
 
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+index 307a503..dc5ea5b 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+@@ -29,6 +29,11 @@ The following is a list of provided IDs and clock names on Kirkwood and Dove:
+  2 = l2clk  (L2 Cache clock derived from CPU0 clock)
+  3 = ddrclk (DDR controller clock derived from CPU0 clock)
+ 
++The following is a list of provided IDs and clock names on Orion5x:
++ 0 = tclk   (Internal Bus clock)
++ 1 = cpuclk (CPU0 clock)
++ 2 = ddrclk (DDR controller clock derived from CPU0 clock)
++
+ Required properties:
+ - compatible : shall be one of the following:
+ 	"marvell,armada-370-core-clock" - For Armada 370 SoC core clocks
+@@ -38,6 +43,9 @@ Required properties:
+ 	"marvell,dove-core-clock" - for Dove SoC core clocks
+ 	"marvell,kirkwood-core-clock" - for Kirkwood SoC (except mv88f6180)
+ 	"marvell,mv88f6180-core-clock" - for Kirkwood MV88f6180 SoC
++	"marvell,mv88f5182-core-clock" - for Orion MV88F5182 SoC
++	"marvell,mv88f5281-core-clock" - for Orion MV88F5281 SoC
++	"marvell,mv88f6183-core-clock" - for Orion MV88F6183 SoC
+ - reg : shall be the register address of the Sample-At-Reset (SAR) register
+ - #clock-cells : from common clock binding; shall be set to 1
+ 
+diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
+index 693f7be..3b34dba 100644
+--- a/drivers/clk/mvebu/Kconfig
++++ b/drivers/clk/mvebu/Kconfig
+@@ -34,3 +34,7 @@ config DOVE_CLK
+ config KIRKWOOD_CLK
+ 	bool
+ 	select MVEBU_CLK_COMMON
++
++config ORION_CLK
++	bool
++	select MVEBU_CLK_COMMON
+diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
+index 4c66162..a9a56fc 100644
+--- a/drivers/clk/mvebu/Makefile
++++ b/drivers/clk/mvebu/Makefile
+@@ -8,3 +8,4 @@ obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
+ obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
+ obj-$(CONFIG_DOVE_CLK)		+= dove.o
+ obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
++obj-$(CONFIG_ORION_CLK)		+= orion.o
+diff --git a/drivers/clk/mvebu/orion.c b/drivers/clk/mvebu/orion.c
+new file mode 100644
+index 0000000..005aa2f
+--- /dev/null
++++ b/drivers/clk/mvebu/orion.c
+@@ -0,0 +1,212 @@
++/*
++ * Marvell Orion SoC clocks
++ *
++ * Copyright (C) 2014 Thomas Petazzoni
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include "common.h"
++
++static const struct coreclk_ratio orion_coreclk_ratios[] __initconst = {
++	{ .id = 0, .name = "ddrclk", }
++};
++
++/*
++ * Orion 5182
++ */
++
++#define SAR_MV88F5182_TCLK_FREQ      0x8
++#define SAR_MV88F5182_TCLK_FREQ_MASK 0x3
++
++static u32 __init mv88f5182_get_tclk_freq(void __iomem *sar)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5182_TCLK_FREQ) &
++		SAR_MV88F5182_TCLK_FREQ_MASK;
++	if (opt == 1)
++		return 150000000;
++	else if (opt == 2)
++		return 166666667;
++	else
++		return 0;
++}
++
++#define SAR_MV88F5182_CPU_FREQ       0x4
++#define SAR_MV88F5182_CPU_FREQ_MASK  0xf
++
++static u32 __init mv88f5182_get_cpu_freq(void __iomem *sar)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5182_CPU_FREQ) &
++		SAR_MV88F5182_CPU_FREQ_MASK;
++	if (opt == 0)
++		return 333333333;
++	else if (opt == 1)
++		return 400000000;
++	else if (opt == 2)
++		return 400000000;
++	else if (opt == 3)
++		return 500000000;
++	else
++		return 0;
++}
++
++static void __init mv88f5182_get_clk_ratio(void __iomem *sar, int id,
++					   int *mult, int *div)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5182_CPU_FREQ) &
++		SAR_MV88F5182_CPU_FREQ_MASK;
++	if (opt == 0 || opt == 1) {
++		*mult = 1;
++		*div  = 2;
++	} else if (opt == 2 || opt == 3) {
++		*mult = 1;
++		*div  = 3;
++	} else {
++		*mult = 0;
++		*div  = 1;
++	}
++}
++
++static const struct coreclk_soc_desc mv88f5182_coreclks = {
++	.get_tclk_freq = mv88f5182_get_tclk_freq,
++	.get_cpu_freq = mv88f5182_get_cpu_freq,
++	.get_clk_ratio = mv88f5182_get_clk_ratio,
++	.ratios = orion_coreclk_ratios,
++	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
++};
++
++static void __init mv88f5182_clk_init(struct device_node *np)
++{
++	return mvebu_coreclk_setup(np, &mv88f5182_coreclks);
++}
++
++CLK_OF_DECLARE(mv88f5182_clk, "marvell,mv88f5182-core-clock", mv88f5182_clk_init);
++
++/*
++ * Orion 5281
++ */
++
++static u32 __init mv88f5281_get_tclk_freq(void __iomem *sar)
++{
++	/* On 5281, tclk is always 166 Mhz */
++	return 166666667;
++}
++
++#define SAR_MV88F5281_CPU_FREQ       0x4
++#define SAR_MV88F5281_CPU_FREQ_MASK  0xf
++
++static u32 __init mv88f5281_get_cpu_freq(void __iomem *sar)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5281_CPU_FREQ) &
++		SAR_MV88F5281_CPU_FREQ_MASK;
++	if (opt == 1 || opt == 2)
++		return 400000000;
++	else if (opt == 3)
++		return 500000000;
++	else
++		return 0;
++}
++
++static void __init mv88f5281_get_clk_ratio(void __iomem *sar, int id,
++					   int *mult, int *div)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5281_CPU_FREQ) &
++		SAR_MV88F5281_CPU_FREQ_MASK;
++	if (opt == 1) {
++		*mult = 1;
++		*div = 2;
++	} else if (opt == 2 || opt == 3) {
++		*mult = 1;
++		*div = 3;
++	} else {
++		*mult = 0;
++		*div = 1;
++	}
++}
++
++static const struct coreclk_soc_desc mv88f5281_coreclks = {
++	.get_tclk_freq = mv88f5281_get_tclk_freq,
++	.get_cpu_freq = mv88f5281_get_cpu_freq,
++	.get_clk_ratio = mv88f5281_get_clk_ratio,
++	.ratios = orion_coreclk_ratios,
++	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
++};
++
++static void __init mv88f5281_clk_init(struct device_node *np)
++{
++	return mvebu_coreclk_setup(np, &mv88f5281_coreclks);
++}
++
++CLK_OF_DECLARE(mv88f5281_clk, "marvell,mv88f5281-core-clock", mv88f5281_clk_init);
++
++/*
++ * Orion 6183
++ */
++
++#define SAR_MV88F6183_TCLK_FREQ      0x9
++#define SAR_MV88F6183_TCLK_FREQ_MASK 0x1
++
++static u32 __init mv88f6183_get_tclk_freq(void __iomem *sar)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F6183_TCLK_FREQ) &
++		SAR_MV88F6183_TCLK_FREQ_MASK;
++	if (opt == 0)
++		return 133333333;
++	else if (opt == 1)
++		return 166666667;
++	else
++		return 0;
++}
++
++#define SAR_MV88F6183_CPU_FREQ       0x1
++#define SAR_MV88F6183_CPU_FREQ_MASK  0x3f
++
++static u32 __init mv88f6183_get_cpu_freq(void __iomem *sar)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F6183_CPU_FREQ) &
++		SAR_MV88F6183_CPU_FREQ_MASK;
++	if (opt == 9)
++		return 333333333;
++	else if (opt == 17)
++		return 400000000;
++	else
++		return 0;
++}
++
++static void __init mv88f6183_get_clk_ratio(void __iomem *sar, int id,
++					   int *mult, int *div)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F6183_CPU_FREQ) &
++		SAR_MV88F6183_CPU_FREQ_MASK;
++	if (opt == 9 || opt == 17) {
++		*mult = 1;
++		*div  = 2;
++	} else {
++		*mult = 0;
++		*div  = 1;
++	}
++}
++
++static const struct coreclk_soc_desc mv88f6183_coreclks = {
++	.get_tclk_freq = mv88f6183_get_tclk_freq,
++	.get_cpu_freq = mv88f6183_get_cpu_freq,
++	.get_clk_ratio = mv88f6183_get_clk_ratio,
++	.ratios = orion_coreclk_ratios,
++	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
++};
++
++
++static void __init mv88f6183_clk_init(struct device_node *np)
++{
++	return mvebu_coreclk_setup(np, &mv88f6183_coreclks);
++}
++
++CLK_OF_DECLARE(mv88f6183_clk, "marvell,mv88f6183-core-clock", mv88f6183_clk_init);
 -- 
 1.8.3.2
