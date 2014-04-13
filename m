@@ -1,42 +1,117 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 13 Apr 2014 12:33:31 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAwMi8xMF0gQVJNOiBkdHM6IGlteDUxLWJhYmJhZ2U6IFVz?=
- =?UTF-8?B?ZSBzZXBhcmF0ZSBwaW5ncm91cCBmb3IgZml4ZWQtY2xvY2s=?=
-In-Reply-To: <20140413081806.GH24180@dragon>
-References: <1397366353-29395-1-git-send-email-shc_work@mail.ru>
- <1397366353-29395-2-git-send-email-shc_work@mail.ru>
- <20140413081806.GH24180@dragon>
-Message-ID: <1397378011.695010899@f215.i.mail.ru>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 13 Apr 2014 11:15:33 +0200
+Subject: [PATCH] Revert "net: mvneta: fix usage as a module on RGMII
+ configurations"
+Message-ID: <1397380533-16012-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sun, 13 Apr 2014 16:18:07 +0800 ?? Shawn Guo <shawn.guo@freescale.com>:
-> On Sun, Apr 13, 2014 at 09:19:05AM +0400, Alexander Shiyan wrote:
-> > This patch moves GPIOs definitions for "fixed-clock" into a separate
-> > pingroup.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/boot/dts/imx51-babbage.dts | 9 ++++++++-
-> >  1 file changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> > index eddb62d..651a8c8 100644
-> > --- a/arch/arm/boot/dts/imx51-babbage.dts
-> > +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> > @@ -125,6 +125,8 @@
-> >  
-> >  		clk_26M: codec_clock {
-> >  			compatible = "fixed-clock";
-> > +			pinctrl-names = "default";
-> > +			pinctrl-0 = <&pinctrl_clkcodec>;
-> 
-> Are you sure that pinctrl-* settings work for a fixed-clock?  My
-> impression is that it only works for the device that Linux creates
-> struct device and probes for.
+This reverts commit e3a8786c10e75903f1269474e21fe8cb49c3a670. While
+this commit allows to use the mvneta driver as a module on some
+configurations, it breaks other configurations even if mvneta is used
+built-in.
 
-Hmm, you are right.
-In this case, it would be logical to move the pinctrl definition for this GPIO
-to the codec node.
+This breakage is due to the fact that on some RGMII platforms, the PCS
+bit has to be set, and on some other platforms, it has to be
+cleared. At the moment, we lack informations to know exactly the
+significance of this bit (the datasheet only says "enables PCS"), and
+so we can't produce a patch that will work on all platforms at this
+point. And since this change is breaking the network completely for
+many users, it's much better to revert it for now. We'll come back
+later with a proper fix that takes into account all platforms.
 
+Basically:
+
+ * Armada XP GP is configured as RGMII-ID, and needs the PCS bit to be
+   set.
+ * Armada 370 Mirabox is configured as RGMII-ID, and needs the PCS bit
+   to be cleared.
+
+And at the moment, we don't know how to make the distinction between
+those two cases. One hint is that the Armada XP GP appears in fact to
+be using a QSGMII connection with the PHY (Quad-SGMII), but
+configuring it as SGMII doesn't work, while RGMII-ID works. This needs
+more investigation, but in the mean time, let's unbreak the network
+for all those users.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reported-by: Arnaud Ebalard <arno@natisbad.org>
+Reported-by: Alexander Reuter <Alexander.Reuter@gmx.net>
+Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=73401
+Cc: stable at vger.kernel.org
 ---
+ drivers/net/ethernet/marvell/mvneta.c | 41 ++++++++++++++++++++++++++++-------
+ 1 file changed, 33 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 8d76fca..ca2dfbe 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -89,9 +89,8 @@
+ #define      MVNETA_TX_IN_PRGRS                  BIT(1)
+ #define      MVNETA_TX_FIFO_EMPTY                BIT(8)
+ #define MVNETA_RX_MIN_FRAME_SIZE                 0x247c
+-#define MVNETA_SERDES_CFG			 0x24A0
++#define MVNETA_SGMII_SERDES_CFG			 0x24A0
+ #define      MVNETA_SGMII_SERDES_PROTO		 0x0cc7
+-#define      MVNETA_RGMII_SERDES_PROTO		 0x0667
+ #define MVNETA_TYPE_PRIO                         0x24bc
+ #define      MVNETA_FORCE_UNI                    BIT(21)
+ #define MVNETA_TXQ_CMD_1                         0x24e4
+@@ -712,6 +711,35 @@ static void mvneta_rxq_bm_disable(struct mvneta_port *pp,
+ 	mvreg_write(pp, MVNETA_RXQ_CONFIG_REG(rxq->id), val);
+ }
+ 
++
++
++/* Sets the RGMII Enable bit (RGMIIEn) in port MAC control register */
++static void mvneta_gmac_rgmii_set(struct mvneta_port *pp, int enable)
++{
++	u32  val;
++
++	val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
++
++	if (enable)
++		val |= MVNETA_GMAC2_PORT_RGMII;
++	else
++		val &= ~MVNETA_GMAC2_PORT_RGMII;
++
++	mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
++}
++
++/* Config SGMII port */
++static void mvneta_port_sgmii_config(struct mvneta_port *pp)
++{
++	u32 val;
++
++	val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
++	val |= MVNETA_GMAC2_PCS_ENABLE;
++	mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
++
++	mvreg_write(pp, MVNETA_SGMII_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
++}
++
+ /* Start the Ethernet port RX and TX activity */
+ static void mvneta_port_up(struct mvneta_port *pp)
+ {
+@@ -2729,15 +2757,12 @@ static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
+ 	mvreg_write(pp, MVNETA_UNIT_INTR_CAUSE, 0);
+ 
+ 	if (phy_mode == PHY_INTERFACE_MODE_SGMII)
+-		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
+-	else
+-		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_RGMII_SERDES_PROTO);
++		mvneta_port_sgmii_config(pp);
+ 
+-	val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+-
+-	val |= MVNETA_GMAC2_PCS_ENABLE | MVNETA_GMAC2_PORT_RGMII;
++	mvneta_gmac_rgmii_set(pp, 1);
+ 
+ 	/* Cancel Port Reset */
++	val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+ 	val &= ~MVNETA_GMAC2_PORT_RESET;
+ 	mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
+ 
+-- 
+1.8.3.2
