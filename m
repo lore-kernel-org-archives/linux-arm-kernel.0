@@ -1,36 +1,55 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 13 Apr 2014 18:59:34 +0200
-Subject: [PATCH 26/29] ARM: orion5x: convert RD-88F5182 to Device Tree
-In-Reply-To: <20140413185304.358c1c42@skate>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-27-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140413154715.GE10033@lunn.ch> <20140413175658.64b65a76@skate>
- <20140413155949.GG10033@lunn.ch> <20140413185304.358c1c42@skate>
-Message-ID: <534AC276.70009@gmail.com>
+From: xypron.glpk@gmx.de (xypron.glpk at gmx.de)
+Date: Sun, 13 Apr 2014 19:31:51 +0200
+Subject: [PATCH 1/1] arm/mach-vexpress: array accessed out of bounds
+Message-ID: <1397410311-8313-1-git-send-email-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2014 06:53 PM, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Sun, 13 Apr 2014 17:59:49 +0200, Andrew Lunn wrote:
-> 
->> I hope kirkwood will complete its move soon. I have Openrd in a state
->> it can move to mvebu, So that only leaves netxbig_v2.c.
-> 
-> Nice, that would be a good move. Regarding netxbig_v2.c, looks like I
-> need to revive
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/188443.html.
-> 
-> On the mach-dove front, what is preventing the removal of the old style
-> cm-a510.c and dove-db-setup.c, since I see there are Device Tree for
-> those platforms? Maybe they are not complete? Maybe the biggest problem
-> is testing PCIe?
+From: Heinrich Schuchardt <xypron.glpk@gmx.de>
 
-cm-a510 and dove-db have never seen any love since we moved to DT. The
-board files basically only add serial devices nothing more. Nobody
-complained about it and I guess we'll just drop support for them.
+dcscb_allcpus_mask is an array of size 2.
 
-Consider mach-dove deprecated and dying.
+The index variable cluster has to be checked against this limit
+before accessing the array.
 
-Sebastian
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+---
+ arch/arm/mach-vexpress/dcscb.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+index 14d4996..5cbf7fa 100644
+--- a/arch/arm/mach-vexpress/dcscb.c
++++ b/arch/arm/mach-vexpress/dcscb.c
+@@ -51,12 +51,14 @@ static int dcscb_allcpus_mask[2];
+ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
+ {
+ 	unsigned int rst_hold, cpumask = (1 << cpu);
+-	unsigned int all_mask = dcscb_allcpus_mask[cluster];
++	unsigned int all_mask;
+ 
+ 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+ 	if (cpu >= 4 || cluster >= 2)
+ 		return -EINVAL;
+ 
++	all_mask = dcscb_allcpus_mask[cluster];
++
+ 	/*
+ 	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+ 	 * variant exists, we need to disable IRQs manually here.
+@@ -101,11 +103,12 @@ static void dcscb_power_down(void)
+ 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+ 	cpumask = (1 << cpu);
+-	all_mask = dcscb_allcpus_mask[cluster];
+ 
+ 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+ 	BUG_ON(cpu >= 4 || cluster >= 2);
+ 
++	all_mask = dcscb_allcpus_mask[cluster];
++
+ 	__mcpm_cpu_going_down(cpu, cluster);
+ 
+ 	arch_spin_lock(&dcscb_lock);
+-- 
+1.7.10.4
