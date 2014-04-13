@@ -1,61 +1,50 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 13 Apr 2014 17:26:05 +0200
-Subject: [PATCH 20/29] ARM: orion5x: convert edmini_v2 to DT pinctrl
-In-Reply-To: <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Sun, 13 Apr 2014 17:28:40 +0200
+Subject: [PATCH 21/29] ARM: orion5x: use DT to describe I2C devices on
+ edmini_v2
+In-Reply-To: <1397400006-4315-22-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140413152605.GB10033@lunn.ch>
+ <1397400006-4315-22-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140413152840.GC10033@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 13, 2014 at 04:39:57PM +0200, Thomas Petazzoni wrote:
+On Sun, Apr 13, 2014 at 04:39:58PM +0200, Thomas Petazzoni wrote:
 > This commit converts the already partially DT-converted edmini_v2
-> platform to use the Device Tree for pinctrl.
+> platform to use the Device Tree for I2C bus and devices.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 31 ++++++++++++++++++++++
->  arch/arm/mach-orion5x/edmini_v2-setup.c            | 28 -------------------
->  2 files changed, 31 insertions(+), 28 deletions(-)
+>  .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 14 +++++++++++++
+>  arch/arm/mach-orion5x/edmini_v2-setup.c            | 24 ----------------------
+>  2 files changed, 14 insertions(+), 24 deletions(-)
 > 
 > diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> index d66d2fa..eee42f7 100644
+> index eee42f7..f077b7b 100644
 > --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
 > +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> @@ -29,12 +29,39 @@
->  			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>;
+> @@ -10,6 +10,7 @@
 >  
->  		internal-regs {
-> +			pinctrl at 10000 {
-> +				pinctrl-0 = <&pmx_rtc &pmx_power_led_ctrl>;
-> +				pinctrl-names = "default";
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+>  #include "orion5x-mv88f5182.dtsi"
+>  
+>  / {
+> @@ -54,6 +55,19 @@
+>  				};
+>  			};
+>  
+> +			i2c at 11000 {
+> +				status = "okay";
+> +				clock-frequency = <100000>;
+> +				#address-cells = <1>;
 > +
-> +				pmx_rtc: pmx-rtc {
-> +					marvell,pins = "mpp3";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_power_led: pmx-power-led {
-> +					marvell,pins = "mpp16";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_power_led_ctrl: pmx-power-led-ctrl {
-> +					marvell,pins = "mpp17";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_power_button: pmx-power-button {
-> +					marvell,pins = "mpp18";
-> +					marvell,function = "gpio";
-> +				};
-> +			};
+> +				rtc at 32 {
+> +					compatible = "rs5c372a";
 
 Hi Thomas
 
-One of the things Sebastian did as part of his Kirkwood DT cleanup was
-sort pinctrl nodes by label, instead of mpp number. We should probably
-discuss this and come to a conclusion before converting Orion5x
-platforms.
+This should have a vendor prefix.
 
-	Andrew
+     Andrew
