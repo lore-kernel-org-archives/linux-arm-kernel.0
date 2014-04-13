@@ -1,40 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 13 Apr 2014 16:39:38 +0200
-Subject: [PATCH 01/29] ARM: orion5x: fix target ID for crypto SRAM window
+Date: Sun, 13 Apr 2014 16:39:41 +0200
+Subject: [PATCH 04/29] memory: mvebu-devbus: fix the conversion of the bus
+ width
 In-Reply-To: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397400006-4315-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397400006-4315-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 4ca2c04085a1caa903e92a5fc0da25362150aac2 ('ARM: orion5x:
-Move to ID based window creation'), the mach-orion5x code was changed
-to use the new mvebu-mbus API. However, in the process, a mistake was
-made on the crypto SRAM window target ID: it should have been 0x9
-(verified in the datasheet) and not 0x0.
+According to the Armada 370 and Armada XP datasheets, the part of the
+Device Bus register that configure the bus width should contain 0 for
+a 8 bits bus width, and 1 for a 16 bits bus width (other values are
+unsupported/reserved).
+
+However, the current conversion done in the driver to convert from a
+bus width in bits to the value expected by the register leads to
+setting the register to 1 for a 8 bits bus, and 2 for a 16 bits bus.
+
+This commit fixes that by adjusting the conversion logic.
+
+This patch fixes a bug that was introduced in
+3edad321b1bd2e6c8b5f38146c115c8982438f06 ('drivers: memory: Introduce
+Marvell EBU Device Bus driver'), which was merged in v3.11.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: stable at vger.kernel.org
 ---
-This should be backported to stable all the way to v3.12.
+ drivers/memory/mvebu-devbus.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-orion5x/common.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
-index f565f99..7548db2 100644
---- a/arch/arm/mach-orion5x/common.h
-+++ b/arch/arm/mach-orion5x/common.h
-@@ -21,7 +21,7 @@ struct mv_sata_platform_data;
- #define ORION_MBUS_DEVBUS_BOOT_ATTR   0x0f
- #define ORION_MBUS_DEVBUS_TARGET(cs)  0x01
- #define ORION_MBUS_DEVBUS_ATTR(cs)    (~(1 << cs))
--#define ORION_MBUS_SRAM_TARGET        0x00
-+#define ORION_MBUS_SRAM_TARGET        0x09
- #define ORION_MBUS_SRAM_ATTR          0x00
+diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
+index 110c036..b82cdf1 100644
+--- a/drivers/memory/mvebu-devbus.c
++++ b/drivers/memory/mvebu-devbus.c
+@@ -108,8 +108,12 @@ static int devbus_set_timing_params(struct devbus *devbus,
+ 			node->full_name);
+ 		return err;
+ 	}
+-	/* Convert bit width to byte width */
+-	r.bus_width /= 8;
++
++	/*
++	 * The bus width is encoded into the register as 0 for 8 bits,
++	 * and 1 for 16 bits, so we do the necessary conversion here.
++	 */
++	r.bus_width = (r.bus_width / 8) - 1;
  
- /*
+ 	err = get_timing_param_ps(devbus, node, "devbus,badr-skew-ps",
+ 				 &r.badr_skew);
 -- 
 1.8.3.2
