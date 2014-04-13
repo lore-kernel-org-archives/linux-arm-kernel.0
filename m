@@ -1,71 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 13 Apr 2014 11:48:43 -0300
-Subject: [PATCH v4 3/3] ARM: dts: imx27-pdk: Pass the FEC pin configuration
-In-Reply-To: <1397400523-4330-1-git-send-email-festevam@gmail.com>
-References: <1397400523-4330-1-git-send-email-festevam@gmail.com>
-Message-ID: <1397400523-4330-3-git-send-email-festevam@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 13 Apr 2014 17:26:05 +0200
+Subject: [PATCH 20/29] ARM: orion5x: convert edmini_v2 to DT pinctrl
+In-Reply-To: <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140413152605.GB10033@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Sun, Apr 13, 2014 at 04:39:57PM +0200, Thomas Petazzoni wrote:
+> This commit converts the already partially DT-converted edmini_v2
+> platform to use the Device Tree for pinctrl.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 31 ++++++++++++++++++++++
+>  arch/arm/mach-orion5x/edmini_v2-setup.c            | 28 -------------------
+>  2 files changed, 31 insertions(+), 28 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> index d66d2fa..eee42f7 100644
+> --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> @@ -29,12 +29,39 @@
+>  			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>;
+>  
+>  		internal-regs {
+> +			pinctrl at 10000 {
+> +				pinctrl-0 = <&pmx_rtc &pmx_power_led_ctrl>;
+> +				pinctrl-names = "default";
+> +
+> +				pmx_rtc: pmx-rtc {
+> +					marvell,pins = "mpp3";
+> +					marvell,function = "gpio";
+> +				};
+> +
+> +				pmx_power_led: pmx-power-led {
+> +					marvell,pins = "mpp16";
+> +					marvell,function = "gpio";
+> +				};
+> +
+> +				pmx_power_led_ctrl: pmx-power-led-ctrl {
+> +					marvell,pins = "mpp17";
+> +					marvell,function = "gpio";
+> +				};
+> +
+> +				pmx_power_button: pmx-power-button {
+> +					marvell,pins = "mpp18";
+> +					marvell,function = "gpio";
+> +				};
+> +			};
 
-Provide an entry for the FEC pin muxing.
+Hi Thomas
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v3:
-- Fix closing } in the pinctrl_fec node
-Changes since v2:
-- Keep iomux node sorted
-Changes since v1:
-- Keep the iomuxc node at the bottom
+One of the things Sebastian did as part of his Kirkwood DT cleanup was
+sort pinctrl nodes by label, instead of mpp number. We should probably
+discuss this and come to a conclusion before converting Orion5x
+platforms.
 
- arch/arm/boot/dts/imx27-pdk.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-index e0f4213..430b72b 100644
---- a/arch/arm/boot/dts/imx27-pdk.dts
-+++ b/arch/arm/boot/dts/imx27-pdk.dts
-@@ -23,6 +23,9 @@
- 
- 
- &fec {
-+	phy-mode = "mii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
- 	status = "okay";
- };
- 
-@@ -35,6 +38,29 @@
- 
- &iomuxc {
- 	imx27-pdk {
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <
-+				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
-+				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
-+				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
-+				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
-+				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
-+				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
-+				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
-+				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
-+				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
-+				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
-+				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
-+				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
-+				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
-+				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
-+				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
-+				MX27_PAD_ATA_DATA13__FEC_COL 0x0
-+				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
-+				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX27_PAD_UART1_TXD__UART1_TXD 0x0
--- 
-1.8.3.2
+	Andrew
