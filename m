@@ -1,64 +1,44 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 13 Apr 2014 16:18:07 +0800
-Subject: [PATCH 02/10] ARM: dts: imx51-babbage: Use separate pingroup for
- fixed-clock
-In-Reply-To: <1397366353-29395-2-git-send-email-shc_work@mail.ru>
+Date: Sun, 13 Apr 2014 16:22:38 +0800
+Subject: [PATCH 09/10] ARM: dts: imx51-babbage: Add "clock-frequency"
+ property for I2C2
+In-Reply-To: <1397366353-29395-9-git-send-email-shc_work@mail.ru>
 References: <1397366353-29395-1-git-send-email-shc_work@mail.ru>
- <1397366353-29395-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20140413081806.GH24180@dragon>
+ <1397366353-29395-9-git-send-email-shc_work@mail.ru>
+Message-ID: <20140413082237.GI24180@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 13, 2014 at 09:19:05AM +0400, Alexander Shiyan wrote:
-> This patch moves GPIOs definitions for "fixed-clock" into a separate
-> pingroup.
+On Sun, Apr 13, 2014 at 09:19:12AM +0400, Alexander Shiyan wrote:
+> This patch adds missing "clock-frequency" property for I2C2.
+> Value was be taken from old non-DT board file.
 > 
 > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > ---
->  arch/arm/boot/dts/imx51-babbage.dts | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/imx51-babbage.dts | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 > diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index eddb62d..651a8c8 100644
+> index ff7d2fa..cdcdd87 100644
 > --- a/arch/arm/boot/dts/imx51-babbage.dts
 > +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -125,6 +125,8 @@
->  
->  		clk_26M: codec_clock {
->  			compatible = "fixed-clock";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_clkcodec>;
+> @@ -340,6 +340,7 @@
+>  &i2c2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_i2c2>;
+> +	clock-frequency = <100000>;
 
-Are you sure that pinctrl-* settings work for a fixed-clock?  My
-impression is that it only works for the device that Linux creates
-struct device and probes for.
+This is unnecessary.  Documentation/devicetree/bindings/i2c/i2c-imx.txt:
+
+Optional properties:
+- clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
+  The absence of the propoerty indicates the default frequency 100 kHz.
 
 Shawn
 
->  			reg=<0>;
->  			#clock-cells = <0>;
->  			clock-frequency = <26000000>;
-> @@ -337,7 +339,6 @@
->  				MX51_PAD_GPIO1_6__GPIO1_6    0x100
->  				MX51_PAD_CSPI1_SS0__GPIO4_24 0x85
->  				MX51_PAD_CSPI1_SS1__GPIO4_25 0x85
-> -				MX51_PAD_CSPI1_RDY__GPIO4_26 0x80000000
->  			>;
->  		};
+>  	status = "okay";
 >  
-> @@ -350,6 +351,12 @@
->  			>;
->  		};
->  
-> +		pinctrl_clkcodec: clkcodecgrp {
-> +			fsl,pins = <
-> +				MX51_PAD_CSPI1_RDY__GPIO4_26		0x80000000
-> +			>;
-> +		};
-> +
->  		pinctrl_ecspi1: ecspi1grp {
->  			fsl,pins = <
->  				MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
+>  	sgtl5000: codec at 0a {
 > -- 
 > 1.8.3.2
 > 
