@@ -1,20 +1,178 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 13 Apr 2014 20:29:30 +0100
-Subject: Help for doubt about why update SCTLR by cr_alignment every
- syscall,IRQ,exception ?
-In-Reply-To: <BB7C62C2B0732E4DA93834A501E846456C8F15D9@szxema505-mbx.china.huawei.com>
-References: <BB7C62C2B0732E4DA93834A501E846456C8F15D9@szxema505-mbx.china.huawei.com>
-Message-ID: <20140413192930.GE24070@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 13 Apr 2014 22:48:48 +0200 (CEST)
+Subject: [PATCH] arm: edma: Fix xbar mapping
+Message-ID: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 08, 2014 at 03:46:38AM +0000, Wuqixuan wrote:
-> Second question is important for us, because the instruction of
-> updation is too slow(about 100 cycles) in our chip, we want to remove
-> the updation instruction for low latency reason, so need your opinion. 
+Subject: arm: edma: Fix xbar mapping
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Sun, 13 Apr 2014 20:44:46 +0200
 
-What about it is slow - is the 100 cycles from the mcr itself?
+This is another great example of trainwreck engineering:
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+commit 2646a0e529 (ARM: edma: Add EDMA crossbar event mux support)
+added support for using EDMA on peripherals which have no direct EDMA
+event mapping.
+
+The code compiles and does not explode in your face, but that's it.
+
+1) Reading an u16 array from an u32 device tree array simply does not
+   work. Even if the function is named "edma_of_read_u32_to_s16_array".
+
+   It merily calls of_property_read_u16_array. So the resulting 16bit
+   array will have every other entry = 0.
+
+2) The DT entry for the xbar registers related to xbar has length 0x10
+   instead of the real length: 0xfd0 - 0xf90 = 0x40.
+
+   Not a real problem as it does not cross a page boundary, but
+   wrong nevertheless.
+
+3) But none of this matters as the mapping never happens:
+
+   After reading nonsense edma_of_read_u32_to_s16_array() invalidates
+   the first array entry pair, so nobody can ever notice the
+   braindamage by immediate explosion.
+
+Seems the QA criteria for this code was solely not to explode when
+someone adds edma-xbar-event-map entries to the DT. Goal achieved,
+congratulations!
+
+Not really helpful if someone wants to use edma on a device which
+requires a xbar mapping.
+
+Fix the issues by:
+
+- annotating the device tree entry with "/bits/ 16" as documented in
+  the of_property_read_u16_array kernel doc
+
+- make the size of the xbar register mapping correct
+
+- invalidating the end of the array and not the start
+
+This convoluted mess wants to be completely rewritten as there is no
+point to keep the xbar_chan array memory and the iomapping of the xbar
+regs around forever. Marking the xbar mapped channels as used should
+be done right there.
+
+But that's a different issue and this patch is small enough to make it
+work and allows a simple backport for stable.
+
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ Documentation/devicetree/bindings/dma/ti-edma.txt |    4 -
+ arch/arm/boot/dts/am33xx.dtsi                     |    2 
+ arch/arm/common/edma.c                            |   48 ++++++----------------
+ 3 files changed, 18 insertions(+), 36 deletions(-)
+
+Index: linux-2.6/Documentation/devicetree/bindings/dma/ti-edma.txt
+===================================================================
+--- linux-2.6.orig/Documentation/devicetree/bindings/dma/ti-edma.txt
++++ linux-2.6/Documentation/devicetree/bindings/dma/ti-edma.txt
+@@ -29,6 +29,6 @@ edma: edma at 49000000 {
+ 	dma-channels = <64>;
+ 	ti,edma-regions = <4>;
+ 	ti,edma-slots = <256>;
+-	ti,edma-xbar-event-map = <1 12
+-				  2 13>;
++	ti,edma-xbar-event-map = /bits/ 16 <1 12
++				  	    2 13>;
+ };
+Index: linux-2.6/arch/arm/boot/dts/am33xx.dtsi
+===================================================================
+--- linux-2.6.orig/arch/arm/boot/dts/am33xx.dtsi
++++ linux-2.6/arch/arm/boot/dts/am33xx.dtsi
+@@ -144,7 +144,7 @@
+ 			compatible = "ti,edma3";
+ 			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+ 			reg =	<0x49000000 0x10000>,
+-				<0x44e10f90 0x10>;
++				<0x44e10f90 0x40>;
+ 			interrupts = <12 13 14>;
+ 			#dma-cells = <1>;
+ 			dma-channels = <64>;
+Index: linux-2.6/arch/arm/common/edma.c
+===================================================================
+--- linux-2.6.orig/arch/arm/common/edma.c
++++ linux-2.6/arch/arm/common/edma.c
+@@ -1423,55 +1423,38 @@ EXPORT_SYMBOL(edma_clear_event);
+ 
+ #if IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_DMADEVICES)
+ 
+-static int edma_of_read_u32_to_s16_array(const struct device_node *np,
+-					 const char *propname, s16 *out_values,
+-					 size_t sz)
++static int edma_xbar_event_map(struct device *dev, struct device_node *node,
++			       struct edma_soc_info *pdata, size_t sz)
+ {
+-	int ret;
+-
+-	ret = of_property_read_u16_array(np, propname, out_values, sz);
+-	if (ret)
+-		return ret;
+-
+-	/* Terminate it */
+-	*out_values++ = -1;
+-	*out_values++ = -1;
+-
+-	return 0;
+-}
+-
+-static int edma_xbar_event_map(struct device *dev,
+-			       struct device_node *node,
+-			       struct edma_soc_info *pdata, int len)
+-{
+-	int ret, i;
++	const char pname[] = "ti,edma-xbar-event-map";
+ 	struct resource res;
+ 	void __iomem *xbar;
+-	const s16 (*xbar_chans)[2];
++	s16 (*xbar_chans)[2];
++	size_t nelm = sz / sizeof(s16);
+ 	u32 shift, offset, mux;
++	int ret, i;
+ 
+-	xbar_chans = devm_kzalloc(dev,
+-				  len/sizeof(s16) + 2*sizeof(s16),
+-				  GFP_KERNEL);
++	xbar_chans = devm_kzalloc(dev, (nelm + 2) * sizeof(s16), GFP_KERNEL);
+ 	if (!xbar_chans)
+ 		return -ENOMEM;
+ 
+ 	ret = of_address_to_resource(node, 1, &res);
+ 	if (ret)
+-		return -EIO;
++		return -ENOMEM;
+ 
+ 	xbar = devm_ioremap(dev, res.start, resource_size(&res));
+ 	if (!xbar)
+ 		return -ENOMEM;
+ 
+-	ret = edma_of_read_u32_to_s16_array(node,
+-					    "ti,edma-xbar-event-map",
+-					    (s16 *)xbar_chans,
+-					    len/sizeof(u32));
++	ret = of_property_read_u16_array(node, pname, (u16 *)xbar_chans, nelm);
+ 	if (ret)
+ 		return -EIO;
+ 
+-	for (i = 0; xbar_chans[i][0] != -1; i++) {
++	/* Invalidate last entry for the other user of this mess */
++	nelm >>= 1;
++	xbar_chans[nelm][0] = xbar_chans[nelm][1] = -1;
++
++	for (i = 0; i < nelm; i++) {
+ 		shift = (xbar_chans[i][1] & 0x03) << 3;
+ 		offset = xbar_chans[i][1] & 0xfffffffc;
+ 		mux = readl(xbar + offset);
+@@ -1480,8 +1463,7 @@ static int edma_xbar_event_map(struct de
+ 		writel(mux, (xbar + offset));
+ 	}
+ 
+-	pdata->xbar_chans = xbar_chans;
+-
++	pdata->xbar_chans = (const s16 (*)[2]) xbar_chans;
+ 	return 0;
+ }
+ 
