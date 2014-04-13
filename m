@@ -1,34 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 13 Apr 2014 21:11:24 +0200
-Subject: [PATCH] ARM: ux500: configure in sensors
-Message-ID: <1397416284-4588-1-git-send-email-linus.walleij@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 13 Apr 2014 20:29:30 +0100
+Subject: Help for doubt about why update SCTLR by cr_alignment every
+ syscall,IRQ,exception ?
+In-Reply-To: <BB7C62C2B0732E4DA93834A501E846456C8F15D9@szxema505-mbx.china.huawei.com>
+References: <BB7C62C2B0732E4DA93834A501E846456C8F15D9@szxema505-mbx.china.huawei.com>
+Message-ID: <20140413192930.GE24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the STMicroelectronics MEMS sensors for accelerometer,
-gyroscope, magnetometer and pressure that are mounted on the Ux500
-models.
+On Tue, Apr 08, 2014 at 03:46:38AM +0000, Wuqixuan wrote:
+> Second question is important for us, because the instruction of
+> updation is too slow(about 100 cycles) in our chip, we want to remove
+> the updation instruction for low latency reason, so need your opinion. 
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/u8500_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+What about it is slow - is the 100 cycles from the mcr itself?
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index dac0a876e737..726b1fa786f7 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -103,6 +103,11 @@ CONFIG_STE_DMA40=y
- CONFIG_STAGING=y
- CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4=y
- CONFIG_HSEM_U8500=y
-+CONFIG_IIO=y
-+CONFIG_IIO_ST_ACCEL_3AXIS=y
-+CONFIG_IIO_ST_GYRO_3AXIS=y
-+CONFIG_IIO_ST_MAGN_3AXIS=y
-+CONFIG_IIO_ST_PRESS=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
