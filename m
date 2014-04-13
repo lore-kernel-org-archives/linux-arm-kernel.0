@@ -1,38 +1,33 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 13 Apr 2014 12:42:55 -0400 (EDT)
-Subject: [PATCH v2 1/2] ARM : DMA : remove useless information about
- DMA
-In-Reply-To: <534A7EA7.5090900@huawei.com>
-References: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
- <1397203252-22977-2-git-send-email-sdu.liu@huawei.com>
- <alpine.LFD.2.11.1404112252050.980@knanqh.ubzr> <5348C040.1060305@huawei.com>
- <alpine.LFD.2.11.1404121031170.980@knanqh.ubzr>
- <534A7EA7.5090900@huawei.com>
-Message-ID: <alpine.LFD.2.11.1404131240150.980@knanqh.ubzr>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 13 Apr 2014 18:53:04 +0200
+Subject: [PATCH 26/29] ARM: orion5x: convert RD-88F5182 to Device Tree
+In-Reply-To: <20140413155949.GG10033@lunn.ch>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-27-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140413154715.GE10033@lunn.ch> <20140413175658.64b65a76@skate>
+ <20140413155949.GG10033@lunn.ch>
+Message-ID: <20140413185304.358c1c42@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 13 Apr 2014, Liu hua wrote:
+Dear Andrew Lunn,
 
-> On 2014/4/12 22:32, Nicolas Pitre write:
-> > On Sat, 12 Apr 2014, Liu hua wrote:
-> > 
-> >> Hi Nicolas,
-> >>
-> >> Your version is better. you tell me this in the former letters.
-> >> So I am very sorry to forget to check that.
-> >>
-> >> May be I should remake this second patch to fit your change. What do
-> >> you think about that patch?
-> > 
-> > You may simply drop your first patch and only keep the other two.
-> > 
-> Sure. But your patch and my second one both change Document/arm/memory.txt.
-> I am afraid there will be conflicts when someone tests my patch before
-> yours getting into the mainline.
+On Sun, 13 Apr 2014 17:59:49 +0200, Andrew Lunn wrote:
 
-That's still an easy conflict to fix.  And it is likely that git will 
-fix it automatically.
+> I hope kirkwood will complete its move soon. I have Openrd in a state
+> it can move to mvebu, So that only leaves netxbig_v2.c.
 
+Nice, that would be a good move. Regarding netxbig_v2.c, looks like I
+need to revive
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/188443.html.
 
-Nicolas
+On the mach-dove front, what is preventing the removal of the old style
+cm-a510.c and dove-db-setup.c, since I see there are Device Tree for
+those platforms? Maybe they are not complete? Maybe the biggest problem
+is testing PCIe?
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
