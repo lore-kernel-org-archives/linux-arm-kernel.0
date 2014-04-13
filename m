@@ -1,156 +1,64 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 13 Apr 2014 13:34:51 -0400 (EDT)
-Subject: [PATCH v2 2/2] ARM : change fixmap mapping region to support 32
- CPUs
-In-Reply-To: <534A9031.5030006@huawei.com>
-References: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
- <1397203252-22977-3-git-send-email-sdu.liu@huawei.com>
- <alpine.LFD.2.11.1404112314560.980@knanqh.ubzr> <534A9031.5030006@huawei.com>
-Message-ID: <alpine.LFD.2.11.1404131305120.980@knanqh.ubzr>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Sun, 13 Apr 2014 18:36:24 +0100
+Subject: Marvell Orion5x boards with PCIe, and DT conversion
+In-Reply-To: <20140411155735.109c5d04@skate>
+References: <20140411155735.109c5d04@skate>
+Message-ID: <20140413173624.GA6166@marmot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 13 Apr 2014, Liu hua wrote:
+On Fri, Apr 11, 2014 at 03:57:35PM +0200, Thomas Petazzoni wrote:
+>
+>I am contacting you because you are all maintainers/contributors to
+>Marvell Orion5x boards supported in the Linux kernel.
+>
+>I am currently converting the mach-orion5x to the Device Tree. I have
+>two Orion5x boards, so I was able to test most of the interfaces myself.
 
-> Hi Nicolas.
-> 
-> Sure, your suggestion made my patch looks better. How about that :
-> 
-> Thanks,
-> Liu Hua
+I had a stab at doing my board about a year ago and put together:
 
-There is something else that bothers me.
+https://github.com/jimdigriz/ts78xx/blob/ts78xx/arch/arm/mach-orion5x/board-ts7800.c
+https://github.com/jimdigriz/ts78xx/blob/ts78xx/arch/arm/boot/dts/orion5x-ts7800.dts
 
+>However, one interface I'm not able to test is the PCI Express one, and
+>therefore I wanted to let you know if one of you still has a working
+>Orion5x board that has a PCI Express interface that is actually usable.
 
-> -------------------------------------------------
-> 
-> Changes from v2:
-> 	moved new codes to highmem.c as more as possible.
-> 	unchanged Document/arm/memory.txt.
-> 
-> 
-> In 32-bit ARM systems, the fixmap mapping region can support
-> no more than 14 CPUs(total: 896k; one CPU: 64K). And we can
-> configure NR_CPUS up to 32. So there is a mismatch.
-> 
-> This patch moves fixmapping region downwards to region
-> 0xffc00000-0xffe00000 . Then the fixmap mapping region can
-> support up to 32 CPUs
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
-> ---
->  arch/arm/include/asm/fixmap.h  |  4 ++--
->  arch/arm/include/asm/highmem.h |  1 +
->  arch/arm/mm/highmem.c          | 28 ++++++++++++++++++++++------
->  arch/arm/mm/mmu.c              |  4 ++++
->  4 files changed, 29 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index bbae919..014a70d 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -13,8 +13,8 @@
->   * 0xfffe0000 and 0xfffeffff.
->   */
-> 
-> -#define FIXADDR_START		0xfff00000UL
-> -#define FIXADDR_TOP		0xfffe0000UL
-> +#define FIXADDR_START		0xffc00000UL
-> +#define FIXADDR_TOP		0xffe00000UL
->  #define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
-> 
->  #define FIX_KMAP_BEGIN		0
-> diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
-> index 91b99ab..5355795 100644
-> --- a/arch/arm/include/asm/highmem.h
-> +++ b/arch/arm/include/asm/highmem.h
-> @@ -18,6 +18,7 @@
->  	} while (0)
-> 
->  extern pte_t *pkmap_page_table;
-> +extern pte_t *fixmap_page_table;
-> 
->  extern void *kmap_high(struct page *page);
->  extern void kunmap_high(struct page *page);
-> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> index 21b9e1b..fa97896 100644
-> --- a/arch/arm/mm/highmem.c
-> +++ b/arch/arm/mm/highmem.c
-> @@ -18,6 +18,22 @@
->  #include <asm/tlbflush.h>
->  #include "mm.h"
-> 
-> +pte_t *fixmap_page_table;
-> +
-> +static inline void set_fixmap_pte(int idx, pte_t pte)
-> +{
-> +	unsigned long vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-> +	set_pte_ext(fixmap_page_table + idx, pte, 0);
-> +	local_flush_tlb_kernel_page(vaddr);
-> +}
-> +
-> +static inline pte_t get_fixmap_pte(unsigned long vaddr)
-> +{
-> +	unsigned long idx = __virt_to_fix(vaddr);
-> +	idx -= FIX_KMAP_BEGIN;
-> +	return *(fixmap_page_table + idx);
+>Note that Orion5x SOCs have both a classical PCI interface and a PCI
+>Express interface. On one of my board, I have the classical PCI
+>interface, so I can easily test this. However, I don't have a board
+>with the PCI Express interface.
 
-FIX_KMAP_BEGIN represents the starting point for mapping fixmap indices 
-to page table entries.  So here you should _add_ the 
-FIX_KMAP_BEGIN offset to the page table index not substract it.  
-Currently FIX_KMAP_BEGIN is defined to 0 but still.
+Alas, PCI only (although at the end of my 'PCI bus') lurks an FPGA
+soaking up the whole IO range.
 
-> +}
-> +
->  void *kmap(struct page *page)
->  {
->  	might_sleep();
-> @@ -69,14 +85,14 @@ void *kmap_atomic(struct page *page)
->  	 * With debugging enabled, kunmap_atomic forces that entry to 0.
->  	 * Make sure it was indeed properly unmapped.
->  	 */
-> -	BUG_ON(!pte_none(get_top_pte(vaddr)));
-> +	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
+>Moreover, I will be sending in the near future a set of patches
+>converting many of the boards to the Device Tree, so if you still have
+>those boards and are willing to test the conversion, it would be very
+>useful.
 
-This is therefore also wrong.  It should be
-fixmap_page_table + idx + FIX_KMAP_BEGIN.
+As a heads up...the problem I had[1] was as the NAND on my board is not
+handled with the usual orion controller, its a proprietary thing handled
+by the the onboard FPGA:
 
->  #endif
->  	/*
->  	 * When debugging is off, kunmap_atomic leaves the previous mapping
->  	 * in place, so the contained TLB flush ensures the TLB is updated
->  	 * with the new mapping.
->  	 */
-> -	set_top_pte(vaddr, mk_pte(page, kmap_prot));
-> +	set_fixmap_pte(idx, mk_pte(page, kmap_prot));
-> 
->  	return (void *)vaddr;
->  }
-> @@ -95,7 +111,7 @@ void __kunmap_atomic(void *kvaddr)
->  			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
->  #ifdef CONFIG_DEBUG_HIGHMEM
->  		BUG_ON(vaddr != __fix_to_virt(FIX_KMAP_BEGIN + idx));
-> -		set_top_pte(vaddr, __pte(0));
-> +		set_fixmap_pte(idx, __pte(0));
->  #else
->  		(void) idx;  /* to kill a warning */
->  #endif
-> @@ -119,9 +135,9 @@ void *kmap_atomic_pfn(unsigned long pfn)
->  	idx = type + KM_TYPE_NR * smp_processor_id();
->  	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
->  #ifdef CONFIG_DEBUG_HIGHMEM
-> -	BUG_ON(!pte_none(get_top_pte(vaddr)));
-> +	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
+https://github.com/jimdigriz/ts78xx/blob/plat-nand/arch/arm/mach-orion5x/board-ts7800.c#L199
 
-Ditto here.
+The patch I used for that extends plat-nand and I need to pull out my thumb
+and do something further with this:
 
-In fact, this FIX_KMAP_BEGIN is only creating more confusing code for 
-nothing as we define it to 0 anyway, and it is not used by non 
-architecture specific code.  So I'd suggest you create a patch to be 
-applied before this one that simply gets rid of FIX_KMAP_BEGIN and 
-FIX_KMAP_END altogether.  We could reintroduce them back if ever they're 
-needed.
+http://lists.infradead.org/pipermail/linux-mtd/2013-September/048701.html
 
+In my repo are also branches for getting the rtc-m48t86/timeriomem-rng
+drivers DT aware.
 
-Nicolas
+If you tell me what a pain in the ass it is that I have not pushed
+and got these mainlined/run-by-you, that will probably motivate me
+enough to actually find some time to do this :)
+
+Thanks for your DT work!
+
+[1] other than the xor crashing the board and needing to be disabled
+
+-- 
+Alexander Clouter
+.sigmonster says: Is a wedding successful if it comes off without a hitch?
