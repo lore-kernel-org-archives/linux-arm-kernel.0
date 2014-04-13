@@ -1,76 +1,45 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 13 Apr 2014 15:31:47 +0800
-Subject: [PATCH v2 3/3] ARM: dts: imx27-pdk: Pass the FEC pin configuration
-In-Reply-To: <1397069722-14778-3-git-send-email-festevam@gmail.com>
-References: <1397069722-14778-1-git-send-email-festevam@gmail.com>
- <1397069722-14778-3-git-send-email-festevam@gmail.com>
-Message-ID: <20140413073146.GB24180@dragon>
+Date: Sun, 13 Apr 2014 15:41:38 +0800
+Subject: [PATCH BUGFIX] arm: dts: imx53: fix apparent copy/paste error
+In-Reply-To: <1397117020-8900-1-git-send-email-LW@KARO-electronics.de>
+References: <1397117020-8900-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140413074137.GC24180@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 03:55:22PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Apr 10, 2014 at 10:03:40AM +0200, Lothar Wa?mann wrote:
+> The 'remote-endpoint' property should point back to ipu_di1_lvds1
+> rather than ipu_di0_lvds0.
 > 
-> Provide an entry for the FEC pin muxing.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Keep the iomuxc node at the bottom
-> 
->  arch/arm/boot/dts/imx27-pdk.dts | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-> index e0f4213..97ee781 100644
-> --- a/arch/arm/boot/dts/imx27-pdk.dts
-> +++ b/arch/arm/boot/dts/imx27-pdk.dts
-> @@ -23,6 +23,9 @@
->  
->  
->  &fec {
-> +	phy-mode = "mii";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_fec>;
->  	status = "okay";
->  };
->  
-> @@ -43,5 +46,28 @@
->  				MX27_PAD_UART1_RTS__UART1_RTS 0x0
->  			>;
->  		};
-> +
-> +		pinctrl_fec: fecgrp {
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 
-I prefer to sort these pinctrl nodes alphabetically under &iomuxc.
+Changed 'arm:' in patch subject to 'ARM:', and applied the patch.
 
 Shawn
 
-> +			fsl,pins = <
-> +				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
-> +				MX27_PAD_SD3_CLK__FEC_TXD1 0x0
-> +				MX27_PAD_ATA_DATA0__FEC_TXD2 0x0
-> +				MX27_PAD_ATA_DATA1__FEC_TXD3 0x0
-> +				MX27_PAD_ATA_DATA2__FEC_RX_ER 0x0
-> +				MX27_PAD_ATA_DATA3__FEC_RXD1 0x0
-> +				MX27_PAD_ATA_DATA4__FEC_RXD2 0x0
-> +				MX27_PAD_ATA_DATA5__FEC_RXD3 0x0
-> +				MX27_PAD_ATA_DATA6__FEC_MDIO 0x0
-> +				MX27_PAD_ATA_DATA7__FEC_MDC 0x0
-> +				MX27_PAD_ATA_DATA8__FEC_CRS 0x0
-> +				MX27_PAD_ATA_DATA9__FEC_TX_CLK 0x0
-> +				MX27_PAD_ATA_DATA10__FEC_RXD0 0x0
-> +				MX27_PAD_ATA_DATA11__FEC_RX_DV 0x0
-> +				MX27_PAD_ATA_DATA12__FEC_RX_CLK 0x0
-> +				MX27_PAD_ATA_DATA13__FEC_COL 0x0
-> +				MX27_PAD_ATA_DATA14__FEC_TX_ER 0x0
-> +				MX27_PAD_ATA_DATA15__FEC_TX_EN 0x0
-> +			>;
-> +		};
->  	};
->  };
-> -- 
-> 1.8.3.2
+> ---
+>  arch/arm/boot/dts/imx53.dtsi |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index f0962e5..33a4e5b 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -431,7 +431,7 @@
+>  
+>  					port {
+>  						lvds1_in: endpoint {
+> -							remote-endpoint = <&ipu_di0_lvds0>;
+> +							remote-endpoint = <&ipu_di1_lvds1>;
+>  						};
+>  					};
+>  				};
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
 > 
