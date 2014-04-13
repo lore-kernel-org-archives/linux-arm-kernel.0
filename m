@@ -1,46 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 13 Apr 2014 21:11:14 +0200
-Subject: [PATCH] ARM: ux500: update defconfig
-Message-ID: <1397416274-4541-1-git-send-email-linus.walleij@linaro.org>
+Date: Sun, 13 Apr 2014 21:11:24 +0200
+Subject: [PATCH] ARM: ux500: configure in sensors
+Message-ID: <1397416284-4588-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the ux500 defconfig to match the latest output of
-savedefconfig.
+This enables the STMicroelectronics MEMS sensors for accelerometer,
+gyroscope, magnetometer and pressure that are mounted on the Ux500
+models.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/configs/u8500_defconfig | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/configs/u8500_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 65f77885c167..d130a01d9342 100644
+index dac0a876e737..726b1fa786f7 100644
 --- a/arch/arm/configs/u8500_defconfig
 +++ b/arch/arm/configs/u8500_defconfig
-@@ -1,6 +1,6 @@
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
--CONFIG_NO_HZ=y
-+CONFIG_NO_HZ_IDLE=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
-@@ -10,7 +10,6 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
--CONFIG_MACH_UX500_DT=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_PREEMPT=y
-@@ -85,8 +84,6 @@ CONFIG_AB8500_USB=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_ETH=m
- CONFIG_MMC=y
--CONFIG_MMC_UNSAFE_RESUME=y
--# CONFIG_MMC_BLOCK_BOUNCE is not set
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
+@@ -103,6 +103,11 @@ CONFIG_STE_DMA40=y
+ CONFIG_STAGING=y
+ CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4=y
+ CONFIG_HSEM_U8500=y
++CONFIG_IIO=y
++CONFIG_IIO_ST_ACCEL_3AXIS=y
++CONFIG_IIO_ST_GYRO_3AXIS=y
++CONFIG_IIO_ST_MAGN_3AXIS=y
++CONFIG_IIO_ST_PRESS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
 -- 
 1.9.0
