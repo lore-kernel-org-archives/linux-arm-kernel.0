@@ -1,46 +1,37 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 13 Apr 2014 14:09:15 +0200
-Subject: [PATCH] reset: Add of_reset_control_get to reset.h
-Message-ID: <1397390955-22644-1-git-send-email-hdegoede@redhat.com>
+From: sdu.liu@huawei.com (Liu hua)
+Date: Sun, 13 Apr 2014 20:10:15 +0800
+Subject: [PATCH v2 1/2] ARM : DMA : remove useless information about DMA
+In-Reply-To: <alpine.LFD.2.11.1404121031170.980@knanqh.ubzr>
+References: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
+ <1397203252-22977-2-git-send-email-sdu.liu@huawei.com>
+ <alpine.LFD.2.11.1404112252050.980@knanqh.ubzr> <5348C040.1060305@huawei.com>
+ <alpine.LFD.2.11.1404121031170.980@knanqh.ubzr>
+Message-ID: <534A7EA7.5090900@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_reset_control_get is not declared static in drivers/reset/core.c, which
-is correct as we want to use it elsewhere too. But it does not have a
-protype declared anywhere under include/linux. Add a prototype / stub for it
-to linux/reset.h to fix this.
+On 2014/4/12 22:32, Nicolas Pitre write:
+> On Sat, 12 Apr 2014, Liu hua wrote:
+> 
+>> Hi Nicolas,
+>>
+>> Your version is better. you tell me this in the former letters.
+>> So I am very sorry to forget to check that.
+>>
+>> May be I should remake this second patch to fit your change. What do
+>> you think about that patch?
+> 
+> You may simply drop your first patch and only keep the other two.
+> 
+Sure. But your patch and my second one both change Document/arm/memory.txt.
+I am afraid there will be conflicts when someone tests my patch before
+yours getting into the mainline.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- include/linux/reset.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Maybe I can spilt the document-changing part to a new patch. And send it
+after yours are in the mainline.
 
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index c0eda50..f1ae7ce 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -33,6 +33,9 @@ static inline struct reset_control *devm_reset_control_get_optional(
- 	return devm_reset_control_get(dev, id);
- }
- 
-+struct reset_control *of_reset_control_get(struct device_node *node,
-+					   const char *id);
-+
- #else
- 
- static inline int reset_control_reset(struct reset_control *rstc)
-@@ -75,6 +78,12 @@ static inline struct reset_control *devm_reset_control_get_optional(
- 	return ERR_PTR(-ENOSYS);
- }
- 
-+static inline struct reset_control *of_reset_control_get(
-+				struct device_node *node, const char *id)
-+{
-+	return ERR_PTR(-ENOSYS);
-+}
-+
- #endif /* CONFIG_RESET_CONTROLLER */
- 
- #endif
--- 
-1.9.0
+Liu Hua
+> 
+> Nicolas
+> 
+> 
