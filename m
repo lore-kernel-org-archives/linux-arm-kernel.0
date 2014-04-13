@@ -1,48 +1,17 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun, 13 Apr 2014 10:59:48 +0400
-Subject: [PATCH 1/2] ARM: dts: i.MX27: Allow to define partitions onto SDHC
-Message-ID: <1397372389-32016-1-git-send-email-shc_work@mail.ru>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 13 Apr 2014 15:25:53 +0800
+Subject: [PATCH v3] ARM: dts: i.MX: Use single naming style for i.MX WEIM
+ device
+In-Reply-To: <1397056096-29233-1-git-send-email-shc_work@mail.ru>
+References: <1397056096-29233-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140413072551.GA24180@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allow to define partitions onto SDHC in user defined
-devicetrees.
+On Wed, Apr 09, 2014 at 07:08:16PM +0400, Alexander Shiyan wrote:
+> This patch converts all i.MX WEIM users to use single naming style
+> for devices.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 83a8247..843aefc 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -263,6 +263,8 @@
- 			};
- 
- 			sdhci1: sdhci at 10013000 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
- 				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
- 				reg = <0x10013000 0x1000>;
- 				interrupts = <11>;
-@@ -274,6 +276,8 @@
- 			};
- 
- 			sdhci2: sdhci at 10014000 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
- 				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
- 				reg = <0x10014000 0x1000>;
- 				interrupts = <10>;
-@@ -416,6 +420,8 @@
- 			};
- 
- 			sdhci3: sdhci at 1001e000 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
- 				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
- 				reg = <0x1001e000 0x1000>;
- 				interrupts = <9>;
--- 
-1.8.3.2
+Applied, thanks.
