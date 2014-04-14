@@ -1,46 +1,43 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 14 Apr 2014 14:00:31 -0300
-Subject: [PATCH v2 0/4] ARM: mvebu: fix bus width handling in mvebu-devbus
-In-Reply-To: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140414170031.GB527@arch.cereza>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 14 Apr 2014 10:05:28 -0700
+Subject: ARM: Zynq: CPUFreq issues in setting frequencies (Was: Re: Help
+ about PetaLinux)
+In-Reply-To: <CAOh2x=n5NzPCMiZfWhQ4tFhPE+4TA_tqsOkkeeA87Q0VqECXog@mail.gmail.com>
+References: <CAOh2x=n5NzPCMiZfWhQ4tFhPE+4TA_tqsOkkeeA87Q0VqECXog@mail.gmail.com>
+Message-ID: <671c307a-813b-41d8-9839-09265df019df@AM1EHSMHS005.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 14, Thomas Petazzoni wrote:
-> Jason, Greg, Andrew, Sebastian,
+On Sat, 2014-04-12 at 02:14PM +0530, Viresh Kumar wrote:
+> On Sat, Apr 12, 2014 at 3:02 AM, Mokhtar Bouain
+> <mokhtar.bouain@gmail.com> wrote:
+> > Hi Viresh,
+> > Please, I have a problem with the PetaLinux and Zynq board.
+> > I posted my probem here :
+> > http://forums.xilinx.com/t5/Embedded-Linux/clk-set-rate-failed-to-set-i2c0-aper-rate-zc702-board-and/td-p/438352
+> > There is a member of the xilinx forum who you mentioned that you found the
+> > solution.
+> > Can you help me please?
 > 
-> This set of patches fix a bug in the mvebu-devbus driver, which was
-> leading to a misinterpretation of Device Tree provided value: a NOR
-> bus width declared as 8 bits in the Device Tree was in fact configured
-> as 16 bits at the hardware level.
+> Hi Mokhtar,
 > 
-> This bug was not noticed until now, because it was compensated by a
-> symetric mistake in the Device Tree files.
+> I don't have a clue what's going on here as I haven't been looking
+> at platform internals at all..
 > 
-> This set of commits therefore fix both the driver itself, and the
-> incorrect Device Tree files. The patches for the Device Tree files
-> have been separated, because some of them should apply all the way to
-> v3.10, while some of them apply only up to v3.11.
-> 
-> Changes since v1:
-> 
->  * Added patches to fix the Device Tree files to indicate the correct
->    bus width, as documented in the board schematics. Noticed by
->    Ezequiel Garcia.
-> 
->  * Changed the bus_width conversion logic in the driver to only accept
->    valid values: 8 bits and 16 bits. All other values lead to an error
->    being returned. Suggested by Sebastian Hesselbarth.
-> 
->  * Rebased on top of v3.15-rc1.
+> Soren/Michal are probably working on those things, they might help.
 > 
 
-Thanks a lot for taking care of this!
+All the information is actually in the forum and referenced topics
+there...
+Unfortunately, Zynq has plenty inter dependencies between clocks.
+That results in all kinds of limitations, because Zynq's timers are
+driven by their bus clock which is derived from the CPU clock.
+And also other peripherals are clocked by this clock. So, a solution
+needs to take all these dependencies into account, which means that
+certain operations may fail.
 
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Also, the issue described affects (an outdated version of) our vendor
+tree only. We just merged cpufreq support into mainline. We'll see
+how that goes.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+	S?ren
