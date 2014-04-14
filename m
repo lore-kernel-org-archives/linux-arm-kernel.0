@@ -1,47 +1,43 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 13 Apr 2014 23:14:57 -0400 (EDT)
-Subject: [PATCH] Revert "net: mvneta: fix usage as a module on RGMII
- configurations"
-In-Reply-To: <1397380533-16012-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397380533-16012-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140413.231457.1275572148025135232.davem@davemloft.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 14 Apr 2014 13:02:44 +0900
+Subject: [GIT PULL] Fifth Round of Renesas ARM Based SoC DT Updates for v3.15
+Message-ID: <cover.1397448066.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Sun, 13 Apr 2014 11:15:33 +0200
+Hi Olof, Hi Kevin, Hi Arnd,
 
-> This reverts commit e3a8786c10e75903f1269474e21fe8cb49c3a670. While
-> this commit allows to use the mvneta driver as a module on some
-> configurations, it breaks other configurations even if mvneta is used
-> built-in.
-> 
-> This breakage is due to the fact that on some RGMII platforms, the PCS
-> bit has to be set, and on some other platforms, it has to be
-> cleared. At the moment, we lack informations to know exactly the
-> significance of this bit (the datasheet only says "enables PCS"), and
-> so we can't produce a patch that will work on all platforms at this
-> point. And since this change is breaking the network completely for
-> many users, it's much better to revert it for now. We'll come back
-> later with a proper fix that takes into account all platforms.
-> 
-> Basically:
-> 
->  * Armada XP GP is configured as RGMII-ID, and needs the PCS bit to be
->    set.
->  * Armada 370 Mirabox is configured as RGMII-ID, and needs the PCS bit
->    to be cleared.
-> 
-> And at the moment, we don't know how to make the distinction between
-> those two cases. One hint is that the Armada XP GP appears in fact to
-> be using a QSGMII connection with the PHY (Quad-SGMII), but
-> configuring it as SGMII doesn't work, while RGMII-ID works. This needs
-> more investigation, but in the mean time, let's unbreak the network
-> for all those users.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reported-by: Arnaud Ebalard <arno@natisbad.org>
-> Reported-by: Alexander Reuter <Alexander.Reuter@gmx.net>
-> Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=73401
+Please consider this fifth round of Renesas ARM based SoC DT updates for v3.15.
 
-Applied, thanks for following up on this.
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt4-for-v3.15,
+which I have already sent a pull-request for.
+
+I am sending this pull request (long) after the release of v3.14-rc6
+as it contains a single bug-fix.
+
+
+The following changes since commit 2c60a7df72711fb8b4be1e6aa651ab166a8931bc:
+
+  ARM: shmobile: Add SDHI devices for Koelsch DTS (2014-02-26 15:11:41 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt5-for-v3.15
+
+for you to fetch changes up to b08eed0c4d7d70eae2f4f1ff518cc33643722a07:
+
+  ARM: shmobile: lager: correct renesas,gpios to renesas,groups in sd[02] pfc (2014-04-08 09:38:51 +0900)
+
+----------------------------------------------------------------
+Fifth Round of Renesas ARM Based SoC DT Updates for v3.15
+
+Correct renesas,groups in SDHI nodes of for r8a7790 (R-Car H2) based
+Lager board.
+
+----------------------------------------------------------------
+Rob Taylor (1):
+      ARM: shmobile: lager: correct renesas,gpios to renesas,groups in sd[02] pfc
+
+ arch/arm/boot/dts/r8a7790-lager.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
