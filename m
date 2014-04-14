@@ -1,44 +1,107 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 14 Apr 2014 10:59:20 +0200
-Subject: [PATCH 01/29] ARM: orion5x: fix target ID for crypto SRAM window
-In-Reply-To: <1397400006-4315-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <534BA368.2040607@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 14 Apr 2014 11:01:03 +0200
+Subject: [PATCH V5 00/20] ARM: exynos: cpuidle: Move the driver to
+ drivers/cpuidle
+In-Reply-To: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <534BA3CF.6030701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
-> In commit 4ca2c04085a1caa903e92a5fc0da25362150aac2 ('ARM: orion5x:
-> Move to ID based window creation'), the mach-orion5x code was changed
-> to use the new mvebu-mbus API. However, in the process, a mistake was
-> made on the crypto SRAM window target ID: it should have been 0x9
-> (verified in the datasheet) and not 0x0.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: stable at vger.kernel.org
-> ---
-> This should be backported to stable all the way to v3.12.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Hi Kukjin,
 
-> ---
->   arch/arm/mach-orion5x/common.h | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+I believe I addressed all the comments. Is it possible to take this 
+patchset for next ?
+
+Regards
+
+   -- Daniel
+
+
+
+On 04/11/2014 12:39 PM, Daniel Lezcano wrote:
+> Changelog:
 >
-> diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
-> index f565f99..7548db2 100644
-> --- a/arch/arm/mach-orion5x/common.h
-> +++ b/arch/arm/mach-orion5x/common.h
-> @@ -21,7 +21,7 @@ struct mv_sata_platform_data;
->   #define ORION_MBUS_DEVBUS_BOOT_ATTR   0x0f
->   #define ORION_MBUS_DEVBUS_TARGET(cs)  0x01
->   #define ORION_MBUS_DEVBUS_ATTR(cs)    (~(1 << cs))
-> -#define ORION_MBUS_SRAM_TARGET        0x00
-> +#define ORION_MBUS_SRAM_TARGET        0x09
->   #define ORION_MBUS_SRAM_ATTR          0x00
+> V5:
+> 	* Removed patch : "Move clock setup to pm.c"
+> 	* Added patch   : "Move arm core power down clock to exynos5250 common code"
+> V4:
+> 	* Took into account Tomasz's comments
+> 		* Fixed missing call in for central suspend
+> 		* Passed parameter to the wakeup mask function
+> 		* Moved wakeup mask, boot vector and aftr state into a single
+> 		function
+> 		* Used this function as callback for platform data
+> 		* Moved S5P_CHECK_AFTR/S5P_CHECK_SLEEP into pm.c
+> 		* Set boot vector only one time
+> 	* Splitted some patches to make them more readable
+> V3:
+> 	* Added patch   : "ARM: exynos: cpuidle: Disable cpuidle for 5440"
+> 	* Removed patch : "ARM: exynos: config: Enable cpuidle"
+> 	* Removed default ARM_EXYNOS4210_CPUIDLE=y
+> 	* Added comment about bug fix side effect 'for_each_possible_cpu'
+> V2:
+> 	* Added comment in changelog for calls order (5/17)
+> 	* Call the powerdown only for cpu0 in the pm notifier
+> 	* Set the pm notifier for all boards
 >
->   /*
+> V1: initial post
 >
+> This patchset relies on the cpm_pm notifier to initiate the powerdown sequence
+> operations from pm.c instead cpuidle.c. Thus the cpuidle driver is no longer
+> dependent from arch specific code as everything is called from the pm.c file.
+>
+> The patchset applies on top of linux-samsung/for-next.
+>
+> Tested on exynos4: 4210
+> Tested on exynos5: 5250 (without AFTR)
+>
+> Amit Daniel Kachhap (1):
+>    ARM: EXYNOS: Move arm core power down clock to exynos5250 common
+>      clock
+>
+> Daniel Lezcano (19):
+>    ARM: exynos: cpuidle: Prevent forward declaration
+>    ARM: exynos: cpuidle: Use cpuidle_register
+>    ARM: exynos: cpuidle: Change function name prefix
+>    ARM: exynos: cpuidle: Encapsulate register access inside a function
+>    ARM: exynos: cpuidle: Move some code inside the idle_finisher
+>    ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
+>    ARM: exynos: cpuidle: Use the cpu_pm notifier
+>    ARM: exynos: cpuidle: Move scu_enable in the cpu_pm notifier
+>    ARM: exynos: cpuidle: Remove ifdef for scu_enable
+>    ARM: exynos: cpuidle: Pass wakeup mask parameter to function
+>    ARM: exynos: cpuidle: Encapsulate boot vector code into a function
+>    ARM: exynos: cpuidle: Disable cpuidle for 5440
+>    ARM: exynos: cpuidle: Encapsulate the AFTR code into a function
+>    ARM: exynos: cpuidle: Move the AFTR state function into pm.c
+>    ARM: exynos: cpuidle: Move the power sequence call in the cpu_pm
+>      notifier
+>    ARM: exynos: cpuidle: Move S5P_CHECK_SLEEP into pm.c
+>    ARM: exynos: cpuidle: Pass the AFTR callback to the platform_data
+>    ARM: exynos: cpuidle: Cleanup all unneeded headers from cpuidle.c
+>    ARM: exynos: cpuidle: Move the driver to drivers/cpuidle directory
+>
+>   arch/arm/mach-exynos/Makefile        |    1 -
+>   arch/arm/mach-exynos/common.h        |    1 +
+>   arch/arm/mach-exynos/cpuidle.c       |  255 ----------------------------------
+>   arch/arm/mach-exynos/exynos.c        |    8 +-
+>   arch/arm/mach-exynos/pm.c            |  152 ++++++++++++++++----
+>   arch/arm/mach-exynos/regs-pmu.h      |    2 -
+>   drivers/clk/samsung/clk-exynos5250.c |   42 ++++++
+>   drivers/cpuidle/Kconfig.arm          |    6 +
+>   drivers/cpuidle/Makefile             |    1 +
+>   drivers/cpuidle/cpuidle-exynos.c     |   98 +++++++++++++
+>   10 files changed, 277 insertions(+), 289 deletions(-)
+>   delete mode 100644 arch/arm/mach-exynos/cpuidle.c
+>   create mode 100644 drivers/cpuidle/cpuidle-exynos.c
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
