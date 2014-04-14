@@ -1,126 +1,232 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Apr 2014 15:35:39 +0200
-Subject: [PATCH v3 09/18] ASoC: fsl-ssi: Only enable baudclk when used
+Date: Mon, 14 Apr 2014 15:35:42 +0200
+Subject: [PATCH v3 12/18] ASoC: fsl-ssi: Move fsl_ssi_set_dai_sysclk above
+ fsl_ssi_hw_params
 In-Reply-To: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
 References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
+Message-ID: <1397482548-28463-13-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Enable baudclk only when it is used. The baudclock is only needed in master
-mode and only when thr driver is active, so move enabling to fsl_ssi_startup
-and disabling to fsl_ssi_shutdown.
+fsl_ssi_set_dai_sysclk will be called from fsl_ssi_hw_params in the
+next patch. Move up to avoid forward declaration and to keep the next patch
+more readable. No functional change.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 37 ++++++++++++++++++++++++++++++-------
- 1 file changed, 30 insertions(+), 7 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 190 ++++++++++++++++++++++++------------------------
+ 1 file changed, 96 insertions(+), 94 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index f2255cb..d6d3f0a3 100644
+index d5f91b1..74f5a91 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -236,6 +236,12 @@ static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
- 	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
+@@ -533,6 +533,102 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
  }
  
-+static bool fsl_ssi_is_i2s_master(struct fsl_ssi_private *ssi_private)
-+{
-+	return (ssi_private->dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) ==
-+		SND_SOC_DAIFMT_CBS_CFS;
-+}
-+
  /**
-  * fsl_ssi_isr: SSI interrupt handler
-  *
-@@ -489,6 +495,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 	struct fsl_ssi_private *ssi_private =
- 		snd_soc_dai_get_drvdata(rtd->cpu_dai);
- 	unsigned long flags;
-+	int ret;
- 
- 	if (!dai->active && !fsl_ssi_is_ac97(ssi_private)) {
- 		spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
-@@ -496,6 +503,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
- 	}
- 
-+	if (fsl_ssi_is_i2s_master(ssi_private)) {
-+		ret = clk_prepare_enable(ssi_private->baudclk);
-+		if (ret)
-+			return ret;
++ * fsl_ssi_set_dai_sysclk - configure Digital Audio Interface bit clock
++ *
++ * Note: This function can be only called when using SSI as DAI master
++ *
++ * Quick instruction for parameters:
++ * freq: Output BCLK frequency = samplerate * 32 (fixed) * channels
++ * dir: SND_SOC_CLOCK_OUT -> TxBCLK, SND_SOC_CLOCK_IN -> RxBCLK.
++ */
++static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
++				  int clk_id, unsigned int freq, int dir)
++{
++	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
++	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates, ret;
++	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, i;
++	unsigned long flags, clkrate, baudrate, tmprate;
++	u64 sub, savesub = 100000;
++
++	/* Don't apply it to any non-baudclk circumstance */
++	if (IS_ERR(ssi_private->baudclk))
++		return -EINVAL;
++
++	/* It should be already enough to divide clock by setting pm alone */
++	psr = 0;
++	div2 = 0;
++
++	factor = (div2 + 1) * (7 * psr + 1) * 2;
++
++	for (i = 0; i < 255; i++) {
++		/* The bclk rate must be smaller than 1/5 sysclk rate */
++		if (factor * (i + 1) < 5)
++			continue;
++
++		tmprate = freq * factor * (i + 2);
++		clkrate = clk_round_rate(ssi_private->baudclk, tmprate);
++
++		do_div(clkrate, factor);
++		afreq = (u32)clkrate / (i + 1);
++
++		if (freq == afreq)
++			sub = 0;
++		else if (freq / afreq == 1)
++			sub = freq - afreq;
++		else if (afreq / freq == 1)
++			sub = afreq - freq;
++		else
++			continue;
++
++		/* Calculate the fraction */
++		sub *= 100000;
++		do_div(sub, freq);
++
++		if (sub < savesub) {
++			baudrate = tmprate;
++			savesub = sub;
++			pm = i;
++		}
++
++		/* We are lucky */
++		if (savesub == 0)
++			break;
 +	}
 +
- 	/* When using dual fifo mode, it is safer to ensure an even period
- 	 * size. If appearing to an odd number while DMA always starts its
- 	 * task from fifo0, fifo1 would be neglected at the end of each
-@@ -508,6 +521,17 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 	return 0;
- }
- 
-+static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
-+		struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct fsl_ssi_private *ssi_private =
-+		snd_soc_dai_get_drvdata(rtd->cpu_dai);
-+
-+	if (fsl_ssi_is_i2s_master(ssi_private))
-+		clk_disable_unprepare(ssi_private->baudclk);
-+}
-+
- /**
-  * fsl_ssi_hw_params - program the sample size
-  *
-@@ -576,6 +600,11 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- 
- 	ssi_private->dai_fmt = fmt;
- 
-+	if (fsl_ssi_is_i2s_master(ssi_private) && IS_ERR(ssi_private->baudclk)) {
-+		dev_err(cpu_dai->dev, "no baudclk needed for master mode\n");
++	/* No proper pm found if it is still remaining the initial value */
++	if (pm == 999) {
++		dev_err(cpu_dai->dev, "failed to handle the required sysclk\n");
 +		return -EINVAL;
 +	}
 +
- 	fsl_ssi_setup_reg_vals(ssi_private);
- 
- 	scr = read_ssi(&ssi->scr) & ~(CCSR_SSI_SCR_SYN | CCSR_SSI_SCR_I2S_MODE_MASK);
-@@ -910,6 +939,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
- 
- static const struct snd_soc_dai_ops fsl_ssi_dai_ops = {
- 	.startup	= fsl_ssi_startup,
-+	.shutdown	= fsl_ssi_shutdown,
- 	.hw_params	= fsl_ssi_hw_params,
- 	.set_fmt	= fsl_ssi_set_dai_fmt,
- 	.set_sysclk	= fsl_ssi_set_dai_sysclk,
-@@ -1050,8 +1080,6 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 	if (IS_ERR(ssi_private->baudclk))
- 		dev_dbg(&pdev->dev, "could not get baud clock: %ld\n",
- 			 PTR_ERR(ssi_private->baudclk));
--	else
--		clk_prepare_enable(ssi_private->baudclk);
- 
- 	/*
- 	 * We have burstsize be "fifo_depth - 2" to match the SSI
-@@ -1102,9 +1130,6 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 	return 0;
- 
- error_pcm:
--	if (!IS_ERR(ssi_private->baudclk))
--		clk_disable_unprepare(ssi_private->baudclk);
--
- 	clk_disable_unprepare(ssi_private->clk);
- 
- 	return ret;
-@@ -1115,8 +1140,6 @@ static void fsl_ssi_imx_clean(struct platform_device *pdev,
- {
- 	if (!ssi_private->use_dma)
- 		imx_pcm_fiq_exit(pdev);
--	if (!IS_ERR(ssi_private->baudclk))
--		clk_disable_unprepare(ssi_private->baudclk);
- 	clk_disable_unprepare(ssi_private->clk);
++	stccr = CCSR_SSI_SxCCR_PM(pm + 1) | (div2 ? CCSR_SSI_SxCCR_DIV2 : 0) |
++		(psr ? CCSR_SSI_SxCCR_PSR : 0);
++	mask = CCSR_SSI_SxCCR_PM_MASK | CCSR_SSI_SxCCR_DIV2 |
++		CCSR_SSI_SxCCR_PSR;
++
++	if (dir == SND_SOC_CLOCK_OUT || synchronous)
++		write_ssi_mask(&ssi->stccr, mask, stccr);
++	else
++		write_ssi_mask(&ssi->srccr, mask, stccr);
++
++	spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
++	if (!ssi_private->baudclk_locked) {
++		ret = clk_set_rate(ssi_private->baudclk, baudrate);
++		if (ret) {
++			spin_unlock_irqrestore(&ssi_private->baudclk_lock,
++					flags);
++			dev_err(cpu_dai->dev, "failed to set baudclk rate\n");
++			return -EINVAL;
++		}
++		ssi_private->baudclk_locked = true;
++	}
++	spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
++
++	return 0;
++}
++
++/**
+  * fsl_ssi_hw_params - program the sample size
+  *
+  * Most of the SSI registers have been programmed in the startup function,
+@@ -748,100 +844,6 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
  }
  
+ /**
+- * fsl_ssi_set_dai_sysclk - configure Digital Audio Interface bit clock
+- *
+- * Note: This function can be only called when using SSI as DAI master
+- *
+- * Quick instruction for parameters:
+- * freq: Output BCLK frequency = samplerate * 32 (fixed) * channels
+- * dir: SND_SOC_CLOCK_OUT -> TxBCLK, SND_SOC_CLOCK_IN -> RxBCLK.
+- */
+-static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
+-				  int clk_id, unsigned int freq, int dir)
+-{
+-	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
+-	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+-	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates, ret;
+-	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, i;
+-	unsigned long flags, clkrate, baudrate, tmprate;
+-	u64 sub, savesub = 100000;
+-
+-	/* Don't apply it to any non-baudclk circumstance */
+-	if (IS_ERR(ssi_private->baudclk))
+-		return -EINVAL;
+-
+-	/* It should be already enough to divide clock by setting pm alone */
+-	psr = 0;
+-	div2 = 0;
+-
+-	factor = (div2 + 1) * (7 * psr + 1) * 2;
+-
+-	for (i = 0; i < 255; i++) {
+-		/* The bclk rate must be smaller than 1/5 sysclk rate */
+-		if (factor * (i + 1) < 5)
+-			continue;
+-
+-		tmprate = freq * factor * (i + 2);
+-		clkrate = clk_round_rate(ssi_private->baudclk, tmprate);
+-
+-		do_div(clkrate, factor);
+-		afreq = (u32)clkrate / (i + 1);
+-
+-		if (freq == afreq)
+-			sub = 0;
+-		else if (freq / afreq == 1)
+-			sub = freq - afreq;
+-		else if (afreq / freq == 1)
+-			sub = afreq - freq;
+-		else
+-			continue;
+-
+-		/* Calculate the fraction */
+-		sub *= 100000;
+-		do_div(sub, freq);
+-
+-		if (sub < savesub) {
+-			baudrate = tmprate;
+-			savesub = sub;
+-			pm = i;
+-		}
+-
+-		/* We are lucky */
+-		if (savesub == 0)
+-			break;
+-	}
+-
+-	/* No proper pm found if it is still remaining the initial value */
+-	if (pm == 999) {
+-		dev_err(cpu_dai->dev, "failed to handle the required sysclk\n");
+-		return -EINVAL;
+-	}
+-
+-	stccr = CCSR_SSI_SxCCR_PM(pm + 1) | (div2 ? CCSR_SSI_SxCCR_DIV2 : 0) |
+-		(psr ? CCSR_SSI_SxCCR_PSR : 0);
+-	mask = CCSR_SSI_SxCCR_PM_MASK | CCSR_SSI_SxCCR_DIV2 | CCSR_SSI_SxCCR_PSR;
+-
+-	if (dir == SND_SOC_CLOCK_OUT || synchronous)
+-		write_ssi_mask(&ssi->stccr, mask, stccr);
+-	else
+-		write_ssi_mask(&ssi->srccr, mask, stccr);
+-
+-	spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
+-	if (!ssi_private->baudclk_locked) {
+-		ret = clk_set_rate(ssi_private->baudclk, baudrate);
+-		if (ret) {
+-			spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
+-			dev_err(cpu_dai->dev, "failed to set baudclk rate\n");
+-			return -EINVAL;
+-		}
+-		ssi_private->baudclk_locked = true;
+-	}
+-	spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
+-
+-	return 0;
+-}
+-
+-/**
+  * fsl_ssi_set_dai_tdm_slot - set TDM slot number
+  *
+  * Note: This function can be only called when using SSI as DAI master
 -- 
 1.9.1
