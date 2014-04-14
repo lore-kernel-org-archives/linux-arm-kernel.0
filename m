@@ -1,36 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Apr 2014 21:10:36 +0100
-Subject: [PATCH 2/2] ARM: i.MX6: ipu_di_sel clocks can set parent rates
-In-Reply-To: <1397485240-29163-2-git-send-email-p.zabel@pengutronix.de>
-References: <1397485240-29163-1-git-send-email-p.zabel@pengutronix.de>
- <1397485240-29163-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140414201036.GL24070@n2100.arm.linux.org.uk>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 14 Apr 2014 13:51:37 -0700
+Subject: [PATCH] PM / devfreq: Use freq_table for available_frequencies
+In-Reply-To: <1397184881-12223-1-git-send-email-skannan@codeaurora.org>
+References: <1397184881-12223-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <534C4A59.8040507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 04:20:40PM +0200, Philipp Zabel wrote:
-> To obtain exact pixel clocks, allow the DI clock selectors to influence
-> the PLLs that they are derived from.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+MyungJoo/Kyungmin,
 
-Both these appear to work for me on the iMX6Solo Hummingboard, and fix
-the ability of imx-hdmi to produce a picture with correct timing.
-So...
+Bump. Can we accept this patch please?
 
-Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+-Saravana
 
-For reference, at 1080p, I see:
 
-    pll5_video                  1           1            1188000000 0
-       pll5_post_div            1           1            297000000  0
-          pll5_video_div        1           1            148500000  0
-...
-             ipu1_di0_pre_sel   1           1            148500000  0
-                ipu1_di0_pre    1           1            148500000  0
-                   ipu1_di0_sel 1           1            148500000  0
-                      ipu1_di0  1           1            148500000  0
+On 04/10/2014 07:54 PM, Saravana Kannan wrote:
+> Some devices use freq_table instead of OPP. For those devices, the
+> available_frequencies file shows up empty. Fix that by using freq_table to
+> generate the available_frequencies data when OPP is not present.
+>
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+>   drivers/devfreq/devfreq.c | 15 +++++++++++----
+>   1 file changed, 11 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+> index 2042ec3..a715d15 100644
+> --- a/drivers/devfreq/devfreq.c
+> +++ b/drivers/devfreq/devfreq.c
+> @@ -912,19 +912,26 @@ static ssize_t available_frequencies_show(struct device *d,
+>   	struct devfreq *df = to_devfreq(d);
+>   	struct device *dev = df->dev.parent;
+>   	struct dev_pm_opp *opp;
+> +	unsigned int i = 0, max_state = df->profile->max_state;
+> +	bool use_opp;
+>   	ssize_t count = 0;
+>   	unsigned long freq = 0;
+>
+>   	rcu_read_lock();
+> +	use_opp = dev_pm_opp_get_opp_count(dev) > 0;
+>   	do {
+> -		opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+> -		if (IS_ERR(opp))
+> -			break;
+> +		if (use_opp) {
+> +			opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+> +			if (IS_ERR(opp))
+> +				break;
+> +		} else {
+> +			freq = df->profile->freq_table[i++];
+> +		}
+>
+>   		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
+>   				   "%lu ", freq);
+>   		freq++;
+> -	} while (1);
+> +	} while (use_opp || (!use_opp && i < max_state));
+>   	rcu_read_unlock();
+>
+>   	/* Truncate the trailing space */
+>
+
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
