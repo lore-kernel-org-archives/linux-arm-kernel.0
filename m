@@ -1,127 +1,51 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 14 Apr 2014 16:33:46 +0100
-Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
-In-Reply-To: <20140414151333.GA29654@linaro.org>
-References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
- <20140414151333.GA29654@linaro.org>
-Message-ID: <20140414153346.GA32602@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 14 Apr 2014 17:37:30 +0200
+Subject: [PATCH 08/10] ARM: dts: pfla02: Add UART1 (uart3)
+In-Reply-To: <1397489852-1669-1-git-send-email-p.zabel@pengutronix.de>
+References: <1397489852-1669-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1397489852-1669-8-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 04:13:35PM +0100, Steve Capper wrote:
-> On Mon, Apr 14, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
+The pins labeled UART1 on the module connector are wired to i.MX6 uart3.
 
-[ ... ]
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > index 0fd5650..0b0b16a 100644
-> > --- a/arch/arm64/kernel/head.S
-> > +++ b/arch/arm64/kernel/head.S
-> 
-> A comment above this line needs to also be changed?
-> 
-> > @@ -46,8 +46,8 @@
-> >  #error KERNEL_RAM_VADDR must start at 0xXXX80000
-> >  #endif
-> >  
-> > -#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-> > -#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
-> > +#define SWAPPER_DIR_SIZE	(4 * PAGE_SIZE)
-> > +#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
-> 
-> Again, this affects <4 levels of paging.
-> 
-> >  
-> >  	.globl	swapper_pg_dir
-> >  	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - SWAPPER_DIR_SIZE
-> > @@ -384,6 +384,20 @@ ENDPROC(__calc_phys_offset)
-> >  	.endm
-> >  
-> >  /*
-> > + * Macro to populate the PUD for the corresponding block entry in the next
-> > + * level (tbl) for the given virtual address.
-> > + *
-> > + * Preserves:	pud, tbl, virt
-> > + * Corrupts:	tmp1, tmp2
-> > + */
-> > +	.macro create_pud_entry, pud, tbl, virt, tmp1, tmp2
-> > +	lsr	\tmp1, \virt, #PUD_SHIFT
-> > +	and	\tmp1, \tmp1, #PTRS_PER_PUD - 1	// PUD index
-> > +	orr	\tmp2, \tbl, #3			// PUD entry table type
-> > +	str	\tmp2, [\pud, \tmp1, lsl #3]
-> > +	.endm
-> > +
-> > +/*
-> >   * Macro to populate block entries in the page table for the start..end
-> >   * virtual range (inclusive).
-> >   *
-> > @@ -445,10 +459,18 @@ __create_page_tables:
-> >  	ldr	x3, =KERNEL_START
-> >  	add	x3, x3, x28			// __pa(KERNEL_START)
-> >  	create_pgd_entry x25, x0, x3, x5, x6
-> > +#ifdef CONFIG_ARM64_4_LEVELS
-> > +	add	x1, x0, #PAGE_SIZE
-> > +	create_pud_entry x0, x1, x3, x5, x6
-> > +#endif
-> >  	ldr	x6, =KERNEL_END
-> >  	mov	x5, x3				// __pa(KERNEL_START)
-> >  	add	x6, x6, x28			// __pa(KERNEL_END)
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	create_block_map x0, x7, x3, x5, x6
-> > +#else
-> > +	create_block_map x1, x7, x3, x5, x6
-> > +#endif
-> >  
-> >  	/*
-> >  	 * Map the kernel image (starting with PHYS_OFFSET).
-> > @@ -456,9 +478,17 @@ __create_page_tables:
-> >  	add	x0, x26, #PAGE_SIZE		// section table address
-> >  	mov	x5, #PAGE_OFFSET
-> >  	create_pgd_entry x26, x0, x5, x3, x6
-> > +#ifdef CONFIG_ARM64_4_LEVELS
-> > +	add	x1, x0, #PAGE_SIZE
-> > +	create_pud_entry x0, x1, x3, x5, x6
-> > +#endif
-> >  	ldr	x6, =KERNEL_END
-> >  	mov	x3, x24				// phys offset
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	create_block_map x0, x7, x3, x5, x6
-> > +#else
-> > +	create_block_map x1, x7, x3, x5, x6
-> > +#endif
-> >  
-> >  	/*
-> >  	 * Map the FDT blob (maximum 2MB; must be within 512MB of
-> > @@ -474,14 +504,25 @@ __create_page_tables:
-> >  	add	x5, x5, x6			// __va(FDT blob)
-> >  	add	x6, x5, #1 << 21		// 2MB for the FDT blob
-> >  	sub	x6, x6, #1			// inclusive range
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	create_block_map x0, x7, x3, x5, x6
-> > +#else
-> > +	create_block_map x1, x7, x3, x5, x6
-> > +#endif
-> >  1:
-> >  	/*
-> >  	 * Create the pgd entry for the fixed mappings.
-> >  	 */
-> >  	ldr	x5, =FIXADDR_TOP		// Fixed mapping virtual address
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	add	x0, x26, #2 * PAGE_SIZE		// section table address
-> >  	create_pgd_entry x26, x0, x5, x6, x7
-> > +#else
-> > +	add	x0, x26, #PAGE_SIZE
-> > +	create_pgd_entry x26, x0, x5, x6, x7
-> > +	add	x1, x0, #2 * PAGE_SIZE
-> > +	create_pud_entry x0, x1, x5, x6, x7
-> > +#endif
-> 
-> So we essentially need an extra page for PUD mappings for both the
-> idmap and swapper mappings. Could the logic of create_pgd_entry be
-> adapted to call create_pud_entry for 4levels? That way a lot of #ifdefs
-> can be eliminated.
-> 
-
-I forgot to mention, create_pgd_entry could also return the address that is
-then used as the first argument of create_block_map, that would further
-simplify the 4 level logic.
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 6936177..faa3494 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -235,6 +235,15 @@
+ 			>;
+ 		};
+ 
++		pinctrl_uart3: uart3grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
++				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
++				MX6QDL_PAD_EIM_D30__UART3_RTS_B		0x1b0b1
++				MX6QDL_PAD_EIM_D31__UART3_CTS_B		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart4: uart4grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+@@ -302,6 +311,12 @@
+ 	status = "disabled";
+ };
+ 
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	status = "disabled";
++};
++
+ &uart4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart4>;
+-- 
+1.9.1
