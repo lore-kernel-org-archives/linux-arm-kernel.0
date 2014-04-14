@@ -1,46 +1,45 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Mon, 14 Apr 2014 15:37:58 -0700
-Subject: [PATCH v9 1/2] ARM: avoid tracers in soft_restart
-In-Reply-To: <20140414105314.GB3530@arm.com>
-References: <1395178858-27343-1-git-send-email-sebastian.capella@linaro.org>
- <1395178858-27343-2-git-send-email-sebastian.capella@linaro.org>
- <20140414105314.GB3530@arm.com>
-Message-ID: <CADHgK6vY4tzb3fJRZyTDZ=e7e9sEhDDc5_ja28qna-AhXwaFEA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Apr 2014 07:38:26 +0900
+Subject: [PATCH v2 6/6] ARM: shmobile: sh73a0: drop address cells from
+ GIC node
+In-Reply-To: <1397485098-19198-6-git-send-email-l.stach@pengutronix.de>
+References: <1397485098-19198-1-git-send-email-l.stach@pengutronix.de>
+ <1397485098-19198-6-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140414223826.GA22518@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Mon, Apr 14, 2014 at 04:18:18PM +0200, Lucas Stach wrote:
+> This is likely a copy-and-paste error from the
+> ARM GIC documentation, that has already been fixed.
+> 
+> address-cells should have been set to 0, as with the size
+> cells. As having those properties set to 0 is the
+> same thing as not specifying them, drop them completely.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> v2: split patch, added ack
 
-On 14 April 2014 03:53, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Mar 18, 2014 at 09:40:57PM +0000, Sebastian Capella wrote:
->> Use of tracers in local_irq_disable is causes abort loops when called
->> with irqs disabled using a temporary stack.  Replace local_irq_disable
->> with raw_local_irq_disable instead to avoid tracers.
->
-> Do you have any more information about these aborts? At the time we call
-> local_irq_disable, the stack is still intact, so if the issue is simply
-> related to having any tracers active at the call_with_stack invocation, we'd
-> be better off disabling tracing here altogether.
+Thanks, I have queued this up as a fix for v3.15.
 
-This is specifically for when soft_restart is called in the
-hibernation path with tracers enabled.  At that point, we've already
-switched to a temporary stack, and when we call local_irq_disable,
-we'll see this:
-
-In the local_irq_disable, it ends up calling trace_hardirqs_off
-(CONFIG_TRACE_IRQFLAGS_SUPPORT is enabled), which calls
-trace_hardirqs_off_caller which checks lockdep_recursion in the
-current task, but we've switched to a temporary stack with the
-call_with_stack, and get_current is returning NULL.  This
-triggers a data abort, which calls trace_hardirqs_off
-again and so on.
-
-We originally had a patch which added a soft restart called
-soft_restart_noirq which avoided the irq disable.
-
-You can see the discussion here:
-https://patchwork.kernel.org/patch/3677591/
-
-Thanks!
-
-Sebastian
+> ---
+>  arch/arm/boot/dts/sh73a0.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> index b7bd3b9a6753..5ecf552e1c00 100644
+> --- a/arch/arm/boot/dts/sh73a0.dtsi
+> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> @@ -34,7 +34,6 @@
+>  	gic: interrupt-controller at f0001000 {
+>  		compatible = "arm,cortex-a9-gic";
+>  		#interrupt-cells = <3>;
+> -		#address-cells = <1>;
+>  		interrupt-controller;
+>  		reg = <0xf0001000 0x1000>,
+>  		      <0xf0000100 0x100>;
+> -- 
+> 1.9.1
+> 
