@@ -1,205 +1,96 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 14 Apr 2014 17:57:51 +0530
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <534BD447.1080909@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 14:28:29 +0200
+Subject: [PATCH 20/29] ARM: orion5x: convert edmini_v2 to DT pinctrl
+In-Reply-To: <20140414120648.GB20845@lunn.ch>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
+ <534BBDAC.2010801@gmail.com> <20140414132329.48df793e@skate>
+ <534BC62D.6010000@gmail.com> <20140414120648.GB20845@lunn.ch>
+Message-ID: <534BD46D.4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/14/2014 02:06 PM, Andrew Lunn wrote:
+> On Mon, Apr 14, 2014 at 01:27:41PM +0200, Sebastian Hesselbarth wrote:
+>> On 04/14/2014 01:23 PM, Thomas Petazzoni wrote:
+>>> Dear Sebastian Hesselbarth,
+>>>
+>>> On Mon, 14 Apr 2014 12:51:24 +0200, Sebastian Hesselbarth wrote:
+>>>
+>>>>>    		internal-regs {
+>>>>> +			pinctrl at 10000 {
+>>>>
+>>>> Use node label reference:
+>>>>
+>>>> &pinctrl {
+>>>> 	...
+>>>> };
+>>>
+>>> I personally dislike using node label references. I know they are used
+>>> for Ethernet because it has been done by someone else for Orion
+>>> platforms. But on all Armada 370/XP platforms, we don't use node label
+>>> references, and I'd prefer to do it the same way for Orion5x platforms
+>>> if possible.
+>>
+>> Well, I definitely disagree and would like to _enforce_ using node
+>> label references. Anyway, if there is a strong reason for not using
+>> them, I'd be fine too.
+>
+> Could you both explain your like/dislike for using node labels.
 
-On Tuesday 08 April 2014 08:06 PM, Vivek Gautam wrote:
-> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
-> The new driver uses the generic PHY framework and will interact
-> with DWC3 controller present on Exynos5 series of SoCs.
-> Thereby, removing old phy-samsung-usb3 driver and related code
-> used untill now which was based on usb/phy framework.
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
->  .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->  drivers/phy/Kconfig                                |   11 +
->  drivers/phy/Makefile                               |    1 +
->  drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
->  4 files changed, 722 insertions(+)
->  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> index 28f9edb..6d99ba9 100644
-> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> @@ -74,3 +74,45 @@ phy-consumer at 12340000 {
->  
->  Refer to DT bindings documentation of particular PHY consumer devices for more
->  information about required PHYs and the way of specification.
-> +
-> +Samsung Exynos5 SoC series USB DRD PHY controller
-> +--------------------------------------------------
-> +
-> +Required properties:
-> +- compatible : Should be set to one of the following supported values:
-> +	- "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
-> +	- "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
-> +- reg : Register offset and length of USB DRD PHY register set;
-> +- clocks: Clock IDs array as required by the controller
-> +- clock-names: names of clocks correseponding to IDs in the clock property;
-> +	       Required clocks:
-> +	- phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
-> +	       used for register access.
-> +	- ref: PHY's reference clock (usually crystal clock), associated by
-> +	       phy name, used to determine bit values for clock settings
-> +	       register.
-> +	Additional clock required for Exynos5420:
-> +	- usb30_sclk_100m: Additional special clock used for PHY operation
-> +			   depicted as 'sclk_usbphy30' in CMU of Exynos5420.
-> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
-> +			  control pmu registers for power isolation.
-> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
-> +		      base.
-> +- #phy-cells : from the generic PHY bindings, must be 1;
-> +
-> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
-> +compatible PHYs, the second cell in the PHY specifier identifies the
-> +PHY id, which is interpreted as follows:
-> +  0 - UTMI+ type phy,
-> +  1 - PIPE3 type phy,
-> +
-> +Example:
-> +	usb3_phy: usbphy at 12100000 {
-> +		compatible = "samsung,exynos5250-usbdrd-phy";
-> +		reg = <0x12100000 0x100>;
-> +		clocks = <&clock 286>, <&clock 1>;
-> +		clock-names = "phy", "usb3phy_refclk";
-> +		samsung,syscon-phandle = <&pmu_syscon>;
-> +		samsung,pmu-offset = <0x704>;
-> +		#phy-cells = <1>;
-> +	};
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 8d3c49c..d955a05 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -166,4 +166,15 @@ config PHY_XGENE
->  	help
->  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
->  
-> +config PHY_EXYNOS5_USBDRD
-> +	tristate "Exynos5 SoC series USB DRD PHY driver"
-> +	depends on ARCH_EXYNOS5 && OF
-> +	depends on HAS_IOMEM
-> +	select GENERIC_PHY
-> +	select MFD_SYSCON
+My personal preferences are
 
-Lets try to avoid select in Kconfig. We've got enough problems with that.
-> +	help
-> +	  Enable USB DRD PHY support for Exynos 5 SoC series.
-> +	  This driver provides PHY interface for USB 3.0 DRD controller
-> +	  present on Exynos5 SoC series.
-> +
->  endmenu
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 2faf78e..31baa0c 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -18,3 +18,4 @@ obj-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
->  obj-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
->  obj-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
->  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-> +obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
-> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-> new file mode 100644
-> index 0000000..ff54a7c
-> --- /dev/null
-> +++ b/drivers/phy/phy-exynos5-usbdrd.c
-> @@ -0,0 +1,668 @@
-> +/*
-> + * Samsung EXYNOS5 SoC series USB DRD PHY driver
-> + *
-> + * Phy provider for USB 3.0 DRD controller on Exynos5 SoC series
-> + *
-> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
+(a) you cannot add any typos in nodes already existing, e.g.
+     while copying serial at 11000 you have serial at 11100, or
+     clock-frequency = <100000000>; becomes
+     clock-frequency = <10000000>;.
 
-2014 already ;-)
-> + * Author: Vivek Gautam <gautam.vivek@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-.
-.
-<sniip>
-.
-.
+(b) any mistake in toplevel includes gets multiplied by
+     board dts files using the include.
 
-> +
-> +/*
-> + * Sets the pipe3 phy's clk as EXTREFCLK (XXTI) which is internal clock
-> + * from clock core. Further sets multiplier values and spread spectrum
-> + * clock settings for SuperSpeed operations.
-> + */
-> +static unsigned int
-> +exynos5_usbdrd_pipe3_set_refclk(struct phy_usb_instance *inst)
-> +{
-> +	static u32 reg;
-> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
-> +
-> +	/* restore any previous reference clock settings */
-> +	reg = phy_drd->refclk_reg;
+Best example is kirkwood.dtsi which grew incrementally of
+course. There are some issues with it and each of it is
+replicated in up to ~40 board files.
 
-Why don't we just read back from the register instead?
-> +
-> +	/* Use EXTREFCLK as ref clock */
-> +	reg &= ~PHYCLKRST_REFCLKSEL_MASK;
-> +	reg |=	PHYCLKRST_REFCLKSEL_EXT_REFCLK;
-> +
-> +	/* FSEL settings corresponding to reference clock */
-> +	reg &= ~PHYCLKRST_FSEL_PIPE_MASK |
-> +		PHYCLKRST_MPLL_MULTIPLIER_MASK |
-> +		PHYCLKRST_SSC_REFCLKSEL_MASK;
-> +	switch (phy_drd->extrefclk) {
-> +	case EXYNOS5_FSEL_50MHZ:
-> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_50M_REF |
-> +			PHYCLKRST_SSC_REFCLKSEL(0x00));
-> +		break;
-> +	case EXYNOS5_FSEL_24MHZ:
-> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_24MHZ_REF |
-> +			PHYCLKRST_SSC_REFCLKSEL(0x88));
-> +		break;
-> +	case EXYNOS5_FSEL_20MHZ:
-> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_20MHZ_REF |
-> +			PHYCLKRST_SSC_REFCLKSEL(0x00));
-> +		break;
-> +	case EXYNOS5_FSEL_19MHZ2:
-> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_19200KHZ_REF |
-> +			PHYCLKRST_SSC_REFCLKSEL(0x88));
-> +		break;
-> +	default:
-> +		dev_dbg(phy_drd->dev, "unsupported ref clk\n");
-> +		break;
-> +	}
-> +
-> +	/* save refclk settings for multiple phy inits */
-> +	phy_drd->refclk_reg = reg;
-> +
-> +	return reg;
-> +}
-> +
-> +/*
-> + * Sets the utmi phy's clk as EXTREFCLK (XXTI) which is internal clock
-> + * from clock core. Further sets the FSEL values for HighSpeed operations.
-> + */
-> +static unsigned int
-> +exynos5_usbdrd_utmi_set_refclk(struct phy_usb_instance *inst)
-> +{
-> +	static u32 reg;
-> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
-> +
-> +	reg = phy_drd->refclk_reg;
+For example, moving ocp at f1000000 for kirkwood will be a
+real pain in the ass. Thomas can do it for orion5x.dtsi
+because there is only one board using it, dove.dtsi was
+already painful with only 3 boards.. but kirkwood.. don't
+even think of it ;)
 
-same here..
+Also, I found two or three board files for kirkwood that
+still have their pcie nodes sitting in ocp at f100000 because
+we missed them when moving the nodes. With node label
+references, this wouldn't be a problem at all.
 
-Thanks
-Kishon
+The only drawback for node label references is, they have
+to be known at dtc link time. I already mentioned it in
+our internal mail, but if you have
+
+kirkwood.dtsi
+   +- kirkwood-6281.dtsi adds sata, sdio, ...
+   +- kirkwood-6282.dtsi adds sata, sdio, ..., i2c1
+
+You cannot have another set of dts[i] files doing
+
+kirkwood-db.dtsi
+   +- kirkwood-db-88f6281.dts
+   +- kirkwood-db-88f6282.dts
+
+with:
+
+kirkwood-db.dtsi:
+#include <kirkwood.dtsi>
+
+&sdio {...};
+
+because kirkwood.dtsi does not know about &sdio.
+
+One way of solving this would be to include e.g.
+kirkwood-6281.dtsi and overwrite what was added
+in the corresponding board files again.
+
+But again, this really is my personal preference.
+If there are other good reasons not to do it, I'll agree.
+
+Sebastian
