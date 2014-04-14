@@ -1,32 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 14 Apr 2014 17:24:02 +0200
-Subject: [PATCH v2 0/3] ARM: mvebu: enable SDHCI interface on Armada 38x
-In-Reply-To: <1397486478-16991-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397486478-16991-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140414152402.GE22546@lunn.ch>
+From: jay.foad@gmail.com (Jay Foad)
+Date: Mon, 14 Apr 2014 16:26:49 +0100
+Subject: [PATCH] ARM: VFP: Fix emulation of multiply accumulate
+ instructions
+In-Reply-To: <20140408131256.GA5637@e103592.cambridge.arm.com>
+References: <1395852549-2745-1-git-send-email-jay.foad@gmail.com>
+ <20140408131256.GA5637@e103592.cambridge.arm.com>
+Message-ID: <CANd1uZmHi2PB0FLZ8zox_X2kbaMz_td0xqo7PkC3bP1jQNMfSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 04:41:15PM +0200, Thomas Petazzoni wrote:
-> Jason, Gregory, Andrew, Sebastian,
-> 
-> Here is a small set of patches that enable the SDHCI interface on
-> Armada 38x. The first one adds the DT details, the second and third
-> ones adjusts the appropriate defconfigs to include the relevant
-> driver.
-> 
-> The sdhci-pxav3 driver change has been taken by the MMC maintainer
-> Chris Ball, and is already in 3.15-rc1.
-> 
-> Changes since v1:
-> 
->  * Rebased on top of v3.15-rc1.
-> 
->  * Split in two commits the defconfig changes, so that the
->    multi_v7_defconfig change can be directly taken by the arm-soc
->    maintainers.
+On 8 April 2014 14:13, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Wed, Mar 26, 2014 at 04:49:09PM +0000, Jay Foad wrote:
+>> The emulation for single and double precision multiply accumulate
+>> instructions correctly normalised any denormal values in the operand
+>> registers, but failed to normalise the destination (accumulator)
+>> register.
+>>
+>> This fixes https://bugzilla.kernel.org/show_bug.cgi?id=70501
+>>
+>> Signed-off-by: Jay Foad <jay.foad@gmail.com>
+>
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>
+> This appears to be clean and straightforward, so if nobody else has
+> commented on this by the time -rc1 comes out, I suggest you rebase it
+> and send it to the patch system.  (See
+> http://www.arm.linux.org.uk/developer/patches/info.php for details
+> -- make sure you read it carefully.)
 
+Done.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+> Has this issue been hitting real-world users of the kernel, or is
+> this fixing a latent bug?
 
-	  Andrew
+Real world: it was causing failures in the test suite for an APL
+interpreter running on the Raspberry Pi.
+
+Thanks,
+Jay.
