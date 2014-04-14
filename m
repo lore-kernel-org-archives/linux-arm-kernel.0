@@ -1,30 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Apr 2014 11:03:15 +0900
-Subject: [PATCH 2/2] pwm: use PWM_LOOKUP to set the period and polarity
-In-Reply-To: <20140410073702.GF2879@piout.net>
-References: <1397066649-3767-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1397066649-3767-3-git-send-email-alexandre.belloni@free-electrons.com>
- <20140409231549.GD2187@verge.net.au>
- <20140410073702.GF2879@piout.net>
-Message-ID: <20140414020315.GF22411@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 14 Apr 2014 10:14:54 +0800
+Subject: [PATCH 4/6] ARM: dts: vybrid: drop address and size cells from
+ GIC node
+In-Reply-To: <1397228380-7352-4-git-send-email-l.stach@pengutronix.de>
+References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
+ <1397228380-7352-4-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140414021451.GA2344@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 09:37:03AM +0200, Alexandre Belloni wrote:
-> On 10/04/2014 at 08:15:49 +0900, Simon Horman wrote :
-> > On Wed, Apr 09, 2014 at 08:04:09PM +0200, Alexandre Belloni wrote:
-> > > Now that the PWM core is able to set the period and polarity based on
-> > > the lookup table, add those to PWM_LOOKUP to ease their usage.
-> > 
-> > I would prefer if this change was made in a non-atomic manner.
-> > 
-> > 1. Add new infrastructure
-> > 2. Update users individually
-> > 3. Remove old infrastructure
-> > 
+On Fri, Apr 11, 2014 at 04:59:38PM +0200, Lucas Stach wrote:
+> This is likely a copy-and-paste error from the
+> ARM GIC documentation, that has already been fixed.
 > 
-> I agree this would be better but I'm not sure how you can modify a macro
-> without renaming it or changing it everywhere at once. Like said, I'm
-> open to creating a new macro.
+> address-cells should have been set to 0, as with the size
+> cells. As having those properties set to 0 is the
+> same thing as not specifying them, drop them completely.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-I for one would prefer the new macro approach.
+Applied, thanks.
