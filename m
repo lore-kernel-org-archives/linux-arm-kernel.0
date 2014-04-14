@@ -1,89 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:54:03 +0200
-Subject: [PATCH v3 06/11] ARM: mvebu: add function to set the resume boot
- address for Armada 375
+Date: Mon, 14 Apr 2014 15:54:04 +0200
+Subject: [PATCH v3 07/11] ARM: mvebu: add Armada 38x compatible string to pmsu
 In-Reply-To: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483648-26611-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483648-26611-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Since the Armada 38x PMSU registers are slightly different than the
+Armada 370/XP PMSU ones, we introduce a new compatible string
+"armada-380-pmsu" in the PMSU driver. These differences are not
+visible for the current usage of the PMSU, but they might become
+visible in the future.
 
-In order to boot the secondary CPUs on Armada 375, we need to set the
-boot address of these CPUs, through a register part of the System
-Controller (this deviates from the Armada XP design, where the boot
-address was defined using a register part of the PMSU unit).
-
-Therefore, this commit adds a new helper function in the System
-Controller driver to set the secondary CPU boot address.
-
-Moreover, it moves the System Controller initialization as an
-early_initcall(), since arch_initcall() is too late for an SMP-related
-initialization.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/common.h            |  1 +
- arch/arm/mach-mvebu/system-controller.c | 15 ++++++++++++++-
- 2 files changed, 15 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt | 9 ++++++---
+ arch/arm/mach-mvebu/pmsu.c                                   | 1 +
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 2b88eb0..b67fb7a 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -20,6 +20,7 @@
- void mvebu_restart(enum reboot_mode mode, const char *cmd);
- int mvebu_cpu_reset_deassert(int cpu);
- void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
-+void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+index 9761887..26799ef 100644
+--- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
++++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+@@ -1,11 +1,14 @@
+ Power Management Service Unit(PMSU)
+ -----------------------------------
+-Available on Marvell SOCs: Armada 370 and Armada XP
++Available on Marvell SOCs: Armada 370, Armada 38x and Armada XP
  
- void armada_xp_cpu_die(unsigned int cpu);
+ Required properties:
  
-diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-index 614ba68..0c5524a 100644
---- a/arch/arm/mach-mvebu/system-controller.c
-+++ b/arch/arm/mach-mvebu/system-controller.c
-@@ -37,6 +37,8 @@ struct mvebu_system_controller {
+-- compatible: should be "marvell,armada-370-pmsu", whereas
+-  "marvell,armada-370-xp-pmsu" is deprecated and will be removed
++- compatible: should be one of:
++  - "marvell,armada-370-pmsu" for Armada 370 or Armada XP
++  - "marvell,armada-380-pmsu" for Armada 38x
++  - "marvell,armada-370-xp-pmsu" was used for Armada 370/XP but is now
++    deprecated and will be removed
  
- 	u32 rstoutn_mask_reset_out_en;
- 	u32 system_soft_reset;
-+
-+	u32 resume_boot_addr;
+ - reg: Should contain PMSU registers location and length.
+ 
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index a1508de..a8796b8 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -38,6 +38,7 @@ static void __iomem *pmsu_mp_base;
+ static struct of_device_id of_pmsu_table[] = {
+ 	{ .compatible = "marvell,armada-370-pmsu", },
+ 	{ .compatible = "marvell,armada-370-xp-pmsu", },
++	{ .compatible = "marvell,armada-380-pmsu", },
+ 	{ /* end of list */ },
  };
- static struct mvebu_system_controller *mvebu_sc;
  
-@@ -52,6 +54,7 @@ static const struct mvebu_system_controller armada_375_system_controller = {
- 	.system_soft_reset_offset = 0x58,
- 	.rstoutn_mask_reset_out_en = 0x1,
- 	.system_soft_reset = 0x1,
-+	.resume_boot_addr = 0xd4,
- };
- 
- static const struct mvebu_system_controller orion_system_controller = {
-@@ -98,6 +101,16 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd)
- 		;
- }
- 
-+#ifdef CONFIG_SMP
-+void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
-+{
-+	BUG_ON(system_controller_base == NULL);
-+	BUG_ON(mvebu_sc->resume_boot_addr == 0);
-+	writel(virt_to_phys(boot_addr), system_controller_base +
-+	       mvebu_sc->resume_boot_addr);
-+}
-+#endif
-+
- static int __init mvebu_system_controller_init(void)
- {
- 	const struct of_device_id *match;
-@@ -114,4 +127,4 @@ static int __init mvebu_system_controller_init(void)
- 	return 0;
- }
- 
--arch_initcall(mvebu_system_controller_init);
-+early_initcall(mvebu_system_controller_init);
 -- 
 1.8.3.2
