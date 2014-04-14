@@ -1,47 +1,35 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 14 Apr 2014 13:46:06 -0400
-Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
-In-Reply-To: <20140414181920.1e309019@skate>
-References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <16639486.i0jTGsaDYr@amdc1032> <20140414180142.0dd63a1f@skate>
- <10589751.qhi630WAFs@amdc1032> <20140414181920.1e309019@skate>
-Message-ID: <20140414174606.GB10416@htj.dyndns.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 14 Apr 2014 10:48:19 -0700
+Subject: [PATCH] ARM: debug: qcom: make UART address selection
+ configuration option
+In-Reply-To: <1397483254-3612-1-git-send-email-iivanov@mm-sol.com>
+References: <53458708.40702@codeaurora.org>
+ <1397483254-3612-1-git-send-email-iivanov@mm-sol.com>
+Message-ID: <534C1F63.1040705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 06:19:20PM +0200, Thomas Petazzoni wrote:
-> Dear Bartlomiej Zolnierkiewicz,
-> 
-> On Mon, 14 Apr 2014 18:13:07 +0200, Bartlomiej Zolnierkiewicz wrote:
-> > On Monday, April 14, 2014 06:01:42 PM Thomas Petazzoni wrote:
-> > > Dear Bartlomiej Zolnierkiewicz,
-> > > 
-> > > On Mon, 14 Apr 2014 17:53:37 +0200, Bartlomiej Zolnierkiewicz wrote:
-> > > 
-> > > > >  * Fixed the module alias name. Suggested by Bartlomiej
-> > > > >    Zolnierkiewicz.
-> > > > 
-> > > > Well, you could have also added a comment explaining the lack of
-> > > > the Power Management support..
-> > > 
-> > > True, sorry for this. Should I resend a new version of the patch series
-> > > with an indication about this in the commit log? Or is this OK as it is?
-> > 
-> > Please include the comment in the next revision if this is not too much
-> > trouble (I assume that you would like to do another re-spin just to add
-> > Acked-by/Reviewed-by tags anyway).
-> 
-> Well, I wasn't planning on re-spinning just to add Acked-by/Reviewed-by
-> tags, as those are generally added by the subsystem maintainers when
-> applying the patches. Though if Tejun says otherwise, I can definitely
-> re-spin without any problem.
-> 
-> Tejun, just let me know what you prefer.
+On 04/14/14 06:47, Ivan T. Ivanov wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+>
+> Separate Qualcomm low-level debugging UART to two options.
+>
+> DEBUG_MSM_UART is used in earlier non-multi platform arches,
+> like MSM7X00A, QSD8X50 and MSM7X30.
+>
+> DEBUG_QCOM_UARTDM is used in multi-plafrom arches and have
+> embedded data mover.
+>
+> Make DEBUG_UART_PHYS and DEBUG_UART_BASE user adjustable by
+> Kconfig menu.
+>
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 
-I can collect the -by's but better patch description is always nice.
-Maybe just update the patch description and post that one as reply to
-the patch posted in this thread?  Also, how do you want the patches to
-be routed?  Can all go through libata?
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Looks good. Thanks. I'll give it a test later today. We may still need
+to send the small fix for 3.15 if this is too large for rc2.
 
 -- 
-tejun
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
