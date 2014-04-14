@@ -1,49 +1,22 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 14 Apr 2014 14:12:45 -0500
-Subject: [PATCH 1/2] ARM: dts: DRA7: Use dra7-l3-noc instead of omap4-l3-noc
-In-Reply-To: <1397502766-13994-1-git-send-email-nm@ti.com>
-References: <1397502766-13994-1-git-send-email-nm@ti.com>
-Message-ID: <1397502766-13994-2-git-send-email-nm@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Apr 2014 20:35:49 +0100
+Subject: [PATCH] arm: allow all architectures to change max zone order
+In-Reply-To: <1397487962.4548.30.camel@weser.hi.pengutronix.de>
+References: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
+ <1397487962.4548.30.camel@weser.hi.pengutronix.de>
+Message-ID: <20140414193549.GJ24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <ranayak@ti.com>
+On Mon, Apr 14, 2014 at 05:06:02PM +0200, Lucas Stach wrote:
+> Russell, can you please take a look at this? Nobody else seems to care
+> about this and we have to carry it around as without it imx-drm is
+> broken for FullHD displays with a 32bpp framebuffer.
 
-We have currently marked the DRA7 L3 as being compatible with
-omap4-l3-noc This is not true considering the differences in data
-involved.
+I intentionally decided to ignore it because of the argumentative
+description in it that implies that I'm stupid for not making this
+available everywhere.  So, it can wait a bit longer.
 
-Now that we have proper support for ti,dra7-l3-noc, add the clock
-modules clk1 and clk3 (clk2 submodule will be handled by the driver)
-and switch compatibility flag to use the proper data.
-
-Signed-off-by: Rajendra Nayak <ranayak@ti.com>
-[nm at ti.com: map up full address range]
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 1c0f8e1..c7222ca 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -99,13 +99,13 @@
- 	 * hierarchy.
- 	 */
- 	ocp {
--		compatible = "ti,omap4-l3-noc", "simple-bus";
-+		compatible = "ti,dra7-l3-noc", "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
- 		ti,hwmods = "l3_main_1", "l3_main_2";
--		reg = <0x44000000 0x2000>,
--		      <0x44800000 0x3000>;
-+		reg = <0x44000000 0x1000000>,
-+		      <0x45000000 0x1000>;
- 		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
