@@ -1,102 +1,59 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Apr 2014 15:35:31 +0200
-Subject: [PATCH v3 01/18] ASoC: fsl-ssi: Fix register values when disabling
-In-Reply-To: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
-References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1397482548-28463-2-git-send-email-mpa@pengutronix.de>
+Date: Mon, 14 Apr 2014 15:35:30 +0200
+Subject: [PATCH v3 00/18] ASoC: fsl-ssi: Driver cleanup
+Message-ID: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bits we have to clear when disabling are different when the other
-stream is still active.
+Hi,
 
-This patch fixes the calculation of new register values after disabling
-one stream. It also adds a more detailed description of the new register
-value calculation.
+This series is a cleanup of the fsl-ssi driver.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 40 +++++++++++++++++++++++++++++++++++-----
- 1 file changed, 35 insertions(+), 5 deletions(-)
+There is no DT binding for regmap yet, as this should be solved in the regmap
+framework first. The current configuration should at least work on the same
+SoCs it was previously used. As soon as we have a common DT binding to set the
+endianess we replace it in this driver.
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index fdb123d..fadb264 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -490,6 +490,26 @@ static void fsl_ssi_rxtx_config(struct fsl_ssi_private *ssi_private,
- }
- 
- /*
-+ * Calculate the bits that have to be disabled for the current stream that is
-+ * getting disabled. This keeps the bits enabled that are necessary for the
-+ * second stream to work if 'stream_active' is true.
-+ *
-+ * Detailed calculation:
-+ * These are the values that need to be active after disabling. For non-active
-+ * second stream, this is 0:
-+ *	vals_stream * !!stream_active
-+ *
-+ * The following computes the overall differences between the setup for the
-+ * to-disable stream and the active stream, a simple XOR:
-+ *	vals_disable ^ (vals_stream * !!(stream_active))
-+ *
-+ * The full expression adds a mask on all values we care about
-+ */
-+#define fsl_ssi_disable_val(vals_disable, vals_stream, stream_active) \
-+	((vals_disable) & \
-+	 ((vals_disable) ^ ((vals_stream) * (u32)!!(stream_active))))
-+
-+/*
-  * Enable/Disable a ssi configuration. You have to pass either
-  * ssi_private->rxtx_reg_val.rx or tx as vals parameter.
-  */
-@@ -501,6 +521,12 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
- 	u32 scr_val = read_ssi(&ssi->scr);
- 	int nr_active_streams = !!(scr_val & CCSR_SSI_SCR_TE) +
- 				!!(scr_val & CCSR_SSI_SCR_RE);
-+	int keep_active;
-+
-+	if (nr_active_streams - 1 > 0)
-+		keep_active = 1;
-+	else
-+		keep_active = 0;
- 
- 	/* Find the other direction values rx or tx which we do not want to
- 	 * modify */
-@@ -511,7 +537,8 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
- 
- 	/* If vals should be disabled, start with disabling the unit */
- 	if (!enable) {
--		u32 scr = vals->scr & (vals->scr ^ avals->scr);
-+		u32 scr = fsl_ssi_disable_val(vals->scr, avals->scr,
-+				keep_active);
- 		write_ssi_mask(&ssi->scr, scr, 0);
- 	}
- 
-@@ -522,7 +549,7 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
- 	 */
- 	if (ssi_private->offline_config) {
- 		if ((enable && !nr_active_streams) ||
--				(!enable && nr_active_streams == 1))
-+				(!enable && !keep_active))
- 			fsl_ssi_rxtx_config(ssi_private, enable);
- 
- 		goto config_done;
-@@ -551,9 +578,12 @@ static void fsl_ssi_config(struct fsl_ssi_private *ssi_private, bool enable,
- 		 */
- 
- 		/* These assignments are simply vals without bits set in avals*/
--		sier = vals->sier & (vals->sier ^ avals->sier);
--		srcr = vals->srcr & (vals->srcr ^ avals->srcr);
--		stcr = vals->stcr & (vals->stcr ^ avals->stcr);
-+		sier = fsl_ssi_disable_val(vals->sier, avals->sier,
-+				keep_active);
-+		srcr = fsl_ssi_disable_val(vals->srcr, avals->srcr,
-+				keep_active);
-+		stcr = fsl_ssi_disable_val(vals->stcr, avals->stcr,
-+				keep_active);
- 
- 		write_ssi_mask(&ssi->srcr, srcr, 0);
- 		write_ssi_mask(&ssi->stcr, stcr, 0);
+Best regards,
+
+Markus
+
+
+Changes in v3:
+ - Some new patches to improve/fix i2s master mode by Sascha
+ - baudclock is enabled/disabled in startup/shutdown now
+ - bitclock setup moved to a seperate function (not set_dai_sysclk)
+ - Regmap config changed to NATIVE now.
+
+Markus Pargmann (11):
+  ASoC: fsl-ssi: Fix register values when disabling
+  ASoC: fsl-ssi: Move debugging to seperate file
+  ASoC: fsl-ssi: Use dev_name for DAI driver struct
+  ASoC: fsl-ssi: Move imx-specific probe to seperate function
+  ASoC: fsl-ssi: Remove useless DMA code
+  ASoC: fsl-ssi: Cleanup probe function
+  ASoC: fsl-ssi: Remove unnecessary variables from ssi_private
+  ASoC: fsl-ssi: make fsl,mode property optional
+  ASoC: fsl-ssi: Transmit enable synchronization
+  ASoC: fsl-ssi: reorder and document fsl_ssi_private
+  ASoC: fsl-ssi: Use regmap
+
+Sascha Hauer (7):
+  ASoC: fsl-ssi: introduce SoC specific data
+  ASoC: fsl-ssi: Only enable baudclk when used
+  ASoC: fsl-ssi: Move fsl_ssi_set_dai_sysclk above fsl_ssi_hw_params
+  ASoC: fsl-ssi: set bitclock in master mode from hw_params
+  ASoC: fsl-ssi: remove unnecessary spinlock
+  ASoC: fsl-ssi: Allow first stream to set the bitclock
+  ASoC: fsl-ssi: Set framerate divider correctly for i2s master mode
+
+ sound/soc/fsl/Kconfig       |    1 +
+ sound/soc/fsl/Makefile      |    3 +-
+ sound/soc/fsl/fsl_ssi.c     | 1249 +++++++++++++++++++------------------------
+ sound/soc/fsl/fsl_ssi.h     |  112 +++-
+ sound/soc/fsl/fsl_ssi_dbg.c |  163 ++++++
+ 5 files changed, 807 insertions(+), 721 deletions(-)
+ create mode 100644 sound/soc/fsl/fsl_ssi_dbg.c
+
 -- 
 1.9.1
