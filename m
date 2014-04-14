@@ -1,67 +1,34 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Mon, 14 Apr 2014 13:35:12 +0530
-Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
- on/off
-In-Reply-To: <20140412033718.GA18777@saruman.home>
-References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
- <20140412033718.GA18777@saruman.home>
-Message-ID: <CAFp+6iF9Xk=uCUi6q_AEbGKL6LYxoa6kECUPXzUS4E3B9+CWYg@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 14 Apr 2014 16:39:43 +0800
+Subject: Device tree support for Atmel AC97 controller on AT91SAM9263
+In-Reply-To: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+Message-ID: <534B9ECF.806@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Hi Alexander,
 
+On 04/12/2014 05:08 PM, Alexander Stein wrote:
+> This set of patches add device tree support for the AC97 controller found
+> on AT91SAM9263.
+> The first two patches are minor cleanup, while the last ones add the actual
+> support.
 
-On Sat, Apr 12, 2014 at 9:07 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Wed, Apr 09, 2014 at 05:24:45PM +0530, Vivek Gautam wrote:
->> Adding support to enable/disable VBUS hooked to a gpio
->> to enable vbus supply on the port.
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>
->> Based on 'phy-exynos5-usbdrd' patches:
->> [PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
->> http://www.spinics.net/lists/linux-usb/msg105507.html
->>
->>  drivers/phy/phy-exynos5-usbdrd.c |   18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
->> index ff54a7c..5ca7485 100644
->> --- a/drivers/phy/phy-exynos5-usbdrd.c
->> +++ b/drivers/phy/phy-exynos5-usbdrd.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->> +#include <linux/of_gpio.h>
->>  #include <linux/phy/phy.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/mutex.h>
->> @@ -176,6 +177,7 @@ struct exynos5_usbdrd_phy {
->>       struct clk *ref_clk;
->>       unsigned long ref_rate;
->>       unsigned int refclk_reg;
->> +     int gpio;
->>  };
->>
->>  #define to_usbdrd_phy(inst) \
->> @@ -460,6 +462,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
->>       if (!IS_ERR(phy_drd->usb30_sclk))
->>               clk_prepare_enable(phy_drd->usb30_sclk);
->>
->> +     /* Toggle VBUS gpio - on */
->> +     gpio_set_value(phy_drd->gpio, 1);
->
-> It seems like you'd be better off using a regulator_enable() call for
-> this.
+I just test the whole patch series, and find issues to work with device 
+tree kernel.
+When we use dt kernel, no where assign the device id (so take it as 
+"-1"), so when register devices, it will be /dev/snd/pcmC0D-1p and 
+/dev/snd/pcmC0D-1c. So, the sound won't work.
 
-Sure, i will use a regulator for this vbus settings.
+The root cause is that when call "snd_pcm_new", it will pass 
+"chip->pdev->id" as parameter.
 
+So, I am thinking whether this should be fix in <sound/atmel/ac97c.c> or 
+in <sound/core/pcm.c>
 
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+> Regards,
+> Alexander
+
+Best Regards,
+Bo Shen
