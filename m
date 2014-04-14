@@ -1,53 +1,30 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Apr 2014 10:02:26 +0800
-Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent device
- is disabled
-Message-ID: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Apr 2014 11:03:15 +0900
+Subject: [PATCH 2/2] pwm: use PWM_LOOKUP to set the period and polarity
+In-Reply-To: <20140410073702.GF2879@piout.net>
+References: <1397066649-3767-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1397066649-3767-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140409231549.GD2187@verge.net.au>
+ <20140410073702.GF2879@piout.net>
+Message-ID: <20140414020315.GF22411@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a board setup which disables LDB device node completely by changing
-status to 'disabled', and only enables HDMI device, we're running into
-the problem that imx-drm master never succeeds in binding, and hence
-HDMI does not come up either.
+On Thu, Apr 10, 2014 at 09:37:03AM +0200, Alexandre Belloni wrote:
+> On 10/04/2014 at 08:15:49 +0900, Simon Horman wrote :
+> > On Wed, Apr 09, 2014 at 08:04:09PM +0200, Alexandre Belloni wrote:
+> > > Now that the PWM core is able to set the period and polarity based on
+> > > the lookup table, add those to PWM_LOOKUP to ease their usage.
+> > 
+> > I would prefer if this change was made in a non-atomic manner.
+> > 
+> > 1. Add new infrastructure
+> > 2. Update users individually
+> > 3. Remove old infrastructure
+> > 
+> 
+> I agree this would be better but I'm not sure how you can modify a macro
+> without renaming it or changing it everywhere at once. Like said, I'm
+> open to creating a new macro.
 
-&ldb {
-	status = "disabled";
-
-	lvds-channel at 1 {
-		...
-		status = "okay";
-	};
-};
-
-The imx-drm-core should really skip the LVDS channels no matter what
-lvds-channel's status is, if LDB device is disabled.  Let's consider
-such setup a misconfiguration, give a warning in there and not add the
-component.
-
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Changes since v1:
-* Put a warning on such misconfiguration
-
- drivers/staging/imx-drm/imx-drm-core.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 4144a75..0da8a8a 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -675,6 +675,11 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
- 			if (!remote || !of_device_is_available(remote)) {
- 				of_node_put(remote);
- 				continue;
-+			} else if (!of_device_is_available(remote->parent)) {
-+				dev_warn(&pdev->dev, "parent device of %s is not available\n",
-+					 remote->full_name);
-+				of_node_put(remote);
-+				continue;
- 			}
- 
- 			ret = imx_drm_add_component(&pdev->dev, remote);
--- 
-1.8.3.2
+I for one would prefer the new macro approach.
