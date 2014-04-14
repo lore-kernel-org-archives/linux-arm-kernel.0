@@ -1,79 +1,91 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 14 Apr 2014 20:41:21 +0300
-Subject: [PATCH v2 3/5] ARM: keystone: remove redundant reset stuff
+Date: Mon, 14 Apr 2014 20:41:20 +0300
+Subject: [PATCH v2 2/5] Power: reset: add bindings for keystone reset driver
 In-Reply-To: <1397497283-16391-1-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1397497283-16391-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1397497283-16391-4-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1397497283-16391-3-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove reset stuff in flavour of using keystone reset driver:
-driver/power/reset/keystone-reset.c
+This node is intended to allow SoC reset in case of software reset
+or appropriate watchdogs.
+
+The Keystone SoCs can contain up to 4 watchdog timers to reset
+SoC. Each watchdog timer event input is connected to the Reset Mux
+block. The Reset Mux block can be configured to cause reset or not.
+
+Additionally soft or hard reset can be configured.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 ---
- arch/arm/mach-keystone/keystone.c | 35 -----------------------------------
- 1 file changed, 35 deletions(-)
+ .../bindings/power/reset/keystone-reset.txt        | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
 
-diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index e0b9e1b..c96e2a4 100644
---- a/arch/arm/mach-keystone/keystone.c
-+++ b/arch/arm/mach-keystone/keystone.c
-@@ -23,24 +23,8 @@
- 
- #include "keystone.h"
- 
--#define PLL_RESET_WRITE_KEY_MASK		0xffff0000
--#define PLL_RESET_WRITE_KEY			0x5a69
--#define PLL_RESET				BIT(16)
--
--static void __iomem *keystone_rstctrl;
--
- static void __init keystone_init(void)
- {
--	struct device_node *node;
--
--	node = of_find_compatible_node(NULL, NULL, "ti,keystone-reset");
--	if (WARN_ON(!node))
--		pr_warn("ti,keystone-reset node undefined\n");
--
--	keystone_rstctrl = of_iomap(node, 0);
--	if (WARN_ON(!keystone_rstctrl))
--		pr_warn("ti,keystone-reset iomap error\n");
--
- 	keystone_pm_runtime_init();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
-@@ -50,24 +34,6 @@ static const char *keystone_match[] __initconst = {
- 	NULL,
- };
- 
--void keystone_restart(enum reboot_mode mode, const char *cmd)
--{
--	u32 val;
--
--	BUG_ON(!keystone_rstctrl);
--
--	/* Enable write access to RSTCTRL */
--	val = readl(keystone_rstctrl);
--	val &= PLL_RESET_WRITE_KEY_MASK;
--	val |= PLL_RESET_WRITE_KEY;
--	writel(val, keystone_rstctrl);
--
--	/* Reset the SOC */
--	val = readl(keystone_rstctrl);
--	val &= ~PLL_RESET;
--	writel(val, keystone_rstctrl);
--}
--
- DT_MACHINE_START(KEYSTONE, "Keystone")
- #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
- 	.dma_zone_size	= SZ_2G,
-@@ -75,5 +41,4 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
- 	.smp		= smp_ops(keystone_smp_ops),
- 	.init_machine	= keystone_init,
- 	.dt_compat	= keystone_match,
--	.restart	= keystone_restart,
- MACHINE_END
+diff --git a/Documentation/devicetree/bindings/power/reset/keystone-reset.txt b/Documentation/devicetree/bindings/power/reset/keystone-reset.txt
+new file mode 100644
+index 0000000..5ad5883
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/reset/keystone-reset.txt
+@@ -0,0 +1,59 @@
++* Device tree bindings for Texas Instruments keystone reset
++
++This node is intended to allow SoC reset in case of software reset
++of selected watchdogs.
++
++The Keystone SoCs can contain up to 4 watchdog timers to reset
++SoC. Each watchdog timer event input is connected to the Reset Mux
++block. The Reset Mux block can be configured to cause reset or not.
++
++Additionally soft or hard reset can be configured.
++
++Required properties:
++
++- compatible:		ti,keystone-reset
++
++- reg:			Contains offset/length value for mux registers.
++
++			reg = <0x23100e4 0x10>,
++			      <0x2620328 0x10>;
++
++-reg-names:		Contains two ranges "pllregs" and "muxregs".
++			"pllregs" - PLL reset control regs: RSTYPE, RSCTRL,
++			RSCFG, RSISO.
++			"muxregs" - mux block registers for all watchdogs.
++
++Optional properties:
++
++- ti,soft-reset:	Boolean option indicating soft reset.
++			By default hard reset is used.
++
++- ti,wdt_list:		WDT list that can cause SoC reset.
++			The list in format: <0>, <2>;
++			Begins from 0 to 3, as keystone can contain up
++			to 4 SoC reset watchdogs.
++
++Example 1:
++Setup keystone reset so that in case software reset or
++WDT1 is triggered it issues hard reset for SoC.
++
++rstctrl: reset-controller {
++	compatible = "ti,keystone-reset";
++	reg = <0x23100e4 0x10>,
++	      <0x2620328 0x10>;
++	reg-names = "pllregs", "muxregs";
++	ti,wdt_list = <0>;
++};
++
++Example 2:
++Setup keystone reset so that in case of software reset or
++WDT1 or WDT3 is triggered it issues soft reset for SoC.
++
++rstctrl: reset-controller {
++	compatible = "ti,keystone-reset";
++	reg = <0x23100e4 0x10>,
++	      <0x2620328 0x10>;
++	reg-names = "pllregs", "muxregs";
++	ti,wdt_list = <0>, <2>;
++	ti,soft-reset;
++};
 -- 
 1.8.3.2
