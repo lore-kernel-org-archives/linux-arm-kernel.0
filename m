@@ -1,55 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Apr 2014 11:53:14 +0100
-Subject: [PATCH v9 1/2] ARM: avoid tracers in soft_restart
-In-Reply-To: <1395178858-27343-2-git-send-email-sebastian.capella@linaro.org>
-References: <1395178858-27343-1-git-send-email-sebastian.capella@linaro.org>
- <1395178858-27343-2-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20140414105314.GB3530@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Apr 2014 13:03:42 +0200
+Subject: [PATCH v8 1/3] ARM: EXYNOS: Add support for EXYNOS5410 SoC
+In-Reply-To: <1397459860-21869-2-git-send-email-t.dakhran@samsung.com>
+References: <1397459860-21869-1-git-send-email-t.dakhran@samsung.com>
+ <1397459860-21869-2-git-send-email-t.dakhran@samsung.com>
+Message-ID: <5617478.sn2TYu7iO3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On Tue, Mar 18, 2014 at 09:40:57PM +0000, Sebastian Capella wrote:
-> Use of tracers in local_irq_disable is causes abort loops when called
-> with irqs disabled using a temporary stack.  Replace local_irq_disable
-> with raw_local_irq_disable instead to avoid tracers.
-
-Do you have any more information about these aborts? At the time we call
-local_irq_disable, the stack is still intact, so if the issue is simply
-related to having any tracers active at the call_with_stack invocation, we'd
-be better off disabling tracing here altogether.
-
-Will
-
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Holt <holt@sgi.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
-> Cc: Steven Capper <steve.capper@linaro.org>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Tejun Heo <tj@kernel.org>
-> ---
->  arch/arm/kernel/process.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 92f7b15..f58b723 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -100,7 +100,7 @@ void soft_restart(unsigned long addr)
->  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+On Monday 14 April 2014 11:17:38 Tarek Dakhran wrote:
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -159,6 +159,15 @@ static struct map_desc exynos5250_iodesc[] __initdata = {
+>         },
+>  };
 >  
->  	/* Disable interrupts first */
-> -	local_irq_disable();
-> +	raw_local_irq_disable();
->  	local_fiq_disable();
->  
->  	/* Disable the L2 if we're the last man standing. */
-> -- 
-> 1.7.9.5
-> 
-> 
+> +static struct map_desc exynos5410_iodesc[] __initdata = {
+> +       {
+> +               .virtual        = (unsigned long)S5P_VA_SYSRAM_NS,
+> +               .pfn            = __phys_to_pfn(EXYNOS5410_PA_SYSRAM_NS),
+> +               .length         = SZ_4K,
+> +               .type           = MT_DEVICE,
+> +       },
+> +};
+> +
+>  static struct map_desc exynos5_iodesc[] __initdata = {
+
+NAK
+
+Why does this keep coming up?
+
+	Arnd
