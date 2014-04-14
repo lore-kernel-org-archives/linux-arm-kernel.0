@@ -1,36 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
+From: andrew@lunn.ch (Andrew Lunn)
 Date: Mon, 14 Apr 2014 20:44:32 +0200
-Subject: [PATCH v2 2/5] Power: reset: add bindings for keystone reset
- driver
-In-Reply-To: <1397497283-16391-3-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1397497283-16391-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1397497283-16391-3-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <6937937.4J6iI7VpBO@wuerfel>
+Subject: [PATCH 23/29] ARM: orion5x: use DT to describe NOR on edmini_v2
+In-Reply-To: <20140413174513.2e39a55c@skate>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-24-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140413153150.GD10033@lunn.ch> <20140413174513.2e39a55c@skate>
+Message-ID: <20140414184432.GI22546@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 April 2014 20:41:20 Ivan Khoronzhuk wrote:
-> +Optional properties:
-> +
-> +- ti,soft-reset:       Boolean option indicating soft reset.
-> +                       By default hard reset is used.
-> +
-> +- ti,wdt_list:         WDT list that can cause SoC reset.
-> +                       The list in format: <0>, <2>;
-> +                       Begins from 0 to 3, as keystone can contain up
-> +                       to 4 SoC reset watchdogs.
+> > Hi Thomas
+> > 
+> > Did you check if this is still true? If it is fixed, maybe now would
+> > be a good time to swap to three partitions?
 > 
+> I don't know, and since the NOR contains the bootloader, and I'm not
+> sure those Orion devices support UART booting
 
-This looks like your binding just describes a subset of the
-watchdog timer registers. If so, don't do a standalone reset
-driver, but instead do a watchdog driver that can also be
-used for reset, and have a binding that properly describes
-the watchdog hardware.
+Hi Thomas
 
-It is bad to have overlapping register ranges between logical
-devices, and it's also generally wrong to describe devices that
-are not actually there: The hardware contains a watchdog, not
-a system-reset device, so you should not make one up because
-it seems easier given the Linux driver model.
+I had a quick look at the datasheet. I could not find any mention of
+booting from Serial. So i agree, without having a tested JTAG setup,
+play safe and leave the partitions alone.
 
-	Arnd
+	Andrew
