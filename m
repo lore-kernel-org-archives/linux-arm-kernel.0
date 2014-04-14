@@ -1,50 +1,53 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 13 Apr 2014 18:55:33 -0700
-Subject: [PATCH -next 3.16 01/19] arm: Convert use of typedef ctl_table to
- struct ctl_table
-In-Reply-To: <cover.1397438826.git.joe@perches.com>
-References: <cover.1397438826.git.joe@perches.com>
-Message-ID: <65faf95dca0024f9544f84efecfee3b538fc57f8.1397438826.git.joe@perches.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 14 Apr 2014 10:02:26 +0800
+Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent device
+ is disabled
+Message-ID: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This typedef is unnecessary and should just be removed.
+In a board setup which disables LDB device node completely by changing
+status to 'disabled', and only enables HDMI device, we're running into
+the problem that imx-drm master never succeeds in binding, and hence
+HDMI does not come up either.
 
-Signed-off-by: Joe Perches <joe@perches.com>
+&ldb {
+	status = "disabled";
+
+	lvds-channel at 1 {
+		...
+		status = "okay";
+	};
+};
+
+The imx-drm-core should really skip the LVDS channels no matter what
+lvds-channel's status is, if LDB device is disabled.  Let's consider
+such setup a misconfiguration, give a warning in there and not add the
+component.
+
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/kernel/isa.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Changes since v1:
+* Put a warning on such misconfiguration
 
-diff --git a/arch/arm/kernel/isa.c b/arch/arm/kernel/isa.c
-index 3464859..9d1cf71 100644
---- a/arch/arm/kernel/isa.c
-+++ b/arch/arm/kernel/isa.c
-@@ -20,7 +20,7 @@
+ drivers/staging/imx-drm/imx-drm-core.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 4144a75..0da8a8a 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -675,6 +675,11 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
+ 			if (!remote || !of_device_is_available(remote)) {
+ 				of_node_put(remote);
+ 				continue;
++			} else if (!of_device_is_available(remote->parent)) {
++				dev_warn(&pdev->dev, "parent device of %s is not available\n",
++					 remote->full_name);
++				of_node_put(remote);
++				continue;
+ 			}
  
- static unsigned int isa_membase, isa_portbase, isa_portshift;
- 
--static ctl_table ctl_isa_vars[4] = {
-+static struct ctl_table ctl_isa_vars[4] = {
- 	{
- 		.procname	= "membase",
- 		.data		= &isa_membase, 
-@@ -44,7 +44,7 @@ static ctl_table ctl_isa_vars[4] = {
- 
- static struct ctl_table_header *isa_sysctl_header;
- 
--static ctl_table ctl_isa[2] = {
-+static struct ctl_table ctl_isa[2] = {
- 	{
- 		.procname	= "isa",
- 		.mode		= 0555,
-@@ -52,7 +52,7 @@ static ctl_table ctl_isa[2] = {
- 	}, {}
- };
- 
--static ctl_table ctl_bus[2] = {
-+static struct ctl_table ctl_bus[2] = {
- 	{
- 		.procname	= "bus",
- 		.mode		= 0555,
+ 			ret = imx_drm_add_component(&pdev->dev, remote);
 -- 
-1.8.1.2.459.gbcd45b4.dirty
+1.8.3.2
