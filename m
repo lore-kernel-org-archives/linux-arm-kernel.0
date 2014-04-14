@@ -1,103 +1,154 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 14 Apr 2014 11:22:24 +0200
-Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
- generic_pm_domain_data
-In-Reply-To: <20140414012013.GB22411@verge.net.au>
-References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
- <1397230004-22306-2-git-send-email-ulf.hansson@linaro.org>
- <20140414012013.GB22411@verge.net.au>
-Message-ID: <CAPDyKFp76Z93tNhd5vBpTUVzF0Km9oMAmBbg0RCT+91V5J-jzw@mail.gmail.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Mon, 14 Apr 2014 18:24:55 +0900
+Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
+In-Reply-To: <20140414091424.GA14204@linaro.org>
+References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
+ <20140414091424.GA14204@linaro.org>
+Message-ID: <000c01cf57c3$65afc110$310f4330$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
->> There are no active users of these callbacks, thus there are no benefit
->> of trying to invoke them.
->>
->> Cc: Simon Horman <horms@verge.net.au>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>
->> I am seeking ack from the SOC maintainers since this needs to go with the other
->> patches in this patchset on the PM core.
->
-> In order to reduce the possibility of conflicts I would prefer
-> to take this patch through my tree.
+On Monday, April 14, 2014 6:14 PM, Steve Capper wrote:
+> On Mon, Apr 13, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
+> > This patch implements 4 levels of translation tables since 3 levels of
+> > page tables with 4KB pages cannot support 40-bit physical address
+> > space described in [1] due to the following issue.
+> >
+> > It is a restriction that kernel logical memory map with 4KB + 3 levels
+> > (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
+> > 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
+> > mapping for this region in map_mem function since __phys_to_virt for
+> > this region reaches to address overflow.
+> >
+> > If SoC design follows the document, [1], over 32GB RAM would be placed
+> > from 544GB. Even 64GB system is supposed to use the region from 544GB
+> > to 576GB for only 32GB RAM. Naturally, it would reach to enable 4
+> > levels of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
+> >
+> > However, it is recommended 4 levels of page table should be only
+> > enabled if memory map is too sparse or there is about 512GB RAM.
+> 
+> Hi,
+> So I thought I'd apply this series and have a play, this patch doesn't apply cleanly for me, please
+> see below why...
 
-Okay, go ahead!
+This pathset is based on 3.15-rc1.
 
-Kind regards
-Ulf Hansson
+> [ ... ]
+> 
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S index
+> > 0fd5650..0b0b16a 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -46,8 +46,8 @@
+> >  #error KERNEL_RAM_VADDR must start at 0xXXX80000  #endif
+> >
+> > -#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
+> > -#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
+> > +#define SWAPPER_DIR_SIZE	(4 * PAGE_SIZE)
+> > +#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
+> >
+> >  	.globl	swapper_pg_dir
+> >  	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - SWAPPER_DIR_SIZE
+> > @@ -384,6 +384,20 @@ ENDPROC(__calc_phys_offset)
+> >  	.endm
+> >
+> >  /*
+> > + * Macro to populate the PUD for the corresponding block entry in the
+> > +next
+> > + * level (tbl) for the given virtual address.
+> > + *
+> > + * Preserves:	pud, tbl, virt
+> > + * Corrupts:	tmp1, tmp2
+> > + */
+> > +	.macro create_pud_entry, pud, tbl, virt, tmp1, tmp2
+> > +	lsr	\tmp1, \virt, #PUD_SHIFT
+> > +	and	\tmp1, \tmp1, #PTRS_PER_PUD - 1	// PUD index
+> > +	orr	\tmp2, \tbl, #3			// PUD entry table type
+> > +	str	\tmp2, [\pud, \tmp1, lsl #3]
+> > +	.endm
+> > +
+> > +/*
+> >   * Macro to populate block entries in the page table for the start..end
+> >   * virtual range (inclusive).
+> >   *
+> > @@ -445,10 +459,18 @@ __create_page_tables:
+> >  	ldr	x3, =KERNEL_START
+> >  	add	x3, x3, x28			// __pa(KERNEL_START)
+> 
+> I don't think we have C++ style comments in the kernel. Also, I can't see any references to
+> =KERNEL_START in arch/arm64/kernel/head.S (from 3.14 down).
 
->
->> ---
->>  arch/arm/mach-shmobile/pm-rmobile.c |   38 +++--------------------------------
->>  1 file changed, 3 insertions(+), 35 deletions(-)
->>
->> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
->> index 1fc05d9..f710235 100644
->> --- a/arch/arm/mach-shmobile/pm-rmobile.c
->> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
->> @@ -99,39 +99,7 @@ static int rmobile_pd_power_up(struct generic_pm_domain *genpd)
->>
->>  static bool rmobile_pd_active_wakeup(struct device *dev)
->>  {
->> -     bool (*active_wakeup)(struct device *dev);
->> -
->> -     active_wakeup = dev_gpd_data(dev)->ops.active_wakeup;
->> -     return active_wakeup ? active_wakeup(dev) : true;
->> -}
->> -
->> -static int rmobile_pd_stop_dev(struct device *dev)
->> -{
->> -     int (*stop)(struct device *dev);
->> -
->> -     stop = dev_gpd_data(dev)->ops.stop;
->> -     if (stop) {
->> -             int ret = stop(dev);
->> -             if (ret)
->> -                     return ret;
->> -     }
->> -     return pm_clk_suspend(dev);
->> -}
->> -
->> -static int rmobile_pd_start_dev(struct device *dev)
->> -{
->> -     int (*start)(struct device *dev);
->> -     int ret;
->> -
->> -     ret = pm_clk_resume(dev);
->> -     if (ret)
->> -             return ret;
->> -
->> -     start = dev_gpd_data(dev)->ops.start;
->> -     if (start)
->> -             ret = start(dev);
->> -
->> -     return ret;
->> +     return true;
->>  }
->>
->>  static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
->> @@ -140,8 +108,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
->>       struct dev_power_governor *gov = rmobile_pd->gov;
->>
->>       pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
->> -     genpd->dev_ops.stop             = rmobile_pd_stop_dev;
->> -     genpd->dev_ops.start            = rmobile_pd_start_dev;
->> +     genpd->dev_ops.stop             = pm_clk_suspend;
->> +     genpd->dev_ops.start            = pm_clk_resume;
->>       genpd->dev_ops.active_wakeup    = rmobile_pd_active_wakeup;
->>       genpd->dev_irq_safe             = true;
->>       genpd->power_off                = rmobile_pd_power_down;
->> --
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+C++ style comments are prevalent in arch/arm64/kernel/head.S. I've followed the
+code style written previously.
+
+You can see this change in the commit, ea8c2e1124457f266f82effc3e6558552527943a).
+It's title is "arm64: Extend the idmap to the whole kernel image".
+
+> >  	create_pgd_entry x25, x0, x3, x5, x6
+> > +#ifdef CONFIG_ARM64_4_LEVELS
+> > +	add	x1, x0, #PAGE_SIZE
+> > +	create_pud_entry x0, x1, x3, x5, x6
+> > +#endif
+> >  	ldr	x6, =KERNEL_END
+> >  	mov	x5, x3				// __pa(KERNEL_START)
+> >  	add	x6, x6, x28			// __pa(KERNEL_END)
+> > +#ifndef CONFIG_ARM64_4_LEVELS
+> >  	create_block_map x0, x7, x3, x5, x6
+> > +#else
+> > +	create_block_map x1, x7, x3, x5, x6
+> > +#endif
+> >
+> >  	/*
+> >  	 * Map the kernel image (starting with PHYS_OFFSET).
+> > @@ -456,9 +478,17 @@ __create_page_tables:
+> >  	add	x0, x26, #PAGE_SIZE		// section table address
+> >  	mov	x5, #PAGE_OFFSET
+> >  	create_pgd_entry x26, x0, x5, x3, x6
+> > +#ifdef CONFIG_ARM64_4_LEVELS
+> > +	add	x1, x0, #PAGE_SIZE
+> > +	create_pud_entry x0, x1, x3, x5, x6
+> > +#endif
+> >  	ldr	x6, =KERNEL_END
+> >  	mov	x3, x24				// phys offset
+> > +#ifndef CONFIG_ARM64_4_LEVELS
+> >  	create_block_map x0, x7, x3, x5, x6
+> > +#else
+> > +	create_block_map x1, x7, x3, x5, x6
+> > +#endif
+> >
+> >  	/*
+> >  	 * Map the FDT blob (maximum 2MB; must be within 512MB of @@ -474,14
+> > +504,25 @@ __create_page_tables:
+> >  	add	x5, x5, x6			// __va(FDT blob)
+> >  	add	x6, x5, #1 << 21		// 2MB for the FDT blob
+> >  	sub	x6, x6, #1			// inclusive range
+> > +#ifndef CONFIG_ARM64_4_LEVELS
+> >  	create_block_map x0, x7, x3, x5, x6
+> > +#else
+> > +	create_block_map x1, x7, x3, x5, x6
+> > +#endif
+> >  1:
+> >  	/*
+> >  	 * Create the pgd entry for the fixed mappings.
+> >  	 */
+> >  	ldr	x5, =FIXADDR_TOP		// Fixed mapping virtual address
+> > +#ifndef CONFIG_ARM64_4_LEVELS
+> >  	add	x0, x26, #2 * PAGE_SIZE		// section table address
+> >  	create_pgd_entry x26, x0, x5, x6, x7
+> > +#else
+> > +	add	x0, x26, #PAGE_SIZE
+> > +	create_pgd_entry x26, x0, x5, x6, x7
+> > +	add	x1, x0, #2 * PAGE_SIZE
+> > +	create_pud_entry x0, x1, x5, x6, x7
+> > +#endif
+> >
+> >  	/*
+> >  	 * Since the page tables have been populated with non-cacheable
+> 
+> What tree is this series based on?
+
+This series is based on 3.15-rc1.
+
+Thanks
+Jungseok Lee
