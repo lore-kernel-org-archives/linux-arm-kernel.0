@@ -1,63 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 17:29:18 +0200
-Subject: [PATCH v2 1/4] memory: mvebu-devbus: fix the conversion of the bus
- width
-In-Reply-To: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397489361-5833-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 14 Apr 2014 17:29:17 +0200
+Subject: [PATCH v2 0/4] ARM: mvebu: fix bus width handling in mvebu-devbus
+Message-ID: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the Armada 370 and Armada XP datasheets, the part of the
-Device Bus register that configure the bus width should contain 0 for
-a 8 bits bus width, and 1 for a 16 bits bus width (other values are
-unsupported/reserved).
+Jason, Greg, Andrew, Sebastian,
 
-However, the current conversion done in the driver to convert from a
-bus width in bits to the value expected by the register leads to
-setting the register to 1 for a 8 bits bus, and 2 for a 16 bits bus.
+This set of patches fix a bug in the mvebu-devbus driver, which was
+leading to a misinterpretation of Device Tree provided value: a NOR
+bus width declared as 8 bits in the Device Tree was in fact configured
+as 16 bits at the hardware level.
 
-This mistake was compensated by a mistake in the existing Device Tree
-files for Armada 370/XP platforms: they were declaring a 8 bits bus
-width, while the hardware in fact uses a 16 bits bus width.
+This bug was not noticed until now, because it was compensated by a
+symetric mistake in the Device Tree files.
 
-This commit fixes that by adjusting the conversion logic.
+This set of commits therefore fix both the driver itself, and the
+incorrect Device Tree files. The patches for the Device Tree files
+have been separated, because some of them should apply all the way to
+v3.10, while some of them apply only up to v3.11.
 
-This patch fixes a bug that was introduced in
-3edad321b1bd2e6c8b5f38146c115c8982438f06 ('drivers: memory: Introduce
-Marvell EBU Device Bus driver'), which was merged in v3.11.
+Changes since v1:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: stable at vger.kernel.org
----
- drivers/memory/mvebu-devbus.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ * Added patches to fix the Device Tree files to indicate the correct
+   bus width, as documented in the board schematics. Noticed by
+   Ezequiel Garcia.
 
-diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
-index 110c036..b59a17f 100644
---- a/drivers/memory/mvebu-devbus.c
-+++ b/drivers/memory/mvebu-devbus.c
-@@ -108,8 +108,19 @@ static int devbus_set_timing_params(struct devbus *devbus,
- 			node->full_name);
- 		return err;
- 	}
--	/* Convert bit width to byte width */
--	r.bus_width /= 8;
-+
-+	/*
-+	 * The bus width is encoded into the register as 0 for 8 bits,
-+	 * and 1 for 16 bits, so we do the necessary conversion here.
-+	 */
-+	if (r.bus_width == 8)
-+		r.bus_width = 0;
-+	else if (r.bus_width == 16)
-+		r.bus_width = 1;
-+	else {
-+		dev_err(devbus->dev, "invalid bus width %d\n", r.bus_width);
-+		return -EINVAL;
-+	}
- 
- 	err = get_timing_param_ps(devbus, node, "devbus,badr-skew-ps",
- 				 &r.badr_skew);
+ * Changed the bus_width conversion logic in the driver to only accept
+   valid values: 8 bits and 16 bits. All other values lead to an error
+   being returned. Suggested by Sebastian Hesselbarth.
+
+ * Rebased on top of v3.15-rc1.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (4):
+  memory: mvebu-devbus: fix the conversion of the bus width
+  ARM: mvebu: fix NOR bus-width in Armada XP GP Device Tree
+  ARM: mvebu: fix NOR bus-width in Armada XP DB Device Tree
+  ARM: mvebu: fix NOR bus-width in Armada XP OpenBlocks AX3 Device Tree
+
+ arch/arm/boot/dts/armada-xp-db.dts               |  2 +-
+ arch/arm/boot/dts/armada-xp-gp.dts               |  2 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  2 +-
+ drivers/memory/mvebu-devbus.c                    | 15 +++++++++++++--
+ 4 files changed, 16 insertions(+), 5 deletions(-)
+
 -- 
 1.8.3.2
