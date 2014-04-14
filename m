@@ -1,60 +1,96 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 14 Apr 2014 12:12:37 +0100
-Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
-In-Reply-To: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
-References: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
-Message-ID: <20140414111237.GB3844@e103592.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Apr 2014 12:14:34 +0100
+Subject: [PATCH v2] ARM: mm: support big-endian page tables
+In-Reply-To: <20140414104300.GA3530@arm.com>
+References: <5301B4AF.1040305@huawei.com> <5327F75F.1010406@huawei.com>
+ <20140414104300.GA3530@arm.com>
+Message-ID: <534BC31A.7060705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 06:16:24PM +0800, Lu Xiangyu wrote:
-> From: Xiangyu Lu <luxiangyu@huawei.com>
+On 14/04/14 11:43, Will Deacon wrote:
+> (catching up on old email)
 > 
-> In big-endian systems, "%1" get the most significant part of the value, cause
-> the instruction to get the wrong result.
+> On Tue, Mar 18, 2014 at 07:35:59AM +0000, Jianguo Wu wrote:
+>> Cloud you please take a look at this?
 > 
-> When viewing ftrace record in big-endian ARM systems, we found that
-> the timestamp errors:
+> [...]
 > 
-> swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
-> events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
-> swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
-> swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
-> swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
-> swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
+>> On 2014/2/17 15:05, Jianguo Wu wrote:
+>>> When enable LPAE and big-endian in a hisilicon board, while specify
+>>> mem=384M mem=512M at 7680M, will get bad page state:
+>>>
+>>> Freeing unused kernel memory: 180K (c0466000 - c0493000)
+>>> BUG: Bad page state in process init  pfn:fa442
+>>> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+>>> page flags: 0x40000400(reserved)
+>>> Modules linked in:
+>>> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+>>> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+>>> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+>>> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+>>> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+>>> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+>>> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+>>> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+>>> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+>>> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
 > 
-> When viewed ftrace records, it will call the do_div(n, base) function, which
-> achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
-> do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
+> [...]
 > 
-> Cc: <stable@vger.kernel.org> # 2.6.20+
-> Signed-off-by: Alex Wu <wuquanming@huawei.com>
-> Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
-> ---
->  arch/arm/include/asm/div64.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>>> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+>>> when pte is 64-bit, for little-endian, will store low 32-bit in r2,
+>>> high 32-bit in r3; for big-endian, will store low 32-bit in r3,
+>>> high 32-bit in r2, this will cause wrong pfn stored in pte,
+>>> so we should exchange r2 and r3 for big-endian.
 > 
-> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> index 191ada6..662c7bd 100644
-> --- a/arch/arm/include/asm/div64.h
-> +++ b/arch/arm/include/asm/div64.h
-> @@ -156,7 +156,7 @@
->  		/* Select the best insn combination to perform the   */	\
->  		/* actual __m * __n / (__p << 64) operation.         */	\
->  		if (!__c) {						\
-> -			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
-> +			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
+> I believe that Marc (added to CC) has been running LPAE-enabled, big-endian
+> KVM guests without any issues, so it seems unlikely that we're storing the
+> PTEs backwards. Can you check the configuration of SCTLR.EE?
 
-This looks plausible: these if() clauses are all concerned with
-multiplying the low parts of __m and __n together, and this seems
-to be the only 64-bit asm operand reference where Q or R is suspiciously
-missing: so it looks likely that "Q" is required here for consistency.
+So, for the record:
 
-My understanding of the details of this code are limited: do you have
-a simple test case to demonstrate the error and the fix?
+root at when-the-lie-s-so-big:~# cat /proc/cpuinfo 
+processor	: 0
+model name	: ARMv7 Processor rev 4 (v7b)
+Features	: swp half thumb fastmult vfp edsp thumbee neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x0
+CPU part	: 0xc07
+CPU revision	: 4
 
-It should be sufficient to find two values a and b, where do_div(a,b)
-demonstrates the bug.
+processor	: 1
+model name	: ARMv7 Processor rev 4 (v7b)
+Features	: swp half thumb fastmult vfp edsp thumbee neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x0
+CPU part	: 0xc07
+CPU revision	: 4
 
-Cheers
----Dave
+Hardware	: Dummy Virtual Machine
+Revision	: 0000
+Serial		: 0000000000000000
+root at when-the-lie-s-so-big:~# uname -a
+Linux when-the-lie-s-so-big 3.14.0+ #2465 SMP PREEMPT Tue Apr 8 13:05:11 BST 2014 armv7b GNU/Linux
+
+Now, looking at the patch, I think it makes some sense:
+- Depending on the endianness, we have to test the L_PTE_NONE in one 
+word on the other, and possibly clear L_PTE_VALID
+- Same for L_PTE_DIRTY, respectively setting L_PTE_RDONLY
+
+The commit message looks wrong though, as it mention the PTE storage in 
+memory (which looks completely fine to me, and explain why I was able to
+boot a guest). As none of my guest RAM is above 4GB IPA, I didn't see 
+the corruption of bit 32 in the PTE (which should have been bit 0,
+corresponding to L_PTE_VALID).
+
+So, provided that the commit message is rewritten to match the what it does,
+I'm fine with that patch.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
