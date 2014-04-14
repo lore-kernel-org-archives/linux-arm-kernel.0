@@ -1,58 +1,294 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 15 Apr 2014 00:51:29 +0200
-Subject: [PATCH 2/4] ALSA: sound/atmel-ac97c.h: Remove unused flags from
- platform data
-In-Reply-To: <1397293707-26890-3-git-send-email-alexanders83@web.de>
-References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
- <1397293707-26890-3-git-send-email-alexanders83@web.de>
-Message-ID: <20140414225129.GZ2967@piout.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 14 Apr 2014 16:55:20 -0600
+Subject: [PATCH] ARM: tegra: define Jetson TK1 regulators
+Message-ID: <1397516120-18220-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2014 at 11:08:25 +0200, Alexander Stein wrote :
-> This platform data member is unsed, so remove it.
-                                 ^
-                                 another typo :)
-> 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-I would say that it doesn't matter anymore but no code is better tahn
-dead code.
+From: Stephen Warren <swarren@nvidia.com>
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  include/sound/atmel-ac97c.h | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/include/sound/atmel-ac97c.h b/include/sound/atmel-ac97c.h
-> index e6aabdb..00e6c289 100644
-> --- a/include/sound/atmel-ac97c.h
-> +++ b/include/sound/atmel-ac97c.h
-> @@ -23,7 +23,6 @@
->   * @reset_pin: GPIO pin wired to the reset input on the external AC97 codec,
->   *             optional to use, set to -ENODEV if not in use. AC97 layer will
->   *             try to do a software reset of the external codec anyway.
-> - * @flags: Flags for which directions should be enabled.
->   *
->   * If the user do not want to use a DMA channel for playback or capture, i.e.
->   * only one feature is required on the board. The slave for playback or capture
-> @@ -33,7 +32,6 @@
->  struct ac97c_platform_data {
->  	struct dw_dma_slave	rx_dws;
->  	struct dw_dma_slave	tx_dws;
-> -	unsigned int 		flags;
->  	int			reset_pin;
->  };
->  
-> -- 
-> 1.9.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+These are mostly identical to the Venice2 regulator definitions, since
+the board designs are very similar. Differences are:
 
+- Jetson TK1 doesn't have a built-in LCD panel, so on-board regulators
+  are not present for the backlight, touchscreen, or panel.
+- +3.3V_RUN needs to be boot-on/always-on, since it's widely used. This
+  change should likely be propagated to Venice2 for completeness,
+  although it will have no practical effect there since various other
+  regulators use +3.3V_RUN as their supply and are always-on.
+- +3.3V_LP0 needs to be boot-on as well as always-on. One reason
+  is because it's used to driver the UART level-shifter; without this, I
+  see a brief period of UART corruption during cold boots.I suspect this
+  change needs to be propagated to Venice2, and we simply haven't noticed
+  the need since there's no UART level-shifter on Venice2.
+- A few rails have different names in the schematics.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 230 ++++++++++++++++++++++++++++++
+ 1 file changed, 230 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index dedcb0c165c5..ae5c750dc515 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1426,6 +1426,155 @@
+ 					bias-high-impedance;
+ 				};
+ 			};
++
++			regulators {
++				vsup-sd2-supply = <&vdd_5v0_sys>;
++				vsup-sd3-supply = <&vdd_5v0_sys>;
++				vsup-sd4-supply = <&vdd_5v0_sys>;
++				vsup-sd5-supply = <&vdd_5v0_sys>;
++				vin-ldo0-supply = <&vdd_1v35_lp0>;
++				vin-ldo1-6-supply = <&vdd_3v3_run>;
++				vin-ldo2-5-7-supply = <&vddio_1v8>;
++				vin-ldo3-4-supply = <&vdd_3v3_sys>;
++				vin-ldo9-10-supply = <&vdd_5v0_sys>;
++				vin-ldo11-supply = <&vdd_3v3_run>;
++
++				sd0 {
++					regulator-name = "+VDD_CPU_AP";
++					regulator-min-microvolt = <700000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-min-microamp = <3500000>;
++					regulator-max-microamp = <3500000>;
++					regulator-always-on;
++					regulator-boot-on;
++					ams,external-control = <2>;
++				};
++
++				sd1 {
++					regulator-name = "+VDD_CORE";
++					regulator-min-microvolt = <700000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-min-microamp = <2500000>;
++					regulator-max-microamp = <2500000>;
++					regulator-always-on;
++					regulator-boot-on;
++					ams,external-control = <1>;
++				};
++
++				vdd_1v35_lp0: sd2 {
++					regulator-name = "+1.35V_LP0(sd2)";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				sd3 {
++					regulator-name = "+1.35V_LP0(sd3)";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				sd4 {
++					regulator-name = "+1.05V_RUN";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++				};
++
++				vddio_1v8: sd5 {
++					regulator-name = "+1.8V_VDDIO";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-boot-on;
++					regulator-always-on;
++				};
++
++				sd6 {
++					regulator-name = "+VDD_GPU_AP";
++					regulator-min-microvolt = <650000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-min-microamp = <3500000>;
++					regulator-max-microamp = <3500000>;
++					regulator-boot-on;
++					regulator-always-on;
++				};
++
++				ldo0 {
++					regulator-name = "+1.05V_RUN_AVDD";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					regulator-boot-on;
++					regulator-always-on;
++					ams,external-control = <1>;
++				};
++
++				ldo1 {
++					regulator-name = "+1.8V_RUN_CAM";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				ldo2 {
++					regulator-name = "+1.2V_GEN_AVDD";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-boot-on;
++					regulator-always-on;
++				};
++
++				ldo3 {
++					regulator-name = "+1.05V_LP0_VDD_RTC";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-boot-on;
++					regulator-always-on;
++					ams,enable-tracking;
++				};
++
++				ldo4 {
++					regulator-name = "+2.8V_RUN_CAM";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo5 {
++					regulator-name = "+1.2V_RUN_CAM_FRONT";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++				};
++
++				vddio_sdmmc3: ldo6 {
++					regulator-name = "+VDDIO_SDMMC3";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldo7 {
++					regulator-name = "+1.05V_RUN_CAM_REAR";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++				};
++
++				ldo9 {
++					regulator-name = "+3.3V_RUN_TOUCH";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo10 {
++					regulator-name = "+2.8V_RUN_CAM_AF";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo11 {
++					regulator-name = "+1.8V_RUN_VPP_FUSE";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++			};
+ 		};
+ 	};
+ 
+@@ -1462,6 +1611,7 @@
+ 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+ 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
+ 		bus-width = <4>;
++		vmmc-supply = <&vddio_sdmmc3>;
+ 	};
+ 
+ 	/* eMMC */
+@@ -1525,6 +1675,72 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
++		vdd_mux: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "+VDD_MUX";
++			regulator-min-microvolt = <12000000>;
++			regulator-max-microvolt = <12000000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		vdd_5v0_sys: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "+5V_SYS";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++			vin-supply = <&vdd_mux>;
++		};
++
++		vdd_3v3_sys: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "+3.3V_SYS";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			regulator-boot-on;
++			vin-supply = <&vdd_mux>;
++		};
++
++		vdd_3v3_run: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "+3.3V_RUN";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			vin-supply = <&vdd_3v3_sys>;
++		};
++
++		vdd_3v3_hdmi: regulator at 4 {
++			compatible = "regulator-fixed";
++			reg = <4>;
++			regulator-name = "+3.3V_AVDD_HDMI_AP_GATED";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			vin-supply = <&vdd_3v3_run>;
++		};
++
++		vdd_usb1_vbus: regulator at 7 {
++			compatible = "regulator-fixed";
++			reg = <7>;
++			regulator-name = "+USB0_VBUS_SW";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio TEGRA_GPIO(N, 4) GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			gpio-open-drain;
++			vin-supply = <&vdd_5v0_sys>;
++		};
++
+ 		vdd_usb3_vbus: regulator at 8 {
+ 			compatible = "regulator-fixed";
+ 			reg = <8>;
+@@ -1534,6 +1750,20 @@
+ 			gpio = <&gpio TEGRA_GPIO(N, 5) GPIO_ACTIVE_HIGH>;
+ 			enable-active-high;
+ 			gpio-open-drain;
++			vin-supply = <&vdd_5v0_sys>;
++		};
++
++		vdd_3v3_lp0: regulator at 10 {
++			compatible = "regulator-fixed";
++			reg = <10>;
++			regulator-name = "+3.3V_LP0";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&pmic 2 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			vin-supply = <&vdd_3v3_sys>;
+ 		};
+ 	};
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.1.5
