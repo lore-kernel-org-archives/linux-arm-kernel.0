@@ -1,57 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 14 Apr 2014 17:14:09 +0200
-Subject: [PATCH v2 1/5] Documentation: dt-bindings: reformat and order
- list of ahci-platform compatibles
-In-Reply-To: <1397486055-16303-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397486055-16303-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140414151409.GC22546@lunn.ch>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 14 Apr 2014 17:22:12 +0200
+Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
+In-Reply-To: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
+References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20140414152212.GC2255@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 04:34:11PM +0200, Thomas Petazzoni wrote:
-> The ahci-platform.txt Device Tree binding documentation is gaining a
-> growing number of compatible strings, and it will gain one more with
-> the addition of the Marvell Armada 380 AHCI support. It is therefore
-> time to reformat this list into a proper bullet list, and more
-> importantly order it alphabetically;
+Hi Richard,
+
+On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
+> RTS pin is an active low pin.
+> For now, this doesn't change anything as the ACTIVE_LOW flag is not
+> handled in atmel_serial, but it will be in 3.16.
 > 
-> Suggested-by: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-Thanks Thomas
-
-       Andrew
-
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 > ---
->  Documentation/devicetree/bindings/ata/ahci-platform.txt | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
+>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> index 48b285f..5598862 100644
-> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> @@ -4,10 +4,14 @@ SATA nodes are defined to describe on-chip Serial ATA controllers.
->  Each SATA controller should have its own node.
+> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> index 17c1042b2df8..2f7aad71b3c9 100644
+> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> @@ -35,7 +35,7 @@ Example:
+>  		clock-names = "usart";
+>  		atmel,use-dma-rx;
+>  		atmel,use-dma-tx;
+> -		rts-gpios = <&pioD 15 0>;
+> +		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+
+I was told we should not use macros here. If it is still the truth:
+
+rts-gpios = <&pioD 15 1>;
+
+
+Ludovic
+
+>  	};
 >  
->  Required properties:
-> -- compatible        : compatible list, one of "snps,spear-ahci",
-> -                      "snps,exynos5440-ahci", "ibm,476gtr-ahci",
-> -                      "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
-> -                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
-> +- compatible        : compatible string, one of:
-> +  - "allwinner,sun4i-a10-ahci"
-> +  - "fsl,imx53-ahci"
-> +  - "fsl,imx6q-ahci"
-> +  - "ibm,476gtr-ahci"
-> +  - "snps,dwc-ahci"
-> +  - "snps,exynos5440-ahci"
-> +  - "snps,spear-ahci"
->  - interrupts        : <interrupt mapping for SATA IRQ>
->  - reg               : <registers mapping>
->  
+>  - use DMA:
 > -- 
-> 1.8.3.2
+> 1.8.5.5
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
