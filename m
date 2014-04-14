@@ -1,53 +1,60 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Apr 2014 17:10:09 +0200
-Subject: [PATCH v7 06/11] ARM: mvebu: Low level function to disable HW
- coherency support
+Date: Mon, 14 Apr 2014 17:10:10 +0200
+Subject: [PATCH v7 07/11] ARM: mvebu: Allow to power down L2 cache controller
+ in idle mode
 In-Reply-To: <1397488214-20685-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1397488214-20685-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1397488214-20685-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1397488214-20685-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When going to deep idle we need to disable the SoC snooping (aka
-hardware coherency support). Playing with the coherency fabric
-requires to use assembly code to be sure that the compiler doesn't
-reorder the instructions nor do wrong optimization.
+This commit adds a function which adjusts the PMSU configuration to
+automatically power down the L2 and coherency fabric when we enter a
+certain idle state.
+
+This feature is part of the Power Management Service Unit of the
+Armada 370 and Armada XP SoCs.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/coherency_ll.S | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/mach-mvebu/pmsu.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
-index f2e2e8677c4b..6828f9f157b0 100644
---- a/arch/arm/mach-mvebu/coherency_ll.S
-+++ b/arch/arm/mach-mvebu/coherency_ll.S
-@@ -102,6 +102,26 @@ ENTRY(ll_enable_coherency)
- 	mov	pc, lr
- ENDPROC(ll_enable_coherency)
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 8361281f9180..db5011f98df3 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -33,7 +33,12 @@ static void __iomem *pmsu_mp_base;
+ #define PMSU_BASE_OFFSET    0x100
+ #define PMSU_REG_SIZE	    0x1000
  
-+ENTRY(ll_disable_coherency)
-+	/*
-+	 * r0 being untouched in ll_get_coherency_base and
-+	 * ll_get_cpuid, we can use it to save lr modifing it with the
-+	 * following bl
-+	 */
-+	mov r0, lr
-+	bl	ll_get_coherency_base
-+	bl	ll_get_cpuid
-+	mov lr, r0
-+	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
-+1:
-+	ldrex	r2, [r0]
-+	bic	r2, r2, r3
-+	strex	r1, r2, [r0]
-+	cmp	r1, #0
-+	bne	1b
-+	dsb
-+	mov	pc, lr
-+ENDPROC(ll_disable_coherency)
+-#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x124)
++/* PMSU MP registers */
++#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x124)
++
++/* PMSU fabric registers */
++#define L2C_NFABRIC_PM_CTL		    0x4
++#define L2C_NFABRIC_PM_CTL_PWR_DOWN		BIT(20)
  
- 	.align 2
- 3:
+ static struct of_device_id of_pmsu_table[] = {
+ 	{ .compatible = "marvell,armada-370-pmsu", },
+@@ -115,4 +120,17 @@ static int __init armada_370_xp_pmsu_init(void)
+ 	return ret;
+ }
+ 
++static void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
++{
++	u32 reg;
++
++	if (pmsu_mp_base == NULL)
++		return;
++
++	/* Enable L2 & Fabric powerdown in Deep-Idle mode - Fabric */
++	reg = readl(pmsu_mp_base + L2C_NFABRIC_PM_CTL);
++	reg |= L2C_NFABRIC_PM_CTL_PWR_DOWN;
++	writel(reg, pmsu_mp_base + L2C_NFABRIC_PM_CTL);
++}
++
+ early_initcall(armada_370_xp_pmsu_init);
 -- 
 1.8.1.2
