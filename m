@@ -1,36 +1,51 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 14 Apr 2014 15:33:41 -0600
-Subject: [PATCH 3/4] pinctrl: tegra: reduce size of data table fields
+Date: Mon, 14 Apr 2014 15:33:42 -0600
+Subject: [PATCH 4/4] pinctrl: tegra: print better error messages
 In-Reply-To: <1397511222-28533-1-git-send-email-swarren@wwwdotorg.org>
 References: <1397511222-28533-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1397511222-28533-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1397511222-28533-4-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The range of npins and function ID values is small enough to fit into a
-u8. Use this type rather than unsigned to shrink the pinmux data tables.
+When an attempt is made to configure an unsupported option on a pin,
+print the DT property name of that option, so it's easier to debug
+what the problem is.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/pinctrl/pinctrl-tegra.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pinctrl/pinctrl-tegra.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-tegra.h b/drivers/pinctrl/pinctrl-tegra.h
-index c60ad4cf971c..9052c1f8a59b 100644
---- a/drivers/pinctrl/pinctrl-tegra.h
-+++ b/drivers/pinctrl/pinctrl-tegra.h
-@@ -131,8 +131,8 @@ struct tegra_function {
- struct tegra_pingroup {
- 	const char *name;
- 	const unsigned *pins;
--	unsigned npins;
--	unsigned funcs[4];
-+	u8 npins;
-+	u8 funcs[4];
- 	s16 mux_reg;
- 	s16 pupd_reg;
- 	s16 tri_reg;
+diff --git a/drivers/pinctrl/pinctrl-tegra.c b/drivers/pinctrl/pinctrl-tegra.c
+index 0faa09200781..2d43bff74f59 100644
+--- a/drivers/pinctrl/pinctrl-tegra.c
++++ b/drivers/pinctrl/pinctrl-tegra.c
+@@ -413,10 +413,21 @@ static int tegra_pinconf_reg(struct tegra_pmx *pmx,
+ 	}
+ 
+ 	if (*reg < 0 || *bit > 31) {
+-		if (report_err)
++		if (report_err) {
++			const char *prop = "unknown";
++			int i;
++
++			for (i = 0; i < ARRAY_SIZE(cfg_params); i++) {
++				if (cfg_params[i].param == param) {
++					prop = cfg_params[i].property;
++					break;
++				}
++			}
++
+ 			dev_err(pmx->dev,
+-				"Config param %04x not supported on group %s\n",
+-				param, g->name);
++				"Config param %04x (%s) not supported on group %s\n",
++				param, prop, g->name);
++		}
+ 		return -ENOTSUPP;
+ 	}
+ 
 -- 
 1.8.1.5
