@@ -1,72 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Apr 2014 14:01:54 +0100
-Subject: [PATCH] arm64: Flush the process's mm context TLB entries when
- switching
-In-Reply-To: <534BCE80.3090406@huawei.com>
-References: <534BCE80.3090406@huawei.com>
-Message-ID: <20140414130154.GE3530@arm.com>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Mon, 14 Apr 2014 22:03:04 +0900
+Subject: [PATCH] ARM: dts: exynos4: clean up arm-pmu node
+Message-ID: <1397480584-16195-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ding,
+This patch cleans a arm-pmu node up for exynos4. Only exynos4412 series
+boards have four pmu interrupts. Rest of exynos4 boards, except 4412, have only
+two pmu interrupts. Thus, we can define two interrupts in the
+exynos4.dtsi and extends the interrupts only exynos4412.dtsi.
 
-On Mon, Apr 14, 2014 at 01:03:12PM +0100, Ding Tianhong wrote:
-> I met a problem when migrating process by following steps:
-> 
-> 1) The process was already running on core 0.
-> 2) Set the CPU affinity of the process to 0x02 and move it to core 1,
->    it could work well.
-> 3) Set the CPU affinity of the process to 0x01 and move it to core 0 again,
->    the problem occurs and the process was killed.
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi    | 6 ++++++
+ arch/arm/boot/dts/exynos4210.dtsi | 6 ------
+ arch/arm/boot/dts/exynos4412.dtsi | 6 ++++++
+ arch/arm/boot/dts/exynos4x12.dtsi | 6 ------
+ 4 files changed, 12 insertions(+), 12 deletions(-)
 
-[...]
-
-> It was a very strange problem that the PC and LR are both 0, and the esr is
-> 0x83000006, it means that the used for instruction access generated MMU faults
-> and synchronous external aborts, including synchronous parity errors.
-> 
-> I try to fix the problem by invalidating the process's TLB entries when switching,
-> it will make the context stale and pick new one, and then it could work well.
-> 
-> So I think in some situation that after the process switching, the modification of
-> the TLB entries in the new core didn't inform all other cores to invalidate the old
-> TLB entries which was in the inner shareable caches, and then if the process schedule
-> to another core, the old TLB entries may occur MMU faults.
-
-Yes, it sounds like you don't have your TLBs configured correctly. Can you
-confirm that your EL3 firmware is configuring TLB broadcasting correctly
-please?
-
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> ---
->  arch/arm64/kernel/process.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 6391485..d7d8439 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -283,6 +283,13 @@ static void tls_thread_switch(struct task_struct *next)
->  	: : "r" (tpidr), "r" (tpidrro));
->  }
->  
-> +static void tlb_flush_thread(struct task_struct *prev)
-> +{
-> +	/* Flush the prev task's TLB entries */
-> +	if (prev->mm)
-> +		flush_tlb_mm(prev->mm);
-> +}
-> +
->  /*
->   * Thread switching.
->   */
-> @@ -296,6 +303,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
->  	hw_breakpoint_thread_switch(next);
->  	contextidr_thread_switch(next);
->  
-> +	tlb_flush_thread(prev);
-
-NAK to the patch -- the architecture certainly doesn't require this, and
-it's a huge hammer for what is more likely a firmware initialisation issue.
-
-Will
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index e541ecb..6de978c 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -105,6 +105,12 @@
+ 		reg = <0x10440000 0x1000>;
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&combiner>;
++		interrupts = <2 2>, <3 2>;
++	};
++
+ 	sys_reg: syscon at 10010000 {
+ 		compatible = "samsung,exynos4-sysreg", "syscon";
+ 		reg = <0x10010000 0x400>;
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index cacf614..4e7610f 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -75,12 +75,6 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
+-	pmu {
+-		compatible = "arm,cortex-a9-pmu";
+-		interrupt-parent = <&combiner>;
+-		interrupts = <2 2>, <3 2>;
+-	};
+-
+ 	pinctrl_0: pinctrl at 11400000 {
+ 		compatible = "samsung,exynos4210-pinctrl";
+ 		reg = <0x11400000 0x1000>;
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index 15d3c0a..e6af870 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -26,6 +26,12 @@
+ 		samsung,combiner-nr = <20>;
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&combiner>;
++		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
++	};
++
+ 	gic: interrupt-controller at 10490000 {
+ 		cpu-offset = <0x4000>;
+ 	};
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 3d77a40..318f3ac 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -31,12 +31,6 @@
+ 		mshc0 = &mshc_0;
+ 	};
+ 
+-	pmu {
+-		compatible = "arm,cortex-a9-pmu";
+-		interrupt-parent = <&combiner>;
+-		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
+-	};
+-
+ 	pd_isp: isp-power-domain at 10023CA0 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10023CA0 0x20>;
+-- 
+1.8.3.2
