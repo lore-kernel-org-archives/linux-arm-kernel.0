@@ -1,77 +1,76 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 14 Apr 2014 19:44:14 +0530
-Subject: [PATCH] arm: edma: Fix xbar mapping
-In-Reply-To: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
-References: <alpine.DEB.2.02.1404132123100.22697@ionos.tec.linutronix.de>
-Message-ID: <534BED36.2060907@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 14 Apr 2014 16:17:03 +0200
+Subject: [GIT PULL] ARM: Updates for mmci driver for 3.16, take 1
+Message-ID: <CAPDyKFp0K=cijuAZox7_BsTk2UCyC7Dp9HQoO6eJzaHikRMVUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Matt with current e-mail address.
+Hi Russell,
 
-On Monday 14 April 2014 02:18 AM, Thomas Gleixner wrote:
-> Subject: arm: edma: Fix xbar mapping
-> From: Thomas Gleixner <tglx@linutronix.de>
-> Date: Sun, 13 Apr 2014 20:44:46 +0200
-> 
-> This is another great example of trainwreck engineering:
-> 
-> commit 2646a0e529 (ARM: edma: Add EDMA crossbar event mux support)
-> added support for using EDMA on peripherals which have no direct EDMA
-> event mapping.
+I have collected some patches which all relates to changes to the mmci driver.
 
-I committed it, so the blame goes to me (at least in part).
+The SOC specific patches has been acked by the SOC maintainer Linus
+Walleij and the DT patches has been iterated a few times, due to
+comments from Rob Herring.
 
-> 
-> The code compiles and does not explode in your face, but that's it.
-> 
-> 1) Reading an u16 array from an u32 device tree array simply does not
->    work. Even if the function is named "edma_of_read_u32_to_s16_array".
-> 
->    It merily calls of_property_read_u16_array. So the resulting 16bit
->    array will have every other entry = 0.
-> 
-> 2) The DT entry for the xbar registers related to xbar has length 0x10
->    instead of the real length: 0xfd0 - 0xf90 = 0x40.
-> 
->    Not a real problem as it does not cross a page boundary, but
->    wrong nevertheless.
-> 
-> 3) But none of this matters as the mapping never happens:
-> 
->    After reading nonsense edma_of_read_u32_to_s16_array() invalidates
->    the first array entry pair, so nobody can ever notice the
->    braindamage by immediate explosion.
-> 
-> Seems the QA criteria for this code was solely not to explode when
-> someone adds edma-xbar-event-map entries to the DT. Goal achieved,
-> congratulations!
-> 
-> Not really helpful if someone wants to use edma on a device which
-> requires a xbar mapping.
-> 
-> Fix the issues by:
-> 
-> - annotating the device tree entry with "/bits/ 16" as documented in
->   the of_property_read_u16_array kernel doc
-> 
-> - make the size of the xbar register mapping correct
-> 
-> - invalidating the end of the array and not the start
-> 
-> This convoluted mess wants to be completely rewritten as there is no
-> point to keep the xbar_chan array memory and the iomapping of the xbar
-> regs around forever. Marking the xbar mapped channels as used should
-> be done right there.
-> 
-> But that's a different issue and this patch is small enough to make it
-> work and allows a simple backport for stable.
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Unless you have some concern with any of the patches, please pull them
+into your ARM tree.
 
-This time, I tested this patch and FWIW you can add:
+Kind regards
+Ulf Hansson
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Thanks,
-Sekhar
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ulf.hansson/linux-2.6.git
+mmci_for_russell_3.16_take1
+
+for you to fetch changes up to 724404ce84cbc3cb9a16dcc593bc4d07aa5b8b2e:
+
+  mmc: mmci: Enforce max frequency configuration through DT
+(2014-04-14 15:55:09 +0200)
+
+----------------------------------------------------------------
+Ulf Hansson (22):
+      mmc: mmci: Mask IRQs for all variants during runtime suspend
+      mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
+      mmc: mmci: Put the device into low power state at system suspend
+      mmc: mmci: Convert to the mmc gpio API
+      mmc: mmci: Convert to devm functions
+      mmc: mmci: Update DT documentation
+      mmc: mmci: Add DT bindings for signal direction
+      mmc: mmci: Add DT bindings for feedback clock pin
+      mmc: mmci: Use the common mmc DT parser
+      ARM: ux500: Add mmci signal directions and feeback clock in DT for href
+      ARM: ux500: Convert to the common mmc DT bindings for highspeed mode
+      ARM: nomadik: Convert to the common mmc DT bindings for highspeed mode
+      ARM: u300: Convert to the common mmc DT bindings for highspeed mode
+      mmc: mmci: Mark the DT bindings for highspeed mode as deprecated
+      mmc: mmci: Enable MMC_CAP_CMD23
+      ARM: ux500: Add the mmc capabilities flags to DT
+      ARM: ux500: Add a vmmc regulator through DT for the poped eMMC for href
+      ARM: ux500: Remove redundant board file for mmci platform data
+      mmc: mmci: Enforce DT for signal direction and feedback clock
+      mmc: mmci: Enforce mmc capabilities through DT
+      mmc: mmci: Enforce DMA configuration through DT
+      mmc: mmci: Enforce max frequency configuration through DT
+
+ Documentation/devicetree/bindings/mmc/mmci.txt |   54 +++-
+ arch/arm/boot/dts/ste-ccu9540.dts              |    6 +-
+ arch/arm/boot/dts/ste-href.dtsi                |   19 +-
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     |    4 +-
+ arch/arm/boot/dts/ste-snowball.dts             |    4 +-
+ arch/arm/boot/dts/ste-u300.dts                 |    4 +-
+ arch/arm/mach-ux500/Makefile                   |    3 +-
+ arch/arm/mach-ux500/board-mop500-sdi.c         |  166 ------------
+ arch/arm/mach-ux500/board-mop500.h             |    5 -
+ arch/arm/mach-ux500/cpu-db8500.c               |    4 -
+ drivers/mmc/host/mmci.c                        |  324 ++++++------------------
+ drivers/mmc/host/mmci.h                        |   14 +-
+ include/linux/amba/mmci.h                      |   42 ---
+ 13 files changed, 169 insertions(+), 480 deletions(-)
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-sdi.c
