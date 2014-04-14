@@ -1,40 +1,41 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Apr 2014 23:59:47 +0200
-Subject: [PATCHv2 05/11] ARM: pxa: hx4700: initialize all the struct
- pwm_lookup members
+Date: Mon, 14 Apr 2014 23:59:53 +0200
+Subject: [PATCHv2 11/11] backlight: pwm_bl: retrieve configured pwm period
 In-Reply-To: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1397512793-10325-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1397512793-10325-12-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow to get rid of the .pwm_period_ns member of struct
-platform_pwm_backlight_data as the period will be set by the PWM core.
+The PWM core is now able to initialize the PWM period from platform_data. Use it
+and if it is not configured, use the supplied pwm_period_ns.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-pxa/hx4700.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/video/backlight/pwm_bl.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index a7c30eb0c8db..0788a1f171fe 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -574,7 +574,14 @@ static struct platform_device backlight = {
- };
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index b75201ff46f6..1bb8a69062c5 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -304,12 +304,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	/*
+ 	 * The DT case will set the pwm_period_ns field to 0 and store the
+ 	 * period, parsed from the DT, in the PWM device. For the non-DT case,
+-	 * set the period from platform data.
++	 * set the period from platform data if it is not already set.
+ 	 */
+-	if (data->pwm_period_ns > 0)
++	pb->period = pwm_get_period(pb->pwm);
++	if (!pb->period && (data->pwm_period_ns > 0)) {
++		pb->period = data->pwm_period_ns;
+ 		pwm_set_period(pb->pwm, data->pwm_period_ns);
++	}
  
- static struct pwm_lookup hx4700_pwm_lookup[] = {
--	PWM_LOOKUP("pxa27x-pwm.1", 0, "pwm-backlight", NULL),
-+	{
-+		.provider = "pxa27x-pwm.1",
-+		.index = 0,
-+		.dev_id = "pwm-backlight",
-+		.con_id = NULL,
-+		.period = 30923,
-+		.polarity = PWM_POLARITY_NORMAL,
-+	},
- };
+-	pb->period = pwm_get_period(pb->pwm);
+ 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
  
- /*
+ 	memset(&props, 0, sizeof(struct backlight_properties));
 -- 
 1.8.3.2
