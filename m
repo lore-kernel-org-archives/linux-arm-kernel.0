@@ -1,60 +1,112 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 14 Apr 2014 11:30:06 +0200
-Subject: [PATCH 04/29] memory: mvebu-devbus: fix the conversion of the
- bus width
-In-Reply-To: <1397400006-4315-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 14 Apr 2014 11:33:16 +0200
+Subject: [PATCH 05/29] memory: mvebu-devbus: use ARMADA_ prefix in defines
+In-Reply-To: <1397400006-4315-6-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <534BAA9E.2040201@gmail.com>
+ <1397400006-4315-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BAB5C.6020703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
-> According to the Armada 370 and Armada XP datasheets, the part of the
-> Device Bus register that configure the bus width should contain 0 for
-> a 8 bits bus width, and 1 for a 16 bits bus width (other values are
-> unsupported/reserved).
->
-> However, the current conversion done in the driver to convert from a
-> bus width in bits to the value expected by the register leads to
-> setting the register to 1 for a 8 bits bus, and 2 for a 16 bits bus.
->
-> This commit fixes that by adjusting the conversion logic.
->
-> This patch fixes a bug that was introduced in
-> 3edad321b1bd2e6c8b5f38146c115c8982438f06 ('drivers: memory: Introduce
-> Marvell EBU Device Bus driver'), which was merged in v3.11.
+> The mvebu-devbus driver currently only supports the Armada 370/XP
+> family, but it can also cover the Orion5x family. However, the Orion5x
+> family has a different organization of the register. Therefore, in
+> preparation to the introduction of Orion5x support, we rename the
+> Armada 370/XP specific definitions to have an ARMADA_ prefix.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: stable at vger.kernel.org
 > ---
->   drivers/memory/mvebu-devbus.c | 8 ++++++--
->   1 file changed, 6 insertions(+), 2 deletions(-)
+>   drivers/memory/mvebu-devbus.c | 48 +++++++++++++++++++++----------------------
+>   1 file changed, 24 insertions(+), 24 deletions(-)
 >
 > diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
-> index 110c036..b82cdf1 100644
+> index b82cdf1..84746e3 100644
 > --- a/drivers/memory/mvebu-devbus.c
 > +++ b/drivers/memory/mvebu-devbus.c
-> @@ -108,8 +108,12 @@ static int devbus_set_timing_params(struct devbus *devbus,
->   			node->full_name);
->   		return err;
->   	}
-> -	/* Convert bit width to byte width */
-> -	r.bus_width /= 8;
-> +
-> +	/*
-> +	 * The bus width is encoded into the register as 0 for 8 bits,
-> +	 * and 1 for 16 bits, so we do the necessary conversion here.
-> +	 */
-> +	r.bus_width = (r.bus_width / 8) - 1;
+> @@ -30,19 +30,19 @@
+>   #include <linux/platform_device.h>
+>
+>   /* Register definitions */
+> -#define DEV_WIDTH_BIT		30
+> -#define BADR_SKEW_BIT		28
+> -#define RD_HOLD_BIT		23
+> -#define ACC_NEXT_BIT		17
+> -#define RD_SETUP_BIT		12
+> -#define ACC_FIRST_BIT		6
+> +#define ARMADA_DEV_WIDTH_BIT		30
+> +#define ARMADA_BADR_SKEW_BIT		28
+> +#define ARMADA_RD_HOLD_BIT		23
+> +#define ARMADA_ACC_NEXT_BIT		17
+> +#define ARMADA_RD_SETUP_BIT		12
+> +#define ARMADA_ACC_FIRST_BIT		6
 
-I guess the next larger register value would be 0x2 for 32b? I cannot
-tell, if there is any SoC spending 32 pins on this, but the correct
-formula would possibly include ld().
+I guess the correct terminology would be _SHIFT.
+Also, if it is a single bit, I'd expect BIT(x)
+instead of shifting a one.
+
+Anyway, you are not directly responsible for it.
 
 Sebastian
 
 >
->   	err = get_timing_param_ps(devbus, node, "devbus,badr-skew-ps",
->   				 &r.badr_skew);
+> -#define SYNC_ENABLE_BIT		24
+> -#define WR_HIGH_BIT		16
+> -#define WR_LOW_BIT		8
+> +#define ARMADA_SYNC_ENABLE_BIT		24
+> +#define ARMADA_WR_HIGH_BIT		16
+> +#define ARMADA_WR_LOW_BIT		8
+>
+> -#define READ_PARAM_OFFSET	0x0
+> -#define WRITE_PARAM_OFFSET	0x4
+> +#define ARMADA_READ_PARAM_OFFSET	0x0
+> +#define ARMADA_WRITE_PARAM_OFFSET	0x4
+>
+>   struct devbus_read_params {
+>   	u32 bus_width;
+> @@ -171,31 +171,31 @@ static int devbus_set_timing_params(struct devbus *devbus,
+>   		return err;
+>
+>   	/* Set read timings */
+> -	value = r.bus_width << DEV_WIDTH_BIT |
+> -		r.badr_skew << BADR_SKEW_BIT |
+> -		r.rd_hold   << RD_HOLD_BIT   |
+> -		r.acc_next  << ACC_NEXT_BIT  |
+> -		r.rd_setup  << RD_SETUP_BIT  |
+> -		r.acc_first << ACC_FIRST_BIT |
+> +	value = r.bus_width << ARMADA_DEV_WIDTH_BIT |
+> +		r.badr_skew << ARMADA_BADR_SKEW_BIT |
+> +		r.rd_hold   << ARMADA_RD_HOLD_BIT   |
+> +		r.acc_next  << ARMADA_ACC_NEXT_BIT  |
+> +		r.rd_setup  << ARMADA_RD_SETUP_BIT  |
+> +		r.acc_first << ARMADA_ACC_FIRST_BIT |
+>   		r.turn_off;
+>
+>   	dev_dbg(devbus->dev, "read parameters register 0x%p = 0x%x\n",
+> -		devbus->base + READ_PARAM_OFFSET,
+> +		devbus->base + ARMADA_READ_PARAM_OFFSET,
+>   		value);
+>
+> -	writel(value, devbus->base + READ_PARAM_OFFSET);
+> +	writel(value, devbus->base + ARMADA_READ_PARAM_OFFSET);
+>
+>   	/* Set write timings */
+> -	value = w.sync_enable  << SYNC_ENABLE_BIT |
+> -		w.wr_low       << WR_LOW_BIT      |
+> -		w.wr_high      << WR_HIGH_BIT     |
+> +	value = w.sync_enable  << ARMADA_SYNC_ENABLE_BIT |
+> +		w.wr_low       << ARMADA_WR_LOW_BIT      |
+> +		w.wr_high      << ARMADA_WR_HIGH_BIT     |
+>   		w.ale_wr;
+>
+>   	dev_dbg(devbus->dev, "write parameters register: 0x%p = 0x%x\n",
+> -		devbus->base + WRITE_PARAM_OFFSET,
+> +		devbus->base + ARMADA_WRITE_PARAM_OFFSET,
+>   		value);
+>
+> -	writel(value, devbus->base + WRITE_PARAM_OFFSET);
+> +	writel(value, devbus->base + ARMADA_WRITE_PARAM_OFFSET);
+>
+>   	return 0;
+>   }
 >
