@@ -1,61 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 15 Apr 2014 01:21:34 +0200
-Subject: [PATCH 3/4] ALSA: sound/atmel/ac97c.c: Add device tree support
-In-Reply-To: <11572820.ByGz2BLudS@kongar>
-References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
- <5369289.Xz059aMMT6@kongar> <1397299697.719282244@f331.i.mail.ru>
- <11572820.ByGz2BLudS@kongar>
-Message-ID: <20140414232134.GB2967@piout.net>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Tue, 15 Apr 2014 01:45:35 +0200
+Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
+In-Reply-To: <534C3606.7010206@meduna.org>
+References: <534C3606.7010206@meduna.org>
+Message-ID: <534C731F.1050406@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/2014 at 10:32:09 +0200, Alexander Stein wrote :
-> On Saturday 12 April 2014, 14:48:17 wrote Alexander Shiyan:
-> > Sat, 12 Apr 2014 12:42:18 +0200 ?? Alexander Stein <alexanders83@web.de>:
-> > > On Saturday 12 April 2014, 14:31:28 wrote Alexander Shiyan:
-> > > > Sat, 12 Apr 2014 11:08:26 +0200 ?? Alexander Stein <alexanders83@web.de>:
-> > > > > Signed-off-by: Alexander Stein <alexanders83@web.de>
-> > > > > ---
-> > > > >  .../devicetree/bindings/sound/atmel_ac97c.txt      | 20 +++++++++
-> > > > >  sound/atmel/ac97c.c                                | 52 ++++++++++++++++++++--
-> > > > >  2 files changed, 69 insertions(+), 3 deletions(-)
-> > > > >  create mode 100644 Documentation/devicetree/bindings/sound/atmel_ac97c.txt
-> > > > > 
-> > > > > diff --git a/Documentation/devicetree/bindings/sound/atmel_ac97c.txt b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
-> > > > > new file mode 100644
-> > > > > index 0000000..9839403
-> > > > > --- /dev/null
-> > > > > +++ b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
-> > > > > @@ -0,0 +1,20 @@
-> > > > > +* Atmel AC97 controller
-> > > > > +
-> > > > > +Required properties:
-> > > > > +  - compatible: "atmel,atmel_ac97c"
-> > > > > +  - reg: Address and length of the register set for the device
-> > > > > +  - interrupts: Should contain AC97 interrupt
-> > > > > +  - atmel,reset-pin: GPIO for resetting the codec
-> > > > 
-> > > > Why standard "gpios" property cannot be used here?
-> > > 
-> > > I guess they can. I have no experience defining a devicetree binding, so I just stuck to the platformdata member name.
-> > > If this is the recommended way, I'll gladly change that.
-> > 
-> > Another question is whether this property should refer to the controller,
-> > as it is clear that it refers to the codec ....
+On 14.04.2014 21:24, Stanislav Meduna wrote:
+
+> hunting another problem with AUART acting weirdly I got
+
+okay, the AUART thing was some device tree snafu, but I have seen
+the BUG a few times (but not readily reproducible). This thread
+looks remotely similar https://lkml.org/lkml/2013/9/27/534 - looks
+like the real bug happened somewhere else :( Any hints on how to
+get more info?
+
+Adding Cc: to linux-arm and linux-kernel
+
+> BUG: spinlock trylock failure on UP on CPU#0, ksoftirqd/0/3
+>  lock: boot_tvec_bases+0x0/0x10a0, .magic: dead4ead, .owner: ksoftirqd/0/3, .owner_cpu: 0
+> CPU: 0 PID: 3 Comm: ksoftirqd/0 Not tainted 3.12.15-rt25-00371-gfec62f5-dirty #26
+> [<c00149ec>] (unwind_backtrace+0x0/0xf4) from [<c0012ab0>] (show_stack+0x10/0x14)
+> [<c0012ab0>] (show_stack+0x10/0x14) from [<c01a4b80>] (do_raw_spin_trylock+0x4c/0x58)
+> [<c01a4b80>] (do_raw_spin_trylock+0x4c/0x58) from [<c02ca0b4>] (_raw_spin_trylock+0x20/0x98)
+> [<c02ca0b4>] (_raw_spin_trylock+0x20/0x98) from [<c02c9654>] (rt_spin_trylock+0x14/0xd0)
+> [<c02c9654>] (rt_spin_trylock+0x14/0xd0) from [<c00285cc>] (run_local_timers+0x24/0x78)
+> [<c00285cc>] (run_local_timers+0x24/0x78) from [<c0028654>] (update_process_times+0x34/0x68)
+> [<c0028654>] (update_process_times+0x34/0x68) from [<c005f0ac>] (tick_sched_timer+0x58/0x22c)
+> [<c005f0ac>] (tick_sched_timer+0x58/0x22c) from [<c003f2f8>] (__run_hrtimer+0x7c/0x2a8)
+> [<c003f2f8>] (__run_hrtimer+0x7c/0x2a8) from [<c003f684>] (hrtimer_interrupt+0x104/0x30c)
+> [<c003f684>] (hrtimer_interrupt+0x104/0x30c) from [<c0230a84>] (mxs_timer_interrupt+0x20/0x2c)
+> [<c0230a84>] (mxs_timer_interrupt+0x20/0x2c) from [<c0051d1c>] (handle_irq_event_percpu+0x80/0x2f8)
+> [<c0051d1c>] (handle_irq_event_percpu+0x80/0x2f8) from [<c0051fd0>] (handle_irq_event+0x3c/0x5c)
+> [<c0051fd0>] (handle_irq_event+0x3c/0x5c) from [<c0054778>] (handle_level_irq+0x8c/0x118)
+> [<c0054778>] (handle_level_irq+0x8c/0x118) from [<c0051c8c>] (generic_handle_irq+0x28/0x30)
+> [<c0051c8c>] (generic_handle_irq+0x28/0x30) from [<c001009c>] (handle_IRQ+0x30/0x84)
+> [<c001009c>] (handle_IRQ+0x30/0x84) from [<c0013324>] (__irq_svc+0x44/0x88)
+> [<c0013324>] (__irq_svc+0x44/0x88) from [<c006a664>] (__try_to_take_rt_mutex+0x4/0x144)
+> [<c006a664>] (__try_to_take_rt_mutex+0x4/0x144) from [<00000000>] (  (null))
 > 
-> AFAICT the codec itself has no representation in the devicetree. It gets detected by the controller which uses the reset GPIO.
->
-
-Yeah, maybe we can already go for ac97-gpios, there. It actually takes a
-list of gpios: ac97-sync, ac97-sdata and ac97-reset. You may want to
-have a look at Documentation/devicetree/bindings/sound/soc-ac97link.txt
-and snd_soc_set_ac97_ops_of_reset(), snd_soc_ac97_parse_pinctl() in
-sound/soc/core.c
-
-The goal would be to be able to keep the same bindings when switching
-over to ASoC.
+> 
+> Linux nxt 3.12.15-rt25-00371-gfec62f5-dirty #26 PREEMPT RT Mon Apr 14 20:40:56 CEST 2014 armv5tejl GNU/Linux
+> 
+> This is on a Freescale i.MX28, 3.12.15-rt25 with patches that do not touch
+> anything related.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+                                                 Stano
