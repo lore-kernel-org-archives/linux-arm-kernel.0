@@ -1,57 +1,52 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Apr 2014 14:42:02 +0300
-Subject: [PATCH v3 07/10] dmaengine: edma: Reduce debug print verbosity for
- non verbose debugging
+Date: Mon, 14 Apr 2014 14:42:04 +0300
+Subject: [PATCH v3 09/10] dmaengine: edma: Add channel number to debug prints
 In-Reply-To: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1397475725-5036-8-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1397475725-5036-10-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not print the paRAM information when verbose debugging is not asked and
-also reduce the number of lines printed in edma_prep_dma_cyclic()
+It helps to identify issues if we have some information regarding to the
+channel which the event is associated.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ drivers/dma/edma.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 2f58c04cbcb1..6d9edc47150d 100644
+index bc8175c92e0c..4aa5eb005b5c 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -141,7 +141,7 @@ static void edma_execute(struct edma_chan *echan)
- 	for (i = 0; i < nslots; i++) {
- 		j = i + edesc->processed;
- 		edma_write_slot(echan->slot[i], &edesc->pset[j]);
--		dev_dbg(echan->vchan.chan.device->dev,
-+		dev_vdbg(echan->vchan.chan.device->dev,
- 			"\n pset[%d]:\n"
- 			"  chnum\t%d\n"
- 			"  slot\t%d\n"
-@@ -560,9 +560,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
- 	edesc->cyclic = 1;
- 	edesc->pset_nr = nslots;
+@@ -185,7 +185,8 @@ static void edma_execute(struct edma_chan *echan)
+ 	edma_resume(echan->ch_num);
  
--	dev_dbg(dev, "%s: nslots=%d\n", __func__, nslots);
--	dev_dbg(dev, "%s: period_len=%d\n", __func__, period_len);
--	dev_dbg(dev, "%s: buf_len=%d\n", __func__, buf_len);
-+	dev_dbg(dev, "%s: channel=%d nslots=%d period_len=%zu buf_len=%zu\n",
-+		__func__, echan->ch_num, nslots, period_len, buf_len);
+ 	if (edesc->processed <= MAX_NR_SG) {
+-		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
++		dev_dbg(dev, "first transfer starting on channel %d\n",
++			echan->ch_num);
+ 		edma_start(echan->ch_num);
+ 	}
  
- 	for (i = 0; i < nslots; i++) {
- 		/* Allocate a PaRAM slot, if needed */
-@@ -596,8 +595,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
- 		else
- 			src_addr += period_len;
+@@ -195,7 +196,7 @@ static void edma_execute(struct edma_chan *echan)
+ 	 * MAX_NR_SG
+ 	 */
+ 	if (echan->missed) {
+-		dev_dbg(dev, "missed event in execute detected\n");
++		dev_dbg(dev, "missed event on channel %d\n", echan->ch_num);
+ 		edma_clean_channel(echan->ch_num);
+ 		edma_stop(echan->ch_num);
+ 		edma_start(echan->ch_num);
+@@ -735,7 +736,7 @@ static int edma_alloc_chan_resources(struct dma_chan *chan)
+ 	echan->alloced = true;
+ 	echan->slot[0] = echan->ch_num;
  
--		dev_dbg(dev, "%s: Configure period %d of buf:\n", __func__, i);
--		dev_dbg(dev,
-+		dev_vdbg(dev, "%s: Configure period %d of buf:\n", __func__, i);
-+		dev_vdbg(dev,
- 			"\n pset[%d]:\n"
- 			"  chnum\t%d\n"
- 			"  slot\t%d\n"
+-	dev_dbg(dev, "allocated channel for %u:%u\n",
++	dev_dbg(dev, "allocated channel %d for %u:%u\n", echan->ch_num,
+ 		EDMA_CTLR(echan->ch_num), EDMA_CHAN_SLOT(echan->ch_num));
+ 
+ 	return 0;
 -- 
 1.9.2
