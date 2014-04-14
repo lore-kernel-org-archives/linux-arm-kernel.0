@@ -1,35 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 14 Apr 2014 10:48:19 -0700
-Subject: [PATCH] ARM: debug: qcom: make UART address selection
- configuration option
-In-Reply-To: <1397483254-3612-1-git-send-email-iivanov@mm-sol.com>
-References: <53458708.40702@codeaurora.org>
- <1397483254-3612-1-git-send-email-iivanov@mm-sol.com>
-Message-ID: <534C1F63.1040705@codeaurora.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 14 Apr 2014 13:50:37 -0400
+Subject: [PATCH v2] pata_arasan_cf: fix ata_host_activate() failure
+ handling
+In-Reply-To: <1706948.xQXQIMFS2B@amdc1032>
+References: <1706948.xQXQIMFS2B@amdc1032>
+Message-ID: <20140414175037.GA15249@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/14 06:47, Ivan T. Ivanov wrote:
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
->
-> Separate Qualcomm low-level debugging UART to two options.
->
-> DEBUG_MSM_UART is used in earlier non-multi platform arches,
-> like MSM7X00A, QSD8X50 and MSM7X30.
->
-> DEBUG_QCOM_UARTDM is used in multi-plafrom arches and have
-> embedded data mover.
->
-> Make DEBUG_UART_PHYS and DEBUG_UART_BASE user adjustable by
-> Kconfig menu.
->
-> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+On Mon, Apr 14, 2014 at 06:01:47PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> Add missing cf_exit() and clk_put() calls to ata_host_activate()
+> failure path.
+> 
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Applied to libata/for-3.15-fixes.
 
-Looks good. Thanks. I'll give it a test later today. We may still need
-to send the small fix for 3.15 if this is too large for rc2.
+Thanks.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+tejun
