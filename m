@@ -1,29 +1,53 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Mon, 14 Apr 2014 17:08:03 +0900
-Subject: [PATCH] arm64:kconfig: make default for CONFIG_COMPAT
-Message-ID: <1397462883-12740-1-git-send-email-chanho.min@lge.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 14 Apr 2014 10:14:38 +0200
+Subject: [PATCH] pinctrl/at91: Fix mask creation in at91_gpio_dbg_show
+In-Reply-To: <1397241193-2420-1-git-send-email-alexanders83@web.de>
+References: <CAJjB1qLC6HBwz=bBef-EGH8wrfpqE3DdTGcfGrwb_r1qCdRPRA@mail.gmail.com>
+ <1397241193-2420-1-git-send-email-alexanders83@web.de>
+Message-ID: <20140414081438.GI2967@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'make savedefconfig' doesn't generate defconfig properly due to
-missing COMPAT default. So Add default and set to yes.
+On 11/04/2014 at 20:33:13 +0200, Alexander Stein wrote :
+> pin_to_mask expects a bank pin number. So do not add the chip base.
+> 
+I would prefer that you add a description of the effects of the bug as
+seen by the user.
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- arch/arm64/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+else
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4907b85..93b7531 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -294,6 +294,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	bool "Kernel support for 32-bit EL0"
-+	default y
- 	depends on !ARM64_64K_PAGES
- 	select COMPAT_BINFMT_ELF
- 	select HAVE_UID16
+> ---
+> Mark, thanks for the clarification that pin_to_mask only expects tha bank
+> pin number. This wasn't obvious to me.
+>  drivers/pinctrl/pinctrl-at91.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 63176f2..2da0e6e 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1205,8 +1205,7 @@ static void at91_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  	void __iomem *pio = at91_gpio->regbase;
+>  
+>  	for (i = 0; i < chip->ngpio; i++) {
+> -		unsigned pin = chip->base + i;
+> -		unsigned mask = pin_to_mask(pin);
+> +		unsigned mask = pin_to_mask(i);
+>  		const char *gpio_label;
+>  		u32 pdsr;
+>  
+> -- 
+> 1.9.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-1.7.9.5
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
