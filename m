@@ -1,46 +1,125 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 18:19:20 +0200
-Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
-In-Reply-To: <10589751.qhi630WAFs@amdc1032>
-References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <16639486.i0jTGsaDYr@amdc1032> <20140414180142.0dd63a1f@skate>
- <10589751.qhi630WAFs@amdc1032>
-Message-ID: <20140414181920.1e309019@skate>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 14 Apr 2014 11:25:20 -0500
+Subject: [PATCH 09/15] bus: omap_l3_noc: rename functions and data to omap_l3
+In-Reply-To: <1397492726-17203-1-git-send-email-nm@ti.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+Message-ID: <1397492726-17203-11-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Bartlomiej Zolnierkiewicz,
+From: Sricharan R <r.sricharan@ti.com>
 
-On Mon, 14 Apr 2014 18:13:07 +0200, Bartlomiej Zolnierkiewicz wrote:
-> On Monday, April 14, 2014 06:01:42 PM Thomas Petazzoni wrote:
-> > Dear Bartlomiej Zolnierkiewicz,
-> > 
-> > On Mon, 14 Apr 2014 17:53:37 +0200, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > > >  * Fixed the module alias name. Suggested by Bartlomiej
-> > > >    Zolnierkiewicz.
-> > > 
-> > > Well, you could have also added a comment explaining the lack of
-> > > the Power Management support..
-> > 
-> > True, sorry for this. Should I resend a new version of the patch series
-> > with an indication about this in the commit log? Or is this OK as it is?
-> 
-> Please include the comment in the next revision if this is not too much
-> trouble (I assume that you would like to do another re-spin just to add
-> Acked-by/Reviewed-by tags anyway).
+Since omap_l3_noc driver is now being used for OMAP5 and reusable with
+DRA7 and AM437x, using omap4 specific naming is misleading.
 
-Well, I wasn't planning on re-spinning just to add Acked-by/Reviewed-by
-tags, as those are generally added by the subsystem maintainers when
-applying the patches. Though if Tejun says otherwise, I can definitely
-re-spin without any problem.
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/bus/omap_l3_noc.c |   24 ++++++++++++------------
+ drivers/bus/omap_l3_noc.h |   11 ++++++-----
+ 2 files changed, 18 insertions(+), 17 deletions(-)
 
-Tejun, just let me know what you prefer.
-
-Thanks!
-
-Thomas
+diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
+index c2b0cc3..6848822 100644
+--- a/drivers/bus/omap_l3_noc.c
++++ b/drivers/bus/omap_l3_noc.c
+@@ -1,5 +1,5 @@
+ /*
+- * OMAP4XXX L3 Interconnect error handling driver
++ * OMAP L3 Interconnect error handling driver
+  *
+  * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
+  *	Santosh Shilimkar <santosh.shilimkar@ti.com>
+@@ -50,7 +50,7 @@
+ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ {
+ 
+-	struct omap4_l3 *l3 = _l3;
++	struct omap_l3 *l3 = _l3;
+ 	int inttype, i, k;
+ 	int err_src = 0;
+ 	u32 std_err_main, err_reg, clear, masterid;
+@@ -166,9 +166,9 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int omap4_l3_probe(struct platform_device *pdev)
++static int omap_l3_probe(struct platform_device *pdev)
+ {
+-	static struct omap4_l3 *l3;
++	static struct omap_l3 *l3;
+ 	int ret, i;
+ 
+ 	l3 = devm_kzalloc(&pdev->dev, sizeof(*l3), GFP_KERNEL);
+@@ -221,8 +221,8 @@ MODULE_DEVICE_TABLE(of, l3_noc_match);
+ #define l3_noc_match NULL
+ #endif
+ 
+-static struct platform_driver omap4_l3_driver = {
+-	.probe		= omap4_l3_probe,
++static struct platform_driver omap_l3_driver = {
++	.probe		= omap_l3_probe,
+ 	.driver		= {
+ 		.name		= "omap_l3_noc",
+ 		.owner		= THIS_MODULE,
+@@ -230,14 +230,14 @@ static struct platform_driver omap4_l3_driver = {
+ 	},
+ };
+ 
+-static int __init omap4_l3_init(void)
++static int __init omap_l3_init(void)
+ {
+-	return platform_driver_register(&omap4_l3_driver);
++	return platform_driver_register(&omap_l3_driver);
+ }
+-postcore_initcall_sync(omap4_l3_init);
++postcore_initcall_sync(omap_l3_init);
+ 
+-static void __exit omap4_l3_exit(void)
++static void __exit omap_l3_exit(void)
+ {
+-	platform_driver_unregister(&omap4_l3_driver);
++	platform_driver_unregister(&omap_l3_driver);
+ }
+-module_exit(omap4_l3_exit);
++module_exit(omap_l3_exit);
+diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
+index c4a1760..a1931e8 100644
+--- a/drivers/bus/omap_l3_noc.h
++++ b/drivers/bus/omap_l3_noc.h
+@@ -1,5 +1,5 @@
+ /*
+- * OMAP4XXX L3 Interconnect  error handling driver header
++ * OMAP L3 Interconnect  error handling driver header
+  *
+  * Copyright (C) 2011-2014 Texas Instruments Incorporated - http://www.ti.com/
+  *	Santosh Shilimkar <santosh.shilimkar@ti.com>
+@@ -14,8 +14,8 @@
+  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-#ifndef __ARCH_ARM_MACH_OMAP2_L3_INTERCONNECT_3XXX_H
+-#define __ARCH_ARM_MACH_OMAP2_L3_INTERCONNECT_3XXX_H
++#ifndef __OMAP_L3_NOC_H
++#define __OMAP_L3_NOC_H
+ 
+ #define L3_MODULES			3
+ #define CLEAR_STDERR_LOG		(1 << 31)
+@@ -140,7 +140,7 @@ static struct l3_target_data *l3_targ[L3_MODULES] = {
+ 	l3_target_inst_data_clk3,
+ };
+ 
+-struct omap4_l3 {
++struct omap_l3 {
+ 	struct device *dev;
+ 	struct clk *ick;
+ 
+@@ -150,4 +150,5 @@ struct omap4_l3 {
+ 	int debug_irq;
+ 	int app_irq;
+ };
+-#endif
++
++#endif	/* __OMAP_L3_NOC_H */
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
