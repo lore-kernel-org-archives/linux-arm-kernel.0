@@ -1,184 +1,188 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 14 Apr 2014 11:41:29 +0100
-Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
-References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
- <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
-Message-ID: <20140414104116.GA3844@e103592.cambridge.arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 12:43:27 +0200
+Subject: [PATCH 15/29] ARM: orion5x: switch to DT interrupts and timer
+In-Reply-To: <1397400006-4315-16-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-16-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BBBCF.9020806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 04:23:04PM -0400, Nicolas Pitre wrote:
-> On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
-> 
-> > Add machine-dependent MCPM call-backs for Exynos5420. These are used
-> > to power up/down the secondary CPUs during boot, shutdown, s2r and
-> > switching.
-> > 
-> > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> > Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
-> > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> 
-> See comments inline.
+On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
+> This commit switches the Orion5x platforms described through DT to use
+> a DT-defined interrupt controller and timer.
+>
+> This involves:
+>
+>   * Describing in the DT the bridge interrupt controller, which is a
+>     child interrupt controller to the main one, which is used for timer
+>     and watchdog interrupts.
+>
+>   * Describing in the DT the timer.
+>
+>   * Adding in the DT the interrupt specifications for the watchdog.
+>
+>   * Selecting the ORION_IRQCHIP and ORION_TIMER drivers to be compiled.
+>
+>   * Change the timer initialization in board-dt.c to use
+>     clocksource_of_init().
+>
+>   * Implement a multi-IRQ handler for non-DT platforms in
+>     mach-orion5x/irq.c.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/orion5x.dtsi   | 19 +++++++++++++++++++
+>   arch/arm/mach-orion5x/Kconfig    |  2 ++
+>   arch/arm/mach-orion5x/board-dt.c | 10 ++--------
+>   arch/arm/mach-orion5x/irq.c      | 28 ++++++++++++++++++++++++++++
+>   4 files changed, 51 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> index ac2ec8f..f25ed91 100644
+> --- a/arch/arm/boot/dts/orion5x.dtsi
+> +++ b/arch/arm/boot/dts/orion5x.dtsi
+> @@ -78,6 +78,15 @@
+>   				status = "disabled";
+>   			};
+>
+> +			bridge_intc: bridge-interrupt-ctrl at 20110 {
+> +				compatible = "marvell,orion-bridge-intc";
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +				reg = <0x20110 0x8>;
+> +				interrupts = <0>;
+> +				marvell,#interrupts = <4>;
+> +			};
+> +
+>   			intc: interrupt-controller at 20200 {
+>   				compatible = "marvell,orion-intc";
+>   				interrupt-controller;
+> @@ -85,9 +94,19 @@
+>   				reg = <0x20200 0x08>;
+>   			};
+>
+> +			timer at 20300 {
+> +				compatible = "marvell,orion-timer";
+> +				reg = <0x20300 0x20>;
+> +				interrupt-parent = <&bridge_intc>;
+> +				interrupts = <1>, <2>;
+> +				clocks = <&core_clk 0>;
+> +			};
+> +
+>   			wdt at 20300 {
+>   				compatible = "marvell,orion-wdt";
+>   				reg = <0x20300 0x28>;
+> +				interrupt-parent = <&bridge_intc>;
+> +				interrupts = <3>;
+>   				status = "okay";
+>   			};
+>
+> diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+> index 4f51132..bd65872 100644
+> --- a/arch/arm/mach-orion5x/Kconfig
+> +++ b/arch/arm/mach-orion5x/Kconfig
+> @@ -6,6 +6,8 @@ config ARCH_ORION5X_DT
+>   	bool "Marvell Orion5x Flattened Device Tree"
+>   	select USE_OF
+>   	select ORION_CLK
+> +	select ORION_IRQCHIP
+> +	select ORION_TIMER
+>   	help
+>   	  Say 'Y' here if you want your kernel to support the
+>   	  Marvell Orion5x using flattened device tree.
+> diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
+> index c489661..38b54f1 100644
+> --- a/arch/arm/mach-orion5x/board-dt.c
+> +++ b/arch/arm/mach-orion5x/board-dt.c
+> @@ -17,6 +17,7 @@
+>   #include <linux/cpu.h>
+>   #include <linux/mbus.h>
+>   #include <linux/clk-provider.h>
+> +#include <linux/clocksource.h>
+>   #include <asm/system_misc.h>
+>   #include <asm/mach/arch.h>
+>   #include <asm/mach/map.h>
+> @@ -36,15 +37,10 @@ static struct of_dev_auxdata orion5x_auxdata_lookup[] __initdata = {
+>   	{},
+>   };
+>
+> -static void orion5x_dt_init_early(void)
+> -{
+> -	orion_time_set_base(TIMER_VIRT_BASE);
+> -}
+> -
+>   static void orion5x_dt_init_time(void)
+>   {
+> -	orion5x_timer_init();
+>   	of_clk_init(NULL);
+> +	clocksource_of_init();
+>   	BUG_ON(mvebu_mbus_dt_init());
 
-I won't duplicate Nico's review, but I have a couple of extra comments/
-questions, below.
+If you move the mvebu_mbus_dt_init() to .init_machine callback, you
+can also drop .init_time callback.
 
-[...]
+Sebastian
 
-> > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> > new file mode 100644
-> > index 0000000..46d4968
-> > --- /dev/null
-> > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> > @@ -0,0 +1,444 @@
-
-[...]
-
-> > +static void exynos_cluster_power_control(unsigned int cluster, int enable)
-> > +{
-> > +	unsigned long timeout = jiffies + msecs_to_jiffies(20);
-> > +	unsigned int status, val = EXYNOS_CORE_LOCAL_PWR_DIS;
-> > +
-> > +	if (enable)
-> > +		val = EXYNOS_CORE_LOCAL_PWR_EN;
-> > +
-> > +	status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
-> > +	if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
-> > +		return;
-> > +
-> > +	__raw_writel(val, EXYNOS_COMMON_CONFIGURATION(cluster));
-> > +	/* Wait until cluster power control is applied */
-> > +	while (time_before(jiffies, timeout)) {
-> > +		status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
-> > +
-> > +		if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
-> > +			return;
-> > +
-> > +		cpu_relax();
-> > +	}
-> > +	pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
-> > +		enable ? "on" : "off");
-> 
-> You should not have to wait for the power status to change here.  
-> Simply signaling the desired state and returning is all that is 
-> expected.  And because IRQs are turned off, it is likely that 
-> time_before(jiffies, timeout) will always be true anyway because jiffies 
-> are not updated if there is no other CPU to service the timer interrupt.
-> 
-> The actual power status should be polled for in the mcpm_finish() 
-> method only.
-
-Depending on the power controller, it might be possible for writes to
-the controller to be lost or not acted upon, if a previous change is
-still pending.
-
-Does this issue apply to the exynos power controller?
-
-If this is the case, it might be necessary to ensure before a power-up
-request, that the power controller has caught up and reports the
-cluster/CPU as down.  Putting this poll before the write to the
-power controller maximises the chance of pipelining useful work
-in the meantime.  Putting the poll after the write is the worst case.
-
-> 
-> > +}
-> > +
-> > +static int exynos_power_up(unsigned int cpu, unsigned int cluster)
-> > +{
-> > +	unsigned long mpidr;
-> > +
-> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> > +	if (cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
-> > +		cluster >= EXYNOS5420_NR_CLUSTERS)
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
-> > +	 * variant exists, we need to disable IRQs manually here.
-> > +	 */
-> > +	local_irq_disable();
-> > +	arch_spin_lock(&bl_lock);
-> > +
-> > +	cpu_use_count[cpu][cluster]++;
-> > +	if (cpu_use_count[cpu][cluster] == 1) {
-> > +		bool was_cluster_down =
-> > +			__mcpm_cluster_state(cluster) == CLUSTER_DOWN;
-> > +
-> > +		if (was_cluster_down)
-> > +			exynos_cluster_power_control(cluster, 1);
-> > +		exynos_core_power_control(cpu, cluster, 1);
-> > +
-> > +		if (was_cluster_down) {
-> > +			mpidr = read_cpuid_mpidr();
-> > +			udelay(10);
-> > +			cci_control_port_by_cpu(mpidr, true);
-> > +		}
-> 
-> This is completely wrong.  Is this why you created the patch to 
-> introduce cci_control_port_by_cpu()?  If so I'm NAKing that other patch 
-> as well.
-> 
-> This is going to be completely ineffective with concurrent usage by 
-> cpuidle where CPUs in the other cluster are awaken by an interrupt and 
-> not by calling the cpu_up method.  The current cluster will therefore 
-> not be aware of the other cluster coming online and system memory 
-> corruption will occur.
-> 
-> I see below that you do turn off the CCI port for the current cluster 
-> and the other cluster together, hence the need to enable back the CCI 
-> for the current cluster here.  Please don't do that.  That's not the 
-> proper way to achieve that and there are many race conditions to take 
-> care of before this can be done.  And if we were to go that route, I 
-> want to be convinced it is worth the needed complexity first i.e. I want 
-> to see evidence this actually does save power or improve performance by 
-> a non negligible margin.
-
-Agreed.
-
-The fact that there is no C interface for enabling ACE ports is
-deliberate.  For CPUs connected to ACE and managed via MCPM,
-it is incorrect to enable CCI via C code, since the safe window
-is the window during which all outbound CPUs have reached CLUSTER_DOWN
-and all inbound CPUs have not turned their MMU on yet (and thus cannot
-execute any general Linux C code).
-
-There might be scenarios involving GPUs and other non-CPU devices
-connected to ACE ports where the device cannot enable CCI snoops
-for itself -- but this would require a holding-pen protocol to enable
-the device to wait and signal a CPU to enable CCI snoops on the device's
-behalf before the device proceeds.  It is not the correct solution for
-CPU clusters attached to ACE, precisely because we can be more efficient
-in that case.
-
-In fact, because you implement a power_up_setup method that calls
-cci_enable_port_for_self, CCI snoops are actually enabled twice, making
-the above code appear redundant.   Have I missed something?
-
-Cheers
----Dave
-
-> 
-> > +		/* CPU should be powered up there */
-> > +		/* Also setup Cluster Power Sequence here */
-> > +	} else if (cpu_use_count[cpu][cluster] != 2) {
-> > +		/*
-> > +		 * The only possible values are:
-> > +		 * 0 = CPU down
-> > +		 * 1 = CPU (still) up
-> > +		 * 2 = CPU requested to be up before it had a chance
-> > +		 *     to actually make itself down.
-> > +		 * Any other value is a bug.
-> > +		 */
-> > +		BUG();
-> > +	}
-> > +
-> > +	arch_spin_unlock(&bl_lock);
-> > +	local_irq_enable();
-> > +
-> > +	return 0;
-> > +}
-
-[...]
+>   }
+>
+> @@ -85,8 +81,6 @@ static const char *orion5x_dt_compat[] = {
+>   DT_MACHINE_START(ORION5X_DT, "Marvell Orion5x (Flattened Device Tree)")
+>   	/* Maintainer: Thomas Petazzoni <thomas.petazzoni@free-electrons.com> */
+>   	.map_io		= orion5x_map_io,
+> -	.init_early	= orion5x_dt_init_early,
+> -	.init_irq	= orion_dt_init_irq,
+>   	.init_time	= orion5x_dt_init_time,
+>   	.init_machine	= orion5x_dt_init,
+>   	.restart	= orion5x_restart,
+> diff --git a/arch/arm/mach-orion5x/irq.c b/arch/arm/mach-orion5x/irq.c
+> index 9654b0c..cd4bac4 100644
+> --- a/arch/arm/mach-orion5x/irq.c
+> +++ b/arch/arm/mach-orion5x/irq.c
+> @@ -16,6 +16,7 @@
+>   #include <mach/bridge-regs.h>
+>   #include <plat/orion-gpio.h>
+>   #include <plat/irq.h>
+> +#include <asm/exception.h>
+>   #include "common.h"
+>
+>   static int __initdata gpio0_irqs[4] = {
+> @@ -25,10 +26,37 @@ static int __initdata gpio0_irqs[4] = {
+>   	IRQ_ORION5X_GPIO_24_31,
+>   };
+>
+> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+> +/*
+> + * Compiling with both non-DT and DT support enabled, will
+> + * break asm irq handler used by non-DT boards. Therefore,
+> + * we provide a C-style irq handler even for non-DT boards,
+> + * if MULTI_IRQ_HANDLER is set.
+> + */
+> +
+> +asmlinkage void
+> +__exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
+> +{
+> +	u32 stat;
+> +
+> +	stat = readl_relaxed(MAIN_IRQ_CAUSE);
+> +	stat &= readl_relaxed(MAIN_IRQ_MASK);
+> +	if (stat) {
+> +		unsigned int hwirq = __fls(stat);
+> +		handle_IRQ(hwirq, regs);
+> +		return;
+> +	}
+> +}
+> +#endif
+> +
+>   void __init orion5x_init_irq(void)
+>   {
+>   	orion_irq_init(0, MAIN_IRQ_MASK);
+>
+> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+> +	set_handle_irq(orion5x_legacy_handle_irq);
+> +#endif
+> +
+>   	/*
+>   	 * Initialize gpiolib for GPIOs 0-31.
+>   	 */
+>
