@@ -1,67 +1,38 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 14 Apr 2014 18:00:04 +0200
-Subject: [PATCH] pata_arasan_cf: fix ata_host_activate() failure handling
-In-Reply-To: <CAOh2x=n8PGuykczfpi0T1-WwVmakURyX+RuuOQiFVhpYPmrS6A@mail.gmail.com>
-References: <7093981.6c4k98qyGh@amdc1032>
- <CAOh2x=n8PGuykczfpi0T1-WwVmakURyX+RuuOQiFVhpYPmrS6A@mail.gmail.com>
-Message-ID: <1861056.i4MLEJ6v1d@amdc1032>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 14 Apr 2014 18:01:42 +0200
+Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
+In-Reply-To: <16639486.i0jTGsaDYr@amdc1032>
+References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <16639486.i0jTGsaDYr@amdc1032>
+Message-ID: <20140414180142.0dd63a1f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Bartlomiej Zolnierkiewicz,
 
-Hi,
+On Mon, 14 Apr 2014 17:53:37 +0200, Bartlomiej Zolnierkiewicz wrote:
 
-On Tuesday, April 01, 2014 09:50:42 AM Viresh Kumar wrote:
-> On Mon, Mar 31, 2014 at 11:19 PM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> > Add missing cf_exit() and clk_put() calls to ata_host_activate()
-> > failure path.
-> >
-> > Cc: Viresh Kumar <viresh.linux@gmail.com>
-> > Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  drivers/ata/pata_arasan_cf.c |   10 ++++++++--
-> >  1 file changed, 8 insertions(+), 2 deletions(-)
-> >
-> > Index: b/drivers/ata/pata_arasan_cf.c
-> > ===================================================================
-> > --- a/drivers/ata/pata_arasan_cf.c      2014-03-31 16:57:47.443727785 +0200
-> > +++ b/drivers/ata/pata_arasan_cf.c      2014-03-31 17:09:48.171715498 +0200
-> > @@ -898,9 +898,15 @@ static int arasan_cf_probe(struct platfo
-> >
-> >         cf_card_detect(acdev, 0);
-> >
-> > -       return ata_host_activate(host, acdev->irq, irq_handler, 0,
-> > -                       &arasan_cf_sht);
-> > +       ret = ata_host_activate(host, acdev->irq, irq_handler, 0,
-> > +                               &arasan_cf_sht);
-> > +       if (ret)
-> > +               goto exit_cf;
-> >
-> > +       return 0;
+> >  * Fixed the module alias name. Suggested by Bartlomiej
+> >    Zolnierkiewicz.
 > 
-> Probably this would be better:
+> Well, you could have also added a comment explaining the lack of
+> the Power Management support..
+
+True, sorry for this. Should I resend a new version of the patch series
+with an indication about this in the commit log? Or is this OK as it is?
+
+Note that working on power management support is part of our mid-term
+TODO list for this platform, so it will not remain unimplemented
+forever.
+
+> Anyway, all patches look OK to me.
 > 
-> if (!ret)
->     return 0
-> 
-> and then no need of a goto..
+> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-I considered doing it this way initially but decided that code consistency
-with other host drivers is more important.  However if this is what you
-prefer I'll re-do the patch and post it as v2.
+Thanks a lot!
 
-> > +
-> > +exit_cf:
-> > +       cf_exit(acdev);
-> >  free_clk:
-> >         clk_put(acdev->clk);
-> >         return ret;
-> >
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
