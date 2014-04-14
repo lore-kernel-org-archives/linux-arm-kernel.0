@@ -1,22 +1,37 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 14 Apr 2014 10:42:06 +0200
-Subject: Device tree support for Atmel AC97 controller on AT91SAM9263
-In-Reply-To: <1397293707-26890-1-git-send-email-alexanders83@web.de>
-References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
-Message-ID: <s5h38hgnvz5.wl%tiwai@suse.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 14 Apr 2014 10:43:13 +0200
+Subject: [PATCH 3/4] ARM: at91/dt: define sam9x5ek's crystal frequencies
+In-Reply-To: <1397464994-27267-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397464994-27267-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397464994-27267-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Sat, 12 Apr 2014 11:08:23 +0200,
-Alexander Stein wrote:
-> 
-> This set of patches add device tree support for the AC97 controller found
-> on AT91SAM9263.
-> The first two patches are minor cleanup, while the last ones add the actual
-> support.
+Define sam9x5ek's main and slow crystal frequencies.
 
-Do you really need work on this driver?  The sound/atmel/* stuff is an
-old one before ASoC was introduced, mostly obsoleted nowadays.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9x5cm.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-
-Takashi
+diff --git a/arch/arm/boot/dts/at91sam9x5cm.dtsi b/arch/arm/boot/dts/at91sam9x5cm.dtsi
+index 4a5ee5c..2798b02 100644
+--- a/arch/arm/boot/dts/at91sam9x5cm.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5cm.dtsi
+@@ -23,6 +23,14 @@
+ 		};
+ 	};
+ 
++	slow_xtal: slow_xtal {
++		clock-frequency = <32768>;
++	};
++
++	main_xtal: main_xtal {
++		clock-frequency = <12000000>;
++	};
++
+ 	ahb {
+ 		apb {
+ 			pinctrl at fffff400 {
+-- 
+1.8.3.2
