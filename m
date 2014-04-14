@@ -1,102 +1,256 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Apr 2014 15:35:47 +0200
-Subject: [PATCH v3 17/18] ASoC: fsl-ssi: reorder and document fsl_ssi_private
+Date: Mon, 14 Apr 2014 15:35:34 +0200
+Subject: [PATCH v3 04/18] ASoC: fsl-ssi: Move imx-specific probe to seperate
+ function
 In-Reply-To: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
 References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1397482548-28463-18-git-send-email-mpa@pengutronix.de>
+Message-ID: <1397482548-28463-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorder all variables in struct fsl_ssi_private to have groups that make
-sense together. The patch also updates the struct documentation.
+Move imx specific probe code to a seperate function. It reduces the
+size of the probe() function and makes the code and error handling
+easier to understand.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 59 +++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 43 insertions(+), 16 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 185 +++++++++++++++++++++++++++---------------------
+ 1 file changed, 103 insertions(+), 82 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 9425299..f8a30689 100644
+index 65d9da1..418c646 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -141,35 +141,62 @@ struct fsl_ssi_soc_data {
- /**
-  * fsl_ssi_private: per-SSI private data
-  *
-- * @ssi: pointer to the SSI's registers
-- * @ssi_phys: physical address of the SSI registers
-+ * @ssi: Pointer to the memory area
-  * @irq: IRQ of this SSI
-- * @playback: the number of playback streams opened
-- * @capture: the number of capture streams opened
-- * @cpu_dai: the CPU DAI for this device
-- * @dev_attr: the sysfs device attribute structure
-- * @stats: SSI statistics
-+ * @cpu_dai_drv: CPU DAI driver for this device
-+ *
-+ * @dai_fmt: DAI configuration this device is currently used with
-+ * @i2s_mode: i2s and network mode configuration of the device. Is used to
-+ * switch between normal and i2s/network mode
-+ * mode depending on the number of channels
-+ * @use_dma: DMA is used or FIQ with stream filter
-+ * @use_dual_fifo: DMA with support for both FIFOs used
-+ * @fifo_deph: Depth of the SSI FIFOs
-+ * @rxtx_reg_val: Specific register settings for receive/transmit configuration
-+ *
-+ * @clk: SSI clock
-+ * @baudclk: SSI baud clock for master mode
-+ * @baudclk_locked: SSI baudclk is locked because it is in use
-+ *
-+ * @dma_params_tx: DMA transmit parameters
-+ * @dma_params_rx: DMA receive parameters
-+ * @ssi_phys: physical address of the SSI registers
-+ *
-+ * @fiq_params: FIQ stream filtering parameters
-+ *
-+ * @pdev: Pointer to pdev used for deprecated fsl-ssi sound card
-+ *
-+ * @dbg_stats: Debugging statistics
-+ *
-+ * @soc: SoC specifc data
-  */
- struct fsl_ssi_private {
- 	struct ccsr_ssi __iomem *ssi;
--	dma_addr_t ssi_phys;
- 	unsigned int irq;
--	unsigned int fifo_depth;
- 	struct snd_soc_dai_driver cpu_dai_drv;
--	struct platform_device *pdev;
--	unsigned int dai_fmt;
+@@ -992,6 +992,100 @@ static void make_lowercase(char *s)
+ 	}
+ }
  
-+	unsigned int dai_fmt;
-+	u8 i2s_mode;
- 	bool use_dma;
--	bool baudclk_locked;
- 	bool use_dual_fifo;
--	u8 i2s_mode;
--	struct clk *baudclk;
-+	unsigned int fifo_depth;
-+	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
++static int fsl_ssi_imx_probe(struct platform_device *pdev,
++		struct fsl_ssi_private *ssi_private)
++{
++	struct device_node *np = pdev->dev.of_node;
++	u32 dma_events[2], dmas[4];
++	bool shared;
++	int ret;
 +
- 	struct clk *clk;
-+	struct clk *baudclk;
-+	bool baudclk_locked;
++	ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(ssi_private->clk)) {
++		ret = PTR_ERR(ssi_private->clk);
++		dev_err(&pdev->dev, "could not get clock: %d\n", ret);
++		return ret;
++	}
 +
-+	/* DMA params */
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
-+	dma_addr_t ssi_phys;
++	ret = clk_prepare_enable(ssi_private->clk);
++	if (ret) {
++		dev_err(&pdev->dev, "clk_prepare_enable failed: %d\n", ret);
++		return ret;
++	}
 +
-+	/* params for non-dma FIQ stream filtered mode */
- 	struct imx_pcm_fiq_params fiq_params;
--	/* Register values for rx/tx configuration */
--	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
++	/* For those SLAVE implementations, we ingore non-baudclk cases
++	 * and, instead, abandon MASTER mode that needs baud clock.
++	 */
++	ssi_private->baudclk = devm_clk_get(&pdev->dev, "baud");
++	if (IS_ERR(ssi_private->baudclk))
++		dev_dbg(&pdev->dev, "could not get baud clock: %ld\n",
++			 PTR_ERR(ssi_private->baudclk));
++	else
++		clk_prepare_enable(ssi_private->baudclk);
 +
-+	/* Used when using fsl-ssi as sound-card. This is only used by ppc and
-+	 * should be replaced with simple-sound-card. */
-+	struct platform_device *pdev;
++	/*
++	 * We have burstsize be "fifo_depth - 2" to match the SSI
++	 * watermark setting in fsl_ssi_startup().
++	 */
++	ssi_private->dma_params_tx.maxburst = ssi_private->fifo_depth - 2;
++	ssi_private->dma_params_rx.maxburst = ssi_private->fifo_depth - 2;
++	ssi_private->dma_params_tx.addr = ssi_private->ssi_phys +
++			offsetof(struct ccsr_ssi, stx0);
++	ssi_private->dma_params_rx.addr = ssi_private->ssi_phys +
++			offsetof(struct ccsr_ssi, srx0);
++	ssi_private->dma_params_tx.filter_data = &ssi_private->filter_data_tx;
++	ssi_private->dma_params_rx.filter_data = &ssi_private->filter_data_rx;
++
++	if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
++			ssi_private->use_dma) {
++		/*
++		 * FIXME: This is a temporary solution until all
++		 * necessary dma drivers support the generic dma
++		 * bindings.
++		 */
++		ret = of_property_read_u32_array(pdev->dev.of_node,
++				"fsl,ssi-dma-events", dma_events, 2);
++		if (ret && ssi_private->use_dma) {
++			dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
++			goto error_dma_events;
++		}
++	}
++	/* Should this be merge with the above? */
++	if (!of_property_read_u32_array(pdev->dev.of_node, "dmas", dmas, 4)
++			&& dmas[2] == IMX_DMATYPE_SSI_DUAL) {
++		ssi_private->use_dual_fifo = true;
++		/* When using dual fifo mode, we need to keep watermark
++		 * as even numbers due to dma script limitation.
++		 */
++		ssi_private->dma_params_tx.maxburst &= ~0x1;
++		ssi_private->dma_params_rx.maxburst &= ~0x1;
++	}
++
++	shared = of_device_is_compatible(of_get_parent(np), "fsl,spba-bus");
++
++	imx_pcm_dma_params_init_data(&ssi_private->filter_data_tx,
++		dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
++	imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
++		dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
++
++	return 0;
++
++error_dma_events:
++	if (!IS_ERR(ssi_private->baudclk))
++		clk_disable_unprepare(ssi_private->baudclk);
++	clk_disable_unprepare(ssi_private->clk);
++
++	return ret;
++}
++
++static void fsl_ssi_imx_clean(struct platform_device *pdev,
++		struct fsl_ssi_private *ssi_private)
++{
++	if (!IS_ERR(ssi_private->baudclk))
++		clk_disable_unprepare(ssi_private->baudclk);
++	clk_disable_unprepare(ssi_private->clk);
++}
++
+ static int fsl_ssi_probe(struct platform_device *pdev)
+ {
+ 	struct fsl_ssi_private *ssi_private;
+@@ -1004,7 +1098,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	const uint32_t *iprop;
+ 	struct resource res;
+ 	char name[64];
+-	bool shared;
+ 	bool ac97 = false;
  
- 	struct fsl_ssi_dbg dbg_stats;
+ 	/* SSIs that are not connected on the board should have a
+@@ -1118,80 +1211,11 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 
+ 	if (hw_type == FSL_SSI_MX21 || hw_type == FSL_SSI_MX51 ||
+ 			hw_type == FSL_SSI_MX35) {
+-		u32 dma_events[2], dmas[4];
+ 		ssi_private->ssi_on_imx = true;
+ 
+-		ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
+-		if (IS_ERR(ssi_private->clk)) {
+-			ret = PTR_ERR(ssi_private->clk);
+-			dev_err(&pdev->dev, "could not get clock: %d\n", ret);
++		ret = fsl_ssi_imx_probe(pdev, ssi_private);
++		if (ret)
+ 			goto error_irqmap;
+-		}
+-		ret = clk_prepare_enable(ssi_private->clk);
+-		if (ret) {
+-			dev_err(&pdev->dev, "clk_prepare_enable failed: %d\n",
+-				ret);
+-			goto error_irqmap;
+-		}
+-
+-		/* For those SLAVE implementations, we ingore non-baudclk cases
+-		 * and, instead, abandon MASTER mode that needs baud clock.
+-		 */
+-		ssi_private->baudclk = devm_clk_get(&pdev->dev, "baud");
+-		if (IS_ERR(ssi_private->baudclk))
+-			dev_dbg(&pdev->dev, "could not get baud clock: %ld\n",
+-				 PTR_ERR(ssi_private->baudclk));
+-		else
+-			clk_prepare_enable(ssi_private->baudclk);
+-
+-		/*
+-		 * We have burstsize be "fifo_depth - 2" to match the SSI
+-		 * watermark setting in fsl_ssi_startup().
+-		 */
+-		ssi_private->dma_params_tx.maxburst =
+-			ssi_private->fifo_depth - 2;
+-		ssi_private->dma_params_rx.maxburst =
+-			ssi_private->fifo_depth - 2;
+-		ssi_private->dma_params_tx.addr =
+-			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, stx0);
+-		ssi_private->dma_params_rx.addr =
+-			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, srx0);
+-		ssi_private->dma_params_tx.filter_data =
+-			&ssi_private->filter_data_tx;
+-		ssi_private->dma_params_rx.filter_data =
+-			&ssi_private->filter_data_rx;
+-		if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
+-				ssi_private->use_dma) {
+-			/*
+-			 * FIXME: This is a temporary solution until all
+-			 * necessary dma drivers support the generic dma
+-			 * bindings.
+-			 */
+-			ret = of_property_read_u32_array(pdev->dev.of_node,
+-					"fsl,ssi-dma-events", dma_events, 2);
+-			if (ret && ssi_private->use_dma) {
+-				dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
+-				goto error_clk;
+-			}
+-		}
+-		/* Should this be merge with the above? */
+-		if (!of_property_read_u32_array(pdev->dev.of_node, "dmas", dmas, 4)
+-				&& dmas[2] == IMX_DMATYPE_SSI_DUAL) {
+-			ssi_private->use_dual_fifo = true;
+-			/* When using dual fifo mode, we need to keep watermark
+-			 * as even numbers due to dma script limitation.
+-			 */
+-			ssi_private->dma_params_tx.maxburst &= ~0x1;
+-			ssi_private->dma_params_rx.maxburst &= ~0x1;
+-		}
+-
+-		shared = of_device_is_compatible(of_get_parent(np),
+-			    "fsl,spba-bus");
+-
+-		imx_pcm_dma_params_init_data(&ssi_private->filter_data_tx,
+-			dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+-		imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
+-			dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+ 	}
+ 
+ 	/*
+@@ -1206,7 +1230,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		if (ret < 0) {
+ 			dev_err(&pdev->dev, "could not claim irq %u\n",
+ 					ssi_private->irq);
+-			goto error_clk;
++			goto error_irq;
+ 		}
+ 	}
+ 
+@@ -1298,11 +1322,9 @@ error_dbgfs:
+ error_dev:
+ 	device_remove_file(&pdev->dev, dev_attr);
+ 
+-error_clk:
++error_irq:
+ 	if (ssi_private->ssi_on_imx) {
+-		if (!IS_ERR(ssi_private->baudclk))
+-			clk_disable_unprepare(ssi_private->baudclk);
+-		clk_disable_unprepare(ssi_private->clk);
++		fsl_ssi_imx_clean(pdev, ssi_private);
+ 	}
+ 
+ error_irqmap:
+@@ -1321,11 +1343,10 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ 	if (!ssi_private->new_binding)
+ 		platform_device_unregister(ssi_private->pdev);
+ 	snd_soc_unregister_component(&pdev->dev);
+-	if (ssi_private->ssi_on_imx) {
+-		if (!IS_ERR(ssi_private->baudclk))
+-			clk_disable_unprepare(ssi_private->baudclk);
+-		clk_disable_unprepare(ssi_private->clk);
+-	}
++
++	if (ssi_private->ssi_on_imx)
++		fsl_ssi_imx_clean(pdev, ssi_private);
++
+ 	if (ssi_private->irq_stats)
+ 		irq_dispose_mapping(ssi_private->irq);
  
 -- 
 1.9.1
