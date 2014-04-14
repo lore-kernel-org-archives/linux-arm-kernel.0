@@ -1,42 +1,38 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Apr 2014 23:59:52 +0200
-Subject: [PATCHv2 10/11] leds: leds-pwm: retrieve configured pwm period
+Date: Mon, 14 Apr 2014 23:59:49 +0200
+Subject: [PATCHv2 07/11] ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize
+ struct pwm_lookup
 In-Reply-To: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1397512793-10325-11-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1397512793-10325-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM core is now able to initialize the PWM period. Use it and if it is not
-configured, use the supplied pwm_period_ns.
-
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/leds/leds-pwm.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/board-omap3beagle.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-index 7d0aaed1e23a..aa770ec1e892 100644
---- a/drivers/leds/leds-pwm.c
-+++ b/drivers/leds/leds-pwm.c
-@@ -181,7 +181,6 @@ static int led_pwm_probe(struct platform_device *pdev)
- 			led_dat->cdev.name = cur_led->name;
- 			led_dat->cdev.default_trigger = cur_led->default_trigger;
- 			led_dat->active_low = cur_led->active_low;
--			led_dat->period = cur_led->pwm_period_ns;
- 			led_dat->cdev.brightness_set = led_pwm_set;
- 			led_dat->cdev.brightness = LED_OFF;
- 			led_dat->cdev.max_brightness = cur_led->max_brightness;
-@@ -191,6 +190,10 @@ static int led_pwm_probe(struct platform_device *pdev)
- 			if (led_dat->can_sleep)
- 				INIT_WORK(&led_dat->work, led_pwm_work);
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index f27e1ec90b5e..54c135a5b4f7 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -61,14 +61,8 @@
  
-+			led_dat->period = pwm_get_period(led_dat->pwm);
-+			if (!led_dat->period && (cur_led->pwm_period_ns > 0))
-+				led_dat->period = cur_led->pwm_period_ns;
-+
- 			ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
- 			if (ret < 0)
- 				goto err;
+ static struct pwm_lookup pwm_lookup[] = {
+ 	/* LEDB -> PMU_STAT */
+-	{
+-		.provider = "twl-pwmled",
+-		.index = 1,
+-		.dev_id = "leds_pwm",
+-		.con_id = "beagleboard::pmu_stat",
+-		.period = 7812500,
+-		.polarity = PWM_POLARITY_NORMAL,
+-	},
++	PWM_LOOKUP("twl-pwmled", 1, "leds_pwm", "beagleboard::pmu_stat",
++		   7812500, PWM_POLARITY_NORMAL),
+ };
+ 
+ static struct led_pwm pwm_leds[] = {
 -- 
 1.8.3.2
