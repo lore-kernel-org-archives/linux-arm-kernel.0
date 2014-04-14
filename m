@@ -1,96 +1,81 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:50:31 +0200
-Subject: [PATCH v3 4/6] ARM: mvebu: extend the PMSU registers
+Date: Mon, 14 Apr 2014 15:50:30 +0200
+Subject: [PATCH v3 3/6] ARM: mvebu: improve PMSU driver to request its resource
 In-Reply-To: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483433-25836-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483433-25836-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Until now, the PMSU driver was using of_iomap() to map its registers,
+but of_iomap() doesn't call request_mem_region(). This commit fixes
+the memory mapping code of the PMSU to do so, which will also be
+useful for a later commit since we will need to adjust the resource
+base address and size for Device Tree backward compatibility.
 
-The initial binding for PMSU was wrong, as it didn't take into account
-all the registers from the PMSU and moreover it referred to the CPU
-reset registers which are not part of PMSU.
-
-The Power Management Unit Service block also controls the Coherency
-Fabric subsystem. These registers are needed for the CPU idle
-implementation for the Armada 370/XP, it allows to enter a deep CPU
-idle state where the Coherency Fabric and the L2 cache are powered
-down.
-
-This commit adds support for a new compatible for the PMSU node which
-includes the registers related to the coherency fabric. It also keeps
-compatibility with the old compatible string.
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt         | 14 ++++++--------
- arch/arm/mach-mvebu/pmsu.c                                 | 14 ++++++++++++--
- 2 files changed, 18 insertions(+), 10 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 36 +++++++++++++++++++++++++++++++-----
+ 1 file changed, 31 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-index 926b4d6..9761887 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-@@ -4,17 +4,15 @@ Available on Marvell SOCs: Armada 370 and Armada XP
- 
- Required properties:
- 
--- compatible: "marvell,armada-370-xp-pmsu"
-+- compatible: should be "marvell,armada-370-pmsu", whereas
-+  "marvell,armada-370-xp-pmsu" is deprecated and will be removed
- 
--- reg: Should contain PMSU registers location and length. First pair
--  for the per-CPU SW Reset Control registers, second pair for the
--  Power Management Service Unit.
-+- reg: Should contain PMSU registers location and length.
- 
- Example:
- 
--armada-370-xp-pmsu at d0022000 {
--	compatible = "marvell,armada-370-xp-pmsu";
--	reg = <0xd0022100 0x430>,
--	      <0xd0020800 0x20>;
-+armada-370-xp-pmsu at 22000 {
-+	compatible = "marvell,armada-370-pmsu";
-+	reg = <0x22000 0x1000>;
- };
- 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index b337fe5..4ae3ea1 100644
+index 1807639..b337fe5 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -30,10 +30,14 @@
+@@ -16,6 +16,8 @@
+  * other SOC units
+  */
  
- static void __iomem *pmsu_mp_base;
- 
--#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
-+#define PMSU_BASE_OFFSET    0x100
-+#define PMSU_REG_SIZE	    0x1000
++#define pr_fmt(fmt) "mvebu-pmsu: " fmt
 +
-+#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x124)
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/of_address.h>
+@@ -63,15 +65,39 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ static int __init armada_370_xp_pmsu_init(void)
+ {
+ 	struct device_node *np;
++	struct resource res;
++	int ret = 0;
  
- static struct of_device_id of_pmsu_table[] = {
--	{.compatible = "marvell,armada-370-xp-pmsu"},
-+	{ .compatible = "marvell,armada-370-pmsu", },
-+	{ .compatible = "marvell,armada-370-xp-pmsu", },
- 	{ /* end of list */ },
- };
- 
-@@ -80,6 +84,12 @@ static int __init armada_370_xp_pmsu_init(void)
- 		goto out;
+ 	np = of_find_matching_node(NULL, of_pmsu_table);
+-	if (np) {
+-		pr_info("Initializing Power Management Service Unit\n");
+-		pmsu_mp_base = of_iomap(np, 0);
+-		of_node_put(np);
++	if (!np)
++		return 0;
++
++	pr_info("Initializing Power Management Service Unit\n");
++
++	if (of_address_to_resource(np, 0, &res)) {
++		pr_err("unable to get resource\n");
++		ret = -ENOENT;
++		goto out;
  	}
  
-+	if (of_device_is_compatible(np, "marvell,armada-370-xp-pmsu")) {
-+		pr_warn(FW_WARN "deprecated pmsu binding\n");
-+		res.start = res.start - PMSU_BASE_OFFSET;
-+		res.end = res.start + PMSU_REG_SIZE - 1;
+-	return 0;
++	if (!request_mem_region(res.start, resource_size(&res),
++				np->full_name)) {
++		pr_err("unable to request region\n");
++		ret = -EBUSY;
++		goto out;
 +	}
 +
- 	if (!request_mem_region(res.start, resource_size(&res),
- 				np->full_name)) {
- 		pr_err("unable to request region\n");
++	pmsu_mp_base = ioremap(res.start, resource_size(&res));
++	if (!pmsu_mp_base) {
++		pr_err("unable to map registers\n");
++		release_mem_region(res.start, resource_size(&res));
++		ret = -ENOMEM;
++		goto out;
++	}
++
++ out:
++	of_node_put(np);
++	return ret;
+ }
+ 
+ early_initcall(armada_370_xp_pmsu_init);
 -- 
 1.8.3.2
