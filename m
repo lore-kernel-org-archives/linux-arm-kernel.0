@@ -1,23 +1,30 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Apr 2014 20:41:11 +0100
-Subject: [PATCH v4 1/2] ASoC: sam9g20_wm8731: remove useless mach/gpio.h
-In-Reply-To: <cb4eece4e6fadca4627a869bfe6efb3d41c66700.1397468934.git.nicolas.ferre@atmel.com>
-References: <cb4eece4e6fadca4627a869bfe6efb3d41c66700.1397468934.git.nicolas.ferre@atmel.com>
-Message-ID: <20140414194111.GN25182@sirena.org.uk>
+Date: Mon, 14 Apr 2014 20:59:39 +0100
+Subject: [PATCH 3/4] regulator: bcm590xx: add support for regulators on
+ secondary i2c slave
+In-Reply-To: <1397501428-8857-4-git-send-email-mporter@linaro.org>
+References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
+ <1397501428-8857-4-git-send-email-mporter@linaro.org>
+Message-ID: <20140414195939.GR25182@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 11:54:38AM +0200, Nicolas Ferre wrote:
-> This include file is about to disapear. In addition it is
-> useless for this code. So it is time to remove it.
+On Mon, Apr 14, 2014 at 02:50:27PM -0400, Matt Porter wrote:
+> The bcm590xx mfd driver now exposes a second regmap descriptor making
+> the registers for regulators on the secondary i2c slave address
+> available.  Add support for GPLDO1-6 and VBUS regulators found within
+> this register range.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Matt Porter <mporter@linaro.org>
 
 Acked-by: Mark Brown <broonie@linaro.org>
+
+though if possible I'd prefer to merge this into the regulator tree
+which would need a cross tree merge with MFD.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/d222bb41/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/74dc2421/attachment-0001.sig>
