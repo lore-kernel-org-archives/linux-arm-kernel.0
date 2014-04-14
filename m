@@ -1,28 +1,218 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Apr 2014 13:03:38 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: enable option
- CONFIG_LOCALVERSION_AUTO
-Message-ID: <1397451818-27372-1-git-send-email-shawn.guo@freescale.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 14 Apr 2014 14:13:50 +0900
+Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
+In-Reply-To: <5347AA35.4010504@samsung.com>
+References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
+ <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
+ <20140411014650.GB14934@quad.lixom.net> <53478C75.60302@samsung.com>
+ <5347AA35.4010504@samsung.com>
+Message-ID: <534B6E8E.20506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Option CONFIG_LOCALVERSION_AUTO is quite helpful to tell kernel version.
-I do not see any reason why we should unset it.  Let's remove the unset
-to have it enabled.
+Dear Olof and Tomasz,
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+On 04/11/2014 05:39 PM, Tomasz Figa wrote:
+> On 11.04.2014 08:32, Chanwoo Choi wrote:
+>> Hi,
+>>
+>> On 04/11/2014 10:46 AM, Olof Johansson wrote:
+>>> On Thu, Apr 10, 2014 at 06:37:12PM +0900, Chanwoo Choi wrote:
+>>>> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
+>>>> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
+>>>> dual cores and has a target speed of 1.0GHz.
+>>>>
+>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>> ---
+>>>>   arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
+>>>>   arch/arm/mach-exynos/exynos.c            |  1 +
+>>>>   arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
+>>>>   3 files changed, 33 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>>>> index fc8bf18..6da8a68 100644
+>>>> --- a/arch/arm/mach-exynos/Kconfig
+>>>> +++ b/arch/arm/mach-exynos/Kconfig
+>>>> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
+>>>>
+>>>>   menu "SAMSUNG EXYNOS SoCs Support"
+>>>>
+>>>> +config ARCH_EXYNOS3
+>>>> +    bool "SAMSUNG EXYNOS3"
+>>>> +    select ARM_AMBA
+>>>> +    select CLKSRC_OF
+>>>> +    select HAVE_ARM_SCU if SMP
+>>>> +    select HAVE_SMP
+>>>> +    select PINCTRL
+>>>> +    select PM_GENERIC_DOMAINS if PM_RUNTIME
+>>>> +    help
+>>>> +      Samsung EXYNOS3 SoCs based systems
+>>>> +
+>>>>   config ARCH_EXYNOS4
+>>>>       bool "SAMSUNG EXYNOS4"
+>>>>       default y
+>>>> @@ -41,6 +52,17 @@ config ARCH_EXYNOS5
+>>>>
+>>>>   comment "EXYNOS SoCs"
+>>>>
+>>>> +config SOC_EXYNOS3250
+>>>> +    bool "SAMSUNG EXYNOS3250"
+>>>> +    default y
+>>>> +    depends on ARCH_EXYNOS3
+>>>> +    select ARCH_HAS_BANDGAP
+>>>> +    select ARM_CPU_SUSPEND if PM
+>>>> +    select PINCTRL_EXYNOS
+>>>> +    select SAMSUNG_DMADEV
+>>>> +    help
+>>>> +      Enable EXYNOS3250 CPU support
+>>>> +
+>>>>   config CPU_EXYNOS4210
+>>>>       bool "SAMSUNG EXYNOS4210"
+>>>>       default y
+>>>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>>>> index b32a907..b134868 100644
+>>>> --- a/arch/arm/mach-exynos/exynos.c
+>>>> +++ b/arch/arm/mach-exynos/exynos.c
+>>>> @@ -370,6 +370,7 @@ static void __init exynos_dt_machine_init(void)
+>>>>   }
+>>>>
+>>>>   static char const *exynos_dt_compat[] __initconst = {
+>>>> +    "samsung,exynos3250",
+>>>
+>>> Please consider samsung,exynos3 instead, so you don't have to update this table
+>>> for every SoC. We've talked about this before..
+>>
+>> This patchset included only exynos3250.dtsi without exynos3.dtsi.
+>> So, I added only "samsung,exynos3250" compatible name.
+> 
+> There is no direct relation between dts file names and compatible string (although usually they correspond). You don't need exynos3.dtsi (at least until another SoC from this family shows up).
+> 
+>>
+>> Do you prefer to add SoC version as following?
+>> +       "samsung,exynos3",
+>> +       "samsung,exynos3250",
+>>
+>> or ?
+>> +       "samsung,exynos3",
+> 
+> This is actually a good question. If adding exynos3 anyway, it probably wouldn't hurt to add exynos3250 anyway, to avoid adding it in future if some SoC specific quirks show up, especially when both of compatible strings need to be documented anyway.
+> 
+>>
+>>>
+>>>>       "samsung,exynos4",
+>>>>       "samsung,exynos4210",
+>>>>       "samsung,exynos4212",
+>>>> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+>>>> index 5992b8d..3d808f6b 100644
+>>>> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+>>>> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+>>>> @@ -43,6 +43,9 @@ extern unsigned long samsung_cpu_id;
+>>>>   #define S5PV210_CPU_ID        0x43110000
+>>>>   #define S5PV210_CPU_MASK    0xFFFFF000
+>>>>
+>>>> +#define EXYNOS3250_SOC_ID       0xE3472000
+>>>> +#define EXYNOS3_SOC_MASK        0xFFFFF000
+>>>> +
+>>>>   #define EXYNOS4210_CPU_ID    0x43210000
+>>>>   #define EXYNOS4212_CPU_ID    0x43220000
+>>>>   #define EXYNOS4412_CPU_ID    0xE4412200
+>>>> @@ -68,6 +71,7 @@ IS_SAMSUNG_CPU(s5p6440, S5P6440_CPU_ID, S5P64XX_CPU_MASK)
+>>>>   IS_SAMSUNG_CPU(s5p6450, S5P6450_CPU_ID, S5P64XX_CPU_MASK)
+>>>>   IS_SAMSUNG_CPU(s5pc100, S5PC100_CPU_ID, S5PC100_CPU_MASK)
+>>>>   IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
+>>>> +IS_SAMSUNG_CPU(exynos3250, EXYNOS3250_SOC_ID, EXYNOS3_SOC_MASK)
+>>>>   IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+>>>>   IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+>>>>   IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+>>>> @@ -126,6 +130,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+>>>>   # define soc_is_s5pv210()    0
+>>>>   #endif
+>>>>
+>>>> +#if defined(CONFIG_SOC_EXYNOS3250)
+>>>> +# define soc_is_exynos3250()    is_samsung_exynos3250()
+>>>> +#else
+>>>> +# define soc_is_exynos3250()    0
+>>>> +#endif
+>>>
+>>> In general, I think we have too much code littered with soc_is_<foo>() going
+>>> on, so please try to avoid adding more for this SoC. Especially in cases where
+>>> you just want to bail out of certain features where we might already have
+>>> function pointers to control if a function is called or not, such as the
+>>> firmware interfaces.
+>>>
+>>
+>> Do you prefer dt helper function such as following function instead of new soc_is_xx() ?
+>> - of_machine_is_compatible("samsung,exynos3250")
+>>
+>> If you are OK, I'll use of_machine_is_compatible() instead of soc_is_xx().
+> 
+> First of all, there is still a lot of code in mach-exynos/ using the soc_is_xx() macros, so having some SoCs use them and other SoCs use of_machine_is_compatible() wouldn't make the code cleaner.
+> 
+> For now, I wouldn't mind adding soc_is_exynos3250(), but in general such code surrounded with if (soc_is_xx()) blocks should be reworked to use something better, for example function pointers, as Olof suggested.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index bf5ad0f..9fc3024 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -1,4 +1,3 @@
--# CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_KERNEL_LZO=y
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
--- 
-1.8.3.2
+I thought 'function pointers' method instead of soc_is_xxx() macro as following two case:
+I need more detailed explanation/example of "for example function pointers, as Olof suggested." sentence.
+
+[case 1]
+Each Exynos SoC has other function pointers according to compatible name of DT.
+
+For example, arch/arm/mach-exynos/firmware.c
+
+static const struct firmware_ops exynos_firmware_ops = {
+	.do_idle		= exynos_do_idle,
+	.set_cpu_boot_addr	= exynos_set_cpu_boot_addr,
+	.cpu_boot		= exynos_cpu_boot,
+};
+static const struct firmware_ops exynos3250_firmware_ops = {
+	.do_idle		= exynos_do_idle,
+	.set_cpu_boot_addr	= exynos4212_set_cpu_boot_addr,
+	.cpu_boot		= exynos3250_cpu_boot,
+};
+
+static const struct firmware_ops exynos4212_firmware_ops = {
+	.do_idle		= exynos_do_idle,
+	.set_cpu_boot_addr	= exynos4212_set_cpu_boot_addr,
+	.cpu_boot		= exynos4212_cpu_boot,
+};
+
+struct secure_firmware {
+	char *name;
+	const struct firmware_ops *ops;
+} exynos_secure_firmware[] __initconst = {
+	{ "samsung,secure-firmware",		&exynos_firmware_ops },
+	{ "samsung,exynos3250-secure-firmware", &exynos3250_firmware_ops },
+	{ "samsung,exynos4212-secure-firmware", &exynos4212_firmware_ops },
+};
+
+
+[case 2]
+Delete all the soc_is_xxx() macro and then
+use only get_samsung_soc_id() function as following:
+	 
+	switch (get_samsung_soc_id()) {
+	case EXYNOS3250_SOC_ID:
+		// ...
+		break;
+	case EXYNOS4210_CPU_ID:
+		// ...
+		break;
+	case EXYNOS4212_CPU_ID:
+		// ...
+		break;
+	case EXYNOS4412_CPU_ID:
+		// ...
+		break;
+	case EXYNOS5250_SOC_ID:
+		// ...
+		break;
+	case EXYNOS5420_SOC_ID:
+		// ...
+		break;
+	case EXYNOS5440_SOC_ID:
+		// ...
+		break;
+	};
+
+Best Regards,
+Chanwoo Choi
