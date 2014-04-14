@@ -1,31 +1,155 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 14 Apr 2014 17:37:32 +0200
-Subject: [PATCH 10/10] ARM: dts: pbab01: Enable DVI
+Date: Mon, 14 Apr 2014 17:37:24 +0200
+Subject: [PATCH 02/10] ARM: dts: Add Phytec pbab01 with i.MX6 DualLite/Solo
 In-Reply-To: <1397489852-1669-1-git-send-email-p.zabel@pengutronix.de>
 References: <1397489852-1669-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1397489852-1669-10-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1397489852-1669-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The PBA-B-01 carrier board can be equipped with either Quad or DualLite/Solo
+phyFLEX i.MX6 modules (PFL-A-02).
+This moves all common devices into imx6qdl-phytec-pbab01.dtsi. The SoC specific
+device trees then just include the pfla01 and pbab01 dtsi files corresponding
+to the SoC variant.
+
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/Makefile                   |  1 +
+ arch/arm/boot/dts/imx6dl-phytec-pbab01.dts   | 19 ++++++++++++++
+ arch/arm/boot/dts/imx6q-phytec-pbab01.dts    | 31 ++---------------------
+ arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 38 ++++++++++++++++++++++++++++
+ 4 files changed, 60 insertions(+), 29 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6dl-phytec-pbab01.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-index 323a647..5847212 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-@@ -23,6 +23,10 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 35c146f..1afa764 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -197,6 +197,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-gw54xx.dtb \
+ 	imx6q-nitrogen6x.dtb \
+ 	imx6q-phytec-pbab01.dtb \
++	imx6dl-phytec-pbab01.dtb \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-phytec-pbab01.dts b/arch/arm/boot/dts/imx6dl-phytec-pbab01.dts
+new file mode 100644
+index 0000000..08e9780
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-phytec-pbab01.dts
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++#include "imx6dl-phytec-pfla02.dtsi"
++#include "imx6qdl-phytec-pbab01.dtsi"
++
++/ {
++	model = "Phytec phyFLEX-i.MX6 DualLite/Solo Carrier-Board";
++	compatible = "phytec,imx6dl-pbab01", "phytec,imx6dl-pfla02", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
+index 5607c33..3a43dab 100644
+--- a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
++++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
+@@ -11,40 +11,13 @@
+ 
+ /dts-v1/;
+ #include "imx6q-phytec-pfla02.dtsi"
++#include "imx6qdl-phytec-pbab01.dtsi"
+ 
+ / {
+ 	model = "Phytec phyFLEX-i.MX6 Quad Carrier-Board";
+ 	compatible = "phytec,imx6q-pbab01", "phytec,imx6q-pfla02", "fsl,imx6q";
  };
  
-+&hdmi {
+-&fec {
+-	status = "okay";
+-};
+-
+-&gpmi {
+-	status = "okay";
+-};
+-
+ &sata {
+-	status = "okay";
+-};
+-
+-&uart4 {
+-	status = "okay";
+-};
+-
+-&usbh1 {
+-	status = "okay";
+-};
+-
+-&usbotg {
+-	status = "okay";
+-};
+-
+-&usdhc2 {
+-	status = "okay";
+-};
+-
+-&usdhc3 {
+-	status = "okay";
++        status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+new file mode 100644
+index 0000000..cd2d4af
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+@@ -0,0 +1,38 @@
++/*
++ * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++&fec {
 +	status = "okay";
 +};
 +
- &i2c2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c2>;
++&gpmi {
++	status = "okay";
++};
++
++&uart4 {
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++&usbotg {
++	status = "okay";
++};
++
++&usdhc2 {
++	status = "okay";
++};
++
++&usdhc3 {
++	status = "okay";
++};
 -- 
 1.9.1
