@@ -1,37 +1,34 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Apr 2014 14:41:58 +0300
-Subject: [PATCH v3 03/10] dmaengine: edma: Correct the handling of
- src/dst_maxburst == 0
+Date: Mon, 14 Apr 2014 14:41:57 +0300
+Subject: [PATCH v3 02/10] arm: common: edma: Save the number of event
+ queues/TCs
 In-Reply-To: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1397475725-5036-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1397475725-5036-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When clients asks for maxburst = 0 it is basically the same case as if they
-were asking for maxburst = 1 since in both case ASYNC need to be used and
-the eDMA is expected to write/read one word per DMA request.
+For later use save the number of queues available for the CC.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/common/edma.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index cd04eb7b182e..2742867fd1e6 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -285,6 +285,10 @@ static int edma_config_pset(struct dma_chan *chan, struct edmacc_param *pset,
- 	int absync;
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 41bca32409fc..999266bf69b9 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1768,6 +1768,9 @@ static int edma_probe(struct platform_device *pdev)
+ 			map_queue_tc(j, queue_tc_mapping[i][0],
+ 					queue_tc_mapping[i][1]);
  
- 	acnt = dev_width;
++		/* Save the number of TCs */
++		edma_cc[j]->num_tc = i;
 +
-+	/* src/dst_maxburst == 0 is the same case as src/dst_maxburst == 1 */
-+	if (!burst)
-+		burst = 1;
- 	/*
- 	 * If the maxburst is equal to the fifo width, use
- 	 * A-synced transfers. This allows for large contiguous
+ 		/* Event queue priority mapping */
+ 		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
+ 			assign_priority_to_queue(j,
 -- 
 1.9.2
