@@ -1,156 +1,205 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 14 Apr 2014 14:25:59 +0200
-Subject: [PATCH/RFC 3/3] ARM: pxa: zeus: Replace OHCI init/exit functions with
- a regulator
-In-Reply-To: <1397478359-22541-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1397478359-22541-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397478359-22541-4-git-send-email-laurent.pinchart@ideasonboard.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 14 Apr 2014 17:57:51 +0530
+Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
+ <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <534BD447.1080909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- arch/arm/mach-pxa/zeus.c | 89 ++++++++++++++++++++++++++----------------------
- 1 file changed, 48 insertions(+), 41 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index b19d1c3..205f9bf 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -413,7 +413,7 @@ static struct fixed_voltage_config can_regulator_pdata = {
- 
- static struct platform_device can_regulator_device = {
- 	.name	= "reg-fixed-volage",
--	.id	= -1,
-+	.id	= 0,
- 	.dev	= {
- 		.platform_data	= &can_regulator_pdata,
- 	},
-@@ -510,18 +510,6 @@ struct platform_device zeus_max6369_device = {
- 	.num_resources	= 1,
- };
- 
--static struct platform_device *zeus_devices[] __initdata = {
--	&zeus_serial_device,
--	&zeus_mtd_devices[0],
--	&zeus_dm9k0_device,
--	&zeus_dm9k1_device,
--	&zeus_sram_device,
--	&zeus_leds_device,
--	&zeus_pcmcia_device,
--	&zeus_max6369_device,
--	&can_regulator_device,
--};
--
- /* AC'97 */
- static pxa2xx_audio_ops_t zeus_ac97_info = {
- 	.reset_gpio = 95,
-@@ -532,44 +520,50 @@ static pxa2xx_audio_ops_t zeus_ac97_info = {
-  * USB host
-  */
- 
--static int zeus_ohci_init(struct device *dev)
--{
--	int err;
--
--	/* Switch on port 2. */
--	if ((err = gpio_request(ZEUS_USB2_PWREN_GPIO, "USB2_PWREN"))) {
--		dev_err(dev, "Can't request USB2_PWREN\n");
--		return err;
--	}
--
--	if ((err = gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 1))) {
--		gpio_free(ZEUS_USB2_PWREN_GPIO);
--		dev_err(dev, "Can't enable USB2_PWREN\n");
--		return err;
--	}
-+static struct regulator_consumer_supply zeus_ohci_regulator_supplies[] = {
-+	REGULATOR_SUPPLY("vbus2", "pxa27x-ohci"),
-+};
- 
--	/* Port 2 is shared between host and client interface. */
--	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
-+static struct regulator_init_data zeus_ohci_regulator_data = {
-+	.constraints = {
-+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(zeus_ohci_regulator_supplies),
-+	.consumer_supplies	= zeus_ohci_regulator_supplies,
-+};
- 
--	return 0;
--}
-+static struct fixed_voltage_config zeus_ohci_regulator_config = {
-+	.supply_name		= "vbus2",
-+	.microvolts		= 5000000, /* 5.0V */
-+	.gpio			= ZEUS_USB2_PWREN_GPIO,
-+	.enable_high		= 1,
-+	.startup_delay		= 0,
-+	.init_data		= &zeus_ohci_regulator_data,
-+};
- 
--static void zeus_ohci_exit(struct device *dev)
--{
--	/* Power-off port 2 */
--	gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 0);
--	gpio_free(ZEUS_USB2_PWREN_GPIO);
--}
-+static struct platform_device zeus_ohci_regulator_device = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 1,
-+	.dev = {
-+		.platform_data = &zeus_ohci_regulator_config,
-+	},
-+};
- 
- static struct pxaohci_platform_data zeus_ohci_platform_data = {
- 	.port_mode	= PMM_NPS_MODE,
- 	/* Clear Power Control Polarity Low and set Power Sense
- 	 * Polarity Low. Supply power to USB ports. */
- 	.flags		= ENABLE_PORT_ALL | POWER_SENSE_LOW,
--	.init		= zeus_ohci_init,
--	.exit		= zeus_ohci_exit,
- };
- 
-+static void zeus_register_ohci(void)
-+{
-+	/* Port 2 is shared between host and client interface. */
-+	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
-+
-+	pxa_set_ohci_info(&zeus_ohci_platform_data);
-+}
-+
- /*
-  * Flat Panel
-  */
-@@ -677,6 +671,19 @@ static struct pxa2xx_udc_mach_info zeus_udc_info = {
- 	.udc_command = zeus_udc_command,
- };
- 
-+static struct platform_device *zeus_devices[] __initdata = {
-+	&zeus_serial_device,
-+	&zeus_mtd_devices[0],
-+	&zeus_dm9k0_device,
-+	&zeus_dm9k1_device,
-+	&zeus_sram_device,
-+	&zeus_leds_device,
-+	&zeus_pcmcia_device,
-+	&zeus_max6369_device,
-+	&can_regulator_device,
-+	&zeus_ohci_regulator_device,
-+};
-+
- #ifdef CONFIG_PM
- static void zeus_power_off(void)
- {
-@@ -847,7 +854,7 @@ static void __init zeus_init(void)
- 
- 	platform_add_devices(zeus_devices, ARRAY_SIZE(zeus_devices));
- 
--	pxa_set_ohci_info(&zeus_ohci_platform_data);
-+	zeus_register_ohci();
- 
- 	if (zeus_setup_fb_gpios())
- 		pr_err("Failed to setup fb gpios\n");
--- 
-1.8.3.2
+On Tuesday 08 April 2014 08:06 PM, Vivek Gautam wrote:
+> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+> The new driver uses the generic PHY framework and will interact
+> with DWC3 controller present on Exynos5 series of SoCs.
+> Thereby, removing old phy-samsung-usb3 driver and related code
+> used untill now which was based on usb/phy framework.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
+>  .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
+>  drivers/phy/Kconfig                                |   11 +
+>  drivers/phy/Makefile                               |    1 +
+>  drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
+>  4 files changed, 722 insertions(+)
+>  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> index 28f9edb..6d99ba9 100644
+> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+> @@ -74,3 +74,45 @@ phy-consumer at 12340000 {
+>  
+>  Refer to DT bindings documentation of particular PHY consumer devices for more
+>  information about required PHYs and the way of specification.
+> +
+> +Samsung Exynos5 SoC series USB DRD PHY controller
+> +--------------------------------------------------
+> +
+> +Required properties:
+> +- compatible : Should be set to one of the following supported values:
+> +	- "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+> +	- "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+> +- reg : Register offset and length of USB DRD PHY register set;
+> +- clocks: Clock IDs array as required by the controller
+> +- clock-names: names of clocks correseponding to IDs in the clock property;
+> +	       Required clocks:
+> +	- phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+> +	       used for register access.
+> +	- ref: PHY's reference clock (usually crystal clock), associated by
+> +	       phy name, used to determine bit values for clock settings
+> +	       register.
+> +	Additional clock required for Exynos5420:
+> +	- usb30_sclk_100m: Additional special clock used for PHY operation
+> +			   depicted as 'sclk_usbphy30' in CMU of Exynos5420.
+> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
+> +			  control pmu registers for power isolation.
+> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
+> +		      base.
+> +- #phy-cells : from the generic PHY bindings, must be 1;
+> +
+> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
+> +compatible PHYs, the second cell in the PHY specifier identifies the
+> +PHY id, which is interpreted as follows:
+> +  0 - UTMI+ type phy,
+> +  1 - PIPE3 type phy,
+> +
+> +Example:
+> +	usb3_phy: usbphy at 12100000 {
+> +		compatible = "samsung,exynos5250-usbdrd-phy";
+> +		reg = <0x12100000 0x100>;
+> +		clocks = <&clock 286>, <&clock 1>;
+> +		clock-names = "phy", "usb3phy_refclk";
+> +		samsung,syscon-phandle = <&pmu_syscon>;
+> +		samsung,pmu-offset = <0x704>;
+> +		#phy-cells = <1>;
+> +	};
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 8d3c49c..d955a05 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -166,4 +166,15 @@ config PHY_XGENE
+>  	help
+>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
+>  
+> +config PHY_EXYNOS5_USBDRD
+> +	tristate "Exynos5 SoC series USB DRD PHY driver"
+> +	depends on ARCH_EXYNOS5 && OF
+> +	depends on HAS_IOMEM
+> +	select GENERIC_PHY
+> +	select MFD_SYSCON
+
+Lets try to avoid select in Kconfig. We've got enough problems with that.
+> +	help
+> +	  Enable USB DRD PHY support for Exynos 5 SoC series.
+> +	  This driver provides PHY interface for USB 3.0 DRD controller
+> +	  present on Exynos5 SoC series.
+> +
+>  endmenu
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 2faf78e..31baa0c 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -18,3 +18,4 @@ obj-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS4X12_USB2)	+= phy-exynos4x12-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5250_USB2)	+= phy-exynos5250-usb2.o
+>  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+> +obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+> new file mode 100644
+> index 0000000..ff54a7c
+> --- /dev/null
+> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+> @@ -0,0 +1,668 @@
+> +/*
+> + * Samsung EXYNOS5 SoC series USB DRD PHY driver
+> + *
+> + * Phy provider for USB 3.0 DRD controller on Exynos5 SoC series
+> + *
+> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
+
+2014 already ;-)
+> + * Author: Vivek Gautam <gautam.vivek@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+.
+.
+<sniip>
+.
+.
+
+> +
+> +/*
+> + * Sets the pipe3 phy's clk as EXTREFCLK (XXTI) which is internal clock
+> + * from clock core. Further sets multiplier values and spread spectrum
+> + * clock settings for SuperSpeed operations.
+> + */
+> +static unsigned int
+> +exynos5_usbdrd_pipe3_set_refclk(struct phy_usb_instance *inst)
+> +{
+> +	static u32 reg;
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
+> +
+> +	/* restore any previous reference clock settings */
+> +	reg = phy_drd->refclk_reg;
+
+Why don't we just read back from the register instead?
+> +
+> +	/* Use EXTREFCLK as ref clock */
+> +	reg &= ~PHYCLKRST_REFCLKSEL_MASK;
+> +	reg |=	PHYCLKRST_REFCLKSEL_EXT_REFCLK;
+> +
+> +	/* FSEL settings corresponding to reference clock */
+> +	reg &= ~PHYCLKRST_FSEL_PIPE_MASK |
+> +		PHYCLKRST_MPLL_MULTIPLIER_MASK |
+> +		PHYCLKRST_SSC_REFCLKSEL_MASK;
+> +	switch (phy_drd->extrefclk) {
+> +	case EXYNOS5_FSEL_50MHZ:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_50M_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x00));
+> +		break;
+> +	case EXYNOS5_FSEL_24MHZ:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_24MHZ_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x88));
+> +		break;
+> +	case EXYNOS5_FSEL_20MHZ:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_20MHZ_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x00));
+> +		break;
+> +	case EXYNOS5_FSEL_19MHZ2:
+> +		reg |= (PHYCLKRST_MPLL_MULTIPLIER_19200KHZ_REF |
+> +			PHYCLKRST_SSC_REFCLKSEL(0x88));
+> +		break;
+> +	default:
+> +		dev_dbg(phy_drd->dev, "unsupported ref clk\n");
+> +		break;
+> +	}
+> +
+> +	/* save refclk settings for multiple phy inits */
+> +	phy_drd->refclk_reg = reg;
+> +
+> +	return reg;
+> +}
+> +
+> +/*
+> + * Sets the utmi phy's clk as EXTREFCLK (XXTI) which is internal clock
+> + * from clock core. Further sets the FSEL values for HighSpeed operations.
+> + */
+> +static unsigned int
+> +exynos5_usbdrd_utmi_set_refclk(struct phy_usb_instance *inst)
+> +{
+> +	static u32 reg;
+> +	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
+> +
+> +	reg = phy_drd->refclk_reg;
+
+same here..
+
+Thanks
+Kishon
