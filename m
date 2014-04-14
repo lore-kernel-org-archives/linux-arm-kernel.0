@@ -1,101 +1,62 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 14 Apr 2014 18:42:17 +0900
-Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
-In-Reply-To: <20140414093342.GA14635@linaro.org>
-References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
- <20140414091424.GA14204@linaro.org>
- <000c01cf57c3$65afc110$310f4330$@samsung.com>
- <20140414093342.GA14635@linaro.org>
-Message-ID: <000d01cf57c5$d2cd08a0$786719e0$@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 11:42:33 +0200
+Subject: [PATCH 08/29] ARM: orion5x: move interrupt controller node into
+ ocp
+In-Reply-To: <1397400006-4315-9-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BAD89.5090302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 14, 2014 6:34 PM, Steve Capper wrote:
-> On Mon, Apr 14, 2014 at 06:24:55PM +0900, Jungseok Lee wrote:
-> > On Monday, April 14, 2014 6:14 PM, Steve Capper wrote:
-> > > On Mon, Apr 13, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
-> > > > This patch implements 4 levels of translation tables since 3
-> > > > levels of page tables with 4KB pages cannot support 40-bit
-> > > > physical address space described in [1] due to the following issue.
-> > > >
-> > > > It is a restriction that kernel logical memory map with 4KB + 3
-> > > > levels
-> > > > (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region
-> > > > from 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to
-> > > > create mapping for this region in map_mem function since
-> > > > __phys_to_virt for this region reaches to address overflow.
-> > > >
-> > > > If SoC design follows the document, [1], over 32GB RAM would be
-> > > > placed from 544GB. Even 64GB system is supposed to use the region
-> > > > from 544GB to 576GB for only 32GB RAM. Naturally, it would reach
-> > > > to enable 4 levels of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
-> > > >
-> > > > However, it is recommended 4 levels of page table should be only
-> > > > enabled if memory map is too sparse or there is about 512GB RAM.
-> > >
-> > > Hi,
-> > > So I thought I'd apply this series and have a play, this patch
-> > > doesn't apply cleanly for me, please see below why...
-> >
-> > This pathset is based on 3.15-rc1.
-> 
-> Thanks, yes that applies cleanly for me now.
+On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
+> The interrupt controller node was located outside of the ocp at f1000000
+> node, which doesn't make much sense: like any other device, the
+> interrupt controller has registers located in the "Internal Registers
+> Window", so it is much more logical to have it under the ocp at f1000000
+> node.
+>
+> It is even more important as we are going to move Orion5x to use the
+> Device Tree binding of the mvebu-mbus driver.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Okay, it sounds good.
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-> >
-> > > [ ... ]
-> > >
-> > > > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > > > index 0fd5650..0b0b16a 100644
-> > > > --- a/arch/arm64/kernel/head.S
-> > > > +++ b/arch/arm64/kernel/head.S
-> > > > @@ -46,8 +46,8 @@
-> > > >  #error KERNEL_RAM_VADDR must start at 0xXXX80000  #endif
-> > > >
-> > > > -#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-> > > > -#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
-> > > > +#define SWAPPER_DIR_SIZE	(4 * PAGE_SIZE)
-> > > > +#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
-> > > >
-> > > >  	.globl	swapper_pg_dir
-> > > >  	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - SWAPPER_DIR_SIZE
-> > > > @@ -384,6 +384,20 @@ ENDPROC(__calc_phys_offset)
-> > > >  	.endm
-> > > >
-> > > >  /*
-> > > > + * Macro to populate the PUD for the corresponding block entry in
-> > > > +the next
-> > > > + * level (tbl) for the given virtual address.
-> > > > + *
-> > > > + * Preserves:	pud, tbl, virt
-> > > > + * Corrupts:	tmp1, tmp2
-> > > > + */
-> > > > +	.macro create_pud_entry, pud, tbl, virt, tmp1, tmp2
-> > > > +	lsr	\tmp1, \virt, #PUD_SHIFT
-> > > > +	and	\tmp1, \tmp1, #PTRS_PER_PUD - 1	// PUD index
-> > > > +	orr	\tmp2, \tbl, #3			// PUD entry table type
-> > > > +	str	\tmp2, [\pud, \tmp1, lsl #3]
-> > > > +	.endm
-> > > > +
-> > > > +/*
-> > > >   * Macro to populate block entries in the page table for the start..end
-> > > >   * virtual range (inclusive).
-> > > >   *
-> > > > @@ -445,10 +459,18 @@ __create_page_tables:
-> > > >  	ldr	x3, =KERNEL_START
-> > > >  	add	x3, x3, x28			// __pa(KERNEL_START)
-> > >
-> > > I don't think we have C++ style comments in the kernel. Also, I
-> > > can't see any references to =KERNEL_START in arch/arm64/kernel/head.S (from 3.14 down).
-> >
-> > C++ style comments are prevalent in arch/arm64/kernel/head.S. I've
-> > C++ followed the
-> > code style written previously.
-> 
-> Apologies, my mistake, I've been staring at arch/arm too long where @ is used.
-
-It's okay.
-
-Best Regards
-Jungseok Lee
+> ---
+>   arch/arm/boot/dts/orion5x.dtsi | 14 +++++++-------
+>   1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> index 174d892..da57fb9 100644
+> --- a/arch/arm/boot/dts/orion5x.dtsi
+> +++ b/arch/arm/boot/dts/orion5x.dtsi
+> @@ -17,13 +17,6 @@
+>   		gpio0 = &gpio0;
+>   	};
+>
+> -	intc: interrupt-controller {
+> -		compatible = "marvell,orion-intc";
+> -		interrupt-controller;
+> -		#interrupt-cells = <1>;
+> -		reg = <0xf1020200 0x08>;
+> -	};
+> -
+>   	ocp at f1000000 {
+>   		compatible = "simple-bus";
+>   		ranges = <0x00000000 0xf1000000 0x4000000
+> @@ -79,6 +72,13 @@
+>   			status = "disabled";
+>   		};
+>
+> +		intc: interrupt-controller at 20200 {
+> +			compatible = "marvell,orion-intc";
+> +			interrupt-controller;
+> +			#interrupt-cells = <1>;
+> +			reg = <0x20200 0x08>;
+> +		};
+> +
+>   		wdt at 20300 {
+>   			compatible = "marvell,orion-wdt";
+>   			reg = <0x20300 0x28>;
+>
