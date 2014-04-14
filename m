@@ -1,52 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Apr 2014 11:15:43 +0200
-Subject: [GIT PULL] Ux500/U300 defconfig updates for v3.15-rc:s
-Message-ID: <CACRpkdb+hnZvNgEfjWBhao=MU5Hx0GLXEqxXnu4ifk1AUZFD1A@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 14 Apr 2014 11:22:24 +0200
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <20140414012013.GB22411@verge.net.au>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <1397230004-22306-2-git-send-email-ulf.hansson@linaro.org>
+ <20140414012013.GB22411@verge.net.au>
+Message-ID: <CAPDyKFp76Z93tNhd5vBpTUVzF0Km9oMAmBbg0RCT+91V5J-jzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On 14 April 2014 03:20, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+>> There are no active users of these callbacks, thus there are no benefit
+>> of trying to invoke them.
+>>
+>> Cc: Simon Horman <horms@verge.net.au>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>
+>> I am seeking ack from the SOC maintainers since this needs to go with the other
+>> patches in this patchset on the PM core.
+>
+> In order to reduce the possibility of conflicts I would prefer
+> to take this patch through my tree.
 
-here is a set of defconfig updates for the Ux500 and one update for
-the U300. It activates compilation of some features available
-upstream that applies to these platform.
+Okay, go ahead!
 
-Please pull it in for the early -rc cycle!
+Kind regards
+Ulf Hansson
 
-Yours,
-Linus Walleij
-
-
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson
-tags/ux500-defconfig-for-arm-soc
-
-for you to fetch changes up to 1fb4e407b520a2344b92a680c75672c7900aedf8:
-
-  ARM: ux500: configure for CW1200 WLAN chip (2014-04-14 11:08:26 +0200)
-
-----------------------------------------------------------------
-This is a patch set for some ST-Ericsson devices:
-- Updates the Ux500 (U8500) defconfig
-- Selects PARTITION_ADVANCED for Ux500 and U300
-- Configure in IIO sensor drivers for the Ux500
-- Configure in the CW1200 WLAN chip for the Ux500
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: ux500: update defconfig
-      ARM: ux500: configure in sensors
-      ARM: ux500: configure for CW1200 WLAN chip
-
-Ulf Hansson (2):
-      ARM: ux500: u8500_defconfig: Enable PARTITION_ADVANCED
-      ARM: u300: u300_defconfig: Enable PARTITION_ADVANCED
-
- arch/arm/configs/u300_defconfig  |  4 ++--
- arch/arm/configs/u8500_defconfig | 24 +++++++++++++++---------
- 2 files changed, 17 insertions(+), 11 deletions(-)
+>
+>> ---
+>>  arch/arm/mach-shmobile/pm-rmobile.c |   38 +++--------------------------------
+>>  1 file changed, 3 insertions(+), 35 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+>> index 1fc05d9..f710235 100644
+>> --- a/arch/arm/mach-shmobile/pm-rmobile.c
+>> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
+>> @@ -99,39 +99,7 @@ static int rmobile_pd_power_up(struct generic_pm_domain *genpd)
+>>
+>>  static bool rmobile_pd_active_wakeup(struct device *dev)
+>>  {
+>> -     bool (*active_wakeup)(struct device *dev);
+>> -
+>> -     active_wakeup = dev_gpd_data(dev)->ops.active_wakeup;
+>> -     return active_wakeup ? active_wakeup(dev) : true;
+>> -}
+>> -
+>> -static int rmobile_pd_stop_dev(struct device *dev)
+>> -{
+>> -     int (*stop)(struct device *dev);
+>> -
+>> -     stop = dev_gpd_data(dev)->ops.stop;
+>> -     if (stop) {
+>> -             int ret = stop(dev);
+>> -             if (ret)
+>> -                     return ret;
+>> -     }
+>> -     return pm_clk_suspend(dev);
+>> -}
+>> -
+>> -static int rmobile_pd_start_dev(struct device *dev)
+>> -{
+>> -     int (*start)(struct device *dev);
+>> -     int ret;
+>> -
+>> -     ret = pm_clk_resume(dev);
+>> -     if (ret)
+>> -             return ret;
+>> -
+>> -     start = dev_gpd_data(dev)->ops.start;
+>> -     if (start)
+>> -             ret = start(dev);
+>> -
+>> -     return ret;
+>> +     return true;
+>>  }
+>>
+>>  static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+>> @@ -140,8 +108,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+>>       struct dev_power_governor *gov = rmobile_pd->gov;
+>>
+>>       pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
+>> -     genpd->dev_ops.stop             = rmobile_pd_stop_dev;
+>> -     genpd->dev_ops.start            = rmobile_pd_start_dev;
+>> +     genpd->dev_ops.stop             = pm_clk_suspend;
+>> +     genpd->dev_ops.start            = pm_clk_resume;
+>>       genpd->dev_ops.active_wakeup    = rmobile_pd_active_wakeup;
+>>       genpd->dev_irq_safe             = true;
+>>       genpd->power_off                = rmobile_pd_power_down;
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
