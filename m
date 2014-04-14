@@ -1,26 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 14 Apr 2014 21:43:47 +0530
-Subject: [PATCH v2] pata_arasan_cf: fix ata_host_activate() failure
- handling
-In-Reply-To: <1706948.xQXQIMFS2B@amdc1032>
-References: <1706948.xQXQIMFS2B@amdc1032>
-Message-ID: <CAOh2x=nQWZbYdbKpkVaXhRjTKq++GMujO+aFEBgLLyrEtsCPew@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Apr 2014 17:19:21 +0100
+Subject: [PATCH 2/8] arm/arm64: KVM: Fix line length exceeding 80
+ characters
+In-Reply-To: <000001cf57b4$d3450780$79cf1680$@samsung.com>
+References: <000001cf57b4$d3450780$79cf1680$@samsung.com>
+Message-ID: <534C0A89.4090907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 9:31 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Add missing cf_exit() and clk_put() calls to ata_host_activate()
-> failure path.
->
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+On 14/04/14 08:40, Jungseok Lee wrote:
+> This patch deals with checkpatch complaint as fixing line length
+> exceeding 80 characters.
+> 
+> WARNING: line over 80 characters
+> 
+> Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+> Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
 > ---
-> v2:
-> - re-order code and then drop redundant goto statement
->
->  drivers/ata/pata_arasan_cf.c |    7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+>  arch/arm/kvm/mmu.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 80bb1e6..e0d4f24 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -563,8 +563,8 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>  	kvm->arch.pgd = NULL;
+>  }
+>  
+> -static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> -			     phys_addr_t addr)
+> +static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache
+> +			     *cache, phys_addr_t addr)
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Please don't. This makes the code unreadable (and no, I don't care about
+checkpatch ;-).
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
