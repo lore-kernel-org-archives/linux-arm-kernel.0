@@ -1,9 +1,8 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 14 Apr 2014 16:18:16 +0200
-Subject: [PATCH v2 4/6] ARM: dts: ste-dbx: drop address cells from GIC node
-In-Reply-To: <1397485098-19198-1-git-send-email-l.stach@pengutronix.de>
-References: <1397485098-19198-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1397485098-19198-4-git-send-email-l.stach@pengutronix.de>
+Date: Mon, 14 Apr 2014 16:18:13 +0200
+Subject: [PATCH v2 1/6] ARM: dts: keystone: drop address and size cells from
+ GIC node
+Message-ID: <1397485098-19198-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,20 +18,21 @@ Acked-by: Rob Herring <robh@kernel.org>
 ---
 v2: no change, added ack
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/keystone.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index e41eedca3ce3..c73414d3fe50 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -24,7 +24,6 @@
- 		intc: interrupt-controller at a0411000 {
- 			compatible = "arm,cortex-a9-gic";
- 			#interrupt-cells = <3>;
--			#address-cells = <1>;
- 			interrupt-controller;
- 			reg = <0xa0411000 0x1000>,
- 			      <0xa0410100 0x100>;
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 90823eb90c1b..d0b0266d8922 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -28,8 +28,6 @@
+ 	gic: interrupt-controller {
+ 		compatible = "arm,cortex-a15-gic";
+ 		#interrupt-cells = <3>;
+-		#size-cells = <0>;
+-		#address-cells = <1>;
+ 		interrupt-controller;
+ 		reg = <0x0 0x02561000 0x0 0x1000>,
+ 		      <0x0 0x02562000 0x0 0x2000>,
 -- 
 1.9.1
