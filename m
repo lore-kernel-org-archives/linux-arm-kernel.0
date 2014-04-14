@@ -1,52 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Apr 2014 10:20:27 +0800
-Subject: [PATCH 3/4] ARM: dts: imx6: use of_clk_get_by_name() to retrieve
- fixed-clock
-In-Reply-To: <20140411084042.GF2334@dragon>
-References: <1397203447-22965-1-git-send-email-shawn.guo@freescale.com>
- <1397203447-22965-4-git-send-email-shawn.guo@freescale.com>
- <20140411084042.GF2334@dragon>
-Message-ID: <20140414022025.GA26807@dragon>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 13 Apr 2014 23:14:57 -0400 (EDT)
+Subject: [PATCH] Revert "net: mvneta: fix usage as a module on RGMII
+ configurations"
+In-Reply-To: <1397380533-16012-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397380533-16012-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140413.231457.1275572148025135232.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 04:40:44PM +0800, Shawn Guo wrote:
-> On Fri, Apr 11, 2014 at 04:04:06PM +0800, Shawn Guo wrote:
-> > With the dependencies of those fixed input clocks reflected in device
-> > tree, we now can just call of_clk_get_by_name() to retrieve the clocks.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/clk-imx6q.c  | 6 +++---
-> >  arch/arm/mach-imx/clk-imx6sl.c | 4 ++--
-> >  2 files changed, 5 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> > index b0e7f9d..862c80e 100644
-> > --- a/arch/arm/mach-imx/clk-imx6q.c
-> > +++ b/arch/arm/mach-imx/clk-imx6q.c
-> > @@ -148,9 +148,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
-> >  	int ret;
-> >  
-> >  	clk[dummy] = imx_clk_fixed("dummy", 0);
-> > -	clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
-> > -	clk[ckih] = imx_obtain_fixed_clock("ckih1", 0);
-> > -	clk[osc] = imx_obtain_fixed_clock("osc", 0);
-> > +	clk[ckil] = of_clk_get_by_name(ccm_node, "ckil");
-> > +	clk[ckih] = of_clk_get_by_name(ccm_node, "ckih1");
-> > +	clk[osc] = of_clk_get_by_name(ccm_node, "osc");
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Sun, 13 Apr 2014 11:15:33 +0200
+
+> This reverts commit e3a8786c10e75903f1269474e21fe8cb49c3a670. While
+> this commit allows to use the mvneta driver as a module on some
+> configurations, it breaks other configurations even if mvneta is used
+> built-in.
 > 
-> Damn.  The change will break existing DTB.  Will fix it in v2.
+> This breakage is due to the fact that on some RGMII platforms, the PCS
+> bit has to be set, and on some other platforms, it has to be
+> cleared. At the moment, we lack informations to know exactly the
+> significance of this bit (the datasheet only says "enables PCS"), and
+> so we can't produce a patch that will work on all platforms at this
+> point. And since this change is breaking the network completely for
+> many users, it's much better to revert it for now. We'll come back
+> later with a proper fix that takes into account all platforms.
+> 
+> Basically:
+> 
+>  * Armada XP GP is configured as RGMII-ID, and needs the PCS bit to be
+>    set.
+>  * Armada 370 Mirabox is configured as RGMII-ID, and needs the PCS bit
+>    to be cleared.
+> 
+> And at the moment, we don't know how to make the distinction between
+> those two cases. One hint is that the Armada XP GP appears in fact to
+> be using a QSGMII connection with the PHY (Quad-SGMII), but
+> configuring it as SGMII doesn't work, while RGMII-ID works. This needs
+> more investigation, but in the mean time, let's unbreak the network
+> for all those users.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Reported-by: Arnaud Ebalard <arno@natisbad.org>
+> Reported-by: Alexander Reuter <Alexander.Reuter@gmx.net>
+> Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=73401
 
-The code will need to be like:
-
-	clk[ckil] = of_clk_get_by_name(ccm_node, "ckil");
-	if (IS_ERR(clk[ckil]))
-		clk[ckil] = imx_obtain_fixed_clock("ckil", 0);
-
-I think the new clock driver will just need to call of_clk_get_by_name()
-and stay away from imx_obtain_fixed_clock(), but it's unnecessary to
-churn the existing clock drivers.  That said, I will only apply the
-first patch and drop all others.
-
-Shawn
+Applied, thanks for following up on this.
