@@ -1,108 +1,60 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Apr 2014 15:35:44 +0200
-Subject: [PATCH v3 14/18] ASoC: fsl-ssi: remove unnecessary spinlock
+Date: Mon, 14 Apr 2014 15:35:33 +0200
+Subject: [PATCH v3 03/18] ASoC: fsl-ssi: Use dev_name for DAI driver struct
 In-Reply-To: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
 References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1397482548-28463-15-git-send-email-mpa@pengutronix.de>
+Message-ID: <1397482548-28463-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+Instead of creating a name using string manipulation functions, we can
+simply use the device name for the DAI driver struct.
 
-The baudclock_locked variable is only used in functions which
-are serialized anyway from the core. No need to have a lock
-around the variable, so remove it.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 21 ++++-----------------
- 1 file changed, 4 insertions(+), 17 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index e3a93f0..e5fa626 100644
+index 344f752..65d9da1 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -163,7 +163,6 @@ struct fsl_ssi_private {
- 	bool baudclk_locked;
- 	bool use_dual_fifo;
- 	u8 i2s_mode;
--	spinlock_t baudclk_lock;
- 	struct clk *baudclk;
- 	struct clk *clk;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
-@@ -494,14 +493,10 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct fsl_ssi_private *ssi_private =
- 		snd_soc_dai_get_drvdata(rtd->cpu_dai);
--	unsigned long flags;
- 	int ret;
+@@ -1027,17 +1027,13 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	if (!strcmp(sprop, "ac97-slave"))
+ 		ac97 = true;
  
--	if (!dai->active && !fsl_ssi_is_ac97(ssi_private)) {
--		spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
-+	if (!dai->active && !fsl_ssi_is_ac97(ssi_private))
- 		ssi_private->baudclk_locked = false;
--		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
--	}
- 
- 	if (fsl_ssi_is_i2s_master(ssi_private)) {
- 		ret = clk_prepare_enable(ssi_private->baudclk);
-@@ -548,7 +543,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
- 	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates, ret;
- 	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, i;
--	unsigned long flags, clkrate, baudrate, tmprate;
-+	unsigned long clkrate, baudrate, tmprate;
- 	u64 sub, savesub = 100000;
- 
- 	/* Don't apply it to any non-baudclk circumstance */
-@@ -612,18 +607,14 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
- 	else
- 		write_ssi_mask(&ssi->srccr, mask, stccr);
- 
--	spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
- 	if (!ssi_private->baudclk_locked) {
- 		ret = clk_set_rate(ssi_private->baudclk, baudrate);
- 		if (ret) {
--			spin_unlock_irqrestore(&ssi_private->baudclk_lock,
--					flags);
- 			dev_err(cpu_dai->dev, "failed to set baudclk rate\n");
- 			return -EINVAL;
- 		}
- 		ssi_private->baudclk_locked = true;
+-	/* The DAI name is the last part of the full name of the node. */
+-	p = strrchr(np->full_name, '/') + 1;
+-	ssi_private = devm_kzalloc(&pdev->dev, sizeof(*ssi_private) + strlen(p),
+-			      GFP_KERNEL);
++	ssi_private = devm_kzalloc(&pdev->dev, sizeof(*ssi_private),
++			GFP_KERNEL);
+ 	if (!ssi_private) {
+ 		dev_err(&pdev->dev, "could not allocate DAI object\n");
+ 		return -ENOMEM;
  	}
--	spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
  
- 	return 0;
- }
-@@ -905,7 +896,6 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
--	unsigned long flags;
+-	strcpy(ssi_private->name, p);
+-
+ 	ssi_private->use_dma = !of_property_read_bool(np,
+ 			"fsl,fiq-stream-filter");
+ 	ssi_private->hw_type = hw_type;
+@@ -1055,7 +1051,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		memcpy(&ssi_private->cpu_dai_drv, &fsl_ssi_dai_template,
+ 		       sizeof(fsl_ssi_dai_template));
+ 	}
+-	ssi_private->cpu_dai_drv.name = ssi_private->name;
++	ssi_private->cpu_dai_drv.name = dev_name(&pdev->dev);
  
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
-@@ -924,11 +914,9 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- 			fsl_ssi_rx_config(ssi_private, false);
- 
- 		if (!fsl_ssi_is_ac97(ssi_private) && (read_ssi(&ssi->scr) &
--					(CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0) {
--			spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
-+					(CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0)
- 			ssi_private->baudclk_locked = false;
--			spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
--		}
-+
- 		break;
- 
- 	default:
-@@ -1254,7 +1242,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		ssi_private->fifo_depth = 8;
- 
- 	ssi_private->baudclk_locked = false;
--	spin_lock_init(&ssi_private->baudclk_lock);
- 
- 	dev_set_drvdata(&pdev->dev, ssi_private);
- 
+ 	/* Get the addresses and IRQ */
+ 	ret = of_address_to_resource(np, 0, &res);
+@@ -1203,7 +1199,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	 * different writeable interrupt status registers.
+ 	 */
+ 	if (ssi_private->use_dma) {
+-		/* The 'name' should not have any slashes in it. */
+ 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
+ 					fsl_ssi_isr, 0, ssi_private->name,
+ 					ssi_private);
 -- 
 1.9.1
