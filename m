@@ -1,8 +1,8 @@
 From: stratosk@semaphore.gr (Stratos Karafotis)
-Date: Tue, 15 Apr 2014 00:10:16 +0300
-Subject: [PATCH 15/20] mfd: db8500-prcmu: Use cpufreq_for_each_entry macro
- for iteration
-Message-ID: <534C4EB8.9080704@semaphore.gr>
+Date: Tue, 15 Apr 2014 00:10:41 +0300
+Subject: [PATCH 17/20] davinci: da850: Use cpufreq_for_each_entry macro for
+ iteration
+Message-ID: <534C4ED1.7080901@semaphore.gr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,63 +13,38 @@ It should have no functional changes.
 
 Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
 ---
- drivers/mfd/db8500-prcmu.c | 18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
+ arch/arm/mach-davinci/da850.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7694e07..3429e4f 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -1734,18 +1734,17 @@ static struct cpufreq_frequency_table db8500_cpufreq_table[] = {
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 85399c9..45ce065 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -1092,20 +1092,21 @@ int da850_register_cpufreq(char *async_clk)
  
- static long round_armss_rate(unsigned long rate)
+ static int da850_round_armrate(struct clk *clk, unsigned long rate)
  {
-+	struct cpufreq_frequency_table *pos;
- 	long freq = 0;
--	int i = 0;
- 
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		freq = db8500_cpufreq_table[i].frequency;
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table) {
-+		freq = pos->frequency;
- 		if (freq == rate)
- 			break;
--		i++;
- 	}
- 
- 	/* Return the last valid value, even if a match was not found. */
-@@ -1886,23 +1885,22 @@ static void set_clock_rate(u8 clock, unsigned long rate)
- 
- static int set_armss_rate(unsigned long rate)
- {
--	int i = 0;
+-	int i, ret = 0, diff;
++	int ret = 0, diff;
+ 	unsigned int best = (unsigned int) -1;
+ 	struct cpufreq_frequency_table *table = cpufreq_info.freq_table;
 +	struct cpufreq_frequency_table *pos;
  
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
+ 	rate /= 1000; /* convert to kHz */
  
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		if (db8500_cpufreq_table[i].frequency == rate)
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table) {
-+		if (pos->frequency == rate)
- 			break;
--		i++;
+-	for (i = 0; table[i].frequency != CPUFREQ_TABLE_END; i++) {
+-		diff = table[i].frequency - rate;
++	cpufreq_for_each_entry(pos, table) {
++		diff = pos->frequency - rate;
+ 		if (diff < 0)
+ 			diff = -diff;
+ 
+ 		if (diff < best) {
+ 			best = diff;
+-			ret = table[i].frequency;
++			ret = pos->frequency;
+ 		}
  	}
  
--	if (db8500_cpufreq_table[i].frequency != rate)
-+	if (pos->frequency != rate)
- 		return -EINVAL;
- 
- 	/* Set the new arm opp. */
--	return db8500_prcmu_set_arm_opp(db8500_cpufreq_table[i].driver_data);
-+	return db8500_prcmu_set_arm_opp(pos->driver_data);
- }
- 
- static int set_plldsi_rate(unsigned long rate)
 -- 
 1.9.0
