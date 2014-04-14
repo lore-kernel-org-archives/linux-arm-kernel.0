@@ -1,32 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 14 Apr 2014 10:16:39 +0200
-Subject: [PATCH 4/4] ARM: at91: move sam9n12 SoC to the CCF
-In-Reply-To: <1397463399-11771-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397463399-11771-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397463399-11771-5-git-send-email-boris.brezillon@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 14 Apr 2014 10:19:28 +0200
+Subject: [PATCH] pinctrl/at91: Fix mask creation in at91_gpio_dbg_show
+In-Reply-To: <1397241193-2420-1-git-send-email-alexanders83@web.de>
+References: <CAJjB1qLC6HBwz=bBef-EGH8wrfpqE3DdTGcfGrwb_r1qCdRPRA@mail.gmail.com>
+ <1397241193-2420-1-git-send-email-alexanders83@web.de>
+Message-ID: <534B9A10.9040409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the selection of AT91_USE_OLD_CLK when selecting
-sam9n12 SoC support. This will automatically enable COMMON_CLK_AT91 option
-and add support for at91 common clk implementation.
+On 11/04/2014 20:33, Alexander Stein :
+> pin_to_mask expects a bank pin number. So do not add the chip base.
+> 
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- arch/arm/mach-at91/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Indeed, seems to be a bug in this function:
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index b2d2cf4..a1ac430 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -183,7 +183,6 @@ config SOC_AT91SAM9N12
- 	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 	select SOC_AT91SAM9
--	select AT91_USE_OLD_CLK
- 	select HAVE_AT91_USB_CLK
- 	help
- 	  Select this if you are using Atmel's AT91SAM9N12 SoC.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks a lot. Bye,
+
+
+> ---
+> Mark, thanks for the clarification that pin_to_mask only expects tha bank
+> pin number. This wasn't obvious to me.
+>  drivers/pinctrl/pinctrl-at91.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 63176f2..2da0e6e 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1205,8 +1205,7 @@ static void at91_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  	void __iomem *pio = at91_gpio->regbase;
+>  
+>  	for (i = 0; i < chip->ngpio; i++) {
+> -		unsigned pin = chip->base + i;
+> -		unsigned mask = pin_to_mask(pin);
+> +		unsigned mask = pin_to_mask(i);
+>  		const char *gpio_label;
+>  		u32 pdsr;
+>  
+> 
+
+
 -- 
-1.8.3.2
+Nicolas Ferre
