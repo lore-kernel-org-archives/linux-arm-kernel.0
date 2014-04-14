@@ -1,30 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Apr 2014 20:59:39 +0100
-Subject: [PATCH 3/4] regulator: bcm590xx: add support for regulators on
- secondary i2c slave
-In-Reply-To: <1397501428-8857-4-git-send-email-mporter@linaro.org>
-References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
- <1397501428-8857-4-git-send-email-mporter@linaro.org>
-Message-ID: <20140414195939.GR25182@sirena.org.uk>
+Date: Mon, 14 Apr 2014 21:02:08 +0100
+Subject: [PATCH 1/5] spi: sirf: correct TXFIFO empty interrupt status bit
+In-Reply-To: <1397457001-5266-2-git-send-email-21cnbao@gmail.com>
+References: <1397457001-5266-1-git-send-email-21cnbao@gmail.com>
+ <1397457001-5266-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <20140414200208.GT25182@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 02:50:27PM -0400, Matt Porter wrote:
-> The bcm590xx mfd driver now exposes a second regmap descriptor making
-> the registers for regulators on the secondary i2c slave address
-> available.  Add support for GPLDO1-6 and VBUS regulators found within
-> this register range.
+On Mon, Apr 14, 2014 at 02:29:57PM +0800, Barry Song wrote:
+> From: Qipan Li <Qipan.Li@csr.com>
 > 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
+> the old code uses wrong marco - SIRFSOC_SPI_FIFO_FULL is not for
+> FIFO interrupt status, it is for FIFO status. here in the ISR,
+> SIRFSOC_SPI_TXFIFO_EMPTY is the right bit for SPI TXFIFO interrupt
+> status.
 
-Acked-by: Mark Brown <broonie@linaro.org>
-
-though if possible I'd prefer to merge this into the regulator tree
-which would need a cross tree merge with MFD.
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/74dc2421/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/b3b4ad33/attachment.sig>
