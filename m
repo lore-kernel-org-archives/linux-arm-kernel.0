@@ -1,34 +1,36 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Mon, 14 Apr 2014 14:28:30 -0400
-Subject: [PATCH v8 02/12] ARM/ARM64: KVM: Add common header for PSCI
- related defines
-In-Reply-To: <1396515949-1459-3-git-send-email-anup.patel@linaro.org>
-References: <1396515949-1459-1-git-send-email-anup.patel@linaro.org>
- <1396515949-1459-3-git-send-email-anup.patel@linaro.org>
-Message-ID: <CAJ5Y-eYNzdO5X0e8GNT5Srd4q7JdE-aGpjrEBSxnT3tcq4g1CQ@mail.gmail.com>
+From: alexanders83@web.de (Alexander Stein)
+Date: Mon, 14 Apr 2014 20:34:10 +0200
+Subject: Device tree support for Atmel AC97 controller on AT91SAM9263
+In-Reply-To: <534B9ECF.806@atmel.com>
+References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+ <534B9ECF.806@atmel.com>
+Message-ID: <3514422.OSZGxjlElf@kongar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anup,
+Hello Bo,
 
-On 3 April 2014 05:05, Anup Patel <anup.patel@linaro.org> wrote:
+On Monday 14 April 2014, 16:39:43 wrote Bo Shen:
+> On 04/12/2014 05:08 PM, Alexander Stein wrote:
+> > This set of patches add device tree support for the AC97 controller found
+> > on AT91SAM9263.
+> > The first two patches are minor cleanup, while the last ones add the actual
+> > support.
+> 
+> I just test the whole patch series, and find issues to work with device 
+> tree kernel.
+> When we use dt kernel, no where assign the device id (so take it as 
+> "-1"), so when register devices, it will be /dev/snd/pcmC0D-1p and 
+> /dev/snd/pcmC0D-1c. So, the sound won't work.
+> 
+> The root cause is that when call "snd_pcm_new", it will pass 
+> "chip->pdev->id" as parameter.
+> 
+> So, I am thinking whether this should be fix in <sound/atmel/ac97c.c> or 
+> in <sound/core/pcm.c>
 
-> +/* PSCI version decoding (independent of PSCI version) */
-> +#define PSCI_VERSION_MAJOR_MASK                        0xffff0000
-> +#define PSCI_VERSION_MINOR_MASK                        0x0000ffff
-> +#define PSCI_VERSION_MAJOR_SHIFT               16
-> +#define PSCI_VERSION_MAJOR(ver)                        \
-> +               (((ver) & PSCI_VER_MAJOR_MASK) >> PSCI_VER_MAJOR_SHIFT)
-> +#define PSCI_VERSION_MINOR(ver)                        ((ver) & PSCI_VER_MINOR_MASK)
+Ah. thanks for figuring out. I also noticed later that e.g. aplay actually doesn't work, but could not figure out why. pcmC0D-1c looked valid at first glance I wasn't aware that this includes a -1 :)
+I was already happy that the controller found the codec.
 
-I just noticed this as I was preparing to rebase my patches on top of
-yours. Looks like you modified my original version of these macros,
-but forgot to change them completely. You still have the old "_VER_"
-in there which are now undefined.
-
-Can you please resend with this fix? If these are already picked up
-for upstreaming, then I can send a follow up fix along with my v0.2
-patchset which is (hopefully) the first user of these macros.
-
-Thanks,
-Ashwin
+Best regards,
+Alexander
