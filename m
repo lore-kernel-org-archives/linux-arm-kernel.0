@@ -1,43 +1,37 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Mon, 14 Apr 2014 21:48:19 +0900
-Subject: [PATCH 3/4] ARM: dts: exynos4: add hsotg device node
-In-Reply-To: <1397479700-15864-1-git-send-email-chanho61.park@samsung.com>
-References: <1397479700-15864-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <1397479700-15864-4-git-send-email-chanho61.park@samsung.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 14 Apr 2014 14:53:09 +0200
+Subject: [PATCH 3/6] ARM: dts: zynq: drop address cells from GIC node
+In-Reply-To: <f0de762f-56b3-4894-aa78-7ca3c88b9e28@AM1EHSMHS004.ehs.local>
+References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
+ <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
+ <f0de762f-56b3-4894-aa78-7ca3c88b9e28@AM1EHSMHS004.ehs.local>
+Message-ID: <1397479989.4548.26.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a hsotg node for exynos4 USB2.0 device controller.
+Hi S?ren,
 
-Cc: Tomasz Figa <t.figa@samsung.com>
-Cc: Kamil Debski <k.debski@samsung.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Chanho Park <chanho61.park@samsung.com>
----
- arch/arm/boot/dts/exynos4.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Am Freitag, den 11.04.2014, 08:54 -0700 schrieb S?ren Brinkmann:
+> On Fri, 2014-04-11 at 04:59PM +0200, Lucas Stach wrote:
+> > This is likely a copy-and-paste error from the
+> > ARM GIC documentation, that has already been fixed.
+> > 
+> > address-cells should have been set to 0, as with the size
+> > cells. As having those properties set to 0 is the
+> > same thing as not specifying them, drop them completely.
+> 
+> Isn't this property inherited from the parent node, requiring to
+> actually set them to 0 to comply with the docs?
+> 
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 0e32d7f..e541ecb 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -288,6 +288,17 @@
- 		#phy-cells = <1>;
- 	};
- 
-+	hsotg at 12480000 {
-+		compatible = "samsung,s3c6400-hsotg";
-+		reg = <0x12480000 0x20000>;
-+		interrupts = <0 71 0>;
-+		clocks = <&clock 305>;
-+		clock-names = "otg";
-+		phys = <&exynos_usbphy 0>;
-+		phy-names = "device";
-+		status = "disabled";
-+	};
-+
- 	ehci at 12580000 {
- 		compatible = "samsung,exynos4210-ehci";
- 		reg = <0x12580000 0x100>;
+No, it isn't. From ePAPR v1.1 section 2.3.5:
+"The #address-cells and #size-cells properties are not inherited from
+ancestors in the device tree. They shall be explicitly defined."
+
+Regards,
+Lucas
 -- 
-1.8.3.2
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
