@@ -1,71 +1,244 @@
-From: domenico.andreoli@linux.com (Domenico Andreoli)
-Date: Mon, 14 Apr 2014 11:55:01 +0200
-Subject: ARM: Tidy up DTB Makefile entries
-Message-ID: <20140414095501.GA4879@glitch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Apr 2014 11:52:56 +0200
+Subject: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add AXP209 support to
+ various boards
+In-Reply-To: <1397209093-10077-8-git-send-email-carlo@caione.org>
+References: <1397209093-10077-1-git-send-email-carlo@caione.org>
+ <1397209093-10077-8-git-send-email-carlo@caione.org>
+Message-ID: <20140414095256.GA28585@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Domenico Andreoli <domenico.andreoli@linux.com>
+Hi Carlo,
 
-Few things were out of order:
+On Fri, Apr 11, 2014 at 11:38:11AM +0200, Carlo Caione wrote:
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+> 
+> In all the DTs the min and max microvolt allowed for each regulator are actually
+> the min and max voltage possible for the regulator itself. This is not safe but
+> we do not have the ranges allowed for each board and the original Allwinner 
+> driver does exactly this way.
+> 
+> AXP20x has the so called Power Path Management (IPS) that can select the proper
+> power supply according to the status of the external power and the Li-battery
+> status. The output of the IPS block is usually a 5V fixed voltage used as 
+> input supply for all the other regulators. This fixed voltage is represented
+> in the DT as a fixed voltage regulator in the "regulator" subnode.
+> 
+>  arch/arm/boot/dts/sun4i-a10-a1000.dts           | 69 +++++++++++++++++++++++
+>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts      | 69 +++++++++++++++++++++++
+>  arch/arm/boot/dts/sun4i-a10-hackberry.dts       | 75 +++++++++++++++++++++++++
+>  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts       | 69 +++++++++++++++++++++++
+>  arch/arm/boot/dts/sun4i-a10-mini-xplus.dts      | 75 +++++++++++++++++++++++++
+>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts  | 75 +++++++++++++++++++++++++
+>  arch/arm/boot/dts/sun4i-a10-pcduino.dts         | 69 +++++++++++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     | 70 +++++++++++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 70 +++++++++++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 70 +++++++++++++++++++++++
 
-- removed ARCH_BCM2835 duplicate
-- shuffled ARCH_BCM_5301X, ARCH_U8500 and ARCH_U300 around so to keep the
-  list sorted
+That looks like a lot of them. Did you test all of them?
+Are all those regulators you define used on all these boards?
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Signed-by: Domenico Andreoli <domenico.andreoli@linux.com>
+>  10 files changed, 711 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> index fa746aea..029a880 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> @@ -88,6 +88,75 @@
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&i2c0_pins_a>;
+>  			status = "okay";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
 
----
- arch/arm/boot/dts/Makefile |   19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+That should be in the DTSI.
 
-Index: b/arch/arm/boot/dts/Makefile
-===================================================================
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -51,10 +51,9 @@ dtb-$(CONFIG_ARCH_AT91)	+= sama5d36ek.dt
- 
- dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
-+dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
- dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
- 	bcm21664-garnet.dtb
--dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
--dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
- dtb-$(CONFIG_ARCH_BERLIN) += \
- 	berlin2-sony-nsz-gs7.dtb	\
- 	berlin2cd-google-chromecast.dtb
-@@ -294,13 +293,6 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.
- dtb-$(CONFIG_ARCH_QCOM) += qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb \
- 	qcom-apq8074-dragonboard.dtb
--dtb-$(CONFIG_ARCH_U8500) += ste-snowball.dtb \
--	ste-hrefprev60-stuib.dtb \
--	ste-hrefprev60-tvk.dtb \
--	ste-hrefv60plus-stuib.dtb \
--	ste-hrefv60plus-tvk.dtb \
--	ste-ccu8540.dtb \
--	ste-ccu9540.dtb
- dtb-$(CONFIG_ARCH_S3C24XX) += s3c2416-smdk2416.dtb
- dtb-$(CONFIG_ARCH_S3C64XX) += s3c6410-mini6410.dtb \
- 	s3c6410-smdk6410.dtb
-@@ -369,9 +361,16 @@ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harm
- 	tegra30-cardhu-a04.dtb \
- 	tegra114-dalmore.dtb \
- 	tegra124-venice2.dtb
-+dtb-$(CONFIG_ARCH_U300) += ste-u300.dtb
-+dtb-$(CONFIG_ARCH_U8500) += ste-snowball.dtb \
-+	ste-hrefprev60-stuib.dtb \
-+	ste-hrefprev60-tvk.dtb \
-+	ste-hrefv60plus-stuib.dtb \
-+	ste-hrefv60plus-tvk.dtb \
-+	ste-ccu8540.dtb \
-+	ste-ccu9540.dtb
- dtb-$(CONFIG_ARCH_VERSATILE) += versatile-ab.dtb \
- 	versatile-pb.dtb
--dtb-$(CONFIG_ARCH_U300) += ste-u300.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
- 	vexpress-v2p-ca9.dtb \
- 	vexpress-v2p-ca15-tc1.dtb \
+> +			axp209: pmic at 34 {
+> +				compatible = "x-powers,axp209";
+> +				reg = <0x34>;
+> +				interrupts = <0>;
+> +
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +
+> +				acin-supply = <&axp_ipsout_reg>;
+> +				vin2-supply = <&axp_ipsout_reg>;
+> +				vin3-supply = <&axp_ipsout_reg>;
+> +				ldo24in-supply = <&axp_ipsout_reg>;
+> +				ldo3in-supply = <&axp_ipsout_reg>;
+> +				ldo5in-supply = <&axp_ipsout_reg>;
+> +
+> +				regulators {
+> +					compatible = "x-powers,axp20x-reg";
+
+I told you a few times already, but don't introduce pattern-matching
+compatibles.
+
+> +
+> +					x-powers,dcdc-freq = <1500>;
+> +
+> +					axp_ipsout_reg: axp_ipsout {
+> +						compatible = "regulator-fixed";
+> +						regulator-name = "axp-ipsout";
+> +						regulator-min-microvolt = <5000000>;
+> +						regulator-max-microvolt = <5000000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_vcore_reg: dcdc2 {
+> +						regulator-min-microvolt = <700000>;
+> +						regulator-max-microvolt = <2275000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_ddr_reg: dcdc3 {
+> +						regulator-min-microvolt = <700000>;
+> +						regulator-max-microvolt = <3500000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_rtc_reg: ldo1 {
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_analog_reg: ldo2 {
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_pll_reg: ldo3 {
+> +						regulator-min-microvolt = <700000>;
+> +						regulator-max-microvolt = <3500000>;
+> +					};
+> +
+> +					axp_hdmi_reg: ldo4 {
+> +						regulator-min-microvolt = <1250000>;
+> +						regulator-max-microvolt = <3300000>;
+> +					};
+> +
+> +					axp_mic_reg: ldo5 {
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <3300000>;
+> +					};
+> +				};
+> +			};
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> index 4684cbe..635fd4b 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> @@ -80,6 +80,75 @@
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&i2c0_pins_a>;
+>  			status = "okay";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			axp209: pmic at 34 {
+> +				compatible = "x-powers,axp209";
+> +				reg = <0x34>;
+> +				interrupts = <0>;
+> +
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +
+> +				acin-supply = <&axp_ipsout_reg>;
+> +				vin2-supply = <&axp_ipsout_reg>;
+> +				vin3-supply = <&axp_ipsout_reg>;
+> +				ldo24in-supply = <&axp_ipsout_reg>;
+> +				ldo3in-supply = <&axp_ipsout_reg>;
+> +				ldo5in-supply = <&axp_ipsout_reg>;
+> +
+> +				regulators {
+> +					compatible = "x-powers,axp20x-reg";
+> +
+> +					x-powers,dcdc-freq = <1500>;
+> +
+> +					axp_ipsout_reg: axp_ipsout {
+> +						compatible = "regulator-fixed";
+> +						regulator-name = "axp-ipsout";
+> +						regulator-min-microvolt = <5000000>;
+> +						regulator-max-microvolt = <5000000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_vcore_reg: dcdc2 {
+> +						regulator-min-microvolt = <700000>;
+> +						regulator-max-microvolt = <2275000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_ddr_reg: dcdc3 {
+> +						regulator-min-microvolt = <700000>;
+> +						regulator-max-microvolt = <3500000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_rtc_reg: ldo1 {
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_analog_reg: ldo2 {
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <3300000>;
+> +						regulator-always-on;
+> +					};
+> +
+> +					axp_pll_reg: ldo3 {
+> +						regulator-min-microvolt = <700000>;
+> +						regulator-max-microvolt = <3500000>;
+> +					};
+> +
+> +					axp_hdmi_reg: ldo4 {
+> +						regulator-min-microvolt = <1250000>;
+> +						regulator-max-microvolt = <3300000>;
+> +					};
+> +
+> +					axp_mic_reg: ldo5 {
+> +						regulator-min-microvolt = <1800000>;
+> +						regulator-max-microvolt = <3300000>;
+> +					};
+> +				};
+> +			};
+>  		};
+>  
+>  		i2c1: i2c at 01c2b000 {
+> diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+> index d7c17e4..8f2db9c 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+> @@ -82,6 +82,81 @@
+>  			pinctrl-0 = <&uart0_pins_a>;
+>  			status = "okay";
+>  		};
+> +
+> +		i2c0: i2c at 01c2ac00 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c0_pins_a>;
+> +			status = "okay";
+
+That should be in a separate patch.
+
+These comments apply to most of the changes here. Make sure you edit
+all of them.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/8e5946b5/attachment.sig>
