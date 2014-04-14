@@ -1,53 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Apr 2014 18:13:00 +0100
-Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
-In-Reply-To: <20140403220713.GA23545@google.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <20140403220713.GA23545@google.com>
-Message-ID: <20140414171300.GL12916@arm.com>
+From: cl@linux.com (Christoph Lameter)
+Date: Mon, 14 Apr 2014 12:12:52 -0500 (CDT)
+Subject: [3.15-rc1] a huge number of warnings produced by xhci &
+In-Reply-To: <534C182C.8040206@ti.com>
+References: <53285FE7.5010203@ti.com> <534C182C.8040206@ti.com>
+Message-ID: <alpine.DEB.2.10.1404141206040.18190@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+n Mon, 14 Apr 2014, Grygorii Strashko wrote:
 
-(apologies for the delay, I've been away for a month)
+> Hi All,
+>
+> I'm observing a huge number of warnings produced during the boot of my Keystone 2 board
+> when USB is enabled.
+>
+> [    2.496460] BUG: using __this_cpu_read() in preemptible [00000000] code: khubd/202
+> [    2.504030] caller is __mod_zone_page_state+0x20/0xc8
+> [    2.509094] CPU: 1 PID: 202 Comm: khubd Not tainted 3.15.0-rc1-00015-ge521fa3-dirty #55
+> [    2.517122] [<c0013788>] (unwind_backtrace) from [<c001129c>] (show_stack+0x10/0x14)
+> [    2.524854] [<c001129c>] (show_stack) from [<c049f800>] (dump_stack+0x68/0xb8)
+> [    2.532086] [<c049f800>] (dump_stack) from [<c02731c0>] (check_preemption_disabled+0xe8/0x10c)
+> [    2.540708] [<c02731c0>] (check_preemption_disabled) from [<c00bc944>] (__mod_zone_page_state+0x20/0xc8)
+> [    2.550187] [<c00bc944>] (__mod_zone_page_state) from [<c00b50c8>] (reclaim_clean_pages_from_list+0x16c/0x178)
+> [    2.560193] [<c00b50c8>] (reclaim_clean_pages_from_list) from [<c00ac8f0>] (alloc_contig_range+0x10c/0x2d0)
+> [    2.569932] [<c00ac8f0>] (alloc_contig_range) from [<c02b0e58>] (dma_alloc_from_contiguous+0x70/0x118)
+> [    2.579241] [<c02b0e58>] (dma_alloc_from_contiguous) from [<c0017d24>] (__alloc_from_contiguous+0x34/0x160)
+> [    2.588974] [<c0017d24>] (__alloc_from_contiguous) from [<c0018760>] (__dma_alloc+0x18c/0x294)
+> [    2.597582] [<c0018760>] (__dma_alloc) from [<c00189f0>] (arm_dma_alloc+0xac/0xd8)
+> [    2.605140] [<c00189f0>] (arm_dma_alloc) from [<c00d84a8>] (dma_pool_alloc+0xc8/0x1b8)
+> [    2.613067] [<c00d84a8>] (dma_pool_alloc) from [<c0317120>] (xhci_alloc_container_ctx+0x70/0xe0)
+> [    2.621851] [<c0317120>] (xhci_alloc_container_ctx) from [<c03194e8>] (xhci_alloc_virt_device+0x98/0x220)
+> [    2.631418] [<c03194e8>] (xhci_alloc_virt_device) from [<c0315d28>] (xhci_alloc_dev+0x158/0x1f0)
+> [    2.640207] [<c0315d28>] (xhci_alloc_dev) from [<c02f6310>] (usb_alloc_dev+0x1d4/0x27c)
+> [    2.648217] [<c02f6310>] (usb_alloc_dev) from [<c02fb204>] (hub_thread+0x670/0x1204)
+> [    2.655943] [<c02fb204>] (hub_thread) from [<c003d8d8>] (kthread+0xcc/0xe8)
+> [    2.662906] [<c003d8d8>] (kthread) from [<c000e2f8>] (ret_from_fork+0x14/0x3c)
+>
+> Anyone else sees the same thing?
 
-On Thu, Apr 03, 2014 at 11:07:13PM +0100, Bjorn Helgaas wrote:
-> On Tue, Feb 04, 2014 at 04:53:01PM +0000, Will Deacon wrote:
-> > Hello,
-> > 
-> > This small set of patches brings PCI support to mach-virt based upon an
-> > idealised host controller (see patch 2 for more details).
-> > 
-> > This has been tested with kvmtool, for which I have a corresponding set
-> > of patches which you can find in my kvmtool/pci branch at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git
-> > 
-> > Once the arm64 PCI patches from Liviu have stabilised, I plan to port
-> > this host controller to work there as well.
-> > 
-> > The main issue I can see with this code is how to describe configuration
-> > space in the device-tree. I'm following the ePAPR PCI bindings (SS == 0)
-> > , but this adds an ugly 'case 0:' line in the pci range parser, which
-> > also exists in mainline for the pcie-designware.c driver.
-> 
-> There was a long discussion about this (especially 2/3), and I didn't
-> follow it closely enough to get the resolution, and I don't think I
-> picked up the patches.
-> 
-> Can you post them again if they're still applicable?
+Either disable interrupts or use mod_zone_page_state instead.
 
-I ended up at v5 of the series:
+This should fix it:
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237540.html
 
-which hasn't received any feedback. My plan is to get the driver working
-with arm64 once Liviu's series is merged, but I'd be happy to see this
-merged for 32-bit ARM before then.
 
-Arnd: Is there anything more you'd like me to do with this series? Given
-that it would be targetting 3.16, there's still plenty of time to make
-changes (we talked about extracting some library functions in the past).
 
-Will
+Subject: vmscan: reclaim_clean_pages_from_list must use mod_zone_page_state
+
+Seems to be called with preemption enabled. Therefore it must use
+mod_zone_page_state instead.
+
+Signed-off-by: Christoph Lameter <cl@linux.com>
+
+Index: linux/mm/vmscan.c
+===================================================================
+--- linux.orig/mm/vmscan.c	2014-04-09 11:35:43.917930976 -0500
++++ linux/mm/vmscan.c	2014-04-14 12:09:48.070745938 -0500
+@@ -1158,7 +1158,7 @@ unsigned long reclaim_clean_pages_from_l
+ 			TTU_UNMAP|TTU_IGNORE_ACCESS,
+ 			&dummy1, &dummy2, &dummy3, &dummy4, &dummy5, true);
+ 	list_splice(&clean_pages, page_list);
+-	__mod_zone_page_state(zone, NR_ISOLATED_FILE, -ret);
++	mod_zone_page_state(zone, NR_ISOLATED_FILE, -ret);
+ 	return ret;
+ }
