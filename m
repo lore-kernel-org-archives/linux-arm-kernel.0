@@ -1,10 +1,10 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 17:29:20 +0200
-Subject: [PATCH v2 3/4] ARM: mvebu: fix NOR bus-width in Armada XP DB Device
- Tree
+Date: Mon, 14 Apr 2014 17:29:21 +0200
+Subject: [PATCH v2 4/4] ARM: mvebu: fix NOR bus-width in Armada XP OpenBlocks
+ AX3 Device Tree
 In-Reply-To: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397489361-5833-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397489361-5833-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,29 +13,29 @@ width declared in the Device Tree being considered as a 16 bits bus
 width when configuring the hardware.
 
 This bug in mvebu-devbus driver was compensated by a symetric mistake
-in the Armada XP DB Device Tree: a 8 bits bus width was declared, even
-though the hardware actually has a 16 bits bus width connection with
-the NOR flash.
+in the Armada XP OpenBlocks AX3 Device Tree: a 8 bits bus width was
+declared, even though the hardware actually has a 16 bits bus width
+connection with the NOR flash.
 
 Now that we have fixed the mvebu-devbus driver to behave according to
 its Device Tree binding, this commit fixes the problematic Device Tree
 files as well.
 
 This bug was introduced in commit
-b484ff42df475c5087d614c4d477273e1906bcb9 ('ARM: mvebu: Add support for
-NOR flash device on Armada XP-DB board') which was merged in v3.11.
+a7d4f81821f7eec3175f8e23dd6949c71ab2da43 ('ARM: mvebu: Add support for
+NOR flash device on Openblocks AX3 board') which was merged in v3.10.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: stable at vger.kernel.org
 ---
- arch/arm/boot/dts/armada-xp-db.dts | 2 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 448373c..90f0bf6 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -49,7 +49,7 @@
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 985948c..5d42feb 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -39,7 +39,7 @@
  			/* Device Bus parameters are required */
  
  			/* Read parameters */
