@@ -1,76 +1,92 @@
-From: domenico.andreoli@linux.com (Domenico Andreoli)
-Date: Mon, 14 Apr 2014 16:25:39 +0200
-Subject: Forcing DEBUG_UART_{PHYS, VIRT} changes when switching between
- v7 platforms?
-In-Reply-To: <20140320124648.GS7528@n2100.arm.linux.org.uk>
-References: <CAGVrzcZT+3VuuM9wdLTAu7wtbYTFcwSnMaYE7PcR8Eo4PmTnhg@mail.gmail.com>
- <8099777.qvOx0M5YBS@wuerfel>
- <20140320101127.GN7528@n2100.arm.linux.org.uk>
- <201403201245.34108.arnd@arndb.de>
- <20140320124648.GS7528@n2100.arm.linux.org.uk>
-Message-ID: <20140414142539.GA21490@glitch>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 14 Apr 2014 20:02:33 +0530
+Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
+ default when booted with DT
+In-Reply-To: <534BD788.3050406@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+ <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com> <5347AE49.5020109@ti.com>
+ <5347B7F8.2000508@ti.com> <20140411094217.GA32284@intel.com>
+ <5347D2CC.4030407@ti.com> <20140411113154.GB32284@intel.com>
+ <5347DEDA.2060008@ti.com> <20140411124641.GC32284@intel.com>
+ <534BCCD3.9060805@ti.com> <534BD0B5.5000004@ti.com> <534BD788.3050406@ti.com>
+Message-ID: <534BF181.6060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 20, 2014 at 12:46:48PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 20, 2014 at 12:45:33PM +0100, Arnd Bergmann wrote:
-> > 
-> > Ok, thanks for the clarification. On a semi-related topic, we have
-> > (once more) discussed adding an early printk implementation during
-> > the Linaro Connect meeting this month. I think this would all become
-> > much less painful if we had a way to handle console output in a
-> > platform independent way before the regular console kicks in, like
-> > a few other architectures do.
- 
-This reminds me a related investigation I did:
-
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/177186
-
-> > debug_ll is great for debugging the extremely early code, since
-> > it works basically from the first instruction on, but a lot of
-> > problems actually happen much later. The early console code
-> > runs from parse_early_param(), which comes after setup_arch(),
-> > so we can't use to debug that part but it means we already
-> > have an unflattened device tree to work with for finding typical
-> > 8250 or pl011 ports. At the moment, pl011 doesn't even have a
-> > console_initcall, so it comes up only at arch_initcall time,
-> > which is about the earliest a normal tty driver can get registered,
-> > and a lot can go wrong between parse_early_param() and
-> > arch_initcall().
+On Monday 14 April 2014 06:11 PM, Peter Ujfalusi wrote:
+> On 04/14/2014 03:12 PM, Sekhar Nori wrote:
+>> On Monday 14 April 2014 05:26 PM, Peter Ujfalusi wrote:
+>>> Hi Vinod,
+>>>
+>>> On 04/11/2014 03:46 PM, Vinod Koul wrote:
+>>>> I think the number shouldn't be viewed in absolute terms. If we decide that (lets
+>>>> say) 0-7, then any controller should map 0 to lowest and 7 to highest.
+>>>>
+>>>> For your case you can do this and then intermediate numbers would be medium
+>>>> priority. Such a system might work well...
+>>>>
+>>>> Also how would a client driver know which priority to use? Would it come from
+>>>> DT?
+>>>
+>>> I think DT would be the best place.
+>>
+>> In the strict sense of what DT is supposed to represent, DT is not the
+>> best place for this. Priority is usecase driven rather that hardware
+>> description driven.
 > 
-> It depends how much crap you want to shovel into serial drivers.  Fixing
-> stuff to work at console_initcall time basically means that the driver
-> has to have some way to find where the console is independent of the
-> driver model - because the driver model won't be up and running at that
-> point.
+> While this is true, the DMA priority - if supported by the DMA engine - is a
+> HW feature as well. If it is supported by the HW it can be used to tune and
+> partition the system for the anticipated load or purpose.
+> 
+>> So on a reasonably less loaded system, I am sure you
+>> could run audio even with a lower priority DMA queue.
+> 
+> Yes, you can. But as soon as you have other devices using the same priority
+> (with eDMA3 at least) and asks for a 'long' transfer it can ruin the audio.
+> During audio playback/capture you execute a long MMC read for example can
+> introduce a glitch.
+> 
+>> Moreover, IMHO, encoding it in DT now will make it an ABI. Without a
+>> wide variety of example use cases, I think it is too early to commit to
+>> an ABI.
+> 
+> True, but we need to start from somewhere?
 
-Indeed there was some "early console" driver model and some crap to push
-this through the decompressor throat.
+Right, and based on our IRC discussion, we are not really fixing up the
+priority value space. That makes me much more comfortable with the idea.
 
-> Yes, we could have a console_initcall() in there parsing the device tree
-> for a console port, but what console= parameter would that correspond
-> with?  You wouldn't know which ttyAM* port it should tie up with because
-> you don't have that information at that point in time - and it's important
-> to know that so that /dev/console in userspace works.
+>>> Not sure if we should set the range for this either. What I was thinking is to
+>>> add an optional new property to be set by the client nodes, using DMA:
+>>>
+>>> mcasp0: mcasp at 48038000 {
+>>> 	compatible = "ti,am33xx-mcasp-audio";
+>>> 	...
+>>> 	dmas =	<&edma 8>,
+>>> 		<&edma 9>;
+>>> 	dma-names = "tx", "rx";
+>>> 	dma-priorities = <2>, <2>;
+>>> };
+>>>
 
-there was decomp-console-dt.patch saying:
+>>> We could agree that lower number means lower priority, higher is - well -
+>>> higher priority.
 
-| This is the very minimal support of DT that currently the decompressor
-| console provides. That is reading the command line from the DT.
-|
-| This means that pure DT machines currently need some console data to
-| be shipped to the decompressor (tags have their DT table) although they
-| already provide all the required info in the DT, where the decompressor
-| should ideally take them.
-|
-| So the current blocker here is what to extract from DT. Or, what to _put_
-| into the DT for the decompressor.
+Even this does not have to be uniform across, right? The numbers could
+be left to interpretation per-SoC.
 
-I think that the match of console= + DT serial drivers + "early console"
-driver model (which establishes the ttyXXXYY <-> DT compatible property,
-in the serial driver itself) is enough to get the thing working.
+>>> If the dma-priority is missing we should assume lowest priority (0).
+>>> The highest priority depends on the platform. For eDMA3 in AM335x it is three
+>>> level. For designware controller you might have the range 0-8 as valid.
+>>>
+>>> The question is how to get this information into use?
+>>> We can take the priority number in the core when the dma channel is requested
+>>> and add field to "struct dma_chan" in order to store it and the DMA drivers
+>>> could have access to it.
 
-Maybe it would not look so horrible, is it worth a try?
+How about Vinod's idea of extending dma_slave_config? Priority is
+similar to rest of the runtime setup dmaengine_slave_config() is meant
+to do.
 
-Regards,
-Domenico
+Thanks,
+Sekhar
