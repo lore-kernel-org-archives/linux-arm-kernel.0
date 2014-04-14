@@ -1,36 +1,20 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 14 Apr 2014 10:01:01 +0200
-Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
- device is disabled
-In-Reply-To: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
-References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1397462461.3800.3.camel@paszta.hi.pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 14 Apr 2014 10:01:26 +0200
+Subject: [PATCH 26/29] ARM: orion5x: convert RD-88F5182 to Device Tree
+In-Reply-To: <5818301.yXvUbauJMr@wuerfel>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140413154715.GE10033@lunn.ch> <20140413175658.64b65a76@skate>
+ <5818301.yXvUbauJMr@wuerfel>
+Message-ID: <20140414080126.GH10033@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 14.04.2014, 10:02 +0800 schrieb Shawn Guo:
-> In a board setup which disables LDB device node completely by changing
-> status to 'disabled', and only enables HDMI device, we're running into
-> the problem that imx-drm master never succeeds in binding, and hence
-> HDMI does not come up either.
-> 
-> &ldb {
-> 	status = "disabled";
-> 
-> 	lvds-channel at 1 {
-> 		...
-> 		status = "okay";
-> 	};
-> };
-> 
-> The imx-drm-core should really skip the LVDS channels no matter what
-> lvds-channel's status is, if LDB device is disabled.  Let's consider
-> such setup a misconfiguration, give a warning in there and not add the
-> component.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Changes since v1:
-> * Put a warning on such misconfiguration
+> Other than that, I guess it's just a couple of runtime bugs like
+> the one Andrew pointed out here.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Hi Arnd
+
+I didn't point out a bug, i complimented Thomas in doing the right
+thing with respect to multi platform.
+
+      Andrew
