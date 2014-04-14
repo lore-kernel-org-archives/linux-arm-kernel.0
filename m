@@ -1,54 +1,86 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:50:33 +0200
-Subject: [PATCH v3 6/6] ARM: mvebu: use a separate function to set the boot
- address of CPUs
+Date: Mon, 14 Apr 2014 15:50:32 +0200
+Subject: [PATCH v3 5/6] ARM: mvebu: switch to the new PMSU binding in Armada
+ 370/XP Device Tree
 In-Reply-To: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483433-25836-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483433-25836-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Setting the start (or boot) address of a CPU is no more used only
-during SMP bring up on Armada 370/XP, but it will also be used by the
-CPU idle function of Armada XP, and by the Armada 38x SMP support.
+Following the introduction of the new PMSU Device Tree binding, as
+well as the separate CPU reset binding, this commit switches the
+Armada 370 and Armada XP Device Trees to use them.
 
-Therefore this commit creates a separate PMSU function to set the boot
-address of a CPU with the PMSU.
+The PMSU node is moved from the Armada XP specific armada-xp.dtsi to
+the common Armada 370/XP armada-370-xp.dtsi because the PMSU is in
+fact available at the same location on both SOCs.
+
+The CPU reset node is then added on both Armada 370 and Armada XP,
+with a different compatible string. On Armada 370, the CPU reset
+driver is not really needed as Armada 370 is single core and the only
+use of the CPU reset driver is to boot secondary processors, but it
+still makes sense to have this CPU reset register described in the
+Device Tree.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++++
+ arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
+ arch/arm/boot/dts/armada-xp.dtsi     | 6 +++---
+ 3 files changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 4ae3ea1..8361281 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -41,6 +41,12 @@ static struct of_device_id of_pmsu_table[] = {
- 	{ /* end of list */ },
- };
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index bbb40f6..10d7786 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -203,6 +203,11 @@
+ 				reg = <0x20300 0x34>, <0x20704 0x4>;
+ 			};
  
-+static void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
-+{
-+	writel(virt_to_phys(boot_addr), pmsu_mp_base +
-+		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+}
++			pmsu at 22000 {
++				compatible = "marvell,armada-370-pmsu";
++				reg = <0x22000 0x1000>;
++			};
 +
- #ifdef CONFIG_SMP
- int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- {
-@@ -53,8 +59,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ 			usb at 50000 {
+ 				compatible = "marvell,orion-ehci";
+ 				reg = <0x50000 0x500>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index af1f11e..21b588b 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -220,6 +220,11 @@
+ 				clocks = <&coreclk 2>;
+ 			};
  
- 	hw_cpu = cpu_logical_map(cpu_id);
++			cpurst at 20800 {
++				compatible = "marvell,armada-370-cpu-reset";
++				reg = <0x20800 0x8>;
++			};
++
+ 			audio_controller: audio-controller at 30000 {
+ 				compatible = "marvell,armada370-audio";
+ 				reg = <0x30000 0x4000>;
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index abb9f9d..0a7dff6 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -117,9 +117,9 @@
+ 				clock-names = "nbclk", "fixed";
+ 			};
  
--	writel(virt_to_phys(boot_addr), pmsu_mp_base +
--			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, boot_addr);
+-			armada-370-xp-pmsu at 22000 {
+-				compatible = "marvell,armada-370-xp-pmsu";
+-				reg = <0x22100 0x400>, <0x20800 0x20>;
++			cpurst at 20800 {
++				compatible = "marvell,armada-370-cpu-reset";
++				reg = <0x20800 0x20>;
+ 			};
  
- 	ret = mvebu_cpu_reset_deassert(hw_cpu);
- 	if (ret) {
+ 			eth2: ethernet at 30000 {
 -- 
 1.8.3.2
