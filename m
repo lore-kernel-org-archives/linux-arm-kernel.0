@@ -1,49 +1,81 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 14 Apr 2014 16:39:51 +0900
-Subject: [PATCH 0/8] Support 4 levels of translation tables for ARM64
-Message-ID: <000001cf57b4$b86facd0$294f0670$@samsung.com>
+Date: Mon, 14 Apr 2014 16:40:12 +0900
+Subject: [PATCH 1/8] arm64: Use pr_* instead of printk
+Message-ID: <000001cf57b4$c4b52790$4e1f76b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+This patch fixed the following checkpatch complaint as using pr_*
+instead of printk.
 
-This patchset supports 4 levels of tranlsation tables for ARM64.
+WARNING: printk() should include KERN_ facility level
 
-Firstly, the patchset decouples page size from level of translation tables
-as taking account into the comment from Catalin Marinas:
-http://www.spinics.net/linux/lists/arm-kernel/msg319552.html
+Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+---
+ arch/arm64/kernel/traps.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-Then, it implements 4 levels of translation tables for both native, HYP
-and stage2 sides.
-
-This series is validated with Fast Models and kvmtool as platform and guest
-launcher, respectively.
-
-Jungseok Lee (8):
-      arm64: Use pr_* instead of printk
-      arm/arm64: KVM: Fix line length exceeding 80 characters
-      arm64: Decouple page size from level of translation tables
-      arm64: Introduce a kernel configuration option for VA_BITS
-      arm64: Add a description on 48-bit address space with 4KB pages
-      arm64: Add 4 levels of page tables definition with 4KB pages
-      arm64: mm: Implement 4 levels of translation tables
-      arm64: KVM: Implement 4 levels of translation tables for HYP and stage2
-
-Documentation/arm64/memory.txt                |   59 ++++++++++--
- arch/arm/kvm/mmu.c                            |  100 ++++++++++++++++++---
- arch/arm64/Kconfig                            |   51 ++++++++++-
- arch/arm64/include/asm/kvm_arm.h              |   20 +++++
- arch/arm64/include/asm/kvm_mmu.h              |    1 +
- arch/arm64/include/asm/memory.h               |    6 +-
- arch/arm64/include/asm/page.h                 |    6 +-
- arch/arm64/include/asm/pgalloc.h              |   24 ++++-
- arch/arm64/include/asm/pgtable-4level-hwdef.h |   50 +++++++++++
- arch/arm64/include/asm/pgtable-4level-types.h |   71 +++++++++++++++
- arch/arm64/include/asm/pgtable-hwdef.h        |   10 ++-
- arch/arm64/include/asm/pgtable.h              |   52 +++++++++--
- arch/arm64/include/asm/tlb.h                  |   10 ++-
- arch/arm64/kernel/head.S                      |   45 +++++++++-
- arch/arm64/kernel/traps.c                     |   19 ++--
- arch/arm64/mm/fault.c                         |    1 +
- arch/arm64/mm/mmu.c                           |   14 ++-
- 17 files changed, 488 insertions(+), 51 deletions(-)
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 7ffaddd..0484e81 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -65,7 +65,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 	fs = get_fs();
+ 	set_fs(KERNEL_DS);
+ 
+-	printk("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
++	pr_emerg("%s%s(0x%016lx to 0x%016lx)\n", lvl, str, bottom, top);
+ 
+ 	for (first = bottom & ~31; first < top; first += 32) {
+ 		unsigned long p;
+@@ -83,7 +83,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
+ 					sprintf(str + i * 9, " ????????");
+ 			}
+ 		}
+-		printk("%s%04lx:%s\n", lvl, first & 0xffff, str);
++		pr_emerg("%s%04lx:%s\n", lvl, first & 0xffff, str);
+ 	}
+ 
+ 	set_fs(fs);
+@@ -124,7 +124,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+ 			break;
+ 		}
+ 	}
+-	printk("%sCode: %s\n", lvl, str);
++	pr_emerg("%sCode: %s\n", lvl, str);
+ 
+ 	set_fs(fs);
+ }
+@@ -156,7 +156,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 		frame.pc = thread_saved_pc(tsk);
+ 	}
+ 
+-	printk("Call trace:\n");
++	pr_emerg("Call trace:\n");
+ 	while (1) {
+ 		unsigned long where = frame.pc;
+ 		int ret;
+@@ -328,17 +328,17 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+ 
+ void __pte_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pte %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pte %016lx.\n", file, line, val);
+ }
+ 
+ void __pmd_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pmd %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pmd %016lx.\n", file, line, val);
+ }
+ 
+ void __pgd_error(const char *file, int line, unsigned long val)
+ {
+-	printk("%s:%d: bad pgd %016lx.\n", file, line, val);
++	pr_crit("%s:%d: bad pgd %016lx.\n", file, line, val);
+ }
+ 
+ void __init trap_init(void)
+-- 
+1.7.10.4
