@@ -1,107 +1,62 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 14 Apr 2014 11:01:03 +0200
-Subject: [PATCH V5 00/20] ARM: exynos: cpuidle: Move the driver to
- drivers/cpuidle
-In-Reply-To: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1397212815-16068-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <534BA3CF.6030701@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 14 Apr 2014 10:59:35 +0200
+Subject: [PATCH 1/4] ARM: at91: prepare common clk transition for sam9x5
+ SoCs
+In-Reply-To: <1397464994-27267-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397464994-27267-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397464994-27267-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140414085935.GO2967@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Kukjin,
-
-I believe I addressed all the comments. Is it possible to take this 
-patchset for next ?
-
-Regards
-
-   -- Daniel
-
-
-
-On 04/11/2014 12:39 PM, Daniel Lezcano wrote:
-> Changelog:
->
-> V5:
-> 	* Removed patch : "Move clock setup to pm.c"
-> 	* Added patch   : "Move arm core power down clock to exynos5250 common code"
-> V4:
-> 	* Took into account Tomasz's comments
-> 		* Fixed missing call in for central suspend
-> 		* Passed parameter to the wakeup mask function
-> 		* Moved wakeup mask, boot vector and aftr state into a single
-> 		function
-> 		* Used this function as callback for platform data
-> 		* Moved S5P_CHECK_AFTR/S5P_CHECK_SLEEP into pm.c
-> 		* Set boot vector only one time
-> 	* Splitted some patches to make them more readable
-> V3:
-> 	* Added patch   : "ARM: exynos: cpuidle: Disable cpuidle for 5440"
-> 	* Removed patch : "ARM: exynos: config: Enable cpuidle"
-> 	* Removed default ARM_EXYNOS4210_CPUIDLE=y
-> 	* Added comment about bug fix side effect 'for_each_possible_cpu'
-> V2:
-> 	* Added comment in changelog for calls order (5/17)
-> 	* Call the powerdown only for cpu0 in the pm notifier
-> 	* Set the pm notifier for all boards
->
-> V1: initial post
->
-> This patchset relies on the cpm_pm notifier to initiate the powerdown sequence
-> operations from pm.c instead cpuidle.c. Thus the cpuidle driver is no longer
-> dependent from arch specific code as everything is called from the pm.c file.
->
-> The patchset applies on top of linux-samsung/for-next.
->
-> Tested on exynos4: 4210
-> Tested on exynos5: 5250 (without AFTR)
->
-> Amit Daniel Kachhap (1):
->    ARM: EXYNOS: Move arm core power down clock to exynos5250 common
->      clock
->
-> Daniel Lezcano (19):
->    ARM: exynos: cpuidle: Prevent forward declaration
->    ARM: exynos: cpuidle: Use cpuidle_register
->    ARM: exynos: cpuidle: Change function name prefix
->    ARM: exynos: cpuidle: Encapsulate register access inside a function
->    ARM: exynos: cpuidle: Move some code inside the idle_finisher
->    ARM: exynos: cpuidle: Fix S5P_WAKEUP_STAT call
->    ARM: exynos: cpuidle: Use the cpu_pm notifier
->    ARM: exynos: cpuidle: Move scu_enable in the cpu_pm notifier
->    ARM: exynos: cpuidle: Remove ifdef for scu_enable
->    ARM: exynos: cpuidle: Pass wakeup mask parameter to function
->    ARM: exynos: cpuidle: Encapsulate boot vector code into a function
->    ARM: exynos: cpuidle: Disable cpuidle for 5440
->    ARM: exynos: cpuidle: Encapsulate the AFTR code into a function
->    ARM: exynos: cpuidle: Move the AFTR state function into pm.c
->    ARM: exynos: cpuidle: Move the power sequence call in the cpu_pm
->      notifier
->    ARM: exynos: cpuidle: Move S5P_CHECK_SLEEP into pm.c
->    ARM: exynos: cpuidle: Pass the AFTR callback to the platform_data
->    ARM: exynos: cpuidle: Cleanup all unneeded headers from cpuidle.c
->    ARM: exynos: cpuidle: Move the driver to drivers/cpuidle directory
->
->   arch/arm/mach-exynos/Makefile        |    1 -
->   arch/arm/mach-exynos/common.h        |    1 +
->   arch/arm/mach-exynos/cpuidle.c       |  255 ----------------------------------
->   arch/arm/mach-exynos/exynos.c        |    8 +-
->   arch/arm/mach-exynos/pm.c            |  152 ++++++++++++++++----
->   arch/arm/mach-exynos/regs-pmu.h      |    2 -
->   drivers/clk/samsung/clk-exynos5250.c |   42 ++++++
->   drivers/cpuidle/Kconfig.arm          |    6 +
->   drivers/cpuidle/Makefile             |    1 +
->   drivers/cpuidle/cpuidle-exynos.c     |   98 +++++++++++++
->   10 files changed, 277 insertions(+), 289 deletions(-)
->   delete mode 100644 arch/arm/mach-exynos/cpuidle.c
->   create mode 100644 drivers/cpuidle/cpuidle-exynos.c
->
-
+On 14/04/2014 at 10:43:11 +0200, Boris Brezillon wrote :
+> This patch encloses sam9x5 old clk registration in
+> "#if defined(CONFIG_OLD_CLK_AT91) #endif" sections.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/mach-at91/at91sam9x5.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+> index 9ad781d..e994edd 100644
+> --- a/arch/arm/mach-at91/at91sam9x5.c
+> +++ b/arch/arm/mach-at91/at91sam9x5.c
+> @@ -19,9 +19,10 @@
+>  #include "board.h"
+>  #include "soc.h"
+>  #include "generic.h"
+> -#include "clock.h"
+>  #include "sam9_smc.h"
+>  
+> +#if defined(CONFIG_OLD_CLK_AT91)
+> +#include "clock.h"
+>  /* --------------------------------------------------------------------
+>   *  Clocks
+>   * -------------------------------------------------------------------- */
+> @@ -313,6 +314,7 @@ static void __init at91sam9x5_register_clocks(void)
+>  	clk_register(&pck0);
+>  	clk_register(&pck1);
+>  }
+> +#endif
+>  
+>  /* --------------------------------------------------------------------
+>   *  AT91SAM9x5 processor initialization
+> @@ -334,6 +336,8 @@ static void __init at91sam9x5_initialize(void)
+>  
+>  AT91_SOC_START(at91sam9x5)
+>  	.map_io = at91sam9x5_map_io,
+> +#if defined(CONFIG_OLD_CLK_AT91)
+>  	.register_clocks = at91sam9x5_register_clocks,
+> +#endif
+>  	.init = at91sam9x5_initialize,
+>  AT91_SOC_END
+> -- 
+> 1.8.3.2
+> 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
