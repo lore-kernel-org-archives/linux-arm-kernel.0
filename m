@@ -1,76 +1,154 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Apr 2014 07:58:22 +0900
-Subject: [PATCHv2 02/11] ARM: shmobile: Armadillo 800 EVA: initialize all
- struct pwm_lookup members
-In-Reply-To: <1397512793-10325-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1397512793-10325-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140414225822.GG22518@verge.net.au>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 15 Apr 2014 01:07:49 +0200
+Subject: [PATCH 3/4] ALSA: sound/atmel/ac97c.c: Add device tree support
+In-Reply-To: <1397293707-26890-4-git-send-email-alexanders83@web.de>
+References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+ <1397293707-26890-4-git-send-email-alexanders83@web.de>
+Message-ID: <20140414230749.GA2967@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 11:59:44PM +0200, Alexandre Belloni wrote:
-> Initializing all the struct pwm_lookup members allows to get rid of the struct
-> tpu_pwm_platform_data as the polarity initialization will be taken care of by
-> the PWM core.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 12/04/2014 at 11:08:26 +0200, Alexander Stein wrote :
 
+Even if dead simple, please try to include a commit log.
 
-This looks good to me.
-Please let me know when the driver code has been merged and
-I'll take this patch. Likewise for the other shmobile patch in this series.
-
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
 > ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 20 +++++++++-----------
->  1 file changed, 9 insertions(+), 11 deletions(-)
+>  .../devicetree/bindings/sound/atmel_ac97c.txt      | 20 +++++++++
+>  sound/atmel/ac97c.c                                | 52 ++++++++++++++++++++--
+
+You should separate the documentation from the rest of the patch. The
+patch adding documentation is actually the only one of the series that
+should go to devicetree at vger.kernel.org and the devicetree maintainers.
+
+>  2 files changed, 69 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/sound/atmel_ac97c.txt
 > 
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index 2858f380beae..1bf61dad9a35 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -31,7 +31,7 @@
->  #include <linux/gpio_keys.h>
->  #include <linux/regulator/driver.h>
->  #include <linux/pinctrl/machine.h>
-> -#include <linux/platform_data/pwm-renesas-tpu.h>
-> +#include <linux/pwm.h>
->  #include <linux/pwm_backlight.h>
->  #include <linux/regulator/fixed.h>
->  #include <linux/regulator/gpio-regulator.h>
-> @@ -399,24 +399,22 @@ static struct resource pwm_resources[] = {
+> diff --git a/Documentation/devicetree/bindings/sound/atmel_ac97c.txt b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> new file mode 100644
+> index 0000000..9839403
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> @@ -0,0 +1,20 @@
+> +* Atmel AC97 controller
+> +
+> +Required properties:
+> +  - compatible: "atmel,atmel_ac97c"
+> +  - reg: Address and length of the register set for the device
+> +  - interrupts: Should contain AC97 interrupt
+> +  - atmel,reset-pin: GPIO for resetting the codec
+> +Optional properties:
+> +  - pinctrl-names, pinctrl-0: Please refer to pinctrl-bindings.txt
+> +
+> +Example:
+> +sound at fffa0000 {
+> +	compatible = "atmel,atmel_ac97c";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ac97>;
+> +	reg = <0xfffa0000 0x4000>;
+> +	interrupts = <18 IRQ_TYPE_LEVEL_HIGH 5>;
+> +
+> +	atmel,reset-pin = <&pioC 29 GPIO_ACTIVE_LOW>;
+> +};
+> diff --git a/sound/atmel/ac97c.c b/sound/atmel/ac97c.c
+> index 9a13875..b84432b 100644
+> --- a/sound/atmel/ac97c.c
+> +++ b/sound/atmel/ac97c.c
+> @@ -22,6 +22,9 @@
+>  #include <linux/gpio.h>
+>  #include <linux/types.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <sound/core.h>
+>  #include <sound/initval.h>
+> @@ -901,6 +904,47 @@ static void atmel_ac97c_reset(struct atmel_ac97c *chip)
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id atmel_ac97c_dt_ids[] = {
+> +	{ .compatible = "atmel,atmel_ac97c", },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, atmel_ac97c_dt_ids);
+> +
+> +static struct ac97c_platform_data *atmel_ac97c_probe_dt(struct device *dev)
+> +{
+> +	struct ac97c_platform_data *pdata;
+> +	struct device_node *node = dev->of_node;
+> +	const struct of_device_id *match;
+> +
+> +	if (!node) {
+> +		dev_err(dev, "Device does not have associated DT data\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	match = of_match_device(atmel_ac97c_dt_ids, dev);
+> +	if (!match) {
+> +		dev_err(dev, "Unknown device model\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+
+You probably don't need that, it will always match. You would need it if
+you were actually using match (for example to get the .data member).
+
+> +
+> +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	pdata->reset_pin = of_get_named_gpio(dev->of_node,
+> +					     "atmel,reset-pin", 0);
+> +
+> +	return pdata;
+> +}
+> +#else
+> +static struct ac97c_platform_data *atmel_ac97c_probe_dt(struct device *dev)
+> +{
+> +	dev_err(dev, "no platform data defined\n");
+> +	return ERR_PTR(-ENXIO);
+> +}
+> +#endif
+> +
+>  static int atmel_ac97c_probe(struct platform_device *pdev)
+>  {
+>  	struct snd_card			*card;
+> @@ -921,10 +965,11 @@ static int atmel_ac97c_probe(struct platform_device *pdev)
+>  		return -ENXIO;
+>  	}
+>  
+> -	pdata = pdev->dev.platform_data;
+> +	pdata = dev_get_platdata(&pdev->dev);
+>  	if (!pdata) {
+> -		dev_dbg(&pdev->dev, "no platform data\n");
+> -		return -ENXIO;
+> +		pdata = atmel_ac97c_probe_dt(&pdev->dev);
+> +		if (IS_ERR(pdata))
+> +			return PTR_ERR(pdata);
+>  	}
+>  
+>  	irq = platform_get_irq(pdev, 0);
+> @@ -1208,6 +1253,7 @@ static struct platform_driver atmel_ac97c_driver = {
+>  		.name	= "atmel_ac97c",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= ATMEL_AC97C_PM_OPS,
+> +		.of_match_table = of_match_ptr(atmel_ac97c_dt_ids),
 >  	},
 >  };
->  
-> -static struct tpu_pwm_platform_data pwm_device_data = {
-> -	.channels[2] = {
-> -		.polarity = PWM_POLARITY_INVERSED,
-> -	}
-> -};
-> -
->  static struct platform_device pwm_device = {
->  	.name = "renesas-tpu-pwm",
->  	.id = -1,
-> -	.dev = {
-> -		.platform_data = &pwm_device_data,
-> -	},
->  	.num_resources = ARRAY_SIZE(pwm_resources),
->  	.resource = pwm_resources,
->  };
->  
->  static struct pwm_lookup pwm_lookup[] = {
-> -	PWM_LOOKUP("renesas-tpu-pwm", 2, "pwm-backlight.0", NULL),
-> +	{
-> +		.provider = "renesas-tpu-pwm",
-> +		.index = 2,
-> +		.dev_id = "pwm-backlight.0",
-> +		.con_id = NULL,
-> +		.period = 33333,
-> +		.polarity = PWM_POLARITY_INVERSED,
-> +	},
->  };
->  
->  /* LCDC and backlight */
+>  module_platform_driver(atmel_ac97c_driver);
 > -- 
-> 1.8.3.2
+> 1.9.2
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
