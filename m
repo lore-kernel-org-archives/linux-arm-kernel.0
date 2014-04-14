@@ -1,94 +1,109 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:47:03 +0200
-Subject: [PATCH v3 05/10] ARM: mvebu: enable the ARM SCU on Armada 375 and
- Armada 38x
+Date: Mon, 14 Apr 2014 15:47:06 +0200
+Subject: [PATCH v3 08/10] ARM: mvebu: add Armada 38x support to the coherency
+ code
 In-Reply-To: <1397483228-25625-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483228-25625-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483228-25625-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483228-25625-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to the Armada 370 and XP that used the PJ4B Marvell cores,
-the Armada 375 and Armada 38x use the ARM Cortex-A9. A consequence of
-this is that the unit responsible for the coherency between CPUs is
-now the ARM SCU, and not the Marvell coherency unit (which is still
-present to do coherency with I/O devices).
+The Armada 38x has a coherency unit that is similar to the one of the
+Armada 375 SoC, except that it does not have the bug of the Armada 375
+coherency unit that requires the XOR based workaround.
 
-Therefore this commit:
-
- * Ensures that the selection of the Armada 375 or Armada 38x SoC
-   support enables the ARM SCU support in the kernel.
-
- * Make sure to initialize the SCU at boot time.
+This commit therefore extends the Marvell EBU coherency code with a
+new compatible string to support the Armada 38x coherency unit.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig    |  2 ++
- arch/arm/mach-mvebu/board-v7.c | 19 +++++++++++++++++++
- 2 files changed, 21 insertions(+)
+ Documentation/devicetree/bindings/arm/coherency-fabric.txt |  7 ++++++-
+ arch/arm/mach-mvebu/coherency.c                            | 14 +++++++++++---
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 3f73eec..45e5714 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -39,6 +39,7 @@ config MACH_ARMADA_375
- 	select ARM_GIC
- 	select ARMADA_375_CLK
- 	select CPU_V7
-+	select HAVE_ARM_SCU
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_375
- 	help
-@@ -52,6 +53,7 @@ config MACH_ARMADA_38X
- 	select ARM_GIC
- 	select ARMADA_38X_CLK
- 	select CPU_V7
-+	select HAVE_ARM_SCU
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_38X
- 	help
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index 1730e0c..85f964e 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -27,12 +27,30 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-+#include <asm/smp_scu.h>
- #include "armada-370-xp.h"
- #include "common.h"
- #include "coherency.h"
- #include "mvebu-soc-id.h"
+diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+index dcd80d6..8dd4661 100644
+--- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
++++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+@@ -1,6 +1,6 @@
+ Coherency fabric
+ ----------------
+-Available on Marvell SOCs: Armada 370, Armada 375 and Armada XP
++Available on Marvell SOCs: Armada 370, Armada 375, Armada 38x and Armada XP
  
- /*
-+ * Enables the SCU when available. Obviously, this is only useful on
-+ * Cortex-A based SOCs, not on PJ4B based ones.
-+ */
-+static void __init mvebu_scu_enable(void)
-+{
-+	void __iomem *scu_base;
+ Required properties:
+ 
+@@ -12,6 +12,9 @@ Required properties:
+  * "marvell,armada-375-coherency-fabric", for the Armada 375 coherency
+    fabric.
+ 
++ * "marvell,armada-380-coherency-fabric", for the Armada 38x coherency
++   fabric.
 +
-+	struct device_node *np =
-+		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-+	if (np) {
-+		scu_base = of_iomap(np, 0);
-+		scu_enable(scu_base);
-+		of_node_put(np);
-+	}
-+}
-+
-+/*
-  * Early versions of Armada 375 SoC have a bug where the BootROM
-  * leaves an external data abort pending. The kernel is hit by this
-  * data abort as soon as it enters userspace, because it unmasks the
-@@ -57,6 +75,7 @@ static void __init mvebu_timer_and_clk_init(void)
+ - reg: Should contain coherency fabric registers location and
+   length.
+ 
+@@ -21,6 +24,8 @@ Required properties:
+  * For "marvell,armada-375-coherency-fabric", only one pair is needed
+    for the per-CPU fabric registers.
+ 
++ * For "marvell,armada-380-coherency-fabric", only one pair is needed
++   for the per-CPU fabric registers.
+ 
+ Examples:
+ 
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 75db33e..489edd1 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -47,6 +47,7 @@ enum {
+ 	COHERENCY_FABRIC_TYPE_NONE,
+ 	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
+ 	COHERENCY_FABRIC_TYPE_ARMADA_375,
++	COHERENCY_FABRIC_TYPE_ARMADA_380,
+ };
+ 
+ static struct of_device_id of_coherency_table[] = {
+@@ -54,6 +55,8 @@ static struct of_device_id of_coherency_table[] = {
+ 	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_370_XP },
+ 	{.compatible = "marvell,armada-375-coherency-fabric",
+ 	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_375 },
++	{.compatible = "marvell,armada-380-coherency-fabric",
++	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_380 },
+ 	{ /* end of list */ },
+ };
+ 
+@@ -302,7 +305,7 @@ static void __init armada_370_coherency_init(struct device_node *np)
+ 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+ }
+ 
+-static void __init armada_375_coherency_init(struct device_node *np)
++static void __init armada_375_380_coherency_init(struct device_node *np)
  {
- 	of_clk_init(NULL);
- 	clocksource_of_init();
-+	mvebu_scu_enable();
- 	coherency_init();
- 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
- #ifdef CONFIG_CACHE_L2X0
+ 	coherency_cpu_base = of_iomap(np, 0);
+ }
+@@ -324,6 +327,10 @@ static int coherency_type(void)
+ 		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
+ 			return type;
+ 
++		/* Armada 380 coherency works only on SMP */
++		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380 && is_smp())
++			return type;
++
+ 		of_node_put(np);
+ 	}
+ 
+@@ -344,8 +351,9 @@ int __init coherency_init(void)
+ 
+ 	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+ 		armada_370_coherency_init(np);
+-	else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375)
+-		armada_375_coherency_init(np);
++	else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 ||
++		 type == COHERENCY_FABRIC_TYPE_ARMADA_380)
++		armada_375_380_coherency_init(np);
+ 
+ 	return 0;
+ }
 -- 
 1.8.3.2
