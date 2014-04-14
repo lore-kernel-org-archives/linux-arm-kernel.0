@@ -1,91 +1,51 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 14 Apr 2014 14:25:57 +0200
-Subject: [PATCH/RFC 1/3] USB: OHCI: Export the ohci_hub_control function
-In-Reply-To: <1397478359-22541-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1397478359-22541-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397478359-22541-2-git-send-email-laurent.pinchart@ideasonboard.com>
+Date: Mon, 14 Apr 2014 14:25:56 +0200
+Subject: [PATCH/RFC 0/3] Allow OHCI drivers to override hub control operations
+Message-ID: <1397478359-22541-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platform drivers sometimes need to perform specific handling of hub
-control requests. Make this possible by exporting the ohci_hub_control()
-function which can then be called from a custom hub control handler in
-the default case.
+Hello,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- drivers/usb/host/ohci-hub.c     | 4 ++--
- drivers/usb/host/ohci-s3c2410.c | 7 ++-----
- drivers/usb/host/ohci.h         | 2 ++
- 3 files changed, 6 insertions(+), 7 deletions(-)
+The PXA27x OHCI implementation doesn't perform automatic control of port power
+supplies for all ports. While the PPS and LSDA bits of the HcRhPortStatus
+register are implemented, only a subset of ports have an external power enable
+pin controlled by the port status register. Other ports need their power supply
+to be controlled manually.
 
-diff --git a/drivers/usb/host/ohci-hub.c b/drivers/usb/host/ohci-hub.c
-index c81c872..70013c6 100644
---- a/drivers/usb/host/ohci-hub.c
-+++ b/drivers/usb/host/ohci-hub.c
-@@ -646,7 +646,7 @@ static inline int root_port_reset (struct ohci_hcd *ohci, unsigned port)
- 	return 0;
- }
- 
--static int ohci_hub_control (
-+int ohci_hub_control (
- 	struct usb_hcd	*hcd,
- 	u16		typeReq,
- 	u16		wValue,
-@@ -772,4 +772,4 @@ error:
- 	}
- 	return retval;
- }
--
-+EXPORT_SYMBOL_GPL(ohci_hub_control);
-diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
-index ff7c8f1..95809c5 100644
---- a/drivers/usb/host/ohci-s3c2410.c
-+++ b/drivers/usb/host/ohci-s3c2410.c
-@@ -45,8 +45,6 @@ static struct clk *usb_clk;
- 
- /* forward definitions */
- 
--static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
--			u16 wValue, u16 wIndex, char *buf, u16 wLength);
- static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
- 
- static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
-@@ -181,7 +179,7 @@ static int ohci_s3c2410_hub_control(
- 	 * process the request straight away and exit */
- 
- 	if (info == NULL) {
--		ret = orig_ohci_hub_control(hcd, typeReq, wValue,
-+		ret = ohci_hub_control(hcd, typeReq, wValue,
- 				       wIndex, buf, wLength);
- 		goto out;
- 	}
-@@ -231,7 +229,7 @@ static int ohci_s3c2410_hub_control(
- 		break;
- 	}
- 
--	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
- 	if (ret)
- 		goto out;
- 
-@@ -489,7 +487,6 @@ static int __init ohci_s3c2410_init(void)
- 	 * override these functions by making it too easy.
- 	 */
- 
--	orig_ohci_hub_control = ohci_s3c2410_hc_driver.hub_control;
- 	orig_ohci_hub_status_data = ohci_s3c2410_hc_driver.hub_status_data;
- 
- 	ohci_s3c2410_hc_driver.hub_status_data	= ohci_s3c2410_hub_status_data;
-diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
-index 9250cad..f317de6 100644
---- a/drivers/usb/host/ohci.h
-+++ b/drivers/usb/host/ohci.h
-@@ -727,3 +727,5 @@ extern int	ohci_setup(struct usb_hcd *hcd);
- extern int	ohci_suspend(struct usb_hcd *hcd, bool do_wakeup);
- extern int	ohci_resume(struct usb_hcd *hcd, bool hibernated);
- #endif
-+extern int	ohci_hub_control(struct usb_hcd	*hcd, u16 typeReq, u16 wValue,
-+				 u16 wIndex, char *buf, u16 wLength);
+In order to do so I've implemented manual regulator control in the ohci-pxa27x
+driver. This requires overriding the default behaviour of the CLEAR_FEATURE
+and SET_FEATURE requests for USB_PORT_FEAT_POWER with a custom hub control
+operation. In turn this requires calling the currently static ohci_hub_control
+function from the ohci-pxa27x driver.
+
+The ohci-s3c2410 driver already implements a similar feature, and accesses the
+ohci_hub_control function by saving the struct hc_driver hub_control value to
+a global variable right after calling ohci_init_driver. This is a bit of a
+hack, and as I need to call that function as well I've decided to export it
+instead.
+
+Another option would have been to handle the regulators directly inside the
+ohci-hub implementation, but I'm not sure whether it's worth it yet. Comments
+(or acks :-)) will be appreciated.
+
+Please not that I haven't been able to test the third patch due to lack of
+hardware. I've however tested a similar implementation on an out of tree
+PXA270 board.
+
+Laurent Pinchart (3):
+  USB: OHCI: Export the ohci_hub_control function
+  USB: ohci-pxa27x: Add support for external vbus regulators
+  ARM: pxa: zeus: Replace OHCI init/exit functions with a regulator
+
+ arch/arm/mach-pxa/zeus.c        | 89 ++++++++++++++++++++++-------------------
+ drivers/usb/host/ohci-hub.c     |  4 +-
+ drivers/usb/host/ohci-pxa27x.c  | 67 +++++++++++++++++++++++++++++++
+ drivers/usb/host/ohci-s3c2410.c |  7 +---
+ drivers/usb/host/ohci.h         |  2 +
+ 5 files changed, 121 insertions(+), 48 deletions(-)
+
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
