@@ -1,36 +1,65 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 14 Apr 2014 13:27:41 +0200
-Subject: [PATCH 20/29] ARM: orion5x: convert edmini_v2 to DT pinctrl
-In-Reply-To: <20140414132329.48df793e@skate>
+Date: Mon, 14 Apr 2014 13:28:49 +0200
+Subject: [PATCH 23/29] ARM: orion5x: use DT to describe NOR on edmini_v2
+In-Reply-To: <20140414132449.6eae17fa@skate>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BBDAC.2010801@gmail.com> <20140414132329.48df793e@skate>
-Message-ID: <534BC62D.6010000@gmail.com>
+ <1397400006-4315-24-git-send-email-thomas.petazzoni@free-electrons.com>
+ <534BC330.90206@gmail.com> <20140414132449.6eae17fa@skate>
+Message-ID: <534BC671.1010908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2014 01:23 PM, Thomas Petazzoni wrote:
+On 04/14/2014 01:24 PM, Thomas Petazzoni wrote:
 > Dear Sebastian Hesselbarth,
 >
-> On Mon, 14 Apr 2014 12:51:24 +0200, Sebastian Hesselbarth wrote:
+> On Mon, 14 Apr 2014 13:14:56 +0200, Sebastian Hesselbarth wrote:
 >
->>>    		internal-regs {
->>> +			pinctrl at 10000 {
+>>> +		devbus-bootcs {
 >>
->> Use node label reference:
+>> Node label reference?
 >>
->> &pinctrl {
->> 	...
->> };
+>>> +			status = "okay";
+>>> +
+>>> +			/* Read parameters */
+>>> +			devbus,bus-width    = <8>;
+>>> +			devbus,turn-off-ps  = <90000>;
+>>> +			devbus,badr-skew-ps = <0>;
+>>> +			devbus,acc-first-ps = <186000>;
+>>> +			devbus,acc-next-ps  = <186000>;
+>>> +
+>>> +			/* Write parameters */
+>>> +			devbus,wr-high-ps  = <90000>;
+>>> +			devbus,wr-low-ps   = <90000>;
+>>> +			devbus,ale-wr-ps   = <90000>;
+>>> +
+>>> +			/*
+>>> +			 * Currently the MTD code does not recognize
+>>> +			 * the MX29LV400CBCT as a bottom-type
+>>> +			 * device. This could cause risks of
+>>> +			 * accidentally erasing critical flash
+>>> +			 * sectors. We thus define a single,
+>>> +			 * write-protected partition covering the
+>>> +			 * whole flash.  TODO: once the flash part
+>>> +			 * TOP/BOTTOM detection issue is sorted out in
+>>> +			 * the MTD code, break this into at least
+>>> +			 * three partitions: 'u-boot code', 'u-boot
+>>> +			 * environment' and 'whatever is left'.
+>>> +			 */
+>>> +			nor at 0 {
+>>
+>> ePAPR suggests a generic node name. I talked to Olof on IRC, he prefers
+>> generic names all over. I confirmed that this means "flash" node name
+>> for both the controller _and_ the device.
 >
-> I personally dislike using node label references. I know they are used
-> for Ethernet because it has been done by someone else for Orion
-> platforms. But on all Armada 370/XP platforms, we don't use node label
-> references, and I'd prefer to do it the same way for Orion5x platforms
-> if possible.
+> While I'm fine with changing the nor at 0 node name to flash at 0, I'm
+> clearly not ok with changing devbus-bootcs to something that refers to
+> a "flash", because the Device Bus controller is not only a flash
+> controller. It can be used for many other memory mapped devices, such
+> as FPGAs and so on.
 
-Well, I definitely disagree and would like to _enforce_ using node
-label references. Anyway, if there is a strong reason for not using
-them, I'd be fine too.
+No, I didn't mean to rename devbus-foo nodes, just the flash.
+
+devbus-foo was the reason I pointed out that we have never been
+very strict with node names.
 
 Sebastian
