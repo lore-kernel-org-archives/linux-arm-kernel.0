@@ -1,122 +1,104 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:46:59 +0200
-Subject: [PATCH v3 01/10] ARM: mvebu: prepare coherency code to support more
- SOCs
+Date: Mon, 14 Apr 2014 15:47:00 +0200
+Subject: [PATCH v3 02/10] ARM: mvebu: add a coherency_available() call
 In-Reply-To: <1397483228-25625-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483228-25625-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483228-25625-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483228-25625-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code that handles the coherency fabric of Armada 370 and Armada XP
-in arch/arm/mach-mvebu/coherency.c made the assumption that there was
-only one type of coherency fabric. Unfortunately, it turns out that
-upcoming SoCs have a slightly different coherency unit.
-
-In preparation to the introduction of the coherency support for more
-SoCs, this commit:
-
- * Introduces a data associated to the compatible string in the
-   compatible string match table, so that the code can differantiate
-   the variant of coherency unit being used.
-
- * Separates the coherency unit initialization code into its own
-   function.
+This commit extends the coherency fabric code to provide a
+coherency_available()function that the SoC code can call to be told
+whether coherency support is available or not. On Armada 370/XP,
+coherency support is available as soon as the relevant DT node is
+present. On some upcoming SoCs, the DT node needs to be present *and*
+the system running with CONFIG_SMP enabled.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/arm/coherency-fabric.txt   |  5 ++-
- arch/arm/mach-mvebu/coherency.c                    | 47 +++++++++++++++-------
- 2 files changed, 37 insertions(+), 15 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 30 ++++++++++++++++++++++--------
+ arch/arm/mach-mvebu/coherency.h |  1 +
+ 2 files changed, 23 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-index 17d8cd1..f0bfa37 100644
---- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-+++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-@@ -4,7 +4,10 @@ Available on Marvell SOCs: Armada 370 and Armada XP
- 
- Required properties:
- 
--- compatible: "marvell,coherency-fabric"
-+- compatible: the possible values are:
-+
-+ * "marvell,coherency-fabric", to be used for the coherency fabric of
-+   the Armada 370 and Armada XP.
- 
- - reg: Should contain coherency fabric registers location and
-   length. First pair for the coherency fabric registers, second pair
 diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 4e9d581..434cf5f 100644
+index 434cf5f..296cf14 100644
 --- a/arch/arm/mach-mvebu/coherency.c
 +++ b/arch/arm/mach-mvebu/coherency.c
-@@ -38,8 +38,13 @@ static void __iomem *coherency_cpu_base;
- 
+@@ -39,6 +39,7 @@ static void __iomem *coherency_cpu_base;
  #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
  
-+enum {
-+	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
-+};
-+
- static struct of_device_id of_coherency_table[] = {
--	{.compatible = "marvell,coherency-fabric"},
-+	{.compatible = "marvell,coherency-fabric",
-+	 .data = (void *) COHERENCY_FABRIC_TYPE_ARMADA_370_XP },
- 	{ /* end of list */ },
+ enum {
++	COHERENCY_FABRIC_TYPE_NONE,
+ 	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
  };
  
-@@ -121,26 +126,40 @@ static struct notifier_block mvebu_hwcc_platform_nb = {
- 	.notifier_call = mvebu_hwcc_platform_notifier,
- };
+@@ -144,7 +145,7 @@ static void __init armada_370_coherency_init(struct device_node *np)
+ 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+ }
  
-+static void __init armada_370_coherency_init(struct device_node *np)
-+{
-+	struct resource res;
-+
-+	of_address_to_resource(np, 0, &res);
-+	coherency_phys_base = res.start;
-+	/*
-+	 * Ensure secondary CPUs will see the updated value,
-+	 * which they read before they join the coherency
-+	 * fabric, and therefore before they are coherent with
-+	 * the boot CPU cache.
-+	 */
-+	sync_cache_w(&coherency_phys_base);
-+	coherency_base = of_iomap(np, 0);
-+	coherency_cpu_base = of_iomap(np, 1);
-+	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+}
-+
- int __init coherency_init(void)
+-int __init coherency_init(void)
++static int coherency_type(void)
  {
  	struct device_node *np;
  
- 	np = of_find_matching_node(NULL, of_coherency_table);
- 	if (np) {
--		struct resource res;
-+		const struct of_device_id *match =
-+			of_match_node(of_coherency_table, np);
-+		int type;
-+
-+		type = (int) match->data;
- 		pr_info("Initializing Coherency fabric\n");
--		of_address_to_resource(np, 0, &res);
--		coherency_phys_base = res.start;
--		/*
--		 * Ensure secondary CPUs will see the updated value,
--		 * which they read before they join the coherency
--		 * fabric, and therefore before they are coherent with
--		 * the boot CPU cache.
--		 */
--		sync_cache_w(&coherency_phys_base);
--		coherency_base = of_iomap(np, 0);
--		coherency_cpu_base = of_iomap(np, 1);
--		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-+
-+		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
-+			armada_370_coherency_init(np);
-+
+@@ -155,27 +156,40 @@ int __init coherency_init(void)
+ 		int type;
+ 
+ 		type = (int) match->data;
+-		pr_info("Initializing Coherency fabric\n");
+ 
++		/* Armada 370/XP coherency works in both UP and SMP */
+ 		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+-			armada_370_coherency_init(np);
++			return type;
+ 
  		of_node_put(np);
  	}
  
+-	return 0;
++	return COHERENCY_FABRIC_TYPE_NONE;
+ }
+ 
+-static int __init coherency_late_init(void)
++int coherency_available(void)
+ {
++	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
++}
++
++int __init coherency_init(void)
++{
++	int type = coherency_type();
+ 	struct device_node *np;
+ 
+ 	np = of_find_matching_node(NULL, of_coherency_table);
+-	if (np) {
++
++	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
++		armada_370_coherency_init(np);
++
++	return 0;
++}
++
++static int __init coherency_late_init(void)
++{
++	if (coherency_available())
+ 		bus_register_notifier(&platform_bus_type,
+ 				      &mvebu_hwcc_platform_nb);
+-		of_node_put(np);
+-	}
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+index 760226c..02f7ec3 100644
+--- a/arch/arm/mach-mvebu/coherency.h
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -18,5 +18,6 @@ extern unsigned long coherency_phys_base;
+ 
+ int set_cpu_coherent(unsigned int cpu_id, int smp_group_id);
+ int coherency_init(void);
++int coherency_available(void);
+ 
+ #endif	/* __MACH_370_XP_COHERENCY_H */
 -- 
 1.8.3.2
