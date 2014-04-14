@@ -1,41 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Apr 2014 10:58:09 +0200
-Subject: [PATCH 4/4] ARM: at91: move sam9n12 SoC to the CCF
-In-Reply-To: <1397463399-11771-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397463399-11771-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397463399-11771-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140414085809.GN2967@piout.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 10:59:20 +0200
+Subject: [PATCH 01/29] ARM: orion5x: fix target ID for crypto SRAM window
+In-Reply-To: <1397400006-4315-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BA368.2040607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/2014 at 10:16:39 +0200, Boris Brezillon wrote :
-> This patch removes the selection of AT91_USE_OLD_CLK when selecting
-> sam9n12 SoC support. This will automatically enable COMMON_CLK_AT91 option
-> and add support for at91 common clk implementation.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
+> In commit 4ca2c04085a1caa903e92a5fc0da25362150aac2 ('ARM: orion5x:
+> Move to ID based window creation'), the mach-orion5x code was changed
+> to use the new mvebu-mbus API. However, in the process, a mistake was
+> made on the crypto SRAM window target ID: it should have been 0x9
+> (verified in the datasheet) and not 0x0.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: stable at vger.kernel.org
 > ---
->  arch/arm/mach-at91/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index b2d2cf4..a1ac430 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -183,7 +183,6 @@ config SOC_AT91SAM9N12
->  	select HAVE_AT91_DBGU0
->  	select HAVE_FB_ATMEL
->  	select SOC_AT91SAM9
-> -	select AT91_USE_OLD_CLK
->  	select HAVE_AT91_USB_CLK
->  	help
->  	  Select this if you are using Atmel's AT91SAM9N12 SoC.
-> -- 
-> 1.8.3.2
-> 
+> This should be backported to stable all the way to v3.12.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+> ---
+>   arch/arm/mach-orion5x/common.h | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+> index f565f99..7548db2 100644
+> --- a/arch/arm/mach-orion5x/common.h
+> +++ b/arch/arm/mach-orion5x/common.h
+> @@ -21,7 +21,7 @@ struct mv_sata_platform_data;
+>   #define ORION_MBUS_DEVBUS_BOOT_ATTR   0x0f
+>   #define ORION_MBUS_DEVBUS_TARGET(cs)  0x01
+>   #define ORION_MBUS_DEVBUS_ATTR(cs)    (~(1 << cs))
+> -#define ORION_MBUS_SRAM_TARGET        0x00
+> +#define ORION_MBUS_SRAM_TARGET        0x09
+>   #define ORION_MBUS_SRAM_ATTR          0x00
+>
+>   /*
+>
