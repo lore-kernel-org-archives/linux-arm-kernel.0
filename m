@@ -1,52 +1,48 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 17:29:17 +0200
-Subject: [PATCH v2 0/4] ARM: mvebu: fix bus width handling in mvebu-devbus
-Message-ID: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 14 Apr 2014 17:29:19 +0200
+Subject: [PATCH v2 2/4] ARM: mvebu: fix NOR bus-width in Armada XP GP Device
+ Tree
+In-Reply-To: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397489361-5833-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason, Greg, Andrew, Sebastian,
+The mvebu-devbus driver had a serious bug, which lead to a 8 bits bus
+width declared in the Device Tree being considered as a 16 bits bus
+width when configuring the hardware.
 
-This set of patches fix a bug in the mvebu-devbus driver, which was
-leading to a misinterpretation of Device Tree provided value: a NOR
-bus width declared as 8 bits in the Device Tree was in fact configured
-as 16 bits at the hardware level.
+This bug in mvebu-devbus driver was compensated by a symetric mistake
+in the Armada XP GP Device Tree: a 8 bits bus width was declared, even
+though the hardware actually has a 16 bits bus width connection with
+the NOR flash.
 
-This bug was not noticed until now, because it was compensated by a
-symetric mistake in the Device Tree files.
+Now that we have fixed the mvebu-devbus driver to behave according to
+its Device Tree binding, this commit fixes the problematic Device Tree
+files as well.
 
-This set of commits therefore fix both the driver itself, and the
-incorrect Device Tree files. The patches for the Device Tree files
-have been separated, because some of them should apply all the way to
-v3.10, while some of them apply only up to v3.11.
+This bug was introduced in commit
+da8d1b38356853c37116f9afa29f15648d7fb159 ('ARM: mvebu: Add support for
+NOR flash device on Armada XP-GP board') which was merged in v3.10.
 
-Changes since v1:
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: stable at vger.kernel.org
+---
+ arch/arm/boot/dts/armada-xp-gp.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- * Added patches to fix the Device Tree files to indicate the correct
-   bus width, as documented in the board schematics. Noticed by
-   Ezequiel Garcia.
-
- * Changed the bus_width conversion logic in the driver to only accept
-   valid values: 8 bits and 16 bits. All other values lead to an error
-   being returned. Suggested by Sebastian Hesselbarth.
-
- * Rebased on top of v3.15-rc1.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (4):
-  memory: mvebu-devbus: fix the conversion of the bus width
-  ARM: mvebu: fix NOR bus-width in Armada XP GP Device Tree
-  ARM: mvebu: fix NOR bus-width in Armada XP DB Device Tree
-  ARM: mvebu: fix NOR bus-width in Armada XP OpenBlocks AX3 Device Tree
-
- arch/arm/boot/dts/armada-xp-db.dts               |  2 +-
- arch/arm/boot/dts/armada-xp-gp.dts               |  2 +-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  2 +-
- drivers/memory/mvebu-devbus.c                    | 15 +++++++++++++--
- 4 files changed, 16 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 61bda68..3a359fd 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -59,7 +59,7 @@
+ 			/* Device Bus parameters are required */
+ 
+ 			/* Read parameters */
+-			devbus,bus-width    = <8>;
++			devbus,bus-width    = <16>;
+ 			devbus,turn-off-ps  = <60000>;
+ 			devbus,badr-skew-ps = <0>;
+ 			devbus,acc-first-ps = <124000>;
 -- 
 1.8.3.2
