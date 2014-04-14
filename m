@@ -1,65 +1,72 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Apr 2014 15:20:25 +0900
-Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
-In-Reply-To: <534745D9.30604@samsung.com>
-References: <1397122124-15690-1-git-send-email-cw00.choi@samsung.com>
- <1397122124-15690-2-git-send-email-cw00.choi@samsung.com>
- <5032959.JQvlxpLHiQ@wuerfel> <534745D9.30604@samsung.com>
-Message-ID: <534B7E29.5090601@samsung.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 14 Apr 2014 14:26:34 +0800
+Subject: [PATCH v2 02/12] ARM: append ARCH_MULTI_V7_LPAE
+In-Reply-To: <5170679.UrtmSgyEZI@wuerfel>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-3-git-send-email-haojian.zhuang@linaro.org>
+ <5170679.UrtmSgyEZI@wuerfel>
+Message-ID: <CAD6h2NTmVBm++Co2_YGmTp44qcrDjaBDEvatutbQq+P0OBEhWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin and Tomasz,
-
-On 04/11/2014 10:31 AM, Chanwoo Choi wrote:
-> Hi,
-> 
-> On 04/10/2014 06:43 PM, Arnd Bergmann wrote:
->> On Thursday 10 April 2014 18:28:18 Chanwoo Choi wrote:
->>> This patch add Exynos3250's SoC ID. Exynos 3250 is System-On-Chip(SoC) that
->>> is based on the 32-bit RISC processor for Smartphone. Exynos3250 uses Cortex-A7
->>> dual cores and has a target speed of 1.0GHz.
->>>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos/Kconfig             | 22 ++++++++++++++++++++++
->>>  arch/arm/mach-exynos/exynos.c            |  1 +
->>>  arch/arm/plat-samsung/include/plat/cpu.h | 10 ++++++++++
->>>  3 files changed, 33 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->>> index fc8bf18..6da8a68 100644
->>> --- a/arch/arm/mach-exynos/Kconfig
->>> +++ b/arch/arm/mach-exynos/Kconfig
->>> @@ -11,6 +11,17 @@ if ARCH_EXYNOS
->>>  
->>>  menu "SAMSUNG EXYNOS SoCs Support"
->>>  
->>> +config ARCH_EXYNOS3
->>> +	bool "SAMSUNG EXYNOS3"
->>> +	select ARM_AMBA
->>> +	select CLKSRC_OF
->>> +	select HAVE_ARM_SCU if SMP
->>> +	select HAVE_SMP
->>> +	select PINCTRL
->>> +	select PM_GENERIC_DOMAINS if PM_RUNTIME
->>> +	help
->>> +	  Samsung EXYNOS3 SoCs based systems
->>> +
+On 8 April 2014 18:59, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 April 2014 16:00:42 Haojian Zhuang wrote:
+>> Add new ARCH_MULTI_V7_LPAE config. It will select ARM_LPAE only both
+>> ARCH_MULTI_V6 & ARCH_MULTI_V7 is disabled.
 >>
->> Isn't S5PV210 also called an Exynos3 these days? Are we going to get
->> any conflicts here when merging that code into Exynos as Tomasz has
->> suggested in the past?
-> 
-> I knew. But, S5PV210/S5PC110 has not yet included in Exynos3 category on mainline.
-> Need opinion of Exynos SoC Maintainer to clear this ambiguous stuff.
-> 
-> Dear Kukjin and Tomasz,
-> I need your opinion about this patch.
-> 
+>> ARCH_MULTI_V7 means non-LPAE platform.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>
+> I think it's good to have this option, but it should be added more carefully.
+>
+>>  arch/arm/Kconfig | 9 ++++++++-
+>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 5248923..a8b2b45 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -918,12 +918,19 @@ config ARCH_MULTI_V6
+>>       select CPU_V6K
+>>
+>>  config ARCH_MULTI_V7
+>> -     bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+>> +     bool "ARMv7 non-LPAE based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+>>       default y
+>>       select ARCH_MULTI_V6_V7
+>>       select CPU_V7
+>>       select HAVE_SMP
+>>
+>> +config ARCH_MULTI_V7_LPAE
+>> +     bool "ARMv7 LPAE based platforms (HIP04)"
+>> +     select ARCH_MULTI_V6_V7
+>> +     select CPU_V7
+>> +     select HAVE_SMP
+>> +     select ARM_LPAE if !(ARCH_MULTI_V6 || ARCH_MULTI_V7)
+>> +
+>>  config ARCH_MULTI_V6_V7
+>>       bool
+>>       select MIGHT_HAVE_CACHE_L2X0
+>
+> Two points here:
+>
+> a) The other options all list the CPU types (Cortex-A, PJ4, ...),
+>    while the one you introduce lists the platform name. I think they
+>    should all list the CPU cores, like
+>
+>   bool "ARMv7 non-LPAE based platforms (Cortex-A5/A8/A9, PJ4, Scorpion)"
+>
+>   bool "ARMv7 non-LPAE based platforms (Cortex-A7/A12/A15/A17, Brahma-B15, PJ4B, Krait)"
+>   (I'm not completely sure about Krait, need to check that).
+>
+I think that you're saying ARMv7 LPAE based platforms (Cortex-A7/...) at here.
 
-Please review this patch and reply about Arnd's comment.
+> b) When you introduce this, please change the other platforms over to use
+> the symbol correctly. We already have a number of platforms based on A7, A15,
+> PJ4B and Krait.
+>
+Sure, I'll update all the platforms.
 
-Best Regards,
-Chanwoo Choi
+Regards
+Haojian
