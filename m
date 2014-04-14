@@ -1,67 +1,67 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 14 Apr 2014 11:59:25 -0400 (EDT)
-Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
-In-Reply-To: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
-References: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
-Message-ID: <alpine.LFD.2.11.1404141148480.980@knanqh.ubzr>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 14 Apr 2014 18:00:04 +0200
+Subject: [PATCH] pata_arasan_cf: fix ata_host_activate() failure handling
+In-Reply-To: <CAOh2x=n8PGuykczfpi0T1-WwVmakURyX+RuuOQiFVhpYPmrS6A@mail.gmail.com>
+References: <7093981.6c4k98qyGh@amdc1032>
+ <CAOh2x=n8PGuykczfpi0T1-WwVmakURyX+RuuOQiFVhpYPmrS6A@mail.gmail.com>
+Message-ID: <1861056.i4MLEJ6v1d@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Apr 2014, Lu Xiangyu wrote:
 
-> From: Xiangyu Lu <luxiangyu@huawei.com>
-> 
-> In big-endian systems, "%1" get the most significant part of the value, cause
-> the instruction to get the wrong result.
-> 
-> When viewing ftrace record in big-endian ARM systems, we found that
-> the timestamp errors:
-> 
-> swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
-> events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
-> swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
-> swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
-> swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
-> swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
-> 
-> When viewed ftrace records, it will call the do_div(n, base) function, which
-> achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
-> do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
-> 
-> Cc: <stable@vger.kernel.org> # 2.6.20+
-> Signed-off-by: Alex Wu <wuquanming@huawei.com>
-> Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
+Hi,
 
-Argh..  My bad.
-
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-
-Please send to RMK's patch system.
-
-
-> ---
->  arch/arm/include/asm/div64.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Tuesday, April 01, 2014 09:50:42 AM Viresh Kumar wrote:
+> On Mon, Mar 31, 2014 at 11:19 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> > Add missing cf_exit() and clk_put() calls to ata_host_activate()
+> > failure path.
+> >
+> > Cc: Viresh Kumar <viresh.linux@gmail.com>
+> > Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > ---
+> >  drivers/ata/pata_arasan_cf.c |   10 ++++++++--
+> >  1 file changed, 8 insertions(+), 2 deletions(-)
+> >
+> > Index: b/drivers/ata/pata_arasan_cf.c
+> > ===================================================================
+> > --- a/drivers/ata/pata_arasan_cf.c      2014-03-31 16:57:47.443727785 +0200
+> > +++ b/drivers/ata/pata_arasan_cf.c      2014-03-31 17:09:48.171715498 +0200
+> > @@ -898,9 +898,15 @@ static int arasan_cf_probe(struct platfo
+> >
+> >         cf_card_detect(acdev, 0);
+> >
+> > -       return ata_host_activate(host, acdev->irq, irq_handler, 0,
+> > -                       &arasan_cf_sht);
+> > +       ret = ata_host_activate(host, acdev->irq, irq_handler, 0,
+> > +                               &arasan_cf_sht);
+> > +       if (ret)
+> > +               goto exit_cf;
+> >
+> > +       return 0;
 > 
-> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> index 191ada6..662c7bd 100644
-> --- a/arch/arm/include/asm/div64.h
-> +++ b/arch/arm/include/asm/div64.h
-> @@ -156,7 +156,7 @@
->  		/* Select the best insn combination to perform the   */	\
->  		/* actual __m * __n / (__p << 64) operation.         */	\
->  		if (!__c) {						\
-> -			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
-> +			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
->  				"mov	%Q0, #0"			\
->  				: "=&r" (__res)				\
->  				: "r" (__m), "r" (__n)			\
-> -- 
-> 1.7.9.5
+> Probably this would be better:
 > 
+> if (!ret)
+>     return 0
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> and then no need of a goto..
+
+I considered doing it this way initially but decided that code consistency
+with other host drivers is more important.  However if this is what you
+prefer I'll re-do the patch and post it as v2.
+
+> > +
+> > +exit_cf:
+> > +       cf_exit(acdev);
+> >  free_clk:
+> >         clk_put(acdev->clk);
+> >         return ret;
+> >
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
