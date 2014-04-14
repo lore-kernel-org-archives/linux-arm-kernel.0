@@ -1,10 +1,9 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 14 Apr 2014 16:18:17 +0200
-Subject: [PATCH v2 5/6] ARM: shmobile: r8a7740: drop address cells from GIC
- node
+Date: Mon, 14 Apr 2014 16:18:18 +0200
+Subject: [PATCH v2 6/6] ARM: shmobile: sh73a0: drop address cells from GIC node
 In-Reply-To: <1397485098-19198-1-git-send-email-l.stach@pengutronix.de>
 References: <1397485098-19198-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1397485098-19198-5-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1397485098-19198-6-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,20 +19,20 @@ Acked-by: Rob Herring <robh@kernel.org>
 ---
 v2: split patch, added ack
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 1 -
+ arch/arm/boot/dts/sh73a0.dtsi | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 8280884bfa59..2551e9438d35 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -28,7 +28,6 @@
- 	gic: interrupt-controller at c2800000 {
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index b7bd3b9a6753..5ecf552e1c00 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -34,7 +34,6 @@
+ 	gic: interrupt-controller at f0001000 {
  		compatible = "arm,cortex-a9-gic";
  		#interrupt-cells = <3>;
 -		#address-cells = <1>;
  		interrupt-controller;
- 		reg = <0xc2800000 0x1000>,
- 		      <0xc2000000 0x1000>;
+ 		reg = <0xf0001000 0x1000>,
+ 		      <0xf0000100 0x100>;
 -- 
 1.9.1
