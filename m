@@ -1,120 +1,105 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 14 Apr 2014 15:05:20 +0100
-Subject: [PATCH v2 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
- support.
-In-Reply-To: <1397271984-23405-5-git-send-email-isubramanian@apm.com>
-References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
- <1397271984-23405-5-git-send-email-isubramanian@apm.com>
-Message-ID: <534BEB20.3080501@codethink.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 14 Apr 2014 15:53:58 +0200
+Subject: [PATCH v3 01/11] ARM: mvebu: move Armada XP specific SMP
+ initialization to platsmp.c
+In-Reply-To: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483648-26611-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/14 04:06, Iyappan Subramanian wrote:
-> This patch adds network driver for APM X-Gene SoC ethernet.
->
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Ravi Patel <rapatel@apm.com>
+The pmsu.c driver contained an armada_xp_boot_cpu() function that sets
+the boot address of a secondary CPUs and deasserts the reset. However,
+the Armada 375 needs a slightly different logic, so it makes more
+sense to move this code into the Armada XP specific platsmp.c.
 
-[snip]
+In order to achieve this, the mvebu_pmsu_set_cpu_boot_addr() function
+is exported. It will be needed for both the Armada XP and Armada 38x
+SMP implementations.
 
-> +{
-> +	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
-> +	struct phy_device *phydev;
-> +	unsigned char phy_id[MII_BUS_ID_SIZE+3];
-> +	int ret = 0;
-> +
-> +	phydev = phy_find_first(pdata->mdio_bus);
-> +	if (!phydev) {
-> +		netdev_info(ndev, "no PHY found\n");
-> +		ret = -1;
-> +		goto out;
-> +	}
-> +
-> +	/* attach the mac to the phy */
-> +	snprintf(phy_id, sizeof(phy_id), PHY_ID_FMT, pdata->mdio_bus->id,
-> +		 pdata->phy_addr);
-> +	phydev = phy_connect(ndev, phy_id,
-> +			     &xgene_enet_mdio_link_change, pdata->phy_mode);
-> +	if (IS_ERR(phydev)) {
-> +		netdev_err(ndev, "Could not attach to PHY\n");
-> +		ret = PTR_ERR(phydev);
-> +		phydev = NULL;
-> +		goto out;
-> +	}
-> +
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/common.h  |  1 +
+ arch/arm/mach-mvebu/platsmp.c | 10 +++++++++-
+ arch/arm/mach-mvebu/pmsu.c    | 26 +-------------------------
+ 3 files changed, 11 insertions(+), 26 deletions(-)
 
-You should be using of_phy_connect or similar so that the
-necessary PHY<>OF data is properly initialised
-
-> +	netdev_info(ndev, "phy_id=0x%08x phy_drv=\"%s\"",
-> +		    phydev->phy_id, phydev->drv->name);
-> +out:
-> +	pdata->phy_link = 0;
-> +	pdata->phy_speed = 0;
-> +	pdata->phy_dev = phydev;
-> +
-> +	return ret;
-> +}
-> +
-
-
-[snip]
-
-> +struct xgene_enet_desc {
-> +	u64 m0;
-> +	u64 m1;
-> +	u64 m2;
-> +	u64 m3;
-> +};
-> +
-> +struct xgene_enet_desc16 {
-> +	u64 m0;
-> +	u64 m1;
-> +};
-> +
-> +static inline void xgene_enet_cpu_to_le64(struct xgene_enet_desc *desc,
-> +					  int count)
-> +{
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +	int i;
-> +
-> +	for (i = 0; i < count; i++)
-> +		((u64 *)desc)[i] = cpu_to_le64(((u64 *)desc)[i]);
-> +#endif
-> +}
-> +
-> +static inline void xgene_enet_le64_to_cpu(struct xgene_enet_desc *desc,
-> +					  int count)
-> +{
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +	int i;
-> +
-> +	for (i = 0; i < count; i++)
-> +		((u64 *)desc)[i] = le64_to_cpu(((u64 *)desc)[i]);
-> +#endif
-> +}
-> +
-> +static inline void xgene_enet_desc16_to_le64(struct xgene_enet_desc *desc)
-> +{
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +	((u64 *)desc)[1] = cpu_to_le64(((u64 *)desc)[1]);
-> +#endif
-> +}
-> +
-> +static inline void xgene_enet_le64_to_desc16(struct xgene_enet_desc *desc)
-> +{
-> +#ifdef CONFIG_CPU_BIG_ENDIAN
-> +	((u64 *)desc)[1] = le64_to_cpu(((u64 *)desc)[1]);
-> +#endif
-> +}
-
-With this do you not risk confusing the hardware by swapping the
-format of the descriptors?
-
-Why not use xxx_to_cpu() and cpu_to_xxx() functions when reading or
-writing the descriptors? It would also remove a lot of the #ifdef in
-this code.
-
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index cfb129b..2b88eb0 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -19,6 +19,7 @@
+ 
+ void mvebu_restart(enum reboot_mode mode, const char *cmd);
+ int mvebu_cpu_reset_deassert(int cpu);
++void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
+ 
+ void armada_xp_cpu_die(unsigned int cpu);
+ 
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index a6da03f..e98075f 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -77,9 +77,17 @@ static void armada_xp_secondary_init(unsigned int cpu)
+ 
+ static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
++	int ret, hw_cpu;
++
+ 	pr_info("Booting CPU %d\n", cpu);
+ 
+-	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
++	hw_cpu = cpu_logical_map(cpu);
++	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, armada_xp_secondary_startup);
++	ret = mvebu_cpu_reset_deassert(hw_cpu);
++	if (ret) {
++		pr_warn("unable to boot CPU: %d\n", ret);
++		return ret;
++	}
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 8361281..a1508de 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -41,36 +41,12 @@ static struct of_device_id of_pmsu_table[] = {
+ 	{ /* end of list */ },
+ };
+ 
+-static void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
++void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+ {
+ 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
+ 		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
+ }
+ 
+-#ifdef CONFIG_SMP
+-int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+-{
+-	int hw_cpu, ret;
+-
+-	if (!pmsu_mp_base) {
+-		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
+-		return -ENODEV;
+-	}
+-
+-	hw_cpu = cpu_logical_map(cpu_id);
+-
+-	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, boot_addr);
+-
+-	ret = mvebu_cpu_reset_deassert(hw_cpu);
+-	if (ret) {
+-		pr_warn("unable to boot CPU: %d\n", ret);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-#endif
+-
+ static int __init armada_370_xp_pmsu_init(void)
+ {
+ 	struct device_node *np;
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.8.3.2
