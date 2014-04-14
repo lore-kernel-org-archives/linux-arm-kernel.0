@@ -1,82 +1,96 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Apr 2014 15:35:45 +0200
-Subject: [PATCH v3 15/18] ASoC: fsl-ssi: Allow first stream to set the bitclock
+Date: Mon, 14 Apr 2014 15:35:35 +0200
+Subject: [PATCH v3 05/18] ASoC: fsl-ssi: Remove useless DMA code
 In-Reply-To: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
 References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1397482548-28463-16-git-send-email-mpa@pengutronix.de>
+Message-ID: <1397482548-28463-6-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+Simplify dma DT property handling. fsl,ssi-dma-events is not used
+anymore. It passes invalid data to imx_pcm_dma_params_init_data() which
+copies some data into an imx dma struct. This struct is never used in
+imx-dma or imx-sdma because of generic OF DMA handling. The
+"fsl,ssi-dma-events" is not used anywhere in dts files.
 
-Allow to set the bitlcock exactly once when the ssi unit is
-opened and do not touch the clock until both streams are closed
-again. We should not unlock the bitclock in the stop trigger
-since a trigger could be the result of an underrun and doesn't
-mean the bitclock can be reconfigured again.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 40 +++-------------------------------------
+ 1 file changed, 3 insertions(+), 37 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index e5fa626..e97e30f 100644
+index 418c646..8072926 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -495,9 +495,6 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		snd_soc_dai_get_drvdata(rtd->cpu_dai);
+@@ -168,8 +168,6 @@ struct fsl_ssi_private {
+ 	struct clk *clk;
+ 	struct snd_dmaengine_dai_dma_data dma_params_tx;
+ 	struct snd_dmaengine_dai_dma_data dma_params_rx;
+-	struct imx_dma_data filter_data_tx;
+-	struct imx_dma_data filter_data_rx;
+ 	struct imx_pcm_fiq_params fiq_params;
+ 	/* Register values for rx/tx configuration */
+ 	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
+@@ -996,8 +994,7 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
+ 		struct fsl_ssi_private *ssi_private)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+-	u32 dma_events[2], dmas[4];
+-	bool shared;
++	u32 dmas[4];
  	int ret;
  
--	if (!dai->active && !fsl_ssi_is_ac97(ssi_private))
--		ssi_private->baudclk_locked = false;
--
- 	if (fsl_ssi_is_i2s_master(ssi_private)) {
- 		ret = clk_prepare_enable(ssi_private->baudclk);
- 		if (ret)
-@@ -525,6 +522,9 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
+ 	ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
+@@ -1033,26 +1030,9 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
+ 			offsetof(struct ccsr_ssi, stx0);
+ 	ssi_private->dma_params_rx.addr = ssi_private->ssi_phys +
+ 			offsetof(struct ccsr_ssi, srx0);
+-	ssi_private->dma_params_tx.filter_data = &ssi_private->filter_data_tx;
+-	ssi_private->dma_params_rx.filter_data = &ssi_private->filter_data_rx;
  
- 	if (fsl_ssi_is_i2s_master(ssi_private))
- 		clk_disable_unprepare(ssi_private->baudclk);
-+
-+	if (!dai->active)
-+		ssi_private->baudclk_locked = 0;
+-	if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
+-			ssi_private->use_dma) {
+-		/*
+-		 * FIXME: This is a temporary solution until all
+-		 * necessary dma drivers support the generic dma
+-		 * bindings.
+-		 */
+-		ret = of_property_read_u32_array(pdev->dev.of_node,
+-				"fsl,ssi-dma-events", dma_events, 2);
+-		if (ret && ssi_private->use_dma) {
+-			dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
+-			goto error_dma_events;
+-		}
+-	}
+-	/* Should this be merge with the above? */
+-	if (!of_property_read_u32_array(pdev->dev.of_node, "dmas", dmas, 4)
+-			&& dmas[2] == IMX_DMATYPE_SSI_DUAL) {
++	ret = !of_property_read_u32_array(np, "dmas", dmas, 4);
++	if (ssi_private->use_dma && !ret && dmas[2] == IMX_DMATYPE_SSI_DUAL) {
+ 		ssi_private->use_dual_fifo = true;
+ 		/* When using dual fifo mode, we need to keep watermark
+ 		 * as even numbers due to dma script limitation.
+@@ -1061,21 +1041,7 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
+ 		ssi_private->dma_params_rx.maxburst &= ~0x1;
+ 	}
+ 
+-	shared = of_device_is_compatible(of_get_parent(np), "fsl,spba-bus");
+-
+-	imx_pcm_dma_params_init_data(&ssi_private->filter_data_tx,
+-		dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+-	imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
+-		dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
+-
+ 	return 0;
+-
+-error_dma_events:
+-	if (!IS_ERR(ssi_private->baudclk))
+-		clk_disable_unprepare(ssi_private->baudclk);
+-	clk_disable_unprepare(ssi_private->clk);
+-
+-	return ret;
  }
  
- /**
-@@ -562,7 +562,11 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
- 			continue;
- 
- 		tmprate = freq * factor * (i + 2);
--		clkrate = clk_round_rate(ssi_private->baudclk, tmprate);
-+
-+		if (ssi_private->baudclk_locked)
-+			clkrate = clk_get_rate(ssi_private->baudclk);
-+		else
-+			clkrate = clk_round_rate(ssi_private->baudclk, tmprate);
- 
- 		do_div(clkrate, factor);
- 		afreq = (u32)clkrate / (i + 1);
-@@ -912,11 +916,6 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- 			fsl_ssi_tx_config(ssi_private, false);
- 		else
- 			fsl_ssi_rx_config(ssi_private, false);
--
--		if (!fsl_ssi_is_ac97(ssi_private) && (read_ssi(&ssi->scr) &
--					(CCSR_SSI_SCR_TE | CCSR_SSI_SCR_RE)) == 0)
--			ssi_private->baudclk_locked = false;
--
- 		break;
- 
- 	default:
-@@ -1241,8 +1240,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
-                 /* Older 8610 DTs didn't have the fifo-depth property */
- 		ssi_private->fifo_depth = 8;
- 
--	ssi_private->baudclk_locked = false;
--
- 	dev_set_drvdata(&pdev->dev, ssi_private);
- 
- 	if (ssi_private->soc->imx) {
+ static void fsl_ssi_imx_clean(struct platform_device *pdev,
 -- 
 1.9.1
