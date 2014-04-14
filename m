@@ -1,51 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 20:44:55 +0200
-Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
-In-Reply-To: <20140414174606.GB10416@htj.dyndns.org>
-References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <16639486.i0jTGsaDYr@amdc1032> <20140414180142.0dd63a1f@skate>
- <10589751.qhi630WAFs@amdc1032> <20140414181920.1e309019@skate>
- <20140414174606.GB10416@htj.dyndns.org>
-Message-ID: <20140414204455.5d83513d@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Apr 2014 20:44:32 +0200
+Subject: [PATCH v2 2/5] Power: reset: add bindings for keystone reset
+ driver
+In-Reply-To: <1397497283-16391-3-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1397497283-16391-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1397497283-16391-3-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <6937937.4J6iI7VpBO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Tejun Heo,
-
-On Mon, 14 Apr 2014 13:46:06 -0400, Tejun Heo wrote:
-
-> > Well, I wasn't planning on re-spinning just to add Acked-by/Reviewed-by
-> > tags, as those are generally added by the subsystem maintainers when
-> > applying the patches. Though if Tejun says otherwise, I can definitely
-> > re-spin without any problem.
-> > 
-> > Tejun, just let me know what you prefer.
+On Monday 14 April 2014 20:41:20 Ivan Khoronzhuk wrote:
+> +Optional properties:
+> +
+> +- ti,soft-reset:       Boolean option indicating soft reset.
+> +                       By default hard reset is used.
+> +
+> +- ti,wdt_list:         WDT list that can cause SoC reset.
+> +                       The list in format: <0>, <2>;
+> +                       Begins from 0 to 3, as keystone can contain up
+> +                       to 4 SoC reset watchdogs.
 > 
-> I can collect the -by's but better patch description is always nice.
-> Maybe just update the patch description and post that one as reply to
-> the patch posted in this thread?
 
-Actually, Bartlomiej wanted the comment about the power management
-features to be made in the code itself, rather than in the commit log,
-so I guess I'll just respin the patch series. Expect a v3 tomorrow with
-this change.
+This looks like your binding just describes a subset of the
+watchdog timer registers. If so, don't do a standalone reset
+driver, but instead do a watchdog driver that can also be
+used for reset, and have a binding that properly describes
+the watchdog hardware.
 
-> Also, how do you want the patches to be routed?  Can all go through libata?
+It is bad to have overlapping register ranges between logical
+devices, and it's also generally wrong to describe devices that
+are not actually there: The hardware contains a watchdog, not
+a system-reset device, so you should not make one up because
+it seems easier given the Linux driver model.
 
-As written in the cover letter, I'd expect patches 1 and 2 to go
-through libata, and then patches 3, 4 and 5 to go through arm-soc. The
-reason is that patches 3, 4 and 5 modifies the Device Tree files and
-the ARM defconfigs, which are likely to also be changed by other
-commits in the same cycle. However, the DT binding documentation change
-and the driver change are independent, so they can go through libata.
-
-I guess Jason Cooper, who handles the patch merging for mvebu
-platforms, can confirm (or not?) this proposal.
-
-Thanks a lot for the feedback!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
