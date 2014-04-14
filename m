@@ -1,26 +1,26 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 14 Apr 2014 20:44:32 +0200
-Subject: [PATCH 23/29] ARM: orion5x: use DT to describe NOR on edmini_v2
-In-Reply-To: <20140413174513.2e39a55c@skate>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-24-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140413153150.GD10033@lunn.ch> <20140413174513.2e39a55c@skate>
-Message-ID: <20140414184432.GI22546@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Apr 2014 20:48:17 +0200
+Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
+In-Reply-To: <20140414171300.GL12916@arm.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <20140403220713.GA23545@google.com> <20140414171300.GL12916@arm.com>
+Message-ID: <21141977.8ucQJzlJts@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Hi Thomas
-> > 
-> > Did you check if this is still true? If it is fixed, maybe now would
-> > be a good time to swap to three partitions?
-> 
-> I don't know, and since the NOR contains the bootloader, and I'm not
-> sure those Orion devices support UART booting
+On Monday 14 April 2014 18:13:00 Will Deacon wrote:
+> Arnd: Is there anything more you'd like me to do with this series? Given
+> that it would be targetting 3.16, there's still plenty of time to make
+> changes (we talked about extracting some library functions in the past).
 
-Hi Thomas
+I don't remember the latest status of your patch set, but you might want
+to read the discussions we had about Liviu's patches last week.
 
-I had a quick look at the datasheet. I could not find any mention of
-booting from Serial. So i agree, without having a tested JTAG setup,
-play safe and leave the partitions alone.
+We still haven't figured out exactly how to handle I/O space in the common
+code, but I think we are making progress.
 
-	Andrew
+We also have discussed some ideas about how to restructure the PCI
+code layer to make it easier to share host drivers across architectures
+and clean up the interfaces in the process.
+
+	Arnd
