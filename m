@@ -1,119 +1,74 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 14 Apr 2014 18:35:27 +0530
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <CAFp+6iGxhfgZRPysMuj5nALEQBbFXnAXhtDPpbf3P42LDHqFxg@mail.gmail.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>	<1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>	<534529B2.2020107@samsung.com>	<534BCC91.8090108@ti.com>
- <CAFp+6iGxhfgZRPysMuj5nALEQBbFXnAXhtDPpbf3P42LDHqFxg@mail.gmail.com>
-Message-ID: <534BDD17.60003@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 14 Apr 2014 14:06:55 +0100
+Subject: [PATCH v2 2/4] Documentation: dts: Add bindings for APM X-Gene
+ SoC ethernet driver
+In-Reply-To: <1397271984-23405-3-git-send-email-isubramanian@apm.com>
+References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
+ <1397271984-23405-3-git-send-email-isubramanian@apm.com>
+Message-ID: <534BDD6F.2070903@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/04/14 04:06, Iyappan Subramanian wrote:
+> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
+>
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Ravi Patel <rapatel@apm.com>
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> ---
+>   .../devicetree/bindings/net/apm-xgene-enet.txt     |   46 ++++++++++++++++++++
+>   1 file changed, 46 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>
+> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+> new file mode 100644
+> index 0000000..0c983e8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+> @@ -0,0 +1,46 @@
+> +APM X-Gene SoC Ethernet nodes
+> +
+> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
+> +APM X-Gene SoC.
+> +
+> +Required properties:
+> +- compatible		: Should be "apm,xgene-enet"
+> +- reg			: First resource is the ethernet base register set
+> +			  Second resource is the ring base register set
+> +			  Third resource is the ring command register set
+> +- interrupts		: Ethernet main interrupt
+> +- clocks		: Reference to the clock entry.
+> +- local-mac-address	: Ethernet MAC address.
+> +- phy-addr		: Ethernet MII phy address.
+> +- phy-mode		: Ethernet MII mode.
+> +
+> +Optional properties:
+> +- status		: Should be "ok" or "disabled" for enabled/disabled.
+> +			  Default is "ok".
+> +
+> +Example:
+> +	menetclk: menetclk {
+> +		compatible = "apm,xgene-device-clock";
+> +		clock-output-names = "menetclk";
+> +		status = "ok";
+> +	};
+> +
+> +	menet: ethernet at 17020000 {
+> +		compatible = "apm,xgene-enet";
+> +		status = "disabled";
+> +		reg = <0x0 0x17020000 0x0 0xd100>,
+> +		      <0x0 0X17030000 0x0 0X400>,
+> +		      <0x0 0X10000000 0x0 0X200>;
+> +		interrupts = <0x0 0x3c 0x4>;
+> +		clocks = <&menetclk 0>;
+> +		local-mac-address = [00 01 73 00 00 01];
+> +		phy-addr = <3>;
+> +		phy-mode = "rgmii";
+> +	};
+
+That doesn't look correct for a phy binding.
 
 
-On Monday 14 April 2014 05:35 PM, Vivek Gautam wrote:
-> Hi Kishon,
-> 
-> 
-> On Mon, Apr 14, 2014 at 5:24 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi,
->>
->> On Wednesday 09 April 2014 04:36 PM, Tomasz Figa wrote:
->>> Hi Vivek,
->>>
->>> Please see my comments inline.
->>>
->>> On 08.04.2014 16:36, Vivek Gautam wrote:
->>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>>> The new driver uses the generic PHY framework and will interact
->>>> with DWC3 controller present on Exynos5 series of SoCs.
->>>> Thereby, removing old phy-samsung-usb3 driver and related code
->>>> used untill now which was based on usb/phy framework.
->>>>
->>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>>> ---
->>>>   .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->>>>   drivers/phy/Kconfig                                |   11 +
->>>>   drivers/phy/Makefile                               |    1 +
->>>>   drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
->>>>   4 files changed, 722 insertions(+)
->>>>   create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
->>>
->>> [snip]
->>>
->>>> +    Additional clock required for Exynos5420:
->>>> +    - usb30_sclk_100m: Additional special clock used for PHY operation
->>>> +               depicted as 'sclk_usbphy30' in CMU of Exynos5420.
->>>
->>> Are you sure this isn't simply a gate for the ref clock, as it can be found on
->>> another SoC that is not upstream yet? I don't have documentation for Exynos
->>> 5420 so I can't tell, but I'd like to ask you to recheck this.
->>>
->>>> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
->>>> +              control pmu registers for power isolation.
->>>> +- samsung,pmu-offset: phy power control register offset to
->>>> pmu-system-controller
->>>> +              base.
->>>> +- #phy-cells : from the generic PHY bindings, must be 1;
->>>> +
->>>> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
->>>> +compatible PHYs, the second cell in the PHY specifier identifies the
->>>> +PHY id, which is interpreted as follows:
->>>> +  0 - UTMI+ type phy,
->>>> +  1 - PIPE3 type phy,
->>>> +
->>>> +Example:
->>>> +    usb3_phy: usbphy at 12100000 {
->>>> +        compatible = "samsung,exynos5250-usbdrd-phy";
->>>> +        reg = <0x12100000 0x100>;
->>>> +        clocks = <&clock 286>, <&clock 1>;
->>>> +        clock-names = "phy", "usb3phy_refclk";
->>>
->>> Binding description above doesn't mention "usb3phy_refclk" entry.
->>>
->>>> +        samsung,syscon-phandle = <&pmu_syscon>;
->>>> +        samsung,pmu-offset = <0x704>;
->>>> +        #phy-cells = <1>;
->>>> +    };
->>>
->>> [snip]
->>>
->>>> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
->>>> new file mode 100644
->>>> index 0000000..ff54a7c
->>>> --- /dev/null
->>>> +++ b/drivers/phy/phy-exynos5-usbdrd.c
->>>
->>> [snip]
->>>
->>>> +static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
->>>> +{
->>>> +    struct device *dev = &pdev->dev;
->>>> +    struct device_node *node = dev->of_node;
->>>> +    struct exynos5_usbdrd_phy *phy_drd;
->>>> +    struct phy_provider *phy_provider;
->>>> +    struct resource *res;
->>>> +    const struct of_device_id *match;
->>>> +    const struct exynos5_usbdrd_phy_drvdata *drv_data;
->>>> +    struct regmap *reg_pmu;
->>>> +    u32 pmu_offset;
->>>> +    int i;
->>>> +
->>>> +    /*
->>>> +     * Exynos systems are completely DT enabled,
->>>> +     * so lets not have any platform data support for this driver.
->>>> +     */
->>>> +    if (!node) {
->>>> +        dev_err(dev, "no device node found\n");
->>>
->>> This error message is not very meaningful. I'd rather use something like "This
->>> driver can be only instantiated using Device Tree".
->>
->> how about just adding depend_on OF in Kconfig?
-> 
-> Already added a depend on 'OF'. Copying below the part of Kconfig in this patch.
-
-Alright.. Do we need the check then? If config_OF is enabled devices will be
-created using device tree no?
-
-Thanks
-Kishon
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
