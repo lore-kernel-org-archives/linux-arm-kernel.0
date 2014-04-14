@@ -1,81 +1,54 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:50:30 +0200
-Subject: [PATCH v3 3/6] ARM: mvebu: improve PMSU driver to request its resource
+Date: Mon, 14 Apr 2014 15:50:33 +0200
+Subject: [PATCH v3 6/6] ARM: mvebu: use a separate function to set the boot
+ address of CPUs
 In-Reply-To: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483433-25836-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483433-25836-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, the PMSU driver was using of_iomap() to map its registers,
-but of_iomap() doesn't call request_mem_region(). This commit fixes
-the memory mapping code of the PMSU to do so, which will also be
-useful for a later commit since we will need to adjust the resource
-base address and size for Device Tree backward compatibility.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
+Setting the start (or boot) address of a CPU is no more used only
+during SMP bring up on Armada 370/XP, but it will also be used by the
+CPU idle function of Armada XP, and by the Armada 38x SMP support.
+
+Therefore this commit creates a separate PMSU function to set the boot
+address of a CPU with the PMSU.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 36 +++++++++++++++++++++++++++++++-----
- 1 file changed, 31 insertions(+), 5 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 1807639..b337fe5 100644
+index 4ae3ea1..8361281 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -16,6 +16,8 @@
-  * other SOC units
-  */
+@@ -41,6 +41,12 @@ static struct of_device_id of_pmsu_table[] = {
+ 	{ /* end of list */ },
+ };
  
-+#define pr_fmt(fmt) "mvebu-pmsu: " fmt
++static void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
++{
++	writel(virt_to_phys(boot_addr), pmsu_mp_base +
++		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++}
 +
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/of_address.h>
-@@ -63,15 +65,39 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- static int __init armada_370_xp_pmsu_init(void)
+ #ifdef CONFIG_SMP
+ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
  {
- 	struct device_node *np;
-+	struct resource res;
-+	int ret = 0;
+@@ -53,8 +59,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
  
- 	np = of_find_matching_node(NULL, of_pmsu_table);
--	if (np) {
--		pr_info("Initializing Power Management Service Unit\n");
--		pmsu_mp_base = of_iomap(np, 0);
--		of_node_put(np);
-+	if (!np)
-+		return 0;
-+
-+	pr_info("Initializing Power Management Service Unit\n");
-+
-+	if (of_address_to_resource(np, 0, &res)) {
-+		pr_err("unable to get resource\n");
-+		ret = -ENOENT;
-+		goto out;
- 	}
+ 	hw_cpu = cpu_logical_map(cpu_id);
  
--	return 0;
-+	if (!request_mem_region(res.start, resource_size(&res),
-+				np->full_name)) {
-+		pr_err("unable to request region\n");
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
-+	pmsu_mp_base = ioremap(res.start, resource_size(&res));
-+	if (!pmsu_mp_base) {
-+		pr_err("unable to map registers\n");
-+		release_mem_region(res.start, resource_size(&res));
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+ out:
-+	of_node_put(np);
-+	return ret;
- }
+-	writel(virt_to_phys(boot_addr), pmsu_mp_base +
+-			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++	mvebu_pmsu_set_cpu_boot_addr(hw_cpu, boot_addr);
  
- early_initcall(armada_370_xp_pmsu_init);
+ 	ret = mvebu_cpu_reset_deassert(hw_cpu);
+ 	if (ret) {
 -- 
 1.8.3.2
