@@ -1,108 +1,142 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 14 Apr 2014 08:15:36 -0500
-Subject: [PATCH] clk: socfpga: fix clock driver for 3.15
-Message-ID: <1397481336-5592-1-git-send-email-dinguyen@altera.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Mon, 14 Apr 2014 18:50:48 +0530
+Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <534BDBBC.5010701@ti.com>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
+ <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
+ <534BD447.1080909@ti.com>
+ <CAFp+6iF=SpEax+5KUhZkmtkwp=Pj7LbAHOoySgOwJx_50u6GZQ@mail.gmail.com>
+ <534BDBBC.5010701@ti.com>
+Message-ID: <CAFp+6iFFW8XQg_UtYEZfaiENULZDD8A7_9fr4f2no=qfau7-sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Mon, Apr 14, 2014 at 6:29 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>
+>
+> On Monday 14 April 2014 06:12 PM, Vivek Gautam wrote:
+>> Hi,
+>>
+>>
+>> On Mon, Apr 14, 2014 at 5:57 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi,
+>>>
+>>> On Tuesday 08 April 2014 08:06 PM, Vivek Gautam wrote:
+>>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>>>> The new driver uses the generic PHY framework and will interact
+>>>> with DWC3 controller present on Exynos5 series of SoCs.
+>>>> Thereby, removing old phy-samsung-usb3 driver and related code
+>>>> used untill now which was based on usb/phy framework.
+>>>>
+>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>>> ---
+>>>>  .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
+>>>>  drivers/phy/Kconfig                                |   11 +
+>>>>  drivers/phy/Makefile                               |    1 +
+>>>>  drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
+>>>>  4 files changed, 722 insertions(+)
+>>>>  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>> index 28f9edb..6d99ba9 100644
+>>>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>> @@ -74,3 +74,45 @@ phy-consumer at 12340000 {
+>>>>
+>>>>  Refer to DT bindings documentation of particular PHY consumer devices for more
+>>>>  information about required PHYs and the way of specification.
+>>>> +
+>>>> +Samsung Exynos5 SoC series USB DRD PHY controller
+>>>> +--------------------------------------------------
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible : Should be set to one of the following supported values:
+>>>> +     - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+>>>> +     - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+>>>> +- reg : Register offset and length of USB DRD PHY register set;
+>>>> +- clocks: Clock IDs array as required by the controller
+>>>> +- clock-names: names of clocks correseponding to IDs in the clock property;
+>>>> +            Required clocks:
+>>>> +     - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+>>>> +            used for register access.
+>>>> +     - ref: PHY's reference clock (usually crystal clock), associated by
+>>>> +            phy name, used to determine bit values for clock settings
+>>>> +            register.
+>>>> +     Additional clock required for Exynos5420:
+>>>> +     - usb30_sclk_100m: Additional special clock used for PHY operation
+>>>> +                        depicted as 'sclk_usbphy30' in CMU of Exynos5420.
+>>>> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
+>>>> +                       control pmu registers for power isolation.
+>>>> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
+>>>> +                   base.
+>>>> +- #phy-cells : from the generic PHY bindings, must be 1;
+>>>> +
+>>>> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
+>>>> +compatible PHYs, the second cell in the PHY specifier identifies the
+>>>> +PHY id, which is interpreted as follows:
+>>>> +  0 - UTMI+ type phy,
+>>>> +  1 - PIPE3 type phy,
+>>>> +
+>>>> +Example:
+>>>> +     usb3_phy: usbphy at 12100000 {
+>>>> +             compatible = "samsung,exynos5250-usbdrd-phy";
+>>>> +             reg = <0x12100000 0x100>;
+>>>> +             clocks = <&clock 286>, <&clock 1>;
+>>>> +             clock-names = "phy", "usb3phy_refclk";
+>>>> +             samsung,syscon-phandle = <&pmu_syscon>;
+>>>> +             samsung,pmu-offset = <0x704>;
+>>>> +             #phy-cells = <1>;
+>>>> +     };
+>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>> index 8d3c49c..d955a05 100644
+>>>> --- a/drivers/phy/Kconfig
+>>>> +++ b/drivers/phy/Kconfig
+>>>> @@ -166,4 +166,15 @@ config PHY_XGENE
+>>>>       help
+>>>>         This option enables support for APM X-Gene SoC multi-purpose PHY.
+>>>>
+>>>> +config PHY_EXYNOS5_USBDRD
+>>>> +     tristate "Exynos5 SoC series USB DRD PHY driver"
+>>>> +     depends on ARCH_EXYNOS5 && OF
+>>>> +     depends on HAS_IOMEM
+>>>> +     select GENERIC_PHY
+>>>> +     select MFD_SYSCON
+>>>
+>>> Lets try to avoid select in Kconfig. We've got enough problems with that.
+>>
+>> I hope you meant with "select MFD_SYSCON".
+>> We are referencing the syscon for accessing pmu reg, for which we need
+>> this config to be selected.
+>> Other Exynos phy drivers also need this config and for that they have
+>> selected this.
+>>
+>> Do you want me to do it any other way ?
+>
+> depends on is one option.
 
-commit [1771b10d6 clk: respect the clock dependencies in of_clk_init]
-exposed a flaw in the socfpga clock driver and prevents the platform
-from booting on 3.15-rc1.
+Ok, i can see there are places where depends_on MFD_SYSCON is used.
+"drivers/gpu/drm/exynos/Kconfig:60"
 
-Because the "altr,clk-mgr" is not really a clock, it should not be using
-CLK_OF_DECLARE, instead we should be mapping the clk-mgr's base address
-one of the functional clock init function. Use the socfpga_pll_init function
-to map the clk_mgr_base_addr as this clock should always be initialized first.
+so, do you want me to fix at other places too ?
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
-Hi Mike,
+But i also have a question here.
+MFD_SYSCON is a subsystem that's facilitating us in getting our work
+done here by giving an access to pmu_system_controller.
+So unless MFD_SYSCON is exposed, the phy driver will not be exposed to us.
+So is that valid enough really ?
 
-This patch is needed to fix the SOCFPGA platform from booting on 3.15-rc1.
+>
+> Thanks
+> Kishon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Thanks,
-Dinh
----
- drivers/clk/socfpga/clk-pll.c |    7 +++++++
- drivers/clk/socfpga/clk.c     |   23 +++--------------------
- 2 files changed, 10 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/clk/socfpga/clk-pll.c b/drivers/clk/socfpga/clk-pll.c
-index 88dafb5..de6da95 100644
---- a/drivers/clk/socfpga/clk-pll.c
-+++ b/drivers/clk/socfpga/clk-pll.c
-@@ -20,6 +20,7 @@
- #include <linux/clk-provider.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- 
- #include "clk.h"
- 
-@@ -43,6 +44,8 @@
- 
- #define to_socfpga_clk(p) container_of(p, struct socfpga_pll, hw.hw)
- 
-+void __iomem *clk_mgr_base_addr;
-+
- static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
- 					 unsigned long parent_rate)
- {
-@@ -87,6 +90,7 @@ static __init struct clk *__socfpga_pll_init(struct device_node *node,
- 	const char *clk_name = node->name;
- 	const char *parent_name[SOCFPGA_MAX_PARENTS];
- 	struct clk_init_data init;
-+	struct device_node *clkmgr_np;
- 	int rc;
- 	int i = 0;
- 
-@@ -96,6 +100,9 @@ static __init struct clk *__socfpga_pll_init(struct device_node *node,
- 	if (WARN_ON(!pll_clk))
- 		return NULL;
- 
-+	clkmgr_np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
-+	clk_mgr_base_addr = of_iomap(clkmgr_np, 0);
-+	BUG_ON(!clk_mgr_base_addr);
- 	pll_clk->hw.reg = clk_mgr_base_addr + reg;
- 
- 	of_property_read_string(node, "clock-output-names", &clk_name);
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index 35a960a..43db947 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -17,28 +17,11 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
--#include <linux/clk.h>
--#include <linux/clkdev.h>
--#include <linux/clk-provider.h>
--#include <linux/io.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
- 
- #include "clk.h"
- 
--void __iomem *clk_mgr_base_addr;
--
--static const struct of_device_id socfpga_child_clocks[] __initconst = {
--	{ .compatible = "altr,socfpga-pll-clock", socfpga_pll_init, },
--	{ .compatible = "altr,socfpga-perip-clk", socfpga_periph_init, },
--	{ .compatible = "altr,socfpga-gate-clk", socfpga_gate_init, },
--	{},
--};
--
--static void __init socfpga_clkmgr_init(struct device_node *node)
--{
--	clk_mgr_base_addr = of_iomap(node, 0);
--	of_clk_init(socfpga_child_clocks);
--}
--CLK_OF_DECLARE(socfpga_mgr, "altr,clk-mgr", socfpga_clkmgr_init);
-+CLK_OF_DECLARE(socfpga_pll_clk, "altr,socfpga-pll-clock", socfpga_pll_init);
-+CLK_OF_DECLARE(socfpga_perip_clk, "altr,socfpga-perip-clk", socfpga_periph_init);
-+CLK_OF_DECLARE(socfpga_gate_clk, "altr,socfpga-gate-clk", socfpga_gate_init);
- 
+
 -- 
-1.7.9.5
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
