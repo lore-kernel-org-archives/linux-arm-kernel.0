@@ -1,123 +1,60 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 14 Apr 2014 09:58:21 +0900
-Subject: [PATCH] iio: adc: exynos_adc: Control special clock of ADC to
- support Exynos3250 ADC
-In-Reply-To: <f457ceee-ac84-45a4-9274-2ab196f92b96@email.android.com>
-References: <1397181640-18513-1-git-send-email-cw00.choi@samsung.com>
- <18632148.yOYlTYattA@amdc1032>
- <CAGTfZH2Rpa+hooPHY2xmquVHCwcE2X7rqf3rzGKCz02rA9qSzA@mail.gmail.com>
- <f457ceee-ac84-45a4-9274-2ab196f92b96@email.android.com>
-Message-ID: <534B32AD.2030209@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 14 Apr 2014 10:17:29 +0900
+Subject: [PATCH 6/6] ARM: dts: sh: drop address cells from GIC node
+In-Reply-To: <1397228380-7352-6-git-send-email-l.stach@pengutronix.de>
+References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
+ <1397228380-7352-6-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140414011726.GA22411@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
-
-On 04/12/2014 04:49 PM, Jonathan Cameron wrote:
+On Fri, Apr 11, 2014 at 04:59:40PM +0200, Lucas Stach wrote:
+> This is likely a copy-and-paste error from the
+> ARM GIC documentation, that has already been fixed.
 > 
+> address-cells should have been set to 0, as with the size
+> cells. As having those properties set to 0 is the
+> same thing as not specifying them, drop them completely.
+
+Hi Lucas,
+
+Please split this patch into two, one for r8a7740 with the prefix
+ARM: shmobile: r8a7740:
+
+And one for sh73a0 with the prefix
+ARM: shmobile: sh73a0:
+
 > 
-> On April 11, 2014 11:45:42 PM GMT+01:00, "???" <cwchoi00@gmail.com> wrote:
->> Hi Bartlomiej,
->>
->> On Fri, Apr 11, 2014 at 6:41 PM, Bartlomiej Zolnierkiewicz
->> <b.zolnierkie@samsung.com> wrote:
->>>
->>> Hi,
->>>
->>> On Friday, April 11, 2014 11:00:40 AM Chanwoo Choi wrote:
->>>> This patch control special clock for ADC in Exynos series's FSYS
->> block.
->>>
->>> s/control/controls/
->>
->> I'll fix it.
->>
->>>
->>>> If special clock of ADC is registerd on clock list of common clk
->> framework,
->>>> Exynos ADC drvier have to control this clock.
->>>
->>> s/drvier/driver/
->>
->> I'll fix it.
->>
->>>
->>>> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
->>>> - 'adc' clock: bus clock for ADC
->>>>
->>>> Exynos3250 has additional 'sclk_tsadc' clock as following:
->>>> - 'sclk_tsadc' clock: special clock for ADC which provide clock to
->> internal ADC
->>>>
->>>> Exynos 4210/4212/4412 and Exynos5250/5420 has not included
->> 'sclk_tsadc' clock
->>>> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included
->> 'sclk_tsadc'
->>>> clock in FSYS_BLK.
->>>>
->>>> Cc: Jonathan Cameron <jic23@kernel.org>
->>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->>>> Cc: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->>>> Cc: linux-iio at vger.kernel.org
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>>  drivers/iio/adc/exynos_adc.c | 13 +++++++++++++
->>>>  1 file changed, 13 insertions(+)
->>>>
->>>> diff --git a/drivers/iio/adc/exynos_adc.c
->> b/drivers/iio/adc/exynos_adc.c
->>>> index d25b262..4cd1975 100644
->>>> --- a/drivers/iio/adc/exynos_adc.c
->>>> +++ b/drivers/iio/adc/exynos_adc.c
->>>> @@ -88,6 +88,7 @@ struct exynos_adc {
->>>>       void __iomem            *regs;
->>>>       void __iomem            *enable_reg;
->>>>       struct clk              *clk;
->>>> +     struct clk              *sclk;
->>>>       unsigned int            irq;
->>>>       struct regulator        *vdd;
->>>>
->>>> @@ -308,6 +309,13 @@ static int exynos_adc_probe(struct
->> platform_device *pdev)
->>>>               goto err_irq;
->>>>       }
->>>>
->>>> +     info->sclk = devm_clk_get(&pdev->dev, "sclk_tsadc");
->>>> +     if (IS_ERR(info->sclk)) {
->>>> +             dev_warn(&pdev->dev, "failed getting sclk clock, err =
->> %ld\n",
->>>> +                                                    
->> PTR_ERR(info->sclk));
->>>> +             info->sclk = NULL;
->>>> +     }
->>>> +
->>>>       info->vdd = devm_regulator_get(&pdev->dev, "vdd");
->>>>       if (IS_ERR(info->vdd)) {
->>>>               dev_err(&pdev->dev, "failed getting regulator, err =
->> %ld\n",
->>>> @@ -341,6 +349,7 @@ static int exynos_adc_probe(struct
->> platform_device *pdev)
->>>>               goto err_iio_dev;
->>>>
->>>>       clk_prepare_enable(info->clk);
->>>> +     clk_prepare_enable(info->sclk);
->>>>
->>>>       exynos_adc_hw_init(info);
->>>>
->>>> @@ -357,6 +366,7 @@ err_of_populate:
->>>>                               exynos_adc_remove_devices);
->>>>       regulator_disable(info->vdd);
->>>>       clk_disable_unprepare(info->clk);
->>>> +     clk_disable_unprepare(info->sclk);
->>>
->>> Please disable clocks in the reverse of order in which they were
->> enabled.
->>
->> Is it necessary? I don't think that.
-> It is probably not a bug but it is more obviously correct in the reverse order so that is how it should be done!
-
-OK, I'll fix it on next posting(v2). Thanks.
-
-Best Regards,
-Chanwoo Choi
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/r8a7740.dtsi | 1 -
+>  arch/arm/boot/dts/sh73a0.dtsi  | 1 -
+>  2 files changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+> index 8280884bfa59..2551e9438d35 100644
+> --- a/arch/arm/boot/dts/r8a7740.dtsi
+> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+> @@ -28,7 +28,6 @@
+>  	gic: interrupt-controller at c2800000 {
+>  		compatible = "arm,cortex-a9-gic";
+>  		#interrupt-cells = <3>;
+> -		#address-cells = <1>;
+>  		interrupt-controller;
+>  		reg = <0xc2800000 0x1000>,
+>  		      <0xc2000000 0x1000>;
+> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> index b7bd3b9a6753..5ecf552e1c00 100644
+> --- a/arch/arm/boot/dts/sh73a0.dtsi
+> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> @@ -34,7 +34,6 @@
+>  	gic: interrupt-controller at f0001000 {
+>  		compatible = "arm,cortex-a9-gic";
+>  		#interrupt-cells = <3>;
+> -		#address-cells = <1>;
+>  		interrupt-controller;
+>  		reg = <0xf0001000 0x1000>,
+>  		      <0xf0000100 0x100>;
+> -- 
+> 1.9.1
+> 
