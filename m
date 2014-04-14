@@ -1,43 +1,32 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 14 Apr 2014 10:05:28 -0700
-Subject: ARM: Zynq: CPUFreq issues in setting frequencies (Was: Re: Help
- about PetaLinux)
-In-Reply-To: <CAOh2x=n5NzPCMiZfWhQ4tFhPE+4TA_tqsOkkeeA87Q0VqECXog@mail.gmail.com>
-References: <CAOh2x=n5NzPCMiZfWhQ4tFhPE+4TA_tqsOkkeeA87Q0VqECXog@mail.gmail.com>
-Message-ID: <671c307a-813b-41d8-9839-09265df019df@AM1EHSMHS005.ehs.local>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 14 Apr 2014 17:59:56 +0100
+Subject: [PATCH 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+ deadlock
+In-Reply-To: <20140407121304.GD3360@arm.com>
+References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140403160727.17b3558b@skate>
+ <20140403141533.GP7528@n2100.arm.linux.org.uk>
+ <20140407121304.GD3360@arm.com>
+Message-ID: <20140414165956.GJ12916@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2014-04-12 at 02:14PM +0530, Viresh Kumar wrote:
-> On Sat, Apr 12, 2014 at 3:02 AM, Mokhtar Bouain
-> <mokhtar.bouain@gmail.com> wrote:
-> > Hi Viresh,
-> > Please, I have a problem with the PetaLinux and Zynq board.
-> > I posted my probem here :
-> > http://forums.xilinx.com/t5/Embedded-Linux/clk-set-rate-failed-to-set-i2c0-aper-rate-zc702-board-and/td-p/438352
-> > There is a member of the xilinx forum who you mentioned that you found the
-> > solution.
-> > Can you help me please?
+On Mon, Apr 07, 2014 at 01:13:04PM +0100, Catalin Marinas wrote:
+> On Thu, Apr 03, 2014 at 03:15:33PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Apr 03, 2014 at 04:07:27PM +0200, Thomas Petazzoni wrote:
+> > > Any comments about the proposed patches? These are important for the
+> > > recent Armada 375/38x platforms and I'm sure will require a bit of
+> > > discussion. Moreover, one of the patch affects the L2 cache driver that
+> > > Russell is currently working on, so it would be nice if we could get
+> > > the discussion going soon.
+> > 
+> > Will is away for another week and a half.
 > 
-> Hi Mokhtar,
-> 
-> I don't have a clue what's going on here as I haven't been looking
-> at platform internals at all..
-> 
-> Soren/Michal are probably working on those things, they might help.
-> 
+> And when he's back, I'm pretty sure he will be eager to look at the
+> PL310 code ;)
 
-All the information is actually in the forum and referenced topics
-there...
-Unfortunately, Zynq has plenty inter dependencies between clocks.
-That results in all kinds of limitations, because Zynq's timers are
-driven by their bus clock which is derived from the CPU clock.
-And also other peripherals are clocked by this clock. So, a solution
-needs to take all these dependencies into account, which means that
-certain operations may fail.
+Lucky for me, it looks like rmk is rewriting it ;)
 
-Also, the issue described affects (an outdated version of) our vendor
-tree only. We just merged cpufreq support into mainline. We'll see
-how that goes.
+Is there anything you want me to do here?
 
-	S?ren
+Will
