@@ -1,55 +1,91 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 14 Apr 2014 09:24:40 -0300
-Subject: [PATCH 20/29] ARM: orion5x: convert edmini_v2 to DT pinctrl
-In-Reply-To: <20140414120648.GB20845@lunn.ch>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-21-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BBDAC.2010801@gmail.com> <20140414132329.48df793e@skate>
- <534BC62D.6010000@gmail.com> <20140414120648.GB20845@lunn.ch>
-Message-ID: <20140414122440.GB6393@arch.cereza>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 14 Apr 2014 14:25:57 +0200
+Subject: [PATCH/RFC 1/3] USB: OHCI: Export the ohci_hub_control function
+In-Reply-To: <1397478359-22541-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1397478359-22541-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1397478359-22541-2-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 14, Andrew Lunn wrote:
-> On Mon, Apr 14, 2014 at 01:27:41PM +0200, Sebastian Hesselbarth wrote:
-> > On 04/14/2014 01:23 PM, Thomas Petazzoni wrote:
-> > >Dear Sebastian Hesselbarth,
-> > >
-> > >On Mon, 14 Apr 2014 12:51:24 +0200, Sebastian Hesselbarth wrote:
-> > >
-> > >>>   		internal-regs {
-> > >>>+			pinctrl at 10000 {
-> > >>
-> > >>Use node label reference:
-> > >>
-> > >>&pinctrl {
-> > >>	...
-> > >>};
-> > >
-> > >I personally dislike using node label references. I know they are used
-> > >for Ethernet because it has been done by someone else for Orion
-> > >platforms. But on all Armada 370/XP platforms, we don't use node label
-> > >references, and I'd prefer to do it the same way for Orion5x platforms
-> > >if possible.
-> > 
-> > Well, I definitely disagree and would like to _enforce_ using node
-> > label references. Anyway, if there is a strong reason for not using
-> > them, I'd be fine too.
->  
-> Hi Sebastian, Thomas
-> 
-> Could you both explain your like/dislike for using node labels.
-> 
+Platform drivers sometimes need to perform specific handling of hub
+control requests. Make this possible by exporting the ohci_hub_control()
+function which can then be called from a custom hub control handler in
+the default case.
 
-Aside from aesthetical reasons, let me add a fact in favor of node labels.
-When we added the MBus devicetree we had to do some intrusive and error-prone
-node relocations, such as:
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ drivers/usb/host/ohci-hub.c     | 4 ++--
+ drivers/usb/host/ohci-s3c2410.c | 7 ++-----
+ drivers/usb/host/ohci.h         | 2 ++
+ 3 files changed, 6 insertions(+), 7 deletions(-)
 
-de1af8d486ae05922efbb69b93b902b197dfaca9
-
-These changes would have been much simpler by using node labels, probably
-one-liners.
+diff --git a/drivers/usb/host/ohci-hub.c b/drivers/usb/host/ohci-hub.c
+index c81c872..70013c6 100644
+--- a/drivers/usb/host/ohci-hub.c
++++ b/drivers/usb/host/ohci-hub.c
+@@ -646,7 +646,7 @@ static inline int root_port_reset (struct ohci_hcd *ohci, unsigned port)
+ 	return 0;
+ }
+ 
+-static int ohci_hub_control (
++int ohci_hub_control (
+ 	struct usb_hcd	*hcd,
+ 	u16		typeReq,
+ 	u16		wValue,
+@@ -772,4 +772,4 @@ error:
+ 	}
+ 	return retval;
+ }
+-
++EXPORT_SYMBOL_GPL(ohci_hub_control);
+diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
+index ff7c8f1..95809c5 100644
+--- a/drivers/usb/host/ohci-s3c2410.c
++++ b/drivers/usb/host/ohci-s3c2410.c
+@@ -45,8 +45,6 @@ static struct clk *usb_clk;
+ 
+ /* forward definitions */
+ 
+-static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
+-			u16 wValue, u16 wIndex, char *buf, u16 wLength);
+ static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
+ 
+ static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
+@@ -181,7 +179,7 @@ static int ohci_s3c2410_hub_control(
+ 	 * process the request straight away and exit */
+ 
+ 	if (info == NULL) {
+-		ret = orig_ohci_hub_control(hcd, typeReq, wValue,
++		ret = ohci_hub_control(hcd, typeReq, wValue,
+ 				       wIndex, buf, wLength);
+ 		goto out;
+ 	}
+@@ -231,7 +229,7 @@ static int ohci_s3c2410_hub_control(
+ 		break;
+ 	}
+ 
+-	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
++	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
+ 	if (ret)
+ 		goto out;
+ 
+@@ -489,7 +487,6 @@ static int __init ohci_s3c2410_init(void)
+ 	 * override these functions by making it too easy.
+ 	 */
+ 
+-	orig_ohci_hub_control = ohci_s3c2410_hc_driver.hub_control;
+ 	orig_ohci_hub_status_data = ohci_s3c2410_hc_driver.hub_status_data;
+ 
+ 	ohci_s3c2410_hc_driver.hub_status_data	= ohci_s3c2410_hub_status_data;
+diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
+index 9250cad..f317de6 100644
+--- a/drivers/usb/host/ohci.h
++++ b/drivers/usb/host/ohci.h
+@@ -727,3 +727,5 @@ extern int	ohci_setup(struct usb_hcd *hcd);
+ extern int	ohci_suspend(struct usb_hcd *hcd, bool do_wakeup);
+ extern int	ohci_resume(struct usb_hcd *hcd, bool hibernated);
+ #endif
++extern int	ohci_hub_control(struct usb_hcd	*hcd, u16 typeReq, u16 wValue,
++				 u16 wIndex, char *buf, u16 wLength);
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.3.2
