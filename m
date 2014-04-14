@@ -1,26 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Apr 2014 21:06:28 +0100
-Subject: [PATCH 5/5] spi: sirf: fix spi full-duplex DMA transferring issue
-In-Reply-To: <1397457001-5266-6-git-send-email-21cnbao@gmail.com>
-References: <1397457001-5266-1-git-send-email-21cnbao@gmail.com>
- <1397457001-5266-6-git-send-email-21cnbao@gmail.com>
-Message-ID: <20140414200628.GX25182@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Apr 2014 21:10:36 +0100
+Subject: [PATCH 2/2] ARM: i.MX6: ipu_di_sel clocks can set parent rates
+In-Reply-To: <1397485240-29163-2-git-send-email-p.zabel@pengutronix.de>
+References: <1397485240-29163-1-git-send-email-p.zabel@pengutronix.de>
+ <1397485240-29163-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20140414201036.GL24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 02:30:01PM +0800, Barry Song wrote:
-> From: Qipan Li <Qipan.Li@csr.com>
+On Mon, Apr 14, 2014 at 04:20:40PM +0200, Philipp Zabel wrote:
+> To obtain exact pixel clocks, allow the DI clock selectors to influence
+> the PLLs that they are derived from.
 > 
-> sometimes t->tx can be equal with t->rx. for example, spidev will make
-> tx and rx point to spidev->buffer at the same time. currently, for this
-> case, we map the buffer BIDIRECTION to fix the cache consistency.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-I've applied this but such usage is out of spec - do we have any drivers
-doing this in mainline?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/45208439/attachment.sig>
+Both these appear to work for me on the iMX6Solo Hummingboard, and fix
+the ability of imx-hdmi to produce a picture with correct timing.
+So...
+
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+For reference, at 1080p, I see:
+
+    pll5_video                  1           1            1188000000 0
+       pll5_post_div            1           1            297000000  0
+          pll5_video_div        1           1            148500000  0
+...
+             ipu1_di0_pre_sel   1           1            148500000  0
+                ipu1_di0_pre    1           1            148500000  0
+                   ipu1_di0_sel 1           1            148500000  0
+                      ipu1_di0  1           1            148500000  0
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
