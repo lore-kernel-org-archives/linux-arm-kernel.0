@@ -1,143 +1,446 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 14 Apr 2014 10:14:25 +0100
-Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
-In-Reply-To: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
-References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
-Message-ID: <20140414091424.GA14204@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 11:15:17 +0200
+Subject: [PATCH 02/29] pinctrl: mvebu: new driver for Orion platforms
+In-Reply-To: <1397400006-4315-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BA725.9010609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 13, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
-> This patch implements 4 levels of translation tables since 3 levels
-> of page tables with 4KB pages cannot support 40-bit physical address
-> space described in [1] due to the following issue.
-> 
-> It is a restriction that kernel logical memory map with 4KB + 3 levels
-> (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
-> 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
-> mapping for this region in map_mem function since __phys_to_virt for
-> this region reaches to address overflow.
-> 
-> If SoC design follows the document, [1], over 32GB RAM would be placed
-> from 544GB. Even 64GB system is supposed to use the region from 544GB
-> to 576GB for only 32GB RAM. Naturally, it would reach to enable 4 levels
-> of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
-> 
-> However, it is recommended 4 levels of page table should be only enabled
-> if memory map is too sparse or there is about 512GB RAM.
+On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
+> This commit extends the pinctrl mvebu logic with a new driver to cover
+> Orion5x SoC. It supports the definitions for the 5181l, 5182 and 5281
+> variants of Orion5x, which are the three ones supported by the old
+> style MPP code in arch/arm/mach-orion5x/.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>   .../bindings/pinctrl/marvell,orion-pinctrl.txt     |  91 +++++++
+>   drivers/pinctrl/mvebu/Kconfig                      |   4 +
+>   drivers/pinctrl/mvebu/Makefile                     |   1 +
+>   drivers/pinctrl/mvebu/pinctrl-orion.c              | 261 +++++++++++++++++++++
+>   4 files changed, 357 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
+>   create mode 100644 drivers/pinctrl/mvebu/pinctrl-orion.c
+>
+> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
+> new file mode 100644
+> index 0000000..1748209
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
+> @@ -0,0 +1,91 @@
+> +* Marvell Orion SoC pinctrl driver for mpp
+> +
+> +Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
+> +part and usage.
+> +
+> +Required properties:
+> +- compatible: "marvell,88f5181l-pinctrl", "marvell,88f5182-pinctrl",
+> +              "marvell,88f5281-pinctrl"
+> +
+> +- reg: two register areas, the first one describing the first two
+> +  contiguous MPP registers, and the second one describing the single
+> +  final MPP register, separated from the previous one.
+> +
+> +Available mpp pins/groups and functions:
+> +Note: brackets (x) are not part of the mpp name for marvell,function and given
+> +only for more detailed description in this document.
+> +
+> +* Marvell Orion 88f5181l
+> +
+> +name          pins     functions
+> +================================================================================
+> +mpp0          0        pci(rstout), pci(req2), gpio
+> +mpp1          1        gpio, pci(gnt2)
+> +mpp2          2        gpio, pci(req3), pci(pme)
+> +mpp3          3        gpio, pci(gnt3)
+> +mpp4          4        gpio, pci(req4)
+> +mpp5          5        gpio, pci(gnt4)
+> +mpp6          6        gpio, pci(req5), pci(clk)
+> +mpp7          7        gpio, pci(gnt5), pci(clk)
+> +mpp8          8        gpio, ge(col)
+> +mpp9          9        gpio, ge(rxerr)
+> +mpp10         10       gpio, ge(crs)
+> +mpp11         11       gpio, ge(txerr)
+> +mpp12         12       gpio, ge(txd4)
+> +mpp13         13       gpio, ge(txd5)
+> +mpp14         14       gpio, ge(txd6)
+> +mpp15         15       gpio, ge(txd7)
+> +mpp16         16       ge(rxd4)
+> +mpp17         17       ge(rxd5)
+> +mpp18         18       ge(rxd6)
+> +mpp19         19       ge(rxd7)
+> +
+> +* Marvell Orion 88f5182
+> +
+> +name          pins     functions
+> +================================================================================
+> +mpp0          0        pci(rstout), pci(req2), gpio
 
-Hi,
-So I thought I'd apply this series and have a play, this patch doesn't apply
-cleanly for me, please see below why...
+Shouldn't the above pcie(rstout)?
 
-[ ... ]
+The one available datasheet I have for 5182 names the function
+PEX_RST_OUTn, which is PCIexpress then.
 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0fd5650..0b0b16a 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -46,8 +46,8 @@
->  #error KERNEL_RAM_VADDR must start at 0xXXX80000
->  #endif
->  
-> -#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-> -#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
-> +#define SWAPPER_DIR_SIZE	(4 * PAGE_SIZE)
-> +#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
->  
->  	.globl	swapper_pg_dir
->  	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - SWAPPER_DIR_SIZE
-> @@ -384,6 +384,20 @@ ENDPROC(__calc_phys_offset)
->  	.endm
->  
->  /*
-> + * Macro to populate the PUD for the corresponding block entry in the next
-> + * level (tbl) for the given virtual address.
+> +mpp1          1        gpio, pci(gnt2)
+> +mpp2          2        gpio, pci(req3), pci(pme)
+
+pinctrl-mvebu isn't that good with identically named functions.
+You need to rename one of the "pci" functions to e.g. "pci-1".
+
+> +mpp3          3        gpio, pci(gnt3)
+> +mpp4          4        gpio, pci(req4), bootnand(re), sata0(prsnt)
+> +mpp5          5        gpio, pci(gnt4), bootnand(we), sata1(prsnt)
+> +mpp6          6        gpio, pci(req5), nand(re0), sata0(act)
+> +mpp7          7        gpio, pci(gnt5), nand(we0), sata1(act)
+> +mpp8          8        gpio, ge(col)
+> +mpp9          9        gpio, ge(rxerr)
+> +mpp10         10       gpio, ge(crs)
+> +mpp11         11       gpio, ge(txerr)
+> +mpp12         12       gpio, ge(txd4), nand(re1), sata0(ledprsnt)
+> +mpp13         13       gpio, ge(txd5), nand(we1), sata1(ledprsnt)
+> +mpp14         14       gpio, ge(txd6), nand(re2), sata0(ledact)
+> +mpp15         15       gpio, ge(txd7), nand(we2), sata1(ledact)
+
+Four "led" prefixes above should be removed.
+
+I guess the above comments are also valid for the other
+two SoCs.
+
+> +mpp16         16       uart1(rxd), ge(rxd4), gpio
+> +mpp17         17       uart1(txd), ge(rxd5), gpio
+> +mpp18         18       uart1(cts), ge(rxd6), gpio
+> +mpp19         19       uart1(rts), ge(rxd7), gpio
+> +
+> +* Marvell Orion 88f5281
+> +
+> +name          pins     functions
+> +================================================================================
+> +mpp0          0        pci(rstout), pci(req2), gpio
+> +mpp1          1        gpio, pci(gnt2)
+> +mpp2          2        gpio, pci(req3), pci(pme)
+> +mpp3          3        gpio, pci(gnt3)
+> +mpp4          4        gpio, pci(req4), bootnand(re)
+> +mpp5          5        gpio, pci(gnt4), bootnand(we)
+> +mpp6          6        gpio, pci(req5), nand(re0)
+> +mpp7          7        gpio, pci(gnt5), nand(we0)
+> +mpp8          8        gpio, ge(col)
+> +mpp9          9        gpio, ge(rxerr)
+> +mpp10         10       gpio, ge(crs)
+> +mpp11         11       gpio, ge(txerr)
+> +mpp12         12       gpio, ge(txd4), nand(re1)
+> +mpp13         13       gpio, ge(txd5), nand(we1)
+> +mpp14         14       gpio, ge(txd6), nand(re2)
+> +mpp15         15       gpio, ge(txd7), nand(we2)
+> +mpp16         16       uart1(rxd), ge(rxd4)
+> +mpp17         17       uart1(txd), ge(rxd5)
+> +mpp18         18       uart1(cts), ge(rxd6)
+> +mpp19         19       uart1(rts), ge(rxd7)
+> diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
+> index cc298fad..d6dd835 100644
+> --- a/drivers/pinctrl/mvebu/Kconfig
+> +++ b/drivers/pinctrl/mvebu/Kconfig
+> @@ -30,4 +30,8 @@ config PINCTRL_ARMADA_XP
+>   	bool
+>   	select PINCTRL_MVEBU
+>
+> +config PINCTRL_ORION
+> +	bool
+> +	select PINCTRL_MVEBU
+> +
+>   endif
+> diff --git a/drivers/pinctrl/mvebu/Makefile b/drivers/pinctrl/mvebu/Makefile
+> index bc1b9f1..a0818e9 100644
+> --- a/drivers/pinctrl/mvebu/Makefile
+> +++ b/drivers/pinctrl/mvebu/Makefile
+> @@ -5,3 +5,4 @@ obj-$(CONFIG_PINCTRL_ARMADA_370) += pinctrl-armada-370.o
+>   obj-$(CONFIG_PINCTRL_ARMADA_375) += pinctrl-armada-375.o
+>   obj-$(CONFIG_PINCTRL_ARMADA_38X) += pinctrl-armada-38x.o
+>   obj-$(CONFIG_PINCTRL_ARMADA_XP)  += pinctrl-armada-xp.o
+> +obj-$(CONFIG_PINCTRL_ORION)  += pinctrl-orion.o
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-orion.c b/drivers/pinctrl/mvebu/pinctrl-orion.c
+> new file mode 100644
+> index 0000000..8312fb3
+> --- /dev/null
+> +++ b/drivers/pinctrl/mvebu/pinctrl-orion.c
+> @@ -0,0 +1,261 @@
+> +/*
+> + * Marvell Orion pinctrl driver based on mvebu pinctrl core
 > + *
-> + * Preserves:	pud, tbl, virt
-> + * Corrupts:	tmp1, tmp2
+> + * Author: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * The first 16 MPP pins on Orion are easy to handle: they are
+> + * configured through 2 consecutive registers, located at the base
+> + * address of the MPP device.
+> + *
+> + * However the last 4 MPP pins are handled by a register at offset
+> + * 0x50 from the base address, so it is not consecutive with the first
+> + * two registers.
 > + */
-> +	.macro create_pud_entry, pud, tbl, virt, tmp1, tmp2
-> +	lsr	\tmp1, \virt, #PUD_SHIFT
-> +	and	\tmp1, \tmp1, #PTRS_PER_PUD - 1	// PUD index
-> +	orr	\tmp2, \tbl, #3			// PUD entry table type
-> +	str	\tmp2, [\pud, \tmp1, lsl #3]
-> +	.endm
+> +
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/pinctrl/pinctrl.h>
+> +
+> +#include "pinctrl-mvebu.h"
+> +
+> +static void __iomem *mpp_base;
+> +static void __iomem *high_mpp_base;
+> +
+> +static int orion_mpp_ctrl_get(unsigned pid, unsigned long *config)
+> +{
+> +	unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+> +
+> +	if (pid < 16) {
+> +		unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+> +		*config = (readl(mpp_base + off) >> shift) & MVEBU_MPP_MASK;
+> +	}
+> +	else {
+> +		*config = (readl(high_mpp_base) >> shift) & MVEBU_MPP_MASK;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int orion_mpp_ctrl_set(unsigned pid, unsigned long config)
+> +{
+> +	unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+> +
+> +	if (pid < 16) {
+> +		unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+> +		u32 reg = readl(mpp_base + off) & ~(MVEBU_MPP_MASK << shift);
+> +		writel(reg | (config << shift), mpp_base + off);
+> +	}
+> +	else {
+> +		u32 reg = readl(high_mpp_base) & ~(MVEBU_MPP_MASK << shift);
+> +		writel(reg | (config << shift), high_mpp_base);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +#define V(f5181l, f5182, f5281) \
+> +	((f5181l << 0) | (f5182 << 1) | (f5281 << 2))
+> +
+> +enum orion_variant {
+> +	V_5181L = V(1, 0, 0),
+> +	V_5182  = V(0, 1, 0),
+> +	V_5281  = V(0, 0, 1),
+> +	V_ALL   = V(1, 1, 1),
+> +};
+> +
+> +static struct mvebu_mpp_mode orion_mpp_modes[] = {
+> +	MPP_MODE(0,
+> +		 MPP_VAR_FUNCTION(0x0, "pci", "rstout",     V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "req2",       V_ALL),
+
+Same comment about identically named functions.
+
+> +		 MPP_VAR_FUNCTION(0x3, "gpio", NULL,        V_ALL)),
+> +	MPP_MODE(1,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "gnt2",       V_ALL)),
+> +	MPP_MODE(2,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "req3",       V_ALL),
+> +		 MPP_VAR_FUNCTION(0x3, "pci", "pme",        V_ALL)),
+> +	MPP_MODE(3,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "gnt3",       V_ALL)),
+> +	MPP_MODE(4,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "req4",       V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "bootnand", "re",    V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "sata0", "prsnt",    V_5182)),
+> +	MPP_MODE(5,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "gnt4",       V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "bootnand", "we",    V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "sata1", "prsnt",    V_5182)),
+> +	MPP_MODE(6,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "req5",       V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "nand", "re0",       V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "pci", "clk",        V_5181L),
+> +		 MPP_VAR_FUNCTION(0x5, "sata0", "act",      V_5182)),
+> +	MPP_MODE(7,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x2, "pci", "gnt5",       V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "nand", "we0",       V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "pci", "clk",        V_5181L),
+> +		 MPP_VAR_FUNCTION(0x5, "sata1", "act",      V_5182)),
+> +	MPP_MODE(8,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "col",         V_ALL)),
+> +	MPP_MODE(9,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "rxerr",       V_ALL)),
+> +	MPP_MODE(10,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "crs",         V_ALL)),
+> +	MPP_MODE(11,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "txerr",       V_ALL)),
+> +	MPP_MODE(12,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "txd4",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "nand", "re1",       V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "sata0", "ledprsnt", V_5182)),
+
+...and "led" prefix, too.
+
+> +	MPP_MODE(13,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "txd5",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "nand", "we1",       V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "sata1", "ledprsnt", V_5182)),
+> +	MPP_MODE(14,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "txd6",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "nand", "re2",       V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "sata0", "ledact",   V_5182)),
+> +	MPP_MODE(15,
+> +		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "txd7",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x4, "nand", "we2",       V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x5, "sata1", "ledact",   V_5182)),
+> +	MPP_MODE(16,
+> +		 MPP_VAR_FUNCTION(0x0, "uart1", "rxd",      V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "rxd4",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x5, "gpio", NULL,        V_5182)),
+> +	MPP_MODE(17,
+> +		 MPP_VAR_FUNCTION(0x0, "uart1", "txd",      V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "rxd5",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x5, "gpio", NULL,        V_5182)),
+> +	MPP_MODE(18,
+> +		 MPP_VAR_FUNCTION(0x0, "uart1", "cts",      V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "rxd6",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x5, "gpio", NULL,        V_5182)),
+> +	MPP_MODE(19,
+> +		 MPP_VAR_FUNCTION(0x0, "uart1", "rts",      V_5182 | V_5281),
+> +		 MPP_VAR_FUNCTION(0x1, "ge", "rxd7",        V_ALL),
+> +		 MPP_VAR_FUNCTION(0x5, "gpio", NULL,        V_5182)),
+> +};
+> +
+> +static struct mvebu_mpp_ctrl orion_mpp_controls[] = {
+> +	MPP_FUNC_CTRL(0, 19, NULL, orion_mpp_ctrl),
+> +};
+> +
+> +static struct pinctrl_gpio_range mv88f5181l_gpio_ranges[] = {
+> +	MPP_GPIO_RANGE(0, 0, 0, 16),
+> +};
+> +
+> +static struct pinctrl_gpio_range mv88f5182_gpio_ranges[] = {
+> +	MPP_GPIO_RANGE(0, 0, 0, 19),
+> +};
+> +
+> +static struct pinctrl_gpio_range mv88f5281_gpio_ranges[] = {
+> +	MPP_GPIO_RANGE(0, 0, 0, 16),
+> +};
+
+mv88f5181l_gpio_ranges == mv88f5281_gpio_ranges.
+
+You can possibly join them to mv88f5x81_gpio ranges, but I have
+no strong opinion about it.
+
+> +
+> +static struct mvebu_pinctrl_soc_info mv88f5181l_info = {
+> +	.variant = V_5181L,
+> +	.controls = orion_mpp_controls,
+> +	.ncontrols = ARRAY_SIZE(orion_mpp_controls),
+> +	.modes = orion_mpp_modes,
+> +	.nmodes = ARRAY_SIZE(orion_mpp_modes),
+> +	.gpioranges = mv88f5181l_gpio_ranges,
+> +	.ngpioranges = ARRAY_SIZE(mv88f5181l_gpio_ranges),
+> +};
+> +
+> +static struct mvebu_pinctrl_soc_info mv88f5182_info = {
+> +	.variant = V_5182,
+> +	.controls = orion_mpp_controls,
+> +	.ncontrols = ARRAY_SIZE(orion_mpp_controls),
+> +	.modes = orion_mpp_modes,
+> +	.nmodes = ARRAY_SIZE(orion_mpp_modes),
+> +	.gpioranges = mv88f5182_gpio_ranges,
+> +	.ngpioranges = ARRAY_SIZE(mv88f5182_gpio_ranges),
+> +};
+> +
+> +static struct mvebu_pinctrl_soc_info mv88f5281_info = {
+> +	.variant = V_5281,
+> +	.controls = orion_mpp_controls,
+> +	.ncontrols = ARRAY_SIZE(orion_mpp_controls),
+> +	.modes = orion_mpp_modes,
+> +	.nmodes = ARRAY_SIZE(orion_mpp_modes),
+> +	.gpioranges = mv88f5281_gpio_ranges,
+> +	.ngpioranges = ARRAY_SIZE(mv88f5281_gpio_ranges),
+> +};
 > +
 > +/*
->   * Macro to populate block entries in the page table for the start..end
->   * virtual range (inclusive).
->   *
-> @@ -445,10 +459,18 @@ __create_page_tables:
->  	ldr	x3, =KERNEL_START
->  	add	x3, x3, x28			// __pa(KERNEL_START)
+> + * There are multiple variants of the Orion SoCs, but in terms of pin
+> + * muxing, they are identical.
+> + */
+> +static struct of_device_id orion_pinctrl_of_match[] = {
+> +	{ .compatible = "marvell,88f5181l-pinctrl", .data = &mv88f5181l_info },
+> +	{ .compatible = "marvell,88f5182-pinctrl", .data = &mv88f5182_info },
+> +	{ .compatible = "marvell,88f5281-pinctrl", .data = &mv88f5281_info },
+> +	{ }
+> +};
+> +
+> +static int orion_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id *match =
+> +		of_match_device(orion_pinctrl_of_match, &pdev->dev);
+> +	struct resource *res;
+> +
+> +	pdev->dev.platform_data = (void*) match->data;
 
-I don't think we have C++ style comments in the kernel. Also, I can't see
-any references to =KERNEL_START in arch/arm64/kernel/head.S (from 3.14 down).
+Useless (void *) cast?
 
->  	create_pgd_entry x25, x0, x3, x5, x6
-> +#ifdef CONFIG_ARM64_4_LEVELS
-> +	add	x1, x0, #PAGE_SIZE
-> +	create_pud_entry x0, x1, x3, x5, x6
-> +#endif
->  	ldr	x6, =KERNEL_END
->  	mov	x5, x3				// __pa(KERNEL_START)
->  	add	x6, x6, x28			// __pa(KERNEL_END)
-> +#ifndef CONFIG_ARM64_4_LEVELS
->  	create_block_map x0, x7, x3, x5, x6
-> +#else
-> +	create_block_map x1, x7, x3, x5, x6
-> +#endif
->  
->  	/*
->  	 * Map the kernel image (starting with PHYS_OFFSET).
-> @@ -456,9 +478,17 @@ __create_page_tables:
->  	add	x0, x26, #PAGE_SIZE		// section table address
->  	mov	x5, #PAGE_OFFSET
->  	create_pgd_entry x26, x0, x5, x3, x6
-> +#ifdef CONFIG_ARM64_4_LEVELS
-> +	add	x1, x0, #PAGE_SIZE
-> +	create_pud_entry x0, x1, x3, x5, x6
-> +#endif
->  	ldr	x6, =KERNEL_END
->  	mov	x3, x24				// phys offset
-> +#ifndef CONFIG_ARM64_4_LEVELS
->  	create_block_map x0, x7, x3, x5, x6
-> +#else
-> +	create_block_map x1, x7, x3, x5, x6
-> +#endif
->  
->  	/*
->  	 * Map the FDT blob (maximum 2MB; must be within 512MB of
-> @@ -474,14 +504,25 @@ __create_page_tables:
->  	add	x5, x5, x6			// __va(FDT blob)
->  	add	x6, x5, #1 << 21		// 2MB for the FDT blob
->  	sub	x6, x6, #1			// inclusive range
-> +#ifndef CONFIG_ARM64_4_LEVELS
->  	create_block_map x0, x7, x3, x5, x6
-> +#else
-> +	create_block_map x1, x7, x3, x5, x6
-> +#endif
->  1:
->  	/*
->  	 * Create the pgd entry for the fixed mappings.
->  	 */
->  	ldr	x5, =FIXADDR_TOP		// Fixed mapping virtual address
-> +#ifndef CONFIG_ARM64_4_LEVELS
->  	add	x0, x26, #2 * PAGE_SIZE		// section table address
->  	create_pgd_entry x26, x0, x5, x6, x7
-> +#else
-> +	add	x0, x26, #PAGE_SIZE
-> +	create_pgd_entry x26, x0, x5, x6, x7
-> +	add	x1, x0, #2 * PAGE_SIZE
-> +	create_pud_entry x0, x1, x5, x6, x7
-> +#endif
->  
->  	/*
->  	 * Since the page tables have been populated with non-cacheable
+Sebastian
 
-What tree is this series based on?
-
-Thanks,
--- 
-Steve
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	mpp_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(mpp_base))
+> +		return PTR_ERR(mpp_base);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	high_mpp_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(high_mpp_base))
+> +		return PTR_ERR(high_mpp_base);
+> +
+> +	return mvebu_pinctrl_probe(pdev);
+> +}
+> +
+> +static int orion_pinctrl_remove(struct platform_device *pdev)
+> +{
+> +	return mvebu_pinctrl_remove(pdev);
+> +}
+> +
+> +static struct platform_driver orion_pinctrl_driver = {
+> +	.driver = {
+> +		.name = "orion-pinctrl",
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = of_match_ptr(orion_pinctrl_of_match),
+> +	},
+> +	.probe = orion_pinctrl_probe,
+> +	.remove = orion_pinctrl_remove,
+> +};
+> +
+> +module_platform_driver(orion_pinctrl_driver);
+> +
+> +MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
+> +MODULE_DESCRIPTION("Marvell Orion pinctrl driver");
+> +MODULE_LICENSE("GPL v2");
+>
