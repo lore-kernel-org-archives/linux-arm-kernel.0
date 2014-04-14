@@ -1,57 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Apr 2014 12:16:07 +0100
-Subject: [linux-sunxi] Re: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add
- AXP209 support to various boards
-In-Reply-To: <534BB670.8030102@redhat.com>
-References: <1397209093-10077-1-git-send-email-carlo@caione.org>
- <1397209093-10077-8-git-send-email-carlo@caione.org>
- <20140414095256.GA28585@lukather>
- <CAOQ7t2ZybF=dm-NBQ3niN7gb-Asgwz5CW-VSkOzWR6t2NCaA8w@mail.gmail.com>
- <534BB670.8030102@redhat.com>
-Message-ID: <20140414111607.GL28800@sirena.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 13:17:11 +0200
+Subject: [PATCH 24/29] ARM: orion5x: keep TODO list in edmini_v2 DT
+In-Reply-To: <1397400006-4315-25-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-25-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BC3B7.2010603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 12:20:32PM +0200, Hans de Goede wrote:
+On 04/13/2014 04:40 PM, Thomas Petazzoni wrote:
+> In preparation to the complete removal of non-DT support for
+> edmini_v2, this commit copies the TODO list of things to support from
+> the old-style board file into the Device Tree of edmini_v2.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>   arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 7 +++++++
+>   1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> index 44cc36a..ffa0fc5 100644
+> --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> @@ -6,6 +6,13 @@
+>    * warranty of any kind, whether express or implied.
+>    */
+>
+> +/*
+> + * TODO: add Orion USB device port init when kernel.org support is added.
 
-Please fix your mailer to word wrap at less than 80 columns.
+I had a great time lately to look up usb phy init for all MVEBU SoCs.
+Expect barebox usb-phy code first, then later proper init for Linux,
+too.
 
-> As Mark has also mentioned we should probably pin the regulators to a
-> certain voltage, except for those which we expect to be controlled by
-> a driver, so basically all of them should be pinned to a certain
-> voltage except for DCDC2 which gets used for the cpu voltage which we
-> will want to scale as soon as we've a cpufreq driver.
+> + * TODO: add flash write support: see below.
+> + * TODO: add power-off support.
+> + * TODO: add I2C EEPROM support.
 
-If you don't know what to do with the regulators and don't have any
-information on what's safe then you shouldn't be specifying a voltage at
-all.
+Have you evaluated, what is blocking i2c eeprom?
 
-> While testing the latest revision of your code I also noticed that the
-> kernel ends up disabling LDO3 and LDO4, which could be fine on some
-> boards and a problem on other boards.
+Sebastian
 
-> I think we need to be careful here. For now it may be best to only add
-> the DCDC2 regulator to the dts, as we know that dcdc2 is used for the
-> cpu voltage everywhere, and we will actually want to control that
-> later on.
-
-You need to at least specify that regulators that need to be kept on are
-always-on.
-
-> For the others, for the boards where we've schematics (*) it would be
-> good to add the other regulators with fixed voltages as specified in
-> the schematics. For the rest it may be best to simply leave the
-> regulators alone / at their default settings.
-
-If everyone has been running the board at a voltage different to that in
-the schematic then I'd not assume that everything has been validated at
-the voltage in the schematic, if production firmware is available that's
-going to be a more reliable guide than the schematic but it sounds like
-all these boards have just been left to run at their default voltages.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/c1fb3028/attachment.sig>
+> + */
+> +
+>   /dts-v1/;
+>
+>   #include <dt-bindings/gpio/gpio.h>
+>
