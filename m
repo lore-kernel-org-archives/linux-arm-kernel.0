@@ -1,65 +1,116 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Apr 2014 13:00:27 +0100
-Subject: [PATCH] ARM: imx: propagate DI clock changes up the clock tree
- to PLL5
-In-Reply-To: <1397119544.3226.6.camel@paszta.hi.pengutronix.de>
-References: <E1WXuag-0007Gs-Ku@rmk-PC.arm.linux.org.uk>
- <1397119544.3226.6.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140414120027.GH24070@n2100.arm.linux.org.uk>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 14 Apr 2014 20:03:12 +0800
+Subject: [PATCH] arm64: Flush the process's mm context TLB entries when
+ switching
+Message-ID: <534BCE80.3090406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 10:45:44AM +0200, Philipp Zabel wrote:
-> I fear this will break LVDS, which depends on being able to set this
-> divisor manually (depending on whether it is in single or dual channel
-> mode).
-> I'd rather route the di clock inputs to the video pll via the
-> ipu_di_pre_sel muxes:
-> 
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -258,14 +258,14 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->         clk[ipu2_sel]         = imx_clk_mux("ipu2_sel",         base + 0x3c, 14, 2, ipu_sels,          ARRAY_SIZE(ipu_sels));
->         clk[ldb_di0_sel]      = imx_clk_mux_flags("ldb_di0_sel", base + 0x2c, 9,  3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_P
->         clk[ldb_di1_sel]      = imx_clk_mux_flags("ldb_di1_sel", base + 0x2c, 12, 3, ldb_di_sels,      ARRAY_SIZE(ldb_di_sels), CLK_SET_RATE_P
-> -       clk[ipu1_di0_pre_sel] = imx_clk_mux("ipu1_di0_pre_sel", base + 0x34, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
-> -       clk[ipu1_di1_pre_sel] = imx_clk_mux("ipu1_di1_pre_sel", base + 0x34, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
-> -       clk[ipu2_di0_pre_sel] = imx_clk_mux("ipu2_di0_pre_sel", base + 0x38, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
-> -       clk[ipu2_di1_pre_sel] = imx_clk_mux("ipu2_di1_pre_sel", base + 0x38, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels));
-> -       clk[ipu1_di0_sel]     = imx_clk_mux("ipu1_di0_sel",     base + 0x34, 0,  3, ipu1_di0_sels,     ARRAY_SIZE(ipu1_di0_sels));
-> -       clk[ipu1_di1_sel]     = imx_clk_mux("ipu1_di1_sel",     base + 0x34, 9,  3, ipu1_di1_sels,     ARRAY_SIZE(ipu1_di1_sels));
-> -       clk[ipu2_di0_sel]     = imx_clk_mux("ipu2_di0_sel",     base + 0x38, 0,  3, ipu2_di0_sels,     ARRAY_SIZE(ipu2_di0_sels));
-> -       clk[ipu2_di1_sel]     = imx_clk_mux("ipu2_di1_sel",     base + 0x38, 9,  3, ipu2_di1_sels,     ARRAY_SIZE(ipu2_di1_sels));
-> +       clk[ipu1_di0_pre_sel] = imx_clk_mux_flags("ipu1_di0_pre_sel", base + 0x34, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_
-> +       clk[ipu1_di1_pre_sel] = imx_clk_mux_flags("ipu1_di1_pre_sel", base + 0x34, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_
-> +       clk[ipu2_di0_pre_sel] = imx_clk_mux_flags("ipu2_di0_pre_sel", base + 0x38, 6,  3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_
-> +       clk[ipu2_di1_pre_sel] = imx_clk_mux_flags("ipu2_di1_pre_sel", base + 0x38, 15, 3, ipu_di_pre_sels,   ARRAY_SIZE(ipu_di_pre_sels), CLK_
-> +       clk[ipu1_di0_sel]     = imx_clk_mux_flags("ipu1_di0_sel",     base + 0x34, 0,  3, ipu1_di0_sels,     ARRAY_SIZE(ipu1_di0_sels), CLK_SE
-> +       clk[ipu1_di1_sel]     = imx_clk_mux_flags("ipu1_di1_sel",     base + 0x34, 9,  3, ipu1_di1_sels,     ARRAY_SIZE(ipu1_di1_sels), CLK_SE
-> +       clk[ipu2_di0_sel]     = imx_clk_mux_flags("ipu2_di0_sel",     base + 0x38, 0,  3, ipu2_di0_sels,     ARRAY_SIZE(ipu2_di0_sels), CLK_SE
-> +       clk[ipu2_di1_sel]     = imx_clk_mux_flags("ipu2_di1_sel",     base + 0x38, 9,  3, ipu2_di1_sels,     ARRAY_SIZE(ipu2_di1_sels), CLK_SE
->         clk[hsi_tx_sel]       = imx_clk_mux("hsi_tx_sel",       base + 0x30, 28, 1, hsi_tx_sels,       ARRAY_SIZE(hsi_tx_sels));
->         clk[pcie_axi_sel]     = imx_clk_mux("pcie_axi_sel",     base + 0x18, 10, 1, pcie_axi_sels,     ARRAY_SIZE(pcie_axi_sels));
->         clk[ssi1_sel]         = imx_clk_fixup_mux("ssi1_sel",   base + 0x1c, 10, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),          imx_cscm
-> @@ -445,6 +445,15 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->                 clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
->         }
->  
-> +       clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
-> +       clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
-> +       clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
-> +       clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
-> +       clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
-> +       clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
-> +       clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
-> +       clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
-> +
->         /*
->          * The gpmi needs 100MHz frequency in the EDO/Sync mode,
->          * We can not get the 100MHz from the pll2_pfd0_352m.
+I met a problem when migrating process by following steps:
 
-If you'd like the above patch tested, please send the complete patch rather than a version with tabs converted to spaces, and lines longer tha
+1) The process was already running on core 0.
+2) Set the CPU affinity of the process to 0x02 and move it to core 1,
+   it could work well.
+3) Set the CPU affinity of the process to 0x01 and move it to core 0 again,
+   the problem occurs and the process was killed.
 
+---------------------------------------------------------------------
+
+Aborting.../init: line 29:   434 Aborted                 setsid cttyhack sh
+Console sh exited with 134, respawning...
+fork_test[440]: unhandled level 2 translation fault (11) at 0x00000000, esr 0x83
+000006
+pgd = ffffffc01a505000
+[00000000] *pgd=000000001a3f4003, *pmd=0000000000000000
+
+CPU: 0 PID: 440 Comm: fork_test Not tainted 3.13.0+ #7
+task: ffffffc01a41c800 ti: ffffffc01a55c000 task.ti: ffffffc01a55c000
+PC is at 0x0
+LR is at 0x0
+pc : [<0000000000000000>] lr : [<0000000000000000>] pstate: 20000000
+sp : 0000007fdeb1dc50
+x29: 0000000000000000 x28: 0000000000000000
+x27: 0000000000000000 x26: 0000000000000000
+x25: 0000000000000000 x24: 0000000000000000
+x23: 0000000000000000 x22: 0000000000000000
+x21: 0000000000400570 x20: 0000000000000000
+x19: 0000000000400570 x18: 0000007fdeb1d9e0
+x17: 0000007fa7a65840 x16: 0000000000410a50
+x15: 0000007fa7b3b028 x14: 0000000000000040
+x13: 0000000000000090 x12: 000000000013c000
+x11: 000000000002b028 x10: 0000000000000000
+x9 : 00000000ffffffff x8 : 0000000000000104
+x7 : 0000000000000000 x6 : 0000000000000000
+x5 : 00000000fbad2a84 x4 : 0000000000000000
+x3 : 0000000000000000 x2 : 0000000000000020
+x1 : 0000007fa7b356f0 x0 : ffffffffffffffff
+
+CPU: 0 PID: 440 Comm: fork_test Not tainted 3.13.0+ #7
+Call trace:
+[<ffffffc0000872b0>] dump_backtrace+0x0/0x12c
+[<ffffffc0000873f0>] show_stack+0x14/0x1c
+[<ffffffc000420e74>] dump_stack+0x70/0x90
+[<ffffffc0000912d0>] __do_user_fault+0x48/0xf4
+[<ffffffc0000914e4>] do_page_fault+0x168/0x378
+[<ffffffc0000917b4>] do_translation_fault+0xc0/0xf0
+[<ffffffc000081108>] do_mem_abort+0x3c/0x9c
+Exception stack(0xffffffc01a55fe30 to 0xffffffc01a55ff50)
+fe20:                                     00400570 00000000 00000000 00000000
+fe40: ffffffff ffffffff 00000000 00000000 ffffffff ffffffff 000000dc 00000000
+fe60: 00000003 00000004 00000000 00000000 00000000 00000000 000001bb 00000000
+fe80: 00000000 00000000 00000000 0000007f 1a41c800 ffffffc0 00095508 ffffffc0
+fea0: 00100100 00000000 00200200 00000000 fffffff6 00000000 00001000 00000000
+fec0: deb1dc00 0000007f 000839ec ffffffc0 ffffffff ffffffff a7b356f0 0000007f
+fee0: 00000020 00000000 00000000 00000000 00000000 00000000 fbad2a84 00000000
+ff00: 00000000 00000000 00000000 00000000 00000104 00000000 ffffffff 00000000
+ff20: 00000000 00000000 0002b028 00000000 0013c000 00000000 00000090 00000000
+ff40: 00000040 00000000 a7b3b028 0000007f
+
+---------------------------- cut here -----------------------------------
+
+It was a very strange problem that the PC and LR are both 0, and the esr is
+0x83000006, it means that the used for instruction access generated MMU faults
+and synchronous external aborts, including synchronous parity errors.
+
+I try to fix the problem by invalidating the process's TLB entries when switching,
+it will make the context stale and pick new one, and then it could work well.
+
+So I think in some situation that after the process switching, the modification of
+the TLB entries in the new core didn't inform all other cores to invalidate the old
+TLB entries which was in the inner shareable caches, and then if the process schedule
+to another core, the old TLB entries may occur MMU faults.
+
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+---
+ arch/arm64/kernel/process.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 6391485..d7d8439 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -283,6 +283,13 @@ static void tls_thread_switch(struct task_struct *next)
+ 	: : "r" (tpidr), "r" (tpidrro));
+ }
+ 
++static void tlb_flush_thread(struct task_struct *prev)
++{
++	/* Flush the prev task's TLB entries */
++	if (prev->mm)
++		flush_tlb_mm(prev->mm);
++}
++
+ /*
+  * Thread switching.
+  */
+@@ -296,6 +303,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
+ 	hw_breakpoint_thread_switch(next);
+ 	contextidr_thread_switch(next);
+ 
++	tlb_flush_thread(prev);
++
+ 	/*
+ 	 * Complete any pending TLB or cache maintenance on this CPU in case
+ 	 * the thread migrates to a different CPU.
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.0
