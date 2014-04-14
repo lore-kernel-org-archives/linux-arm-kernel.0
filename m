@@ -1,68 +1,44 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Apr 2014 14:41:59 +0300
-Subject: [PATCH v3 04/10] dmaengine: edma: Add support for DMA_PAUSE/RESUME
- operation
+Date: Mon, 14 Apr 2014 14:42:00 +0300
+Subject: [PATCH v3 05/10] dmaengine: edma: Set DMA_CYCLIC capability flag
 In-Reply-To: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1397475725-5036-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1397475725-5036-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pause/Resume can be used by the audio stack when the stream is paused/resumed
-The edma platform code has support for this and the legacy audio stack used
-this.
+Indicate that the edma dmaengine driver has support for cyclic mode.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/common/edma.c | 1 +
+ drivers/dma/edma.c     | 1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 999266bf69b9..0b37f7734d0f 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1574,6 +1574,7 @@ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
+ 		return ERR_PTR(ret);
+ 
+ 	dma_cap_set(DMA_SLAVE, edma_filter_info.dma_cap);
++	dma_cap_set(DMA_CYCLIC, edma_filter_info.dma_cap);
+ 	of_dma_controller_register(dev->of_node, of_dma_simple_xlate,
+ 				   &edma_filter_info);
+ 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 2742867fd1e6..7891378a03f0 100644
+index 7891378a03f0..1dd9e8806975 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -240,6 +240,26 @@ static int edma_slave_config(struct edma_chan *echan,
- 	return 0;
- }
+@@ -891,6 +891,7 @@ static int edma_probe(struct platform_device *pdev)
  
-+static int edma_dma_pause(struct edma_chan *echan)
-+{
-+	/* Pause/Resume only allowed with cyclic mode */
-+	if (!echan->edesc->cyclic)
-+		return -EINVAL;
-+
-+	edma_pause(echan->ch_num);
-+	return 0;
-+}
-+
-+static int edma_dma_resume(struct edma_chan *echan)
-+{
-+	/* Pause/Resume only allowed with cyclic mode */
-+	if (!echan->edesc->cyclic)
-+		return -EINVAL;
-+
-+	edma_resume(echan->ch_num);
-+	return 0;
-+}
-+
- static int edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 			unsigned long arg)
- {
-@@ -255,6 +275,14 @@ static int edma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		config = (struct dma_slave_config *)arg;
- 		ret = edma_slave_config(echan, config);
- 		break;
-+	case DMA_PAUSE:
-+		ret = edma_dma_pause(echan);
-+		break;
-+
-+	case DMA_RESUME:
-+		ret = edma_dma_resume(echan);
-+		break;
-+
- 	default:
- 		ret = -ENOSYS;
- 	}
+ 	dma_cap_zero(ecc->dma_slave.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, ecc->dma_slave.cap_mask);
++	dma_cap_set(DMA_CYCLIC, ecc->dma_slave.cap_mask);
+ 
+ 	edma_dma_init(ecc, &ecc->dma_slave, &pdev->dev);
+ 
 -- 
 1.9.2
