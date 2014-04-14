@@ -1,60 +1,67 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 14 Apr 2014 13:59:26 +0530
-Subject: [PATCH] ARM: AM33xx: hwmod: Add INIT_NO_IDLE flag for debugss
- hwmod
-In-Reply-To: <alpine.DEB.2.02.1404111807210.14347@utopia.booyaka.com>
-References: <1397022467-6166-1-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1404111800430.14347@utopia.booyaka.com>
- <alpine.DEB.2.02.1404111807210.14347@utopia.booyaka.com>
-Message-ID: <534B9C66.9020007@ti.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Mon, 14 Apr 2014 13:35:12 +0530
+Subject: [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio
+ on/off
+In-Reply-To: <20140412033718.GA18777@saruman.home>
+References: <1397044485-26483-1-git-send-email-gautam.vivek@samsung.com>
+ <20140412033718.GA18777@saruman.home>
+Message-ID: <CAFp+6iF9Xk=uCUi6q_AEbGKL6LYxoa6kECUPXzUS4E3B9+CWYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-On Friday 11 April 2014 11:39 PM, Paul Walmsley wrote:
-> On Fri, 11 Apr 2014, Paul Walmsley wrote:
-> 
->> On Wed, 9 Apr 2014, Lokesh Vutla wrote:
+Hi Felipe,
+
+
+On Sat, Apr 12, 2014 at 9:07 AM, Felipe Balbi <balbi@ti.com> wrote:
+> On Wed, Apr 09, 2014 at 05:24:45PM +0530, Vivek Gautam wrote:
+>> Adding support to enable/disable VBUS hooked to a gpio
+>> to enable vbus supply on the port.
 >>
->>> During boot, when hwmod tries to cut clocks for debugss it always
->>> gets stuck in transition state and throws the following warning:
->>>
->>> [    0.139581] omap_hwmod: debugss: _wait_target_disable failed
->>>
->>> As per the information provided by folks, clocks to debugss cannot be cut.
->>> So adding HWMOD_INIT_NO_IDLE flag to debugss hwmod.
->>>
->>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
 >>
->> Thanks, queued for v3.15-rc.
-> 
-> Hmmm.  On second thought, this doesn't look like the right fix.  Could 
-> you please comment on the issues raised here:
-> 
-> https://patchwork.kernel.org/patch/2212111/
-Yes, I initially created a driver for enabling and disabling clocks for DEBUGSS.
-But I always see that DEBUGSS is always stuck in transition whenever clocks are cut
-to DEBUGSS. 
-During boot also when hwmod tries to cut clocks the following warning comes:
-  [    0.139581] omap_hwmod: debugss: _wait_target_disable failed.
+>> Based on 'phy-exynos5-usbdrd' patches:
+>> [PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
+>> http://www.spinics.net/lists/linux-usb/msg105507.html
+>>
+>>  drivers/phy/phy-exynos5-usbdrd.c |   18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+>> index ff54a7c..5ca7485 100644
+>> --- a/drivers/phy/phy-exynos5-usbdrd.c
+>> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_address.h>
+>> +#include <linux/of_gpio.h>
+>>  #include <linux/phy/phy.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/mutex.h>
+>> @@ -176,6 +177,7 @@ struct exynos5_usbdrd_phy {
+>>       struct clk *ref_clk;
+>>       unsigned long ref_rate;
+>>       unsigned int refclk_reg;
+>> +     int gpio;
+>>  };
+>>
+>>  #define to_usbdrd_phy(inst) \
+>> @@ -460,6 +462,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+>>       if (!IS_ERR(phy_drd->usb30_sclk))
+>>               clk_prepare_enable(phy_drd->usb30_sclk);
+>>
+>> +     /* Toggle VBUS gpio - on */
+>> +     gpio_set_value(phy_drd->gpio, 1);
+>
+> It seems like you'd be better off using a regulator_enable() call for
+> this.
 
-As confirmed by the hardware team that this is a bug in silicon that clocks cannot
-be cut to DEBUGSS.
-So I am just adding HWMOD_INIT_NO_IDLE flag to debugss hwmod. 
+Sure, i will use a regulator for this vbus settings.
 
-I have also tested suspend-resume with $subject patch with TI internal tree.
 
-Please let me know if I am not clear.
-
-Thanks and regards,
-Lokesh
-
-> 
-> Looks to me like there should be at least one device driver, either for 
-> the entire DEBUGSS, or for the individual IP blocks inside the DEBUGSS.
-> 
-> Dropping this patch for now.
-> 
-> 
-> - Paul
-> 
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
