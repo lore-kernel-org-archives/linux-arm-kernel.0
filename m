@@ -1,147 +1,87 @@
-From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Mon, 14 Apr 2014 23:28:51 +0800
-Subject: [PATCH v3 09/18] ASoC: fsl-ssi: Only enable baudclk when used
-In-Reply-To: <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
-References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
- <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140414152850.GB7197@MrMyself>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 14 Apr 2014 17:53:37 +0200
+Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
+In-Reply-To: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <16639486.i0jTGsaDYr@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 03:35:39PM +0200, Markus Pargmann wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Enable baudclk only when it is used. The baudclock is only needed in master
-> mode and only when thr driver is active, so move enabling to fsl_ssi_startup
-> and disabling to fsl_ssi_shutdown.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  sound/soc/fsl/fsl_ssi.c | 37 ++++++++++++++++++++++++++++++-------
->  1 file changed, 30 insertions(+), 7 deletions(-)
-> 
-> diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> index f2255cb..d6d3f0a3 100644
-> --- a/sound/soc/fsl/fsl_ssi.c
-> +++ b/sound/soc/fsl/fsl_ssi.c
-> @@ -236,6 +236,12 @@ static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
->  	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
->  }
->  
-> +static bool fsl_ssi_is_i2s_master(struct fsl_ssi_private *ssi_private)
-> +{
-> +	return (ssi_private->dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) ==
-> +		SND_SOC_DAIFMT_CBS_CFS;
-> +}
-> +
->  /**
->   * fsl_ssi_isr: SSI interrupt handler
->   *
-> @@ -489,6 +495,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
->  	struct fsl_ssi_private *ssi_private =
->  		snd_soc_dai_get_drvdata(rtd->cpu_dai);
->  	unsigned long flags;
-> +	int ret;
->  
->  	if (!dai->active && !fsl_ssi_is_ac97(ssi_private)) {
->  		spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
-> @@ -496,6 +503,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
->  		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
->  	}
->  
-> +	if (fsl_ssi_is_i2s_master(ssi_private)) {
-> +		ret = clk_prepare_enable(ssi_private->baudclk);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	/* When using dual fifo mode, it is safer to ensure an even period
->  	 * size. If appearing to an odd number while DMA always starts its
->  	 * task from fifo0, fifo1 would be neglected at the end of each
-> @@ -508,6 +521,17 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
->  	return 0;
->  }
->  
-> +static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
-> +		struct snd_soc_dai *dai)
-> +{
-> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> +	struct fsl_ssi_private *ssi_private =
-> +		snd_soc_dai_get_drvdata(rtd->cpu_dai);
-> +
-> +	if (fsl_ssi_is_i2s_master(ssi_private))
-> +		clk_disable_unprepare(ssi_private->baudclk);
-> +}
-> +
->  /**
->   * fsl_ssi_hw_params - program the sample size
->   *
-> @@ -576,6 +600,11 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
->  
->  	ssi_private->dai_fmt = fmt;
->  
-> +	if (fsl_ssi_is_i2s_master(ssi_private) && IS_ERR(ssi_private->baudclk)) {
-> +		dev_err(cpu_dai->dev, "no baudclk needed for master mode\n");
-> +		return -EINVAL;
-> +	}
-> +
 
-I was wondering what if machine driver doesn't set fmt to master during
-its probe(), in another word -- before fsl_ssi_startup(), but leave that
-into its hw_params() via snd_soc_dai_set_fmt() which then would run after
-fsl_ssi_startup() while having no baud clock enabled in this case.
+Hi,
 
-A better solution may be to wrap clk_prepare_enable() and master mode
-clock dividing code into fsl_ssi_hw_params(), a bit like the ESAI driver
-even though it doesn't contain the clk_prepare_enable() part currently,
-and then to put clk_disable_unprepare() into hw_free() for symmetry.
-
-Any suggestion?
-
-Thank you,
-Nicolin
-
->  	fsl_ssi_setup_reg_vals(ssi_private);
->  
->  	scr = read_ssi(&ssi->scr) & ~(CCSR_SSI_SCR_SYN | CCSR_SSI_SCR_I2S_MODE_MASK);
-> @@ -910,6 +939,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
->  
->  static const struct snd_soc_dai_ops fsl_ssi_dai_ops = {
->  	.startup	= fsl_ssi_startup,
-> +	.shutdown	= fsl_ssi_shutdown,
->  	.hw_params	= fsl_ssi_hw_params,
->  	.set_fmt	= fsl_ssi_set_dai_fmt,
->  	.set_sysclk	= fsl_ssi_set_dai_sysclk,
-> @@ -1050,8 +1080,6 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
->  	if (IS_ERR(ssi_private->baudclk))
->  		dev_dbg(&pdev->dev, "could not get baud clock: %ld\n",
->  			 PTR_ERR(ssi_private->baudclk));
-> -	else
-> -		clk_prepare_enable(ssi_private->baudclk);
->  
->  	/*
->  	 * We have burstsize be "fifo_depth - 2" to match the SSI
-> @@ -1102,9 +1130,6 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
->  	return 0;
->  
->  error_pcm:
-> -	if (!IS_ERR(ssi_private->baudclk))
-> -		clk_disable_unprepare(ssi_private->baudclk);
-> -
->  	clk_disable_unprepare(ssi_private->clk);
->  
->  	return ret;
-> @@ -1115,8 +1140,6 @@ static void fsl_ssi_imx_clean(struct platform_device *pdev,
->  {
->  	if (!ssi_private->use_dma)
->  		imx_pcm_fiq_exit(pdev);
-> -	if (!IS_ERR(ssi_private->baudclk))
-> -		clk_disable_unprepare(ssi_private->baudclk);
->  	clk_disable_unprepare(ssi_private->clk);
->  }
->  
-> -- 
-> 1.9.1
+On Monday, April 14, 2014 04:34:10 PM Thomas Petazzoni wrote:
+> Hello,
 > 
+> The Marvell Armada 38x ARM processors use an AHCI compatible interface
+> for SATA (in replacement of the Marvell-specific SATA interface,
+> handled by the sata_mv driver). However, like all DMA-capable Marvell
+> interfaces, some specific MBus window configuration must be done, so a
+> small specific glue layer is needed, which relies on the recently
+> introduced libahci_platform.c.
 > 
+> Changes since v1:
 > 
+>  * Rebased on top of v3.15-rc1
+> 
+>  * Added a preliminary patch that orders alphabetically the list of
+>    compatible strings in the DT binding document
+>    ahci-platform.txt. Suggested by Andrew Lunn.
+> 
+>  * Made the availability of MBus DRAM window informations
+>    mandatory. Suggested by Andrew Lunn.
+> 
+>  * Fixed the module alias name. Suggested by Bartlomiej
+>    Zolnierkiewicz.
+
+Well, you could have also added a comment explaining the lack of
+the Power Management support..
+
+> Details of the patches:
+> 
+>  * The first patch is a DT binding documentation cleanup. I believe it
+>    should be taken by the ATA maintainer, because the second patch
+>    (driver patch) depends on it.
+> 
+>  * The second patch of this series contains the driver itself, which
+>    is fairly straight-forward. It should be taken by Tejun Heo as the
+>    ATA maintainer.
+> 
+>  * The last three patches add the Device Tree and defconfig
+>    changes. They should be taken by the respective ARM maintainers
+>    (mvebu maintainers for the DT and mvebu_v7_defconfig, and arm-soc
+>    maintainers for the multi_v7_defconfig change).
+
+Anyway, all patches look OK to me.
+
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (5):
+>   Documentation: dt-bindings: reformat and order list of ahci-platform
+>     compatibles
+>   ata: ahci_mvebu: new driver for Marvell Armada 380 AHCI interfaces
+>   ARM: mvebu: add Device Tree description of AHCI interfaces on Armada
+>     38x
+>   ARM: configs: add ahci_mvebu to mvebu_v7_defconfig
+>   ARM: configs: add ahci_mvebu to multi_v7_defconfig
+> 
+>  .../devicetree/bindings/ata/ahci-platform.txt      |  13 ++-
+>  arch/arm/boot/dts/armada-385-db.dts                |   8 ++
+>  arch/arm/boot/dts/armada-38x.dtsi                  |  16 +++
+>  arch/arm/configs/multi_v7_defconfig                |   1 +
+>  arch/arm/configs/mvebu_v7_defconfig                |   1 +
+>  drivers/ata/Kconfig                                |   9 ++
+>  drivers/ata/Makefile                               |   1 +
+>  drivers/ata/ahci_mvebu.c                           | 107 +++++++++++++++++++++
+>  8 files changed, 152 insertions(+), 4 deletions(-)
+>  create mode 100644 drivers/ata/ahci_mvebu.c
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
