@@ -1,86 +1,120 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:50:32 +0200
-Subject: [PATCH v3 5/6] ARM: mvebu: switch to the new PMSU binding in Armada
- 370/XP Device Tree
-In-Reply-To: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483433-25836-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 14 Apr 2014 15:05:20 +0100
+Subject: [PATCH v2 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <1397271984-23405-5-git-send-email-isubramanian@apm.com>
+References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
+ <1397271984-23405-5-git-send-email-isubramanian@apm.com>
+Message-ID: <534BEB20.3080501@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On 12/04/14 04:06, Iyappan Subramanian wrote:
+> This patch adds network driver for APM X-Gene SoC ethernet.
+>
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Ravi Patel <rapatel@apm.com>
 
-Following the introduction of the new PMSU Device Tree binding, as
-well as the separate CPU reset binding, this commit switches the
-Armada 370 and Armada XP Device Trees to use them.
+[snip]
 
-The PMSU node is moved from the Armada XP specific armada-xp.dtsi to
-the common Armada 370/XP armada-370-xp.dtsi because the PMSU is in
-fact available at the same location on both SOCs.
+> +{
+> +	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+> +	struct phy_device *phydev;
+> +	unsigned char phy_id[MII_BUS_ID_SIZE+3];
+> +	int ret = 0;
+> +
+> +	phydev = phy_find_first(pdata->mdio_bus);
+> +	if (!phydev) {
+> +		netdev_info(ndev, "no PHY found\n");
+> +		ret = -1;
+> +		goto out;
+> +	}
+> +
+> +	/* attach the mac to the phy */
+> +	snprintf(phy_id, sizeof(phy_id), PHY_ID_FMT, pdata->mdio_bus->id,
+> +		 pdata->phy_addr);
+> +	phydev = phy_connect(ndev, phy_id,
+> +			     &xgene_enet_mdio_link_change, pdata->phy_mode);
+> +	if (IS_ERR(phydev)) {
+> +		netdev_err(ndev, "Could not attach to PHY\n");
+> +		ret = PTR_ERR(phydev);
+> +		phydev = NULL;
+> +		goto out;
+> +	}
+> +
 
-The CPU reset node is then added on both Armada 370 and Armada XP,
-with a different compatible string. On Armada 370, the CPU reset
-driver is not really needed as Armada 370 is single core and the only
-use of the CPU reset driver is to boot secondary processors, but it
-still makes sense to have this CPU reset register described in the
-Device Tree.
+You should be using of_phy_connect or similar so that the
+necessary PHY<>OF data is properly initialised
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi | 5 +++++
- arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
- arch/arm/boot/dts/armada-xp.dtsi     | 6 +++---
- 3 files changed, 13 insertions(+), 3 deletions(-)
+> +	netdev_info(ndev, "phy_id=0x%08x phy_drv=\"%s\"",
+> +		    phydev->phy_id, phydev->drv->name);
+> +out:
+> +	pdata->phy_link = 0;
+> +	pdata->phy_speed = 0;
+> +	pdata->phy_dev = phydev;
+> +
+> +	return ret;
+> +}
+> +
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index bbb40f6..10d7786 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -203,6 +203,11 @@
- 				reg = <0x20300 0x34>, <0x20704 0x4>;
- 			};
- 
-+			pmsu at 22000 {
-+				compatible = "marvell,armada-370-pmsu";
-+				reg = <0x22000 0x1000>;
-+			};
-+
- 			usb at 50000 {
- 				compatible = "marvell,orion-ehci";
- 				reg = <0x50000 0x500>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index af1f11e..21b588b 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -220,6 +220,11 @@
- 				clocks = <&coreclk 2>;
- 			};
- 
-+			cpurst at 20800 {
-+				compatible = "marvell,armada-370-cpu-reset";
-+				reg = <0x20800 0x8>;
-+			};
-+
- 			audio_controller: audio-controller at 30000 {
- 				compatible = "marvell,armada370-audio";
- 				reg = <0x30000 0x4000>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index abb9f9d..0a7dff6 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -117,9 +117,9 @@
- 				clock-names = "nbclk", "fixed";
- 			};
- 
--			armada-370-xp-pmsu at 22000 {
--				compatible = "marvell,armada-370-xp-pmsu";
--				reg = <0x22100 0x400>, <0x20800 0x20>;
-+			cpurst at 20800 {
-+				compatible = "marvell,armada-370-cpu-reset";
-+				reg = <0x20800 0x20>;
- 			};
- 
- 			eth2: ethernet at 30000 {
+
+[snip]
+
+> +struct xgene_enet_desc {
+> +	u64 m0;
+> +	u64 m1;
+> +	u64 m2;
+> +	u64 m3;
+> +};
+> +
+> +struct xgene_enet_desc16 {
+> +	u64 m0;
+> +	u64 m1;
+> +};
+> +
+> +static inline void xgene_enet_cpu_to_le64(struct xgene_enet_desc *desc,
+> +					  int count)
+> +{
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	int i;
+> +
+> +	for (i = 0; i < count; i++)
+> +		((u64 *)desc)[i] = cpu_to_le64(((u64 *)desc)[i]);
+> +#endif
+> +}
+> +
+> +static inline void xgene_enet_le64_to_cpu(struct xgene_enet_desc *desc,
+> +					  int count)
+> +{
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	int i;
+> +
+> +	for (i = 0; i < count; i++)
+> +		((u64 *)desc)[i] = le64_to_cpu(((u64 *)desc)[i]);
+> +#endif
+> +}
+> +
+> +static inline void xgene_enet_desc16_to_le64(struct xgene_enet_desc *desc)
+> +{
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	((u64 *)desc)[1] = cpu_to_le64(((u64 *)desc)[1]);
+> +#endif
+> +}
+> +
+> +static inline void xgene_enet_le64_to_desc16(struct xgene_enet_desc *desc)
+> +{
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	((u64 *)desc)[1] = le64_to_cpu(((u64 *)desc)[1]);
+> +#endif
+> +}
+
+With this do you not risk confusing the hardware by swapping the
+format of the descriptors?
+
+Why not use xxx_to_cpu() and cpu_to_xxx() functions when reading or
+writing the descriptors? It would also remove a lot of the #ifdef in
+this code.
+
 -- 
-1.8.3.2
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
