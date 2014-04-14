@@ -1,24 +1,21 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Apr 2014 11:57:58 +0200
-Subject: [PATCH 0/4] ARM: sunxi: dt: Misc. fixes
-In-Reply-To: <1397389265-22288-1-git-send-email-hdegoede@redhat.com>
-References: <1397389265-22288-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140414095758.GD28585@lukather>
+Date: Mon, 14 Apr 2014 11:59:07 +0200
+Subject: [PATCH 2/4] ARM: sun7i: fix PLL4 clock and add PLL8
+In-Reply-To: <1395253173-30437-3-git-send-email-emilio@elopez.com.ar>
+References: <1395253173-30437-1-git-send-email-emilio@elopez.com.ar>
+ <1395253173-30437-3-git-send-email-emilio@elopez.com.ar>
+Message-ID: <20140414095907.GA3207@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 19, 2014 at 03:19:31PM -0300, Emilio L?pez wrote:
+> Allwinner reworked the PLL4 clock in sun7i; so we need to change the
+> compatible. Additionally, PLL8 is compatible with this new PLL4
+> implementation, so let's add a node for it as well.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-On Sun, Apr 13, 2014 at 01:41:01PM +0200, Hans de Goede wrote:
-> Hi Maxime,
-> 
-> Here is are 4 misc. dts fixes for sunxi.
-> 
-> Regards,
-> 
-> Hans
-
-Applied all of them to sunxi/dt-for-3.16.
+Applied to sunxi/fixes-for-3.15.
 
 Thanks!
 Maxime
@@ -33,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/1546a1eb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/ab8d5ed0/attachment.sig>
