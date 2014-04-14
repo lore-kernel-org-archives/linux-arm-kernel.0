@@ -1,154 +1,309 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 14 Apr 2014 18:24:55 +0900
-Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
-In-Reply-To: <20140414091424.GA14204@linaro.org>
-References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
- <20140414091424.GA14204@linaro.org>
-Message-ID: <000c01cf57c3$65afc110$310f4330$@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 11:27:17 +0200
+Subject: [PATCH 03/29] clk: mvebu: add Orion5x clock driver
+In-Reply-To: <1397400006-4315-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BA9F5.7080908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 14, 2014 6:14 PM, Steve Capper wrote:
-> On Mon, Apr 13, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
-> > This patch implements 4 levels of translation tables since 3 levels of
-> > page tables with 4KB pages cannot support 40-bit physical address
-> > space described in [1] due to the following issue.
-> >
-> > It is a restriction that kernel logical memory map with 4KB + 3 levels
-> > (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
-> > 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
-> > mapping for this region in map_mem function since __phys_to_virt for
-> > this region reaches to address overflow.
-> >
-> > If SoC design follows the document, [1], over 32GB RAM would be placed
-> > from 544GB. Even 64GB system is supposed to use the region from 544GB
-> > to 576GB for only 32GB RAM. Naturally, it would reach to enable 4
-> > levels of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
-> >
-> > However, it is recommended 4 levels of page table should be only
-> > enabled if memory map is too sparse or there is about 512GB RAM.
-> 
-> Hi,
-> So I thought I'd apply this series and have a play, this patch doesn't apply cleanly for me, please
-> see below why...
+On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
+> This commit adds a core clock driver for the Orion5x SoC, with support
+> for the tclk, the CPU frequency and the DDR frequency. All the details
+> about the Sample-At-Reset register were extracted from the U-Boot
+> sources for Orion5x.
+>
+> Note that Orion5x does not have gatable clocks, so this core clock
+> driver is sufficient to support clocking on Orion5x platforms.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>   .../devicetree/bindings/clock/mvebu-core-clock.txt |   8 +
+>   drivers/clk/mvebu/Kconfig                          |   4 +
+>   drivers/clk/mvebu/Makefile                         |   1 +
+>   drivers/clk/mvebu/orion.c                          | 212 +++++++++++++++++++++
+>   4 files changed, 225 insertions(+)
+>   create mode 100644 drivers/clk/mvebu/orion.c
+>
+> diff --git a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+> index 307a503..dc5ea5b 100644
+> --- a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+> @@ -29,6 +29,11 @@ The following is a list of provided IDs and clock names on Kirkwood and Dove:
+>    2 = l2clk  (L2 Cache clock derived from CPU0 clock)
+>    3 = ddrclk (DDR controller clock derived from CPU0 clock)
+>
+> +The following is a list of provided IDs and clock names on Orion5x:
+> + 0 = tclk   (Internal Bus clock)
+> + 1 = cpuclk (CPU0 clock)
+> + 2 = ddrclk (DDR controller clock derived from CPU0 clock)
+> +
 
-This pathset is based on 3.15-rc1.
+Maybe it is time to introduce a dt-binding include to remember
+us to provide the same for the other SoCs, too?
 
-> [ ... ]
-> 
-> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S index
-> > 0fd5650..0b0b16a 100644
-> > --- a/arch/arm64/kernel/head.S
-> > +++ b/arch/arm64/kernel/head.S
-> > @@ -46,8 +46,8 @@
-> >  #error KERNEL_RAM_VADDR must start at 0xXXX80000  #endif
-> >
-> > -#define SWAPPER_DIR_SIZE	(3 * PAGE_SIZE)
-> > -#define IDMAP_DIR_SIZE		(2 * PAGE_SIZE)
-> > +#define SWAPPER_DIR_SIZE	(4 * PAGE_SIZE)
-> > +#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
-> >
-> >  	.globl	swapper_pg_dir
-> >  	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - SWAPPER_DIR_SIZE
-> > @@ -384,6 +384,20 @@ ENDPROC(__calc_phys_offset)
-> >  	.endm
-> >
-> >  /*
-> > + * Macro to populate the PUD for the corresponding block entry in the
-> > +next
-> > + * level (tbl) for the given virtual address.
-> > + *
-> > + * Preserves:	pud, tbl, virt
-> > + * Corrupts:	tmp1, tmp2
-> > + */
-> > +	.macro create_pud_entry, pud, tbl, virt, tmp1, tmp2
-> > +	lsr	\tmp1, \virt, #PUD_SHIFT
-> > +	and	\tmp1, \tmp1, #PTRS_PER_PUD - 1	// PUD index
-> > +	orr	\tmp2, \tbl, #3			// PUD entry table type
-> > +	str	\tmp2, [\pud, \tmp1, lsl #3]
-> > +	.endm
-> > +
-> > +/*
-> >   * Macro to populate block entries in the page table for the start..end
-> >   * virtual range (inclusive).
-> >   *
-> > @@ -445,10 +459,18 @@ __create_page_tables:
-> >  	ldr	x3, =KERNEL_START
-> >  	add	x3, x3, x28			// __pa(KERNEL_START)
-> 
-> I don't think we have C++ style comments in the kernel. Also, I can't see any references to
-> =KERNEL_START in arch/arm64/kernel/head.S (from 3.14 down).
+>   Required properties:
+>   - compatible : shall be one of the following:
+>   	"marvell,armada-370-core-clock" - For Armada 370 SoC core clocks
+> @@ -38,6 +43,9 @@ Required properties:
+>   	"marvell,dove-core-clock" - for Dove SoC core clocks
+>   	"marvell,kirkwood-core-clock" - for Kirkwood SoC (except mv88f6180)
+>   	"marvell,mv88f6180-core-clock" - for Kirkwood MV88f6180 SoC
+> +	"marvell,mv88f5182-core-clock" - for Orion MV88F5182 SoC
 
-C++ style comments are prevalent in arch/arm64/kernel/head.S. I've followed the
-code style written previously.
+Do you know how different 5182 and 5182L are? In the pinctrl driver
+there was an additional L at the end, here it is missing.
 
-You can see this change in the commit, ea8c2e1124457f266f82effc3e6558552527943a).
-It's title is "arm64: Extend the idmap to the whole kernel image".
+The 5182 datasheet I am looking at, is titled "88F5182L Datasheet" but
+uses 88F5182 all over. Maybe we can drop the L entirely.
 
-> >  	create_pgd_entry x25, x0, x3, x5, x6
-> > +#ifdef CONFIG_ARM64_4_LEVELS
-> > +	add	x1, x0, #PAGE_SIZE
-> > +	create_pud_entry x0, x1, x3, x5, x6
-> > +#endif
-> >  	ldr	x6, =KERNEL_END
-> >  	mov	x5, x3				// __pa(KERNEL_START)
-> >  	add	x6, x6, x28			// __pa(KERNEL_END)
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	create_block_map x0, x7, x3, x5, x6
-> > +#else
-> > +	create_block_map x1, x7, x3, x5, x6
-> > +#endif
-> >
-> >  	/*
-> >  	 * Map the kernel image (starting with PHYS_OFFSET).
-> > @@ -456,9 +478,17 @@ __create_page_tables:
-> >  	add	x0, x26, #PAGE_SIZE		// section table address
-> >  	mov	x5, #PAGE_OFFSET
-> >  	create_pgd_entry x26, x0, x5, x3, x6
-> > +#ifdef CONFIG_ARM64_4_LEVELS
-> > +	add	x1, x0, #PAGE_SIZE
-> > +	create_pud_entry x0, x1, x3, x5, x6
-> > +#endif
-> >  	ldr	x6, =KERNEL_END
-> >  	mov	x3, x24				// phys offset
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	create_block_map x0, x7, x3, x5, x6
-> > +#else
-> > +	create_block_map x1, x7, x3, x5, x6
-> > +#endif
-> >
-> >  	/*
-> >  	 * Map the FDT blob (maximum 2MB; must be within 512MB of @@ -474,14
-> > +504,25 @@ __create_page_tables:
-> >  	add	x5, x5, x6			// __va(FDT blob)
-> >  	add	x6, x5, #1 << 21		// 2MB for the FDT blob
-> >  	sub	x6, x6, #1			// inclusive range
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	create_block_map x0, x7, x3, x5, x6
-> > +#else
-> > +	create_block_map x1, x7, x3, x5, x6
-> > +#endif
-> >  1:
-> >  	/*
-> >  	 * Create the pgd entry for the fixed mappings.
-> >  	 */
-> >  	ldr	x5, =FIXADDR_TOP		// Fixed mapping virtual address
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  	add	x0, x26, #2 * PAGE_SIZE		// section table address
-> >  	create_pgd_entry x26, x0, x5, x6, x7
-> > +#else
-> > +	add	x0, x26, #PAGE_SIZE
-> > +	create_pgd_entry x26, x0, x5, x6, x7
-> > +	add	x1, x0, #2 * PAGE_SIZE
-> > +	create_pud_entry x0, x1, x5, x6, x7
-> > +#endif
-> >
-> >  	/*
-> >  	 * Since the page tables have been populated with non-cacheable
-> 
-> What tree is this series based on?
+> +	"marvell,mv88f5281-core-clock" - for Orion MV88F5281 SoC
+> +	"marvell,mv88f6183-core-clock" - for Orion MV88F6183 SoC
+>   - reg : shall be the register address of the Sample-At-Reset (SAR) register
+>   - #clock-cells : from common clock binding; shall be set to 1
+[...]
+> diff --git a/drivers/clk/mvebu/orion.c b/drivers/clk/mvebu/orion.c
+> new file mode 100644
+> index 0000000..005aa2f
+> --- /dev/null
+> +++ b/drivers/clk/mvebu/orion.c
+> @@ -0,0 +1,212 @@
+> +/*
+> + * Marvell Orion SoC clocks
+> + *
+> + * Copyright (C) 2014 Thomas Petazzoni
+> + *
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include "common.h"
+> +
+> +static const struct coreclk_ratio orion_coreclk_ratios[] __initconst = {
+> +	{ .id = 0, .name = "ddrclk", }
+> +};
+> +
+> +/*
+> + * Orion 5182
+> + */
+> +
+> +#define SAR_MV88F5182_TCLK_FREQ      0x8
 
-This series is based on 3.15-rc1.
+nit: as this is a shift, I'd use decimal values.
 
-Thanks
-Jungseok Lee
+> +#define SAR_MV88F5182_TCLK_FREQ_MASK 0x3
+> +
+> +static u32 __init mv88f5182_get_tclk_freq(void __iomem *sar)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F5182_TCLK_FREQ) &
+> +		SAR_MV88F5182_TCLK_FREQ_MASK;
+> +	if (opt == 1)
+> +		return 150000000;
+> +	else if (opt == 2)
+> +		return 166666667;
+> +	else
+> +		return 0;
+> +}
+> +
+> +#define SAR_MV88F5182_CPU_FREQ       0x4
+
+ditto.
+
+> +#define SAR_MV88F5182_CPU_FREQ_MASK  0xf
+> +
+> +static u32 __init mv88f5182_get_cpu_freq(void __iomem *sar)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F5182_CPU_FREQ) &
+> +		SAR_MV88F5182_CPU_FREQ_MASK;
+> +	if (opt == 0)
+> +		return 333333333;
+> +	else if (opt == 1)
+> +		return 400000000;
+> +	else if (opt == 2)
+> +		return 400000000;
+
+join the two above...
+
+> +	else if (opt == 3)
+> +		return 500000000;
+> +	else
+> +		return 0;
+> +}
+> +
+> +static void __init mv88f5182_get_clk_ratio(void __iomem *sar, int id,
+> +					   int *mult, int *div)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F5182_CPU_FREQ) &
+> +		SAR_MV88F5182_CPU_FREQ_MASK;
+> +	if (opt == 0 || opt == 1) {
+> +		*mult = 1;
+> +		*div  = 2;
+> +	} else if (opt == 2 || opt == 3) {
+> +		*mult = 1;
+> +		*div  = 3;
+
+.. like you did here.
+
+> +	} else {
+> +		*mult = 0;
+> +		*div  = 1;
+> +	}
+> +}
+> +
+> +static const struct coreclk_soc_desc mv88f5182_coreclks = {
+> +	.get_tclk_freq = mv88f5182_get_tclk_freq,
+> +	.get_cpu_freq = mv88f5182_get_cpu_freq,
+> +	.get_clk_ratio = mv88f5182_get_clk_ratio,
+> +	.ratios = orion_coreclk_ratios,
+> +	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
+> +};
+> +
+> +static void __init mv88f5182_clk_init(struct device_node *np)
+> +{
+> +	return mvebu_coreclk_setup(np, &mv88f5182_coreclks);
+> +}
+> +
+> +CLK_OF_DECLARE(mv88f5182_clk, "marvell,mv88f5182-core-clock", mv88f5182_clk_init);
+> +
+> +/*
+> + * Orion 5281
+> + */
+> +
+> +static u32 __init mv88f5281_get_tclk_freq(void __iomem *sar)
+> +{
+> +	/* On 5281, tclk is always 166 Mhz */
+> +	return 166666667;
+> +}
+> +
+> +#define SAR_MV88F5281_CPU_FREQ       0x4
+
+same nit for the hex/decimal value.
+
+> +#define SAR_MV88F5281_CPU_FREQ_MASK  0xf
+> +
+> +static u32 __init mv88f5281_get_cpu_freq(void __iomem *sar)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F5281_CPU_FREQ) &
+> +		SAR_MV88F5281_CPU_FREQ_MASK;
+> +	if (opt == 1 || opt == 2)
+> +		return 400000000;
+> +	else if (opt == 3)
+> +		return 500000000;
+> +	else
+> +		return 0;
+> +}
+> +
+> +static void __init mv88f5281_get_clk_ratio(void __iomem *sar, int id,
+> +					   int *mult, int *div)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F5281_CPU_FREQ) &
+> +		SAR_MV88F5281_CPU_FREQ_MASK;
+> +	if (opt == 1) {
+> +		*mult = 1;
+> +		*div = 2;
+> +	} else if (opt == 2 || opt == 3) {
+> +		*mult = 1;
+> +		*div = 3;
+> +	} else {
+> +		*mult = 0;
+> +		*div = 1;
+> +	}
+> +}
+> +
+> +static const struct coreclk_soc_desc mv88f5281_coreclks = {
+> +	.get_tclk_freq = mv88f5281_get_tclk_freq,
+> +	.get_cpu_freq = mv88f5281_get_cpu_freq,
+> +	.get_clk_ratio = mv88f5281_get_clk_ratio,
+> +	.ratios = orion_coreclk_ratios,
+> +	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
+> +};
+> +
+> +static void __init mv88f5281_clk_init(struct device_node *np)
+> +{
+> +	return mvebu_coreclk_setup(np, &mv88f5281_coreclks);
+> +}
+> +
+> +CLK_OF_DECLARE(mv88f5281_clk, "marvell,mv88f5281-core-clock", mv88f5281_clk_init);
+> +
+> +/*
+> + * Orion 6183
+> + */
+> +
+> +#define SAR_MV88F6183_TCLK_FREQ      0x9
+
+ditto.
+
+> +#define SAR_MV88F6183_TCLK_FREQ_MASK 0x1
+> +
+> +static u32 __init mv88f6183_get_tclk_freq(void __iomem *sar)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F6183_TCLK_FREQ) &
+> +		SAR_MV88F6183_TCLK_FREQ_MASK;
+> +	if (opt == 0)
+> +		return 133333333;
+> +	else if (opt == 1)
+> +		return 166666667;
+> +	else
+> +		return 0;
+> +}
+> +
+> +#define SAR_MV88F6183_CPU_FREQ       0x1
+
+ditto.
+
+Besides the dt-include and nits,
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+> +#define SAR_MV88F6183_CPU_FREQ_MASK  0x3f
+> +
+> +static u32 __init mv88f6183_get_cpu_freq(void __iomem *sar)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F6183_CPU_FREQ) &
+> +		SAR_MV88F6183_CPU_FREQ_MASK;
+> +	if (opt == 9)
+> +		return 333333333;
+> +	else if (opt == 17)
+> +		return 400000000;
+> +	else
+> +		return 0;
+> +}
+> +
+> +static void __init mv88f6183_get_clk_ratio(void __iomem *sar, int id,
+> +					   int *mult, int *div)
+> +{
+> +	u32 opt = (readl(sar) >> SAR_MV88F6183_CPU_FREQ) &
+> +		SAR_MV88F6183_CPU_FREQ_MASK;
+> +	if (opt == 9 || opt == 17) {
+> +		*mult = 1;
+> +		*div  = 2;
+> +	} else {
+> +		*mult = 0;
+> +		*div  = 1;
+> +	}
+> +}
+> +
+> +static const struct coreclk_soc_desc mv88f6183_coreclks = {
+> +	.get_tclk_freq = mv88f6183_get_tclk_freq,
+> +	.get_cpu_freq = mv88f6183_get_cpu_freq,
+> +	.get_clk_ratio = mv88f6183_get_clk_ratio,
+> +	.ratios = orion_coreclk_ratios,
+> +	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
+> +};
+> +
+> +
+> +static void __init mv88f6183_clk_init(struct device_node *np)
+> +{
+> +	return mvebu_coreclk_setup(np, &mv88f6183_coreclks);
+> +}
+> +
+> +CLK_OF_DECLARE(mv88f6183_clk, "marvell,mv88f6183-core-clock", mv88f6183_clk_init);
+>
