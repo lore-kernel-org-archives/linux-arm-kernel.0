@@ -1,63 +1,255 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 14 Apr 2014 12:03:09 -0400 (EDT)
-Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
-In-Reply-To: <20140414111237.GB3844@e103592.cambridge.arm.com>
-References: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
- <20140414111237.GB3844@e103592.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1404141201130.980@knanqh.ubzr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 14 Apr 2014 17:11:47 +0100
+Subject: [PATCH 8/8] arm64: KVM: Implement 4 levels of translation tables
+ for HYP and stage2
+In-Reply-To: <000601cf57b4$e93b9680$bbb2c380$@samsung.com>
+References: <000601cf57b4$e93b9680$bbb2c380$@samsung.com>
+Message-ID: <534C08C3.1080705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Apr 2014, Dave Martin wrote:
-
-> On Fri, Apr 11, 2014 at 06:16:24PM +0800, Lu Xiangyu wrote:
-> > From: Xiangyu Lu <luxiangyu@huawei.com>
-> > 
-> > In big-endian systems, "%1" get the most significant part of the value, cause
-> > the instruction to get the wrong result.
-> > 
-> > When viewing ftrace record in big-endian ARM systems, we found that
-> > the timestamp errors:
-> > 
-> > swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
-> > events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
-> > swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
-> > swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
-> > swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
-> > swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
-> > 
-> > When viewed ftrace records, it will call the do_div(n, base) function, which
-> > achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
-> > do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
-> > 
-> > Cc: <stable@vger.kernel.org> # 2.6.20+
-> > Signed-off-by: Alex Wu <wuquanming@huawei.com>
-> > Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
-> > ---
-> >  arch/arm/include/asm/div64.h |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> > index 191ada6..662c7bd 100644
-> > --- a/arch/arm/include/asm/div64.h
-> > +++ b/arch/arm/include/asm/div64.h
-> > @@ -156,7 +156,7 @@
-> >  		/* Select the best insn combination to perform the   */	\
-> >  		/* actual __m * __n / (__p << 64) operation.         */	\
-> >  		if (!__c) {						\
-> > -			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
-> > +			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
+On 14/04/14 08:41, Jungseok Lee wrote:
+> This patch adds 4 levels of translation tables implementation for both
+> HYP and stage2. A combination of 4KB + 4 levels host and 4KB + 4 levels
+> guest can run on ARMv8 architecture as introducing this feature.
 > 
-> This looks plausible: these if() clauses are all concerned with
-> multiplying the low parts of __m and __n together, and this seems
-> to be the only 64-bit asm operand reference where Q or R is suspiciously
-> missing: so it looks likely that "Q" is required here for consistency.
+> Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+> Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+> ---
+>  arch/arm/kvm/mmu.c               |   96 +++++++++++++++++++++++++++++++++-----
+>  arch/arm64/include/asm/kvm_arm.h |   20 ++++++++
+>  arch/arm64/include/asm/kvm_mmu.h |    1 +
+>  3 files changed, 106 insertions(+), 11 deletions(-)
 > 
-> My understanding of the details of this code are limited: do you have
-> a simple test case to demonstrate the error and the fix?
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index e0d4f24..6cf89ad 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -388,13 +388,46 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+>  	return 0;
+>  }
+>  
+> +static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
+> +				   unsigned long end, unsigned long pfn,
+> +				   pgprot_t prot)
+> +{
+> +	pud_t *pud;
+> +	pmd_t *pmd;
+> +	unsigned long addr, next;
+> +
+> +	addr = start;
+> +	do {
+> +		pud = pud_offset(pgd, addr);
+> +
+> +		if (pud_none_or_clear_bad(pud)) {
+> +			pmd = pmd_alloc_one(NULL, addr);
+> +			if (!pmd) {
+> +				kvm_err("Cannot allocate Hyp pmd\n");
+> +				return -ENOMEM;
+> +			}
+> +			pud_populate(NULL, pud, pmd);
+> +			get_page(virt_to_page(pud));
+> +			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+> +		}
+> +
+> +		next = pud_addr_end(addr, end);
+> +
+> +		create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
+> +		pfn += (next - addr) >> PAGE_SHIFT;
+> +	} while (addr = next, addr != end);
+> +
+> +	return 0;
+> +}
+> +
+>  static int __create_hyp_mappings(pgd_t *pgdp,
+>  				 unsigned long start, unsigned long end,
+>  				 unsigned long pfn, pgprot_t prot)
+>  {
+>  	pgd_t *pgd;
+> +#ifdef CONFIG_ARM64_4_LEVELS
+>  	pud_t *pud;
+> -	pmd_t *pmd;
+> +#endif
+>  	unsigned long addr, next;
+>  	int err = 0;
+>  
+> @@ -403,22 +436,25 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+>  	end = PAGE_ALIGN(end);
+>  	do {
+>  		pgd = pgdp + pgd_index(addr);
+> -		pud = pud_offset(pgd, addr);
+>  
+> -		if (pud_none_or_clear_bad(pud)) {
+> -			pmd = pmd_alloc_one(NULL, addr);
+> -			if (!pmd) {
+> -				kvm_err("Cannot allocate Hyp pmd\n");
+> +#ifdef CONFIG_ARM64_4_LEVELS
+> +		if (pgd_none(*pgd)) {
+> +			pud = pud_alloc_one(NULL, addr);
+> +			if (!pud) {
+> +				kvm_err("Cannot allocate Hyp pud\n");
+>  				err = -ENOMEM;
+>  				goto out;
+>  			}
+> -			pud_populate(NULL, pud, pmd);
+> -			get_page(virt_to_page(pud));
+> -			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+> +			pgd_populate(NULL, pgd, pud);
+> +			get_page(virt_to_page(pgd));
+> +			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+>  		}
+> +#endif
 
-No need -- it is indeed wrong on big endian and has been so for the last 
-7.5 years.
+Why do you need all these #ifdefs? The page table code should be able to
+cope with all the variations of presence/absence of pud/pmd (see how
+there is no code difference between 4kB (3 levels) and 64kB (2 levels)).
 
+>  		next = pgd_addr_end(addr, end);
+> -		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
+> +
+> +		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
+> +
+>  		if (err)
+>  			goto out;
+>  		pfn += (next - addr) >> PAGE_SHIFT;
+> @@ -563,6 +599,26 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>  	kvm->arch.pgd = NULL;
+>  }
+>  
+> +#ifdef CONFIG_ARM64_4_LEVELS
+> +static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache
+> +			     *cache, phys_addr_t addr)
+> +{
+> +	pgd_t *pgd;
+> +	pud_t *pud;
+> +
+> +	pgd = kvm->arch.pgd + pgd_index(addr);
+> +	if (pgd_none(*pgd)) {
+> +		if (!cache)
+> +			return NULL;
+> +		pud = mmu_memory_cache_alloc(cache);
+> +		pgd_populate(NULL, pgd, pud);
+> +		get_page(virt_to_page(pgd));
+> +	}
+> +
+> +	return pud_offset(pgd, addr);
+> +}
+> +#endif
 
-Nicolas
+Same here.
+
+>  static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache
+>  			     *cache, phys_addr_t addr)
+>  {
+> @@ -617,6 +673,24 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>  	pmd_t *pmd;
+>  	pte_t *pte, old_pte;
+>  
+> +#ifdef CONFIG_ARM64_4_LEVELS
+> +	pud_t *pud;
+> +
+> +	/* Create stage-2 page table mapping - Level 0 */
+> +	pud = stage2_get_pud(kvm, cache, addr);
+> +	if (!pud)
+> +		return 0;
+> +
+> +	if (pud_none(*pud)) {
+> +		if (!cache)
+> +			return 0;
+> +		pmd = mmu_memory_cache_alloc(cache);
+> +		kvm_clean_pmd(pmd);
+> +		pud_populate(NULL, pud, pmd);
+> +		get_page(virt_to_page(pud));
+> +	}
+> +#endif
+> +
+
+And here.
+
+>  	/* Create stage-2 page table mapping - Level 1 */
+>  	pmd = stage2_get_pmd(kvm, cache, addr);
+>  	if (!pmd) {
+> @@ -675,7 +749,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>  	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+>  		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+>  
+> -		ret = mmu_topup_memory_cache(&cache, 2, 2);
+> +		ret = mmu_topup_memory_cache(&cache, 3, 3);
+
+It would be good to make this depend of the number of levels we're
+actually using (2, 3 or 4).
+
+>  		if (ret)
+>  			goto out;
+>  		spin_lock(&kvm->mmu_lock);
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 3d69030..295eda6 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -117,9 +117,11 @@
+>  #define VTCR_EL2_IRGN0_MASK	(3 << 8)
+>  #define VTCR_EL2_IRGN0_WBWA	(1 << 8)
+>  #define VTCR_EL2_SL0_MASK	(3 << 6)
+> +#define VTCR_EL2_SL0_LVL0	(2 << 6)
+>  #define VTCR_EL2_SL0_LVL1	(1 << 6)
+>  #define VTCR_EL2_T0SZ_MASK	0x3f
+>  #define VTCR_EL2_T0SZ_40B	24
+> +#define VTCR_EL2_T0SZ_48B	16
+>  
+>  #ifdef CONFIG_ARM64_64K_PAGES
+>  /*
+> @@ -134,6 +136,7 @@
+>  				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+>  #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
+>  #else
+> +#ifndef CONFIG_ARM64_4_LEVELS
+>  /*
+>   * Stage2 translation configuration:
+>   * 40bits output (PS = 2)
+> @@ -145,10 +148,27 @@
+>  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+>  				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+>  #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
+> +#else
+> +/*
+> + * Stage2 translation configuration:
+> + * 40bits output (PS = 2)
+> + * 48bits input  (T0SZ = 16)
+> + * 4kB pages (TG0 = 0)
+> + * 4 level page tables (SL = 2)
+> + */
+> +#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+> +				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> +				 VTCR_EL2_SL0_LVL0 | VTCR_EL2_T0SZ_48B)
+> +#define VTTBR_X		(29 - VTCR_EL2_T0SZ_48B)
+> +#endif
+>  #endif
+>  
+>  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+> +#ifndef CONFIG_ARM64_4_LEVELS
+>  #define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+> +#else
+> +#define VTTBR_BADDR_MASK  (((1LLU << (48 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+> +#endif
+>  #define VTTBR_VMID_SHIFT  (48LLU)
+>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+>  
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 7d29847..ec76cf3 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -107,6 +107,7 @@ static inline bool kvm_is_write_fault(unsigned long esr)
+>  }
+>  
+>  static inline void kvm_clean_pgd(pgd_t *pgd) {}
+> +static inline void kvm_clean_pmd(pud_t *pud) {}
+>  static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+>  static inline void kvm_clean_pte(pte_t *pte) {}
+>  static inline void kvm_clean_pte_entry(pte_t *pte) {}
+> 
+
+You'll need to add the 32bit ARM equivalent once you've removed the #ifdefs.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
