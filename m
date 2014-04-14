@@ -1,57 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:54:08 +0200
-Subject: [PATCH v3 11/11] ARM: mvebu: add SMP support in the Armada 38x device
+Date: Mon, 14 Apr 2014 15:54:07 +0200
+Subject: [PATCH v3 10/11] ARM: mvebu: add SMP support in the Armada 375 device
  tree
 In-Reply-To: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483648-26611-12-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483648-26611-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit improves the Armada 38x Device Tree to add the CPU reset
-and PMSU Device Tree nodes as well as the declaration of the enabling
-method for the CPUs. These are needed to get SMP working on Armada 38x
-platforms.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
+Improve the Armada 375 Device Tree to add the CPU reset Device Tree
+node and declare the enabling method for CPUs, both of which are
+necessary to get SMP working.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-380.dtsi |  2 ++
- arch/arm/boot/dts/armada-385.dtsi |  2 ++
- arch/arm/boot/dts/armada-38x.dtsi | 10 ++++++++++
- 3 files changed, 14 insertions(+)
+ arch/arm/boot/dts/armada-375.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
-index 068031f..aa71718 100644
---- a/arch/arm/boot/dts/armada-380.dtsi
-+++ b/arch/arm/boot/dts/armada-380.dtsi
-@@ -21,6 +21,8 @@
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index eceab89..64985c2 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -39,6 +39,8 @@
  	cpus {
  		#address-cells = <1>;
  		#size-cells = <0>;
-+		enable-method = "marvell,armada-380-smp";
++		enable-method = "marvell,armada-375-smp";
 +
  		cpu at 0 {
  			device_type = "cpu";
  			compatible = "arm,cortex-a9";
-diff --git a/arch/arm/boot/dts/armada-385.dtsi b/arch/arm/boot/dts/armada-385.dtsi
-index e2919f0..2c7990d 100644
---- a/arch/arm/boot/dts/armada-385.dtsi
-+++ b/arch/arm/boot/dts/armada-385.dtsi
-@@ -21,6 +21,8 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "marvell,armada-380-smp";
-+
- 		cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index d28fbc2..4742915 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -272,11 +272,21 @@
- 				clock-names = "nbclk", "fixed";
+@@ -325,6 +327,11 @@
+ 				clocks = <&coreclk 0>;
  			};
  
 +			cpurst at 20800 {
@@ -60,17 +43,7 @@ index d28fbc2..4742915 100644
 +			};
 +
  			coherency-fabric at 21010 {
- 				compatible = "marvell,armada-380-coherency-fabric";
+ 				compatible = "marvell,armada-375-coherency-fabric";
  				reg = <0x21010 0x1c>;
- 			};
- 
-+			pmsu at 22000 {
-+				compatible = "marvell,armada-380-pmsu";
-+				reg = <0x22000 0x1000>;
-+			};
-+
- 			eth1: ethernet at 30000 {
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0x30000 0x4000>;
 -- 
 1.8.3.2
