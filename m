@@ -1,81 +1,32 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 14 Apr 2014 17:21:07 +0200
-Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
-In-Reply-To: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140414152107.GD22546@lunn.ch>
+Date: Mon, 14 Apr 2014 17:24:02 +0200
+Subject: [PATCH v2 0/3] ARM: mvebu: enable SDHCI interface on Armada 38x
+In-Reply-To: <1397486478-16991-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397486478-16991-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140414152402.GE22546@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 04:34:10PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On Mon, Apr 14, 2014 at 04:41:15PM +0200, Thomas Petazzoni wrote:
+> Jason, Gregory, Andrew, Sebastian,
 > 
-> The Marvell Armada 38x ARM processors use an AHCI compatible interface
-> for SATA (in replacement of the Marvell-specific SATA interface,
-> handled by the sata_mv driver). However, like all DMA-capable Marvell
-> interfaces, some specific MBus window configuration must be done, so a
-> small specific glue layer is needed, which relies on the recently
-> introduced libahci_platform.c.
+> Here is a small set of patches that enable the SDHCI interface on
+> Armada 38x. The first one adds the DT details, the second and third
+> ones adjusts the appropriate defconfigs to include the relevant
+> driver.
+> 
+> The sdhci-pxav3 driver change has been taken by the MMC maintainer
+> Chris Ball, and is already in 3.15-rc1.
 > 
 > Changes since v1:
 > 
->  * Rebased on top of v3.15-rc1
+>  * Rebased on top of v3.15-rc1.
 > 
->  * Added a preliminary patch that orders alphabetically the list of
->    compatible strings in the DT binding document
->    ahci-platform.txt. Suggested by Andrew Lunn.
-> 
->  * Made the availability of MBus DRAM window informations
->    mandatory. Suggested by Andrew Lunn.
-> 
->  * Fixed the module alias name. Suggested by Bartlomiej
->    Zolnierkiewicz.
+>  * Split in two commits the defconfig changes, so that the
+>    multi_v7_defconfig change can be directly taken by the arm-soc
+>    maintainers.
+
 
 Acked-by: Andrew Lunn <andrew@lunn.ch>
 
 	  Andrew
-
-
-> 
-> Details of the patches:
-> 
->  * The first patch is a DT binding documentation cleanup. I believe it
->    should be taken by the ATA maintainer, because the second patch
->    (driver patch) depends on it.
-> 
->  * The second patch of this series contains the driver itself, which
->    is fairly straight-forward. It should be taken by Tejun Heo as the
->    ATA maintainer.
-> 
->  * The last three patches add the Device Tree and defconfig
->    changes. They should be taken by the respective ARM maintainers
->    (mvebu maintainers for the DT and mvebu_v7_defconfig, and arm-soc
->    maintainers for the multi_v7_defconfig change).
-> 
-> Thanks!
-> 
-> Thomas
-> 
-> Thomas Petazzoni (5):
->   Documentation: dt-bindings: reformat and order list of ahci-platform
->     compatibles
->   ata: ahci_mvebu: new driver for Marvell Armada 380 AHCI interfaces
->   ARM: mvebu: add Device Tree description of AHCI interfaces on Armada
->     38x
->   ARM: configs: add ahci_mvebu to mvebu_v7_defconfig
->   ARM: configs: add ahci_mvebu to multi_v7_defconfig
-> 
->  .../devicetree/bindings/ata/ahci-platform.txt      |  13 ++-
->  arch/arm/boot/dts/armada-385-db.dts                |   8 ++
->  arch/arm/boot/dts/armada-38x.dtsi                  |  16 +++
->  arch/arm/configs/multi_v7_defconfig                |   1 +
->  arch/arm/configs/mvebu_v7_defconfig                |   1 +
->  drivers/ata/Kconfig                                |   9 ++
->  drivers/ata/Makefile                               |   1 +
->  drivers/ata/ahci_mvebu.c                           | 107 +++++++++++++++++++++
->  8 files changed, 152 insertions(+), 4 deletions(-)
->  create mode 100644 drivers/ata/ahci_mvebu.c
-> 
-> -- 
-> 1.8.3.2
-> 
