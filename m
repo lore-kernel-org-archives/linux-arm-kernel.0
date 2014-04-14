@@ -1,45 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Apr 2014 07:38:55 +0900
-Subject: [PATCH v2 5/6] ARM: shmobile: r8a7740: drop address cells from
- GIC node
-In-Reply-To: <1397485098-19198-5-git-send-email-l.stach@pengutronix.de>
-References: <1397485098-19198-1-git-send-email-l.stach@pengutronix.de>
- <1397485098-19198-5-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140414223855.GB22518@verge.net.au>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 15 Apr 2014 00:47:11 +0200
+Subject: Device tree support for Atmel AC97 controller on AT91SAM9263
+In-Reply-To: <2216396.r6UFNn5RuG@kongar>
+References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+ <s5h38hgnvz5.wl%tiwai@suse.de> <2216396.r6UFNn5RuG@kongar>
+Message-ID: <20140414224710.GX2967@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 04:18:17PM +0200, Lucas Stach wrote:
-> This is likely a copy-and-paste error from the
-> ARM GIC documentation, that has already been fixed.
+On 14/04/2014 at 20:43:02 +0200, Alexander Stein wrote :
+> Hello Takashi,
 > 
-> address-cells should have been set to 0, as with the size
-> cells. As having those properties set to 0 is the
-> same thing as not specifying them, drop them completely.
+> On Monday 14 April 2014, 10:42:06 wrote Takashi Iwai:
+> > At Sat, 12 Apr 2014 11:08:23 +0200,
+> > Alexander Stein wrote:
+> > > 
+> > > This set of patches add device tree support for the AC97 controller found
+> > > on AT91SAM9263.
+> > > The first two patches are minor cleanup, while the last ones add the 
+> actual
+> > > support.
+> > 
+> > Do you really need work on this driver?  The sound/atmel/* stuff is an
+> > old one before ASoC was introduced, mostly obsoleted nowadays.
+> 
+> Ah, ok. I wasn't aware of that. But is there a replacement for the ac97c 
+> driver? All I found in sound/soc/atmel is using the SSC peripheral. Not 
+> something I can use.
 
-Thanks, I have queued this up as a fix for v3.15.
+I guess what Takashi wanted to say was: shouldn't we rewrite the driver
+completely to take advantage of the ASoC infrastructure ?
 
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> v2: split patch, added ack
-> ---
->  arch/arm/boot/dts/r8a7740.dtsi | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 8280884bfa59..2551e9438d35 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -28,7 +28,6 @@
->  	gic: interrupt-controller at c2800000 {
->  		compatible = "arm,cortex-a9-gic";
->  		#interrupt-cells = <3>;
-> -		#address-cells = <1>;
->  		interrupt-controller;
->  		reg = <0xc2800000 0x1000>,
->  		      <0xc2000000 0x1000>;
-> -- 
-> 1.9.1
-> 
+I'm actually quite interesting in getting it to work as this is the la
+peripheral that doesn't have DT support on the SAM9RL.
+
+I'll make some comments on your patches but I'm not sure whether we
+should keep that driver or move to ASoC. Maybe that could be an
+intermediate step. I'll try to have a look this week.
+
+Thank you for your work !
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
