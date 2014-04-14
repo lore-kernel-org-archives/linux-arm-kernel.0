@@ -1,194 +1,46 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 14 Apr 2014 17:31:15 -0500
-Subject: [PATCH v2 1/4] reset: add driver for socfpga
-In-Reply-To: <1397118063-21619-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1397118063-21619-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <534C61B3.9020504@gmail.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Mon, 14 Apr 2014 15:37:58 -0700
+Subject: [PATCH v9 1/2] ARM: avoid tracers in soft_restart
+In-Reply-To: <20140414105314.GB3530@arm.com>
+References: <1395178858-27343-1-git-send-email-sebastian.capella@linaro.org>
+ <1395178858-27343-2-git-send-email-sebastian.capella@linaro.org>
+ <20140414105314.GB3530@arm.com>
+Message-ID: <CADHgK6vY4tzb3fJRZyTDZ=e7e9sEhDDc5_ja28qna-AhXwaFEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
+On 14 April 2014 03:53, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Mar 18, 2014 at 09:40:57PM +0000, Sebastian Capella wrote:
+>> Use of tracers in local_irq_disable is causes abort loops when called
+>> with irqs disabled using a temporary stack.  Replace local_irq_disable
+>> with raw_local_irq_disable instead to avoid tracers.
+>
+> Do you have any more information about these aborts? At the time we call
+> local_irq_disable, the stack is still intact, so if the issue is simply
+> related to having any tracers active at the call_with_stack invocation, we'd
+> be better off disabling tracing here altogether.
 
-On 04/10/2014 03:21 AM, Steffen Trumtrar wrote:
-> Add a reset-controller driver for the socfpga platform.
-> The reset-controller has four banks with up to 32 entries all encapsulated in
-> one module block.
->
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
-> Changes since v1:
-> 	- use BITS_PER_LONG everywhere instead of MAX_BANK_WIDTH
-> 	- print pdev->dev.of_node->full_name on error
-> 	- use proper IS_ERR/PTR_ERR
->
->   drivers/reset/Makefile        |   1 +
->   drivers/reset/reset-socfpga.c | 147 ++++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 148 insertions(+)
->   create mode 100644 drivers/reset/reset-socfpga.c
->
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index cc29832..ab64077 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -1,2 +1,3 @@
->   obj-$(CONFIG_RESET_CONTROLLER) += core.o
->   obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
-> +obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
-> diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
-> new file mode 100644
-> index 0000000..bdcd2fa
-> --- /dev/null
-> +++ b/drivers/reset/reset-socfpga.c
-> @@ -0,0 +1,147 @@
-> +/*
-> + * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> + *
-> + * based on
-> + * Allwinner SoCs Reset Controller driver
-> + *
-> + * Copyright 2013 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/types.h>
-> +
-> +#define NR_BANKS		4
-> +#define OFFSET_MODRST		0x10
-> +
-> +struct socfpga_reset_data {
-> +	spinlock_t			lock;
-> +	void __iomem			*membase;
-> +	struct reset_controller_dev	rcdev;
-> +};
-> +
-> +static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-> +{
-> +	struct socfpga_reset_data *data = container_of(rcdev,
-> +						     struct socfpga_reset_data,
-> +						     rcdev);
-> +	int bank = id / BITS_PER_LONG;
-> +	int offset = id % BITS_PER_LONG;
-> +	unsigned long flags;
-> +	u32 reg;
-> +
-> +	spin_lock_irqsave(&data->lock, flags);
-> +
-> +	reg = readl(data->membase + OFFSET_MODRST + (bank * NR_BANKS));
-> +	writel(reg | BIT(offset), data->membase + OFFSET_MODRST +
-> +				 (bank * NR_BANKS));
-> +	spin_unlock_irqrestore(&data->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
-> +				  unsigned long id)
-> +{
-> +	struct socfpga_reset_data *data = container_of(rcdev,
-> +						     struct socfpga_reset_data,
-> +						     rcdev);
-> +
-> +	int bank = id / BITS_PER_LONG;
-> +	int offset = id % BITS_PER_LONG;
-> +	unsigned long flags;
-> +	u32 reg;
-> +
-> +	spin_lock_irqsave(&data->lock, flags);
-> +
-> +	reg = readl(data->membase + OFFSET_MODRST + (bank * NR_BANKS));
-> +	writel(reg & ~BIT(offset), data->membase + OFFSET_MODRST +
-> +				  (bank * NR_BANKS));
-> +
-> +	spin_unlock_irqrestore(&data->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct reset_control_ops socfpga_reset_ops = {
-> +	.assert		= socfpga_reset_assert,
-> +	.deassert	= socfpga_reset_deassert,
-> +};
-> +
-> +static int socfpga_reset_probe(struct platform_device *pdev)
-> +{
-> +	struct socfpga_reset_data *data;
-> +	struct resource *res;
-> +	int ret;
+This is specifically for when soft_restart is called in the
+hibernation path with tracers enabled.  At that point, we've already
+switched to a temporary stack, and when we call local_irq_disable,
+we'll see this:
 
-'ret' is not used in this function.
+In the local_irq_disable, it ends up calling trace_hardirqs_off
+(CONFIG_TRACE_IRQFLAGS_SUPPORT is enabled), which calls
+trace_hardirqs_off_caller which checks lockdep_recursion in the
+current task, but we've switched to a temporary stack with the
+call_with_stack, and get_current is returning NULL.  This
+triggers a data abort, which calls trace_hardirqs_off
+again and so on.
 
-Dinh
-> +
-> +	/*
-> +	 * The binding was mainlined without the required property.
-> +	 * Do not continue, when we encounter an old DT.
-> +	 */
-> +	if (!of_find_property(pdev->dev.of_node, "#reset-cells", NULL)) {
-> +		dev_err(&pdev->dev, "%s missing #reset-cells property\n",
-> +			pdev->dev.of_node->full_name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->membase = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(data->membase))
-> +		return PTR_ERR(data->membase);
-> +
-> +	spin_lock_init(&data->lock);
-> +
-> +	data->rcdev.owner = THIS_MODULE;
-> +	data->rcdev.nr_resets = NR_BANKS * BITS_PER_LONG;
-> +	data->rcdev.ops = &socfpga_reset_ops;
-> +	data->rcdev.of_node = pdev->dev.of_node;
-> +	reset_controller_register(&data->rcdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int socfpga_reset_remove(struct platform_device *pdev)
-> +{
-> +	struct socfpga_reset_data *data = platform_get_drvdata(pdev);
-> +
-> +	reset_controller_unregister(&data->rcdev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id socfpga_reset_dt_ids[] = {
-> +	{ .compatible = "altr,rst-mgr", },
-> +	{ /* sentinel */ },
-> +};
-> +
-> +static struct platform_driver socfpga_reset_driver = {
-> +	.probe	= socfpga_reset_probe,
-> +	.remove	= socfpga_reset_remove,
-> +	.driver = {
-> +		.name		= "socfpga-reset",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= socfpga_reset_dt_ids,
-> +	},
-> +};
-> +module_platform_driver(socfpga_reset_driver);
-> +
-> +MODULE_AUTHOR("Steffen Trumtrar <s.trumtrar@pengutronix.de");
-> +MODULE_DESCRIPTION("Socfpga Reset Controller Driver");
-> +MODULE_LICENSE("GPL");
->
+We originally had a patch which added a soft restart called
+soft_restart_noirq which avoided the irq disable.
+
+You can see the discussion here:
+https://patchwork.kernel.org/patch/3677591/
+
+Thanks!
+
+Sebastian
