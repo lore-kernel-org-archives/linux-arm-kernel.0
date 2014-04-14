@@ -1,74 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Apr 2014 11:10:45 +0200
-Subject: [PATCH v2 03/12] ARM: hisi: add ARCH_HISI
-In-Reply-To: <CAD6h2NTsxDwULLfWqJ1H2GbFuMUnRAdZRvc-KePNk3jD8fVJ2g@mail.gmail.com>
-References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
- <5129577.hb5DDyBthd@wuerfel>
- <CAD6h2NTsxDwULLfWqJ1H2GbFuMUnRAdZRvc-KePNk3jD8fVJ2g@mail.gmail.com>
-Message-ID: <4602303.n32aAEEb8m@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 14 Apr 2014 11:10:03 +0200
+Subject: [PATCH 4/4] ARM: at91: move sam9x5 SoCs to the CCF
+In-Reply-To: <1397464994-27267-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397464994-27267-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397464994-27267-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140414091002.GR2967@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 April 2014 15:57:08 Haojian Zhuang wrote:
-> On 8 April 2014 19:13, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 08 April 2014 16:00:43 Haojian Zhuang wrote:
-> >> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-> >> index feee4db..da16efd 100644
-> >> --- a/arch/arm/mach-hisi/Kconfig
-> >> +++ b/arch/arm/mach-hisi/Kconfig
-> >> @@ -1,8 +1,16 @@
-> >> -config ARCH_HI3xxx
-> >> -       bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-> >> +config ARCH_HISI
-> >> +       bool "Hisilicon SoC Support"
-> >> +       depends on ARCH_MULTIPLATFORM
-> >>         select ARM_AMBA
-> >>         select ARM_GIC
-> >>         select ARM_TIMER_SP804
-> >> +
-> >> +if ARCH_HISI
-> >> +
-> >> +menu "Hisilicon platform type"
-> >> +
-> >> +config ARCH_HI3xxx
-> >> +       bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-> >>         select CACHE_L2X0
-> >>         select HAVE_ARM_SCU if SMP
-> >>         select HAVE_ARM_TWD if SMP
-> >> @@ -10,3 +18,7 @@ config ARCH_HI3xxx
-> >>         select PINCTRL_SINGLE
-> >>         help
-> >>           Support for Hisilicon Hi36xx/Hi37xx processor family
-> >> +
-> >> +endmenu
-> >
-> > On second thought: You don't actually have any sub-options under
-> > the main SoC specific option, so using 'menuconfig' as I suggested
-> > first makes no sense.
-> >
-> > Just leave ARCH_HI3xxx and ARCH_HIP04 as top-level options and
-> > drop this patch. There is no real need for a new menu here.
-> > That also means you can drop patch 9.
-> >
-> >         Arnd
+On 14/04/2014 at 10:43:14 +0200, Boris Brezillon wrote :
+> This patch removes the selection of AT91_USE_OLD_CLK when selecting
+> sam9x5 SoCs support. This will automatically enable COMMON_CLK_AT91 option
+> and add support for at91 common clk implementation.
 > 
-> Since they're two archs. In arch/arm/Kconfig, I have to write as below.
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/mach-at91/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> machine-$(CONFIG_ARCH_HI3xxx)            += mach-hisi
-> machine-$(CONFIG_ARCH_HIP04)             += mach-hisi
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index a1ac430..45b55e0 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -167,7 +167,6 @@ config SOC_AT91SAM9X5
+>  	select HAVE_AT91_DBGU0
+>  	select HAVE_FB_ATMEL
+>  	select SOC_AT91SAM9
+> -	select AT91_USE_OLD_CLK
+>  	select HAVE_AT91_UTMI
+>  	select HAVE_AT91_SMD
+>  	select HAVE_AT91_USB_CLK
+> -- 
+> 1.8.3.2
 > 
-> Then mach-hisi is duplicated in Kconfig. I'll get build error in below.
-> 
-> Makefile:877: target `arch/arm/mach-hisi' given more than once in the same rule.
 
-Ah, you are right.
-
-You can use a top-level option then, but please use 'menuconfig for it'
-Alternatively, you could make ARCH_HISI a hidden symbol like
-
-config ARCH_HISI
-	def_bool ARCH_HI3xxx || ARCH_HIP04
-
-and use that one in the Makefile.
-
-	Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
