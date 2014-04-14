@@ -1,96 +1,170 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Apr 2014 12:14:34 +0100
-Subject: [PATCH v2] ARM: mm: support big-endian page tables
-In-Reply-To: <20140414104300.GA3530@arm.com>
-References: <5301B4AF.1040305@huawei.com> <5327F75F.1010406@huawei.com>
- <20140414104300.GA3530@arm.com>
-Message-ID: <534BC31A.7060705@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 14 Apr 2014 13:14:56 +0200
+Subject: [PATCH 23/29] ARM: orion5x: use DT to describe NOR on edmini_v2
+In-Reply-To: <1397400006-4315-24-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-24-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BC330.90206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/14 11:43, Will Deacon wrote:
-> (catching up on old email)
-> 
-> On Tue, Mar 18, 2014 at 07:35:59AM +0000, Jianguo Wu wrote:
->> Cloud you please take a look at this?
-> 
-> [...]
-> 
->> On 2014/2/17 15:05, Jianguo Wu wrote:
->>> When enable LPAE and big-endian in a hisilicon board, while specify
->>> mem=384M mem=512M at 7680M, will get bad page state:
->>>
->>> Freeing unused kernel memory: 180K (c0466000 - c0493000)
->>> BUG: Bad page state in process init  pfn:fa442
->>> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
->>> page flags: 0x40000400(reserved)
->>> Modules linked in:
->>> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
->>> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
->>> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
->>> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
->>> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
->>> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
->>> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
->>> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
->>> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
->>> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
-> 
-> [...]
-> 
->>> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
->>> when pte is 64-bit, for little-endian, will store low 32-bit in r2,
->>> high 32-bit in r3; for big-endian, will store low 32-bit in r3,
->>> high 32-bit in r2, this will cause wrong pfn stored in pte,
->>> so we should exchange r2 and r3 for big-endian.
-> 
-> I believe that Marc (added to CC) has been running LPAE-enabled, big-endian
-> KVM guests without any issues, so it seems unlikely that we're storing the
-> PTEs backwards. Can you check the configuration of SCTLR.EE?
+On 04/13/2014 04:40 PM, Thomas Petazzoni wrote:
+> This commit converts the already partially DT-converted edmini_v2
+> platform to use the Device Tree for NOR flash, using the Device Bus.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>   .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 46 +++++++++++++++-
+>   arch/arm/mach-orion5x/edmini_v2-setup.c            | 62 ----------------------
+>   2 files changed, 45 insertions(+), 63 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> index ff90b01..44cc36a 100644
+> --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+> @@ -27,7 +27,51 @@
+>
+>   	soc {
+>   		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
+> -			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>;
+> +			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
+> +			 <MBUS_ID(0x01, 0x0f) 0 0xfff80000 0x80000>;
+> +
+> +		devbus-bootcs {
 
-So, for the record:
+Node label reference?
 
-root at when-the-lie-s-so-big:~# cat /proc/cpuinfo 
-processor	: 0
-model name	: ARMv7 Processor rev 4 (v7b)
-Features	: swp half thumb fastmult vfp edsp thumbee neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
-CPU implementer	: 0x41
-CPU architecture: 7
-CPU variant	: 0x0
-CPU part	: 0xc07
-CPU revision	: 4
+> +			status = "okay";
+> +
+> +			/* Read parameters */
+> +			devbus,bus-width    = <8>;
+> +			devbus,turn-off-ps  = <90000>;
+> +			devbus,badr-skew-ps = <0>;
+> +			devbus,acc-first-ps = <186000>;
+> +			devbus,acc-next-ps  = <186000>;
+> +
+> +			/* Write parameters */
+> +			devbus,wr-high-ps  = <90000>;
+> +			devbus,wr-low-ps   = <90000>;
+> +			devbus,ale-wr-ps   = <90000>;
+> +
+> +			/*
+> +			 * Currently the MTD code does not recognize
+> +			 * the MX29LV400CBCT as a bottom-type
+> +			 * device. This could cause risks of
+> +			 * accidentally erasing critical flash
+> +			 * sectors. We thus define a single,
+> +			 * write-protected partition covering the
+> +			 * whole flash.  TODO: once the flash part
+> +			 * TOP/BOTTOM detection issue is sorted out in
+> +			 * the MTD code, break this into at least
+> +			 * three partitions: 'u-boot code', 'u-boot
+> +			 * environment' and 'whatever is left'.
+> +			 */
+> +			nor at 0 {
 
-processor	: 1
-model name	: ARMv7 Processor rev 4 (v7b)
-Features	: swp half thumb fastmult vfp edsp thumbee neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm 
-CPU implementer	: 0x41
-CPU architecture: 7
-CPU variant	: 0x0
-CPU part	: 0xc07
-CPU revision	: 4
+ePAPR suggests a generic node name. I talked to Olof on IRC, he prefers
+generic names all over. I confirmed that this means "flash" node name
+for both the controller _and_ the device.
 
-Hardware	: Dummy Virtual Machine
-Revision	: 0000
-Serial		: 0000000000000000
-root at when-the-lie-s-so-big:~# uname -a
-Linux when-the-lie-s-so-big 3.14.0+ #2465 SMP PREEMPT Tue Apr 8 13:05:11 BST 2014 armv7b GNU/Linux
+We have never been very strict about the node names, but if we add one,
+we should follow the suggestions.
 
-Now, looking at the patch, I think it makes some sense:
-- Depending on the endianness, we have to test the L_PTE_NONE in one 
-word on the other, and possibly clear L_PTE_VALID
-- Same for L_PTE_DIRTY, respectively setting L_PTE_RDONLY
+Sebastian
 
-The commit message looks wrong though, as it mention the PTE storage in 
-memory (which looks completely fine to me, and explain why I was able to
-boot a guest). As none of my guest RAM is above 4GB IPA, I didn't see 
-the corruption of bit 32 in the PTE (which should have been bit 0,
-corresponding to L_PTE_VALID).
-
-So, provided that the commit message is rewritten to match the what it does,
-I'm fine with that patch.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +				compatible = "cfi-flash";
+> +				reg = <0 0x80000>;
+> +				bank-width = <1>;
+> +		                #address-cells = <1>;
+> +				#size-cells = <1>;
+> +
+> +				partition at 0 {
+> +					label = "Full512Kb";
+> +					reg = <0 0x80000>;
+> +					read-only;
+> +				};
+> +			};
+> +		};
+>
+>   		internal-regs {
+>   			pinctrl at 10000 {
+> diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
+> index 2eebc0c..6bef2d5 100644
+> --- a/arch/arm/mach-orion5x/edmini_v2-setup.c
+> +++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
+> @@ -42,74 +42,12 @@
+>    * EDMINI_V2 Info
+>    ****************************************************************************/
+>
+> -/*
+> - * 512KB NOR flash Device bus boot chip select
+> - */
+> -
+> -#define EDMINI_V2_NOR_BOOT_BASE		0xfff80000
+> -#define EDMINI_V2_NOR_BOOT_SIZE		SZ_512K
+> -
+> -/*****************************************************************************
+> - * 512KB NOR Flash on BOOT Device
+> - ****************************************************************************/
+> -
+> -/*
+> - * Currently the MTD code does not recognize the MX29LV400CBCT as a bottom
+> - * -type device. This could cause risks of accidentally erasing critical
+> - * flash sectors. We thus define a single, write-protected partition covering
+> - * the whole flash.
+> - * TODO: once the flash part TOP/BOTTOM detection issue is sorted out in the MTD
+> - * code, break this into at least three partitions: 'u-boot code', 'u-boot
+> - * environment' and 'whatever is left'.
+> - */
+> -
+> -static struct mtd_partition edmini_v2_partitions[] = {
+> -	{
+> -		.name		= "Full512kb",
+> -		.size		= 0x00080000,
+> -		.offset		= 0x00000000,
+> -		.mask_flags	= MTD_WRITEABLE,
+> -	},
+> -};
+> -
+> -static struct physmap_flash_data edmini_v2_nor_flash_data = {
+> -	.width		= 1,
+> -	.parts		= edmini_v2_partitions,
+> -	.nr_parts	= ARRAY_SIZE(edmini_v2_partitions),
+> -};
+> -
+> -static struct resource edmini_v2_nor_flash_resource = {
+> -	.flags			= IORESOURCE_MEM,
+> -	.start			= EDMINI_V2_NOR_BOOT_BASE,
+> -	.end			= EDMINI_V2_NOR_BOOT_BASE
+> -		+ EDMINI_V2_NOR_BOOT_SIZE - 1,
+> -};
+> -
+> -static struct platform_device edmini_v2_nor_flash = {
+> -	.name			= "physmap-flash",
+> -	.id			= 0,
+> -	.dev		= {
+> -		.platform_data	= &edmini_v2_nor_flash_data,
+> -	},
+> -	.num_resources		= 1,
+> -	.resource		= &edmini_v2_nor_flash_resource,
+> -};
+> -
+>   /*****************************************************************************
+>    * General Setup
+>    ****************************************************************************/
+>
+>   void __init edmini_v2_init(void)
+>   {
+> -	/*
+> -	 * Configure peripherals.
+> -	 */
+> -	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
+> -				    ORION_MBUS_DEVBUS_BOOT_ATTR,
+> -				    EDMINI_V2_NOR_BOOT_BASE,
+> -				    EDMINI_V2_NOR_BOOT_SIZE);
+> -	platform_device_register(&edmini_v2_nor_flash);
+> -
+>   	pr_notice("edmini_v2: USB device port, flash write and power-off "
+>   		  "are not yet supported.\n");
+>   }
+>
