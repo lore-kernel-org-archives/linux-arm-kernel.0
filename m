@@ -1,60 +1,95 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Apr 2014 10:17:29 +0900
-Subject: [PATCH 6/6] ARM: dts: sh: drop address cells from GIC node
-In-Reply-To: <1397228380-7352-6-git-send-email-l.stach@pengutronix.de>
-References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
- <1397228380-7352-6-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140414011726.GA22411@verge.net.au>
+Date: Mon, 14 Apr 2014 10:20:13 +0900
+Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
+ generic_pm_domain_data
+In-Reply-To: <1397230004-22306-2-git-send-email-ulf.hansson@linaro.org>
+References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
+ <1397230004-22306-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140414012013.GB22411@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 04:59:40PM +0200, Lucas Stach wrote:
-> This is likely a copy-and-paste error from the
-> ARM GIC documentation, that has already been fixed.
+On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
+> There are no active users of these callbacks, thus there are no benefit
+> of trying to invoke them.
 > 
-> address-cells should have been set to 0, as with the size
-> cells. As having those properties set to 0 is the
-> same thing as not specifying them, drop them completely.
-
-Hi Lucas,
-
-Please split this patch into two, one for r8a7740 with the prefix
-ARM: shmobile: r8a7740:
-
-And one for sh73a0 with the prefix
-ARM: shmobile: sh73a0:
-
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->  arch/arm/boot/dts/r8a7740.dtsi | 1 -
->  arch/arm/boot/dts/sh73a0.dtsi  | 1 -
->  2 files changed, 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 8280884bfa59..2551e9438d35 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -28,7 +28,6 @@
->  	gic: interrupt-controller at c2800000 {
->  		compatible = "arm,cortex-a9-gic";
->  		#interrupt-cells = <3>;
-> -		#address-cells = <1>;
->  		interrupt-controller;
->  		reg = <0xc2800000 0x1000>,
->  		      <0xc2000000 0x1000>;
-> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> index b7bd3b9a6753..5ecf552e1c00 100644
-> --- a/arch/arm/boot/dts/sh73a0.dtsi
-> +++ b/arch/arm/boot/dts/sh73a0.dtsi
-> @@ -34,7 +34,6 @@
->  	gic: interrupt-controller at f0001000 {
->  		compatible = "arm,cortex-a9-gic";
->  		#interrupt-cells = <3>;
-> -		#address-cells = <1>;
->  		interrupt-controller;
->  		reg = <0xf0001000 0x1000>,
->  		      <0xf0000100 0x100>;
+> I am seeking ack from the SOC maintainers since this needs to go with the other
+> patches in this patchset on the PM core.
+
+In order to reduce the possibility of conflicts I would prefer
+to take this patch through my tree.
+
+> ---
+>  arch/arm/mach-shmobile/pm-rmobile.c |   38 +++--------------------------------
+>  1 file changed, 3 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+> index 1fc05d9..f710235 100644
+> --- a/arch/arm/mach-shmobile/pm-rmobile.c
+> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
+> @@ -99,39 +99,7 @@ static int rmobile_pd_power_up(struct generic_pm_domain *genpd)
+>  
+>  static bool rmobile_pd_active_wakeup(struct device *dev)
+>  {
+> -	bool (*active_wakeup)(struct device *dev);
+> -
+> -	active_wakeup = dev_gpd_data(dev)->ops.active_wakeup;
+> -	return active_wakeup ? active_wakeup(dev) : true;
+> -}
+> -
+> -static int rmobile_pd_stop_dev(struct device *dev)
+> -{
+> -	int (*stop)(struct device *dev);
+> -
+> -	stop = dev_gpd_data(dev)->ops.stop;
+> -	if (stop) {
+> -		int ret = stop(dev);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -	return pm_clk_suspend(dev);
+> -}
+> -
+> -static int rmobile_pd_start_dev(struct device *dev)
+> -{
+> -	int (*start)(struct device *dev);
+> -	int ret;
+> -
+> -	ret = pm_clk_resume(dev);
+> -	if (ret)
+> -		return ret;
+> -
+> -	start = dev_gpd_data(dev)->ops.start;
+> -	if (start)
+> -		ret = start(dev);
+> -
+> -	return ret;
+> +	return true;
+>  }
+>  
+>  static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+> @@ -140,8 +108,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+>  	struct dev_power_governor *gov = rmobile_pd->gov;
+>  
+>  	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
+> -	genpd->dev_ops.stop		= rmobile_pd_stop_dev;
+> -	genpd->dev_ops.start		= rmobile_pd_start_dev;
+> +	genpd->dev_ops.stop		= pm_clk_suspend;
+> +	genpd->dev_ops.start		= pm_clk_resume;
+>  	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+>  	genpd->dev_irq_safe		= true;
+>  	genpd->power_off		= rmobile_pd_power_down;
 > -- 
-> 1.9.1
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
