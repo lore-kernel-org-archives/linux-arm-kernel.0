@@ -1,208 +1,50 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 14 Apr 2014 09:14:42 +0200
-Subject: [PATCH v2 2/5] pinctrl: pfc: r8a7790: add mux data for IIC(B)
- cores
-In-Reply-To: <1395773789-17249-3-git-send-email-wsa@the-dreams.de>
-References: <1395773789-17249-1-git-send-email-wsa@the-dreams.de>
- <1395773789-17249-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <20140414071440.GB2993@katana>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Mon, 14 Apr 2014 11:17:37 +0400
+Subject: [PATCH v8 0/3] Exynos 5410 support
+Message-ID: <1397459860-21869-1-git-send-email-t.dakhran@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 07:56:26PM +0100, Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
-> 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+The series of patches represent support of Exynos 5410 SoC
 
-Forgot to add LinusW to CC. Linus, shall I resend?
+The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
 
-> ---
-> Change since V1:
-> 
-> * renamed i2c4-7 to iic0-3
-> 
->  drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 118 ++++++++++++++++++++++++++++++++++-
->  1 file changed, 116 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> index bcb47d138b02..99b62b1ee752 100644
-> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> @@ -782,8 +782,8 @@ enum {
->  	USB1_PWEN_MARK, AUDIO_CLKOUT_D_MARK, USB1_OVC_MARK,
->  	TCLK1_B_MARK,
->  
-> -	I2C0_SCL_MARK, I2C0_SDA_MARK,
-> -	I2C3_SCL_MARK, I2C3_SDA_MARK,
-> +	IIC0_SCL_MARK, IIC0_SDA_MARK, I2C0_SCL_MARK, I2C0_SDA_MARK,
-> +	IIC3_SCL_MARK, IIC3_SDA_MARK, I2C3_SCL_MARK, I2C3_SDA_MARK,
->  	PINMUX_MARK_END,
->  };
->  
-> @@ -1723,9 +1723,13 @@ static const u16 pinmux_data[] = {
->  	PINMUX_IPSR_DATA(IP16_7, USB1_OVC),
->  	PINMUX_IPSR_MODSEL_DATA(IP16_7, TCLK1_B, SEL_TMU1_1),
->  
-> +	PINMUX_DATA(IIC0_SCL_MARK, FN_SEL_IIC0_0),
-> +	PINMUX_DATA(IIC0_SDA_MARK, FN_SEL_IIC0_0),
->  	PINMUX_DATA(I2C0_SCL_MARK, FN_SEL_IIC0_1),
->  	PINMUX_DATA(I2C0_SDA_MARK, FN_SEL_IIC0_1),
->  
-> +	PINMUX_DATA(IIC3_SCL_MARK, FN_SEL_IICDVFS_0),
-> +	PINMUX_DATA(IIC3_SDA_MARK, FN_SEL_IICDVFS_0),
->  	PINMUX_DATA(I2C3_SCL_MARK, FN_SEL_IICDVFS_1),
->  	PINMUX_DATA(I2C3_SDA_MARK, FN_SEL_IICDVFS_1),
->  };
-> @@ -2134,6 +2138,80 @@ static const unsigned int i2c3_pins[] = {
->  static const unsigned int i2c3_mux[] = {
->  	I2C3_SCL_MARK, I2C3_SDA_MARK,
->  };
-> +/* - IIC0 (I2C4) ------------------------------------------------------------ */
-> +static const unsigned int iic0_pins[] = {
-> +	/* SCL, SDA */
-> +	PIN_A_NUMBER('G', 15), PIN_A_NUMBER('F', 15),
-> +};
-> +static const unsigned int iic0_mux[] = {
-> +	IIC0_SCL_MARK, IIC0_SDA_MARK,
-> +};
-> +/* - IIC1 (I2C5) ------------------------------------------------------------ */
-> +static const unsigned int iic1_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(1, 16), RCAR_GP_PIN(1, 17),
-> +};
-> +static const unsigned int iic1_mux[] = {
-> +	IIC1_SCL_MARK, IIC1_SDA_MARK,
-> +};
-> +static const unsigned int iic1_b_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(3, 6), RCAR_GP_PIN(3, 7),
-> +};
-> +static const unsigned int iic1_b_mux[] = {
-> +	IIC1_SCL_B_MARK, IIC1_SDA_B_MARK,
-> +};
-> +static const unsigned int iic1_c_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(4, 30), RCAR_GP_PIN(4, 27),
-> +};
-> +static const unsigned int iic1_c_mux[] = {
-> +	IIC1_SCL_C_MARK, IIC1_SDA_C_MARK,
-> +};
-> +/* - IIC2 (I2C6) ------------------------------------------------------------ */
-> +static const unsigned int iic2_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(5, 5), RCAR_GP_PIN(5, 6),
-> +};
-> +static const unsigned int iic2_mux[] = {
-> +	IIC2_SCL_MARK, IIC2_SDA_MARK,
-> +};
-> +static const unsigned int iic2_b_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(4, 0), RCAR_GP_PIN(4, 1),
-> +};
-> +static const unsigned int iic2_b_mux[] = {
-> +	IIC2_SCL_B_MARK, IIC2_SDA_B_MARK,
-> +};
-> +static const unsigned int iic2_c_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(0, 6), RCAR_GP_PIN(0, 7),
-> +};
-> +static const unsigned int iic2_c_mux[] = {
-> +	IIC2_SCL_C_MARK, IIC2_SDA_C_MARK,
-> +};
-> +static const unsigned int iic2_d_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(3, 14), RCAR_GP_PIN(3, 15),
-> +};
-> +static const unsigned int iic2_d_mux[] = {
-> +	IIC2_SCL_D_MARK, IIC2_SDA_D_MARK,
-> +};
-> +static const unsigned int iic2_e_pins[] = {
-> +	/* SCL, SDA */
-> +	RCAR_GP_PIN(2, 18), RCAR_GP_PIN(2, 19),
-> +};
-> +static const unsigned int iic2_e_mux[] = {
-> +	IIC2_SCL_E_MARK, IIC2_SDA_E_MARK,
-> +};
-> +/* - IIC3 (I2C7) ------------------------------------------------------------ */
-> +static const unsigned int iic3_pins[] = {
-> +/* SCL, SDA */
-> +	PIN_A_NUMBER('J', 15), PIN_A_NUMBER('H', 15),
-> +};
-> +static const unsigned int iic3_mux[] = {
-> +	IIC3_SCL_MARK, IIC3_SDA_MARK,
-> +};
->  /* - INTC ------------------------------------------------------------------- */
->  static const unsigned int intc_irq0_pins[] = {
->  	/* IRQ */
-> @@ -3650,6 +3728,16 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
->  	SH_PFC_PIN_GROUP(i2c2_d),
->  	SH_PFC_PIN_GROUP(i2c2_e),
->  	SH_PFC_PIN_GROUP(i2c3),
-> +	SH_PFC_PIN_GROUP(iic0),
-> +	SH_PFC_PIN_GROUP(iic1),
-> +	SH_PFC_PIN_GROUP(iic1_b),
-> +	SH_PFC_PIN_GROUP(iic1_c),
-> +	SH_PFC_PIN_GROUP(iic2),
-> +	SH_PFC_PIN_GROUP(iic2_b),
-> +	SH_PFC_PIN_GROUP(iic2_c),
-> +	SH_PFC_PIN_GROUP(iic2_d),
-> +	SH_PFC_PIN_GROUP(iic2_e),
-> +	SH_PFC_PIN_GROUP(iic3),
->  	SH_PFC_PIN_GROUP(intc_irq0),
->  	SH_PFC_PIN_GROUP(intc_irq1),
->  	SH_PFC_PIN_GROUP(intc_irq2),
-> @@ -3932,6 +4020,28 @@ static const char * const i2c3_groups[] = {
->  	"i2c3",
->  };
->  
-> +static const char * const iic0_groups[] = {
-> +	"iic0",
-> +};
-> +
-> +static const char * const iic1_groups[] = {
-> +	"iic1",
-> +	"iic1_b",
-> +	"iic1_c",
-> +};
-> +
-> +static const char * const iic2_groups[] = {
-> +	"iic2",
-> +	"iic2_b",
-> +	"iic2_c",
-> +	"iic2_d",
-> +	"iic2_e",
-> +};
-> +
-> +static const char * const iic3_groups[] = {
-> +	"iic3",
-> +};
-> +
->  static const char * const intc_groups[] = {
->  	"intc_irq0",
->  	"intc_irq1",
-> @@ -4226,6 +4336,10 @@ static const struct sh_pfc_function pinmux_functions[] = {
->  	SH_PFC_FUNCTION(i2c1),
->  	SH_PFC_FUNCTION(i2c2),
->  	SH_PFC_FUNCTION(i2c3),
-> +	SH_PFC_FUNCTION(iic0),
-> +	SH_PFC_FUNCTION(iic1),
-> +	SH_PFC_FUNCTION(iic2),
-> +	SH_PFC_FUNCTION(iic3),
->  	SH_PFC_FUNCTION(intc),
->  	SH_PFC_FUNCTION(mmc0),
->  	SH_PFC_FUNCTION(mmc1),
-> -- 
-> 1.9.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/456a968f/attachment.sig>
+Patches add new platform description, support of clock controller and device
+tree for Exynos 5410.
+
+Has been build on Linux Kernel v3.15-rc1
+Has been tested on: 1) Exynos 5410 reference board (exynos_defconfig)
+		    2) Odroid-XU board (exynos_defconfig)
+
+I hope, this will be commited to Linux v3.15...
+
+Tarek.
+
+Tarek Dakhran (3):
+  ARM: EXYNOS: Add support for EXYNOS5410 SoC
+  clk: exynos5410: register clocks using common clock framework
+  ARM: dts: Add initial device tree support for EXYNOS5410
+
+ .../devicetree/bindings/clock/exynos5410-clock.txt |   51 +++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |   65 ++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  140 ++++++++++++
+ arch/arm/mach-exynos/Kconfig                       |    8 +
+ arch/arm/mach-exynos/exynos.c                      |   12 ++
+ arch/arm/mach-exynos/hotplug.c                     |    4 +-
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/platsmp.c                     |   10 +-
+ arch/arm/mach-exynos/regs-pmu.h                    |    4 +-
+ arch/arm/plat-samsung/include/plat/cpu.h           |   11 +-
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5410.c               |  223 ++++++++++++++++++++
+ include/dt-bindings/clock/exynos5410.h             |   33 +++
+ 14 files changed, 556 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+ create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+ create mode 100644 include/dt-bindings/clock/exynos5410.h
+
+-- 
+1.7.9.5
