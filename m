@@ -1,48 +1,72 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 14 Apr 2014 17:06:02 +0200
-Subject: [PATCH] arm: allow all architectures to change max zone order
-In-Reply-To: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
-References: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1397487962.4548.30.camel@weser.hi.pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 14 Apr 2014 17:10:07 +0200
+Subject: [PATCH v7 04/11] ARM: mvebu: Remove the unused argument of
+ set_cpu_coherent()
+In-Reply-To: <1397488214-20685-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1397488214-20685-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1397488214-20685-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, can you please take a look at this? Nobody else seems to care
-about this and we have to carry it around as without it imx-drm is
-broken for FullHD displays with a 32bpp framebuffer.
+set_cpu_coherent() took the SMP group ID as parameter. But this
+parameter was never used, and the CPU always uses the SMP group 0. So
+we can remove this parameter.
 
-Regards,
-Lucas
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/coherency.c | 4 ++--
+ arch/arm/mach-mvebu/coherency.h | 2 +-
+ arch/arm/mach-mvebu/platsmp.c   | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-Am Freitag, den 31.05.2013, 19:02 +0200 schrieb Lucas Stach:
-> Many multimedia applications on architectures without an
-> IOMMU need large physically contiguous buffers and so need
-> to adjust the max zone order of the page allocator.
-> 
-> There is zero reason to not allow this adjustment on arches
-> other than SHMOBILE.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 49d993c..6ceace8 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1710,7 +1710,7 @@ config HW_PERF_EVENTS
->  source "mm/Kconfig"
->  
->  config FORCE_MAX_ZONEORDER
-> -	int "Maximum zone order" if ARCH_SHMOBILE
-> +	int "Maximum zone order"
->  	range 11 64 if ARCH_SHMOBILE
->  	default "12" if SOC_AM33XX
->  	default "9" if SA1111
-
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 51010dbbf7e4..ad61251f7faf 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -46,7 +46,7 @@ static struct of_device_id of_coherency_table[] = {
+ /* Function defined in coherency_ll.S */
+ int ll_set_cpu_coherent(void);
+ 
+-int set_cpu_coherent(int smp_group_id)
++int set_cpu_coherent(void)
+ {
+ 	if (!coherency_base) {
+ 		pr_warn("Can't make current CPU cache coherent.\n");
+@@ -140,7 +140,7 @@ int __init coherency_init(void)
+ 		sync_cache_w(&coherency_phys_base);
+ 		coherency_base = of_iomap(np, 0);
+ 		coherency_cpu_base = of_iomap(np, 1);
+-		set_cpu_coherent(0);
++		set_cpu_coherent();
+ 		of_node_put(np);
+ 	}
+ 
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+index c7e5df368d98..dff16612dd93 100644
+--- a/arch/arm/mach-mvebu/coherency.h
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -15,8 +15,8 @@
+ #define __MACH_370_XP_COHERENCY_H
+ 
+ extern unsigned long coherency_phys_base;
++int set_cpu_coherent(void);
+ 
+-int set_cpu_coherent(int smp_group_id);
+ int coherency_init(void);
+ 
+ #endif	/* __MACH_370_XP_COHERENCY_H */
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index a99d71a747f0..f2f1830063c8 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -102,7 +102,7 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	set_secondary_cpus_clock();
+ 	flush_cache_all();
+-	set_cpu_coherent(0);
++	set_cpu_coherent();
+ 
+ 	/*
+ 	 * In order to boot the secondary CPUs we need to ensure
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.1.2
