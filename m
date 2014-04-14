@@ -1,481 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 14 Apr 2014 15:08:05 +0200
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
-In-Reply-To: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 14 Apr 2014 15:12:36 +0200
+Subject: [PATCH 1/2] ARM: add cpu_is_pj4() to distinguish PJ4 core
+In-Reply-To: <1395385319-25386-1-git-send-email-chao.xie@marvell.com>
+References: <1395385319-25386-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <20140414151236.75f8816d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SMBus is a subset of the I2C protocol, oftenly used to access registers on
-external devices.
+Dear Chao Xie,
 
-I2C adapters are able to access SMBus devices thanks to the SMBus
-emulation layer. In the other hand SMBus adapters may not provide
-regular I2C transfers, and thus you may not be able to expose a regmap
-if your device is connected to such kind of adapter.
-Hence why we need this regmap over SMBus implementation.
+On Fri, 21 Mar 2014 15:01:58 +0800, Chao Xie wrote:
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
-Hello Mark,
+> +/*
+> + * Marvell's PJ4 core is based on V7 version. It has some modification
+> + * for coprocessor setting. For this reason, we need a way to distinguish
+> + * it.
+> + */
+> +#ifndef CONFIG_CPU_PJ4
+> +#define cpu_is_pj4()	0
+> +#else
+> +static inline int cpu_is_pj4(void)
+> +{
+> +	unsigned int id;
+> +
+> +	id = read_cpuid_id();
+> +	if ((id & 0xfffffff0) == 0x562f5840)
+> +		return 1;
 
-Sorry for the noise, but I forgot to add the changes in regmap.h in my
-previous commit.
+Unfortunately, this doesn't work correctly, because this cpuid check
+also matches Armada XP, which uses the PJ4B-MP core, but does not have
+the iWMMXt extension. Therefore, when you build mach-mvebu with Dove
+support enabled, it does not boot on Armada XP: it fails with an
+undefined instruction.
 
-Best Regards,
+Also, I believe the test is not sufficient because the Dove Armada 510
+uses a PJ4 core, but is not matched by the above test.
 
-Boris
+For reference, the cpuid of various platforms:
 
- drivers/base/regmap/Kconfig        |   5 +-
- drivers/base/regmap/Makefile       |   1 +
- drivers/base/regmap/regmap-smbus.c | 364 +++++++++++++++++++++++++++++++++++++
- include/linux/regmap.h             |  13 ++
- 4 files changed, 382 insertions(+), 1 deletion(-)
- create mode 100644 drivers/base/regmap/regmap-smbus.c
+ * Armada XP, PJ4B-MP core, 0x562f5842
+ * Armada 370, PJ4B core, 0x561f5811
+ * Dove Armada 510, PJ4 core, 560f5815
 
-diff --git a/drivers/base/regmap/Kconfig b/drivers/base/regmap/Kconfig
-index 4251570..450b4c1 100644
---- a/drivers/base/regmap/Kconfig
-+++ b/drivers/base/regmap/Kconfig
-@@ -3,7 +3,7 @@
- # subsystems should select the appropriate symbols.
- 
- config REGMAP
--	default y if (REGMAP_I2C || REGMAP_SPI || REGMAP_SPMI || REGMAP_MMIO || REGMAP_IRQ)
-+	default y if (REGMAP_I2C || REGMAP_SMBUS || REGMAP_SPI || REGMAP_SPMI || REGMAP_MMIO || REGMAP_IRQ)
- 	select LZO_COMPRESS
- 	select LZO_DECOMPRESS
- 	select IRQ_DOMAIN if REGMAP_IRQ
-@@ -12,6 +12,9 @@ config REGMAP
- config REGMAP_I2C
- 	tristate
- 
-+config REGMAP_SMBUS
-+	tristate
-+
- config REGMAP_SPI
- 	tristate
- 
-diff --git a/drivers/base/regmap/Makefile b/drivers/base/regmap/Makefile
-index a7c670b..e752b9c 100644
---- a/drivers/base/regmap/Makefile
-+++ b/drivers/base/regmap/Makefile
-@@ -2,6 +2,7 @@ obj-$(CONFIG_REGMAP) += regmap.o regcache.o
- obj-$(CONFIG_REGMAP) += regcache-rbtree.o regcache-lzo.o regcache-flat.o
- obj-$(CONFIG_DEBUG_FS) += regmap-debugfs.o
- obj-$(CONFIG_REGMAP_I2C) += regmap-i2c.o
-+obj-$(CONFIG_REGMAP_SMBUS) += regmap-smbus.o
- obj-$(CONFIG_REGMAP_SPI) += regmap-spi.o
- obj-$(CONFIG_REGMAP_SPMI) += regmap-spmi.o
- obj-$(CONFIG_REGMAP_MMIO) += regmap-mmio.o
-diff --git a/drivers/base/regmap/regmap-smbus.c b/drivers/base/regmap/regmap-smbus.c
-new file mode 100644
-index 0000000..c8b8075
---- /dev/null
-+++ b/drivers/base/regmap/regmap-smbus.c
-@@ -0,0 +1,364 @@
-+/*
-+ * Register map access API - SMBus support
-+ *
-+ * Copyright 2014 Free Electrons
-+ *
-+ * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/regmap.h>
-+#include <linux/i2c.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+
-+struct regmap_smbus_context {
-+	struct i2c_client *i2c;
-+	enum regmap_smbus_transfer_type transfer_type;
-+	int val_bytes;
-+};
-+
-+static int regmap_smbus_write(void *context, const void *data, size_t count)
-+{
-+	struct regmap_smbus_context *ctx = context;
-+	int ret = 0;
-+	u8 reg = *(u8 *)data++;
-+
-+	count--;
-+
-+	switch (ctx->transfer_type) {
-+	case REGMAP_SMBUS_BYTE_TRANSFER:
-+		while (count > 0 && !ret) {
-+			ret = i2c_smbus_write_byte_data(ctx->i2c, reg++,
-+							*(u8 *)data++);
-+
-+			count--;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_WORD_TRANSFER:
-+		while (count > 0 && !ret) {
-+			ret = i2c_smbus_write_word_data(ctx->i2c, reg,
-+							*(u16 *)data++);
-+
-+			reg += 2;
-+			count -= 2;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_BLOCK_TRANSFER:
-+		while (count > 0 && !ret) {
-+			ret = i2c_smbus_write_block_data(ctx->i2c,
-+							 reg,
-+							 ctx->val_bytes,
-+							 (const u8 *)data);
-+
-+			reg += ctx->val_bytes;
-+			count -= ctx->val_bytes;
-+			data += ctx->val_bytes;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_I2C_BLOCK_TRANSFER:
-+		while (count > 0 && !ret) {
-+			ret = i2c_smbus_write_i2c_block_data(ctx->i2c,
-+							     reg,
-+							     ctx->val_bytes,
-+							     (const u8 *)data);
-+
-+			reg += ctx->val_bytes;
-+			count -= ctx->val_bytes;
-+			data += ctx->val_bytes;
-+		}
-+		break;
-+
-+	default:
-+		return -ENOTSUPP;
-+	}
-+
-+	return ret;
-+}
-+
-+static int regmap_smbus_gather_write(void *context,
-+				     const void *reg, size_t reg_size,
-+				     const void *val, size_t val_size)
-+{
-+	struct regmap_smbus_context *ctx = context;
-+	u8 smbus_reg;
-+	int ret = 0;
-+
-+	if (reg_size != 1)
-+		return -ENOTSUPP;
-+
-+	smbus_reg = *(u8 *)reg;
-+
-+	switch (ctx->transfer_type) {
-+	case REGMAP_SMBUS_BYTE_TRANSFER:
-+		while (val_size && !ret) {
-+			ret = i2c_smbus_write_byte_data(ctx->i2c,
-+							smbus_reg++,
-+							*(u8 *)val++);
-+
-+			val_size--;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_WORD_TRANSFER:
-+		while (val_size && !ret) {
-+			ret = i2c_smbus_write_word_data(ctx->i2c,
-+							smbus_reg,
-+							*(u16 *)val++);
-+
-+			smbus_reg += 2;
-+			val_size -= 2;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_BLOCK_TRANSFER:
-+		while (val_size && !ret) {
-+			ret = i2c_smbus_write_block_data(ctx->i2c,
-+							 smbus_reg,
-+							 ctx->val_bytes,
-+							 (const u8 *)val);
-+
-+			smbus_reg += ctx->val_bytes;
-+			val_size -= ctx->val_bytes;
-+			val += ctx->val_bytes;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_I2C_BLOCK_TRANSFER:
-+		if (val_size > I2C_SMBUS_BLOCK_MAX)
-+			return -ENOTSUPP;
-+
-+		while (val_size && !ret) {
-+			ret = i2c_smbus_write_i2c_block_data(ctx->i2c,
-+							     smbus_reg,
-+							     ctx->val_bytes,
-+							     (const u8 *)val);
-+
-+			smbus_reg += ctx->val_bytes;
-+			val_size -= ctx->val_bytes;
-+			val += ctx->val_bytes;
-+		}
-+		break;
-+
-+	default:
-+		return -ENOTSUPP;
-+	}
-+
-+	return ret;
-+}
-+
-+static int regmap_smbus_read(void *context,
-+			     const void *reg, size_t reg_size,
-+			     void *val, size_t val_size)
-+{
-+	struct regmap_smbus_context *ctx = context;
-+	u8 buffer[I2C_SMBUS_BLOCK_MAX];
-+	u8 smbus_reg;
-+	int ret = 0;
-+
-+	if (reg_size != 1)
-+		return -ENOTSUPP;
-+
-+	smbus_reg = *(u8 *)reg;
-+
-+	switch (ctx->transfer_type) {
-+	case REGMAP_SMBUS_BYTE_TRANSFER:
-+		while (val_size && ret >= 0) {
-+			ret = i2c_smbus_read_byte_data(ctx->i2c, smbus_reg++);
-+			if (ret >= 0)
-+				*((u8 *)val++) = ret;
-+
-+			val_size--;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_WORD_TRANSFER:
-+		while (val_size && ret >= 0) {
-+			ret = i2c_smbus_read_word_data(ctx->i2c, smbus_reg);
-+			if (ret >= 0)
-+				*(u16 *)val++ = ret;
-+
-+			smbus_reg += 2;
-+			val_size -= 2;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_BLOCK_TRANSFER:
-+		while (val_size && ret >= 0) {
-+			ret = i2c_smbus_read_block_data(ctx->i2c,
-+							smbus_reg,
-+							buffer);
-+			if (ret >= 0 && ret < ctx->val_bytes) {
-+				ret = -EIO;
-+				break;
-+			}
-+
-+			memcpy(val, buffer, ctx->val_bytes);
-+			smbus_reg += ctx->val_bytes;
-+			val_size -= ctx->val_bytes;
-+			val += ctx->val_bytes;
-+		}
-+		break;
-+
-+	case REGMAP_SMBUS_I2C_BLOCK_TRANSFER:
-+		while (val_size && ret >= 0) {
-+			return -ENOTSUPP;
-+
-+			ret = i2c_smbus_read_i2c_block_data(ctx->i2c,
-+							    smbus_reg,
-+							    ctx->val_bytes,
-+							    (u8 *)val);
-+			if (ret >= 0 && ret < val_size) {
-+				ret = -EIO;
-+				break;
-+			}
-+
-+			smbus_reg += ctx->val_bytes;
-+			val_size -= ctx->val_bytes;
-+			val += ctx->val_bytes;
-+		}
-+		break;
-+
-+	default:
-+		return -ENOTSUPP;
-+	}
-+
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static void regmap_smbus_free_context(void *context)
-+{
-+	kfree(context);
-+}
-+
-+struct regmap_smbus_context *regmap_smbus_gen_context(struct i2c_client *i2c,
-+				const struct regmap_config *config,
-+				enum regmap_smbus_transfer_type transfer_type)
-+{
-+	struct regmap_smbus_context *ctx;
-+	int val_bytes = 0;
-+
-+	if (config->reg_bits != 8 || config->pad_bits != 0)
-+		return ERR_PTR(-ENOTSUPP);
-+
-+	switch (transfer_type) {
-+	case REGMAP_SMBUS_BYTE_TRANSFER:
-+		if (config->val_bits != 8)
-+			return ERR_PTR(-EINVAL);
-+
-+		if (!i2c_check_functionality(i2c->adapter,
-+					     I2C_FUNC_SMBUS_BYTE_DATA))
-+			return ERR_PTR(-ENOTSUPP);
-+		break;
-+
-+	case REGMAP_SMBUS_WORD_TRANSFER:
-+		if (config->val_bits != 16)
-+			return ERR_PTR(-EINVAL);
-+
-+		if (!i2c_check_functionality(i2c->adapter,
-+					     I2C_FUNC_SMBUS_WORD_DATA))
-+			return ERR_PTR(-ENOTSUPP);
-+		break;
-+
-+	case REGMAP_SMBUS_BLOCK_TRANSFER:
-+		if (config->val_bits > (I2C_SMBUS_BLOCK_MAX * 8))
-+			return ERR_PTR(-EINVAL);
-+
-+		val_bytes = DIV_ROUND_UP(config->val_bits, 8);
-+		if (!i2c_check_functionality(i2c->adapter,
-+					     I2C_FUNC_SMBUS_BLOCK_DATA))
-+			return ERR_PTR(-ENOTSUPP);
-+		break;
-+
-+	case REGMAP_SMBUS_I2C_BLOCK_TRANSFER:
-+		if (config->val_bits > (I2C_SMBUS_BLOCK_MAX * 8))
-+			return ERR_PTR(-EINVAL);
-+
-+		val_bytes = DIV_ROUND_UP(config->val_bits, 8);
-+
-+		if (!i2c_check_functionality(i2c->adapter,
-+					     I2C_FUNC_SMBUS_I2C_BLOCK))
-+			return ERR_PTR(-ENOTSUPP);
-+		break;
-+
-+	default:
-+		return ERR_PTR(-ENOTSUPP);
-+	}
-+
-+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
-+	if (!ctx)
-+		return ERR_PTR(-ENOMEM);
-+
-+	ctx->i2c = i2c;
-+	ctx->transfer_type = transfer_type;
-+	ctx->val_bytes = val_bytes;
-+
-+	return ctx;
-+}
-+
-+static struct regmap_bus regmap_smbus = {
-+	.write = regmap_smbus_write,
-+	.gather_write = regmap_smbus_gather_write,
-+	.read = regmap_smbus_read,
-+	.free_context = regmap_smbus_free_context,
-+};
-+
-+/**
-+ * regmap_init_smbus(): Initialise register map
-+ *
-+ * @i2c: Device that will be interacted with
-+ * @config: Configuration for register map
-+ * @transfer_type: SMBUS transfer type
-+ *
-+ * The return value will be an ERR_PTR() on error or a valid pointer to
-+ * a struct regmap.
-+ */
-+struct regmap *regmap_init_smbus(struct i2c_client *i2c,
-+				 const struct regmap_config *config,
-+				 enum regmap_smbus_transfer_type transfer_type)
-+{
-+	struct regmap_smbus_context *ctx =
-+		regmap_smbus_gen_context(i2c, config, transfer_type);
-+
-+	if (IS_ERR(ctx))
-+		return ERR_PTR(PTR_ERR(ctx));
-+
-+	return regmap_init(&i2c->dev, &regmap_smbus, ctx, config);
-+}
-+EXPORT_SYMBOL_GPL(regmap_init_smbus);
-+
-+/**
-+ * devm_regmap_init_smbus(): Initialise managed register map
-+ *
-+ * @i2c: Device that will be interacted with
-+ * @config: Configuration for register map
-+ * @transfer_type: SMBUS transfer type
-+ *
-+ * The return value will be an ERR_PTR() on error or a valid pointer
-+ * to a struct regmap.  The regmap will be automatically freed by the
-+ * device management code.
-+ */
-+struct regmap *devm_regmap_init_smbus(struct i2c_client *i2c,
-+				const struct regmap_config *config,
-+				enum regmap_smbus_transfer_type transfer_type)
-+{
-+	struct regmap_smbus_context *ctx =
-+		regmap_smbus_gen_context(i2c, config, transfer_type);
-+
-+	if (IS_ERR(ctx))
-+		return ERR_PTR(PTR_ERR(ctx));
-+
-+	return devm_regmap_init(&i2c->dev, &regmap_smbus, ctx, config);
-+}
-+EXPORT_SYMBOL_GPL(devm_regmap_init_smbus);
-+
-+MODULE_LICENSE("GPL");
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index 85691b9..34ef2c7 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -317,6 +317,13 @@ struct regmap_bus {
- 	enum regmap_endian val_format_endian_default;
- };
- 
-+enum regmap_smbus_transfer_type {
-+	REGMAP_SMBUS_BYTE_TRANSFER,
-+	REGMAP_SMBUS_WORD_TRANSFER,
-+	REGMAP_SMBUS_BLOCK_TRANSFER,
-+	REGMAP_SMBUS_I2C_BLOCK_TRANSFER,
-+};
-+
- struct regmap *regmap_init(struct device *dev,
- 			   const struct regmap_bus *bus,
- 			   void *bus_context,
-@@ -325,6 +332,9 @@ int regmap_attach_dev(struct device *dev, struct regmap *map,
- 				 const struct regmap_config *config);
- struct regmap *regmap_init_i2c(struct i2c_client *i2c,
- 			       const struct regmap_config *config);
-+struct regmap *regmap_init_smbus(struct i2c_client *i2c,
-+				const struct regmap_config *config,
-+				enum regmap_smbus_transfer_type transfer_type);
- struct regmap *regmap_init_spi(struct spi_device *dev,
- 			       const struct regmap_config *config);
- struct regmap *regmap_init_spmi_base(struct spmi_device *dev,
-@@ -341,6 +351,9 @@ struct regmap *devm_regmap_init(struct device *dev,
- 				const struct regmap_config *config);
- struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
- 				    const struct regmap_config *config);
-+struct regmap *devm_regmap_init_smbus(struct i2c_client *i2c,
-+				const struct regmap_config *config,
-+				enum regmap_smbus_transfer_type transfer_type);
- struct regmap *devm_regmap_init_spi(struct spi_device *dev,
- 				    const struct regmap_config *config);
- struct regmap *devm_regmap_init_spmi_base(struct spmi_device *dev,
+Can you check on your platforms what was the exact cpuid, to see if we
+can find a way of correcting this cpu_is_pj4() function? Can you also
+check whether your CPU uses a PJ4, PJ4B or PJ4B-MP core?
+
+Thanks,
+
+Thomas
 -- 
-1.8.3.2
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
