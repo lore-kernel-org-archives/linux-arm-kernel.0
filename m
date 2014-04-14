@@ -1,126 +1,173 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 14 Apr 2014 15:44:56 +0200
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Mon, 14 Apr 2014 19:16:15 +0530
 Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <534BDD17.60003@ti.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>	<1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>	<534529B2.2020107@samsung.com>	<534BCC91.8090108@ti.com>
- <CAFp+6iGxhfgZRPysMuj5nALEQBbFXnAXhtDPpbf3P42LDHqFxg@mail.gmail.com>
- <534BDD17.60003@ti.com>
-Message-ID: <534BE658.8050606@gmail.com>
+In-Reply-To: <CAFp+6iHWa8RoO8Ey5B+Lj6Z10ZRJ5+2BDrTD=VNUv5Hw=9gUCg@mail.gmail.com>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
+ <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
+ <534BD447.1080909@ti.com>
+ <CAFp+6iF=SpEax+5KUhZkmtkwp=Pj7LbAHOoySgOwJx_50u6GZQ@mail.gmail.com>
+ <534BDBBC.5010701@ti.com>
+ <CAFp+6iFFW8XQg_UtYEZfaiENULZDD8A7_9fr4f2no=qfau7-sQ@mail.gmail.com>
+ <534BE200.8080009@ti.com>
+ <CAFp+6iHWa8RoO8Ey5B+Lj6Z10ZRJ5+2BDrTD=VNUv5Hw=9gUCg@mail.gmail.com>
+Message-ID: <CAFp+6iHXriUZv7CLtXChODN_eWt1mkUBy4CojPyJdhNm2G2JfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.04.2014 15:05, Kishon Vijay Abraham I wrote:
->
->
-> On Monday 14 April 2014 05:35 PM, Vivek Gautam wrote:
->> Hi Kishon,
+On Mon, Apr 14, 2014 at 7:10 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+
+Just correcting mail-ids for Mark and Dong with the latest ones
+(earlier ones got bounced back)
+
+> On Mon, Apr 14, 2014 at 6:56 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
 >>
 >>
->> On Mon, Apr 14, 2014 at 5:24 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi,
->>>
->>> On Wednesday 09 April 2014 04:36 PM, Tomasz Figa wrote:
->>>> Hi Vivek,
+>> On Monday 14 April 2014 06:50 PM, Vivek Gautam wrote:
+>>> On Mon, Apr 14, 2014 at 6:29 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
 >>>>
->>>> Please see my comments inline.
 >>>>
->>>> On 08.04.2014 16:36, Vivek Gautam wrote:
->>>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>>>> The new driver uses the generic PHY framework and will interact
->>>>> with DWC3 controller present on Exynos5 series of SoCs.
->>>>> Thereby, removing old phy-samsung-usb3 driver and related code
->>>>> used untill now which was based on usb/phy framework.
+>>>> On Monday 14 April 2014 06:12 PM, Vivek Gautam wrote:
+>>>>> Hi,
 >>>>>
->>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>>>> ---
->>>>>    .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->>>>>    drivers/phy/Kconfig                                |   11 +
->>>>>    drivers/phy/Makefile                               |    1 +
->>>>>    drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
->>>>>    4 files changed, 722 insertions(+)
->>>>>    create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+>>>>>
+>>>>> On Mon, Apr 14, 2014 at 5:57 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Tuesday 08 April 2014 08:06 PM, Vivek Gautam wrote:
+>>>>>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>>>>>>> The new driver uses the generic PHY framework and will interact
+>>>>>>> with DWC3 controller present on Exynos5 series of SoCs.
+>>>>>>> Thereby, removing old phy-samsung-usb3 driver and related code
+>>>>>>> used untill now which was based on usb/phy framework.
+>>>>>>>
+>>>>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>>>>>> ---
+>>>>>>>  .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
+>>>>>>>  drivers/phy/Kconfig                                |   11 +
+>>>>>>>  drivers/phy/Makefile                               |    1 +
+>>>>>>>  drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
+>>>>>>>  4 files changed, 722 insertions(+)
+>>>>>>>  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+>>>>>>>
+>>>>>>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>>>>> index 28f9edb..6d99ba9 100644
+>>>>>>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>>>>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>>>>>> @@ -74,3 +74,45 @@ phy-consumer at 12340000 {
+>>>>>>>
+>>>>>>>  Refer to DT bindings documentation of particular PHY consumer devices for more
+>>>>>>>  information about required PHYs and the way of specification.
+>>>>>>> +
+>>>>>>> +Samsung Exynos5 SoC series USB DRD PHY controller
+>>>>>>> +--------------------------------------------------
+>>>>>>> +
+>>>>>>> +Required properties:
+>>>>>>> +- compatible : Should be set to one of the following supported values:
+>>>>>>> +     - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+>>>>>>> +     - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+>>>>>>> +- reg : Register offset and length of USB DRD PHY register set;
+>>>>>>> +- clocks: Clock IDs array as required by the controller
+>>>>>>> +- clock-names: names of clocks correseponding to IDs in the clock property;
+>>>>>>> +            Required clocks:
+>>>>>>> +     - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+>>>>>>> +            used for register access.
+>>>>>>> +     - ref: PHY's reference clock (usually crystal clock), associated by
+>>>>>>> +            phy name, used to determine bit values for clock settings
+>>>>>>> +            register.
+>>>>>>> +     Additional clock required for Exynos5420:
+>>>>>>> +     - usb30_sclk_100m: Additional special clock used for PHY operation
+>>>>>>> +                        depicted as 'sclk_usbphy30' in CMU of Exynos5420.
+>>>>>>> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
+>>>>>>> +                       control pmu registers for power isolation.
+>>>>>>> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
+>>>>>>> +                   base.
+>>>>>>> +- #phy-cells : from the generic PHY bindings, must be 1;
+>>>>>>> +
+>>>>>>> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
+>>>>>>> +compatible PHYs, the second cell in the PHY specifier identifies the
+>>>>>>> +PHY id, which is interpreted as follows:
+>>>>>>> +  0 - UTMI+ type phy,
+>>>>>>> +  1 - PIPE3 type phy,
+>>>>>>> +
+>>>>>>> +Example:
+>>>>>>> +     usb3_phy: usbphy at 12100000 {
+>>>>>>> +             compatible = "samsung,exynos5250-usbdrd-phy";
+>>>>>>> +             reg = <0x12100000 0x100>;
+>>>>>>> +             clocks = <&clock 286>, <&clock 1>;
+>>>>>>> +             clock-names = "phy", "usb3phy_refclk";
+>>>>>>> +             samsung,syscon-phandle = <&pmu_syscon>;
+>>>>>>> +             samsung,pmu-offset = <0x704>;
+>>>>>>> +             #phy-cells = <1>;
+>>>>>>> +     };
+>>>>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>>>>> index 8d3c49c..d955a05 100644
+>>>>>>> --- a/drivers/phy/Kconfig
+>>>>>>> +++ b/drivers/phy/Kconfig
+>>>>>>> @@ -166,4 +166,15 @@ config PHY_XGENE
+>>>>>>>       help
+>>>>>>>         This option enables support for APM X-Gene SoC multi-purpose PHY.
+>>>>>>>
+>>>>>>> +config PHY_EXYNOS5_USBDRD
+>>>>>>> +     tristate "Exynos5 SoC series USB DRD PHY driver"
+>>>>>>> +     depends on ARCH_EXYNOS5 && OF
+>>>>>>> +     depends on HAS_IOMEM
+>>>>>>> +     select GENERIC_PHY
+>>>>>>> +     select MFD_SYSCON
+>>>>>>
+>>>>>> Lets try to avoid select in Kconfig. We've got enough problems with that.
+>>>>>
+>>>>> I hope you meant with "select MFD_SYSCON".
+>>>>> We are referencing the syscon for accessing pmu reg, for which we need
+>>>>> this config to be selected.
+>>>>> Other Exynos phy drivers also need this config and for that they have
+>>>>> selected this.
+>>>>>
+>>>>> Do you want me to do it any other way ?
 >>>>
->>>> [snip]
->>>>
->>>>> +    Additional clock required for Exynos5420:
->>>>> +    - usb30_sclk_100m: Additional special clock used for PHY operation
->>>>> +               depicted as 'sclk_usbphy30' in CMU of Exynos5420.
->>>>
->>>> Are you sure this isn't simply a gate for the ref clock, as it can be found on
->>>> another SoC that is not upstream yet? I don't have documentation for Exynos
->>>> 5420 so I can't tell, but I'd like to ask you to recheck this.
->>>>
->>>>> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
->>>>> +              control pmu registers for power isolation.
->>>>> +- samsung,pmu-offset: phy power control register offset to
->>>>> pmu-system-controller
->>>>> +              base.
->>>>> +- #phy-cells : from the generic PHY bindings, must be 1;
->>>>> +
->>>>> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
->>>>> +compatible PHYs, the second cell in the PHY specifier identifies the
->>>>> +PHY id, which is interpreted as follows:
->>>>> +  0 - UTMI+ type phy,
->>>>> +  1 - PIPE3 type phy,
->>>>> +
->>>>> +Example:
->>>>> +    usb3_phy: usbphy at 12100000 {
->>>>> +        compatible = "samsung,exynos5250-usbdrd-phy";
->>>>> +        reg = <0x12100000 0x100>;
->>>>> +        clocks = <&clock 286>, <&clock 1>;
->>>>> +        clock-names = "phy", "usb3phy_refclk";
->>>>
->>>> Binding description above doesn't mention "usb3phy_refclk" entry.
->>>>
->>>>> +        samsung,syscon-phandle = <&pmu_syscon>;
->>>>> +        samsung,pmu-offset = <0x704>;
->>>>> +        #phy-cells = <1>;
->>>>> +    };
->>>>
->>>> [snip]
->>>>
->>>>> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
->>>>> new file mode 100644
->>>>> index 0000000..ff54a7c
->>>>> --- /dev/null
->>>>> +++ b/drivers/phy/phy-exynos5-usbdrd.c
->>>>
->>>> [snip]
->>>>
->>>>> +static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
->>>>> +{
->>>>> +    struct device *dev = &pdev->dev;
->>>>> +    struct device_node *node = dev->of_node;
->>>>> +    struct exynos5_usbdrd_phy *phy_drd;
->>>>> +    struct phy_provider *phy_provider;
->>>>> +    struct resource *res;
->>>>> +    const struct of_device_id *match;
->>>>> +    const struct exynos5_usbdrd_phy_drvdata *drv_data;
->>>>> +    struct regmap *reg_pmu;
->>>>> +    u32 pmu_offset;
->>>>> +    int i;
->>>>> +
->>>>> +    /*
->>>>> +     * Exynos systems are completely DT enabled,
->>>>> +     * so lets not have any platform data support for this driver.
->>>>> +     */
->>>>> +    if (!node) {
->>>>> +        dev_err(dev, "no device node found\n");
->>>>
->>>> This error message is not very meaningful. I'd rather use something like "This
->>>> driver can be only instantiated using Device Tree".
+>>>> depends on is one option.
 >>>
->>> how about just adding depend_on OF in Kconfig?
+>>> Ok, i can see there are places where depends_on MFD_SYSCON is used.
+>>> "drivers/gpu/drm/exynos/Kconfig:60"
+>>>
+>>> so, do you want me to fix at other places too ?
+>>>
+>>> But i also have a question here.
+>>> MFD_SYSCON is a subsystem that's facilitating us in getting our work
+>>> done here by giving an access to pmu_system_controller.
+>>> So unless MFD_SYSCON is exposed, the phy driver will not be exposed to us.
+>>> So is that valid enough really ?
 >>
->> Already added a depend on 'OF'. Copying below the part of Kconfig in this patch.
+>> maybe in the Kconfig for MFD_SYSCON, we can select it if PHY_EXYNOS5_USBDRD is
+>> enabled?
+>>
+>> config MFD_SYSCON
+>> default y if PHY_EXYNOS5_USBDRD
 >
-> Alright.. Do we need the check then? If config_OF is enabled devices will be
-> created using device tree no?
+> Yes, that seems to be one option. But we will end up adding this
+> dependency for all the drivers which want to use syscon.
+>
+> Adding few people who worked on MFS_SYSCON, just to gather ideas.
+>
+> Re-quoting our problem here:
+> "Inside our phy driver we are accessing power mgt unit registers,
+> which we register using syscon in ut device tree.
+> Now we don't want to select MFD_SYSCON from our phy driver, instead
+> want to go 'depend_on' way."
+>
+> So one solution seems to be enabling MFD_SYSCON by default, if any of
+> driver using syscon is enabled.
+> Can we use some other way here ?
+>
+>
+>
+>>
+>> Thanks
+>> Kishon
 
-Not necessarily. Enabling support for OF doesn't mean that it is the 
-only boot method that can be used. Legacy board files may be still 
-available. I'm not sure why someone would try to instantiate this driver 
-from them, though.
 
-Best regards,
-Tomasz
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
