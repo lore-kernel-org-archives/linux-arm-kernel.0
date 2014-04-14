@@ -1,123 +1,32 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 14 Apr 2014 12:09:04 -0600
-Subject: [PATCH v2] rtc: Fix suspend/resume for APM X-Gene SoC RTC driver
-Message-ID: <1397498944-8486-1-git-send-email-lho@apm.com>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Mon, 14 Apr 2014 20:18:45 +0200
+Subject: [PATCH] ARM: dts: imx6qdl: Add VDOA compatible and clocks properties
+Message-ID: <1397499525-6478-1-git-send-email-philipp.zabel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes suspend/resume functions properly for the APM X-Gene
-SoC RTC driver. This patch requires the merged v2 of the APM X-Gene 
-SoC RTC driver.
+This adds a compatible property and the correct clock for the
+i.MX6Q Video Data Order Adapter.
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Reviewed-by: Mark Brown <broonie@linaro.org>
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
 ---
- drivers/rtc/rtc-xgene.c |   41 ++++++++++++++++++++++++++++++++---------
- 1 files changed, 32 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/rtc/rtc-xgene.c b/drivers/rtc/rtc-xgene.c
-index 14129cc..d533edd 100644
---- a/drivers/rtc/rtc-xgene.c
-+++ b/drivers/rtc/rtc-xgene.c
-@@ -52,6 +52,7 @@ struct xgene_rtc_dev {
- 	void __iomem *csr_base;
- 	struct clk *clk;
- 	unsigned int irq_wake;
-+	unsigned int irq_enabled;
- };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index c05a501..8aea954 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -976,8 +976,10 @@
+ 			};
  
- static int xgene_rtc_read_time(struct device *dev, struct rtc_time *tm)
-@@ -104,15 +105,19 @@ static int xgene_rtc_alarm_irq_enable(struct device *dev, u32 enabled)
- 	return 0;
- }
+ 			vdoa at 021e4000 {
++				compatible = "fsl,imx6q-vdoa";
+ 				reg = <0x021e4000 0x4000>;
+ 				interrupts = <0 18 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks 202>;
+ 			};
  
-+static int xgene_rtc_alarm_irq_enabled(struct device *dev)
-+{
-+	struct xgene_rtc_dev *pdata = dev_get_drvdata(dev);
-+
-+	return readl(pdata->csr_base + RTC_CCR) & RTC_CCR_IE ? 1 : 0;
-+}
-+
- static int xgene_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
- {
- 	struct xgene_rtc_dev *pdata = dev_get_drvdata(dev);
--	unsigned long rtc_time;
- 	unsigned long alarm_time;
- 
--	rtc_time = readl(pdata->csr_base + RTC_CCVR);
- 	rtc_tm_to_time(&alrm->time, &alarm_time);
--
- 	pdata->alarm_time = alarm_time;
- 	writel((u32) pdata->alarm_time, pdata->csr_base + RTC_CMR);
- 
-@@ -180,12 +185,18 @@ static int xgene_rtc_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "Couldn't get the clock for RTC\n");
- 		return -ENODEV;
- 	}
--	clk_prepare_enable(pdata->clk);
-+	ret = clk_prepare_enable(pdata->clk);
-+	if (ret)
-+		return ret;
- 
- 	/* Turn on the clock and the crystal */
- 	writel(RTC_CCR_EN, pdata->csr_base + RTC_CCR);
- 
--	device_init_wakeup(&pdev->dev, 1);
-+	ret = device_init_wakeup(&pdev->dev, 1);
-+	if (ret) {
-+		clk_disable_unprepare(pdata->clk);
-+		return ret;
-+	}
- 
- 	pdata->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
- 					 &xgene_rtc_ops, THIS_MODULE);
-@@ -218,14 +229,20 @@ static int xgene_rtc_suspend(struct device *dev)
- 	int irq;
- 
- 	irq = platform_get_irq(pdev, 0);
-+
-+	/*
-+	 * If this RTC alarm will be used for waking the system up,
-+	 * don't disable it of course. Else we just disable the alarm
-+	 * and await suspension.
-+	 */
- 	if (device_may_wakeup(&pdev->dev)) {
- 		if (!enable_irq_wake(irq))
- 			pdata->irq_wake = 1;
- 	} else {
-+		pdata->irq_enabled = xgene_rtc_alarm_irq_enabled(dev);
- 		xgene_rtc_alarm_irq_enable(dev, 0);
--		clk_disable(pdata->clk);
-+		clk_disable_unprepare(pdata->clk);
- 	}
--
- 	return 0;
- }
- 
-@@ -234,16 +251,22 @@ static int xgene_rtc_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct xgene_rtc_dev *pdata = platform_get_drvdata(pdev);
- 	int irq;
-+	int rc;
- 
- 	irq = platform_get_irq(pdev, 0);
-+
- 	if (device_may_wakeup(&pdev->dev)) {
- 		if (pdata->irq_wake) {
- 			disable_irq_wake(irq);
- 			pdata->irq_wake = 0;
- 		}
- 	} else {
--		clk_enable(pdata->clk);
--		xgene_rtc_alarm_irq_enable(dev, 1);
-+		rc = clk_prepare_enable(pdata->clk);
-+		if (rc) {
-+			dev_err(dev, "Unable to enable clock error %d\n", rc);
-+			return rc;
-+		}
-+		xgene_rtc_alarm_irq_enable(dev, pdata->irq_enabled);
- 	}
- 
- 	return 0;
+ 			uart2: serial at 021e8000 {
 -- 
-1.5.5
+1.9.1
