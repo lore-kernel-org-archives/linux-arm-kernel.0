@@ -1,87 +1,67 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 14 Apr 2014 17:53:37 +0200
-Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
-In-Reply-To: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <16639486.i0jTGsaDYr@amdc1032>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 14 Apr 2014 11:59:25 -0400 (EDT)
+Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
+In-Reply-To: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
+References: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
+Message-ID: <alpine.LFD.2.11.1404141148480.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 11 Apr 2014, Lu Xiangyu wrote:
 
-Hi,
+> From: Xiangyu Lu <luxiangyu@huawei.com>
+> 
+> In big-endian systems, "%1" get the most significant part of the value, cause
+> the instruction to get the wrong result.
+> 
+> When viewing ftrace record in big-endian ARM systems, we found that
+> the timestamp errors:
+> 
+> swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
+> events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
+> swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
+> swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
+> swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
+> swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
+> 
+> When viewed ftrace records, it will call the do_div(n, base) function, which
+> achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
+> do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
+> 
+> Cc: <stable@vger.kernel.org> # 2.6.20+
+> Signed-off-by: Alex Wu <wuquanming@huawei.com>
+> Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
 
-On Monday, April 14, 2014 04:34:10 PM Thomas Petazzoni wrote:
-> Hello,
-> 
-> The Marvell Armada 38x ARM processors use an AHCI compatible interface
-> for SATA (in replacement of the Marvell-specific SATA interface,
-> handled by the sata_mv driver). However, like all DMA-capable Marvell
-> interfaces, some specific MBus window configuration must be done, so a
-> small specific glue layer is needed, which relies on the recently
-> introduced libahci_platform.c.
-> 
-> Changes since v1:
-> 
->  * Rebased on top of v3.15-rc1
-> 
->  * Added a preliminary patch that orders alphabetically the list of
->    compatible strings in the DT binding document
->    ahci-platform.txt. Suggested by Andrew Lunn.
-> 
->  * Made the availability of MBus DRAM window informations
->    mandatory. Suggested by Andrew Lunn.
-> 
->  * Fixed the module alias name. Suggested by Bartlomiej
->    Zolnierkiewicz.
+Argh..  My bad.
 
-Well, you could have also added a comment explaining the lack of
-the Power Management support..
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-> Details of the patches:
-> 
->  * The first patch is a DT binding documentation cleanup. I believe it
->    should be taken by the ATA maintainer, because the second patch
->    (driver patch) depends on it.
-> 
->  * The second patch of this series contains the driver itself, which
->    is fairly straight-forward. It should be taken by Tejun Heo as the
->    ATA maintainer.
-> 
->  * The last three patches add the Device Tree and defconfig
->    changes. They should be taken by the respective ARM maintainers
->    (mvebu maintainers for the DT and mvebu_v7_defconfig, and arm-soc
->    maintainers for the multi_v7_defconfig change).
+Please send to RMK's patch system.
 
-Anyway, all patches look OK to me.
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-
-> Thanks!
+> ---
+>  arch/arm/include/asm/div64.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Thomas
+> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+> index 191ada6..662c7bd 100644
+> --- a/arch/arm/include/asm/div64.h
+> +++ b/arch/arm/include/asm/div64.h
+> @@ -156,7 +156,7 @@
+>  		/* Select the best insn combination to perform the   */	\
+>  		/* actual __m * __n / (__p << 64) operation.         */	\
+>  		if (!__c) {						\
+> -			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
+> +			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
+>  				"mov	%Q0, #0"			\
+>  				: "=&r" (__res)				\
+>  				: "r" (__m), "r" (__n)			\
+> -- 
+> 1.7.9.5
 > 
-> Thomas Petazzoni (5):
->   Documentation: dt-bindings: reformat and order list of ahci-platform
->     compatibles
->   ata: ahci_mvebu: new driver for Marvell Armada 380 AHCI interfaces
->   ARM: mvebu: add Device Tree description of AHCI interfaces on Armada
->     38x
->   ARM: configs: add ahci_mvebu to mvebu_v7_defconfig
->   ARM: configs: add ahci_mvebu to multi_v7_defconfig
 > 
->  .../devicetree/bindings/ata/ahci-platform.txt      |  13 ++-
->  arch/arm/boot/dts/armada-385-db.dts                |   8 ++
->  arch/arm/boot/dts/armada-38x.dtsi                  |  16 +++
->  arch/arm/configs/multi_v7_defconfig                |   1 +
->  arch/arm/configs/mvebu_v7_defconfig                |   1 +
->  drivers/ata/Kconfig                                |   9 ++
->  drivers/ata/Makefile                               |   1 +
->  drivers/ata/ahci_mvebu.c                           | 107 +++++++++++++++++++++
->  8 files changed, 152 insertions(+), 4 deletions(-)
->  create mode 100644 drivers/ata/ahci_mvebu.c
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
