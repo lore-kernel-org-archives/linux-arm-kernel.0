@@ -1,57 +1,84 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Apr 2014 14:42:01 +0300
-Subject: [PATCH v3 06/10] dmaengine: edma: Implement device_slave_caps callback
+Date: Mon, 14 Apr 2014 14:42:03 +0300
+Subject: [PATCH v3 08/10] dmaengine: edma: Prefix debug prints where the text
+ were identical in prep callbacks
 In-Reply-To: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1397475725-5036-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1397475725-5036-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the callback implemented omap-dma can provide information to client
-drivers regarding to supported address widths, directions, residue
-granularity, etc.
+prep_slave_sg and prep_dma_cyclic callbacks have mostly same failure cases
+with the same texts printed in case we hit them. It helps when debugging if
+we know exactly which callback generated the errors.
+At the same time change the debug level for descriptor allocation failure
+from dbg to err since all other error cases are dev_err and this failure is
+similarly fatal as the other ones.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/dma/edma.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 1dd9e8806975..2f58c04cbcb1 100644
+index 6d9edc47150d..bc8175c92e0c 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -852,6 +852,23 @@ static void __init edma_chan_init(struct edma_cc *ecc,
+@@ -436,14 +436,14 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
  	}
- }
  
-+#define EDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
-+				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
-+				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
-+
-+static int edma_dma_device_slave_caps(struct dma_chan *dchan,
-+				      struct dma_slave_caps *caps)
-+{
-+	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	caps->dstn_addr_widths = EDMA_DMA_BUSWIDTHS;
-+	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+	caps->cmd_pause = true;
-+	caps->cmd_terminate = true;
-+	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
-+
-+	return 0;
-+}
-+
- static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 			  struct device *dev)
- {
-@@ -862,6 +879,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 	dma->device_issue_pending = edma_issue_pending;
- 	dma->device_tx_status = edma_tx_status;
- 	dma->device_control = edma_control;
-+	dma->device_slave_caps = edma_dma_device_slave_caps;
- 	dma->dev = dev;
+ 	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+-		dev_err(dev, "Undefined slave buswidth\n");
++		dev_err(dev, "%s: Undefined slave buswidth\n", __func__);
+ 		return NULL;
+ 	}
  
- 	INIT_LIST_HEAD(&dma->channels);
+ 	edesc = kzalloc(sizeof(*edesc) + sg_len *
+ 		sizeof(edesc->pset[0]), GFP_ATOMIC);
+ 	if (!edesc) {
+-		dev_dbg(dev, "Failed to allocate a descriptor\n");
++		dev_err(dev, "%s: Failed to allocate a descriptor\n", __func__);
+ 		return NULL;
+ 	}
+ 
+@@ -459,7 +459,8 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 						EDMA_SLOT_ANY);
+ 			if (echan->slot[i] < 0) {
+ 				kfree(edesc);
+-				dev_err(dev, "Failed to allocate slot\n");
++				dev_err(dev, "%s: Failed to allocate slot\n",
++					__func__);
+ 				return NULL;
+ 			}
+ 		}
+@@ -528,7 +529,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 	}
+ 
+ 	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+-		dev_err(dev, "Undefined slave buswidth\n");
++		dev_err(dev, "%s: Undefined slave buswidth\n", __func__);
+ 		return NULL;
+ 	}
+ 
+@@ -553,7 +554,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 	edesc = kzalloc(sizeof(*edesc) + nslots *
+ 		sizeof(edesc->pset[0]), GFP_ATOMIC);
+ 	if (!edesc) {
+-		dev_dbg(dev, "Failed to allocate a descriptor\n");
++		dev_err(dev, "%s: Failed to allocate a descriptor\n", __func__);
+ 		return NULL;
+ 	}
+ 
+@@ -571,7 +572,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 						EDMA_SLOT_ANY);
+ 			if (echan->slot[i] < 0) {
+ 				kfree(edesc);
+-				dev_err(dev, "Failed to allocate slot\n");
++				dev_err(dev, "%s: Failed to allocate slot\n",
++					__func__);
+ 				return NULL;
+ 			}
+ 		}
 -- 
 1.9.2
