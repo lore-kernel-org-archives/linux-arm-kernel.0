@@ -1,234 +1,58 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Mon, 14 Apr 2014 16:41:13 +0900
-Subject: [PATCH 8/8] arm64: KVM: Implement 4 levels of translation tables for
- HYP and stage2
-Message-ID: <000601cf57b4$e93b9680$bbb2c380$@samsung.com>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Mon, 14 Apr 2014 09:42:01 +0200
+Subject: [PATCH 1/1] arm/mach-vexpress: array accessed out of bounds
+In-Reply-To: <alpine.LFD.2.11.1404131337580.980@knanqh.ubzr>
+References: <alpine.LFD.2.11.1404131337580.980@knanqh.ubzr>
+Message-ID: <1397461321-7108-1-git-send-email-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds 4 levels of translation tables implementation for both
-HYP and stage2. A combination of 4KB + 4 levels host and 4KB + 4 levels
-guest can run on ARMv8 architecture as introducing this feature.
+(Forwarding to arm at kernel.org)
 
-Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
-Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+dcscb_allcpus_mask is an array of size 2.
+
+The index variable cluster has to be checked against this limit
+before accessing the array.
+
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/kvm/mmu.c               |   96 +++++++++++++++++++++++++++++++++-----
- arch/arm64/include/asm/kvm_arm.h |   20 ++++++++
- arch/arm64/include/asm/kvm_mmu.h |    1 +
- 3 files changed, 106 insertions(+), 11 deletions(-)
+ arch/arm/mach-vexpress/dcscb.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index e0d4f24..6cf89ad 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -388,13 +388,46 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
- 	return 0;
- }
- 
-+static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
-+				   unsigned long end, unsigned long pfn,
-+				   pgprot_t prot)
-+{
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	unsigned long addr, next;
-+
-+	addr = start;
-+	do {
-+		pud = pud_offset(pgd, addr);
-+
-+		if (pud_none_or_clear_bad(pud)) {
-+			pmd = pmd_alloc_one(NULL, addr);
-+			if (!pmd) {
-+				kvm_err("Cannot allocate Hyp pmd\n");
-+				return -ENOMEM;
-+			}
-+			pud_populate(NULL, pud, pmd);
-+			get_page(virt_to_page(pud));
-+			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-+		}
-+
-+		next = pud_addr_end(addr, end);
-+
-+		create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
-+		pfn += (next - addr) >> PAGE_SHIFT;
-+	} while (addr = next, addr != end);
-+
-+	return 0;
-+}
-+
- static int __create_hyp_mappings(pgd_t *pgdp,
- 				 unsigned long start, unsigned long end,
- 				 unsigned long pfn, pgprot_t prot)
+diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
+index 16d57a8..a76b44c 100644
+--- a/arch/arm/mach-vexpress/dcscb.c
++++ b/arch/arm/mach-vexpress/dcscb.c
+@@ -51,12 +51,14 @@ static int dcscb_allcpus_mask[2];
+ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
  {
- 	pgd_t *pgd;
-+#ifdef CONFIG_ARM64_4_LEVELS
- 	pud_t *pud;
--	pmd_t *pmd;
-+#endif
- 	unsigned long addr, next;
- 	int err = 0;
+ 	unsigned int rst_hold, cpumask = (1 << cpu);
+-	unsigned int all_mask = dcscb_allcpus_mask[cluster];
++	unsigned int all_mask;
  
-@@ -403,22 +436,25 @@ static int __create_hyp_mappings(pgd_t *pgdp,
- 	end = PAGE_ALIGN(end);
- 	do {
- 		pgd = pgdp + pgd_index(addr);
--		pud = pud_offset(pgd, addr);
+ 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+ 	if (cpu >= 4 || cluster >= 2)
+ 		return -EINVAL;
  
--		if (pud_none_or_clear_bad(pud)) {
--			pmd = pmd_alloc_one(NULL, addr);
--			if (!pmd) {
--				kvm_err("Cannot allocate Hyp pmd\n");
-+#ifdef CONFIG_ARM64_4_LEVELS
-+		if (pgd_none(*pgd)) {
-+			pud = pud_alloc_one(NULL, addr);
-+			if (!pud) {
-+				kvm_err("Cannot allocate Hyp pud\n");
- 				err = -ENOMEM;
- 				goto out;
- 			}
--			pud_populate(NULL, pud, pmd);
--			get_page(virt_to_page(pud));
--			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-+			pgd_populate(NULL, pgd, pud);
-+			get_page(virt_to_page(pgd));
-+			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
- 		}
-+#endif
- 
- 		next = pgd_addr_end(addr, end);
--		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
++	all_mask = dcscb_allcpus_mask[cluster];
 +
-+		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
-+
- 		if (err)
- 			goto out;
- 		pfn += (next - addr) >> PAGE_SHIFT;
-@@ -563,6 +599,26 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	kvm->arch.pgd = NULL;
- }
+ 	/*
+ 	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+ 	 * variant exists, we need to disable IRQs manually here.
+@@ -101,11 +103,12 @@ static void dcscb_power_down(void)
+ 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+ 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+ 	cpumask = (1 << cpu);
+-	all_mask = dcscb_allcpus_mask[cluster];
  
-+#ifdef CONFIG_ARM64_4_LEVELS
-+static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache
-+			     *cache, phys_addr_t addr)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+
-+	pgd = kvm->arch.pgd + pgd_index(addr);
-+	if (pgd_none(*pgd)) {
-+		if (!cache)
-+			return NULL;
-+		pud = mmu_memory_cache_alloc(cache);
-+		pgd_populate(NULL, pgd, pud);
-+		get_page(virt_to_page(pgd));
-+	}
-+
-+	return pud_offset(pgd, addr);
-+}
-+#endif
-+
- static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache
- 			     *cache, phys_addr_t addr)
- {
-@@ -617,6 +673,24 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
+ 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+ 	BUG_ON(cpu >= 4 || cluster >= 2);
  
-+#ifdef CONFIG_ARM64_4_LEVELS
-+	pud_t *pud;
++	all_mask = dcscb_allcpus_mask[cluster];
 +
-+	/* Create stage-2 page table mapping - Level 0 */
-+	pud = stage2_get_pud(kvm, cache, addr);
-+	if (!pud)
-+		return 0;
-+
-+	if (pud_none(*pud)) {
-+		if (!cache)
-+			return 0;
-+		pmd = mmu_memory_cache_alloc(cache);
-+		kvm_clean_pmd(pmd);
-+		pud_populate(NULL, pud, pmd);
-+		get_page(virt_to_page(pud));
-+	}
-+#endif
-+
- 	/* Create stage-2 page table mapping - Level 1 */
- 	pmd = stage2_get_pmd(kvm, cache, addr);
- 	if (!pmd) {
-@@ -675,7 +749,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
- 		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+ 	__mcpm_cpu_going_down(cpu, cluster);
  
--		ret = mmu_topup_memory_cache(&cache, 2, 2);
-+		ret = mmu_topup_memory_cache(&cache, 3, 3);
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 3d69030..295eda6 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -117,9 +117,11 @@
- #define VTCR_EL2_IRGN0_MASK	(3 << 8)
- #define VTCR_EL2_IRGN0_WBWA	(1 << 8)
- #define VTCR_EL2_SL0_MASK	(3 << 6)
-+#define VTCR_EL2_SL0_LVL0	(2 << 6)
- #define VTCR_EL2_SL0_LVL1	(1 << 6)
- #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_T0SZ_40B	24
-+#define VTCR_EL2_T0SZ_48B	16
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- /*
-@@ -134,6 +136,7 @@
- 				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
- #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
- #else
-+#ifndef CONFIG_ARM64_4_LEVELS
- /*
-  * Stage2 translation configuration:
-  * 40bits output (PS = 2)
-@@ -145,10 +148,27 @@
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
- 				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
- #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
-+#else
-+/*
-+ * Stage2 translation configuration:
-+ * 40bits output (PS = 2)
-+ * 48bits input  (T0SZ = 16)
-+ * 4kB pages (TG0 = 0)
-+ * 4 level page tables (SL = 2)
-+ */
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
-+				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-+				 VTCR_EL2_SL0_LVL0 | VTCR_EL2_T0SZ_48B)
-+#define VTTBR_X		(29 - VTCR_EL2_T0SZ_48B)
-+#endif
- #endif
- 
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
-+#ifndef CONFIG_ARM64_4_LEVELS
- #define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#else
-+#define VTTBR_BADDR_MASK  (((1LLU << (48 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#endif
- #define VTTBR_VMID_SHIFT  (48LLU)
- #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7d29847..ec76cf3 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -107,6 +107,7 @@ static inline bool kvm_is_write_fault(unsigned long esr)
- }
- 
- static inline void kvm_clean_pgd(pgd_t *pgd) {}
-+static inline void kvm_clean_pmd(pud_t *pud) {}
- static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
- static inline void kvm_clean_pte(pte_t *pte) {}
- static inline void kvm_clean_pte_entry(pte_t *pte) {}
+ 	arch_spin_lock(&dcscb_lock);
 -- 
 1.7.10.4
