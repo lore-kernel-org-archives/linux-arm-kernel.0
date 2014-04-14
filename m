@@ -1,50 +1,41 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Apr 2014 10:57:13 +0200
-Subject: [PATCH 1/4] ARM: at91: prepare common clk transition for sam9n12
- SoC
-In-Reply-To: <1397463399-11771-2-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 14 Apr 2014 10:57:54 +0200
+Subject: [PATCH 3/4] ARM: at91/dt: define sam9n12ek crystal frequencies
+In-Reply-To: <1397463399-11771-4-git-send-email-boris.brezillon@free-electrons.com>
 References: <1397463399-11771-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397463399-11771-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140414085713.GL2967@piout.net>
+ <1397463399-11771-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140414085754.GM2967@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/2014 at 10:16:36 +0200, Boris Brezillon wrote :
-> This patch encloses sam9n12 old clk registration in
-> "#if defined(CONFIG_OLD_CLK_AT91) #endif" sections.
+On 14/04/2014 at 10:16:38 +0200, Boris Brezillon wrote :
+> Define sam9n12ek's main and slow crystal frequencies.
 > 
 > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  arch/arm/mach-at91/at91sam9n12.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/at91sam9n12ek.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-> index f2ea7b0..c8988fe 100644
-> --- a/arch/arm/mach-at91/at91sam9n12.c
-> +++ b/arch/arm/mach-at91/at91sam9n12.c
-> @@ -19,9 +19,10 @@
->  #include "board.h"
->  #include "soc.h"
->  #include "generic.h"
-> -#include "clock.h"
->  #include "sam9_smc.h"
+> diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+> index 924a6a6..6132769 100644
+> --- a/arch/arm/boot/dts/at91sam9n12ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+> @@ -30,6 +30,14 @@
+>  			compatible = "atmel,osc", "fixed-clock";
+>  			clock-frequency = <16000000>;
+>  		};
+> +
+> +		slow_xtal: slow_xtal {
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		main_xtal: main_xtal {
+> +			clock-frequency = <16000000>;
+> +		};
+>  	};
 >  
-> +#if defined(CONFIG_OLD_CLK_AT91)
-> +#include "clock.h"
->  /* --------------------------------------------------------------------
->   *  Clocks
->   * -------------------------------------------------------------------- */
-> @@ -215,6 +216,9 @@ static void __init at91sam9n12_register_clocks(void)
->  			 ARRAY_SIZE(periph_clocks_lookups));
->  
->  }
-> +#else
-> +#define at91sam9n12_register_clocks NULL
-> +#endif
->  
->  /* --------------------------------------------------------------------
->   *  AT91SAM9N12 processor initialization
+>  	ahb {
 > -- 
 > 1.8.3.2
 > 
