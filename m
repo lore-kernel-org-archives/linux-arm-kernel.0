@@ -1,98 +1,67 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 14 Apr 2014 16:38:04 -0500
-Subject: [PATCH] dts: socfpga: Add DTS entries for USB
-Message-ID: <1397511484-23368-1-git-send-email-dinguyen@altera.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 14 Apr 2014 23:59:44 +0200
+Subject: [PATCHv2 02/11] ARM: shmobile: Armadillo 800 EVA: initialize all
+ struct pwm_lookup members
+In-Reply-To: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1397512793-10325-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+Initializing all the struct pwm_lookup members allows to get rid of the struct
+tpu_pwm_platform_data as the polarity initialization will be taken care of by
+the PWM core.
 
-Update all the SOCFPGA DTS files with USB entries.
-
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/socfpga.dtsi                |   30 +++++++++++++++++++++++++
- arch/arm/boot/dts/socfpga_arria5_socdk.dts    |    4 ++++
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  |    4 ++++
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |    4 ++++
- 4 files changed, 42 insertions(+)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index df43702..445fe2f 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -681,6 +681,36 @@
- 			reg = <0xffd05000 0x1000>;
- 		};
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 2858f380beae..1bf61dad9a35 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -31,7 +31,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/regulator/driver.h>
+ #include <linux/pinctrl/machine.h>
+-#include <linux/platform_data/pwm-renesas-tpu.h>
++#include <linux/pwm.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/gpio-regulator.h>
+@@ -399,24 +399,22 @@ static struct resource pwm_resources[] = {
+ 	},
+ };
  
-+		usbphy0: usbphy at 0 {
-+			#phy-cells = <0>;
-+			compatible = "usb-nop-xceiv";
-+			status = "okay";
-+		};
-+
-+		usb0: usb at ffb00000 {
-+			compatible = "snps,dwc2";
-+			reg = <0xffb00000 0xffff>;
-+			interrupts = <0 125 4>;
-+			clocks = <&usb_mp_clk>;
-+			clock-names = "otg";
-+			phys = <&usbphy0>;
-+			phy-names = "usb2-phy";
-+			dma-desc-enable = <0>;
-+			status = "disabled";
-+		};
-+
-+		usb1: usb at ffb40000 {
-+			compatible = "snps,dwc2";
-+			reg = <0xffb40000 0xffff>;
-+			interrupts = <0 128 4>;
-+			clocks = <&usb_mp_clk>;
-+			clock-names = "otg";
-+			phys = <&usbphy0>;
-+			phy-names = "usb2-phy";
-+			dma-desc-enable = <0>;
-+			status = "disabled";
-+		};
-+
- 		sysmgr: sysmgr at ffd08000 {
- 			compatible = "altr,sys-mgr", "syscon";
- 			reg = <0xffd08000 0x4000>;
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index a04061f..d532d17 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -74,3 +74,7 @@
- 		reg = <0x68>;
- 	};
+-static struct tpu_pwm_platform_data pwm_device_data = {
+-	.channels[2] = {
+-		.polarity = PWM_POLARITY_INVERSED,
+-	}
+-};
+-
+ static struct platform_device pwm_device = {
+ 	.name = "renesas-tpu-pwm",
+ 	.id = -1,
+-	.dev = {
+-		.platform_data = &pwm_device_data,
+-	},
+ 	.num_resources = ARRAY_SIZE(pwm_resources),
+ 	.resource = pwm_resources,
  };
-+
-+&usb1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 55d54f7..45de151 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -67,3 +67,7 @@
- 		reg = <0x68>;
- 	};
+ 
+ static struct pwm_lookup pwm_lookup[] = {
+-	PWM_LOOKUP("renesas-tpu-pwm", 2, "pwm-backlight.0", NULL),
++	{
++		.provider = "renesas-tpu-pwm",
++		.index = 2,
++		.dev_id = "pwm-backlight.0",
++		.con_id = NULL,
++		.period = 33333,
++		.polarity = PWM_POLARITY_INVERSED,
++	},
  };
-+
-+&usb1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index d5ce22c..d26f155 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -52,3 +52,7 @@
- 	rxdv-skew-ps = <0>;
- 	rxc-skew-ps = <2000>;
- };
-+
-+&usb1 {
-+	status = "okay";
-+};
+ 
+ /* LCDC and backlight */
 -- 
-1.7.9.5
+1.8.3.2
