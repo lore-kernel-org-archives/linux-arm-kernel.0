@@ -1,36 +1,46 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Mon, 14 Apr 2014 20:34:10 +0200
-Subject: Device tree support for Atmel AC97 controller on AT91SAM9263
-In-Reply-To: <534B9ECF.806@atmel.com>
-References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
- <534B9ECF.806@atmel.com>
-Message-ID: <3514422.OSZGxjlElf@kongar>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 14 Apr 2014 20:39:41 +0200
+Subject: [PATCH 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
+ deadlock
+In-Reply-To: <20140414165956.GJ12916@arm.com>
+References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140403160727.17b3558b@skate>
+ <20140403141533.GP7528@n2100.arm.linux.org.uk>
+ <20140407121304.GD3360@arm.com> <20140414165956.GJ12916@arm.com>
+Message-ID: <20140414203941.4924e277@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bo,
+Dear Will Deacon,
 
-On Monday 14 April 2014, 16:39:43 wrote Bo Shen:
-> On 04/12/2014 05:08 PM, Alexander Stein wrote:
-> > This set of patches add device tree support for the AC97 controller found
-> > on AT91SAM9263.
-> > The first two patches are minor cleanup, while the last ones add the actual
-> > support.
-> 
-> I just test the whole patch series, and find issues to work with device 
-> tree kernel.
-> When we use dt kernel, no where assign the device id (so take it as 
-> "-1"), so when register devices, it will be /dev/snd/pcmC0D-1p and 
-> /dev/snd/pcmC0D-1c. So, the sound won't work.
-> 
-> The root cause is that when call "snd_pcm_new", it will pass 
-> "chip->pdev->id" as parameter.
-> 
-> So, I am thinking whether this should be fix in <sound/atmel/ac97c.c> or 
-> in <sound/core/pcm.c>
+On Mon, 14 Apr 2014 17:59:56 +0100, Will Deacon wrote:
 
-Ah. thanks for figuring out. I also noticed later that e.g. aplay actually doesn't work, but could not figure out why. pcmC0D-1c looked valid at first glance I wasn't aware that this includes a -1 :)
-I was already happy that the controller found the codec.
+> > > Will is away for another week and a half.
+> > 
+> > And when he's back, I'm pretty sure he will be eager to look at the
+> > PL310 code ;)
+> 
+> Lucky for me, it looks like rmk is rewriting it ;)
+> 
+> Is there anything you want me to do here?
 
-Best regards,
-Alexander
+Yes. I would actually been interested in a summary/conclusion of the
+discussions, because I'm not sure what I'm supposed to do now. So there
+are two parts here:
+
+ * Mapping PCIe I/O regions as strongly ordered.
+
+ * Disabling outer_cache sync in the PL310 driver.
+
+Some discussion has been going on with Catalin, I've answered some
+questions by providing more details to Catalin, but in the end, I don't
+know if the patches I provided are acceptable or not, and if not, in
+what way they should be changed.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
