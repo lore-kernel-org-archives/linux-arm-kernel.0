@@ -1,32 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Apr 2014 17:59:56 +0100
-Subject: [PATCH 0/3] ARM: implement workaround for Cortex-A9/PL310/PCIe
- deadlock
-In-Reply-To: <20140407121304.GD3360@arm.com>
-References: <1395677872-32741-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140403160727.17b3558b@skate>
- <20140403141533.GP7528@n2100.arm.linux.org.uk>
- <20140407121304.GD3360@arm.com>
-Message-ID: <20140414165956.GJ12916@arm.com>
+Date: Mon, 14 Apr 2014 18:13:00 +0100
+Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
+In-Reply-To: <20140403220713.GA23545@google.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <20140403220713.GA23545@google.com>
+Message-ID: <20140414171300.GL12916@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 07, 2014 at 01:13:04PM +0100, Catalin Marinas wrote:
-> On Thu, Apr 03, 2014 at 03:15:33PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Apr 03, 2014 at 04:07:27PM +0200, Thomas Petazzoni wrote:
-> > > Any comments about the proposed patches? These are important for the
-> > > recent Armada 375/38x platforms and I'm sure will require a bit of
-> > > discussion. Moreover, one of the patch affects the L2 cache driver that
-> > > Russell is currently working on, so it would be nice if we could get
-> > > the discussion going soon.
+Hi Bjorn,
+
+(apologies for the delay, I've been away for a month)
+
+On Thu, Apr 03, 2014 at 11:07:13PM +0100, Bjorn Helgaas wrote:
+> On Tue, Feb 04, 2014 at 04:53:01PM +0000, Will Deacon wrote:
+> > Hello,
 > > 
-> > Will is away for another week and a half.
+> > This small set of patches brings PCI support to mach-virt based upon an
+> > idealised host controller (see patch 2 for more details).
+> > 
+> > This has been tested with kvmtool, for which I have a corresponding set
+> > of patches which you can find in my kvmtool/pci branch at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git
+> > 
+> > Once the arm64 PCI patches from Liviu have stabilised, I plan to port
+> > this host controller to work there as well.
+> > 
+> > The main issue I can see with this code is how to describe configuration
+> > space in the device-tree. I'm following the ePAPR PCI bindings (SS == 0)
+> > , but this adds an ugly 'case 0:' line in the pci range parser, which
+> > also exists in mainline for the pcie-designware.c driver.
 > 
-> And when he's back, I'm pretty sure he will be eager to look at the
-> PL310 code ;)
+> There was a long discussion about this (especially 2/3), and I didn't
+> follow it closely enough to get the resolution, and I don't think I
+> picked up the patches.
+> 
+> Can you post them again if they're still applicable?
 
-Lucky for me, it looks like rmk is rewriting it ;)
+I ended up at v5 of the series:
 
-Is there anything you want me to do here?
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237540.html
+
+which hasn't received any feedback. My plan is to get the driver working
+with arm64 once Liviu's series is merged, but I'd be happy to see this
+merged for 32-bit ARM before then.
+
+Arnd: Is there anything more you'd like me to do with this series? Given
+that it would be targetting 3.16, there's still plenty of time to make
+changes (we talked about extracting some library functions in the past).
 
 Will
