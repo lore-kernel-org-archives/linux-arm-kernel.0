@@ -1,63 +1,89 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 14 Apr 2014 12:55:58 +0530
-Subject: [PATCH] serial: amba-pl011: fix regression,
- causing an Oops on rmmod
-In-Reply-To: <Pine.LNX.4.64.1404051629050.3518@axis700.grange>
-References: <Pine.LNX.4.64.1404051629050.3518@axis700.grange>
-Message-ID: <CAHbNUh0AfrbamzauMxEp=88+y=Q8BksikCXkYvp5z1YvpKtF7Q@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 14 Apr 2014 09:29:02 +0200
+Subject: [PATCH v4 0/5] rework sched_domain topology description
+In-Reply-To: <534937F0.3020702@arm.com>
+References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
+ <534937F0.3020702@arm.com>
+Message-ID: <CAKfTPtC02QMyA55zVr_MmVMi8h7UzB5SDmZvU2GUNx-VXj+hkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 April 2014 20:01, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> A recent commit ef2889f7ffee67f0aed49e854c72be63f1466759 "serial: pl011:
-> Move uart_register_driver call to device probe" introduced a regression,
-> causing the pl011 driver to Oops if more than 1 port have been probed. Fix
-> the Oops by only calling uart_unregister_driver() once after the last port
-> has been removed.
+On 12 April 2014 14:56, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> On 11/04/14 10:44, Vincent Guittot wrote:
+>>
+>> This patchset was previously part of the larger tasks packing patchset
+>> [1].
+>> I have splitted the latter in 3 different patchsets (at least) to make the
+>> thing easier.
+>> -configuration of sched_domain topology (this patchset)
+>> -update and consolidation of cpu_power
+>> -tasks packing algorithm
+>>
+>> Based on Peter Z's proposal [2][3], this patchset modifies the way to
+>> configure
+>> the sched_domain level in order to let architectures to add specific level
+>> like
+>> the current BOOK level or the proposed power gating level for ARM
+>> architecture.
+>>
+>> [1] https://lkml.org/lkml/2013/10/18/121
+>> [2] https://lkml.org/lkml/2013/11/5/239
+>> [3] https://lkml.org/lkml/2013/11/5/449
 >
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-
-Sorry about this. There were some additional suggestion in following
-thread [1] about registering it once during first probe and then
-unregistering during the last remove.
-
-[1] http://linux-kernel.2935.n7.nabble.com/PATCH-0-2-serial-Move-uart-register-driver-call-to-device-probe-td789746.html#a790221
-
-> ---
->  drivers/tty/serial/amba-pl011.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index d4eda24..07325f2 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2176,6 +2176,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->  static int pl011_remove(struct amba_device *dev)
->  {
->         struct uart_amba_port *uap = amba_get_drvdata(dev);
-> +       bool busy = false;
->         int i;
+> Hi Vincent,
 >
->         uart_remove_one_port(&amba_reg, &uap->port);
-> @@ -2183,9 +2184,12 @@ static int pl011_remove(struct amba_device *dev)
->         for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
->                 if (amba_ports[i] == uap)
->                         amba_ports[i] = NULL;
-> +               else if (amba_ports[i])
-> +                       busy = true;
+> given the discussion we had for v1-v3 and a short boot test of v4:
 >
->         pl011_dma_remove(uap);
-> -       uart_unregister_driver(&amba_reg);
-> +       if (!busy)
-> +               uart_unregister_driver(&amba_reg);
->         return 0;
->  }
+> For patch 1/5, 4/5, 5/5 on ARM TC2 (heterogeneous dual socket w/o SMT
+> machine):
 >
-> --
-> 1.9.1
+> Reviewed-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> Tested-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 >
 
+Thanks
 
-
--- 
-Tushar Behera
+> Cheers,
+>
+> -- Dietmar
+>
+>
+>>
+>> Change since v3:
+>> - remove last patch which was adding SD_SHARE_POWER_DOMAIN for powerpc's
+>> SMT
+>>    level
+>>
+>> Change since v2:
+>> - remove patch 1 as it has been already applied to metag tree for v3.15
+>> - updates some commit messages
+>> - add new flag description in TOPOLOGY_SD_FLAGS description
+>>
+>> Change since v1:
+>> - move sched_domains_curr_level back under #ifdef CONFIG_NUMA
+>> - use function pointer to set flag instead of a plain value.
+>> - add list of tunable flags in the commit message of patch 2
+>> - add SD_SHARE_POWER_DOMAIN flag for powerpc's SMT level
+>>
+>> Vincent Guittot (5):
+>>    sched: rework of sched_domain topology definition
+>>    sched: s390: create a dedicated topology table
+>>    sched: powerpc: create a dedicated topology table
+>>    sched: add a new SD_SHARE_POWERDOMAIN for sched_domain
+>>    sched: ARM: create a dedicated scheduler topology table
+>>
+>>   arch/arm/kernel/topology.c       |  26 +++++
+>>   arch/ia64/include/asm/topology.h |  24 ----
+>>   arch/powerpc/kernel/smp.c        |  31 +++--
+>>   arch/s390/include/asm/topology.h |  13 +--
+>>   arch/s390/kernel/topology.c      |  20 ++++
+>>   arch/tile/include/asm/topology.h |  33 ------
+>>   include/linux/sched.h            |  49 +++++++-
+>>   include/linux/topology.h         | 128 +++-----------------
+>>   kernel/sched/core.c              | 244
+>> ++++++++++++++++++++-------------------
+>>   9 files changed, 255 insertions(+), 313 deletions(-)
+>>
+>
+>
