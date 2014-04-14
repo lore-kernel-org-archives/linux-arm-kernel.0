@@ -1,96 +1,231 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 14 Apr 2014 15:35:35 +0200
-Subject: [PATCH v3 05/18] ASoC: fsl-ssi: Remove useless DMA code
+Date: Mon, 14 Apr 2014 15:35:36 +0200
+Subject: [PATCH v3 06/18] ASoC: fsl-ssi: Cleanup probe function
 In-Reply-To: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
 References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1397482548-28463-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <1397482548-28463-7-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify dma DT property handling. fsl,ssi-dma-events is not used
-anymore. It passes invalid data to imx_pcm_dma_params_init_data() which
-copies some data into an imx dma struct. This struct is never used in
-imx-dma or imx-sdma because of generic OF DMA handling. The
-"fsl,ssi-dma-events" is not used anywhere in dts files.
+Reorder the probe function to be able to move the second imx-specific
+block to the seperate imx probe function. The patch also removes some
+comments/variables/code that are not used anymore or could be simply
+replaced by other variables.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 40 +++-------------------------------------
- 1 file changed, 3 insertions(+), 37 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 113 +++++++++++++++++++++++-------------------------
+ 1 file changed, 53 insertions(+), 60 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 418c646..8072926 100644
+index 8072926..af1b82f 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -168,8 +168,6 @@ struct fsl_ssi_private {
- 	struct clk *clk;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
--	struct imx_dma_data filter_data_tx;
--	struct imx_dma_data filter_data_rx;
- 	struct imx_pcm_fiq_params fiq_params;
- 	/* Register values for rx/tx configuration */
- 	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
-@@ -996,8 +994,7 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 		struct fsl_ssi_private *ssi_private)
+@@ -159,7 +159,6 @@ struct fsl_ssi_private {
+ 	bool imx_ac97;
+ 	bool use_dma;
+ 	bool baudclk_locked;
+-	bool irq_stats;
+ 	bool offline_config;
+ 	bool use_dual_fifo;
+ 	u8 i2s_mode;
+@@ -991,7 +990,7 @@ static void make_lowercase(char *s)
+ }
+ 
+ static int fsl_ssi_imx_probe(struct platform_device *pdev,
+-		struct fsl_ssi_private *ssi_private)
++		struct fsl_ssi_private *ssi_private, void __iomem *iomem)
  {
  	struct device_node *np = pdev->dev.of_node;
--	u32 dma_events[2], dmas[4];
--	bool shared;
-+	u32 dmas[4];
- 	int ret;
- 
- 	ssi_private->clk = devm_clk_get(&pdev->dev, NULL);
-@@ -1033,26 +1030,9 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
- 			offsetof(struct ccsr_ssi, stx0);
- 	ssi_private->dma_params_rx.addr = ssi_private->ssi_phys +
- 			offsetof(struct ccsr_ssi, srx0);
--	ssi_private->dma_params_tx.filter_data = &ssi_private->filter_data_tx;
--	ssi_private->dma_params_rx.filter_data = &ssi_private->filter_data_rx;
- 
--	if (!of_property_read_bool(pdev->dev.of_node, "dmas") &&
--			ssi_private->use_dma) {
--		/*
--		 * FIXME: This is a temporary solution until all
--		 * necessary dma drivers support the generic dma
--		 * bindings.
--		 */
--		ret = of_property_read_u32_array(pdev->dev.of_node,
--				"fsl,ssi-dma-events", dma_events, 2);
--		if (ret && ssi_private->use_dma) {
--			dev_err(&pdev->dev, "could not get dma events but fsl-ssi is configured to use DMA\n");
--			goto error_dma_events;
--		}
--	}
--	/* Should this be merge with the above? */
--	if (!of_property_read_u32_array(pdev->dev.of_node, "dmas", dmas, 4)
--			&& dmas[2] == IMX_DMATYPE_SSI_DUAL) {
-+	ret = !of_property_read_u32_array(np, "dmas", dmas, 4);
-+	if (ssi_private->use_dma && !ret && dmas[2] == IMX_DMATYPE_SSI_DUAL) {
- 		ssi_private->use_dual_fifo = true;
- 		/* When using dual fifo mode, we need to keep watermark
- 		 * as even numbers due to dma script limitation.
-@@ -1061,21 +1041,7 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
+ 	u32 dmas[4];
+@@ -1041,12 +1040,47 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
  		ssi_private->dma_params_rx.maxburst &= ~0x1;
  	}
  
--	shared = of_device_is_compatible(of_get_parent(np), "fsl,spba-bus");
--
--	imx_pcm_dma_params_init_data(&ssi_private->filter_data_tx,
--		dma_events[0], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
--	imx_pcm_dma_params_init_data(&ssi_private->filter_data_rx,
--		dma_events[1], shared ? IMX_DMATYPE_SSI_SP : IMX_DMATYPE_SSI);
--
++	if (!ssi_private->use_dma) {
++
++		/*
++		 * Some boards use an incompatible codec. To get it
++		 * working, we are using imx-fiq-pcm-audio, that
++		 * can handle those codecs. DMA is not possible in this
++		 * situation.
++		 */
++
++		ssi_private->fiq_params.irq = ssi_private->irq;
++		ssi_private->fiq_params.base = iomem;
++		ssi_private->fiq_params.dma_params_rx =
++			&ssi_private->dma_params_rx;
++		ssi_private->fiq_params.dma_params_tx =
++			&ssi_private->dma_params_tx;
++
++		ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
++		if (ret)
++			goto error_pcm;
++	} else {
++		ret = imx_pcm_dma_init(pdev);
++		if (ret)
++			goto error_pcm;
++	}
++
  	return 0;
--
--error_dma_events:
--	if (!IS_ERR(ssi_private->baudclk))
--		clk_disable_unprepare(ssi_private->baudclk);
--	clk_disable_unprepare(ssi_private->clk);
--
--	return ret;
++
++error_pcm:
++	if (!IS_ERR(ssi_private->baudclk))
++		clk_disable_unprepare(ssi_private->baudclk);
++
++	clk_disable_unprepare(ssi_private->clk);
++
++	return ret;
  }
  
  static void fsl_ssi_imx_clean(struct platform_device *pdev,
+ 		struct fsl_ssi_private *ssi_private)
+ {
++	if (!ssi_private->use_dma)
++		imx_pcm_fiq_exit(pdev);
+ 	if (!IS_ERR(ssi_private->baudclk))
+ 		clk_disable_unprepare(ssi_private->baudclk);
+ 	clk_disable_unprepare(ssi_private->clk);
+@@ -1056,7 +1090,6 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ {
+ 	struct fsl_ssi_private *ssi_private;
+ 	int ret = 0;
+-	struct device_attribute *dev_attr = NULL;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	const struct of_device_id *of_id;
+ 	enum fsl_ssi_type hw_type;
+@@ -1149,6 +1182,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	ssi_private->baudclk_locked = false;
+ 	spin_lock_init(&ssi_private->baudclk_lock);
+ 
++	dev_set_drvdata(&pdev->dev, ssi_private);
++
+ 	/*
+ 	 * imx51 and later SoCs have a slightly different IP that allows the
+ 	 * SSI configuration while the SSI unit is running.
+@@ -1179,20 +1214,22 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 			hw_type == FSL_SSI_MX35) {
+ 		ssi_private->ssi_on_imx = true;
+ 
+-		ret = fsl_ssi_imx_probe(pdev, ssi_private);
++		ret = fsl_ssi_imx_probe(pdev, ssi_private, ssi_private->ssi);
+ 		if (ret)
+ 			goto error_irqmap;
+ 	}
+ 
+-	/*
+-	 * Enable interrupts only for MCP8610 and MX51. The other MXs have
+-	 * different writeable interrupt status registers.
+-	 */
++	ret = snd_soc_register_component(&pdev->dev, &fsl_ssi_component,
++					 &ssi_private->cpu_dai_drv, 1);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to register DAI: %d\n", ret);
++		goto error_asoc_register;
++	}
++
+ 	if (ssi_private->use_dma) {
+ 		ret = devm_request_irq(&pdev->dev, ssi_private->irq,
+ 					fsl_ssi_isr, 0, ssi_private->name,
+ 					ssi_private);
+-		ssi_private->irq_stats = true;
+ 		if (ret < 0) {
+ 			dev_err(&pdev->dev, "could not claim irq %u\n",
+ 					ssi_private->irq);
+@@ -1200,46 +1237,9 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	/* Register with ASoC */
+-	dev_set_drvdata(&pdev->dev, ssi_private);
+-
+-	ret = snd_soc_register_component(&pdev->dev, &fsl_ssi_component,
+-					 &ssi_private->cpu_dai_drv, 1);
+-	if (ret) {
+-		dev_err(&pdev->dev, "failed to register DAI: %d\n", ret);
+-		goto error_dev;
+-	}
+-
+ 	ret = fsl_ssi_debugfs_create(&ssi_private->dbg_stats, &pdev->dev);
+ 	if (ret)
+-		goto error_dbgfs;
+-
+-	if (ssi_private->ssi_on_imx) {
+-		if (!ssi_private->use_dma) {
+-
+-			/*
+-			 * Some boards use an incompatible codec. To get it
+-			 * working, we are using imx-fiq-pcm-audio, that
+-			 * can handle those codecs. DMA is not possible in this
+-			 * situation.
+-			 */
+-
+-			ssi_private->fiq_params.irq = ssi_private->irq;
+-			ssi_private->fiq_params.base = ssi_private->ssi;
+-			ssi_private->fiq_params.dma_params_rx =
+-				&ssi_private->dma_params_rx;
+-			ssi_private->fiq_params.dma_params_tx =
+-				&ssi_private->dma_params_tx;
+-
+-			ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
+-			if (ret)
+-				goto error_pcm;
+-		} else {
+-			ret = imx_pcm_dma_init(pdev);
+-			if (ret)
+-				goto error_pcm;
+-		}
+-	}
++		goto error_asoc_register;
+ 
+ 	/*
+ 	 * If codec-handle property is missing from SSI node, we assume
+@@ -1269,32 +1269,25 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	if (IS_ERR(ssi_private->pdev)) {
+ 		ret = PTR_ERR(ssi_private->pdev);
+ 		dev_err(&pdev->dev, "failed to register platform: %d\n", ret);
+-		goto error_dai;
++		goto error_sound_card;
+ 	}
+ 
+ done:
+ 	return 0;
+ 
+-error_dai:
+-	if (ssi_private->ssi_on_imx && !ssi_private->use_dma)
+-		imx_pcm_fiq_exit(pdev);
+-
+-error_pcm:
++error_sound_card:
+ 	fsl_ssi_debugfs_remove(&ssi_private->dbg_stats);
+ 
+-error_dbgfs:
++error_irq:
+ 	snd_soc_unregister_component(&pdev->dev);
+ 
+-error_dev:
+-	device_remove_file(&pdev->dev, dev_attr);
+-
+-error_irq:
++error_asoc_register:
+ 	if (ssi_private->ssi_on_imx) {
+ 		fsl_ssi_imx_clean(pdev, ssi_private);
+ 	}
+ 
+ error_irqmap:
+-	if (ssi_private->irq_stats)
++	if (ssi_private->use_dma)
+ 		irq_dispose_mapping(ssi_private->irq);
+ 
+ 	return ret;
+@@ -1313,7 +1306,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ 	if (ssi_private->ssi_on_imx)
+ 		fsl_ssi_imx_clean(pdev, ssi_private);
+ 
+-	if (ssi_private->irq_stats)
++	if (ssi_private->use_dma)
+ 		irq_dispose_mapping(ssi_private->irq);
+ 
+ 	return 0;
 -- 
 1.9.1
