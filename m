@@ -1,106 +1,256 @@
-From: stratosk@semaphore.gr (Stratos Karafotis)
-Date: Tue, 15 Apr 2014 00:09:18 +0300
-Subject: [PATCH 08/20] cpufreq: exynos5440: Use cpufreq_for_each_entry macro
- for iteration
-Message-ID: <534C4E7E.4090806@semaphore.gr>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 14 Apr 2014 14:20:23 -0700
+Subject: [PATCH v2 1/2] ARM: mm: allow non-text sections to be non-executable
+In-Reply-To: <1397510424-9601-1-git-send-email-keescook@chromium.org>
+References: <1397510424-9601-1-git-send-email-keescook@chromium.org>
+Message-ID: <1397510424-9601-2-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq core supports the cpufreq_for_each_entry macro helper
-for iteration over the cpufreq_frequency_table, so use it.
+Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
+into section-sized areas that can have different permisions. Performs
+the NX permission changes during free_initmem, so that init memory can be
+reclaimed.
 
-It should have no functional changes.
+This uses section size instead of PMD size to reduce memory lost to
+padding on non-LPAE systems.
 
-Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
+
+Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- drivers/cpufreq/exynos5440-cpufreq.c | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/kernel/vmlinux.lds.S |   17 +++++++
+ arch/arm/mm/Kconfig           |    9 ++++
+ arch/arm/mm/init.c            |  106 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/mmu.c             |   13 ++++-
+ 4 files changed, 144 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
-index a6b8214..3e3dd0c 100644
---- a/drivers/cpufreq/exynos5440-cpufreq.c
-+++ b/drivers/cpufreq/exynos5440-cpufreq.c
-@@ -114,25 +114,23 @@ static struct cpufreq_freqs freqs;
- 
- static int init_div_table(void)
- {
--	struct cpufreq_frequency_table *freq_tbl = dvfs_info->freq_table;
-+	struct cpufreq_frequency_table *pos, *freq_tbl = dvfs_info->freq_table;
- 	unsigned int tmp, clk_div, ema_div, freq, volt_id;
--	int i = 0;
- 	struct dev_pm_opp *opp;
- 
- 	rcu_read_lock();
--	for (i = 0; freq_tbl[i].frequency != CPUFREQ_TABLE_END; i++) {
--
-+	cpufreq_for_each_entry(pos, freq_tbl) {
- 		opp = dev_pm_opp_find_freq_exact(dvfs_info->dev,
--					freq_tbl[i].frequency * 1000, true);
-+					pos->frequency * 1000, true);
- 		if (IS_ERR(opp)) {
- 			rcu_read_unlock();
- 			dev_err(dvfs_info->dev,
- 				"failed to find valid OPP for %u KHZ\n",
--				freq_tbl[i].frequency);
-+				pos->frequency);
- 			return PTR_ERR(opp);
- 		}
- 
--		freq = freq_tbl[i].frequency / 1000; /* In MHZ */
-+		freq = pos->frequency / 1000; /* In MHZ */
- 		clk_div = ((freq / CPU_DIV_FREQ_MAX) & P0_7_CPUCLKDEV_MASK)
- 					<< P0_7_CPUCLKDEV_SHIFT;
- 		clk_div |= ((freq / CPU_ATB_FREQ_MAX) & P0_7_ATBCLKDEV_MASK)
-@@ -157,7 +155,8 @@ static int init_div_table(void)
- 		tmp = (clk_div | ema_div | (volt_id << P0_7_VDD_SHIFT)
- 			| ((freq / FREQ_UNIT) << P0_7_FREQ_SHIFT));
- 
--		__raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 * i);
-+		__raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 *
-+						(pos - freq_tbl));
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 7bcee5c9b604..08fa667ef2f1 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -8,6 +8,9 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++#include <asm/pgtable.h>
++#endif
+ 	
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+@@ -90,6 +93,11 @@ SECTIONS
+ 		_text = .;
+ 		HEAD_TEXT
  	}
++
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++#endif
++
+ 	.text : {			/* Real text segment		*/
+ 		_stext = .;		/* Text and read-only data	*/
+ 			__exception_text_start = .;
+@@ -145,7 +153,11 @@ SECTIONS
+ 	_etext = .;			/* End of text and rodata section */
  
- 	rcu_read_unlock();
-@@ -166,8 +165,9 @@ static int init_div_table(void)
+ #ifndef CONFIG_XIP_KERNEL
++# ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++# else
+ 	. = ALIGN(PAGE_SIZE);
++# endif
+ 	__init_begin = .;
+ #endif
+ 	/*
+@@ -220,7 +232,12 @@ SECTIONS
+ 	. = PAGE_OFFSET + TEXT_OFFSET;
+ #else
+ 	__init_end = .;
++
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++	. = ALIGN(1<<SECTION_SHIFT);
++#else
+ 	. = ALIGN(THREAD_SIZE);
++#endif
+ 	__data_loc = .;
+ #endif
  
- static void exynos_enable_dvfs(unsigned int cur_frequency)
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index f5ad9ee70426..b484fb04cf6f 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -957,3 +957,12 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+ 	help
+ 	  This option specifies the architecture can support big endian
+ 	  operation.
++
++config ARM_KERNMEM_PERMS
++	bool "Restrict kernel memory permissions"
++	help
++	  If this is set, kernel memory other than kernel text (and rodata)
++	  will be made non-executable. The tradeoff is that each region is
++	  padded to section-size (1MiB) boundaries (because their permissions
++	  are different and splitting the 1M pages into 4K ones causes TLB
++	  performance problems), wasting memory.
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 2a77ba8796ae..66a7283583cd 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -31,6 +31,11 @@
+ #include <asm/tlb.h>
+ #include <asm/fixmap.h>
+ 
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++#include <asm/system_info.h>
++#include <asm/cp15.h>
++#endif
++
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+@@ -623,11 +628,112 @@ void __init mem_init(void)
+ 	}
+ }
+ 
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++struct section_perm {
++	unsigned long start;
++	unsigned long end;
++	pmdval_t mask;
++	pmdval_t prot;
++};
++
++struct section_perm nx_perms[] = {
++	/* Make pages tables, etc before _stext RW (set NX). */
++	{
++		.start	= PAGE_OFFSET,
++		.end	= (unsigned long)_stext,
++		.mask	= ~PMD_SECT_XN,
++		.prot	= PMD_SECT_XN,
++	},
++	/* Make init RW (set NX). */
++	{
++		.start	= (unsigned long)__init_begin,
++		.end	= (unsigned long)_sdata,
++		.mask	= ~PMD_SECT_XN,
++		.prot	= PMD_SECT_XN,
++	},
++};
++
++/*
++ * Updates section permissions only for the current mm (sections are
++ * copied into each mm). During startup, this is the init_mm.
++ */
++static inline void section_update(unsigned long addr, pmdval_t mask,
++				  pmdval_t prot)
++{
++	struct mm_struct *mm;
++	pmd_t *pmd;
++
++	mm = current->active_mm;
++	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
++
++#ifdef CONFIG_ARM_LPAE
++	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
++#else
++	if (addr & SECTION_SIZE)
++		pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
++	else
++		pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
++#endif
++	flush_pmd_entry(pmd);
++	local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
++}
++
++/* Make sure extended page tables are in use. */
++static inline bool arch_has_strict_perms(void)
++{
++	unsigned int cr;
++
++	if (cpu_architecture() < CPU_ARCH_ARMv6)
++		return false;
++
++	cr = get_cr();
++	if (!(cr & CR_XP))
++		return false;
++
++	return true;
++}
++
++#define set_section_perms(perms, field)	{				\
++	size_t i;							\
++	unsigned long addr;						\
++									\
++	if (!arch_has_strict_perms())					\
++		return;							\
++									\
++	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
++		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
++		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
++			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
++				perms[i].start, perms[i].end,		\
++				SECTION_SIZE);				\
++			continue;					\
++		}							\
++									\
++		for (addr = perms[i].start;				\
++		     addr < perms[i].end;				\
++		     addr += SECTION_SIZE)				\
++			section_update(addr, perms[i].mask,		\
++				       perms[i].field);			\
++	}								\
++}
++
++static inline void fix_kernmem_perms(void)
++{
++	set_section_perms(nx_perms, prot);
++}
++#else
++static inline void fix_kernmem_perms(void) { }
++#endif /* CONFIG_ARM_KERNMEM_PERMS */
++
+ void free_initmem(void)
  {
--	unsigned int tmp, i, cpu;
-+	unsigned int tmp, cpu;
- 	struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
-+	struct cpufreq_frequency_table *pos;
- 	/* Disable DVFS */
- 	__raw_writel(0,	dvfs_info->base + XMU_DVFS_CTRL);
+ #ifdef CONFIG_HAVE_TCM
+ 	extern char __tcm_start, __tcm_end;
++#endif
++
++	fix_kernmem_perms();
  
-@@ -182,15 +182,15 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
- 	 __raw_writel(tmp, dvfs_info->base + XMU_PMUIRQEN);
- 
- 	/* Set initial performance index */
--	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
--		if (freq_table[i].frequency == cur_frequency)
-+	cpufreq_for_each_entry(pos, freq_table) {
-+		if (pos->frequency == cur_frequency)
++#ifdef CONFIG_HAVE_TCM
+ 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+ 	free_reserved_area(&__tcm_start, &__tcm_end, -1, "TCM link");
+ #endif
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b68c6b22e1c8..3e163071bdcb 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1379,13 +1379,24 @@ static void __init map_lowmem(void)
+ 		if (start >= end)
  			break;
-+	}
  
--	if (freq_table[i].frequency == CPUFREQ_TABLE_END) {
-+	if (pos->frequency == CPUFREQ_TABLE_END) {
- 		dev_crit(dvfs_info->dev, "Boot up frequency not supported\n");
- 		/* Assign the highest frequency */
--		i = 0;
--		cur_frequency = freq_table[i].frequency;
-+		cur_frequency = freq_table->frequency;
- 	}
+-		if (end < kernel_x_start || start >= kernel_x_end) {
++		if (end < kernel_x_start) {
+ 			map.pfn = __phys_to_pfn(start);
+ 			map.virtual = __phys_to_virt(start);
+ 			map.length = end - start;
+ 			map.type = MT_MEMORY_RWX;
  
- 	dev_info(dvfs_info->dev, "Setting dvfs initial frequency = %uKHZ",
-@@ -199,7 +199,7 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
- 	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
- 		tmp = __raw_readl(dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
- 		tmp &= ~(P_VALUE_MASK << C0_3_PSTATE_NEW_SHIFT);
--		tmp |= (i << C0_3_PSTATE_NEW_SHIFT);
-+		tmp |= ((pos - freq_table) << C0_3_PSTATE_NEW_SHIFT);
- 		__raw_writel(tmp, dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
- 	}
- 
+ 			create_mapping(&map);
++		} else if (start >= kernel_x_end) {
++			map.pfn = __phys_to_pfn(start);
++			map.virtual = __phys_to_virt(start);
++			map.length = end - start;
++#ifdef CONFIG_ARM_KERNMEM_PERMS
++			map.type = MT_MEMORY_RW;
++#else
++			map.type = MT_MEMORY_RWX;
++#endif
++
++			create_mapping(&map);
+ 		} else {
+ 			/* This better cover the entire kernel */
+ 			if (start < kernel_x_start) {
 -- 
-1.9.0
+1.7.9.5
