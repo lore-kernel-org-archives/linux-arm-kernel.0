@@ -1,53 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Apr 2014 10:14:38 +0200
-Subject: [PATCH] pinctrl/at91: Fix mask creation in at91_gpio_dbg_show
-In-Reply-To: <1397241193-2420-1-git-send-email-alexanders83@web.de>
-References: <CAJjB1qLC6HBwz=bBef-EGH8wrfpqE3DdTGcfGrwb_r1qCdRPRA@mail.gmail.com>
- <1397241193-2420-1-git-send-email-alexanders83@web.de>
-Message-ID: <20140414081438.GI2967@piout.net>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 14 Apr 2014 10:16:36 +0200
+Subject: [PATCH 1/4] ARM: at91: prepare common clk transition for sam9n12 SoC
+In-Reply-To: <1397463399-11771-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397463399-11771-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397463399-11771-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2014 at 20:33:13 +0200, Alexander Stein wrote :
-> pin_to_mask expects a bank pin number. So do not add the chip base.
-> 
-I would prefer that you add a description of the effects of the bug as
-seen by the user.
+This patch encloses sam9n12 old clk registration in
+"#if defined(CONFIG_OLD_CLK_AT91) #endif" sections.
 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-else
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ arch/arm/mach-at91/at91sam9n12.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-> ---
-> Mark, thanks for the clarification that pin_to_mask only expects tha bank
-> pin number. This wasn't obvious to me.
->  drivers/pinctrl/pinctrl-at91.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 63176f2..2da0e6e 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1205,8 +1205,7 @@ static void at91_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
->  	void __iomem *pio = at91_gpio->regbase;
->  
->  	for (i = 0; i < chip->ngpio; i++) {
-> -		unsigned pin = chip->base + i;
-> -		unsigned mask = pin_to_mask(pin);
-> +		unsigned mask = pin_to_mask(i);
->  		const char *gpio_label;
->  		u32 pdsr;
->  
-> -- 
-> 1.9.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index f2ea7b0..c8988fe 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -19,9 +19,10 @@
+ #include "board.h"
+ #include "soc.h"
+ #include "generic.h"
+-#include "clock.h"
+ #include "sam9_smc.h"
+ 
++#if defined(CONFIG_OLD_CLK_AT91)
++#include "clock.h"
+ /* --------------------------------------------------------------------
+  *  Clocks
+  * -------------------------------------------------------------------- */
+@@ -215,6 +216,9 @@ static void __init at91sam9n12_register_clocks(void)
+ 			 ARRAY_SIZE(periph_clocks_lookups));
+ 
+ }
++#else
++#define at91sam9n12_register_clocks NULL
++#endif
+ 
+ /* --------------------------------------------------------------------
+  *  AT91SAM9N12 processor initialization
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.2
