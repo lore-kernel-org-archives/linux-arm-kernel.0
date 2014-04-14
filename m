@@ -1,71 +1,36 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Mon, 14 Apr 2014 20:59:16 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
-References: <20140409184507.GA1058@redhat.com>
- <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
- <5347655B.3080307@linaro.org>
- <20140411.003636.272212797007496394.davem@davemloft.net>
- <20140411145625.GA27493@redhat.com> <20140411152207.GA28188@redhat.com>
- <20140411153041.GQ16119@n2100.arm.linux.org.uk>
- <20140411172456.GA20506@redhat.com>
- <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
-Message-ID: <20140414185916.GA30672@redhat.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 14 Apr 2014 14:12:44 -0500
+Subject: [PATCH 0/2] ARM: dts: DRA7/AM4372: add l3_noc information
+Message-ID: <1397502766-13994-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11, Linus Torvalds wrote:
->
-> On Fri, Apr 11, 2014 at 10:24 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> > +static void arch_uprobe_copy_ixol(struct xol_area *area, unsigned long vaddr,
-> > +                                       struct arch_uprobe *auprobe)
-> > +{
-> > +#ifndef ARCH_UPROBE_XXX
-> > +       copy_to_page(area->page, vaddr, &auprobe->ixol, sizeof(&auprobe->ixol));
-> > +       /*
-> > +        * We probably need flush_icache_user_range() but it needs vma.
-> > +        * If this doesn't work define ARCH_UPROBE_XXX.
-> > +        */
-> > +       flush_dcache_page(area->page);
-> > +#else
-> > +       struct mm_struct *mm = current->mm;
-> > +       struct vm_area_struct *vma;
-> > +
-> > +       down_read(&mm->mmap_sem);
-> > +       vma = find_exact_vma(mm, area->vaddr, area->vaddr + PAGE_SIZE);
-> > +       if (vma) {
-> > +               void *kaddr = kmap_atomic(area->page);
-> > +               copy_to_user_page(vma, area->page,
-> > +                                       vaddr, kaddr + (vaddr & ~PAGE_MASK),
-> > +                                       &auprobe->ixol, sizeof(&auprobe->ixol));
-> > +               kunmap_atomic(kaddr);
-> > +       }
-> > +       up_read(&mm->mmap_sem);
-> > +#endif
->
-> Yeah, no, this is wrong.
+Patch series based on:
+v3.15-rc1 tag.
 
-Yesss, agreed.
+Depends on series posted: http://marc.info/?l=linux-omap&m=139749383932575&w=2
 
-> So I really think we should just have a fixed
-> "flush_icache_page(page,vaddr)" function.
-> ...
-> Then the uprobe case can just do
->
->     copy_to_page()
->     flush_dcache_page()
->     flush_icache_page()
+DTS Patches is available here:
+https://github.com/nmenon/linux-2.6-playground/commits/l3noc/dts-fixes
 
+This just adds the dts information based on driver support provided.
 
-And I obviously like this idea because (iiuc) it more or less matches
-flush_icache_page_xxx() I tried to suggest.
+Test log:
+1: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2pjavFUYd
+2: DRA7xx-EVM:  Boot PASS: http://slexy.org/raw/s21pdAj0hU
+3: pandaboard-es:  Boot PASS: http://slexy.org/raw/s21Hsq97mt
+4:    sdp4430:  Boot PASS: http://slexy.org/raw/s2ZQJUqjrP
+5: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s2hNulLOuX
 
-But we need a short term solution for arm. And unless I misunderstood
-Russell (this is quite possible), arm needs to disable preemption around
-copy + flush.
+Afzal Mohammed (1):
+  ARM: dts: AM4372: add l3-noc information
 
-Russel, so what do you think we can do for arm right now? Does the patch
-above (and subsequent discussion) answer the "why reinvent" question ?
+Rajendra Nayak (1):
+  ARM: dts: DRA7: Use dra7-l3-noc instead of omap4-l3-noc
 
-Oleg.
+ arch/arm/boot/dts/am4372.dtsi |    6 +++++-
+ arch/arm/boot/dts/dra7.dtsi   |    6 +++---
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+-- 
+1.7.9.5
