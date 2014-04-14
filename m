@@ -1,61 +1,52 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 14 Apr 2014 17:37:28 +0200
-Subject: [PATCH 06/10] ARM: dts: pbab01: Add I2C2 and I2C3
+Date: Mon, 14 Apr 2014 17:37:25 +0200
+Subject: [PATCH 03/10] ARM: dts: pfla02: Add GPIO LEDs
 In-Reply-To: <1397489852-1669-1-git-send-email-p.zabel@pengutronix.de>
 References: <1397489852-1669-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1397489852-1669-6-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1397489852-1669-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch enables the red and green GPIO LEDs on Phytec phyFLEX i.MX6 modules.
+
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 30 ++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-index 4e36aef..a449a580 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-@@ -23,6 +23,20 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 8ab2c44..7138937 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -40,6 +40,20 @@
+ 			gpio = <&gpio1 0 0>;
+ 		};
+ 	};
++
++	gpio_leds: leds {
++		compatible = "gpio-leds";
++
++		green {
++			label = "phyflex:green";
++			gpios = <&gpio1 30 0>;
++		};
++
++		red {
++			label = "phyflex:red";
++			gpios = <&gpio2 31 0>;
++		};
++	};
  };
  
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
- &uart4 {
- 	status = "okay";
- };
-@@ -42,3 +56,19 @@
- &usdhc3 {
- 	status = "okay";
- };
-+
-+&iomuxc {
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_EB2__I2C2_SCL		0x4001b8b1
-+			MX6QDL_PAD_EIM_D16__I2C2_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D17__I2C3_SCL		0x4001b8b1
-+			MX6QDL_PAD_EIM_D18__I2C3_SDA		0x4001b8b1
-+		>;
-+	};
-+};
+ &ecspi3 {
+@@ -156,6 +170,8 @@
+ 				MX6QDL_PAD_EIM_D23__GPIO3_IO23 0x80000000
+ 				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect */
+ 				MX6QDL_PAD_DI0_PIN15__GPIO4_IO17  0x80000000 /* PMIC interrupt */
++				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* Green LED */
++				MX6QDL_PAD_EIM_EB3__GPIO2_IO31 0x80000000 /* Red LED */
+ 			>;
+ 		};
+ 
 -- 
 1.9.1
