@@ -1,116 +1,74 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon, 14 Apr 2014 17:35:43 +0530
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <534BCC91.8090108@ti.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
- <534529B2.2020107@samsung.com> <534BCC91.8090108@ti.com>
-Message-ID: <CAFp+6iGxhfgZRPysMuj5nALEQBbFXnAXhtDPpbf3P42LDHqFxg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 14 Apr 2014 17:42:37 +0530
+Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
+ default when booted with DT
+In-Reply-To: <534BCCD3.9060805@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+ <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com> <5347AE49.5020109@ti.com>
+ <5347B7F8.2000508@ti.com> <20140411094217.GA32284@intel.com>
+ <5347D2CC.4030407@ti.com> <20140411113154.GB32284@intel.com>
+ <5347DEDA.2060008@ti.com> <20140411124641.GC32284@intel.com>
+ <534BCCD3.9060805@ti.com>
+Message-ID: <534BD0B5.5000004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Monday 14 April 2014 05:26 PM, Peter Ujfalusi wrote:
+> Hi Vinod,
+> 
+> On 04/11/2014 03:46 PM, Vinod Koul wrote:
+>> I think the number shouldn't be viewed in absolute terms. If we decide that (lets
+>> say) 0-7, then any controller should map 0 to lowest and 7 to highest.
+>>
+>> For your case you can do this and then intermediate numbers would be medium
+>> priority. Such a system might work well...
+>>
+>> Also how would a client driver know which priority to use? Would it come from
+>> DT?
+> 
+> I think DT would be the best place.
 
+In the strict sense of what DT is supposed to represent, DT is not the
+best place for this. Priority is usecase driven rather that hardware
+description driven. So on a reasonably less loaded system, I am sure you
+could run audio even with a lower priority DMA queue.
 
-On Mon, Apr 14, 2014 at 5:24 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Wednesday 09 April 2014 04:36 PM, Tomasz Figa wrote:
->> Hi Vivek,
->>
->> Please see my comments inline.
->>
->> On 08.04.2014 16:36, Vivek Gautam wrote:
->>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>> The new driver uses the generic PHY framework and will interact
->>> with DWC3 controller present on Exynos5 series of SoCs.
->>> Thereby, removing old phy-samsung-usb3 driver and related code
->>> used untill now which was based on usb/phy framework.
->>>
->>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>> ---
->>>   .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->>>   drivers/phy/Kconfig                                |   11 +
->>>   drivers/phy/Makefile                               |    1 +
->>>   drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
->>>   4 files changed, 722 insertions(+)
->>>   create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
->>
->> [snip]
->>
->>> +    Additional clock required for Exynos5420:
->>> +    - usb30_sclk_100m: Additional special clock used for PHY operation
->>> +               depicted as 'sclk_usbphy30' in CMU of Exynos5420.
->>
->> Are you sure this isn't simply a gate for the ref clock, as it can be found on
->> another SoC that is not upstream yet? I don't have documentation for Exynos
->> 5420 so I can't tell, but I'd like to ask you to recheck this.
->>
->>> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
->>> +              control pmu registers for power isolation.
->>> +- samsung,pmu-offset: phy power control register offset to
->>> pmu-system-controller
->>> +              base.
->>> +- #phy-cells : from the generic PHY bindings, must be 1;
->>> +
->>> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
->>> +compatible PHYs, the second cell in the PHY specifier identifies the
->>> +PHY id, which is interpreted as follows:
->>> +  0 - UTMI+ type phy,
->>> +  1 - PIPE3 type phy,
->>> +
->>> +Example:
->>> +    usb3_phy: usbphy at 12100000 {
->>> +        compatible = "samsung,exynos5250-usbdrd-phy";
->>> +        reg = <0x12100000 0x100>;
->>> +        clocks = <&clock 286>, <&clock 1>;
->>> +        clock-names = "phy", "usb3phy_refclk";
->>
->> Binding description above doesn't mention "usb3phy_refclk" entry.
->>
->>> +        samsung,syscon-phandle = <&pmu_syscon>;
->>> +        samsung,pmu-offset = <0x704>;
->>> +        #phy-cells = <1>;
->>> +    };
->>
->> [snip]
->>
->>> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
->>> new file mode 100644
->>> index 0000000..ff54a7c
->>> --- /dev/null
->>> +++ b/drivers/phy/phy-exynos5-usbdrd.c
->>
->> [snip]
->>
->>> +static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
->>> +{
->>> +    struct device *dev = &pdev->dev;
->>> +    struct device_node *node = dev->of_node;
->>> +    struct exynos5_usbdrd_phy *phy_drd;
->>> +    struct phy_provider *phy_provider;
->>> +    struct resource *res;
->>> +    const struct of_device_id *match;
->>> +    const struct exynos5_usbdrd_phy_drvdata *drv_data;
->>> +    struct regmap *reg_pmu;
->>> +    u32 pmu_offset;
->>> +    int i;
->>> +
->>> +    /*
->>> +     * Exynos systems are completely DT enabled,
->>> +     * so lets not have any platform data support for this driver.
->>> +     */
->>> +    if (!node) {
->>> +        dev_err(dev, "no device node found\n");
->>
->> This error message is not very meaningful. I'd rather use something like "This
->> driver can be only instantiated using Device Tree".
->
-> how about just adding depend_on OF in Kconfig?
+Moreover, IMHO, encoding it in DT now will make it an ABI. Without a
+wide variety of example use cases, I think it is too early to commit to
+an ABI.
 
-Already added a depend on 'OF'. Copying below the part of Kconfig in this patch.
+> Not sure if we should set the range for this either. What I was thinking is to
+> add an optional new property to be set by the client nodes, using DMA:
+> 
+> mcasp0: mcasp at 48038000 {
+> 	compatible = "ti,am33xx-mcasp-audio";
+> 	...
+> 	dmas =	<&edma 8>,
+> 		<&edma 9>;
+> 	dma-names = "tx", "rx";
+> 	dma-priorities = <2>, <2>;
+> };
+> 
+> We could agree that lower number means lower priority, higher is - well -
+> higher priority.
+> If the dma-priority is missing we should assume lowest priority (0).
+> The highest priority depends on the platform. For eDMA3 in AM335x it is three
+> level. For designware controller you might have the range 0-8 as valid.
+> 
+> The question is how to get this information into use?
+> We can take the priority number in the core when the dma channel is requested
+> and add field to "struct dma_chan" in order to store it and the DMA drivers
+> could have access to it.
+> In this way we only need to update the nodes which needs non default priority
+> for DMA.
+> 
+> What do you think?
 
-  config PHY_EXYNOS5_USBDRD
-         tristate "Exynos5 SoC series USB DRD PHY driver"
-         depends on ARCH_EXYNOS5 && OF
-         depends on HAS_IOMEM
+If we are using dma_slave_config, I think it will be easiest to define
+two levels of priority (HIGH and LOW, as thats all we see a need for
+right now), and have the audio driver select the HIGH priority. If
+nothing is set, EDMA can default to LOW.
+
+Thanks,
+Sekhar
