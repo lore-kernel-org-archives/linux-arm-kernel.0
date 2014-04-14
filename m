@@ -1,52 +1,58 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 14 Apr 2014 11:43:02 +0200
-Subject: [PATCH 09/29] ARM: orion5x: switch to preprocessor includes in DT
-In-Reply-To: <1397400006-4315-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 14 Apr 2014 11:43:21 +0200
+Subject: [PATCH 10/29] ARM: orion5x: use existing dt-bindings include
+ for Device Tree files
+In-Reply-To: <1397400006-4315-11-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-10-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <534BADA6.4070408@gmail.com>
+ <1397400006-4315-11-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BADB9.2060004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
-> This commit switches the Orion5x Device Tree files to use C
-> preprocessor based includes, as it will allow us to use definitions
-> from header files in future commits.
+> The orion5x-lacie-ethernet-disk-mini-v2.dts can benefit from using
+> gpio.h and input.h dt-bindings headers to replace hardcoded values by
+> more meaningful macros.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
 > ---
->   arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 3 ++-
->   arch/arm/boot/dts/orion5x.dtsi                            | 2 +-
->   2 files changed, 3 insertions(+), 2 deletions(-)
+>   arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 8 +++++---
+>   1 file changed, 5 insertions(+), 3 deletions(-)
 >
 > diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> index 5ed6c13..0245bb3 100644
+> index 0245bb3..24f1ce7 100644
 > --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
 > +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> @@ -7,7 +7,8 @@
->    */
+> @@ -8,6 +8,8 @@
 >
 >   /dts-v1/;
-> -/include/ "orion5x.dtsi"
-> +
-> +#include "orion5x.dtsi"
+>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+>   #include "orion5x.dtsi"
 >
 >   / {
->   	model = "LaCie Ethernet Disk mini V2";
-> diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-> index da57fb9..2364e3d 100644
-> --- a/arch/arm/boot/dts/orion5x.dtsi
-> +++ b/arch/arm/boot/dts/orion5x.dtsi
-> @@ -6,7 +6,7 @@
->    * warranty of any kind, whether express or implied.
->    */
+> @@ -40,8 +42,8 @@
+>   		#size-cells = <0>;
+>   		button at 1 {
+>   			label = "Power-on Switch";
+> -			linux,code = <116>; /* KEY_POWER */
+> -			gpios = <&gpio0 18 0>;
+> +			linux,code = <KEY_POWER>;
+> +			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+>   		};
+>   	};
 >
-> -/include/ "skeleton.dtsi"
-> +#include "skeleton.dtsi"
+> @@ -50,7 +52,7 @@
 >
->   / {
->   	model = "Marvell Orion5x SoC";
+>   		led at 1 {
+>   			label = "power:blue";
+> -			gpios = <&gpio0 16 1>;
+> +			gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
+>   		};
+>   	};
+>   };
 >
