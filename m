@@ -1,95 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Apr 2014 10:20:13 +0900
-Subject: [PATCH 1/4] ARM: shmobile: Ignore callbacks for subsys
- generic_pm_domain_data
-In-Reply-To: <1397230004-22306-2-git-send-email-ulf.hansson@linaro.org>
-References: <1397230004-22306-1-git-send-email-ulf.hansson@linaro.org>
- <1397230004-22306-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140414012013.GB22411@verge.net.au>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 14 Apr 2014 09:32:03 +0800
+Subject: [PATCH 1/2] ARM: dts: i.MX27: Allow to define partitions onto SDHC
+In-Reply-To: <1397372389-32016-1-git-send-email-shc_work@mail.ru>
+References: <1397372389-32016-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140414013202.GK24180@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 05:26:41PM +0200, Ulf Hansson wrote:
-> There are no active users of these callbacks, thus there are no benefit
-> of trying to invoke them.
-> 
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
-> 
-> I am seeking ack from the SOC maintainers since this needs to go with the other
-> patches in this patchset on the PM core.
+On Sun, Apr 13, 2014 at 10:59:48AM +0400, Alexander Shiyan wrote:
+> This patch allow to define partitions onto SDHC in user defined
+> devicetrees.
 
-In order to reduce the possibility of conflicts I would prefer
-to take this patch through my tree.
+Hmm, is this something like MTD ofpart?  Is this the right thing to do
+for block device?  How this will be used by kernel?
 
-> ---
->  arch/arm/mach-shmobile/pm-rmobile.c |   38 +++--------------------------------
->  1 file changed, 3 insertions(+), 35 deletions(-)
+Shawn
+
 > 
-> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-> index 1fc05d9..f710235 100644
-> --- a/arch/arm/mach-shmobile/pm-rmobile.c
-> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
-> @@ -99,39 +99,7 @@ static int rmobile_pd_power_up(struct generic_pm_domain *genpd)
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/imx27.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 83a8247..843aefc 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -263,6 +263,8 @@
+>  			};
 >  
->  static bool rmobile_pd_active_wakeup(struct device *dev)
->  {
-> -	bool (*active_wakeup)(struct device *dev);
-> -
-> -	active_wakeup = dev_gpd_data(dev)->ops.active_wakeup;
-> -	return active_wakeup ? active_wakeup(dev) : true;
-> -}
-> -
-> -static int rmobile_pd_stop_dev(struct device *dev)
-> -{
-> -	int (*stop)(struct device *dev);
-> -
-> -	stop = dev_gpd_data(dev)->ops.stop;
-> -	if (stop) {
-> -		int ret = stop(dev);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -	return pm_clk_suspend(dev);
-> -}
-> -
-> -static int rmobile_pd_start_dev(struct device *dev)
-> -{
-> -	int (*start)(struct device *dev);
-> -	int ret;
-> -
-> -	ret = pm_clk_resume(dev);
-> -	if (ret)
-> -		return ret;
-> -
-> -	start = dev_gpd_data(dev)->ops.start;
-> -	if (start)
-> -		ret = start(dev);
-> -
-> -	return ret;
-> +	return true;
->  }
+>  			sdhci1: sdhci at 10013000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+>  				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
+>  				reg = <0x10013000 0x1000>;
+>  				interrupts = <11>;
+> @@ -274,6 +276,8 @@
+>  			};
 >  
->  static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
-> @@ -140,8 +108,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
->  	struct dev_power_governor *gov = rmobile_pd->gov;
+>  			sdhci2: sdhci at 10014000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+>  				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
+>  				reg = <0x10014000 0x1000>;
+>  				interrupts = <10>;
+> @@ -416,6 +420,8 @@
+>  			};
 >  
->  	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
-> -	genpd->dev_ops.stop		= rmobile_pd_stop_dev;
-> -	genpd->dev_ops.start		= rmobile_pd_start_dev;
-> +	genpd->dev_ops.stop		= pm_clk_suspend;
-> +	genpd->dev_ops.start		= pm_clk_resume;
->  	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
->  	genpd->dev_irq_safe		= true;
->  	genpd->power_off		= rmobile_pd_power_down;
+>  			sdhci3: sdhci at 1001e000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+>  				compatible = "fsl,imx27-mmc", "fsl,imx21-mmc";
+>  				reg = <0x1001e000 0x1000>;
+>  				interrupts = <9>;
 > -- 
-> 1.7.9.5
+> 1.8.3.2
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
