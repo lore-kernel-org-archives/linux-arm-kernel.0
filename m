@@ -1,37 +1,114 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 14 Apr 2014 14:53:09 +0200
-Subject: [PATCH 3/6] ARM: dts: zynq: drop address cells from GIC node
-In-Reply-To: <f0de762f-56b3-4894-aa78-7ca3c88b9e28@AM1EHSMHS004.ehs.local>
-References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
- <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
- <f0de762f-56b3-4894-aa78-7ca3c88b9e28@AM1EHSMHS004.ehs.local>
-Message-ID: <1397479989.4548.26.camel@weser.hi.pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 14 Apr 2014 18:29:40 +0530
+Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <CAFp+6iF=SpEax+5KUhZkmtkwp=Pj7LbAHOoySgOwJx_50u6GZQ@mail.gmail.com>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>	<1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>	<534BD447.1080909@ti.com>
+ <CAFp+6iF=SpEax+5KUhZkmtkwp=Pj7LbAHOoySgOwJx_50u6GZQ@mail.gmail.com>
+Message-ID: <534BDBBC.5010701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
 
-Am Freitag, den 11.04.2014, 08:54 -0700 schrieb S?ren Brinkmann:
-> On Fri, 2014-04-11 at 04:59PM +0200, Lucas Stach wrote:
-> > This is likely a copy-and-paste error from the
-> > ARM GIC documentation, that has already been fixed.
-> > 
-> > address-cells should have been set to 0, as with the size
-> > cells. As having those properties set to 0 is the
-> > same thing as not specifying them, drop them completely.
+
+On Monday 14 April 2014 06:12 PM, Vivek Gautam wrote:
+> Hi,
 > 
-> Isn't this property inherited from the parent node, requiring to
-> actually set them to 0 to comply with the docs?
 > 
+> On Mon, Apr 14, 2014 at 5:57 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Tuesday 08 April 2014 08:06 PM, Vivek Gautam wrote:
+>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
+>>> The new driver uses the generic PHY framework and will interact
+>>> with DWC3 controller present on Exynos5 series of SoCs.
+>>> Thereby, removing old phy-samsung-usb3 driver and related code
+>>> used untill now which was based on usb/phy framework.
+>>>
+>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>> ---
+>>>  .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
+>>>  drivers/phy/Kconfig                                |   11 +
+>>>  drivers/phy/Makefile                               |    1 +
+>>>  drivers/phy/phy-exynos5-usbdrd.c                   |  668 ++++++++++++++++++++
+>>>  4 files changed, 722 insertions(+)
+>>>  create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>> index 28f9edb..6d99ba9 100644
+>>> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
+>>> @@ -74,3 +74,45 @@ phy-consumer at 12340000 {
+>>>
+>>>  Refer to DT bindings documentation of particular PHY consumer devices for more
+>>>  information about required PHYs and the way of specification.
+>>> +
+>>> +Samsung Exynos5 SoC series USB DRD PHY controller
+>>> +--------------------------------------------------
+>>> +
+>>> +Required properties:
+>>> +- compatible : Should be set to one of the following supported values:
+>>> +     - "samsung,exynos5250-usbdrd-phy" - for exynos5250 SoC,
+>>> +     - "samsung,exynos5420-usbdrd-phy" - for exynos5420 SoC.
+>>> +- reg : Register offset and length of USB DRD PHY register set;
+>>> +- clocks: Clock IDs array as required by the controller
+>>> +- clock-names: names of clocks correseponding to IDs in the clock property;
+>>> +            Required clocks:
+>>> +     - phy: main PHY clock (same as USB DRD controller i.e. DWC3 IP clock),
+>>> +            used for register access.
+>>> +     - ref: PHY's reference clock (usually crystal clock), associated by
+>>> +            phy name, used to determine bit values for clock settings
+>>> +            register.
+>>> +     Additional clock required for Exynos5420:
+>>> +     - usb30_sclk_100m: Additional special clock used for PHY operation
+>>> +                        depicted as 'sclk_usbphy30' in CMU of Exynos5420.
+>>> +- samsung,syscon-phandle: phandle for syscon interface, which is used to
+>>> +                       control pmu registers for power isolation.
+>>> +- samsung,pmu-offset: phy power control register offset to pmu-system-controller
+>>> +                   base.
+>>> +- #phy-cells : from the generic PHY bindings, must be 1;
+>>> +
+>>> +For "samsung,exynos5250-usbdrd-phy" and "samsung,exynos5420-usbdrd-phy"
+>>> +compatible PHYs, the second cell in the PHY specifier identifies the
+>>> +PHY id, which is interpreted as follows:
+>>> +  0 - UTMI+ type phy,
+>>> +  1 - PIPE3 type phy,
+>>> +
+>>> +Example:
+>>> +     usb3_phy: usbphy at 12100000 {
+>>> +             compatible = "samsung,exynos5250-usbdrd-phy";
+>>> +             reg = <0x12100000 0x100>;
+>>> +             clocks = <&clock 286>, <&clock 1>;
+>>> +             clock-names = "phy", "usb3phy_refclk";
+>>> +             samsung,syscon-phandle = <&pmu_syscon>;
+>>> +             samsung,pmu-offset = <0x704>;
+>>> +             #phy-cells = <1>;
+>>> +     };
+>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>> index 8d3c49c..d955a05 100644
+>>> --- a/drivers/phy/Kconfig
+>>> +++ b/drivers/phy/Kconfig
+>>> @@ -166,4 +166,15 @@ config PHY_XGENE
+>>>       help
+>>>         This option enables support for APM X-Gene SoC multi-purpose PHY.
+>>>
+>>> +config PHY_EXYNOS5_USBDRD
+>>> +     tristate "Exynos5 SoC series USB DRD PHY driver"
+>>> +     depends on ARCH_EXYNOS5 && OF
+>>> +     depends on HAS_IOMEM
+>>> +     select GENERIC_PHY
+>>> +     select MFD_SYSCON
+>>
+>> Lets try to avoid select in Kconfig. We've got enough problems with that.
+> 
+> I hope you meant with "select MFD_SYSCON".
+> We are referencing the syscon for accessing pmu reg, for which we need
+> this config to be selected.
+> Other Exynos phy drivers also need this config and for that they have
+> selected this.
+> 
+> Do you want me to do it any other way ?
 
-No, it isn't. From ePAPR v1.1 section 2.3.5:
-"The #address-cells and #size-cells properties are not inherited from
-ancestors in the device tree. They shall be explicitly defined."
+depends on is one option.
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Kishon
