@@ -1,182 +1,96 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:50:29 +0200
-Subject: [PATCH v3 2/6] ARM: mvebu: start using the CPU reset driver
+Date: Mon, 14 Apr 2014 15:50:31 +0200
+Subject: [PATCH v3 4/6] ARM: mvebu: extend the PMSU registers
 In-Reply-To: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483433-25836-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483433-25836-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483433-25836-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit changes the PMSU driver to no longer map itself the CPU
-reset registers, and instead call into the CPU reset driver to
-deassert the secondary CPUs for SMP booting.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-In order to provide Device Tree backward compatibility, the CPU reset
-driver is extended to not only support its official compatible string
-"marvell,armada-370-cpu-reset", but to also look at the PMSU
-compatible string "marvell,armada-370-xp-pmsu" to find the CPU reset
-registers address. This allows old Device Tree to work correctly with
-newer kernel versions. Therefore, the CPU reset driver implements the
-following logic:
+The initial binding for PMSU was wrong, as it didn't take into account
+all the registers from the PMSU and moreover it referred to the CPU
+reset registers which are not part of PMSU.
 
- * If one of the normal compatible strings
-   "marvell,armada-370-cpu-reset" is found, then we map its first
-   memory resource as the CPU reset registers.
+The Power Management Unit Service block also controls the Coherency
+Fabric subsystem. These registers are needed for the CPU idle
+implementation for the Armada 370/XP, it allows to enter a deep CPU
+idle state where the Coherency Fabric and the L2 cache are powered
+down.
 
- * Otherwise, if none of the normal compatible strings have been
-   found, we look for the "marvell,armada-370-xp-pmsu" compatible
-   string, and we map the second memory as the CPU reset registers.
+This commit adds support for a new compatible for the PMSU node which
+includes the registers related to the coherency fabric. It also keeps
+compatibility with the old compatible string.
 
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/cpu-reset.c | 53 ++++++++++++++++++++++++++++-------------
- arch/arm/mach-mvebu/pmsu.c      | 20 ++++++++--------
- 2 files changed, 47 insertions(+), 26 deletions(-)
+ .../devicetree/bindings/arm/armada-370-xp-pmsu.txt         | 14 ++++++--------
+ arch/arm/mach-mvebu/pmsu.c                                 | 14 ++++++++++++--
+ 2 files changed, 18 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/cpu-reset.c b/arch/arm/mach-mvebu/cpu-reset.c
-index 4ff4ce7..4a8f9ee 100644
---- a/arch/arm/mach-mvebu/cpu-reset.c
-+++ b/arch/arm/mach-mvebu/cpu-reset.c
-@@ -40,42 +40,63 @@ int mvebu_cpu_reset_deassert(int cpu)
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+index 926b4d6..9761887 100644
+--- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
++++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+@@ -4,17 +4,15 @@ Available on Marvell SOCs: Armada 370 and Armada XP
  
--static int __init mvebu_cpu_reset_init(void)
-+static int mvebu_cpu_reset_map(struct device_node *np, int res_idx)
- {
--	struct device_node *np;
- 	struct resource res;
--	int ret = 0;
--
--	np = of_find_compatible_node(NULL, NULL,
--				     "marvell,armada-370-cpu-reset");
--	if (!np)
--		return 0;
+ Required properties:
  
--	if (of_address_to_resource(np, 0, &res)) {
-+	if (of_address_to_resource(np, res_idx, &res)) {
- 		pr_err("unable to get resource\n");
--		ret = -ENOENT;
--		goto out;
-+		return -ENOENT;
+-- compatible: "marvell,armada-370-xp-pmsu"
++- compatible: should be "marvell,armada-370-pmsu", whereas
++  "marvell,armada-370-xp-pmsu" is deprecated and will be removed
+ 
+-- reg: Should contain PMSU registers location and length. First pair
+-  for the per-CPU SW Reset Control registers, second pair for the
+-  Power Management Service Unit.
++- reg: Should contain PMSU registers location and length.
+ 
+ Example:
+ 
+-armada-370-xp-pmsu at d0022000 {
+-	compatible = "marvell,armada-370-xp-pmsu";
+-	reg = <0xd0022100 0x430>,
+-	      <0xd0020800 0x20>;
++armada-370-xp-pmsu at 22000 {
++	compatible = "marvell,armada-370-pmsu";
++	reg = <0x22000 0x1000>;
+ };
+ 
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index b337fe5..4ae3ea1 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -30,10 +30,14 @@
+ 
+ static void __iomem *pmsu_mp_base;
+ 
+-#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
++#define PMSU_BASE_OFFSET    0x100
++#define PMSU_REG_SIZE	    0x1000
++
++#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x124)
+ 
+ static struct of_device_id of_pmsu_table[] = {
+-	{.compatible = "marvell,armada-370-xp-pmsu"},
++	{ .compatible = "marvell,armada-370-pmsu", },
++	{ .compatible = "marvell,armada-370-xp-pmsu", },
+ 	{ /* end of list */ },
+ };
+ 
+@@ -80,6 +84,12 @@ static int __init armada_370_xp_pmsu_init(void)
+ 		goto out;
  	}
  
++	if (of_device_is_compatible(np, "marvell,armada-370-xp-pmsu")) {
++		pr_warn(FW_WARN "deprecated pmsu binding\n");
++		res.start = res.start - PMSU_BASE_OFFSET;
++		res.end = res.start + PMSU_REG_SIZE - 1;
++	}
++
  	if (!request_mem_region(res.start, resource_size(&res),
  				np->full_name)) {
  		pr_err("unable to request region\n");
--		ret = -EBUSY;
--		goto out;
-+		return -EBUSY;
- 	}
- 
- 	cpu_reset_base = ioremap(res.start, resource_size(&res));
- 	if (!cpu_reset_base) {
- 		pr_err("unable to map registers\n");
- 		release_mem_region(res.start, resource_size(&res));
--		ret = -ENOMEM;
--		goto out;
-+		return -ENOMEM;
- 	}
- 
- 	cpu_reset_size = resource_size(&res);
- 
--out:
-+	return 0;
-+}
-+
-+int __init mvebu_cpu_reset_init(void)
-+{
-+	struct device_node *np;
-+	int res_idx;
-+	int ret;
-+
-+	np = of_find_compatible_node(NULL, NULL,
-+				     "marvell,armada-370-cpu-reset");
-+	if (np) {
-+		res_idx = 0;
-+	} else {
-+		/*
-+		 * This code is kept for backward compatibility with
-+		 * old Device Trees.
-+		 */
-+		np = of_find_compatible_node(NULL, NULL,
-+					     "marvell,armada-370-xp-pmsu");
-+		if (np) {
-+			pr_warn(FW_WARN "deprecated pmsu binding\n");
-+			res_idx = 1;
-+		}
-+	}
-+
-+	/* No reset node found */
-+	if (!np)
-+		return -ENODEV;
-+
-+	ret = mvebu_cpu_reset_map(np, res_idx);
- 	of_node_put(np);
-+
- 	return ret;
- }
- 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index d71ef53..1807639 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -21,14 +21,14 @@
- #include <linux/of_address.h>
- #include <linux/io.h>
- #include <linux/smp.h>
-+#include <linux/resource.h>
- #include <asm/smp_plat.h>
-+#include "common.h"
- #include "pmsu.h"
- 
- static void __iomem *pmsu_mp_base;
--static void __iomem *pmsu_reset_base;
- 
- #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
--#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
- 
- static struct of_device_id of_pmsu_table[] = {
- 	{.compatible = "marvell,armada-370-xp-pmsu"},
-@@ -38,11 +38,11 @@ static struct of_device_id of_pmsu_table[] = {
- #ifdef CONFIG_SMP
- int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- {
--	int reg, hw_cpu;
-+	int hw_cpu, ret;
- 
--	if (!pmsu_mp_base || !pmsu_reset_base) {
-+	if (!pmsu_mp_base) {
- 		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
--		return 1;
-+		return -ENODEV;
- 	}
- 
- 	hw_cpu = cpu_logical_map(cpu_id);
-@@ -50,10 +50,11 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
- 			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
- 
--	/* Release CPU from reset by clearing reset bit*/
--	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
--	reg &= (~0x1);
--	writel(reg, pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-+	ret = mvebu_cpu_reset_deassert(hw_cpu);
-+	if (ret) {
-+		pr_warn("unable to boot CPU: %d\n", ret);
-+		return ret;
-+	}
- 
- 	return 0;
- }
-@@ -67,7 +68,6 @@ static int __init armada_370_xp_pmsu_init(void)
- 	if (np) {
- 		pr_info("Initializing Power Management Service Unit\n");
- 		pmsu_mp_base = of_iomap(np, 0);
--		pmsu_reset_base = of_iomap(np, 1);
- 		of_node_put(np);
- 	}
- 
 -- 
 1.8.3.2
