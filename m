@@ -1,44 +1,80 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 14 Apr 2014 12:45:38 +0200
-Subject: [PATCH 17/29] ARM: orion5x: update I2C description at SoC level
-In-Reply-To: <1397400006-4315-18-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 14 Apr 2014 12:47:25 +0200
+Subject: [PATCH 18/29] ARM: orion5x: add Device Bus description at SoC
+ level
+In-Reply-To: <1397400006-4315-19-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-18-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <534BBC52.7060304@gmail.com>
+ <1397400006-4315-19-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534BBCBD.7080307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
-> This commit fixes the Orion5x SoC definition to:
->
->   * Not define a clock-frequency, as it should be described on a
->     per-board basis.
->
->   * Declare the appropriate clock reference, so that the driver can do
->     correct divisors calculations for the I2C bus.
+> This commit adds the necessary SoC-level Device Tree definitions to
+> describe the Device Bus of Orion5x SOCs. The Device Bus is mainly used
+> to connect NOR flashes to the system.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->   arch/arm/boot/dts/orion5x.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+>   arch/arm/boot/dts/orion5x.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 40 insertions(+)
 >
 > diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-> index f25ed91..ea6ec83 100644
+> index ea6ec83..182682b 100644
 > --- a/arch/arm/boot/dts/orion5x.dtsi
 > +++ b/arch/arm/boot/dts/orion5x.dtsi
-> @@ -56,7 +56,7 @@
->   				#address-cells = <1>;
->   				#size-cells = <0>;
->   				interrupts = <5>;
-> -				clock-frequency = <100000>;
-> +				clocks = <&core_clk 0>;
+> @@ -24,6 +24,46 @@
+>   		#size-cells = <1>;
+>   		controller = <&mbusc>;
+>
+> +		devbus-bootcs {
 
-I guess the 100kHz (<100000>) has been a bug? Please mention that in
-the commit log, too.
+To be consitent, please add node labels for this and below nodes.
+
+Otherwise,
 
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
->   				status = "disabled";
->   			};
->
+> +			compatible = "marvell,orion-devbus";
+> +			reg = <MBUS_ID(0xf0, 0x01) 0x1046C 0x4>;
+> +			ranges = <0 MBUS_ID(0x01, 0x0f) 0 0xffffffff>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			clocks = <&core_clk 0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		devbus-cs0 {
+> +			compatible = "marvell,orion-devbus";
+> +			reg = <MBUS_ID(0xf0, 0x01) 0x1045C 0x4>;
+> +			ranges = <0 MBUS_ID(0x01, 0x1e) 0 0xffffffff>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			clocks = <&core_clk 0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		devbus-cs1 {
+> +			compatible = "marvell,orion-devbus";
+> +			reg = <MBUS_ID(0xf0, 0x01) 0x10460 0x4>;
+> +			ranges = <0 MBUS_ID(0x01, 0x1d) 0 0xffffffff>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			clocks = <&core_clk 0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		devbus-cs2 {
+> +			compatible = "marvell,orion-devbus";
+> +			reg = <MBUS_ID(0xf0, 0x01) 0x10464 0x4>;
+> +			ranges = <0 MBUS_ID(0x01, 0x1b) 0 0xffffffff>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			clocks = <&core_clk 0>;
+> +			status = "disabled";
+> +		};
+> +
+>   		internal-regs {
+>   			compatible = "simple-bus";
+>   			#address-cells = <1>;
 >
