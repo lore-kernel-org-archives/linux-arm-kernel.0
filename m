@@ -1,116 +1,111 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:54:02 +0200
-Subject: [PATCH v3 05/11] irqchip: irq-armada-370-xp: use cpu notifier to
- initialize secondary CPUs
+Date: Mon, 14 Apr 2014 15:54:06 +0200
+Subject: [PATCH v3 09/11] ARM: mvebu: add workaround for SMP support for
+ Armada 375 stepping Z1
 In-Reply-To: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483648-26611-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483648-26611-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some irqchip initialization must be done on secondary CPUs. On mvebu
-platforms, this is currently achieved by having the
-arch/arm/mach-mvebu/platsmp.c code directly call into a function
-exported by the irqchip driver, which isn't really nice.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-This commit changes this by using the same solution as the one used in
-the GIC driver: the irqchip driver registers a CPU notifier, which is
-used to do the secondary CPU IRQ initialization. This way, the irqchip
-driver is completely autonomous, and the function no longer needs to
-be exposed from the irqchip driver to the SoC code.
+Due to internal bootrom issue, CPU[1] initial jump code (four
+instructions) should be placed in SRAM memory of the SoC. In order to
+achieve this, we have to unmap the BootROM and at some specific
+location where the BootROM was place, create a specific MBus window
+for the SRAM. This SRAM is initialized with a few instructions of code
+that allows to jump into the real secondary CPU boot address.
 
+This workaround will most likely be disabled when newer steppings of
+the Armada 375 will be made available, in which case a dynamic test
+based on mvebu-soc-id will be added.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.h |  1 -
- arch/arm/mach-mvebu/platsmp.c       |  6 ------
- drivers/irqchip/irq-armada-370-xp.c | 18 +++++++++++++++++-
- 3 files changed, 17 insertions(+), 8 deletions(-)
+ arch/arm/mach-mvebu/headsmp-a9.S | 12 ++++++++++++
+ arch/arm/mach-mvebu/platsmp-a9.c | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index cd57c78..c3465f5 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -20,7 +20,6 @@
+diff --git a/arch/arm/mach-mvebu/headsmp-a9.S b/arch/arm/mach-mvebu/headsmp-a9.S
+index 78e66c9..5925366 100644
+--- a/arch/arm/mach-mvebu/headsmp-a9.S
++++ b/arch/arm/mach-mvebu/headsmp-a9.S
+@@ -16,6 +16,18 @@
+ #include <linux/init.h>
  
- #define ARMADA_XP_MAX_CPUS 4
- 
--void armada_xp_mpic_smp_cpu_init(void);
- void armada_xp_secondary_startup(void);
- extern struct smp_operations armada_xp_smp_ops;
- #endif
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index 1bc98ce..32bf78e 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -70,11 +70,6 @@ static void __init set_secondary_cpus_clock(void)
- 	}
- }
- 
--static void armada_xp_secondary_init(unsigned int cpu)
--{
--	armada_xp_mpic_smp_cpu_init();
--}
--
- static int armada_xp_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	int ret, hw_cpu;
-@@ -130,7 +125,6 @@ static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
- struct smp_operations armada_xp_smp_ops __initdata = {
- 	.smp_init_cpus		= armada_xp_smp_init_cpus,
- 	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
--	.smp_secondary_init	= armada_xp_secondary_init,
- 	.smp_boot_secondary	= armada_xp_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= armada_xp_cpu_die,
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 7275662..71f7784 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -19,6 +19,7 @@
- #include <linux/irq.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip/chained_irq.h>
-+#include <linux/cpu.h>
- #include <linux/io.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -336,7 +337,7 @@ static void armada_mpic_send_doorbell(const struct cpumask *mask,
- 		ARMADA_370_XP_SW_TRIG_INT_OFFS);
- }
- 
--void armada_xp_mpic_smp_cpu_init(void)
-+static void armada_xp_mpic_smp_cpu_init(void)
- {
- 	/* Clear pending IPIs */
- 	writel(0, per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
-@@ -348,6 +349,20 @@ void armada_xp_mpic_smp_cpu_init(void)
- 	/* Unmask IPI interrupt */
- 	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
- }
+ 	__CPUINIT
++#define CPU_RESUME_ADDR_REG 0xf10182d4
 +
-+static int armada_xp_mpic_secondary_init(struct notifier_block *nfb,
-+					 unsigned long action, void *hcpu)
++.global armada_375_smp_cpu1_enable_code_start
++.global armada_375_smp_cpu1_enable_code_end
++
++armada_375_smp_cpu1_enable_code_start:
++	ldr     r0, [pc, #4]
++	ldr     r1, [r0]
++	mov     pc, r1
++	.word   CPU_RESUME_ADDR_REG
++armada_375_smp_cpu1_enable_code_end:
++
+ ENTRY(mvebu_cortex_a9_secondary_startup)
+ 	bl      v7_invalidate_l1
+ 	b	secondary_startup
+diff --git a/arch/arm/mach-mvebu/platsmp-a9.c b/arch/arm/mach-mvebu/platsmp-a9.c
+index 27dacfc..04d0b18 100644
+--- a/arch/arm/mach-mvebu/platsmp-a9.c
++++ b/arch/arm/mach-mvebu/platsmp-a9.c
+@@ -16,11 +16,36 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/smp.h>
++#include <linux/mbus.h>
+ #include <asm/smp_scu.h>
+ #include <asm/smp_plat.h>
+ #include "common.h"
+ #include "pmsu.h"
+ 
++#define CRYPT0_ENG_ID   41
++#define CRYPT0_ENG_ATTR 0x1
++#define SRAM_PHYS_BASE  0xFFFF0000
++
++#define BOOTROM_BASE    0xFFF00000
++#define BOOTROM_SIZE    0x100000
++
++extern unsigned char armada_375_smp_cpu1_enable_code_end;
++extern unsigned char armada_375_smp_cpu1_enable_code_start;
++
++void armada_375_smp_cpu1_enable_wa(void)
 +{
-+	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-+		armada_xp_mpic_smp_cpu_init();
-+	return NOTIFY_OK;
++	void __iomem *sram_virt_base;
++
++	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
++	mvebu_mbus_add_window_by_id(CRYPT0_ENG_ID, CRYPT0_ENG_ATTR,
++				SRAM_PHYS_BASE, SZ_64K);
++	sram_virt_base = ioremap(SRAM_PHYS_BASE, SZ_64K);
++
++	memcpy(sram_virt_base, &armada_375_smp_cpu1_enable_code_start,
++	       &armada_375_smp_cpu1_enable_code_end
++	       - &armada_375_smp_cpu1_enable_code_start);
 +}
 +
-+static struct notifier_block armada_370_xp_mpic_cpu_notifier = {
-+	.notifier_call = armada_xp_mpic_secondary_init,
-+	.priority = 100,
-+};
-+
- #endif /* CONFIG_SMP */
+ extern void mvebu_cortex_a9_secondary_startup(void);
  
- static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
-@@ -514,6 +529,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 		set_handle_irq(armada_370_xp_handle_irq);
- #ifdef CONFIG_SMP
- 		set_smp_cross_call(armada_mpic_send_doorbell);
-+		register_cpu_notifier(&armada_370_xp_mpic_cpu_notifier);
- #endif
- 	} else {
- 		irq_set_chained_handler(parent_irq,
+ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
+@@ -55,7 +80,14 @@ static int __cpuinit mvebu_cortex_a9_boot_secondary(unsigned int cpu,
+ 	return 0;
+ }
+ 
++static void __init mvebu_cortex_a9_smp_prepare_cpus(unsigned int max_cpus)
++{
++	if (of_machine_is_compatible("marvell,armada375"))
++		armada_375_smp_cpu1_enable_wa();
++}
++
+ static struct smp_operations mvebu_cortex_a9_smp_ops __initdata = {
++	.smp_prepare_cpus	= mvebu_cortex_a9_smp_prepare_cpus,
+ 	.smp_boot_secondary	= mvebu_cortex_a9_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= armada_xp_cpu_die,
 -- 
 1.8.3.2
