@@ -1,52 +1,43 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Apr 2014 14:42:04 +0300
-Subject: [PATCH v3 09/10] dmaengine: edma: Add channel number to debug prints
+Date: Mon, 14 Apr 2014 14:42:05 +0300
+Subject: [PATCH v3 10/10] dmaengine: edma: Print the direction value as well
+ when it is not supported
 In-Reply-To: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1397475725-5036-10-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1397475725-5036-11-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It helps to identify issues if we have some information regarding to the
-channel which the event is associated.
+In case of not supported direction it is better to print the direction also.
+It is unlikely, but in such an event it helps with the debugging.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Acked-by: Joel Fernandes <joelf@ti.com>
 ---
- drivers/dma/edma.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/dma/edma.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index bc8175c92e0c..4aa5eb005b5c 100644
+index 4aa5eb005b5c..91849aa50de1 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -185,7 +185,8 @@ static void edma_execute(struct edma_chan *echan)
- 	edma_resume(echan->ch_num);
- 
- 	if (edesc->processed <= MAX_NR_SG) {
--		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
-+		dev_dbg(dev, "first transfer starting on channel %d\n",
-+			echan->ch_num);
- 		edma_start(echan->ch_num);
+@@ -432,7 +432,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 		dev_width = echan->cfg.dst_addr_width;
+ 		burst = echan->cfg.dst_maxburst;
+ 	} else {
+-		dev_err(dev, "%s: bad direction?\n", __func__);
++		dev_err(dev, "%s: bad direction: %d\n", __func__, direction);
+ 		return NULL;
  	}
  
-@@ -195,7 +196,7 @@ static void edma_execute(struct edma_chan *echan)
- 	 * MAX_NR_SG
- 	 */
- 	if (echan->missed) {
--		dev_dbg(dev, "missed event in execute detected\n");
-+		dev_dbg(dev, "missed event on channel %d\n", echan->ch_num);
- 		edma_clean_channel(echan->ch_num);
- 		edma_stop(echan->ch_num);
- 		edma_start(echan->ch_num);
-@@ -735,7 +736,7 @@ static int edma_alloc_chan_resources(struct dma_chan *chan)
- 	echan->alloced = true;
- 	echan->slot[0] = echan->ch_num;
+@@ -525,7 +525,7 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 		dev_width = echan->cfg.dst_addr_width;
+ 		burst = echan->cfg.dst_maxburst;
+ 	} else {
+-		dev_err(dev, "%s: bad direction?\n", __func__);
++		dev_err(dev, "%s: bad direction: %d\n", __func__, direction);
+ 		return NULL;
+ 	}
  
--	dev_dbg(dev, "allocated channel for %u:%u\n",
-+	dev_dbg(dev, "allocated channel %d for %u:%u\n", echan->ch_num,
- 		EDMA_CTLR(echan->ch_num), EDMA_CHAN_SLOT(echan->ch_num));
- 
- 	return 0;
 -- 
 1.9.2
