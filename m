@@ -1,221 +1,184 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 14 Apr 2014 12:40:48 +0200
-Subject: [PATCH 14/29] ARM: orion: switch to a per-platform handle_irq()
- function
-In-Reply-To: <1397400006-4315-15-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-15-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <534BBB30.5090602@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 14 Apr 2014 11:41:29 +0100
+Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
+References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+ <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
+Message-ID: <20140414104116.GA3844@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
-> Moving to the Device Tree implies having CONFIG_MULTI_IRQ_HANDLER
-> enabled, even for non-DT platforms (if we want both DT and non-DT
-> platforms to be supported in a single kernel).
->
-> However, the common CONFIG_MULTI_IRQ_HANDLER handler for non-DT
-> platforms in plat-orion/irq.c doesn't match the needs of
-> Orion5x. Also, it doesn't make much sense for orion_irq_init() to
-> register the multi-IRQ handler: orion_irq_init() is called once for
-> each IRQ cause/mask tuple, while the multi-IRQ handler only needs to
-> be registered once.
->
-> To solve this problem, we move the multi-IRQ handle in per-platform
-> code: mach-kirkwood/irq.c and mach-dove/irq.c. The Orion5x variant
-> will be introduced in a followup commit. Of course, this code will
-> ultimately be completely removed once all boards are converted to the
-> Device Tree.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->   arch/arm/mach-dove/irq.c     | 36 +++++++++++++++++++++++++++++++++++
->   arch/arm/mach-kirkwood/irq.c | 36 +++++++++++++++++++++++++++++++++++
->   arch/arm/plat-orion/irq.c    | 45 --------------------------------------------
->   3 files changed, 72 insertions(+), 45 deletions(-)
->
-> diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-> index bc4344a..4a5a7ae 100644
-> --- a/arch/arm/mach-dove/irq.c
-> +++ b/arch/arm/mach-dove/irq.c
-> @@ -108,6 +108,38 @@ static int __initdata gpio2_irqs[4] = {
->   	0,
->   };
->
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +/*
-> + * Compiling with both non-DT and DT support enabled, will
-> + * break asm irq handler used by non-DT boards. Therefore,
-> + * we provide a C-style irq handler even for non-DT boards,
-> + * if MULTI_IRQ_HANDLER is set.
-> + */
-> +
-> +static void __iomem *dove_irq_base = IRQ_VIRT_BASE;
-> +
-> +static asmlinkage void
-> +__exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
-> +{
-> +	u32 stat;
-> +
-> +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
-> +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
-> +	if (stat) {
-> +		unsigned int hwirq = __fls(stat);
-> +		handle_IRQ(hwirq, regs);
-> +		return;
-> +	}
+On Fri, Apr 11, 2014 at 04:23:04PM -0400, Nicolas Pitre wrote:
+> On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
+> 
+> > Add machine-dependent MCPM call-backs for Exynos5420. These are used
+> > to power up/down the secondary CPUs during boot, shutdown, s2r and
+> > switching.
+> > 
+> > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> > Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
+> > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> 
+> See comments inline.
 
-I remember we talked about it already, but IMHO copying the multi-irq
-handler to mach-{kirkwood,dove} isn't necessary. The only situation we
-need this is when you compile _one_ mach-{kirkwood,dove,orion5x} with
-both DT and non-DT.
+I won't duplicate Nico's review, but I have a couple of extra comments/
+questions, below.
 
-So, I think it is fine to just add
+[...]
 
-#if !defined(CONFIG_MACH_ORION5X)
-> +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
-> +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
-> +	if (stat) {
-> +		unsigned int hwirq = 32 + __fls(stat);
-> +		handle_IRQ(hwirq, regs);
-> +		return;
-> +	}
-#endif
+> > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> > new file mode 100644
+> > index 0000000..46d4968
+> > --- /dev/null
+> > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> > @@ -0,0 +1,444 @@
 
-in the original handler?
+[...]
 
-Sebastian
+> > +static void exynos_cluster_power_control(unsigned int cluster, int enable)
+> > +{
+> > +	unsigned long timeout = jiffies + msecs_to_jiffies(20);
+> > +	unsigned int status, val = EXYNOS_CORE_LOCAL_PWR_DIS;
+> > +
+> > +	if (enable)
+> > +		val = EXYNOS_CORE_LOCAL_PWR_EN;
+> > +
+> > +	status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
+> > +	if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
+> > +		return;
+> > +
+> > +	__raw_writel(val, EXYNOS_COMMON_CONFIGURATION(cluster));
+> > +	/* Wait until cluster power control is applied */
+> > +	while (time_before(jiffies, timeout)) {
+> > +		status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
+> > +
+> > +		if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
+> > +			return;
+> > +
+> > +		cpu_relax();
+> > +	}
+> > +	pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
+> > +		enable ? "on" : "off");
+> 
+> You should not have to wait for the power status to change here.  
+> Simply signaling the desired state and returning is all that is 
+> expected.  And because IRQs are turned off, it is likely that 
+> time_before(jiffies, timeout) will always be true anyway because jiffies 
+> are not updated if there is no other CPU to service the timer interrupt.
+> 
+> The actual power status should be polled for in the mcpm_finish() 
+> method only.
 
-> +}
-> +#endif
-> +
->   void __init dove_init_irq(void)
->   {
->   	int i;
-> @@ -115,6 +147,10 @@ void __init dove_init_irq(void)
->   	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
->   	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
->
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +	set_handle_irq(dove_legacy_handle_irq);
-> +#endif
-> +
->   	/*
->   	 * Initialize gpiolib for GPIOs 0-71.
->   	 */
-> diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
-> index 2a97a2e..c9dd860 100644
-> --- a/arch/arm/mach-kirkwood/irq.c
-> +++ b/arch/arm/mach-kirkwood/irq.c
-> @@ -30,11 +30,47 @@ static int __initdata gpio1_irqs[4] = {
->   	0,
->   };
->
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +/*
-> + * Compiling with both non-DT and DT support enabled, will
-> + * break asm irq handler used by non-DT boards. Therefore,
-> + * we provide a C-style irq handler even for non-DT boards,
-> + * if MULTI_IRQ_HANDLER is set.
-> + */
-> +
-> +static void __iomem *kirkwood_irq_base = IRQ_VIRT_BASE;
-> +
-> +asmlinkage void
-> +__exception_irq_entry kirkwood_legacy_handle_irq(struct pt_regs *regs)
-> +{
-> +	u32 stat;
-> +
-> +	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_LOW_OFF);
-> +	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_LOW_OFF);
-> +	if (stat) {
-> +		unsigned int hwirq = __fls(stat);
-> +		handle_IRQ(hwirq, regs);
-> +		return;
-> +	}
-> +	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_HIGH_OFF);
-> +	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_HIGH_OFF);
-> +	if (stat) {
-> +		unsigned int hwirq = 32 + __fls(stat);
-> +		handle_IRQ(hwirq, regs);
-> +		return;
-> +	}
-> +}
-> +#endif
-> +
->   void __init kirkwood_init_irq(void)
->   {
->   	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
->   	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
->
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +	set_handle_irq(kirkwood_legacy_handle_irq);
-> +#endif
-> +
->   	/*
->   	 * Initialize gpiolib for GPIOs 0-49.
->   	 */
-> diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
-> index 807df14..27ec18b 100644
-> --- a/arch/arm/plat-orion/irq.c
-> +++ b/arch/arm/plat-orion/irq.c
-> @@ -20,47 +20,6 @@
->   #include <plat/orion-gpio.h>
->   #include <mach/bridge-regs.h>
->
-> -#ifdef CONFIG_MULTI_IRQ_HANDLER
-> -/*
-> - * Compiling with both non-DT and DT support enabled, will
-> - * break asm irq handler used by non-DT boards. Therefore,
-> - * we provide a C-style irq handler even for non-DT boards,
-> - * if MULTI_IRQ_HANDLER is set.
-> - *
-> - * Notes:
-> - * - this is prepared for Kirkwood and Dove only, update
-> - *   accordingly if you add Orion5x or MV78x00.
-> - * - Orion5x uses different macro names and has only one
-> - *   set of CAUSE/MASK registers.
-> - * - MV78x00 uses the same macro names but has a third
-> - *   set of CAUSE/MASK registers.
-> - *
-> - */
-> -
-> -static void __iomem *orion_irq_base = IRQ_VIRT_BASE;
-> -
-> -asmlinkage void
-> -__exception_irq_entry orion_legacy_handle_irq(struct pt_regs *regs)
-> -{
-> -	u32 stat;
-> -
-> -	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_LOW_OFF);
-> -	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_LOW_OFF);
-> -	if (stat) {
-> -		unsigned int hwirq = __fls(stat);
-> -		handle_IRQ(hwirq, regs);
-> -		return;
-> -	}
-> -	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_HIGH_OFF);
-> -	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_HIGH_OFF);
-> -	if (stat) {
-> -		unsigned int hwirq = 32 + __fls(stat);
-> -		handle_IRQ(hwirq, regs);
-> -		return;
-> -	}
-> -}
-> -#endif
-> -
->   void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
->   {
->   	struct irq_chip_generic *gc;
-> @@ -78,10 +37,6 @@ void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
->   	ct->chip.irq_unmask = irq_gc_mask_set_bit;
->   	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_MASK_CACHE,
->   			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
-> -
-> -#ifdef CONFIG_MULTI_IRQ_HANDLER
-> -	set_handle_irq(orion_legacy_handle_irq);
-> -#endif
->   }
->
->   #ifdef CONFIG_OF
->
+Depending on the power controller, it might be possible for writes to
+the controller to be lost or not acted upon, if a previous change is
+still pending.
+
+Does this issue apply to the exynos power controller?
+
+If this is the case, it might be necessary to ensure before a power-up
+request, that the power controller has caught up and reports the
+cluster/CPU as down.  Putting this poll before the write to the
+power controller maximises the chance of pipelining useful work
+in the meantime.  Putting the poll after the write is the worst case.
+
+> 
+> > +}
+> > +
+> > +static int exynos_power_up(unsigned int cpu, unsigned int cluster)
+> > +{
+> > +	unsigned long mpidr;
+> > +
+> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> > +	if (cpu >= EXYNOS5420_CPUS_PER_CLUSTER ||
+> > +		cluster >= EXYNOS5420_NR_CLUSTERS)
+> > +		return -EINVAL;
+> > +
+> > +	/*
+> > +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+> > +	 * variant exists, we need to disable IRQs manually here.
+> > +	 */
+> > +	local_irq_disable();
+> > +	arch_spin_lock(&bl_lock);
+> > +
+> > +	cpu_use_count[cpu][cluster]++;
+> > +	if (cpu_use_count[cpu][cluster] == 1) {
+> > +		bool was_cluster_down =
+> > +			__mcpm_cluster_state(cluster) == CLUSTER_DOWN;
+> > +
+> > +		if (was_cluster_down)
+> > +			exynos_cluster_power_control(cluster, 1);
+> > +		exynos_core_power_control(cpu, cluster, 1);
+> > +
+> > +		if (was_cluster_down) {
+> > +			mpidr = read_cpuid_mpidr();
+> > +			udelay(10);
+> > +			cci_control_port_by_cpu(mpidr, true);
+> > +		}
+> 
+> This is completely wrong.  Is this why you created the patch to 
+> introduce cci_control_port_by_cpu()?  If so I'm NAKing that other patch 
+> as well.
+> 
+> This is going to be completely ineffective with concurrent usage by 
+> cpuidle where CPUs in the other cluster are awaken by an interrupt and 
+> not by calling the cpu_up method.  The current cluster will therefore 
+> not be aware of the other cluster coming online and system memory 
+> corruption will occur.
+> 
+> I see below that you do turn off the CCI port for the current cluster 
+> and the other cluster together, hence the need to enable back the CCI 
+> for the current cluster here.  Please don't do that.  That's not the 
+> proper way to achieve that and there are many race conditions to take 
+> care of before this can be done.  And if we were to go that route, I 
+> want to be convinced it is worth the needed complexity first i.e. I want 
+> to see evidence this actually does save power or improve performance by 
+> a non negligible margin.
+
+Agreed.
+
+The fact that there is no C interface for enabling ACE ports is
+deliberate.  For CPUs connected to ACE and managed via MCPM,
+it is incorrect to enable CCI via C code, since the safe window
+is the window during which all outbound CPUs have reached CLUSTER_DOWN
+and all inbound CPUs have not turned their MMU on yet (and thus cannot
+execute any general Linux C code).
+
+There might be scenarios involving GPUs and other non-CPU devices
+connected to ACE ports where the device cannot enable CCI snoops
+for itself -- but this would require a holding-pen protocol to enable
+the device to wait and signal a CPU to enable CCI snoops on the device's
+behalf before the device proceeds.  It is not the correct solution for
+CPU clusters attached to ACE, precisely because we can be more efficient
+in that case.
+
+In fact, because you implement a power_up_setup method that calls
+cci_enable_port_for_self, CCI snoops are actually enabled twice, making
+the above code appear redundant.   Have I missed something?
+
+Cheers
+---Dave
+
+> 
+> > +		/* CPU should be powered up there */
+> > +		/* Also setup Cluster Power Sequence here */
+> > +	} else if (cpu_use_count[cpu][cluster] != 2) {
+> > +		/*
+> > +		 * The only possible values are:
+> > +		 * 0 = CPU down
+> > +		 * 1 = CPU (still) up
+> > +		 * 2 = CPU requested to be up before it had a chance
+> > +		 *     to actually make itself down.
+> > +		 * Any other value is a bug.
+> > +		 */
+> > +		BUG();
+> > +	}
+> > +
+> > +	arch_spin_unlock(&bl_lock);
+> > +	local_irq_enable();
+> > +
+> > +	return 0;
+> > +}
+
+[...]
