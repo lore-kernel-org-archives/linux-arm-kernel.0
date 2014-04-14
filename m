@@ -1,64 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 16:41:16 +0200
-Subject: [PATCH v2 1/3] ARM: mvebu: enable the SDHCI interface on Armada 385
+Date: Mon, 14 Apr 2014 16:41:18 +0200
+Subject: [PATCH v2 3/3] ARM: configs: add CONFIG_MMC_SDHCI_PXAV3 to the
+ multi_v7_defconfig
 In-Reply-To: <1397486478-16991-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397486478-16991-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397486478-16991-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397486478-16991-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit "mmc: sdhci-pxav3: add support for the Armada 38x SDHCI
-controller", the sdhci-pxav3 driver has been extended to also be
-usable on Armada 38x platforms.
-
-Therefore, this commit adds the necessary Device Tree informations to
-declare this SDHCI interface in the Armada 38x SoC, and also in the
-Armada 385 Development Board.
+The Marvell Armada 38x platform has a SDHCI interface managed by the
+sdhci-pxav3 MMC host driver. It therefore makes sense to enable this
+driver in multi_v7_defconfig, which supports the Armada 38x platform.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-385-db.dts | 8 ++++++++
- arch/arm/boot/dts/armada-38x.dtsi   | 9 +++++++++
- 2 files changed, 17 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
-index 6828d77..959aeed 100644
---- a/arch/arm/boot/dts/armada-385-db.dts
-+++ b/arch/arm/boot/dts/armada-385-db.dts
-@@ -101,6 +101,14 @@
- 					reg = <0x1000000 0x3f000000>;
- 				};
- 			};
-+
-+			sdhci at d8000 {
-+				clock-frequency = <200000000>;
-+				broken-cd;
-+				wp-inverted;
-+				bus-width = <8>;
-+				status = "okay";
-+			};
- 		};
- 
- 		pcie-controller {
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index a064f59..2c1ff30 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -355,6 +355,15 @@
- 				clocks = <&coredivclk 0>;
- 				status = "disabled";
- 			};
-+
-+			sdhci at d8000 {
-+				compatible = "marvell,armada-380-sdhci";
-+				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-+				interrupts = <0 25 0x4>;
-+				clocks = <&gateclk 17>;
-+				mrvl,clk-delay-cycles = <0x1F>;
-+				status = "disabled";
-+			};
- 		};
- 	};
- 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47..d392f2d 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -273,6 +273,7 @@ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
++CONFIG_MMC_SDHCI_PXAV3=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_SPEAR=y
 -- 
 1.8.3.2
