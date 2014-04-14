@@ -1,8 +1,8 @@
 From: stratosk@semaphore.gr (Stratos Karafotis)
-Date: Tue, 15 Apr 2014 00:10:41 +0300
-Subject: [PATCH 17/20] davinci: da850: Use cpufreq_for_each_entry macro for
+Date: Tue, 15 Apr 2014 00:09:10 +0300
+Subject: [PATCH 07/20] cpufreq: exynos: Use cpufreq_for_each_entry macro for
  iteration
-Message-ID: <534C4ED1.7080901@semaphore.gr>
+Message-ID: <534C4E76.6000905@semaphore.gr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,38 +13,38 @@ It should have no functional changes.
 
 Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
 ---
- arch/arm/mach-davinci/da850.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/cpufreq/exynos-cpufreq.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 85399c9..45ce065 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1092,20 +1092,21 @@ int da850_register_cpufreq(char *async_clk)
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index f99cfe2..0e19bce 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -28,18 +28,18 @@ static unsigned int locking_frequency;
  
- static int da850_round_armrate(struct clk *clk, unsigned long rate)
+ static int exynos_cpufreq_get_index(unsigned int freq)
  {
--	int i, ret = 0, diff;
-+	int ret = 0, diff;
- 	unsigned int best = (unsigned int) -1;
- 	struct cpufreq_frequency_table *table = cpufreq_info.freq_table;
-+	struct cpufreq_frequency_table *pos;
+-	struct cpufreq_frequency_table *freq_table = exynos_info->freq_table;
+-	int index;
++	struct cpufreq_frequency_table *pos, *freq_table;
  
- 	rate /= 1000; /* convert to kHz */
+-	for (index = 0;
+-		freq_table[index].frequency != CPUFREQ_TABLE_END; index++)
+-		if (freq_table[index].frequency == freq)
++	freq_table = exynos_info->freq_table;
++	cpufreq_for_each_entry(pos, freq_table) {
++		if (pos->frequency == freq)
+ 			break;
++	}
  
--	for (i = 0; table[i].frequency != CPUFREQ_TABLE_END; i++) {
--		diff = table[i].frequency - rate;
-+	cpufreq_for_each_entry(pos, table) {
-+		diff = pos->frequency - rate;
- 		if (diff < 0)
- 			diff = -diff;
+-	if (freq_table[index].frequency == CPUFREQ_TABLE_END)
++	if (pos->frequency == CPUFREQ_TABLE_END)
+ 		return -EINVAL;
  
- 		if (diff < best) {
- 			best = diff;
--			ret = table[i].frequency;
-+			ret = pos->frequency;
- 		}
- 	}
+-	return index;
++	return pos - freq_table;
+ }
  
+ static int exynos_cpufreq_scale(unsigned int target_freq)
 -- 
 1.9.0
