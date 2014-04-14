@@ -1,53 +1,50 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 14 Apr 2014 14:41:55 +0300
-Subject: [PATCH v3 00/10] dma: edma: Fixes for cyclic (audio) operation
-Message-ID: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Mon, 14 Apr 2014 14:41:56 +0300
+Subject: [PATCH v3 01/10] platform_data: edma: Be precise with the paRAM struct
+In-Reply-To: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1397475725-5036-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The edmacc_param struct should follow the layout of the paRAM area in the
+HW. Be explicit on the size of the fields (u32) and also mark the struct
+as packed to avoid any padding on non 32bit architectures.
 
-Changes since v2:
-- Dropped patch 10 from v2 (simplify direction configuration...)
-- Dropped the channel priority related patches since we are going to go via
-  different route for configuring the priority.
-- Added ACK from Joel for the patches since they are not changed since v2
-
-Changes since v1:
-- ASoC patches removed
-- Comments from Andriy Shevchenko addressed
-- patch added to fix cases when src/dst_maxburst is set to 0
-
-The series contains now only:
-Support for DMA pause/resume in cyclic mode
-device_slave_caps callback and DMA_CYCLIC flag correction.
-While debugging the edma to get things sorted out I noticed that the debug was
-too verbose and the important information was hidden even when the we did not
-asked for verbose dmaengine debug.
-I have included some debug cleanups for the edma dmaengine driver also.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Acked-by: Joel Fernandes <joelf@ti.com>
 ---
-Peter Ujfalusi (10):
-  platform_data: edma: Be precise with the paRAM struct
-  arm: common: edma: Save the number of event queues/TCs
-  dmaengine: edma: Correct the handling of src/dst_maxburst == 0
-  dmaengine: edma: Add support for DMA_PAUSE/RESUME operation
-  dmaengine: edma: Set DMA_CYCLIC capability flag
-  dmaengine: edma: Implement device_slave_caps callback
-  dmaengine: edma: Reduce debug print verbosity for non verbose
-    debugging
-  dmaengine: edma: Prefix debug prints where the text were identical in
-    prep callbacks
-  dmaengine: edma: Add channel number to debug prints
-  dmaengine: edma: Print the direction value as well when it is not
-    supported
+ include/linux/platform_data/edma.h | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
- arch/arm/common/edma.c             |  4 ++
- drivers/dma/edma.c                 | 87 ++++++++++++++++++++++++++++++--------
- include/linux/platform_data/edma.h | 18 ++++----
- 3 files changed, 83 insertions(+), 26 deletions(-)
-
+diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+index f50821cb64be..923f8a3e4ce0 100644
+--- a/include/linux/platform_data/edma.h
++++ b/include/linux/platform_data/edma.h
+@@ -43,15 +43,15 @@
+ 
+ /* PaRAM slots are laid out like this */
+ struct edmacc_param {
+-	unsigned int opt;
+-	unsigned int src;
+-	unsigned int a_b_cnt;
+-	unsigned int dst;
+-	unsigned int src_dst_bidx;
+-	unsigned int link_bcntrld;
+-	unsigned int src_dst_cidx;
+-	unsigned int ccnt;
+-};
++	u32 opt;
++	u32 src;
++	u32 a_b_cnt;
++	u32 dst;
++	u32 src_dst_bidx;
++	u32 link_bcntrld;
++	u32 src_dst_cidx;
++	u32 ccnt;
++} __packed;
+ 
+ /* fields in edmacc_param.opt */
+ #define SAM		BIT(0)
 -- 
 1.9.2
