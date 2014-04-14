@@ -1,22 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Apr 2014 20:35:49 +0100
-Subject: [PATCH] arm: allow all architectures to change max zone order
-In-Reply-To: <1397487962.4548.30.camel@weser.hi.pengutronix.de>
-References: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
- <1397487962.4548.30.camel@weser.hi.pengutronix.de>
-Message-ID: <20140414193549.GJ24070@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Apr 2014 20:41:11 +0100
+Subject: [PATCH v4 1/2] ASoC: sam9g20_wm8731: remove useless mach/gpio.h
+In-Reply-To: <cb4eece4e6fadca4627a869bfe6efb3d41c66700.1397468934.git.nicolas.ferre@atmel.com>
+References: <cb4eece4e6fadca4627a869bfe6efb3d41c66700.1397468934.git.nicolas.ferre@atmel.com>
+Message-ID: <20140414194111.GN25182@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 05:06:02PM +0200, Lucas Stach wrote:
-> Russell, can you please take a look at this? Nobody else seems to care
-> about this and we have to carry it around as without it imx-drm is
-> broken for FullHD displays with a 32bpp framebuffer.
+On Mon, Apr 14, 2014 at 11:54:38AM +0200, Nicolas Ferre wrote:
+> This include file is about to disapear. In addition it is
+> useless for this code. So it is time to remove it.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I intentionally decided to ignore it because of the argumentative
-description in it that implies that I'm stupid for not making this
-available everywhere.  So, it can wait a bit longer.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Acked-by: Mark Brown <broonie@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140414/d222bb41/attachment.sig>
