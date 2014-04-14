@@ -1,75 +1,89 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 14 Apr 2014 15:54:01 +0200
-Subject: [PATCH v3 04/11] irqchip: irq-armada-370-xp: do the
- set_smp_cross_call() in the driver
+Date: Mon, 14 Apr 2014 15:54:03 +0200
+Subject: [PATCH v3 06/11] ARM: mvebu: add function to set the resume boot
+ address for Armada 375
 In-Reply-To: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397483648-26611-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397483648-26611-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397483648-26611-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having the SoC code in arch/arm/mach-mvebu/platsmp.c do the
-set_smp_cross_call() to register the IPI-triggering function, it makes
-more sense to do exactly what the GIC driver is doing: let the irqchip
-driver do it. This way, it avoids having to expose the
-armada_mpic_send_doorbell() function between the irqchip driver and
-the SoC code.
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
+In order to boot the secondary CPUs on Armada 375, we need to set the
+boot address of these CPUs, through a register part of the System
+Controller (this deviates from the Armada XP design, where the boot
+address was defined using a register part of the PMSU unit).
+
+Therefore, this commit adds a new helper function in the System
+Controller driver to set the secondary CPU boot address.
+
+Moreover, it moves the System Controller initialization as an
+early_initcall(), since arch_initcall() is too late for an SMP-related
+initialization.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.h | 1 -
- arch/arm/mach-mvebu/platsmp.c       | 2 --
- drivers/irqchip/irq-armada-370-xp.c | 6 +++++-
- 3 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-mvebu/common.h            |  1 +
+ arch/arm/mach-mvebu/system-controller.c | 15 ++++++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index 237c86b..cd57c78 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -20,7 +20,6 @@
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 2b88eb0..b67fb7a 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -20,6 +20,7 @@
+ void mvebu_restart(enum reboot_mode mode, const char *cmd);
+ int mvebu_cpu_reset_deassert(int cpu);
+ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
++void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr);
  
- #define ARMADA_XP_MAX_CPUS 4
+ void armada_xp_cpu_die(unsigned int cpu);
  
--void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
- void armada_xp_mpic_smp_cpu_init(void);
- void armada_xp_secondary_startup(void);
- extern struct smp_operations armada_xp_smp_ops;
-diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-index e01ae51..1bc98ce 100644
---- a/arch/arm/mach-mvebu/platsmp.c
-+++ b/arch/arm/mach-mvebu/platsmp.c
-@@ -98,8 +98,6 @@ static void __init armada_xp_smp_init_cpus(void)
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+index 614ba68..0c5524a 100644
+--- a/arch/arm/mach-mvebu/system-controller.c
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -37,6 +37,8 @@ struct mvebu_system_controller {
  
- 	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
- 		panic("Invalid number of CPUs in DT\n");
--
--	set_smp_cross_call(armada_mpic_send_doorbell);
+ 	u32 rstoutn_mask_reset_out_en;
+ 	u32 system_soft_reset;
++
++	u32 resume_boot_addr;
+ };
+ static struct mvebu_system_controller *mvebu_sc;
+ 
+@@ -52,6 +54,7 @@ static const struct mvebu_system_controller armada_375_system_controller = {
+ 	.system_soft_reset_offset = 0x58,
+ 	.rstoutn_mask_reset_out_en = 0x1,
+ 	.system_soft_reset = 0x1,
++	.resume_boot_addr = 0xd4,
+ };
+ 
+ static const struct mvebu_system_controller orion_system_controller = {
+@@ -98,6 +101,16 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd)
+ 		;
  }
  
- static void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 41be897..7275662 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -315,7 +315,8 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- }
- 
- #ifdef CONFIG_SMP
--void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq)
-+static void armada_mpic_send_doorbell(const struct cpumask *mask,
-+				      unsigned int irq)
- {
- 	int cpu;
- 	unsigned long map = 0;
-@@ -511,6 +512,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 	if (parent_irq <= 0) {
- 		irq_set_default_host(armada_370_xp_mpic_domain);
- 		set_handle_irq(armada_370_xp_handle_irq);
 +#ifdef CONFIG_SMP
-+		set_smp_cross_call(armada_mpic_send_doorbell);
++void mvebu_system_controller_set_cpu_boot_addr(void *boot_addr)
++{
++	BUG_ON(system_controller_base == NULL);
++	BUG_ON(mvebu_sc->resume_boot_addr == 0);
++	writel(virt_to_phys(boot_addr), system_controller_base +
++	       mvebu_sc->resume_boot_addr);
++}
 +#endif
- 	} else {
- 		irq_set_chained_handler(parent_irq,
- 					armada_370_xp_mpic_handle_cascade_irq);
++
+ static int __init mvebu_system_controller_init(void)
+ {
+ 	const struct of_device_id *match;
+@@ -114,4 +127,4 @@ static int __init mvebu_system_controller_init(void)
+ 	return 0;
+ }
+ 
+-arch_initcall(mvebu_system_controller_init);
++early_initcall(mvebu_system_controller_init);
 -- 
 1.8.3.2
