@@ -1,24 +1,35 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 14 Apr 2014 13:50:37 -0400
-Subject: [PATCH v2] pata_arasan_cf: fix ata_host_activate() failure
- handling
-In-Reply-To: <1706948.xQXQIMFS2B@amdc1032>
-References: <1706948.xQXQIMFS2B@amdc1032>
-Message-ID: <20140414175037.GA15249@htj.dyndns.org>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 14 Apr 2014 10:52:41 -0700
+Subject: [rtc-linux] [PATCH] rtc: Fix suspend/resume for APM X-Gene SoC
+ RTC driver
+In-Reply-To: <20140414172134.GB25182@sirena.org.uk>
+References: <1397259218-20494-1-git-send-email-lho@apm.com>
+ <20140414172134.GB25182@sirena.org.uk>
+Message-ID: <CAPw-ZTn1qjA+1n62HhwphnSCTuqDMEE+adYeJ_L9c8n-Yqmtog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 06:01:47PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> Add missing cf_exit() and clk_put() calls to ata_host_activate()
-> failure path.
-> 
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Hi,
 
-Applied to libata/for-3.15-fixes.
+>> -     clk_prepare_enable(pdata->clk);
+>> +     ret = clk_prepare_enable(pdata->clk);
+>> +     if (ret)
+>> +             return ret;
+>>
+>>       /* Turn on the clock and the crystal */
+>>       writel(RTC_CCR_EN, pdata->csr_base + RTC_CCR);
+>>
+>> -     device_init_wakeup(&pdev->dev, 1);
+>> +     ret = device_init_wakeup(&pdev->dev, 1);
+>> +     if (ret)
+>> +             return ret;
+>>
+> If the init fails you should unprepare (though I suspect the same issue
+> applies to other things in the probe function anyway).  If you fix that
+> then feel free to add:
+>
 
-Thanks.
+Okay... This is the only place missed. I don't see issue with other
+locations. I will post another version soon.
 
--- 
-tejun
+-Loc
