@@ -1,22 +1,33 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 15 Apr 2014 14:01:54 -0400 (EDT)
-Subject: [PATCH v2 1/4] USB: OHCI: Export the ohci_hub_control function
-In-Reply-To: <1397578005-3341-2-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <Pine.LNX.4.44L0.1404151358020.1310-100000@iolanthe.rowland.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 15 Apr 2014 20:03:11 +0200
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140415.134627.1895466146177627985.davem@davemloft.net>
+References: <20140415154637.GA3560@redhat.com> <534D6A1F.70102@linaro.org>
+ <20140415174330.GA10558@redhat.com>
+ <20140415.134627.1895466146177627985.davem@davemloft.net>
+Message-ID: <20140415180311.GA11690@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Apr 2014, Laurent Pinchart wrote:
+On 04/15, David Miller wrote:
+>
+> From: Oleg Nesterov <oleg@redhat.com>
+> Date: Tue, 15 Apr 2014 19:43:30 +0200
+>
+> > Finally, let me repeat, you should verify that this
+> > __copy_to_user_page(page, uaddr, kaddr) will not something bad if uaddr
+> > is not mmapped, or its mapping do not match area->page.
+>
+> Just directly access userspace with the usual exception mechanism we
+> use for copy_to_user(), put_user(), et al. and if it faults you'll get
+> -EFAULT and handle it.
+>
+> This also avoids the D-cache aliasing issues entirely as I explained
+> in my other reply.
 
-> Platform drivers sometimes need to perform specific handling of hub
-> control requests. Make this possible by exporting the ohci_hub_control()
-> function which can then be called from a custom hub control handler in
-> the default case.
+Yes, yes, this is obvious.
 
-You should also export ohci_hub_status_data(), since it also gets
-overridden by these other drivers.
+But I have no idea what else we should do to take care of icache.
 
-For ehci-hcd, this doesn't seem to matter since ehci_hub_status_data 
-doesn't get overridden anywhere.
-
-Alan Stern
+Oleg.
