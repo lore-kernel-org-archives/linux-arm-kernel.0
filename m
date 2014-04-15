@@ -1,39 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Apr 2014 17:23:28 +0200
-Subject: [PATCH 2/5] ARM: dts: Device tree for AXM55xx.
-In-Reply-To: <20140415152047.GB32285@swsaberg01>
-References: <cover.1397552154.git.anders.berg@lsi.com>
- <8344066.GP0Bf5lvlE@wuerfel> <20140415152047.GB32285@swsaberg01>
-Message-ID: <11327885.Oem0QkHdqf@wuerfel>
+Date: Tue, 15 Apr 2014 17:26:39 +0200
+Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
+In-Reply-To: <20140415144735.GM17408@arm.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <21141977.8ucQJzlJts@wuerfel> <20140415144735.GM17408@arm.com>
+Message-ID: <10739949.AxKDLcKlhj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 17:20:47 Anders Berg wrote:
-> > > +                   gpio0: gpio at 2010092000 {
-> > > +                           #gpio-cells = <2>;
-> > > +                           compatible = "arm,pl061", "arm,primecell";
-> > > +                           gpio-controller;
-> > > +                           reg = <0x20 0x10092000 0x00 0x1000>;
-> > > +                           interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
-> > > +                                        <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> > > +                                        <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-> > > +                                        <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-> > > +                                        <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-> > > +                                        <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-> > > +                                        <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-> > > +                                        <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> > > +                           clocks = <&clk_per>;
-> > > +                           clock-names = "apb_pclk";
-> > > +                           status = "disabled";
-> > 
-> > The pl061 binding does not specify any clocks at all. Do we need to update
-> > that?
+On Tuesday 15 April 2014 15:47:35 Will Deacon wrote:
+> > We also have discussed some ideas about how to restructure the PCI
+> > code layer to make it easier to share host drivers across architectures
+> > and clean up the interfaces in the process.
 > 
-> Doesn't all AMBA devices need at least one apb_pclk since the bus driver does
-> clk_get(...,"apb_pclk") before calling probe()?
+> Ok. Whilst this all sounds good from an arm64 perspective (with Liviu
+> currently doing the work), it's not clear to me where that leaves my 32-bit
+> ARM kvmtool code. That was the main reason for me writing this driver, and it
+> seems a shame to have to wait for all the generic code to be sorted out
+> before it can be used on AArch32, where there is already a functional
+> pcibios implementation. The discussions mention things like generic
+> pci_host_bridge_ops, but having that for arch/arm/ doesn't sound like
+> something that is imminent.
+> 
+> Of course, I plan to port my driver to the new infrastructure when it lands
+> (since I want to support arm64), but it would be good to have something for
+> AArch32 in the meantime.
 
-Yes, I was mostly wondering whether we had a policy about whether this clock
-should also be listed in the binding or not. My feeling is that it's better
-to make that explicit.
+Agreed. You'll probably have to add a few #ifdef until we have the
+infrastructure in place. However, I'd prefer not having to do that for
+a lot of other drivers. It's only a matter of time until someone wants
+one of the existing arm32 drivers to work on arm64, and we really
+shouldn't have to duplicate a lot of #ifdef logic across them, just
+to deal with the architectures being different.
 
 	Arnd
