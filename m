@@ -1,38 +1,41 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 14 Apr 2014 18:42:43 -0700
-Subject: [PATCH 4/4] ARM: tegra: fix Venice2 VQMMC regulators
-In-Reply-To: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
-References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1397526163-20126-5-git-send-email-abrestic@chromium.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 15 Apr 2014 09:43:24 +0800
+Subject: [PATCH 5/5] spi: sirf: fix spi full-duplex DMA transferring issue
+In-Reply-To: <20140414200628.GX25182@sirena.org.uk>
+References: <1397457001-5266-1-git-send-email-21cnbao@gmail.com>
+ <1397457001-5266-6-git-send-email-21cnbao@gmail.com>
+ <20140414200628.GX25182@sirena.org.uk>
+Message-ID: <CAGsJ_4yO-LGJEkpNy=dizQWjSE3pHEBOrrPndho3jt1_YMRvHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VDDIO_SDMMC3 is the VQMMC supply, not the VMMC supply, for the SD
-slot.  Add 1.8V_VDDIO as the VQMMC supply for the eMMC.
+2014-04-15 4:06 GMT+08:00 Mark Brown <broonie@kernel.org>:
+> On Mon, Apr 14, 2014 at 02:30:01PM +0800, Barry Song wrote:
+>> From: Qipan Li <Qipan.Li@csr.com>
+>>
+>> sometimes t->tx can be equal with t->rx. for example, spidev will make
+>> tx and rx point to spidev->buffer at the same time. currently, for this
+>> case, we map the buffer BIDIRECTION to fix the cache consistency.
+>
+> I've applied this but such usage is out of spec - do we have any drivers
+> doing this in mainline?
 
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
----
- arch/arm/boot/dts/tegra124-venice2.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+i felt strange too at the first look from internal gerrit. qipan told
+me there is one:
+drivers/spi/spidev.c
 
-diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-index c17283c..53061ef 100644
---- a/arch/arm/boot/dts/tegra124-venice2.dts
-+++ b/arch/arm/boot/dts/tegra124-venice2.dts
-@@ -933,12 +933,13 @@
- 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
- 		status = "okay";
- 		bus-width = <4>;
--		vmmc-supply = <&vddio_sdmmc3>;
-+		vqmmc-supply = <&vddio_sdmmc3>;
- 	};
- 
- 	sdhci at 0,700b0600 {
- 		status = "okay";
- 		bus-width = <8>;
-+		vqmmc-supply = <&vddio_1v8>;
- 	};
- 
- 	ahub at 0,70300000 {
--- 
-1.9.1.423.g4596e3a
+static int spidev_message(struct spidev_data *spidev,
+                struct spi_ioc_transfer *u_xfers, unsigned n_xfers)
+{
+buf = spidev->buffer;
+..
+k_tmp->rx_buf = buf;
+...
+k_tmp->tx_buf = buf;
+...
+spi_message_add_tail(k_tmp, &msg);
+
+spidev_sync(spidev, &msg);
+}
+
+-barry
