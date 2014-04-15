@@ -1,46 +1,59 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 15 Apr 2014 12:43:28 +0100
-Subject: Renesas clock clk-mstp updates for clock-indices
-In-Reply-To: <CAMuHMdVVc-9n4mQSj6qVyP5k9xzSstSw==nfYcFSOXtb895QUw@mail.gmail.com>
-References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
- <CAMuHMdVVc-9n4mQSj6qVyP5k9xzSstSw==nfYcFSOXtb895QUw@mail.gmail.com>
-Message-ID: <534D1B60.8030007@codethink.co.uk>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Tue, 15 Apr 2014 17:13:28 +0530
+Subject: [PATCH V8 2/9] SPEAr13XX: Fix static mapping table
+In-Reply-To: <cover.1397555158.git.mohit.kumar@st.com>
+References: <cover.1397555158.git.mohit.kumar@st.com>
+Message-ID: <d6886e0f97dff12932cf89cb33721ac86c3a8e8b.1397555158.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/14 10:26, Geert Uytterhoeven wrote:
-> Hi Ben,
->
-> On Fri, Mar 7, 2014 at 1:46 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
->> Mike, following the commit to add the clock-indices field, the following
->> pair of commits updates the shmboile clk-mstp driver to uses these over
->> the local variant.
->>
->> Since this is involves two separte trees which are in development, the
->> decision is that we will fixup the renesas trees once they are merged
->> and the development cycle is complete. Once this is done, patch 2/2
->> can be reverted (if people care about three lines of differrence)
->
-> As we now have "renesas,clock-indices" in v3.14, the question about backwards
-> compatibility became moot.
+From: Pratyush Anand <pratyush.anand@st.com>
 
-Do you mean 'necessary'?
+SPEAr13XX was using virtual address space 0xFE000000 to map physical address
+space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
+change 0xFE000000 to 0xF9000000.
 
-> Can you please combine your two patches
->
-> [PATCH 1/2] clk: shmobile: clk-mstp: change to using clock-indices
-> [PATCH 2/2] clk: shmobile: clk-mstp: add backwards comapt for indices field
->
-> into a single patch, and submit to Mike?
->
-> Once it's in Mike's clk-next, we can do the following to get everything in
-> v3.15:
->    1. Simon cherry-picks Mike's commit into his fixes-for-v3.15 branch,
->    2. we fix arch/arm/boot/dts/r8a7790.dtsi and .../r8a7791.dtsi there,
->    3. fixes-for-v3.15 gets into mainline through arm-soc.
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: spear-devel at list.st.com
+Cc: stable at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-spear/include/mach/spear.h |    4 ++--
+ arch/arm/mach-spear/spear13xx.c          |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Wouldn't it be easier if we just got mike's ack and fixed it in one go?
-
+diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
+index 5cdc53d..f2d6a01 100644
+--- a/arch/arm/mach-spear/include/mach/spear.h
++++ b/arch/arm/mach-spear/include/mach/spear.h
+@@ -52,10 +52,10 @@
+ #ifdef CONFIG_ARCH_SPEAR13XX
+ 
+ #define PERIP_GRP2_BASE				UL(0xB3000000)
+-#define VA_PERIP_GRP2_BASE			IOMEM(0xFE000000)
++#define VA_PERIP_GRP2_BASE			IOMEM(0xF9000000)
+ #define MCIF_SDHCI_BASE				UL(0xB3000000)
+ #define SYSRAM0_BASE				UL(0xB3800000)
+-#define VA_SYSRAM0_BASE				IOMEM(0xFE800000)
++#define VA_SYSRAM0_BASE				IOMEM(0xF9800000)
+ #define SYS_LOCATION				(VA_SYSRAM0_BASE + 0x600)
+ 
+ #define PERIP_GRP1_BASE				UL(0xE0000000)
+diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
+index 7aa6e8c..89212ff 100644
+--- a/arch/arm/mach-spear/spear13xx.c
++++ b/arch/arm/mach-spear/spear13xx.c
+@@ -52,7 +52,7 @@ void __init spear13xx_l2x0_init(void)
+ /*
+  * Following will create 16MB static virtual/physical mappings
+  * PHYSICAL		VIRTUAL
+- * 0xB3000000		0xFE000000
++ * 0xB3000000		0xF9000000
+  * 0xE0000000		0xFD000000
+  * 0xEC000000		0xFC000000
+  * 0xED000000		0xFB000000
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.7.0.1
