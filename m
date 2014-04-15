@@ -1,51 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Apr 2014 10:43:09 +0200
-Subject: dma_alloc_coherent and cache?
-In-Reply-To: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
-References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
-Message-ID: <4356499.vN3lxjGqPZ@wuerfel>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 15 Apr 2014 12:43:55 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gbW1jOiBtbWNpOiBzd2l0Y2ggdGhlIGRyaXZlciB0byB1?=
+ =?UTF-8?B?c2luZyBncGlvIGRlc2NyaXB0b3Jz?=
+In-Reply-To: <1397550786-8146-1-git-send-email-linus.walleij@linaro.org>
+References: <1397550786-8146-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1397551435.309400197@f243.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 09:43:38 Lee Essen wrote:
+Tue, 15 Apr 2014 10:33:06 +0200 ?? Linus Walleij <linus.walleij@linaro.org>:
+> The next step in modernization of GPIO is to let drivers handle
+> descriptors rather than integer numbers representing GPIO pins,
+> akin to how clocks or regulators are already handled today.
 > 
+> This patch makes the MMCI driver use GPIO descriptos in the
+> core code with fallback code using the platform data if that
+> is not possible. After all platforms with MMCI have been
+> migrated to use descriptors, the platform data entries for
+> GPIO pins can be removed.
 > 
-> At a high level I have it working, however I get regular (reproducible) 
-> hangs and I suspect it's to do with the writes to the descriptiors 
-> (from dma_alloc_coherent) being buffered or cached and not making it
-> to the device when dma is triggered.
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi Russell,Ulf: there is no hurry to do these changes (only used
+> for my very corner-case MMCI PL181 experiments) but it's the
+> desired direction to use descriptors for GPIOs going forward.
+> I can rebase this on top of Ulf's patch stack any time, no
+> problem.
+> ---
+...
+>  static void mmci_dt_populate_generic_pdata(struct device_node *np,
+> -					struct mmci_platform_data *pdata)
+> +					   struct mmci_platform_data *pdata)
+>  {
+>  	int bus_width = 0;
+>  
+> -	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
+> -	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
+> -
+>  	if (of_get_property(np, "cd-inverted", NULL))
+>  		pdata->cd_invert = true;
 
-dma_alloc_coherent() is a wrapper around a device-specific allocator,
-based on the dma_map_ops implementation. The default allocator
-from arm_dma_ops gives you uncached, buffered memory. It is expected
-that the driver uses a barrier (which is implied by readl/writel
-but not __raw_readl/__raw_writel or readl_relaxed/writel_relaxed)
-to ensure the write buffers are flushed.
+You could even eliminate "cd-inverted" property for DT case.
 
-If the machine sets arm_coherent_dma_ops rather than arm_dma_ops,
-the memory will be cacheable, as it's assumed that the hardware
-is set up for cache-coherent DMAs.
- 
-> My theory is based on the fact that the hang always seems to happen
-> at the point of enabling dma for transmit, and occasionally I get a
-> packet out which is corrupt ... and if I add lots of debug printk's
-> or delay loops then it happens less frequently.
-> 
-> The original GPL code has some functions in to invalidate/clear the
-> L2 cache, but no other driver seems to do this, so it doesn't feel
-> like it's a good solution.
-
-Correct, drivers should never do cache management by hand, they
-should rely on dma_alloc_coherent, dma_map_* and dma_unmap_* to
-do the right thing.
-
-> It's a feroceon cpu, and I've tried disabling the L2 controller and
-> also the d-cache - neither of which made any difference.
-> 
-> So I'm now completely out of ideas and way out of my depth  
-> 
-> Any suggestions would be greatly appreciated.
-
-Can you post a link to the source code?
-
-	Arnd
+---
