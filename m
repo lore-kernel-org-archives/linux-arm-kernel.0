@@ -1,62 +1,49 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 15 Apr 2014 18:26:27 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <CAA3XUr0SBczZSKui-qOivJKGtOe8_rB8HX4rSX24VYvLXm5yvw@mail.gmail.com>
-References: <5347655B.3080307@linaro.org>
- <20140411.003636.272212797007496394.davem@davemloft.net>
- <20140411145625.GA27493@redhat.com> <20140411152207.GA28188@redhat.com>
- <20140411153041.GQ16119@n2100.arm.linux.org.uk>
- <20140411172456.GA20506@redhat.com>
- <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
- <20140414185916.GA30672@redhat.com>
- <CAA3XUr3BGA55JF_cgH=cqbo1wAK0773P1fvnG9dBjLU2KzBdKA@mail.gmail.com>
- <CAA3XUr0SBczZSKui-qOivJKGtOe8_rB8HX4rSX24VYvLXm5yvw@mail.gmail.com>
-Message-ID: <20140415162627.GB3560@redhat.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 15 Apr 2014 18:30:20 +0200
+Subject: [PATCH] clk: exynos4: Use single clock ID for CLK_MDMA gate clocks
+Message-ID: <1397579420-18776-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14, Victor Kamensky wrote:
->
-> Oleg's fix - Oleg's fix proposed on [1]. Basically it uses
-> copy_to_user_page and it does dynamic look-up of xol area vma
-> every tracing
+Exynos4210 and Exynos4x12 SoCs have the PL330 MDMA IP block clock
+defined exactly in same way in documentation. Using different
+names for these clocks is a bit misleading. Since there is no users
+of CLK_MDMA2 in existing dts files this patch drops CLK_MDMA2 and
+replaces it with CLK_MDMA in the driver. This ensures PL330 MDMA
+has correct clock assigned on Exynos4x12 SoCs.
 
-I guess I was not clear. No, I didn't really try to propose this change,
-I do not like it ;)
+Suggested-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c   |    2 +-
+ include/dt-bindings/clock/exynos4.h |    1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-I showed this hack in reply to multiple and persistent requests to reuse
-the ptrace solution we already have.
-
-> my arm specific fix - this one was proposed on as [2].
-
-I didn't even try to read the changes in arm/, I can't understand them
-anyway. I leave this to you and Russel.
-
-But, once again, please do not add arch_uprobe_flush_xol_access(), add
-arch_uprobe_copy_ixol().
-
-> x) fix that I did for ARM that shares ARM code with
-> copy_to_user_page but does not need vma performs best.
-
-The patch which adds copy_to_user_page(vma => NULL) into copy_to_page() ?
-Please see the comments in my previous email.
-
-> When I looked at current uprobes single step out line code
-> and compared it with code that was in the past (utrace
-> times) I noticed main essential difference how xol slots
-> are handled: Currently for each hit uprobes code allocate
-> xol slot and needs dcache/icache flush. But in the past
-> xol slot was attached/cached to uprobe entry
-
-Can't comment, I am not familiar with the old implementation.
-
-But yes, the current implementation is not perfect. Once again, it would
-be nice to remove this vma. Even if this is not possible, we can try to
-share this memory. We do not even need lru, we can make it "per cpu" and
-avoid the broadcasts. On x86 this is simple, we have __switch_to_xtra()
-which can re-copy ->ixol[] and do flush_icache_range() if UTASK_SSTEP.
-Not sure this is possible on arm and other arch'es. But lets not discuss
-this right now, this is a bit off-topic currently.
-
-Oleg.
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index b4f9672..5247caa 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -903,7 +903,7 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+ 	GATE(CLK_AUDSS, "audss", "sclk_epll", E4X12_GATE_IP_MAUDIO, 0, 0, 0),
+ 	GATE(CLK_MDNIE0, "mdnie0", "aclk160", GATE_IP_LCD0, 2, 0, 0),
+ 	GATE(CLK_ROTATOR, "rotator", "aclk200", E4X12_GATE_IP_IMAGE, 1, 0, 0),
+-	GATE(CLK_MDMA2, "mdma2", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
++	GATE(CLK_MDMA, "mdma", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
+ 	GATE(CLK_SMMU_MDMA, "smmu_mdma", "aclk200", E4X12_GATE_IP_IMAGE, 5, 0,
+ 		0),
+ 	GATE(CLK_MIPI_HSI, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
+diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
+index 75aff33..3ff13bc 100644
+--- a/include/dt-bindings/clock/exynos4.h
++++ b/include/dt-bindings/clock/exynos4.h
+@@ -181,7 +181,6 @@
+ #define CLK_KEYIF		347
+ #define CLK_AUDSS		348
+ #define CLK_MIPI_HSI		349 /* Exynos4210 only */
+-#define CLK_MDMA2		350 /* Exynos4210 only */
+ #define CLK_PIXELASYNCM0	351
+ #define CLK_PIXELASYNCM1	352
+ #define CLK_FIMC_LITE0		353 /* Exynos4x12 only */
+-- 
+1.7.9.5
