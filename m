@@ -1,51 +1,26 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 15 Apr 2014 11:26:20 +0200
-Subject: Renesas clock clk-mstp updates for clock-indices
-In-Reply-To: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <CAMuHMdVVc-9n4mQSj6qVyP5k9xzSstSw==nfYcFSOXtb895QUw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Apr 2014 10:26:09 +0100
+Subject: [PATCH 5/5] spi: sirf: fix spi full-duplex DMA transferring issue
+In-Reply-To: <CAGsJ_4yO-LGJEkpNy=dizQWjSE3pHEBOrrPndho3jt1_YMRvHg@mail.gmail.com>
+References: <1397457001-5266-1-git-send-email-21cnbao@gmail.com>
+ <1397457001-5266-6-git-send-email-21cnbao@gmail.com>
+ <20140414200628.GX25182@sirena.org.uk>
+ <CAGsJ_4yO-LGJEkpNy=dizQWjSE3pHEBOrrPndho3jt1_YMRvHg@mail.gmail.com>
+Message-ID: <20140415092609.GJ12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On Tue, Apr 15, 2014 at 09:43:24AM +0800, Barry Song wrote:
 
-On Fri, Mar 7, 2014 at 1:46 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> Mike, following the commit to add the clock-indices field, the following
-> pair of commits updates the shmboile clk-mstp driver to uses these over
-> the local variant.
->
-> Since this is involves two separte trees which are in development, the
-> decision is that we will fixup the renesas trees once they are merged
-> and the development cycle is complete. Once this is done, patch 2/2
-> can be reverted (if people care about three lines of differrence)
+> i felt strange too at the first look from internal gerrit. qipan told
+> me there is one:
+> drivers/spi/spidev.c
 
-As we now have "renesas,clock-indices" in v3.14, the question about backwards
-compatibility became moot.
-
-Can you please combine your two patches
-
-[PATCH 1/2] clk: shmobile: clk-mstp: change to using clock-indices
-[PATCH 2/2] clk: shmobile: clk-mstp: add backwards comapt for indices field
-
-into a single patch, and submit to Mike?
-
-Once it's in Mike's clk-next, we can do the following to get everything in
-v3.15:
-  1. Simon cherry-picks Mike's commit into his fixes-for-v3.15 branch,
-  2. we fix arch/arm/boot/dts/r8a7790.dtsi and .../r8a7791.dtsi there,
-  3. fixes-for-v3.15 gets into mainline through arm-soc.
-
-Does that sound like plan?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+OK, that needs fixing.  That code predates anyone doing DMA.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/6f4fee84/attachment.sig>
