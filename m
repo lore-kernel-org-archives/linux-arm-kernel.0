@@ -1,21 +1,102 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Apr 2014 12:31:25 -0600
-Subject: [PATCH 4/4] ARM: tegra: fix Venice2 VQMMC regulators
-In-Reply-To: <1397526163-20126-5-git-send-email-abrestic@chromium.org>
-References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
- <1397526163-20126-5-git-send-email-abrestic@chromium.org>
-Message-ID: <534D7AFD.7080807@wwwdotorg.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 15 Apr 2014 20:34:19 +0200
+Subject: [PATCH v2 2/3] ARM: EXYNOS: Add initial support of PMU for
+ Exynos5260
+In-Reply-To: <1395061795-17777-3-git-send-email-vikas.sajjan@samsung.com>
+References: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
+ <1395061795-17777-3-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <534D7BAB.30503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2014 07:42 PM, Andrew Bresticker wrote:
-> VDDIO_SDMMC3 is the VQMMC supply, not the VMMC supply, for the SD
-> slot.  Add 1.8V_VDDIO as the VQMMC supply for the eMMC.
+Hi Vikas,
 
-Is there documentation re: what vmmc-supply and vqmmc-supply actually
-refer to? I looked a long while ago and couldn't find any, and didn't
-get an answer when I asked.
+On 17.03.2014 14:09, Vikas Sajjan wrote:
+> Adds PMU support of PMU for Exynos5260. Suspend-to-RAM can be built on
+> top this.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> ---
+>   arch/arm/mach-exynos/common.h            |   26 ++++
+>   arch/arm/mach-exynos/pm.c                |   34 +++--
+>   arch/arm/mach-exynos/pmu.c               |  238 ++++++++++++++++++++++++++++++
+>   arch/arm/mach-exynos/regs-pmu.h          |  232 +++++++++++++++++++++++++++++
+>   arch/arm/plat-samsung/include/plat/cpu.h |    8 +
+>   5 files changed, 529 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index aba6a2a..a17f701 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -56,6 +56,32 @@ enum sys_powerdown {
+>   	NUM_SYS_POWERDOWN,
+>   };
+>
+> +enum running_cpu {
+> +	EXYNOS5_KFC,
+> +	EXYNOS5_ARM,
+> +};
+> +
+> +enum reg_op {
+> +	REG_INIT,	/* write new value */
+> +	REG_RESET,	/* clear with zero */
+> +	REG_SET,	/* bit set */
+> +	REG_CLEAR,	/* bit clear */
+> +};
+> +
+> +/* reg/value set */
+> +#define EXYNOS_PMU_REG(REG, VAL, OP)		\
+> +{						\
+> +	.reg	=	(void __iomem *)REG,	\
+> +	.val	=	VAL,			\
+> +	.op	=	OP,			\
+> +}
+> +
+> +struct exynos_pmu_init_reg {
+> +	void __iomem *reg;
+> +	unsigned int val;
+> +	enum reg_op op;
+> +};
+> +
+>   extern unsigned long l2x0_regs_phys;
+>   struct exynos_pmu_conf {
+>   	void __iomem *reg;
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index 15af0ce..dbe9670 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -109,7 +109,7 @@ static int exynos_cpu_suspend(unsigned long arg)
+>   	outer_flush_all();
+>   #endif
+>
+> -	if (soc_is_exynos5250())
+> +	if (soc_is_exynos5250() || soc_is_exynos5260())
+>   		flush_cache_all();
 
-Neither
-Documentation/devicetree/bindings/mmc/{mmc.txt,nvidia,tegra20-sdhci.txt}
-seem to say:-(
+I think it's the right time for this code to be restructured. Adding 
+more and more SoCs over this cruft is making this code worse and worse.
+
+I believe this should be done as follows:
+
+  - a generic struct describing particular PMU variant should be 
+defined, with things like
+
+	bool flush_cache_on_suspend;
+	struct exynos_pmu_conf *pmu_conf;
+
+or even function pointers, like
+
+	void (*cpu_suspend)(unsigned long arg);
+
+to handle things done currently using soc_is_*() macros, which we should 
+get rid of.
+
+- a DT match table would bind particular compatible strings with 
+respective PMU variants structs,
+
+- in general, this code should be made more like a normal driver, e.g. 
+bind to a DT node and map registers dynamically.
+
+Best regards,
+Tomasz
