@@ -1,100 +1,148 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 15 Apr 2014 14:58:52 +0530
-Subject: [PATCH 4/6] ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
+Date: Tue, 15 Apr 2014 14:58:53 +0530
+Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
 In-Reply-To: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
 References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1397554134-11827-5-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos specific macros and declarations have been moved to
-mach-exynos. Inclusion of plat/cpu.h is no more necessary.
+From: Arnd Bergmann <arnd@arndb.de>
 
+This makes it possible to enable the exynos platform as part of a
+multiplatform kernel, in addition to keeping the single-platform
+Exynos support.
+sparsemem is currently not supported in multiplatform.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |    1 -
- arch/arm/mach-exynos/exynos.c  |    2 --
- arch/arm/mach-exynos/hotplug.c |    2 --
- arch/arm/mach-exynos/platsmp.c |    2 --
- arch/arm/mach-exynos/pm.c      |    1 -
- arch/arm/mach-exynos/pmu.c     |    2 --
- 6 files changed, 10 deletions(-)
+ arch/arm/Kconfig                  |   27 +++------------------------
+ arch/arm/configs/exynos_defconfig |    2 +-
+ arch/arm/mach-exynos/Kconfig      |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-exynos/Makefile     |    2 ++
+ arch/arm/plat-samsung/Makefile    |    3 +++
+ 5 files changed, 36 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index c57cae0e8779..3dd385ebf195 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -24,7 +24,6 @@
- #include <asm/unified.h>
- #include <asm/cpuidle.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4422601059e8..9d459e9c396b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -828,34 +828,13 @@ config ARCH_S5PV210
+ 	help
+ 	  Samsung S5PV210/S5PC110 series based systems
  
--#include <plat/cpu.h>
- #include <plat/pm.h>
+-config ARCH_EXYNOS
++config ARCH_EXYNOS_SINGLE
+ 	bool "Samsung EXYNOS"
+-	select ARCH_HAS_BANDGAP
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_HAS_HOLES_MEMORYMODEL
+-	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_EXYNOS
+ 	select ARCH_SPARSEMEM_ENABLE
+-	select ARM_AMBA
+-	select ARM_GIC
+-	select CLKSRC_OF
+-	select COMMON_CLK
+-	select CPU_V7
+-	select GENERIC_CLOCKEVENTS
+-	select HAVE_ARM_SCU if SMP
+-	select HAVE_S3C2410_I2C if I2C
+-	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+-	select HAVE_S3C_RTC if RTC_CLASS
+-	select HAVE_SMP
+ 	select NEED_MACH_MEMORY_H
+-	select PINCTRL
+-	select PINCTRL_EXYNOS
+-	select PM_GENERIC_DOMAINS if PM_RUNTIME
+-	select S5P_DEV_MFC
+-	select SAMSUNG_DMADEV
+-	select SPARSE_IRQ
+-	select USE_OF
+ 	help
+-	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
++	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
  
- #include <mach/map.h>
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index eb1a431a894a..59aab756702e 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -26,8 +26,6 @@
- #include <asm/mach/map.h>
- #include <asm/memory.h>
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 4ce7b70ea901..103a676256cd 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -7,7 +7,7 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_ARCH_EXYNOS=y
++CONFIG_ARCH_EXYNOS_SINGLE=y
+ CONFIG_S3C_LOWLEVEL_UART_PORT=3
+ CONFIG_S3C24XX_PWM=y
+ CONFIG_ARCH_EXYNOS5=y
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 5c34dc26cec6..bc55af76a05f 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -7,6 +7,33 @@
  
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "mfc.h"
- #include "regs-pmu.h"
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead530c6f8..884e83cfbfbb 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -19,8 +19,6 @@
- #include <asm/cp15.h>
- #include <asm/smp_plat.h>
+ # Configuration options for the EXYNOS4
  
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "regs-pmu.h"
++config ARCH_EXYNOS
++	bool "Samsung EXYNOS" if ARCH_MULTI_V7
++	select ARCH_HAS_BANDGAP
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_HOLES_MEMORYMODEL
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_AMBA
++	select ARM_GIC
++	select CLKSRC_OF
++	select COMMON_CLK
++	select CPU_V7
++	select GENERIC_CLOCKEVENTS
++	select HAVE_ARM_SCU if SMP
++	select HAVE_S3C2410_I2C if I2C
++	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select HAVE_S3C_RTC if RTC_CLASS
++	select HAVE_SMP
++	select PINCTRL
++	select PINCTRL_EXYNOS
++	select PM_GENERIC_DOMAINS if PM_RUNTIME
++	select S5P_DEV_MFC
++	select SAMSUNG_DMADEV
++	select SPARSE_IRQ
++	select USE_OF
++	help
++	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
++
+ if ARCH_EXYNOS
  
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 03e5e9f94705..c28cdb1c82cd 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -26,8 +26,6 @@
- #include <asm/smp_scu.h>
- #include <asm/firmware.h>
+ menu "SAMSUNG EXYNOS SoCs Support"
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index f6dcc256db56..24a8efe3d4bd 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -5,6 +5,8 @@
+ #
+ # Licensed under GPLv2
  
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "regs-pmu.h"
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
++
+ obj-y				:=
+ obj-m				:=
+ obj-n				:=
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 25c826ed3b65..5e5beaa9ae15 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -4,6 +4,9 @@
+ #
+ # Licensed under GPLv2
  
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 15af0ceb0a66..ca672e24b5cd 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -26,7 +26,6 @@
- #include <asm/smp_scu.h>
- #include <asm/suspend.h>
- 
--#include <plat/cpu.h>
- #include <plat/pm-common.h>
- #include <plat/pll.h>
- #include <plat/regs-srom.h>
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 05c7ce15322a..fb0deda3b3a4 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -13,8 +13,6 @@
- #include <linux/kernel.h>
- #include <linux/bug.h>
- 
--#include <plat/cpu.h>
--
- #include "common.h"
- #include "regs-pmu.h"
- 
++ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
++ccflags-$(CONFIG_ARCH_EXYNOS)	+= -I$(srctree)/arch/arm/mach-exynos/include
++
+ obj-y				:=
+ obj-m				:=
+ obj-n				:= dummy.o
 -- 
 1.7.9.5
