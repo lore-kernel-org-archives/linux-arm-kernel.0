@@ -1,86 +1,121 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 15 Apr 2014 09:36:13 +0200
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
-In-Reply-To: <20140414210429.GJ25182@sirena.org.uk>
-References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140414210429.GJ25182@sirena.org.uk>
-Message-ID: <534CE16D.8010508@free-electrons.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 15 Apr 2014 13:08:18 +0530
+Subject: [PATCH] arm: exynos: generalize power register address calculation
+In-Reply-To: <CANuQgHEbepUZO279+Bsx7Ynep6ZPQQJj+zCW3S2k50Cw5SLOdA@mail.gmail.com>
+References: <CANuQgHEbepUZO279+Bsx7Ynep6ZPQQJj+zCW3S2k50Cw5SLOdA@mail.gmail.com>
+Message-ID: <1397547498-21729-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Currently status/configuration power register values are hard-coded for cpu1.
 
+Make it generic so that it is useful for SoC's with more than two cpus.
 
-On 14/04/2014 23:04, Mark Brown wrote:
-> On Mon, Apr 14, 2014 at 03:08:05PM +0200, Boris BREZILLON wrote:
->> SMBus is a subset of the I2C protocol, oftenly used to access
-registers on
->> external devices.
-> 
-> This is basically fine.  However...
-> 
->> +    switch (ctx->transfer_type) { +    case
->> REGMAP_SMBUS_BYTE_TRANSFER: +        while (count > 0 && !ret) { 
->> +            ret = i2c_smbus_write_byte_data(ctx->i2c, reg++, +
->> *(u8 *)data++); + +            count--; +        } +
->> break;
-> 
-> The transfer type gets set once per device at init time so why not
-> just parameterise based on val_bytes?
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+---
+changes in v3:
+	1. Move cpunr calculation to a macro
+	2. Changed printk format specifier from unsigned hex to unsigned decimal
+Changes in v2:
+	1. Used existing macros for clusterid and cpuid calculation
 
-Actually, you may want to transfer 1 byte registers using the block
-method (if your device only support block transfers). This depends on
-the device being accessed and what it supports, but I'm not sure we can
-assume 1 byte registers will always be transferred using SMBUS byte
-transfers.
+ arch/arm/mach-exynos/hotplug.c  |    7 ++++---
+ arch/arm/mach-exynos/platsmp.c  |   13 +++++++------
+ arch/arm/mach-exynos/regs-pmu.h |   15 +++++++++++++--
+ 3 files changed, 24 insertions(+), 11 deletions(-)
 
-> 
-> 
->> +    case REGMAP_SMBUS_I2C_BLOCK_TRANSFER: +        while (count
->> > 0 && !ret) { +            ret =
->> i2c_smbus_write_i2c_block_data(ctx->i2c, +
->> reg, +                                 ctx->val_bytes, +
->> (const u8 *)data);
-> 
-> Fix the const correctness of the API rather than casting.
-
-The API is correct because the i2c_smbus_write_i2c_block does not modify
-the data pointer.
-Just removing the const keyword in the cast should be enough, because
-you can safely cast a non const pointer to a const one.
-
-> 
-> 
->> +            reg += ctx->val_bytes; +            count -=
->> ctx->val_bytes; +            data += ctx->val_bytes; +        }
-> 
-> I'm assuming this will only be used if val_bytes isn't 1 or 2?
-
-As explained earlier, this depends on the device being accessed, but it
-might be used for smaller transfers (1 or 2 bytes).
-
-Thanks for the review.
-
-Best Regards,
-
-Boris
-
-- -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.14 (GNU/Linux)
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iQEcBAEBAgAGBQJTTOFkAAoJEHLimErDqMKyhlcH/jeKnphnxL9Sc+OKsd1sbvZ4
-dgjwm0HVy/oQO4dwGHbGXDrvoqdcuPKjKJv0An1RAW0u8CBQHCHbn2xQZtHkrNhK
-C4g+8ws3R050ppDAAvFGgnx2bIoS8+Elbcd0GNCQW+xYU/xOySH9qgPitFF7PgGw
-X9wgM+o4x6W2Lo/NOxmkXeZVWl3UrfUL24UTXfqysJK6ciYtW7GDP1uInfK2eH1G
-RL7eD7LanEH95bk8eQtVfZZzcoAZCo1ri2z6iPf2WS4Nep84fyAr6Q+B1Ltmhsus
-QXZgXWnVY45ZYFRNjMX8axCUUoJf7DSn9ayi3Gil1i7fLmCPKhpxc8HNxWvIMkk=
-=FFGW
------END PGP SIGNATURE-----
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index 5eead53..9f74be2 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -92,11 +92,12 @@ static inline void cpu_leave_lowpower(void)
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ {
++	unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
+ 	for (;;) {
+ 
+-		/* make cpu1 to be turned off at next WFI command */
+-		if (cpu == 1)
+-			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
++		/* make cpu to be turned off at next WFI command */
++		if (cpu)
++			__raw_writel(0, S5P_ARM_CORE_CONFIGURATION(cpunr));
+ 
+ 		/*
+ 		 * here's the WFI
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 03e5e9f..d9c182f 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -90,7 +90,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
+ 	unsigned long phys_cpu = cpu_logical_map(cpu);
+-
++	unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
+ 	/*
+ 	 * Set synchronisation state between this boot processor
+ 	 * and the secondary one
+@@ -107,14 +107,15 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 */
+ 	write_pen_release(phys_cpu);
+ 
+-	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
++	if (!(__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
++		& S5P_CORE_LOCAL_PWR_EN)) {
+ 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
+-			     S5P_ARM_CORE1_CONFIGURATION);
++			     S5P_ARM_CORE_CONFIGURATION(cpunr));
+ 
+ 		timeout = 10;
+ 
+-		/* wait max 10 ms until cpu1 is on */
+-		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
++		/* wait max 10 ms until secondary cpu is on */
++		while ((__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
+ 			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
+ 			if (timeout-- == 0)
+ 				break;
+@@ -123,7 +124,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		}
+ 
+ 		if (timeout == 0) {
+-			printk(KERN_ERR "cpu1 power enable failed");
++			pr_err("cpu%u power enable failed", cpu);
+ 			spin_unlock(&boot_lock);
+ 			return -ETIMEDOUT;
+ 		}
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 4f6a256..0de6df4 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -105,8 +105,13 @@
+ #define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
+ #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
+ 
+-#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
+-#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
++#define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
++#define S5P_ARM_CORE0_STATUS			S5P_PMUREG(0x2004)
++
++#define S5P_ARM_CORE_CONFIGURATION(_cpunr)	\
++		(S5P_ARM_CORE0_CONFIGURATION + 0x80 * (_cpunr))
++#define S5P_ARM_CORE_STATUS(_cpunr)		\
++		(S5P_ARM_CORE0_STATUS + 0x80 * (_cpunr))
+ 
+ #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
+ #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
+@@ -313,4 +318,10 @@
+ 
+ #define EXYNOS5_OPTION_USE_RETENTION				(1 << 4)
+ 
++#include <asm/cputype.h>
++#define MAX_CPUS_IN_CLUSTER	4
++#define ENYNOS_PMU_CPUNR(mpidr) \
++		((MPIDR_AFFINITY_LEVEL(mpidr, 1) * MAX_CPUS_IN_CLUSTER) \
++		  + MPIDR_AFFINITY_LEVEL(mpidr, 0));
++
+ #endif /* __ASM_ARCH_REGS_PMU_H */
+-- 
+1.7.9.5
