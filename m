@@ -1,71 +1,52 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 15 Apr 2014 09:18:05 +0100
-Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
-In-Reply-To: <alpine.LFD.2.11.1404141201130.980@knanqh.ubzr>
-References: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
- <20140414111237.GB3844@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1404141201130.980@knanqh.ubzr>
-Message-ID: <20140415081805.GB3596@e103592.cambridge.arm.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Tue, 15 Apr 2014 16:20:50 +0800
+Subject: [PATCH] arm64: initialize spinlock for init_mm's context
+Message-ID: <1397550050-5321-1-git-send-email-leoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 12:03:09PM -0400, Nicolas Pitre wrote:
-> On Mon, 14 Apr 2014, Dave Martin wrote:
-> 
-> > On Fri, Apr 11, 2014 at 06:16:24PM +0800, Lu Xiangyu wrote:
-> > > From: Xiangyu Lu <luxiangyu@huawei.com>
-> > > 
-> > > In big-endian systems, "%1" get the most significant part of the value, cause
-> > > the instruction to get the wrong result.
-> > > 
-> > > When viewing ftrace record in big-endian ARM systems, we found that
-> > > the timestamp errors:
-> > > 
-> > > swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
-> > > events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
-> > > swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
-> > > swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
-> > > swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
-> > > swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
-> > > 
-> > > When viewed ftrace records, it will call the do_div(n, base) function, which
-> > > achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
-> > > do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
-> > > 
-> > > Cc: <stable@vger.kernel.org> # 2.6.20+
-> > > Signed-off-by: Alex Wu <wuquanming@huawei.com>
-> > > Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
-> > > ---
-> > >  arch/arm/include/asm/div64.h |    2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> > > index 191ada6..662c7bd 100644
-> > > --- a/arch/arm/include/asm/div64.h
-> > > +++ b/arch/arm/include/asm/div64.h
-> > > @@ -156,7 +156,7 @@
-> > >  		/* Select the best insn combination to perform the   */	\
-> > >  		/* actual __m * __n / (__p << 64) operation.         */	\
-> > >  		if (!__c) {						\
-> > > -			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
-> > > +			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
-> > 
-> > This looks plausible: these if() clauses are all concerned with
-> > multiplying the low parts of __m and __n together, and this seems
-> > to be the only 64-bit asm operand reference where Q or R is suspiciously
-> > missing: so it looks likely that "Q" is required here for consistency.
-> > 
-> > My understanding of the details of this code are limited: do you have
-> > a simple test case to demonstrate the error and the fix?
-> 
-> No need -- it is indeed wrong on big endian and has been so for the last 
-> 7.5 years.
+ARM64 has defined the spinlock for init_mm's context, so need initialize
+the spinlock structure; otherwise during the suspend flow it will dump
+the info for spinlock's bad magic warning as below:
 
-OK, well with that sanity-check on my reasoning I'm happy to:
+[   39.084394] Disabling non-boot CPUs ...
+[   39.092871] BUG: spinlock bad magic on CPU#1, swapper/1/0
+[   39.092896]  lock: init_mm+0x338/0x3e0, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
+[   39.092907] CPU: 1 PID: 0 Comm: swapper/1 Tainted: G           O 3.10.33 #125
+[   39.092912] Call trace:
+[   39.092927] [<ffffffc000087e64>] dump_backtrace+0x0/0x16c
+[   39.092934] [<ffffffc000087fe0>] show_stack+0x10/0x1c
+[   39.092947] [<ffffffc000765334>] dump_stack+0x1c/0x28
+[   39.092953] [<ffffffc0007653b8>] spin_dump+0x78/0x88
+[   39.092960] [<ffffffc0007653ec>] spin_bug+0x24/0x34
+[   39.092971] [<ffffffc000300a28>] do_raw_spin_lock+0x98/0x17c
+[   39.092979] [<ffffffc00076cf08>] _raw_spin_lock_irqsave+0x4c/0x60
+[   39.092990] [<ffffffc000094044>] set_mm_context+0x1c/0x6c
+[   39.092996] [<ffffffc0000941c8>] __new_context+0x94/0x10c
+[   39.093007] [<ffffffc0000d63d4>] idle_task_exit+0x104/0x1b0
+[   39.093014] [<ffffffc00008d91c>] cpu_die+0x14/0x74
+[   39.093021] [<ffffffc000084f74>] arch_cpu_idle_dead+0x8/0x14
+[   39.093030] [<ffffffc0000e7f18>] cpu_startup_entry+0x1ec/0x258
+[   39.093036] [<ffffffc00008d810>] secondary_start_kernel+0x114/0x124
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Leo Yan <leoy@marvell.com>
+---
+ arch/arm64/include/asm/mmu.h |    3 +++
+ 1 file changed, 3 insertions(+)
 
-I suggest you go ahead and send it to Russell's patch system.
-
-Cheers
----Dave
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index f600d40..06a19bd 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -22,6 +22,9 @@ typedef struct {
+ 	void *vdso;
+ } mm_context_t;
+ 
++#define INIT_MM_CONTEXT(name) \
++	.context.id_lock = __RAW_SPIN_LOCK_INITIALIZER(name.context.id_lock),
++
+ #define ASID(mm)	((mm)->context.id & 0xffff)
+ 
+ extern void paging_init(void);
+-- 
+1.7.9.5
