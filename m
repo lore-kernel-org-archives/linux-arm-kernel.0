@@ -1,96 +1,52 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 15 Apr 2014 10:00:07 +0200
-Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
-In-Reply-To: <534CE24F.9020703@gmail.com>
-References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
- <20140414152212.GC2255@ldesroches-Latitude-E6320>
- <534CE24F.9020703@gmail.com>
-Message-ID: <20140415080006.GE2255@ldesroches-Latitude-E6320>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Apr 2014 09:02:17 +0100
+Subject: [PATCH] arm64: Flush the process's mm context TLB entries when
+ switching
+In-Reply-To: <534C92B8.30408@huawei.com>
+References: <534BCE80.3090406@huawei.com> <20140414130154.GE3530@arm.com>
+ <534C92B8.30408@huawei.com>
+Message-ID: <20140415080217.GD17408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 09:39:59AM +0200, Richard Genoud wrote:
-> On 14/04/2014 17:22, Ludovic Desroches wrote:
-> > Hi Richard,
+On Tue, Apr 15, 2014 at 03:00:24AM +0100, Ding Tianhong wrote:
+> On 2014/4/14 21:01, Will Deacon wrote:
+> > Hi Ding,
 > > 
-> > On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
-> >> RTS pin is an active low pin.
-> >> For now, this doesn't change anything as the ACTIVE_LOW flag is not
-> >> handled in atmel_serial, but it will be in 3.16.
+> > On Mon, Apr 14, 2014 at 01:03:12PM +0100, Ding Tianhong wrote:
+> >> I met a problem when migrating process by following steps:
 > >>
-> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> 1) The process was already running on core 0.
+> >> 2) Set the CPU affinity of the process to 0x02 and move it to core 1,
+> >>    it could work well.
+> >> 3) Set the CPU affinity of the process to 0x01 and move it to core 0 again,
+> >>    the problem occurs and the process was killed.
+> > 
+> > [...]
+> > 
+> >> It was a very strange problem that the PC and LR are both 0, and the esr is
+> >> 0x83000006, it means that the used for instruction access generated MMU faults
+> >> and synchronous external aborts, including synchronous parity errors.
 > >>
-> >> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> >> index 17c1042b2df8..2f7aad71b3c9 100644
-> >> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> >> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> >> @@ -35,7 +35,7 @@ Example:
-> >>  		clock-names = "usart";
-> >>  		atmel,use-dma-rx;
-> >>  		atmel,use-dma-tx;
-> >> -		rts-gpios = <&pioD 15 0>;
-> >> +		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+> >> I try to fix the problem by invalidating the process's TLB entries when switching,
+> >> it will make the context stale and pick new one, and then it could work well.
+> >>
+> >> So I think in some situation that after the process switching, the modification of
+> >> the TLB entries in the new core didn't inform all other cores to invalidate the old
+> >> TLB entries which was in the inner shareable caches, and then if the process schedule
+> >> to another core, the old TLB entries may occur MMU faults.
 > > 
-> > I was told we should not use macros here. If it is still the truth:
+> > Yes, it sounds like you don't have your TLBs configured correctly. Can you
+> > confirm that your EL3 firmware is configuring TLB broadcasting correctly
+> > please?
 > > 
-> > rts-gpios = <&pioD 15 1>;
 > 
-> But I'd really like to know if macros are forbidden in DT documentation and why...
-> Because, IMHO, <&pioD 15 1> talks less that <&pioD 15 GPIO_ACTIVE_LOW>.
-> Which is a shame in a documentation.
+> Hi will:
+> 
+> Do you mean the SCR_EL3.NS?
 
-I don't remember who told me that but the reason was that device tree
-should not depend on Linux and macros are relative to Linux.
+No, there's usually a CPU-specific register (called something like actlr or
+ectlr) which contains bit(s) to enable TLB broadcasting in hardware. Which
+CPU are you using?
 
-> 
-> Rob, any idea on that ?
-> 
-> (actually, I missed some uses of GPIO_ACTIVE_ macros in Documentation :)
-> git grep GPIO_ACTIVE Documentation/devicetree/bindings/
-> Documentation/devicetree/bindings/gpio/gpio-davinci.txt:                gpios = <&gpio 10 GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/gpio/gpio-davinci.txt:                gpios = <&gpio 11 GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/gpio/gpio-lp3943.txt:         gpios = <&gpioex 9 GPIO_ACTIVE_LOW>;
-> Documentation/devicetree/bindings/gpio/gpio-lp3943.txt:         gpios = <&gpioex 10 GPIO_ACTIVE_LOW>;
-> Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-> Documentation/devicetree/bindings/gpio/gpio-tz1090-pdc.txt:      GPIO_ACTIVE_HIGH
-> Documentation/devicetree/bindings/gpio/gpio-tz1090-pdc.txt:      GPIO_ACTIVE_LOW
-> Documentation/devicetree/bindings/gpio/gpio-tz1090.txt:        GPIO_ACTIVE_HIGH
-> Documentation/devicetree/bindings/gpio/gpio-tz1090.txt:        GPIO_ACTIVE_LOW
-> Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-> Documentation/devicetree/bindings/input/gpio-beeper.txt:                gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/mmc/mmc.txt:also be specified using the OF_GPIO_ACTIVE_LOW flag. This creates an ambiguity
-> Documentation/devicetree/bindings/mmc/mmc.txt:OF_GPIO_ACTIVE_LOW flag clear and specifying the respective *-inverted
-> Documentation/devicetree/bindings/net/nfc/trf7970a.txt:         ti,enable-gpios = <&gpio2 2 GPIO_ACTIVE_LOW>,
-> Documentation/devicetree/bindings/net/nfc/trf7970a.txt:                           <&gpio2 5 GPIO_ACTIVE_LOW>;
-> Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt:           ti,power-gpio = <&gpio3 23 GPIO_ACTIVE_HIGH>; /* 87 */
-> Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-> Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt:                      gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
-> Documentation/devicetree/bindings/power/isp1704.txt:    nxp,enable-gpio = <&gpio3 3 GPIO_ACTIVE_LOW>;
-> Documentation/devicetree/bindings/sound/max98090.txt:   interrupts = <TEGRA_GPIO(H, 4) GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/sound/rt5640.txt:     interrupts = <TEGRA_GPIO(W, 3) GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/sound/rt5640.txt:             <&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/sound/tpa6130a2.txt:  power-gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt:                reset-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
-> Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt:           gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/video/panel-dsi-cm.txt:       reset-gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;
-> Documentation/devicetree/bindings/video/sony,acx565akm.txt:     reset-gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
-> Documentation/devicetree/bindings/video/ti,omap-dss.txt:                gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;     /* 0, power-down */
-> Documentation/devicetree/bindings/video/ti,omap-dss.txt:                gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,   /* 60, CT CP HPD */
-> Documentation/devicetree/bindings/video/ti,omap-dss.txt:                        <&gpio2 9 GPIO_ACTIVE_HIGH>,    /* 41, LS OE */
-> Documentation/devicetree/bindings/video/ti,omap-dss.txt:                        <&gpio2 31 GPIO_ACTIVE_HIGH>;   /* 63, HPD */
-> Documentation/devicetree/bindings/video/ti,tfp410.txt:  powerdown-gpios = <&twl_gpio 2 GPIO_ACTIVE_LOW>;
-> Documentation/devicetree/bindings/video/ti,tpd12s015.txt:       gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,   /* 60, CT CP HPD */
-> Documentation/devicetree/bindings/video/ti,tpd12s015.txt:               <&gpio2 9 GPIO_ACTIVE_HIGH>,    /* 41, LS OE */
-> Documentation/devicetree/bindings/video/ti,tpd12s015.txt:               <&gpio2 31 GPIO_ACTIVE_HIGH>;   /* 63, HPD */
-> Documentation/devicetree/bindings/watchdog/gpio-wdt.txt:                gpios = <&gpio3 9 GPIO_ACTIVE_LOW>;
-> 
-> Richard.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Will
