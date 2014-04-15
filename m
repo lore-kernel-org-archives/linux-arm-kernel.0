@@ -1,142 +1,114 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 15 Apr 2014 18:06:44 +0200
-Subject: [PATCH v2 3/4] USB: ohci-pxa27x: Add support for external vbus
- regulators
-In-Reply-To: <1397578005-3341-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1397578005-3341-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397578005-3341-4-git-send-email-laurent.pinchart@ideasonboard.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 16 Apr 2014 00:06:59 +0800
+Subject: [linux-sunxi] Re: [PATCH 7/7] ARM: sun7i: cubietruck: enable
+ bluetooth module
+In-Reply-To: <20140415144215.GG3207@lukather>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-8-git-send-email-wens@csie.org>
+ <20140415144215.GG3207@lukather>
+Message-ID: <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Override the hub control operation to enable and disable external
-regulators for the ports vbus power supply in response to clear/set
-USB_PORT_FEAT_POWER requests.
+On Tue, Apr 15, 2014 at 10:42 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Apr 15, 2014 at 02:41:41PM +0800, Chen-Yu Tsai wrote:
+>> The CubieTruck has an AMPAK AP6210 WiFi+Bluetooth module. The Bluetooth
+>> part is a BCM20710 device connected to UART2 in the A20 SoC.
+>>
+>> The IC requires a 32.768 KHz low power clock input for proper
+>> auto-detection of the main clock, and an enable signal via GPIO.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>> index cb25d3c..767c8e1 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>> @@ -61,6 +61,13 @@
+>>                               allwinner,drive = <0>;
+>>                               allwinner,pull = <0>;
+>>                       };
+>> +
+>> +                     bt_pwr_pin_cubietruck: bt_pwr_pin at 0 {
+>> +                             allwinner,pins = "PH18";
+>> +                             allwinner,function = "gpio_out";
+>> +                             allwinner,drive = <0>;
+>> +                             allwinner,pull = <0>;
+>> +                     };
+>>               };
+>>
+>>               uart0: serial at 01c28000 {
+>> @@ -69,6 +76,12 @@
+>>                       status = "okay";
+>>               };
+>>
+>> +             uart2: serial at 01c28800 {
+>> +                     pinctrl-names = "default";
+>> +                     pinctrl-0 = <&uart2_pins_a>;
+>> +                     status = "okay";
+>> +             };
+>> +
+>
+> Please make this a separate patch.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- drivers/usb/host/ohci-pxa27x.c | 67 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+Will do.
 
-diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-index d21d5fe..0c31265 100644
---- a/drivers/usb/host/ohci-pxa27x.c
-+++ b/drivers/usb/host/ohci-pxa27x.c
-@@ -30,6 +30,7 @@
- #include <linux/platform_data/usb-ohci-pxa27x.h>
- #include <linux/platform_data/usb-pxa3xx-ulpi.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/signal.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
-@@ -120,6 +121,8 @@ static struct hc_driver __read_mostly ohci_pxa27x_hc_driver;
- struct pxa27x_ohci {
- 	struct clk	*clk;
- 	void __iomem	*mmio_base;
-+	struct regulator *vbus[3];
-+	bool		vbus_enabled[3];
- };
- 
- #define to_pxa27x_ohci(hcd)	(struct pxa27x_ohci *)(hcd_to_ohci(hcd)->priv)
-@@ -166,6 +169,52 @@ static int pxa27x_ohci_select_pmm(struct pxa27x_ohci *pxa_ohci, int mode)
- 	return 0;
- }
- 
-+static int pxa27x_ohci_set_vbus_power(struct pxa27x_ohci *pxa_ohci,
-+				      unsigned int port, bool enable)
-+{
-+	struct regulator *vbus = pxa_ohci->vbus[port];
-+	int ret = 0;
-+
-+	if (IS_ERR_OR_NULL(vbus))
-+		return 0;
-+
-+	if (enable && !pxa_ohci->vbus_enabled[port])
-+		ret = regulator_enable(vbus);
-+	else if (!enable && pxa_ohci->vbus_enabled[port])
-+		ret = regulator_disable(vbus);
-+
-+	if (ret < 0)
-+		return ret;
-+
-+	pxa_ohci->vbus_enabled[port] = enable;
-+
-+	return 0;
-+}
-+
-+static int pxa27x_ohci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
-+				   u16 wIndex, char *buf, u16 wLength)
-+{
-+	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
-+	int ret;
-+
-+	switch (typeReq) {
-+	case SetPortFeature:
-+	case ClearPortFeature:
-+		if (!wIndex || wIndex > 3)
-+			return -EPIPE;
-+
-+		if (wValue != USB_PORT_FEAT_POWER)
-+			break;
-+
-+		ret = pxa27x_ohci_set_vbus_power(pxa_ohci, wIndex - 1,
-+						 typeReq == SetPortFeature);
-+		if (ret)
-+			return ret;
-+		break;
-+	}
-+
-+	return ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+}
- /*-------------------------------------------------------------------------*/
- 
- static inline void pxa27x_setup_hc(struct pxa27x_ohci *pxa_ohci,
-@@ -372,6 +421,7 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- 	struct ohci_hcd *ohci;
- 	struct resource *r;
- 	struct clk *usb_clk;
-+	unsigned int i;
- 
- 	retval = ohci_pxa_of_init(pdev);
- 	if (retval)
-@@ -417,6 +467,16 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- 	pxa_ohci->clk = usb_clk;
- 	pxa_ohci->mmio_base = (void __iomem *)hcd->regs;
- 
-+	for (i = 0; i < 3; ++i) {
-+		char name[6];
-+
-+		if (!(inf->flags & (ENABLE_PORT1 << i)))
-+			continue;
-+
-+		sprintf(name, "vbus%u", i + 1);
-+		pxa_ohci->vbus[i] = devm_regulator_get(&pdev->dev, name);
-+	}
-+
- 	retval = pxa27x_start_hc(pxa_ohci, &pdev->dev);
- 	if (retval < 0) {
- 		pr_debug("pxa27x_start_hc failed");
-@@ -462,6 +522,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *pdev)
- {
- 	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
-+	unsigned int i;
-+
-+	for (i = 0; i < 3; ++i)
-+		pxa27x_ohci_set_vbus_power(pxa_ohci, i, false);
- 
- 	usb_remove_hcd(hcd);
- 	pxa27x_stop_hc(pxa_ohci, &pdev->dev);
-@@ -563,7 +627,10 @@ static int __init ohci_pxa27x_init(void)
- 		return -ENODEV;
- 
- 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
- 	ohci_init_driver(&ohci_pxa27x_hc_driver, &pxa27x_overrides);
-+	ohci_pxa27x_hc_driver.hub_control = pxa27x_ohci_hub_control;
-+
- 	return platform_driver_register(&ohci_hcd_pxa27x_driver);
- }
- module_init(ohci_pxa27x_init);
--- 
-1.8.3.2
+>>               i2c0: i2c at 01c2ac00 {
+>>                       pinctrl-names = "default";
+>>                       pinctrl-0 = <&i2c0_pins_a>;
+>> @@ -139,4 +152,16 @@
+>>       reg_usb2_vbus: usb2-vbus {
+>>               status = "okay";
+>>       };
+>> +
+>> +     rfkill_bt {
+>> +             compatible = "rfkill-gpio";
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&bt_pwr_pin_cubietruck>, <&clk_out_a_pins_a>;
+>> +             clocks = <&clk_out_a>;
+>> +             clock-frequency = <32768>;
+>> +             gpios = <&pio 7 18 0>; /* PH18 */
+>> +             gpio-names = "reset";
+>> +             rfkill-name = "bt";
+>> +             rfkill-type = <2>;
+>> +     };
+>
+> Hmmm, I don't think that's actually right.
+>
+> If you have such a device, then I'd expect it to be represented as a
+> full device in the DT, probably with one part for the WiFi, one part
+> for the Bluetooth, and here the definition of the rfkill device that
+> controls it.
+
+The AP6210 is not one device, but 2 separate chips in one module. Each
+chip has its own controls and interface. They just so happen to share
+the same enclosure. Even 2-in-1 chips by Broadcom have separate controls
+and interfaces. The WiFi side is most likely connected via SDIO, while
+the Bluetooth side is connected to a UART, and optionally I2S for sound.
+
+> But tying parts of the device to the rfkill that controls it, such as
+> the clocks, or the frequency it runs at seems just wrong.
+
+I understand where you're coming from. For devices on buses that require
+drivers (such as USB, SDIO) these properties probably should be tied to
+the device node.
+
+For our use case here, which is a bluetooth chip connected on the UART,
+there is no in kernel representation or driver to tie them to. Same goes
+for UART based GPS chips. They just so happen to require toggling a GPIO,
+and maybe enabling a specific clock, to get it running. Afterwards,
+accessing it is done solely from userspace. For our Broadcom chips, the
+user has to upload its firmware first, then designate the tty as a Bluetooth
+HCI using hciattach.
+
+We are using the rfkill device as a on-off switch.
+
+Hope this explains the situation.
+
+
+Cheers
+ChenYu
