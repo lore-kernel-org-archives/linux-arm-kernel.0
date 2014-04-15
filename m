@@ -1,82 +1,104 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 15 Apr 2014 18:09:17 +0200
-Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <5347B942.2040703@arm.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
- <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
- <CAL_JsqJowqV2bsxE2VeYXQQSj4_L_KcH+C_dD=ZUvC=1crN4dA@mail.gmail.com>
- <87ha6136dz.fsf@approximate.cambridge.arm.com>
- <CABuKBeKLexBsTwF-nX15AYfLNA9bFDRm2XyeLpwQg9+3m6Xf=w@mail.gmail.com>
- <5347B942.2040703@arm.com>
-Message-ID: <CABuKBeLLC2xApUMpT=u5nq4kxp9f4AotQCdk0nRU=aREM6Bwkg@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 15 Apr 2014 12:10:18 -0400
+Subject: [PATCH 2/2] ahci: imx: software workaround for phy reset issue
+ in resume
+In-Reply-To: <1397529703-21165-2-git-send-email-shawn.guo@freescale.com>
+References: <1397529703-21165-1-git-send-email-shawn.guo@freescale.com>
+ <1397529703-21165-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140415161018.GN1863@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-11 11:43 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
-> On 11/04/14 10:11, Matthias Brugger wrote:
->> 2014-04-10 11:01 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
->>> A couple of things on top of Rob's comments:
->>>
->>> On Wed, Apr 09 2014 at 10:50:33 pm BST, Rob Herring <robherring2@gmail.com> wrote:
->>>> On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->>>>> This adds a generic devicetree board file and a dtsi for boards
->>>>> based on the MT6589 SoCs from Mediatek.
->>>>>
->>>>> Apart from the generic parts (gic, clocks) the only component
->>>>> currently supported are the timers.
->>>>>
->>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>>
->>> [...]
->>>
->>>>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
->>>>> new file mode 100644
->>>>> index 0000000..c0139ca
->>>>> --- /dev/null
->>>>> +++ b/arch/arm/mach-mediatek/Kconfig
->>>>> @@ -0,0 +1,14 @@
->>>>> +config ARCH_MEDIATEK
->>>>> +       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
->>>>> +       select ARCH_REQUIRE_GPIOLIB
->>>>
->>>> Then where is your GPIO driver?
->>>>
->>>>> +       select ARM_GIC
->>>>> +       select CACHE_L2X0
->>>>> +       select HAVE_ARM_TWD if LOCAL_TIMERS
->>>
->>> Hell no! ;-) ARM_ARCH_TIMER is the way (please also add the missing
->>> node).
->>
->> I considered this, but the timer wasn't able to get it's clock frequency:
->> "Architected timer frequency not available
->> Division by zero in kernel."
->
-> This is because your bootloader/firmware is utterly broken, and doesn't
-> set CNTFRQ (it must be set on all CPUs, from secure mode). As a
-> *workaround*, you can set the timer frequency in the timer node, but
-> that's just a hack, and will prevent virtual machines from running on
-> such hardware.
+On Tue, Apr 15, 2014 at 10:41:43AM +0800, Shawn Guo wrote:
+> +static int imx_phy_ack_polling(void __iomem *mmio, bool assert)
+> +{
+> +	int timeout = 100;
+> +	u32 srval;
+> +
+> +	do {
+> +		srval = readl(mmio + IMX_SATA_P0PHYSR);
+> +		if ((assert ? srval : ~srval) & P0PHYSR_CR_ACK)
+> +			break;
+> +		usleep_range(100, 200);
 
-The last days I tried to get the ARM_ARCH_TIMER working, but I wasn't
-able to do so.
-I set the frequency in the DT node.
-But reading CNTP_TVAL at the end of arch_timer_init, it always returns
-the same value.
-When reading CNTPCT at the same place, returns zero.
-As far as I understand CNTPCT will be always incremented, am I right?
+What's up with usleep_range() these days?  There's no point in polling
+in sub-msec intervals.  Let's please stick to msleep().
 
-Consequently, when calling mdelay in arch_timer_init the system hangs.
+> +static int imx_phy_reg_addressing(u16 addr, void __iomem *mmio)
+> +{
+> +	u32 crval = addr;
+> +	int ret;
+> +
+> +	/* 1. Supply the address on cr_data_in */
+> +	writel(crval, mmio + IMX_SATA_P0PHYCR);
+> +
+> +	/* 2. Assert the cr_cap_addr signal */
+> +	crval |= P0PHYCR_CR_CAP_ADDR;
+> +	writel(crval, mmio + IMX_SATA_P0PHYCR);
+> +
+> +	/* 3. Wait for the cr_ack signal to be asserted */
+> +	ret = imx_phy_ack_polling(mmio, true);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* 4. Deassert cr_cap_addr */
+> +	crval &= ~P0PHYCR_CR_CAP_ADDR;
+> +	writel(crval, mmio + IMX_SATA_P0PHYCR);
+> +
+> +	/* 5. Wait for cr_ack to be deasserted */
+> +	ret = imx_phy_ack_polling(mmio, false);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
 
-So can it be, that the timers are not working due to a screwed up chip
-design? Or do I miss something here?
+Wouldn't folding comment 3 and 5 into 2 and 4 respectively make it
+easier on the eyes?  They're single operations anyway.
 
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+> +static int imx_phy_reg_write(u16 val, void __iomem *mmio)
+> +{
+...
+> +}
 
+Ditto.  Also, maybe it'd be better to create a wrapper to assert/clear
+and wait for ack?
 
+...
+> +static int imx_sata_phy_reset(struct ahci_host_priv *hpriv)
+> +{
+> +	void __iomem *mmio = hpriv->mmio;
+> +	int timeout = 10;
+> +	u16 val;
+> +	int ret;
+> +
+> +	/* Reset SATA PHY by setting RESET bit of PHY register CLOCK_RESET */
+> +	ret = imx_phy_reg_addressing(IMX_PHY_CLOCK_RESET, mmio);
+> +	if (ret)
+> +		return ret;
+> +	/*
+> +	 * For phy reset operation, we skip the timeout checking, because phy
+> +	 * will be unable to acknowledge in this case.
+> +	 */
+> +	imx_phy_reg_write(CLOCK_RESET_RESET, mmio);
+> +
+> +	usleep_range(100, 200);
+> +
+> +	/* Wait for PHY RX_PLL to be stable */
+> +	do {
+> +		ret = imx_phy_reg_addressing(IMX_PHY_LANE0_OUT_STAT, mmio);
+> +		if (ret)
+> +			return ret;
+> +		ret = imx_phy_reg_read(&val, mmio);
+> +		if (ret)
+> +			return ret;
+> +		if (val & LANE0_OUT_STAT_RX_PLL_STATE)
+> +			break;
+> +		usleep_range(100, 200);
+
+Ditto with above.
+
+Thanks.
 
 -- 
-motzblog.wordpress.com
+tejun
