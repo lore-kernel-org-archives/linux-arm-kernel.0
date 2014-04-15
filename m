@@ -1,48 +1,43 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 15 Apr 2014 12:44:02 -0700
-Subject: [PATCH 3/4] mmc: sdhci: defer probing on regulator_get_optional()
- failures
-In-Reply-To: <CAAYSxhrmCbGLsu43mK15ParXHa_FJ9OVQiCPUdqyWEpTE=r1uw@mail.gmail.com>
-References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
- <1397526163-20126-4-git-send-email-abrestic@chromium.org>
- <CAAYSxhrmCbGLsu43mK15ParXHa_FJ9OVQiCPUdqyWEpTE=r1uw@mail.gmail.com>
-Message-ID: <CAL1qeaH19h3D49C3O3qQ+GtWSeOdu79TQTZGfj9dC-+-G1c3kA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 15 Apr 2014 15:51:12 -0400 (EDT)
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140415192915.GT24070@n2100.arm.linux.org.uk>
+References: <20140415.143054.770827409393483803.davem@davemloft.net>
+ <20140415.145006.2299301203857235456.davem@davemloft.net>
+ <20140415192915.GT24070@n2100.arm.linux.org.uk>
+Message-ID: <20140415.155112.749167433771714690.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 12:03 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
-> On Mon, Apr 14, 2014 at 6:42 PM, Andrew Bresticker
-> <abrestic@chromium.org> wrote:
->> If regulator_get_optional() returns EPROBE_DEFER, it indicates
->> that the regulator may show up later (e.g. the DT property is
->> present but the corresponding regulator may not have probed).
->> Instead of continuing without the regulator, return EPROBE_DEFER
->> from sdhci_add_host().  Also, fix regulator leaks in the error
->> paths in sdhci_add_host().
->>
->> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> ---
->>  drivers/mmc/host/sdhci.c | 19 ++++++++++++++++---
->>  1 file changed, 16 insertions(+), 3 deletions(-)
->
-> This appears to be an improvement on Mike Looijmans patch:
->
-> https://lkml.org/lkml/2014/4/7/34
->
-> The regulator_put() calls are appropriate but I wonder if we should
-> take this a step farther.  Ulf is sure to point out that
-> mmc_regulator_get_supply() can be used to get regulators (though it
-> does stuff the pointers in host->mmc->supply.vmmc/vqmmc instead of
-> host->vmmc/vqmmc).  However, that function doesn't put back the
-> reference to vmmc if the request for vqmmc returns EPROBE_DEFER.  If
-> it did, it believe it could be used here to simplify the error
-> handling as all the regulator checks would happen up front.  What do
-> you think?
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Date: Tue, 15 Apr 2014 20:29:15 +0100
 
-Seems reasonable.  The put()s aren't necessary with
-mmc_regulator_get_supply() since it uses the devm_* API, however it
-doesn't return an error in case of EPROBE_DEFER when getting vqmmc,
-which is what we want in this case.
+> On Tue, Apr 15, 2014 at 02:50:06PM -0400, David Miller wrote:
+>> From: David Miller <davem@davemloft.net>
+>> Date: Tue, 15 Apr 2014 14:30:54 -0400 (EDT)
+>> 
+>> > Russell, if for example userland stores into the instruction stream
+>> > to patch an instruction, what needs to be done on ARM?
+>> 
+>> Looking around I suspect something like:
+>> 
+>> 	mcrne	p15, 0, INSN_ADDR, c7, c5, 1
+>> 
+>> after the instruction stores will do it.
+> 
+> It does still need to be pushed out of the D-cache first though.  So,
+> for ARMv7 for example:
+> 
+> 	str	NEW_INSN, [INSN_ADDR]		@ store new instruction
+> 	mcr	p15, 0, INSN_ADDR, c7, c11, 1	@ clean d line
+> 	mcr	p15, 0, INSN_ADDR, c7, c5, 1	@ flush i line
+> 
+> would do it.  We of course need the user access marking on that (so that
+> any fault doesn't oops the kernel) - not only for the store, but also the
+> following two instructions which could fault (and oops unless they're
+> marked with a fixup) if someone were to munmap() this page in another
+> thread.  All those fixups can just do the "lets return -EFAULT" from
+> the operation.
 
->
-> -Tim
+Right, you'd need the exception table business used in put_user() et al.
