@@ -1,87 +1,72 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 15 Apr 2014 21:18:11 +0200
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over smbus
-In-Reply-To: <20140415164613.GF12304@sirena.org.uk>
-References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140414210429.GJ25182@sirena.org.uk> <534CE16D.8010508@free-electrons.com>
- <20140415100922.GN12304@sirena.org.uk> <534D1DDA.40207@free-electrons.com>
- <534D252B.8060009@metafoo.de> <20140415125654.GD12304@sirena.org.uk>
- <534D357F.9040906@metafoo.de> <20140415164613.GF12304@sirena.org.uk>
-Message-ID: <534D85F3.5050009@metafoo.de>
+From: alexanders83@web.de (Alexander Stein)
+Date: Tue, 15 Apr 2014 21:17:13 +0200
+Subject: [PATCH 3/4] ALSA: sound/atmel/ac97c.c: Add device tree
+ support
+In-Reply-To: <20140414232134.GB2967@piout.net>
+References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+ <11572820.ByGz2BLudS@kongar> <20140414232134.GB2967@piout.net>
+Message-ID: <1507201.Sg3DHX4q4v@kongar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 06:46 PM, Mark Brown wrote:
-> On Tue, Apr 15, 2014 at 03:34:55PM +0200, Lars-Peter Clausen wrote:
->> On 04/15/2014 02:56 PM, Mark Brown wrote:
->
->>>   - Providing APIs for registering actual smbus devices as a convenience
->>>     for devices with that constraint, regardless of how that is done
->>>     behind the scenes.
->
->>>   - Having the I2C implementation automatically use the smbus APIs if
->>>     it can and either the controller is smbus only or it makes sense to
->>>     do so for optimisation.
->
->> I don't think it makes sense to expose smbus explicitly. We can already
->> describe smbus restricted devices just fine with the current regmap_config
->> and already support them with the current I2C regmap implementation. Using
->
-> Please note what I said about convenience - if lots of devices have
-> exactly the same set of constraints to set up it's possible sensible to
-> have a standard way of specifying them.  It's going to be a bit easier
-> to just say it's smbus than to remember exactly what that means.
+On Tuesday 15 April 2014, 01:21:34 wrote Alexandre Belloni:
+> On 13/04/2014 at 10:32:09 +0200, Alexander Stein wrote :
+> > On Saturday 12 April 2014, 14:48:17 wrote Alexander Shiyan:
+> > > Sat, 12 Apr 2014 12:42:18 +0200 ?? Alexander Stein <alexanders83@web.de>:
+> > > > On Saturday 12 April 2014, 14:31:28 wrote Alexander Shiyan:
+> > > > > Sat, 12 Apr 2014 11:08:26 +0200 ?? Alexander Stein <alexanders83@web.de>:
+> > > > > > Signed-off-by: Alexander Stein <alexanders83@web.de>
+> > > > > > ---
+> > > > > >  .../devicetree/bindings/sound/atmel_ac97c.txt      | 20 +++++++++
+> > > > > >  sound/atmel/ac97c.c                                | 52 ++++++++++++++++++++--
+> > > > > >  2 files changed, 69 insertions(+), 3 deletions(-)
+> > > > > >  create mode 100644 Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> > > > > > 
+> > > > > > diff --git a/Documentation/devicetree/bindings/sound/atmel_ac97c.txt b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> > > > > > new file mode 100644
+> > > > > > index 0000000..9839403
+> > > > > > --- /dev/null
+> > > > > > +++ b/Documentation/devicetree/bindings/sound/atmel_ac97c.txt
+> > > > > > @@ -0,0 +1,20 @@
+> > > > > > +* Atmel AC97 controller
+> > > > > > +
+> > > > > > +Required properties:
+> > > > > > +  - compatible: "atmel,atmel_ac97c"
+> > > > > > +  - reg: Address and length of the register set for the device
+> > > > > > +  - interrupts: Should contain AC97 interrupt
+> > > > > > +  - atmel,reset-pin: GPIO for resetting the codec
+> > > > > 
+> > > > > Why standard "gpios" property cannot be used here?
+> > > > 
+> > > > I guess they can. I have no experience defining a devicetree binding, so I just stuck to the platformdata member name.
+> > > > If this is the recommended way, I'll gladly change that.
+> > > 
+> > > Another question is whether this property should refer to the controller,
+> > > as it is clear that it refers to the codec ....
+> > 
+> > AFAICT the codec itself has no representation in the devicetree. It gets detected by the controller which uses the reset GPIO.
+> >
+> 
+> Yeah, maybe we can already go for ac97-gpios, there. It actually takes a
+> list of gpios: ac97-sync, ac97-sdata and ac97-reset. You may want to
+> have a look at Documentation/devicetree/bindings/sound/soc-ac97link.txt
+> and snd_soc_set_ac97_ops_of_reset(), snd_soc_ac97_parse_pinctl() in
+> sound/soc/core.c
+> 
+> The goal would be to be able to keep the same bindings when switching
+> over to ASoC.
 
-Maybe, but the only shared constraint is reg_bits = 8 (and if it is pure 
-smbus use_single_rw = true).
+Those bindings are only for the description an AC97 codec attached, right?
+I'm just wondering what is ac97-sdata actually?
+The datasheet to my microcontroller (atmel ac97c) has 4 signals:
+* AC97CK - this would be omitted in the description as it's fixed 12,288MHz
+* AC97RX - sdata_in
+* AC97FS - is this ac97-sync?
+* AC97TX - sdata_out
 
->
->> native I2C to access these devices will be more efficient than going through
->> the smbus emulation layer. The smbus emulation layer essentially does the
->> same as we do in regmap, so using the smbus emulation layer through regmap
->> means doing the same thing twice.
->
-> Right, that's why I said it's probably only worth it if the controller
-> does smbus natively.
->
->> As I see it there are currently 3 cases:
->
->> 1) Device is strictly smbus only and the controller supports native smbus
->>     => Use smbus
->> 2) The device is smbus compatible but has extensions (e.g. support for multi
->> register writes) and the controller supports only smbus.
->>     => Use smbus
->> 3) For every other case
->>     => Use native I2C.
->
-> It's not clear to me that if the controller supports smbus we shouldn't
-> use it; presumably it's adding some value to have written the code to
-> take advantage of it.  That would mean another case for device is smbus
-> only and controller has explicit smbus support.
+ac97-reset would be board-specific. Is ac97-reset one of those AC97TX or AC97RX?
 
-Potentially yes, but not necessarily in the first version of the driver. 
-It's a bit of an exotic case, there seem to be only two I2C controller 
-drivers in the Linux kernel that have support for both raw I2C and native 
-SMBus and neither of them don't seem to be fairly recent (i2c-powermac.c and 
-i2c-pasemi.c). And on the other hand most devices are SMBus compatible have 
-extensions like being able to write/read multiple register in one transfer 
-if raw I2C access is available, which is something we want to make use of if 
-available.
+Best regards,
+Alexander
 
-And the other thing to consider is that a client driver currently has no way 
-to query whether the controller driver supports native SMBus or only 
-emulated SMBus. This is surely something that can be added to the I2C core, 
-but this is necessarily something that we require before any SMBus support 
-is added to regmap.
-
-So in conclusion I think the best way forward is to create a patch that 
-checks if native I2C is available, and if not falls back to either 
-SMBUS_{WRITE,READ}_BYTE or SMBUS_{WRITE,READ}_WORD operations (Depending on 
-whether val_bits is 8 or 16). Such a patch, I think, has the most effect for 
-the least amount of work since it is rather simple and self contained and 
-allows all devices which are SMBus compatible to be used with SMBus-only 
-controllers. Everything else discussed in this thread (optimizations for 
-special cases, convince helpers) can then be implemented on top of that.
-
-- Lars
+PS: I splitted Patch 3 to separate the device-tree binding and removed the device match as you suggested.
