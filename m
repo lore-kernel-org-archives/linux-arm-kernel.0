@@ -1,35 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Apr 2014 15:10:27 -0600
-Subject: [PATCH] ARM: multi_v7: enable AT24C EEPROM driver
-Message-ID: <1397596227-23174-1-git-send-email-swarren@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Apr 2014 22:33:26 +0100
+Subject: [RFC] ARM: dts: imx27-pdk: Add PMIC support
+In-Reply-To: <1397596027-14301-1-git-send-email-festevam@gmail.com>
+References: <1397596027-14301-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140415213326.GY24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On Tue, Apr 15, 2014 at 06:07:07PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Hi,
+> 
+> I am sending it as RFC because I am getting the warning below.
+> 
+> Booting the non-dt kernel does not cause this warning.
+> 
+> Appreciate any comments/suggestions.
 
-This is used for the board ID EEPROM on Jetson TK1, as well as likely
-a whole slew of other NVIDIA reference boards; we simply haven't added
-enabled the EEPROM in the DT files until now.
+Quite simply, the driver is buggy.  You seem to be getting an interrupt
+delivered to the thread right after the IRQ is requested:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I assume that updates to this file should go through arm-soc to minimize
-conflicts.
+        ret = request_threaded_irq(mc13xxx->irq, NULL, mc13xxx_irq_thread,
+                        IRQF_ONESHOT | IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx);
+        if (ret)
+                return ret;
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+        mutex_init(&mc13xxx->lock);
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d4e8a47a2f7c..a692b7ae3bd1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -112,6 +112,7 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
-+CONFIG_EEPROM_AT24=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_SCSI_MULTI_LUN=y
+and the thread tries to lock mc13xxx->lock.
+
+There's nothing quite like initialising resources before using them...
+
 -- 
-1.8.1.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
