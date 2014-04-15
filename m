@@ -1,148 +1,81 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 15 Apr 2014 14:58:53 +0530
-Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
+Date: Tue, 15 Apr 2014 14:58:54 +0530
+Subject: [PATCH 6/6] ARM: multi_v7_defconfig: Enable Exynos platform
 In-Reply-To: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
 References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1397554134-11827-7-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Enable Exynos platform and its related IPs.
 
-This makes it possible to enable the exynos platform as part of a
-multiplatform kernel, in addition to keeping the single-platform
-Exynos support.
-sparsemem is currently not supported in multiplatform.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
 ---
- arch/arm/Kconfig                  |   27 +++------------------------
- arch/arm/configs/exynos_defconfig |    2 +-
- arch/arm/mach-exynos/Kconfig      |   27 +++++++++++++++++++++++++++
- arch/arm/mach-exynos/Makefile     |    2 ++
- arch/arm/plat-samsung/Makefile    |    3 +++
- 5 files changed, 36 insertions(+), 25 deletions(-)
+ arch/arm/configs/multi_v7_defconfig |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4422601059e8..9d459e9c396b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -828,34 +828,13 @@ config ARCH_S5PV210
- 	help
- 	  Samsung S5PV210/S5PC110 series based systems
- 
--config ARCH_EXYNOS
-+config ARCH_EXYNOS_SINGLE
- 	bool "Samsung EXYNOS"
--	select ARCH_HAS_BANDGAP
--	select ARCH_HAS_CPUFREQ
--	select ARCH_HAS_HOLES_MEMORYMODEL
--	select ARCH_REQUIRE_GPIOLIB
-+	select ARCH_EXYNOS
- 	select ARCH_SPARSEMEM_ENABLE
--	select ARM_AMBA
--	select ARM_GIC
--	select CLKSRC_OF
--	select COMMON_CLK
--	select CPU_V7
--	select GENERIC_CLOCKEVENTS
--	select HAVE_ARM_SCU if SMP
--	select HAVE_S3C2410_I2C if I2C
--	select HAVE_S3C2410_WATCHDOG if WATCHDOG
--	select HAVE_S3C_RTC if RTC_CLASS
--	select HAVE_SMP
- 	select NEED_MACH_MEMORY_H
--	select PINCTRL
--	select PINCTRL_EXYNOS
--	select PM_GENERIC_DOMAINS if PM_RUNTIME
--	select S5P_DEV_MFC
--	select SAMSUNG_DMADEV
--	select SPARSE_IRQ
--	select USE_OF
- 	help
--	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
-+	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
- 
- config ARCH_DAVINCI
- 	bool "TI DaVinci"
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 4ce7b70ea901..103a676256cd 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -7,7 +7,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
--CONFIG_ARCH_EXYNOS=y
-+CONFIG_ARCH_EXYNOS_SINGLE=y
- CONFIG_S3C_LOWLEVEL_UART_PORT=3
- CONFIG_S3C24XX_PWM=y
- CONFIG_ARCH_EXYNOS5=y
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 5c34dc26cec6..bc55af76a05f 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -7,6 +7,33 @@
- 
- # Configuration options for the EXYNOS4
- 
-+config ARCH_EXYNOS
-+	bool "Samsung EXYNOS" if ARCH_MULTI_V7
-+	select ARCH_HAS_BANDGAP
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_HOLES_MEMORYMODEL
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select CLKSRC_OF
-+	select COMMON_CLK
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_ARM_SCU if SMP
-+	select HAVE_S3C2410_I2C if I2C
-+	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-+	select HAVE_S3C_RTC if RTC_CLASS
-+	select HAVE_SMP
-+	select PINCTRL
-+	select PINCTRL_EXYNOS
-+	select PM_GENERIC_DOMAINS if PM_RUNTIME
-+	select S5P_DEV_MFC
-+	select SAMSUNG_DMADEV
-+	select SPARSE_IRQ
-+	select USE_OF
-+	help
-+	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
-+
- if ARCH_EXYNOS
- 
- menu "SAMSUNG EXYNOS SoCs Support"
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index f6dcc256db56..24a8efe3d4bd 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -5,6 +5,8 @@
- #
- # Licensed under GPLv2
- 
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
-+
- obj-y				:=
- obj-m				:=
- obj-n				:=
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 25c826ed3b65..5e5beaa9ae15 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -4,6 +4,9 @@
- #
- # Licensed under GPLv2
- 
-+ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
-+ccflags-$(CONFIG_ARCH_EXYNOS)	+= -I$(srctree)/arch/arm/mach-exynos/include
-+
- obj-y				:=
- obj-m				:=
- obj-n				:= dummy.o
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index d4e8a47a2f7c..298057a0324c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -47,6 +47,7 @@ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
+ CONFIG_ARCH_STI=y
++CONFIG_ARCH_EXYNOS=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_ARCH_TEGRA=y
+@@ -71,6 +72,7 @@ CONFIG_PCI_MSI=y
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_SMP=y
++CONFIG_NR_CPUS=8
+ CONFIG_HIGHPTE=y
+ CONFIG_CMA=y
+ CONFIG_ARM_APPENDED_DTB=y
+@@ -153,6 +155,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_SAMSUNG=y
++CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+ CONFIG_SERIAL_SIRFSOC=y
+ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+ CONFIG_SERIAL_TEGRA=y
+@@ -176,6 +180,7 @@ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
++CONFIG_I2C_EXYNOS5=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_SIRF=y
+ CONFIG_I2C_TEGRA=y
+@@ -210,6 +215,7 @@ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_SPI=y
+ CONFIG_MFD_MAX8907=y
++CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65090=y
+ CONFIG_MFD_TPS6586X=y
+@@ -220,6 +226,8 @@ CONFIG_REGULATOR_AS3722=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_PALMAS=y
++CONFIG_REGULATOR_S2MPS11=y
++CONFIG_REGULATOR_S5M8767=y
+ CONFIG_REGULATOR_TPS51632=y
+ CONFIG_REGULATOR_TPS62360=y
+ CONFIG_REGULATOR_TPS65090=y
+@@ -280,6 +288,8 @@ CONFIG_MMC_SDHCI_BCM_KONA=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+ CONFIG_MMC_MVSDIO=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_EDAC=y
+ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
 -- 
 1.7.9.5
