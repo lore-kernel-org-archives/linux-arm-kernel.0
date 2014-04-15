@@ -1,40 +1,47 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 15 Apr 2014 11:27:46 +0200
-Subject: [PATCH 1/2] ARM: berlin: add the LIBGPIO as a dependency for the
- BG2Q
-In-Reply-To: <534CF901.2080400@gmail.com>
-References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397549245-3338-2-git-send-email-antoine.tenart@free-electrons.com>
- <534CF901.2080400@gmail.com>
-Message-ID: <20140415092746.GC4584@kwain>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 15 Apr 2014 14:58:48 +0530
+Subject: [PATCH v2 0/6] Further cleanup and enable multiplat build
+Message-ID: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+This series is based on latest linux-next and depends on the
+following patch:
+ARM: EXYNOS: Consolidate Kconfig entries
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
 
-On Tue, Apr 15, 2014 at 11:16:49AM +0200, Sebastian Hesselbarth wrote:
-> On 04/15/2014 10:07 AM, Antoine T?nart wrote:
+Changes since v2:
+Replaced patch 2, "ARM: EXYNOS: Staticize exynos_subsys"
+with "ARM: EXYNOS: Remove exynos_subsys registration" as that
+code is no more used.
 
-[?]
+Tested on Exynos4210, 4412, 5250 and 5420 based boards.
 
-> >diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-> >index 291f1cac6c3d..c31968712095 100644
-> >--- a/arch/arm/mach-berlin/Kconfig
-> >+++ b/arch/arm/mach-berlin/Kconfig
-> >@@ -28,6 +28,7 @@ config MACH_BERLIN_BG2Q
-> >  	select CPU_V7
-> >  	select HAVE_ARM_TWD if SMP
-> >  	select HAVE_SMP
-> >+	select ARCH_REQUIRE_GPIOLIB
-> 
-> Apart from Jisheng's comment, I think we can directly move it
-> into arch/arm/Kconfig's MACH_BERLIN directly?
+Arnd Bergmann (1):
+  ARM: EXYNOS: Enable multi-platform build support
 
-I think so.
+Sachin Kamat (5):
+  ARM: EXYNOS: Remove duplicate lines in Makefile
+  ARM: EXYNOS: Remove exynos_subsys registration
+  ARM: EXYNOS: Migrate Exynos specific macros from plat to mach
+  ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
+  ARM: multi_v7_defconfig: Enable Exynos platform
 
-Antoine
+ arch/arm/Kconfig                         |   27 ++---------
+ arch/arm/configs/exynos_defconfig        |    2 +-
+ arch/arm/configs/multi_v7_defconfig      |   10 +++++
+ arch/arm/mach-exynos/Kconfig             |   27 +++++++++++
+ arch/arm/mach-exynos/Makefile            |    9 ++--
+ arch/arm/mach-exynos/common.h            |   72 ++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/cpuidle.c           |    1 -
+ arch/arm/mach-exynos/exynos.c            |   13 ------
+ arch/arm/mach-exynos/hotplug.c           |    2 -
+ arch/arm/mach-exynos/platsmp.c           |    2 -
+ arch/arm/mach-exynos/pm.c                |    1 -
+ arch/arm/mach-exynos/pmu.c               |    2 -
+ arch/arm/plat-samsung/Makefile           |    3 ++
+ arch/arm/plat-samsung/include/plat/cpu.h |   61 -------------------------
+ 14 files changed, 119 insertions(+), 113 deletions(-)
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
