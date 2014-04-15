@@ -1,65 +1,183 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 15 Apr 2014 15:50:19 +0200
-Subject: [PATCH 1/3] net: phy: add minimal support for QSGMII PHY
+Date: Tue, 15 Apr 2014 15:50:20 +0200
+Subject: [PATCH 2/3] net: mvneta: properly configure the MAC <-> PHY
+ connection in all situations
 In-Reply-To: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397569821-5530-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397569821-5530-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the necessary definitions for the PHY layer to
-recognize "qsgmii" as a valid PHY interface. A QSMII interface, as
-defined at
-http://en.wikipedia.org/wiki/Media_Independent_Interface#Quad_Serial_Gigabit_Media_Independent_Interface,
-is "is a method of combining four SGMII lines into a 5Gbit/s
-interface. QSGMII, like SGMII, uses LVDS signalling for the TX and RX
-data and a single LVDS clock signal. QSGMII uses significantly fewer
-signal lines than four SGMII busses."
+Commit 5445eaf309ff ('mvneta: Try to fix mvneta when compiled as
+module') fixed the mvneta driver to make it work properly when loaded
+as a module in SGMII configuration, which was tested successful by the
+author on the Armada XP OpenBlocks AX3, which uses SGMII.
 
-This type of MAC <-> PHY connection might require special handling on
-the MAC driver side, so it should be possible to express this type of
-MAC <-> PHY connection, for example in the Device Tree.
+However, some other platforms, namely the Armada XP GP don't use
+SGMII, but a QSGMII connection between the MAC and the PHY, and this
+case was not supported by the mvneta driver, which was relying on
+configuration put in place by the bootloader. While this works when
+the mvneta driver is built-in (because clocks are not gated), it
+breaks when mvneta is built as a module, because the clock is gated
+(all configuration is lost) and then re-enabled when the mvneta driver
+is loaded.
+
+In order to support all of RGMII, SGMII and QSGMII, this commit
+reworks how the PHY interface configuration is done, and simplifies
+it: it removes the mvneta_port_sgmii_config() and
+mvneta_gmac_rgmii_set() functions, which were strange because
+mvneta_gmac_rgmii_set() was called in all cases, even for SGMII
+configurations. Also, the mvneta_gmac_rgmii_set() function was taking
+a boolean as argument, which was always true.
+
+Instead, all the PHY interface configuration logic is moved into the
+mvneta_port_power_up() function, in a much simpler 'switch' construct,
+with four cases:
+
+ - QSGMII: the RGMIIEn bit, the PCSEn bit in GMAC_CTRL_2 are set, and
+   the SERDES is configured in QSGMII. Technically speaking,
+   configuring the SERDES of the first port would be sufficient, but
+   it is simpler to do it on all ports.
+
+ - SGMII: the RGMIIEn bit, the PCSEn bit in GMAC_CTRL_2 are set, and
+   the SERDES is configured as SGMII.
+
+ - RGMII: the RGMIIEn bit in GMAC_CTRL_2 is set. The PCSEn bit is kept
+   cleared, and no SERDES configuration is done, because RGMII is not
+   using SERDES lanes.
+
+ - other: an error is returned. For this reason, the
+   mvneta_port_power_up() now returns an int instead of nothing, and
+   the return value is checked by mvneta_probe().
+
+This has been successfully tested on:
+
+ * Armada XP DB, which has two RGMII and two SGMII connections
+ * Armada XP GP, which uses QSGMII for its four interfaces
+ * Armada 370 Mirabox, which has two RGMII connections
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: devicetree at vger.kernel.org
 ---
- Documentation/devicetree/bindings/net/ethernet.txt | 2 +-
- include/linux/phy.h                                | 3 +++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 73 ++++++++++++++++-------------------
+ 1 file changed, 34 insertions(+), 39 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/ethernet.txt b/Documentation/devicetree/bindings/net/ethernet.txt
-index 9ecd43d..3fc3605 100644
---- a/Documentation/devicetree/bindings/net/ethernet.txt
-+++ b/Documentation/devicetree/bindings/net/ethernet.txt
-@@ -10,7 +10,7 @@ The following properties are common to the Ethernet controllers:
- - max-frame-size: number, maximum transfer unit (IEEE defined MTU), rather than
-   the maximum frame size (there's contradiction in ePAPR).
- - phy-mode: string, operation mode of the PHY interface; supported values are
--  "mii", "gmii", "sgmii", "tbi", "rev-mii", "rmii", "rgmii", "rgmii-id",
-+  "mii", "gmii", "sgmii", "qsgmii", "tbi", "rev-mii", "rmii", "rgmii", "rgmii-id",
-   "rgmii-rxid", "rgmii-txid", "rtbi", "smii", "xgmii"; this is now a de-facto
-   standard property;
- - phy-connection-type: the same as "phy-mode" property but described in ePAPR;
-diff --git a/include/linux/phy.h b/include/linux/phy.h
-index 24126c4..4d0221f 100644
---- a/include/linux/phy.h
-+++ b/include/linux/phy.h
-@@ -75,6 +75,7 @@ typedef enum {
- 	PHY_INTERFACE_MODE_SMII,
- 	PHY_INTERFACE_MODE_XGMII,
- 	PHY_INTERFACE_MODE_MOCA,
-+	PHY_INTERFACE_MODE_QSGMII,
- 	PHY_INTERFACE_MODE_MAX,
- } phy_interface_t;
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index b248bcb..14786c8 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -89,8 +89,9 @@
+ #define      MVNETA_TX_IN_PRGRS                  BIT(1)
+ #define      MVNETA_TX_FIFO_EMPTY                BIT(8)
+ #define MVNETA_RX_MIN_FRAME_SIZE                 0x247c
+-#define MVNETA_SGMII_SERDES_CFG			 0x24A0
++#define MVNETA_SERDES_CFG			 0x24A0
+ #define      MVNETA_SGMII_SERDES_PROTO		 0x0cc7
++#define      MVNETA_QSGMII_SERDES_PROTO		 0x0667
+ #define MVNETA_TYPE_PRIO                         0x24bc
+ #define      MVNETA_FORCE_UNI                    BIT(21)
+ #define MVNETA_TXQ_CMD_1                         0x24e4
+@@ -711,35 +712,6 @@ static void mvneta_rxq_bm_disable(struct mvneta_port *pp,
+ 	mvreg_write(pp, MVNETA_RXQ_CONFIG_REG(rxq->id), val);
+ }
  
-@@ -116,6 +117,8 @@ static inline const char *phy_modes(phy_interface_t interface)
- 		return "xgmii";
- 	case PHY_INTERFACE_MODE_MOCA:
- 		return "moca";
+-
+-
+-/* Sets the RGMII Enable bit (RGMIIEn) in port MAC control register */
+-static void mvneta_gmac_rgmii_set(struct mvneta_port *pp, int enable)
+-{
+-	u32  val;
+-
+-	val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+-
+-	if (enable)
+-		val |= MVNETA_GMAC2_PORT_RGMII;
+-	else
+-		val &= ~MVNETA_GMAC2_PORT_RGMII;
+-
+-	mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
+-}
+-
+-/* Config SGMII port */
+-static void mvneta_port_sgmii_config(struct mvneta_port *pp)
+-{
+-	u32 val;
+-
+-	val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+-	val |= MVNETA_GMAC2_PCS_ENABLE;
+-	mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
+-
+-	mvreg_write(pp, MVNETA_SGMII_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
+-}
+-
+ /* Start the Ethernet port RX and TX activity */
+ static void mvneta_port_up(struct mvneta_port *pp)
+ {
+@@ -2749,26 +2721,44 @@ static void mvneta_conf_mbus_windows(struct mvneta_port *pp,
+ }
+ 
+ /* Power up the port */
+-static void mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
++static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
+ {
+-	u32 val;
++	u32 ctrl;
+ 
+ 	/* MAC Cause register should be cleared */
+ 	mvreg_write(pp, MVNETA_UNIT_INTR_CAUSE, 0);
+ 
+-	if (phy_mode == PHY_INTERFACE_MODE_SGMII)
+-		mvneta_port_sgmii_config(pp);
++	ctrl = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+ 
+-	mvneta_gmac_rgmii_set(pp, 1);
++	/* Even though it might look weird, when we're configured in
++	 * SGMII or QSGMII mode, the RGMII bit needs to be set.
++	 */
++	switch(phy_mode) {
 +	case PHY_INTERFACE_MODE_QSGMII:
-+		return "qsgmii";
- 	default:
- 		return "unknown";
++		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_QSGMII_SERDES_PROTO);
++		ctrl |= MVNETA_GMAC2_PCS_ENABLE | MVNETA_GMAC2_PORT_RGMII;
++		break;
++	case PHY_INTERFACE_MODE_SGMII:
++		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
++		ctrl |= MVNETA_GMAC2_PCS_ENABLE | MVNETA_GMAC2_PORT_RGMII;
++		break;
++	case PHY_INTERFACE_MODE_RGMII:
++	case PHY_INTERFACE_MODE_RGMII_ID:
++		ctrl |= MVNETA_GMAC2_PORT_RGMII;
++		break;
++	default:
++		return -EINVAL;
++	}
+ 
+ 	/* Cancel Port Reset */
+-	val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+-	val &= ~MVNETA_GMAC2_PORT_RESET;
+-	mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
++	ctrl &= ~MVNETA_GMAC2_PORT_RESET;
++	mvreg_write(pp, MVNETA_GMAC_CTRL_2, ctrl);
+ 
+ 	while ((mvreg_read(pp, MVNETA_GMAC_CTRL_2) &
+ 		MVNETA_GMAC2_PORT_RESET) != 0)
+ 		continue;
++
++	return 0;
+ }
+ 
+ /* Device initialization routine */
+@@ -2879,7 +2869,12 @@ static int mvneta_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "can't init eth hal\n");
+ 		goto err_free_stats;
  	}
+-	mvneta_port_power_up(pp, phy_mode);
++
++	err = mvneta_port_power_up(pp, phy_mode);
++	if (err < 0) {
++		dev_err(&pdev->dev, "can't power up port\n");
++		goto err_deinit;
++	}
+ 
+ 	dram_target_info = mv_mbus_dram_info();
+ 	if (dram_target_info)
 -- 
 1.8.3.2
