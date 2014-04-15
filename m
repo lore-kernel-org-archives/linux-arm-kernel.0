@@ -1,106 +1,83 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue, 15 Apr 2014 07:37:19 -0500
-Subject: [PATCH v4] mach-bcm: clean up config and build targets
-Message-ID: <1397565439-29735-1-git-send-email-elder@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 15 Apr 2014 14:40:46 +0200
+Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
+In-Reply-To: <534D252B.8060009@metafoo.de>
+References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140414210429.GJ25182@sirena.org.uk> <534CE16D.8010508@free-electrons.com>
+ <20140415100922.GN12304@sirena.org.uk> <534D1DDA.40207@free-electrons.com>
+ <534D252B.8060009@metafoo.de>
+Message-ID: <534D28CE.8020006@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently CONFIG_ARCH_BCM_MOBILE is used to select all (both)
-Broadcom mobile SoC families.  Instead, use that only as a config
-menu switch, and define specific symbols like ARCH_BCM_281XX to
-select a particular SoC family.  If ARCH_BCM_MOBILE is selected, all
-of the SoCs will be selected by default, but this way each can be
-disabled individually as well.
 
-Note that BCM281xx and BCM21664 both require the SMC and L2 cache
-control code, so that code will be built based on ARCH_BCM_MOBILE.
+On 15/04/2014 14:25, Lars-Peter Clausen wrote:
+> On 04/15/2014 01:54 PM, Boris BREZILLON wrote:
+>>
+>>
+>> On 15/04/2014 12:09, Mark Brown wrote:
+>>> On Tue, Apr 15, 2014 at 09:36:13AM +0200, Boris BREZILLON wrote:
+>>>> On 14/04/2014 23:04, Mark Brown wrote:
+>>
+>>>>> The transfer type gets set once per device at init time so why not
+>>>>> just parameterise based on val_bytes?
+>>
+>>>> Actually, you may want to transfer 1 byte registers using the block
+>>>> method (if your device only support block transfers). This depends on
+>>>> the device being accessed and what it supports, but I'm not sure we
+>>>> can
+>>>> assume 1 byte registers will always be transferred using SMBUS byte
+>>>> transfers.
+>>
+>>> OK, so if this a realistic issue then it seems like it's better to
+>>> implement three different buses - there is not really any common code
+>>> between the various paths.
+>>
+>> Okay, I'll create 4 different busses (one for each access type).
+>> BTW, should I keep these implementations in the same source file
+>> (regmap-smbus.c) ?
+>> And, should I keep one method to register an smbus regmap or should I
+>> provide one method per access type and get rid of the
+>> regmap_smbus_transfer_type enum ?
+>
+> I don't think we should leave the decision which bus to use to the
+> driver. Neither should the driver have to choose whether to use smbus
+> or native I2C. We want to use native I2C when available, because it is
+> more efficient than going through the smbus emulation layer. On the
+> other hand we want to automatically switch to smbus when native I2C is
+> not available and the device can work fine with smbus. Also I'm afraid
+> that we'll otherwise soon see code popping up like:
+>
+> if (of_property_read_bool(np, "use-smbus-regmap"))
+>     regmap = regmap_init_smbus(...)
+> else
+>     regmap = regmap_init_i2c(...)
+>
+> My suggestion is that in regmap_init_i2c() you check the capabilities
+> of the I2C adapter. If it supports native I2C you setup the regmap
+> with the regmap_i2c struct just as it does right now. If the adapter
+> does not support native I2C, check if the device can be supported by
+> smbus (reg_bytes == 8 && val_bytes % 8 == 0). For each type of smbus
+> operations have one regmap_bus struct, and if you can fallback to
+> smbus choose the bus depending on the config's val_bytes.
+>
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
-v4:  Rebased on to of v3.15-rc1.  Small tweak in Makefile.
-v3:  SMC and L2 cache code is needed by both SoC families.
-v2:  No longer uses Kbuild's $(<modulename>-y) variable mechanism.
+What if the device only support SMBus block transfers, but the adapter
+support both regular I2C and SMBus block transfers (don't know if such a
+device exist :-)) ?
 
-The patch is available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/mach-bcm-cleanup-v4
+My point is that I'm not sure the core remap-i2c code can decide whether
+to use SMBus or I2C transfer only from val_bytes value, but I might be
+wrong.
 
- arch/arm/mach-bcm/Kconfig  |   28 ++++++++++++++++++++++++----
- arch/arm/mach-bcm/Makefile |   15 ++++++++++++---
- 2 files changed, 36 insertions(+), 7 deletions(-)
+Best Regards,
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 49c914c..5f5740f 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -10,7 +10,7 @@ if ARCH_BCM
- menu "Broadcom SoC Selection"
- 
- config ARCH_BCM_MOBILE
--	bool "Broadcom Mobile SoC" if ARCH_MULTI_V7
-+	bool "Broadcom Mobile SoC Support" if ARCH_MULTI_V7
- 	depends on MMU
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_754322
-@@ -23,9 +23,29 @@ config ARCH_BCM_MOBILE
- 	select PINCTRL
- 	help
- 	  This enables support for systems based on Broadcom mobile SoCs.
--	  It currently supports the 'BCM281XX' family, which includes
--	  BCM11130, BCM11140, BCM11351, BCM28145 and
--	  BCM28155 variants.
-+
-+if ARCH_BCM_MOBILE
-+
-+menu "Broadcom Mobile SoC Selection"
-+
-+config ARCH_BCM_281XX
-+	bool "Broadcom BCM281XX SoC family"
-+	default y
-+	help
-+	  Enable support for the the BCM281XX family, which includes
-+	  BCM11130, BCM11140, BCM11351, BCM28145 and BCM28155
-+	  variants.
-+
-+config ARCH_BCM_21664
-+	bool "Broadcom BCM21664 SoC family"
-+	default y
-+	help
-+	  Enable support for the the BCM21664 family, which includes
-+	  BCM21663 and BCM21664 variants.
-+
-+endmenu
-+
-+endif
- 
- config ARCH_BCM2835
- 	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index a326b28..7fb9b04 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -10,10 +10,19 @@
- # of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- # GNU General Public License for more details.
- 
--obj-$(CONFIG_ARCH_BCM_MOBILE)	:= board_bcm281xx.o board_bcm21664.o \
--				bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
--obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-+# BCM281XX
-+obj-$(CONFIG_ARCH_BCM_281XX)	+= board_bcm281xx.o
- 
-+# BCM21664
-+obj-$(CONFIG_ARCH_BCM_21664)	+= board_bcm21664.o
-+
-+# BCM281XX and BCM21664 L2 cache control
-+obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
-+
-+# BCM2835
-+obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-+
-+# BCM5301X
- obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+Boris
+
+> - Lars
+
 -- 
-1.7.9.5
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
