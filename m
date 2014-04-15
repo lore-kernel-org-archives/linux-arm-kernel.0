@@ -1,69 +1,39 @@
-From: moore@free.fr (Chris Moore)
-Date: Tue, 15 Apr 2014 04:59:39 +0200
-Subject: [PATCH 24/29] ARM: orion5x: keep TODO list in edmini_v2 DT
-In-Reply-To: <534BC3B7.2010603@gmail.com>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-25-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BC3B7.2010603@gmail.com>
-Message-ID: <534CA09B.7090602@free.fr>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 15 Apr 2014 07:01:39 +0200
+Subject: [PATCH] clk: sirf: fix a bundle of checkpatch issues
+In-Reply-To: <1397529603-16937-1-git-send-email-21cnbao@gmail.com>
+References: <1397529603-16937-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20140415050139.GF5969@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-Le 14/04/2014 13:17, Sebastian Hesselbarth a ?crit :
-> On 04/13/2014 04:40 PM, Thomas Petazzoni wrote:
->> In preparation to the complete removal of non-DT support for
->> edmini_v2, this commit copies the TODO list of things to support from
->> the old-style board file into the Device Tree of edmini_v2.
->>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> ---
->>   arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git 
->> a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts 
->> b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
->> index 44cc36a..ffa0fc5 100644
->> --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
->> +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
->> @@ -6,6 +6,13 @@
->>    * warranty of any kind, whether express or implied.
->>    */
->>
->> +/*
->> + * TODO: add Orion USB device port init when kernel.org support is 
->> added.
->
-> I had a great time lately to look up usb phy init for all MVEBU SoCs.
-> Expect barebox usb-phy code first, then later proper init for Linux,
-> too.
->
->> + * TODO: add flash write support: see below.
->> + * TODO: add power-off support.
->> + * TODO: add I2C EEPROM support.
->
-> Have you evaluated, what is blocking i2c eeprom?
->
+On Tue, Apr 15, 2014 at 10:40:03AM +0800, Barry Song wrote:
+> From: Bin Shi <Bin.Shi@csr.com>
+> diff --git a/drivers/clk/sirf/clk-atlas6.c b/drivers/clk/sirf/clk-atlas6.c
+> index d63b76c..b068feb 100644
+> --- a/drivers/clk/sirf/clk-atlas6.c
+> +++ b/drivers/clk/sirf/clk-atlas6.c
+> @@ -60,10 +60,10 @@ static struct clk_dmn clk_nand = {
+>  
+>  enum atlas6_clk_index {
+>  	/* 0    1     2      3      4      5      6       7         8      9 */
+> -	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
+> -	mf,     io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
+> -	spi1,   pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
+> -	usp2,   vip,   gfx,   gfx2d,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
+> +	rtc,  osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
+> +	mf,   io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
+> +	spi1, pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
+> +	usp2, vip,   gfx,   gfx2d, lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
+>  	usb0,  usb1,   cphif, maxclk,
+Here only the indention is changed, right? I wonder why the last line
+was not fixed to be aligned with the others.
 
- From memory:
+Best regards
+Uwe
 
-I2C access from user space is no problem using the generic I2C driver.
-I had I2C access from kernel space working in a personal branch but 
-unfortunately my way of doing this was very messy.
-I therefore never dared submit my version.
-
-I also had power-off working but, to be persistent across a power 
-outage, the edmini_v2 driver needs to modify a flag in the I2C EEPROM.
-In fact the LaCie EDmini V2 never really powers-off, it starts a reboot 
-then loops in U-Boot.
-If this flag indicates a power-off state, U-Boot waits for the power-on 
-button to be pressed before booting Linux.
-This was actually the main reason for needing I2C access from kernel space.
-
-If anyone can show me how to cleanly access the generic I2C driver from 
-the edmini_v2 driver, I could try again.
-
-Cheers,
-Chris
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
