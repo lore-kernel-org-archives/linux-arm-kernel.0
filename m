@@ -1,39 +1,45 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Tue, 15 Apr 2014 10:37:25 +0530
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <534BEEED.1060309@samsung.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
- <534529B2.2020107@samsung.com> <534BCC91.8090108@ti.com>
- <CAFp+6iGxhfgZRPysMuj5nALEQBbFXnAXhtDPpbf3P42LDHqFxg@mail.gmail.com>
- <534BDD17.60003@ti.com> <534BE658.8050606@gmail.com>
- <CAFp+6iHhUvLhAKGPARS8RUfmO8RGcTrumvYb7QjJXbFD1nUuig@mail.gmail.com>
- <534BEEED.1060309@samsung.com>
-Message-ID: <CAFp+6iFQes3xSj7V7a0sCPaD1oXNccgp3j5ZNNPUqJPXHu9OSg@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 14 Apr 2014 22:16:10 -0700
+Subject: [PATCH] PM / devfreq: Use freq_table for available_frequencies
+In-Reply-To: <8568895.444151397525760132.JavaMail.weblogic@epml02>
+References: <8568895.444151397525760132.JavaMail.weblogic@epml02>
+Message-ID: <534CC09A.30200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+On 04/14/2014 06:36 PM, ??? wrote:
+>> MyungJoo/Kyungmin,
+>>
+>> Bump. Can we accept this patch please?
+>>
+>> -Saravana
+> 
+> Nack.
+> 
+> Please note that freq_table is also an optional value, which may
+> be null.
 
+Ah, I saw that the max_freq would be zero if freq_table was NULL and I
+assumed that it can't be NULL. But I see that the max_freq limit is not
+applied if it's zero. Thanks for catching it.
 
-On Mon, Apr 14, 2014 at 7:51 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> On 14/04/14 15:49, Vivek Gautam wrote:
->> True, we don't have a scope of instantiating this driver using old
->> platform device and
->> old legacy board files.
->> So we don't need this check then, right ?
->
-> I think it can be dropped.
-> At least IMHO there is no point to increase size of the module with
-> an error log that has no chance to be ever called in practice.
+> Besides, please be aware that your code is under rcu_read_lock().
 
-Ok, i will remove this error message and in fact this check.
+Valid point. I was just trying to keep the diff simple. No one's really
+going to be catting this file often when performance matters.
 
+> 
+> 
+> Cheers,
+> MyungJoo.
+> 
+> ps. I'll send a related patch (avoid accessing null but not-an-error
+> pointer at other sysfs nodes). Thank you for letting me catch such bugs anyway.
 
+I can go ahead and do this myself if you don't mind.
+
+-Saravana
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
