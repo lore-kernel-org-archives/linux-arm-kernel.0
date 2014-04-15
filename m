@@ -1,121 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Apr 2014 11:55:45 +0100
-Subject: [PATCH v9 08/12] ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
-In-Reply-To: <1397542455-354-9-git-send-email-anup.patel@linaro.org> (Anup
- Patel's message of "Tue, 15 Apr 2014 07:14:11 +0100")
-References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
- <1397542455-354-9-git-send-email-anup.patel@linaro.org>
-Message-ID: <87lhv6zwsu.fsf@approximate.cambridge.arm.com>
+From: stratosk@semaphore.gr (Stratos Karafotis)
+Date: Tue, 15 Apr 2014 14:02:26 +0300
+Subject: [PATCH 08/20] cpufreq: exynos5440: Use cpufreq_for_each_entry
+ macro for iteration
+In-Reply-To: <CAKohpokfsR3soykZbtH4-L=4TC6Oab=jyzUr=W-EfkRFfefRDQ@mail.gmail.com>
+References: <534C4E7E.4090806@semaphore.gr>
+ <CAKohpokfsR3soykZbtH4-L=4TC6Oab=jyzUr=W-EfkRFfefRDQ@mail.gmail.com>
+Message-ID: <534D11C2.3080206@semaphore.gr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15 2014 at  7:14:11 am BST, Anup Patel <anup.patel@linaro.org> wrote:
-> This patch adds emulation of PSCI v0.2 AFFINITY_INFO function call
-> for KVM ARM/ARM64. This is a VCPU-level function call which will be
-> used to determine current state of given affinity level.
->
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/kvm/psci.c |   52 +++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 50 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index b964aa4..f6f9290 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -27,6 +27,16 @@
->   * as described in ARM document number ARM DEN 0022A.
->   */
->  
-> +#define AFFINITY_MASK(level)	~((0x1UL << ((level) * 8)) - 1)
+On 15/04/2014 08:44 ??, Viresh Kumar wrote:
+> On 15 April 2014 02:39, Stratos Karafotis <stratosk@semaphore.gr> wrote:
+> 
+>> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+> 
+>>  static void exynos_enable_dvfs(unsigned int cur_frequency)
+>>  {
+>> -       unsigned int tmp, i, cpu;
+>> +       unsigned int tmp, cpu;
+>>         struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
+>> +       struct cpufreq_frequency_table *pos;
+> 
+> Merge above two.
+> 
 
-Nit: Use MPIDR_LEVEL_MASK instead of 8.
+Then the line will be 82 characters long.
+Do you mind to keep it as is?
 
-> +
-> +static unsigned long psci_affinity_mask(unsigned long affinity_level)
-> +{
-> +	if (affinity_level <= 3)
-> +		return MPIDR_HWID_BITMASK & AFFINITY_MASK(affinity_level);
-> +
-> +	return 0;
-> +}
-> +
->  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
->  {
->  	vcpu->arch.pause = true;
-> @@ -85,6 +95,42 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->  	return PSCI_RET_SUCCESS;
->  }
->  
-> +static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
-> +{
-> +	int i;
-> +	unsigned long mpidr;
-> +	unsigned long target_affinity;
-> +	unsigned long target_affinity_mask;
-> +	unsigned long lowest_affinity_level;
-> +	struct kvm *kvm = vcpu->kvm;
-> +	struct kvm_vcpu *tmp;
-> +
-> +	target_affinity = *vcpu_reg(vcpu, 1);
-> +	lowest_affinity_level = *vcpu_reg(vcpu, 2);
-> +
-> +	/* Determine target affinity mask */
-> +	target_affinity_mask = psci_affinity_mask(lowest_affinity_level);
-> +	if (!target_affinity_mask)
-> +		return PSCI_RET_INVALID_PARAMS;
-> +
-> +	/* Ignore other bits of target affinity */
-> +	target_affinity &= target_affinity_mask;
-> +
-> +	/*
-> +	 * If one or more VCPU matching target affinity are running
-> +	 * then return 0 (ON) else return 1 (OFF)
 
-Would be good to define symbolic values for these (and for ON_PENDING as
-well).
-
-> +	 */
-> +	kvm_for_each_vcpu(i, tmp, kvm) {
-> +		mpidr = kvm_vcpu_get_mpidr(tmp);
-> +		if (((mpidr & target_affinity_mask) == target_affinity) &&
-> +		    !tmp->arch.pause) {
-> +			return 0;
-> +		}
-> +	}
-> +
-> +	return 1;
-> +}
-> +
->  static inline void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
->  {
->  	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
-> @@ -132,6 +178,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  	case PSCI_0_2_FN64_CPU_ON:
->  		val = kvm_psci_vcpu_on(vcpu);
->  		break;
-> +	case PSCI_0_2_FN_AFFINITY_INFO:
-> +	case PSCI_0_2_FN64_AFFINITY_INFO:
-> +		val = kvm_psci_vcpu_affinity_info(vcpu);
-> +		break;
->  	case PSCI_0_2_FN_SYSTEM_OFF:
->  		kvm_psci_system_off(vcpu);
->  		val = PSCI_RET_SUCCESS;
-> @@ -143,12 +193,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->  		ret = 0;
->  		break;
->  	case PSCI_0_2_FN_CPU_SUSPEND:
-> -	case PSCI_0_2_FN_AFFINITY_INFO:
->  	case PSCI_0_2_FN_MIGRATE:
->  	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
->  	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
->  	case PSCI_0_2_FN64_CPU_SUSPEND:
-> -	case PSCI_0_2_FN64_AFFINITY_INFO:
->  	case PSCI_0_2_FN64_MIGRATE:
->  	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
->  		val = PSCI_RET_NOT_SUPPORTED;
-
--- 
-Jazz is not dead. It just smells funny.
+Stratos
