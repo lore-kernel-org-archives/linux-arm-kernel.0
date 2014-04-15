@@ -1,25 +1,71 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 15 Apr 2014 14:07:32 +0100
-Subject: [PATCH v9 05/12] ARM/ARM64: KVM: Make kvm_psci_call() return
- convention more flexible
-In-Reply-To: <87vbuaye63.fsf@approximate.cambridge.arm.com>
-References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
- <1397542455-354-6-git-send-email-anup.patel@linaro.org>
- <87y4z6zydm.fsf@approximate.cambridge.arm.com>
- <CAAhSdy0hna8NifXXb6icgUEVA_T0Seu99xf6JtGGbsEWYH2+fQ@mail.gmail.com>
- <87vbuaye63.fsf@approximate.cambridge.arm.com>
-Message-ID: <CAFEAcA__jNiWnODSna8bLPv9xw4a-YQi=kJcpPivgXMjt+T5gg@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 15 Apr 2014 15:34:55 +0200
+Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over smbus
+In-Reply-To: <20140415125654.GD12304@sirena.org.uk>
+References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140414210429.GJ25182@sirena.org.uk> <534CE16D.8010508@free-electrons.com>
+ <20140415100922.GN12304@sirena.org.uk> <534D1DDA.40207@free-electrons.com>
+ <534D252B.8060009@metafoo.de> <20140415125654.GD12304@sirena.org.uk>
+Message-ID: <534D357F.9040906@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 April 2014 13:23, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> I understand that, and this is the only case at the moment. What I'm
-> foreseeing is a situation where we've been unable to perform the
-> expected service, and PSCI doesn't specify any "internal error". So an
-> error injection looks like a valid solution to me.
+On 04/15/2014 02:56 PM, Mark Brown wrote:
+[...]
+>> My suggestion is that in regmap_init_i2c() you check the capabilities of the
+>> I2C adapter. If it supports native I2C you setup the regmap with the
+>> regmap_i2c struct just as it does right now. If the adapter does not support
+>> native I2C, check if the device can be supported by smbus (reg_bytes == 8 &&
+>> val_bytes % 8 == 0). For each type of smbus operations have one regmap_bus
+>> struct, and if you can fallback to smbus choose the bus depending on the
+>> config's val_bytes.
+>
+> That'd definitely be useful but potentially orthogonal, we can also do
+> both and expose smbus explicitly with I2C falling back to it
+> transparently.
+>
+> If the device *is* limited to smbus and the controller supports both
+> (some do) I'd naively have expected that the native smbus support would
+> do a little better - otherwise why bother using it?  We could identify
+> the constraint set automatically for I2C devices though it's more for
+> the client driver to specify.
+>
+> This means there's two changes to consider here:
+>
+>   - Providing APIs for registering actual smbus devices as a convenience
+>     for devices with that constraint, regardless of how that is done
+>     behind the scenes.
+>
+>   - Having the I2C implementation automatically use the smbus APIs if
+>     it can and either the controller is smbus only or it makes sense to
+>     do so for optimisation.
+>
+> both of which are independently useful.
+>
 
-This sounds like a flaw in the PSCI spec which we should
-try to get fixed...
+I don't think it makes sense to expose smbus explicitly. We can already 
+describe smbus restricted devices just fine with the current regmap_config 
+and already support them with the current I2C regmap implementation. Using 
+native I2C to access these devices will be more efficient than going through 
+the smbus emulation layer. The smbus emulation layer essentially does the 
+same as we do in regmap, so using the smbus emulation layer through regmap 
+means doing the same thing twice.
 
-thanks
--- PMM
+What we currently do not support is devices which are restricted to block 
+transfers and I think adding support for this should be handled by a 
+separate patchset. As far as I understood it this patchset is about making 
+it possible to use smbus controllers with regmap devices which are smbus 
+compatible.
+
+As I see it there are currently 3 cases:
+
+1) Device is strictly smbus only and the controller supports native smbus
+    => Use smbus
+2) The device is smbus compatible but has extensions (e.g. support for multi 
+register writes) and the controller supports only smbus.
+    => Use smbus
+3) For every other case
+    => Use native I2C.
+
+- Lars
