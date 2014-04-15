@@ -1,63 +1,57 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 15 Apr 2014 17:13:32 +0200
-Subject: [PATCH 1/6] dmaengine: Add fly-by transfer flag to slave
- configuration structure
+Date: Tue, 15 Apr 2014 17:13:33 +0200
+Subject: [PATCH 2/6] dma: mmp_pdma: Fix the #dma-channels DT property
+ documentation
 In-Reply-To: <1397574817-15559-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1397574817-15559-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397574817-15559-2-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1397574817-15559-3-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fly-by transfer mode cuts down the number of bus transactions by letting
-the slave drive or latch the memory data bus during memory transactions
-instead of performing a dedicated transaction to read data from or write
-data to the slave.
+The property is optional and defaults to 32. Document it as such.
 
-Support for fly-by mode by adding a new flag field to struct
-dma_slave_config.
-
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/linux/dmaengine.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ Documentation/devicetree/bindings/dma/mmp-dma.txt | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index c5c92d5..ae99153 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -304,6 +304,17 @@ enum dma_slave_buswidth {
- };
+diff --git a/Documentation/devicetree/bindings/dma/mmp-dma.txt b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+index a4fa4ef..7a802f6 100644
+--- a/Documentation/devicetree/bindings/dma/mmp-dma.txt
++++ b/Documentation/devicetree/bindings/dma/mmp-dma.txt
+@@ -1,17 +1,20 @@
+ * MARVELL MMP DMA controller
  
- /**
-+ * enum dma_slave_flags - DMA slave configuration flags
-+ * @DMA_SLAVE_FLAG_FLY_BY - perform DMA transfers for the slave in fly-by mode.
-+ *   Instead of performing a bus transaction to read (write) data from (to) the
-+ *   slave, let the slave drive (latch) the memory bus data signals during the
-+ *   memory write (read) transaction.
-+ */
-+enum dma_slave_flags {
-+	DMA_SLAVE_FLAG_FLY_BY = (1 << 0),
-+};
+ Marvell Peripheral DMA Controller
+-Used platfroms: pxa688, pxa910, pxa3xx, etc
++Used platforms: pxa688, pxa910, pxa3xx, etc
+ 
+ Required properties:
+ - compatible: Should be "marvell,pdma-1.0"
+ - reg: Should contain DMA registers location and length.
+ - interrupts: Either contain all of the per-channel DMA interrupts
+ 		or one irq for pdma device
+-- #dma-channels: Number of DMA channels supported by the controller.
 +
-+/**
-  * struct dma_slave_config - dma slave channel runtime config
-  * @direction: whether the data shall go in or out on this slave
-  * channel, right now. DMA_MEM_TO_DEV and DMA_DEV_TO_MEM are
-@@ -333,6 +344,7 @@ enum dma_slave_buswidth {
-  * @slave_id: Slave requester id. Only valid for slave channels. The dma
-  * slave peripheral will have unique id as dma requester which need to be
-  * pass as slave config.
-+ * @flags: DMA slave flags, a combination of enum dma_slave_flags flags.
-  *
-  * This struct is passed in as configuration data to a DMA engine
-  * in order to set up a certain channel for DMA transport@runtime.
-@@ -361,6 +373,7 @@ struct dma_slave_config {
- 	u32 dst_maxburst;
- 	bool device_fc;
- 	unsigned int slave_id;
-+	u32 flags;
- };
++Optional properties:
++- #dma-channels: Number of DMA channels supported by the controller (defaults
++  to 32 when not specified)
  
- /**
+ "marvell,pdma-1.0"
+-Used platfroms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
++Used platforms: pxa25x, pxa27x, pxa3xx, pxa93x, pxa168, pxa910, pxa688.
+ 
+ Examples:
+ 
+@@ -45,7 +48,7 @@ pdma: dma-controller at d4000000 {
+ 
+ 
+ Marvell Two Channel DMA Controller used specifically for audio
+-Used platfroms: pxa688, pxa910
++Used platforms: pxa688, pxa910
+ 
+ Required properties:
+ - compatible: Should be "marvell,adma-1.0" or "marvell,pxa910-squ"
 -- 
 1.8.3.2
