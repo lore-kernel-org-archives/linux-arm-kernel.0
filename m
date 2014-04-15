@@ -1,39 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 15 Apr 2014 14:40:08 +0200
-Subject: [PATCH] ARM: Kirkwood: T5325: Fix double probe of Codec
-Message-ID: <1397565608-1830-1-git-send-email-andrew@lunn.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Apr 2014 13:42:53 +0100
+Subject: [PATCH 2/5] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
+References: <cover.1397552154.git.anders.berg@lsi.com>
+ <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
+Message-ID: <534D294D.7000201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The codec is defined both in DT and the board file. The board file
-however contains platform data which is required in order that the
-codec works. When the DT instantiates the codec before the board files
-does, it is missing the platform data and so fails. Remove the DT node
-until we have a binding which can pass the additional data.
+Hi Anders,
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
+On 15/04/14 13:06, Anders Berg wrote:
+> Add device tree for the Amarillo validation board with an AXM5516 SoC.
+> 
+> Signed-off-by: Anders Berg <anders.berg@lsi.com>
+> ---
+>  arch/arm/boot/dts/Makefile             |   1 +
+>  arch/arm/boot/dts/axm5516-amarillo.dts |  51 ++++++
+>  arch/arm/boot/dts/axm5516-cpus.dtsi    | 204 ++++++++++++++++++++++
+>  arch/arm/boot/dts/axm55xx.dtsi         | 306 +++++++++++++++++++++++++++++++++
+>  4 files changed, 562 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/axm5516-amarillo.dts
+>  create mode 100644 arch/arm/boot/dts/axm5516-cpus.dtsi
+>  create mode 100644 arch/arm/boot/dts/axm55xx.dtsi
+> 
 
-It would be good to get this into -rc2.
+[...]
 
- arch/arm/boot/dts/kirkwood-t5325.dts | 5 -----
- 1 file changed, 5 deletions(-)
+> +       gic: interrupt-controller at 2001001000 {
+> +               compatible = "arm,cortex-a15-gic";
+> +               #interrupt-cells = <3>;
+> +               #address-cells = <0>;
+> +               interrupt-controller;
+> +               reg = <0x20 0x01001000 0 0x1000>,
+> +                     <0x20 0x01002000 0 0x1000>,
+> +                     <0x20 0x01004000 0 0x2000>,
+> +                     <0x20 0x01006000 0 0x2000>;
+> +               interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
+> +                               IRQ_TYPE_LEVEL_HIGH)>;
+> +       };
 
-diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-index 7d1c7677a18f..0bd70d928c69 100644
---- a/arch/arm/boot/dts/kirkwood-t5325.dts
-+++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-@@ -127,11 +127,6 @@
- 
- 		i2c at 11000 {
- 			status = "okay";
--
--			alc5621: alc5621 at 1a {
--				compatible = "realtek,alc5621";
--				reg = <0x1a>;
--			};
- 		};
- 
- 		serial at 12000 {
+Given how many CPUs this system has, what's the catch regarding the GIC?
+Is there a second one shadowing this one at the same address for another
+set of 8 CPUs? Is there an additional mechanism to IPI the other CPUs?
+
+Thanks,
+
+	M.
 -- 
-1.9.2
+Jazz is not dead. It just smells funny...
