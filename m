@@ -1,111 +1,65 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 15 Apr 2014 09:36:15 +0100
-Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <alpine.LFD.2.11.1404140956060.980@knanqh.ubzr>
-References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
- <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
- <20140414104116.GA3844@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1404140956060.980@knanqh.ubzr>
-Message-ID: <20140415083615.GC3596@e103592.cambridge.arm.com>
+From: sajjan.linux@gmail.com (Vikas Sajjan)
+Date: Tue, 15 Apr 2014 14:09:24 +0530
+Subject: [PATCHv2 3/8] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+In-Reply-To: <534CEEA8.6020800@samsung.com>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <1397527192-21988-4-git-send-email-cw00.choi@samsung.com>
+ <4788081.xvaJfdGTMu@wuerfel> <534CEEA8.6020800@samsung.com>
+Message-ID: <CAGm_ybhGBVmUu9PgppgWfH8b8=3JVhqK0v=ZR_yE8Cs42+VUOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 10:01:27AM -0400, Nicolas Pitre wrote:
-> On Mon, 14 Apr 2014, Dave Martin wrote:
-> 
-> > On Fri, Apr 11, 2014 at 04:23:04PM -0400, Nicolas Pitre wrote:
-> > > On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
-> > > 
-> > > > Add machine-dependent MCPM call-backs for Exynos5420. These are used
-> > > > to power up/down the secondary CPUs during boot, shutdown, s2r and
-> > > > switching.
-> > > > 
-> > > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> > > > Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
-> > > > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> > > > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > > 
-> > > See comments inline.
-> > 
-> > I won't duplicate Nico's review, but I have a couple of extra comments/
-> > questions, below.
-> > 
-> > [...]
-> > 
-> > > > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> > > > new file mode 100644
-> > > > index 0000000..46d4968
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> > > > @@ -0,0 +1,444 @@
-> > 
-> > [...]
-> > 
-> > > > +static void exynos_cluster_power_control(unsigned int cluster, int enable)
-> > > > +{
-> > > > +	unsigned long timeout = jiffies + msecs_to_jiffies(20);
-> > > > +	unsigned int status, val = EXYNOS_CORE_LOCAL_PWR_DIS;
-> > > > +
-> > > > +	if (enable)
-> > > > +		val = EXYNOS_CORE_LOCAL_PWR_EN;
-> > > > +
-> > > > +	status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
-> > > > +	if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
-> > > > +		return;
-> > > > +
-> > > > +	__raw_writel(val, EXYNOS_COMMON_CONFIGURATION(cluster));
-> > > > +	/* Wait until cluster power control is applied */
-> > > > +	while (time_before(jiffies, timeout)) {
-> > > > +		status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
-> > > > +
-> > > > +		if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
-> > > > +			return;
-> > > > +
-> > > > +		cpu_relax();
-> > > > +	}
-> > > > +	pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
-> > > > +		enable ? "on" : "off");
-> > > 
-> > > You should not have to wait for the power status to change here.  
-> > > Simply signaling the desired state and returning is all that is 
-> > > expected.  And because IRQs are turned off, it is likely that 
-> > > time_before(jiffies, timeout) will always be true anyway because jiffies 
-> > > are not updated if there is no other CPU to service the timer interrupt.
-> > > 
-> > > The actual power status should be polled for in the mcpm_finish() 
-> > > method only.
-> > 
-> > Depending on the power controller, it might be possible for writes to
-> > the controller to be lost or not acted upon, if a previous change is
-> > still pending.
-> > 
-> > Does this issue apply to the exynos power controller?
-> 
-> Given the way the code is structured now, I suppose that has not been 
-> the case so far.
+Hi,
 
-It depends on the purpose of the polling loop.  If it was added to resolve
-a race between a power-up and a power-down that is complete in MCPM but
-still pending in the hardware, than that would suggest the power controller
-does have this behaviour.
+On Tue, Apr 15, 2014 at 2:02 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> Hi,
+>
+> On 04/15/2014 05:11 PM, Arnd Bergmann wrote:
+>> On Tuesday 15 April 2014 10:59:47 Chanwoo Choi wrote:
+>>> This patch add memory mapping for PMU (Power Management Unit) which is used
+>>> for power control of Exynos3250.
+>>>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>> Arnd Bergmann suggested that need proper driver instead of static memory mapping.
+>>> As Chanho Park reply[2], Sachin Kamat already posted the DT support patch[1]
+>>> for memory mapping for SYSRAM.
+>>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg27647.html
+>>> [2] https://lkml.org/lkml/2014/4/10/161
+>>>
+>>> So, I'm going to re-implement following patch related to static memory mapping
+>>> after merged Sachin Kamat patch[1].
+>>>   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+>>
+>> I don't think we have a patch for the PMU yet, Sachin was looking at the SYSRAM
+>> only.
+>
+> You are right. Sachin's patch only included the solution of SYSRAM memory mapping.
+> I set out the plan that I would implment proper driver for PMU memory mapping
+> instead of static method after merged Sachin's patch for SYSRAM.
+>
+> But,
+> If you'd like me to implment PMU memory mapping instead of static mapping right now,
+> I'll implement it for PMU such as Sachin's patch on next posting(v3).
+>
 
-But I'm just guessing.
+I have already posted patch[1] for mapping PMU through DT as part of
+my PMU series for exynos5260.
+You can rebase on the same.
 
-Abhilash, can you comment?
 
-> > 
-> > If this is the case, it might be necessary to ensure before a power-up
-> > request, that the power controller has caught up and reports the
-> > cluster/CPU as down.  Putting this poll before the write to the
-> > power controller maximises the chance of pipelining useful work
-> > in the meantime.  Putting the poll after the write is the worst case.
-> 
-> More useful might be a check on the actual _control_ bit.  If the 
-> control bits may be read back then I expect the indicated state will 
-> happen even if delayed.
+[1] http://www.spinics.net/lists/arm-kernel/msg316013.html
 
-Quite likely, yes.  It just depends on what the hardware specs say.
 
-Cheers
----Dave
+> Thanks for your review.
+>
+> Best Regards,
+> Chanwoo Choi
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
