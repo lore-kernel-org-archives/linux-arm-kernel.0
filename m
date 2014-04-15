@@ -1,178 +1,220 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Tue, 15 Apr 2014 11:35:49 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
-In-Reply-To: <534CFA77.9030108@gmail.com>
-References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
- <534CFA77.9030108@gmail.com>
-Message-ID: <20140415093549.GD4584@kwain>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 15 Apr 2014 17:48:07 +0800
+Subject: =?UTF-8?q?=5BPATCH=20v2=5D=20clk=3A=20sirf=3A=20fix=20a=20bundle=20of=20checkpatch=20issues?=
+Message-ID: <1397555287-25544-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+From: Bin Shi <Bin.Shi@csr.com>
 
-On Tue, Apr 15, 2014 at 11:23:03AM +0200, Sebastian Hesselbarth wrote:
-> On 04/15/2014 10:07 AM, Antoine T?nart wrote:
+fix the below checkpatch issues about which users of codes - key customers care
+very much.
 
-[?]
+WARNING: line over 80 characters
+66: FILE: clk-atlas6.c:66:
++	usp2,   vip,   gfx,   gfx2d,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
 
-> >diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> >index e6e556055dfc..b2625f896bc5 100644
-> >--- a/arch/arm/boot/dts/berlin2q.dtsi
-> >+++ b/arch/arm/boot/dts/berlin2q.dtsi
-> >@@ -109,6 +109,78 @@
-> >  			ranges = <0 0xe80000 0x10000>;
-> >  			interrupt-parent = <&aic>;
-> >
-> >+			gpio0: gpio at 0400 {
-> >+				compatible = "snps,dw-apb-gpio";
-> >+				reg = <0x0400 0x400>;
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+
-> >+				porta: gpio-controller at 0 {
-> 
-> ePAPR recommended name is even more generic, i.e. "gpio". If
-> that clashed in any way with other numbered names, I suggest
-> to rename to "gpio-port" as actually the controller is the
-> parent node and this represents one port (in the nomenclature
-> of DW-APB-GPIO).
+total: 0 errors, 1 warnings, 153 lines checked
 
-I followed the dwapb GPIO binding documentation, but I think this is a good
-idea. I'll update.
+clk-atlas6.c has style problems, please review.
 
-> >+					compatible = "snps,dw-apb-gpio-port";
-> >+					gpio-controller;
-> >+					#gpio-cells = <2>;
-> >+					snps,nr-gpios = <32>;
-> 
-> 32 gpio pins for each of the 6 GPIO controllers? Either BG2Q is a GPIO
-> beast or it is a mistake :P
-> 
-> Can you please double-check?
+If any of these errors are false positives, please report
+them to the maintainer, see CHECKPATCH in MAINTAINERS.
+WARNING: line over 80 characters
+24: FILE: clk-common.c:24:
++ *     Each clock domain can select its own clock source from five clock sources,
+WARNING: line over 80 characters
+25: FILE: clk-common.c:25:
++ *     X_XIN, X_XINW, PLL1, PLL2 and PLL3. The domain clock is used as the source
 
-Maybe Jisheng can confirm this.
+WARNING: line over 80 characters
+171: FILE: clk-common.c:171:
++	return pll_clk_round_rate(__clk_get_hw(parent_clk), rate, &pll_parent_rate);
 
-> I am fine with using nr-gpios property now, but I guess BG2Q also
-> has that CONFIG[1,2] registers to actually read out the features
-> synthesized in? If I find some time, I'll prepare a patch for
-> dw-apb-gpio to exploit that (optional) information instead of
-> using nr-gpios.
+WARNING: static const char * array should probably be static const char * const
+191: FILE: clk-common.c:191:
++static const char *pll_clk_parents[] = {
 
-Maybe, that would be nice.
+WARNING: line over 80 characters
+260: FILE: clk-common.c:260:
++static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 
+WARNING: static const char * array should probably be static const char * const
+287: FILE: clk-common.c:287:
++static const char *dmn_clk_parents[] = {
 
-Antoine
+WARNING: static const char * array should probably be static const char * const
+676: FILE: clk-common.c:676:
++static const char *std_clk_io_parents[] = {
 
-> Otherwise,
-> 
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> 
-> >+					reg = <0>;
-> >+					interrupt-controller;
-> >+					#interrupt-cells = <2>;
-> >+					interrupts = <0>;
-> >+				};
-> >+			};
-> >+
-> >+			gpio1: gpio at 0800 {
-> >+				compatible = "snps,dw-apb-gpio";
-> >+				reg = <0x0800 0x400>;
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+
-> >+				portb: gpio-controller at 1 {
-> >+					compatible = "snps,dw-apb-gpio-port";
-> >+					gpio-controller;
-> >+					#gpio-cells = <2>;
-> >+					snps,nr-gpios = <32>;
-> >+					reg = <0>;
-> >+					interrupt-controller;
-> >+					#interrupt-cells = <2>;
-> >+					interrupts = <1>;
-> >+				};
-> >+			};
-> >+
-> >+			gpio2: gpio at 0c00 {
-> >+				compatible = "snps,dw-apb-gpio";
-> >+				reg = <0x0c00 0x400>;
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+
-> >+				portc: gpio-controller at 2 {
-> >+					compatible = "snps,dw-apb-gpio-port";
-> >+					gpio-controller;
-> >+					#gpio-cells = <2>;
-> >+					snps,nr-gpios = <32>;
-> >+					reg = <0>;
-> >+					interrupt-controller;
-> >+					#interrupt-cells = <2>;
-> >+					interrupts = <2>;
-> >+				};
-> >+			};
-> >+
-> >+			gpio3: gpio at 1000 {
-> >+				compatible = "snps,dw-apb-gpio";
-> >+				reg = <0x1000 0x400>;
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+
-> >+				portd: gpio-controller at 3 {
-> >+					compatible = "snps,dw-apb-gpio-port";
-> >+					gpio-controller;
-> >+					#gpio-cells = <2>;
-> >+					snps,nr-gpios = <32>;
-> >+					reg = <0>;
-> >+					interrupt-controller;
-> >+					#interrupt-cells = <2>;
-> >+					interrupts = <3>;
-> >+				};
-> >+			};
-> >+
-> >  			timer0: timer at 2c00 {
-> >  				compatible = "snps,dw-apb-timer";
-> >  				reg = <0x2c00 0x14>;
-> >@@ -181,6 +253,36 @@
-> >  				interrupt-parent = <&gic>;
-> >  				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-> >  			};
-> >+
-> >+			gpio4: gpio at 5000 {
-> >+				compatible = "snps,dw-apb-gpio";
-> >+				reg = <0x5000 0x400>;
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+
-> >+				porte: gpio-controller at 4 {
-> >+					compatible = "snps,dw-apb-gpio-port";
-> >+					gpio-controller;
-> >+					#gpio-cells = <2>;
-> >+					snps,nr-gpios = <32>;
-> >+					reg = <0>;
-> >+				};
-> >+			};
-> >+
-> >+			gpio5: gpio at c000 {
-> >+				compatible = "snps,dw-apb-gpio";
-> >+				reg = <0xc000 0x400>;
-> >+				#address-cells = <1>;
-> >+				#size-cells = <0>;
-> >+
-> >+				portf: gpio-controller at 5 {
-> >+					compatible = "snps,dw-apb-gpio-port";
-> >+					gpio-controller;
-> >+					#gpio-cells = <2>;
-> >+					snps,nr-gpios = <32>;
-> >+					reg = <0>;
-> >+				};
-> >+			};
-> >  		};
-> >
-> >  		pinctrl: pinctrl at 0 {
-> >
-> 
+WARNING: static const char * array should probably be static const char * const
+952: FILE: clk-common.c:952:
++static const char *std_clk_dsp_parents[] = {
 
+WARNING: static const char * array should probably be static const char * const
+984: FILE: clk-common.c:984:
++static const char *std_clk_sys_parents[] = {
+
+WARNING: static const char * array should probably be static const char * const
+1002: FILE: clk-common.c:1002:
++static const char *std_clk_usb_parents[] = {
+
+total: 0 errors, 10 warnings, 1032 lines checked
+
+clk-common.c has style problems, please review.
+
+If any of these errors are false positives, please report
+them to the maintainer, see CHECKPATCH in MAINTAINERS.
+total: 0 errors, 0 warnings, 1032 lines checked
+
+clk-common.c.orig has no obvious style problems and is ready for submission.
+WARNING: line over 80 characters
+65: FILE: clk-prima2.c:65:
++	usp2,   vip,   gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
+
+total: 0 errors, 1 warnings, 152 lines checked
+
+Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/clk/sirf/clk-atlas6.c |   12 ++++++------
+ drivers/clk/sirf/clk-common.c |   22 ++++++++++++----------
+ drivers/clk/sirf/clk-prima2.c |   10 +++++-----
+ 3 files changed, 23 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/clk/sirf/clk-atlas6.c b/drivers/clk/sirf/clk-atlas6.c
+index d63b76c..bca0052 100644
+--- a/drivers/clk/sirf/clk-atlas6.c
++++ b/drivers/clk/sirf/clk-atlas6.c
+@@ -59,12 +59,12 @@ static struct clk_dmn clk_nand = {
+ };
+ 
+ enum atlas6_clk_index {
+-	/* 0    1     2      3      4      5      6       7         8      9 */
+-	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
+-	mf,     io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
+-	spi1,   pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
+-	usp2,   vip,   gfx,   gfx2d,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
+-	usb0,  usb1,   cphif, maxclk,
++	/* 0    1     2      3      4      5      6       7       8      9 */
++	rtc,  osc,  pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
++	mf,   io,   cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
++	spi1, pwmc, efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
++	usp2, vip,  gfx,   gfx2d, lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
++	usb0, usb1, cphif, maxclk,
+ };
+ 
+ static __initdata struct clk_hw *atlas6_clk_hw_array[maxclk] = {
+diff --git a/drivers/clk/sirf/clk-common.c b/drivers/clk/sirf/clk-common.c
+index 37af51c..aebaec01 100644
+--- a/drivers/clk/sirf/clk-common.c
++++ b/drivers/clk/sirf/clk-common.c
+@@ -21,8 +21,8 @@ static struct clk_onecell_data clk_data;
+  * - 2 exclusive plls: usb phy pll and sata phy pll
+  * - 8 clock domains: cpu/cpudiv, mem/memdiv, sys/io, dsp, graphic, multimedia,
+  *     display and sdphy.
+- *     Each clock domain can select its own clock source from five clock sources,
+- *     X_XIN, X_XINW, PLL1, PLL2 and PLL3. The domain clock is used as the source
++ *     Each clock domain can select its own clock source from 5 clock sources,
++ *     X_XIN, X_XINW, PLL1, PLL2 & PLL3. Domain clock is used as the source
+  *     clock of the group clock.
+  *     - dsp domain: gps, mf
+  *     - io domain: dmac, nand, audio, uart, i2c, spi, usp, pwm, pulse
+@@ -168,7 +168,8 @@ static long cpu_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct clk *parent_clk = clk_get_parent(hw->clk);
+ 	struct clk *pll_parent_clk = clk_get_parent(parent_clk);
+ 	unsigned long pll_parent_rate = clk_get_rate(pll_parent_clk);
+-	return pll_clk_round_rate(__clk_get_hw(parent_clk), rate, &pll_parent_rate);
++	return pll_clk_round_rate(__clk_get_hw(parent_clk),
++		rate, &pll_parent_rate);
+ }
+ 
+ static unsigned long cpu_clk_recalc_rate(struct clk_hw *hw,
+@@ -188,7 +189,7 @@ static struct clk_ops std_pll_ops = {
+ 	.set_rate = pll_clk_set_rate,
+ };
+ 
+-static const char *pll_clk_parents[] = {
++static const char * const pll_clk_parents[] = {
+ 	"osc",
+ };
+ 
+@@ -257,7 +258,8 @@ static void usb_pll_clk_disable(struct clk_hw *clk)
+ 	writel(reg, sirfsoc_rsc_vbase + SIRFSOC_USBPHY_PLL_CTRL);
+ }
+ 
+-static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw,
++	unsigned long parent_rate)
+ {
+ 	u32 reg = readl(sirfsoc_rsc_vbase + SIRFSOC_USBPHY_PLL_CTRL);
+ 	return (reg & SIRFSOC_USBPHY_PLL_BYPASS) ? parent_rate : 48*MHZ;
+@@ -284,7 +286,7 @@ static struct clk_hw usb_pll_clk_hw = {
+  * clock domains - cpu, mem, sys/io, dsp, gfx
+  */
+ 
+-static const char *dmn_clk_parents[] = {
++static const char * const dmn_clk_parents[] = {
+ 	"rtc",
+ 	"osc",
+ 	"pll1",
+@@ -673,7 +675,7 @@ static void std_clk_disable(struct clk_hw *hw)
+ 	clkc_writel(val, reg);
+ }
+ 
+-static const char *std_clk_io_parents[] = {
++static const char * const std_clk_io_parents[] = {
+ 	"io",
+ };
+ 
+@@ -949,7 +951,7 @@ static struct clk_std clk_pulse = {
+ 	},
+ };
+ 
+-static const char *std_clk_dsp_parents[] = {
++static const char * const std_clk_dsp_parents[] = {
+ 	"dsp",
+ };
+ 
+@@ -981,7 +983,7 @@ static struct clk_std clk_mf = {
+ 	},
+ };
+ 
+-static const char *std_clk_sys_parents[] = {
++static const char * const std_clk_sys_parents[] = {
+ 	"sys",
+ };
+ 
+@@ -999,7 +1001,7 @@ static struct clk_std clk_security = {
+ 	},
+ };
+ 
+-static const char *std_clk_usb_parents[] = {
++static const char * const std_clk_usb_parents[] = {
+ 	"usb_pll",
+ };
+ 
+diff --git a/drivers/clk/sirf/clk-prima2.c b/drivers/clk/sirf/clk-prima2.c
+index 6968e2e..83d74c4 100644
+--- a/drivers/clk/sirf/clk-prima2.c
++++ b/drivers/clk/sirf/clk-prima2.c
+@@ -59,11 +59,11 @@ static struct clk_std clk_nand = {
+ 
+ enum prima2_clk_index {
+ 	/* 0    1     2      3      4      5      6       7         8      9 */
+-	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
+-	mf,     io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
+-	spi1,   pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
+-	usp2,   vip,   gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
+-	usb0,  usb1,   cphif, maxclk,
++	rtc,  osc,  pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
++	mf,   io,   cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
++	spi1, pwmc, efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
++	usp2, vip,  gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
++	usb0, usb1, cphif, maxclk,
+ };
+ 
+ static __initdata struct clk_hw *prima2_clk_hw_array[maxclk] = {
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.5.4
