@@ -1,38 +1,31 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 15 Apr 2014 09:53:10 +0200
-Subject: [PATCH v4 0/5] rework sched_domain topology description
-In-Reply-To: <534937F0.3020702@arm.com>
-References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
- <534937F0.3020702@arm.com>
-Message-ID: <20140415075310.GI11182@twins.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Apr 2014 09:54:28 +0200
+Subject: [PATCH] arm64:kconfig: make default for CONFIG_COMPAT
+References: <1397462883-12740-1-git-send-email-chanho.min@lge.com>
+ <20140414164618.GC12916@arm.com>
+Message-ID: <4386453.rooF7jKWKy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 12, 2014 at 01:56:16PM +0100, Dietmar Eggemann wrote:
-> On 11/04/14 10:44, Vincent Guittot wrote:
-> >This patchset was previously part of the larger tasks packing patchset [1].
-> >I have splitted the latter in 3 different patchsets (at least) to make the
-> >thing easier.
-> >-configuration of sched_domain topology (this patchset)
-> >-update and consolidation of cpu_power
-> >-tasks packing algorithm
-> >
-> >Based on Peter Z's proposal [2][3], this patchset modifies the way to configure
-> >the sched_domain level in order to let architectures to add specific level like
-> >the current BOOK level or the proposed power gating level for ARM architecture.
-> >
-> >[1] https://lkml.org/lkml/2013/10/18/121
-> >[2] https://lkml.org/lkml/2013/11/5/239
-> >[3] https://lkml.org/lkml/2013/11/5/449
+On Tuesday 15 April 2014 09:07:00 Chanho Min wrote:
+> > -----Original Message-----
+> > From: Will Deacon [mailto:will.deacon at arm.com]
+> > Sent: Tuesday, April 15, 2014 1:46 AM
+> > To: Chanho Min
+> > Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> > Subject: Re: [PATCH] arm64:kconfig: make default for CONFIG_COMPAT
+> > 
+> > On Mon, Apr 14, 2014 at 09:08:03AM +0100, Chanho Min wrote:
+> > > 'make savedefconfig' doesn't generate defconfig properly due to
+> > > missing COMPAT default. So Add default and set to yes.
+> > 
+> > I thought a missing `default' line in a Kconfig entry meant that the option
+> > ended up defaulting to 'n'. What exactly is the problem you are seeing?
 > 
-> Hi Vincent,
-> 
-> given the discussion we had for v1-v3 and a short boot test of v4:
-> 
-> For patch 1/5, 4/5, 5/5 on ARM TC2 (heterogeneous dual socket w/o SMT
-> machine):
-> 
-> Reviewed-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> Tested-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> Correct minimal config is not generated without default line.
+> If we want to set COMPAT to 'n', 'default n' should be added.
 
-Thanks guys!
+That would be pointless, because 'n' is already the default.
+What do you want to achieve?
+
+	Arnd
