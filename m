@@ -1,52 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Apr 2014 09:02:17 +0100
-Subject: [PATCH] arm64: Flush the process's mm context TLB entries when
- switching
-In-Reply-To: <534C92B8.30408@huawei.com>
-References: <534BCE80.3090406@huawei.com> <20140414130154.GE3530@arm.com>
- <534C92B8.30408@huawei.com>
-Message-ID: <20140415080217.GD17408@arm.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Tue, 15 Apr 2014 10:07:24 +0200
+Subject: [PATCH 1/2] ARM: berlin: add the LIBGPIO as a dependency for the BG2Q
+In-Reply-To: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1397549245-3338-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 03:00:24AM +0100, Ding Tianhong wrote:
-> On 2014/4/14 21:01, Will Deacon wrote:
-> > Hi Ding,
-> > 
-> > On Mon, Apr 14, 2014 at 01:03:12PM +0100, Ding Tianhong wrote:
-> >> I met a problem when migrating process by following steps:
-> >>
-> >> 1) The process was already running on core 0.
-> >> 2) Set the CPU affinity of the process to 0x02 and move it to core 1,
-> >>    it could work well.
-> >> 3) Set the CPU affinity of the process to 0x01 and move it to core 0 again,
-> >>    the problem occurs and the process was killed.
-> > 
-> > [...]
-> > 
-> >> It was a very strange problem that the PC and LR are both 0, and the esr is
-> >> 0x83000006, it means that the used for instruction access generated MMU faults
-> >> and synchronous external aborts, including synchronous parity errors.
-> >>
-> >> I try to fix the problem by invalidating the process's TLB entries when switching,
-> >> it will make the context stale and pick new one, and then it could work well.
-> >>
-> >> So I think in some situation that after the process switching, the modification of
-> >> the TLB entries in the new core didn't inform all other cores to invalidate the old
-> >> TLB entries which was in the inner shareable caches, and then if the process schedule
-> >> to another core, the old TLB entries may occur MMU faults.
-> > 
-> > Yes, it sounds like you don't have your TLBs configured correctly. Can you
-> > confirm that your EL3 firmware is configuring TLB broadcasting correctly
-> > please?
-> > 
-> 
-> Hi will:
-> 
-> Do you mean the SCR_EL3.NS?
+The BG2Q has GPIOs driven by the dwapb GPIO driver. Add the LIBGPIO as a
+dependency to be able to support them.
 
-No, there's usually a CPU-specific register (called something like actlr or
-ectlr) which contains bit(s) to enable TLB broadcasting in hardware. Which
-CPU are you using?
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/mach-berlin/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Will
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+index 291f1cac6c3d..c31968712095 100644
+--- a/arch/arm/mach-berlin/Kconfig
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -28,6 +28,7 @@ config MACH_BERLIN_BG2Q
+ 	select CPU_V7
+ 	select HAVE_ARM_TWD if SMP
+ 	select HAVE_SMP
++	select ARCH_REQUIRE_GPIOLIB
+ 
+ endmenu
+ 
+-- 
+1.8.3.2
