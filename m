@@ -1,49 +1,25 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue, 15 Apr 2014 08:12:53 -0500
-Subject: [PATCH v2 4/5] ARM: dts: enable SMP support for bcm28155
-In-Reply-To: <1397567574-31599-1-git-send-email-elder@linaro.org>
-References: <1397567574-31599-1-git-send-email-elder@linaro.org>
-Message-ID: <1397567574-31599-5-git-send-email-elder@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 15 Apr 2014 14:07:32 +0100
+Subject: [PATCH v9 05/12] ARM/ARM64: KVM: Make kvm_psci_call() return
+ convention more flexible
+In-Reply-To: <87vbuaye63.fsf@approximate.cambridge.arm.com>
+References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
+ <1397542455-354-6-git-send-email-anup.patel@linaro.org>
+ <87y4z6zydm.fsf@approximate.cambridge.arm.com>
+ <CAAhSdy0hna8NifXXb6icgUEVA_T0Seu99xf6JtGGbsEWYH2+fQ@mail.gmail.com>
+ <87vbuaye63.fsf@approximate.cambridge.arm.com>
+Message-ID: <CAFEAcA__jNiWnODSna8bLPv9xw4a-YQi=kJcpPivgXMjt+T5gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define nodes representing the two Cortex A9 CPUs in a bcm28155 SoC.
+On 15 April 2014 13:23, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> I understand that, and this is the only case at the moment. What I'm
+> foreseeing is a situation where we've been unable to perform the
+> expected service, and PSCI doesn't specify any "internal error". So an
+> error injection looks like a valid solution to me.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+This sounds like a flaw in the PSCI spec which we should
+try to get fixed...
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 64d069b..61372a6 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -27,6 +27,25 @@
- 		bootargs = "console=ttyS0,115200n8";
- 	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "brcm,bcm11351-cpu-method";
-+		secondary-boot-reg = <0x3500417c>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <1>;
-+		};
-+	};
-+
- 	gic: interrupt-controller at 3ff00100 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--- 
-1.7.9.5
+thanks
+-- PMM
