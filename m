@@ -1,84 +1,52 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 15 Apr 2014 09:39:59 +0200
-Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
-In-Reply-To: <20140414152212.GC2255@ldesroches-Latitude-E6320>
-References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
- <20140414152212.GC2255@ldesroches-Latitude-E6320>
-Message-ID: <534CE24F.9020703@gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 15 Apr 2014 10:42:03 +0300
+Subject: [PATCHv2 07/11] ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize
+ struct pwm_lookup
+In-Reply-To: <20140415071430.GA13659@verge.net.au>
+References: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1397512793-10325-8-git-send-email-alexandre.belloni@free-electrons.com>
+ <534CD958.4000303@ti.com> <20140415071430.GA13659@verge.net.au>
+Message-ID: <534CE2CB.5030503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/2014 17:22, Ludovic Desroches wrote:
-> Hi Richard,
-> 
-> On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
->> RTS pin is an active low pin.
->> For now, this doesn't change anything as the ACTIVE_LOW flag is not
->> handled in atmel_serial, but it will be in 3.16.
+On 04/15/2014 10:14 AM, Simon Horman wrote:
+> On Tue, Apr 15, 2014 at 10:01:44AM +0300, Peter Ujfalusi wrote:
+>> On 04/15/2014 12:59 AM, Alexandre Belloni wrote:
+>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> ---
+>>>  arch/arm/mach-omap2/board-omap3beagle.c | 10 ++--------
+>>>  1 file changed, 2 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+>>> index f27e1ec90b5e..54c135a5b4f7 100644
+>>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+>>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+>>> @@ -61,14 +61,8 @@
+>>>  
+>>>  static struct pwm_lookup pwm_lookup[] = {
+>>>  	/* LEDB -> PMU_STAT */
+>>> -	{
+>>> -		.provider = "twl-pwmled",
+>>> -		.index = 1,
+>>> -		.dev_id = "leds_pwm",
+>>> -		.con_id = "beagleboard::pmu_stat",
+>>> -		.period = 7812500,
+>>> -		.polarity = PWM_POLARITY_NORMAL,
+>>> -	},
+>>> +	PWM_LOOKUP("twl-pwmled", 1, "leds_pwm", "beagleboard::pmu_stat",
+>>> +		   7812500, PWM_POLARITY_NORMAL),
 >>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->> index 17c1042b2df8..2f7aad71b3c9 100644
->> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
->> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->> @@ -35,7 +35,7 @@ Example:
->>  		clock-names = "usart";
->>  		atmel,use-dma-rx;
->>  		atmel,use-dma-tx;
->> -		rts-gpios = <&pioD 15 0>;
->> +		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+>> Why do you need to do this in two steps?
+>> In patch 4 you removed the existing PWM_LOOKUP() and now you are adding it back.
+>> Would not be simpler if you just add the two new parameters in patch 4 (the
+>> 812500, PWM_POLARITY_NORMAL)?
 > 
-> I was told we should not use macros here. If it is still the truth:
-> 
-> rts-gpios = <&pioD 15 1>;
+> Such an approach would apply an atomic change to both the infrastructure
+> and the users.
 
-But I'd really like to know if macros are forbidden in DT documentation and why...
-Because, IMHO, <&pioD 15 1> talks less that <&pioD 15 GPIO_ACTIVE_LOW>.
-Which is a shame in a documentation.
+Yes, I overlooked patch 6...
+Just ignore my comment.
 
-Rob, any idea on that ?
-
-(actually, I missed some uses of GPIO_ACTIVE_ macros in Documentation :)
-git grep GPIO_ACTIVE Documentation/devicetree/bindings/
-Documentation/devicetree/bindings/gpio/gpio-davinci.txt:                gpios = <&gpio 10 GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/gpio/gpio-davinci.txt:                gpios = <&gpio 11 GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/gpio/gpio-lp3943.txt:         gpios = <&gpioex 9 GPIO_ACTIVE_LOW>;
-Documentation/devicetree/bindings/gpio/gpio-lp3943.txt:         gpios = <&gpioex 10 GPIO_ACTIVE_LOW>;
-Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-Documentation/devicetree/bindings/gpio/gpio-tz1090-pdc.txt:      GPIO_ACTIVE_HIGH
-Documentation/devicetree/bindings/gpio/gpio-tz1090-pdc.txt:      GPIO_ACTIVE_LOW
-Documentation/devicetree/bindings/gpio/gpio-tz1090.txt:        GPIO_ACTIVE_HIGH
-Documentation/devicetree/bindings/gpio/gpio-tz1090.txt:        GPIO_ACTIVE_LOW
-Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-Documentation/devicetree/bindings/input/gpio-beeper.txt:                gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/mmc/mmc.txt:also be specified using the OF_GPIO_ACTIVE_LOW flag. This creates an ambiguity
-Documentation/devicetree/bindings/mmc/mmc.txt:OF_GPIO_ACTIVE_LOW flag clear and specifying the respective *-inverted
-Documentation/devicetree/bindings/net/nfc/trf7970a.txt:         ti,enable-gpios = <&gpio2 2 GPIO_ACTIVE_LOW>,
-Documentation/devicetree/bindings/net/nfc/trf7970a.txt:                           <&gpio2 5 GPIO_ACTIVE_LOW>;
-Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt:           ti,power-gpio = <&gpio3 23 GPIO_ACTIVE_HIGH>; /* 87 */
-Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
-Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt:                      gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
-Documentation/devicetree/bindings/power/isp1704.txt:    nxp,enable-gpio = <&gpio3 3 GPIO_ACTIVE_LOW>;
-Documentation/devicetree/bindings/sound/max98090.txt:   interrupts = <TEGRA_GPIO(H, 4) GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/sound/rt5640.txt:     interrupts = <TEGRA_GPIO(W, 3) GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/sound/rt5640.txt:             <&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/sound/tpa6130a2.txt:  power-gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt:                reset-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
-Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt:           gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/video/panel-dsi-cm.txt:       reset-gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;
-Documentation/devicetree/bindings/video/sony,acx565akm.txt:     reset-gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
-Documentation/devicetree/bindings/video/ti,omap-dss.txt:                gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;     /* 0, power-down */
-Documentation/devicetree/bindings/video/ti,omap-dss.txt:                gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,   /* 60, CT CP HPD */
-Documentation/devicetree/bindings/video/ti,omap-dss.txt:                        <&gpio2 9 GPIO_ACTIVE_HIGH>,    /* 41, LS OE */
-Documentation/devicetree/bindings/video/ti,omap-dss.txt:                        <&gpio2 31 GPIO_ACTIVE_HIGH>;   /* 63, HPD */
-Documentation/devicetree/bindings/video/ti,tfp410.txt:  powerdown-gpios = <&twl_gpio 2 GPIO_ACTIVE_LOW>;
-Documentation/devicetree/bindings/video/ti,tpd12s015.txt:       gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,   /* 60, CT CP HPD */
-Documentation/devicetree/bindings/video/ti,tpd12s015.txt:               <&gpio2 9 GPIO_ACTIVE_HIGH>,    /* 41, LS OE */
-Documentation/devicetree/bindings/video/ti,tpd12s015.txt:               <&gpio2 31 GPIO_ACTIVE_HIGH>;   /* 63, HPD */
-Documentation/devicetree/bindings/watchdog/gpio-wdt.txt:                gpios = <&gpio3 9 GPIO_ACTIVE_LOW>;
-
-Richard.
+-- 
+P?ter
