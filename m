@@ -1,139 +1,52 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Tue, 15 Apr 2014 10:07:25 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
-In-Reply-To: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Apr 2014 09:11:05 +0100
+Subject: [PATCH 2/8] arm/arm64: KVM: Fix line length exceeding 80
+ characters
+In-Reply-To: <001601cf5843$07c38160$174a8420$@samsung.com>
+References: <000001cf57b4$d3450780$79cf1680$@samsung.com>
+ <534C0A89.4090907@arm.com> <001601cf5843$07c38160$174a8420$@samsung.com>
+Message-ID: <534CE999.10209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Berlin BG2Q has 6 GPIO ports compatible with the snps,dw-apb-gpio
-driver. This patch add the corresponding device tree nodes.
+On 15/04/14 01:38, Jungseok Lee wrote:
+> On Tuesday, April 15, 2014 1:19 AM, Marc Zyngier wrote:
+>> On 14/04/14 08:40, Jungseok Lee wrote:
+>>> This patch deals with checkpatch complaint as fixing line length
+>>> exceeding 80 characters.
+>>>
+>>> WARNING: line over 80 characters
+>>>
+>>> Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+>>> Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+>>> ---
+>>>  arch/arm/kvm/mmu.c |    4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c index
+>>> 80bb1e6..e0d4f24 100644
+>>> --- a/arch/arm/kvm/mmu.c
+>>> +++ b/arch/arm/kvm/mmu.c
+>>> @@ -563,8 +563,8 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>>>  	kvm->arch.pgd = NULL;
+>>>  }
+>>>
+>>> -static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>> -			     phys_addr_t addr)
+>>> +static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache
+>>> +			     *cache, phys_addr_t addr)
+>>
+>> Please don't. This makes the code unreadable (and no, I don't care about checkpatch ;-).
+> 
+> Okay. I will drop this patch from the next version.
+> 
+> It would be good to change stage2_set_pmd_huge function for readability
+> if you don't care about checkpatch.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 102 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 102 insertions(+)
+We usually don't change that kind of thing just for the sake of changing
+it. It feels like fairly pointless churn. *IF* someone happens to rework
+that code, then they're welcome to fix it.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index e6e556055dfc..b2625f896bc5 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -109,6 +109,78 @@
- 			ranges = <0 0xe80000 0x10000>;
- 			interrupt-parent = <&aic>;
- 
-+			gpio0: gpio at 0400 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0400 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porta: gpio-controller at 0 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <0>;
-+				};
-+			};
-+
-+			gpio1: gpio at 0800 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0800 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portb: gpio-controller at 1 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <1>;
-+				};
-+			};
-+
-+			gpio2: gpio at 0c00 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0c00 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portc: gpio-controller at 2 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <2>;
-+				};
-+			};
-+
-+			gpio3: gpio at 1000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x1000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portd: gpio-controller at 3 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <3>;
-+				};
-+			};
-+
- 			timer0: timer at 2c00 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c00 0x14>;
-@@ -181,6 +253,36 @@
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
- 			};
-+
-+			gpio4: gpio at 5000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x5000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porte: gpio-controller at 4 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+				};
-+			};
-+
-+			gpio5: gpio at c000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0xc000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portf: gpio-controller at 5 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		pinctrl: pinctrl at 0 {
+	M.
 -- 
-1.8.3.2
+Jazz is not dead. It just smells funny...
