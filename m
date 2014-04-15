@@ -1,40 +1,47 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Apr 2014 12:28:45 -0600
-Subject: [PATCH 3/4] mmc: sdhci: defer probing on regulator_get_optional()
- failures
-In-Reply-To: <1397526163-20126-4-git-send-email-abrestic@chromium.org>
-References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
- <1397526163-20126-4-git-send-email-abrestic@chromium.org>
-Message-ID: <534D7A5D.9090707@wwwdotorg.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 15 Apr 2014 12:30:48 -0600
+Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
+ possible
+In-Reply-To: <1397556454.4574.13.camel@weser.hi.pengutronix.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-3-git-send-email-l.stach@pengutronix.de>
+ <20140404165559.GE9007@google.com>
+ <1397556454.4574.13.camel@weser.hi.pengutronix.de>
+Message-ID: <20140415182651.GA17721@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2014 07:42 PM, Andrew Bresticker wrote:
-> If regulator_get_optional() returns EPROBE_DEFER, it indicates
-> that the regulator may show up later (e.g. the DT property is
-> present but the corresponding regulator may not have probed).
-> Instead of continuing without the regulator, return EPROBE_DEFER
-> from sdhci_add_host().  Also, fix regulator leaks in the error
-> paths in sdhci_add_host().
+On Tue, Apr 15, 2014 at 12:07:34PM +0200, Lucas Stach wrote:
+> Hi Bjorn,
+> 
+> Am Freitag, den 04.04.2014, 10:55 -0600 schrieb Bjorn Helgaas:
+> > On Wed, Mar 05, 2014 at 02:25:47PM +0100, Lucas Stach wrote:
+> > > This is the recommended method of doing the IRQ
+> > > mapping. For old devicetrees we fall back to the
+> > > previous practice.
+> > > 
+> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > Applied with Stephen's Tested-by to my pending/host-tegra branch.  I'll
+> > rebase and rename it after v3.15-rc1, and I think we can squeeze it into
+> > v3.15 shortly after that.  Thanks.
+> > 
+> 
+> Are you still planning to push this into 3.15, or has this slipped to
+> 3.16?
 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+Yes, I'm hoping to put them in v3.15.  I assume these actually
+fix something, e.g., we need these changes to boot with new devicetrees, or
+something?
 
->  	if (IS_ERR_OR_NULL(host->vqmmc)) {
+The changelogs don't make it clear that these are fixes, and I want to heed
+Linus' guidance: "Anyway, because -rc1 is already pretty darn big, I do
+*not* want to hear about 'sorry this missed the window, can I still sneak
+in'.  Fixes only."
 
-This is a pre-existing condition, but ick: Why doesn't this test either
-IS_ERR() /or/ == NULL, but not both. On error, the regulator API should
-either return and error-point or return NULL, so that client code
-shouldn't need to check for both.
+I should have applied these sooner to make the merge window; I apologize
+for that.  Anyway, if you outline what these fix, I'll update the
+changelogs in my tree.
 
-> +put_vmmc:
-> +	if (host->vmmc)
-> +		regulator_put(host->vmmc);
-> +put_vqmmc:
-> +	if (host->vqmmc)
-> +		regulator_put(host->vqmmc);
-
-If IS_ERR_OR_NULL() really is required above, it should be used here
-too. More likely, I hope you need to replace if (host->vmmc) with if
-(!IS_ERR(host->vmmc)).
-
-I wonder if fixing this would help solve the crashes that Alex saw?
+Bjorn
