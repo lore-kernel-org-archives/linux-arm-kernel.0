@@ -1,150 +1,204 @@
 From: anup@brainfault.org (Anup Patel)
-Date: Tue, 15 Apr 2014 16:40:30 +0530
-Subject: [PATCH v9 02/12] ARM/ARM64: KVM: Add common header for PSCI
- related defines
-In-Reply-To: <87eh0y29fk.fsf@approximate.cambridge.arm.com>
+Date: Tue, 15 Apr 2014 16:43:30 +0530
+Subject: [PATCH v9 05/12] ARM/ARM64: KVM: Make kvm_psci_call() return
+ convention more flexible
+In-Reply-To: <87y4z6zydm.fsf@approximate.cambridge.arm.com>
 References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
- <1397542455-354-3-git-send-email-anup.patel@linaro.org>
- <87eh0y29fk.fsf@approximate.cambridge.arm.com>
-Message-ID: <CAAhSdy2PLWy+KFTjoLAo0d65RQij30skUdB=0HCWxNLcDE0-7g@mail.gmail.com>
+ <1397542455-354-6-git-send-email-anup.patel@linaro.org>
+ <87y4z6zydm.fsf@approximate.cambridge.arm.com>
+Message-ID: <CAAhSdy0hna8NifXXb6icgUEVA_T0Seu99xf6JtGGbsEWYH2+fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 3:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Tue, Apr 15 2014 at  7:14:05 am BST, Anup Patel <anup.patel@linaro.org> wrote:
->> We need a common place to share PSCI related defines among ARM kernel,
->> ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
+On Tue, Apr 15, 2014 at 3:51 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Tue, Apr 15 2014 at  7:14:08 am BST, Anup Patel <anup.patel@linaro.org> wrote:
+>> Currently, the kvm_psci_call() returns 'true' or 'false' based on whether
+>> the PSCI function call was handled successfully or not. This does not help
+>> us emulate system-level PSCI functions where the actual emulation work will
+>> be done by user space (QEMU or KVMTOOL). Examples of such system-level PSCI
+>> functions are: PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET.
 >>
->> We introduce uapi/linux/psci.h for this purpose. This newly added
->> header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
->> and user space (i.e. QEMU or KVMTOOL).
+>> This patch updates kvm_psci_call() to return three types of values:
+>> 1) > 0 (success)
+>> 2) = 0 (success but exit to user space)
+>> 3) < 0 (errors)
 >>
 >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 >> ---
->>  include/uapi/linux/Kbuild |    1 +
->>  include/uapi/linux/psci.h |   78 +++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 79 insertions(+)
->>  create mode 100644 include/uapi/linux/psci.h
+>>  arch/arm/include/asm/kvm_psci.h   |    2 +-
+>>  arch/arm/kvm/handle_exit.c        |   10 +++++++---
+>>  arch/arm/kvm/psci.c               |   28 ++++++++++++++++------------
+>>  arch/arm64/include/asm/kvm_psci.h |    2 +-
+>>  arch/arm64/kvm/handle_exit.c      |   10 +++++++---
+>>  5 files changed, 32 insertions(+), 20 deletions(-)
 >>
->> diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
->> index 6929571..24e9033 100644
->> --- a/include/uapi/linux/Kbuild
->> +++ b/include/uapi/linux/Kbuild
->> @@ -317,6 +317,7 @@ header-y += ppp-ioctl.h
->>  header-y += ppp_defs.h
->>  header-y += pps.h
->>  header-y += prctl.h
->> +header-y += psci.h
->>  header-y += ptp_clock.h
->>  header-y += ptrace.h
->>  header-y += qnx4_fs.h
->> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
->> new file mode 100644
->> index 0000000..077b623
->> --- /dev/null
->> +++ b/include/uapi/linux/psci.h
->> @@ -0,0 +1,78 @@
->> +/*
->> + * ARM Power State and Coordination Interface (PSCI) header
+>> diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
+>> index 4c0e3e1..6bda945 100644
+>> --- a/arch/arm/include/asm/kvm_psci.h
+>> +++ b/arch/arm/include/asm/kvm_psci.h
+>> @@ -22,6 +22,6 @@
+>>  #define KVM_ARM_PSCI_0_2     2
+>>
+>>  int kvm_psci_version(struct kvm_vcpu *vcpu);
+>> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+>> +int kvm_psci_call(struct kvm_vcpu *vcpu);
+>>
+>>  #endif /* __ARM_KVM_PSCI_H__ */
+>> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+>> index 0de91fc..1270095 100644
+>> --- a/arch/arm/kvm/handle_exit.c
+>> +++ b/arch/arm/kvm/handle_exit.c
+>> @@ -38,14 +38,18 @@ static int handle_svc_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>
+>>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  {
+>> +     int ret;
+>> +
+>>       trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
+>>                     kvm_vcpu_hvc_get_imm(vcpu));
+>>
+>> -     if (kvm_psci_call(vcpu))
+>> +     ret = kvm_psci_call(vcpu);
+>> +     if (ret == -EINVAL) {
+>
+> Please check for (ret < 0), so it actually matches with the comment (and
+> will same some debugging when we introduce another error code).
+
+Should we be injecting undefined exception for all types errors?
+
+The intention here was to only inject undefined exception when
+PSCI function number is invalid.
+
+>
+>> +             kvm_inject_undefined(vcpu);
+>>               return 1;
+>> +     }
+>>
+>> -     kvm_inject_undefined(vcpu);
+>> -     return 1;
+>> +     return ret;
+>>  }
+>>
+>>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+>> index 8c42596c..14e6fa6 100644
+>> --- a/arch/arm/kvm/psci.c
+>> +++ b/arch/arm/kvm/psci.c
+>> @@ -93,7 +93,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
+>>       return KVM_ARM_PSCI_0_1;
+>>  }
+>>
+>> -static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>> +static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>>  {
+>>       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>>       unsigned long val;
+>> @@ -128,14 +128,14 @@ static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>>               val = PSCI_RET_NOT_SUPPORTED;
+>>               break;
+>>       default:
+>> -             return false;
+>> +             return -EINVAL;
+>>       }
+>>
+>>       *vcpu_reg(vcpu, 0) = val;
+>> -     return true;
+>> +     return 1;
+>>  }
+>>
+>> -static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>> +static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>>  {
+>>       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>>       unsigned long val;
+>> @@ -153,11 +153,11 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>>               val = PSCI_RET_NOT_SUPPORTED;
+>>               break;
+>>       default:
+>> -             return false;
+>> +             return -EINVAL;
+>>       }
+>>
+>>       *vcpu_reg(vcpu, 0) = val;
+>> -     return true;
+>> +     return 1;
+>>  }
+>>
+>>  /**
+>> @@ -165,12 +165,16 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>>   * @vcpu: Pointer to the VCPU struct
+>>   *
+>>   * Handle PSCI calls from guests through traps from HVC instructions.
+>> - * The calling convention is similar to SMC calls to the secure world where
+>> - * the function number is placed in r0 and this function returns true if the
+>> - * function number specified in r0 is withing the PSCI range, and false
+>> - * otherwise.
+>> + * The calling convention is similar to SMC calls to the secure world
+>> + * where the function number is placed in r0.
 >> + *
->> + * This header holds common PSCI defines and macros shared
->> + * by: ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space.
+>> + * This function returns: > 0 (success), 0 (success but exit to user
+>> + * space), and < 0 (errors)
 >> + *
->> + * Copyright (C) 2014 Linaro Ltd.
->> + * Author: Anup Patel <anup.patel@linaro.org>
->> + */
+>> + * Errors:
+>> + * -EINVAL: Unrecognized PSCI function
+>>   */
+>> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>> +int kvm_psci_call(struct kvm_vcpu *vcpu)
+>>  {
+>>       switch (kvm_psci_version(vcpu)) {
+>>       case KVM_ARM_PSCI_0_2:
+>> @@ -178,6 +182,6 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>>       case KVM_ARM_PSCI_0_1:
+>>               return kvm_psci_0_1_call(vcpu);
+>>       default:
+>> -             return false;
+>> +             return -EINVAL;
+>>       };
+>>  }
+>> diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+>> index e25c658..bc39e55 100644
+>> --- a/arch/arm64/include/asm/kvm_psci.h
+>> +++ b/arch/arm64/include/asm/kvm_psci.h
+>> @@ -22,6 +22,6 @@
+>>  #define KVM_ARM_PSCI_0_2     2
+>>
+>>  int kvm_psci_version(struct kvm_vcpu *vcpu);
+>> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+>> +int kvm_psci_call(struct kvm_vcpu *vcpu);
+>>
+>>  #endif /* __ARM64_KVM_PSCI_H__ */
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 7bc41ea..743a74d 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -30,11 +30,15 @@ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+>>
+>>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  {
+>> -     if (kvm_psci_call(vcpu))
+>> +     int ret;
 >> +
->> +#ifndef _UAPI_LINUX_PSCI_H
->> +#define _UAPI_LINUX_PSCI_H
->> +
->> +/* PSCI v0.1 interface */
->> +#define PSCI_FN(base, n)                     ((base) + (n))
->> +
->> +#define PSCI_FN_CPU_SUSPEND(base)            PSCI_FN(base, 0)
->> +#define PSCI_FN_CPU_OFF(base)                        PSCI_FN(base, 1)
->> +#define PSCI_FN_CPU_ON(base)                 PSCI_FN(base, 2)
->> +#define PSCI_FN_MIGRATE(base)                        PSCI_FN(base, 3)
+>> +     ret = kvm_psci_call(vcpu);
+>> +     if (ret == -EINVAL) {
 >
-> For PSCI v0.1, all the function numbers are independent (the spec didn't
-> specify any number...). You cannot assume contiguous numbering.
-
-This is more like KVM recommended function numbering for PSCI v0.1.
-We were already having it in uapi/asm/kvm.h to share between KVM and
-user space so I felt this to be better place for it.
-
-Do you want me to drop these or add some comment about PSCI v0.1
-function numbering ?
-
+> Same here.
 >
->> +/* PSCI v0.2 interface */
->> +#define PSCI_0_2_FN_BASE                     0x84000000
->> +#define PSCI_0_2_FN(n)                               (PSCI_0_2_FN_BASE + (n))
->> +#define PSCI_0_2_64BIT                               0x40000000
->> +#define PSCI_0_2_FN64_BASE                   \
->> +                                     (PSCI_0_2_FN_BASE + PSCI_0_2_64BIT)
->> +#define PSCI_0_2_FN64(n)                     (PSCI_0_2_FN64_BASE + (n))
->> +
->> +#define PSCI_0_2_FN_PSCI_VERSION             PSCI_0_2_FN(0)
->> +#define PSCI_0_2_FN_CPU_SUSPEND                      PSCI_0_2_FN(1)
->> +#define PSCI_0_2_FN_CPU_OFF                  PSCI_0_2_FN(2)
->> +#define PSCI_0_2_FN_CPU_ON                   PSCI_0_2_FN(3)
->> +#define PSCI_0_2_FN_AFFINITY_INFO            PSCI_0_2_FN(4)
->> +#define PSCI_0_2_FN_MIGRATE                  PSCI_0_2_FN(5)
->> +#define PSCI_0_2_FN_MIGRATE_INFO_TYPE                PSCI_0_2_FN(6)
->> +#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU              PSCI_0_2_FN(7)
->> +#define PSCI_0_2_FN_SYSTEM_OFF                       PSCI_0_2_FN(8)
->> +#define PSCI_0_2_FN_SYSTEM_RESET             PSCI_0_2_FN(9)
->> +
->> +#define PSCI_0_2_FN64_CPU_SUSPEND            PSCI_0_2_FN64(1)
->> +#define PSCI_0_2_FN64_CPU_ON                 PSCI_0_2_FN64(3)
->> +#define PSCI_0_2_FN64_AFFINITY_INFO          PSCI_0_2_FN64(4)
->> +#define PSCI_0_2_FN64_MIGRATE                        PSCI_0_2_FN64(5)
->> +#define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU    PSCI_0_2_FN64(7)
->> +
->> +#define PSCI_0_2_POWER_STATE_ID_MASK         0xffff
->> +#define PSCI_0_2_POWER_STATE_ID_SHIFT                0
->> +#define PSCI_0_2_POWER_STATE_TYPE_MASK               0x1
->> +#define PSCI_0_2_POWER_STATE_TYPE_SHIFT              16
->> +#define PSCI_0_2_POWER_STATE_AFFL_MASK               0x3
->> +#define PSCI_0_2_POWER_STATE_AFFL_SHIFT              24
->> +
->> +#define PSCI_0_2_TOS_UP_MIGRATE                      0
->> +#define PSCI_0_2_TOS_UP_NO_MIGRATE           1
->> +#define PSCI_0_2_TOS_MP                              2
->> +
->> +/* PSCI version decoding (independent of PSCI version) */
->> +#define PSCI_VERSION_MAJOR_MASK                      0xffff0000
->> +#define PSCI_VERSION_MINOR_MASK                      0x0000ffff
->> +#define PSCI_VERSION_MAJOR_SHIFT             16
+>> +             kvm_inject_undefined(vcpu);
+>>               return 1;
+>> +     }
+>>
+>> -     kvm_inject_undefined(vcpu);
+>> -     return 1;
+>> +     return ret;
+>>  }
+>>
+>>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
 >
-> What about:
+> Thanks,
 >
-> #define PSCI_VERSION_MINOR_MASK ((1U << PSCI_VERSION_MAJOR_SHIFT) - 1)
-> #define PSCI_VERSION_MAJOR_MASK ~PSCI_VERSION_MINOR_MASK
-
-OK, I will update this.
-
->
->> +#define PSCI_VERSION_MAJOR(ver)                      \
->> +             (((ver) & PSCI_VERSION_MAJOR_MASK) >> PSCI_VERSION_MAJOR_SHIFT)
->> +#define PSCI_VERSION_MINOR(ver)                      \
->> +             ((ver) & PSCI_VERSION_MINOR_MASK)
->> +
->> +/* PSCI return values (inclusive of all PSCI versions) */
->> +#define PSCI_RET_SUCCESS                     0
->> +#define PSCI_RET_NOT_SUPPORTED                       -1
->> +#define PSCI_RET_INVALID_PARAMS                      -2
->> +#define PSCI_RET_DENIED                              -3
->> +#define PSCI_RET_ALREADY_ON                  -4
->> +#define PSCI_RET_ON_PENDING                  -5
->> +#define PSCI_RET_INTERNAL_FAILURE            -6
->> +#define PSCI_RET_NOT_PRESENT                 -7
->> +#define PSCI_RET_DISABLED                    -8
->> +
->> +#endif /* _UAPI_LINUX_PSCI_H */
->
+>         M.
 > --
 > Jazz is not dead. It just smells funny.
 > _______________________________________________
