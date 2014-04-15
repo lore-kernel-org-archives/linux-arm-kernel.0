@@ -1,30 +1,35 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 16 Apr 2014 01:00:50 +0200
-Subject: [PATCH v2 1/4] USB: OHCI: Export the ohci_hub_control function
-In-Reply-To: <Pine.LNX.4.44L0.1404151358020.1310-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1404151358020.1310-100000@iolanthe.rowland.org>
-Message-ID: <1489663.xkLJNqq9Pt@avalon>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 15 Apr 2014 18:06:03 -0500
+Subject: [PATCH v3 1/4] reset: add driver for socfpga
+In-Reply-To: <1397548592-6384-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1397548592-6384-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1397603163.4702.0.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
-
-On Tuesday 15 April 2014 14:01:54 Alan Stern wrote:
-> On Tue, 15 Apr 2014, Laurent Pinchart wrote:
-> > Platform drivers sometimes need to perform specific handling of hub
-> > control requests. Make this possible by exporting the ohci_hub_control()
-> > function which can then be called from a custom hub control handler in
-> > the default case.
+On Tue, 2014-04-15 at 09:56 +0200, Steffen Trumtrar wrote:
+> Add a reset-controller driver for the socfpga platform.
+> The reset-controller has four banks with up to 32 entries all encapsulated in
+> one module block.
 > 
-> You should also export ohci_hub_status_data(), since it also gets
-> overridden by these other drivers.
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+> 
+> Notes:
+>     Changes since v2:
+>     	- remove superfluous ret in probe function
+>     	- add Acked-by
+>     
+>     Changes since v1:
+>     	- use BITS_PER_LONG everywhere instead of MAX_BANK_WIDTH
+>     	- print pdev->dev.of_node->full_name on error
+>     	- use proper IS_ERR/PTR_ERR
+> 
 
-OK, I'll submit v3.
+I've applied this series to rocketboards linux-socfpga-next/drivers and
+linux-socfpga-next/next-dt.
 
-> For ehci-hcd, this doesn't seem to matter since ehci_hub_status_data
-> doesn't get overridden anywhere.
+Thanks,
 
--- 
-Regards,
-
-Laurent Pinchart
+Dinh
