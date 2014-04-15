@@ -1,45 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Apr 2014 13:41:00 +0100
-Subject: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
-In-Reply-To: <175CCF5F49938B4D99B2E3EF7F558EBE55075F1873@SC-VEXCH4.marvell.com>
-References: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
- <20140415084749.GG17408@arm.com>
- <175CCF5F49938B4D99B2E3EF7F558EBE55075F1873@SC-VEXCH4.marvell.com>
-Message-ID: <20140415124100.GK17408@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 15 Apr 2014 14:40:08 +0200
+Subject: [PATCH] ARM: Kirkwood: T5325: Fix double probe of Codec
+Message-ID: <1397565608-1830-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 01:37:17PM +0100, Neil Zhang wrote:
-> > On Mon, Apr 14, 2014 at 02:42:22AM +0100, Neil Zhang wrote:
-> > > From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> > >
-> > > This adds core support for saving and restoring CPU PMU registers for
-> > > suspend/resume support i.e. deeper C-states in cpuidle terms.
-> > > This patch adds support only to ARMv7 PMU registers save/restore.
-> > > It needs to be extended to xscale and ARMv6 if needed.
-> > >
-> > > [Neil] We found that DS-5 not work on our CA7 based SoCs.
-> > > After debuging, found PMU registers were lost because of core power down.
-> > > Then i found Sudeep had a patch to fix it about two years ago but not
-> > > in the mainline, just port it.
-> > 
-> > What I don't like about this patch is that we're introducing significant
-> > overhead for SoCs that don't require save/restore of the PMU state. I'd much
-> > rather see core power down disabled whilst the PMU is in use but, if that's not
-> > possible, then I think we need to:
-> > 
-> >  (1) Make this conditional for cores that really need it
-> > 
-> >  (2) Only save/restore if the PMU is in use (even better, just save/restore
-> >      the live registers, but that's probably not worth the effort
-> >      initially).
-> > 
-> 
-> The patch has check the ARMV7_PMNC_E bit when save / restore, 
-> so suppose only the core's that use PMU will do the save / restore work.
+The codec is defined both in DT and the board file. The board file
+however contains platform data which is required in order that the
+codec works. When the DT instantiates the codec before the board files
+does, it is missing the platform data and so fails. Remove the DT node
+until we have a binding which can pass the additional data.
 
-Seems pretty fragile to base our save/restore decision on the value of one
-of the registers, though. What happens if the control register is zeroed by
-the core power down?
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
 
-Will
+It would be good to get this into -rc2.
+
+ arch/arm/boot/dts/kirkwood-t5325.dts | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
+index 7d1c7677a18f..0bd70d928c69 100644
+--- a/arch/arm/boot/dts/kirkwood-t5325.dts
++++ b/arch/arm/boot/dts/kirkwood-t5325.dts
+@@ -127,11 +127,6 @@
+ 
+ 		i2c at 11000 {
+ 			status = "okay";
+-
+-			alc5621: alc5621 at 1a {
+-				compatible = "realtek,alc5621";
+-				reg = <0x1a>;
+-			};
+ 		};
+ 
+ 		serial at 12000 {
+-- 
+1.9.2
