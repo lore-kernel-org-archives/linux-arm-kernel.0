@@ -1,36 +1,48 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 15 Apr 2014 12:36:07 -0700
-Subject: [PATCH 2/4] mmc: tegra: fix reporting of base clock frequency
-In-Reply-To: <534D797D.7030201@wwwdotorg.org>
+Date: Tue, 15 Apr 2014 12:44:02 -0700
+Subject: [PATCH 3/4] mmc: sdhci: defer probing on regulator_get_optional()
+ failures
+In-Reply-To: <CAAYSxhrmCbGLsu43mK15ParXHa_FJ9OVQiCPUdqyWEpTE=r1uw@mail.gmail.com>
 References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
- <1397526163-20126-3-git-send-email-abrestic@chromium.org>
- <534D797D.7030201@wwwdotorg.org>
-Message-ID: <CAL1qeaFoQd1sZkTHSJnnVcYgLDLSP_Hr6VHd3s8aKfnAz-iyNw@mail.gmail.com>
+ <1397526163-20126-4-git-send-email-abrestic@chromium.org>
+ <CAAYSxhrmCbGLsu43mK15ParXHa_FJ9OVQiCPUdqyWEpTE=r1uw@mail.gmail.com>
+Message-ID: <CAL1qeaH19h3D49C3O3qQ+GtWSeOdu79TQTZGfj9dC-+-G1c3kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 11:25 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/14/2014 07:42 PM, Andrew Bresticker wrote:
->> Tegra SDHCI controllers, by default, report a base clock frequency
->> of 208Mhz in SDHCI_CAPABILTIES which may or may not be equal to the
->> actual base clock frequency.
+On Tue, Apr 15, 2014 at 12:03 PM, Tim Kryger <tim.kryger@linaro.org> wrote:
+> On Mon, Apr 14, 2014 at 6:42 PM, Andrew Bresticker
+> <abrestic@chromium.org> wrote:
+>> If regulator_get_optional() returns EPROBE_DEFER, it indicates
+>> that the regulator may show up later (e.g. the DT property is
+>> present but the corresponding regulator may not have probed).
+>> Instead of continuing without the regulator, return EPROBE_DEFER
+>> from sdhci_add_host().  Also, fix regulator leaks in the error
+>> paths in sdhci_add_host().
+>>
+>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>> ---
+>>  drivers/mmc/host/sdhci.c | 19 ++++++++++++++++---
+>>  1 file changed, 16 insertions(+), 3 deletions(-)
 >
-> Some explanation of why this "may or may not be equal to the actual base
-> clock frequency" would be nice.
+> This appears to be an improvement on Mike Looijmans patch:
 >
-> Presumably, it's because the clock frequency is supplied by the clock
-> controller module, and configuring that happens externally to the SD
-> controller, so the SD HW has no knowledge of the actual frequency, and
-> hence simply reports a hard-coded maximum possible clock frequency?
+> https://lkml.org/lkml/2014/4/7/34
+>
+> The regulator_put() calls are appropriate but I wonder if we should
+> take this a step farther.  Ulf is sure to point out that
+> mmc_regulator_get_supply() can be used to get regulators (though it
+> does stuff the pointers in host->mmc->supply.vmmc/vqmmc instead of
+> host->vmmc/vqmmc).  However, that function doesn't put back the
+> reference to vmmc if the request for vqmmc returns EPROBE_DEFER.  If
+> it did, it believe it could be used here to simplify the error
+> handling as all the regulator checks would happen up front.  What do
+> you think?
 
-Correct.  I'll fix up the commit message.
+Seems reasonable.  The put()s aren't necessary with
+mmc_regulator_get_supply() since it uses the devm_* API, however it
+doesn't return an error in case of EPROBE_DEFER when getting vqmmc,
+which is what we want in this case.
 
 >
->> While this can be overridden by setting
->> BASE_CLK_FREQ in VENDOR_CLOCK_CTRL on Tegra30 and later SoCs, just
->> set SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN and supply a get_max_clock()
->> callback to get the actual rate of the base clock.
->
-> It's not clear to me from the function name that
-> sdhci_pltfm_clk_get_max_clock() simply calls clk_get() on the actual
-> clock. It might be nice to mention that in the commit description.
+> -Tim
