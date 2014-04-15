@@ -1,96 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Apr 2014 14:45:48 +0200
-Subject: [PATCH 2/5] ARM: dts: Device tree for AXM55xx.
-In-Reply-To: <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
-References: <cover.1397552154.git.anders.berg@lsi.com>
- <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
-Message-ID: <8344066.GP0Bf5lvlE@wuerfel>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Tue, 15 Apr 2014 05:46:08 -0700
+Subject: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <20140415124100.GK17408@arm.com>
+References: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
+ <20140415084749.GG17408@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE55075F1873@SC-VEXCH4.marvell.com>
+ <20140415124100.GK17408@arm.com>
+Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE55075F1875@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 14:06:11 Anders Berg wrote:
-> diff --git a/arch/arm/boot/dts/axm5516-amarillo.dts b/arch/arm/boot/dts/axm5516-amarillo.dts
-> new file mode 100644
-> index 0000000..1760d6c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/axm5516-amarillo.dts
-> @@ -0,0 +1,51 @@
-> +/*
-> + * arch/arm/boot/dts/axm5516-amarillo.dts
-> + *
-> + * Copyright (C) 2013 LSI
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
 
-It's better to use a permissive license such as the BSD license for dts files,
-so they can be shared with other OSs.
 
-The situation with the clocks is still very strange: either the bindings
-are all in need of update, or you got all devices wrong:
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 2014?4?15? 20:41
+> To: Neil Zhang
+> Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; Sudeep Holla
+> Subject: Re: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+> 
+> On Tue, Apr 15, 2014 at 01:37:17PM +0100, Neil Zhang wrote:
+> > > On Mon, Apr 14, 2014 at 02:42:22AM +0100, Neil Zhang wrote:
+> > > > From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> > > >
+> > > > This adds core support for saving and restoring CPU PMU registers
+> > > > for suspend/resume support i.e. deeper C-states in cpuidle terms.
+> > > > This patch adds support only to ARMv7 PMU registers save/restore.
+> > > > It needs to be extended to xscale and ARMv6 if needed.
+> > > >
+> > > > [Neil] We found that DS-5 not work on our CA7 based SoCs.
+> > > > After debuging, found PMU registers were lost because of core power
+> down.
+> > > > Then i found Sudeep had a patch to fix it about two years ago but
+> > > > not in the mainline, just port it.
+> > >
+> > > What I don't like about this patch is that we're introducing
+> > > significant overhead for SoCs that don't require save/restore of the
+> > > PMU state. I'd much rather see core power down disabled whilst the
+> > > PMU is in use but, if that's not possible, then I think we need to:
+> > >
+> > >  (1) Make this conditional for cores that really need it
+> > >
+> > >  (2) Only save/restore if the PMU is in use (even better, just save/restore
+> > >      the live registers, but that's probably not worth the effort
+> > >      initially).
+> > >
+> >
+> > The patch has check the ARMV7_PMNC_E bit when save / restore, so
+> > suppose only the core's that use PMU will do the save / restore work.
+> 
+> Seems pretty fragile to base our save/restore decision on the value of one of
+> the registers, though. What happens if the control register is zeroed by the
+> core power down?
+> 
+It will check the saved control value when restore, so is should be OK while control register is zeroed. 
 
-> +			serial0: uart at 2010080000 {
-> +				compatible = "arm,pl011", "arm,primecell";
-> +				reg = <0x20 0x10080000 0 0x1000>;
-> +				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clk_per>, <&clk_per>;
-> +				clock-names = "uartclk", "apb_pclk";
-> +				status = "disabled";
-> +			};
+> Will
 
-"uartclk" is not a valid string for pl011, as per binding:
-
-| - clocks:  When present, must refer to exactly one clock named
-|           "apb_pclk"
-
-I do see that a lot of platforms do the same thing you have here, not
-sure who is wrong.
-
-> +			timer0: timer at 2010091000 {
-> +				compatible = "arm,sp804", "arm,primecell";
-> +				reg = <0x20 0x10091000 0 0x1000>;
-> +				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clk_per>, <&clk_per>;
-> +				clock-names = "timclken1", "apb_pclk";
-
-Citing the binding:
-
-| - clocks: clocks driving the dual timer hardware. This list should be 1 or 3
-|        clocks. With 3 clocks, the order is timer0 clock, timer1 clock,
-|        apb_pclk. A single clock can also be specified if the same clock is
-|        used for all clock inputs.
-
-I think you only want to have one clock here and make that the "apb_pclk".
-
-> +			gpio0: gpio at 2010092000 {
-> +				#gpio-cells = <2>;
-> +				compatible = "arm,pl061", "arm,primecell";
-> +				gpio-controller;
-> +				reg = <0x20 0x10092000 0x00 0x1000>;
-> +				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clk_per>;
-> +				clock-names = "apb_pclk";
-> +				status = "disabled";
-
-The pl061 binding does not specify any clocks at all. Do we need to update
-that?
-
-	Arnd
+Best Regards,
+Neil Zhang
