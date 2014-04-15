@@ -1,65 +1,50 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Tue, 15 Apr 2014 14:09:24 +0530
-Subject: [PATCHv2 3/8] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
-In-Reply-To: <534CEEA8.6020800@samsung.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-4-git-send-email-cw00.choi@samsung.com>
- <4788081.xvaJfdGTMu@wuerfel> <534CEEA8.6020800@samsung.com>
-Message-ID: <CAGm_ybhGBVmUu9PgppgWfH8b8=3JVhqK0v=ZR_yE8Cs42+VUOg@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 15 Apr 2014 10:42:18 +0200
+Subject: Rockchip RK3188 I2C driver
+In-Reply-To: <3748421.ND1tAjvgKS@typ>
+References: <3748421.ND1tAjvgKS@typ>
+Message-ID: <3138967.5Gj2T0XUGf@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Max,
 
-On Tue, Apr 15, 2014 at 2:02 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> Hi,
->
-> On 04/15/2014 05:11 PM, Arnd Bergmann wrote:
->> On Tuesday 15 April 2014 10:59:47 Chanwoo Choi wrote:
->>> This patch add memory mapping for PMU (Power Management Unit) which is used
->>> for power control of Exynos3250.
->>>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>> Arnd Bergmann suggested that need proper driver instead of static memory mapping.
->>> As Chanho Park reply[2], Sachin Kamat already posted the DT support patch[1]
->>> for memory mapping for SYSRAM.
->>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg27647.html
->>> [2] https://lkml.org/lkml/2014/4/10/161
->>>
->>> So, I'm going to re-implement following patch related to static memory mapping
->>> after merged Sachin Kamat patch[1].
->>>   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
->>
->> I don't think we have a patch for the PMU yet, Sachin was looking at the SYSRAM
->> only.
->
-> You are right. Sachin's patch only included the solution of SYSRAM memory mapping.
-> I set out the plan that I would implment proper driver for PMU memory mapping
-> instead of static method after merged Sachin's patch for SYSRAM.
->
-> But,
-> If you'd like me to implment PMU memory mapping instead of static mapping right now,
-> I'll implement it for PMU such as Sachin's patch on next posting(v3).
->
+Am Dienstag, 15. April 2014, 02:19:31 schrieb Max Schwarz:
+> Hello Heiko,
+> 
+> I just wanted to advertise that I'm currently working on a driver for the
+> native I2C adapters in the RK3188. I want to avoid duplicating work, and I
+> just saw that you also started on one in your github repository (nice job on
+> the clock driver and ethernet support, by the way!).
+> 
+> If you want to peek, my status quo is here:
+> https://github.com/xqms/linux.git topic/i2c-rk3x
 
-I have already posted patch[1] for mapping PMU through DT as part of
-my PMU series for exynos5260.
-You can rebase on the same.
+no worries ... the i2c stub in my tree is very old, so I'm very much looking 
+forward to your driver :-)
 
 
-[1] http://www.spinics.net/lists/arm-kernel/msg316013.html
+> The driver is almost finished, it's just missing support for long transfers
+> (>32 bytes) and a bit of cleanup. Communication with the ACT8846 works
+> without problems. It depends on your clock driver though, so I'll wait with
+> a patch until that is finished, right?
+
+Not necessarily. Normally the drivers go through different trees anyway (here 
+clock tree vs. i2c tree) and you might get comments and might need a v2 
+anyway. Also as the driver will simply use the standard clock API, you have no 
+dependies on my series - so in my mind you should simply go ahead when you're 
+finished with it.
 
 
-> Thanks for your review.
->
-> Best Regards,
-> Chanwoo Choi
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> By the way, I got my arc-emac working correctly only after re-setting the
+> mac address from userspace (ifconfig eth0 hw ether ...). A simple fix for
+> that is also in my github repo (topic/emac-addr-fix), if you are
+> interested.
+
+THANKS, that was exactly the tip/fix needed. We've been working the emac for 
+some days now (getting the correct clock rate, phy working etc) but didn't see 
+the data getting from the phy to the emac.
+
+
+Thanks again
+Heko
