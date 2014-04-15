@@ -1,43 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Apr 2014 20:29:15 +0100
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140415.145006.2299301203857235456.davem@davemloft.net>
-References: <20140415.134627.1895466146177627985.davem@davemloft.net>
- <20140415180311.GA11690@redhat.com>
- <20140415.143054.770827409393483803.davem@davemloft.net>
- <20140415.145006.2299301203857235456.davem@davemloft.net>
-Message-ID: <20140415192915.GT24070@n2100.arm.linux.org.uk>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 15 Apr 2014 12:29:58 -0700
+Subject: [PATCH v2] PM / devfreq: Use freq_table for available_frequencies
+In-Reply-To: <1368716.232331397543409452.JavaMail.weblogic@epv6ml06>
+References: <1368716.232331397543409452.JavaMail.weblogic@epv6ml06>
+Message-ID: <1397590198-4965-1-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 02:50:06PM -0400, David Miller wrote:
-> From: David Miller <davem@davemloft.net>
-> Date: Tue, 15 Apr 2014 14:30:54 -0400 (EDT)
-> 
-> > Russell, if for example userland stores into the instruction stream
-> > to patch an instruction, what needs to be done on ARM?
-> 
-> Looking around I suspect something like:
-> 
-> 	mcrne	p15, 0, INSN_ADDR, c7, c5, 1
-> 
-> after the instruction stores will do it.
+Some devices use freq_table instead of OPP. For those devices, the
+available_frequencies file shows up empty. Fix that by using freq_table to
+generate the available_frequencies data when it's available.
 
-It does still need to be pushed out of the D-cache first though.  So,
-for ARMv7 for example:
+OPP find frequency APIs also skips frequencies that have been temporarily
+disabled (say, due to thermal, etc). Since available_frequencies is
+supposed to show the entire list of available frequencies without taking
+temporary limits into consideration, preference is given to freq_table when
+available.
 
-	str	NEW_INSN, [INSN_ADDR]		@ store new instruction
-	mcr	p15, 0, INSN_ADDR, c7, c11, 1	@ clean d line
-	mcr	p15, 0, INSN_ADDR, c7, c5, 1	@ flush i line
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+---
+ drivers/devfreq/devfreq.c | 29 ++++++++++++++++++-----------
+ 1 file changed, 18 insertions(+), 11 deletions(-)
 
-would do it.  We of course need the user access marking on that (so that
-any fault doesn't oops the kernel) - not only for the store, but also the
-following two instructions which could fault (and oops unless they're
-marked with a fixup) if someone were to munmap() this page in another
-thread.  All those fixups can just do the "lets return -EFAULT" from
-the operation.
-
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index 2042ec3..527cbe2 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -912,20 +912,27 @@ static ssize_t available_frequencies_show(struct device *d,
+ 	struct devfreq *df = to_devfreq(d);
+ 	struct device *dev = df->dev.parent;
+ 	struct dev_pm_opp *opp;
++	unsigned int i = 0;
+ 	ssize_t count = 0;
+ 	unsigned long freq = 0;
+ 
+-	rcu_read_lock();
+-	do {
+-		opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+-		if (IS_ERR(opp))
+-			break;
+-
+-		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
+-				   "%lu ", freq);
+-		freq++;
+-	} while (1);
+-	rcu_read_unlock();
++	if (df->profile->freq_table) {
++		for (i = 0; i < df->profile->max_state; i++)
++			count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
++					   "%u ", df->profile->freq_table[i]);
++	} else {
++		rcu_read_lock();
++		do {
++			opp = dev_pm_opp_find_freq_ceil(dev, &freq);
++			if (IS_ERR(opp))
++				break;
++
++			count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
++					   "%lu ", freq);
++			freq++;
++		} while (1);
++		rcu_read_unlock();
++	}
+ 
+ 	/* Truncate the trailing space */
+ 	if (count)
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
