@@ -1,80 +1,111 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 15 Apr 2014 17:20:04 +0200 (CEST)
-Subject: [PATCH 1/3] clocksource: exynos_mct: Fix stall after CPU
- hotplugging
-In-Reply-To: <1397566023.29169.31.camel@AMDC1943>
-References: <1396011962-4467-1-git-send-email-k.kozlowski@samsung.com>
- <1397554445.29169.21.camel@AMDC1943> <534D25DC.4050400@linaro.org>
- <1397566023.29169.31.camel@AMDC1943>
-Message-ID: <alpine.DEB.2.02.1404151711250.22697@ionos.tec.linutronix.de>
+From: anders.berg@lsi.com (Anders Berg)
+Date: Tue, 15 Apr 2014 17:20:47 +0200
+Subject: [PATCH 2/5] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <8344066.GP0Bf5lvlE@wuerfel>
+References: <cover.1397552154.git.anders.berg@lsi.com>
+ <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
+ <8344066.GP0Bf5lvlE@wuerfel>
+Message-ID: <20140415152047.GB32285@swsaberg01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Apr 2014, Krzysztof Kozlowski wrote:
-
-> On wto, 2014-04-15 at 14:28 +0200, Daniel Lezcano wrote:
-> > On 04/15/2014 11:34 AM, Krzysztof Kozlowski wrote:
-> > > On pi?, 2014-03-28 at 14:06 +0100, Krzysztof Kozlowski wrote:
-> > >> Fix stall after hotplugging CPU1. Affected are SoCs where Multi Core Timer
-> > >> interrupts are shared (SPI), e.g. Exynos 4210. The stall was a result of
-> > >> starting the CPU1 local timer not in L1 timer but in L0 (which is used
-> > >> by CPU0).
-> > >
-> > > Hi,
-> > >
-> > > Do you have any comments on these 3 patches? They fix the CPU stall on
-> > > Exynos4210 and also on Exynos3250 (Chanwoo Choi sent patches for it
-> > > recently).
-> > 
-> > You describe this issue as impacting different SoC not only the exynos, 
-> > right ?
-> >
-> > Do you know what other SoCs are impacted by this ?
+On Tue, Apr 15, 2014 at 02:45:48PM +0200, Arnd Bergmann wrote:
+> On Tuesday 15 April 2014 14:06:11 Anders Berg wrote:
+> > diff --git a/arch/arm/boot/dts/axm5516-amarillo.dts b/arch/arm/boot/dts/axm5516-amarillo.dts
+> > new file mode 100644
+> > index 0000000..1760d6c
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/axm5516-amarillo.dts
+> > @@ -0,0 +1,51 @@
+> > +/*
+> > + * arch/arm/boot/dts/axm5516-amarillo.dts
+> > + *
+> > + * Copyright (C) 2013 LSI
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
 > 
-> No, affected are only Exynos SoC-s. It was confirmed on Exynos4210
-> (Trats board) and Exynos3250 (new SoC, patches for it were recently
-> posted by Chanwoo).
+> It's better to use a permissive license such as the BSD license for dts files,
+> so they can be shared with other OSs.
+
+Ok.
+
 > 
-> Other Exynos SoC-s where MCT local timers use shared interrupts (SPI)
-> can also be affected. Candidates are Exynos 5250 and 5420 but I haven't
-> tested them.
+> The situation with the clocks is still very strange: either the bindings
+> are all in need of update, or you got all devices wrong:
 > 
-> > I guess this issue is not reproducible just with the line below, we need 
-> > a timer to expire right at the moment CPU1 is hotplugged, right ?
+> > +			serial0: uart at 2010080000 {
+> > +				compatible = "arm,pl011", "arm,primecell";
+> > +				reg = <0x20 0x10080000 0 0x1000>;
+> > +				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> > +				clocks = <&clk_per>, <&clk_per>;
+> > +				clock-names = "uartclk", "apb_pclk";
+> > +				status = "disabled";
+> > +			};
 > 
-> Right. The timer must fire in short time between enabling local timer
-> for CPU1 and setting the affinity for IRQ.
+> "uartclk" is not a valid string for pl011, as per binding:
+> 
+> | - clocks:  When present, must refer to exactly one clock named
+> |           "apb_pclk"
+> 
+> I do see that a lot of platforms do the same thing you have here, not
+> sure who is wrong.
 
-Why do you set the affinity in the CPU_ONLINE hotplug callback and not
-right away when the interrupt is requested?
+The docs are probably correct. I used some vexpress dtsi as a reference, hence
+the uartclk reference. It's gone now.
 
-Thanks,
+> 
+> > +			timer0: timer at 2010091000 {
+> > +				compatible = "arm,sp804", "arm,primecell";
+> > +				reg = <0x20 0x10091000 0 0x1000>;
+> > +				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+> > +				clocks = <&clk_per>, <&clk_per>;
+> > +				clock-names = "timclken1", "apb_pclk";
+> 
+> Citing the binding:
+> 
+> | - clocks: clocks driving the dual timer hardware. This list should be 1 or 3
+> |        clocks. With 3 clocks, the order is timer0 clock, timer1 clock,
+> |        apb_pclk. A single clock can also be specified if the same clock is
+> |        used for all clock inputs.
+> 
+> I think you only want to have one clock here and make that the "apb_pclk".
 
-	tglx
+Yepp, will be fixed.
 
+> 
+> > +			gpio0: gpio at 2010092000 {
+> > +				#gpio-cells = <2>;
+> > +				compatible = "arm,pl061", "arm,primecell";
+> > +				gpio-controller;
+> > +				reg = <0x20 0x10092000 0x00 0x1000>;
+> > +				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
+> > +					     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> > +				clocks = <&clk_per>;
+> > +				clock-names = "apb_pclk";
+> > +				status = "disabled";
+> 
+> The pl061 binding does not specify any clocks at all. Do we need to update
+> that?
 
-Index: linux-2.6/drivers/clocksource/exynos_mct.c
-===================================================================
---- linux-2.6.orig/drivers/clocksource/exynos_mct.c
-+++ linux-2.6/drivers/clocksource/exynos_mct.c
-@@ -430,6 +430,7 @@ static int exynos4_local_timer_setup(str
- 				evt->irq);
- 			return -EIO;
- 		}
-+		irq_set_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
- 	} else {
- 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
- 	}
-@@ -461,12 +462,6 @@ static int exynos4_mct_cpu_notify(struct
- 		mevt = this_cpu_ptr(&percpu_mct_tick);
- 		exynos4_local_timer_setup(&mevt->evt);
- 		break;
--	case CPU_ONLINE:
--		cpu = (unsigned long)hcpu;
--		if (mct_int_type == MCT_INT_SPI)
--			irq_set_affinity(mct_irqs[MCT_L0_IRQ + cpu],
--						cpumask_of(cpu));
--		break;
- 	case CPU_DYING:
- 		mevt = this_cpu_ptr(&percpu_mct_tick);
- 		exynos4_local_timer_stop(&mevt->evt);
+Doesn't all AMBA devices need at least one apb_pclk since the bus driver does
+clk_get(...,"apb_pclk") before calling probe()?
+
+/Anders
