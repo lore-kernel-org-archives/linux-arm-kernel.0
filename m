@@ -1,31 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Apr 2014 11:00:23 +0200
-Subject: [PATCHv2 2/7] pwm: sunxi: document OF bindings
-In-Reply-To: <1397337959-12408-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1397337959-12408-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1397337959-12408-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140415090023.GB3207@lukather>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 15 Apr 2014 14:36:15 +0530
+Subject: [PATCH 2/6] ARM: EXYNOS: Staticize exynos_subsys
+In-Reply-To: <CAK9yfHw9fga+1kOo5tpW37wskZEQarrABiyZD+SBzBwk1h6DbQ@mail.gmail.com>
+References: <1397118296-6846-1-git-send-email-sachin.kamat@linaro.org>
+ <1397118296-6846-3-git-send-email-sachin.kamat@linaro.org>
+ <534661C7.9090304@samsung.com>
+ <CAK9yfHwAM0d5JsrhKGP0gkrjQLxGFE0+oEjv26N5jsFnvYku9A@mail.gmail.com>
+ <53468F44.3050109@samsung.com>
+ <CAK9yfHw9fga+1kOo5tpW37wskZEQarrABiyZD+SBzBwk1h6DbQ@mail.gmail.com>
+Message-ID: <CAK9yfHxwTo1WPPS7asJOMAVSK5=3ufFrLuB9mYyT8t-CgMxGWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 12, 2014 at 11:25:54PM +0200, Alexandre Belloni wrote:
-> This is the documentation for the Allwinner Socs PWM bindings.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Tomasz,
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 10 April 2014 18:05, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> On 10 April 2014 18:02, Tomasz Figa <t.figa@samsung.com> wrote:
+>> On 10.04.2014 11:22, Sachin Kamat wrote:
+>>>
+>>> Hi Tomasz,
+>>>
+>>> On 10 April 2014 14:47, Tomasz Figa <t.figa@samsung.com> wrote:
+<snip>
+>> Hmm, I don't see why it could break anything as I can't find any users of
+>> it. Anyway I just tested removing this code on Exynos4412-trats2 board and
+>> didn't find any problems.
+>
+> Thanks for testing. Let me check at my end on other boards and if it
+> doesn't cause
+> any problem, will remove this.
 
-Thanks!
-Maxime
+Tested after removing this code on various boards and there doesn't
+seem to be any
+problems. Will re-send with this change.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/7a833d2a/attachment.sig>
+With warm regards,
+Sachin
