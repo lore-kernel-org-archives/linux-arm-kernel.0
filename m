@@ -1,435 +1,113 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 15 Apr 2014 18:38:39 +0200
-Subject: [PATCH] Exynos4: cpuidle: support dual CPUs with AFTR state
-In-Reply-To: <20140415175432.0d73018e@amdc2363>
-References: <1396604925-18383-1-git-send-email-daniel.lezcano@linaro.org>
- <20140415083704.212d3a0f@amdc2363> <534D4ED4.9020203@linaro.org>
- <20140415175432.0d73018e@amdc2363>
-Message-ID: <534D608F.60007@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 15 Apr 2014 18:45:54 +0200
+Subject: [PATCH v2 1/7] clk: exynos5420: Add more clock register offsets
+In-Reply-To: <1395918470-16374-2-git-send-email-shaik.ameer@samsung.com>
+References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
+ <1395918470-16374-2-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <534D6242.9000605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 05:54 PM, Lukasz Majewski wrote:
-> Hi Daniel,
->
->> On 04/15/2014 08:37 AM, Lukasz Majewski wrote:
->>> Hi Daniel,
->>>
->>>> The following driver is for exynos4210. I did not yet finished the
->>>> other boards, so I created a specific driver for 4210 which could
->>>> be merged later.
->>>>
->>>
->>> If I may ask - do you plan to develop this code for Exynos4412 in a
->>> near future?
->>
->> Yes it is in my plan.
->>
->>> I did some tests (with hotplug) and it turns out, that due to static
->>> leakage current one can save up to 12 % of power consumption when
->>> power domains for cores are disabled.
->>>
->>>
->>> Such notable power consumption reduction could drive (and justify)
->>> the further development of power aware scheduling code.
->>>
->>> If you don't have time, then I can offer myself to develop the
->>> code. I just want to avoid potential duplication of effort.
->>
->> I would be very glad if we can cooperate. Thanks for proposing your
->> help.
->
-> You are welcome :-)
->
->>
->> I have put a branch containing the cleanups + driver moving + dual
->> cpu support, so you can base your work in it.
->>
->> git://git.linaro.org/people/daniel.lezcano/linux.git
->> cpuidle/samsung-next
->
-> Thanks for sharing code. I will look into it.
->
->>
->> I am wondering if the 5250 board wouldn't make sense as a primary
->> target before the 4412...
->
-> I'm working on a device based on 4412, not 5250. Therefore, I would
-> prefer to have this concept implemented on 4412 as soon as possible to
-> not hinder my scheduler related experiments.
->
-> If you have other priorities, then we can split the work. What do you
-> think?
+Hi Shaik,
 
-It is ok for me if you want to handle the cpuidle driver 4412. Will you 
-create a new driver or extend this dual cpu driver to support 4 cpus ?
-
-
->>>> The driver is based on Colin Cross's driver found at:
->>>>
->>>> https://android.googlesource.com/kernel/exynos/+/e686b1ec67423c40b4fdf811f9a4dfa3b393a010%5E%5E!/
->>>>
->>>> This one was based on a 3.4 kernel and an old API.
->>>>
->>>> It has been refreshed, simplified and based on the recent code
->>>> cleanup I sent today.
->>>>
->>>> The AFTR could be entered when all the cpus (except cpu0) are down.
->>>> In order to reach this situation, the couple idle states are used.
->>>>
->>>> There is a sync barrier at the entry and the exit of the low power
->>>> function. So all cpus will enter and exit the function at the same
->>>> time.
->>>>
->>>> At this point, CPU0 knows the other cpu will power down itself.
->>>> CPU0 waits for the CPU1 to be powered down and then initiate the
->>>> AFTR power down sequence.
->>>>
->>>> No interrupts are handled by CPU1, this is why we switch to the
->>>> timer broadcast even if the local timer is not impacted by the
->>>> idle state.
->>>>
->>>> When CPU0 wakes up, it powers up CPU1 and waits for it to boot.
->>>> Then they both exit the idle function.
->>>>
->>>> This driver allows the exynos4210 to have the same power
->>>> consumption at idle time than the one when we have to unplug CPU1
->>>> in order to let CPU0 to reach the AFTR state.
->>>>
->>>> This patch is a RFC because, we have to find a way to remove the
->>>> macros definitions and cpu powerdown function without pulling the
->>>> arch dependent headers.
->>>>
->>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> ---
->>>>    arch/arm/mach-exynos/common.c        |   11 +-
->>>>    drivers/cpuidle/Kconfig.arm          |    8 ++
->>>>    drivers/cpuidle/Makefile             |    1 +
->>>>    drivers/cpuidle/cpuidle-exynos4210.c |  226
->>>> ++++++++++++++++++++++++++++++++++ 4 files changed, 245
->>>> insertions(+), 1 deletion(-) create mode 100644
->>>> drivers/cpuidle/cpuidle-exynos4210.c
->>>>
->>>> diff --git a/arch/arm/mach-exynos/common.c
->>>> b/arch/arm/mach-exynos/common.c index d5fa21e..1765a98 100644
->>>> --- a/arch/arm/mach-exynos/common.c
->>>> +++ b/arch/arm/mach-exynos/common.c
->>>> @@ -299,9 +299,18 @@ static struct platform_device exynos_cpuidle
->>>> = { .id                = -1,
->>>>    };
->>>>
->>>> +static struct platform_device exynos4210_cpuidle = {
->>>> +       .name              = "exynos4210-cpuidle",
->>>> +       .dev.platform_data = exynos_sys_powerdown_aftr,
->>>> +       .id                = -1,
->>>> +};
->>>> +
->>>>    void __init exynos_cpuidle_init(void)
->>>>    {
->>>> -       platform_device_register(&exynos_cpuidle);
->>>> +       if (soc_is_exynos4210())
->>>> +               platform_device_register(&exynos4210_cpuidle);
->>>> +       else
->>>> +               platform_device_register(&exynos_cpuidle);
->>>>    }
->>>>
->>>>    void __init exynos_cpufreq_init(void)
->>>> diff --git a/drivers/cpuidle/Kconfig.arm
->>>> b/drivers/cpuidle/Kconfig.arm index 92f0c12..2772130 100644
->>>> --- a/drivers/cpuidle/Kconfig.arm
->>>> +++ b/drivers/cpuidle/Kconfig.arm
->>>> @@ -51,3 +51,11 @@ config ARM_EXYNOS_CPUIDLE
->>>>           depends on ARCH_EXYNOS
->>>>           help
->>>>             Select this to enable cpuidle for Exynos processors
->>>> +
->>>> +config ARM_EXYNOS4210_CPUIDLE
->>>> +       bool "Cpu Idle Driver for the Exynos 4210 processor"
->>>> +       default y
->>>> +       depends on ARCH_EXYNOS
->>>> +       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
->>>> +       help
->>>> +         Select this to enable cpuidle for the Exynos 4210
->>>> processors diff --git a/drivers/cpuidle/Makefile
->>>> b/drivers/cpuidle/Makefile index 0d1540a..e0ec9bc 100644
->>>> --- a/drivers/cpuidle/Makefile
->>>> +++ b/drivers/cpuidle/Makefile
->>>> @@ -14,6 +14,7 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)                +=
->>>> cpuidle-zynq.o obj-$(CONFIG_ARM_U8500_CPUIDLE)         +=
->>>> cpuidle-ux500.o obj-$(CONFIG_ARM_AT91_CPUIDLE)          +=
->>>> cpuidle-at91.o obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        +=
->>>> cpuidle-exynos.o +obj-$(CONFIG_ARM_EXYNOS4210_CPUIDLE)    +=
->>>> cpuidle-exynos4210.o
->>>>
->>>>    ###############################################################################
->>>>    # POWERPC drivers
->>>> diff --git a/drivers/cpuidle/cpuidle-exynos4210.c
->>>> b/drivers/cpuidle/cpuidle-exynos4210.c new file mode 100644
->>>> index 0000000..56f6d51
->>>> --- /dev/null
->>>> +++ b/drivers/cpuidle/cpuidle-exynos4210.c
->>>> @@ -0,0 +1,226 @@
->>>> +/*
->>>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
->>>> + *             http://www.samsung.com
->>>> + *
->>>> + * Copyright (c) 2014 Linaro : Daniel Lezcano
->>>> <daniel.lezcano@linaro.org>
->>>> + *             http://www.linaro.org
->>>> + *
->>>> + * Based on the work of Colin Cross <ccross@android.com>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or
->>>> modify
->>>> + * it under the terms of the GNU General Public License version 2
->>>> as
->>>> + * published by the Free Software Foundation.
->>>> + */
->>>> +
->>>> +#include <linux/cpuidle.h>
->>>> +#include <linux/cpu_pm.h>
->>>> +#include <linux/io.h>
->>>> +#include <linux/platform_device.h>
->>>> +
->>>> +#include <asm/proc-fns.h>
->>>> +#include <asm/suspend.h>
->>>> +#include <asm/cpuidle.h>
->>>> +
->>>> +#include <plat/pm.h>
->>>> +#include <plat/cpu.h>
->>>> +#include <plat/map-base.h>
->>>> +#include <plat/map-s5p.h>
->>>> +
->>>> +static atomic_t exynos_idle_barrier;
->>>> +static atomic_t cpu1_wakeup = ATOMIC_INIT(0);
->>>> +
->>>> +#define BOOT_VECTOR S5P_VA_SYSRAM
->>>> +#define S5P_VA_PMU                  S3C_ADDR(0x02180000)
->>>> +#define S5P_PMUREG(x)              (S5P_VA_PMU + (x))
->>>> +#define S5P_ARM_CORE1_CONFIGURATION S5P_PMUREG(0x2080)
->>>> +#define S5P_ARM_CORE1_STATUS        S5P_PMUREG(0x2084)
->>>> +
->>>> +static void (*exynos_aftr)(void);
->>>> +
->>>> +static int cpu_suspend_finish(unsigned long flags)
->>>> +{
->>>> +       if (flags)
->>>> +               exynos_aftr();
->>>> +
->>>> +       cpu_do_idle();
->>>> +
->>>> +       return -1;
->>>> +}
->>>> +
->>>> +static int exynos_cpu0_enter_aftr(void)
->>>> +{
->>>> +       int ret = -1;
->>>> +
->>>> +       /*
->>>> +        * If the other cpu is powered on, we have to power it off,
->>>> because
->>>> +        * the AFTR state won't work otherwise
->>>> +        */
->>>> +       if (cpu_online(1)) {
->>>> +
->>>> +               /*
->>>> +                * We reach a sync point with the coupled idle
->>>> state, we know
->>>> +                * the other cpu will power down itself or will
->>>> abort the
->>>> +                * sequence, let's wait for one of these to happen
->>>> +                */
->>>> +               while (__raw_readl(S5P_ARM_CORE1_STATUS) & 3) {
->>>> +
->>>> +                       /*
->>>> +                        * The other cpu may skip idle and boot
->>>> back
->>>> +                        * up again
->>>> +                        */
->>>> +                       if (atomic_read(&cpu1_wakeup))
->>>> +                               goto abort;
->>>> +
->>>> +                       /*
->>>> +                        * The other cpu may bounce through idle
->>>> and
->>>> +                        * boot back up again, getting stuck in the
->>>> +                        * boot rom code
->>>> +                        */
->>>> +                       if (__raw_readl(BOOT_VECTOR) == 0)
->>>> +                               goto abort;
->>>> +
->>>> +                       cpu_relax();
->>>> +               }
->>>> +       }
->>>> +
->>>> +       cpu_pm_enter();
->>>> +
->>>> +       ret = cpu_suspend(1, cpu_suspend_finish);
->>>> +
->>>> +       cpu_pm_exit();
->>>> +
->>>> +abort:
->>>> +       if (cpu_online(1)) {
->>>> +               /*
->>>> +                * Set the boot vector to something non-zero
->>>> +                */
->>>> +               __raw_writel(virt_to_phys(s3c_cpu_resume),
->>>> +                            BOOT_VECTOR);
->>>> +               dsb();
->>>> +
->>>> +               /*
->>>> +                * Turn on cpu1 and wait for it to be on
->>>> +                */
->>>> +               __raw_writel(0x3, S5P_ARM_CORE1_CONFIGURATION);
->>>> +               while ((__raw_readl(S5P_ARM_CORE1_STATUS) & 3) !=
->>>> 3)
->>>> +                       cpu_relax();
->>>> +
->>>> +               /*
->>>> +                * Wait for cpu1 to get stuck in the boot rom
->>>> +                */
->>>> +               while ((__raw_readl(BOOT_VECTOR) != 0) &&
->>>> +                      !atomic_read(&cpu1_wakeup))
->>>> +                       cpu_relax();
->>>> +
->>>> +               if (!atomic_read(&cpu1_wakeup)) {
->>>> +                       /*
->>>> +                        * Poke cpu1 out of the boot rom
->>>> +                        */
->>>> +                       __raw_writel(virt_to_phys(s3c_cpu_resume),
->>>> +                                    BOOT_VECTOR);
->>>> +                       dsb_sev();
->>>> +               }
->>>> +
->>>> +               /*
->>>> +                * Wait for cpu1 to finish booting
->>>> +                */
->>>> +               while (!atomic_read(&cpu1_wakeup))
->>>> +                       cpu_relax();
->>>> +       }
->>>> +
->>>> +       return ret;
->>>> +}
->>>> +
->>>> +static int exynos_powerdown_cpu1(void)
->>>> +{
->>>> +       int ret = -1;
->>>> +
->>>> +       /*
->>>> +        * Idle sequence for cpu1
->>>> +        */
->>>> +       if (cpu_pm_enter())
->>>> +               goto cpu1_aborted;
->>>> +
->>>> +       /*
->>>> +        * Turn off cpu 1
->>>> +        */
->>>> +       __raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
->>>> +
->>>> +       ret = cpu_suspend(0, cpu_suspend_finish);
->>>> +
->>>> +       cpu_pm_exit();
->>>> +
->>>> +cpu1_aborted:
->>>> +       dsb();
->>>> +       /*
->>>> +        * Notify cpu 0 that cpu 1 is awake
->>>> +        */
->>>> +       atomic_set(&cpu1_wakeup, 1);
->>>> +
->>>> +       return ret;
->>>> +}
->>>> +
->>>> +static int exynos_enter_aftr(struct cpuidle_device *dev,
->>>> +                            struct cpuidle_driver *drv, int index)
->>>> +{
->>>> +       int ret;
->>>> +
->>>> +       __raw_writel(virt_to_phys(s3c_cpu_resume), BOOT_VECTOR);
->>>> +
->>>> +       /*
->>>> +        * Waiting all cpus to reach this point at the same moment
->>>> +        */
->>>> +       cpuidle_coupled_parallel_barrier(dev,
->>>> &exynos_idle_barrier); +
->>>> +       /*
->>>> +        * Both cpus will reach this point at the same time
->>>> +        */
->>>> +       ret = dev->cpu ? exynos_powerdown_cpu1() :
->>>> exynos_cpu0_enter_aftr();
->>>> +       if (ret)
->>>> +               index = ret;
->>>> +
->>>> +       /*
->>>> +        * Waiting all cpus to finish the power sequence before
->>>> going further
->>>> +        */
->>>> +       cpuidle_coupled_parallel_barrier(dev,
->>>> &exynos_idle_barrier); +
->>>> +       atomic_set(&cpu1_wakeup, 0);
->>>> +
->>>> +       return index;
->>>> +}
->>>> +
->>>> +static struct cpuidle_driver exynos_idle_driver = {
->>>> +       .name           = "exynos4210_idle",
->>>> +       .owner          = THIS_MODULE,
->>>> +       .states = {
->>>> +               ARM_CPUIDLE_WFI_STATE,
->>>> +               [1] = {
->>>> +                       .enter                  =
->>>> exynos_enter_aftr,
->>>> +                       .exit_latency           = 5000,
->>>> +                       .target_residency       = 10000,
->>>> +                       .flags                  =
->>>> CPUIDLE_FLAG_TIME_VALID |
->>>> +                       CPUIDLE_FLAG_COUPLED |
->>>> CPUIDLE_FLAG_TIMER_STOP,
->>>> +                       .name                   = "C1",
->>>> +                       .desc                   = "ARM power down",
->>>> +               },
->>>> +       },
->>>> +       .state_count = 2,
->>>> +       .safe_state_index = 0,
->>>> +};
->>>> +
->>>> +static int exynos_cpuidle_probe(struct platform_device *pdev)
->>>> +{
->>>> +       exynos_aftr = (void *)(pdev->dev.platform_data);
->>>> +
->>>> +       return cpuidle_register(&exynos_idle_driver,
->>>> cpu_possible_mask); +}
->>>> +
->>>> +static struct platform_driver exynos_cpuidle_driver = {
->>>> +       .driver = {
->>>> +               .name = "exynos4210-cpuidle",
->>>> +               .owner = THIS_MODULE,
->>>> +       },
->>>> +       .probe = exynos_cpuidle_probe,
->>>> +};
->>>> +
->>>> +module_platform_driver(exynos_cpuidle_driver);
->>>> --
->>>> 1.7.9.5
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>>
->>>
->>
->>
+On 27.03.2014 12:07, Shaik Ameer Basha wrote:
+> From: Rahul Sharma <rahul.sharma@samsung.com>
 >
+> This patch adds the missing clock register offsets for Exynos5420.
 >
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> ---
+>   drivers/clk/samsung/clk-exynos5420.c |   29 ++++++++++++++++++++++++++++-
+>   1 file changed, 28 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 13f624d..3d0fb77 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -27,6 +27,9 @@
+>   #define DIV_CPU1		0x504
+>   #define GATE_BUS_CPU		0x700
+>   #define GATE_SCLK_CPU		0x800
+> +#define CLKOUT_CMU_CPU		0xa00
+> +#define DIV_G2D			0x8500
+> +#define GATE_BUS_G2D		0x8700
+>   #define GATE_IP_G2D		0x8800
+>   #define CPLL_LOCK		0x10020
+>   #define DPLL_LOCK		0x10030
+> @@ -39,7 +42,11 @@
+>   #define CPLL_CON0		0x10120
+>   #define DPLL_CON0		0x10128
+>   #define EPLL_CON0		0x10130
+> +#define EPLL_CON1		0x10134
+> +#define EPLL_CON2		0x10138
+>   #define RPLL_CON0		0x10140
+> +#define RPLL_CON1		0x10144
+> +#define RPLL_CON2		0x10148
+>   #define IPLL_CON0		0x10150
+>   #define SPLL_CON0		0x10160
+>   #define VPLL_CON0		0x10170
+> @@ -57,10 +64,13 @@
+>   #define SRC_FSYS		0x10244
+>   #define SRC_PERIC0		0x10250
+>   #define SRC_PERIC1		0x10254
+> +#define SRC_ISP			0x10270
+>   #define SRC_TOP10		0x10280
+>   #define SRC_TOP11		0x10284
+>   #define SRC_TOP12		0x10288
+> -#define	SRC_MASK_DISP10		0x1032c
+> +#define SRC_MASK_TOP2		0x10308
+> +#define SRC_MASK_DISP10		0x1032c
+> +#define SRC_MASK_MAU		0x10334
+>   #define SRC_MASK_FSYS		0x10340
+>   #define SRC_MASK_PERIC0		0x10350
+>   #define SRC_MASK_PERIC1		0x10354
+> @@ -77,24 +87,41 @@
+>   #define DIV_PERIC2		0x10560
+>   #define DIV_PERIC3		0x10564
+>   #define DIV_PERIC4		0x10568
+> +#define SCLK_DIV_ISP0		0x10580
+> +#define SCLK_DIV_ISP1		0x10584
+> +#define DIV2_RATIO0		0x10590
+> +#define DIV4_RATIO		0x105a0
+>   #define GATE_BUS_TOP		0x10700
+> +#define GATE_BUS_GSCL0		0x10710
+> +#define GATE_BUS_GSCL1		0x10720
+> +#define GATE_BUS_DISP1		0x10728
+> +#define GATE_BUS_MFC		0x10734
+> +#define GATE_BUS_GEN		0x1073c
+>   #define GATE_BUS_FSYS0		0x10740
+> +#define GATE_BUS_FSYS2		0x10748
+> +#define GATE_BUS_MSCL		0x1074C
+>   #define GATE_BUS_PERIC		0x10750
+>   #define GATE_BUS_PERIC1		0x10754
+>   #define GATE_BUS_PERIS0		0x10760
+>   #define GATE_BUS_PERIS1		0x10764
+> +#define GATE_BUS_NOC		0x10770
+> +#define GATE_TOP_SCLK_ISP	0x10870
+>   #define GATE_IP_GSCL0		0x10910
+>   #define GATE_IP_GSCL1		0x10920
+>   #define GATE_IP_MFC		0x1092c
+>   #define GATE_IP_DISP1		0x10928
+>   #define GATE_IP_G3D		0x10930
+>   #define GATE_IP_GEN		0x10934
+> +#define GATE_IP_FSYS		0x10944
+> +#define GATE_IP_PERIC		0x10950
+> +#define GATE_IP_PERIS		0x10960
+>   #define GATE_IP_MSCL		0x10970
+>   #define GATE_TOP_SCLK_GSCL	0x10820
+>   #define GATE_TOP_SCLK_DISP1	0x10828
+>   #define GATE_TOP_SCLK_MAU	0x1083c
+>   #define GATE_TOP_SCLK_FSYS	0x10840
+>   #define GATE_TOP_SCLK_PERIC	0x10850
+> +#define TOP_SPARE2		0x10b08
+>   #define BPLL_LOCK		0x20010
+>   #define BPLL_CON0		0x20110
+>   #define SRC_CDREX		0x20200
 >
 
+ From this patch, it's hard to tell what is the use for those registers. 
+I think they should be added along with definitions that need them.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best regards,
+Tomasz
