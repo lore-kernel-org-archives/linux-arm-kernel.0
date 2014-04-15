@@ -1,50 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Apr 2014 15:47:35 +0100
-Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
-In-Reply-To: <21141977.8ucQJzlJts@wuerfel>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <20140403220713.GA23545@google.com>
- <20140414171300.GL12916@arm.com> <21141977.8ucQJzlJts@wuerfel>
-Message-ID: <20140415144735.GM17408@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 15 Apr 2014 10:48:44 -0400 (EDT)
+Subject: [PATCH v2 06/12] ARM: mcpm: change max clusters to 4
+In-Reply-To: <CAD6h2NTH1ZGWSNPeEMaZ4Lf+4UFOhXFtJeX1NEXETeonc76DYg@mail.gmail.com>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140410095650.GA5499@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404102203590.980@knanqh.ubzr>
+ <CAD6h2NTH1ZGWSNPeEMaZ4Lf+4UFOhXFtJeX1NEXETeonc76DYg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1404151044070.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, 15 Apr 2014, Haojian Zhuang wrote:
 
-On Mon, Apr 14, 2014 at 07:48:17PM +0100, Arnd Bergmann wrote:
-> On Monday 14 April 2014 18:13:00 Will Deacon wrote:
-> > Arnd: Is there anything more you'd like me to do with this series? Given
-> > that it would be targetting 3.16, there's still plenty of time to make
-> > changes (we talked about extracting some library functions in the past).
+> On 11 April 2014 10:39, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 10 Apr 2014, Dave Martin wrote:
+> >
+> >> On Tue, Apr 08, 2014 at 04:00:46PM +0800, Haojian Zhuang wrote:
+> >> > In order to support 4 clusters with 4 Cortex A15 Cores in each cluster,
+> >> > enlarge maximum clusters from 2 to 4 in MCPM.
+> >>
+> >> CC Nico on mcpm patches please.  I'm happy to be CC'd as well.
+> >
+> > Indeed.
+> >
+> >> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> > ---
+> >> >  arch/arm/include/asm/mcpm.h | 2 +-
+> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> >> > index 608516e..68f82cf 100644
+> >> > --- a/arch/arm/include/asm/mcpm.h
+> >> > +++ b/arch/arm/include/asm/mcpm.h
+> >> > @@ -20,7 +20,7 @@
+> >> >   * to consider dynamic allocation.
+> >> >   */
+> >> >  #define MAX_CPUS_PER_CLUSTER       4
+> >> > -#define MAX_NR_CLUSTERS            2
+> >> > +#define MAX_NR_CLUSTERS            4
+> >>
+> >> Because of the need for alignment to the biggest cacheline size in the
+> >> system, the MCPM low-level locking structures consume a non-trivial
+> >> amount of memory.
+> >>
+> >> Therefore, I'm not keen on the idea of simply increasing this #define
+> >> every time a platform appears with a larger number of clusters.
+> >> If hip04 is not built into the kernel, this just wastes memory.
+> >>
+> >> I'll leave it to Nico to decide whether we can increase the #define
+> >> to 4 or whether this needs a proper fix now.  Ideally, we would have
+> >> a way of choosing the maximum value required by the set of boards built
+> >> into the kernel, or switch to dynamic allocation.
+> >
+> > I think we should go with the ability to select a maximum based on the
+> > configured platforms. That could be as simple as having a
+> > CONFIG_MCPM_QUAD_CLUSTER symbol to be selected by those platforms that
+> > need it.
+> >
 > 
-> I don't remember the latest status of your patch set, but you might want
-> to read the discussions we had about Liviu's patches last week.
+> I'll set MAX_NR_CLUSTERS from Kconfig.
+> 
+> If BIG_LITTLE isn't enabled & HIP04 is enabled, MAX_NR_CLUSTERS could
+> be set to 4.
+> Otherwise, it's always 2. Since there're only 16 A15 cores in HiP04.
 
-The latest status (v5) was that I had something working (I got hung up on
-the I/O offset handing), with all feedback addressed. The next step was to
-try and move parts into library code, but it looks like Liviu is handling a
-lot of that with his arm64 stuff.
+No.
 
-> We still haven't figured out exactly how to handle I/O space in the common
-> code, but I think we are making progress.
+Please let's avoid cross dependencies for things that are conceptually 
+unrelated.
 
-The discussions certainly seem to be making progress.
+Like I suggested, just create a CONFIG_MCPM_QUAD_CLUSTER symbol and 
+select it from the HIP04 config.
 
-> We also have discussed some ideas about how to restructure the PCI
-> code layer to make it easier to share host drivers across architectures
-> and clean up the interfaces in the process.
+For multi-platform kernels we must be able to support both BIG_LITTLE 
+and HIP04 in the same config.  Whether or not the big.LITTLE code is 
+activated can be decided at run time.
 
-Ok. Whilst this all sounds good from an arm64 perspective (with Liviu
-currently doing the work), it's not clear to me where that leaves my 32-bit
-ARM kvmtool code. That was the main reason for me writing this driver, and it
-seems a shame to have to wait for all the generic code to be sorted out
-before it can be used on AArch32, where there is already a functional
-pcibios implementation. The discussions mention things like generic
-pci_host_bridge_ops, but having that for arch/arm/ doesn't sound like
-something that is imminent.
 
-Of course, I plan to port my driver to the new infrastructure when it lands
-(since I want to support arm64), but it would be good to have something for
-AArch32 in the meantime.
-
-Will
+Nicolas
