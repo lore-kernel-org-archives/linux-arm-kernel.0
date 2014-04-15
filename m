@@ -1,73 +1,175 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Apr 2014 13:56:54 +0100
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over smbus
-In-Reply-To: <534D252B.8060009@metafoo.de>
-References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140414210429.GJ25182@sirena.org.uk>
- <534CE16D.8010508@free-electrons.com>
- <20140415100922.GN12304@sirena.org.uk>
- <534D1DDA.40207@free-electrons.com> <534D252B.8060009@metafoo.de>
-Message-ID: <20140415125654.GD12304@sirena.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 15 Apr 2014 14:05:59 +0100
+Subject: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
+References: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <534D2EB7.6020904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 02:25:15PM +0200, Lars-Peter Clausen wrote:
-> On 04/15/2014 01:54 PM, Boris BREZILLON wrote:
+Hi Will,
 
-> >And, should I keep one method to register an smbus regmap or should I
-> >provide one method per access type and get rid of the
-> >regmap_smbus_transfer_type enum ?
+Thanks for the response.
 
-> I don't think we should leave the decision which bus to use to the driver.
-> Neither should the driver have to choose whether to use smbus or native I2C.
-> We want to use native I2C when available, because it is more efficient than
-> going through the smbus emulation layer. On the other hand we want to
-> automatically switch to smbus when native I2C is not available and the
-> device can work fine with smbus. Also I'm afraid that we'll otherwise soon
-> see code popping up like:
+Hi Neil,
 
-I have to say I'd misread the commit message (due to the multiple copies
-that arrived before I actually reviewed it I think I just skimmed it and
-went into incremental review) and was reviewing this as being for
-*device* limitations not controller ones.  That also matches with what
-Boris was saying about not being able to decide to use the word or byte
-at a time operations automatically, though the commit message does say
-it's about controller limitations.
+On 14/04/14 02:42, Neil Zhang wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> This adds core support for saving and restoring CPU PMU registers
+> for suspend/resume support i.e. deeper C-states in cpuidle terms.
+> This patch adds support only to ARMv7 PMU registers save/restore.
+> It needs to be extended to xscale and ARMv6 if needed.
+> 
+> [Neil] We found that DS-5 not work on our CA7 based SoCs.
+> After debuging, found PMU registers were lost because of core power down.
+> Then i found Sudeep had a patch to fix it about two years ago but not in
+> the mainline, just port it.
+> 
 
-> My suggestion is that in regmap_init_i2c() you check the capabilities of the
-> I2C adapter. If it supports native I2C you setup the regmap with the
-> regmap_i2c struct just as it does right now. If the adapter does not support
-> native I2C, check if the device can be supported by smbus (reg_bytes == 8 &&
-> val_bytes % 8 == 0). For each type of smbus operations have one regmap_bus
-> struct, and if you can fallback to smbus choose the bus depending on the
-> config's val_bytes.
+The patch was written as PoC to support multiple PMUs back then and was clearly
+not intended for upstream. Will has already mentioned what this patch needs to
+improve on.
 
-That'd definitely be useful but potentially orthogonal, we can also do
-both and expose smbus explicitly with I2C falling back to it
-transparently.
+I have mentioned few comments which IMO is necessary.
 
-If the device *is* limited to smbus and the controller supports both
-(some do) I'd naively have expected that the native smbus support would
-do a little better - otherwise why bother using it?  We could identify
-the constraint set automatically for I2C devices though it's more for
-the client driver to specify.
+> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+> ---
+>  arch/arm/include/asm/pmu.h       |   11 +++++++++
+>  arch/arm/kernel/perf_event_cpu.c |   29 ++++++++++++++++++++++-
+>  arch/arm/kernel/perf_event_v7.c  |   47 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 86 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+> index ae1919b..f37f048 100644
+> --- a/arch/arm/include/asm/pmu.h
+> +++ b/arch/arm/include/asm/pmu.h
+> @@ -62,6 +62,15 @@ struct pmu_hw_events {
+>  	raw_spinlock_t		pmu_lock;
+>  };
+>  
+> +struct cpupmu_regs {
+> +	u32 pmc;
+> +	u32 pmcntenset;
+> +	u32 pmuseren;
+> +	u32 pmintenset;
+> +	u32 pmxevttype[8];
+> +	u32 pmxevtcnt[8];
+> +};
+> +
 
-This means there's two changes to consider here:
+This can't be generic, it needs to be specific to each PMU implementations.
+I have clearly mentioned it in the commit log. It's better to move this out
+to each PMU specific implementations.
 
- - Providing APIs for registering actual smbus devices as a convenience
-   for devices with that constraint, regardless of how that is done
-   behind the scenes.
+>  struct arm_pmu {
+>  	struct pmu	pmu;
+>  	cpumask_t	active_irqs;
+> @@ -83,6 +92,8 @@ struct arm_pmu {
+>  	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
+>  	void		(*free_irq)(struct arm_pmu *);
+>  	int		(*map_event)(struct perf_event *event);
+> +	void		(*save_regs)(struct arm_pmu *, struct cpupmu_regs *);
+> +	void		(*restore_regs)(struct arm_pmu *, struct cpupmu_regs *);
 
- - Having the I2C implementation automatically use the smbus APIs if
-   it can and either the controller is smbus only or it makes sense to
-   do so for optimisation.
+Once cpupmu_regs becomes PMU specific, you can remove it from the above 2
+function pointers.
 
-both of which are independently useful.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/980758da/attachment.sig>
+>  	int		num_events;
+>  	atomic_t	active_events;
+>  	struct mutex	reserve_mutex;
+> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> index 51798d7..7f1c756 100644
+> --- a/arch/arm/kernel/perf_event_cpu.c
+> +++ b/arch/arm/kernel/perf_event_cpu.c
+> @@ -19,6 +19,7 @@
+>  #define pr_fmt(fmt) "CPU PMU: " fmt
+>  
+>  #include <linux/bitmap.h>
+> +#include <linux/cpu_pm.h>
+>  #include <linux/export.h>
+>  #include <linux/kernel.h>
+>  #include <linux/of.h>
+> @@ -39,6 +40,7 @@ static DEFINE_PER_CPU(struct arm_pmu *, percpu_pmu);
+>  static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
+>  static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
+>  static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
+> +static DEFINE_PER_CPU(struct cpupmu_regs, cpu_pmu_regs);
+>  
+>  /*
+>   * Despite the names, these two functions are CPU-specific and are used
+> @@ -217,6 +219,23 @@ static struct notifier_block cpu_pmu_hotplug_notifier = {
+>  	.notifier_call = cpu_pmu_notify,
+>  };
+>  
+> +static int cpu_pmu_pm_notify(struct notifier_block *b,
+> +					unsigned long action, void *hcpu)
+
+hcpu is misleading, the cpu_pm_notify doesn't pass the logical cpu index.
+IIRC its NULL, rename it.
+
+> +{
+> +	struct cpupmu_regs *pmuregs = this_cpu_ptr(&cpu_pmu_regs);
+> +
+> +	if (action == CPU_PM_ENTER && cpu_pmu->save_regs)
+> +		cpu_pmu->save_regs(cpu_pmu, pmuregs);
+> +	else if (action == CPU_PM_EXIT && cpu_pmu->restore_regs)
+> +		cpu_pmu->restore_regs(cpu_pmu, pmuregs);
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block cpu_pmu_pm_notifier = {
+> +	.notifier_call = cpu_pmu_pm_notify,
+> +};
+> +
+>  /*
+>   * PMU platform driver and devicetree bindings.
+>   */
+> @@ -349,9 +368,17 @@ static int __init register_pmu_driver(void)
+>  	if (err)
+>  		return err;
+>  
+> +	err = cpu_pm_register_notifier(&cpu_pmu_pm_notifier);
+> +	if (err) {
+> +		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
+> +		return err;
+> +	}
+> +
+>  	err = platform_driver_register(&cpu_pmu_driver);
+> -	if (err)
+> +	if (err) {
+> +		cpu_pm_unregister_notifier(&cpu_pmu_pm_notifier);
+>  		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
+> +	}
+>  
+>  	return err;
+>  }
+> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> index f4ef398..29ae8f1 100644
+> --- a/arch/arm/kernel/perf_event_v7.c
+> +++ b/arch/arm/kernel/perf_event_v7.c
+> @@ -1237,6 +1237,51 @@ static void armv7_pmnc_dump_regs(struct arm_pmu *cpu_pmu)
+>  }
+>  #endif
+>  
+> +static void armv7pmu_save_regs(struct arm_pmu *cpu_pmu,
+> +					struct cpupmu_regs *regs)
+> +{
+> +	unsigned int cnt;
+> +	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (regs->pmc));
+> +	if (!(regs->pmc & ARMV7_PMNC_E))
+> +		return;
+> +
+> +	asm volatile("mrc p15, 0, %0, c9, c12, 1" : "=r" (regs->pmcntenset));
+> +	asm volatile("mrc p15, 0, %0, c9, c14, 0" : "=r" (regs->pmuseren));
+> +	asm volatile("mrc p15, 0, %0, c9, c14, 1" : "=r" (regs->pmintenset));
+> +	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (regs->pmxevtcnt[0]));
+> +	for (cnt = ARMV7_IDX_COUNTER0;
+> +			cnt <= ARMV7_IDX_COUNTER_LAST(cpu_pmu); cnt++) {
+
+As Will suggested better to use used_mask to save/restore only active events.
+
+Regards,
+Sudeep
