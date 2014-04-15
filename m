@@ -1,25 +1,51 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 15 Apr 2014 10:10:04 +0200
-Subject: dma_alloc_coherent and cache?
-In-Reply-To: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
-References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
-Message-ID: <20140415081004.GJ22546@lunn.ch>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 15 Apr 2014 10:12:39 +0200
+Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
+In-Reply-To: <20140415080006.GE2255@ldesroches-Latitude-E6320>
+References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
+ <20140414152212.GC2255@ldesroches-Latitude-E6320>
+ <534CE24F.9020703@gmail.com>
+ <20140415080006.GE2255@ldesroches-Latitude-E6320>
+Message-ID: <534CE9F7.60202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 09:43:38AM +0400, Lee Essen wrote:
-> Hi,
+On 15/04/2014 10:00, Ludovic Desroches wrote:
+> On Tue, Apr 15, 2014 at 09:39:59AM +0200, Richard Genoud wrote:
+>> On 14/04/2014 17:22, Ludovic Desroches wrote:
+>>> Hi Richard,
+>>>
+>>> On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
+>>>> RTS pin is an active low pin.
+>>>> For now, this doesn't change anything as the ACTIVE_LOW flag is not
+>>>> handled in atmel_serial, but it will be in 3.16.
+>>>>
+>>>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
+>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>>>> index 17c1042b2df8..2f7aad71b3c9 100644
+>>>> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>>>> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>>>> @@ -35,7 +35,7 @@ Example:
+>>>>  		clock-names = "usart";
+>>>>  		atmel,use-dma-rx;
+>>>>  		atmel,use-dma-tx;
+>>>> -		rts-gpios = <&pioD 15 0>;
+>>>> +		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+>>>
+>>> I was told we should not use macros here. If it is still the truth:
+>>>
+>>> rts-gpios = <&pioD 15 1>;
+>>
+>> But I'd really like to know if macros are forbidden in DT documentation and why...
+>> Because, IMHO, <&pioD 15 1> talks less that <&pioD 15 GPIO_ACTIVE_LOW>.
+>> Which is a shame in a documentation.
 > 
-> I'm working on a driver for a Marvell switch device (98dx4122) where the basic interface closely resembles the mv643xx_eth device.
-
-Hi Lee
-
-There is basic support for this SoC in the kernel. See
-arch/arm/boot/dts/kirkwood-98dx4122.dtsi and
-arch/arm/boot/dts/kirkwood-km_kirkwood.dts which is keymile's
-reference design.
-
-Keymile are the experts for this device within the kernel community,
-so maybe they can comment?
-
-   Andrew
+> I don't remember who told me that but the reason was that device tree
+> should not depend on Linux and macros are relative to Linux.
+> 
+Well, that makes sense, but I thought that include/dt-bindings/ was more
+DT relative.
