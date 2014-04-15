@@ -1,65 +1,48 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Tue, 15 Apr 2014 17:19:45 +0530
-Subject: [PATCH V8 3/9] phy: SPEAr1310/40-miphy: Add binding information
+Date: Tue, 15 Apr 2014 17:19:48 +0530
+Subject: [PATCH V8 6/9] SPEAr13XX: Add binding information for PCIe controller
 In-Reply-To: <cover.1397555158.git.mohit.kumar@st.com>
 References: <cover.1397555158.git.mohit.kumar@st.com>
-Message-ID: <323b13ad6a87e6650c00f6e566818fa2ede7be95.1397555158.git.mohit.kumar@st.com>
+Message-ID: <6d35ffd2873453be8ccba8a53062f1830e367e5f.1397555158.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <pratyush.anand@st.com>
 
-SPEAr1310/40 uses miphy for PCIe, SATA. This patch adds documentation
-for the binding on the top of generic phy bindings.
+SPEAr13XX uses designware PCIe controller. This patch adds information
+for the PCIe binding properties which are specific to SPEAr13XX SoC
+series.
 
 Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Mohit Kumar <mohit.kumar@st.com>
 Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
 Cc: spear-devel at list.st.com
 Cc: devicetree at vger.kernel.org
 ---
- .../devicetree/bindings/phy/st-spear1310-miphy.txt |   12 ++++++++++++
- .../devicetree/bindings/phy/st-spear1340-miphy.txt |   11 +++++++++++
- 2 files changed, 23 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
- create mode 100644 Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt
+ .../devicetree/bindings/pci/spear13xx-pcie.txt     |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
 
-diff --git a/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+diff --git a/Documentation/devicetree/bindings/pci/spear13xx-pcie.txt b/Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
 new file mode 100644
-index 0000000..b9b281a
+index 0000000..49ea76d
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
-@@ -0,0 +1,12 @@
-+ST SPEAr1310-miphy DT detail
-+===================================
++++ b/Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
+@@ -0,0 +1,14 @@
++SPEAr13XX PCIe DT detail:
++================================
 +
-+SPEAr1310-miphy is a phy controller supporting PCIe and SATA.
++SPEAr13XX uses synopsis designware PCIe controller and ST MiPHY as phy
++controller.
 +
 +Required properties:
-+- compatible : should be "st,spear1310-miphy"
-+- reg : offset and length of the PHY register set.
-+- misc: phandle for the syscon node to access misc registers
-+- phy-id: Instance id of the phy.
-+- #phy-cells : from the generic PHY bindings, must be 1.
-+	- cell[1]: 0 if phy used for SATA, 1 for PCIe.
-diff --git a/Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt b/Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt
-new file mode 100644
-index 0000000..7eb5335
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt
-@@ -0,0 +1,11 @@
-+ST SPEAr1340-miphy DT detail
-+===================================
++- compatible : should be "st,spear1340-pcie", "snps,dw-pcie".
++- phys		    : phandle to phy node associated with pcie controller
++- phy-names	    : must be "pcie-phy"
++- All other definitions as per generic PCI bindings
 +
-+SPEAr1340-miphy is a phy controller supporting PCIe and SATA.
-+
-+Required properties:
-+- compatible : should be "st,spear1340-miphy"
-+- reg : offset and length of the PHY register set.
-+- misc: phandle for the syscon node to access misc registers
-+- #phy-cells : from the generic PHY bindings, must be 1.
-+	- cell[1]: 0 if phy used for SATA, 1 for PCIe.
++ Optional properties:
++- st,pcie-is-gen1 indicates that forced gen1 initialization is needed.
 -- 
 1.7.0.1
