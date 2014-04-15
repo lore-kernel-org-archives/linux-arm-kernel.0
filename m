@@ -1,126 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Apr 2014 10:29:45 +0200
-Subject: [PATCH] clk: impd1: add pclk clocks
-Message-ID: <1397550585-7248-1-git-send-email-linus.walleij@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 15 Apr 2014 17:32:40 +0900
+Subject: [PATCHv2 3/8] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+In-Reply-To: <4788081.xvaJfdGTMu@wuerfel>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <1397527192-21988-4-git-send-email-cw00.choi@samsung.com>
+ <4788081.xvaJfdGTMu@wuerfel>
+Message-ID: <534CEEA8.6020800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IM-PD1 PrimeCells all have pclk assignments though this clock
-cannot be controlled, and we need to provide this as a dummy
-clock for the PL061 GPIO driver to probe, so let's assign it to
-all the cells on the board.
+Hi,
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clk/versatile/clk-impd1.c | 36 +++++++++++++++++++++++++++++-------
- 1 file changed, 29 insertions(+), 7 deletions(-)
+On 04/15/2014 05:11 PM, Arnd Bergmann wrote:
+> On Tuesday 15 April 2014 10:59:47 Chanwoo Choi wrote:
+>> This patch add memory mapping for PMU (Power Management Unit) which is used
+>> for power control of Exynos3250.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> Arnd Bergmann suggested that need proper driver instead of static memory mapping.
+>> As Chanho Park reply[2], Sachin Kamat already posted the DT support patch[1]
+>> for memory mapping for SYSRAM.
+>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg27647.html
+>> [2] https://lkml.org/lkml/2014/4/10/161
+>>
+>> So, I'm going to re-implement following patch related to static memory mapping
+>> after merged Sachin Kamat patch[1].
+>>   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+> 
+> I don't think we have a patch for the PMU yet, Sachin was looking at the SYSRAM
+> only.
 
-diff --git a/drivers/clk/versatile/clk-impd1.c b/drivers/clk/versatile/clk-impd1.c
-index 31b44f025f9e..8d7d4d5a514c 100644
---- a/drivers/clk/versatile/clk-impd1.c
-+++ b/drivers/clk/versatile/clk-impd1.c
-@@ -20,6 +20,8 @@
- #define IMPD1_LOCK	0x08
- 
- struct impd1_clk {
-+	char *pclkname;
-+	struct clk *pclk;
- 	char *vco1name;
- 	struct clk *vco1clk;
- 	char *vco2name;
-@@ -31,7 +33,7 @@ struct impd1_clk {
- 	struct clk *spiclk;
- 	char *scname;
- 	struct clk *scclk;
--	struct clk_lookup *clks[6];
-+	struct clk_lookup *clks[15];
- };
- 
- /* One entry for each connected IM-PD1 LM */
-@@ -86,6 +88,7 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
- {
- 	struct impd1_clk *imc;
- 	struct clk *clk;
-+	struct clk *pclk;
- 	int i;
- 
- 	if (id > 3) {
-@@ -94,11 +97,18 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
- 	}
- 	imc = &impd1_clks[id];
- 
-+	/* Register the fixed rate PCLK */
-+	imc->pclkname = kasprintf(GFP_KERNEL, "lm%x-pclk", id);
-+	pclk = clk_register_fixed_rate(NULL, imc->pclkname, NULL,
-+				      CLK_IS_ROOT, 0);
-+	imc->pclk = pclk;
-+
- 	imc->vco1name = kasprintf(GFP_KERNEL, "lm%x-vco1", id);
- 	clk = icst_clk_register(NULL, &impd1_icst1_desc, imc->vco1name, NULL,
- 				base);
- 	imc->vco1clk = clk;
--	imc->clks[0] = clkdev_alloc(clk, NULL, "lm%x:01000", id);
-+	imc->clks[0] = clkdev_alloc(pclk, "apb_pclk", "lm%x:01000", id);
-+	imc->clks[1] = clkdev_alloc(clk, NULL, "lm%x:01000", id);
- 
- 	/* VCO2 is also called "CLK2" */
- 	imc->vco2name = kasprintf(GFP_KERNEL, "lm%x-vco2", id);
-@@ -107,28 +117,38 @@ void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
- 	imc->vco2clk = clk;
- 
- 	/* MMCI uses CLK2 right off */
--	imc->clks[1] = clkdev_alloc(clk, NULL, "lm%x:00700", id);
-+	imc->clks[2] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00700", id);
-+	imc->clks[3] = clkdev_alloc(clk, NULL, "lm%x:00700", id);
- 
- 	/* UART reference clock divides CLK2 by a fixed factor 4 */
- 	imc->uartname = kasprintf(GFP_KERNEL, "lm%x-uartclk", id);
- 	clk = clk_register_fixed_factor(NULL, imc->uartname, imc->vco2name,
- 				   CLK_IGNORE_UNUSED, 1, 4);
- 	imc->uartclk = clk;
--	imc->clks[2] = clkdev_alloc(clk, NULL, "lm%x:00100", id);
--	imc->clks[3] = clkdev_alloc(clk, NULL, "lm%x:00200", id);
-+	imc->clks[4] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00100", id);
-+	imc->clks[5] = clkdev_alloc(clk, NULL, "lm%x:00100", id);
-+	imc->clks[6] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00200", id);
-+	imc->clks[7] = clkdev_alloc(clk, NULL, "lm%x:00200", id);
- 
- 	/* SPI PL022 clock divides CLK2 by a fixed factor 64 */
- 	imc->spiname = kasprintf(GFP_KERNEL, "lm%x-spiclk", id);
- 	clk = clk_register_fixed_factor(NULL, imc->spiname, imc->vco2name,
- 				   CLK_IGNORE_UNUSED, 1, 64);
--	imc->clks[4] = clkdev_alloc(clk, NULL, "lm%x:00300", id);
-+	imc->clks[8] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00300", id);
-+	imc->clks[9] = clkdev_alloc(clk, NULL, "lm%x:00300", id);
-+
-+	/* The GPIO blocks and AACI have only PCLK */
-+	imc->clks[10] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00400", id);
-+	imc->clks[11] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00500", id);
-+	imc->clks[12] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00800", id);
- 
- 	/* Smart Card clock divides CLK2 by a fixed factor 4 */
- 	imc->scname = kasprintf(GFP_KERNEL, "lm%x-scclk", id);
- 	clk = clk_register_fixed_factor(NULL, imc->scname, imc->vco2name,
- 				   CLK_IGNORE_UNUSED, 1, 4);
- 	imc->scclk = clk;
--	imc->clks[5] = clkdev_alloc(clk, NULL, "lm%x:00600", id);
-+	imc->clks[13] = clkdev_alloc(pclk, "apb_pclk", "lm%x:00600", id);
-+	imc->clks[14] = clkdev_alloc(clk, NULL, "lm%x:00600", id);
- 
- 	for (i = 0; i < ARRAY_SIZE(imc->clks); i++)
- 		clkdev_add(imc->clks[i]);
-@@ -149,9 +169,11 @@ void integrator_impd1_clk_exit(unsigned int id)
- 	clk_unregister(imc->uartclk);
- 	clk_unregister(imc->vco2clk);
- 	clk_unregister(imc->vco1clk);
-+	clk_unregister(imc->pclk);
- 	kfree(imc->scname);
- 	kfree(imc->spiname);
- 	kfree(imc->uartname);
- 	kfree(imc->vco2name);
- 	kfree(imc->vco1name);
-+	kfree(imc->pclkname);
- }
--- 
-1.9.0
+You are right. Sachin's patch only included the solution of SYSRAM memory mapping.
+I set out the plan that I would implment proper driver for PMU memory mapping
+instead of static method after merged Sachin's patch for SYSRAM.
+
+But,
+If you'd like me to implment PMU memory mapping instead of static mapping right now,
+I'll implement it for PMU such as Sachin's patch on next posting(v3).
+
+Thanks for your review.
+
+Best Regards,
+Chanwoo Choi
