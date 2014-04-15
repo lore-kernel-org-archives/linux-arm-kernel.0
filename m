@@ -1,215 +1,292 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 15 Apr 2014 10:40:03 +0800
-Subject: [PATCH] clk: sirf: fix a bundle of checkpatch issues
-Message-ID: <1397529603-16937-1-git-send-email-21cnbao@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 15 Apr 2014 10:41:43 +0800
+Subject: [PATCH 2/2] ahci: imx: software workaround for phy reset issue in
+ resume
+In-Reply-To: <1397529703-21165-1-git-send-email-shawn.guo@freescale.com>
+References: <1397529703-21165-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1397529703-21165-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bin Shi <Bin.Shi@csr.com>
+When suspending imx6q systems which have rootfs on SATA, the following
+error will likely be seen in resume.  The SATA link will fail to come
+up, and it results in an unusable system across the suspend/resume
+cycle.
 
-fix the below checkpatch issues about which users of codes - key customers care
-very much.
+$ echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+PM: Preparing system for mem sleep
+Freezing user space processes ... (elapsed 0.002 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
+PM: Entering mem sleep
+sd 0:0:0:0: [sda] Synchronizing SCSI cache
+sd 0:0:0:0: [sda] Stopping disk
+PM: suspend of devices complete after 61.914 msecs
+PM: suspend devices took 0.070 seconds
+PM: late suspend of devices complete after 4.906 msecs
+PM: noirq suspend of devices complete after 4.521 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+PM: noirq resume of devices complete after 10.486 msecs
+PM: early resume of devices complete after 4.679 msecs
+sd 0:0:0:0: [sda] Starting disk
+PM: resume of devices complete after 22.674 msecs
+PM: resume devices took 0.030 seconds
+PM: Finishing wakeup.
+Restarting tasks ... done.
+$ ata1: SATA link down (SStatus 1 SControl 300)
+ata1: SATA link down (SStatus 1 SControl 300)
+ata1: limiting SATA link speed to 1.5 Gbps
+ata1: SATA link down (SStatus 1 SControl 310)
+ata1.00: disabled
+ata1: exception Emask 0x10 SAct 0x0 SErr 0x4040000 action 0xe frozen t4
+ata1: irq_stat 0x00000040, connection status changed
+ata1: SError: { CommWake DevExch }
+ata1: hard resetting link
+sd 0:0:0:0: rejecting I/O to offline device
+sd 0:0:0:0: killing request
+sd 0:0:0:0: rejecting I/O to offline device
+Aborting journal on device sda2-8.
+sd 0:0:0:0: rejecting I/O to offline device
+EXT4-fs warning (device sda2): ext4_end_bio:317: I/O error writing to inode 132577 (offset 0 size 0 starting block 26235)
+Buffer I/O error on device sda2, logical block 10169
+...
 
-WARNING: line over 80 characters
-66: FILE: clk-atlas6.c:66:
-+	usp2,   vip,   gfx,   gfx2d,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
+It's caused by a silicon issue that SATA phy does not get reset by
+controller when coming back from LPM.  The patch adds a software
+workaround for this issue.  It enforces a software reset on SATA phy
+in imx_sata_enable() function, so that we can ensure SATA link will
+come up properly in both power-on and resume.
 
-total: 0 errors, 1 warnings, 153 lines checked
+The software reset is implemented by writing phy reset register through
+the phy control register bus interface.  Functions
+imx_phy_reg_[addressing|write|read]() implement this bus interface, while
+imx_sata_phy_reset() performs the actually reset operation.
 
-clk-atlas6.c has style problems, please review.
-
-If any of these errors are false positives, please report
-them to the maintainer, see CHECKPATCH in MAINTAINERS.
-WARNING: line over 80 characters
-24: FILE: clk-common.c:24:
-+ *     Each clock domain can select its own clock source from five clock sources,
-WARNING: line over 80 characters
-25: FILE: clk-common.c:25:
-+ *     X_XIN, X_XINW, PLL1, PLL2 and PLL3. The domain clock is used as the source
-
-WARNING: line over 80 characters
-171: FILE: clk-common.c:171:
-+	return pll_clk_round_rate(__clk_get_hw(parent_clk), rate, &pll_parent_rate);
-
-WARNING: static const char * array should probably be static const char * const
-191: FILE: clk-common.c:191:
-+static const char *pll_clk_parents[] = {
-
-WARNING: line over 80 characters
-260: FILE: clk-common.c:260:
-+static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
-
-WARNING: static const char * array should probably be static const char * const
-287: FILE: clk-common.c:287:
-+static const char *dmn_clk_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-676: FILE: clk-common.c:676:
-+static const char *std_clk_io_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-952: FILE: clk-common.c:952:
-+static const char *std_clk_dsp_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-984: FILE: clk-common.c:984:
-+static const char *std_clk_sys_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-1002: FILE: clk-common.c:1002:
-+static const char *std_clk_usb_parents[] = {
-
-total: 0 errors, 10 warnings, 1032 lines checked
-
-clk-common.c has style problems, please review.
-
-If any of these errors are false positives, please report
-them to the maintainer, see CHECKPATCH in MAINTAINERS.
-total: 0 errors, 0 warnings, 1032 lines checked
-
-clk-common.c.orig has no obvious style problems and is ready for submission.
-WARNING: line over 80 characters
-65: FILE: clk-prima2.c:65:
-+	usp2,   vip,   gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
-
-total: 0 errors, 1 warnings, 152 lines checked
-
-Signed-off-by: Bin Shi <Bin.Shi@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Signed-off-by: Richard Zhu <r65037@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- drivers/clk/sirf/clk-atlas6.c |    8 ++++----
- drivers/clk/sirf/clk-common.c |   22 ++++++++++++----------
- drivers/clk/sirf/clk-prima2.c |   10 +++++-----
- 3 files changed, 21 insertions(+), 19 deletions(-)
+ drivers/ata/ahci_imx.c | 175 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 175 insertions(+)
 
-diff --git a/drivers/clk/sirf/clk-atlas6.c b/drivers/clk/sirf/clk-atlas6.c
-index d63b76c..b068feb 100644
---- a/drivers/clk/sirf/clk-atlas6.c
-+++ b/drivers/clk/sirf/clk-atlas6.c
-@@ -60,10 +60,10 @@ static struct clk_dmn clk_nand = {
+diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+index 39629b4..7d4756d 100644
+--- a/drivers/ata/ahci_imx.c
++++ b/drivers/ata/ahci_imx.c
+@@ -31,6 +31,18 @@
+ #define IMX_SATA_TIMER1MS			0x00e0
+ #define IMX_SATA_P0PHYCR			0x0178
+ #define  P0PHYCR_TEST_PDDQ			(1 << 20)
++#define  P0PHYCR_CR_READ			(1 << 19)
++#define  P0PHYCR_CR_WRITE			(1 << 18)
++#define  P0PHYCR_CR_CAP_DATA			(1 << 17)
++#define  P0PHYCR_CR_CAP_ADDR			(1 << 16)
++#define IMX_SATA_P0PHYSR			0x017c
++#define  P0PHYSR_CR_ACK				(1 << 18)
++#define  P0PHYSR_CR_DATA_OUT			0xffff
++
++#define IMX_PHY_LANE0_OUT_STAT			0x2003
++#define  LANE0_OUT_STAT_RX_PLL_STATE		(1 << 1)
++#define IMX_PHY_CLOCK_RESET			0x7f3f
++#define  CLOCK_RESET_RESET			(1 << 0)
  
- enum atlas6_clk_index {
- 	/* 0    1     2      3      4      5      6       7         8      9 */
--	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
--	mf,     io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
--	spi1,   pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
--	usp2,   vip,   gfx,   gfx2d,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
-+	rtc,  osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
-+	mf,   io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
-+	spi1, pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
-+	usp2, vip,   gfx,   gfx2d, lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
- 	usb0,  usb1,   cphif, maxclk,
- };
+ enum ahci_imx_type {
+ 	AHCI_IMX53,
+@@ -52,9 +64,165 @@ MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support
  
-diff --git a/drivers/clk/sirf/clk-common.c b/drivers/clk/sirf/clk-common.c
-index 37af51c..aebaec01 100644
---- a/drivers/clk/sirf/clk-common.c
-+++ b/drivers/clk/sirf/clk-common.c
-@@ -21,8 +21,8 @@ static struct clk_onecell_data clk_data;
-  * - 2 exclusive plls: usb phy pll and sata phy pll
-  * - 8 clock domains: cpu/cpudiv, mem/memdiv, sys/io, dsp, graphic, multimedia,
-  *     display and sdphy.
-- *     Each clock domain can select its own clock source from five clock sources,
-- *     X_XIN, X_XINW, PLL1, PLL2 and PLL3. The domain clock is used as the source
-+ *     Each clock domain can select its own clock source from 5 clock sources,
-+ *     X_XIN, X_XINW, PLL1, PLL2 & PLL3. Domain clock is used as the source
-  *     clock of the group clock.
-  *     - dsp domain: gps, mf
-  *     - io domain: dmac, nand, audio, uart, i2c, spi, usp, pwm, pulse
-@@ -168,7 +168,8 @@ static long cpu_clk_round_rate(struct clk_hw *hw, unsigned long rate,
- 	struct clk *parent_clk = clk_get_parent(hw->clk);
- 	struct clk *pll_parent_clk = clk_get_parent(parent_clk);
- 	unsigned long pll_parent_rate = clk_get_rate(pll_parent_clk);
--	return pll_clk_round_rate(__clk_get_hw(parent_clk), rate, &pll_parent_rate);
-+	return pll_clk_round_rate(__clk_get_hw(parent_clk),
-+		rate, &pll_parent_rate);
- }
+ static void ahci_imx_host_stop(struct ata_host *host);
  
- static unsigned long cpu_clk_recalc_rate(struct clk_hw *hw,
-@@ -188,7 +189,7 @@ static struct clk_ops std_pll_ops = {
- 	.set_rate = pll_clk_set_rate,
- };
- 
--static const char *pll_clk_parents[] = {
-+static const char * const pll_clk_parents[] = {
- 	"osc",
- };
- 
-@@ -257,7 +258,8 @@ static void usb_pll_clk_disable(struct clk_hw *clk)
- 	writel(reg, sirfsoc_rsc_vbase + SIRFSOC_USBPHY_PLL_CTRL);
- }
- 
--static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
-+static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw,
-+	unsigned long parent_rate)
++static int imx_phy_ack_polling(void __iomem *mmio, bool assert)
++{
++	int timeout = 100;
++	u32 srval;
++
++	do {
++		srval = readl(mmio + IMX_SATA_P0PHYSR);
++		if ((assert ? srval : ~srval) & P0PHYSR_CR_ACK)
++			break;
++		usleep_range(100, 200);
++	} while (--timeout);
++
++	return timeout ? 0 : -ETIMEDOUT;
++}
++
++static int imx_phy_reg_addressing(u16 addr, void __iomem *mmio)
++{
++	u32 crval = addr;
++	int ret;
++
++	/* 1. Supply the address on cr_data_in */
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 2. Assert the cr_cap_addr signal */
++	crval |= P0PHYCR_CR_CAP_ADDR;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 3. Wait for the cr_ack signal to be asserted */
++	ret = imx_phy_ack_polling(mmio, true);
++	if (ret)
++		return ret;
++
++	/* 4. Deassert cr_cap_addr */
++	crval &= ~P0PHYCR_CR_CAP_ADDR;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 5. Wait for cr_ack to be deasserted */
++	ret = imx_phy_ack_polling(mmio, false);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static int imx_phy_reg_write(u16 val, void __iomem *mmio)
++{
++	u32 crval = val;
++	int ret;
++
++	/* 1. Supply the data on cr_data_in */
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 2. Assert the cr_cap_data signal */
++	crval |= P0PHYCR_CR_CAP_DATA;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 3. Wait for the cr_ack signal to be asserted */
++	ret = imx_phy_ack_polling(mmio, true);
++	if (ret)
++		return ret;
++
++	/* 4. Deassert cr_cap_data */
++	crval &= ~P0PHYCR_CR_CAP_DATA;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 5. Wait for cr_ack to be deasserted */
++	ret = imx_phy_ack_polling(mmio, false);
++	if (ret)
++		return ret;
++
++	/* 6. Assert the cr_write signal */
++	crval |= P0PHYCR_CR_WRITE;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 7. Wait for cr_ack to be asserted */
++	ret = imx_phy_ack_polling(mmio, true);
++	if (ret)
++		return ret;
++
++	/* 8. Deassert cr_write */
++	crval &= ~P0PHYCR_CR_WRITE;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 9. Wait for cr_ack to be deasserted */
++	ret = imx_phy_ack_polling(mmio, false);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static int imx_phy_reg_read(u16 *val, void __iomem *mmio)
++{
++	u32 crval = 0;
++	int ret;
++
++	/* 1. Assert the cr_read signal */
++	crval |= P0PHYCR_CR_READ;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 2. Wait for the cr_ack signal to be asserted */
++	ret = imx_phy_ack_polling(mmio, true);
++	if (ret)
++		return ret;
++
++	/* 3. Capture the data from cr_data_out[] */
++	*val = readl(mmio + IMX_SATA_P0PHYSR) & P0PHYSR_CR_DATA_OUT;
++
++	/* 4. Deassert cr_read */
++	crval &= ~P0PHYCR_CR_READ;
++	writel(crval, mmio + IMX_SATA_P0PHYCR);
++
++	/* 5. Wait for cr_ack to be deasserted */
++	ret = imx_phy_ack_polling(mmio, false);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static int imx_sata_phy_reset(struct ahci_host_priv *hpriv)
++{
++	void __iomem *mmio = hpriv->mmio;
++	int timeout = 10;
++	u16 val;
++	int ret;
++
++	/* Reset SATA PHY by setting RESET bit of PHY register CLOCK_RESET */
++	ret = imx_phy_reg_addressing(IMX_PHY_CLOCK_RESET, mmio);
++	if (ret)
++		return ret;
++	/*
++	 * For phy reset operation, we skip the timeout checking, because phy
++	 * will be unable to acknowledge in this case.
++	 */
++	imx_phy_reg_write(CLOCK_RESET_RESET, mmio);
++
++	usleep_range(100, 200);
++
++	/* Wait for PHY RX_PLL to be stable */
++	do {
++		ret = imx_phy_reg_addressing(IMX_PHY_LANE0_OUT_STAT, mmio);
++		if (ret)
++			return ret;
++		ret = imx_phy_reg_read(&val, mmio);
++		if (ret)
++			return ret;
++		if (val & LANE0_OUT_STAT_RX_PLL_STATE)
++			break;
++		usleep_range(100, 200);
++	} while (--timeout);
++
++	return timeout ? 0 : -ETIMEDOUT;
++}
++
+ static int imx_sata_enable(struct ahci_host_priv *hpriv)
  {
- 	u32 reg = readl(sirfsoc_rsc_vbase + SIRFSOC_USBPHY_PLL_CTRL);
- 	return (reg & SIRFSOC_USBPHY_PLL_BYPASS) ? parent_rate : 48*MHZ;
-@@ -284,7 +286,7 @@ static struct clk_hw usb_pll_clk_hw = {
-  * clock domains - cpu, mem, sys/io, dsp, gfx
-  */
+ 	struct imx_ahci_priv *imxpriv = hpriv->plat_data;
++	struct device *dev = &imxpriv->ahci_pdev->dev;
+ 	int ret;
  
--static const char *dmn_clk_parents[] = {
-+static const char * const dmn_clk_parents[] = {
- 	"rtc",
- 	"osc",
- 	"pll1",
-@@ -673,7 +675,7 @@ static void std_clk_disable(struct clk_hw *hw)
- 	clkc_writel(val, reg);
- }
+ 	if (imxpriv->no_device)
+@@ -99,6 +267,12 @@ static int imx_sata_enable(struct ahci_host_priv *hpriv)
+ 		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+ 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN,
+ 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN);
++
++		ret = imx_sata_phy_reset(hpriv);
++		if (ret) {
++			dev_err(dev, "failed to reset phy: %d\n", ret);
++			goto disable_regulator;
++		}
+ 	}
  
--static const char *std_clk_io_parents[] = {
-+static const char * const std_clk_io_parents[] = {
- 	"io",
- };
+ 	usleep_range(1000, 2000);
+@@ -215,6 +389,7 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ 	if (!imxpriv)
+ 		return -ENOMEM;
  
-@@ -949,7 +951,7 @@ static struct clk_std clk_pulse = {
- 	},
- };
- 
--static const char *std_clk_dsp_parents[] = {
-+static const char * const std_clk_dsp_parents[] = {
- 	"dsp",
- };
- 
-@@ -981,7 +983,7 @@ static struct clk_std clk_mf = {
- 	},
- };
- 
--static const char *std_clk_sys_parents[] = {
-+static const char * const std_clk_sys_parents[] = {
- 	"sys",
- };
- 
-@@ -999,7 +1001,7 @@ static struct clk_std clk_security = {
- 	},
- };
- 
--static const char *std_clk_usb_parents[] = {
-+static const char * const std_clk_usb_parents[] = {
- 	"usb_pll",
- };
- 
-diff --git a/drivers/clk/sirf/clk-prima2.c b/drivers/clk/sirf/clk-prima2.c
-index 6968e2e..83d74c4 100644
---- a/drivers/clk/sirf/clk-prima2.c
-+++ b/drivers/clk/sirf/clk-prima2.c
-@@ -59,11 +59,11 @@ static struct clk_std clk_nand = {
- 
- enum prima2_clk_index {
- 	/* 0    1     2      3      4      5      6       7         8      9 */
--	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
--	mf,     io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
--	spi1,   pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
--	usp2,   vip,   gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
--	usb0,  usb1,   cphif, maxclk,
-+	rtc,  osc,  pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
-+	mf,   io,   cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
-+	spi1, pwmc, efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
-+	usp2, vip,  gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
-+	usb0, usb1, cphif, maxclk,
- };
- 
- static __initdata struct clk_hw *prima2_clk_hw_array[maxclk] = {
++	imxpriv->ahci_pdev = pdev;
+ 	imxpriv->no_device = false;
+ 	imxpriv->first_time = true;
+ 	imxpriv->type = (enum ahci_imx_type)of_id->data;
 -- 
-1.7.5.4
+1.8.3.2
