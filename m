@@ -1,91 +1,62 @@
-From: lee.essen@nowonline.co.uk (Lee Essen)
-Date: Tue, 15 Apr 2014 20:22:55 +0400
-Subject: dma_alloc_coherent and cache?
-In-Reply-To: <4292964.mUEmdLVWYx@wuerfel>
-References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
- <4356499.vN3lxjGqPZ@wuerfel>
- <E94CEA02-A987-4212-A0CA-D0CDC80E7250@nowonline.co.uk>
- <4292964.mUEmdLVWYx@wuerfel>
-Message-ID: <30E320E3-FE79-4E2B-89D3-07E0D6EE975C@nowonline.co.uk>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 15 Apr 2014 18:26:27 +0200
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <CAA3XUr0SBczZSKui-qOivJKGtOe8_rB8HX4rSX24VYvLXm5yvw@mail.gmail.com>
+References: <5347655B.3080307@linaro.org>
+ <20140411.003636.272212797007496394.davem@davemloft.net>
+ <20140411145625.GA27493@redhat.com> <20140411152207.GA28188@redhat.com>
+ <20140411153041.GQ16119@n2100.arm.linux.org.uk>
+ <20140411172456.GA20506@redhat.com>
+ <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
+ <20140414185916.GA30672@redhat.com>
+ <CAA3XUr3BGA55JF_cgH=cqbo1wAK0773P1fvnG9dBjLU2KzBdKA@mail.gmail.com>
+ <CAA3XUr0SBczZSKui-qOivJKGtOe8_rB8HX4rSX24VYvLXm5yvw@mail.gmail.com>
+Message-ID: <20140415162627.GB3560@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/14, Victor Kamensky wrote:
+>
+> Oleg's fix - Oleg's fix proposed on [1]. Basically it uses
+> copy_to_user_page and it does dynamic look-up of xol area vma
+> every tracing
 
-On 15 Apr 2014, at 14:49, Arnd Bergmann <arnd@arndb.de> wrote:
+I guess I was not clear. No, I didn't really try to propose this change,
+I do not like it ;)
 
-> On Tuesday 15 April 2014 14:01:39 Lee Essen wrote:
->>> On 15 Apr 2014, at 12:43, Arnd Bergmann <arnd@arndb.de> wrote:
->>> 
->>> dma_alloc_coherent() is a wrapper around a device-specific allocator,
->>> based on the dma_map_ops implementation. The default allocator
->>> from arm_dma_ops gives you uncached, buffered memory. It is expected
->>> that the driver uses a barrier (which is implied by readl/writel
->>> but not __raw_readl/__raw_writel or readl_relaxed/writel_relaxed)
->>> to ensure the write buffers are flushed.
->>> 
->>> If the machine sets arm_coherent_dma_ops rather than arm_dma_ops,
->>> the memory will be cacheable, as it's assumed that the hardware
->>> is set up for cache-coherent DMAs.
->> 
->> Hi,
->> 
->> The driver writes to the descriptor and then uses wmb() before enabling DMA. The descriptor is in dma_alloc_coherent() space, but the enable is a writel().
-> 
-> Ok
-> 
->>> 
->>> Can you post a link to the source code?
->>> 
->>>  Arnd
->> 
->> The code is available here:
->> 
->> http://www.nowonline.co.uk/scratch/le_netdev.c
->> 
->> It hangs consistently when it executes the txq_enable() on line 1280. Occasionally I see a corrupt packet on the wire, but mostly it's just a hang. If I uncomment all the printk's then it generally gets 20 or 30 packets out before it freezes.
->> 
-> 
-> 
-> Unfortunately I don't see an obvious mistake with the DMA handling there,
-> I would try looking somewhere other than the dma code first. What
-> kind of freeze do you see? Does the entire machine hang, or is it
-> just the network interface that stops sending packets?
-> 
+I showed this hack in reply to multiple and persistent requests to reuse
+the ptrace solution we already have.
 
-Hi Arnd,
+> my arm specific fix - this one was proposed on as [2].
 
-Thanks for having a look ? on the hangs it?s a complete machine hang, I?m connected via serial and it just stops dead.
+I didn't even try to read the changes in arm/, I can't understand them
+anyway. I leave this to you and Russel.
 
-I?m starting to look at other differences compared to the GPL code, but unfortunately there are many things. One very big difference is that the GPL code (used with 2.6.22) uses a patched version of proc-arm926.S that caters for a couple of Feroceon specifics.
+But, once again, please do not add arch_uprobe_flush_xol_access(), add
+arch_uprobe_copy_ixol().
 
-The proc-feroceon.S version, which is used in the newer kernel, doesn?t seem to have some of these ? one section of note is:
+> x) fix that I did for ARM that shares ARM code with
+> copy_to_user_page but does not need vma performs best.
 
-ENTRY(cpu_arm926_do_idle)
-#ifdef CONFIG_ARCH_FEROCEON
-        /* Implement workaround for FEr# CPU-C16: Wait for interrupt command */
-        /* is not processed properly, the workaround is not to use this command */
-        /* the erratum is relevant for 5281 devices with revision less than C0 */
+The patch which adds copy_to_user_page(vma => NULL) into copy_to_page() ?
+Please see the comments in my previous email.
 
-        ldr     r0, support_wait_for_interrupt_address /* this variable set in core.c*/
-        ldr     r0, [r0]
-        cmp     r0, #1    /* check if the device doesn't support wait for interrupt*/
-        bne     1f        /* if yes, then go out*/
-        /* workaround ends here*/
-#endif
-    mov r0, #0
-    mrc p15, 0, r1, c1, c0, 0       @ Read control register
-    mcr p15, 0, r0, c7, c10, 4      @ Drain write buffer
-    bic r2, r1, #1 << 12
-    mcr p15, 0, r2, c1, c0, 0       @ Disable I cache
-    mcr p15, 0, r0, c7, c0, 4       @ Wait for interrupt
-    mcr p15, 0, r1, c1, c0, 0       @ Restore ICache enable
-#ifdef CONFIG_ARCH_FEROCEON
-1:
-#endif
-    mov pc, lr
+> When I looked at current uprobes single step out line code
+> and compared it with code that was in the past (utrace
+> times) I noticed main essential difference how xol slots
+> are handled: Currently for each hit uprobes code allocate
+> xol slot and needs dcache/icache flush. But in the past
+> xol slot was attached/cached to uprobe entry
 
-? but there are many others. I?ll continue to look@these and see if I can experiment ? but I?m am definitely way out of my depth.
+Can't comment, I am not familiar with the old implementation.
 
-Regards,
+But yes, the current implementation is not perfect. Once again, it would
+be nice to remove this vma. Even if this is not possible, we can try to
+share this memory. We do not even need lru, we can make it "per cpu" and
+avoid the broadcasts. On x86 this is simple, we have __switch_to_xtra()
+which can re-copy ->ixol[] and do flush_icache_range() if UTASK_SSTEP.
+Not sure this is possible on arm and other arch'es. But lets not discuss
+this right now, this is a bit off-topic currently.
 
-Lee.
+Oleg.
