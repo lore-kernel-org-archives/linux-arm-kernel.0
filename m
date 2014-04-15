@@ -1,49 +1,31 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Apr 2014 20:20:13 +0200
-Subject: [PATCH v2 4/5] mmc: dove: prepare new Dove DT Kconfig variable
-In-Reply-To: <533442B9.80900@gmail.com>
-References: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393662801-17950-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140304040357.GH1872@titan.lakedaemon.net> <533442B9.80900@gmail.com>
-Message-ID: <534D785D.50704@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Apr 2014 12:25:01 -0600
+Subject: [PATCH 2/4] mmc: tegra: fix reporting of base clock frequency
+In-Reply-To: <1397526163-20126-3-git-send-email-abrestic@chromium.org>
+References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+ <1397526163-20126-3-git-send-email-abrestic@chromium.org>
+Message-ID: <534D797D.7030201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2014 04:24 PM, Sebastian Hesselbarth wrote:
-> On 03/04/2014 05:03 AM, Jason Cooper wrote:
->> On Sat, Mar 01, 2014 at 09:33:20AM +0100, Sebastian Hesselbarth wrote:
->>> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to
->>> MACH_DOVE in
->>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
->>> DT-only MACH_DOVE Kconfig.
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> ---
->>> Chris,
->>>
->>> Mark Brown requested to take the corresponding ASoC patch through
->>> his tree. Therefore, I have split the former patch into individual
->>> subsystem
->>> patches.
->>>
->>> Cc: Chris Ball <chris@printf.net>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Andrew Lunn <andrew@lunn.ch>
->>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> ---
->>>   drivers/mmc/host/Kconfig | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> Ping. Chris, can you please take it in for v3.15-rc1?
+On 04/14/2014 07:42 PM, Andrew Bresticker wrote:
+> Tegra SDHCI controllers, by default, report a base clock frequency
+> of 208Mhz in SDHCI_CAPABILTIES which may or may not be equal to the
+> actual base clock frequency.
 
-Ping again.
+Some explanation of why this "may or may not be equal to the actual base
+clock frequency" would be nice.
 
-Chris, anything wrong with this one? It still applies to
-v3.15-rc1 and is required to get sdhci working again on
-MULTI_V7 Dove.
+Presumably, it's because the clock frequency is supplied by the clock
+controller module, and configuring that happens externally to the SD
+controller, so the SD HW has no knowledge of the actual frequency, and
+hence simply reports a hard-coded maximum possible clock frequency?
 
-Sebastian
+> While this can be overridden by setting
+> BASE_CLK_FREQ in VENDOR_CLOCK_CTRL on Tegra30 and later SoCs, just
+> set SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN and supply a get_max_clock()
+> callback to get the actual rate of the base clock.
+
+It's not clear to me from the function name that
+sdhci_pltfm_clk_get_max_clock() simply calls clk_get() on the actual
+clock. It might be nice to mention that in the commit description.
