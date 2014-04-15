@@ -1,153 +1,124 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 15 Apr 2014 11:39:24 +0530
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <CAFp+6iHU0YXj18ajDwOqPh_SJWr6GkMPRr6qaGdmPoCc0+tz5g@mail.gmail.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
- <534529B2.2020107@samsung.com>
- <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
- <53454C11.7060607@samsung.com>
- <CAFp+6iHU0YXj18ajDwOqPh_SJWr6GkMPRr6qaGdmPoCc0+tz5g@mail.gmail.com>
-Message-ID: <CAFp+6iH7-O8pNNMrk7Yhg1u+DXcXD1Tp9RYdiFg+-Om5Toojfw@mail.gmail.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Tue, 15 Apr 2014 11:44:05 +0530
+Subject: [PATCH v9 02/12] ARM/ARM64: KVM: Add common header for PSCI related
+ defines
+In-Reply-To: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
+References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <1397542455-354-3-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+We need a common place to share PSCI related defines among ARM kernel,
+ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
 
+We introduce uapi/linux/psci.h for this purpose. This newly added
+header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
+and user space (i.e. QEMU or KVMTOOL).
 
-On Thu, Apr 10, 2014 at 5:09 PM, Vivek Gautam <gautamvivek1987@gmail.com> wrote:
-> On Wed, Apr 9, 2014 at 7:03 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->> On 09.04.2014 13:49, Vivek Gautam wrote:
->>>
->>> Hi,
->>>
->>>
->>> On Wed, Apr 9, 2014 at 4:36 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->>>>
->>>> Hi Vivek,
->>>>
->>>> Please see my comments inline.
->>>>
->>>>
->>>> On 08.04.2014 16:36, Vivek Gautam wrote:
->>>>>
->>>>>
->>>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>>>> The new driver uses the generic PHY framework and will interact
->>>>> with DWC3 controller present on Exynos5 series of SoCs.
->>>>> Thereby, removing old phy-samsung-usb3 driver and related code
->>>>> used untill now which was based on usb/phy framework.
->>>>>
->>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>>>> ---
->>>>>    .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->>>>>    drivers/phy/Kconfig                                |   11 +
->>>>>    drivers/phy/Makefile                               |    1 +
->>>>>    drivers/phy/phy-exynos5-usbdrd.c                   |  668
->>>>> ++++++++++++++++++++
->>>>>    4 files changed, 722 insertions(+)
->>>>>    create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
->>>>
->>>>
->>>>
->>>> [snip]
->>>>
->>>>
->>>>> +       Additional clock required for Exynos5420:
->>>>> +       - usb30_sclk_100m: Additional special clock used for PHY
->>>>> operation
->>>>> +                          depicted as 'sclk_usbphy30' in CMU of
->>>>> Exynos5420.
->>>>
->>>>
->>>>
->>>> Are you sure this isn't simply a gate for the ref clock, as it can be
->>>> found
->>>> on another SoC that is not upstream yet? I don't have documentation for
->>>> Exynos 5420 so I can't tell, but I'd like to ask you to recheck this.
->>>
->>>
->>>> From what i can see in the manual :
->>>
->>> sclk_usbphy30 is derived from OSCCLK.
->>> It is coming from a MUX (default input line to this is OSCCLK)  and
->>> then through a DIV
->>> there's this gate.
->>>
->>>        {OSCCLK  + other sources} --->[MUX] ---> [DIV] --> [GATE for
->>> sclk_usbphy30]
->>>
->>> the {rate of sclk_usbphy30} == OSCCLK
->>>
->>> However the 'ref' clock that we have been using is the actual oscillator
->>> clock.
->>> And on SoC Exynos5250, we don't have any such gate (sclk_usbphy30).
->>> So should this mean that ref clock and sclk_usbphy30 are still be
->>> controlled by
->>> two different gates ?
->>>
->>
->> Is there maybe a diagram of PHY input clocks in the datasheet, like for USB
->> 2.0 PHY in Exynos4210/4412/5250 datasheets in the chapter about USB2.0
->> Device? Something like:
->>
->>                      ____________________________________
->>                     |                                    |
->>                     |                         ___________|
->> XusbXTI             |   Phy_fsel[2:0]        |  _______  |
->>    _______[X]_______|    |         __________|_|___|\__|_|
->>   |                 |   _v___     |  _____   ^ |   |/  | |
->> _____               |  |     |    | |     |  | |  ___  | |
->>  ___                |  |     |    | |     |  | | |   |_|_|
->> |___|               |  | X 0 |____|_| PLL |__|_|_|CLK|_|_|
->> _____               |  |     |      |     |    | |DIV|_|_|
->>   |_______[X]       |  |_____| 12   |_____|480 | |___| | |
->>                     |          MHz         MHz |Digital| |
->> XusbXTO             |   USB PHY                |_______| |
->>                     |____________________________________|
->>
->>
->
-> Below is the block diagram given for DRD controller.
->
-> ___________________
-> |                                |
-> |      ____________     |
-> |      | PHY           |      |
-> |      | controller     |-----|-----------------------------------------------
-> |      |__________  |     |                                               |
-> |                                |
->           |
-> |         USB 3.0           |                                              V
-> |           DRD              |
-> -----------------------
-> |        Controller          |                                      |
->                      |
-> |                                |    USB30_SCLK_100M    | USB 3.0 DRD  |
-> |      ----------------          |           ----------------------->
-> |       PHY         |
-> |     | Link cont. |         |                                      |
->                      |
-> |      -------------             |
->  |                       |
-> |___________________|                                     |_____________|
->
-> Does this help ?
->
-> So, USB30_SCLK_100M is the SCLK that we are talking in the driver. I
-> don't see any reference to XXTI in the USB 3.0 DRD controller chapter
-> (in both Exynos5250 and 5420)
-> In addition to this there's one more point to be noticed here.
-> On Exynos5420 system, the sclk_usbphy300 (which is the sclk_usbphy30
-> for USB DRD channel 0), is also the PICO phy clock, i.e. USB 2.0 phy
-> clock.
-> So we should add a similar clk_get() for this clock in the
-> phy-exynos5250-usb2 driver too, to support Exynos5420.
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+---
+ include/uapi/linux/Kbuild |    1 +
+ include/uapi/linux/psci.h |   78 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
+ create mode 100644 include/uapi/linux/psci.h
 
-Is something clear from the above block diagram ? (although the
-diagram looks weird - space and tabs problem :-(  )
-Basically there's the clock USB30_SCLK_100M which is going into the
-USB 3.0 DRD PHY controller.
-And this is the only sclk mentioned in the block diagram for USB 3.0
-DRD controller in Exynos5420.
-Same is not there in the block diagram in Exynos5250 UM.
+diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
+index 6929571..24e9033 100644
+--- a/include/uapi/linux/Kbuild
++++ b/include/uapi/linux/Kbuild
+@@ -317,6 +317,7 @@ header-y += ppp-ioctl.h
+ header-y += ppp_defs.h
+ header-y += pps.h
+ header-y += prctl.h
++header-y += psci.h
+ header-y += ptp_clock.h
+ header-y += ptrace.h
+ header-y += qnx4_fs.h
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+new file mode 100644
+index 0000000..077b623
+--- /dev/null
++++ b/include/uapi/linux/psci.h
+@@ -0,0 +1,78 @@
++/*
++ * ARM Power State and Coordination Interface (PSCI) header
++ *
++ * This header holds common PSCI defines and macros shared
++ * by: ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space.
++ *
++ * Copyright (C) 2014 Linaro Ltd.
++ * Author: Anup Patel <anup.patel@linaro.org>
++ */
++
++#ifndef _UAPI_LINUX_PSCI_H
++#define _UAPI_LINUX_PSCI_H
++
++/* PSCI v0.1 interface */
++#define PSCI_FN(base, n)			((base) + (n))
++
++#define PSCI_FN_CPU_SUSPEND(base)		PSCI_FN(base, 0)
++#define PSCI_FN_CPU_OFF(base)			PSCI_FN(base, 1)
++#define PSCI_FN_CPU_ON(base)			PSCI_FN(base, 2)
++#define PSCI_FN_MIGRATE(base)			PSCI_FN(base, 3)
++
++/* PSCI v0.2 interface */
++#define PSCI_0_2_FN_BASE			0x84000000
++#define PSCI_0_2_FN(n)				(PSCI_0_2_FN_BASE + (n))
++#define PSCI_0_2_64BIT				0x40000000
++#define PSCI_0_2_FN64_BASE			\
++					(PSCI_0_2_FN_BASE + PSCI_0_2_64BIT)
++#define PSCI_0_2_FN64(n)			(PSCI_0_2_FN64_BASE + (n))
++
++#define PSCI_0_2_FN_PSCI_VERSION		PSCI_0_2_FN(0)
++#define PSCI_0_2_FN_CPU_SUSPEND			PSCI_0_2_FN(1)
++#define PSCI_0_2_FN_CPU_OFF			PSCI_0_2_FN(2)
++#define PSCI_0_2_FN_CPU_ON			PSCI_0_2_FN(3)
++#define PSCI_0_2_FN_AFFINITY_INFO		PSCI_0_2_FN(4)
++#define PSCI_0_2_FN_MIGRATE			PSCI_0_2_FN(5)
++#define PSCI_0_2_FN_MIGRATE_INFO_TYPE		PSCI_0_2_FN(6)
++#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU		PSCI_0_2_FN(7)
++#define PSCI_0_2_FN_SYSTEM_OFF			PSCI_0_2_FN(8)
++#define PSCI_0_2_FN_SYSTEM_RESET		PSCI_0_2_FN(9)
++
++#define PSCI_0_2_FN64_CPU_SUSPEND		PSCI_0_2_FN64(1)
++#define PSCI_0_2_FN64_CPU_ON			PSCI_0_2_FN64(3)
++#define PSCI_0_2_FN64_AFFINITY_INFO		PSCI_0_2_FN64(4)
++#define PSCI_0_2_FN64_MIGRATE			PSCI_0_2_FN64(5)
++#define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU	PSCI_0_2_FN64(7)
++
++#define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
++#define PSCI_0_2_POWER_STATE_ID_SHIFT		0
++#define PSCI_0_2_POWER_STATE_TYPE_MASK		0x1
++#define PSCI_0_2_POWER_STATE_TYPE_SHIFT		16
++#define PSCI_0_2_POWER_STATE_AFFL_MASK		0x3
++#define PSCI_0_2_POWER_STATE_AFFL_SHIFT		24
++
++#define PSCI_0_2_TOS_UP_MIGRATE			0
++#define PSCI_0_2_TOS_UP_NO_MIGRATE		1
++#define PSCI_0_2_TOS_MP				2
++
++/* PSCI version decoding (independent of PSCI version) */
++#define PSCI_VERSION_MAJOR_MASK			0xffff0000
++#define PSCI_VERSION_MINOR_MASK			0x0000ffff
++#define PSCI_VERSION_MAJOR_SHIFT		16
++#define PSCI_VERSION_MAJOR(ver)			\
++		(((ver) & PSCI_VERSION_MAJOR_MASK) >> PSCI_VERSION_MAJOR_SHIFT)
++#define PSCI_VERSION_MINOR(ver)			\
++		((ver) & PSCI_VERSION_MINOR_MASK)
++
++/* PSCI return values (inclusive of all PSCI versions) */
++#define PSCI_RET_SUCCESS			0
++#define PSCI_RET_NOT_SUPPORTED			-1
++#define PSCI_RET_INVALID_PARAMS			-2
++#define PSCI_RET_DENIED				-3
++#define PSCI_RET_ALREADY_ON			-4
++#define PSCI_RET_ON_PENDING			-5
++#define PSCI_RET_INTERNAL_FAILURE		-6
++#define PSCI_RET_NOT_PRESENT			-7
++#define PSCI_RET_DISABLED			-8
++
++#endif /* _UAPI_LINUX_PSCI_H */
+-- 
+1.7.9.5
