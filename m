@@ -1,84 +1,62 @@
-From: mohit.kumar@st.com (Mohit Kumar)
-Date: Tue, 15 Apr 2014 17:13:35 +0530
-Subject: [PATCH V8 9/9] SPEAr13xx: defconfig: Update
-In-Reply-To: <cover.1397555158.git.mohit.kumar@st.com>
-References: <cover.1397555158.git.mohit.kumar@st.com>
-Message-ID: <ff9f1a8a515daf56f31c67b3be832b93e3642324.1397555158.git.mohit.kumar@st.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 15 Apr 2014 13:45:34 +0200
+Subject: [PATCH] pata_samsung_cf: fix ata_host_activate() failure handling
+In-Reply-To: <000801cf4d48$54c45210$fe4cf630$%han@samsung.com>
+References: <6050762.sdUI3gZZlK@amdc1032>
+ <000801cf4d48$54c45210$fe4cf630$%han@samsung.com>
+Message-ID: <2600390.JXZXrjzsbS@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PCIe, EABI, VFP and NFS configs in default configuration file for
-SPEAr13xx.
 
-Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Pratyush Anand <pratyush.anand@st.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/configs/spear13xx_defconfig |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+Hi,
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-index 82eaa55..d271b26 100644
---- a/arch/arm/configs/spear13xx_defconfig
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -11,13 +11,24 @@ CONFIG_ARCH_SPEAR13XX=y
- CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
-+CONFIG_PCIE_SPEAR13XX=y
- CONFIG_SMP=y
- # CONFIG_SMP_ON_UP is not set
- # CONFIG_ARM_CPU_TOPOLOGY is not set
-+CONFIG_AEABI=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_VFP=y
- CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+CONFIG_NET_IPIP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
- CONFIG_MTD_OF_PARTS=y
-@@ -27,6 +38,7 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- # CONFIG_SATA_PMP is not set
- CONFIG_SATA_AHCI_PLATFORM=y
-@@ -66,6 +78,7 @@ CONFIG_USB=y
- # CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_SPEAR=y
-@@ -79,11 +92,14 @@ CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_SECURITY=y
- CONFIG_AUTOFS4_FS=m
-+CONFIG_FUSE_FS=y
- CONFIG_MSDOS_FS=m
- CONFIG_VFAT_FS=m
- CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- CONFIG_NLS_DEFAULT="utf8"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
--- 
-1.7.0.1
+Tejun, could you please also pick this one?
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+On Tuesday, April 01, 2014 10:18:46 AM Jingoo Han wrote:
+> On Tuesday, April 01, 2014 2:53 AM, Tejun Heo wrote:
+> > 
+> > Add missing clk_disable() call to ata_host_activate() failure path.
+> > 
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> 
+> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+> 
+> Best regards,
+> Jingoo Han
+> 
+> > ---
+> >  drivers/ata/pata_samsung_cf.c |   10 +++++++---
+> >  1 file changed, 7 insertions(+), 3 deletions(-)
+> > 
+> > Index: b/drivers/ata/pata_samsung_cf.c
+> > ===================================================================
+> > --- a/drivers/ata/pata_samsung_cf.c	2014-03-14 16:45:04.344724378 +0100
+> > +++ b/drivers/ata/pata_samsung_cf.c	2014-03-31 18:31:58.083631437 +0200
+> > @@ -594,9 +594,13 @@ static int __init pata_s3c_probe(struct
+> > 
+> >  	platform_set_drvdata(pdev, host);
+> > 
+> > -	return ata_host_activate(host, info->irq,
+> > -			info->irq ? pata_s3c_irq : NULL,
+> > -			0, &pata_s3c_sht);
+> > +	ret = ata_host_activate(host, info->irq,
+> > +				info->irq ? pata_s3c_irq : NULL,
+> > +				0, &pata_s3c_sht);
+> > +	if (ret)
+> > +		goto stop_clk;
+> > +
+> > +	return 0;
+> > 
+> >  stop_clk:
+> >  	clk_disable(info->clk);
+> > 
+> > --
