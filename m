@@ -1,30 +1,60 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 15 Apr 2014 12:28:07 +0200
-Subject: [PATCHv3 12/15] ARM: at91: remove atmel_tsadcc from sama5_defconfig
+Date: Tue, 15 Apr 2014 12:28:04 +0200
+Subject: [PATCHv3 09/15] ARM: at91: sam9rlek add touchscreen support through
+ at91_adc
 In-Reply-To: <1397557690-5650-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1397557690-5650-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1397557690-5650-13-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1397557690-5650-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel_tsadcc has been removed, stop selecting it.
+at91_adc now supports reading a touchscreen for ADCs without a TSMR register.
+Enable touchscreen support through at91_adc. This allows to use both a
+touchscreen and the remaining ADC channel at the same time.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/configs/sama5_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-at91/board-sam9rlek.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index dc3881e07630..869fa18ebeb2 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -122,7 +122,6 @@ CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ATMEL_MXT=y
--CONFIG_TOUCHSCREEN_ATMEL_TSADCC=y
- # CONFIG_SERIO is not set
- CONFIG_LEGACY_PTY_COUNT=4
- CONFIG_SERIAL_ATMEL=y
+diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
+index 604eecf6cd70..35d420247e25 100644
+--- a/arch/arm/mach-at91/board-sam9rlek.c
++++ b/arch/arm/mach-at91/board-sam9rlek.c
+@@ -18,6 +18,7 @@
+ #include <linux/clk.h>
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
++#include <linux/platform_data/at91_adc.h>
+ 
+ #include <video/atmel_lcdc.h>
+ 
+@@ -239,6 +240,17 @@ static struct at91_tsadcc_data ek_tsadcc_data = {
+ 
+ 
+ /*
++ * ADC + Touchscreen
++ */
++static struct at91_adc_data ek_adc_data = {
++	.channels_used = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5),
++	.use_external_triggers = true,
++	.vref = 3300,
++	.touchscreen_type = ATMEL_ADC_TOUCHSCREEN_4WIRE,
++};
++
++
++/*
+  * GPIO Buttons
+  */
+ #if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+@@ -312,6 +324,8 @@ static void __init ek_board_init(void)
+ 	at91_add_device_ac97(&ek_ac97_data);
+ 	/* Touch Screen Controller */
+ 	at91_add_device_tsadcc(&ek_tsadcc_data);
++	/* Touch Screen Controller + ADC */
++	at91_add_device_adc(&ek_adc_data);
+ 	/* LEDs */
+ 	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
+ 	/* Push Buttons */
 -- 
 1.8.3.2
