@@ -1,29 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Apr 2014 10:46:56 +0200
-Subject: [PATCHv2 3/8] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
-In-Reply-To: <534CEEA8.6020800@samsung.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <4788081.xvaJfdGTMu@wuerfel> <534CEEA8.6020800@samsung.com>
-Message-ID: <5677551.At1Foxml9e@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Apr 2014 09:47:50 +0100
+Subject: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
+References: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
+Message-ID: <20140415084749.GG17408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 17:32:40 Chanwoo Choi wrote:
-> On 04/15/2014 05:11 PM, Arnd Bergmann wrote:
-> > On Tuesday 15 April 2014 10:59:47 Chanwoo Choi wrote:
->
-> > I don't think we have a patch for the PMU yet, Sachin was looking at the SYSRAM
-> > only.
-> 
-> You are right. Sachin's patch only included the solution of SYSRAM memory mapping.
-> I set out the plan that I would implment proper driver for PMU memory mapping
-> instead of static method after merged Sachin's patch for SYSRAM.
-> 
-> But,
-> If you'd like me to implment PMU memory mapping instead of static mapping right now,
-> I'll implement it for PMU such as Sachin's patch on next posting(v3).
+Hello,
 
-I don't really want to merge a new SoC type until these are resolved, so
-it would definitely be better to implement this for v3.
+On Mon, Apr 14, 2014 at 02:42:22AM +0100, Neil Zhang wrote:
+> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> 
+> This adds core support for saving and restoring CPU PMU registers
+> for suspend/resume support i.e. deeper C-states in cpuidle terms.
+> This patch adds support only to ARMv7 PMU registers save/restore.
+> It needs to be extended to xscale and ARMv6 if needed.
+> 
+> [Neil] We found that DS-5 not work on our CA7 based SoCs.
+> After debuging, found PMU registers were lost because of core power down.
+> Then i found Sudeep had a patch to fix it about two years ago but not in
+> the mainline, just port it.
 
-	Arnd
+What I don't like about this patch is that we're introducing significant
+overhead for SoCs that don't require save/restore of the PMU state. I'd much
+rather see core power down disabled whilst the PMU is in use but, if that's
+not possible, then I think we need to:
+
+ (1) Make this conditional for cores that really need it
+
+ (2) Only save/restore if the PMU is in use (even better, just save/restore
+     the live registers, but that's probably not worth the effort
+     initially).
+
+ (3) Ensure we ->reset the PMU before doing the restore
+
+Will
