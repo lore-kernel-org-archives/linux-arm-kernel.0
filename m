@@ -1,163 +1,68 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Apr 2014 11:23:03 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
-In-Reply-To: <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <534CFA77.9030108@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Apr 2014 10:24:39 +0100
+Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
+In-Reply-To: <534CF9B4.306@samsung.com>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
+ <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
+ <534CF847.5040008@arm.com> <534CF9B4.306@samsung.com>
+Message-ID: <534CFAD7.4030508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 10:07 AM, Antoine T?nart wrote:
-> The Marvell Berlin BG2Q has 6 GPIO ports compatible with the snps,dw-apb-gpio
-> driver. This patch add the corresponding device tree nodes.
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->   arch/arm/boot/dts/berlin2q.dtsi | 102 ++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 102 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index e6e556055dfc..b2625f896bc5 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -109,6 +109,78 @@
->   			ranges = <0 0xe80000 0x10000>;
->   			interrupt-parent = <&aic>;
->
-> +			gpio0: gpio at 0400 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0x0400 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				porta: gpio-controller at 0 {
+On 15/04/14 10:19, Chanwoo Choi wrote:
+> On 04/15/2014 06:13 PM, Marc Zyngier wrote:
+>> On 15/04/14 09:27, Chanwoo Choi wrote:
+>>> Hi,
+>>>
+>>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
+>>>> On 15/04/14 02:59, Chanwoo Choi wrote:
+>>>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>>>
+>>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
+>>>>> dual core and includes following dt nodes:
+>>>>>
+>>>>> - GIC interrupt controller
+>>>>> - Pinctrl to control GPIOs
+>>>>> - Clock controller
+>>>>> - CPU information (Cortex-A7 dual core)
+>>>>> - UART to support serial port
+>>>>> - MCT (Multi Core Timer)
+>>>>> - ADC (Analog Digital Converter)
+>>>>> - I2C/SPI bus
+>>>>> - Power domain
+>>>>> - PMU (Performance Monitoring Unit)
+>>>>> - MSHC (Mobile Storage Host Controller)
+>>>>> - PWM (Pluse Width Modulation)
+>>>>> - AMBA bus
+>>>>
+>>>> [...]
+>>>>
+>>>> Where is the arch timer node?
+>>>
+>>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
+>>> - in drivers/clocksource/exynos_mct.c
+>>
+>> Don't you have a Cortex-A7? If so, you have the arch timer.
+> 
+> Do you means that 'arch timer" is ARM_ARCH_TIMER?
 
-ePAPR recommended name is even more generic, i.e. "gpio". If
-that clashed in any way with other numbered names, I suggest
-to rename to "gpio-port" as actually the controller is the
-parent node and this represents one port (in the nomenclature
-of DW-APB-GPIO).
+Yes.
 
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
+> As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
+> But, Exynos SoC used MCT clocksource for system timer.
+> 
+> Exynos dts file didn't include arch timer node but only include mct node.
 
-32 gpio pins for each of the 6 GPIO controllers? Either BG2Q is a GPIO
-beast or it is a mistake :P
+Well, it is a bug, and a recurrent one. A Cortex-A7 has the arch timers
+implemented. Always.
 
-Can you please double-check?
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0464f/BABFEBJJ.html
 
-I am fine with using nr-gpios property now, but I guess BG2Q also
-has that CONFIG[1,2] registers to actually read out the features
-synthesized in? If I find some time, I'll prepare a patch for
-dw-apb-gpio to exploit that (optional) information instead of
-using nr-gpios.
+All Cortex-A7 have it, and so do A12, A15, A17, A53, A57.
 
-Otherwise,
+Cheers,
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-> +					reg = <0>;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +					interrupts = <0>;
-> +				};
-> +			};
-> +
-> +			gpio1: gpio at 0800 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0x0800 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				portb: gpio-controller at 1 {
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
-> +					reg = <0>;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +					interrupts = <1>;
-> +				};
-> +			};
-> +
-> +			gpio2: gpio at 0c00 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0x0c00 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				portc: gpio-controller at 2 {
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
-> +					reg = <0>;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +					interrupts = <2>;
-> +				};
-> +			};
-> +
-> +			gpio3: gpio at 1000 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0x1000 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				portd: gpio-controller at 3 {
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
-> +					reg = <0>;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +					interrupts = <3>;
-> +				};
-> +			};
-> +
->   			timer0: timer at 2c00 {
->   				compatible = "snps,dw-apb-timer";
->   				reg = <0x2c00 0x14>;
-> @@ -181,6 +253,36 @@
->   				interrupt-parent = <&gic>;
->   				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
->   			};
-> +
-> +			gpio4: gpio at 5000 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0x5000 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				porte: gpio-controller at 4 {
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
-> +					reg = <0>;
-> +				};
-> +			};
-> +
-> +			gpio5: gpio at c000 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0xc000 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				portf: gpio-controller at 5 {
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
-> +					reg = <0>;
-> +				};
-> +			};
->   		};
->
->   		pinctrl: pinctrl at 0 {
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
