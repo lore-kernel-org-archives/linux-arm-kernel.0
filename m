@@ -1,41 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Apr 2014 10:49:53 +0100
-Subject: [PATCH v9 01/12] KVM: Add capability to advertise PSCI v0.2
- support
-In-Reply-To: <1397542455-354-2-git-send-email-anup.patel@linaro.org> (Anup
- Patel's message of "Tue, 15 Apr 2014 07:14:04 +0100")
-References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
- <1397542455-354-2-git-send-email-anup.patel@linaro.org>
-Message-ID: <87ioqa2a7y.fsf@approximate.cambridge.arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 15 Apr 2014 17:57:39 +0800
+Subject: [PATCH 5/5] spi: sirf: fix spi full-duplex DMA transferring issue
+In-Reply-To: <20140415092609.GJ12304@sirena.org.uk>
+References: <1397457001-5266-1-git-send-email-21cnbao@gmail.com>
+ <1397457001-5266-6-git-send-email-21cnbao@gmail.com>
+ <20140414200628.GX25182@sirena.org.uk>
+ <CAGsJ_4yO-LGJEkpNy=dizQWjSE3pHEBOrrPndho3jt1_YMRvHg@mail.gmail.com>
+ <20140415092609.GJ12304@sirena.org.uk>
+Message-ID: <CAGsJ_4yWkBr2x=hLNaCsVwytDTua48kR+DEO86A6vH5x+jLEDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15 2014 at  7:14:04 am BST, Anup Patel <anup.patel@linaro.org> wrote:
-> User space (i.e. QEMU or KVMTOOL) should be able to check whether KVM
-> ARM/ARM64 supports in-kernel PSCI v0.2 emulation. For this purpose, we
-> define KVM_CAP_ARM_PSCI_0_2 in KVM user space interface header.
+2014-04-15 17:26 GMT+08:00 Mark Brown <broonie@kernel.org>:
+> On Tue, Apr 15, 2014 at 09:43:24AM +0800, Barry Song wrote:
 >
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-> ---
->  include/uapi/linux/kvm.h |    1 +
->  1 file changed, 1 insertion(+)
+>> i felt strange too at the first look from internal gerrit. qipan told
+>> me there is one:
+>> drivers/spi/spidev.c
 >
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index a8f4ee5..01c5624 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -743,6 +743,7 @@ struct kvm_ppc_smmu_info {
->  #define KVM_CAP_IOAPIC_POLARITY_IGNORED 97
->  #define KVM_CAP_ENABLE_CAP_VM 98
->  #define KVM_CAP_S390_IRQCHIP 99
-> +#define KVM_CAP_ARM_PSCI_0_2 100
->  
->  #ifdef KVM_CAP_IRQ_ROUTING
+> OK, that needs fixing.  That code predates anyone doing DMA.
 
--- 
-Jazz is not dead. It just smells funny.
+if it is out of specification, it seems fixing spidev.c is not enough
+as spi transfer actually needs an precondition of tx!=rx now.
+
+-barry
