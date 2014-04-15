@@ -1,40 +1,77 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Apr 2014 14:50:14 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
-In-Reply-To: <20140415114848.GA2813@piout.net>
-References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
- <534CFA77.9030108@gmail.com> <20140415180058.2fefca78@xhacker>
- <534D0943.2050100@gmail.com> <20140415114848.GA2813@piout.net>
-Message-ID: <534D2B06.6000408@gmail.com>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Tue, 15 Apr 2014 05:53:15 -0700
+Subject: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <20140415124953.GL17408@arm.com>
+References: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
+ <20140415084749.GG17408@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE55075F1873@SC-VEXCH4.marvell.com>
+ <20140415124100.GK17408@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE55075F1875@SC-VEXCH4.marvell.com>
+ <20140415124953.GL17408@arm.com>
+Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE55075F187A@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 01:48 PM, Alexandre Belloni wrote:
-> On 15/04/2014 at 12:26:11 +0200, Sebastian Hesselbarth wrote :
->> On 04/15/2014 12:00 PM, Jisheng Zhang wrote:
->>> On Tue, 15 Apr 2014 02:23:03 -0700
->>> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->>>> I am fine with using nr-gpios property now, but I guess BG2Q also
->>>> has that CONFIG[1,2] registers to actually read out the features
->>>> synthesized in? If I find some time, I'll prepare a patch for
->>>> dw-apb-gpio to exploit that (optional) information instead of
->>>> using nr-gpios.
->>>
->>> The problem is CONFIG1/2 registers don't exist on some versions.
->>> For example, the version used in BG2/BG2CD. So nr-gpio is necessary
->>> if we want to support these versions.
->>
->> Hmm, are you sure about BG2? I remember reading it and it contains
->> sane values. Anyway, a proper patch for dw-apb-gpio would include
->> checking for sane (e.g. non-zero) values. And nr-gpios will always
->> stay as fall-back just because e.g. sunxi does not have the CONFIG
->> registers.
->
-> Shouldn't that be use nr-gpios and if not available, read the CONFIG
-> registers? Else, what about bogus registers ?
 
-Probably, it is a better idea to only look for CONFIG registers if
-nr-gpios is not set. Anyway, I'll really have to find more time first ;)
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 2014?4?15? 20:50
+> To: Neil Zhang
+> Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; Sudeep Holla
+> Subject: Re: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+> 
+> On Tue, Apr 15, 2014 at 01:46:08PM +0100, Neil Zhang wrote:
+> > > On Tue, Apr 15, 2014 at 01:37:17PM +0100, Neil Zhang wrote:
+> > > > > On Mon, Apr 14, 2014 at 02:42:22AM +0100, Neil Zhang wrote:
+> > > > > > From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> > > > > >
+> > > > > > This adds core support for saving and restoring CPU PMU
+> > > > > > registers for suspend/resume support i.e. deeper C-states in cpuidle
+> terms.
+> > > > > > This patch adds support only to ARMv7 PMU registers save/restore.
+> > > > > > It needs to be extended to xscale and ARMv6 if needed.
+> > > > > >
+> > > > > > [Neil] We found that DS-5 not work on our CA7 based SoCs.
+> > > > > > After debuging, found PMU registers were lost because of core
+> > > > > > power
+> > > down.
+> > > > > > Then i found Sudeep had a patch to fix it about two years ago
+> > > > > > but not in the mainline, just port it.
+> > > > >
+> > > > > What I don't like about this patch is that we're introducing
+> > > > > significant overhead for SoCs that don't require save/restore of
+> > > > > the PMU state. I'd much rather see core power down disabled
+> > > > > whilst the PMU is in use but, if that's not possible, then I think we need
+> to:
+> > > > >
+> > > > >  (1) Make this conditional for cores that really need it
+> > > > >
+> > > > >  (2) Only save/restore if the PMU is in use (even better, just
+> save/restore
+> > > > >      the live registers, but that's probably not worth the effort
+> > > > >      initially).
+> > > > >
+> > > >
+> > > > The patch has check the ARMV7_PMNC_E bit when save / restore, so
+> > > > suppose only the core's that use PMU will do the save / restore work.
+> > >
+> > > Seems pretty fragile to base our save/restore decision on the value
+> > > of one of the registers, though. What happens if the control
+> > > register is zeroed by the core power down?
+> > >
+> > It will check the saved control value when restore, so is should be OK
+> > while control register is zeroed.
+> 
+> Ah yes, I mixed up and save and restore functions. It's still horrible that we
+> have to read the control register unconditionally during the save though
+> -- it might be nicer if we simply register/unregister the notifier during perf runs
+> (in the same way that we request/free the PMU IRQs).
+> 
 
-Sebastian
+Thanks for the comments, I will refine it according to your suggestion.
+
+> Will
+
+Best Regards,
+Neil Zhang
