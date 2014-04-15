@@ -1,222 +1,108 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Apr 2014 10:33:06 +0200
-Subject: [PATCH] mmc: mmci: switch the driver to using gpio descriptors
-Message-ID: <1397550786-8146-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 15 Apr 2014 10:33:39 +0200
+Subject: [PATCH] ARM: integrator: add MMCI device to IM-PD1
+Message-ID: <1397550819-8209-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The next step in modernization of GPIO is to let drivers handle
-descriptors rather than integer numbers representing GPIO pins,
-akin to how clocks or regulators are already handled today.
+The IM-PD1 logic module daughterboard holds an MMCI block, which
+we can now provide using platform resources such as proper GPIO
+lines etc. We add the GPIO table dynamically and using the new
+GPIO descriptor mechanism. Tested and hey, it works:
 
-This patch makes the MMCI driver use GPIO descriptos in the
-core code with fallback code using the platform data if that
-is not possible. After all platforms with MMCI have been
-migrated to use descriptors, the platform data entries for
-GPIO pins can be removed.
+root at integrator:/ mount /dev/mmcblk0p1 /mnt/
+root at integrator:/ ls /mnt/
+ARM          U-BOOT.EXE   u-boot.bin   u-boot.srec  u-pad.bin
 
 Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Hi Russell,Ulf: there is no hurry to do these changes (only used
-for my very corner-case MMCI PL181 experiments) but it's the
-desired direction to use descriptors for GPIOs going forward.
-I can rebase this on top of Ulf's patch stack any time, no
-problem.
----
- drivers/mmc/host/mmci.c | 76 ++++++++++++++++++++++++-------------------------
- drivers/mmc/host/mmci.h |  4 +--
- 2 files changed, 40 insertions(+), 40 deletions(-)
+ arch/arm/mach-integrator/impd1.c | 48 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 771c60ab4a32..f84e39a5d592 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -26,7 +26,7 @@
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 0e870ea818c4..29767cfc98bc 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -20,10 +20,13 @@
+ #include <linux/mm.h>
  #include <linux/amba/bus.h>
- #include <linux/clk.h>
- #include <linux/scatterlist.h>
--#include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/of_gpio.h>
- #include <linux/regulator/consumer.h>
- #include <linux/dmaengine.h>
-@@ -1330,10 +1330,10 @@ static int mmci_get_ro(struct mmc_host *mmc)
- {
- 	struct mmci_host *host = mmc_priv(mmc);
+ #include <linux/amba/clcd.h>
++#include <linux/amba/mmci.h>
++#include <linux/amba/pl061.h>
+ #include <linux/io.h>
+ #include <linux/platform_data/clk-integrator.h>
+ #include <linux/slab.h>
+ #include <linux/irqchip/arm-vic.h>
++#include <linux/gpio/driver.h>
  
--	if (host->gpio_wp == -ENOSYS)
-+	if (IS_ERR(host->gpio_wp))
- 		return -ENOSYS;
+ #include <asm/sizes.h>
+ #include "lm.h"
+@@ -52,6 +55,14 @@ void impd1_tweak_control(struct device *dev, u32 mask, u32 val)
+ EXPORT_SYMBOL(impd1_tweak_control);
  
--	return gpio_get_value_cansleep(host->gpio_wp);
-+	return gpiod_get_value_cansleep(host->gpio_wp);
- }
+ /*
++ * MMC support
++ */
++static struct mmci_platform_data mmc_data = {
++	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
++	.cd_invert	= 1,
++};
++
++/*
+  * CLCD support
+  */
+ #define PANEL		PROSPECTOR
+@@ -291,6 +302,7 @@ static struct impd1_device impd1_devs[] = {
+ 		.offset	= 0x00700000,
+ 		.irq	= { 7, 8 },
+ 		.id	= 0x00041181,
++		.platform_data = &mmc_data,
+ 	}, {
+ 		.offset	= 0x00800000,
+ 		.irq	= { 9 },
+@@ -367,6 +379,42 @@ static int __init impd1_probe(struct lm_device *dev)
  
- static int mmci_get_cd(struct mmc_host *mmc)
-@@ -1342,13 +1342,13 @@ static int mmci_get_cd(struct mmc_host *mmc)
- 	struct mmci_platform_data *plat = host->plat;
- 	unsigned int status;
- 
--	if (host->gpio_cd == -ENOSYS) {
-+	if (IS_ERR(host->gpio_cd)) {
- 		if (!plat->status)
- 			return 1; /* Assume always present */
- 
- 		status = plat->status(mmc_dev(host->mmc));
- 	} else
--		status = !!gpio_get_value_cansleep(host->gpio_cd)
-+		status = !!gpiod_get_value_cansleep(host->gpio_cd)
- 			^ plat->cd_invert;
- 
- 	/*
-@@ -1412,13 +1412,10 @@ static struct mmc_host_ops mmci_ops = {
- 
- #ifdef CONFIG_OF
- static void mmci_dt_populate_generic_pdata(struct device_node *np,
--					struct mmci_platform_data *pdata)
-+					   struct mmci_platform_data *pdata)
- {
- 	int bus_width = 0;
- 
--	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
--	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
--
- 	if (of_get_property(np, "cd-inverted", NULL))
- 		pdata->cd_invert = true;
- 	else
-@@ -1494,9 +1491,20 @@ static int mmci_probe(struct amba_device *dev,
- 	host = mmc_priv(mmc);
- 	host->mmc = mmc;
- 
--	host->gpio_wp = -ENOSYS;
--	host->gpio_cd = -ENOSYS;
-+	host->gpio_wp = ERR_PTR(-ENOSYS);
-+	host->gpio_cd = ERR_PTR(-ENOSYS);
- 	host->gpio_cd_irq = -1;
-+	/*
-+	 * TODO: when we finally get rid of all platform data for all
-+	 * platforms deploying the MMCI block, we can delete the
-+	 * gpio_to_desc() calls.
-+	 */
-+	host->gpio_wp = gpiod_get(&dev->dev, "wp");
-+	if (IS_ERR(host->gpio_wp) && gpio_is_valid(plat->gpio_wp))
-+		host->gpio_wp = gpio_to_desc(plat->gpio_wp);
-+	host->gpio_cd = gpiod_get(&dev->dev, "cd");
-+	if (IS_ERR(host->gpio_cd) && gpio_is_valid(plat->gpio_wp))
-+		host->gpio_cd = gpio_to_desc(plat->gpio_cd);
- 
- 	host->hw_designer = amba_manf(dev);
- 	host->hw_revision = amba_rev(dev);
-@@ -1616,17 +1624,13 @@ static int mmci_probe(struct amba_device *dev,
- 	writel(0, host->base + MMCIMASK1);
- 	writel(0xfff, host->base + MMCICLEAR);
- 
--	if (plat->gpio_cd == -EPROBE_DEFER) {
-+	if (PTR_ERR(host->gpio_cd) == -EPROBE_DEFER) {
- 		ret = -EPROBE_DEFER;
- 		goto err_gpio_cd;
- 	}
--	if (gpio_is_valid(plat->gpio_cd)) {
--		ret = gpio_request(plat->gpio_cd, DRIVER_NAME " (cd)");
--		if (ret == 0)
--			ret = gpio_direction_input(plat->gpio_cd);
--		if (ret == 0)
--			host->gpio_cd = plat->gpio_cd;
--		else if (ret != -ENOSYS)
-+	if (!IS_ERR(host->gpio_cd)) {
-+		ret = gpiod_direction_input(host->gpio_cd);
-+		if (ret < 0 && ret != -ENOSYS)
- 			goto err_gpio_cd;
- 
- 		/*
-@@ -1636,28 +1640,24 @@ static int mmci_probe(struct amba_device *dev,
- 		 * for the inverted case) so we request triggers on both
- 		 * edges.
- 		 */
--		ret = request_any_context_irq(gpio_to_irq(plat->gpio_cd),
-+		ret = request_any_context_irq(gpiod_to_irq(host->gpio_cd),
- 				mmci_cd_irq,
- 				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
- 				DRIVER_NAME " (cd)", host);
- 		if (ret >= 0)
--			host->gpio_cd_irq = gpio_to_irq(plat->gpio_cd);
-+			host->gpio_cd_irq = gpiod_to_irq(host->gpio_cd);
- 	}
--	if (plat->gpio_wp == -EPROBE_DEFER) {
-+	if (PTR_ERR(host->gpio_wp) == -EPROBE_DEFER) {
- 		ret = -EPROBE_DEFER;
- 		goto err_gpio_wp;
- 	}
--	if (gpio_is_valid(plat->gpio_wp)) {
--		ret = gpio_request(plat->gpio_wp, DRIVER_NAME " (wp)");
--		if (ret == 0)
--			ret = gpio_direction_input(plat->gpio_wp);
--		if (ret == 0)
--			host->gpio_wp = plat->gpio_wp;
--		else if (ret != -ENOSYS)
-+	if (!IS_ERR(host->gpio_wp)) {
-+		ret = gpiod_direction_input(host->gpio_wp);
-+		if (ret < 0 && ret != -ENOSYS)
- 			goto err_gpio_wp;
- 	}
- 
--	if ((host->plat->status || host->gpio_cd != -ENOSYS)
-+	if ((host->plat->status || !IS_ERR(host->gpio_cd))
- 	    && host->gpio_cd_irq < 0)
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 
-@@ -1696,13 +1696,13 @@ static int mmci_probe(struct amba_device *dev,
-  irq0_free:
- 	free_irq(dev->irq[0], host);
-  unmap:
--	if (host->gpio_wp != -ENOSYS)
--		gpio_free(host->gpio_wp);
-+	if (!IS_ERR(host->gpio_wp))
-+		gpiod_put(host->gpio_wp);
-  err_gpio_wp:
- 	if (host->gpio_cd_irq >= 0)
- 		free_irq(host->gpio_cd_irq, host);
--	if (host->gpio_cd != -ENOSYS)
--		gpio_free(host->gpio_cd);
-+	if (!IS_ERR(host->gpio_cd))
-+		gpiod_put(host->gpio_cd);
-  err_gpio_cd:
- 	iounmap(host->base);
-  clk_disable:
-@@ -1741,12 +1741,12 @@ static int mmci_remove(struct amba_device *dev)
- 		if (!host->singleirq)
- 			free_irq(dev->irq[1], host);
- 
--		if (host->gpio_wp != -ENOSYS)
--			gpio_free(host->gpio_wp);
-+		if (!IS_ERR(host->gpio_wp))
-+			gpiod_put(host->gpio_wp);
- 		if (host->gpio_cd_irq >= 0)
- 			free_irq(host->gpio_cd_irq, host);
--		if (host->gpio_cd != -ENOSYS)
--			gpio_free(host->gpio_cd);
-+		if (!IS_ERR(host->gpio_cd))
-+			gpiod_put(host->gpio_cd);
- 
- 		iounmap(host->base);
- 		clk_disable_unprepare(host->clk);
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 58b1b8896bf2..b1c1de28201f 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -176,8 +176,8 @@ struct mmci_host {
- 	struct mmc_data		*data;
- 	struct mmc_host		*mmc;
- 	struct clk		*clk;
--	int			gpio_cd;
--	int			gpio_wp;
-+	struct gpio_desc	*gpio_cd;
-+	struct gpio_desc	*gpio_wp;
- 	int			gpio_cd_irq;
- 	bool			singleirq;
- 
+ 		pc_base = dev->resource.start + idev->offset;
+ 		snprintf(devname, 32, "lm%x:%5.5lx", dev->id, idev->offset >> 12);
++
++		/* Add GPIO descriptor lookup table for the PL061 block */
++		if (idev->offset == 0x00400000) {
++			struct gpiod_lookup_table *lookup;
++			char *chipname;
++			char *mmciname;
++
++			lookup = devm_kzalloc(&dev->dev,
++					      sizeof(*lookup) + 3 * sizeof(struct gpiod_lookup),
++					      GFP_KERNEL);
++			chipname = devm_kstrdup(&dev->dev, devname, GFP_KERNEL);
++			mmciname = kasprintf(GFP_KERNEL, "lm%x:00700", dev->id);
++			lookup->dev_id = mmciname;
++			/*
++			 * Offsets on GPIO block 1:
++			 * 3 = MMC WP (write protect)
++			 * 4 = MMC CD (card detect)
++			 *
++			 * Offsets on GPIO block 2:
++			 * 0 = Up key
++			 * 1 = Down key
++			 * 2 = Left key
++			 * 3 = Right key
++			 * 4 = Key lower left
++			 * 5 = Key lower right
++			 */
++			/* We need the two MMCI GPIO entries */
++			lookup->table[0].chip_label = chipname;
++			lookup->table[0].chip_hwnum = 3;
++			lookup->table[0].con_id = "wp";
++			lookup->table[1].chip_label = chipname;
++			lookup->table[1].chip_hwnum = 4;
++			lookup->table[1].con_id = "cd";
++			gpiod_add_lookup_table(lookup);
++		}
++
+ 		d = amba_ahb_device_add_res(&dev->dev, devname, pc_base, SZ_4K,
+ 					    irq1, irq2,
+ 					    idev->platform_data, idev->id,
 -- 
 1.9.0
