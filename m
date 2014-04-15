@@ -1,30 +1,111 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 15 Apr 2014 10:35:25 +0200
-Subject: [PATCH v4 2/2] reset: Add GPIO support to reset controller
- framework
-In-Reply-To: <20140414115758.2c0c8a9d@alan.etchedpixels.co.uk>
-References: <1397463709-19405-1-git-send-email-p.zabel@pengutronix.de>
- <1397463709-19405-2-git-send-email-p.zabel@pengutronix.de>
- <20140414115758.2c0c8a9d@alan.etchedpixels.co.uk>
-Message-ID: <1397550925.3836.30.camel@paszta.hi.pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 15 Apr 2014 09:36:15 +0100
+Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <alpine.LFD.2.11.1404140956060.980@knanqh.ubzr>
+References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+ <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
+ <20140414104116.GA3844@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404140956060.980@knanqh.ubzr>
+Message-ID: <20140415083615.GC3596@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
-
-Am Montag, den 14.04.2014, 11:57 +0100 schrieb One Thousand Gnomes:
-> > This adds support for GPIO controlled reset pins on peripheral ICs to the reset
-> > controller framework. Currently there is no support for specifying a delay
-> > between assertion and de-assertion of the reset signal, so this has to be
-> > handled by the drivers.
+On Mon, Apr 14, 2014 at 10:01:27AM -0400, Nicolas Pitre wrote:
+> On Mon, 14 Apr 2014, Dave Martin wrote:
 > 
-> Lots of GPIO controllers are doing posted writes to the fabric so surely
-> your delay will be wrong ?
+> > On Fri, Apr 11, 2014 at 04:23:04PM -0400, Nicolas Pitre wrote:
+> > > On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
+> > > 
+> > > > Add machine-dependent MCPM call-backs for Exynos5420. These are used
+> > > > to power up/down the secondary CPUs during boot, shutdown, s2r and
+> > > > switching.
+> > > > 
+> > > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> > > > Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
+> > > > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> > > > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > > 
+> > > See comments inline.
+> > 
+> > I won't duplicate Nico's review, but I have a couple of extra comments/
+> > questions, below.
+> > 
+> > [...]
+> > 
+> > > > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> > > > new file mode 100644
+> > > > index 0000000..46d4968
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> > > > @@ -0,0 +1,444 @@
+> > 
+> > [...]
+> > 
+> > > > +static void exynos_cluster_power_control(unsigned int cluster, int enable)
+> > > > +{
+> > > > +	unsigned long timeout = jiffies + msecs_to_jiffies(20);
+> > > > +	unsigned int status, val = EXYNOS_CORE_LOCAL_PWR_DIS;
+> > > > +
+> > > > +	if (enable)
+> > > > +		val = EXYNOS_CORE_LOCAL_PWR_EN;
+> > > > +
+> > > > +	status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
+> > > > +	if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
+> > > > +		return;
+> > > > +
+> > > > +	__raw_writel(val, EXYNOS_COMMON_CONFIGURATION(cluster));
+> > > > +	/* Wait until cluster power control is applied */
+> > > > +	while (time_before(jiffies, timeout)) {
+> > > > +		status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
+> > > > +
+> > > > +		if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
+> > > > +			return;
+> > > > +
+> > > > +		cpu_relax();
+> > > > +	}
+> > > > +	pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
+> > > > +		enable ? "on" : "off");
+> > > 
+> > > You should not have to wait for the power status to change here.  
+> > > Simply signaling the desired state and returning is all that is 
+> > > expected.  And because IRQs are turned off, it is likely that 
+> > > time_before(jiffies, timeout) will always be true anyway because jiffies 
+> > > are not updated if there is no other CPU to service the timer interrupt.
+> > > 
+> > > The actual power status should be polled for in the mcpm_finish() 
+> > > method only.
+> > 
+> > Depending on the power controller, it might be possible for writes to
+> > the controller to be lost or not acted upon, if a previous change is
+> > still pending.
+> > 
+> > Does this issue apply to the exynos power controller?
+> 
+> Given the way the code is structured now, I suppose that has not been 
+> the case so far.
 
-I haven't seen hardware yet where this is an issue, but it's a valid
-point. I can also imagine boards where the GPIO is connected to some
-board specific timed reset logic or where the reset length has to be
-altered just due to capacitance.
+It depends on the purpose of the polling loop.  If it was added to resolve
+a race between a power-up and a power-down that is complete in MCPM but
+still pending in the hardware, than that would suggest the power controller
+does have this behaviour.
 
-regards
-Philipp
+But I'm just guessing.
+
+Abhilash, can you comment?
+
+> > 
+> > If this is the case, it might be necessary to ensure before a power-up
+> > request, that the power controller has caught up and reports the
+> > cluster/CPU as down.  Putting this poll before the write to the
+> > power controller maximises the chance of pipelining useful work
+> > in the meantime.  Putting the poll after the write is the worst case.
+> 
+> More useful might be a check on the actual _control_ bit.  If the 
+> control bits may be read back then I expect the indicated state will 
+> happen even if delayed.
+
+Quite likely, yes.  It just depends on what the hardware specs say.
+
+Cheers
+---Dave
