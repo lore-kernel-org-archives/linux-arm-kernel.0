@@ -1,48 +1,33 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 15 Apr 2014 20:46:07 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140415.142731.2298870571726062338.davem@davemloft.net>
-References: <20140415174900.GA11184@redhat.com>
- <20140415.135038.1703628429468655272.davem@davemloft.net>
- <20140415180700.GB11690@redhat.com>
- <20140415.142731.2298870571726062338.davem@davemloft.net>
-Message-ID: <20140415184607.GA13468@redhat.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 15 Apr 2014 20:48:19 +0200
+Subject: [PATCH] ARM: berlin: add CPU_V7 to Marvell Armada 1500-mini (BG2CD)
+Message-ID: <1397587699-11023-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15, David Miller wrote:
->
-> From: Oleg Nesterov <oleg@redhat.com>
-> Date: Tue, 15 Apr 2014 20:07:00 +0200
->
-> > On 04/15, David Miller wrote:
-> >>
-> >> From: Oleg Nesterov <oleg@redhat.com>
-> >> Date: Tue, 15 Apr 2014 19:49:00 +0200
-> >>
-> >> > We do not want to write to, say, page cache if the probed application
-> >> > mmaps a file at the same vaddr.
-> >>
-> >> If user has write access to that page... not our problem.
-> >
-> > Well, I am not sure.
-> >
-> > Yes, this won't allow you to write the exploit. But if this actually
-> > happens because an application is buggy, this can lead to really
-> > hard-to-debug problems.
->
-> And this is different from a stray userland scribble onto such a page
-> how?
+This selects missing CPU_V7 for ARM Cortex-A9 based Marvell Armada
+1500-mini (BG2CD).
 
-Sure. But I think that the kernel should not write to the file just because
-a buggy application did the extra munmap() or passed a wrong addres to
-mmap/munmap.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-berlin/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> This is all so much simpler if you don't insist on doing all of this
-> hand-holding for the user, that's not the kernel's job.
-
-Well, I do not agree, but perhaps because I do not really understand
-what do you mean.
-
-Oleg.
+diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+index d3c5f14dc142..0add8350faf4 100644
+--- a/arch/arm/mach-berlin/Kconfig
++++ b/arch/arm/mach-berlin/Kconfig
+@@ -18,6 +18,7 @@ config MACH_BERLIN_BG2
+ config MACH_BERLIN_BG2CD
+ 	bool "Marvell Armada 1500-mini (BG2CD)"
+ 	select CACHE_L2X0
++	select CPU_V7
+ 	select HAVE_ARM_TWD if SMP
+ 
+ config MACH_BERLIN_BG2Q
+-- 
+1.9.1
