@@ -1,51 +1,74 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 15 Apr 2014 10:12:39 +0200
-Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
-In-Reply-To: <20140415080006.GE2255@ldesroches-Latitude-E6320>
-References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
- <20140414152212.GC2255@ldesroches-Latitude-E6320>
- <534CE24F.9020703@gmail.com>
- <20140415080006.GE2255@ldesroches-Latitude-E6320>
-Message-ID: <534CE9F7.60202@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 15 Apr 2014 09:15:08 +0100
+Subject: [PATCH v2 06/12] ARM: mcpm: change max clusters to 4
+In-Reply-To: <CAD6h2NTH1ZGWSNPeEMaZ4Lf+4UFOhXFtJeX1NEXETeonc76DYg@mail.gmail.com>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140410095650.GA5499@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404102203590.980@knanqh.ubzr>
+ <CAD6h2NTH1ZGWSNPeEMaZ4Lf+4UFOhXFtJeX1NEXETeonc76DYg@mail.gmail.com>
+Message-ID: <20140415081501.GA3596@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/2014 10:00, Ludovic Desroches wrote:
-> On Tue, Apr 15, 2014 at 09:39:59AM +0200, Richard Genoud wrote:
->> On 14/04/2014 17:22, Ludovic Desroches wrote:
->>> Hi Richard,
->>>
->>> On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
->>>> RTS pin is an active low pin.
->>>> For now, this doesn't change anything as the ACTIVE_LOW flag is not
->>>> handled in atmel_serial, but it will be in 3.16.
->>>>
->>>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->>>> index 17c1042b2df8..2f7aad71b3c9 100644
->>>> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
->>>> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
->>>> @@ -35,7 +35,7 @@ Example:
->>>>  		clock-names = "usart";
->>>>  		atmel,use-dma-rx;
->>>>  		atmel,use-dma-tx;
->>>> -		rts-gpios = <&pioD 15 0>;
->>>> +		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
->>>
->>> I was told we should not use macros here. If it is still the truth:
->>>
->>> rts-gpios = <&pioD 15 1>;
->>
->> But I'd really like to know if macros are forbidden in DT documentation and why...
->> Because, IMHO, <&pioD 15 1> talks less that <&pioD 15 GPIO_ACTIVE_LOW>.
->> Which is a shame in a documentation.
+On Tue, Apr 15, 2014 at 02:45:05PM +0800, Haojian Zhuang wrote:
+> On 11 April 2014 10:39, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 10 Apr 2014, Dave Martin wrote:
+> >
+> >> On Tue, Apr 08, 2014 at 04:00:46PM +0800, Haojian Zhuang wrote:
+> >> > In order to support 4 clusters with 4 Cortex A15 Cores in each cluster,
+> >> > enlarge maximum clusters from 2 to 4 in MCPM.
+> >>
+> >> CC Nico on mcpm patches please.  I'm happy to be CC'd as well.
+> >
+> > Indeed.
+> >
+> >> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> >> > ---
+> >> >  arch/arm/include/asm/mcpm.h | 2 +-
+> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> >> > index 608516e..68f82cf 100644
+> >> > --- a/arch/arm/include/asm/mcpm.h
+> >> > +++ b/arch/arm/include/asm/mcpm.h
+> >> > @@ -20,7 +20,7 @@
+> >> >   * to consider dynamic allocation.
+> >> >   */
+> >> >  #define MAX_CPUS_PER_CLUSTER       4
+> >> > -#define MAX_NR_CLUSTERS            2
+> >> > +#define MAX_NR_CLUSTERS            4
+> >>
+> >> Because of the need for alignment to the biggest cacheline size in the
+> >> system, the MCPM low-level locking structures consume a non-trivial
+> >> amount of memory.
+> >>
+> >> Therefore, I'm not keen on the idea of simply increasing this #define
+> >> every time a platform appears with a larger number of clusters.
+> >> If hip04 is not built into the kernel, this just wastes memory.
+> >>
+> >> I'll leave it to Nico to decide whether we can increase the #define
+> >> to 4 or whether this needs a proper fix now.  Ideally, we would have
+> >> a way of choosing the maximum value required by the set of boards built
+> >> into the kernel, or switch to dynamic allocation.
+> >
+> > I think we should go with the ability to select a maximum based on the
+> > configured platforms. That could be as simple as having a
+> > CONFIG_MCPM_QUAD_CLUSTER symbol to be selected by those platforms that
+> > need it.
+> >
 > 
-> I don't remember who told me that but the reason was that device tree
-> should not depend on Linux and macros are relative to Linux.
+> I'll set MAX_NR_CLUSTERS from Kconfig.
 > 
-Well, that makes sense, but I thought that include/dt-bindings/ was more
-DT relative.
+> If BIG_LITTLE isn't enabled & HIP04 is enabled, MAX_NR_CLUSTERS could
+> be set to 4.
+
+Perhaps the bL switcher should simply refuse to enable itself if there
+are more than 2 clusters, or 2 clusters that are identical.
+
+There's no reason why HIP04 and b.L switcher support shouldn't be built
+into the same kernel image, since the decision about whether to enable
+the switcher is made at runtime.
+
+Cheers
+---Dave
