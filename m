@@ -1,26 +1,139 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Tue, 15 Apr 2014 10:07:23 +0200
-Subject: [PATCH 0/2] ARM: berlin: add GPIO support for the BG2Q
-Message-ID: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Tue, 15 Apr 2014 10:07:25 +0200
+Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
+In-Reply-To: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add the support for the GPIOs of the Berlin BG2Q. We use the
-newly integrated dwapb GPIO driver here.
+The Marvell Berlin BG2Q has 6 GPIO ports compatible with the snps,dw-apb-gpio
+driver. This patch add the corresponding device tree nodes.
 
-This applies on top of Alexandre's BG2Q symbol introduction[1] and the dwapb
-gpio patch fixing IRQ initialization[2].
-
-[1] https://patchwork.kernel.org/patch/3876141/
-[2] https://lkml.org/lkml/2014/4/7/96
-
-Antoine T?nart (2):
-  ARM: berlin: add the LIBGPIO as a dependency for the BG2Q
-  ARM: dts: berlin: add GPIO nodes for the BG2Q
-
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
  arch/arm/boot/dts/berlin2q.dtsi | 102 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-berlin/Kconfig    |   1 +
- 2 files changed, 103 insertions(+)
+ 1 file changed, 102 insertions(+)
 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index e6e556055dfc..b2625f896bc5 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -109,6 +109,78 @@
+ 			ranges = <0 0xe80000 0x10000>;
+ 			interrupt-parent = <&aic>;
+ 
++			gpio0: gpio at 0400 {
++				compatible = "snps,dw-apb-gpio";
++				reg = <0x0400 0x400>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				porta: gpio-controller at 0 {
++					compatible = "snps,dw-apb-gpio-port";
++					gpio-controller;
++					#gpio-cells = <2>;
++					snps,nr-gpios = <32>;
++					reg = <0>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					interrupts = <0>;
++				};
++			};
++
++			gpio1: gpio at 0800 {
++				compatible = "snps,dw-apb-gpio";
++				reg = <0x0800 0x400>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				portb: gpio-controller at 1 {
++					compatible = "snps,dw-apb-gpio-port";
++					gpio-controller;
++					#gpio-cells = <2>;
++					snps,nr-gpios = <32>;
++					reg = <0>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					interrupts = <1>;
++				};
++			};
++
++			gpio2: gpio at 0c00 {
++				compatible = "snps,dw-apb-gpio";
++				reg = <0x0c00 0x400>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				portc: gpio-controller at 2 {
++					compatible = "snps,dw-apb-gpio-port";
++					gpio-controller;
++					#gpio-cells = <2>;
++					snps,nr-gpios = <32>;
++					reg = <0>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					interrupts = <2>;
++				};
++			};
++
++			gpio3: gpio at 1000 {
++				compatible = "snps,dw-apb-gpio";
++				reg = <0x1000 0x400>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				portd: gpio-controller at 3 {
++					compatible = "snps,dw-apb-gpio-port";
++					gpio-controller;
++					#gpio-cells = <2>;
++					snps,nr-gpios = <32>;
++					reg = <0>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					interrupts = <3>;
++				};
++			};
++
+ 			timer0: timer at 2c00 {
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c00 0x14>;
+@@ -181,6 +253,36 @@
+ 				interrupt-parent = <&gic>;
+ 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
++
++			gpio4: gpio at 5000 {
++				compatible = "snps,dw-apb-gpio";
++				reg = <0x5000 0x400>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				porte: gpio-controller at 4 {
++					compatible = "snps,dw-apb-gpio-port";
++					gpio-controller;
++					#gpio-cells = <2>;
++					snps,nr-gpios = <32>;
++					reg = <0>;
++				};
++			};
++
++			gpio5: gpio at c000 {
++				compatible = "snps,dw-apb-gpio";
++				reg = <0xc000 0x400>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				portf: gpio-controller at 5 {
++					compatible = "snps,dw-apb-gpio-port";
++					gpio-controller;
++					#gpio-cells = <2>;
++					snps,nr-gpios = <32>;
++					reg = <0>;
++				};
++			};
+ 		};
+ 
+ 		pinctrl: pinctrl at 0 {
 -- 
 1.8.3.2
