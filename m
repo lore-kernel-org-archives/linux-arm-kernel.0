@@ -1,41 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Apr 2014 19:50:25 +0100
-Subject: Rockchip RK3188 I2C driver
-In-Reply-To: <2863495.Gjdj6NpOm9@phil>
-References: <3748421.ND1tAjvgKS@typ> <2745802.Mh5myQIMrf@phil>
- <20140415175504.GG12304@sirena.org.uk> <2863495.Gjdj6NpOm9@phil>
-Message-ID: <20140415185025.GH12304@sirena.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 15 Apr 2014 14:53:56 -0400 (EDT)
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140415184726.GS24070@n2100.arm.linux.org.uk>
+References: <20140415180311.GA11690@redhat.com>
+ <20140415.143054.770827409393483803.davem@davemloft.net>
+ <20140415184726.GS24070@n2100.arm.linux.org.uk>
+Message-ID: <20140415.145356.1351037435109448467.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 08:39:24PM +0200, Heiko St?bner wrote:
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Date: Tue, 15 Apr 2014 19:47:26 +0100
 
-> The register has 32 bit. The upper 16 bit [31:16] are a write enable mask, so 
-> to change bit x, you also have to set (x+16) to 1.
+> However, unlike your "most braindead sparc" CPU, the i-cache doesn't
+> snoop d-cache stores at all.
 
-Perhaps I'm missing something about why this is helpful but it does seem
-like the hardware designers have good drugs here.
+All that matters is remote snooping on SMP, not local snooping.
 
-> To cite the relevant bits 31:16:
-> 	bit0~bit15 write enable
-> 	When bit 16=1, bit 0 can be written by software .
-> 	When bit 16=0, bit 0 cannot be written by software;
-> 	When bit 17=1, bit 1 can be written by software .
-> 	When bit 17=0, bit 1 cannot be written by software;
-> 	...
+> However, this is something that we already deal with since
+> self-modifying code has to work, so (from userspace) we have a
+> syscall that is used to sort that out.  Internally in the kernel,
+> this translates to:
+> 
+> 	ret = flush_cache_user_range(start, end)
+> 
+> This deals with whatever the CPU requires to be able to correctly execute
+> code which has been previously written in the range - and only actions on
+> the currently mapped userspace.
 
-> And these "write enable" bits are reset to 0 after the write, so if you write 
-> 0x30001 you will get something like 0x1 on the next read, without the mask.
+Looking around it seems the I-cache line mcr operation should do the
+right thing for most chips.
 
-For non-volatile registers this should work fine if the write enable
-bits are just latched on at probe time, we'll never actually look at the
-what the hardware reads back once things are in cache.  For ones that
-are volatile we'll need to teach the framework about it...  a write
-enable mask setting that we splat into the value perhaps?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/57db1d0a/attachment.sig>
+You could simply make a new cpuc op for writing an instruction or two
+to userspace and doing the I-cache line mcr op afterwards.
