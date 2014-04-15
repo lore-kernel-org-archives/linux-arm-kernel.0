@@ -1,79 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Apr 2014 13:10:09 +0100
-Subject: [PATCH v9 10/12] ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI
- v0.2
-In-Reply-To: <1397542455-354-11-git-send-email-anup.patel@linaro.org> (Anup
- Patel's message of "Tue, 15 Apr 2014 07:14:13 +0100")
-References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
- <1397542455-354-11-git-send-email-anup.patel@linaro.org>
-Message-ID: <87d2giztcu.fsf@approximate.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Apr 2014 13:10:42 +0100
+Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
+In-Reply-To: <534D1DDA.40207@free-electrons.com>
+References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140414210429.GJ25182@sirena.org.uk>
+ <534CE16D.8010508@free-electrons.com>
+ <20140415100922.GN12304@sirena.org.uk>
+ <534D1DDA.40207@free-electrons.com>
+Message-ID: <20140415121042.GV12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15 2014 at  7:14:13 am BST, Anup Patel <anup.patel@linaro.org> wrote:
-> As-per PSCI v0.2, the source CPU provides physical address of
-> "entry point" and "context id" for starting a target CPU. Also,
-> if target CPU is already running then we should return ALREADY_ON.
->
-> Current emulation of CPU_ON function does not consider physical
-> address of "context id" and returns INVALID_PARAMETERS if target
-> CPU is already running.
->
-> This patch updates kvm_psci_vcpu_on() such that it works for both
-> PSCI v0.1 and PSCI v0.2.
->
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Tue, Apr 15, 2014 at 01:54:02PM +0200, Boris BREZILLON wrote:
+> On 15/04/2014 12:09, Mark Brown wrote:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > OK, so if this a realistic issue then it seems like it's better to
+> > implement three different buses - there is not really any common code
+> > between the various paths.
 
-> ---
->  arch/arm/kvm/psci.c |   15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 1af0016..f59f09d 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -48,6 +48,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->  	struct kvm_vcpu *vcpu = NULL, *tmp;
->  	wait_queue_head_t *wq;
->  	unsigned long cpu_id;
-> +	unsigned long context_id;
->  	unsigned long mpidr;
->  	phys_addr_t target_pc;
->  	int i;
-> @@ -68,10 +69,17 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->  	 * Make sure the caller requested a valid CPU and that the CPU is
->  	 * turned off.
->  	 */
-> -	if (!vcpu || !vcpu->arch.pause)
-> +	if (!vcpu)
->  		return PSCI_RET_INVALID_PARAMS;
-> +	if (!vcpu->arch.pause) {
-> +		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
-> +			return PSCI_RET_ALREADY_ON;
-> +		else
-> +			return PSCI_RET_INVALID_PARAMS;
-> +	}
->  
->  	target_pc = *vcpu_reg(source_vcpu, 2);
-> +	context_id = *vcpu_reg(source_vcpu, 3);
->  
->  	kvm_reset_vcpu(vcpu);
->  
-> @@ -86,6 +94,11 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->  		kvm_vcpu_set_be(vcpu);
->  
->  	*vcpu_pc(vcpu) = target_pc;
-> +	/*
-> +	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
-> +	 * the general puspose registers are undefined upon CPU_ON.
-> +	 */
-> +	*vcpu_reg(vcpu, 0) = context_id;
->  	vcpu->arch.pause = false;
->  	smp_mb();		/* Make sure the above is visible */
+> Okay, I'll create 4 different busses (one for each access type).
+> BTW, should I keep these implementations in the same source file
+> (regmap-smbus.c) ?
+> And, should I keep one method to register an smbus regmap or should I
+> provide one method per access type and get rid of the
+> regmap_smbus_transfer_type enum ?
 
--- 
-Jazz is not dead. It just smells funny.
+Do something that looks tasteful in implementation.
+
+> >   This would also mean that you avoid having
+> > gather write when it can't be implemented.
+
+> Correct me if I'm wrong, but they all support gather write.
+
+Everything except for the block transfers is writing one register at a
+time, actually looking again everything that can only write one register
+at a time ought not to be implementing the buffer based stuff at all and
+should instead be hooked into reg_read() and reg_write() - it's not able
+to implement the API properly in any of the cases, it's unpacking the
+buffer which the upper level code already supports.
+
+> > The code is also not validating the lengths for two byte values.
+
+> I'm not sure I get this one.
+> Do you mean I should check that val_size is a 2 byte multiple ?
+> If this is what you meant, then I should also check it for block transfers.
+
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/63eff8cd/attachment.sig>
