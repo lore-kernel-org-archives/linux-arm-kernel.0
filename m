@@ -1,72 +1,113 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Apr 2014 23:38:50 +0100
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over smbus
-In-Reply-To: <534D85F3.5050009@metafoo.de>
-References: <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140414210429.GJ25182@sirena.org.uk>
- <534CE16D.8010508@free-electrons.com>
- <20140415100922.GN12304@sirena.org.uk>
- <534D1DDA.40207@free-electrons.com> <534D252B.8060009@metafoo.de>
- <20140415125654.GD12304@sirena.org.uk>
- <534D357F.9040906@metafoo.de>
- <20140415164613.GF12304@sirena.org.uk>
- <534D85F3.5050009@metafoo.de>
-Message-ID: <20140415223849.GJ12304@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Apr 2014 15:56:00 -0700
+Subject: [PATCH 02/11] ARM: OMAP3: Fix idle mode signaling for sys_clkreq
+ and sys_off_mode
+In-Reply-To: <CANOLnOO=O8xkTV9LiH+JTtmEXd9ihu0+ZYoHtrQK2QsFWOWVbg@mail.gmail.com>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-3-git-send-email-tony@atomide.com>
+ <CANOLnOO=O8xkTV9LiH+JTtmEXd9ihu0+ZYoHtrQK2QsFWOWVbg@mail.gmail.com>
+Message-ID: <20140415225559.GA5313@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 09:18:11PM +0200, Lars-Peter Clausen wrote:
-> On 04/15/2014 06:46 PM, Mark Brown wrote:
+* Grazvydas Ignotas <notasas@gmail.com> [140414 15:51]:
+> On Fri, Apr 11, 2014 at 2:47 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > @@ -282,6 +283,7 @@ void omap_sram_idle(void)
+> >
+> >         /* CORE */
+> >         if (core_next_state < PWRDM_POWER_ON) {
+> > +               omap3_vc_set_pmic_signaling(core_next_state);
+> 
+> I wonder how is it going to affect latencies, adding stuff to suspend
+> path hurts things like NAND transfers, which consist of lots of small
+> blocks with an interrupt after each..
 
-> >Please note what I said about convenience - if lots of devices have
-> >exactly the same set of constraints to set up it's possible sensible to
-> >have a standard way of specifying them.  It's going to be a bit easier
-> >to just say it's smbus than to remember exactly what that means.
+For most part this is the completely idle path, so there should
+not be much of hurry. Most devices should already block the deeper
+idle states for the devices listed in cm_idlest_per, cm_idlest1_core
+and cm_idlest3_core registers. So it should be mostly automatic with
+runtime PM.
 
-> Maybe, but the only shared constraint is reg_bits = 8 (and if it is pure
-> smbus use_single_rw = true).
+No idea what happens with GPMC though for NAND transfers :) Might
+be worth checking.
+ 
+> > +void omap3_vc_set_pmic_signaling(int core_next_state)
+> > +{
+> > +       u32 voltctrl;
+> > +
+> > +       voltctrl = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
+> > +                                         OMAP3_PRM_VOLTCTRL_OFFSET);
+> > +       switch (core_next_state) {
+> > +       case PWRDM_POWER_OFF:
+> > +               voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_RET |
+> > +                             OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP);
+> > +               voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_OFF;
+> > +               break;
+> > +       case PWRDM_POWER_RET:
+> > +               voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_OFF |
+> > +                             OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP);
+> > +               voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_RET;
+> > +               break;
+> > +       default:
+> > +               voltctrl &= ~(OMAP3430_PRM_VOLTCTRL_AUTO_OFF |
+> > +                             OMAP3430_PRM_VOLTCTRL_AUTO_RET);
+> > +               voltctrl |= OMAP3430_PRM_VOLTCTRL_AUTO_SLEEP;
+> > +               break;
+> > +       }
+> > +       omap2_prm_write_mod_reg(voltctrl, OMAP3430_GR_MOD,
+> > +                               OMAP3_PRM_VOLTCTRL_OFFSET);
+> 
+> Could it only write if the value changed? Caching register value would
+> be great too to avoid slow register accesses.
 
-I thought there was some other stuff at the edge of the protocol, though
-perhaps I misremember.  We do also have the thing with implementing the
-bulk write differently.
+Yeah sure makes sense, I'll take a look at that. We should not need
+to check for voltctrl constantly.
+ 
+> > +}
+> > +
+> > +/*
+> > + * Configure signal polarity for sys_clkreq and sys_off_mode pins
+> > + * as the default values are wrong and can cause the system to hang
+> > + * if any twl4030 sccripts are loaded.
+> 
+> s/sccripts/scripts
 
-> It's a bit of an exotic case, there seem to be only two I2C controller
-> drivers in the Linux kernel that have support for both raw I2C and native
-> SMBus and neither of them don't seem to be fairly recent (i2c-powermac.c and
-> i2c-pasemi.c). And on the other hand most devices are SMBus compatible have
+Will fix.
+ 
+> > + */
+> > +static void __init omap3_vc_init_pmic_signaling(void)
+> > +{
+> > +       u32 val, old;
+> > +
+> > +       val = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
+> > +                                    OMAP3_PRM_POLCTRL_OFFSET);
+> > +       old = val;
+> > +
+> > +       if (old & OMAP3430_PRM_POLCTRL_CLKREQ_POL)
+> > +               val |= OMAP3430_PRM_POLCTRL_CLKREQ_POL;
+> 
+> Are these 2 lines actually doing anything?
 
-Blackfin was another - I didn't look that far to be honest since the
-first few that I found did it.
+Nope :) It should be if (!(old & OMAP3430_PRM_POLCTRL_CLKREQ_POL))...
+ 
+> > +       if (old & OMAP3430_PRM_POLCTRL_OFFMODE_POL)
+> > +               val &= ~OMAP3430_PRM_POLCTRL_OFFMODE_POL;
+> 
+> Why not just clear the bit unconditionally?
 
-> extensions like being able to write/read multiple register in one transfer
-> if raw I2C access is available, which is something we want to make use of if
-> available.
+Mostly for producing some kind of debug message of what's going on
+in case somebody has a PMIC with different polarity. If we agree
+that's not needed, then that's not needed. 
 
-Sure, if the device supports it.
+> > +       if (val != old) {
+> > +               pr_debug("PM: fixing sys_clkreq and sys_off_mode polarity 0x%x -> 0x%x\n",
+> > +                        old, val);
+> > +       }
+> > +       omap2_prm_write_mod_reg(val, OMAP3430_GR_MOD,
+> > +                               OMAP3_PRM_POLCTRL_OFFSET);
+> 
+> Maybe move this write inside the block just above it?
 
-> And the other thing to consider is that a client driver currently has no way
-> to query whether the controller driver supports native SMBus or only
-> emulated SMBus. This is surely something that can be added to the I2C core,
-> but this is necessarily something that we require before any SMBus support
-> is added to regmap.
+Makes sense.
 
-Right, that'll take a couple of minutes though.
-
-> So in conclusion I think the best way forward is to create a patch that
-> checks if native I2C is available, and if not falls back to either
-> SMBUS_{WRITE,READ}_BYTE or SMBUS_{WRITE,READ}_WORD operations (Depending on
-> whether val_bits is 8 or 16). Such a patch, I think, has the most effect for
-> the least amount of work since it is rather simple and self contained and
-> allows all devices which are SMBus compatible to be used with SMBus-only
-> controllers. Everything else discussed in this thread (optimizations for
-> special cases, convince helpers) can then be implemented on top of that.
-
-Indeed, like I've been saying there's several orthogonal things going on
-here and that's one of them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/1baf6253/attachment.sig>
+Tony
