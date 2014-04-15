@@ -1,121 +1,84 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 15 Apr 2014 13:08:18 +0530
-Subject: [PATCH] arm: exynos: generalize power register address calculation
-In-Reply-To: <CANuQgHEbepUZO279+Bsx7Ynep6ZPQQJj+zCW3S2k50Cw5SLOdA@mail.gmail.com>
-References: <CANuQgHEbepUZO279+Bsx7Ynep6ZPQQJj+zCW3S2k50Cw5SLOdA@mail.gmail.com>
-Message-ID: <1397547498-21729-1-git-send-email-chander.kashyap@linaro.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 15 Apr 2014 09:39:59 +0200
+Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
+In-Reply-To: <20140414152212.GC2255@ldesroches-Latitude-E6320>
+References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
+ <20140414152212.GC2255@ldesroches-Latitude-E6320>
+Message-ID: <534CE24F.9020703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently status/configuration power register values are hard-coded for cpu1.
+On 14/04/2014 17:22, Ludovic Desroches wrote:
+> Hi Richard,
+> 
+> On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
+>> RTS pin is an active low pin.
+>> For now, this doesn't change anything as the ACTIVE_LOW flag is not
+>> handled in atmel_serial, but it will be in 3.16.
+>>
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>> index 17c1042b2df8..2f7aad71b3c9 100644
+>> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>> @@ -35,7 +35,7 @@ Example:
+>>  		clock-names = "usart";
+>>  		atmel,use-dma-rx;
+>>  		atmel,use-dma-tx;
+>> -		rts-gpios = <&pioD 15 0>;
+>> +		rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+> 
+> I was told we should not use macros here. If it is still the truth:
+> 
+> rts-gpios = <&pioD 15 1>;
 
-Make it generic so that it is useful for SoC's with more than two cpus.
+But I'd really like to know if macros are forbidden in DT documentation and why...
+Because, IMHO, <&pioD 15 1> talks less that <&pioD 15 GPIO_ACTIVE_LOW>.
+Which is a shame in a documentation.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
----
-changes in v3:
-	1. Move cpunr calculation to a macro
-	2. Changed printk format specifier from unsigned hex to unsigned decimal
-Changes in v2:
-	1. Used existing macros for clusterid and cpuid calculation
+Rob, any idea on that ?
 
- arch/arm/mach-exynos/hotplug.c  |    7 ++++---
- arch/arm/mach-exynos/platsmp.c  |   13 +++++++------
- arch/arm/mach-exynos/regs-pmu.h |   15 +++++++++++++--
- 3 files changed, 24 insertions(+), 11 deletions(-)
+(actually, I missed some uses of GPIO_ACTIVE_ macros in Documentation :)
+git grep GPIO_ACTIVE Documentation/devicetree/bindings/
+Documentation/devicetree/bindings/gpio/gpio-davinci.txt:                gpios = <&gpio 10 GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/gpio/gpio-davinci.txt:                gpios = <&gpio 11 GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/gpio/gpio-lp3943.txt:         gpios = <&gpioex 9 GPIO_ACTIVE_LOW>;
+Documentation/devicetree/bindings/gpio/gpio-lp3943.txt:         gpios = <&gpioex 10 GPIO_ACTIVE_LOW>;
+Documentation/devicetree/bindings/gpio/gpio-pcf857x.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
+Documentation/devicetree/bindings/gpio/gpio-tz1090-pdc.txt:      GPIO_ACTIVE_HIGH
+Documentation/devicetree/bindings/gpio/gpio-tz1090-pdc.txt:      GPIO_ACTIVE_LOW
+Documentation/devicetree/bindings/gpio/gpio-tz1090.txt:        GPIO_ACTIVE_HIGH
+Documentation/devicetree/bindings/gpio/gpio-tz1090.txt:        GPIO_ACTIVE_LOW
+Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
+Documentation/devicetree/bindings/input/gpio-beeper.txt:                gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/mmc/mmc.txt:also be specified using the OF_GPIO_ACTIVE_LOW flag. This creates an ambiguity
+Documentation/devicetree/bindings/mmc/mmc.txt:OF_GPIO_ACTIVE_LOW flag clear and specifying the respective *-inverted
+Documentation/devicetree/bindings/net/nfc/trf7970a.txt:         ti,enable-gpios = <&gpio2 2 GPIO_ACTIVE_LOW>,
+Documentation/devicetree/bindings/net/nfc/trf7970a.txt:                           <&gpio2 5 GPIO_ACTIVE_LOW>;
+Documentation/devicetree/bindings/net/wireless/ti,wl1251.txt:           ti,power-gpio = <&gpio3 23 GPIO_ACTIVE_HIGH>; /* 87 */
+Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt:    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
+Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt:                      gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
+Documentation/devicetree/bindings/power/isp1704.txt:    nxp,enable-gpio = <&gpio3 3 GPIO_ACTIVE_LOW>;
+Documentation/devicetree/bindings/sound/max98090.txt:   interrupts = <TEGRA_GPIO(H, 4) GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/sound/rt5640.txt:     interrupts = <TEGRA_GPIO(W, 3) GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/sound/rt5640.txt:             <&gpio TEGRA_GPIO(V, 3) GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/sound/tpa6130a2.txt:  power-gpio = <&gpio4 2 GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt:                reset-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+Documentation/devicetree/bindings/video/backlight/gpio-backlight.txt:           gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/video/panel-dsi-cm.txt:       reset-gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;
+Documentation/devicetree/bindings/video/sony,acx565akm.txt:     reset-gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
+Documentation/devicetree/bindings/video/ti,omap-dss.txt:                gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;     /* 0, power-down */
+Documentation/devicetree/bindings/video/ti,omap-dss.txt:                gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,   /* 60, CT CP HPD */
+Documentation/devicetree/bindings/video/ti,omap-dss.txt:                        <&gpio2 9 GPIO_ACTIVE_HIGH>,    /* 41, LS OE */
+Documentation/devicetree/bindings/video/ti,omap-dss.txt:                        <&gpio2 31 GPIO_ACTIVE_HIGH>;   /* 63, HPD */
+Documentation/devicetree/bindings/video/ti,tfp410.txt:  powerdown-gpios = <&twl_gpio 2 GPIO_ACTIVE_LOW>;
+Documentation/devicetree/bindings/video/ti,tpd12s015.txt:       gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>,   /* 60, CT CP HPD */
+Documentation/devicetree/bindings/video/ti,tpd12s015.txt:               <&gpio2 9 GPIO_ACTIVE_HIGH>,    /* 41, LS OE */
+Documentation/devicetree/bindings/video/ti,tpd12s015.txt:               <&gpio2 31 GPIO_ACTIVE_HIGH>;   /* 63, HPD */
+Documentation/devicetree/bindings/watchdog/gpio-wdt.txt:                gpios = <&gpio3 9 GPIO_ACTIVE_LOW>;
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead53..9f74be2 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -92,11 +92,12 @@ static inline void cpu_leave_lowpower(void)
- 
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- {
-+	unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
- 	for (;;) {
- 
--		/* make cpu1 to be turned off at next WFI command */
--		if (cpu == 1)
--			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
-+		/* make cpu to be turned off at next WFI command */
-+		if (cpu)
-+			__raw_writel(0, S5P_ARM_CORE_CONFIGURATION(cpunr));
- 
- 		/*
- 		 * here's the WFI
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 03e5e9f..d9c182f 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -90,7 +90,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	unsigned long timeout;
- 	unsigned long phys_cpu = cpu_logical_map(cpu);
--
-+	unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
- 	/*
- 	 * Set synchronisation state between this boot processor
- 	 * and the secondary one
-@@ -107,14 +107,15 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 */
- 	write_pen_release(phys_cpu);
- 
--	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-+	if (!(__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
-+		& S5P_CORE_LOCAL_PWR_EN)) {
- 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--			     S5P_ARM_CORE1_CONFIGURATION);
-+			     S5P_ARM_CORE_CONFIGURATION(cpunr));
- 
- 		timeout = 10;
- 
--		/* wait max 10 ms until cpu1 is on */
--		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
-+		/* wait max 10 ms until secondary cpu is on */
-+		while ((__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
- 			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
- 			if (timeout-- == 0)
- 				break;
-@@ -123,7 +124,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		}
- 
- 		if (timeout == 0) {
--			printk(KERN_ERR "cpu1 power enable failed");
-+			pr_err("cpu%u power enable failed", cpu);
- 			spin_unlock(&boot_lock);
- 			return -ETIMEDOUT;
- 		}
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 4f6a256..0de6df4 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -105,8 +105,13 @@
- #define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
- #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
- 
--#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
--#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
-+#define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
-+#define S5P_ARM_CORE0_STATUS			S5P_PMUREG(0x2004)
-+
-+#define S5P_ARM_CORE_CONFIGURATION(_cpunr)	\
-+		(S5P_ARM_CORE0_CONFIGURATION + 0x80 * (_cpunr))
-+#define S5P_ARM_CORE_STATUS(_cpunr)		\
-+		(S5P_ARM_CORE0_STATUS + 0x80 * (_cpunr))
- 
- #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
- #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
-@@ -313,4 +318,10 @@
- 
- #define EXYNOS5_OPTION_USE_RETENTION				(1 << 4)
- 
-+#include <asm/cputype.h>
-+#define MAX_CPUS_IN_CLUSTER	4
-+#define ENYNOS_PMU_CPUNR(mpidr) \
-+		((MPIDR_AFFINITY_LEVEL(mpidr, 1) * MAX_CPUS_IN_CLUSTER) \
-+		  + MPIDR_AFFINITY_LEVEL(mpidr, 0));
-+
- #endif /* __ASM_ARCH_REGS_PMU_H */
--- 
-1.7.9.5
+Richard.
