@@ -1,80 +1,49 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Apr 2014 20:16:02 +0200
-Subject: [PATCH 4/5] ARM: pj4: fix cpu_is_pj4 check
-In-Reply-To: <1397585763-23482-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20140414151236.75f8816d@skate>
- <1397585763-23482-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1397585763-23482-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Tue, 15 Apr 2014 20:20:13 +0200
+Subject: [PATCH v2 4/5] mmc: dove: prepare new Dove DT Kconfig variable
+In-Reply-To: <533442B9.80900@gmail.com>
+References: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393662801-17950-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140304040357.GH1872@titan.lakedaemon.net> <533442B9.80900@gmail.com>
+Message-ID: <534D785D.50704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fdb487f5c961b94486a78fa61fa28b8eff1954ab
-  ("ARM: 8015/1: Add cpu_is_pj4 to distinguish PJ4 because it
-    has some differences with V7")
-introduced a cpuid check for Marvell PJ4 processors to fix a
-regression caused by adding PJ4 based Marvell Dove into
-multi_v7.
+On 03/27/2014 04:24 PM, Sebastian Hesselbarth wrote:
+> On 03/04/2014 05:03 AM, Jason Cooper wrote:
+>> On Sat, Mar 01, 2014 at 09:33:20AM +0100, Sebastian Hesselbarth wrote:
+>>> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to
+>>> MACH_DOVE in
+>>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>>> DT-only MACH_DOVE Kconfig.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+>>> Chris,
+>>>
+>>> Mark Brown requested to take the corresponding ASoC patch through
+>>> his tree. Therefore, I have split the former patch into individual
+>>> subsystem
+>>> patches.
+>>>
+>>> Cc: Chris Ball <chris@printf.net>
+>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> Cc: Andrew Lunn <andrew@lunn.ch>
+>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> ---
+>>>   drivers/mmc/host/Kconfig | 2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> 
+> Ping. Chris, can you please take it in for v3.15-rc1?
 
-Unfortunately, this check is too narrow to catch PJ4 used on
-Dove itself and breaks iWMMXt support.
+Ping again.
 
-This patch therefore relaxes the cpuid mask to match both PJ4
-and PJ4B. Also, rework the given comment about PJ4/PJ4B
-modifications to be a little bit more specific about the
-differences.
+Chris, anything wrong with this one? It still applies to
+v3.15-rc1 and is required to get sdhci working again on
+MULTI_V7 Dove.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Chao Xie <xiechao.mail@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/include/asm/cputype.h | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index c651e3b26ec7..4764344367d4 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -222,22 +222,22 @@ static inline int cpu_is_xsc3(void)
- #endif
- 
- /*
-- * Marvell's PJ4 core is based on V7 version. It has some modification
-- * for coprocessor setting. For this reason, we need a way to distinguish
-- * it.
-+ * Marvell's PJ4 and PJ4B cores are based on V7 version,
-+ * but require a specical sequence for enabling coprocessors.
-+ * For this reason, we need a way to distinguish them.
-  */
--#ifndef CONFIG_CPU_PJ4
--#define cpu_is_pj4()	0
--#else
-+#if defined(CONFIG_CPU_PJ4) || defined(CONFIG_CPU_PJ4B)
- static inline int cpu_is_pj4(void)
- {
- 	unsigned int id;
- 
- 	id = read_cpuid_id();
--	if ((id & 0xfffffff0) == 0x562f5840)
-+	if ((id & 0xff0fff00) == 0x560f5800)
- 		return 1;
- 
- 	return 0;
- }
-+#else
-+#define cpu_is_pj4()	0
- #endif
- #endif
--- 
-1.9.1
+Sebastian
