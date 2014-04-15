@@ -1,31 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Apr 2014 09:54:28 +0200
-Subject: [PATCH] arm64:kconfig: make default for CONFIG_COMPAT
-References: <1397462883-12740-1-git-send-email-chanho.min@lge.com>
- <20140414164618.GC12916@arm.com>
-Message-ID: <4386453.rooF7jKWKy@wuerfel>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 15 Apr 2014 09:56:30 +0200
+Subject: [PATCH v3 2/4] Documentation: dt: socfpga: add reset-cells property
+In-Reply-To: <1397548592-6384-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1397548592-6384-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1397548592-6384-2-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 09:07:00 Chanho Min wrote:
-> > -----Original Message-----
-> > From: Will Deacon [mailto:will.deacon at arm.com]
-> > Sent: Tuesday, April 15, 2014 1:46 AM
-> > To: Chanho Min
-> > Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> > Subject: Re: [PATCH] arm64:kconfig: make default for CONFIG_COMPAT
-> > 
-> > On Mon, Apr 14, 2014 at 09:08:03AM +0100, Chanho Min wrote:
-> > > 'make savedefconfig' doesn't generate defconfig properly due to
-> > > missing COMPAT default. So Add default and set to yes.
-> > 
-> > I thought a missing `default' line in a Kconfig entry meant that the option
-> > ended up defaulting to 'n'. What exactly is the problem you are seeing?
-> 
-> Correct minimal config is not generated without default line.
-> If we want to set COMPAT to 'n', 'default n' should be added.
+To be able to use the reset-controller framework, the property
+	#reset-cells
+is mandatory.
 
-That would be pointless, because 'n' is already the default.
-What do you want to achieve?
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-	Arnd
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
+index ecdb57d..32c1c8b 100644
+--- a/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
+@@ -3,9 +3,11 @@ Altera SOCFPGA Reset Manager
+ Required properties:
+ - compatible : "altr,rst-mgr"
+ - reg : Should contain 1 register ranges(address and length)
++- #reset-cells: 1
+ 
+ Example:
+ 	 rstmgr at ffd05000 {
++		#reset-cells = <1>;
+ 		compatible = "altr,rst-mgr";
+ 		reg = <0xffd05000 0x1000>;
+ 	};
+-- 
+1.9.1
