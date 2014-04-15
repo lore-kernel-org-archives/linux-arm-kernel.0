@@ -1,23 +1,87 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Apr 2014 10:30:39 -0600
-Subject: [PATCH 1/4] pinctrl: tegra: remove redundant data table fields
-In-Reply-To: <534D25D1.8070202@nvidia.com>
-References: <1397511222-28533-1-git-send-email-swarren@wwwdotorg.org>
- <534D25D1.8070202@nvidia.com>
-Message-ID: <534D5EAF.9010403@wwwdotorg.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Apr 2014 17:40:38 +0100
+Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
+In-Reply-To: <CABuKBeLLC2xApUMpT=u5nq4kxp9f4AotQCdk0nRU=aREM6Bwkg@mail.gmail.com>
+References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
+ <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
+ <CAL_JsqJowqV2bsxE2VeYXQQSj4_L_KcH+C_dD=ZUvC=1crN4dA@mail.gmail.com>
+ <87ha6136dz.fsf@approximate.cambridge.arm.com>
+ <CABuKBeKLexBsTwF-nX15AYfLNA9bFDRm2XyeLpwQg9+3m6Xf=w@mail.gmail.com>
+ <5347B942.2040703@arm.com>
+ <CABuKBeLLC2xApUMpT=u5nq4kxp9f4AotQCdk0nRU=aREM6Bwkg@mail.gmail.com>
+Message-ID: <534D6106.1070005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 06:28 AM, Laxman Dewangan wrote:
-> On Tuesday 15 April 2014 03:03 AM, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
+On 15/04/14 17:09, Matthias Brugger wrote:
+> 2014-04-11 11:43 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
+>> On 11/04/14 10:11, Matthias Brugger wrote:
+>>> 2014-04-10 11:01 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
+>>>> A couple of things on top of Rob's comments:
+>>>>
+>>>> On Wed, Apr 09 2014 at 10:50:33 pm BST, Rob Herring <robherring2@gmail.com> wrote:
+>>>>> On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+>>>>>> This adds a generic devicetree board file and a dtsi for boards
+>>>>>> based on the MT6589 SoCs from Mediatek.
+>>>>>>
+>>>>>> Apart from the generic parts (gic, clocks) the only component
+>>>>>> currently supported are the timers.
+>>>>>>
+>>>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>>>>
+>>>> [...]
+>>>>
+>>>>>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+>>>>>> new file mode 100644
+>>>>>> index 0000000..c0139ca
+>>>>>> --- /dev/null
+>>>>>> +++ b/arch/arm/mach-mediatek/Kconfig
+>>>>>> @@ -0,0 +1,14 @@
+>>>>>> +config ARCH_MEDIATEK
+>>>>>> +       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
+>>>>>> +       select ARCH_REQUIRE_GPIOLIB
+>>>>>
+>>>>> Then where is your GPIO driver?
+>>>>>
+>>>>>> +       select ARM_GIC
+>>>>>> +       select CACHE_L2X0
+>>>>>> +       select HAVE_ARM_TWD if LOCAL_TIMERS
+>>>>
+>>>> Hell no! ;-) ARM_ARCH_TIMER is the way (please also add the missing
+>>>> node).
+>>>
+>>> I considered this, but the timer wasn't able to get it's clock frequency:
+>>> "Architected timer frequency not available
+>>> Division by zero in kernel."
 >>
->>          u32 drvtype_bit:5;
+>> This is because your bootloader/firmware is utterly broken, and doesn't
+>> set CNTFRQ (it must be set on all CPUs, from secure mode). As a
+>> *workaround*, you can set the timer frequency in the timer node, but
+>> that's just a hack, and will prevent virtual machines from running on
+>> such hardware.
 > 
-> Seems this is also need for 6.
+> The last days I tried to get the ARM_ARCH_TIMER working, but I wasn't
+> able to do so.
+> I set the frequency in the DT node.
+> But reading CNTP_TVAL at the end of arch_timer_init, it always returns
+> the same value.
+> When reading CNTPCT at the same place, returns zero.
+> As far as I understand CNTPCT will be always incremented, am I right?
+> 
+> Consequently, when calling mdelay in arch_timer_init the system hangs.
+> 
+> So can it be, that the timers are not working due to a screwed up chip
+> design? Or do I miss something here?
 
-Good catch, thanks.
+That would indicate that the clock that feeds into the timer is gated.
+Other SoC vendors have done the same thing. Do you have access to
+documentation describing the clock tree?
 
-I'll posted a V2 for this patch, although I won't repost patches 2..4 to
-avoid re-spamming the list with the very large patch 2. Linus, I hope
-that's OK.
+Of course, a broken design is always possible, but let's not think of
+the worse just yet... ;-)
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
