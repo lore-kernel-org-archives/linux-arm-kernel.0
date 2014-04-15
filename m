@@ -1,30 +1,67 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Tue, 15 Apr 2014 10:28:00 +0900
-Subject: [PATCH] arm64:kconfig: Add default line for CONFIG_COMPAT
-Message-ID: <1397525280-21844-1-git-send-email-chanho.min@lge.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Tue, 15 Apr 2014 10:37:11 +0900
+Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
+In-Reply-To: <20140414151333.GA29654@linaro.org>
+References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
+ <20140414151333.GA29654@linaro.org>
+Message-ID: <001a01cf584b$38945370$a9bcfa50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct minimal config is not generated without default line.
-'default n' should be added to set COMPAT to 'n'. Otherwise,
-Enabling COMPAT is not reflected to minial config.
+On Tuesday, April 15, 2014 12:14 AM, Steve Capper wrote:
+> On Mon, Apr 14, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
+> > This patch implements 4 levels of translation tables since 3 levels of
+> > page tables with 4KB pages cannot support 40-bit physical address
+> > space described in [1] due to the following issue.
+> >
+> > It is a restriction that kernel logical memory map with 4KB + 3 levels
+> > (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
+> > 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
+> > mapping for this region in map_mem function since __phys_to_virt for
+> > this region reaches to address overflow.
+> >
+> > If SoC design follows the document, [1], over 32GB RAM would be placed
+> > from 544GB. Even 64GB system is supposed to use the region from 544GB
+> > to 576GB for only 32GB RAM. Naturally, it would reach to enable 4
+> > levels of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
+> >
+> > However, it is recommended 4 levels of page table should be only
+> > enabled if memory map is too sparse or there is about 512GB RAM.
+> >
+> > References
+> > ----------
+> > [1]: Principle of ARM Memory Maps, White Paper, Issue C
+> >
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- arch/arm64/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+[ ... ]
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e6e4d37..b891543 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -288,6 +288,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	bool "Kernel support for 32-bit EL0"
-+	default n
- 	depends on !ARM64_64K_PAGES
- 	select COMPAT_BINFMT_ELF
- 	select HAVE_UID16
--- 
-1.7.9.5
+> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c index
+> > 6b7e895..321f569 100644
+> > --- a/arch/arm64/mm/mmu.c
+> > +++ b/arch/arm64/mm/mmu.c
+> > @@ -222,9 +222,17 @@ static void __init alloc_init_pmd(pud_t *pud,
+> > unsigned long addr,  static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+> >  				  unsigned long end, unsigned long phys)  {
+> > -	pud_t *pud = pud_offset(pgd, addr);
+> > +	pud_t *pud;
+> >  	unsigned long next;
+> >
+> > +#ifdef CONFIG_ARM64_4_LEVELS
+> > +	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
+> > +		pud = early_alloc(PTRS_PER_PUD * sizeof(pud_t));
+> > +		pgd_populate(&init_mm, pgd, pud);
+> > +	}
+> > +#endif
+> 
+> We don't need this #ifdef block, as pgd_none and pgd_bad should be zero when we have fewer than 4
+> levels.
+
+This block is needed to cover the third RAM region from 544GB to 1024GB
+described in the document [1].
+
+A single PGD can cover only up to 512GB with 4KB+4Level. In other words,
+kernel would reach to panic if a system has RAM over 512GB memory map space.
+That is why pgd_none should be handled.
+
+Best Regards
+Jungseok Lee
