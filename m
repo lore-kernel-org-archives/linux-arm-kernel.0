@@ -1,48 +1,73 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 15 Apr 2014 12:43:55 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gbW1jOiBtbWNpOiBzd2l0Y2ggdGhlIGRyaXZlciB0byB1?=
- =?UTF-8?B?c2luZyBncGlvIGRlc2NyaXB0b3Jz?=
-In-Reply-To: <1397550786-8146-1-git-send-email-linus.walleij@linaro.org>
-References: <1397550786-8146-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1397551435.309400197@f243.i.mail.ru>
+From: luxiangyu@huawei.com (luxiangyu)
+Date: Tue, 15 Apr 2014 16:44:15 +0800
+Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
+In-Reply-To: <20140415081805.GB3596@e103592.cambridge.arm.com>
+References: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
+ <20140414111237.GB3844@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404141201130.980@knanqh.ubzr>
+ <20140415081805.GB3596@e103592.cambridge.arm.com>
+Message-ID: <534CF15F.3030403@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tue, 15 Apr 2014 10:33:06 +0200 ?? Linus Walleij <linus.walleij@linaro.org>:
-> The next step in modernization of GPIO is to let drivers handle
-> descriptors rather than integer numbers representing GPIO pins,
-> akin to how clocks or regulators are already handled today.
-> 
-> This patch makes the MMCI driver use GPIO descriptos in the
-> core code with fallback code using the platform data if that
-> is not possible. After all platforms with MMCI have been
-> migrated to use descriptors, the platform data entries for
-> GPIO pins can be removed.
-> 
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi Russell,Ulf: there is no hurry to do these changes (only used
-> for my very corner-case MMCI PL181 experiments) but it's the
-> desired direction to use descriptors for GPIOs going forward.
-> I can rebase this on top of Ulf's patch stack any time, no
-> problem.
-> ---
-...
->  static void mmci_dt_populate_generic_pdata(struct device_node *np,
-> -					struct mmci_platform_data *pdata)
-> +					   struct mmci_platform_data *pdata)
->  {
->  	int bus_width = 0;
->  
-> -	pdata->gpio_wp = of_get_named_gpio(np, "wp-gpios", 0);
-> -	pdata->gpio_cd = of_get_named_gpio(np, "cd-gpios", 0);
-> -
->  	if (of_get_property(np, "cd-inverted", NULL))
->  		pdata->cd_invert = true;
-
-You could even eliminate "cd-inverted" property for DT case.
-
----
+On 2014/4/15 16:18, Dave Martin wrote:
+> On Mon, Apr 14, 2014 at 12:03:09PM -0400, Nicolas Pitre wrote:
+>> On Mon, 14 Apr 2014, Dave Martin wrote:
+>>
+>>> On Fri, Apr 11, 2014 at 06:16:24PM +0800, Lu Xiangyu wrote:
+>>>> From: Xiangyu Lu <luxiangyu@huawei.com>
+>>>>
+>>>> In big-endian systems, "%1" get the most significant part of the value, cause
+>>>> the instruction to get the wrong result.
+>>>>
+>>>> When viewing ftrace record in big-endian ARM systems, we found that
+>>>> the timestamp errors:
+>>>>
+>>>> swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
+>>>> events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
+>>>> swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
+>>>> swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
+>>>> swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
+>>>> swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
+>>>>
+>>>> When viewed ftrace records, it will call the do_div(n, base) function, which
+>>>> achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
+>>>> do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
+>>>>
+>>>> Cc: <stable@vger.kernel.org> # 2.6.20+
+>>>> Signed-off-by: Alex Wu <wuquanming@huawei.com>
+>>>> Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
+>>>> ---
+>>>>   arch/arm/include/asm/div64.h |    2 +-
+>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+>>>> index 191ada6..662c7bd 100644
+>>>> --- a/arch/arm/include/asm/div64.h
+>>>> +++ b/arch/arm/include/asm/div64.h
+>>>> @@ -156,7 +156,7 @@
+>>>>   		/* Select the best insn combination to perform the   */	\
+>>>>   		/* actual __m * __n / (__p << 64) operation.         */	\
+>>>>   		if (!__c) {						\
+>>>> -			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
+>>>> +			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
+>>> This looks plausible: these if() clauses are all concerned with
+>>> multiplying the low parts of __m and __n together, and this seems
+>>> to be the only 64-bit asm operand reference where Q or R is suspiciously
+>>> missing: so it looks likely that "Q" is required here for consistency.
+>>>
+>>> My understanding of the details of this code are limited: do you have
+>>> a simple test case to demonstrate the error and the fix?
+>> No need -- it is indeed wrong on big endian and has been so for the last
+>> 7.5 years.
+> OK, well with that sanity-check on my reasoning I'm happy to:
+>
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>
+> I suggest you go ahead and send it to Russell's patch system.
+>
+> Cheers
+> ---Dave
+> .
+>
+OK, thanks.
