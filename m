@@ -1,61 +1,196 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 15 Apr 2014 18:20:00 +0800
-Subject: [PATCH] arm64: Flush the process's mm context TLB entries when
- switching
-In-Reply-To: <20140415080217.GD17408@arm.com>
-References: <534BCE80.3090406@huawei.com> <20140414130154.GE3530@arm.com>
- <534C92B8.30408@huawei.com> <20140415080217.GD17408@arm.com>
-Message-ID: <534D07D0.1090807@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Apr 2014 11:21:41 +0100
+Subject: [PATCH v9 05/12] ARM/ARM64: KVM: Make kvm_psci_call() return
+ convention more flexible
+In-Reply-To: <1397542455-354-6-git-send-email-anup.patel@linaro.org> (Anup
+ Patel's message of "Tue, 15 Apr 2014 07:14:08 +0100")
+References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
+ <1397542455-354-6-git-send-email-anup.patel@linaro.org>
+Message-ID: <87y4z6zydm.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/4/15 16:02, Will Deacon wrote:
-> On Tue, Apr 15, 2014 at 03:00:24AM +0100, Ding Tianhong wrote:
->> On 2014/4/14 21:01, Will Deacon wrote:
->>> Hi Ding,
->>>
->>> On Mon, Apr 14, 2014 at 01:03:12PM +0100, Ding Tianhong wrote:
->>>> I met a problem when migrating process by following steps:
->>>>
->>>> 1) The process was already running on core 0.
->>>> 2) Set the CPU affinity of the process to 0x02 and move it to core 1,
->>>>    it could work well.
->>>> 3) Set the CPU affinity of the process to 0x01 and move it to core 0 again,
->>>>    the problem occurs and the process was killed.
->>>
->>> [...]
->>>
->>>> It was a very strange problem that the PC and LR are both 0, and the esr is
->>>> 0x83000006, it means that the used for instruction access generated MMU faults
->>>> and synchronous external aborts, including synchronous parity errors.
->>>>
->>>> I try to fix the problem by invalidating the process's TLB entries when switching,
->>>> it will make the context stale and pick new one, and then it could work well.
->>>>
->>>> So I think in some situation that after the process switching, the modification of
->>>> the TLB entries in the new core didn't inform all other cores to invalidate the old
->>>> TLB entries which was in the inner shareable caches, and then if the process schedule
->>>> to another core, the old TLB entries may occur MMU faults.
->>>
->>> Yes, it sounds like you don't have your TLBs configured correctly. Can you
->>> confirm that your EL3 firmware is configuring TLB broadcasting correctly
->>> please?
->>>
->>
->> Hi will:
->>
->> Do you mean the SCR_EL3.NS?
-> 
-> No, there's usually a CPU-specific register (called something like actlr or
-> ectlr) which contains bit(s) to enable TLB broadcasting in hardware. Which
-> CPU are you using?
-> 
-> Will
-> 
-Yes?I set the CPUECTLR.SMP to 1 and enable the core to receive TLB broadcast, then fix the problem,
-thanks for your help, And I use arm64-A57.
+On Tue, Apr 15 2014 at  7:14:08 am BST, Anup Patel <anup.patel@linaro.org> wrote:
+> Currently, the kvm_psci_call() returns 'true' or 'false' based on whether
+> the PSCI function call was handled successfully or not. This does not help
+> us emulate system-level PSCI functions where the actual emulation work will
+> be done by user space (QEMU or KVMTOOL). Examples of such system-level PSCI
+> functions are: PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET.
+>
+> This patch updates kvm_psci_call() to return three types of values:
+> 1) > 0 (success)
+> 2) = 0 (success but exit to user space)
+> 3) < 0 (errors)
+>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_psci.h   |    2 +-
+>  arch/arm/kvm/handle_exit.c        |   10 +++++++---
+>  arch/arm/kvm/psci.c               |   28 ++++++++++++++++------------
+>  arch/arm64/include/asm/kvm_psci.h |    2 +-
+>  arch/arm64/kvm/handle_exit.c      |   10 +++++++---
+>  5 files changed, 32 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h
+> index 4c0e3e1..6bda945 100644
+> --- a/arch/arm/include/asm/kvm_psci.h
+> +++ b/arch/arm/include/asm/kvm_psci.h
+> @@ -22,6 +22,6 @@
+>  #define KVM_ARM_PSCI_0_2	2
+>  
+>  int kvm_psci_version(struct kvm_vcpu *vcpu);
+> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+> +int kvm_psci_call(struct kvm_vcpu *vcpu);
+>  
+>  #endif /* __ARM_KVM_PSCI_H__ */
+> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+> index 0de91fc..1270095 100644
+> --- a/arch/arm/kvm/handle_exit.c
+> +++ b/arch/arm/kvm/handle_exit.c
+> @@ -38,14 +38,18 @@ static int handle_svc_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> +	int ret;
+> +
+>  	trace_kvm_hvc(*vcpu_pc(vcpu), *vcpu_reg(vcpu, 0),
+>  		      kvm_vcpu_hvc_get_imm(vcpu));
+>  
+> -	if (kvm_psci_call(vcpu))
+> +	ret = kvm_psci_call(vcpu);
+> +	if (ret == -EINVAL) {
 
-Regards
-Ding
-> .
-> 
+Please check for (ret < 0), so it actually matches with the comment (and
+will same some debugging when we introduce another error code).
+
+> +		kvm_inject_undefined(vcpu);
+>  		return 1;
+> +	}
+>  
+> -	kvm_inject_undefined(vcpu);
+> -	return 1;
+> +	return ret;
+>  }
+>  
+>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 8c42596c..14e6fa6 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -93,7 +93,7 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
+>  	return KVM_ARM_PSCI_0_1;
+>  }
+>  
+> -static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+> +static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  {
+>  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>  	unsigned long val;
+> @@ -128,14 +128,14 @@ static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  		val = PSCI_RET_NOT_SUPPORTED;
+>  		break;
+>  	default:
+> -		return false;
+> +		return -EINVAL;
+>  	}
+>  
+>  	*vcpu_reg(vcpu, 0) = val;
+> -	return true;
+> +	return 1;
+>  }
+>  
+> -static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+> +static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>  {
+>  	unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+>  	unsigned long val;
+> @@ -153,11 +153,11 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>  		val = PSCI_RET_NOT_SUPPORTED;
+>  		break;
+>  	default:
+> -		return false;
+> +		return -EINVAL;
+>  	}
+>  
+>  	*vcpu_reg(vcpu, 0) = val;
+> -	return true;
+> +	return 1;
+>  }
+>  
+>  /**
+> @@ -165,12 +165,16 @@ static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>   * @vcpu: Pointer to the VCPU struct
+>   *
+>   * Handle PSCI calls from guests through traps from HVC instructions.
+> - * The calling convention is similar to SMC calls to the secure world where
+> - * the function number is placed in r0 and this function returns true if the
+> - * function number specified in r0 is withing the PSCI range, and false
+> - * otherwise.
+> + * The calling convention is similar to SMC calls to the secure world
+> + * where the function number is placed in r0.
+> + *
+> + * This function returns: > 0 (success), 0 (success but exit to user
+> + * space), and < 0 (errors)
+> + *
+> + * Errors:
+> + * -EINVAL: Unrecognized PSCI function
+>   */
+> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
+> +int kvm_psci_call(struct kvm_vcpu *vcpu)
+>  {
+>  	switch (kvm_psci_version(vcpu)) {
+>  	case KVM_ARM_PSCI_0_2:
+> @@ -178,6 +182,6 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+>  	case KVM_ARM_PSCI_0_1:
+>  		return kvm_psci_0_1_call(vcpu);
+>  	default:
+> -		return false;
+> +		return -EINVAL;
+>  	};
+>  }
+> diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
+> index e25c658..bc39e55 100644
+> --- a/arch/arm64/include/asm/kvm_psci.h
+> +++ b/arch/arm64/include/asm/kvm_psci.h
+> @@ -22,6 +22,6 @@
+>  #define KVM_ARM_PSCI_0_2	2
+>  
+>  int kvm_psci_version(struct kvm_vcpu *vcpu);
+> -bool kvm_psci_call(struct kvm_vcpu *vcpu);
+> +int kvm_psci_call(struct kvm_vcpu *vcpu);
+>  
+>  #endif /* __ARM64_KVM_PSCI_H__ */
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 7bc41ea..743a74d 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -30,11 +30,15 @@ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+>  
+>  static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	if (kvm_psci_call(vcpu))
+> +	int ret;
+> +
+> +	ret = kvm_psci_call(vcpu);
+> +	if (ret == -EINVAL) {
+
+Same here.
+
+> +		kvm_inject_undefined(vcpu);
+>  		return 1;
+> +	}
+>  
+> -	kvm_inject_undefined(vcpu);
+> -	return 1;
+> +	return ret;
+>  }
+>  
+>  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
