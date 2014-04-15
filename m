@@ -1,30 +1,30 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 15 Apr 2014 14:05:14 -0400 (EDT)
-Subject: [PATCH/RFC 0/3] Allow OHCI drivers to override hub control
- operations
-In-Reply-To: <2441746.S6bOE6v56B@avalon>
-Message-ID: <Pine.LNX.4.44L0.1404151402250.1310-100000@iolanthe.rowland.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 15 Apr 2014 20:07:00 +0200
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140415.135038.1703628429468655272.davem@davemloft.net>
+References: <534D6A1F.70102@linaro.org>
+ <20140415.133840.2270952586596479547.davem@davemloft.net>
+ <20140415174900.GA11184@redhat.com>
+ <20140415.135038.1703628429468655272.davem@davemloft.net>
+Message-ID: <20140415180700.GB11690@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Apr 2014, Laurent Pinchart wrote:
+On 04/15, David Miller wrote:
+>
+> From: Oleg Nesterov <oleg@redhat.com>
+> Date: Tue, 15 Apr 2014 19:49:00 +0200
+>
+> > We do not want to write to, say, page cache if the probed application
+> > mmaps a file at the same vaddr.
+>
+> If user has write access to that page... not our problem.
 
-> > I'm open to the idea of exporting the hub functions. In the end, it doesn't
-> > make all that much difference (it would save a little object code).
-> 
-> I would have agreed to keep the code as it is today if you had thought that 
-> exporting the hub functions was a really bad idea, but as you're open to it, 
-> and as it removes a bit of code without much of a drawback, I think it makes 
-> sense to perform that optimization.
+Well, I am not sure.
 
-Agreed.  We aren't really _encouraging_ people to do this, because it 
-still takes some manual work to override the default operation.
+Yes, this won't allow you to write the exploit. But if this actually
+happens because an application is buggy, this can lead to really
+hard-to-debug problems.
 
-> By the way, as a second step, do you think it would make sense to handle the 
-> vbus regulators directly in ohci_hub_control() ?
-
-I don't see any good way of doing this generically.  Since it is
-currently needed only for PXA27x, we don't know what other
-architectures will require in the future.
-
-Alan Stern
+Oleg.
