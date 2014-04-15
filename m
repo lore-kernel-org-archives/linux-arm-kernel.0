@@ -1,37 +1,21 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 15 Apr 2014 14:30:54 -0400 (EDT)
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140415180311.GA11690@redhat.com>
-References: <20140415174330.GA10558@redhat.com>
- <20140415.134627.1895466146177627985.davem@davemloft.net>
- <20140415180311.GA11690@redhat.com>
-Message-ID: <20140415.143054.770827409393483803.davem@davemloft.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Apr 2014 12:31:25 -0600
+Subject: [PATCH 4/4] ARM: tegra: fix Venice2 VQMMC regulators
+In-Reply-To: <1397526163-20126-5-git-send-email-abrestic@chromium.org>
+References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+ <1397526163-20126-5-git-send-email-abrestic@chromium.org>
+Message-ID: <534D7AFD.7080807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleg Nesterov <oleg@redhat.com>
-Date: Tue, 15 Apr 2014 20:03:11 +0200
+On 04/14/2014 07:42 PM, Andrew Bresticker wrote:
+> VDDIO_SDMMC3 is the VQMMC supply, not the VMMC supply, for the SD
+> slot.  Add 1.8V_VDDIO as the VQMMC supply for the eMMC.
 
-> On 04/15, David Miller wrote:
->>
->> From: Oleg Nesterov <oleg@redhat.com>
->> Date: Tue, 15 Apr 2014 19:43:30 +0200
->>
->> > Finally, let me repeat, you should verify that this
->> > __copy_to_user_page(page, uaddr, kaddr) will not something bad if uaddr
->> > is not mmapped, or its mapping do not match area->page.
->>
->> Just directly access userspace with the usual exception mechanism we
->> use for copy_to_user(), put_user(), et al. and if it faults you'll get
->> -EFAULT and handle it.
->>
->> This also avoids the D-cache aliasing issues entirely as I explained
->> in my other reply.
-> 
-> Yes, yes, this is obvious.
-> 
-> But I have no idea what else we should do to take care of icache.
+Is there documentation re: what vmmc-supply and vqmmc-supply actually
+refer to? I looked a long while ago and couldn't find any, and didn't
+get an answer when I asked.
 
-Russell, if for example userland stores into the instruction stream
-to patch an instruction, what needs to be done on ARM?
+Neither
+Documentation/devicetree/bindings/mmc/{mmc.txt,nvidia,tegra20-sdhci.txt}
+seem to say:-(
