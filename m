@@ -1,304 +1,156 @@
-From: sdu.liu@huawei.com (Liu hua)
-Date: Tue, 15 Apr 2014 19:04:35 +0800
-Subject: [PATCH v2 2/2] ARM : change fixmap mapping region to support
- 32 CPUs
-In-Reply-To: <alpine.LFD.2.11.1404140936230.980@knanqh.ubzr>
-References: <1397203252-22977-1-git-send-email-sdu.liu@huawei.com>
- <1397203252-22977-3-git-send-email-sdu.liu@huawei.com>
- <alpine.LFD.2.11.1404112314560.980@knanqh.ubzr> <534A9031.5030006@huawei.com>
- <alpine.LFD.2.11.1404131305120.980@knanqh.ubzr> <534BD488.3020606@huawei.com>
- <alpine.LFD.2.11.1404140936230.980@knanqh.ubzr>
-Message-ID: <534D1243.20004@huawei.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 15 Apr 2014 13:07:43 +0200
+Subject: [PATCH 2/2] ARM: at91/dt: add peripherals to the at91sam9rlek board
+In-Reply-To: <1397560063-7439-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1397560063-7439-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1397560063-7439-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2014/4/14 21:50, Nicolas Pitre ??:
-> On Mon, 14 Apr 2014, Liu hua wrote:
-> 
->> Yes, it seems that FIX_KMAP_BEGIN and FIX_KMAP_END are not as important for
->> ARM than that for other architectures (MIPS PowerPC x86), whose FIX_KMAP_BEGIN
->> is not 0. I will reminder this in my patch. Anyone who need them can get
->> imformantion there.
->>
->>
->> Now the new patchs are following. Maybe I sould resend the patch series
->> with a new tag. If It is time to do that. Can I add this information
->> "Reviewed-by: Nicolas Pitre <nico@linaro.org>" ?
->>
->> Thanks,
->> Liu Hua.
->>
->> -----------------patch 1-------------------------
->>
->> Subject: [PATCH 1/2] ARM : fixmap : remove FIX_KMAP_BEGIN and FIX_KMAP_END
->>
->> It seems that these two variables are not used by non
->> architecture specific code. And on ARM FIX_KMAP_BEGIN
->> equals zero; FIX_KMAP_END is totally not used by the
->> kernel.
->>
->> This patch removes these two variables. The code will
->> become clear when I introduce a bugfix on fixmap mapping
-> 
-> s/clear/clearer/
-> 
->> region.
->>
->> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
->> ---
->>  arch/arm/include/asm/fixmap.h | 12 ++++++++----
->>  arch/arm/mm/highmem.c         |  6 +++---
->>  2 files changed, 11 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index bbae919..8675bb9 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -17,9 +17,13 @@
->>  #define FIXADDR_TOP		0xfffe0000UL
->>  #define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
->>
->> -#define FIX_KMAP_BEGIN		0
->> -#define FIX_KMAP_END		(FIXADDR_SIZE >> PAGE_SHIFT)
->> -
->> +/* Notice : FIX_KMAP_END and FIX_KMAP_BEGIN are removed.
->> + *
->> + * Instead, using FIX_KMAP_NR_PTES to tell the pte number
->> + * belonged to fixmap mapping region.
->> + *
->> + */
-> 
-> Please move this comment to the commit log instead.  This is not 
-> important enough to occupy that much space in the code.
-> 
->> +#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
->>  #define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
->>  #define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
->>
->> @@ -27,7 +31,7 @@ extern void __this_fixmap_does_not_exist(void);
->>
->>  static inline unsigned long fix_to_virt(const unsigned int idx)
->>  {
->> -	if (idx >= FIX_KMAP_END)
->> +	if (idx >= FIX_KMAP_NR_PTES)
->>  		__this_fixmap_does_not_exist();
->>  	return __fix_to_virt(idx);
->>  }
->> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
->> index 21b9e1b..e05e8ad 100644
->> --- a/arch/arm/mm/highmem.c
->> +++ b/arch/arm/mm/highmem.c
->> @@ -63,7 +63,7 @@ void *kmap_atomic(struct page *page)
->>  	type = kmap_atomic_idx_push();
->>
->>  	idx = type + KM_TYPE_NR * smp_processor_id();
->> -	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
->> +	vaddr = __fix_to_virt(idx);
->>  #ifdef CONFIG_DEBUG_HIGHMEM
->>  	/*
->>  	 * With debugging enabled, kunmap_atomic forces that entry to 0.
->> @@ -94,7 +94,7 @@ void __kunmap_atomic(void *kvaddr)
->>  		if (cache_is_vivt())
->>  			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
->>  #ifdef CONFIG_DEBUG_HIGHMEM
->> -		BUG_ON(vaddr != __fix_to_virt(FIX_KMAP_BEGIN + idx));
->> +		BUG_ON(vaddr != __fix_to_virt(idx));
->>  		set_top_pte(vaddr, __pte(0));
->>  #else
->>  		(void) idx;  /* to kill a warning */
->> @@ -117,7 +117,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
->>
->>  	type = kmap_atomic_idx_push();
->>  	idx = type + KM_TYPE_NR * smp_processor_id();
->> -	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
->> +	vaddr = __fix_to_virt(idx);
->>  #ifdef CONFIG_DEBUG_HIGHMEM
->>  	BUG_ON(!pte_none(get_top_pte(vaddr)));
->>  #endif
->> -- 
->> 1.9.0
-> 
-> With the above details fixed you may add:
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> 
->> -----------------patch 2-------------------------
->>
->>
->>
->> Subject: [PATCH 2/2] ARM : change fixmap mapping region to support 32 CPUs
->>
->> In 32-bit ARM systems, the fixmap mapping region can support
->> no more than 14 CPUs(total: 896k; one CPU: 64K). And we can
->> configure NR_CPUS up to 32. So there is a mismatch.
->>
->> This patch moves fixmapping region downwards to region
->> 0xffc00000-0xffe00000 . Then the fixmap mapping region can
->> support up to 32 CPUs
->>
->> Signed-off-by: Liu Hua <sdu.liu@huawei.com>
->> ---
->>  Documentation/arm/memory.txt   |  2 +-
->>  arch/arm/include/asm/fixmap.h  | 16 ++--------------
->>  arch/arm/include/asm/highmem.h |  1 +
->>  arch/arm/mm/highmem.c          | 27 +++++++++++++++++++++------
->>  arch/arm/mm/mmu.c              |  4 ++++
->>  5 files changed, 29 insertions(+), 21 deletions(-)
->>
->> diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
->> index d74e8a5..256c5e0 100644
->> --- a/Documentation/arm/memory.txt
->> +++ b/Documentation/arm/memory.txt
->> @@ -41,7 +41,7 @@ fffe8000	fffeffff	DTCM mapping area for platforms with
->>  fffe0000	fffe7fff	ITCM mapping area for platforms with
->>  				ITCM mounted inside the CPU.
->>
->> -fff00000	fffdffff	Fixmap mapping region.  Addresses provided
->> +fffc0000	ffdfffff	Fixmap mapping region.  Addresses provided
->>  				by fix_to_virt() will be located here.
->>
->>  fee00000	feffffff	Mapping of PCI I/O space. This is a static
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index 8675bb9..fb8a5a7 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -1,20 +1,8 @@
->>  #ifndef _ASM_FIXMAP_H
->>  #define _ASM_FIXMAP_H
->>
->> -/*
->> - * Nothing too fancy for now.
->> - *
->> - * On ARM we already have well known fixed virtual addresses imposed by
->> - * the architecture such as the vector page which is located at 0xffff0000,
->> - * therefore a second level page table is already allocated covering
->> - * 0xfff00000 upwards.
->> - *
->> - * The cache flushing code in proc-xscale.S uses the virtual area between
->> - * 0xfffe0000 and 0xfffeffff.
->> - */
->> -
->> -#define FIXADDR_START		0xfff00000UL
->> -#define FIXADDR_TOP		0xfffe0000UL
->> +#define FIXADDR_START		0xffc00000UL
->> +#define FIXADDR_TOP		0xffe00000UL
->>  #define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
->>
->>  /* Notice : FIX_KMAP_END and FIX_KMAP_BEGIN are removed.
->> diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
->> index 91b99ab..5355795 100644
->> --- a/arch/arm/include/asm/highmem.h
->> +++ b/arch/arm/include/asm/highmem.h
->> @@ -18,6 +18,7 @@
->>  	} while (0)
->>
->>  extern pte_t *pkmap_page_table;
->> +extern pte_t *fixmap_page_table;
->>
->>  extern void *kmap_high(struct page *page);
->>  extern void kunmap_high(struct page *page);
->> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
->> index e05e8ad..45aeaac 100644
->> --- a/arch/arm/mm/highmem.c
->> +++ b/arch/arm/mm/highmem.c
->> @@ -18,6 +18,21 @@
->>  #include <asm/tlbflush.h>
->>  #include "mm.h"
->>
->> +pte_t *fixmap_page_table;
->> +
->> +static inline void set_fixmap_pte(int idx, pte_t pte)
->> +{
->> +	unsigned long vaddr = __fix_to_virt(idx);
->> +	set_pte_ext(fixmap_page_table + idx, pte, 0);
->> +	local_flush_tlb_kernel_page(vaddr);
->> +}
->> +
->> +static inline pte_t get_fixmap_pte(unsigned long vaddr)
->> +{
->> +	unsigned long idx = __virt_to_fix(vaddr);
->> +	return *(fixmap_page_table + idx);
->> +}
->> +
->>  void *kmap(struct page *page)
->>  {
->>  	might_sleep();
->> @@ -69,14 +84,14 @@ void *kmap_atomic(struct page *page)
->>  	 * With debugging enabled, kunmap_atomic forces that entry to 0.
->>  	 * Make sure it was indeed properly unmapped.
->>  	 */
->> -	BUG_ON(!pte_none(get_top_pte(vaddr)));
->> +	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
->>  #endif
->>  	/*
->>  	 * When debugging is off, kunmap_atomic leaves the previous mapping
->>  	 * in place, so the contained TLB flush ensures the TLB is updated
->>  	 * with the new mapping.
->>  	 */
->> -	set_top_pte(vaddr, mk_pte(page, kmap_prot));
->> +	set_fixmap_pte(idx, mk_pte(page, kmap_prot));
->>
->>  	return (void *)vaddr;
->>  }
->> @@ -95,7 +110,7 @@ void __kunmap_atomic(void *kvaddr)
->>  			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
->>  #ifdef CONFIG_DEBUG_HIGHMEM
->>  		BUG_ON(vaddr != __fix_to_virt(idx));
->> -		set_top_pte(vaddr, __pte(0));
->> +		set_fixmap_pte(idx, __pte(0));
->>  #else
->>  		(void) idx;  /* to kill a warning */
->>  #endif
->> @@ -119,9 +134,9 @@ void *kmap_atomic_pfn(unsigned long pfn)
->>  	idx = type + KM_TYPE_NR * smp_processor_id();
->>  	vaddr = __fix_to_virt(idx);
->>  #ifdef CONFIG_DEBUG_HIGHMEM
->> -	BUG_ON(!pte_none(get_top_pte(vaddr)));
->> +	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
->>  #endif
->> -	set_top_pte(vaddr, pfn_pte(pfn, kmap_prot));
->> +	set_fixmap_pte(idx, pfn_pte(pfn, kmap_prot));
->>
->>  	return (void *)vaddr;
->>  }
->> @@ -133,5 +148,5 @@ struct page *kmap_atomic_to_page(const void *ptr)
->>  	if (vaddr < FIXADDR_START)
->>  		return virt_to_page(ptr);
->>
->> -	return pte_page(get_top_pte(vaddr));
->> +	return pte_page(get_fixmap_pte(vaddr));
->>  }
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index b68c6b2..09c0a16 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -35,6 +35,7 @@
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach/map.h>
->>  #include <asm/mach/pci.h>
->> +#include <asm/fixmap.h>
->>
->>  #include "mm.h"
->>  #include "tcm.h"
->> @@ -1359,6 +1360,9 @@ static void __init kmap_init(void)
->>  #ifdef CONFIG_HIGHMEM
->>  	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
->>  		PKMAP_BASE, _PAGE_KERNEL_TABLE);
->> +
->> +	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
->> +		FIXADDR_START, _PAGE_KERNEL_TABLE);
->>  #endif
->>  }
->>
->> -- 
->> 1.9.0
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> 
->>
->>
-Ok, I will send the patch series with tag "v3". If there is no
-bothersome details. you can add "Reviewed-by:" at than time!
+This adds support for:
+ - SPI
+ - Dataflash
+ - LCD
+ - i2c
+ - ADC
+ - Touchscreen
+ - USB gadget
+ - PWM
 
-Thanks,
-Liu Hua
+Also it switches the ds1 and ds2 leds to PWM control.
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9rlek.dts | 90 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 86 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
+index cddb37825fad..f148fa4b3ab9 100644
+--- a/arch/arm/boot/dts/at91sam9rlek.dts
++++ b/arch/arm/boot/dts/at91sam9rlek.dts
+@@ -32,6 +32,37 @@
+ 	};
+ 
+ 	ahb {
++		fb0: fb at 00500000 {
++			display = <&display0>;
++			status = "okay";
++
++			display0: display {
++				bits-per-pixel = <16>;
++				atmel,lcdcon-backlight;
++				atmel,dmacon = <0x1>;
++				atmel,lcdcon2 = <0x80008002>;
++				atmel,guard-time = <1>;
++				atmel,lcd-wiring-mode = "RGB";
++
++				display-timings {
++					native-mode = <&timing0>;
++					timing0: timing0 {
++						clock-frequency = <4965000>;
++						hactive = <240>;
++						vactive = <320>;
++						hback-porch = <1>;
++						hfront-porch = <33>;
++						vback-porch = <1>;
++						vfront-porch = <0>;
++						hsync-len = <5>;
++						vsync-len = <1>;
++						hsync-active = <1>;
++						vsync-active = <1>;
++					};
++				};
++			};
++		};
++
+ 		nand0: nand at 40000000 {
+ 			nand-bus-width = <8>;
+ 			nand-ecc-mode = "soft";
+@@ -92,6 +123,43 @@
+ 				status = "okay";
+ 			};
+ 
++			adc0: adc at fffd0000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <
++					&pinctrl_adc0_ad0
++					&pinctrl_adc0_ad1
++					&pinctrl_adc0_ad2
++					&pinctrl_adc0_ad3
++					&pinctrl_adc0_ad4
++					&pinctrl_adc0_ad5
++					&pinctrl_adc0_adtrg>;
++				atmel,adc-ts-wires = <4>;
++				status = "okay";
++			};
++
++			usb0: gadget at fffd4000 {
++				atmel,vbus-gpio = <&pioA 8 GPIO_ACTIVE_HIGH>;
++				status = "okay";
++			};
++
++			spi0: spi at fffcc000 {
++				status = "okay";
++				cs-gpios = <&pioA 28 0>, <0>, <0>, <0>;
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <15000000>;
++					reg = <0>;
++				};
++			};
++
++			pwm0: pwm at fffc8000 {
++				status = "okay";
++
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_pwm0_pwm1_2>,
++					<&pinctrl_pwm0_pwm2_2>;
++			};
++
+ 			dbgu: serial at fffff200 {
+ 				status = "okay";
+ 			};
+@@ -117,18 +185,24 @@
+ 		};
+ 	};
+ 
+-	leds {
+-		compatible = "gpio-leds";
++	pwmleds {
++		compatible = "pwm-leds";
+ 
+ 		ds1 {
+ 			label = "ds1";
+-			gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
++			pwms = <&pwm0 1 5000 PWM_POLARITY_INVERTED>;
++			max-brightness = <255>;
+ 		};
+ 
+ 		ds2 {
+ 			label = "ds2";
+-			gpios = <&pioD 16 GPIO_ACTIVE_LOW>;
++			pwms = <&pwm0 2 5000 PWM_POLARITY_INVERTED>;
++			max-brightness = <255>;
+ 		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
+ 
+ 		ds3 {
+ 			label = "ds3";
+@@ -154,4 +228,12 @@
+ 			gpio-key,wakeup;
+ 		};
+ 	};
++
++	i2c at 0 {
++		status = "okay";
++	};
++
++	i2c at 1 {
++		status = "okay";
++	};
+ };
+-- 
+1.8.3.2
