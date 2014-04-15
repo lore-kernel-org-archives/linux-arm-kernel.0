@@ -1,67 +1,28 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Tue, 15 Apr 2014 10:37:11 +0900
-Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
-In-Reply-To: <20140414151333.GA29654@linaro.org>
-References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
- <20140414151333.GA29654@linaro.org>
-Message-ID: <001a01cf584b$38945370$a9bcfa50$@samsung.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 14 Apr 2014 18:42:39 -0700
+Subject: [PATCH 0/4] Tegra SD/MMC fixes
+Message-ID: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 15, 2014 12:14 AM, Steve Capper wrote:
-> On Mon, Apr 14, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
-> > This patch implements 4 levels of translation tables since 3 levels of
-> > page tables with 4KB pages cannot support 40-bit physical address
-> > space described in [1] due to the following issue.
-> >
-> > It is a restriction that kernel logical memory map with 4KB + 3 levels
-> > (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
-> > 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
-> > mapping for this region in map_mem function since __phys_to_virt for
-> > this region reaches to address overflow.
-> >
-> > If SoC design follows the document, [1], over 32GB RAM would be placed
-> > from 544GB. Even 64GB system is supposed to use the region from 544GB
-> > to 576GB for only 32GB RAM. Naturally, it would reach to enable 4
-> > levels of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
-> >
-> > However, it is recommended 4 levels of page table should be only
-> > enabled if memory map is too sparse or there is about 512GB RAM.
-> >
-> > References
-> > ----------
-> > [1]: Principle of ARM Memory Maps, White Paper, Issue C
-> >
+The following patches fix a couple of issues which prevented Venice2
+boards from booting via eMMC and SD card reliably.  Note that this
+includes disabling UHS support since SDR50 and above require a
+Tegra-specific tuning procedure which is not supported yet (and still
+seems to have issues even in downstream kernels).
 
-[ ... ]
+Tested on Tegra124-based Venice2 and Norrin boards.
 
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c index
-> > 6b7e895..321f569 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -222,9 +222,17 @@ static void __init alloc_init_pmd(pud_t *pud,
-> > unsigned long addr,  static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-> >  				  unsigned long end, unsigned long phys)  {
-> > -	pud_t *pud = pud_offset(pgd, addr);
-> > +	pud_t *pud;
-> >  	unsigned long next;
-> >
-> > +#ifdef CONFIG_ARM64_4_LEVELS
-> > +	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
-> > +		pud = early_alloc(PTRS_PER_PUD * sizeof(pud_t));
-> > +		pgd_populate(&init_mm, pgd, pud);
-> > +	}
-> > +#endif
-> 
-> We don't need this #ifdef block, as pgd_none and pgd_bad should be zero when we have fewer than 4
-> levels.
+Andrew Bresticker (4):
+  mmc: tegra: disable UHS modes
+  mmc: tegra: fix reporting of base clock frequency
+  mmc: sdhci: defer probing on regulator_get_optional() failures
+  ARM: tegra: fix Venice2 VQMMC regulators
 
-This block is needed to cover the third RAM region from 544GB to 1024GB
-described in the document [1].
+ arch/arm/boot/dts/tegra124-venice2.dts |  3 ++-
+ drivers/mmc/host/sdhci-tegra.c         | 40 +++++++++++++++++++++++++---------
+ drivers/mmc/host/sdhci.c               | 19 +++++++++++++---
+ 3 files changed, 48 insertions(+), 14 deletions(-)
 
-A single PGD can cover only up to 512GB with 4KB+4Level. In other words,
-kernel would reach to panic if a system has RAM over 512GB memory map space.
-That is why pgd_none should be handled.
-
-Best Regards
-Jungseok Lee
+-- 
+1.9.1.423.g4596e3a
