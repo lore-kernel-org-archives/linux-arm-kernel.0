@@ -1,75 +1,181 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 15 Apr 2014 08:28:12 +0100
-Subject: [PATCH 7/8] arm64: mm: Implement 4 levels of translation tables
-In-Reply-To: <001a01cf584b$38945370$a9bcfa50$@samsung.com>
-References: <000501cf57b4$e57e8e80$b07bab80$@samsung.com>
- <20140414151333.GA29654@linaro.org>
- <001a01cf584b$38945370$a9bcfa50$@samsung.com>
-Message-ID: <20140415072811.GA1795@linaro.org>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 15 Apr 2014 15:35:59 +0800
+Subject: [PATCH v2 07/12] ARM: hisi: add hip04 SoC support
+In-Reply-To: <20140410085052.GC22639@e106331-lin.cambridge.arm.com>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-8-git-send-email-haojian.zhuang@linaro.org>
+ <20140410085052.GC22639@e106331-lin.cambridge.arm.com>
+Message-ID: <CAD6h2NRcQg2Gy+4rDR188r8VERqTo_YbCFZdXo-Baqcz9N+JSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 10:37:11AM +0900, Jungseok Lee wrote:
-> On Tuesday, April 15, 2014 12:14 AM, Steve Capper wrote:
-> > On Mon, Apr 14, 2014 at 04:41:07PM +0900, Jungseok Lee wrote:
-> > > This patch implements 4 levels of translation tables since 3 levels of
-> > > page tables with 4KB pages cannot support 40-bit physical address
-> > > space described in [1] due to the following issue.
-> > >
-> > > It is a restriction that kernel logical memory map with 4KB + 3 levels
-> > > (0xffffffc000000000-0xffffffffffffffff) cannot cover RAM region from
-> > > 544GB to 1024GB in [1]. Specifically, ARM64 kernel fails to create
-> > > mapping for this region in map_mem function since __phys_to_virt for
-> > > this region reaches to address overflow.
-> > >
-> > > If SoC design follows the document, [1], over 32GB RAM would be placed
-> > > from 544GB. Even 64GB system is supposed to use the region from 544GB
-> > > to 576GB for only 32GB RAM. Naturally, it would reach to enable 4
-> > > levels of page tables to avoid hacking __virt_to_phys and __phys_to_virt.
-> > >
-> > > However, it is recommended 4 levels of page table should be only
-> > > enabled if memory map is too sparse or there is about 512GB RAM.
-> > >
-> > > References
-> > > ----------
-> > > [1]: Principle of ARM Memory Maps, White Paper, Issue C
-> > >
-> 
-> [ ... ]
-> 
-> > > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c index
-> > > 6b7e895..321f569 100644
-> > > --- a/arch/arm64/mm/mmu.c
-> > > +++ b/arch/arm64/mm/mmu.c
-> > > @@ -222,9 +222,17 @@ static void __init alloc_init_pmd(pud_t *pud,
-> > > unsigned long addr,  static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-> > >  				  unsigned long end, unsigned long phys)  {
-> > > -	pud_t *pud = pud_offset(pgd, addr);
-> > > +	pud_t *pud;
-> > >  	unsigned long next;
-> > >
-> > > +#ifdef CONFIG_ARM64_4_LEVELS
-> > > +	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
-> > > +		pud = early_alloc(PTRS_PER_PUD * sizeof(pud_t));
-> > > +		pgd_populate(&init_mm, pgd, pud);
-> > > +	}
-> > > +#endif
-> > 
-> > We don't need this #ifdef block, as pgd_none and pgd_bad should be zero when we have fewer than 4
-> > levels.
-> 
-> This block is needed to cover the third RAM region from 544GB to 1024GB
-> described in the document [1].
-> 
-> A single PGD can cover only up to 512GB with 4KB+4Level. In other words,
-> kernel would reach to panic if a system has RAM over 512GB memory map space.
-> That is why pgd_none should be handled.
+On 10 April 2014 16:50, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Apr 08, 2014 at 09:00:47AM +0100, Haojian Zhuang wrote:
+>> Hisilicon Hi3xxx is based on Cortex A9 Core. Now HiP04 SoC is based on
+>> Cortex A15 Core. Since multiple clusters is used in HiP04 SoC, it could
+>> be based on MCPM.
+>>
+>>
+>> +config ARCH_HIP04
+>> +       bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7_LPAE
+>> +       select HAVE_ARM_ARCH_TIMER
+>> +       select MCPM if SMP
+>> +       help
+>> +         Support for Hisilicon HiP04 processor family
+>
+> Nit: Surely this is an SoC family? The processor is Cortex-A15, as you
+> state above.
+>
+Yes, it's SoC, not processor. I'll fix it.
 
-I could have been clearer; I meant to say keep the code but remove the #ifdef
-and #endif. The condition for the if statement will be false for <4 levels so
-the whole block will compile out in those situations anyay; and for 4 levels
-we then check the pgd.
+>> +
+>>  endmenu
+>>
+>>  endif
+>> diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
+>> index af23ec2..e008c7a 100644
+>> --- a/arch/arm/mach-hisi/core.h
+>> +++ b/arch/arm/mach-hisi/core.h
+>> @@ -12,4 +12,10 @@ extern void hi3xxx_cpu_die(unsigned int cpu);
+>>  extern int hi3xxx_cpu_kill(unsigned int cpu);
+>>  extern void hi3xxx_set_cpu(int cpu, bool enable);
+>>
+>> +#define HIP04_BOOTWRAPPER_PHYS         0x10c00000
+>> +#define HIP04_BOOTWRAPPER_MAGIC                0xa5a5a5a5
+>> +#define HIP04_BOOTWRAPPER_SIZE         0x00010000
+>
+> The address and size should come from DT.
+>
+> What is the magic, exactly? How is it used by the kernel and
+> bootwrapper?
+>
+Of course, I can move it into DT.
 
-Cheers,
--- 
-Steve
+>
+>> +static void __init hip04_reserve(void)
+>> +{
+>> +       memblock_reserve(HIP04_BOOTWRAPPER_PHYS, HIP04_BOOTWRAPPER_SIZE);
+>> +}
+>
+> As Arnd said, do this in your DT. This is not a hardware property the
+> kernel needs to statically know, but rather a system-specific property
+> that needs to be in the DT such that it can vary.
+>
+Sure. I'll update it.
+
+>
+>> +static int hip04_mcpm_power_up(unsigned int cpu, unsigned int cluster)
+>> +{
+>> +       unsigned long data, mask;
+>> +
+>> +       if (!relocation || !sysctrl)
+>> +               return -ENODEV;
+>> +       if (cluster >= HIP04_MAX_CLUSTERS || cpu >= HIP04_MAX_CPUS_PER_CLUSTER)
+>> +               return -EINVAL;
+>> +
+>> +       spin_lock(&boot_lock);
+>> +       writel_relaxed(HIP04_BOOTWRAPPER_PHYS, relocation);
+>> +       writel_relaxed(HIP04_BOOTWRAPPER_MAGIC, relocation + 4);
+>> +       writel_relaxed(virt_to_phys(mcpm_entry_point), relocation + 8);
+>
+> So the kernel is poking the hardware directly to throw CPUs into a
+> bootwrapper that it pokes to throw the CPUs into the kernel? That does
+> not strike me as fantastic.
+>
+> It's a shame we have to manage coherency here at all and don't have a
+> PSCI implementation to abstract this. That would mean you wouldn't need
+> a machine descriptor at all, could reuse existing infrastructure, and
+> you'd be able to use Hyp.
+>
+
+Do we need a firmware to support PSCI first? Up to now, I don't have
+this kind of firmware.
+
+>
+>> +static void hip04_mcpm_power_down(void)
+>> +{
+>> +       unsigned int mpidr, cpu, cluster;
+>> +       unsigned int v;
+>> +
+>> +       spin_lock(&boot_lock);
+>> +       spin_unlock(&boot_lock);
+>
+> Huh? What's this for?
+
+Actually it could be removed. Since secondary CPU is always booted up
+one by one.
+>
+>> +       asm volatile(
+>> +       "       mrc     p15, 0, %0, c1, c0, 0\n"
+>> +       "       bic     %0, %0, %1\n"
+>> +       "       mcr     p15, 0, %0, c1, c0, 0\n"
+>> +         : "=&r" (v)
+>> +         : "Ir" (CR_C)
+>> +         : "cc");
+>
+> I don't think that cc clobber is necessary, none of these instructions
+> set the flags.
+
+Yes, I'll remove it.
+>
+>> +       asm volatile(
+>> +       /*
+>> +       * Turn off coherency
+>> +       */
+>> +       "       mrc     p15, 0, %0, c1, c0, 1\n"
+>> +       "       bic     %0, %0, %1\n"
+>> +       "       mcr     p15, 0, %0, c1, c0, 1\n"
+>> +       : "=&r" (v)
+>> +       : "Ir" (0x40)
+>
+> 0x40?
+
+Disable SMP bit in ACTLR register.
+
+>
+>> +       : "cc");
+>
+> Likewise I don't think this clobber is necessary.
+
+Yes, I'll remove it.
+>
+>> +static int __init hip04_mcpm_init(void)
+>> +{
+>> +       struct device_node *np;
+>> +       int ret = -ENODEV;
+>> +
+>> +       np = of_find_compatible_node(NULL, NULL, "hisilicon,hip04-mcpm");
+>> +       if (!np) {
+>> +               pr_err("failed to find hisilicon,hip04-mcpm node\n");
+>> +               goto err;
+>> +       }
+>
+> MCPM is a Linux-specific software construct. It is not a piece of
+> hardware, and not a generic interface name. Please come up with a better
+> name for this that makes it clear exactly what you are describing.
+>
+
+OK. I'll use "hisilicon,core-power-control" instead.
+
+>> +       relocation = of_iomap(np, 0);
+>> +       if (!relocation) {
+>> +               pr_err("failed to get relocation space\n");
+>> +               ret = -ENOMEM;
+>> +               goto err;
+>> +       }
+>> +       sysctrl = of_iomap(np, 1);
+>> +       if (!sysctrl) {
+>> +               pr_err("failed to get sysctrl base\n");
+>> +               ret = -ENOMEM;
+>> +               goto err_sysctrl;
+>> +       }
+>> +       fabric = of_iomap(np, 2);
+>> +       if (!fabric) {
+>> +               pr_err("failed to get fabric base\n");
+>> +               ret = -ENOMEM;
+>> +               goto err_fabric;
+>> +       }
+>
+> These sounds like they would be better described by separate nodes.
+>
+OK
