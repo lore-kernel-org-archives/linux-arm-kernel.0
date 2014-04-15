@@ -1,358 +1,156 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 15 Apr 2014 13:07:42 +0200
-Subject: [PATCH 1/2] ARM: at91/dt: sam9rl: add lcd, adc,
- usb gadget and pwm support
-In-Reply-To: <1397560063-7439-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1397560063-7439-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1397560063-7439-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Tue, 15 Apr 2014 16:40:30 +0530
+Subject: [PATCH v9 02/12] ARM/ARM64: KVM: Add common header for PSCI
+ related defines
+In-Reply-To: <87eh0y29fk.fsf@approximate.cambridge.arm.com>
+References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
+ <1397542455-354-3-git-send-email-anup.patel@linaro.org>
+ <87eh0y29fk.fsf@approximate.cambridge.arm.com>
+Message-ID: <CAAhSdy2PLWy+KFTjoLAo0d65RQij30skUdB=0HCWxNLcDE0-7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the ADC, LCD, USB gadget and PWM controllers to the
-at91sam9rl. It also reorders the pinctrl_spi0 as it was not correctly sorted.
+On Tue, Apr 15, 2014 at 3:36 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Tue, Apr 15 2014 at  7:14:05 am BST, Anup Patel <anup.patel@linaro.org> wrote:
+>> We need a common place to share PSCI related defines among ARM kernel,
+>> ARM64 kernel, KVM ARM/ARM64 PSCI emulation, and user space.
+>>
+>> We introduce uapi/linux/psci.h for this purpose. This newly added
+>> header will be first used by KVM ARM/ARM64 in-kernel PSCI emulation
+>> and user space (i.e. QEMU or KVMTOOL).
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>> ---
+>>  include/uapi/linux/Kbuild |    1 +
+>>  include/uapi/linux/psci.h |   78 +++++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 79 insertions(+)
+>>  create mode 100644 include/uapi/linux/psci.h
+>>
+>> diff --git a/include/uapi/linux/Kbuild b/include/uapi/linux/Kbuild
+>> index 6929571..24e9033 100644
+>> --- a/include/uapi/linux/Kbuild
+>> +++ b/include/uapi/linux/Kbuild
+>> @@ -317,6 +317,7 @@ header-y += ppp-ioctl.h
+>>  header-y += ppp_defs.h
+>>  header-y += pps.h
+>>  header-y += prctl.h
+>> +header-y += psci.h
+>>  header-y += ptp_clock.h
+>>  header-y += ptrace.h
+>>  header-y += qnx4_fs.h
+>> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+>> new file mode 100644
+>> index 0000000..077b623
+>> --- /dev/null
+>> +++ b/include/uapi/linux/psci.h
+>> @@ -0,0 +1,78 @@
+>> +/*
+>> + * ARM Power State and Coordination Interface (PSCI) header
+>> + *
+>> + * This header holds common PSCI defines and macros shared
+>> + * by: ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space.
+>> + *
+>> + * Copyright (C) 2014 Linaro Ltd.
+>> + * Author: Anup Patel <anup.patel@linaro.org>
+>> + */
+>> +
+>> +#ifndef _UAPI_LINUX_PSCI_H
+>> +#define _UAPI_LINUX_PSCI_H
+>> +
+>> +/* PSCI v0.1 interface */
+>> +#define PSCI_FN(base, n)                     ((base) + (n))
+>> +
+>> +#define PSCI_FN_CPU_SUSPEND(base)            PSCI_FN(base, 0)
+>> +#define PSCI_FN_CPU_OFF(base)                        PSCI_FN(base, 1)
+>> +#define PSCI_FN_CPU_ON(base)                 PSCI_FN(base, 2)
+>> +#define PSCI_FN_MIGRATE(base)                        PSCI_FN(base, 3)
+>
+> For PSCI v0.1, all the function numbers are independent (the spec didn't
+> specify any number...). You cannot assume contiguous numbering.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9rl.dtsi | 265 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 256 insertions(+), 9 deletions(-)
+This is more like KVM recommended function numbering for PSCI v0.1.
+We were already having it in uapi/asm/kvm.h to share between KVM and
+user space so I felt this to be better place for it.
 
-diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-index 63e1784d272c..6202e161314a 100644
---- a/arch/arm/boot/dts/at91sam9rl.dtsi
-+++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-@@ -11,6 +11,7 @@
- #include <dt-bindings/clk/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pwm/pwm.h>
- 
- / {
- 	model = "Atmel AT91SAM9RL family SoC";
-@@ -32,6 +33,7 @@
- 		i2c1 = &i2c1;
- 		ssc0 = &ssc0;
- 		ssc1 = &ssc1;
-+		pwm0 = &pwm0;
- 	};
- 
- 	cpus {
-@@ -48,12 +50,31 @@
- 		reg = <0x20000000 0x04000000>;
- 	};
- 
-+	clocks {
-+		adc_op_clk: adc_op_clk{
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <1000000>;
-+		};
-+	};
-+
- 	ahb {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
- 
-+		fb0: fb at 00500000 {
-+			compatible = "atmel,at91sam9rl-lcdc";
-+			reg = <0x00500000 0x1000>;
-+			interrupts = <23 IRQ_TYPE_LEVEL_HIGH 3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_fb>;
-+			clocks = <&lcd_clk>, <&lcd_clk>;
-+			clock-names = "hclk", "lcdc_clk";
-+			status = "disabled";
-+		};
-+
- 		nand0: nand at 40000000 {
- 			compatible = "atmel,at91rm9200-nand";
- 			#address-cells = <1>;
-@@ -187,6 +208,16 @@
- 				status = "disabled";
- 			};
- 
-+			pwm0: pwm at fffc8000 {
-+				compatible = "atmel,at91sam9rl-pwm";
-+				reg = <0xfffc8000 0x300>;
-+				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 4>;
-+				#pwm-cells = <3>;
-+				clocks = <&pwm_clk>;
-+				clock-names = "pwm_clk";
-+				status = "disabled";
-+			};
-+
- 			spi0: spi at fffcc000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -200,6 +231,111 @@
- 				status = "disabled";
- 			};
- 
-+			adc0: adc at fffd0000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91sam9rl-adc";
-+				reg = <0xfffd0000 0x100>;
-+				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&adc_clk>, <&adc_op_clk>;
-+				clock-names = "adc_clk", "adc_op_clk";
-+				atmel,adc-use-external-triggers;
-+				atmel,adc-channels-used = <0x3f>;
-+				atmel,adc-vref = <3300>;
-+				atmel,adc-startup-time = <40>;
-+				atmel,adc-res = <8 10>;
-+				atmel,adc-res-names = "lowres", "highres";
-+				atmel,adc-use-res = "highres";
-+
-+				trigger at 0 {
-+					reg = <0>;
-+					trigger-name = "timer-counter-0";
-+					trigger-value = <0x1>;
-+				};
-+				trigger at 1 {
-+					reg = <1>;
-+					trigger-name = "timer-counter-1";
-+					trigger-value = <0x3>;
-+				};
-+
-+				trigger at 2 {
-+					reg = <2>;
-+					trigger-name = "timer-counter-2";
-+					trigger-value = <0x5>;
-+				};
-+
-+				trigger at 3 {
-+					reg = <3>;
-+					trigger-name = "external";
-+					trigger-value = <0x13>;
-+					trigger-external;
-+				};
-+			};
-+
-+			usb0: gadget at fffd4000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91sam9rl-udc";
-+				reg = <0x00600000 0x100000>,
-+				      <0xfffd4000 0x4000>;
-+				interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-+				clocks = <&udphs_clk>, <&utmi>;
-+				clock-names = "pclk", "hclk";
-+				status = "disabled";
-+
-+				ep0 {
-+					reg = <0>;
-+					atmel,fifo-size = <64>;
-+					atmel,nb-banks = <1>;
-+				};
-+
-+				ep1 {
-+					reg = <1>;
-+					atmel,fifo-size = <1024>;
-+					atmel,nb-banks = <2>;
-+					atmel,can-dma;
-+					atmel,can-isoc;
-+				};
-+
-+				ep2 {
-+					reg = <2>;
-+					atmel,fifo-size = <1024>;
-+					atmel,nb-banks = <2>;
-+					atmel,can-dma;
-+					atmel,can-isoc;
-+				};
-+
-+				ep3 {
-+					reg = <3>;
-+					atmel,fifo-size = <1024>;
-+					atmel,nb-banks = <3>;
-+					atmel,can-dma;
-+				};
-+
-+				ep4 {
-+					reg = <4>;
-+					atmel,fifo-size = <1024>;
-+					atmel,nb-banks = <3>;
-+					atmel,can-dma;
-+				};
-+
-+				ep5 {
-+					reg = <5>;
-+					atmel,fifo-size = <1024>;
-+					atmel,nb-banks = <3>;
-+					atmel,can-dma;
-+					atmel,can-isoc;
-+				};
-+
-+				ep6 {
-+					reg = <6>;
-+					atmel,fifo-size = <1024>;
-+					atmel,nb-banks = <3>;
-+					atmel,can-dma;
-+					atmel,can-isoc;
-+				};
-+			};
-+
- 			ramc0: ramc at ffffea00 {
- 				compatible = "atmel,at91sam9260-sdramc";
- 				reg = <0xffffea00 0x200>;
-@@ -238,6 +374,44 @@
- 					<0x003fffff 0x0001ff3c>;  /* pioD */
- 
- 				/* shared pinctrl settings */
-+				adc0 {
-+					pinctrl_adc0_ts: adc0_ts-0 {
-+						atmel,pins =
-+							<AT91_PIOA 17 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOA 18 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOA 19 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOA 20 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_adc0_ad0: adc0_ad0-0 {
-+						atmel,pins = <AT91_PIOA 17 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_adc0_ad1: adc0_ad1-0 {
-+						atmel,pins = <AT91_PIOA 18 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_adc0_ad2: adc0_ad2-0 {
-+						atmel,pins = <AT91_PIOA 19 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_adc0_ad3: adc0_ad3-0 {
-+						atmel,pins = <AT91_PIOA 20 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_adc0_ad4: adc0_ad4-0 {
-+						atmel,pins = <AT91_PIOD 6 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_adc0_ad5: adc0_ad5-0 {
-+						atmel,pins = <AT91_PIOD 7 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_adc0_adtrg: adc0_adtrg-0 {
-+						atmel,pins = <AT91_PIOB 15 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
- 				dbgu {
- 					pinctrl_dbgu: dbgu-0 {
- 						atmel,pins =
-@@ -246,6 +420,33 @@
- 					};
- 				};
- 
-+				fb {
-+					pinctrl_fb: fb-0 {
-+						atmel,pins =
-+							<AT91_PIOC 1 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 3 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 9 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 11 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 12 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 13 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 15 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 16 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 17 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 18 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 19 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 20 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 21 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 24 AT91_PERIPH_B AT91_PINCTRL_NONE>,
-+							<AT91_PIOC 25 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
- 				i2c_gpio0 {
- 					pinctrl_i2c_gpio0: i2c_gpio0-0 {
- 						atmel,pins =
-@@ -307,6 +508,61 @@
- 					};
- 				};
- 
-+				pwm0 {
-+					pinctrl_pwm0_pwm0_0: pwm0_pwm0-0 {
-+						atmel,pins = <AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm0_1: pwm0_pwm0-1 {
-+						atmel,pins = <AT91_PIOC 2 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm0_2: pwm0_pwm0-2 {
-+						atmel,pins = <AT91_PIOD 14 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm1_0: pwm0_pwm1-0 {
-+						atmel,pins = <AT91_PIOB 9 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm1_1: pwm0_pwm1-1 {
-+						atmel,pins = <AT91_PIOC 3 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm1_2: pwm0_pwm1-2 {
-+						atmel,pins = <AT91_PIOD 15 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm2_0: pwm0_pwm2-0 {
-+						atmel,pins = <AT91_PIOD 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm2_1: pwm0_pwm2-1 {
-+						atmel,pins = <AT91_PIOD 12 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm2_2: pwm0_pwm2-2 {
-+						atmel,pins = <AT91_PIOD 16 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm3_0: pwm0_pwm3-0 {
-+						atmel,pins = <AT91_PIOD 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-+					};
-+
-+					pinctrl_pwm0_pwm3_1: pwm0_pwm3-1 {
-+						atmel,pins = <AT91_PIOD 18 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
-+				spi0 {
-+					pinctrl_spi0: spi0-0 {
-+						atmel,pins =
-+							<AT91_PIOA 25 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOA 26 AT91_PERIPH_A AT91_PINCTRL_NONE>,
-+							<AT91_PIOA 27 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-+					};
-+				};
-+
- 				ssc0 {
- 					pinctrl_ssc0_tx: ssc0_tx-0 {
- 						atmel,pins =
-@@ -339,15 +595,6 @@
- 					};
- 				};
- 
--				spi0 {
--					pinctrl_spi0: spi0-0 {
--						atmel,pins =
--							<AT91_PIOA 25 AT91_PERIPH_A AT91_PINCTRL_NONE>,
--							<AT91_PIOA 26 AT91_PERIPH_A AT91_PINCTRL_NONE>,
--							<AT91_PIOA 27 AT91_PERIPH_A AT91_PINCTRL_NONE>;
--					};
--				};
--
- 				tcb0 {
- 					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
- 						atmel,pins = <AT91_PIOA 3 AT91_PERIPH_B AT91_PINCTRL_NONE>;
--- 
-1.8.3.2
+Do you want me to drop these or add some comment about PSCI v0.1
+function numbering ?
+
+>
+>> +/* PSCI v0.2 interface */
+>> +#define PSCI_0_2_FN_BASE                     0x84000000
+>> +#define PSCI_0_2_FN(n)                               (PSCI_0_2_FN_BASE + (n))
+>> +#define PSCI_0_2_64BIT                               0x40000000
+>> +#define PSCI_0_2_FN64_BASE                   \
+>> +                                     (PSCI_0_2_FN_BASE + PSCI_0_2_64BIT)
+>> +#define PSCI_0_2_FN64(n)                     (PSCI_0_2_FN64_BASE + (n))
+>> +
+>> +#define PSCI_0_2_FN_PSCI_VERSION             PSCI_0_2_FN(0)
+>> +#define PSCI_0_2_FN_CPU_SUSPEND                      PSCI_0_2_FN(1)
+>> +#define PSCI_0_2_FN_CPU_OFF                  PSCI_0_2_FN(2)
+>> +#define PSCI_0_2_FN_CPU_ON                   PSCI_0_2_FN(3)
+>> +#define PSCI_0_2_FN_AFFINITY_INFO            PSCI_0_2_FN(4)
+>> +#define PSCI_0_2_FN_MIGRATE                  PSCI_0_2_FN(5)
+>> +#define PSCI_0_2_FN_MIGRATE_INFO_TYPE                PSCI_0_2_FN(6)
+>> +#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU              PSCI_0_2_FN(7)
+>> +#define PSCI_0_2_FN_SYSTEM_OFF                       PSCI_0_2_FN(8)
+>> +#define PSCI_0_2_FN_SYSTEM_RESET             PSCI_0_2_FN(9)
+>> +
+>> +#define PSCI_0_2_FN64_CPU_SUSPEND            PSCI_0_2_FN64(1)
+>> +#define PSCI_0_2_FN64_CPU_ON                 PSCI_0_2_FN64(3)
+>> +#define PSCI_0_2_FN64_AFFINITY_INFO          PSCI_0_2_FN64(4)
+>> +#define PSCI_0_2_FN64_MIGRATE                        PSCI_0_2_FN64(5)
+>> +#define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU    PSCI_0_2_FN64(7)
+>> +
+>> +#define PSCI_0_2_POWER_STATE_ID_MASK         0xffff
+>> +#define PSCI_0_2_POWER_STATE_ID_SHIFT                0
+>> +#define PSCI_0_2_POWER_STATE_TYPE_MASK               0x1
+>> +#define PSCI_0_2_POWER_STATE_TYPE_SHIFT              16
+>> +#define PSCI_0_2_POWER_STATE_AFFL_MASK               0x3
+>> +#define PSCI_0_2_POWER_STATE_AFFL_SHIFT              24
+>> +
+>> +#define PSCI_0_2_TOS_UP_MIGRATE                      0
+>> +#define PSCI_0_2_TOS_UP_NO_MIGRATE           1
+>> +#define PSCI_0_2_TOS_MP                              2
+>> +
+>> +/* PSCI version decoding (independent of PSCI version) */
+>> +#define PSCI_VERSION_MAJOR_MASK                      0xffff0000
+>> +#define PSCI_VERSION_MINOR_MASK                      0x0000ffff
+>> +#define PSCI_VERSION_MAJOR_SHIFT             16
+>
+> What about:
+>
+> #define PSCI_VERSION_MINOR_MASK ((1U << PSCI_VERSION_MAJOR_SHIFT) - 1)
+> #define PSCI_VERSION_MAJOR_MASK ~PSCI_VERSION_MINOR_MASK
+
+OK, I will update this.
+
+>
+>> +#define PSCI_VERSION_MAJOR(ver)                      \
+>> +             (((ver) & PSCI_VERSION_MAJOR_MASK) >> PSCI_VERSION_MAJOR_SHIFT)
+>> +#define PSCI_VERSION_MINOR(ver)                      \
+>> +             ((ver) & PSCI_VERSION_MINOR_MASK)
+>> +
+>> +/* PSCI return values (inclusive of all PSCI versions) */
+>> +#define PSCI_RET_SUCCESS                     0
+>> +#define PSCI_RET_NOT_SUPPORTED                       -1
+>> +#define PSCI_RET_INVALID_PARAMS                      -2
+>> +#define PSCI_RET_DENIED                              -3
+>> +#define PSCI_RET_ALREADY_ON                  -4
+>> +#define PSCI_RET_ON_PENDING                  -5
+>> +#define PSCI_RET_INTERNAL_FAILURE            -6
+>> +#define PSCI_RET_NOT_PRESENT                 -7
+>> +#define PSCI_RET_DISABLED                    -8
+>> +
+>> +#endif /* _UAPI_LINUX_PSCI_H */
+>
+> --
+> Jazz is not dead. It just smells funny.
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+
+--
+Anup
