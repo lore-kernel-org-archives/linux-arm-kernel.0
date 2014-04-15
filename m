@@ -1,50 +1,121 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Apr 2014 12:49:14 +0200
-Subject: dma_alloc_coherent and cache?
-In-Reply-To: <E94CEA02-A987-4212-A0CA-D0CDC80E7250@nowonline.co.uk>
-References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
- <4356499.vN3lxjGqPZ@wuerfel>
- <E94CEA02-A987-4212-A0CA-D0CDC80E7250@nowonline.co.uk>
-Message-ID: <4292964.mUEmdLVWYx@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Apr 2014 11:55:45 +0100
+Subject: [PATCH v9 08/12] ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
+In-Reply-To: <1397542455-354-9-git-send-email-anup.patel@linaro.org> (Anup
+ Patel's message of "Tue, 15 Apr 2014 07:14:11 +0100")
+References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
+ <1397542455-354-9-git-send-email-anup.patel@linaro.org>
+Message-ID: <87lhv6zwsu.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 14:01:39 Lee Essen wrote:
-> > On 15 Apr 2014, at 12:43, Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > dma_alloc_coherent() is a wrapper around a device-specific allocator,
-> > based on the dma_map_ops implementation. The default allocator
-> > from arm_dma_ops gives you uncached, buffered memory. It is expected
-> > that the driver uses a barrier (which is implied by readl/writel
-> > but not __raw_readl/__raw_writel or readl_relaxed/writel_relaxed)
-> > to ensure the write buffers are flushed.
-> > 
-> > If the machine sets arm_coherent_dma_ops rather than arm_dma_ops,
-> > the memory will be cacheable, as it's assumed that the hardware
-> > is set up for cache-coherent DMAs.
-> 
-> Hi,
-> 
-> The driver writes to the descriptor and then uses wmb() before enabling DMA. The descriptor is in dma_alloc_coherent() space, but the enable is a writel().
+On Tue, Apr 15 2014 at  7:14:11 am BST, Anup Patel <anup.patel@linaro.org> wrote:
+> This patch adds emulation of PSCI v0.2 AFFINITY_INFO function call
+> for KVM ARM/ARM64. This is a VCPU-level function call which will be
+> used to determine current state of given affinity level.
+>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/kvm/psci.c |   52 +++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 50 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index b964aa4..f6f9290 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -27,6 +27,16 @@
+>   * as described in ARM document number ARM DEN 0022A.
+>   */
+>  
+> +#define AFFINITY_MASK(level)	~((0x1UL << ((level) * 8)) - 1)
 
-Ok
+Nit: Use MPIDR_LEVEL_MASK instead of 8.
 
-> > 
-> > Can you post a link to the source code?
-> > 
-> >   Arnd
-> 
-> The code is available here:
-> 
-> http://www.nowonline.co.uk/scratch/le_netdev.c
-> 
-> It hangs consistently when it executes the txq_enable() on line 1280. Occasionally I see a corrupt packet on the wire, but mostly it's just a hang. If I uncomment all the printk's then it generally gets 20 or 30 packets out before it freezes.
-> 
+> +
+> +static unsigned long psci_affinity_mask(unsigned long affinity_level)
+> +{
+> +	if (affinity_level <= 3)
+> +		return MPIDR_HWID_BITMASK & AFFINITY_MASK(affinity_level);
+> +
+> +	return 0;
+> +}
+> +
+>  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+>  {
+>  	vcpu->arch.pause = true;
+> @@ -85,6 +95,42 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  	return PSCI_RET_SUCCESS;
+>  }
+>  
+> +static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
+> +{
+> +	int i;
+> +	unsigned long mpidr;
+> +	unsigned long target_affinity;
+> +	unsigned long target_affinity_mask;
+> +	unsigned long lowest_affinity_level;
+> +	struct kvm *kvm = vcpu->kvm;
+> +	struct kvm_vcpu *tmp;
+> +
+> +	target_affinity = *vcpu_reg(vcpu, 1);
+> +	lowest_affinity_level = *vcpu_reg(vcpu, 2);
+> +
+> +	/* Determine target affinity mask */
+> +	target_affinity_mask = psci_affinity_mask(lowest_affinity_level);
+> +	if (!target_affinity_mask)
+> +		return PSCI_RET_INVALID_PARAMS;
+> +
+> +	/* Ignore other bits of target affinity */
+> +	target_affinity &= target_affinity_mask;
+> +
+> +	/*
+> +	 * If one or more VCPU matching target affinity are running
+> +	 * then return 0 (ON) else return 1 (OFF)
 
+Would be good to define symbolic values for these (and for ON_PENDING as
+well).
 
-Unfortunately I don't see an obvious mistake with the DMA handling there,
-I would try looking somewhere other than the dma code first. What
-kind of freeze do you see? Does the entire machine hang, or is it
-just the network interface that stops sending packets?
+> +	 */
+> +	kvm_for_each_vcpu(i, tmp, kvm) {
+> +		mpidr = kvm_vcpu_get_mpidr(tmp);
+> +		if (((mpidr & target_affinity_mask) == target_affinity) &&
+> +		    !tmp->arch.pause) {
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return 1;
+> +}
+> +
+>  static inline void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+>  {
+>  	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
+> @@ -132,6 +178,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  	case PSCI_0_2_FN64_CPU_ON:
+>  		val = kvm_psci_vcpu_on(vcpu);
+>  		break;
+> +	case PSCI_0_2_FN_AFFINITY_INFO:
+> +	case PSCI_0_2_FN64_AFFINITY_INFO:
+> +		val = kvm_psci_vcpu_affinity_info(vcpu);
+> +		break;
+>  	case PSCI_0_2_FN_SYSTEM_OFF:
+>  		kvm_psci_system_off(vcpu);
+>  		val = PSCI_RET_SUCCESS;
+> @@ -143,12 +193,10 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  		ret = 0;
+>  		break;
+>  	case PSCI_0_2_FN_CPU_SUSPEND:
+> -	case PSCI_0_2_FN_AFFINITY_INFO:
+>  	case PSCI_0_2_FN_MIGRATE:
+>  	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+>  	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+>  	case PSCI_0_2_FN64_CPU_SUSPEND:
+> -	case PSCI_0_2_FN64_AFFINITY_INFO:
+>  	case PSCI_0_2_FN64_MIGRATE:
+>  	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+>  		val = PSCI_RET_NOT_SUPPORTED;
 
-	Arnd
+-- 
+Jazz is not dead. It just smells funny.
