@@ -1,47 +1,70 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 15 Apr 2014 17:00:02 +0200
-Subject: [PATCHv3 1/5] Documentation: dt-bindings: reformat and order list of
- ahci-platform compatibles
+Date: Tue, 15 Apr 2014 17:00:04 +0200
+Subject: [PATCHv3 3/5] ARM: mvebu: add Device Tree description of AHCI
+ interfaces on Armada 38x
 In-Reply-To: <1397574006-5868-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397574006-5868-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397574006-5868-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397574006-5868-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci-platform.txt Device Tree binding documentation is gaining a
-growing number of compatible strings, and it will gain one more with
-the addition of the Marvell Armada 380 AHCI support. It is therefore
-time to reformat this list into a proper bullet list, and more
-importantly order it alphabetically;
+The Marvell Armada 38x processors contain two AHCI compatible
+interfaces. This commit adds the Device Tree description of those
+interfaces at the SoC level, and also enables them on the Armada 385
+DB platform, which allows access to both interfaces through SATA
+ports.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Andrew Lunn <andrew@lunn.ch>
 ---
- Documentation/devicetree/bindings/ata/ahci-platform.txt | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-385-db.dts |  8 ++++++++
+ arch/arm/boot/dts/armada-38x.dtsi   | 16 ++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 48b285f..5598862 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -4,10 +4,14 @@ SATA nodes are defined to describe on-chip Serial ATA controllers.
- Each SATA controller should have its own node.
+diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+index 6828d77..bdde8ff 100644
+--- a/arch/arm/boot/dts/armada-385-db.dts
++++ b/arch/arm/boot/dts/armada-385-db.dts
+@@ -81,6 +81,14 @@
+ 				};
+ 			};
  
- Required properties:
--- compatible        : compatible list, one of "snps,spear-ahci",
--                      "snps,exynos5440-ahci", "ibm,476gtr-ahci",
--                      "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
--                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
-+- compatible        : compatible string, one of:
-+  - "allwinner,sun4i-a10-ahci"
-+  - "fsl,imx53-ahci"
-+  - "fsl,imx6q-ahci"
-+  - "ibm,476gtr-ahci"
-+  - "snps,dwc-ahci"
-+  - "snps,exynos5440-ahci"
-+  - "snps,spear-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
++			sata at a8000 {
++				status = "okay";
++			};
++
++			sata at e0000 {
++				status = "okay";
++			};
++
+ 			flash at d0000 {
+ 				status = "okay";
+ 				num-cs = <1>;
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index a064f59..634a020 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -338,6 +338,22 @@
+ 				reg = <0x72004 0x4>;
+ 			};
  
++			sata at a8000 {
++				compatible = "marvell,armada-380-ahci";
++				reg = <0xa8000 0x2000>;
++				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gateclk 15>;
++				status = "disabled";
++			};
++
++			sata at e0000 {
++				compatible = "marvell,armada-380-ahci";
++				reg = <0xe0000 0x2000>;
++				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gateclk 30>;
++				status = "disabled";
++			};
++
+ 			coredivclk: clock at e4250 {
+ 				compatible = "marvell,armada-380-corediv-clock";
+ 				reg = <0xe4250 0xc>;
 -- 
 1.9.2
