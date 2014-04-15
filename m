@@ -1,58 +1,56 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 15 Apr 2014 11:09:16 +0530
-Subject: [PATCH 07/20] cpufreq: exynos: Use cpufreq_for_each_entry macro
- for iteration
-In-Reply-To: <534C4E76.6000905@semaphore.gr>
-References: <534C4E76.6000905@semaphore.gr>
-Message-ID: <CAKohpompoScQJVmYRpRmfx4rF1j0nFtBiPnfQyHtDM8mUEUkMQ@mail.gmail.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 15 Apr 2014 07:59:36 +0200
+Subject: Device tree support for Atmel AC97 controller on AT91SAM9263
+In-Reply-To: <20140414224710.GX2967@piout.net>
+References: <1397293707-26890-1-git-send-email-alexanders83@web.de>
+ <s5h38hgnvz5.wl%tiwai@suse.de> <2216396.r6UFNn5RuG@kongar>
+ <20140414224710.GX2967@piout.net>
+Message-ID: <s5hfvlfrv3r.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 April 2014 02:39, Stratos Karafotis <stratosk@semaphore.gr> wrote:
-> The cpufreq core supports the cpufreq_for_each_entry macro helper
-> for iteration over the cpufreq_frequency_table, so use it.
->
-> It should have no functional changes.
->
-> Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
-> ---
->  drivers/cpufreq/exynos-cpufreq.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-> index f99cfe2..0e19bce 100644
-> --- a/drivers/cpufreq/exynos-cpufreq.c
-> +++ b/drivers/cpufreq/exynos-cpufreq.c
-> @@ -28,18 +28,18 @@ static unsigned int locking_frequency;
->
->  static int exynos_cpufreq_get_index(unsigned int freq)
->  {
-> -       struct cpufreq_frequency_table *freq_table = exynos_info->freq_table;
-> -       int index;
-> +       struct cpufreq_frequency_table *pos, *freq_table;
->
-> -       for (index = 0;
-> -               freq_table[index].frequency != CPUFREQ_TABLE_END; index++)
-> -               if (freq_table[index].frequency == freq)
-> +       freq_table = exynos_info->freq_table;
+At Tue, 15 Apr 2014 00:47:11 +0200,
+Alexandre Belloni wrote:
+> 
+> On 14/04/2014 at 20:43:02 +0200, Alexander Stein wrote :
+> > Hello Takashi,
+> > 
+> > On Monday 14 April 2014, 10:42:06 wrote Takashi Iwai:
+> > > At Sat, 12 Apr 2014 11:08:23 +0200,
+> > > Alexander Stein wrote:
+> > > > 
+> > > > This set of patches add device tree support for the AC97 controller found
+> > > > on AT91SAM9263.
+> > > > The first two patches are minor cleanup, while the last ones add the 
+> > actual
+> > > > support.
+> > > 
+> > > Do you really need work on this driver?  The sound/atmel/* stuff is an
+> > > old one before ASoC was introduced, mostly obsoleted nowadays.
+> > 
+> > Ah, ok. I wasn't aware of that. But is there a replacement for the ac97c 
+> > driver? All I found in sound/soc/atmel is using the SSC peripheral. Not 
+> > something I can use.
+> 
+> I guess what Takashi wanted to say was: shouldn't we rewrite the driver
+> completely to take advantage of the ASoC infrastructure ?
 
-Keep it as it was, i.e. fill freq_table during its definition. If with
-addition of
-pos it is crossing 80 columns, then define pos in a separate line.
+Yep, exactly.  Thanks for my sparse word completion :)
 
-> +       cpufreq_for_each_entry(pos, freq_table) {
-> +               if (pos->frequency == freq)
->                         break;
-> +       }
->
-> -       if (freq_table[index].frequency == CPUFREQ_TABLE_END)
-> +       if (pos->frequency == CPUFREQ_TABLE_END)
->                 return -EINVAL;
->
-> -       return index;
-> +       return pos - freq_table;
->  }
->
->  static int exynos_cpufreq_scale(unsigned int target_freq)
-> --
-> 1.9.0
+> I'm actually quite interesting in getting it to work as this is the la
+> peripheral that doesn't have DT support on the SAM9RL.
+> 
+> I'll make some comments on your patches but I'm not sure whether we
+> should keep that driver or move to ASoC. Maybe that could be an
+> intermediate step. I'll try to have a look this week.
+
+OK, if people think it's still useful, I can take the patches without
+problems.  The changes are small and easy enough.  But, the only
+condition is that it's assured that the changes / binding is
+applicable to ASoC (in future, if any).  That said, it'd be great if
+anyone can work on the proper integration to ASoC at the same time. 
+
+
+thanks,
+
+Takashi
