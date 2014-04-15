@@ -1,37 +1,87 @@
-From: chris@printf.net (Chris Ball)
-Date: Tue, 15 Apr 2014 20:12:48 +0100
-Subject: [PATCH 4/4] ARM: tegra: fix Venice2 VQMMC regulators
-In-Reply-To: <534D7AFD.7080807@wwwdotorg.org> (Stephen Warren's message of
- "Tue, 15 Apr 2014 12:31:25 -0600")
-References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
- <1397526163-20126-5-git-send-email-abrestic@chromium.org>
- <534D7AFD.7080807@wwwdotorg.org>
-Message-ID: <864n1uv233.fsf@void.printf.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 15 Apr 2014 21:18:11 +0200
+Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over smbus
+In-Reply-To: <20140415164613.GF12304@sirena.org.uk>
+References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140414210429.GJ25182@sirena.org.uk> <534CE16D.8010508@free-electrons.com>
+ <20140415100922.GN12304@sirena.org.uk> <534D1DDA.40207@free-electrons.com>
+ <534D252B.8060009@metafoo.de> <20140415125654.GD12304@sirena.org.uk>
+ <534D357F.9040906@metafoo.de> <20140415164613.GF12304@sirena.org.uk>
+Message-ID: <534D85F3.5050009@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Tue, Apr 15 2014, Stephen Warren wrote:
-> Is there documentation re: what vmmc-supply and vqmmc-supply actually
-> refer to? I looked a long while ago and couldn't find any, and didn't
-> get an answer when I asked.
+On 04/15/2014 06:46 PM, Mark Brown wrote:
+> On Tue, Apr 15, 2014 at 03:34:55PM +0200, Lars-Peter Clausen wrote:
+>> On 04/15/2014 02:56 PM, Mark Brown wrote:
 >
-> Neither
-> Documentation/devicetree/bindings/mmc/{mmc.txt,nvidia,tegra20-sdhci.txt}
-> seem to say:-(
+>>>   - Providing APIs for registering actual smbus devices as a convenience
+>>>     for devices with that constraint, regardless of how that is done
+>>>     behind the scenes.
+>
+>>>   - Having the I2C implementation automatically use the smbus APIs if
+>>>     it can and either the controller is smbus only or it makes sense to
+>>>     do so for optimisation.
+>
+>> I don't think it makes sense to expose smbus explicitly. We can already
+>> describe smbus restricted devices just fine with the current regmap_config
+>> and already support them with the current I2C regmap implementation. Using
+>
+> Please note what I said about convenience - if lots of devices have
+> exactly the same set of constraints to set up it's possible sensible to
+> have a standard way of specifying them.  It's going to be a bit easier
+> to just say it's smbus than to remember exactly what that means.
 
-MMC cards use the same voltage for the VDD pin on the card and to pull
-up the signal lines.  UHS SDHCI switches to using 1.8V vqmmc (signaling
-voltage) and 3.3V vmmc (card supply voltage).
+Maybe, but the only shared constraint is reg_bits = 8 (and if it is pure 
+smbus use_single_rw = true).
 
-So the idea is to supply a vqmmc-supply if your board supports
-ultra-high-speed modes on an SD 3.0 host, and a vmmc-supply if your
-card power is controlled by a regulator.  I agree that this ought to
-be in the bindings somewhere.
+>
+>> native I2C to access these devices will be more efficient than going through
+>> the smbus emulation layer. The smbus emulation layer essentially does the
+>> same as we do in regmap, so using the smbus emulation layer through regmap
+>> means doing the same thing twice.
+>
+> Right, that's why I said it's probably only worth it if the controller
+> does smbus natively.
+>
+>> As I see it there are currently 3 cases:
+>
+>> 1) Device is strictly smbus only and the controller supports native smbus
+>>     => Use smbus
+>> 2) The device is smbus compatible but has extensions (e.g. support for multi
+>> register writes) and the controller supports only smbus.
+>>     => Use smbus
+>> 3) For every other case
+>>     => Use native I2C.
+>
+> It's not clear to me that if the controller supports smbus we shouldn't
+> use it; presumably it's adding some value to have written the code to
+> take advantage of it.  That would mean another case for device is smbus
+> only and controller has explicit smbus support.
 
-Thanks,
+Potentially yes, but not necessarily in the first version of the driver. 
+It's a bit of an exotic case, there seem to be only two I2C controller 
+drivers in the Linux kernel that have support for both raw I2C and native 
+SMBus and neither of them don't seem to be fairly recent (i2c-powermac.c and 
+i2c-pasemi.c). And on the other hand most devices are SMBus compatible have 
+extensions like being able to write/read multiple register in one transfer 
+if raw I2C access is available, which is something we want to make use of if 
+available.
 
-- Chris.
--- 
-Chris Ball   <http://printf.net/>
+And the other thing to consider is that a client driver currently has no way 
+to query whether the controller driver supports native SMBus or only 
+emulated SMBus. This is surely something that can be added to the I2C core, 
+but this is necessarily something that we require before any SMBus support 
+is added to regmap.
+
+So in conclusion I think the best way forward is to create a patch that 
+checks if native I2C is available, and if not falls back to either 
+SMBUS_{WRITE,READ}_BYTE or SMBUS_{WRITE,READ}_WORD operations (Depending on 
+whether val_bits is 8 or 16). Such a patch, I think, has the most effect for 
+the least amount of work since it is rather simple and self contained and 
+allows all devices which are SMBus compatible to be used with SMBus-only 
+controllers. Everything else discussed in this thread (optimizations for 
+special cases, convince helpers) can then be implemented on top of that.
+
+- Lars
