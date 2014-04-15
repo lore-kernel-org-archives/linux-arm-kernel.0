@@ -1,175 +1,88 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 15 Apr 2014 14:05:59 +0100
-Subject: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
-In-Reply-To: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
-References: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
-Message-ID: <534D2EB7.6020904@arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 15 Apr 2014 15:08:27 +0200
+Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
+In-Reply-To: <534D28CE.8020006@free-electrons.com>
+References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140414210429.GJ25182@sirena.org.uk> <534CE16D.8010508@free-electrons.com>
+ <20140415100922.GN12304@sirena.org.uk> <534D1DDA.40207@free-electrons.com>
+ <534D252B.8060009@metafoo.de> <534D28CE.8020006@free-electrons.com>
+Message-ID: <534D2F4B.7050404@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 04/15/2014 02:40 PM, Boris BREZILLON wrote:
+>
+> On 15/04/2014 14:25, Lars-Peter Clausen wrote:
+>> On 04/15/2014 01:54 PM, Boris BREZILLON wrote:
+>>>
+>>>
+>>> On 15/04/2014 12:09, Mark Brown wrote:
+>>>> On Tue, Apr 15, 2014 at 09:36:13AM +0200, Boris BREZILLON wrote:
+>>>>> On 14/04/2014 23:04, Mark Brown wrote:
+>>>
+>>>>>> The transfer type gets set once per device at init time so why not
+>>>>>> just parameterise based on val_bytes?
+>>>
+>>>>> Actually, you may want to transfer 1 byte registers using the block
+>>>>> method (if your device only support block transfers). This depends on
+>>>>> the device being accessed and what it supports, but I'm not sure we
+>>>>> can
+>>>>> assume 1 byte registers will always be transferred using SMBUS byte
+>>>>> transfers.
+>>>
+>>>> OK, so if this a realistic issue then it seems like it's better to
+>>>> implement three different buses - there is not really any common code
+>>>> between the various paths.
+>>>
+>>> Okay, I'll create 4 different busses (one for each access type).
+>>> BTW, should I keep these implementations in the same source file
+>>> (regmap-smbus.c) ?
+>>> And, should I keep one method to register an smbus regmap or should I
+>>> provide one method per access type and get rid of the
+>>> regmap_smbus_transfer_type enum ?
+>>
+>> I don't think we should leave the decision which bus to use to the
+>> driver. Neither should the driver have to choose whether to use smbus
+>> or native I2C. We want to use native I2C when available, because it is
+>> more efficient than going through the smbus emulation layer. On the
+>> other hand we want to automatically switch to smbus when native I2C is
+>> not available and the device can work fine with smbus. Also I'm afraid
+>> that we'll otherwise soon see code popping up like:
+>>
+>> if (of_property_read_bool(np, "use-smbus-regmap"))
+>>      regmap = regmap_init_smbus(...)
+>> else
+>>      regmap = regmap_init_i2c(...)
+>>
+>> My suggestion is that in regmap_init_i2c() you check the capabilities
+>> of the I2C adapter. If it supports native I2C you setup the regmap
+>> with the regmap_i2c struct just as it does right now. If the adapter
+>> does not support native I2C, check if the device can be supported by
+>> smbus (reg_bytes == 8 && val_bytes % 8 == 0). For each type of smbus
+>> operations have one regmap_bus struct, and if you can fallback to
+>> smbus choose the bus depending on the config's val_bytes.
+>>
+>
+> What if the device only support SMBus block transfers, but the adapter
+> support both regular I2C and SMBus block transfers (don't know if such a
+> device exist :-)) ?
 
-Thanks for the response.
+SMBus block transfers prefix the transfer with the number of bytes that are 
+in this transfer. We do not support this currently in the I2C backend (but 
+we could). If there should ever be a driver that needs support for SMBus 
+block transfers this could easily be added. For now I think it is safe to 
+ignore this.
 
-Hi Neil,
+>
+> My point is that I'm not sure the core remap-i2c code can decide whether
+> to use SMBus or I2C transfer only from val_bytes value, but I might be
+> wrong.
 
-On 14/04/14 02:42, Neil Zhang wrote:
-> From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> 
-> This adds core support for saving and restoring CPU PMU registers
-> for suspend/resume support i.e. deeper C-states in cpuidle terms.
-> This patch adds support only to ARMv7 PMU registers save/restore.
-> It needs to be extended to xscale and ARMv6 if needed.
-> 
-> [Neil] We found that DS-5 not work on our CA7 based SoCs.
-> After debuging, found PMU registers were lost because of core power down.
-> Then i found Sudeep had a patch to fix it about two years ago but not in
-> the mainline, just port it.
-> 
+It must be able to figure out what to do based on the config. If it is not 
+we probably need to extend the config. E.g. if we should ever need to 
+support devices which require SMBus block transfers we could add a flag that 
+tells regmap that this device want's all messages prefixed with the length 
+of the message.
 
-The patch was written as PoC to support multiple PMUs back then and was clearly
-not intended for upstream. Will has already mentioned what this patch needs to
-improve on.
-
-I have mentioned few comments which IMO is necessary.
-
-> Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> ---
->  arch/arm/include/asm/pmu.h       |   11 +++++++++
->  arch/arm/kernel/perf_event_cpu.c |   29 ++++++++++++++++++++++-
->  arch/arm/kernel/perf_event_v7.c  |   47 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 86 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-> index ae1919b..f37f048 100644
-> --- a/arch/arm/include/asm/pmu.h
-> +++ b/arch/arm/include/asm/pmu.h
-> @@ -62,6 +62,15 @@ struct pmu_hw_events {
->  	raw_spinlock_t		pmu_lock;
->  };
->  
-> +struct cpupmu_regs {
-> +	u32 pmc;
-> +	u32 pmcntenset;
-> +	u32 pmuseren;
-> +	u32 pmintenset;
-> +	u32 pmxevttype[8];
-> +	u32 pmxevtcnt[8];
-> +};
-> +
-
-This can't be generic, it needs to be specific to each PMU implementations.
-I have clearly mentioned it in the commit log. It's better to move this out
-to each PMU specific implementations.
-
->  struct arm_pmu {
->  	struct pmu	pmu;
->  	cpumask_t	active_irqs;
-> @@ -83,6 +92,8 @@ struct arm_pmu {
->  	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
->  	void		(*free_irq)(struct arm_pmu *);
->  	int		(*map_event)(struct perf_event *event);
-> +	void		(*save_regs)(struct arm_pmu *, struct cpupmu_regs *);
-> +	void		(*restore_regs)(struct arm_pmu *, struct cpupmu_regs *);
-
-Once cpupmu_regs becomes PMU specific, you can remove it from the above 2
-function pointers.
-
->  	int		num_events;
->  	atomic_t	active_events;
->  	struct mutex	reserve_mutex;
-> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> index 51798d7..7f1c756 100644
-> --- a/arch/arm/kernel/perf_event_cpu.c
-> +++ b/arch/arm/kernel/perf_event_cpu.c
-> @@ -19,6 +19,7 @@
->  #define pr_fmt(fmt) "CPU PMU: " fmt
->  
->  #include <linux/bitmap.h>
-> +#include <linux/cpu_pm.h>
->  #include <linux/export.h>
->  #include <linux/kernel.h>
->  #include <linux/of.h>
-> @@ -39,6 +40,7 @@ static DEFINE_PER_CPU(struct arm_pmu *, percpu_pmu);
->  static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS], hw_events);
->  static DEFINE_PER_CPU(unsigned long [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);
->  static DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
-> +static DEFINE_PER_CPU(struct cpupmu_regs, cpu_pmu_regs);
->  
->  /*
->   * Despite the names, these two functions are CPU-specific and are used
-> @@ -217,6 +219,23 @@ static struct notifier_block cpu_pmu_hotplug_notifier = {
->  	.notifier_call = cpu_pmu_notify,
->  };
->  
-> +static int cpu_pmu_pm_notify(struct notifier_block *b,
-> +					unsigned long action, void *hcpu)
-
-hcpu is misleading, the cpu_pm_notify doesn't pass the logical cpu index.
-IIRC its NULL, rename it.
-
-> +{
-> +	struct cpupmu_regs *pmuregs = this_cpu_ptr(&cpu_pmu_regs);
-> +
-> +	if (action == CPU_PM_ENTER && cpu_pmu->save_regs)
-> +		cpu_pmu->save_regs(cpu_pmu, pmuregs);
-> +	else if (action == CPU_PM_EXIT && cpu_pmu->restore_regs)
-> +		cpu_pmu->restore_regs(cpu_pmu, pmuregs);
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
-> +static struct notifier_block cpu_pmu_pm_notifier = {
-> +	.notifier_call = cpu_pmu_pm_notify,
-> +};
-> +
->  /*
->   * PMU platform driver and devicetree bindings.
->   */
-> @@ -349,9 +368,17 @@ static int __init register_pmu_driver(void)
->  	if (err)
->  		return err;
->  
-> +	err = cpu_pm_register_notifier(&cpu_pmu_pm_notifier);
-> +	if (err) {
-> +		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
-> +		return err;
-> +	}
-> +
->  	err = platform_driver_register(&cpu_pmu_driver);
-> -	if (err)
-> +	if (err) {
-> +		cpu_pm_unregister_notifier(&cpu_pmu_pm_notifier);
->  		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
-> +	}
->  
->  	return err;
->  }
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index f4ef398..29ae8f1 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -1237,6 +1237,51 @@ static void armv7_pmnc_dump_regs(struct arm_pmu *cpu_pmu)
->  }
->  #endif
->  
-> +static void armv7pmu_save_regs(struct arm_pmu *cpu_pmu,
-> +					struct cpupmu_regs *regs)
-> +{
-> +	unsigned int cnt;
-> +	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (regs->pmc));
-> +	if (!(regs->pmc & ARMV7_PMNC_E))
-> +		return;
-> +
-> +	asm volatile("mrc p15, 0, %0, c9, c12, 1" : "=r" (regs->pmcntenset));
-> +	asm volatile("mrc p15, 0, %0, c9, c14, 0" : "=r" (regs->pmuseren));
-> +	asm volatile("mrc p15, 0, %0, c9, c14, 1" : "=r" (regs->pmintenset));
-> +	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (regs->pmxevtcnt[0]));
-> +	for (cnt = ARMV7_IDX_COUNTER0;
-> +			cnt <= ARMV7_IDX_COUNTER_LAST(cpu_pmu); cnt++) {
-
-As Will suggested better to use used_mask to save/restore only active events.
-
-Regards,
-Sudeep
+- Lars
