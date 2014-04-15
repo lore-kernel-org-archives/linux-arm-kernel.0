@@ -1,87 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Apr 2014 17:40:38 +0100
-Subject: [PATCH 3/4] arm: add basic support for Mediatek MT6589 boards
-In-Reply-To: <CABuKBeLLC2xApUMpT=u5nq4kxp9f4AotQCdk0nRU=aREM6Bwkg@mail.gmail.com>
-References: <1397072736-10793-1-git-send-email-matthias.bgg@gmail.com>
- <1397072736-10793-4-git-send-email-matthias.bgg@gmail.com>
- <CAL_JsqJowqV2bsxE2VeYXQQSj4_L_KcH+C_dD=ZUvC=1crN4dA@mail.gmail.com>
- <87ha6136dz.fsf@approximate.cambridge.arm.com>
- <CABuKBeKLexBsTwF-nX15AYfLNA9bFDRm2XyeLpwQg9+3m6Xf=w@mail.gmail.com>
- <5347B942.2040703@arm.com>
- <CABuKBeLLC2xApUMpT=u5nq4kxp9f4AotQCdk0nRU=aREM6Bwkg@mail.gmail.com>
-Message-ID: <534D6106.1070005@arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 15 Apr 2014 18:43:20 +0200
+Subject: [PATCH] clk: exynos4: Use single clock ID for CLK_MDMA gate clocks
+In-Reply-To: <1397579420-18776-1-git-send-email-s.nawrocki@samsung.com>
+References: <1397579420-18776-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <534D61A8.9090204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/14 17:09, Matthias Brugger wrote:
-> 2014-04-11 11:43 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
->> On 11/04/14 10:11, Matthias Brugger wrote:
->>> 2014-04-10 11:01 GMT+02:00 Marc Zyngier <marc.zyngier@arm.com>:
->>>> A couple of things on top of Rob's comments:
->>>>
->>>> On Wed, Apr 09 2014 at 10:50:33 pm BST, Rob Herring <robherring2@gmail.com> wrote:
->>>>> On Wed, Apr 9, 2014 at 2:45 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->>>>>> This adds a generic devicetree board file and a dtsi for boards
->>>>>> based on the MT6589 SoCs from Mediatek.
->>>>>>
->>>>>> Apart from the generic parts (gic, clocks) the only component
->>>>>> currently supported are the timers.
->>>>>>
->>>>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->>>>
->>>> [...]
->>>>
->>>>>> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
->>>>>> new file mode 100644
->>>>>> index 0000000..c0139ca
->>>>>> --- /dev/null
->>>>>> +++ b/arch/arm/mach-mediatek/Kconfig
->>>>>> @@ -0,0 +1,14 @@
->>>>>> +config ARCH_MEDIATEK
->>>>>> +       bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
->>>>>> +       select ARCH_REQUIRE_GPIOLIB
->>>>>
->>>>> Then where is your GPIO driver?
->>>>>
->>>>>> +       select ARM_GIC
->>>>>> +       select CACHE_L2X0
->>>>>> +       select HAVE_ARM_TWD if LOCAL_TIMERS
->>>>
->>>> Hell no! ;-) ARM_ARCH_TIMER is the way (please also add the missing
->>>> node).
->>>
->>> I considered this, but the timer wasn't able to get it's clock frequency:
->>> "Architected timer frequency not available
->>> Division by zero in kernel."
->>
->> This is because your bootloader/firmware is utterly broken, and doesn't
->> set CNTFRQ (it must be set on all CPUs, from secure mode). As a
->> *workaround*, you can set the timer frequency in the timer node, but
->> that's just a hack, and will prevent virtual machines from running on
->> such hardware.
-> 
-> The last days I tried to get the ARM_ARCH_TIMER working, but I wasn't
-> able to do so.
-> I set the frequency in the DT node.
-> But reading CNTP_TVAL at the end of arch_timer_init, it always returns
-> the same value.
-> When reading CNTPCT at the same place, returns zero.
-> As far as I understand CNTPCT will be always incremented, am I right?
-> 
-> Consequently, when calling mdelay in arch_timer_init the system hangs.
-> 
-> So can it be, that the timers are not working due to a screwed up chip
-> design? Or do I miss something here?
+Hi Sylwester,
 
-That would indicate that the clock that feeds into the timer is gated.
-Other SoC vendors have done the same thing. Do you have access to
-documentation describing the clock tree?
+On 15.04.2014 18:30, Sylwester Nawrocki wrote:
+> Exynos4210 and Exynos4x12 SoCs have the PL330 MDMA IP block clock
+> defined exactly in same way in documentation. Using different
+> names for these clocks is a bit misleading. Since there is no users
+> of CLK_MDMA2 in existing dts files this patch drops CLK_MDMA2 and
+> replaces it with CLK_MDMA in the driver. This ensures PL330 MDMA
+> has correct clock assigned on Exynos4x12 SoCs.
+>
+> Suggested-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>   drivers/clk/samsung/clk-exynos4.c   |    2 +-
+>   include/dt-bindings/clock/exynos4.h |    1 -
+>   2 files changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index b4f9672..5247caa 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -903,7 +903,7 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+>   	GATE(CLK_AUDSS, "audss", "sclk_epll", E4X12_GATE_IP_MAUDIO, 0, 0, 0),
+>   	GATE(CLK_MDNIE0, "mdnie0", "aclk160", GATE_IP_LCD0, 2, 0, 0),
+>   	GATE(CLK_ROTATOR, "rotator", "aclk200", E4X12_GATE_IP_IMAGE, 1, 0, 0),
+> -	GATE(CLK_MDMA2, "mdma2", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
+> +	GATE(CLK_MDMA, "mdma", "aclk200", E4X12_GATE_IP_IMAGE, 2, 0, 0),
+>   	GATE(CLK_SMMU_MDMA, "smmu_mdma", "aclk200", E4X12_GATE_IP_IMAGE, 5, 0,
+>   		0),
+>   	GATE(CLK_MIPI_HSI, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
+> diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
+> index 75aff33..3ff13bc 100644
+> --- a/include/dt-bindings/clock/exynos4.h
+> +++ b/include/dt-bindings/clock/exynos4.h
+> @@ -181,7 +181,6 @@
+>   #define CLK_KEYIF		347
+>   #define CLK_AUDSS		348
+>   #define CLK_MIPI_HSI		349 /* Exynos4210 only */
+> -#define CLK_MDMA2		350 /* Exynos4210 only */
+>   #define CLK_PIXELASYNCM0	351
+>   #define CLK_PIXELASYNCM1	352
+>   #define CLK_FIMC_LITE0		353 /* Exynos4x12 only */
+>
 
-Of course, a broken design is always possible, but let's not think of
-the worse just yet... ;-)
+Looks good, will apply. Thanks.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Tomasz
