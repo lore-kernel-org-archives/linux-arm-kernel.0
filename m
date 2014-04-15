@@ -1,69 +1,71 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 15 Apr 2014 19:43:30 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <534D6A1F.70102@linaro.org>
-References: <20140411.003636.272212797007496394.davem@davemloft.net>
- <20140411145625.GA27493@redhat.com> <20140411152207.GA28188@redhat.com>
- <20140411153041.GQ16119@n2100.arm.linux.org.uk>
- <20140411172456.GA20506@redhat.com>
- <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
- <20140414185916.GA30672@redhat.com>
- <CAA3XUr3BGA55JF_cgH=cqbo1wAK0773P1fvnG9dBjLU2KzBdKA@mail.gmail.com>
- <20140415154637.GA3560@redhat.com> <534D6A1F.70102@linaro.org>
-Message-ID: <20140415174330.GA10558@redhat.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Tue, 15 Apr 2014 20:37:45 +0300
+Subject: [RESEND PATCH 0/4] ARM: OMAP: raw read and write endian fix
+Message-ID: <1397583469-14457-1-git-send-email-taras.kondratiuk@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15, David Long wrote:
->
-> On 04/15/14 11:46, Oleg Nesterov wrote:
-> >
-> > But. Please do not add copy_to_user_page() into copy_to_page() (as your patch
-> > did). This is certainly not what uprobe_write_opcode() wants, we do not want
-> > or need "flush" in this case. The same for __create_xol_area().
-> >
->
-> It looked me like a call to a new __copy_to_user_page(current->mm, ...) in xol_get_insn_slot()
-> would be in line with David Miller's suggestion and would cure the problem on ARM (and hopefuly
-> be more philosophically correct for all architectures):
+This series does trivial replacement of __raw_xxx functions with xxx_relaxed
+endian-neutral variants in 'mach-omap2' and 'plat-omap' directories.
+Some code here most probably won't be used in BE mode (like debug-leds for
+OMAP1 boards), but changes are made anyway to remove __raw_xxx() functions
+completely and simplify future grep'ing for new __raw_xxx() entries.
 
-David, let me repeat. I am not going to argue even if I obviously like
-the Linus's suggestion more.
+This is a part of RFC series [1].
+It was missed in previous merge window [2].
 
-I only argued with the suggestions to follow the __access_remote_vm()
-logic.
+Based on v3.15-rc1.
 
-> @@ -1297,13 +1298,11 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
->                 return 0;
->
->         /* Initialize the slot */
-> -       copy_to_page(area->page, xol_vaddr,
-> -                       &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
-> -       /*
-> -        * We probably need flush_icache_user_range() but it needs vma.
-> -        * This should work on supported architectures too.
-> -        */
-> -       flush_dcache_page(area->page);
-> +       kaddr = kmap_atomic(area->page);
-> +       __copy_to_user_page(current->mm, area->page, xol_vaddr,
-> +                       kaddr + (xol_vaddr & ~PAGE_MASK),
-> +                       &uprobe->arch.ixol, sizeof(uprobe->arch.ixol), true);
-> +       kunmap_atomic(kaddr);
+[1] http://www.spinics.net/lists/linux-omap/msg99927.html
+[2] https://lkml.org/lkml/2014/4/2/292
 
-This all is fine, but you need to introduce __copy_to_user_page() first.
+Victor Kamensky (4):
+  ARM: OMAP2+: raw read and write endian fix
+  ARM: OMAP: dmtimer: raw read and write endian fix
+  ARM: OMAP: counter-32k: raw read and write endian fix
+  ARM: OMAP: debug-leds: raw read and write endian fix
 
-And you need to do this for every arch. And you need to verify that it
-does not need mmap_sem. It seems that at least alpha needs this lock.
-And as Russel pointed out (again, again, I could easily misunderstood him)
-you need preempt_disable() around memcpy + flush, so down_read(mmap_sem)
-should probably go into __copy_to_user_page(). And I am not sure this
-helper needs "struct mm_struct *mm" argument, but this is minor.
+ arch/arm/mach-omap2/board-flash.c         |    4 +--
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c   |    2 +-
+ arch/arm/mach-omap2/clkt2xxx_osc.c        |    8 +++---
+ arch/arm/mach-omap2/clkt2xxx_sys.c        |    2 +-
+ arch/arm/mach-omap2/cm2xxx_3xxx.h         |    4 +--
+ arch/arm/mach-omap2/cm33xx.c              |    4 +--
+ arch/arm/mach-omap2/cm3xxx.c              |    8 +++---
+ arch/arm/mach-omap2/cm44xx.c              |    8 +++---
+ arch/arm/mach-omap2/cminst44xx.c          |    4 +--
+ arch/arm/mach-omap2/control.c             |   20 +++++++-------
+ arch/arm/mach-omap2/dma.c                 |    4 +--
+ arch/arm/mach-omap2/gpmc.c                |    8 +++---
+ arch/arm/mach-omap2/id.c                  |    2 +-
+ arch/arm/mach-omap2/irq.c                 |    4 +--
+ arch/arm/mach-omap2/mux.c                 |    8 +++---
+ arch/arm/mach-omap2/omap-hotplug.c        |    4 +--
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   18 ++++++-------
+ arch/arm/mach-omap2/omap-smp.c            |    6 ++---
+ arch/arm/mach-omap2/omap-wakeupgen.c      |   42 ++++++++++++++---------------
+ arch/arm/mach-omap2/omap4-common.c        |   18 ++++++-------
+ arch/arm/mach-omap2/omap_hwmod.c          |   10 +++----
+ arch/arm/mach-omap2/omap_phy_internal.c   |    6 ++---
+ arch/arm/mach-omap2/prcm_mpu44xx.c        |    4 +--
+ arch/arm/mach-omap2/prm2xxx.h             |    2 +-
+ arch/arm/mach-omap2/prm2xxx_3xxx.h        |    4 +--
+ arch/arm/mach-omap2/prm33xx.c             |    4 +--
+ arch/arm/mach-omap2/prm3xxx.h             |    2 +-
+ arch/arm/mach-omap2/prm44xx.c             |    4 +--
+ arch/arm/mach-omap2/prminst44xx.c         |    4 +--
+ arch/arm/mach-omap2/sdrc.h                |    8 +++---
+ arch/arm/mach-omap2/sdrc2xxx.c            |    4 +--
+ arch/arm/mach-omap2/sr_device.c           |    2 +-
+ arch/arm/mach-omap2/sram.c                |   16 +++++------
+ arch/arm/mach-omap2/timer.c               |    8 +++---
+ arch/arm/mach-omap2/vc.c                  |    4 +--
+ arch/arm/mach-omap2/wd_timer.c            |    8 +++---
+ arch/arm/plat-omap/counter_32k.c          |    6 ++---
+ arch/arm/plat-omap/debug-leds.c           |   14 +++++-----
+ arch/arm/plat-omap/dmtimer.c              |    8 +++---
+ arch/arm/plat-omap/include/plat/dmtimer.h |   16 +++++------
+ 40 files changed, 156 insertions(+), 156 deletions(-)
 
-Finally, let me repeat, you should verify that this
-__copy_to_user_page(page, uaddr, kaddr) will not something bad if uaddr
-is not mmapped, or its mapping do not match area->page.
-
-Good luck ;)
-
-Oleg.
+-- 
+1.7.9.5
