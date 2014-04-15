@@ -1,38 +1,55 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Apr 2014 11:16:49 +0200
-Subject: [PATCH 1/2] ARM: berlin: add the LIBGPIO as a dependency for
- the BG2Q
-In-Reply-To: <1397549245-3338-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397549245-3338-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <534CF901.2080400@gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 15 Apr 2014 18:19:48 +0900
+Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
+In-Reply-To: <534CF847.5040008@arm.com>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
+ <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
+ <534CF847.5040008@arm.com>
+Message-ID: <534CF9B4.306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 10:07 AM, Antoine T?nart wrote:
-> The BG2Q has GPIOs driven by the dwapb GPIO driver. Add the LIBGPIO as a
-> dependency to be able to support them.
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->   arch/arm/mach-berlin/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-> index 291f1cac6c3d..c31968712095 100644
-> --- a/arch/arm/mach-berlin/Kconfig
-> +++ b/arch/arm/mach-berlin/Kconfig
-> @@ -28,6 +28,7 @@ config MACH_BERLIN_BG2Q
->   	select CPU_V7
->   	select HAVE_ARM_TWD if SMP
->   	select HAVE_SMP
-> +	select ARCH_REQUIRE_GPIOLIB
+On 04/15/2014 06:13 PM, Marc Zyngier wrote:
+> On 15/04/14 09:27, Chanwoo Choi wrote:
+>> Hi,
+>>
+>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
+>>> On 15/04/14 02:59, Chanwoo Choi wrote:
+>>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>>
+>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
+>>>> dual core and includes following dt nodes:
+>>>>
+>>>> - GIC interrupt controller
+>>>> - Pinctrl to control GPIOs
+>>>> - Clock controller
+>>>> - CPU information (Cortex-A7 dual core)
+>>>> - UART to support serial port
+>>>> - MCT (Multi Core Timer)
+>>>> - ADC (Analog Digital Converter)
+>>>> - I2C/SPI bus
+>>>> - Power domain
+>>>> - PMU (Performance Monitoring Unit)
+>>>> - MSHC (Mobile Storage Host Controller)
+>>>> - PWM (Pluse Width Modulation)
+>>>> - AMBA bus
+>>>
+>>> [...]
+>>>
+>>> Where is the arch timer node?
+>>
+>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
+>> - in drivers/clocksource/exynos_mct.c
+> 
+> Don't you have a Cortex-A7? If so, you have the arch timer.
 
-Apart from Jisheng's comment, I think we can directly move it
-into arch/arm/Kconfig's MACH_BERLIN directly?
+Do you means that 'arch timer" is ARM_ARCH_TIMER?
 
-Sebastian
+As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
+But, Exynos SoC used MCT clocksource for system timer.
 
->   endmenu
->
->
+Exynos dts file didn't include arch timer node but only include mct node.
+
+Best Regards,
+Chanwoo Choi
