@@ -1,30 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Apr 2014 11:00:02 +0100
-Subject: [PATCH] ARM: prima2: remove L2 cache size override
-In-Reply-To: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
-References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20140415100002.GQ24070@n2100.arm.linux.org.uk>
+From: lee.essen@nowonline.co.uk (Lee Essen)
+Date: Tue, 15 Apr 2014 14:01:39 +0400
+Subject: dma_alloc_coherent and cache?
+In-Reply-To: <4356499.vN3lxjGqPZ@wuerfel>
+References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
+ <4356499.vN3lxjGqPZ@wuerfel>
+Message-ID: <E94CEA02-A987-4212-A0CA-D0CDC80E7250@nowonline.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 05:49:02PM +0800, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+> On 15 Apr 2014, at 12:43, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> L2 cache size has been read by l2x0_init(), it is useless to set
-> WAY_SIZE and ASSOCIATIVITY in prima2.
+> dma_alloc_coherent() is a wrapper around a device-specific allocator,
+> based on the dma_map_ops implementation. The default allocator
+> from arm_dma_ops gives you uncached, buffered memory. It is expected
+> that the driver uses a barrier (which is implied by readl/writel
+> but not __raw_readl/__raw_writel or readl_relaxed/writel_relaxed)
+> to ensure the write buffers are flushed.
 > 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  -Derived from Russell's "ARM: l2c: prima2: remove cache size override"
+> If the machine sets arm_coherent_dma_ops rather than arm_dma_ops,
+> the memory will be cacheable, as it's assumed that the hardware
+> is set up for cache-coherent DMAs.
 
-You're a SMP architecture... it would be much better to initialise the
-L2 cache before the secondary CPUs are brought online.
+Hi,
 
-In any case, across the board, it's preferable that the L2 cache is
-enabled before the delay loop calibration as it can have an effect on
-the calibrated value.
+The driver writes to the descriptor and then uses wmb() before enabling DMA. The descriptor is in dma_alloc_coherent() space, but the enable is a writel().
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> 
+> Can you post a link to the source code?
+> 
+>   Arnd
+
+The code is available here:
+
+http://www.nowonline.co.uk/scratch/le_netdev.c
+
+It hangs consistently when it executes the txq_enable() on line 1280. Occasionally I see a corrupt packet on the wire, but mostly it's just a hang. If I uncomment all the printk's then it generally gets 20 or 30 packets out before it freezes.
+
+Regards,
+
+Lee.
