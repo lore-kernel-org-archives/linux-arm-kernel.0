@@ -1,67 +1,67 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 15 Apr 2014 13:46:27 +0200
-Subject: Renesas clock clk-mstp updates for clock-indices
-In-Reply-To: <534D1B60.8030007@codethink.co.uk>
-References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
- <CAMuHMdVVc-9n4mQSj6qVyP5k9xzSstSw==nfYcFSOXtb895QUw@mail.gmail.com>
- <534D1B60.8030007@codethink.co.uk>
-Message-ID: <CAMuHMdWQ5WvLvaZp7Vaj3tHGJioR+rtfmWxSAaiKTDUrmN-e+w@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 15 Apr 2014 13:48:49 +0200
+Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
+In-Reply-To: <534D0943.2050100@gmail.com>
+References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
+ <534CFA77.9030108@gmail.com> <20140415180058.2fefca78@xhacker>
+ <534D0943.2050100@gmail.com>
+Message-ID: <20140415114848.GA2813@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On 15/04/2014 at 12:26:11 +0200, Sebastian Hesselbarth wrote :
+> On 04/15/2014 12:00 PM, Jisheng Zhang wrote:
+> >On Tue, 15 Apr 2014 02:23:03 -0700
+> >Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> >>On 04/15/2014 10:07 AM, Antoine T?nart wrote:
+> >>>The Marvell Berlin BG2Q has 6 GPIO ports compatible with the
+> >>>snps,dw-apb-gpio driver. This patch add the corresponding device tree
+> >>>nodes.
+> >>>
+> >>>Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> >>>---
+> >>>   arch/arm/boot/dts/berlin2q.dtsi | 102
+> >>>++++++++++++++++++++++++++++++++++++++++ 1 file changed, 102 insertions(+)
+> >>>
+> >>>diff --git a/arch/arm/boot/dts/berlin2q.dtsi
+> >>>b/arch/arm/boot/dts/berlin2q.dtsi index e6e556055dfc..b2625f896bc5 100644
+> >>>--- a/arch/arm/boot/dts/berlin2q.dtsi
+> >>>+++ b/arch/arm/boot/dts/berlin2q.dtsi
+> [...]
+> >>>+					compatible =
+> >>>"snps,dw-apb-gpio-port";
+> >>>+					gpio-controller;
+> >>>+					#gpio-cells = <2>;
+> >>>+					snps,nr-gpios = <32>;
+> >>
+> >>32 gpio pins for each of the 6 GPIO controllers? Either BG2Q is a GPIO
+> >
+> >Yes, BG2Q support 32 pins every port
+> 
+> Wow. Thanks for confirming this!
+> 
+> >>I am fine with using nr-gpios property now, but I guess BG2Q also
+> >>has that CONFIG[1,2] registers to actually read out the features
+> >>synthesized in? If I find some time, I'll prepare a patch for
+> >>dw-apb-gpio to exploit that (optional) information instead of
+> >>using nr-gpios.
+> >
+> >The problem is CONFIG1/2 registers don't exist on some versions.
+> >For example, the version used in BG2/BG2CD. So nr-gpio is necessary
+> >if we want to support these versions.
+> 
+> Hmm, are you sure about BG2? I remember reading it and it contains
+> sane values. Anyway, a proper patch for dw-apb-gpio would include
+> checking for sane (e.g. non-zero) values. And nr-gpios will always
+> stay as fall-back just because e.g. sunxi does not have the CONFIG
+> registers.
+> 
 
-On Tue, Apr 15, 2014 at 1:43 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 15/04/14 10:26, Geert Uytterhoeven wrote:
->> On Fri, Mar 7, 2014 at 1:46 PM, Ben Dooks <ben.dooks@codethink.co.uk>
->> wrote:
->>>
->>> Mike, following the commit to add the clock-indices field, the following
->>> pair of commits updates the shmboile clk-mstp driver to uses these over
->>> the local variant.
->>>
->>> Since this is involves two separte trees which are in development, the
->>> decision is that we will fixup the renesas trees once they are merged
->>> and the development cycle is complete. Once this is done, patch 2/2
->>> can be reverted (if people care about three lines of differrence)
->>
->>
->> As we now have "renesas,clock-indices" in v3.14, the question about
->> backwards
->> compatibility became moot.
->
-> Do you mean 'necessary'?
+Shouldn't that be use nr-gpios and if not available, read the CONFIG
+registers? Else, what about bogus registers ?
 
-Yes, now the backwards compatibility is necessary.
-
->> Can you please combine your two patches
->>
->> [PATCH 1/2] clk: shmobile: clk-mstp: change to using clock-indices
->> [PATCH 2/2] clk: shmobile: clk-mstp: add backwards comapt for indices
->> field
->>
->> into a single patch, and submit to Mike?
->>
->> Once it's in Mike's clk-next, we can do the following to get everything in
->> v3.15:
->>    1. Simon cherry-picks Mike's commit into his fixes-for-v3.15 branch,
->>    2. we fix arch/arm/boot/dts/r8a7790.dtsi and .../r8a7791.dtsi there,
->>    3. fixes-for-v3.15 gets into mainline through arm-soc.
->
-> Wouldn't it be easier if we just got mike's ack and fixed it in one go?
-
-That's another option. But if Mike doesn't apply it to his clk-next, this
-may cause a merge conflict later.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
