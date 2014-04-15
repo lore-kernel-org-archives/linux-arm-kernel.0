@@ -1,51 +1,96 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Apr 2014 13:42:53 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Apr 2014 14:45:48 +0200
 Subject: [PATCH 2/5] ARM: dts: Device tree for AXM55xx.
 In-Reply-To: <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
 References: <cover.1397552154.git.anders.berg@lsi.com>
  <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
-Message-ID: <534D294D.7000201@arm.com>
+Message-ID: <8344066.GP0Bf5lvlE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anders,
+On Tuesday 15 April 2014 14:06:11 Anders Berg wrote:
+> diff --git a/arch/arm/boot/dts/axm5516-amarillo.dts b/arch/arm/boot/dts/axm5516-amarillo.dts
+> new file mode 100644
+> index 0000000..1760d6c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/axm5516-amarillo.dts
+> @@ -0,0 +1,51 @@
+> +/*
+> + * arch/arm/boot/dts/axm5516-amarillo.dts
+> + *
+> + * Copyright (C) 2013 LSI
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
 
-On 15/04/14 13:06, Anders Berg wrote:
-> Add device tree for the Amarillo validation board with an AXM5516 SoC.
-> 
-> Signed-off-by: Anders Berg <anders.berg@lsi.com>
-> ---
->  arch/arm/boot/dts/Makefile             |   1 +
->  arch/arm/boot/dts/axm5516-amarillo.dts |  51 ++++++
->  arch/arm/boot/dts/axm5516-cpus.dtsi    | 204 ++++++++++++++++++++++
->  arch/arm/boot/dts/axm55xx.dtsi         | 306 +++++++++++++++++++++++++++++++++
->  4 files changed, 562 insertions(+)
->  create mode 100644 arch/arm/boot/dts/axm5516-amarillo.dts
->  create mode 100644 arch/arm/boot/dts/axm5516-cpus.dtsi
->  create mode 100644 arch/arm/boot/dts/axm55xx.dtsi
-> 
+It's better to use a permissive license such as the BSD license for dts files,
+so they can be shared with other OSs.
 
-[...]
+The situation with the clocks is still very strange: either the bindings
+are all in need of update, or you got all devices wrong:
 
-> +       gic: interrupt-controller at 2001001000 {
-> +               compatible = "arm,cortex-a15-gic";
-> +               #interrupt-cells = <3>;
-> +               #address-cells = <0>;
-> +               interrupt-controller;
-> +               reg = <0x20 0x01001000 0 0x1000>,
-> +                     <0x20 0x01002000 0 0x1000>,
-> +                     <0x20 0x01004000 0 0x2000>,
-> +                     <0x20 0x01006000 0 0x2000>;
-> +               interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
-> +                               IRQ_TYPE_LEVEL_HIGH)>;
-> +       };
+> +			serial0: uart at 2010080000 {
+> +				compatible = "arm,pl011", "arm,primecell";
+> +				reg = <0x20 0x10080000 0 0x1000>;
+> +				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk_per>, <&clk_per>;
+> +				clock-names = "uartclk", "apb_pclk";
+> +				status = "disabled";
+> +			};
 
-Given how many CPUs this system has, what's the catch regarding the GIC?
-Is there a second one shadowing this one at the same address for another
-set of 8 CPUs? Is there an additional mechanism to IPI the other CPUs?
+"uartclk" is not a valid string for pl011, as per binding:
 
-Thanks,
+| - clocks:  When present, must refer to exactly one clock named
+|           "apb_pclk"
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I do see that a lot of platforms do the same thing you have here, not
+sure who is wrong.
+
+> +			timer0: timer at 2010091000 {
+> +				compatible = "arm,sp804", "arm,primecell";
+> +				reg = <0x20 0x10091000 0 0x1000>;
+> +				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk_per>, <&clk_per>;
+> +				clock-names = "timclken1", "apb_pclk";
+
+Citing the binding:
+
+| - clocks: clocks driving the dual timer hardware. This list should be 1 or 3
+|        clocks. With 3 clocks, the order is timer0 clock, timer1 clock,
+|        apb_pclk. A single clock can also be specified if the same clock is
+|        used for all clock inputs.
+
+I think you only want to have one clock here and make that the "apb_pclk".
+
+> +			gpio0: gpio at 2010092000 {
+> +				#gpio-cells = <2>;
+> +				compatible = "arm,pl061", "arm,primecell";
+> +				gpio-controller;
+> +				reg = <0x20 0x10092000 0x00 0x1000>;
+> +				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clk_per>;
+> +				clock-names = "apb_pclk";
+> +				status = "disabled";
+
+The pl061 binding does not specify any clocks at all. Do we need to update
+that?
+
+	Arnd
