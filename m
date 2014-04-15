@@ -1,73 +1,29 @@
-From: luxiangyu@huawei.com (luxiangyu)
-Date: Tue, 15 Apr 2014 16:44:15 +0800
-Subject: [PATCH] ARM: fix do_div() bug in big-endian systems
-In-Reply-To: <20140415081805.GB3596@e103592.cambridge.arm.com>
-References: <1397211384-2962-1-git-send-email-luxiangyu@huawei.com>
- <20140414111237.GB3844@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1404141201130.980@knanqh.ubzr>
- <20140415081805.GB3596@e103592.cambridge.arm.com>
-Message-ID: <534CF15F.3030403@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Apr 2014 10:46:56 +0200
+Subject: [PATCHv2 3/8] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+In-Reply-To: <534CEEA8.6020800@samsung.com>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <4788081.xvaJfdGTMu@wuerfel> <534CEEA8.6020800@samsung.com>
+Message-ID: <5677551.At1Foxml9e@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/4/15 16:18, Dave Martin wrote:
-> On Mon, Apr 14, 2014 at 12:03:09PM -0400, Nicolas Pitre wrote:
->> On Mon, 14 Apr 2014, Dave Martin wrote:
->>
->>> On Fri, Apr 11, 2014 at 06:16:24PM +0800, Lu Xiangyu wrote:
->>>> From: Xiangyu Lu <luxiangyu@huawei.com>
->>>>
->>>> In big-endian systems, "%1" get the most significant part of the value, cause
->>>> the instruction to get the wrong result.
->>>>
->>>> When viewing ftrace record in big-endian ARM systems, we found that
->>>> the timestamp errors:
->>>>
->>>> swapper-0     [001]  1325.970000:      0:120:R ==> [001]    16:120:R events/1
->>>> events/1-16   [001]  1325.970000:      16:120:S ==> [001]    0:120:R swapper
->>>> swapper-0     [000]  1325.1000000:     0:120:R   + [000]    15:120:R events/0
->>>> swapper-0     [000]  1325.1000000:     0:120:R ==> [000]    15:120:R events/0
->>>> swapper-0     [000]  1326.030000:      0:120:R   + [000]  1150:120:R sshd
->>>> swapper-0     [000]  1326.030000:      0:120:R ==> [000]  1150:120:R sshd
->>>>
->>>> When viewed ftrace records, it will call the do_div(n, base) function, which
->>>> achieved arch/arm/include/asm/div64.h in. When n = 10000000, base = 1000000, in
->>>> do_div(n, base) will execute "umull %Q0, %R0, %1, %Q2".
->>>>
->>>> Cc: <stable@vger.kernel.org> # 2.6.20+
->>>> Signed-off-by: Alex Wu <wuquanming@huawei.com>
->>>> Signed-off-by: Xiangyu Lu <luxiangyu@huawei.com>
->>>> ---
->>>>   arch/arm/include/asm/div64.h |    2 +-
->>>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
->>>> index 191ada6..662c7bd 100644
->>>> --- a/arch/arm/include/asm/div64.h
->>>> +++ b/arch/arm/include/asm/div64.h
->>>> @@ -156,7 +156,7 @@
->>>>   		/* Select the best insn combination to perform the   */	\
->>>>   		/* actual __m * __n / (__p << 64) operation.         */	\
->>>>   		if (!__c) {						\
->>>> -			asm (	"umull	%Q0, %R0, %1, %Q2\n\t"		\
->>>> +			asm (	"umull	%Q0, %R0, %Q1, %Q2\n\t"		\
->>> This looks plausible: these if() clauses are all concerned with
->>> multiplying the low parts of __m and __n together, and this seems
->>> to be the only 64-bit asm operand reference where Q or R is suspiciously
->>> missing: so it looks likely that "Q" is required here for consistency.
->>>
->>> My understanding of the details of this code are limited: do you have
->>> a simple test case to demonstrate the error and the fix?
->> No need -- it is indeed wrong on big endian and has been so for the last
->> 7.5 years.
-> OK, well with that sanity-check on my reasoning I'm happy to:
+On Tuesday 15 April 2014 17:32:40 Chanwoo Choi wrote:
+> On 04/15/2014 05:11 PM, Arnd Bergmann wrote:
+> > On Tuesday 15 April 2014 10:59:47 Chanwoo Choi wrote:
 >
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
->
-> I suggest you go ahead and send it to Russell's patch system.
->
-> Cheers
-> ---Dave
-> .
->
-OK, thanks.
+> > I don't think we have a patch for the PMU yet, Sachin was looking at the SYSRAM
+> > only.
+> 
+> You are right. Sachin's patch only included the solution of SYSRAM memory mapping.
+> I set out the plan that I would implment proper driver for PMU memory mapping
+> instead of static method after merged Sachin's patch for SYSRAM.
+> 
+> But,
+> If you'd like me to implment PMU memory mapping instead of static mapping right now,
+> I'll implement it for PMU such as Sachin's patch on next posting(v3).
+
+I don't really want to merge a new SoC type until these are resolved, so
+it would definitely be better to implement this for v3.
+
+	Arnd
