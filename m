@@ -1,43 +1,50 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 15 Apr 2014 22:54:37 +0200
-Subject: [PATCH 0/3] net: mvneta: fix usage as a module,
- and support QSGMII properly
-In-Reply-To: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 15 Apr 2014 15:50:18 +0200")
-References: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87a9bmxqia.fsf@natisbad.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Apr 2014 15:00:01 -0600
+Subject: [PATCH 5/7] net: rfkill: gpio: add device tree support
+In-Reply-To: <1397544101-18135-6-git-send-email-wens@csie.org>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-6-git-send-email-wens@csie.org>
+Message-ID: <534D9DD1.2070004@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 04/15/2014 12:41 AM, Chen-Yu Tsai wrote:
 
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
+Patch description?
 
-> This set of patches has been tested on:
->
->  * Armada XP GP (four QSGMII interfaces)
->  * Armada XP DB (two RGMII interfaces and two SGMII interfaces)
->  * Armada 370 Mirabox (two RGMII interfaces)
->
-> I've tested both the driver built-in, and compiled as a module.
->
-> Since the last attempt at fixing this was quite a fiasco, I'd like
-> this new attempt to be tested more widely before being applied. I'll
-> try to do some testing on other Armada boards I have, but independent
-> testing from other persons would also be appreciated.
->
-> Note that these patches apply after reverting the previous attempt,
-> obviously.
+> diff --git a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
 
-I just tested the set w/ the driver built-on on top of current
-3.15.0-rc1 w/ e3a8786c10e7 reverted on a RN102 (A370, 2xRGMII), a
-RN104  (A370, 2xRGMII) and a RN2120 (AXP, 2xRGMII). The interface(s)
-work(s) as expected, i.e. everything is in order. You can add my
+> +Required properties:
 
-Tested-by: Arnaud Ebalard <arno@natisbad.org>
+> +- gpios		: At most two GPIO phandles
+> +- gpio-names	: Shall be "reset" or "shutdown", matching gpios.
+> +		  If both are provided, the "reset" GPIO is toggled first.
 
-Thanks for your work!
+As Maxime mentioned, this is an unusual way of defining GPIOs. If this
+new way is acceptable, then I'd suggest more precise wording, e.g.:
 
-Cheers,
+- gpios: Must contain an entry for each entry in gpio-names.
+  See ../gpio/gpio.txt for details.
+- gpio-names: May contain any or all of the following entries:
+  - reset
+  - shutdown
 
-a+
+> +- rfkill-type	: Type of RFKILL device: 1 for WiFi, 2 for BlueTooth, etc.
+> +		  See include/uapi/linux/rfkill.h for all valid values
+
+It would be nice if include/dt-bindings/rfkill-gpio.h existed and
+contained e.g.:
+
+#define RFKILL_TYPE_BLUETOOTH 2
+
+So that:
+
+> +Example:
+> +
+> +	rfkill_bt {
+...
+> +		rfkill-type = <2>;
+
+Could be written as:
+
+		rfkill-type = <RFKILL_TYPE_BLUETOOTH>;
