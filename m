@@ -1,35 +1,79 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 15 Apr 2014 18:06:03 -0500
-Subject: [PATCH v3 1/4] reset: add driver for socfpga
-In-Reply-To: <1397548592-6384-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1397548592-6384-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1397603163.4702.0.camel@linux-builds1>
+From: tthayer@altera.com (tthayer at altera.com)
+Date: Tue, 15 Apr 2014 18:30:08 -0500
+Subject: [PATCHv2 1/3] dts: socfpga: Add bindings for Altera SoC SDRAM
+ controller
+In-Reply-To: <1397604610-20931-1-git-send-email-tthayer@altera.com>
+References: <1397604610-20931-1-git-send-email-tthayer@altera.com>
+Message-ID: <1397604610-20931-3-git-send-email-tthayer@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-15 at 09:56 +0200, Steffen Trumtrar wrote:
-> Add a reset-controller driver for the socfpga platform.
-> The reset-controller has four banks with up to 32 entries all encapsulated in
-> one module block.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> 
-> Notes:
->     Changes since v2:
->     	- remove superfluous ret in probe function
->     	- add Acked-by
->     
->     Changes since v1:
->     	- use BITS_PER_LONG everywhere instead of MAX_BANK_WIDTH
->     	- print pdev->dev.of_node->full_name on error
->     	- use proper IS_ERR/PTR_ERR
-> 
+From: Thor Thayer <tthayer@altera.com>
 
-I've applied this series to rocketboards linux-socfpga-next/drivers and
-linux-socfpga-next/next-dt.
+Addition of the Altera SDRAM controller bindings and device
+tree changes to the Altera SoC project.
 
-Thanks,
+---
+v2: Update the mailing list to include the EDAC mailing list.
 
-Dinh
+Signed-off-by: Thor Thayer <tthayer@altera.com>
+To: Rob Herring <robherring2@gmail.com>
+To: Pawel Moll <pawel.moll@arm.com>
+To: Mark Rutland <mark.rutland@arm.com>
+To: Ian Campbell <ijc+devicetree@hellion.org.uk>
+To: Kumar Gala <galak@codeaurora.org>
+To: Rob Landley <rob@landley.net>
+To: Russell King <linux@arm.linux.org.uk>
+To: Dinh Nguyen <dinguyen@altera.com>
+To: Doug Thompson <dougthompson@xmission.com>
+To: Grant Likely <grant.likely@linaro.org>
+Cc: Borislav Petkov <bp@alien8.de>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-edac at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ .../bindings/arm/altera/socfpga-sdram.txt          |   14 ++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |    5 +++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+new file mode 100644
+index 0000000..525cb76
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram.txt
+@@ -0,0 +1,14 @@
++Altera SOCFPGA SDRAM Controller
++
++Required properties:
++- compatible : "altr,sdr-ctl", "syscon";
++                Note that syscon is invoked for this device to support the FPGA
++		bridge driver, EDAC driver and other devices that share the
++		registers.
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++	sdrctl at ffc25000 {
++		compatible = "altr,sdr-ctl", "syscon";
++		reg = <0xffc25000 0x1000>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index df43702..6ce912e 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -676,6 +676,11 @@
+ 			clocks = <&l4_sp_clk>;
+ 		};
+ 
++		sdrctl at ffc25000 {
++			compatible = "altr,sdr-ctl", "syscon";
++			reg = <0xffc25000 0x1000>;
++		};
++
+ 		rstmgr at ffd05000 {
+ 			compatible = "altr,rst-mgr";
+ 			reg = <0xffd05000 0x1000>;
+-- 
+1.7.9.5
