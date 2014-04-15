@@ -1,39 +1,81 @@
 From: sdu.liu@huawei.com (Liu Hua)
-Date: Tue, 15 Apr 2014 19:06:05 +0800
-Subject: [PATCH v3 0/2] change ARM linux memory layout to support 32 CPUs
-Message-ID: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+Date: Tue, 15 Apr 2014 19:06:06 +0800
+Subject: [PATCH v3 1/2] ARM : fixmap : remove FIX_KMAP_BEGIN and FIX_KMAP_END
+In-Reply-To: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+Message-ID: <1397559967-26050-2-git-send-email-sdu.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series change fixmap mapping region to suppport 32 CPUs.
-Because the "top_pmd" covers 0xfffe0000 - 0xffffffff(2M). And part 
-is used by vector table. So I move this region down to 0xffc00000
- - 0xffdffff. 
+It seems that these two macros are not used by non
+architecture specific code. And on ARM FIX_KMAP_BEGIN
+equals zero.
 
+This patch removes these two macros. Instead, using
+FIX_KMAP_NR_PTES to tell the pte number belonged to
+fixmap mapping region. The code will become clearer
+when I introduce a bugfix on fixmap mapping region.
 
-I have tested the patches on arma9(2 CPUs) and arma15(16 CPUs) platforms
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Liu Hua <sdu.liu@huawei.com>
+---
+ arch/arm/include/asm/fixmap.h | 5 ++---
+ arch/arm/mm/highmem.c         | 6 +++---
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
-Changes from v2:
----------------
-- Removed two macros: FIX_KMAP_BEGIN and FIX_KMAP_END;
-- Unchanged DMA mapping region related documentation; 
-
-Changes from v1:
----------------
-- changed documentation for ARM linux memory layout.
-- moved fixmap mapping region, not just extended.
-
-
-Liu Hua (2):
-  ARM : fixmap : remove FIX_KMAP_BEGIN and FIX_KMAP_END
-  ARM : change fixmap mapping region to support 32 CPUs
-
- Documentation/arm/memory.txt   |  2 +-
- arch/arm/include/asm/fixmap.h  | 21 ++++-----------------
- arch/arm/include/asm/highmem.h |  1 +
- arch/arm/mm/highmem.c          | 33 ++++++++++++++++++++++++---------
- arch/arm/mm/mmu.c              |  4 ++++
- 5 files changed, 34 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index bbae919..be55ebc 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -17,8 +17,7 @@
+ #define FIXADDR_TOP		0xfffe0000UL
+ #define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
+ 
+-#define FIX_KMAP_BEGIN		0
+-#define FIX_KMAP_END		(FIXADDR_SIZE >> PAGE_SHIFT)
++#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
+ 
+ #define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
+ #define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
+@@ -27,7 +26,7 @@ extern void __this_fixmap_does_not_exist(void);
+ 
+ static inline unsigned long fix_to_virt(const unsigned int idx)
+ {
+-	if (idx >= FIX_KMAP_END)
++	if (idx >= FIX_KMAP_NR_PTES)
+ 		__this_fixmap_does_not_exist();
+ 	return __fix_to_virt(idx);
+ }
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index 21b9e1b..e05e8ad 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -63,7 +63,7 @@ void *kmap_atomic(struct page *page)
+ 	type = kmap_atomic_idx_push();
+ 
+ 	idx = type + KM_TYPE_NR * smp_processor_id();
+-	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
++	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	/*
+ 	 * With debugging enabled, kunmap_atomic forces that entry to 0.
+@@ -94,7 +94,7 @@ void __kunmap_atomic(void *kvaddr)
+ 		if (cache_is_vivt())
+ 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+-		BUG_ON(vaddr != __fix_to_virt(FIX_KMAP_BEGIN + idx));
++		BUG_ON(vaddr != __fix_to_virt(idx));
+ 		set_top_pte(vaddr, __pte(0));
+ #else
+ 		(void) idx;  /* to kill a warning */
+@@ -117,7 +117,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+ 
+ 	type = kmap_atomic_idx_push();
+ 	idx = type + KM_TYPE_NR * smp_processor_id();
+-	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
++	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	BUG_ON(!pte_none(get_top_pte(vaddr)));
+ #endif
 -- 
 1.9.0
