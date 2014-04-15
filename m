@@ -1,52 +1,78 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 15 Apr 2014 10:42:03 +0300
-Subject: [PATCHv2 07/11] ARM: OMAP3: Beagle: use PWM_LOOKUP to initialize
- struct pwm_lookup
-In-Reply-To: <20140415071430.GA13659@verge.net.au>
-References: <1397512793-10325-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1397512793-10325-8-git-send-email-alexandre.belloni@free-electrons.com>
- <534CD958.4000303@ti.com> <20140415071430.GA13659@verge.net.au>
-Message-ID: <534CE2CB.5030503@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Apr 2014 09:50:40 +0200
+Subject: [PATCH v2 07/12] ARM: hisi: add hip04 SoC support
+In-Reply-To: <CAD6h2NSJ5MvSbLw8kGkbNmy1UYXb+LDKYp9hfG1YEswFNDkOrQ@mail.gmail.com>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <4584675.BJyVXFoGau@wuerfel>
+ <CAD6h2NSJ5MvSbLw8kGkbNmy1UYXb+LDKYp9hfG1YEswFNDkOrQ@mail.gmail.com>
+Message-ID: <90100568.4DTyQlJ7Rj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 10:14 AM, Simon Horman wrote:
-> On Tue, Apr 15, 2014 at 10:01:44AM +0300, Peter Ujfalusi wrote:
->> On 04/15/2014 12:59 AM, Alexandre Belloni wrote:
->>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> ---
->>>  arch/arm/mach-omap2/board-omap3beagle.c | 10 ++--------
->>>  1 file changed, 2 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
->>> index f27e1ec90b5e..54c135a5b4f7 100644
->>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
->>> @@ -61,14 +61,8 @@
->>>  
->>>  static struct pwm_lookup pwm_lookup[] = {
->>>  	/* LEDB -> PMU_STAT */
->>> -	{
->>> -		.provider = "twl-pwmled",
->>> -		.index = 1,
->>> -		.dev_id = "leds_pwm",
->>> -		.con_id = "beagleboard::pmu_stat",
->>> -		.period = 7812500,
->>> -		.polarity = PWM_POLARITY_NORMAL,
->>> -	},
->>> +	PWM_LOOKUP("twl-pwmled", 1, "leds_pwm", "beagleboard::pmu_stat",
->>> +		   7812500, PWM_POLARITY_NORMAL),
->>
->> Why do you need to do this in two steps?
->> In patch 4 you removed the existing PWM_LOOKUP() and now you are adding it back.
->> Would not be simpler if you just add the two new parameters in patch 4 (the
->> 812500, PWM_POLARITY_NORMAL)?
+On Tuesday 15 April 2014 15:02:10 Haojian Zhuang wrote:
+> On 8 April 2014 19:10, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 08 April 2014 16:00:47 Haojian Zhuang wrote:
+> >> diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+> >> index 741faf3..10a605f 100644
+> >> --- a/arch/arm/mach-hisi/hisilicon.c
+> >> +++ b/arch/arm/mach-hisi/hisilicon.c
+> >> @@ -14,6 +14,7 @@
+> >>  #include <linux/clk-provider.h>
+> >>  #include <linux/clocksource.h>
+> >>  #include <linux/irqchip.h>
+> >> +#include <linux/memblock.h>
+> >>  #include <linux/of_address.h>
+> >>  #include <linux/of_platform.h>
+> >>
+> >> @@ -88,3 +89,21 @@ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+> >>       .smp            = smp_ops(hi3xxx_smp_ops),
+> >>       .restart        = hi3xxx_restart,
+> >>  MACHINE_END
+> >> +
+> >> +static const char *hip04_compat[] __initconst = {
+> >> +     "hisilicon,hip04-d01",
+> >> +     NULL,
+> >> +};
+> >> +
+> >> +static void __init hip04_reserve(void)
+> >> +{
+> >> +     memblock_reserve(HIP04_BOOTWRAPPER_PHYS, HIP04_BOOTWRAPPER_SIZE);
+> >> +}
+> >
+> > Can you explain why you do this? Shouldn't that memory just be listed
+> > in the DT?
 > 
-> Such an approach would apply an atomic change to both the infrastructure
-> and the users.
+> In current implementation, boot code of secondary CPUs are stored in the memory
+> of HIP04_BOOTWRAPPER_PHYS.
+> 
+> If the bootwrapper could be removed, we need to refresh the code on booting
+> up secondary CPU.
 
-Yes, I overlooked patch 6...
-Just ignore my comment.
+What I meant was that you should not call memblock_reserve() from an early
+function here, but instead pass correct data through the DT so you don't
+have to. You can reserve the memory in DT.
 
--- 
-P?ter
+If changing the boot code is an option, you might consider just using the
+standard PSCI interface. That is definitely the recommended approach, although
+I don't know how that interacts with MCPM
+
+> >> +DT_MACHINE_START(HIP04, "Hisilicon HiP04 (Flattened Device Tree)")
+> >> +     .dt_compat      = hip04_compat,
+> >> +#ifdef CONFIG_MCPM
+> >> +     .smp_init       = smp_init_ops(hip04_smp_init_ops),
+> >> +#endif
+> >> +     .reserve        = hip04_reserve,
+> >> +MACHINE_END
+> >
+> > I think the #ifdef is not needed here, you already hide hip04_smp_init_ops
+> > if CONFIG_SMP is disabled, and SMP implies MCPM based on your Kconfig.
+> >
+> 
+> If I build only ARCH_HI3xxx without ARCH_HIP04, CONFIG_MCPM won't be
+> selected. Then I'll meet the build error.
+
+I would rather see an #ifdef ARCH_HIP04 around the HIP04 code then.
+You could also just use separate files for HI3xxx and HIP04, since
+there is nothing shared between the two anyway.
+
+	Arnd
