@@ -1,54 +1,66 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 15 Apr 2014 14:43:49 +0800
-Subject: [PATCH 4/4] pinctrl: sirf: move to use irq_get_handler_data
-In-Reply-To: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
-References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1397544229-20545-5-git-send-email-21cnbao@gmail.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Tue, 15 Apr 2014 14:45:05 +0800
+Subject: [PATCH v2 06/12] ARM: mcpm: change max clusters to 4
+In-Reply-To: <alpine.LFD.2.11.1404102203590.980@knanqh.ubzr>
+References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
+ <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
+ <20140410095650.GA5499@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404102203590.980@knanqh.ubzr>
+Message-ID: <CAD6h2NTH1ZGWSNPeEMaZ4Lf+4UFOhXFtJeX1NEXETeonc76DYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On 11 April 2014 10:39, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 10 Apr 2014, Dave Martin wrote:
+>
+>> On Tue, Apr 08, 2014 at 04:00:46PM +0800, Haojian Zhuang wrote:
+>> > In order to support 4 clusters with 4 Cortex A15 Cores in each cluster,
+>> > enlarge maximum clusters from 2 to 4 in MCPM.
+>>
+>> CC Nico on mcpm patches please.  I'm happy to be CC'd as well.
+>
+> Indeed.
+>
+>> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> > ---
+>> >  arch/arm/include/asm/mcpm.h | 2 +-
+>> >  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >
+>> > diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+>> > index 608516e..68f82cf 100644
+>> > --- a/arch/arm/include/asm/mcpm.h
+>> > +++ b/arch/arm/include/asm/mcpm.h
+>> > @@ -20,7 +20,7 @@
+>> >   * to consider dynamic allocation.
+>> >   */
+>> >  #define MAX_CPUS_PER_CLUSTER       4
+>> > -#define MAX_NR_CLUSTERS            2
+>> > +#define MAX_NR_CLUSTERS            4
+>>
+>> Because of the need for alignment to the biggest cacheline size in the
+>> system, the MCPM low-level locking structures consume a non-trivial
+>> amount of memory.
+>>
+>> Therefore, I'm not keen on the idea of simply increasing this #define
+>> every time a platform appears with a larger number of clusters.
+>> If hip04 is not built into the kernel, this just wastes memory.
+>>
+>> I'll leave it to Nico to decide whether we can increase the #define
+>> to 4 or whether this needs a proper fix now.  Ideally, we would have
+>> a way of choosing the maximum value required by the set of boards built
+>> into the kernel, or switch to dynamic allocation.
+>
+> I think we should go with the ability to select a maximum based on the
+> configured platforms. That could be as simple as having a
+> CONFIG_MCPM_QUAD_CLUSTER symbol to be selected by those platforms that
+> need it.
+>
 
-we set bank as handler_data, now we can get bank in ISR directly
-instead of looking-up.
+I'll set MAX_NR_CLUSTERS from Kconfig.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/pinctrl/sirf/pinctrl-sirf.c |   12 ++----------
- 1 files changed, 2 insertions(+), 10 deletions(-)
+If BIG_LITTLE isn't enabled & HIP04 is enabled, MAX_NR_CLUSTERS could
+be set to 4.
+Otherwise, it's always 2. Since there're only 16 A15 cores in HiP04.
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
-index c03dcc7..36cc678 100644
---- a/drivers/pinctrl/sirf/pinctrl-sirf.c
-+++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
-@@ -568,18 +568,10 @@ static struct irq_chip sirfsoc_irq_chip = {
- 
- static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
- {
--	struct sirfsoc_gpio_bank *bank;
-+	struct sirfsoc_gpio_bank *bank = irq_get_handler_data(irq);
- 	u32 status, ctrl;
- 	int idx = 0;
- 	struct irq_chip *chip = irq_get_chip(irq);
--	int i;
--
--	for (i = 0; i < SIRFSOC_GPIO_BANK_SIZE; i++) {
--		bank = &sgpio_chip.sgpio_bank[i];
--		if (bank->parent_irq == irq)
--			break;
--	}
--	BUG_ON (i == SIRFSOC_GPIO_BANK_SIZE);
- 
- 	chained_irq_enter(chip, desc);
- 
-@@ -845,7 +837,7 @@ static int sirfsoc_gpio_probe(struct device_node *np)
- 			goto out;
- 		}
- 
--		gpiochip_set_chained_irqchip(&sgpio_chip.chip.gc,
-+		gpiochip_set_chained_irqchip(bank,
- 			&sirfsoc_irq_chip,
- 			bank->parent_irq,
- 			sirfsoc_gpio_handle_irq);
--- 
-1.7.5.4
+Regards
+Haojian
