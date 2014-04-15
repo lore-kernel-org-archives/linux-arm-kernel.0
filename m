@@ -1,30 +1,36 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 15 Apr 2014 20:07:00 +0200
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140415.135038.1703628429468655272.davem@davemloft.net>
-References: <534D6A1F.70102@linaro.org>
- <20140415.133840.2270952586596479547.davem@davemloft.net>
- <20140415174900.GA11184@redhat.com>
- <20140415.135038.1703628429468655272.davem@davemloft.net>
-Message-ID: <20140415180700.GB11690@redhat.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 15 Apr 2014 20:01:48 +0200
+Subject: [PATCH v2 7/7] ARM: dts: update macros in clock bindings for
+ exynos5420
+In-Reply-To: <1395918470-16374-8-git-send-email-shaik.ameer@samsung.com>
+References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
+ <1395918470-16374-8-git-send-email-shaik.ameer@samsung.com>
+Message-ID: <534D740C.2060904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15, David Miller wrote:
->
-> From: Oleg Nesterov <oleg@redhat.com>
-> Date: Tue, 15 Apr 2014 19:49:00 +0200
->
-> > We do not want to write to, say, page cache if the probed application
-> > mmaps a file at the same vaddr.
->
-> If user has write access to that page... not our problem.
+Hi Shaik,
 
-Well, I am not sure.
+On 27.03.2014 12:07, Shaik Ameer Basha wrote:
+> From: Rahul Sharma <rahul.sharma@samsung.com>
+>
+> This patch updates the macros as per the latest changes and
+> replaces magic numbers with macros defined in DT header for
+> exynos5420.
+>
 
-Yes, this won't allow you to write the exploit. But if this actually
-happens because an application is buggy, this can lead to really
-hard-to-debug problems.
+Contents of dts files are not "bindings", they are just device tree 
+sources/data, defined according to some bindings. Bindings are defined 
+sets of nodes and properties and their formats, as you can see in 
+Documentation/devicetree/bindings/, where documentation of supported 
+bindings is available.
 
-Oleg.
+So this patch doesn't update clock bindings, but rather device nodes. 
+Following would be more appropriate: "ARM: dts: update clock IDs in 
+device tree of Exynos5420".
+
+However, as mentioned in comments to previous patches, most (if not all) 
+of the changes below could be probably dropped.
+
+Best regards,
+Tomasz
