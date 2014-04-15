@@ -1,45 +1,30 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 14 Apr 2014 22:16:10 -0700
-Subject: [PATCH] PM / devfreq: Use freq_table for available_frequencies
-In-Reply-To: <8568895.444151397525760132.JavaMail.weblogic@epml02>
-References: <8568895.444151397525760132.JavaMail.weblogic@epml02>
-Message-ID: <534CC09A.30200@codeaurora.org>
+From: lee.essen@nowonline.co.uk (Lee Essen)
+Date: Tue, 15 Apr 2014 09:43:38 +0400
+Subject: dma_alloc_coherent and cache?
+Message-ID: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2014 06:36 PM, ??? wrote:
->> MyungJoo/Kyungmin,
->>
->> Bump. Can we accept this patch please?
->>
->> -Saravana
-> 
-> Nack.
-> 
-> Please note that freq_table is also an optional value, which may
-> be null.
+Hi,
 
-Ah, I saw that the max_freq would be zero if freq_table was NULL and I
-assumed that it can't be NULL. But I see that the max_freq limit is not
-applied if it's zero. Thanks for catching it.
+I'm working on a driver for a Marvell switch device (98dx4122) where the basic interface closely resembles the mv643xx_eth device.
 
-> Besides, please be aware that your code is under rcu_read_lock().
+(I should say this is a bit of a personal project to experiment with a trendnet switch, not affiliated with any commercial activities.)
 
-Valid point. I was just trying to keep the diff simple. No one's really
-going to be catting this file often when performance matters.
+GPL code from Marvell is available for an old kernel, so I have been working to use the mv643xx_eth concepts and at least get basic functionality up an running on the current kernel version.
 
-> 
-> 
-> Cheers,
-> MyungJoo.
-> 
-> ps. I'll send a related patch (avoid accessing null but not-an-error
-> pointer at other sysfs nodes). Thank you for letting me catch such bugs anyway.
+At a high level I have it working, however I get regular (reproducible) hangs and I suspect it's to do with the writes to the descriptiors (from dma_alloc_coherent) being buffered or cached and not making it to the device when dma is triggered.
 
-I can go ahead and do this myself if you don't mind.
+My theory is based on the fact that the hang always seems to happen at the point of enabling dma for transmit, and occasionally I get a packet out which is corrupt ... and if I add lots of debug printk's or delay loops then it happens less frequently.
 
--Saravana
+The original GPL code has some functions in to invalidate/clear the L2 cache, but no other driver seems to do this, so it doesn't feel like it's a good solution.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+It's a feroceon cpu, and I've tried disabling the L2 controller and also the d-cache - neither of which made any difference.
+
+So I'm now completely out of ideas and way out of my depth ;-) 
+
+Any suggestions would be greatly appreciated.
+
+Regards,
+
+Lee.
