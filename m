@@ -1,53 +1,37 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 15 Apr 2014 21:06:35 +0200
-Subject: [PATCH V2 3/3] ARM: dts: Add node for GPIO keys on SMDK5420
-In-Reply-To: <1395900785-11334-4-git-send-email-vikas.sajjan@samsung.com>
-References: <1395900785-11334-1-git-send-email-vikas.sajjan@samsung.com>
- <1395900785-11334-4-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <534D833B.8030607@gmail.com>
+From: chris@printf.net (Chris Ball)
+Date: Tue, 15 Apr 2014 20:12:48 +0100
+Subject: [PATCH 4/4] ARM: tegra: fix Venice2 VQMMC regulators
+In-Reply-To: <534D7AFD.7080807@wwwdotorg.org> (Stephen Warren's message of
+ "Tue, 15 Apr 2014 12:31:25 -0600")
+References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+ <1397526163-20126-5-git-send-email-abrestic@chromium.org>
+ <534D7AFD.7080807@wwwdotorg.org>
+Message-ID: <864n1uv233.fsf@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stephen,
 
-On 27.03.2014 07:13, Vikas Sajjan wrote:
-> From: Abhilash Kesavan <a.kesavan@samsung.com>
+On Tue, Apr 15 2014, Stephen Warren wrote:
+> Is there documentation re: what vmmc-supply and vqmmc-supply actually
+> refer to? I looked a long while ago and couldn't find any, and didn't
+> get an answer when I asked.
 >
-> Add support for the suspend/resume button (SW7) on SMDK5420 using
-> gpio-keys driver.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5420-smdk5420.dts |   11 +++++++++++
->   1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> index 6910485..5ae0dd4 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -158,6 +158,17 @@
->   		};
->   	};
->
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +
-> +		wakeup {
+> Neither
+> Documentation/devicetree/bindings/mmc/{mmc.txt,nvidia,tegra20-sdhci.txt}
+> seem to say:-(
 
-Is wakeup the label of this key on the PCB? The "label" property below 
-would suggest otherwise. This should probably be called key-sw7 or 
-something like this.
+MMC cards use the same voltage for the VDD pin on the card and to pull
+up the signal lines.  UHS SDHCI switches to using 1.8V vqmmc (signaling
+voltage) and 3.3V vmmc (card supply voltage).
 
-Moreover, is this the only GPIO key on the board? If there are also 
-SW0-SW6, you should add them too.
+So the idea is to supply a vqmmc-supply if your board supports
+ultra-high-speed modes on an SD 3.0 host, and a vmmc-supply if your
+card power is controlled by a regulator.  I agree that this ought to
+be in the bindings somewhere.
 
-> +			label = "SW7";
-> +			gpios = <&gpx0 0 1>;
-> +			linux,code = <143>;	/* KEY_WAKEUP */
+Thanks,
 
-Why not use KEY_WAKEUP defined in include/dt-bindings/input/input.h 
-directly?
-
-Best regards,
-Tomasz
+- Chris.
+-- 
+Chris Ball   <http://printf.net/>
