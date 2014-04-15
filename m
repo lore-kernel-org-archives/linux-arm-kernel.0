@@ -1,47 +1,37 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 15 Apr 2014 12:30:48 -0600
-Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
- possible
-In-Reply-To: <1397556454.4574.13.camel@weser.hi.pengutronix.de>
-References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
- <1394025951-32438-3-git-send-email-l.stach@pengutronix.de>
- <20140404165559.GE9007@google.com>
- <1397556454.4574.13.camel@weser.hi.pengutronix.de>
-Message-ID: <20140415182651.GA17721@google.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 15 Apr 2014 14:30:54 -0400 (EDT)
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140415180311.GA11690@redhat.com>
+References: <20140415174330.GA10558@redhat.com>
+ <20140415.134627.1895466146177627985.davem@davemloft.net>
+ <20140415180311.GA11690@redhat.com>
+Message-ID: <20140415.143054.770827409393483803.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 12:07:34PM +0200, Lucas Stach wrote:
-> Hi Bjorn,
+From: Oleg Nesterov <oleg@redhat.com>
+Date: Tue, 15 Apr 2014 20:03:11 +0200
+
+> On 04/15, David Miller wrote:
+>>
+>> From: Oleg Nesterov <oleg@redhat.com>
+>> Date: Tue, 15 Apr 2014 19:43:30 +0200
+>>
+>> > Finally, let me repeat, you should verify that this
+>> > __copy_to_user_page(page, uaddr, kaddr) will not something bad if uaddr
+>> > is not mmapped, or its mapping do not match area->page.
+>>
+>> Just directly access userspace with the usual exception mechanism we
+>> use for copy_to_user(), put_user(), et al. and if it faults you'll get
+>> -EFAULT and handle it.
+>>
+>> This also avoids the D-cache aliasing issues entirely as I explained
+>> in my other reply.
 > 
-> Am Freitag, den 04.04.2014, 10:55 -0600 schrieb Bjorn Helgaas:
-> > On Wed, Mar 05, 2014 at 02:25:47PM +0100, Lucas Stach wrote:
-> > > This is the recommended method of doing the IRQ
-> > > mapping. For old devicetrees we fall back to the
-> > > previous practice.
-> > > 
-> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > Applied with Stephen's Tested-by to my pending/host-tegra branch.  I'll
-> > rebase and rename it after v3.15-rc1, and I think we can squeeze it into
-> > v3.15 shortly after that.  Thanks.
-> > 
+> Yes, yes, this is obvious.
 > 
-> Are you still planning to push this into 3.15, or has this slipped to
-> 3.16?
+> But I have no idea what else we should do to take care of icache.
 
-Yes, I'm hoping to put them in v3.15.  I assume these actually
-fix something, e.g., we need these changes to boot with new devicetrees, or
-something?
-
-The changelogs don't make it clear that these are fixes, and I want to heed
-Linus' guidance: "Anyway, because -rc1 is already pretty darn big, I do
-*not* want to hear about 'sorry this missed the window, can I still sneak
-in'.  Fixes only."
-
-I should have applied these sooner to make the merge window; I apologize
-for that.  Anyway, if you outline what these fix, I'll update the
-changelogs in my tree.
-
-Bjorn
+Russell, if for example userland stores into the instruction stream
+to patch an instruction, what needs to be done on ARM?
