@@ -1,61 +1,190 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 15 Apr 2014 14:25:15 +0200
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
-In-Reply-To: <534D1DDA.40207@free-electrons.com>
-References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140414210429.GJ25182@sirena.org.uk> <534CE16D.8010508@free-electrons.com>
- <20140415100922.GN12304@sirena.org.uk> <534D1DDA.40207@free-electrons.com>
-Message-ID: <534D252B.8060009@metafoo.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 15 Apr 2014 14:28:12 +0200
+Subject: [PATCH 1/3] clocksource: exynos_mct: Fix stall after CPU
+ hotplugging
+In-Reply-To: <1397554445.29169.21.camel@AMDC1943>
+References: <1396011962-4467-1-git-send-email-k.kozlowski@samsung.com>
+ <1397554445.29169.21.camel@AMDC1943>
+Message-ID: <534D25DC.4050400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 01:54 PM, Boris BREZILLON wrote:
+On 04/15/2014 11:34 AM, Krzysztof Kozlowski wrote:
+> On pi?, 2014-03-28 at 14:06 +0100, Krzysztof Kozlowski wrote:
+>> Fix stall after hotplugging CPU1. Affected are SoCs where Multi Core Timer
+>> interrupts are shared (SPI), e.g. Exynos 4210. The stall was a result of
+>> starting the CPU1 local timer not in L1 timer but in L0 (which is used
+>> by CPU0).
 >
+> Hi,
 >
-> On 15/04/2014 12:09, Mark Brown wrote:
->> On Tue, Apr 15, 2014 at 09:36:13AM +0200, Boris BREZILLON wrote:
->>> On 14/04/2014 23:04, Mark Brown wrote:
->
->>>> The transfer type gets set once per device at init time so why not
->>>> just parameterise based on val_bytes?
->
->>> Actually, you may want to transfer 1 byte registers using the block
->>> method (if your device only support block transfers). This depends on
->>> the device being accessed and what it supports, but I'm not sure we can
->>> assume 1 byte registers will always be transferred using SMBUS byte
->>> transfers.
->
->> OK, so if this a realistic issue then it seems like it's better to
->> implement three different buses - there is not really any common code
->> between the various paths.
->
-> Okay, I'll create 4 different busses (one for each access type).
-> BTW, should I keep these implementations in the same source file
-> (regmap-smbus.c) ?
-> And, should I keep one method to register an smbus regmap or should I
-> provide one method per access type and get rid of the
-> regmap_smbus_transfer_type enum ?
+> Do you have any comments on these 3 patches? They fix the CPU stall on
+> Exynos4210 and also on Exynos3250 (Chanwoo Choi sent patches for it
+> recently).
 
-I don't think we should leave the decision which bus to use to the driver. 
-Neither should the driver have to choose whether to use smbus or native I2C. 
-We want to use native I2C when available, because it is more efficient than 
-going through the smbus emulation layer. On the other hand we want to 
-automatically switch to smbus when native I2C is not available and the 
-device can work fine with smbus. Also I'm afraid that we'll otherwise soon 
-see code popping up like:
+You describe this issue as impacting different SoC not only the exynos, 
+right ?
 
-if (of_property_read_bool(np, "use-smbus-regmap"))
-	regmap = regmap_init_smbus(...)
-else
-	regmap = regmap_init_i2c(...)
+Do you know what other SoCs are impacted by this ?
 
-My suggestion is that in regmap_init_i2c() you check the capabilities of the 
-I2C adapter. If it supports native I2C you setup the regmap with the 
-regmap_i2c struct just as it does right now. If the adapter does not support 
-native I2C, check if the device can be supported by smbus (reg_bytes == 8 && 
-val_bytes % 8 == 0). For each type of smbus operations have one regmap_bus 
-struct, and if you can fallback to smbus choose the bus depending on the 
-config's val_bytes.
+I guess this issue is not reproducible just with the line below, we need 
+a timer to expire right at the moment CPU1 is hotplugged, right ?
 
-- Lars
+>> Trigger:
+>> $ echo 0 > /sys/bus/cpu/devices/cpu1/online && echo 1 > /sys/bus/cpu/devices/cpu1/online
+>>
+>> Stall information:
+>> [  530.045259] INFO: rcu_preempt detected stalls on CPUs/tasks:
+>> [  530.045618]  1: (6 GPs behind) idle=6d0/0/0 softirq=369/369
+>> [  530.050987]  (detected by 0, t=6589 jiffies, g=33, c=32, q=0)
+>> [  530.056721] Task dump for CPU 1:
+>> [  530.059928] swapper/1       R running      0     0      1 0x00001000
+>> [  530.066377] [<c0524e14>] (__schedule+0x414/0x9b4) from [<c00b6610>] (rcu_idle_enter+0x18/0x38)
+>> [  530.074955] [<c00b6610>] (rcu_idle_enter+0x18/0x38) from [<c0079a18>] (cpu_startup_entry+0x60/0x3bc)
+>> [  530.084069] [<c0079a18>] (cpu_startup_entry+0x60/0x3bc) from [<c0517d34>] (secondary_start_kernel+0x164/0x1a0)
+>> [  530.094029] [<c0517d34>] (secondary_start_kernel+0x164/0x1a0) from [<40517244>] (0x40517244)
+>>
+>> The timers for CPU1 were missed:
+>> [  591.668436] cpu: 1
+>> [  591.670430]  clock 0:
+>> [  591.672691]   .base:       c0ab7750
+>> [  591.676160]   .index:      0
+>> [  591.679025]   .resolution: 1 nsecs
+>> [  591.682404]   .get_time:   ktime_get
+>> [  591.685970]   .offset:     0 nsecs
+>> [  591.689349] active timers:
+>> [  591.692045]  #0: <dfb51f40>, hrtimer_wakeup, S:01
+>> [  591.696759]  # expires at 454687834257-454687884257 nsecs [in -136770537232 to -136770487232 nsecs]
+>>
+>> And the event_handler for next event was wrong:
+>> [  591.917120] Tick Device: mode:     1
+>> [  591.920676] Per CPU device: 0
+>> [  591.923621] Clock Event Device: mct_tick0
+>> [  591.927623]  max_delta_ns:   178956969027
+>> [  591.931613]  min_delta_ns:   1249
+>> [  591.934913]  mult:           51539608
+>> [  591.938557]  shift:          32
+>> [  591.941681]  mode:           3
+>> [  591.944724]  next_event:     595025000000 nsecs
+>> [  591.949227]  set_next_event: exynos4_tick_set_next_event
+>> [  591.954522]  set_mode:       exynos4_tick_set_mode
+>> [  591.959296]  event_handler:  hrtimer_interrupt
+>> [  591.963730]  retries:        0
+>> [  591.966761]
+>> [  591.968245] Tick Device: mode:     0
+>> [  591.971801] Per CPU device: 1
+>> [  591.974746] Clock Event Device: mct_tick1
+>> [  591.978750]  max_delta_ns:   178956969027
+>> [  591.982739]  min_delta_ns:   1249
+>> [  591.986037]  mult:           51539608
+>> [  591.989681]  shift:          32
+>> [  591.992806]  mode:           3
+>> [  591.995848]  next_event:     453685000000 nsecs
+>> [  592.000353]  set_next_event: exynos4_tick_set_next_event
+>> [  592.005648]  set_mode:       exynos4_tick_set_mode
+>> [  592.010421]  event_handler:  tick_handle_periodic
+>> [  592.015115]  retries:        0
+>> [  592.018145]
+>>
+>> After turning off the CPU1, the MCT L1 local timer was disabled but the
+>> interrupt was not cleared. Turning on the CPU1 enabled the IRQ
+>> with setup_irq() but, before setting affinity to CPU1, the pending L1 timer
+>> interrupt was processed by CPU0 in exynos4_mct_tick_isr().
+>>
+>> The ISR then called event handler which set up the next timer event for
+>> current CPU (CPU0). Therefore the MCT L1 timer wasn't actually started.
+>>
+>> Fix the stall by:
+>> 1. Setting next timer event not on current CPU but on the CPU indicated
+>>     by cpumask in 'clock_event_device'.
+>> 2. Clearing the timer interrupt upon stopping the local timer.
+>>
+>> The patch also moves around the call to exynos4_mct_tick_stop() but this
+>> is done only for the code readability as it is not essential for the fix.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Cc: <stable@vger.kernel.org>
+>> ---
+>>   drivers/clocksource/exynos_mct.c |   33 ++++++++++++++++++++-------------
+>>   1 file changed, 20 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+>> index 48f76bc05da0..0b49b09dd1a9 100644
+>> --- a/drivers/clocksource/exynos_mct.c
+>> +++ b/drivers/clocksource/exynos_mct.c
+>> @@ -339,7 +339,14 @@ static void exynos4_mct_tick_start(unsigned long cycles,
+>>   static int exynos4_tick_set_next_event(unsigned long cycles,
+>>   				       struct clock_event_device *evt)
+>>   {
+>> -	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+>> +	/*
+>> +	 * In case of hotplugging non-boot CPU, the set_next_event could be
+>> +	 * called on CPU0 by ISR before IRQ affinity is set to proper CPU.
+>> +	 * Thus for accessing proper MCT Lx timer, 'per_cpu' for cpumask
+>> +	 * in event must be used instead of 'this_cpu_ptr'.
+>> +	 */
+>> +	struct mct_clock_event_device *mevt = &per_cpu(percpu_mct_tick,
+>> +			cpumask_first(evt->cpumask));
+>>
+>>   	exynos4_mct_tick_start(cycles, mevt);
+>>
+>> @@ -371,23 +378,13 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+>>
+>>   static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+>>   {
+>> -	struct clock_event_device *evt = &mevt->evt;
+>> -
+>> -	/*
+>> -	 * This is for supporting oneshot mode.
+>> -	 * Mct would generate interrupt periodically
+>> -	 * without explicit stopping.
+>> -	 */
+>> -	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+>> -		exynos4_mct_tick_stop(mevt);
+>> -
+>>   	/* Clear the MCT tick interrupt */
+>>   	if (__raw_readl(reg_base + mevt->base + MCT_L_INT_CSTAT_OFFSET) & 1) {
+>>   		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+>>   		return 1;
+>> -	} else {
+>> -		return 0;
+>>   	}
+>> +
+>> +	return 0;
+>>   }
+>>
+>>   static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+>> @@ -395,6 +392,13 @@ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+>>   	struct mct_clock_event_device *mevt = dev_id;
+>>   	struct clock_event_device *evt = &mevt->evt;
+>>
+>> +	/*
+>> +	 * This is for supporting oneshot mode.
+>> +	 * Mct would generate interrupt periodically
+>> +	 * without explicit stopping.
+>> +	 */
+>> +	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
+>> +		exynos4_mct_tick_stop(mevt);
+>>   	exynos4_mct_tick_clear(mevt);
+>>
+>>   	evt->event_handler(evt);
+>> @@ -441,7 +445,10 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>>
+>>   static void exynos4_local_timer_stop(struct clock_event_device *evt)
+>>   {
+>> +	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+>> +
+>>   	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+>> +	exynos4_mct_tick_clear(mevt);
+>>   	if (mct_int_type == MCT_INT_SPI)
+>>   		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+>>   	else
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
