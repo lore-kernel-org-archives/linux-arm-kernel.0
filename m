@@ -1,110 +1,29 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 15 Apr 2014 14:41:39 +0800
-Subject: [PATCH 5/7] net: rfkill: gpio: add device tree support
-In-Reply-To: <1397544101-18135-1-git-send-email-wens@csie.org>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
-Message-ID: <1397544101-18135-6-git-send-email-wens@csie.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 15 Apr 2014 14:43:45 +0800
+Subject: [PATCH 0/4] pinctrl: sirf: switch to one gpiolib and gpiolib_irqchip
+ helpers
+Message-ID: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../devicetree/bindings/rfkill/rfkill-gpio.txt     | 24 ++++++++++++++++++++++
- net/rfkill/rfkill-gpio.c                           | 23 +++++++++++++++++++++
- 2 files changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+From: Barry Song <Baohua.Song@csr.com>
 
-diff --git a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-new file mode 100644
-index 0000000..a23da65
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-@@ -0,0 +1,24 @@
-+GPIO controlled RFKILL devices
-+
-+Required properties:
-+- compatible	: Must be "rfkill-gpio".
-+- rfkill-name	: Name of RFKILL device
-+- rfkill-type	: Type of RFKILL device: 1 for WiFi, 2 for BlueTooth, etc.
-+		  See include/uapi/linux/rfkill.h for all valid values
-+- gpios		: At most two GPIO phandles
-+- gpio-names	: Shall be "reset" or "shutdown", matching gpios.
-+		  If both are provided, the "reset" GPIO is toggled first.
-+
-+Optional properties:
-+- clocks		: phandle to clock to enable/disable
-+
-+Example:
-+
-+	rfkill_bt {
-+		compatible = "rfkill-gpio";
-+		rfkill-name = "bluetooth";
-+		rfkill-type = <2>;
-+		gpios = <&pio 7 18 0>;
-+		gpio-names = "reset";
-+		clocks = <&clk_out_a>;
-+	};
-diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
-index f46ddf7..a174359 100644
---- a/net/rfkill/rfkill-gpio.c
-+++ b/net/rfkill/rfkill-gpio.c
-@@ -26,6 +26,7 @@
- #include <linux/slab.h>
- #include <linux/acpi.h>
- #include <linux/gpio/consumer.h>
-+#include <linux/of_gpio.h>
- 
- #include <linux/rfkill-gpio.h>
- 
-@@ -81,6 +82,18 @@ static int rfkill_gpio_acpi_probe(struct device *dev,
- 	return 0;
- }
- 
-+static int rfkill_gpio_dt_probe(struct device *dev,
-+				struct rfkill_gpio_data *rfkill)
-+{
-+	struct device_node * np = dev->of_node;
-+
-+	rfkill->name = np->name;
-+	of_property_read_string(np, "rfkill-name", &rfkill->name);
-+	of_property_read_u32(np, "rfkill-type", &rfkill->type);
-+
-+	return 0;
-+}
-+
- static int rfkill_gpio_probe(struct platform_device *pdev)
- {
- 	struct rfkill_gpio_platform_data *pdata = pdev->dev.platform_data;
-@@ -96,6 +109,10 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
- 		ret = rfkill_gpio_acpi_probe(&pdev->dev, rfkill);
- 		if (ret)
- 			return ret;
-+	} else if (&pdev->dev.of_node) {
-+		ret = rfkill_gpio_dt_probe(&pdev->dev, rfkill);
-+		if (ret)
-+			return ret;
- 	} else if (pdata) {
- 		rfkill->name = pdata->name;
- 		rfkill->type = pdata->type;
-@@ -167,6 +184,11 @@ static const struct acpi_device_id rfkill_acpi_match[] = {
- };
- #endif
- 
-+static const struct of_device_id rfkill_of_match[] = {
-+	{ .compatible = "rfkill-gpio", },
-+	{},
-+};
-+
- static struct platform_driver rfkill_gpio_driver = {
- 	.probe = rfkill_gpio_probe,
- 	.remove = rfkill_gpio_remove,
-@@ -174,6 +196,7 @@ static struct platform_driver rfkill_gpio_driver = {
- 		.name = "rfkill_gpio",
- 		.owner = THIS_MODULE,
- 		.acpi_match_table = ACPI_PTR(rfkill_acpi_match),
-+		.of_match_table = of_match_ptr(rfkill_of_match),
- 	},
- };
- 
+This patchset depends on Linus Walleij's "pinctrl: sirf: rename inlined accessor".
+and "pinctrl: sirf: switch driver to use gpiolib irqchip helpers" is rebased
+from Linus Walleij's patch too.
+
+Barry Song (3):
+  pinctrl: sirf: wrap all gpio banks into one gpio_chip
+  gpio: make handler_data configurable while using gpiolib_irqchip
+  pinctrl: sirf: move to use irq_get_handler_data
+Linus Walleij (1):
+  pinctrl: sirf: switch driver to use gpiolib irqchip helpers
+
+ drivers/gpio/gpiolib.c              |   10 +-
+ drivers/pinctrl/Kconfig             |    1 +
+ drivers/pinctrl/sirf/pinctrl-sirf.c |  264 ++++++++++++-----------------------
+ include/linux/gpio/driver.h         |    2 +-
+ 4 files changed, 97 insertions(+), 180 deletions(-)
+
 -- 
-1.9.1
+1.7.5.4
