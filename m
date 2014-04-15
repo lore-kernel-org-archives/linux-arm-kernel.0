@@ -1,96 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Apr 2014 16:42:15 +0200
-Subject: [PATCH 7/7] ARM: sun7i: cubietruck: enable bluetooth module
-In-Reply-To: <1397544101-18135-8-git-send-email-wens@csie.org>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-8-git-send-email-wens@csie.org>
-Message-ID: <20140415144215.GG3207@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Apr 2014 15:47:35 +0100
+Subject: [PATCH 0/3] ARM: PCI: implement virtual PCI host controller
+In-Reply-To: <21141977.8ucQJzlJts@wuerfel>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <20140403220713.GA23545@google.com>
+ <20140414171300.GL12916@arm.com> <21141977.8ucQJzlJts@wuerfel>
+Message-ID: <20140415144735.GM17408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 02:41:41PM +0800, Chen-Yu Tsai wrote:
-> The CubieTruck has an AMPAK AP6210 WiFi+Bluetooth module. The Bluetooth
-> part is a BCM20710 device connected to UART2 in the A20 SoC.
+Hi Arnd,
+
+On Mon, Apr 14, 2014 at 07:48:17PM +0100, Arnd Bergmann wrote:
+> On Monday 14 April 2014 18:13:00 Will Deacon wrote:
+> > Arnd: Is there anything more you'd like me to do with this series? Given
+> > that it would be targetting 3.16, there's still plenty of time to make
+> > changes (we talked about extracting some library functions in the past).
 > 
-> The IC requires a 32.768 KHz low power clock input for proper
-> auto-detection of the main clock, and an enable signal via GPIO.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> index cb25d3c..767c8e1 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> @@ -61,6 +61,13 @@
->  				allwinner,drive = <0>;
->  				allwinner,pull = <0>;
->  			};
-> +
-> +			bt_pwr_pin_cubietruck: bt_pwr_pin at 0 {
-> +				allwinner,pins = "PH18";
-> +				allwinner,function = "gpio_out";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <0>;
-> +			};
->  		};
->  
->  		uart0: serial at 01c28000 {
-> @@ -69,6 +76,12 @@
->  			status = "okay";
->  		};
->  
-> +		uart2: serial at 01c28800 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&uart2_pins_a>;
-> +			status = "okay";
-> +		};
-> +
+> I don't remember the latest status of your patch set, but you might want
+> to read the discussions we had about Liviu's patches last week.
 
-Please make this a separate patch.
+The latest status (v5) was that I had something working (I got hung up on
+the I/O offset handing), with all feedback addressed. The next step was to
+try and move parts into library code, but it looks like Liviu is handling a
+lot of that with his arm64 stuff.
 
->  		i2c0: i2c at 01c2ac00 {
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&i2c0_pins_a>;
-> @@ -139,4 +152,16 @@
->  	reg_usb2_vbus: usb2-vbus {
->  		status = "okay";
->  	};
-> +
-> +	rfkill_bt {
-> +		compatible = "rfkill-gpio";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&bt_pwr_pin_cubietruck>, <&clk_out_a_pins_a>;
-> +		clocks = <&clk_out_a>;
-> +		clock-frequency = <32768>;
-> +		gpios = <&pio 7 18 0>; /* PH18 */
-> +		gpio-names = "reset";
-> +		rfkill-name = "bt";
-> +		rfkill-type = <2>;
-> +	};
+> We still haven't figured out exactly how to handle I/O space in the common
+> code, but I think we are making progress.
 
-Hmmm, I don't think that's actually right.
+The discussions certainly seem to be making progress.
 
-If you have such a device, then I'd expect it to be represented as a
-full device in the DT, probably with one part for the WiFi, one part
-for the Bluetooth, and here the definition of the rfkill device that
-controls it.
+> We also have discussed some ideas about how to restructure the PCI
+> code layer to make it easier to share host drivers across architectures
+> and clean up the interfaces in the process.
 
-But tying parts of the device to the rfkill that controls it, such as
-the clocks, or the frequency it runs at seems just wrong.
+Ok. Whilst this all sounds good from an arm64 perspective (with Liviu
+currently doing the work), it's not clear to me where that leaves my 32-bit
+ARM kvmtool code. That was the main reason for me writing this driver, and it
+seems a shame to have to wait for all the generic code to be sorted out
+before it can be used on AArch32, where there is already a functional
+pcibios implementation. The discussions mention things like generic
+pci_host_bridge_ops, but having that for arch/arm/ doesn't sound like
+something that is imminent.
 
-Maxime
+Of course, I plan to port my driver to the new infrastructure when it lands
+(since I want to support arm64), but it would be good to have something for
+AArch32 in the meantime.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/dbc08192/attachment.sig>
+Will
