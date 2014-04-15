@@ -1,36 +1,62 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 15 Apr 2014 20:01:48 +0200
-Subject: [PATCH v2 7/7] ARM: dts: update macros in clock bindings for
- exynos5420
-In-Reply-To: <1395918470-16374-8-git-send-email-shaik.ameer@samsung.com>
-References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
- <1395918470-16374-8-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <534D740C.2060904@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 15 Apr 2014 20:15:59 +0200
+Subject: [PATCH 1/5] ARM: iwmmxt: explicitly check for supported architectures
+In-Reply-To: <1397585763-23482-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <20140414151236.75f8816d@skate>
+ <1397585763-23482-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1397585763-23482-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shaik,
+iwmmxt.S requires special treatment of coprocessor access registers
+for PJ4 and XScale-based CPUs. It only checks for CPU_PJ4 and drops
+down to XScale-based treatment on all other architectures.
 
-On 27.03.2014 12:07, Shaik Ameer Basha wrote:
-> From: Rahul Sharma <rahul.sharma@samsung.com>
->
-> This patch updates the macros as per the latest changes and
-> replaces magic numbers with macros defined in DT header for
-> exynos5420.
->
+As some PJ4B also come with iWMMXt and also need PJ4 treatment,
+rework the corresponding preprocessor directives to explicitly
+check for supported architectures and fail on unsupported ones.
 
-Contents of dts files are not "bindings", they are just device tree 
-sources/data, defined according to some bindings. Bindings are defined 
-sets of nodes and properties and their formats, as you can see in 
-Documentation/devicetree/bindings/, where documentation of supported 
-bindings is available.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Chao Xie <xiechao.mail@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/kernel/iwmmxt.S | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-So this patch doesn't update clock bindings, but rather device nodes. 
-Following would be more appropriate: "ARM: dts: update clock IDs in 
-device tree of Exynos5420".
-
-However, as mentioned in comments to previous patches, most (if not all) 
-of the changes below could be probably dropped.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index a08783823b32..2452dd1bef53 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -19,12 +19,16 @@
+ #include <asm/thread_info.h>
+ #include <asm/asm-offsets.h>
+ 
+-#if defined(CONFIG_CPU_PJ4)
++#if defined(CONFIG_CPU_PJ4) || defined(CONFIG_CPU_PJ4B)
+ #define PJ4(code...)		code
+ #define XSC(code...)
+-#else
++#elif defined(CONFIG_CPU_MOHAWK) || \
++	defined(CONFIG_CPU_XSC3) || \
++	defined(CONFIG_CPU_XSCALE)
+ #define PJ4(code...)
+ #define XSC(code...)		code
++#else
++#error "Unsupported iWMMXt architecture"
+ #endif
+ 
+ #define MMX_WR0		 	(0x00)
+-- 
+1.9.1
