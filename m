@@ -1,68 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Apr 2014 10:24:39 +0100
-Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
-In-Reply-To: <534CF9B4.306@samsung.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
- <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
- <534CF847.5040008@arm.com> <534CF9B4.306@samsung.com>
-Message-ID: <534CFAD7.4030508@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 15 Apr 2014 11:26:20 +0200
+Subject: Renesas clock clk-mstp updates for clock-indices
+In-Reply-To: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <CAMuHMdVVc-9n4mQSj6qVyP5k9xzSstSw==nfYcFSOXtb895QUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/14 10:19, Chanwoo Choi wrote:
-> On 04/15/2014 06:13 PM, Marc Zyngier wrote:
->> On 15/04/14 09:27, Chanwoo Choi wrote:
->>> Hi,
->>>
->>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
->>>> On 15/04/14 02:59, Chanwoo Choi wrote:
->>>>> From: Tomasz Figa <t.figa@samsung.com>
->>>>>
->>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
->>>>> dual core and includes following dt nodes:
->>>>>
->>>>> - GIC interrupt controller
->>>>> - Pinctrl to control GPIOs
->>>>> - Clock controller
->>>>> - CPU information (Cortex-A7 dual core)
->>>>> - UART to support serial port
->>>>> - MCT (Multi Core Timer)
->>>>> - ADC (Analog Digital Converter)
->>>>> - I2C/SPI bus
->>>>> - Power domain
->>>>> - PMU (Performance Monitoring Unit)
->>>>> - MSHC (Mobile Storage Host Controller)
->>>>> - PWM (Pluse Width Modulation)
->>>>> - AMBA bus
->>>>
->>>> [...]
->>>>
->>>> Where is the arch timer node?
->>>
->>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
->>> - in drivers/clocksource/exynos_mct.c
->>
->> Don't you have a Cortex-A7? If so, you have the arch timer.
-> 
-> Do you means that 'arch timer" is ARM_ARCH_TIMER?
+Hi Ben,
 
-Yes.
+On Fri, Mar 7, 2014 at 1:46 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> Mike, following the commit to add the clock-indices field, the following
+> pair of commits updates the shmboile clk-mstp driver to uses these over
+> the local variant.
+>
+> Since this is involves two separte trees which are in development, the
+> decision is that we will fixup the renesas trees once they are merged
+> and the development cycle is complete. Once this is done, patch 2/2
+> can be reverted (if people care about three lines of differrence)
 
-> As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
-> But, Exynos SoC used MCT clocksource for system timer.
-> 
-> Exynos dts file didn't include arch timer node but only include mct node.
+As we now have "renesas,clock-indices" in v3.14, the question about backwards
+compatibility became moot.
 
-Well, it is a bug, and a recurrent one. A Cortex-A7 has the arch timers
-implemented. Always.
+Can you please combine your two patches
 
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0464f/BABFEBJJ.html
+[PATCH 1/2] clk: shmobile: clk-mstp: change to using clock-indices
+[PATCH 2/2] clk: shmobile: clk-mstp: add backwards comapt for indices field
 
-All Cortex-A7 have it, and so do A12, A15, A17, A53, A57.
+into a single patch, and submit to Mike?
 
-Cheers,
+Once it's in Mike's clk-next, we can do the following to get everything in
+v3.15:
+  1. Simon cherry-picks Mike's commit into his fixes-for-v3.15 branch,
+  2. we fix arch/arm/boot/dts/r8a7790.dtsi and .../r8a7791.dtsi there,
+  3. fixes-for-v3.15 gets into mainline through arm-soc.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Does that sound like plan?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
