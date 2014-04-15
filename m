@@ -1,70 +1,71 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 15 Apr 2014 14:41:40 +0800
-Subject: [PATCH 6/7] net: rfkill: gpio: add clock-frequency device tree
- property
-In-Reply-To: <1397544101-18135-1-git-send-email-wens@csie.org>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
-Message-ID: <1397544101-18135-7-git-send-email-wens@csie.org>
+Date: Tue, 15 Apr 2014 14:41:34 +0800
+Subject: [PATCH 0/7] net: rfkill: gpio: Add device tree support
+Message-ID: <1397544101-18135-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices, such as Broadcom Bluetooth devices, require a specific
-clock rate for the clock tied to the rfkill device. Add a clock-frequency
-property so we can specify this from the device tree.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt | 2 ++
- net/rfkill/rfkill-gpio.c                                 | 5 +++++
- 2 files changed, 7 insertions(+)
+This patch series adds device tree support to rfkill-gpio, and
+fixes some issues I ran into. This is so we can define and control
+RF devices through the device tree, such as the Broadcom BCM20710
+UART-based Bluetooth device found on the CubieTruck.
 
-diff --git a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-index a23da65..67b5edb 100644
---- a/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-+++ b/Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
-@@ -11,6 +11,7 @@ Required properties:
- 
- Optional properties:
- - clocks		: phandle to clock to enable/disable
-+- clock-frequency	: desired clock rate for the given clock
- 
- Example:
- 
-@@ -21,4 +22,5 @@ Example:
- 		gpios = <&pio 7 18 0>;
- 		gpio-names = "reset";
- 		clocks = <&clk_out_a>;
-+		clock-frequency = <32678>;
- 	};
-diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
-index a174359..14ac8c1 100644
---- a/net/rfkill/rfkill-gpio.c
-+++ b/net/rfkill/rfkill-gpio.c
-@@ -38,6 +38,7 @@ struct rfkill_gpio_data {
- 
- 	struct rfkill		*rfkill_dev;
- 	struct clk		*clk;
-+	uint32_t		clk_frequency;
- 
- 	bool			clk_enabled;
- };
-@@ -90,6 +91,7 @@ static int rfkill_gpio_dt_probe(struct device *dev,
- 	rfkill->name = np->name;
- 	of_property_read_string(np, "rfkill-name", &rfkill->name);
- 	of_property_read_u32(np, "rfkill-type", &rfkill->type);
-+	of_property_read_u32(np, "clock-frequency", &rfkill->clk_frequency);
- 
- 	return 0;
- }
-@@ -122,6 +124,9 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
- 
- 	rfkill->clk = devm_clk_get(&pdev->dev, NULL);
- 
-+	if (!IS_ERR(rfkill->clk) && rfkill->clk_frequency > 0)
-+		clk_set_rate(rfkill->clk, rfkill->clk_frequency);
-+
- 	gpio = devm_gpiod_get_index(&pdev->dev, "reset", 0);
- 	if (!IS_ERR(gpio)) {
- 		ret = gpiod_direction_output(gpio, 0);
+The series is based on Heikki's rfkill-gpio cleanup patches [1],
+applied on 3.15-rc1. Kudos to Heikki for paving the way.
+
+ [1] https://lkml.org/lkml/2014/4/1/451
+
+The device tree bindings are much better than was defined in the
+RFC series I sent a few months earlier [2], due to cleanups by
+Heikki, and named gpios (via gpio-names) implemented in the first
+two patches. Hopefully this will satisfy everyone.
+
+ [2] https://lkml.org/lkml/2014/1/17/31
+
+The CubieTruck uses a non-default clock rate oscillator for the
+BCM20710 device. As the datasheet states, a precise 32.768 KHz
+low power clock must be provided at power on for the device to
+detect the correct clock rate of the main oscillator. Hence the
+need for the "clock-frequency" property.
+
+The first 2 patches should go through the gpio tree. The 4 rfkill-gpio
+patches should go through the same tree that Heikki's patches are
+in. Maxime, can you take the last one?
+
+A big thanks to everyone who gave reviews and suggestions.
+
+
+Changes since RFC:
+
+  - Dropped gpio name buffer fix patch (not needed after cleanup patches)
+  - New gpios/gpio-names support for device trees
+  - Simplify device tree bindings due to name cleanup and gpio-names
+    support
+
+
+Cheers
+
+ChenYu
+
+Chen-Yu Tsai (7):
+  gpiolib: gpiolib-of: Implement device tree gpio-names based lookup
+  gpiolib: Support purely name based gpiod lookup in device trees
+  net: rfkill: gpio: use clk_prepare_enable/clk_disable_unprepare
+  net: rfkill: gpio: fix reversed clock enable state
+  net: rfkill: gpio: add device tree support
+  net: rfkill: gpio: add clock-frequency device tree property
+  ARM: sun7i: cubietruck: enable bluetooth module
+
+ .../devicetree/bindings/rfkill/rfkill-gpio.txt     | 26 ++++++++++++
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         | 25 +++++++++++
+ drivers/gpio/gpiolib-of.c                          | 48 ++++++++++++++++++++++
+ drivers/gpio/gpiolib.c                             |  9 +++-
+ include/linux/of_gpio.h                            |  3 ++
+ net/rfkill/rfkill-gpio.c                           | 34 +++++++++++++--
+ 6 files changed, 140 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rfkill/rfkill-gpio.txt
+
 -- 
 1.9.1
