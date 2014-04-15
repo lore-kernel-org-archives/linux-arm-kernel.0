@@ -1,67 +1,104 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 15 Apr 2014 13:48:49 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
-In-Reply-To: <534D0943.2050100@gmail.com>
-References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
- <534CFA77.9030108@gmail.com> <20140415180058.2fefca78@xhacker>
- <534D0943.2050100@gmail.com>
-Message-ID: <20140415114848.GA2813@piout.net>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Tue, 15 Apr 2014 17:19:42 +0530
+Subject: [PATCH V8 0/9] PCI: Add SPEAr13xx PCie support
+Message-ID: <cover.1397555158.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/2014 at 12:26:11 +0200, Sebastian Hesselbarth wrote :
-> On 04/15/2014 12:00 PM, Jisheng Zhang wrote:
-> >On Tue, 15 Apr 2014 02:23:03 -0700
-> >Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-> >>On 04/15/2014 10:07 AM, Antoine T?nart wrote:
-> >>>The Marvell Berlin BG2Q has 6 GPIO ports compatible with the
-> >>>snps,dw-apb-gpio driver. This patch add the corresponding device tree
-> >>>nodes.
-> >>>
-> >>>Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> >>>---
-> >>>   arch/arm/boot/dts/berlin2q.dtsi | 102
-> >>>++++++++++++++++++++++++++++++++++++++++ 1 file changed, 102 insertions(+)
-> >>>
-> >>>diff --git a/arch/arm/boot/dts/berlin2q.dtsi
-> >>>b/arch/arm/boot/dts/berlin2q.dtsi index e6e556055dfc..b2625f896bc5 100644
-> >>>--- a/arch/arm/boot/dts/berlin2q.dtsi
-> >>>+++ b/arch/arm/boot/dts/berlin2q.dtsi
-> [...]
-> >>>+					compatible =
-> >>>"snps,dw-apb-gpio-port";
-> >>>+					gpio-controller;
-> >>>+					#gpio-cells = <2>;
-> >>>+					snps,nr-gpios = <32>;
-> >>
-> >>32 gpio pins for each of the 6 GPIO controllers? Either BG2Q is a GPIO
-> >
-> >Yes, BG2Q support 32 pins every port
-> 
-> Wow. Thanks for confirming this!
-> 
-> >>I am fine with using nr-gpios property now, but I guess BG2Q also
-> >>has that CONFIG[1,2] registers to actually read out the features
-> >>synthesized in? If I find some time, I'll prepare a patch for
-> >>dw-apb-gpio to exploit that (optional) information instead of
-> >>using nr-gpios.
-> >
-> >The problem is CONFIG1/2 registers don't exist on some versions.
-> >For example, the version used in BG2/BG2CD. So nr-gpio is necessary
-> >if we want to support these versions.
-> 
-> Hmm, are you sure about BG2? I remember reading it and it contains
-> sane values. Anyway, a proper patch for dw-apb-gpio would include
-> checking for sane (e.g. non-zero) values. And nr-gpios will always
-> stay as fall-back just because e.g. sunxi does not have the CONFIG
-> registers.
-> 
+Patch# 1 and 2: Improvement and fixes for SPEAr13xx support.
+Patch# 3,4 and 6: Add DT bindings for spear1310/40-miphy, misc and pcie node
+Patch# 5: Add spear1310/40-miphy driver and support for spear1310/40 
+miphy wrapper.
+Patch# 7-9: Add SPEAr13xx PCIe driver and dt support.
 
-Shouldn't that be use nr-gpios and if not available, read the CONFIG
-registers? Else, what about bogus registers ?
+These pathes are tested with linux-3.15 tag of arm-soc tree.
+Tested with SPEAr1310 evaluation board with:
+	- INTEL PRO 100/100 EP card
+	- USB xhci gen2 card
+ 	- Above cards connected through LeCROY PTC switch
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Modifications for SATA are tested with SPEAr1340-evb board
+
+Changes since v7:
+- Rebase over for-linus-3.15 tag of arm-soc tree so that complete patch series
+ can be applied cleanly.
+- Incorporated few comments on comment style and superfluous comments
+Changes since v6:
+- Split miphy driver for SPEAr1310 and SPEAr1340
+- Some cleanup and incorporated other minor comments
+Changes since v5:
+- Split DT bindings for misc, miphy-40lp and pcie node into sepearte patches
+- Merge config options PCIE_SPEAR13XX and PCI_MSI into defconfig patch 
+- Incorporated other minor comments
+Changes since v4:
+- Uses per device function pointers passed from .data field to
+  the of_device_id instead of of_device_is_compatible.
+- Incorporated other minor comments from v4
+
+Changes since v3:
+- Phy driver renamed to phy-miphy40lp
+- ahci phy hook patch used as suggested by Arnd
+- Incorporated other minor comments from v3
+
+Changes since v2:
+- Incorporated comments to move SPEAr13xx PCIe and SATA phy specific routines to
+  the phy framework
+- Modify ahci driver to include phy hooks
+- phy-core driver modifications for subsys_initcall() 
+ 
+Changes since v1:
+- Few patches of the series are already accepted and applied to mainline e.g.
+ pcie designware driver improvements,fixes for IO translation bug, PCIe dw
+ driver maintainer. So dropped these from v2.
+- Incorporated comment to move the common/reset PCIe code to the seperate driver
+- PCIe and SATA share common PHY configuration registers, so move SATA
+ platform code to the system config driver
+Fourth patch is improves pcie designware driver and fixes the IO
+translation bug. IO translation bug fix leads to the working of PCIe EP devices
+connected to RC through switch.
+
+Mohit Kumar (1):
+  SPEAr13xx: defconfig: Update
+
+Pratyush Anand (8):
+  clk: SPEAr13XX: Fix pcie clock name
+  SPEAr13XX: Fix static mapping table
+  phy: SPEAr1310/40-miphy: Add binding information
+  SPEAr: misc: Add binding information
+  phy: SPEAr1310/40-miphy: Add phy driver for PCIe and SATA
+  SPEAr13XX: Add binding information for PCIe controller
+  SPEAr13XX: dts: Add PCIe node information
+  pcie: SPEAr13xx: Add designware wrapper support
+
+ .../devicetree/bindings/arm/spear-misc.txt         |    9 +
+ .../devicetree/bindings/pci/spear13xx-pcie.txt     |   14 +
+ .../devicetree/bindings/phy/st-spear1310-miphy.txt |   12 +
+ .../devicetree/bindings/phy/st-spear1340-miphy.txt |   11 +
+ MAINTAINERS                                        |    6 +
+ arch/arm/boot/dts/spear1310-evb.dts                |    4 +
+ arch/arm/boot/dts/spear1310.dtsi                   |   93 +++++-
+ arch/arm/boot/dts/spear1340-evb.dts                |    4 +
+ arch/arm/boot/dts/spear1340.dtsi                   |   30 ++-
+ arch/arm/boot/dts/spear13xx.dtsi                   |    9 +-
+ arch/arm/configs/spear13xx_defconfig               |   16 +
+ arch/arm/mach-spear/Kconfig                        |    4 +
+ arch/arm/mach-spear/include/mach/spear.h           |    4 +-
+ arch/arm/mach-spear/spear1340.c                    |  127 +------
+ arch/arm/mach-spear/spear13xx.c                    |    2 +-
+ drivers/clk/spear/spear1310_clock.c                |    6 +-
+ drivers/clk/spear/spear1340_clock.c                |    2 +-
+ drivers/pci/host/Kconfig                           |    8 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pcie-spear13xx.c                  |  407 ++++++++++++++++++++
+ drivers/phy/Kconfig                                |   12 +
+ drivers/phy/Makefile                               |    2 +
+ drivers/phy/phy-spear1310-miphy.c                  |  274 +++++++++++++
+ drivers/phy/phy-spear1340-miphy.c                  |  300 ++++++++++++++
+ 24 files changed, 1218 insertions(+), 139 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/st-spear1310-miphy.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/st-spear1340-miphy.txt
+ create mode 100644 drivers/pci/host/pcie-spear13xx.c
+ create mode 100644 drivers/phy/phy-spear1310-miphy.c
+ create mode 100644 drivers/phy/phy-spear1340-miphy.c
