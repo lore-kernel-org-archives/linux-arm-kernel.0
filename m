@@ -1,25 +1,40 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 15 Apr 2014 19:05:33 +0200
-Subject: [PATCH v2 4/7] clk: exynos5420: Rename clock names
-In-Reply-To: <1395918470-16374-5-git-send-email-shaik.ameer@samsung.com>
-References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
- <1395918470-16374-5-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <534D66DD.30503@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Apr 2014 11:18:43 -0600
+Subject: [PATCH v2 2/4] USB: EHCI: Export the ehci_hub_control function
+In-Reply-To: <1397578005-3341-3-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1397578005-3341-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1397578005-3341-3-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <534D69F3.2050006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shaik,
+On 04/15/2014 10:06 AM, Laurent Pinchart wrote:
+> Platform drivers sometimes need to perform specific handling of hub
+> control requests. Make this possible by exporting the ehci_hub_control()
+> function which can then be called from a custom hub control handler in
+> the default case.
 
-On 27.03.2014 12:07, Shaik Ameer Basha wrote:
-> From: Rahul Sharma <rahul.sharma@samsung.com>
->
-> Maintain the mout_, dout_, sclk_ prefix to the clock names
-> wherever applicable.
+I recall trying to do something like this in the past, but IIRC Alan
+Stern didn't want to make this easy for odd drivers needing this unusual
+case. Witness the comment right above the context of the modified code
+in ehci-tegra.c:
 
-Looking at the patch, it does seem to do more than that. Considering my 
-comments to patch 3/7, I would drop the renames simply adding *CLK_ 
-prefix (except SCLK_, which is fine as it specifies clock type, just as 
-MOUT_/DOUT_/etc.).
+> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
 
-Best regards,
-Tomasz
+/*
+ * The Tegra HW has some unusual quirks, which require Tegra-specific
+ * workarounds. We override certain hc_driver functions here to
+ * achieve that. We explicitly do not enhance ehci_driver_overrides to
+ * allow this more easily, since this is an unusual case, and we don't
+ * want to encourage others to override these functions by making it
+ * too easy.
+ */
+
+orig_hub_control = tegra_ehci_hc_driver.hub_control;
+
+> @@ -531,8 +527,6 @@ static int __init ehci_tegra_init(void)
+>  	 * too easy.
+>  	 */
+>  
+> -	orig_hub_control = tegra_ehci_hc_driver.hub_control;
+> -
