@@ -1,75 +1,34 @@
-From: stratosk@semaphore.gr (Stratos Karafotis)
-Date: Wed, 16 Apr 2014 01:26:27 +0300
-Subject: [PATCH v2 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry macro
- for iteration
-Message-ID: <534DB213.7080802@semaphore.gr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 15 Apr 2014 16:29:44 -0600
+Subject: [PATCH] ARM: tegra: make Venice's +3.3V_RUN regulator always on
+Message-ID: <1397600984-25198-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq core now supports the cpufreq_for_each_entry macro helper
-for iteration over the cpufreq_frequency_table, so use it.
+From: Stephen Warren <swarren@nvidia.com>
 
-It should have no functional changes.
+This regulator supplies power to pretty much everything on the board, so
+it doesn't make sense to allow it to turn off. Mark it boot-on and
+always-on so it doesn't get turned off. Without this, I see issues with
+the eMMC device; it can't be correctly detected during boot.
 
-Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/tegra124-venice2.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7694e07..b11fdd6 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -1734,18 +1734,17 @@ static struct cpufreq_frequency_table db8500_cpufreq_table[] = {
- 
- static long round_armss_rate(unsigned long rate)
- {
-+	struct cpufreq_frequency_table *pos;
- 	long freq = 0;
--	int i = 0;
- 
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		freq = db8500_cpufreq_table[i].frequency;
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table) {
-+		freq = pos->frequency;
- 		if (freq == rate)
- 			break;
--		i++;
- 	}
- 
- 	/* Return the last valid value, even if a match was not found. */
-@@ -1886,23 +1885,21 @@ static void set_clock_rate(u8 clock, unsigned long rate)
- 
- static int set_armss_rate(unsigned long rate)
- {
--	int i = 0;
-+	struct cpufreq_frequency_table *pos;
- 
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		if (db8500_cpufreq_table[i].frequency == rate)
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table)
-+		if (pos->frequency == rate)
- 			break;
--		i++;
--	}
- 
--	if (db8500_cpufreq_table[i].frequency != rate)
-+	if (pos->frequency != rate)
- 		return -EINVAL;
- 
- 	/* Set the new arm opp. */
--	return db8500_prcmu_set_arm_opp(db8500_cpufreq_table[i].driver_data);
-+	return db8500_prcmu_set_arm_opp(pos->driver_data);
- }
- 
- static int set_plldsi_rate(unsigned long rate)
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index c17283c04598..87537f499875 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -1060,6 +1060,8 @@
+ 			regulator-name = "+3.3V_RUN";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			regulator-boot-on;
+ 			gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
+ 			enable-active-high;
+ 			vin-supply = <&vdd_3v3_sys>;
 -- 
-1.9.0
+1.8.1.5
