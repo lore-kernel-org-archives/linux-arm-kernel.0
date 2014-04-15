@@ -1,47 +1,115 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 15 Apr 2014 19:34:27 +0200
-Subject: [PATCH 0/5] Exynos4 SoC camera subsystem driver cleanups
-Message-ID: <1397583272-28295-1-git-send-email-s.nawrocki@samsung.com>
+Date: Tue, 15 Apr 2014 19:34:28 +0200
+Subject: [PATCH 1/5] ARM: S5PV210: Remove camera support from mach-goni.c
+In-Reply-To: <1397583272-28295-1-git-send-email-s.nawrocki@samsung.com>
+References: <1397583272-28295-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1397583272-28295-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series removes support for non-dt platforms from the
-Exynos4/S5P SoC camera interface drivers and removes (ab)use
-of "simple-bus" compatible string.
+S5PV210 is going to get DT support, so we can remove the camera
+bits from the only board using camera on S5PV210. This allows to
+clean the exynos4-is driver by dropping code for non-dt platforms.
+This patch can be dropped if a patch removing the whole board
+file is applied first.
 
-Sylwester Nawrocki (5):
-  ARM: S5PV210: Remove camera support from mach-goni.c
-  exynos4-is: Fix compilation for !CONFIG_COMMON_CLK
-  exynos4-is: Remove support for non-dt platforms
-  exynos4-is: Remove requirement for "simple-bus" compatible
-  ARM: dts: exynos4: Remove simple-bus compatible from camera subsystem
-    nodes
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/mach-goni.c |   51 -------------------------------------
+ 1 file changed, 51 deletions(-)
 
- .../devicetree/bindings/media/samsung-fimc.txt     |    6 +-
- Documentation/video4linux/fimc.txt                 |   30 --
- MAINTAINERS                                        |    1 -
- arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
- arch/arm/boot/dts/exynos4x12.dtsi                  |    2 +-
- arch/arm/mach-s5pv210/mach-goni.c                  |   51 ---
- drivers/media/platform/exynos4-is/Kconfig          |    3 +-
- drivers/media/platform/exynos4-is/common.c         |   49 ++-
- drivers/media/platform/exynos4-is/common.h         |    6 +-
- drivers/media/platform/exynos4-is/fimc-core.h      |    2 +-
- drivers/media/platform/exynos4-is/fimc-is.c        |   12 +-
- drivers/media/platform/exynos4-is/fimc-isp-video.c |    2 +-
- drivers/media/platform/exynos4-is/fimc-isp.h       |    2 +-
- drivers/media/platform/exynos4-is/fimc-lite-reg.c  |    2 +-
- drivers/media/platform/exynos4-is/fimc-lite.c      |    2 +-
- drivers/media/platform/exynos4-is/fimc-lite.h      |    2 +-
- drivers/media/platform/exynos4-is/fimc-reg.c       |    2 +-
- drivers/media/platform/exynos4-is/media-dev.c      |  356 +++-----------------
- drivers/media/platform/exynos4-is/media-dev.h      |    2 +-
- drivers/media/platform/exynos4-is/mipi-csis.c      |   43 +--
- include/linux/platform_data/mipi-csis.h            |   28 --
- include/media/{s5p_fimc.h => exynos-fimc.h}        |   21 --
- 22 files changed, 138 insertions(+), 488 deletions(-)
- delete mode 100644 include/linux/platform_data/mipi-csis.h
- rename include/media/{s5p_fimc.h => exynos-fimc.h} (87%)
-
---
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index b41a38a..6c719ec 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -49,11 +49,6 @@
+ #include <plat/clock.h>
+ #include <plat/samsung-time.h>
+ #include <plat/mfc.h>
+-#include <plat/camport.h>
+-
+-#include <media/v4l2-mediabus.h>
+-#include <media/s5p_fimc.h>
+-#include <media/noon010pc30.h>
+ 
+ #include "common.h"
+ 
+@@ -285,14 +280,6 @@ static void __init goni_tsp_init(void)
+ /* USB OTG */
+ static struct s3c_hsotg_plat goni_hsotg_pdata;
+ 
+-static void goni_camera_init(void)
+-{
+-	s5pv210_fimc_setup_gpio(S5P_CAMPORT_A);
+-
+-	/* Set max driver strength on CAM_A_CLKOUT pin. */
+-	s5p_gpio_set_drvstr(S5PV210_GPE1(3), S5P_GPIO_DRVSTR_LV4);
+-}
+-
+ /* MAX8998 regulators */
+ #if defined(CONFIG_REGULATOR_MAX8998) || defined(CONFIG_REGULATOR_MAX8998_MODULE)
+ 
+@@ -825,34 +812,6 @@ static void goni_setup_sdhci(void)
+ 	s3c_sdhci2_set_platdata(&goni_hsmmc2_data);
+ };
+ 
+-static struct noon010pc30_platform_data noon010pc30_pldata = {
+-	.clk_rate	= 16000000UL,
+-	.gpio_nreset	= S5PV210_GPB(2), /* CAM_CIF_NRST */
+-	.gpio_nstby	= S5PV210_GPB(0), /* CAM_CIF_NSTBY */
+-};
+-
+-static struct i2c_board_info noon010pc30_board_info = {
+-	I2C_BOARD_INFO("NOON010PC30", 0x60 >> 1),
+-	.platform_data = &noon010pc30_pldata,
+-};
+-
+-static struct fimc_source_info goni_camera_sensors[] = {
+-	{
+-		.mux_id		= 0,
+-		.flags		= V4L2_MBUS_PCLK_SAMPLE_FALLING |
+-				  V4L2_MBUS_VSYNC_ACTIVE_LOW,
+-		.fimc_bus_type	= FIMC_BUS_TYPE_ITU_601,
+-		.board_info	= &noon010pc30_board_info,
+-		.i2c_bus_num	= 0,
+-		.clk_frequency	= 16000000UL,
+-	},
+-};
+-
+-static struct s5p_platform_fimc goni_fimc_md_platdata __initdata = {
+-	.source_info	= goni_camera_sensors,
+-	.num_clients	= ARRAY_SIZE(goni_camera_sensors),
+-};
+-
+ /* Audio device */
+ static struct platform_device goni_device_audio = {
+ 	.name = "smdk-audio",
+@@ -874,10 +833,6 @@ static struct platform_device *goni_devices[] __initdata = {
+ 	&s5p_device_mixer,
+ 	&s5p_device_sdo,
+ 	&s3c_device_i2c0,
+-	&s5p_device_fimc0,
+-	&s5p_device_fimc1,
+-	&s5p_device_fimc2,
+-	&s5p_device_fimc_md,
+ 	&s3c_device_hsmmc0,
+ 	&s3c_device_hsmmc1,
+ 	&s3c_device_hsmmc2,
+@@ -946,14 +901,8 @@ static void __init goni_machine_init(void)
+ 	/* FB */
+ 	s3c_fb_set_platdata(&goni_lcd_pdata);
+ 
+-	/* FIMC */
+-	s3c_set_platdata(&goni_fimc_md_platdata, sizeof(goni_fimc_md_platdata),
+-			 &s5p_device_fimc_md);
+-
+ 	s3c_hsotg_set_platdata(&goni_hsotg_pdata);
+ 
+-	goni_camera_init();
+-
+ 	/* SPI */
+ 	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
+ 
+-- 
 1.7.9.5
