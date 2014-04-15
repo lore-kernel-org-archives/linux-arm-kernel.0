@@ -1,66 +1,58 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Wed, 16 Apr 2014 00:08:49 +0200
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <534C731F.1050406@meduna.org>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
-Message-ID: <534DADF1.6060608@meduna.org>
+From: heiko.stuebner@bq.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Apr 2014 00:16:37 +0200
+Subject: [PATCH] dtc: add ability to make nodes conditional on them being
+ referenced
+In-Reply-To: <199290403.sj4aYrj8FC@diego>
+References: <199290403.sj4aYrj8FC@diego>
+Message-ID: <12484017.EBrG8OPNT6@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.04.2014 01:45, Stanislav Meduna wrote:
+Am Sonntag, 16. M?rz 2014, 22:22:02 schrieb Heiko St?bner:
+> From: Heiko Stuebner <heiko.stuebner@bq.com>
+> 
+> On i.MX, which carries a lot of pin-groups of which most are unused on
+> individual boards, they noticed that this plethora of nodes also results
+> in the runtime-lookup-performance also degrading [0].
+> 
+> A i.MX-specific solution defining the pingroups in the board files but
+> using macros to reference the pingroup-data was not well received.
+> 
+> This patch is trying to solve this issue in a more general way, by
+> adding the ability to mark nodes as needing to be referenced somewhere
+> in the tree.
+> 
+> To mark a node a needing to be referenced it must be prefixed with
+> /delete-unreferenced/. This makes dtc check the nodes reference-status
+> when creating the flattened tree, dropping it if unreferenced.
+> 
+> For example, the i.MX6SL pingroup
+> 
+> 	/delete-unreferenced/ pinctrl_ecspi1_1: ecspi1grp-1 {
+> 		fsl,pins = <
+> 			MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO 0x100b1
+> 			MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI 0x100b1
+> 			MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK 0x100b1
+> 
+> 		>;
+> 
+> 	};
+> 
+> would only be included in the dtb if it got referenced somewhere
+> as pingroup via
+> 
+> 	node {
+> 		pinctrl-0 <&pinctrl_ecscpi1_1>;
+> 	};
+> 
+> [0] http://thread.gmane.org/gmane.linux.ports.arm.kernel/275912/
+> 
+> Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
 
->> BUG: spinlock trylock failure on UP on CPU#0, ksoftirqd/0/3
+ping?
 
-I am now getting this quite reproducibly a few seconds into
-the boot and the path is always similar. Depending on what modules
-I am loading the source changes, but it is nearly always
-a schedule_timeout with a following timer interrupt.
+Is this ok, bad, something else entirely? :-)
 
-Disabling highres timers just changes the bug path but it happens
-also in that case. I am using CONFIG_HZ_PERIODIC. I tried to disable
-the serial console and several drivers to rule out some interference
-but it did not change anything.
-
-Freescale i.MX28, 3.12.15-rt25 + patches enabling the platform,
-none of them touches anything in kernel/* or the MXS timer.
-Up to now no freeze or other BUGs, it was always only this one.
-
-I see that the relevant code was touched a few times in the last
-few months, maybe there is still something lurking.
-
-Hmm... how is it in the rt-case guaranteed that the timer interrupt
-does not preempt someone trying to modify the timer? The run_local_timers
-looks to have arrived via hardirq context. The spinlock in the tvec_base
-is a normal one and spin_lock_irqsave does not disable interrupts
-on rt, right?
-
-[   11.797460] BUG: spinlock trylock failure on UP on CPU#0, rcu_preempt/11
-[   11.797522]  lock: boot_tvec_bases+0x0/0x10c0, .magic: dead4ead, .owner: rcu_preempt/11, .owner_cpu: 0
-[   11.797550] CPU: 0 PID: 11 Comm: rcu_preempt Not tainted 3.12.15-rt25+ #52
-[   11.797630] [<c00151bc>] (unwind_backtrace+0x0/0xf4) from [<c0012c00>] (show_stack+0x10/0x14)
-[   11.797691] [<c0012c00>] (show_stack+0x10/0x14) from [<c01b2758>] (do_raw_spin_trylock+0x4c/0x58)
-[   11.797748] [<c01b2758>] (do_raw_spin_trylock+0x4c/0x58) from [<c02e0194>] (_raw_spin_trylock+0x20/0x98)
-[   11.797792] [<c02e0194>] (_raw_spin_trylock+0x20/0x98) from [<c02df734>] (rt_spin_trylock+0x14/0xd0)
-[   11.797851] [<c02df734>] (rt_spin_trylock+0x14/0xd0) from [<c0028e7c>] (run_local_timers+0x24/0x78)
-[   11.797892] [<c0028e7c>] (run_local_timers+0x24/0x78) from [<c0028f04>] (update_process_times+0x34/0x68)
-[   11.797940] [<c0028f04>] (update_process_times+0x34/0x68) from [<c0060920>] (tick_sched_timer+0x58/0x22c)
-[   11.797990] [<c0060920>] (tick_sched_timer+0x58/0x22c) from [<c0040820>] (__run_hrtimer+0x88/0x2b8)
-[   11.798029] [<c0040820>] (__run_hrtimer+0x88/0x2b8) from [<c0040bb0>] (hrtimer_interrupt+0x104/0x30c)
-[   11.798076] [<c0040bb0>] (hrtimer_interrupt+0x104/0x30c) from [<c0246c50>] (mxs_timer_interrupt+0x20/0x2c)
-[   11.798123] [<c0246c50>] (mxs_timer_interrupt+0x20/0x2c) from [<c00534d8>] (handle_irq_event_percpu+0x80/0x2f8)
-[   11.798161] [<c00534d8>] (handle_irq_event_percpu+0x80/0x2f8) from [<c005378c>] (handle_irq_event+0x3c/0x5c)
-[   11.798201] [<c005378c>] (handle_irq_event+0x3c/0x5c) from [<c0055f68>] (handle_level_irq+0x8c/0x118)
-[   11.798239] [<c0055f68>] (handle_level_irq+0x8c/0x118) from [<c0053448>] (generic_handle_irq+0x28/0x30)
-[   11.798281] [<c0053448>] (generic_handle_irq+0x28/0x30) from [<c00101dc>] (handle_IRQ+0x30/0x84)
-[   11.798322] [<c00101dc>] (handle_IRQ+0x30/0x84) from [<c0013484>] (__irq_svc+0x44/0x88)
-[   11.798364] [<c0013484>] (__irq_svc+0x44/0x88) from [<c02deb18>] (rt_spin_lock_slowlock+0x60/0x204)
-[   11.798402] [<c02deb18>] (rt_spin_lock_slowlock+0x60/0x204) from [<c02df4d0>] (rt_spin_lock+0x28/0x60)
-[   11.798451] [<c02df4d0>] (rt_spin_lock+0x28/0x60) from [<c0028874>] (lock_timer_base+0x28/0x48)
-[   11.798494] [<c0028874>] (lock_timer_base+0x28/0x48) from [<c02dcb28>] (schedule_timeout+0x78/0x254)
-[   11.798531] [<c02dcb28>] (schedule_timeout+0x78/0x254) from [<c00763a4>] (rcu_gp_kthread+0x2d4/0x5f0)
-[   11.798578] [<c00763a4>] (rcu_gp_kthread+0x2d4/0x5f0) from [<c003cf24>] (kthread+0xa0/0xa8)
-[   11.798621] [<c003cf24>] (kthread+0xa0/0xa8) from [<c000f3e0>] (ret_from_fork+0x14/0x34)
 
 Thanks
--- 
-                                            Stano
+Heiko
