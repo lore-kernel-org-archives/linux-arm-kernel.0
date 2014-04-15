@@ -1,48 +1,36 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Apr 2014 21:40:21 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Select
- CONFIG_MACH_BERLIN_BG2Q
-In-Reply-To: <532CB266.6050800@gmail.com>
-References: <1395430757-8677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1395430757-8677-2-git-send-email-alexandre.belloni@free-electrons.com>
- <532CB266.6050800@gmail.com>
-Message-ID: <534D8B25.3070103@gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 15 Apr 2014 12:36:07 -0700
+Subject: [PATCH 2/4] mmc: tegra: fix reporting of base clock frequency
+In-Reply-To: <534D797D.7030201@wwwdotorg.org>
+References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+ <1397526163-20126-3-git-send-email-abrestic@chromium.org>
+ <534D797D.7030201@wwwdotorg.org>
+Message-ID: <CAL1qeaFoQd1sZkTHSJnnVcYgLDLSP_Hr6VHd3s8aKfnAz-iyNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 10:43 PM, Sebastian Hesselbarth wrote:
-> On 03/21/2014 08:39 PM, Alexandre Belloni wrote:
->> Now that we support Berlin BG2Q, select CONFIG_MACH_BERLIN_BG2Q so
->> that we can
->> boot BG2Q based boards like the BG2Q DMP.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Applied to berlin/soc, Thanks!
+On Tue, Apr 15, 2014 at 11:25 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/14/2014 07:42 PM, Andrew Bresticker wrote:
+>> Tegra SDHCI controllers, by default, report a base clock frequency
+>> of 208Mhz in SDHCI_CAPABILTIES which may or may not be equal to the
+>> actual base clock frequency.
+>
+> Some explanation of why this "may or may not be equal to the actual base
+> clock frequency" would be nice.
+>
+> Presumably, it's because the clock frequency is supplied by the clock
+> controller module, and configuring that happens externally to the SD
+> controller, so the SD HW has no knowledge of the actual frequency, and
+> hence simply reports a hard-coded maximum possible clock frequency?
 
-After talking to Arnd on IRC, I found out it is not my business
-taking patches for multi_v7_defconfig.
+Correct.  I'll fix up the commit message.
 
-Instead of me taking it, you get my
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
->> ---
->>   arch/arm/configs/multi_v7_defconfig | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/configs/multi_v7_defconfig
->> b/arch/arm/configs/multi_v7_defconfig
->> index ee6982976d66..8b09b72fb688 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -15,6 +15,7 @@ CONFIG_ARCH_BCM_MOBILE=y
->>   CONFIG_ARCH_BERLIN=y
->>   CONFIG_MACH_BERLIN_BG2=y
->>   CONFIG_MACH_BERLIN_BG2CD=y
->> +CONFIG_MACH_BERLIN_BG2Q=y
->>   CONFIG_GPIO_PCA953X=y
->>   CONFIG_ARCH_HIGHBANK=y
->>   CONFIG_ARCH_HI3xxx=y
->>
-> 
+>
+>> While this can be overridden by setting
+>> BASE_CLK_FREQ in VENDOR_CLOCK_CTRL on Tegra30 and later SoCs, just
+>> set SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN and supply a get_max_clock()
+>> callback to get the actual rate of the base clock.
+>
+> It's not clear to me from the function name that
+> sdhci_pltfm_clk_get_max_clock() simply calls clk_get() on the actual
+> clock. It might be nice to mention that in the commit description.
