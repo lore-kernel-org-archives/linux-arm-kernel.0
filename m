@@ -1,92 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Apr 2014 11:25:34 +0100
-Subject: [PATCH v9 06/12] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
- header
-In-Reply-To: <1397542455-354-7-git-send-email-anup.patel@linaro.org> (Anup
- Patel's message of "Tue, 15 Apr 2014 07:14:09 +0100")
-References: <1397542455-354-1-git-send-email-anup.patel@linaro.org>
- <1397542455-354-7-git-send-email-anup.patel@linaro.org>
-Message-ID: <87tx9uzy75.fsf@approximate.cambridge.arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 15 Apr 2014 12:26:11 +0200
+Subject: [PATCH 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
+In-Reply-To: <20140415180058.2fefca78@xhacker>
+References: <1397549245-3338-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397549245-3338-3-git-send-email-antoine.tenart@free-electrons.com>
+ <534CFA77.9030108@gmail.com> <20140415180058.2fefca78@xhacker>
+Message-ID: <534D0943.2050100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15 2014 at  7:14:09 am BST, Anup Patel <anup.patel@linaro.org> wrote:
-> Currently, we don't have an exit reason to notify user space about
-> a system-level event (for e.g. system reset or shutdown) triggered
-> by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
-> this purpose. We can also inform user space about the 'type' and
-> architecture specific 'flags' of a system-level event using the
-> kvm_run structure.
+On 04/15/2014 12:00 PM, Jisheng Zhang wrote:
+> On Tue, 15 Apr 2014 02:23:03 -0700
+> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+>> On 04/15/2014 10:07 AM, Antoine T?nart wrote:
+>>> The Marvell Berlin BG2Q has 6 GPIO ports compatible with the
+>>> snps,dw-apb-gpio driver. This patch add the corresponding device tree
+>>> nodes.
+>>>
+>>> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+>>> ---
+>>>    arch/arm/boot/dts/berlin2q.dtsi | 102
+>>> ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 102 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi
+>>> b/arch/arm/boot/dts/berlin2q.dtsi index e6e556055dfc..b2625f896bc5 100644
+>>> --- a/arch/arm/boot/dts/berlin2q.dtsi
+>>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+[...]
+>>> +					compatible =
+>>> "snps,dw-apb-gpio-port";
+>>> +					gpio-controller;
+>>> +					#gpio-cells = <2>;
+>>> +					snps,nr-gpios = <32>;
+>>
+>> 32 gpio pins for each of the 6 GPIO controllers? Either BG2Q is a GPIO
 >
-> This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM ARM/ARM64
-> in-kernel PSCI v0.2 support to reset/shutdown VMs.
+> Yes, BG2Q support 32 pins every port
+
+Wow. Thanks for confirming this!
+
+>> I am fine with using nr-gpios property now, but I guess BG2Q also
+>> has that CONFIG[1,2] registers to actually read out the features
+>> synthesized in? If I find some time, I'll prepare a patch for
+>> dw-apb-gpio to exploit that (optional) information instead of
+>> using nr-gpios.
 >
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> The problem is CONFIG1/2 registers don't exist on some versions.
+> For example, the version used in BG2/BG2CD. So nr-gpio is necessary
+> if we want to support these versions.
 
-This patch should be posted on the main KVM ML, and reviewed by the KVM
-maintainers (shouldn't be controvertial though).
+Hmm, are you sure about BG2? I remember reading it and it contains
+sane values. Anyway, a proper patch for dw-apb-gpio would include
+checking for sane (e.g. non-zero) values. And nr-gpios will always
+stay as fall-back just because e.g. sunxi does not have the CONFIG
+registers.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-> ---
->  Documentation/virtual/kvm/api.txt |   15 +++++++++++++++
->  include/uapi/linux/kvm.h          |    8 ++++++++
->  2 files changed, 23 insertions(+)
->
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 6dc1db5..c02d725 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2740,6 +2740,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
->  external interrupt has just been delivered into the guest. User space
->  should put the acknowledged interrupt vector into the 'epr' field.
->  
-> +		/* KVM_EXIT_SYSTEM_EVENT */
-> +		struct {
-> +#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-> +#define KVM_SYSTEM_EVENT_RESET          2
-> +			__u32 type;
-> +			__u64 flags;
-> +		} system_event;
-> +
-> +If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
-> +a system-level event using some architecture specific mechanism (hypercall
-> +or some special instruction). In case of ARM/ARM64, this is triggered using
-> +HVC instruction based PSCI call from the vcpu. The 'type' field describes
-> +the system-level event type. The 'flags' field describes architecture
-> +specific flags for the system-level event.
-> +
->  		/* Fix the size of the union. */
->  		char padding[256];
->  	};
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 01c5624..e86c36a 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -171,6 +171,7 @@ struct kvm_pit_config {
->  #define KVM_EXIT_WATCHDOG         21
->  #define KVM_EXIT_S390_TSCH        22
->  #define KVM_EXIT_EPR              23
-> +#define KVM_EXIT_SYSTEM_EVENT     24
->  
->  /* For KVM_EXIT_INTERNAL_ERROR */
->  /* Emulate instruction failed. */
-> @@ -301,6 +302,13 @@ struct kvm_run {
->  		struct {
->  			__u32 epr;
->  		} epr;
-> +		/* KVM_EXIT_SYSTEM_EVENT */
-> +		struct {
-> +#define KVM_SYSTEM_EVENT_SHUTDOWN       1
-> +#define KVM_SYSTEM_EVENT_RESET          2
-> +			__u32 type;
-> +			__u64 flags;
-> +		} system_event;
->  		/* Fix the size of the union. */
->  		char padding[256];
->  	};
-
--- 
-Jazz is not dead. It just smells funny.
+Sebastian
