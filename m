@@ -1,54 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Apr 2014 11:09:22 +0100
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
-In-Reply-To: <534CE16D.8010508@free-electrons.com>
-References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140414210429.GJ25182@sirena.org.uk>
- <534CE16D.8010508@free-electrons.com>
-Message-ID: <20140415100922.GN12304@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 15 Apr 2014 12:11:28 +0200
+Subject: [GIT PULL] ARM: rockchip: fixes for  v3.15
+Message-ID: <2072835.sS0OefbP8P@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 09:36:13AM +0200, Boris BREZILLON wrote:
-> On 14/04/2014 23:04, Mark Brown wrote:
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-> > The transfer type gets set once per device at init time so why not
-> > just parameterise based on val_bytes?
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
-> Actually, you may want to transfer 1 byte registers using the block
-> method (if your device only support block transfers). This depends on
-> the device being accessed and what it supports, but I'm not sure we can
-> assume 1 byte registers will always be transferred using SMBUS byte
-> transfers.
+are available in the git repository at:
 
-OK, so if this a realistic issue then it seems like it's better to
-implement three different buses - there is not really any common code
-between the various paths.  This would also mean that you avoid having
-gather write when it can't be implemented.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.15-rockchip-fixes1
 
-The code is also not validating the lengths for two byte values.
+for you to fetch changes up to 5c4348c1f959234664e4667f428cf82b3b8a7c2c:
 
-> >> +    case REGMAP_SMBUS_I2C_BLOCK_TRANSFER: +        while (count
-> >> > 0 && !ret) { +            ret =
-> >> i2c_smbus_write_i2c_block_data(ctx->i2c, +
-> >> reg, +                                 ctx->val_bytes, +
-> >> (const u8 *)data);
+  ARM: rockchip: fix copy'n'paste error in smp error messages (2014-04-15 11:17:00 +0200)
 
-> > Fix the const correctness of the API rather than casting.
+----------------------------------------------------------------
+Fixing uart-rx pull settings and a copy'n'paste error in a smp message
 
-> The API is correct because the i2c_smbus_write_i2c_block does not modify
-> the data pointer.
-> Just removing the const keyword in the cast should be enough, because
-> you can safely cast a non const pointer to a const one.
+----------------------------------------------------------------
+Heiko Stuebner (1):
+      ARM: rockchip: fix copy'n'paste error in smp error messages
 
-If you need to cast away from void at all something is going wrong (and
-we appear to be always passing in write buffers as const too, I can't
-remember which operation this was though).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/101e2bae/attachment.sig>
+Max Schwarz (1):
+      ARM: rockchip: rk3188: enable pull-ups on UART RX pins
+
+ arch/arm/boot/dts/rk3188.dtsi    | 8 ++++----
+ arch/arm/mach-rockchip/platsmp.c | 2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
