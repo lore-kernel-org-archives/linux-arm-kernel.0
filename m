@@ -1,102 +1,58 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 15 Apr 2014 20:34:19 +0200
-Subject: [PATCH v2 2/3] ARM: EXYNOS: Add initial support of PMU for
- Exynos5260
-In-Reply-To: <1395061795-17777-3-git-send-email-vikas.sajjan@samsung.com>
-References: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
- <1395061795-17777-3-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <534D7BAB.30503@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 15 Apr 2014 20:39:24 +0200
+Subject: Rockchip RK3188 I2C driver
+In-Reply-To: <20140415175504.GG12304@sirena.org.uk>
+References: <3748421.ND1tAjvgKS@typ> <2745802.Mh5myQIMrf@phil>
+ <20140415175504.GG12304@sirena.org.uk>
+Message-ID: <2863495.Gjdj6NpOm9@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas,
+Am Dienstag, 15. April 2014, 18:55:04 schrieb Mark Brown:
+> On Tue, Apr 15, 2014 at 07:25:28PM +0200, Heiko St?bner wrote:
+> > Looking at the grf-handling of your i2c-driver [0] reminded me, that I'm
+> > generally not sure how we should handle these registers. All of them use
+> > what recently always got called a hiword-mask, with the upper 16 bit
+> > indicating which lower 16 bit get changed.
+> > 
+> > So while the
+> > 
+> > 	regmap_write(grf, 4, BIT(11 + bus_idx) | BIT(27 + bus_idx));
+> > 
+> > will most likely get the desired result at least once, I'm not sure how
+> > this interacts with the caching regmap implements [and regmap in
+> > general], as the bit(27 + bus_idx) is not a real value bit and will
+> > always read 0.
+> 
+> Can you be more specific what the wire format is here please?  The above
+> sounds like you're saying that the register value contains 32 bits, the
+> top 16 being essentially an extension of the register field and the last
+> 16 bits being a value but that just sounds like 16+n bit registers and
+> 16 bit data so presumably isn't what you mean.  Is there a datasheet
+> somewhere?
 
-On 17.03.2014 14:09, Vikas Sajjan wrote:
-> Adds PMU support of PMU for Exynos5260. Suspend-to-RAM can be built on
-> top this.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> ---
->   arch/arm/mach-exynos/common.h            |   26 ++++
->   arch/arm/mach-exynos/pm.c                |   34 +++--
->   arch/arm/mach-exynos/pmu.c               |  238 ++++++++++++++++++++++++++++++
->   arch/arm/mach-exynos/regs-pmu.h          |  232 +++++++++++++++++++++++++++++
->   arch/arm/plat-samsung/include/plat/cpu.h |    8 +
->   5 files changed, 529 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index aba6a2a..a17f701 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -56,6 +56,32 @@ enum sys_powerdown {
->   	NUM_SYS_POWERDOWN,
->   };
->
-> +enum running_cpu {
-> +	EXYNOS5_KFC,
-> +	EXYNOS5_ARM,
-> +};
-> +
-> +enum reg_op {
-> +	REG_INIT,	/* write new value */
-> +	REG_RESET,	/* clear with zero */
-> +	REG_SET,	/* bit set */
-> +	REG_CLEAR,	/* bit clear */
-> +};
-> +
-> +/* reg/value set */
-> +#define EXYNOS_PMU_REG(REG, VAL, OP)		\
-> +{						\
-> +	.reg	=	(void __iomem *)REG,	\
-> +	.val	=	VAL,			\
-> +	.op	=	OP,			\
-> +}
-> +
-> +struct exynos_pmu_init_reg {
-> +	void __iomem *reg;
-> +	unsigned int val;
-> +	enum reg_op op;
-> +};
-> +
->   extern unsigned long l2x0_regs_phys;
->   struct exynos_pmu_conf {
->   	void __iomem *reg;
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 15af0ce..dbe9670 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -109,7 +109,7 @@ static int exynos_cpu_suspend(unsigned long arg)
->   	outer_flush_all();
->   #endif
->
-> -	if (soc_is_exynos5250())
-> +	if (soc_is_exynos5250() || soc_is_exynos5260())
->   		flush_cache_all();
+ok, I'll try to explain better.
 
-I think it's the right time for this code to be restructured. Adding 
-more and more SoCs over this cruft is making this code worse and worse.
+The register has 32 bit. The upper 16 bit [31:16] are a write enable mask, so 
+to change bit x, you also have to set (x+16) to 1.
 
-I believe this should be done as follows:
+There is a manual floating around the net, for example linked on [0] (the first 
+link to TRM v2.0) and in it for example on page 226 the GRF_SOC_CON2 register.
 
-  - a generic struct describing particular PMU variant should be 
-defined, with things like
+To cite the relevant bits 31:16:
+	bit0~bit15 write enable
+	When bit 16=1, bit 0 can be written by software .
+	When bit 16=0, bit 0 cannot be written by software;
+	When bit 17=1, bit 1 can be written by software .
+	When bit 17=0, bit 1 cannot be written by software;
+	...
 
-	bool flush_cache_on_suspend;
-	struct exynos_pmu_conf *pmu_conf;
+And these "write enable" bits are reset to 0 after the write, so if you write 
+0x30001 you will get something like 0x1 on the next read, without the mask.
 
-or even function pointers, like
 
-	void (*cpu_suspend)(unsigned long arg);
+Thanks
+Heiko
 
-to handle things done currently using soc_is_*() macros, which we should 
-get rid of.
 
-- a DT match table would bind particular compatible strings with 
-respective PMU variants structs,
-
-- in general, this code should be made more like a normal driver, e.g. 
-bind to a DT node and map registers dynamically.
-
-Best regards,
-Tomasz
+[0] http://hwswbits.blogspot.nl/2013/06/full-rk3066-technical-reference-manual.html
