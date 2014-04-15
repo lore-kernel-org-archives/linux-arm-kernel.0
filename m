@@ -1,58 +1,60 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 15 Apr 2014 20:39:24 +0200
-Subject: Rockchip RK3188 I2C driver
-In-Reply-To: <20140415175504.GG12304@sirena.org.uk>
-References: <3748421.ND1tAjvgKS@typ> <2745802.Mh5myQIMrf@phil>
- <20140415175504.GG12304@sirena.org.uk>
-Message-ID: <2863495.Gjdj6NpOm9@phil>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 15 Apr 2014 11:41:28 -0700
+Subject: [PATCH] PM / devfreq: Use freq_table for available_frequencies
+In-Reply-To: <1368716.232331397543409452.JavaMail.weblogic@epv6ml06>
+References: <1368716.232331397543409452.JavaMail.weblogic@epv6ml06>
+Message-ID: <534D7D58.4050201@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 15. April 2014, 18:55:04 schrieb Mark Brown:
-> On Tue, Apr 15, 2014 at 07:25:28PM +0200, Heiko St?bner wrote:
-> > Looking at the grf-handling of your i2c-driver [0] reminded me, that I'm
-> > generally not sure how we should handle these registers. All of them use
-> > what recently always got called a hiword-mask, with the upper 16 bit
-> > indicating which lower 16 bit get changed.
-> > 
-> > So while the
-> > 
-> > 	regmap_write(grf, 4, BIT(11 + bus_idx) | BIT(27 + bus_idx));
-> > 
-> > will most likely get the desired result at least once, I'm not sure how
-> > this interacts with the caching regmap implements [and regmap in
-> > general], as the bit(27 + bus_idx) is not a real value bit and will
-> > always read 0.
+On 04/14/2014 11:30 PM, ??? wrote:
+>> On 04/14/2014 06:36 PM, ??? wrote:
+>>>> MyungJoo/Kyungmin,
+>>>>
+>>>> Bump. Can we accept this patch please?
+>>>>
+>>>> -Saravana
+>>>
+>>> Nack.
+>>>
+>>> Please note that freq_table is also an optional value, which may
+>>> be null.
+>>
+>> Ah, I saw that the max_freq would be zero if freq_table was NULL and I
+>> assumed that it can't be NULL. But I see that the max_freq limit is not
+>> applied if it's zero. Thanks for catching it.
+>>
+>>> Besides, please be aware that your code is under rcu_read_lock().
+>>
+>> Valid point. I was just trying to keep the diff simple. No one's really
+>> going to be catting this file often when performance matters.
+>>
+>>>
+>>>
+>>> Cheers,
+>>> MyungJoo.
+>>>
+>>> ps. I'll send a related patch (avoid accessing null but not-an-error
+>>> pointer at other sysfs nodes). Thank you for letting me catch such bugs anyway.
+>>
+>> I can go ahead and do this myself if you don't mind.
 > 
-> Can you be more specific what the wire format is here please?  The above
-> sounds like you're saying that the register value contains 32 bits, the
-> top 16 being essentially an extension of the register field and the last
-> 16 bits being a value but that just sounds like 16+n bit registers and
-> 16 bit data so presumably isn't what you mean.  Is there a datasheet
-> somewhere?
+> No, we don't need it. It was a false alarm.
+> Reading again, I've found that we've already made other sysfs nodes
+> check if either freq_table is null or its size is 0.
+> 
+> So, we only need to look at this available_frequencies node now.
+> 
+> I'll add some notes on the ABI doc for available_frequencies soon.
+> 
 
-ok, I'll try to explain better.
+Ah, I misunderstood your previous email. I thought you Nack-ed my patch
+and decided to send your own patch to replace mine. Ok, I'll fix up mine
+and send it out.
 
-The register has 32 bit. The upper 16 bit [31:16] are a write enable mask, so 
-to change bit x, you also have to set (x+16) to 1.
-
-There is a manual floating around the net, for example linked on [0] (the first 
-link to TRM v2.0) and in it for example on page 226 the GRF_SOC_CON2 register.
-
-To cite the relevant bits 31:16:
-	bit0~bit15 write enable
-	When bit 16=1, bit 0 can be written by software .
-	When bit 16=0, bit 0 cannot be written by software;
-	When bit 17=1, bit 1 can be written by software .
-	When bit 17=0, bit 1 cannot be written by software;
-	...
-
-And these "write enable" bits are reset to 0 after the write, so if you write 
-0x30001 you will get something like 0x1 on the next read, without the mask.
+-Saravana
 
 
-Thanks
-Heiko
-
-
-[0] http://hwswbits.blogspot.nl/2013/06/full-rk3066-technical-reference-manual.html
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
