@@ -1,47 +1,44 @@
 From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 15 Apr 2014 14:58:48 +0530
-Subject: [PATCH v2 0/6] Further cleanup and enable multiplat build
-Message-ID: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+Date: Tue, 15 Apr 2014 14:58:49 +0530
+Subject: [PATCH 1/6] ARM: EXYNOS: Remove duplicate lines in Makefile
+In-Reply-To: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+Message-ID: <1397554134-11827-2-git-send-email-sachin.kamat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is based on latest linux-next and depends on the
-following patch:
-ARM: EXYNOS: Consolidate Kconfig entries
-http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
+Group all files compiled under common config option together.
 
-Changes since v2:
-Replaced patch 2, "ARM: EXYNOS: Staticize exynos_subsys"
-with "ARM: EXYNOS: Remove exynos_subsys registration" as that
-code is no more used.
+Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+---
+ arch/arm/mach-exynos/Makefile |    7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-Tested on Exynos4210, 4412, 5250 and 5420 based boards.
-
-Arnd Bergmann (1):
-  ARM: EXYNOS: Enable multi-platform build support
-
-Sachin Kamat (5):
-  ARM: EXYNOS: Remove duplicate lines in Makefile
-  ARM: EXYNOS: Remove exynos_subsys registration
-  ARM: EXYNOS: Migrate Exynos specific macros from plat to mach
-  ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
-  ARM: multi_v7_defconfig: Enable Exynos platform
-
- arch/arm/Kconfig                         |   27 ++---------
- arch/arm/configs/exynos_defconfig        |    2 +-
- arch/arm/configs/multi_v7_defconfig      |   10 +++++
- arch/arm/mach-exynos/Kconfig             |   27 +++++++++++
- arch/arm/mach-exynos/Makefile            |    9 ++--
- arch/arm/mach-exynos/common.h            |   72 ++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/cpuidle.c           |    1 -
- arch/arm/mach-exynos/exynos.c            |   13 ------
- arch/arm/mach-exynos/hotplug.c           |    2 -
- arch/arm/mach-exynos/platsmp.c           |    2 -
- arch/arm/mach-exynos/pm.c                |    1 -
- arch/arm/mach-exynos/pmu.c               |    2 -
- arch/arm/plat-samsung/Makefile           |    3 ++
- arch/arm/plat-samsung/include/plat/cpu.h |   61 -------------------------
- 14 files changed, 119 insertions(+), 113 deletions(-)
-
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index a656dbe3b78c..f6dcc256db56 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -12,20 +12,15 @@ obj-				:=
+ 
+ # Core
+ 
+-obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o
++obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o
+ 
+ obj-$(CONFIG_PM_SLEEP)		+= pm.o sleep.o
+ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ 
+-obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
+-
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ 
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ 
+-obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-smc.o
+-obj-$(CONFIG_ARCH_EXYNOS)	+= firmware.o
+-
+ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
 -- 
 1.7.9.5
