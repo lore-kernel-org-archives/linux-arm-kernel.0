@@ -1,30 +1,65 @@
-From: lee.essen@nowonline.co.uk (Lee Essen)
-Date: Tue, 15 Apr 2014 09:43:38 +0400
-Subject: dma_alloc_coherent and cache?
-Message-ID: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 15 Apr 2014 11:14:11 +0530
+Subject: [PATCH 08/20] cpufreq: exynos5440: Use cpufreq_for_each_entry
+ macro for iteration
+In-Reply-To: <534C4E7E.4090806@semaphore.gr>
+References: <534C4E7E.4090806@semaphore.gr>
+Message-ID: <CAKohpokfsR3soykZbtH4-L=4TC6Oab=jyzUr=W-EfkRFfefRDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 15 April 2014 02:39, Stratos Karafotis <stratosk@semaphore.gr> wrote:
 
-I'm working on a driver for a Marvell switch device (98dx4122) where the basic interface closely resembles the mv643xx_eth device.
+> diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
 
-(I should say this is a bit of a personal project to experiment with a trendnet switch, not affiliated with any commercial activities.)
+>  static void exynos_enable_dvfs(unsigned int cur_frequency)
+>  {
+> -       unsigned int tmp, i, cpu;
+> +       unsigned int tmp, cpu;
+>         struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
+> +       struct cpufreq_frequency_table *pos;
 
-GPL code from Marvell is available for an old kernel, so I have been working to use the mv643xx_eth concepts and at least get basic functionality up an running on the current kernel version.
+Merge above two.
 
-At a high level I have it working, however I get regular (reproducible) hangs and I suspect it's to do with the writes to the descriptiors (from dma_alloc_coherent) being buffered or cached and not making it to the device when dma is triggered.
+>         /* Disable DVFS */
+>         __raw_writel(0, dvfs_info->base + XMU_DVFS_CTRL);
+>
+> @@ -182,15 +182,15 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
+>          __raw_writel(tmp, dvfs_info->base + XMU_PMUIRQEN);
+>
+>         /* Set initial performance index */
+> -       for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
+> -               if (freq_table[i].frequency == cur_frequency)
+> +       cpufreq_for_each_entry(pos, freq_table) {
+> +               if (pos->frequency == cur_frequency)
+>                         break;
+> +       }
+>
+> -       if (freq_table[i].frequency == CPUFREQ_TABLE_END) {
+> +       if (pos->frequency == CPUFREQ_TABLE_END) {
+>                 dev_crit(dvfs_info->dev, "Boot up frequency not supported\n");
+>                 /* Assign the highest frequency */
+> -               i = 0;
+> -               cur_frequency = freq_table[i].frequency;
+> +               cur_frequency = freq_table->frequency;
 
-My theory is based on the fact that the hang always seems to happen at the point of enabling dma for transmit, and occasionally I get a packet out which is corrupt ... and if I add lots of debug printk's or delay loops then it happens less frequently.
+First this is not readable enough and you introduced a bug here, see
+below.
 
-The original GPL code has some functions in to invalidate/clear the L2 cache, but no other driver seems to do this, so it doesn't feel like it's a good solution.
+>         }
+>
+>         dev_info(dvfs_info->dev, "Setting dvfs initial frequency = %uKHZ",
+> @@ -199,7 +199,7 @@ static void exynos_enable_dvfs(unsigned int cur_frequency)
+>         for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+>                 tmp = __raw_readl(dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
+>                 tmp &= ~(P_VALUE_MASK << C0_3_PSTATE_NEW_SHIFT);
+> -               tmp |= (i << C0_3_PSTATE_NEW_SHIFT);
+> +               tmp |= ((pos - freq_table) << C0_3_PSTATE_NEW_SHIFT);
 
-It's a feroceon cpu, and I've tried disabling the L2 controller and also the d-cache - neither of which made any difference.
+We used modified value of 'i' here earlier, i.e. 0 ..
 
-So I'm now completely out of ideas and way out of my depth ;-) 
-
-Any suggestions would be greatly appreciated.
-
-Regards,
-
-Lee.
+>                 __raw_writel(tmp, dvfs_info->base + XMU_C0_3_PSTATE + cpu * 4);
+>         }
+>
+> --
+> 1.9.0
