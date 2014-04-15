@@ -1,35 +1,45 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 15 Apr 2014 18:11:51 +0200
-Subject: [PATCH] clk: shmobile: clk-mstp: change to using clock-indices
-In-Reply-To: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1397577994-12061-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <CAMuHMdXfFi5xaR0diobn5C5-v104CaW-DQ=sFhEqmQ61QfVRGQ@mail.gmail.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Tue, 15 Apr 2014 17:18:08 +0100
+Subject: [linux-sunxi] Re: [PATCH 7/7] ARM: sun7i: cubietruck: enable
+ bluetooth module
+In-Reply-To: <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-8-git-send-email-wens@csie.org>
+ <20140415144215.GG3207@lukather>
+ <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
+Message-ID: <20140415171808.6d60d134@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+> For our use case here, which is a bluetooth chip connected on the UART,
+> there is no in kernel representation or driver to tie them to. Same goes
+> for UART based GPS chips. They just so happen to require toggling a GPIO,
+> and maybe enabling a specific clock, to get it running. Afterwards,
+> accessing it is done solely from userspace. For our Broadcom chips, the
+> user has to upload its firmware first, then designate the tty as a Bluetooth
+> HCI using hciattach.
 
-On Tue, Apr 15, 2014 at 6:06 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> With the addition of clock-indices, we need to change the renesas
-> clock implementation to use these instead of the local definition
-> of "renesas,clock-indices".
->
-> Since this will break booting with older device trees, we add a
-> simple auto-detection of which properties are present.
+Somewhat similar on some ordinary PC systems. ACPI describes the
+properties there but the same things apply - its a device mostly
+controlled by a blob of userspace and having a bunch of GPIO lines that
+do stuff like turn it on and off.
 
-Thanks for your patch!
+Is there any reason for not describing it properly and letting the
+userspace code fish it out of the devicetree ?
 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+There's no fundamental reason that it's magically different because of
+the location of the driver. Given in a few cases we have a choice of
+kernel or user space devices for the same hardware thats even more true ?
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Failing that we have a long standing proposal never implemented for
+adding GPIO awareness to the tty layer. There are a few other use
+cases for it including gpio widgets with serial and either some of the
+modem lines hacked in via GPIO or with additional control lines for
+stuff like smartcard reading interfaces.
 
-Gr{oetje,eeting}s,
+https://lkml.org/lkml/2012/5/16/288
 
-                        Geert
+In hindsight I'd do it slightly differently and make each "gpio" a pair
+of values (purpose,number).
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Alan
