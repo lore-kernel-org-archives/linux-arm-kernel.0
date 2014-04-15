@@ -1,56 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 15 Apr 2014 13:10:42 +0100
-Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over SMBus
-In-Reply-To: <534D1DDA.40207@free-electrons.com>
-References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140414210429.GJ25182@sirena.org.uk>
- <534CE16D.8010508@free-electrons.com>
- <20140415100922.GN12304@sirena.org.uk>
- <534D1DDA.40207@free-electrons.com>
-Message-ID: <20140415121042.GV12304@sirena.org.uk>
+From: anders.berg@lsi.com (Anders Berg)
+Date: Tue, 15 Apr 2014 14:06:09 +0200
+Subject: [PATCH 0/5] Add platform support for LSI AXM55xx
+Message-ID: <cover.1397552154.git.anders.berg@lsi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 01:54:02PM +0200, Boris BREZILLON wrote:
-> On 15/04/2014 12:09, Mark Brown wrote:
+Hi,
 
-> > OK, so if this a realistic issue then it seems like it's better to
-> > implement three different buses - there is not really any common code
-> > between the various paths.
+This set of patches introduces basic platform support for the LSI AXM5516 SoC.
+This is another 16 core machine (4x4 cluster config). Please review and provide
+feedback.
 
-> Okay, I'll create 4 different busses (one for each access type).
-> BTW, should I keep these implementations in the same source file
-> (regmap-smbus.c) ?
-> And, should I keep one method to register an smbus regmap or should I
-> provide one method per access type and get rid of the
-> regmap_smbus_transfer_type enum ?
+Regards,
+Anders
 
-Do something that looks tasteful in implementation.
 
-> >   This would also mean that you avoid having
-> > gather write when it can't be implemented.
+Anders Berg (5):
+  ARM: Add platform support for LSI AXM55xx SoC
+  ARM: dts: Device tree for AXM55xx.
+  ARM: axxia: Adding defconfig for AXM55xx
+  power: reset: Add Axxia system reset driver
+  ARM: dts: axxia: Add reset controller
 
-> Correct me if I'm wrong, but they all support gather write.
+ Documentation/devicetree/bindings/arm/axxia.txt    |  12 +
+ .../devicetree/bindings/clock/clk-axxia.txt        |  88 ++++++
+ .../bindings/power_supply/axxia-reset.txt          |  20 ++
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   2 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/axm5516-amarillo.dts             |  51 ++++
+ arch/arm/boot/dts/axm5516-cpus.dtsi                | 204 ++++++++++++++
+ arch/arm/boot/dts/axm55xx.dtsi                     | 311 +++++++++++++++++++++
+ arch/arm/configs/axm55xx_defconfig                 | 248 ++++++++++++++++
+ arch/arm/mach-axxia/Kconfig                        |  19 ++
+ arch/arm/mach-axxia/Makefile                       |   2 +
+ arch/arm/mach-axxia/Makefile.boot                  |   2 +
+ arch/arm/mach-axxia/axxia.c                        | 117 ++++++++
+ arch/arm/mach-axxia/axxia.h                        |  42 +++
+ arch/arm/mach-axxia/headsmp.S                      |  44 +++
+ arch/arm/mach-axxia/platsmp.c                      | 183 ++++++++++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-axxia.c                            | 281 +++++++++++++++++++
+ drivers/power/reset/Kconfig                        |   8 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/axxia-reset.c                  |  97 +++++++
+ 22 files changed, 1736 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/axxia.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-axxia.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/axxia-reset.txt
+ create mode 100644 arch/arm/boot/dts/axm5516-amarillo.dts
+ create mode 100644 arch/arm/boot/dts/axm5516-cpus.dtsi
+ create mode 100644 arch/arm/boot/dts/axm55xx.dtsi
+ create mode 100644 arch/arm/configs/axm55xx_defconfig
+ create mode 100644 arch/arm/mach-axxia/Kconfig
+ create mode 100644 arch/arm/mach-axxia/Makefile
+ create mode 100644 arch/arm/mach-axxia/Makefile.boot
+ create mode 100644 arch/arm/mach-axxia/axxia.c
+ create mode 100644 arch/arm/mach-axxia/axxia.h
+ create mode 100644 arch/arm/mach-axxia/headsmp.S
+ create mode 100644 arch/arm/mach-axxia/platsmp.c
+ create mode 100644 drivers/clk/clk-axxia.c
+ create mode 100644 drivers/power/reset/axxia-reset.c
 
-Everything except for the block transfers is writing one register at a
-time, actually looking again everything that can only write one register
-at a time ought not to be implementing the buffer based stuff at all and
-should instead be hooked into reg_read() and reg_write() - it's not able
-to implement the API properly in any of the cases, it's unpacking the
-buffer which the upper level code already supports.
-
-> > The code is also not validating the lengths for two byte values.
-
-> I'm not sure I get this one.
-> Do you mean I should check that val_size is a 2 byte multiple ?
-> If this is what you meant, then I should also check it for block transfers.
-
-Yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/63eff8cd/attachment.sig>
+-- 
+1.8.3.2
