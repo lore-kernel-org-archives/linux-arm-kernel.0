@@ -1,51 +1,52 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Tue, 15 Apr 2014 01:45:35 +0200
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <534C3606.7010206@meduna.org>
-References: <534C3606.7010206@meduna.org>
-Message-ID: <534C731F.1050406@meduna.org>
+From: chanho.min@lge.com (Chanho Min)
+Date: Tue, 15 Apr 2014 09:07:00 +0900
+Subject: [PATCH] arm64:kconfig: make default for CONFIG_COMPAT
+In-Reply-To: <20140414164618.GC12916@arm.com>
+References: <1397462883-12740-1-git-send-email-chanho.min@lge.com>
+ <20140414164618.GC12916@arm.com>
+Message-ID: <002201cf583e$9fb01f10$df105d30$@min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.04.2014 21:24, Stanislav Meduna wrote:
-
-> hunting another problem with AUART acting weirdly I got
-
-okay, the AUART thing was some device tree snafu, but I have seen
-the BUG a few times (but not readily reproducible). This thread
-looks remotely similar https://lkml.org/lkml/2013/9/27/534 - looks
-like the real bug happened somewhere else :( Any hints on how to
-get more info?
-
-Adding Cc: to linux-arm and linux-kernel
-
-> BUG: spinlock trylock failure on UP on CPU#0, ksoftirqd/0/3
->  lock: boot_tvec_bases+0x0/0x10a0, .magic: dead4ead, .owner: ksoftirqd/0/3, .owner_cpu: 0
-> CPU: 0 PID: 3 Comm: ksoftirqd/0 Not tainted 3.12.15-rt25-00371-gfec62f5-dirty #26
-> [<c00149ec>] (unwind_backtrace+0x0/0xf4) from [<c0012ab0>] (show_stack+0x10/0x14)
-> [<c0012ab0>] (show_stack+0x10/0x14) from [<c01a4b80>] (do_raw_spin_trylock+0x4c/0x58)
-> [<c01a4b80>] (do_raw_spin_trylock+0x4c/0x58) from [<c02ca0b4>] (_raw_spin_trylock+0x20/0x98)
-> [<c02ca0b4>] (_raw_spin_trylock+0x20/0x98) from [<c02c9654>] (rt_spin_trylock+0x14/0xd0)
-> [<c02c9654>] (rt_spin_trylock+0x14/0xd0) from [<c00285cc>] (run_local_timers+0x24/0x78)
-> [<c00285cc>] (run_local_timers+0x24/0x78) from [<c0028654>] (update_process_times+0x34/0x68)
-> [<c0028654>] (update_process_times+0x34/0x68) from [<c005f0ac>] (tick_sched_timer+0x58/0x22c)
-> [<c005f0ac>] (tick_sched_timer+0x58/0x22c) from [<c003f2f8>] (__run_hrtimer+0x7c/0x2a8)
-> [<c003f2f8>] (__run_hrtimer+0x7c/0x2a8) from [<c003f684>] (hrtimer_interrupt+0x104/0x30c)
-> [<c003f684>] (hrtimer_interrupt+0x104/0x30c) from [<c0230a84>] (mxs_timer_interrupt+0x20/0x2c)
-> [<c0230a84>] (mxs_timer_interrupt+0x20/0x2c) from [<c0051d1c>] (handle_irq_event_percpu+0x80/0x2f8)
-> [<c0051d1c>] (handle_irq_event_percpu+0x80/0x2f8) from [<c0051fd0>] (handle_irq_event+0x3c/0x5c)
-> [<c0051fd0>] (handle_irq_event+0x3c/0x5c) from [<c0054778>] (handle_level_irq+0x8c/0x118)
-> [<c0054778>] (handle_level_irq+0x8c/0x118) from [<c0051c8c>] (generic_handle_irq+0x28/0x30)
-> [<c0051c8c>] (generic_handle_irq+0x28/0x30) from [<c001009c>] (handle_IRQ+0x30/0x84)
-> [<c001009c>] (handle_IRQ+0x30/0x84) from [<c0013324>] (__irq_svc+0x44/0x88)
-> [<c0013324>] (__irq_svc+0x44/0x88) from [<c006a664>] (__try_to_take_rt_mutex+0x4/0x144)
-> [<c006a664>] (__try_to_take_rt_mutex+0x4/0x144) from [<00000000>] (  (null))
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Tuesday, April 15, 2014 1:46 AM
+> To: Chanho Min
+> Cc: Catalin Marinas; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH] arm64:kconfig: make default for CONFIG_COMPAT
 > 
+> On Mon, Apr 14, 2014 at 09:08:03AM +0100, Chanho Min wrote:
+> > 'make savedefconfig' doesn't generate defconfig properly due to
+> > missing COMPAT default. So Add default and set to yes.
 > 
-> Linux nxt 3.12.15-rt25-00371-gfec62f5-dirty #26 PREEMPT RT Mon Apr 14 20:40:56 CEST 2014 armv5tejl GNU/Linux
-> 
-> This is on a Freescale i.MX28, 3.12.15-rt25 with patches that do not touch
-> anything related.
+> I thought a missing `default' line in a Kconfig entry meant that the option
+> ended up defaulting to 'n'. What exactly is the problem you are seeing?
 
--- 
-                                                 Stano
+Correct minimal config is not generated without default line.
+If we want to set COMPAT to 'n', 'default n' should be added.
+
+Chanho
+> 
+> Will
+> 
+> > Signed-off-by: Chanho Min <chanho.min@lge.com>
+> > ---
+> >  arch/arm64/Kconfig |    1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 4907b85..93b7531 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -294,6 +294,7 @@ source "fs/Kconfig.binfmt"
+> >
+> >  config COMPAT
+> >  	bool "Kernel support for 32-bit EL0"
+> > +	default y
+> >  	depends on !ARM64_64K_PAGES
+> >  	select COMPAT_BINFMT_ELF
+> >  	select HAVE_UID16
+> > --
+> > 1.7.9.5
+> >
+> >
