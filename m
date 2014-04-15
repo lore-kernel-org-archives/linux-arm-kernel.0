@@ -1,133 +1,54 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 15 Apr 2014 18:50:31 +0200
-Subject: [PATCH v2 2/7] clk: exynos5420: Add more clock IDs
-In-Reply-To: <1395918470-16374-3-git-send-email-shaik.ameer@samsung.com>
-References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
- <1395918470-16374-3-git-send-email-shaik.ameer@samsung.com>
-Message-ID: <534D6357.5000801@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 15 Apr 2014 18:51:37 +0200
+Subject: [PATCH v2 1/4] clocksource: arm_global_timer: Only check for
+ unusable timer on A9
+In-Reply-To: <1394792302-24451-2-git-send-email-matthew.leach@arm.com>
+References: <1394792302-24451-1-git-send-email-matthew.leach@arm.com>
+ <1394792302-24451-2-git-send-email-matthew.leach@arm.com>
+Message-ID: <534D6399.2000504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shaik,
-
-On 27.03.2014 12:07, Shaik Ameer Basha wrote:
-> From: Rahul Sharma <rahul.sharma@samsung.com>
+On 03/14/2014 11:18 AM, Matthew Leach wrote:
+> The check for a usable global timer in the probe code does not enquire
+> which CPU we are currently running on. This can cause the driver to
+> incorrectly assume we have an unusable global timer if we are running
+> on a CPU other than A9.
 >
-> Add more clock IDs to be used in DT bindings for Exynos5420.
+> Before checking the CPU revision, ensure we are running on an A9 CPU.
 >
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Matthew Leach <matthew.leach@arm.com>
 > ---
->   include/dt-bindings/clock/exynos5420.h |   62 ++++++++++++++++++++++++++++++--
->   1 file changed, 60 insertions(+), 2 deletions(-)
+>   drivers/clocksource/arm_global_timer.c | 5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
 >
-> diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
-> index 5eefd88..e921913 100644
-> --- a/include/dt-bindings/clock/exynos5420.h
-> +++ b/include/dt-bindings/clock/exynos5420.h
-> @@ -58,6 +58,16 @@
->   #define CLK_SCLK_GSCL_WA	156
->   #define CLK_SCLK_GSCL_WB	157
->   #define CLK_SCLK_HDMIPHY	158
-> +#define CLK_SCLK_MPHY_REFCLK	159
-> +#define CLK_SCLK_SPI0_ISP	160
-> +#define CLK_SCLK_SPI1_ISP	161
-> +#define CLK_SCLK_UART_ISP	162
-> +#define CLK_SCLK_ISP_SENSOR0	163
-> +#define CLK_SCLK_ISP_SENSOR1	164
-> +#define CLK_SCLK_ISP_SENSOR2	165
-> +#define CLK_SCLK_PWM_ISP	166
-> +#define CLK_SCLK_HSIC_12M	167
-> +#define CLK_SCLK_MPHY_IXTAL24	168
+> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> index 0fc31d0..60e5a170 100644
+> --- a/drivers/clocksource/arm_global_timer.c
+> +++ b/drivers/clocksource/arm_global_timer.c
+> @@ -246,11 +246,12 @@ static void __init global_timer_of_register(struct device_node *np)
+>   	int err = 0;
 >
->   /* gate clocks */
->   #define CLK_ACLK66_PERIC	256
-> @@ -123,6 +133,7 @@
->   #define CLK_USBH20		365
->   #define CLK_USBD300		366
->   #define CLK_USBD301		367
-> +#define CLK_PCLK200_FSYS	370
->   #define CLK_ACLK400_MSCL	380
->   #define CLK_MSCL0		381
->   #define CLK_MSCL1		382
-> @@ -141,6 +152,8 @@
->   #define CLK_ACLK300_DISP1	420
->   #define CLK_FIMD1		421
->   #define CLK_SMMU_FIMD1		422
-> +#define CLK_SMMU_FIMD1M1	423
-> +#define CLK_ACLK400_DISP1	424
->   #define CLK_ACLK166		430
->   #define CLK_MIXER		431
->   #define CLK_ACLK266		440
-> @@ -172,12 +185,57 @@
->   #define CLK_SMMU_FIMCL1		493
->   #define CLK_SMMU_FIMCL3		494
->   #define CLK_FIMC_LITE3		495
-> -#define CLK_ACLK_G3D		500
-> -#define CLK_G3D			501
-> +#define CLK_G3D			500
+>   	/*
+> -	 * In r2p0 the comparators for each processor with the global timer
+> +	 * In A9 r2p0 the comparators for each processor with the global timer
+>   	 * fire when the timer value is greater than or equal to. In previous
+>   	 * revisions the comparators fired when the timer value was equal to.
+>   	 */
+> -	if ((read_cpuid_id() & 0xf0000f) < 0x200000) {
+> +	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9
+> +	    && (read_cpuid_id() & 0xf0000f) < 0x200000) {
+>   		pr_warn("global-timer: non support for this cpu version.\n");
+>   		return;
+>   	}
 
-What is the reason for this ID change? Even if CLK_ACLK_G3D is removed, 
-as it wasn't even referenced by the driver, original clock IDs should 
-remain fixed.
+Applied on my tree for 3.16
 
->   #define CLK_SMMU_MIXER		502
-> +#define CLK_PCLK_TZPC10		503
-> +#define CLK_PCLK_TZPC11		504
-> +#define CLK_PCLK_MC		505
-> +#define CLK_PCLK_TOP_RTC	506
-> +#define CLK_SMMU_JPEG2		507
-> +#define CLK_PCLK_ROTATOR	508
-> +#define CLK_SMMU_RTIC		509
-> +#define CLK_PCLK_G2D		510
-> +#define CLK_ACLK_SMMU_G2D	511
-> +#define CLK_SMMU_G2D		512
-> +#define CLK_ACLK_SMMU_MDMA0	513
-> +#define CLK_SMMU_MDMA0		514
-> +#define CLK_ACLK_SMMU_SSS	515
-> +#define CLK_SMMU_SSS		516
-> +#define CLK_SMMU_SLIM_SSS	517
-> +#define CLK_ACLK_SMMU_SLIM_SSS	518
-> +#define CLK_ACLK266_ISP		519
-> +#define CLK_ACLK400_ISP		520
-> +#define CLK_ACLK333_432_ISP0	521
-> +#define CLK_ACLK333_432_ISP	522
-> +#define CLK_ACLK_SMMU_MIXER	523
-> +#define CLK_PCLK_HDMIPHY	524
-> +#define CLK_PCLK_GSCL0		525
-> +#define CLK_PCLK_GSCL1		526
-> +#define CLK_PCLK_FIMC_3AA	527
-> +#define CLK_ACLK_FIMC_LITE0	528
-> +#define CLK_ACLK_FIMC_LITE1	529
-> +#define CLK_PCLK_FIMC_LITE0	530
-> +#define CLK_PCLK_FIMC_LITE1	531
-> +#define CLK_PCLK_FIMC_LITE3	532
-> +#define CLK_PCLK_MSCL0		533
-> +#define CLK_PCLK_MSCL1		534
-> +#define CLK_PCLK_MSCL2		535
-> +#define CLK_PCLK_MFC		536
->
->   /* mux clocks */
->   #define CLK_MOUT_HDMI		640
-> +#define CLK_MOUT_FIMD1			641
-> +#define CLK_MOUT_MAUDIO0		642
-> +#define CLK_MOUT_SPI0			643
-> +#define CLK_MOUT_SPI1			644
-> +#define CLK_MOUT_SPI2			645
-> +#define CLK_MOUT_SW_ACLK333		646
-> +#define CLK_MOUT_USER_ACLK333		647
-> +#define CLK_MOUT_SW_ACLK300_GSCL	648
-> +#define CLK_MOUT_USER_ACLK300_GSCL	649
-> +#define CLK_MOUT_SW_ACLK333_432_GSCL	650
-> +#define CLK_MOUT_USER_ACLK333_432_GSCL	651
-> +#define CLK_MOUT_G3D			652
->
->   /* divider clocks */
->   #define CLK_DOUT_PIXEL		768
->
 
-Also similar comment as for patch 1/7, it's hard to tell why this change 
-is needed at all.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Best regards,
-Tomasz
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
