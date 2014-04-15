@@ -1,81 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 15 Apr 2014 10:48:44 -0400 (EDT)
-Subject: [PATCH v2 06/12] ARM: mcpm: change max clusters to 4
-In-Reply-To: <CAD6h2NTH1ZGWSNPeEMaZ4Lf+4UFOhXFtJeX1NEXETeonc76DYg@mail.gmail.com>
-References: <1396944052-9887-1-git-send-email-haojian.zhuang@linaro.org>
- <1396944052-9887-7-git-send-email-haojian.zhuang@linaro.org>
- <20140410095650.GA5499@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1404102203590.980@knanqh.ubzr>
- <CAD6h2NTH1ZGWSNPeEMaZ4Lf+4UFOhXFtJeX1NEXETeonc76DYg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1404151044070.980@knanqh.ubzr>
+From: anders.berg@lsi.com (Anders Berg)
+Date: Tue, 15 Apr 2014 16:56:21 +0200
+Subject: [PATCH 2/5] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <534D294D.7000201@arm.com>
+References: <cover.1397552154.git.anders.berg@lsi.com>
+ <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
+ <534D294D.7000201@arm.com>
+Message-ID: <20140415145621.GA32285@swsaberg01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Apr 2014, Haojian Zhuang wrote:
-
-> On 11 April 2014 10:39, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 10 Apr 2014, Dave Martin wrote:
-> >
-> >> On Tue, Apr 08, 2014 at 04:00:46PM +0800, Haojian Zhuang wrote:
-> >> > In order to support 4 clusters with 4 Cortex A15 Cores in each cluster,
-> >> > enlarge maximum clusters from 2 to 4 in MCPM.
-> >>
-> >> CC Nico on mcpm patches please.  I'm happy to be CC'd as well.
-> >
-> > Indeed.
-> >
-> >> > Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> >> > ---
-> >> >  arch/arm/include/asm/mcpm.h | 2 +-
-> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-> >> > index 608516e..68f82cf 100644
-> >> > --- a/arch/arm/include/asm/mcpm.h
-> >> > +++ b/arch/arm/include/asm/mcpm.h
-> >> > @@ -20,7 +20,7 @@
-> >> >   * to consider dynamic allocation.
-> >> >   */
-> >> >  #define MAX_CPUS_PER_CLUSTER       4
-> >> > -#define MAX_NR_CLUSTERS            2
-> >> > +#define MAX_NR_CLUSTERS            4
-> >>
-> >> Because of the need for alignment to the biggest cacheline size in the
-> >> system, the MCPM low-level locking structures consume a non-trivial
-> >> amount of memory.
-> >>
-> >> Therefore, I'm not keen on the idea of simply increasing this #define
-> >> every time a platform appears with a larger number of clusters.
-> >> If hip04 is not built into the kernel, this just wastes memory.
-> >>
-> >> I'll leave it to Nico to decide whether we can increase the #define
-> >> to 4 or whether this needs a proper fix now.  Ideally, we would have
-> >> a way of choosing the maximum value required by the set of boards built
-> >> into the kernel, or switch to dynamic allocation.
-> >
-> > I think we should go with the ability to select a maximum based on the
-> > configured platforms. That could be as simple as having a
-> > CONFIG_MCPM_QUAD_CLUSTER symbol to be selected by those platforms that
-> > need it.
-> >
+On Tue, Apr 15, 2014 at 01:42:53PM +0100, Marc Zyngier wrote:
+> Hi Anders,
 > 
-> I'll set MAX_NR_CLUSTERS from Kconfig.
+> On 15/04/14 13:06, Anders Berg wrote:
+> > Add device tree for the Amarillo validation board with an AXM5516 SoC.
+> > 
+> > Signed-off-by: Anders Berg <anders.berg@lsi.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile             |   1 +
+> >  arch/arm/boot/dts/axm5516-amarillo.dts |  51 ++++++
+> >  arch/arm/boot/dts/axm5516-cpus.dtsi    | 204 ++++++++++++++++++++++
+> >  arch/arm/boot/dts/axm55xx.dtsi         | 306 +++++++++++++++++++++++++++++++++
+> >  4 files changed, 562 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/axm5516-amarillo.dts
+> >  create mode 100644 arch/arm/boot/dts/axm5516-cpus.dtsi
+> >  create mode 100644 arch/arm/boot/dts/axm55xx.dtsi
+> > 
 > 
-> If BIG_LITTLE isn't enabled & HIP04 is enabled, MAX_NR_CLUSTERS could
-> be set to 4.
-> Otherwise, it's always 2. Since there're only 16 A15 cores in HiP04.
+> [...]
+> 
+> > +       gic: interrupt-controller at 2001001000 {
+> > +               compatible = "arm,cortex-a15-gic";
+> > +               #interrupt-cells = <3>;
+> > +               #address-cells = <0>;
+> > +               interrupt-controller;
+> > +               reg = <0x20 0x01001000 0 0x1000>,
+> > +                     <0x20 0x01002000 0 0x1000>,
+> > +                     <0x20 0x01004000 0 0x2000>,
+> > +                     <0x20 0x01006000 0 0x2000>;
+> > +               interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
+> > +                               IRQ_TYPE_LEVEL_HIGH)>;
+> > +       };
+> 
+> Given how many CPUs this system has, what's the catch regarding the GIC?
+> Is there a second one shadowing this one at the same address for another
+> set of 8 CPUs? Is there an additional mechanism to IPI the other CPUs?
+> 
 
-No.
+There is actually one GIC per cluster and SPIs are used to hook the clusters
+together for use as IPIs, so with this patch one cluster may be booted (using
+the standard SGIs still works within each cluster).
 
-Please let's avoid cross dependencies for things that are conceptually 
-unrelated.
+Have a modified GIC driver to run all clusters, but this patch is a bit to
+invasive to submit at the moment...
 
-Like I suggested, just create a CONFIG_MCPM_QUAD_CLUSTER symbol and 
-select it from the HIP04 config.
-
-For multi-platform kernels we must be able to support both BIG_LITTLE 
-and HIP04 in the same config.  Whether or not the big.LITTLE code is 
-activated can be decided at run time.
-
-
-Nicolas
+/Anders
