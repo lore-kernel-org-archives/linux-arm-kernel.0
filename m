@@ -1,31 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Apr 2014 10:11:57 +0200
-Subject: [PATCHv2 3/8] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
-In-Reply-To: <1397527192-21988-4-git-send-email-cw00.choi@samsung.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <4788081.xvaJfdGTMu@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 15 Apr 2014 10:10:04 +0200
+Subject: dma_alloc_coherent and cache?
+In-Reply-To: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
+References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
+Message-ID: <20140415081004.GJ22546@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 10:59:47 Chanwoo Choi wrote:
-> This patch add memory mapping for PMU (Power Management Unit) which is used
-> for power control of Exynos3250.
+On Tue, Apr 15, 2014 at 09:43:38AM +0400, Lee Essen wrote:
+> Hi,
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Arnd Bergmann suggested that need proper driver instead of static memory mapping.
-> As Chanho Park reply[2], Sachin Kamat already posted the DT support patch[1]
-> for memory mapping for SYSRAM.
-> [1] http://www.spinics.net/lists/linux-samsung-soc/msg27647.html
-> [2] https://lkml.org/lkml/2014/4/10/161
-> 
-> So, I'm going to re-implement following patch related to static memory mapping
-> after merged Sachin Kamat patch[1].
->   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+> I'm working on a driver for a Marvell switch device (98dx4122) where the basic interface closely resembles the mv643xx_eth device.
 
-I don't think we have a patch for the PMU yet, Sachin was looking at the SYSRAM
-only.
+Hi Lee
 
-	Arnd
+There is basic support for this SoC in the kernel. See
+arch/arm/boot/dts/kirkwood-98dx4122.dtsi and
+arch/arm/boot/dts/kirkwood-km_kirkwood.dts which is keymile's
+reference design.
+
+Keymile are the experts for this device within the kernel community,
+so maybe they can comment?
+
+   Andrew
