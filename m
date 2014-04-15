@@ -1,220 +1,162 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 15 Apr 2014 17:48:07 +0800
-Subject: =?UTF-8?q?=5BPATCH=20v2=5D=20clk=3A=20sirf=3A=20fix=20a=20bundle=20of=20checkpatch=20issues?=
-Message-ID: <1397555287-25544-1-git-send-email-21cnbao@gmail.com>
+Date: Tue, 15 Apr 2014 17:49:02 +0800
+Subject: [PATCH] ARM: prima2: remove L2 cache size override
+Message-ID: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bin Shi <Bin.Shi@csr.com>
+From: Barry Song <Baohua.Song@csr.com>
 
-fix the below checkpatch issues about which users of codes - key customers care
-very much.
+L2 cache size has been read by l2x0_init(), it is useless to set
+WAY_SIZE and ASSOCIATIVITY in prima2.
 
-WARNING: line over 80 characters
-66: FILE: clk-atlas6.c:66:
-+	usp2,   vip,   gfx,   gfx2d,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
-
-total: 0 errors, 1 warnings, 153 lines checked
-
-clk-atlas6.c has style problems, please review.
-
-If any of these errors are false positives, please report
-them to the maintainer, see CHECKPATCH in MAINTAINERS.
-WARNING: line over 80 characters
-24: FILE: clk-common.c:24:
-+ *     Each clock domain can select its own clock source from five clock sources,
-WARNING: line over 80 characters
-25: FILE: clk-common.c:25:
-+ *     X_XIN, X_XINW, PLL1, PLL2 and PLL3. The domain clock is used as the source
-
-WARNING: line over 80 characters
-171: FILE: clk-common.c:171:
-+	return pll_clk_round_rate(__clk_get_hw(parent_clk), rate, &pll_parent_rate);
-
-WARNING: static const char * array should probably be static const char * const
-191: FILE: clk-common.c:191:
-+static const char *pll_clk_parents[] = {
-
-WARNING: line over 80 characters
-260: FILE: clk-common.c:260:
-+static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
-
-WARNING: static const char * array should probably be static const char * const
-287: FILE: clk-common.c:287:
-+static const char *dmn_clk_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-676: FILE: clk-common.c:676:
-+static const char *std_clk_io_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-952: FILE: clk-common.c:952:
-+static const char *std_clk_dsp_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-984: FILE: clk-common.c:984:
-+static const char *std_clk_sys_parents[] = {
-
-WARNING: static const char * array should probably be static const char * const
-1002: FILE: clk-common.c:1002:
-+static const char *std_clk_usb_parents[] = {
-
-total: 0 errors, 10 warnings, 1032 lines checked
-
-clk-common.c has style problems, please review.
-
-If any of these errors are false positives, please report
-them to the maintainer, see CHECKPATCH in MAINTAINERS.
-total: 0 errors, 0 warnings, 1032 lines checked
-
-clk-common.c.orig has no obvious style problems and is ready for submission.
-WARNING: line over 80 characters
-65: FILE: clk-prima2.c:65:
-+	usp2,   vip,   gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
-
-total: 0 errors, 1 warnings, 152 lines checked
-
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- drivers/clk/sirf/clk-atlas6.c |   12 ++++++------
- drivers/clk/sirf/clk-common.c |   22 ++++++++++++----------
- drivers/clk/sirf/clk-prima2.c |   10 +++++-----
- 3 files changed, 23 insertions(+), 21 deletions(-)
+ -Derived from Russell's "ARM: l2c: prima2: remove cache size override"
 
-diff --git a/drivers/clk/sirf/clk-atlas6.c b/drivers/clk/sirf/clk-atlas6.c
-index d63b76c..bca0052 100644
---- a/drivers/clk/sirf/clk-atlas6.c
-+++ b/drivers/clk/sirf/clk-atlas6.c
-@@ -59,12 +59,12 @@ static struct clk_dmn clk_nand = {
- };
+ arch/arm/boot/dts/marco.dtsi  |    2 +-
+ arch/arm/boot/dts/prima2.dtsi |    2 +-
+ arch/arm/mach-prima2/common.c |   14 +++++++++--
+ arch/arm/mach-prima2/l2x0.c   |   49 -----------------------------------------
+ 4 files changed, 13 insertions(+), 54 deletions(-)
+ delete mode 100644 arch/arm/mach-prima2/l2x0.c
+
+diff --git a/arch/arm/boot/dts/marco.dtsi b/arch/arm/boot/dts/marco.dtsi
+index 0c9647d..fb35422 100644
+--- a/arch/arm/boot/dts/marco.dtsi
++++ b/arch/arm/boot/dts/marco.dtsi
+@@ -36,7 +36,7 @@
+ 		ranges = <0x40000000 0x40000000 0xa0000000>;
  
- enum atlas6_clk_index {
--	/* 0    1     2      3      4      5      6       7         8      9 */
--	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
--	mf,     io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
--	spi1,   pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
--	usp2,   vip,   gfx,   gfx2d,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
--	usb0,  usb1,   cphif, maxclk,
-+	/* 0    1     2      3      4      5      6       7       8      9 */
-+	rtc,  osc,  pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
-+	mf,   io,   cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
-+	spi1, pwmc, efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
-+	usp2, vip,  gfx,   gfx2d, lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
-+	usb0, usb1, cphif, maxclk,
- };
+ 		l2-cache-controller at c0030000 {
+-			compatible = "sirf,marco-pl310-cache", "arm,pl310-cache";
++			compatible = "arm,pl310-cache";
+ 			reg = <0xc0030000 0x1000>;
+ 			interrupts = <0 59 0>;
+ 			arm,tag-latency = <1 1 1>;
+diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+index 1e82571..0d6588d 100644
+--- a/arch/arm/boot/dts/prima2.dtsi
++++ b/arch/arm/boot/dts/prima2.dtsi
+@@ -48,7 +48,7 @@
+ 		ranges = <0x40000000 0x40000000 0x80000000>;
  
- static __initdata struct clk_hw *atlas6_clk_hw_array[maxclk] = {
-diff --git a/drivers/clk/sirf/clk-common.c b/drivers/clk/sirf/clk-common.c
-index 37af51c..aebaec01 100644
---- a/drivers/clk/sirf/clk-common.c
-+++ b/drivers/clk/sirf/clk-common.c
-@@ -21,8 +21,8 @@ static struct clk_onecell_data clk_data;
-  * - 2 exclusive plls: usb phy pll and sata phy pll
-  * - 8 clock domains: cpu/cpudiv, mem/memdiv, sys/io, dsp, graphic, multimedia,
-  *     display and sdphy.
-- *     Each clock domain can select its own clock source from five clock sources,
-- *     X_XIN, X_XINW, PLL1, PLL2 and PLL3. The domain clock is used as the source
-+ *     Each clock domain can select its own clock source from 5 clock sources,
-+ *     X_XIN, X_XINW, PLL1, PLL2 & PLL3. Domain clock is used as the source
-  *     clock of the group clock.
-  *     - dsp domain: gps, mf
-  *     - io domain: dmac, nand, audio, uart, i2c, spi, usp, pwm, pulse
-@@ -168,7 +168,8 @@ static long cpu_clk_round_rate(struct clk_hw *hw, unsigned long rate,
- 	struct clk *parent_clk = clk_get_parent(hw->clk);
- 	struct clk *pll_parent_clk = clk_get_parent(parent_clk);
- 	unsigned long pll_parent_rate = clk_get_rate(pll_parent_clk);
--	return pll_clk_round_rate(__clk_get_hw(parent_clk), rate, &pll_parent_rate);
-+	return pll_clk_round_rate(__clk_get_hw(parent_clk),
-+		rate, &pll_parent_rate);
+ 		l2-cache-controller at 80040000 {
+-			compatible = "arm,pl310-cache", "sirf,prima2-pl310-cache";
++			compatible = "arm,pl310-cache";
+ 			reg = <0x80040000 0x1000>;
+ 			interrupts = <59>;
+ 			arm,tag-latency = <1 1 1>;
+diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
+index 47c7819..23fcade 100644
+--- a/arch/arm/mach-prima2/common.c
++++ b/arch/arm/mach-prima2/common.c
+@@ -8,11 +8,10 @@
+ 
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+-#include <asm/sizes.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <asm/mach/arch.h>
+ #include "common.h"
+ 
+ static void __init sirfsoc_init_late(void)
+@@ -26,6 +25,12 @@ static __init void sirfsoc_map_io(void)
+ 	sirfsoc_map_scu();
  }
  
- static unsigned long cpu_clk_recalc_rate(struct clk_hw *hw,
-@@ -188,7 +189,7 @@ static struct clk_ops std_pll_ops = {
- 	.set_rate = pll_clk_set_rate,
- };
- 
--static const char *pll_clk_parents[] = {
-+static const char * const pll_clk_parents[] = {
- 	"osc",
- };
- 
-@@ -257,7 +258,8 @@ static void usb_pll_clk_disable(struct clk_hw *clk)
- 	writel(reg, sirfsoc_rsc_vbase + SIRFSOC_USBPHY_PLL_CTRL);
- }
- 
--static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
-+static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw,
-+	unsigned long parent_rate)
- {
- 	u32 reg = readl(sirfsoc_rsc_vbase + SIRFSOC_USBPHY_PLL_CTRL);
- 	return (reg & SIRFSOC_USBPHY_PLL_BYPASS) ? parent_rate : 48*MHZ;
-@@ -284,7 +286,7 @@ static struct clk_hw usb_pll_clk_hw = {
-  * clock domains - cpu, mem, sys/io, dsp, gfx
-  */
- 
--static const char *dmn_clk_parents[] = {
-+static const char * const dmn_clk_parents[] = {
- 	"rtc",
- 	"osc",
- 	"pll1",
-@@ -673,7 +675,7 @@ static void std_clk_disable(struct clk_hw *hw)
- 	clkc_writel(val, reg);
- }
- 
--static const char *std_clk_io_parents[] = {
-+static const char * const std_clk_io_parents[] = {
- 	"io",
- };
- 
-@@ -949,7 +951,7 @@ static struct clk_std clk_pulse = {
- 	},
- };
- 
--static const char *std_clk_dsp_parents[] = {
-+static const char * const std_clk_dsp_parents[] = {
- 	"dsp",
- };
- 
-@@ -981,7 +983,7 @@ static struct clk_std clk_mf = {
- 	},
- };
- 
--static const char *std_clk_sys_parents[] = {
-+static const char * const std_clk_sys_parents[] = {
- 	"sys",
- };
- 
-@@ -999,7 +1001,7 @@ static struct clk_std clk_security = {
- 	},
- };
- 
--static const char *std_clk_usb_parents[] = {
-+static const char * const std_clk_usb_parents[] = {
- 	"usb_pll",
- };
- 
-diff --git a/drivers/clk/sirf/clk-prima2.c b/drivers/clk/sirf/clk-prima2.c
-index 6968e2e..83d74c4 100644
---- a/drivers/clk/sirf/clk-prima2.c
-+++ b/drivers/clk/sirf/clk-prima2.c
-@@ -59,11 +59,11 @@ static struct clk_std clk_nand = {
- 
- enum prima2_clk_index {
- 	/* 0    1     2      3      4      5      6       7         8      9 */
--	rtc,    osc,   pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
--	mf,     io,    cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
--	spi1,   pwmc,  efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
--	usp2,   vip,   gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
--	usb0,  usb1,   cphif, maxclk,
-+	rtc,  osc,  pll1,  pll2,  pll3,  mem,   sys,   security, dsp,   gps,
-+	mf,   io,   cpu,   uart0, uart1, uart2, tsc,   i2c0,     i2c1,  spi0,
-+	spi1, pwmc, efuse, pulse, dmac0, dmac1, nand,  audio,    usp0,  usp1,
-+	usp2, vip,  gfx,   mm,    lcd,   vpp,   mmc01, mmc23,    mmc45, usbpll,
-+	usb0, usb1, cphif, maxclk,
- };
- 
- static __initdata struct clk_hw *prima2_clk_hw_array[maxclk] = {
++static __init void sirfsoc_init_mach(void)
++{
++	l2x0_of_init(0, 0xFDFFFFFFUL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ #ifdef CONFIG_ARCH_ATLAS6
+ static const char *atlas6_dt_match[] __initconst = {
+ 	"sirf,atlas6",
+@@ -35,6 +40,7 @@ static const char *atlas6_dt_match[] __initconst = {
+ DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
+ 	/* Maintainer: Barry Song <baohua.song@csr.com> */
+ 	.map_io         = sirfsoc_map_io,
++	.init_machine   = sirfsoc_init_mach,
+ 	.init_late	= sirfsoc_init_late,
+ 	.dt_compat      = atlas6_dt_match,
+ MACHINE_END
+@@ -50,6 +56,7 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
+ 	/* Maintainer: Barry Song <baohua.song@csr.com> */
+ 	.map_io         = sirfsoc_map_io,
+ 	.dma_zone_size	= SZ_256M,
++	.init_machine   = sirfsoc_init_mach,
+ 	.init_late	= sirfsoc_init_late,
+ 	.dt_compat      = prima2_dt_match,
+ MACHINE_END
+@@ -65,6 +72,7 @@ DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
+ 	/* Maintainer: Barry Song <baohua.song@csr.com> */
+ 	.smp            = smp_ops(sirfsoc_smp_ops),
+ 	.map_io         = sirfsoc_map_io,
++	.init_machine   = sirfsoc_init_mach,
+ 	.init_late	= sirfsoc_init_late,
+ 	.dt_compat      = marco_dt_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+deleted file mode 100644
+index c710253..0000000
+--- a/arch/arm/mach-prima2/l2x0.c
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/*
+- * l2 cache initialization for CSR SiRFprimaII
+- *
+- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+- *
+- * Licensed under GPLv2 or later.
+- */
+-
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/of.h>
+-#include <asm/hardware/cache-l2x0.h>
+-
+-struct l2x0_aux {
+-	u32 val;
+-	u32 mask;
+-};
+-
+-static const struct l2x0_aux prima2_l2x0_aux __initconst = {
+-	.val = 2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT,
+-	.mask =	0,
+-};
+-
+-static const struct l2x0_aux marco_l2x0_aux __initconst = {
+-	.val = (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
+-		(1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
+-	.mask = L2X0_AUX_CTRL_MASK,
+-};
+-
+-static const struct of_device_id sirf_l2x0_ids[] __initconst = {
+-	{ .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
+-	{ .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
+-	{},
+-};
+-
+-static int __init sirfsoc_l2x0_init(void)
+-{
+-	struct device_node *np;
+-	const struct l2x0_aux *aux;
+-
+-	np = of_find_matching_node(NULL, sirf_l2x0_ids);
+-	if (np) {
+-		aux = of_match_node(sirf_l2x0_ids, np)->data;
+-		return l2x0_of_init(aux->val, aux->mask);
+-	}
+-
+-	return 0;
+-}
+-early_initcall(sirfsoc_l2x0_init);
 -- 
 1.7.5.4
