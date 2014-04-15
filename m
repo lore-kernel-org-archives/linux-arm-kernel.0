@@ -1,101 +1,65 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 15 Apr 2014 09:46:00 -0700
-Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
- cache flushing
-In-Reply-To: <20140415154637.GA3560@redhat.com>
-References: <CAA3XUr3w_9318mT2_9+J-nf3wDv5bic+v0H4nVfsYof7wWZs9Q@mail.gmail.com>
- <5347655B.3080307@linaro.org>
- <20140411.003636.272212797007496394.davem@davemloft.net>
- <20140411145625.GA27493@redhat.com>
- <20140411152207.GA28188@redhat.com>
- <20140411153041.GQ16119@n2100.arm.linux.org.uk>
- <20140411172456.GA20506@redhat.com>
- <CA+55aFx=1O67Wi85g_3qiUzxyxfFU0RZQMkMj4_kOB=2T09jwQ@mail.gmail.com>
- <20140414185916.GA30672@redhat.com>
- <CAA3XUr3BGA55JF_cgH=cqbo1wAK0773P1fvnG9dBjLU2KzBdKA@mail.gmail.com>
- <20140415154637.GA3560@redhat.com>
-Message-ID: <CAA3XUr0qcm9CaNcUa7wwR8wNO49Lzc1qi1WHD3CYx_ubWXVEgQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 15 Apr 2014 17:46:13 +0100
+Subject: [RFC PATCH v2] regmap: smbus: add support for regmap over smbus
+In-Reply-To: <534D357F.9040906@metafoo.de>
+References: <1397292335-5516-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397480885-11962-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140414210429.GJ25182@sirena.org.uk>
+ <534CE16D.8010508@free-electrons.com>
+ <20140415100922.GN12304@sirena.org.uk>
+ <534D1DDA.40207@free-electrons.com> <534D252B.8060009@metafoo.de>
+ <20140415125654.GD12304@sirena.org.uk>
+ <534D357F.9040906@metafoo.de>
+Message-ID: <20140415164613.GF12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 April 2014 08:46, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 04/14, Victor Kamensky wrote:
->>
->> On 14 April 2014 11:59, Oleg Nesterov <oleg@redhat.com> wrote:
->> > On 04/11, Linus Torvalds wrote:
->> >>
->> >> So I really think we should just have a fixed
->> >> "flush_icache_page(page,vaddr)" function.
->> >> ...
->> >> Then the uprobe case can just do
->> >>
->> >>     copy_to_page()
->> >>     flush_dcache_page()
->> >>     flush_icache_page()
->> >
->> >
->> > And I obviously like this idea because (iiuc) it more or less matches
->> > flush_icache_page_xxx() I tried to suggest.
->>
->> Would not page granularity to be too expensive? Note you need to do that on
->> each probe hit and you flushing whole data and instruction page every time.
->> IMHO it will work correctly when you flush just few dcache/icache lines that
->> correspond to xol slot that got modified. Note copy_to_user_page takes
->> len that describes size of area that has to be flushed. Given that we are
->> flushing xol area page at this case; and nothing except one xol slot is
->> any interest for current task, and if CPU can flush one dcache and icache
->> page as quickly as it can flush range, my remark may not matter.
->
-> We can add "vaddr, len" to the argument list.
->
->> I personally would prefer if we could have function like copy_to_user_page
->> but without requirement to pass vma to it.
->
-> I won't argue, but you need to convince maintainers.
->
->
-> And to remind, we need something simple/nonintrusive for arm right now.
-> Again, I won't argue if we turn copy_to_page() + flush_dcache_page() into
-> __weak arch_uprobe_copy_ixol(), and add the necessary hacks into arm's
-> implementatiion. This is up to you and Russel.
+On Tue, Apr 15, 2014 at 03:34:55PM +0200, Lars-Peter Clausen wrote:
+> On 04/15/2014 02:56 PM, Mark Brown wrote:
 
-For short term arm specific solution I will follow up on [1]. Yes, I
-will incorporate
-your request to make arch_uprobe_copy_ixol() instead of
-arch_uprobe_flush_xol_access, will address Dave Long's
-comments about checkpatch and will remove special handling for broadcast
-situation (FLAG_UA_BROADCAST) since in further discussion it was
-established that task can migrate while doing uprobes xol single stepping.
+> >  - Providing APIs for registering actual smbus devices as a convenience
+> >    for devices with that constraint, regardless of how that is done
+> >    behind the scenes.
 
-I don't think my patch does those things that you describe below. Anyway,
-I will repost new version of short term arm specific fix proposal today PST
-and we will see what Russell, you and all will say about it.
+> >  - Having the I2C implementation automatically use the smbus APIs if
+> >    it can and either the controller is smbus only or it makes sense to
+> >    do so for optimisation.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/245952.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/245743.html
+> I don't think it makes sense to expose smbus explicitly. We can already
+> describe smbus restricted devices just fine with the current regmap_config
+> and already support them with the current I2C regmap implementation. Using
 
-Thanks,
-Victor
+Please note what I said about convenience - if lots of devices have
+exactly the same set of constraints to set up it's possible sensible to
+have a standard way of specifying them.  It's going to be a bit easier
+to just say it's smbus than to remember exactly what that means.
 
->
->
-> But. Please do not add copy_to_user_page() into copy_to_page() (as your patch
-> did). This is certainly not what uprobe_write_opcode() wants, we do not want
-> or need "flush" in this case. The same for __create_xol_area().
->
-> Note also that currently copy_to_user_page() is always called under mmap_sem.
-> I do not know if arm actually needs ->mmap_sem, but if you propose it as a
-> generic solution we should probably take this lock.
->
-> Also. Even if we have copy_to_user_page_no_vma() or change copy_to_user_page()
-> to accept vma => NULL, I am not sure this will work fine on arm when the probed
-> application unmaps xol_area and mmaps something else at the same vaddr. I mean,
-> in this case we do not care if the application crashes, but please verify that
-> something really bad can't happen.
->
-> Let me repeat just in case, I know nothing about arm/. I can't even understand
-> how, say, flush_pfn_alias() works, and how it should work if 2 threads call it
-> at the same time with the same vaddr (or CACHE_COLOUR(vaddr)).
->
-> Oleg.
->
+> native I2C to access these devices will be more efficient than going through
+> the smbus emulation layer. The smbus emulation layer essentially does the
+> same as we do in regmap, so using the smbus emulation layer through regmap
+> means doing the same thing twice.
+
+Right, that's why I said it's probably only worth it if the controller
+does smbus natively.
+
+> As I see it there are currently 3 cases:
+
+> 1) Device is strictly smbus only and the controller supports native smbus
+>    => Use smbus
+> 2) The device is smbus compatible but has extensions (e.g. support for multi
+> register writes) and the controller supports only smbus.
+>    => Use smbus
+> 3) For every other case
+>    => Use native I2C.
+
+It's not clear to me that if the controller supports smbus we shouldn't
+use it; presumably it's adding some value to have written the code to
+take advantage of it.  That would mean another case for device is smbus
+only and controller has explicit smbus support.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/43481013/attachment.sig>
