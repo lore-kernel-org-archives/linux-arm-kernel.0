@@ -1,86 +1,58 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Tue, 15 Apr 2014 20:37:49 +0300
-Subject: [RESEND PATCH 4/4] ARM: OMAP: debug-leds: raw read and write endian
- fix
-In-Reply-To: <1397583469-14457-1-git-send-email-taras.kondratiuk@linaro.org>
-References: <1397583469-14457-1-git-send-email-taras.kondratiuk@linaro.org>
-Message-ID: <1397583469-14457-5-git-send-email-taras.kondratiuk@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 15 Apr 2014 13:38:40 -0400 (EDT)
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <534D6A1F.70102@linaro.org>
+References: <CAA3XUr3BGA55JF_cgH=cqbo1wAK0773P1fvnG9dBjLU2KzBdKA@mail.gmail.com>
+ <20140415154637.GA3560@redhat.com> <534D6A1F.70102@linaro.org>
+Message-ID: <20140415.133840.2270952586596479547.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Kamensky <victor.kamensky@linaro.org>
+From: David Long <dave.long@linaro.org>
+Date: Tue, 15 Apr 2014 13:19:27 -0400
 
-All OMAP IP blocks expect LE data, but CPU may operate in BE mode.
-Need to use endian neutral functions to read/write h/w registers.
-I.e instead of __raw_read[lw] and __raw_write[lw] functions code
-need to use read[lw]_relaxed and write[lw]_relaxed functions.
-If the first simply reads/writes register, the second will byteswap
-it if host operates in BE mode.
+> On 04/15/14 11:46, Oleg Nesterov wrote:
+>> 
+>> But. Please do not add copy_to_user_page() into copy_to_page() (as your patch
+>> did). This is certainly not what uprobe_write_opcode() wants, we do not want
+>> or need "flush" in this case. The same for __create_xol_area().
+>> 
+> 
+> It looked me like a call to a new __copy_to_user_page(current->mm, ...) in xol_get_insn_slot()
+> would be in line with David Miller's suggestion and would cure the problem on ARM (and hopefuly
+> be more philosophically correct for all architectures):
 
-Changes are trivial sed like replacement of __raw_xxx functions
-with xxx_relaxed variant.
+It occurs to me that because of the specific environment in which this
+executes we can make the interface take advantage of the invariants at
+this call site:
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-Signed-off-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
----
- arch/arm/plat-omap/debug-leds.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+1) We are copying into userspace and thus current->mm
 
-diff --git a/arch/arm/plat-omap/debug-leds.c b/arch/arm/plat-omap/debug-leds.c
-index aa7ebc6..48b69de 100644
---- a/arch/arm/plat-omap/debug-leds.c
-+++ b/arch/arm/plat-omap/debug-leds.c
-@@ -85,12 +85,12 @@ static void dbg_led_set(struct led_classdev *cdev,
- 	struct dbg_led *led = container_of(cdev, struct dbg_led, cdev);
- 	u16 reg;
- 
--	reg = __raw_readw(&fpga->leds);
-+	reg = readw_relaxed(&fpga->leds);
- 	if (b != LED_OFF)
- 		reg |= led->mask;
- 	else
- 		reg &= ~led->mask;
--	__raw_writew(reg, &fpga->leds);
-+	writew_relaxed(reg, &fpga->leds);
- }
- 
- static enum led_brightness dbg_led_get(struct led_classdev *cdev)
-@@ -98,7 +98,7 @@ static enum led_brightness dbg_led_get(struct led_classdev *cdev)
- 	struct dbg_led *led = container_of(cdev, struct dbg_led, cdev);
- 	u16 reg;
- 
--	reg = __raw_readw(&fpga->leds);
-+	reg = readw_relaxed(&fpga->leds);
- 	return (reg & led->mask) ? LED_FULL : LED_OFF;
- }
- 
-@@ -112,7 +112,7 @@ static int fpga_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 
- 	fpga = ioremap(iomem->start, resource_size(iomem));
--	__raw_writew(0xff, &fpga->leds);
-+	writew_relaxed(0xff, &fpga->leds);
- 
- 	for (i = 0; i < ARRAY_SIZE(dbg_leds); i++) {
- 		struct dbg_led *led;
-@@ -138,15 +138,15 @@ static int fpga_probe(struct platform_device *pdev)
- 
- static int fpga_suspend_noirq(struct device *dev)
- {
--	fpga_led_state = __raw_readw(&fpga->leds);
--	__raw_writew(0xff, &fpga->leds);
-+	fpga_led_state = readw_relaxed(&fpga->leds);
-+	writew_relaxed(0xff, &fpga->leds);
- 
- 	return 0;
- }
- 
- static int fpga_resume_noirq(struct device *dev)
- {
--	__raw_writew(~fpga_led_state, &fpga->leds);
-+	writew_relaxed(~fpga_led_state, &fpga->leds);
- 	return 0;
- }
- 
--- 
-1.7.9.5
+2) We are only storing an instruction or two
+
+So it would be just like the dynamic linker lazy resolving a PLT slot in
+userland.
+
+Furthermore, we can do the stores using something akin to put_user(),
+directly store them into userspace.
+
+This avoids completely any D-cache aliasing issues.  The kernel stores
+to the same address, and therefore the same cache lines, as userspace
+would.
+
+So for example, since even on the most braindamaged sparc64 cpus the
+remote cpus will have their I-cache snoop the store we do locally we
+just need to do a simple flush on the local cpu where this store is
+happening.  So I'd like to do this something like:
+
+	stw	%r1, [%r2 + 0x0]
+	flush	%r2
+
+PowerPC could probably do something similar.
+
+The copy_to_user_page() interface has to deal with storing into a non-current
+'mm' and therefore via the kernel side copy of the page and that's why the
+D-cache aliasing issues are so painful to deal with.
+
+Just a thought...
