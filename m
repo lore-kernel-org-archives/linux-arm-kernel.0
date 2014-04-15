@@ -1,33 +1,82 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 15 Apr 2014 20:48:19 +0200
-Subject: [PATCH] ARM: berlin: add CPU_V7 to Marvell Armada 1500-mini (BG2CD)
-Message-ID: <1397587699-11023-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 15 Apr 2014 11:48:50 -0700
+Subject: [PATCH 1/3] net: phy: add minimal support for QSGMII PHY
+In-Reply-To: <1397569821-5530-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397569821-5530-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAGVrzcbtrFd=KCabHuzUGpzTdq15n9kWw04xDbve22Xu1M+H8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This selects missing CPU_V7 for ARM Cortex-A9 based Marvell Armada
-1500-mini (BG2CD).
+2014-04-15 6:50 GMT-07:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> This commit adds the necessary definitions for the PHY layer to
+> recognize "qsgmii" as a valid PHY interface. A QSMII interface, as
+> defined at
+> http://en.wikipedia.org/wiki/Media_Independent_Interface#Quad_Serial_Gigabit_Media_Independent_Interface,
+> is "is a method of combining four SGMII lines into a 5Gbit/s
+> interface. QSGMII, like SGMII, uses LVDS signalling for the TX and RX
+> data and a single LVDS clock signal. QSGMII uses significantly fewer
+> signal lines than four SGMII busses."
+>
+> This type of MAC <-> PHY connection might require special handling on
+> the MAC driver side, so it should be possible to express this type of
+> MAC <-> PHY connection, for example in the Device Tree.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-berlin/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-index d3c5f14dc142..0add8350faf4 100644
---- a/arch/arm/mach-berlin/Kconfig
-+++ b/arch/arm/mach-berlin/Kconfig
-@@ -18,6 +18,7 @@ config MACH_BERLIN_BG2
- config MACH_BERLIN_BG2CD
- 	bool "Marvell Armada 1500-mini (BG2CD)"
- 	select CACHE_L2X0
-+	select CPU_V7
- 	select HAVE_ARM_TWD if SMP
- 
- config MACH_BERLIN_BG2Q
+> Cc: devicetree at vger.kernel.org
+> ---
+>  Documentation/devicetree/bindings/net/ethernet.txt | 2 +-
+>  include/linux/phy.h                                | 3 +++
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/net/ethernet.txt b/Documentation/devicetree/bindings/net/ethernet.txt
+> index 9ecd43d..3fc3605 100644
+> --- a/Documentation/devicetree/bindings/net/ethernet.txt
+> +++ b/Documentation/devicetree/bindings/net/ethernet.txt
+> @@ -10,7 +10,7 @@ The following properties are common to the Ethernet controllers:
+>  - max-frame-size: number, maximum transfer unit (IEEE defined MTU), rather than
+>    the maximum frame size (there's contradiction in ePAPR).
+>  - phy-mode: string, operation mode of the PHY interface; supported values are
+> -  "mii", "gmii", "sgmii", "tbi", "rev-mii", "rmii", "rgmii", "rgmii-id",
+> +  "mii", "gmii", "sgmii", "qsgmii", "tbi", "rev-mii", "rmii", "rgmii", "rgmii-id",
+>    "rgmii-rxid", "rgmii-txid", "rtbi", "smii", "xgmii"; this is now a de-facto
+>    standard property;
+>  - phy-connection-type: the same as "phy-mode" property but described in ePAPR;
+> diff --git a/include/linux/phy.h b/include/linux/phy.h
+> index 24126c4..4d0221f 100644
+> --- a/include/linux/phy.h
+> +++ b/include/linux/phy.h
+> @@ -75,6 +75,7 @@ typedef enum {
+>         PHY_INTERFACE_MODE_SMII,
+>         PHY_INTERFACE_MODE_XGMII,
+>         PHY_INTERFACE_MODE_MOCA,
+> +       PHY_INTERFACE_MODE_QSGMII,
+>         PHY_INTERFACE_MODE_MAX,
+>  } phy_interface_t;
+>
+> @@ -116,6 +117,8 @@ static inline const char *phy_modes(phy_interface_t interface)
+>                 return "xgmii";
+>         case PHY_INTERFACE_MODE_MOCA:
+>                 return "moca";
+> +       case PHY_INTERFACE_MODE_QSGMII:
+> +               return "qsgmii";
+>         default:
+>                 return "unknown";
+>         }
+> --
+> 1.8.3.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
 -- 
-1.9.1
+Florian
