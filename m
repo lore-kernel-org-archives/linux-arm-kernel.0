@@ -1,61 +1,51 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 15 Apr 2014 17:41:58 +0900
-Subject: [PATCHv2 3/8] ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
-In-Reply-To: <CAGm_ybhGBVmUu9PgppgWfH8b8=3JVhqK0v=ZR_yE8Cs42+VUOg@mail.gmail.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-4-git-send-email-cw00.choi@samsung.com>
- <4788081.xvaJfdGTMu@wuerfel> <534CEEA8.6020800@samsung.com>
- <CAGm_ybhGBVmUu9PgppgWfH8b8=3JVhqK0v=ZR_yE8Cs42+VUOg@mail.gmail.com>
-Message-ID: <534CF0D6.5030400@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Apr 2014 10:43:09 +0200
+Subject: dma_alloc_coherent and cache?
+In-Reply-To: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
+References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
+Message-ID: <4356499.vN3lxjGqPZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 15 April 2014 09:43:38 Lee Essen wrote:
+> 
+> 
+> At a high level I have it working, however I get regular (reproducible) 
+> hangs and I suspect it's to do with the writes to the descriptiors 
+> (from dma_alloc_coherent) being buffered or cached and not making it
+> to the device when dma is triggered.
 
-On 04/15/2014 05:39 PM, Vikas Sajjan wrote:
-> Hi,
-> 
-> On Tue, Apr 15, 2014 at 2:02 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> Hi,
->>
->> On 04/15/2014 05:11 PM, Arnd Bergmann wrote:
->>> On Tuesday 15 April 2014 10:59:47 Chanwoo Choi wrote:
->>>> This patch add memory mapping for PMU (Power Management Unit) which is used
->>>> for power control of Exynos3250.
->>>>
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>> Arnd Bergmann suggested that need proper driver instead of static memory mapping.
->>>> As Chanho Park reply[2], Sachin Kamat already posted the DT support patch[1]
->>>> for memory mapping for SYSRAM.
->>>> [1] http://www.spinics.net/lists/linux-samsung-soc/msg27647.html
->>>> [2] https://lkml.org/lkml/2014/4/10/161
->>>>
->>>> So, I'm going to re-implement following patch related to static memory mapping
->>>> after merged Sachin Kamat patch[1].
->>>>   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
->>>
->>> I don't think we have a patch for the PMU yet, Sachin was looking at the SYSRAM
->>> only.
->>
->> You are right. Sachin's patch only included the solution of SYSRAM memory mapping.
->> I set out the plan that I would implment proper driver for PMU memory mapping
->> instead of static method after merged Sachin's patch for SYSRAM.
->>
->> But,
->> If you'd like me to implment PMU memory mapping instead of static mapping right now,
->> I'll implement it for PMU such as Sachin's patch on next posting(v3).
->>
-> 
-> I have already posted patch[1] for mapping PMU through DT as part of
-> my PMU series for exynos5260.
-> You can rebase on the same.
-> 
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg316013.html
+dma_alloc_coherent() is a wrapper around a device-specific allocator,
+based on the dma_map_ops implementation. The default allocator
+from arm_dma_ops gives you uncached, buffered memory. It is expected
+that the driver uses a barrier (which is implied by readl/writel
+but not __raw_readl/__raw_writel or readl_relaxed/writel_relaxed)
+to ensure the write buffers are flushed.
 
-OK, I'll rebase it after merged PMU mapping patch[1].
+If the machine sets arm_coherent_dma_ops rather than arm_dma_ops,
+the memory will be cacheable, as it's assumed that the hardware
+is set up for cache-coherent DMAs.
+ 
+> My theory is based on the fact that the hang always seems to happen
+> at the point of enabling dma for transmit, and occasionally I get a
+> packet out which is corrupt ... and if I add lots of debug printk's
+> or delay loops then it happens less frequently.
+> 
+> The original GPL code has some functions in to invalidate/clear the
+> L2 cache, but no other driver seems to do this, so it doesn't feel
+> like it's a good solution.
 
-Thanks,
-Chanwoo Choi
+Correct, drivers should never do cache management by hand, they
+should rely on dma_alloc_coherent, dma_map_* and dma_unmap_* to
+do the right thing.
+
+> It's a feroceon cpu, and I've tried disabling the L2 controller and
+> also the d-cache - neither of which made any difference.
+> 
+> So I'm now completely out of ideas and way out of my depth  
+> 
+> Any suggestions would be greatly appreciated.
+
+Can you post a link to the source code?
+
+	Arnd
