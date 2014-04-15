@@ -1,31 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 15 Apr 2014 12:25:01 -0600
-Subject: [PATCH 2/4] mmc: tegra: fix reporting of base clock frequency
-In-Reply-To: <1397526163-20126-3-git-send-email-abrestic@chromium.org>
-References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
- <1397526163-20126-3-git-send-email-abrestic@chromium.org>
-Message-ID: <534D797D.7030201@wwwdotorg.org>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 15 Apr 2014 14:27:31 -0400 (EDT)
+Subject: [RFC PATCH] uprobes: copy to user-space xol page with proper
+ cache flushing
+In-Reply-To: <20140415180700.GB11690@redhat.com>
+References: <20140415174900.GA11184@redhat.com>
+ <20140415.135038.1703628429468655272.davem@davemloft.net>
+ <20140415180700.GB11690@redhat.com>
+Message-ID: <20140415.142731.2298870571726062338.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2014 07:42 PM, Andrew Bresticker wrote:
-> Tegra SDHCI controllers, by default, report a base clock frequency
-> of 208Mhz in SDHCI_CAPABILTIES which may or may not be equal to the
-> actual base clock frequency.
+From: Oleg Nesterov <oleg@redhat.com>
+Date: Tue, 15 Apr 2014 20:07:00 +0200
 
-Some explanation of why this "may or may not be equal to the actual base
-clock frequency" would be nice.
+> On 04/15, David Miller wrote:
+>>
+>> From: Oleg Nesterov <oleg@redhat.com>
+>> Date: Tue, 15 Apr 2014 19:49:00 +0200
+>>
+>> > We do not want to write to, say, page cache if the probed application
+>> > mmaps a file at the same vaddr.
+>>
+>> If user has write access to that page... not our problem.
+> 
+> Well, I am not sure.
+> 
+> Yes, this won't allow you to write the exploit. But if this actually
+> happens because an application is buggy, this can lead to really
+> hard-to-debug problems.
 
-Presumably, it's because the clock frequency is supplied by the clock
-controller module, and configuring that happens externally to the SD
-controller, so the SD HW has no knowledge of the actual frequency, and
-hence simply reports a hard-coded maximum possible clock frequency?
+And this is different from a stray userland scribble onto such a page
+how?
 
-> While this can be overridden by setting
-> BASE_CLK_FREQ in VENDOR_CLOCK_CTRL on Tegra30 and later SoCs, just
-> set SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN and supply a get_max_clock()
-> callback to get the actual rate of the base clock.
-
-It's not clear to me from the function name that
-sdhci_pltfm_clk_get_max_clock() simply calls clk_get() on the actual
-clock. It might be nice to mention that in the commit description.
+This is all so much simpler if you don't insist on doing all of this
+hand-holding for the user, that's not the kernel's job.
