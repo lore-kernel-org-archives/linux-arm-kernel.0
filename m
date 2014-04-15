@@ -1,40 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Apr 2014 16:20:24 +0200
-Subject: [PATCH 1/7] gpiolib: gpiolib-of: Implement device tree
- gpio-names based lookup
-In-Reply-To: <1397544101-18135-2-git-send-email-wens@csie.org>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-2-git-send-email-wens@csie.org>
-Message-ID: <20140415142024.GD3207@lukather>
+From: t.stanislaws@samsung.com (Tomasz Stanislawski)
+Date: Tue, 15 Apr 2014 16:25:07 +0200
+Subject: [PATCH] arm: dts: exynos4412-trats2: rename alias for i2c_ak8975 label
+Message-ID: <534D4143.3050801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+The i2c_ak8975 controler uses label i2c8.
+This alias is already used for I2C controller 8 defined
+in file arch/arm/boot/dts/exynos4.dtsi.
 
-On Tue, Apr 15, 2014 at 02:41:35PM +0800, Chen-Yu Tsai wrote:
-> This patch provides of_get_gpiod_flags_by_name(), which looks up GPIO
-> phandles by name only, through gpios/gpio-names, and not by index.
+This patch renames a label for i2c_ak8975 to i2c9.
 
-IIRC, gpios only uses the *-gpios properties, and not gpios/gpio-names
-pattern seen on various other things.
+Signed-off-by: Tomasz Stanislawski <t.stanislaws@samsung.com>
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Is it some new property you introduce? If so, please add it to the
-documentation.
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index c16b315..5add765 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -20,7 +20,7 @@
+ 	compatible = "samsung,trats2", "samsung,exynos4412", "samsung,exynos4";
 
-Now, I'm not sure that having two distinct representations of GPIOs in
-the DT is a good thing. Yes, it's looking odd compared to other
-similar bindings, but it's what we have to deal with.
+ 	aliases {
+-		i2c8 = &i2c_ak8975;
++		i2c9 = &i2c_ak8975;
+ 	};
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140415/82315949/attachment.sig>
+ 	memory {
