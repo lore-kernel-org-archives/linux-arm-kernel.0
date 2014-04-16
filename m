@@ -1,44 +1,49 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 16 Apr 2014 11:24:52 +0400
-Subject: [PATCH 3/8] ARM: dts: imx51-babbage: Add missing pingroup for PMIC
+Date: Wed, 16 Apr 2014 11:24:56 +0400
+Subject: [PATCH 7/8] ARM: dts: imx51-babbage: Add devicetree node for I2C1
 In-Reply-To: <1397633097-1640-1-git-send-email-shc_work@mail.ru>
 References: <1397633097-1640-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1397633097-1640-3-git-send-email-shc_work@mail.ru>
+Message-ID: <1397633097-1640-7-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing pin definition for PMIC IRQ GPIO.
+This patch adds devicetree node and pinctrl group for I2C1.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx51-babbage.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx51-babbage.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index ad143eb..1652f6a 100644
+index 6484b73..5a50bbf 100644
 --- a/arch/arm/boot/dts/imx51-babbage.dts
 +++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -199,6 +199,8 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "fsl,mc13892";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pmic>;
- 		spi-max-frequency = <6000000>;
- 		spi-cs-high;
- 		reg = <0>;
-@@ -490,6 +492,12 @@
+@@ -335,6 +335,12 @@
+ 	status = "okay";
+ };
+ 
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++};
++
+ &i2c2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+@@ -513,6 +519,13 @@
  			>;
  		};
  
-+		pinctrl_pmic: pmicgrp {
++		pinctrl_i2c1: i2c1grp {
 +			fsl,pins = <
-+				MX51_PAD_GPIO1_8__GPIO1_8		0xe5 /* IRQ */
++				MX51_PAD_EIM_D19__I2C1_SCL		0x400001ed
++				MX51_PAD_EIM_D16__I2C1_SDA		0x400001ed
 +			>;
 +		};
 +
- 		pinctrl_uart1: uart1grp {
+ 		pinctrl_i2c2: i2c2grp {
  			fsl,pins = <
- 				MX51_PAD_UART1_RXD__UART1_RXD		0x1c5
+ 				MX51_PAD_KEY_COL4__I2C2_SCL		0x400001ed
 -- 
 1.8.3.2
