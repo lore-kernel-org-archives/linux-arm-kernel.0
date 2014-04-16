@@ -1,38 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Apr 2014 18:03:15 +0200
-Subject: [PATCH 5/6] ARM: mvebu: Add thermal quirk for the Armada 375 DB
- board
-In-Reply-To: <534EA8C9.7010907@gmail.com>
-References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1397657720-10893-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <534EA8C9.7010907@gmail.com>
-Message-ID: <20140416180315.5153c3f7@skate>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 16 Apr 2014 11:05:29 -0500
+Subject: [PATCH v2 05/14] arm: common: edma: Select event queue 1 as
+ default when booted with DT
+In-Reply-To: <534E7EB0.9000601@ti.com>
+References: <1396357575-30585-1-git-send-email-peter.ujfalusi@ti.com>
+ <1396357575-30585-6-git-send-email-peter.ujfalusi@ti.com>
+ <5347A4FD.1030803@ti.com> <5347ACDE.7040407@ti.com> <5347AE49.5020109@ti.com>
+ <5347B7F8.2000508@ti.com> <20140411094217.GA32284@intel.com>
+ <5347D2CC.4030407@ti.com> <20140411113154.GB32284@intel.com>
+ <5347DEDA.2060008@ti.com> <20140411124641.GC32284@intel.com>
+ <534BCCD3.9060805@ti.com> <534BD0B5.5000004@ti.com> <534BD788.3050406@ti.com>
+ <534BF181.6060503@ti.com> <534E7EB0.9000601@ti.com>
+Message-ID: <534EAA49.7030702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+On 04/16/2014 07:59 AM, Peter Ujfalusi wrote:
+[..]
+>>>>> If the dma-priority is missing we should assume lowest priority (0).
+>>>>> The highest priority depends on the platform. For eDMA3 in AM335x it is three
+>>>>> level. For designware controller you might have the range 0-8 as valid.
+>>>>>
+>>>>> The question is how to get this information into use?
+>>>>> We can take the priority number in the core when the dma channel is requested
+>>>>> and add field to "struct dma_chan" in order to store it and the DMA drivers
+>>>>> could have access to it.
+>>
+>> How about Vinod's idea of extending dma_slave_config? Priority is
+>> similar to rest of the runtime setup dmaengine_slave_config() is meant
+>> to do.
+> 
+> The dma_slave_config is prepared by the client drivers, so they would need to
+> be updated to handle the priority for the DMA. This would lead to duplicated
+> code - unless we have a small function in dmaengine core to fetch this
+> information, but still all dmaengine clients would need to call that.
+> IMHO it would be better to let the dmaengine core to take the priority for the
+> channel when it has been asked so client drivers does not need to know about it.
+> 
 
-On Wed, 16 Apr 2014 17:59:05 +0200, Sebastian Hesselbarth wrote:
+I still feel it is much cleaner to keep this out of DT and have audio
+driver configure the channel manually for higher priority. Because,
+AFAIK audio is the only device that uses slave DMA and needs higher
+priority. I'd imagine everyone else who needs high priority, have their
+own dedicated DMAC, so from that sense I don't see the priority
+mechanism being used a lot anywhere else but audio, so atleast we can
+rule out things like code duplication in other drivers. Priority can be
+set to a default of low for those drivers that don't configure the
+channel for priority. I'm also OK with EDMA driver configuring channel
+for higher priority manually for the Cyclic case like you did initially.
 
-> Are we sure, we want to fixup quirks like this the way below?
-
-We already have an exactly identical quirk for the A0 I2C issue, in the
-same file, right above the quirk Ezequiel is adding here. So using the
-same strategy for both cases would be nice.
-
-> Alternatively, we can also keep some armada-375-z1.dtsi and one
-> for the board including it.
-
-For minor differences such as SoC stepping, I personally prefer to not
-have separate Device Trees. We already have many of them, for each
-variant of the various SOCs. If we add the different steppings, it's
-going to be even more complicated. Also, there will be a new iteration
-of the Armada 375 DB with an A0 chip, which does not have the Z1 bug.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+-Joel
