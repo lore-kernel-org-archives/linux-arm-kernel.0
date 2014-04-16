@@ -1,45 +1,33 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 16 Apr 2014 09:13:50 +0200
-Subject: [PATCH v3 1/4] reset: add driver for socfpga
-In-Reply-To: <1397602483.3330.2.camel@linux-builds1>
-References: <1397548592-6384-1-git-send-email-s.trumtrar@pengutronix.de>
- <1397602483.3330.2.camel@linux-builds1>
-Message-ID: <20140416071350.GI16054@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 16 Apr 2014 09:19:08 +0200
+Subject: [PATCH v5 02/20] clk: shmobile: r8a7779: Add MSTP clock support
+In-Reply-To: <1397613454-7522-3-git-send-email-horms+renesas@verge.net.au>
+References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
+ <1397613454-7522-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVQ85F-aG+Hg1pitjh3sPPxZ5b2ez95G=g_YkGHA-HTtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 05:54:43PM -0500, Dinh Nguyen wrote:
-> On Tue, 2014-04-15 at 09:56 +0200, Steffen Trumtrar wrote:
-> > Add a reset-controller driver for the socfpga platform.
-> > The reset-controller has four banks with up to 32 entries all encapsulated in
-> > one module block.
-> > 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> > 
-> > Notes:
-> >     Changes since v2:
-> >     	- remove superfluous ret in probe function
-> >     	- add Acked-by
-> >     
-> >     Changes since v1:
-> >     	- use BITS_PER_LONG everywhere instead of MAX_BANK_WIDTH
-> >     	- print pdev->dev.of_node->full_name on error
-> >     	- use proper IS_ERR/PTR_ERR
-> > 
-> 
-> I've applied this series to rocketboards linux-socfpga-next/drivers and
-> linux-socfpga-next/next-dt.
-> 
+On Wed, Apr 16, 2014 at 3:57 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add MSTP clock support for the r8a7779 SoC
+>
+> The only change required appears to be to note a new
+> compatibility string in the bindings.
+>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-\o/
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Thanks,
-Steffen
+Gr{oetje,eeting}s,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
