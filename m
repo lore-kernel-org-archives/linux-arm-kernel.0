@@ -1,85 +1,167 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Apr 2014 15:39:23 +0530
-Subject: [PATCH][next] phy: core: make NULL a valid phy reference if
- !CONFIG_GENERIC_PHY
-In-Reply-To: <5321B4B4.9010806@ti.com>
-References: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
- <5321B4B4.9010806@ti.com>
-Message-ID: <534E56D3.3040907@ti.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Wed, 16 Apr 2014 15:41:34 +0530
+Subject: [PATCH v7 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <20140416090605.GP32284@intel.com>
+References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
+ <1396008222-7058-3-git-send-email-sthokal@xilinx.com>
+ <20140416090605.GP32284@intel.com>
+Message-ID: <CA+mB=1LDGCY3sN5sL1giOwwqHjD8gG74Yy0dXRS8s+MtDOvxHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 16, 2014 at 2:36 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Fri, Mar 28, 2014 at 05:33:42PM +0530, Srikanth Thokala wrote:
+>> This is the driver for the AXI Video Direct Memory Access (AXI
+>> VDMA) core, which is a soft Xilinx IP core that provides high-
+>> bandwidth direct memory access between memory and AXI4-Stream
+>> type video target peripherals. The core provides efficient two
+>> dimensional DMA operations with independent asynchronous read
+>> and write channel operation.
+>>
+>> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
+>
+> Okay the series is fine and was going to apply it BUT
+> 1) need ack on DT patch..
+> 2) issues below on managing the descriptor and resetting the cookie :(
 
-On Thursday 13 March 2014 07:07 PM, Santosh Shilimkar wrote:
-> On Thursday 13 March 2014 07:11 PM, Strashko, Grygorii wrote:
->> This fixes a regression on Keystone 2 platforms caused by patch
->> 57303488cd37da58263e842de134dc65f7c626d5
->> "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
->> optional support of generic phy in DWC3 core.
->>
->> On Keystone 2 platforms the USB is not working now because
->> CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
->> return -ENOSYS always. The log shows:
->>  dwc3 2690000.dwc3: failed to initialize core
->>  dwc3: probe of 2690000.dwc3 failed with error -38
->>
->> Hence, fix it by making NULL a valid phy reference in Generic PHY
->> APIs stubs in the same way as it was done by the patch
->> 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
->> a valid phy reference".
->>
->> CC: Kishon Vijay Abraham I <kishon@ti.com>
->> CC: Felipe Balbi <balbi@ti.com>
->> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
-> This fixes the regression seen in Linux next and patch seems
-> reasonable to me.
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> Felipe, Kishon,
-> Can you guys pick this fix if you are ok by it. Thanks
-> 
-> 
->>  include/linux/phy/phy.h |    8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
->> index e2f5ca9..5a9b193 100644
->> --- a/include/linux/phy/phy.h
->> +++ b/include/linux/phy/phy.h
->> @@ -204,21 +204,29 @@ static inline void phy_pm_runtime_forbid(struct phy *phy)
->>  
->>  static inline int phy_init(struct phy *phy)
->>  {
->> +	if (!phy)
->> +		return 0;
->>  	return -ENOSYS;
->>  }
->>  
->>  static inline int phy_exit(struct phy *phy)
->>  {
->> +	if (!phy)
->> +		return 0;
->>  	return -ENOSYS;
->>  }
->>  
->>  static inline int phy_power_on(struct phy *phy)
->>  {
->> +	if (!phy)
->> +		return 0;
->>  	return -ENOSYS;
->>  }
->>  
->>  static inline int phy_power_off(struct phy *phy)
->>  {
->> +	if (!phy)
->> +		return 0;
->>  	return -ENOSYS;
->>  }
+Ok.
 
-Can you add these checks for other stubs in phy.h too?
+>
+>> +
+>> +/**
+>> + * xilinx_vdma_tx_descriptor - Allocate transaction descriptor
+>> + * @chan: Driver specific VDMA channel
+>> + *
+>> + * Return: The allocated descriptor on success and NULL on failure.
+>> + */
+>> +static struct xilinx_vdma_tx_descriptor *
+>> +xilinx_vdma_alloc_tx_descriptor(struct xilinx_vdma_chan *chan)
+>> +{
+>> +     struct xilinx_vdma_tx_descriptor *desc;
+>> +     unsigned long flags;
+>> +
+>> +     if (chan->allocated_desc)
+>> +             return chan->allocated_desc;
+> ??
+>
+>> +
+>> +     desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+>> +     if (!desc)
+>> +             return NULL;
+>> +
+>> +     spin_lock_irqsave(&chan->lock, flags);
+>> +     chan->allocated_desc = desc;
+> ah why do you need this?
+>
+> So this essentailly prevents you from preparing two trasactions at same time as
+> you would overwrite??
 
-Thanks
-Kishon
+This will allow to queue up multiple segments on to a single
+transaction descriptor.
+User will submit this single desc and in the issue_pending() we decode multiple
+segments and submit to SG HW engine.  We free up the allocated_desc when it is
+submitted to the HW.  This is added after my discussion with Jaswinder, to best
+utilize HW SG engine.
+
+>
+> You should maintain a list for pending and submitted.
+
+Yes, we maintain two lists pending_list and done_list.
+
+>
+>> +     spin_unlock_irqrestore(&chan->lock, flags);
+>> +
+>> +     INIT_LIST_HEAD(&desc->segments);
+>> +
+>> +     return desc;
+>> +}
+>> +
+>
+>> +/**
+>> + * xilinx_vdma_tx_submit - Submit DMA transaction
+>> + * @tx: Async transaction descriptor
+>> + *
+>> + * Return: cookie value on success and failure value on error
+>> + */
+>> +static dma_cookie_t xilinx_vdma_tx_submit(struct dma_async_tx_descriptor *tx)
+>> +{
+>> +     struct xilinx_vdma_tx_descriptor *desc = to_vdma_tx_descriptor(tx);
+>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(tx->chan);
+>> +     dma_cookie_t cookie;
+>> +     unsigned long flags;
+>> +     int err;
+>> +
+>> +     if (chan->err) {
+>> +             /*
+>> +              * If reset fails, need to hard reset the system.
+>> +              * Channel is no longer functional
+>> +              */
+>> +             err = xilinx_vdma_chan_reset(chan);
+>> +             if (err < 0)
+>> +                     return err;
+>> +     }
+>> +
+>> +     spin_lock_irqsave(&chan->lock, flags);
+>> +
+>> +     cookie = dma_cookie_assign(tx);
+>> +
+>> +     /* Append the transaction to the pending transactions queue. */
+>> +     list_add_tail(&desc->node, &chan->pending_list);
+>> +
+>> +     /* Free the allocated desc */
+>> +     chan->allocated_desc = NULL;
+>> +
+>> +     spin_unlock_irqrestore(&chan->lock, flags);
+>> +
+>> +     return cookie;
+>> +}
+>> +
+>> +/**
+>> + * xilinx_vdma_dma_prep_interleaved - prepare a descriptor for a
+>> + *   DMA_SLAVE transaction
+>> + * @dchan: DMA channel
+>> + * @xt: Interleaved template pointer
+>> + * @flags: transfer ack flags
+>> + *
+>> + * Return: Async transaction descriptor on success and NULL on failure
+>> + */
+>> +static struct dma_async_tx_descriptor *
+>> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
+>> +                              struct dma_interleaved_template *xt,
+>> +                              unsigned long flags)
+>> +{
+>> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+>> +     struct xilinx_vdma_tx_descriptor *desc;
+>> +     struct xilinx_vdma_tx_segment *segment, *prev = NULL;
+>> +     struct xilinx_vdma_desc_hw *hw;
+>> +
+>> +     if (!is_slave_direction(xt->dir))
+>> +             return NULL;
+>> +
+>> +     if (!xt->numf || !xt->sgl[0].size)
+>> +             return NULL;
+>> +
+>> +     /* Allocate a transaction descriptor. */
+>> +     desc = xilinx_vdma_alloc_tx_descriptor(chan);
+>> +     if (!desc)
+>> +             return NULL;
+>> +
+>> +     dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
+>> +     desc->async_tx.tx_submit = xilinx_vdma_tx_submit;
+>> +     desc->async_tx.cookie = 0;
+> why this is initialized in submit.. when you call dma_cookie_assign()
+
+This is while preparing the descs, but I see your point.  I will fix
+it in my next version.
+
+Srikanth
+
+>
+> --
+> ~Vinod
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
