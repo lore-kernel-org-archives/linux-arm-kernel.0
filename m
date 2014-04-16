@@ -1,46 +1,129 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Apr 2014 10:52:27 +0200
-Subject: [PATCH] ARM: prima2: remove L2 cache size override
-In-Reply-To: <20140415215615.GZ24070@n2100.arm.linux.org.uk>
-References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
- <CAGsJ_4zt4KMLk7v93e40Zj1A7fHBnvE2_c94nAbGAr9xcCFnwg@mail.gmail.com>
- <20140415215615.GZ24070@n2100.arm.linux.org.uk>
-Message-ID: <6113510.ZYPB60x7iK@wuerfel>
+From: Guangyu.Chen@freescale.com (Nicolin Chen)
+Date: Wed, 16 Apr 2014 16:40:46 +0800
+Subject: [PATCH v3 09/18] ASoC: fsl-ssi: Only enable baudclk when used
+In-Reply-To: <20140416084331.GD6159@pengutronix.de>
+References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
+ <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
+ <20140414152850.GB7197@MrMyself>
+ <20140416072738.GC6159@pengutronix.de>
+ <20140416080826.GA13449@MrMyself>
+ <20140416084331.GD6159@pengutronix.de>
+Message-ID: <20140416084045.GB13449@MrMyself>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 April 2014 22:56:15 Russell King - ARM Linux wrote:
-> On Tue, Apr 15, 2014 at 06:13:27PM +0800, Barry Song wrote:
-> > 
-> > ok, it seems we still need to hook this into the callback of this
-> > specific machine instead of using a global early_initcall(). since now
-> > the dt compatible field has been generic enough, it will cause other
-> > platforms to execute l2x0_of_init() too.
+On Wed, Apr 16, 2014 at 10:43:31AM +0200, Markus Pargmann wrote:
+> Hi Nicolin,
 > 
-> What I did for Versatile Express was to move it to the init_irq stage.
-> I'm not condoning using init_irq() for non-IRQ stuff, but that was
-> just to see whether it was possible (the .init_early is too early for
-> it.)  Let me put it another way: I'm not thrilled by the idea of
-> having it in init_irq() but that's a better location to call L2 cache
-> initialisation than half-way through the kernel's initialisation.
+> On Wed, Apr 16, 2014 at 04:08:29PM +0800, Nicolin Chen wrote:
+> > Hi Markus,
+> > 
+> > Please allow me to drop some content.
+> > 
+> > On Wed, Apr 16, 2014 at 09:27:38AM +0200, Markus Pargmann wrote:
+> > > On Mon, Apr 14, 2014 at 11:28:51PM +0800, Nicolin Chen wrote:
+> > > > On Mon, Apr 14, 2014 at 03:35:39PM +0200, Markus Pargmann wrote:
+> > > > > +static bool fsl_ssi_is_i2s_master(struct fsl_ssi_private *ssi_private)
+> > > > > +{
+> > > > > +	return (ssi_private->dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) ==
+> > > > > +		SND_SOC_DAIFMT_CBS_CFS;
+> > > > > +}
+> > 
+> > > > > @@ -496,6 +503,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+> > > > >  		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
+> > > > >  	}
+> > > > >  
+> > > > > +	if (fsl_ssi_is_i2s_master(ssi_private)) {
+> > > > > +		ret = clk_prepare_enable(ssi_private->baudclk);
+> > > > > +		if (ret)
+> > > > > +			return ret;
+> > > > > +	}
+> > 
+> > > > > +static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
+> > > > > +		struct snd_soc_dai *dai)
+> > > > > +{
+> > > > > +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> > > > > +	struct fsl_ssi_private *ssi_private =
+> > > > > +		snd_soc_dai_get_drvdata(rtd->cpu_dai);
+> > > > > +
+> > > > > +	if (fsl_ssi_is_i2s_master(ssi_private))
+> > > > > +		clk_disable_unprepare(ssi_private->baudclk);
+> > > > > +}
+> > 
+> > > > > @@ -576,6 +600,11 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+> > > > >  
+> > > > >  	ssi_private->dai_fmt = fmt;
+> > > > >  
+> > > > > +	if (fsl_ssi_is_i2s_master(ssi_private) && IS_ERR(ssi_private->baudclk)) {
+> > > > > +		dev_err(cpu_dai->dev, "no baudclk needed for master mode\n");
+> > > > > +		return -EINVAL;
+> > > > > +	}
+> > > > > +
+> > > > 
+> > > > I was wondering what if machine driver doesn't set fmt to master during
+> > > > its probe(), in another word -- before fsl_ssi_startup(), but leave that
+> > > > into its hw_params() via snd_soc_dai_set_fmt() which then would run after
+> > > > fsl_ssi_startup() while having no baud clock enabled in this case.
+> > > > 
+> > > > A better solution may be to wrap clk_prepare_enable() and master mode
+> > > > clock dividing code into fsl_ssi_hw_params(), a bit like the ESAI driver
+> > > > even though it doesn't contain the clk_prepare_enable() part currently,
+> > > > and then to put clk_disable_unprepare() into hw_free() for symmetry.
+> > > > 
+> > > > Any suggestion?
+> > > 
+> > > Yes this is a problem. Although I am not really convinced of the concept
+> > > of setting up the DAIs in hw_params, we should support it as there are
+> > > some users.
+> > 
+> > I think it might be an old fashion way. I saw quite a lot machine drivers
+> > doing the DAI format setting in its hw_params(). Even in the current tree
+> > we can also grep some out by using:
+> > 
+> > find ./sound/soc/ -name "*.c" |xargs grep "snd_soc_dai_set_fmt"
+> > 
+> > So it should be plausible considering there might be some special cases,
+> > using CBS_CFS for 44.1KHz groups and CBM_CFM for 48KHz groups for example.
+> > 
+> > > Is there always exactly one hw_free call for one hw_params call? There
+> > > is a comment above the function:
+> > > "Frees resources allocated by hw_params, can be called multiple times",
+> > 
+> > That's a good question. IIRC, snd_pcm_release_substream() would call its
+> > hw_free() right before calling snd_pcm_close(). So there would be at least
+> > twice for hw_free()'s execution.
+> > 
+> > > so I am not sure if we can directly use clk_prepare_enable or if we need
+> > > to remember the clock state?
+> > 
+> > We need to if applying that. Or put them into trigger() as an alternative
+> > approach even if it sounds weird to me.
+> 
+> Unfortunately trigger() is not an option, it also may be called multiple
+> times for one command due to strange error handling in the layers above.
+> For example a failing START command in the DMA driver may lead to a
+> STOP command in the fsl-ssi driver without a previous START command.
 
-Would it help to introduce a new .init_l2_cache() callback? That
-way, the architecture code can default to initializing any l2x0
-that it finds in DT, and have give platforms the option of
-overriding the call if they need to, and we can do it at the
-same point during early boot for everyone.
+Nice judgement. Okay, just forget about trigger() then.
 
-A number of platforms currently have the same
+> So it seems the only option is to save the clock state? I will move it
+> to hw_params() and hw_free().
 
-static void __init this_platform_init(void)
-{
-      l2x0_of_init(0, ~0UL);
-      of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-}
+I think we might wait other's opinion on this topic or try to send an extra
+patch for it meanwhile you can just drop the single patch from this series
+so that the other patches will be easily applied since they are really useful
+and do fix a few problems.
 
-Where the second line is already the default for .init_machine,
-and it would be nice to get rid of the callback entirely, especially
-for the machines that don't do anything else in their platform
-code.
+Cheers,
+Nicolin
 
-	Arnd
+> 
+> Thanks,
+> 
+> Markus
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
