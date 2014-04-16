@@ -1,99 +1,60 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Apr 2014 18:42:25 +0200
-Subject: [PATCH 06/11] dt-bindings: add documentation for rk3188 clock and
- reset unit
-In-Reply-To: <3673317.X1crLrrlCS@phil>
-References: <3673317.X1crLrrlCS@phil>
-Message-ID: <2756214.EPIkc1d4cv@phil>
+From: leoy@marvell.com (Leo Yan)
+Date: Wed, 16 Apr 2014 20:28:14 +0800
+Subject: [PATCH] arm64: initialize spinlock for init_mm's context
+In-Reply-To: <20140416081506.GB29754@arm.com>
+References: <1397550050-5321-1-git-send-email-leoy@marvell.com>
+ <20140416081506.GB29754@arm.com>
+Message-ID: <534E775E.8090105@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add bindings documentation for the clock and reset unit found on
-rk3188 SoCs from Rockchip.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- .../bindings/clock/rockchip,rk3188-cru.txt         | 72 ++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
+On 04/16/2014 04:15 PM, Will Deacon wrote:
+> On Tue, Apr 15, 2014 at 09:20:50AM +0100, Leo Yan wrote:
+>> ARM64 has defined the spinlock for init_mm's context, so need initialize
+>> the spinlock structure; otherwise during the suspend flow it will dump
+>> the info for spinlock's bad magic warning as below:
+>>
+>> [   39.084394] Disabling non-boot CPUs ...
+>> [   39.092871] BUG: spinlock bad magic on CPU#1, swapper/1/0
+>> [   39.092896]  lock: init_mm+0x338/0x3e0, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
+>> [   39.092907] CPU: 1 PID: 0 Comm: swapper/1 Tainted: G           O 3.10.33 #125
+>> [   39.092912] Call trace:
+>> [   39.092927] [<ffffffc000087e64>] dump_backtrace+0x0/0x16c
+>> [   39.092934] [<ffffffc000087fe0>] show_stack+0x10/0x1c
+>> [   39.092947] [<ffffffc000765334>] dump_stack+0x1c/0x28
+>> [   39.092953] [<ffffffc0007653b8>] spin_dump+0x78/0x88
+>> [   39.092960] [<ffffffc0007653ec>] spin_bug+0x24/0x34
+>> [   39.092971] [<ffffffc000300a28>] do_raw_spin_lock+0x98/0x17c
+>> [   39.092979] [<ffffffc00076cf08>] _raw_spin_lock_irqsave+0x4c/0x60
+>> [   39.092990] [<ffffffc000094044>] set_mm_context+0x1c/0x6c
+>> [   39.092996] [<ffffffc0000941c8>] __new_context+0x94/0x10c
+>> [   39.093007] [<ffffffc0000d63d4>] idle_task_exit+0x104/0x1b0
+>> [   39.093014] [<ffffffc00008d91c>] cpu_die+0x14/0x74
+>> [   39.093021] [<ffffffc000084f74>] arch_cpu_idle_dead+0x8/0x14
+>> [   39.093030] [<ffffffc0000e7f18>] cpu_startup_entry+0x1ec/0x258
+>> [   39.093036] [<ffffffc00008d810>] secondary_start_kernel+0x114/0x124
+>>
+>> Signed-off-by: Leo Yan <leoy@marvell.com>
+>> ---
+>>   arch/arm64/include/asm/mmu.h |    3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+>> index f600d40..06a19bd 100644
+>> --- a/arch/arm64/include/asm/mmu.h
+>> +++ b/arch/arm64/include/asm/mmu.h
+>> @@ -22,6 +22,9 @@ typedef struct {
+>>   	void *vdso;
+>>   } mm_context_t;
+>>
+>> +#define INIT_MM_CONTEXT(name) \
+>> +	.context.id_lock = __RAW_SPIN_LOCK_INITIALIZER(name.context.id_lock),
+>
+> This should probably be __RAW_SPIN_LOCK_UNLOCKED instead.
+>
 
-diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
-new file mode 100644
-index 0000000..26ad529
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
-@@ -0,0 +1,72 @@
-+* Rockchip RK3188 Clock and Reset Unit
-+
-+The RK3188 clock controller generates and supplies clock to various controllers
-+within the SoC and also implements a reset controller for SoC peripherals.
-+
-+Required Properties:
-+
-+- compatible: should be "rockchip,rk3188-cru"
-+- reg: physical base address of the controller and length of memory mapped
-+  region. The first element should be the cru register space and the second
-+  element should be the address of the GRF_SOC_STATUS register providing the
-+  pll lock status.
-+- #clock-cells: should be 1.
-+- #reset-cells: should be 1.
-+
-+- rockchip,armclk-divider-table: when the frequency of the APLL is changed
-+  some core divider clocks also need to be updated. These divider clocks have
-+  SoC specific divider clock output requirements for a specific APLL clock
-+  speeds. When APLL clock rate is changed, these divider clocks are
-+  reprogrammed with pre-determined values in order to maintain the SoC
-+  specific divider clock outputs. This property lists the divider values
-+  for these clocks for supported APLL clock speeds.
-+  The format of each entry included in the arm-frequency-table should be
-+  defined as
-+
-+      cell #1: arm clock parent frequency
-+      cell #2 ~ cell 3#: value of clock divider of core_peri and aclk_core.
-+
-+- #rockchip,armclk-cells: defines the number of cells in
-+  rockchip,armclk-divider-table property. The value of this property depends on
-+  the SoC type. For RK3188 SoCs it should be 3.
-+
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume. All available clocks are defined as
-+preprocessor macros in dt-bindings/clock/rk3188-cru.h header and can be used
-+in device tree sources.
-+
-+External clocks:
-+
-+The basic input clock is generated outside the SoC. It is expected that it is
-+defined using standard clock bindings with a clock-output-name of "xin24m".
-+
-+Example: Clock controller node:
-+
-+	cru: cru at 20000000 {
-+		compatible = "rockchip,rk3188-cru";
-+		reg = <0x20000000 0x1000>,
-+		      <0x200080ac 0x4>;
-+
-+		#clock-cells = <1>;
-+
-+		#rockchip,armclk-cells = <3>;
-+		rockchip,armclk-divider-table =	<1608000 2 3>,
-+						<1416000 2 3>,
-+						<1200000 2 3>,
-+						<1008000 2 3>,
-+						< 816000 2 3>,
-+						< 504000 1 3>,
-+						< 312000 0 1>;
-+	};
-+
-+Example: UART controller node that consumes the clock generated by the clock
-+  controller:
-+
-+	uart0: serial at 10124000 {
-+		compatible = "snps,dw-apb-uart";
-+		reg = <0x10124000 0x400>;
-+		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+		reg-shift = <2>;
-+		reg-io-width = <1>;
-+		clocks = <&cru SCLK_UART0>;
-+	};
--- 
-1.9.0
+Thanks for reviewing, pls see v2's patch.
+
+Thx,
+Leo Yan
