@@ -1,34 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Apr 2014 23:28:33 +0200
-Subject: [PATCH v2 1/4] memory: mvebu-devbus: fix the conversion of the
- bus width
-In-Reply-To: <20140416210924.GL28159@titan.lakedaemon.net>
-References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397489361-5833-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140416210924.GL28159@titan.lakedaemon.net>
-Message-ID: <20140416232833.158ef777@skate>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Apr 2014 22:31:41 +0100
+Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
+ address space
+In-Reply-To: <20140416110603.GA19671@lee--X1>
+References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
+ <1397501428-8857-3-git-send-email-mporter@linaro.org>
+ <20140416110603.GA19671@lee--X1>
+Message-ID: <20140416213141.GD12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Wed, Apr 16, 2014 at 12:06:03PM +0100, Lee Jones wrote:
 
-On Wed, 16 Apr 2014 17:09:24 -0400, Jason Cooper wrote:
+> s/regmap/Regmap
 
-> This looks strikingly similar to patch 4/29 of your own orion5x DT
-> conversion series, but with completely different code...  Which one
-> would you prefer I take?
+It's consistently written regmap in all the documentation and so on :)
 
-Clearly this one. The one in the Orion patch series was a previous
-version of this patch, which was not doing any validation on the bus
-width value coming from the DT. Once this version is merged somewhere,
-I'll base my Orion patch series on it (I'm planning on resending a new
-version of my Orion series soon, to take into account all the review
-comments I've received).
+> addmap{0,1} doesn't quite sit right with me.
 
-Thanks!
+> REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
+> as I first thought, but still, is there a better naming convention you
+> could use?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+addrmap or something?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/eb361ccd/attachment-0001.sig>
