@@ -1,59 +1,25 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 16 Apr 2014 10:28:45 +0200
-Subject: [PATCH RESEND] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <20140416064534.GL32284@intel.com>
-References: <1392636546-15541-1-git-send-email-zonque@gmail.com>
- <20140319151352.GJ1976@intel.com> <534576C3.2020409@zonque.org>
- <20140416064534.GL32284@intel.com>
-Message-ID: <534E3F3D.5080003@zonque.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Apr 2014 09:29:41 +0100
+Subject: [PATCH] ARM: prima2: remove L2 cache size override
+In-Reply-To: <CAGsJ_4zKz=O8FAkuTj8uw=J840qpCb5FWq_sarJBfMHZvz1-sg@mail.gmail.com>
+References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
+ <20140415100002.GQ24070@n2100.arm.linux.org.uk>
+ <CAGsJ_4zt4KMLk7v93e40Zj1A7fHBnvE2_c94nAbGAr9xcCFnwg@mail.gmail.com>
+ <20140415215615.GZ24070@n2100.arm.linux.org.uk>
+ <CAGsJ_4zKz=O8FAkuTj8uw=J840qpCb5FWq_sarJBfMHZvz1-sg@mail.gmail.com>
+Message-ID: <20140416082940.GC24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Wed, Apr 16, 2014 at 04:24:34PM +0800, Barry Song wrote:
+> yes. i meant if that has been done in bootloader, it turns out we
+> don't care about which callback is better any more. and for linux
+> running in non-security, same.
 
-On 04/16/2014 08:45 AM, Vinod Koul wrote:
-> On Wed, Apr 09, 2014 at 06:35:15PM +0200, Daniel Mack wrote:
+However, I don't think it's quite as simple as that, because things
+like the Cortex A9 Full-Line-Of-Zeros feature need a specific enable
+sequence which (I think) can't be done in the boot loader.
 
->> 5. The cookie comparison in the end simply exists to address the fact
->>    that we might have operated on an unreleated descriptor, and we have
->>    to start over.
->>
->> So in short, the logic will return the bytes that are not yet processed
->> for a specific transaction, which is the expected thing to do, right?
-> Looks fine then BUT I have another questions.
-> 
-> Assuming that you have two txn submitted and driver split them to 3 descriptors
-> each, then in that case the driver would walk over all 6 descriptors and sum up
-> the value, which would lead to incorrect residue. It will work for single
-> pending txn only, right?
-
-No, because each of the two txn would have a different cookie set, and
-the residue function is called for one specific cookie so we know which
-one we're looking for. That's the reason why we start over if at the end
-of an iterated transaction chain, if we recognize that the cookie
-doesn't match, we start over.
-
-> While at it and looking at the code again, I think right solution maybe to
-> update the parent child in the descriptors. So on query you simply walk the
-> list for all child descriptors and continue. But the parent and child are
-> defined under CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH.
-
-That's another solution, but it's redundant information after all.
-Ultimately, it makes the driver more complicated and introduces one more
-area of potentially inconsistent pointers.
-
-> So adding Dan (his updated email id), would it be okay if we make these as
-> generic in descriptor and use them to manage larger length transactions in
-> drivers?
-
-It might add to the readability of the drivers, but for the current
-case, I don't think it's really necessary.
-
->> Did you mean "Pls check if *txstate* is not NULL"? I can fix that, yes.
-> Yup!
-
-Ok, but I'll wait with that until we have agreed on the details above :)
-
-
-Thanks,
-Daniel
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
