@@ -1,68 +1,306 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Apr 2014 08:59:47 +0900
-Subject: Renesas clock clk-mstp updates for clock-indices
-In-Reply-To: <534D1D91.2050602@codethink.co.uk>
-References: <1394196400-17112-1-git-send-email-ben.dooks@codethink.co.uk>
- <CAMuHMdVVc-9n4mQSj6qVyP5k9xzSstSw==nfYcFSOXtb895QUw@mail.gmail.com>
- <534D1B60.8030007@codethink.co.uk>
- <CAMuHMdWQ5WvLvaZp7Vaj3tHGJioR+rtfmWxSAaiKTDUrmN-e+w@mail.gmail.com>
- <534D1D91.2050602@codethink.co.uk>
-Message-ID: <20140415235947.GB9817@verge.net.au>
+From: abrestic@google.com (Andrew Bresticker)
+Date: Tue, 15 Apr 2014 17:24:42 -0700
+Subject: [PATCH] ARM: tegra: define Jetson TK1 regulators
+In-Reply-To: <1397516120-18220-1-git-send-email-swarren@wwwdotorg.org>
+References: <1397516120-18220-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAL1qeaF+Kha6bS27OLoWw-G2Tv6PzeB6=GcK6dM6s_hWidvLiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 12:52:49PM +0100, Ben Dooks wrote:
-> On 15/04/14 12:46, Geert Uytterhoeven wrote:
-> >Hi Ben,
-> >
-> >On Tue, Apr 15, 2014 at 1:43 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> >>On 15/04/14 10:26, Geert Uytterhoeven wrote:
-> >>>On Fri, Mar 7, 2014 at 1:46 PM, Ben Dooks <ben.dooks@codethink.co.uk>
-> >>>wrote:
-> >>>>
-> >>>>Mike, following the commit to add the clock-indices field, the following
-> >>>>pair of commits updates the shmboile clk-mstp driver to uses these over
-> >>>>the local variant.
-> >>>>
-> >>>>Since this is involves two separte trees which are in development, the
-> >>>>decision is that we will fixup the renesas trees once they are merged
-> >>>>and the development cycle is complete. Once this is done, patch 2/2
-> >>>>can be reverted (if people care about three lines of differrence)
-> >>>
-> >>>
-> >>>As we now have "renesas,clock-indices" in v3.14, the question about
-> >>>backwards
-> >>>compatibility became moot.
-> >>
-> >>Do you mean 'necessary'?
-> >
-> >Yes, now the backwards compatibility is necessary.
-> >
-> >>>Can you please combine your two patches
-> >>>
-> >>>[PATCH 1/2] clk: shmobile: clk-mstp: change to using clock-indices
-> >>>[PATCH 2/2] clk: shmobile: clk-mstp: add backwards comapt for indices
-> >>>field
-> >>>
-> >>>into a single patch, and submit to Mike?
-> >>>
-> >>>Once it's in Mike's clk-next, we can do the following to get everything in
-> >>>v3.15:
-> >>>    1. Simon cherry-picks Mike's commit into his fixes-for-v3.15 branch,
-> >>>    2. we fix arch/arm/boot/dts/r8a7790.dtsi and .../r8a7791.dtsi there,
-> >>>    3. fixes-for-v3.15 gets into mainline through arm-soc.
-> >>
-> >>Wouldn't it be easier if we just got mike's ack and fixed it in one go?
-> >
-> >That's another option. But if Mike doesn't apply it to his clk-next, this
-> >may cause a merge conflict later.
-> 
-> Given there's not a lot of work going on with the mstp driver at the
-> moment I don't see that there should be much room for conflicts if we
-> are getting fixes in for 3.15-rc1.
-> 
-> Mike, would you prefer an Ack for 1/2, have them both in via yourself
-> (and revert 2/2 later) or have them as one patch and sort out fixing
-> up later?
+On Mon, Apr 14, 2014 at 3:55 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> These are mostly identical to the Venice2 regulator definitions, since
+> the board designs are very similar. Differences are:
+>
+> - Jetson TK1 doesn't have a built-in LCD panel, so on-board regulators
+>   are not present for the backlight, touchscreen, or panel.
+> - +3.3V_RUN needs to be boot-on/always-on, since it's widely used. This
+>   change should likely be propagated to Venice2 for completeness,
+>   although it will have no practical effect there since various other
+>   regulators use +3.3V_RUN as their supply and are always-on.
+> - +3.3V_LP0 needs to be boot-on as well as always-on. One reason
+>   is because it's used to driver the UART level-shifter; without this, I
+>   see a brief period of UART corruption during cold boots.I suspect this
+>   change needs to be propagated to Venice2, and we simply haven't noticed
+>   the need since there's no UART level-shifter on Venice2.
+> - A few rails have different names in the schematics.
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 230 ++++++++++++++++++++++++++++++
+>  1 file changed, 230 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> index dedcb0c165c5..ae5c750dc515 100644
+> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> @@ -1426,6 +1426,155 @@
+>                                         bias-high-impedance;
+>                                 };
+>                         };
+> +
+> +                       regulators {
+> +                               vsup-sd2-supply = <&vdd_5v0_sys>;
+> +                               vsup-sd3-supply = <&vdd_5v0_sys>;
+> +                               vsup-sd4-supply = <&vdd_5v0_sys>;
+> +                               vsup-sd5-supply = <&vdd_5v0_sys>;
+> +                               vin-ldo0-supply = <&vdd_1v35_lp0>;
+> +                               vin-ldo1-6-supply = <&vdd_3v3_run>;
+> +                               vin-ldo2-5-7-supply = <&vddio_1v8>;
+> +                               vin-ldo3-4-supply = <&vdd_3v3_sys>;
+> +                               vin-ldo9-10-supply = <&vdd_5v0_sys>;
+> +                               vin-ldo11-supply = <&vdd_3v3_run>;
+> +
+> +                               sd0 {
+> +                                       regulator-name = "+VDD_CPU_AP";
+> +                                       regulator-min-microvolt = <700000>;
+> +                                       regulator-max-microvolt = <1400000>;
+> +                                       regulator-min-microamp = <3500000>;
+> +                                       regulator-max-microamp = <3500000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                                       ams,external-control = <2>;
+> +                               };
+> +
+> +                               sd1 {
+> +                                       regulator-name = "+VDD_CORE";
+> +                                       regulator-min-microvolt = <700000>;
+> +                                       regulator-max-microvolt = <1350000>;
+> +                                       regulator-min-microamp = <2500000>;
+> +                                       regulator-max-microamp = <2500000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                                       ams,external-control = <1>;
+> +                               };
+> +
+> +                               vdd_1v35_lp0: sd2 {
+> +                                       regulator-name = "+1.35V_LP0(sd2)";
+> +                                       regulator-min-microvolt = <1350000>;
+> +                                       regulator-max-microvolt = <1350000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                               };
+> +
+> +                               sd3 {
+> +                                       regulator-name = "+1.35V_LP0(sd3)";
+> +                                       regulator-min-microvolt = <1350000>;
+> +                                       regulator-max-microvolt = <1350000>;
+> +                                       regulator-always-on;
+> +                                       regulator-boot-on;
+> +                               };
+> +
+> +                               sd4 {
+> +                                       regulator-name = "+1.05V_RUN";
+> +                                       regulator-min-microvolt = <1050000>;
+> +                                       regulator-max-microvolt = <1050000>;
+> +                               };
+> +
+> +                               vddio_1v8: sd5 {
+> +                                       regulator-name = "+1.8V_VDDIO";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-boot-on;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               sd6 {
+> +                                       regulator-name = "+VDD_GPU_AP";
+> +                                       regulator-min-microvolt = <650000>;
+> +                                       regulator-max-microvolt = <1200000>;
+> +                                       regulator-min-microamp = <3500000>;
+> +                                       regulator-max-microamp = <3500000>;
+> +                                       regulator-boot-on;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo0 {
+> +                                       regulator-name = "+1.05V_RUN_AVDD";
+> +                                       regulator-min-microvolt = <1050000>;
+> +                                       regulator-max-microvolt = <1050000>;
+> +                                       regulator-boot-on;
+> +                                       regulator-always-on;
+> +                                       ams,external-control = <1>;
+> +                               };
+> +
+> +                               ldo1 {
+> +                                       regulator-name = "+1.8V_RUN_CAM";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                               };
+> +
+> +                               ldo2 {
+> +                                       regulator-name = "+1.2V_GEN_AVDD";
+> +                                       regulator-min-microvolt = <1200000>;
+> +                                       regulator-max-microvolt = <1200000>;
+> +                                       regulator-boot-on;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               ldo3 {
+> +                                       regulator-name = "+1.05V_LP0_VDD_RTC";
+> +                                       regulator-min-microvolt = <1000000>;
+> +                                       regulator-max-microvolt = <1000000>;
+> +                                       regulator-boot-on;
+> +                                       regulator-always-on;
+> +                                       ams,enable-tracking;
+> +                               };
+> +
+> +                               ldo4 {
+> +                                       regulator-name = "+2.8V_RUN_CAM";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +                               };
+> +
+> +                               ldo5 {
+> +                                       regulator-name = "+1.2V_RUN_CAM_FRONT";
+> +                                       regulator-min-microvolt = <1200000>;
+> +                                       regulator-max-microvolt = <1200000>;
+> +                               };
+> +
+> +                               vddio_sdmmc3: ldo6 {
+> +                                       regulator-name = "+VDDIO_SDMMC3";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <3300000>;
+> +                               };
+> +
+> +                               ldo7 {
+> +                                       regulator-name = "+1.05V_RUN_CAM_REAR";
+> +                                       regulator-min-microvolt = <1050000>;
+> +                                       regulator-max-microvolt = <1050000>;
+> +                               };
+> +
+> +                               ldo9 {
+> +                                       regulator-name = "+3.3V_RUN_TOUCH";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +                               };
+> +
+> +                               ldo10 {
+> +                                       regulator-name = "+2.8V_RUN_CAM_AF";
+> +                                       regulator-min-microvolt = <2800000>;
+> +                                       regulator-max-microvolt = <2800000>;
+> +                               };
+> +
+> +                               ldo11 {
+> +                                       regulator-name = "+1.8V_RUN_VPP_FUSE";
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                               };
+> +                       };
+>                 };
+>         };
+>
+> @@ -1462,6 +1611,7 @@
+>                 cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+>                 power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
+>                 bus-width = <4>;
+> +               vmmc-supply = <&vddio_sdmmc3>;
 
-FWIW, that approach would be fine by me.
+I don't have schematics for this board, but I suspect you mean
+vqmmc-supply here, per the discussion in the Venice2 VQMMC thread.
+
+>         };
+>
+>         /* eMMC */
+> @@ -1525,6 +1675,72 @@
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>
+> +               vdd_mux: regulator at 0 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <0>;
+> +                       regulator-name = "+VDD_MUX";
+> +                       regulator-min-microvolt = <12000000>;
+> +                       regulator-max-microvolt = <12000000>;
+> +                       regulator-always-on;
+> +                       regulator-boot-on;
+> +               };
+> +
+> +               vdd_5v0_sys: regulator at 1 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <1>;
+> +                       regulator-name = "+5V_SYS";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       regulator-always-on;
+> +                       regulator-boot-on;
+> +                       vin-supply = <&vdd_mux>;
+> +               };
+> +
+> +               vdd_3v3_sys: regulator at 2 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <2>;
+> +                       regulator-name = "+3.3V_SYS";
+> +                       regulator-min-microvolt = <3300000>;
+> +                       regulator-max-microvolt = <3300000>;
+> +                       regulator-always-on;
+> +                       regulator-boot-on;
+> +                       vin-supply = <&vdd_mux>;
+> +               };
+> +
+> +               vdd_3v3_run: regulator at 3 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <3>;
+> +                       regulator-name = "+3.3V_RUN";
+> +                       regulator-min-microvolt = <3300000>;
+> +                       regulator-max-microvolt = <3300000>;
+> +                       regulator-always-on;
+> +                       regulator-boot-on;
+> +                       gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
+> +                       enable-active-high;
+> +                       vin-supply = <&vdd_3v3_sys>;
+> +               };
+> +
+> +               vdd_3v3_hdmi: regulator at 4 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <4>;
+> +                       regulator-name = "+3.3V_AVDD_HDMI_AP_GATED";
+> +                       regulator-min-microvolt = <3300000>;
+> +                       regulator-max-microvolt = <3300000>;
+> +                       vin-supply = <&vdd_3v3_run>;
+> +               };
+> +
+> +               vdd_usb1_vbus: regulator at 7 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <7>;
+> +                       regulator-name = "+USB0_VBUS_SW";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       gpio = <&gpio TEGRA_GPIO(N, 4) GPIO_ACTIVE_HIGH>;
+> +                       enable-active-high;
+> +                       gpio-open-drain;
+> +                       vin-supply = <&vdd_5v0_sys>;
+> +               };
+> +
+>                 vdd_usb3_vbus: regulator at 8 {
+>                         compatible = "regulator-fixed";
+>                         reg = <8>;
+> @@ -1534,6 +1750,20 @@
+>                         gpio = <&gpio TEGRA_GPIO(N, 5) GPIO_ACTIVE_HIGH>;
+>                         enable-active-high;
+>                         gpio-open-drain;
+> +                       vin-supply = <&vdd_5v0_sys>;
+> +               };
+> +
+> +               vdd_3v3_lp0: regulator at 10 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <10>;
+> +                       regulator-name = "+3.3V_LP0";
+> +                       regulator-min-microvolt = <3300000>;
+> +                       regulator-max-microvolt = <3300000>;
+> +                       regulator-always-on;
+> +                       regulator-boot-on;
+> +                       gpio = <&pmic 2 GPIO_ACTIVE_HIGH>;
+> +                       enable-active-high;
+> +                       vin-supply = <&vdd_3v3_sys>;
+>                 };
+>         };
+>
+> --
+> 1.8.1.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
