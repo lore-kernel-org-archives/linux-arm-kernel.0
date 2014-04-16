@@ -1,31 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 16 Apr 2014 10:20:09 -0600
-Subject: [PATCH] ARM: tegra: make Venice's +3.3V_RUN regulator always
- on
-In-Reply-To: <CAL1qeaGek9H74s00T-O7P7F6Uraa9juW=3LCMjTUjCuQCZ0pBw@mail.gmail.com>
-References: <1397600984-25198-1-git-send-email-swarren@wwwdotorg.org>
- <CAL1qeaGek9H74s00T-O7P7F6Uraa9juW=3LCMjTUjCuQCZ0pBw@mail.gmail.com>
-Message-ID: <534EADB9.1010605@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 16 Apr 2014 11:16:19 -0500
+Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
+In-Reply-To: <52580F34.8030809@ti.com>
+References: <1381402195-29257-1-git-send-email-kishon@ti.com>
+ <1381402195-29257-2-git-send-email-kishon@ti.com>
+ <52580F34.8030809@ti.com>
+Message-ID: <20140416161619.GH28035@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 06:54 PM, Andrew Bresticker wrote:
-> On Tue, Apr 15, 2014 at 3:29 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> This regulator supplies power to pretty much everything on the board, so
->> it doesn't make sense to allow it to turn off. Mark it boot-on and
->> always-on so it doesn't get turned off. Without this, I see issues with
->> the eMMC device; it can't be correctly detected during boot.
+On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
+> Hi,
 > 
-> This actually isn't a complete fix.  +3V3_RUN will still toggle on a
-> cold boot because the GPIO1_INVERT bit is initialized by the PMIC to
-> 1, but when the regulator core requests the GPIO as an output,
-> as3722_gpio_direction_output() first sets the output value to 1
-> (without considering the INVERT bit!) and then clears the invert bit
-> when setting the mode in as3722_pinctrl_gpio_set_direction().  The
-> as3722 driver should probably not touch the INVERT bit and instead
-> just take it into account when setting the GPIO value.
+> On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
+> > From: George Cherian <george.cherian@ti.com>
+> > 
+> > Added dr_mode property in dwc3 and set its default mode to device.
+> 
+> If there is a specific reason why this is not set to "otg", we need
+> to explain it here.
+> 
+> AFAIK the port is meant to be used as OTG port.
 
-I'll take that as a heads-up on the existence of the AS3722 GPIO patch,
-rather than an objection to this patch.
+we still don't have the workaround for dual role ports, I've been
+working on it but still need to retest and make sure it's working fine
+before merging upstream.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/043d5888/attachment.sig>
