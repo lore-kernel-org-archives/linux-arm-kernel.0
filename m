@@ -1,12 +1,24 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 16 Apr 2014 21:13:15 +0400
-Subject: [PATCH v4 05/21] ARM: dts: pxa27x: irq init using device tree
+Date: Wed, 16 Apr 2014 21:13:16 +0400
+Subject: [PATCH v4 06/21] ARM: dts: provide DMA config to pxamci on PXA27x
 In-Reply-To: <1397668411-27162-1-git-send-email-ynvich@gmail.com>
 References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
  <1397668411-27162-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1397668411-27162-6-git-send-email-ynvich@gmail.com>
+Message-ID: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Non-dts implementation supply required DMA channel numbers as
+IORESOURCE_DMA. We can also get them from the device tree, if it
+is present.
+
+This patch updates device tree with the proper dmaengine-based
+"marvell,pdma-1.0" DMA.
+
+There is no actual data handling in this patch, because the existing
+driver cannot get DMA channel number from dmaengine API. The patch
+in the series will provide temporary workaround by manually parsing
+node attributes, until Daniel's series is ready to be merged.
 
 Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
 CC: Daniel Mack <zonque@gmail.com>
@@ -14,57 +26,70 @@ CC: Haojian Zhuang <haojian.zhuang@gmail.com>
 CC: Arnd Bergmann <arnd@arndb.de>
 ---
    v3..v4
-   v2..v3
    * no changes
 
+   v2..v3
+   * split into good (this one) and temporary (PATCH 07/21) parts
+
    v1..v2
-   * use of_have_populated_dt() instead of a static variable
-   * drop #ifdef in header file
-   * number changed from 8 to 5 (dropped patches)
+   * add binding for next-gen dma controller
+   * use correct dma declararion
+   * number changed from 5 to 3
 
- arch/arm/mach-pxa/include/mach/pxa27x.h |  1 +
- arch/arm/mach-pxa/pxa27x.c              | 10 ++++++++++
- 2 files changed, 11 insertions(+)
+ Documentation/devicetree/bindings/mmc/pxa-mmc.txt |  5 +++++
+ arch/arm/boot/dts/pxa27x.dtsi                     | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/include/mach/pxa27x.h b/arch/arm/mach-pxa/include/mach/pxa27x.h
-index 7cff640..34a4d6f 100644
---- a/arch/arm/mach-pxa/include/mach/pxa27x.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa27x.h
-@@ -23,6 +23,7 @@ extern void __init pxa27x_map_io(void);
- extern void __init pxa27x_init_irq(void);
- extern int __init pxa27x_set_pwrmode(unsigned int mode);
- extern void pxa27x_cpu_pm_enter(suspend_state_t state);
-+extern void __init pxa27x_dt_init_irq(void);
+diff --git a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+index b7025de..9f54c69 100644
+--- a/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/pxa-mmc.txt
+@@ -5,6 +5,8 @@ Driver bindings for the PXA MCI (MMC/SDIO) interfaces
+ Required properties:
+ - compatible: Should be "marvell,pxa-mmc".
+ - vmmc-supply: A regulator for VMMC
++- dmas: Should be DMA specifiers for RX and TX
++- dma-names: Should be "rx" and "tx"
  
- #define pxa27x_handle_irq	ichp_handle_irq
+ Optional properties:
+ - marvell,detect-delay-ms: sets the detection delay timeout in ms.
+@@ -21,5 +23,8 @@ mmc0: mmc at 41100000 {
+ 	interrupts = <23>;
+ 	cd-gpios = <&gpio 23 0>;
+ 	wp-gpios = <&gpio 24 0>;
++	dmas = <&dma 21
++		&dma 22>;
++	dma-names = "rx", "tx";
+ };
  
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 301471a..c6b54f8 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -398,6 +398,13 @@ void __init pxa27x_init_irq(void)
- 	pxa_init_irq(34, pxa27x_set_wake);
- }
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index 39bed5e..0150531 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -35,10 +35,24 @@
+ 			#pwm-cells = <1>;
+ 		};
  
-+#ifdef CONFIG_OF
-+void __init pxa27x_dt_init_irq(void)
-+{
-+	pxa_dt_irq_init(pxa27x_set_wake);
-+}
-+#endif  /* CONFIG_OF */
++		dma: dma-controller at 40000000 {
++			compatible = "marvell,pdma-1.0";
++			reg = <0x40000000 0x10000>;
++			interrupts = <25>;
++			#dma-cells = <1>;
++			dma-channels = <32>;
++		};
 +
- static struct map_desc pxa27x_io_desc[] __initdata = {
- 	{	/* Mem Ctl */
- 		.virtual	= (unsigned long)SMEMC_VIRT,
-@@ -471,6 +478,9 @@ static int __init pxa27x_init(void)
- 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
- 		register_syscore_ops(&pxa2xx_clock_syscore_ops);
- 
-+		if (of_have_populated_dt())
-+			return 0;
+ 		gpio: gpio at 40e00000 {
+ 			compatible = "intel,pxa27x-gpio";
+ 			interrupts = <8>, <9>, <10>;
+ 			interrupt-names = "gpio0", "gpio1", "gpio_mux";
+ 		};
 +
- 		pxa_register_device(&pxa27x_device_gpio, &pxa27x_gpio_info);
- 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
- 	}
++		mmc at 41100000 {
++			dmas = <&dma 21
++				&dma 22>;
++			dma-names = "rx", "tx";
++		};
+ 	};
+ };
 -- 
 1.8.4.2
