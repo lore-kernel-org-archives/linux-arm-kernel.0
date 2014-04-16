@@ -1,106 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Apr 2014 23:43:24 +0100
-Subject: kmalloc and uncached memory
-In-Reply-To: <CAF1ivSafFWU6xmPrAxCWbcY3weZRuHyhDY+yOVGRAPqkYMqfRA@mail.gmail.com>
-References: <CAF1ivSaAQ_8byv+a9NQebtL4kBYFEPOTJHn-JA-bYY=wLFpv2Q@mail.gmail.com>
- <534ECCEB.6090007@codeaurora.org>
- <CAF1ivSaMRj_V_NHBBDfPmNmZ+CNfCnAywfWGudpoAv_8j_FrwA@mail.gmail.com>
- <534ED412.1040909@codeaurora.org>
- <CAF1ivSafFWU6xmPrAxCWbcY3weZRuHyhDY+yOVGRAPqkYMqfRA@mail.gmail.com>
-Message-ID: <20140416224324.GO24070@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 16 Apr 2014 17:46:47 -0500
+Subject: [PATCH RFC 5/5] ahci_imx: add disable for spread-spectrum
+In-Reply-To: <E1WaLRa-0002yX-7L@rmk-PC.arm.linux.org.uk>
+References: <20140416084227.GD24070@n2100.arm.linux.org.uk>
+ <E1WaLRa-0002yX-7L@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAL_JsqK_BbhXs0gcn=w=1KPKOD0HZzmYx5zAaS5_z=UvQDPNjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 02:28:45PM -0700, Lin Ming wrote:
-> On Wed, Apr 16, 2014 at 12:03 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > On 4/16/2014 11:50 AM, Lin Ming wrote:
-> >> On Wed, Apr 16, 2014 at 11:33 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> >>> On 4/16/2014 11:11 AM, Lin Ming wrote:
-> >>>> Hi Peter,
-> >>>>
-> >>>> I have a performance problem(on ARM board) that cpu is very bus at
-> >>>> cache invalidation.
-> >>>> So I'm trying to alloc an uncached memory to eliminate cache invalidation.
-> >>>>
-> >>>> But I also have problem with dma_alloc_coherent().
-> >>>> If I don't use dma_alloc_coherent(), is it OK to use below code to
-> >>>> alloc uncached memory?
-> >>>>
-> >>>> struct page *page;
-> >>>> pgd_t *pgd;
-> >>>> pud_t *pud;
-> >>>> pmd_t *pmd;
-> >>>> pte_t *pte;
-> >>>> void *cpu_addr;
-> >>>> dma_addr_t dma_addr;
-> >>>> unsigned int vaddr;
-> >>>>
-> >>>> cpu_addr = kmalloc(PAGE_SIZE, GFP_KERNEL);
-> >>>> dma_addr = pci_map_single(NULL, cpu_addr, PAGE_SIZE, (int)DMA_FROM_DEVICE);
-> >>>> vaddr = (unsigned int)uncached->cpu_addr;
-> >>>> pgd = pgd_offset_k(vaddr);
-> >>>> pud = pud_offset(pgd, vaddr);
-> >>>> pmd = pmd_offset(pud, vaddr);
-> >>>> pte = pte_offset_kernel(pmd, vaddr);
-> >>>> page = virt_to_page(vaddr);
-> >>>> set_pte_ext(pte, mk_pte(page,  pgprot_dmacoherent(pgprot_kernel)), 0);
-> >>>>
-> >>>> /* This kmalloc memory won't be freed  */
-> >>>>
-> >>>
-> >>> No, that will not work. lowmem pages are mapped with 1MB sections underneath
-> >>> which cannot be (easily) changed at runtime. You really want to be using
-> >>> dma_alloc_coherent here.
-> >>
-> >> For "lowmem pages", do you mean the first 16M physical memory?
-> >> How about that if I only use highmem pages(>16M)?
-> >>
-> >
-> > By lowmem pages I am referring to the direct mapped kernel area. Highmem refers
-> > to pages which do not have a permanent mapping in the kernel address space. If
-> > you are calling kmalloc with GFP_KERNEL you will be getting a page from the lowmem
-> > region.
-> 
-> Thanks for the explanation.
-> 
-> >
-> > What's the reason you can't use dma_alloc_coherent?
-> 
-> I'm actually testing WIFI RX performance on a ARM based AP.
-> WIFI to Ethernet traffic, that is WIFI driver RX packets and then
-> Ethernet driver TX packets.
-> 
-> I used dma_alloc_coherent() to allocate uncached buffer in WIFI driver
-> to receive packets.
-> But then Ethernet driver can't send packets successfully.
-> 
-> If I used kmalloc() to allocate buffers in WIFI driver, then everything is OK.
-> 
-> I know this is too platform/drivers specific problem, but any
-> suggestion would be appreciated.
+On Wed, Apr 16, 2014 at 3:43 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Spread-spectrum doesn't work with Cubox-i hardware, so we have to
+> disable this feature.  Add a DT property so that platforms can
+> indicate that this feature should not be enabled.
 
-So why are you trying to map the memory into userspace?
+This is for spread-spectrum tx or rx? Transmit SS is optional to
+support, but the receiver must support SS. Otherwise random drives
+won't work which makes for a good user experience. Is this really a
+board quirk rather than a Si issue?
 
-Given your fragment above, what you're doing there will be no different
-from using dma_alloc_coherent() - think about what type of mapping you
-end up with.
+Rob
 
-You have two options on ARM:
-
-1. Use dma_alloc_coherent() - recommended for data which both the CPU and
-   DMA can update simultaneously - eg, descriptor ring buffers typically
-   found on ethernet devices.
-
-2. Use dma_map_page/dma_map_single() for what we call streaming support,
-   which can use kmalloc memory.  *But* there is only exactly *one* owner
-   of the buffer at any one time - either the CPU owns it *or* the DMA
-   device owns it.  *Only* the current owner may access the buffer.
-   Such mappings must be unmapped before they are freed.
-
-Since there's the requirement for ownership in (2), these are not really
-suitable to be mapped into userspace while DMA is happening - accesses to
-the buffer while DMA is in progress /can/ corrupt the data.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+>
+> Having it as a negative property keeps existing DT files working.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/boot/dts/imx6q-cubox-i.dts |  1 +
+>  drivers/ata/ahci_imx.c              | 14 +++++++++++++-
+>  2 files changed, 14 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
+> index 941365d7ee65..9efd8b0c8011 100644
+> --- a/arch/arm/boot/dts/imx6q-cubox-i.dts
+> +++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
+> @@ -16,4 +16,5 @@
+>         fsl,transmit-level-mV = <1104>;
+>         fsl,transmit-boost-mdB = <0>;
+>         fsl,transmit-atten-16ths = <9>;
+> +       fsl,no-spread-spectrum;
+>  };
+> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+> index 1251d719cc73..f3221b8bfafa 100644
+> --- a/drivers/ata/ahci_imx.c
+> +++ b/drivers/ata/ahci_imx.c
+> @@ -208,6 +208,7 @@ struct reg_property {
+>         const struct reg_value *values;
+>         size_t num_values;
+>         u32 def_value;
+> +       u32 set_value;
+>  };
+>
+>  static const struct reg_value gpr13_tx_level[] = {
+> @@ -305,6 +306,10 @@ static const struct reg_property gpr13_props[] = {
+>                 .values = gpr13_rx_eq,
+>                 .num_values = ARRAY_SIZE(gpr13_rx_eq),
+>                 .def_value = IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB,
+> +       }, {
+> +               .name = "fsl,no-spread-spectrum",
+> +               .def_value = IMX6Q_GPR13_SATA_MPLL_SS_EN,
+> +               .set_value = 0,
+>         },
+>  };
+>
+> @@ -318,6 +323,14 @@ static u32 imx_ahci_parse_props(struct device *dev,
+>         for (i = 0; i < num; i++, prop++) {
+>                 u32 of_val;
+>
+> +               if (prop->num_values == 0) {
+> +                       if (of_property_read_bool(np, prop->name))
+> +                               reg_value |= prop->set_value;
+> +                       else
+> +                               reg_value |= prop->def_value;
+> +                       continue;
+> +               }
+> +
+>                 if (of_property_read_u32(np, prop->name, &of_val)) {
+>                         dev_info(dev, "%s not specified, using %08x\n",
+>                                 prop->name, prop->def_value);
+> @@ -392,7 +405,6 @@ static int imx_ahci_probe(struct platform_device *pdev)
+>                                    IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
+>                                    IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
+>                                    IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
+> -                                  IMX6Q_GPR13_SATA_MPLL_SS_EN |
+>                                    reg_value;
+>         }
+>
+> --
+> 1.8.3.1
+>
