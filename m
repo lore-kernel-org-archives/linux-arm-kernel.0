@@ -1,33 +1,105 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Apr 2014 23:34:54 +0100
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <CAFEAcA9bqdHvFyGz_mhdU9=rPYaSc2h8Syccv3OEqH8FRhf=dA@mail.gmail.com>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <534EF153.5050603@codeaurora.org>
- <CAFEAcA9bqdHvFyGz_mhdU9=rPYaSc2h8Syccv3OEqH8FRhf=dA@mail.gmail.com>
-Message-ID: <20140416223454.GN24070@n2100.arm.linux.org.uk>
+Date: Wed, 16 Apr 2014 23:43:24 +0100
+Subject: kmalloc and uncached memory
+In-Reply-To: <CAF1ivSafFWU6xmPrAxCWbcY3weZRuHyhDY+yOVGRAPqkYMqfRA@mail.gmail.com>
+References: <CAF1ivSaAQ_8byv+a9NQebtL4kBYFEPOTJHn-JA-bYY=wLFpv2Q@mail.gmail.com>
+ <534ECCEB.6090007@codeaurora.org>
+ <CAF1ivSaMRj_V_NHBBDfPmNmZ+CNfCnAywfWGudpoAv_8j_FrwA@mail.gmail.com>
+ <534ED412.1040909@codeaurora.org>
+ <CAF1ivSafFWU6xmPrAxCWbcY3weZRuHyhDY+yOVGRAPqkYMqfRA@mail.gmail.com>
+Message-ID: <20140416224324.GO24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 10:36:11PM +0100, Peter Maydell wrote:
-> On 16 April 2014 22:08, Christopher Covington <cov@codeaurora.org> wrote:
-> > On 04/16/2014 03:14 PM, Nicolas Pitre wrote:
-> >> But both QEMU and the boot-wrapper should deal with zImage. That's the
-> >> only image format with documented load offset is guaranteed not to
-> >> change i.e. it can be loaded at about any offset as zImage knows how to
-> >> relocate itself as needed.  There is nowhere a guarantee that
-> >> TEXT_OFFSET can't change.
+On Wed, Apr 16, 2014 at 02:28:45PM -0700, Lin Ming wrote:
+> On Wed, Apr 16, 2014 at 12:03 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> > On 4/16/2014 11:50 AM, Lin Ming wrote:
+> >> On Wed, Apr 16, 2014 at 11:33 AM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> >>> On 4/16/2014 11:11 AM, Lin Ming wrote:
+> >>>> Hi Peter,
+> >>>>
+> >>>> I have a performance problem(on ARM board) that cpu is very bus at
+> >>>> cache invalidation.
+> >>>> So I'm trying to alloc an uncached memory to eliminate cache invalidation.
+> >>>>
+> >>>> But I also have problem with dma_alloc_coherent().
+> >>>> If I don't use dma_alloc_coherent(), is it OK to use below code to
+> >>>> alloc uncached memory?
+> >>>>
+> >>>> struct page *page;
+> >>>> pgd_t *pgd;
+> >>>> pud_t *pud;
+> >>>> pmd_t *pmd;
+> >>>> pte_t *pte;
+> >>>> void *cpu_addr;
+> >>>> dma_addr_t dma_addr;
+> >>>> unsigned int vaddr;
+> >>>>
+> >>>> cpu_addr = kmalloc(PAGE_SIZE, GFP_KERNEL);
+> >>>> dma_addr = pci_map_single(NULL, cpu_addr, PAGE_SIZE, (int)DMA_FROM_DEVICE);
+> >>>> vaddr = (unsigned int)uncached->cpu_addr;
+> >>>> pgd = pgd_offset_k(vaddr);
+> >>>> pud = pud_offset(pgd, vaddr);
+> >>>> pmd = pmd_offset(pud, vaddr);
+> >>>> pte = pte_offset_kernel(pmd, vaddr);
+> >>>> page = virt_to_page(vaddr);
+> >>>> set_pte_ext(pte, mk_pte(page,  pgprot_dmacoherent(pgprot_kernel)), 0);
+> >>>>
+> >>>> /* This kmalloc memory won't be freed  */
+> >>>>
+> >>>
+> >>> No, that will not work. lowmem pages are mapped with 1MB sections underneath
+> >>> which cannot be (easily) changed at runtime. You really want to be using
+> >>> dma_alloc_coherent here.
+> >>
+> >> For "lowmem pages", do you mean the first 16M physical memory?
+> >> How about that if I only use highmem pages(>16M)?
+> >>
 > >
-> > QEMU definitely does support zImage and I believe it's promoted as the main
-> > boot method.
+> > By lowmem pages I am referring to the direct mapped kernel area. Highmem refers
+> > to pages which do not have a permanent mapping in the kernel address space. If
+> > you are calling kmalloc with GFP_KERNEL you will be getting a page from the lowmem
+> > region.
 > 
-> Yes; we also support uImage. The code nominally handling Image
-> actually currently loads at 0x10000, so the set of people who actually
-> try to use it is obviously not very large :-)
+> Thanks for the explanation.
+> 
+> >
+> > What's the reason you can't use dma_alloc_coherent?
+> 
+> I'm actually testing WIFI RX performance on a ARM based AP.
+> WIFI to Ethernet traffic, that is WIFI driver RX packets and then
+> Ethernet driver TX packets.
+> 
+> I used dma_alloc_coherent() to allocate uncached buffer in WIFI driver
+> to receive packets.
+> But then Ethernet driver can't send packets successfully.
+> 
+> If I used kmalloc() to allocate buffers in WIFI driver, then everything is OK.
+> 
+> I know this is too platform/drivers specific problem, but any
+> suggestion would be appreciated.
 
-For ARM, that means precisely zero users without modification of that.
-We've never supported an offset of 0x10000 in mainline kernels.
+So why are you trying to map the memory into userspace?
+
+Given your fragment above, what you're doing there will be no different
+from using dma_alloc_coherent() - think about what type of mapping you
+end up with.
+
+You have two options on ARM:
+
+1. Use dma_alloc_coherent() - recommended for data which both the CPU and
+   DMA can update simultaneously - eg, descriptor ring buffers typically
+   found on ethernet devices.
+
+2. Use dma_map_page/dma_map_single() for what we call streaming support,
+   which can use kmalloc memory.  *But* there is only exactly *one* owner
+   of the buffer at any one time - either the CPU owns it *or* the DMA
+   device owns it.  *Only* the current owner may access the buffer.
+   Such mappings must be unmapped before they are freed.
+
+Since there's the requirement for ownership in (2), these are not really
+suitable to be mapped into userspace while DMA is happening - accesses to
+the buffer while DMA is in progress /can/ corrupt the data.
 
 -- 
 FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
