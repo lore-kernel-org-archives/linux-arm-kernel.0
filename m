@@ -1,51 +1,23 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 16 Apr 2014 11:33:15 -0700
-Subject: kmalloc and uncached memory
-In-Reply-To: <CAF1ivSaAQ_8byv+a9NQebtL4kBYFEPOTJHn-JA-bYY=wLFpv2Q@mail.gmail.com>
-References: <CAF1ivSaAQ_8byv+a9NQebtL4kBYFEPOTJHn-JA-bYY=wLFpv2Q@mail.gmail.com>
-Message-ID: <534ECCEB.6090007@codeaurora.org>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Wed, 16 Apr 2014 19:33:06 +0100
+Subject: [RFC PATCH] imx6: imx6duallite/solo i2c4 clock
+In-Reply-To: <20140416074712.GK2523@dragon>
+References: <534CF8A3.3010404@gmail.com> <20140416074712.GK2523@dragon>
+Message-ID: <534ECCE2.1060006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/16/2014 11:11 AM, Lin Ming wrote:
-> Hi Peter,
+On 16/04/14 08:47, Shawn Guo wrote:
+> On Tue, Apr 15, 2014 at 10:15:15AM +0100, Iain Paton wrote:
+>> I'm working on a board using the imx6solo that implements i2c4 and while 
+>> building the devicetree it became clear that the devicetree fragment for 
+>> i2c4 in imx6dl.dtsi it's missing the necessary clock.
+>>
+>> Investigating further turned up that the ecspi5 clock in CCM_CCGR1 on the 
+>> quad/dual is replaced with the i2c4 clock on duallite/solo.
+>>
+>> Would the following patch be sufficient to allow correct use of this clock?
 > 
-> I have a performance problem(on ARM board) that cpu is very bus at
-> cache invalidation.
-> So I'm trying to alloc an uncached memory to eliminate cache invalidation.
-> 
-> But I also have problem with dma_alloc_coherent().
-> If I don't use dma_alloc_coherent(), is it OK to use below code to
-> alloc uncached memory?
-> 
-> struct page *page;
-> pgd_t *pgd;
-> pud_t *pud;
-> pmd_t *pmd;
-> pte_t *pte;
-> void *cpu_addr;
-> dma_addr_t dma_addr;
-> unsigned int vaddr;
-> 
-> cpu_addr = kmalloc(PAGE_SIZE, GFP_KERNEL);
-> dma_addr = pci_map_single(NULL, cpu_addr, PAGE_SIZE, (int)DMA_FROM_DEVICE);
-> vaddr = (unsigned int)uncached->cpu_addr;
-> pgd = pgd_offset_k(vaddr);
-> pud = pud_offset(pgd, vaddr);
-> pmd = pmd_offset(pud, vaddr);
-> pte = pte_offset_kernel(pmd, vaddr);
-> page = virt_to_page(vaddr);
-> set_pte_ext(pte, mk_pte(page,  pgprot_dmacoherent(pgprot_kernel)), 0);
-> 
-> /* This kmalloc memory won't be freed  */
-> 
+> Yes, Iain.  It looks correct to me.  Care to send a formal patch for it?
 
-No, that will not work. lowmem pages are mapped with 1MB sections underneath
-which cannot be (easily) changed at runtime. You really want to be using
-dma_alloc_coherent here.
-
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Sure, it's on it's way.
