@@ -1,54 +1,112 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Apr 2014 08:25:56 -0300
-Subject: [PATCH] ARM: dts: imx27-phytec-phycore-som: Move PMIC IRQ GPIO into a
- separate pin group
-Message-ID: <1397647556-10096-1-git-send-email-festevam@gmail.com>
+From: leigh@solinno.co.uk (Leigh Brown)
+Date: Wed, 16 Apr 2014 12:26:35 +0100
+Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
+Message-ID: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+In "ARM: dts: am33xx: correcting dt node unit address for usb", the
+usb_ctrl_mod and cppi41dma nodes were updated with the correct register
+addresses.  However, the dts files that reference these nodes were not
+updated, and those devices are no longer being enabled.
 
-The hardware is better described if we place the PMIC IRQ GPIO into its own
-pingroup. 
+This patch corrects the references for the affected dts files.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
+ arch/arm/boot/dts/am335x-evm.dts          | 4 ++--
+ arch/arm/boot/dts/am335x-evmsk.dts        | 4 ++--
+ arch/arm/boot/dts/am335x-igep0033.dtsi    | 4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-index d7ed63c..9b3c759 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-@@ -69,6 +69,8 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "fsl,mc13783";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pmic>;
- 		reg = <0>;
- 		spi-cs-high;
- 		spi-max-frequency = <20000000>;
-@@ -204,7 +206,6 @@
- 				MX27_PAD_CSPI1_MOSI__CSPI1_MOSI 0x0
- 				MX27_PAD_CSPI1_SCLK__CSPI1_SCLK 0x0
- 				MX27_PAD_CSPI1_SS0__GPIO4_28	0x0 /* SPI1 CS0 */
--				MX27_PAD_USB_PWR__GPIO2_23	0x0 /* PMIC IRQ */
- 			>;
- 		};
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index e3f27ec..2e7d932 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -183,7 +183,7 @@
+ &usb {
+ 	status = "okay";
  
-@@ -251,6 +252,12 @@
- 			>;
- 		};
+-	control at 44e10000 {
++	control at 44e10620 {
+ 		status = "okay";
+ 	};
  
-+		pinctrl_pmic: pmicgrp {
-+			fsl,pins = <
-+				MX27_PAD_USB_PWR__GPIO2_23	0x0 /* PMIC IRQ */
-+			>;
-+		};
-+
- 		pinctrl_ssi1: ssi1grp {
- 			fsl,pins = <
- 				MX27_PAD_SSI1_FS__SSI1_FS 0x0
+@@ -204,7 +204,7 @@
+ 		dr_mode = "host";
+ 	};
+ 
+-	dma-controller at 07402000  {
++	dma-controller at 47402000  {
+ 		status = "okay";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 28ae040..77df10d 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -331,7 +331,7 @@
+ &usb {
+ 	status = "okay";
+ 
+-	control at 44e10000 {
++	control at 44e10620 {
+ 		status = "okay";
+ 	};
+ 
+@@ -352,7 +352,7 @@
+ 		dr_mode = "host";
+ 	};
+ 
+-	dma-controller at 07402000  {
++	dma-controller at 47402000  {
+ 		status = "okay";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index ec08f6f..ab23885 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -364,7 +364,7 @@
+ &usb {
+ 	status = "okay";
+ 
+-	control at 44e10000 {
++	control at 44e10620 {
+ 		status = "okay";
+ 	};
+ 
+@@ -385,7 +385,7 @@
+ 		dr_mode = "host";
+ 	};
+ 
+-	dma-controller at 07402000  {
++	dma-controller at 47402000  {
+ 		status = "okay";
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index 7063311..5942e7d 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -202,7 +202,7 @@
+ &usb {
+ 	status = "okay";
+ 
+-	control at 44e10000 {
++	control at 44e10620 {
+ 		status = "okay";
+ 	};
+ 
+@@ -223,7 +223,7 @@
+ 		dr_mode = "host";
+ 	};
+ 
+-	dma-controller at 07402000  {
++	dma-controller at 47402000  {
+ 		status = "okay";
+ 	};
+ };
 -- 
-1.8.3.2
+1.9.1
