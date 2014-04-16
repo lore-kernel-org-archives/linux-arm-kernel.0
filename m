@@ -1,239 +1,44 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 16 Apr 2014 08:00:42 +0100
-Subject: [PATCHv2 1/2] iio: adc: exynos_adc: Control special clock of ADC
- to support Exynos3250 ADC
-In-Reply-To: <534DD943.8050707@samsung.com>
-References: <1397466426-13870-1-git-send-email-cw00.choi@samsung.com>
- <1397466426-13870-2-git-send-email-cw00.choi@samsung.com>
- <534DD943.8050707@samsung.com>
-Message-ID: <01dbc4c9-3e34-4e76-b3d8-6f126b9761a7@email.android.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 16 Apr 2014 16:06:59 +0900
+Subject: [PATCH 1/7] gpiolib: gpiolib-of: Implement device tree gpio-names
+ based lookup
+In-Reply-To: <CAAVeFuLDhTVGDnmYtnxEY8hhn6HE6tU9OB24WDPtmxEHjiRiuQ@mail.gmail.com>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-2-git-send-email-wens@csie.org>
+ <20140415142024.GD3207@lukather>
+ <CAAVeFuLDhTVGDnmYtnxEY8hhn6HE6tU9OB24WDPtmxEHjiRiuQ@mail.gmail.com>
+Message-ID: <CAAVeFu+rJXH=Uat5_qWPu6OfmDAFxHj2b+n=OSmwtSw4s+fv6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On April 16, 2014 2:13:39 AM GMT+01:00, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->Hi Jonathan,
+On Wed, Apr 16, 2014 at 3:12 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
+> On Tue, Apr 15, 2014 at 11:20 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> Hi Chen-Yu,
+>>
+>> On Tue, Apr 15, 2014 at 02:41:35PM +0800, Chen-Yu Tsai wrote:
+>>> This patch provides of_get_gpiod_flags_by_name(), which looks up GPIO
+>>> phandles by name only, through gpios/gpio-names, and not by index.
+>>
+>> IIRC, gpios only uses the *-gpios properties, and not gpios/gpio-names
+>> pattern seen on various other things.
+>>
+>> Is it some new property you introduce? If so, please add it to the
+>> documentation.
+>>
+>> Now, I'm not sure that having two distinct representations of GPIOs in
+>> the DT is a good thing. Yes, it's looking odd compared to other
+>> similar bindings, but it's what we have to deal with.
 >
->Any comment of this patchset?
->
->Best Regards,
->Chanwoo Choi
-Hi Chanwoo
+> Mmmm I *think* I somehow remember a discussion about this topic
+> recently, but I cannot find it. Maybe Chen-yu could point us to the
+> conclusion of this discussion and the rationale for (re)implementing
+> named GPIOs this way?
 
-Not got to it yet I'm afraid. May be sometime next week before I do.
+Aha, here maybe:
 
-Jonathan
->
->On 04/14/2014 06:07 PM, Chanwoo Choi wrote:
->> This patch control special clock for ADC in Exynos series's FSYS
->block.
->> If special clock of ADC is registerd on clock list of common clk
->framework,
->> Exynos ADC drvier have to control this clock.
->> 
->> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
->> - 'adc' clock: bus clock for ADC
->> 
->> Exynos3250 has additional 'sclk_tsadc' clock as following:
->> - 'sclk_tsadc' clock: special clock for ADC which provide clock to
->internal ADC
->> 
->> Exynos 4210/4212/4412 and Exynos5250/5420 has not included
->'sclk_tsadc' clock
->> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included
->'sclk_tsadc'
->> clock in FSYS_BLK.
->> 
->> Cc: Jonathan Cameron <jic23@kernel.org>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Naveen Krishna Chatradhi
->> Cc: linux-iio at vger.kernel.org
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  drivers/iio/adc/exynos_adc.c | 54
->+++++++++++++++++++++++++++++++++-----------
->>  1 file changed, 41 insertions(+), 13 deletions(-)
->> 
->> diff --git a/drivers/iio/adc/exynos_adc.c
->b/drivers/iio/adc/exynos_adc.c
->> index d25b262..3c99243 100644
->> --- a/drivers/iio/adc/exynos_adc.c
->> +++ b/drivers/iio/adc/exynos_adc.c
->> @@ -40,8 +40,9 @@
->>  #include <linux/iio/driver.h>
->>  
->>  enum adc_version {
->> -	ADC_V1,
->> -	ADC_V2
->> +	ADC_V1 = 0x1,
->> +	ADC_V2 = 0x2,
->> +	ADC_V3 = (ADC_V1 | ADC_V2),
->>  };
->>  
->>  /* EXYNOS4412/5250 ADC_V1 registers definitions */
->> @@ -88,6 +89,7 @@ struct exynos_adc {
->>  	void __iomem		*regs;
->>  	void __iomem		*enable_reg;
->>  	struct clk		*clk;
->> +	struct clk		*sclk;
->>  	unsigned int		irq;
->>  	struct regulator	*vdd;
->>  
->> @@ -100,6 +102,7 @@ struct exynos_adc {
->>  static const struct of_device_id exynos_adc_match[] = {
->>  	{ .compatible = "samsung,exynos-adc-v1", .data = (void *)ADC_V1 },
->>  	{ .compatible = "samsung,exynos-adc-v2", .data = (void *)ADC_V2 },
->> +	{ .compatible = "samsung,exynos-adc-v3", .data = (void *)ADC_V3 },
->>  	{},
->>  };
->>  MODULE_DEVICE_TABLE(of, exynos_adc_match);
->> @@ -128,7 +131,7 @@ static int exynos_read_raw(struct iio_dev
->*indio_dev,
->>  	mutex_lock(&indio_dev->mlock);
->>  
->>  	/* Select the channel to be used and Trigger conversion */
->> -	if (info->version == ADC_V2) {
->> +	if (info->version & ADC_V2) {
->>  		con2 = readl(ADC_V2_CON2(info->regs));
->>  		con2 &= ~ADC_V2_CON2_ACH_MASK;
->>  		con2 |= ADC_V2_CON2_ACH_SEL(chan->address);
->> @@ -165,7 +168,7 @@ static irqreturn_t exynos_adc_isr(int irq, void
->*dev_id)
->>  	info->value = readl(ADC_V1_DATX(info->regs)) &
->>  						ADC_DATX_MASK;
->>  	/* clear irq */
->> -	if (info->version == ADC_V2)
->> +	if (info->version & ADC_V2)
->>  		writel(1, ADC_V2_INT_ST(info->regs));
->>  	else
->>  		writel(1, ADC_V1_INTCLR(info->regs));
->> @@ -226,11 +229,25 @@ static int exynos_adc_remove_devices(struct
->device *dev, void *c)
->>  	return 0;
->>  }
->>  
->> +static void exynos_adc_enable_clock(struct exynos_adc *info, bool
->enable)
->> +{
->> +	if (enable) {
->> +		clk_prepare_enable(info->clk);
->> +		if (info->version == ADC_V3)
->> +			clk_prepare_enable(info->sclk);
->> +
->> +	} else {
->> +		if (info->version == ADC_V3)
->> +			clk_disable_unprepare(info->sclk);
->> +		clk_disable_unprepare(info->clk);
->> +	}
->> +}
->> +
->>  static void exynos_adc_hw_init(struct exynos_adc *info)
->>  {
->>  	u32 con1, con2;
->>  
->> -	if (info->version == ADC_V2) {
->> +	if (info->version & ADC_V2) {
->>  		con1 = ADC_V2_CON1_SOFT_RESET;
->>  		writel(con1, ADC_V2_CON1(info->regs));
->>  
->> @@ -300,6 +317,8 @@ static int exynos_adc_probe(struct
->platform_device *pdev)
->>  
->>  	writel(1, info->enable_reg);
->>  
->> +	info->version = exynos_adc_get_version(pdev);
->> +
->>  	info->clk = devm_clk_get(&pdev->dev, "adc");
->>  	if (IS_ERR(info->clk)) {
->>  		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
->> @@ -308,6 +327,17 @@ static int exynos_adc_probe(struct
->platform_device *pdev)
->>  		goto err_irq;
->>  	}
->>  
->> +	if (info->version == ADC_V3) {
->> +		info->sclk = devm_clk_get(&pdev->dev, "sclk_tsadc");
->> +		if (IS_ERR(info->sclk)) {
->> +			dev_warn(&pdev->dev,
->> +				"failed getting sclk clock, err = %ld\n",
->> +				PTR_ERR(info->sclk));
->> +			ret = PTR_ERR(info->sclk);
->> +			goto err_irq;
->> +		}
->> +	}
->> +
->>  	info->vdd = devm_regulator_get(&pdev->dev, "vdd");
->>  	if (IS_ERR(info->vdd)) {
->>  		dev_err(&pdev->dev, "failed getting regulator, err = %ld\n",
->> @@ -316,8 +346,6 @@ static int exynos_adc_probe(struct
->platform_device *pdev)
->>  		goto err_irq;
->>  	}
->>  
->> -	info->version = exynos_adc_get_version(pdev);
->> -
->>  	platform_set_drvdata(pdev, indio_dev);
->>  
->>  	indio_dev->name = dev_name(&pdev->dev);
->> @@ -340,7 +368,7 @@ static int exynos_adc_probe(struct
->platform_device *pdev)
->>  	if (ret)
->>  		goto err_iio_dev;
->>  
->> -	clk_prepare_enable(info->clk);
->> +	exynos_adc_enable_clock(info, true);
->>  
->>  	exynos_adc_hw_init(info);
->>  
->> @@ -356,7 +384,7 @@ err_of_populate:
->>  	device_for_each_child(&pdev->dev, NULL,
->>  				exynos_adc_remove_devices);
->>  	regulator_disable(info->vdd);
->> -	clk_disable_unprepare(info->clk);
->> +	exynos_adc_enable_clock(info, false);
->>  err_iio_dev:
->>  	iio_device_unregister(indio_dev);
->>  err_irq:
->> @@ -372,7 +400,7 @@ static int exynos_adc_remove(struct
->platform_device *pdev)
->>  	device_for_each_child(&pdev->dev, NULL,
->>  				exynos_adc_remove_devices);
->>  	regulator_disable(info->vdd);
->> -	clk_disable_unprepare(info->clk);
->> +	exynos_adc_enable_clock(info, false);
->>  	writel(0, info->enable_reg);
->>  	iio_device_unregister(indio_dev);
->>  	free_irq(info->irq, info);
->> @@ -387,7 +415,7 @@ static int exynos_adc_suspend(struct device *dev)
->>  	struct exynos_adc *info = iio_priv(indio_dev);
->>  	u32 con;
->>  
->> -	if (info->version == ADC_V2) {
->> +	if (info->version & ADC_V2) {
->>  		con = readl(ADC_V2_CON1(info->regs));
->>  		con &= ~ADC_CON_EN_START;
->>  		writel(con, ADC_V2_CON1(info->regs));
->> @@ -397,7 +425,7 @@ static int exynos_adc_suspend(struct device *dev)
->>  		writel(con, ADC_V1_CON(info->regs));
->>  	}
->>  
->> -	clk_disable_unprepare(info->clk);
->> +	exynos_adc_enable_clock(info, false);
->>  	writel(0, info->enable_reg);
->>  	regulator_disable(info->vdd);
->>  
->> @@ -415,7 +443,7 @@ static int exynos_adc_resume(struct device *dev)
->>  		return ret;
->>  
->>  	writel(1, info->enable_reg);
->> -	clk_prepare_enable(info->clk);
->> +	exynos_adc_enable_clock(info, true);
->>  
->>  	exynos_adc_hw_init(info);
->>  
->> 
+https://lkml.org/lkml/2014/1/21/164
 
--- 
-Sent from my Android phone with K-9 Mail. Please excuse my brevity.
+However I don't see a clear conclusion that we should implement that
+scheme. Not that I am strongly against it, but I'd like to see a
+practical purpose for it.
