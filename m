@@ -1,114 +1,275 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 16 Apr 2014 13:42:56 +0900
-Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
+Date: Wed, 16 Apr 2014 13:43:26 +0900
+Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
 In-Reply-To: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
 References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
-Message-ID: <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+Message-ID: <000a01cf592e$67e592e0$37b0b8a0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM64 PCI support for Synopsys designware PCIe, by using
-pcie arm64 arch support and creating generic pcie bridge from
-device tree.
+Samsung GH7 has four PCIe controllers which can be used as root
+complex for PCIe interface.
 
 Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
- drivers/pci/host/pcie-designware.c |   32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/pci/host/Kconfig      |    2 +-
+ drivers/pci/host/pci-exynos.c |  135 ++++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 126 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 6d23d8c..fac0440 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -65,14 +65,27 @@
- #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
- #define PCIE_ATU_UPPER_TARGET		0x91C
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index a6f67ec..3be047c 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -11,7 +11,7 @@ config PCIE_DW
  
-+#ifdef CONFIG_ARM
- static struct hw_pci dw_pci;
-+#endif
+ config PCI_EXYNOS
+ 	bool "Samsung Exynos PCIe controller"
+-	depends on SOC_EXYNOS5440
++	depends on SOC_EXYNOS5440 || ARCH_GH7
+ 	select PCIEPORTBUS
+ 	select PCIE_DW
  
- static unsigned long global_io_offset;
+diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+index 3de6bfb..6e845ca 100644
+--- a/drivers/pci/host/pci-exynos.c
++++ b/drivers/pci/host/pci-exynos.c
+@@ -57,6 +57,8 @@ struct exynos_pcie {
+ #define PCIE_NONSTICKY_RESET		0x024
+ #define PCIE_APP_INIT_RESET		0x028
+ #define PCIE_APP_LTSSM_ENABLE		0x02c
++#define PCIE_SYS_AUX_PWR_DET		0x038
++#define PCIE_SYS_AUX_PWR_ENABLE		(0x1 << 0)
+ #define PCIE_ELBI_RDLH_LINKUP		0x064
+ #define PCIE_ELBI_LTSSM_ENABLE		0x1
+ #define PCIE_ELBI_SLV_AWMISC		0x11c
+@@ -72,6 +74,23 @@ struct exynos_pcie {
+ #define PCIE_PHY_TRSVREG_RESET		0x020
+ #define PCIE_PHY_TRSV_RESET		0x024
  
-+#ifdef CONFIG_ARM
- static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
- {
- 	return sys->private_data;
- }
-+#endif
++/* PCIe PHY glue registers */
++#define PCIE_PHY_GLUE_REG0		0x000
++#define PCIE_PHY_GLUE_GLOBAL_RESET	(0x1 << 0)
++#define PCIE_PHY_GLUE_COMMON_RESET	(0x1 << 1)
++#define PCIE_PHY_GLUE_MAC_RESET		(0x1 << 11)
++#define PCIE_PHY_GLUE_REG2		0x008
++#define PCIE_PHY_GLUE_CLK100M_DS_MAX	(0x7 << 0)
++#define PCIE_PHY_GLUE_CLK100M_RFCLK	(0x1 << 3)
++#define PCIE_PHY_GLUE_CLK100M_ENABLE	(0x1 << 4)
++#define PCIE_PHY_GLUE_PLL_BUF_ENABLE	(0x1 << 8)
++#define PCIE_PHY_GLUE_PLL_DIV_ENABLE	(0x1 << 9)
++#define PCIE_PHY_GLUE_REFCLK_IN(x)	(((x) & 0xf) << 10)
++#define PCIE_PHY_GLUE_REG3		0x00c
++#define PCIE_PHY_GLUE_REF_RATE_100MHZ	(0x2 << 0)
++#define PCIE_PHY_GLUE_REG4		0x010
++#define PCIE_PHY_GLUE_MODE_PCIE		(0x0 << 0)
 +
-+#ifdef CONFIG_ARM64
-+static inline struct pcie_port *sys_to_pcie(struct pcie_port *pp)
+ /* PCIe PHY registers */
+ #define PCIE_PHY_IMPEDANCE		0x004
+ #define PCIE_PHY_PLL_DIV_0		0x008
+@@ -164,11 +183,45 @@ static void exynos_pcie_sideband_dbi_r_mode(struct pcie_port *pp, bool on)
+ 	}
+ }
+ 
++static void exynos_pcie_set_phy_mode(struct pcie_port *pp)
 +{
-+	return pp;
++	u32 val;
++	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
++
++	if (!of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
++		return;
++
++	/* configure phy reference clock setting */
++	val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG2);
++	val |= PCIE_PHY_GLUE_CLK100M_ENABLE | PCIE_PHY_GLUE_CLK100M_RFCLK |
++		PCIE_PHY_GLUE_CLK100M_DS_MAX;
++	exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG2);
++
++	val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG2);
++	val |= PCIE_PHY_GLUE_PLL_DIV_ENABLE | PCIE_PHY_GLUE_PLL_BUF_ENABLE;
++	exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG2);
++
++	val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG2);
++	val |= PCIE_PHY_GLUE_REFCLK_IN(6);
++	exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG2);
++
++	/* set phy reference clock  */
++	exynos_blk_writel(exynos_pcie, PCIE_PHY_GLUE_REF_RATE_100MHZ,
++			  PCIE_PHY_GLUE_REG3);
++
++	/* set phy mode to pcie mode */
++	exynos_blk_writel(exynos_pcie, PCIE_PHY_GLUE_MODE_PCIE,
++			  PCIE_PHY_GLUE_REG4);
 +}
 +
-+static struct pci_ops dw_pcie_ops;
-+#endif
- 
- int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+ static void exynos_pcie_assert_core_reset(struct pcie_port *pp)
  {
-@@ -381,7 +394,9 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
-+#ifdef CONFIG_ARM
- 	set_irq_flags(irq, IRQF_VALID);
-+#endif
- 
- 	return 0;
- }
-@@ -397,6 +412,10 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	struct of_pci_range_parser parser;
  	u32 val;
- 	int i;
-+#ifdef CONFIG_ARM64
-+	struct pci_host_bridge *bridge;
-+	resource_size_t lastbus;
-+#endif
+ 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
  
- 	if (of_pci_range_parser_init(&parser, np)) {
- 		dev_err(pp->dev, "missing ranges property\n");
-@@ -489,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	val |= PORT_LOGIC_SPEED_CHANGE;
- 	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
- 
-+#ifdef CONFIG_ARM
- 	dw_pci.nr_controllers = 1;
- 	dw_pci.private_data = (void **)&pp;
- 
-@@ -497,6 +517,16 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- #ifdef CONFIG_PCI_DOMAINS
- 	dw_pci.domain++;
- #endif
-+#endif
++	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
++		return;
 +
-+#ifdef CONFIG_ARM64
-+	bridge = of_create_pci_host_bridge(pp->dev, &dw_pcie_ops, pp);
-+	if (IS_ERR_OR_NULL(bridge))
-+		return PTR_ERR(bridge);
+ 	val = exynos_elb_readl(exynos_pcie, PCIE_CORE_RESET);
+ 	val &= ~PCIE_CORE_RESET_ENABLE;
+ 	exynos_elb_writel(exynos_pcie, val, PCIE_CORE_RESET);
+@@ -190,27 +243,48 @@ static void exynos_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	exynos_elb_writel(exynos_pcie, 1, PCIE_NONSTICKY_RESET);
+ 	exynos_elb_writel(exynos_pcie, 1, PCIE_APP_INIT_RESET);
+ 	exynos_elb_writel(exynos_pcie, 0, PCIE_APP_INIT_RESET);
+-	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_MAC_RESET);
 +
-+	lastbus = pci_rescan_bus(bridge->bus);
-+	pci_bus_update_busn_res_end(bridge->bus, lastbus);
-+#endif
- 
- 	return 0;
++	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
++		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
++		val |= PCIE_PHY_GLUE_MAC_RESET;
++		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
++	} else {
++		exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_MAC_RESET);
++	}
  }
-@@ -695,6 +725,7 @@ static struct pci_ops dw_pcie_ops = {
- 	.write = dw_pcie_wr_conf,
- };
  
-+#ifdef CONFIG_ARM
- static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+ static void exynos_pcie_assert_phy_reset(struct pcie_port *pp)
  {
- 	struct pcie_port *pp;
-@@ -758,6 +789,7 @@ static struct hw_pci dw_pci = {
- 	.map_irq	= dw_pcie_map_irq,
- 	.add_bus	= dw_pcie_add_bus,
- };
-+#endif /* CONFIG_ARM */
+ 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
  
- void dw_pcie_setup_rc(struct pcie_port *pp)
++	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
++		return;
++
+ 	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_MAC_RESET);
+ 	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_GLOBAL_RESET);
+ }
+ 
+ static void exynos_pcie_deassert_phy_reset(struct pcie_port *pp)
  {
++	u32 val;
+ 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
+ 
+-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_GLOBAL_RESET);
+-	exynos_elb_writel(exynos_pcie, 1, PCIE_PWR_RESET);
+-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
+-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_CMN_REG);
+-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSVREG_RESET);
+-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSV_RESET);
++	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
++		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
++		val |= PCIE_PHY_GLUE_GLOBAL_RESET;
++		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
++		exynos_elb_writel(exynos_pcie, 1, PCIE_PWR_RESET);
++		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
++		val |= PCIE_PHY_GLUE_COMMON_RESET;
++		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
++	} else {
++		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_GLOBAL_RESET);
++		exynos_elb_writel(exynos_pcie, 1, PCIE_PWR_RESET);
++		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
++		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_CMN_REG);
++		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSVREG_RESET);
++		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSV_RESET);
++	}
+ }
+ 
+ static void exynos_pcie_power_on_phy(struct pcie_port *pp)
+@@ -269,6 +343,9 @@ static void exynos_pcie_init_phy(struct pcie_port *pp)
+ {
+ 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
+ 
++	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
++		return;
++
+ 	/* DCC feedback control off */
+ 	exynos_phy_writel(exynos_pcie, 0x29, PCIE_PHY_DCC_FEEDBACK);
+ 
+@@ -305,6 +382,26 @@ static void exynos_pcie_init_phy(struct pcie_port *pp)
+ 	exynos_phy_writel(exynos_pcie, 0xa0, PCIE_PHY_TRSV3_LVCC);
+ }
+ 
++static void exynos_pcie_pulse_common_reset(struct pcie_port *pp)
++{
++	u32 val;
++	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
++
++	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
++		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
++		val &= ~PCIE_PHY_GLUE_COMMON_RESET;
++		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
++		udelay(500);
++		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
++		val |= PCIE_PHY_GLUE_COMMON_RESET;
++		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
++	} else {
++		exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_COMMON_RESET);
++		udelay(500);
++		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
++	}
++}
++
+ static void exynos_pcie_assert_reset(struct pcie_port *pp)
+ {
+ 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
+@@ -326,6 +423,9 @@ static int exynos_pcie_establish_link(struct pcie_port *pp)
+ 		return 0;
+ 	}
+ 
++	/* set phy mode */
++	exynos_pcie_set_phy_mode(pp);
++
+ 	/* assert reset signals */
+ 	exynos_pcie_assert_core_reset(pp);
+ 	exynos_pcie_assert_phy_reset(pp);
+@@ -340,9 +440,7 @@ static int exynos_pcie_establish_link(struct pcie_port *pp)
+ 	exynos_pcie_init_phy(pp);
+ 
+ 	/* pulse for common reset */
+-	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_COMMON_RESET);
+-	udelay(500);
+-	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
++	exynos_pcie_pulse_common_reset(pp);
+ 
+ 	/* de-assert core reset */
+ 	exynos_pcie_deassert_core_reset(pp);
+@@ -357,6 +455,12 @@ static int exynos_pcie_establish_link(struct pcie_port *pp)
+ 	exynos_elb_writel(exynos_pcie, PCIE_ELBI_LTSSM_ENABLE,
+ 			  PCIE_APP_LTSSM_ENABLE);
+ 
++	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
++		/* supply auxiliary power */
++		exynos_elb_writel(exynos_pcie, PCIE_SYS_AUX_PWR_ENABLE,
++				  PCIE_SYS_AUX_PWR_DET);
++	}
++
+ 	/* check if the link is up or not */
+ 	while (!dw_pcie_link_up(pp)) {
+ 		mdelay(100);
+@@ -564,6 +668,7 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
+ 	struct resource *elbi_base;
+ 	struct resource *phy_base;
+ 	struct resource *block_base;
++	 struct resource *dbi_base;
+ 	int ret;
+ 
+ 	exynos_pcie = devm_kzalloc(&pdev->dev, sizeof(*exynos_pcie),
+@@ -619,6 +724,15 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
+ 		goto fail_bus_clk;
+ 	}
+ 
++	if (of_device_is_compatible(pdev->dev.of_node, "samsung,gh7-pcie")) {
++		dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 3);
++		pp->dbi_base = devm_ioremap_resource(&pdev->dev, dbi_base);
++		if (IS_ERR(pp->dbi_base)) {
++			ret = PTR_ERR(pp->dbi_base);
++			goto fail_bus_clk;
++		}
++	}
++
+ 	ret = add_pcie_port(pp, pdev);
+ 	if (ret < 0)
+ 		goto fail_bus_clk;
+@@ -645,6 +759,7 @@ static int __exit exynos_pcie_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id exynos_pcie_of_match[] = {
+ 	{ .compatible = "samsung,exynos5440-pcie", },
++	{ .compatible = "samsung,gh7-pcie", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, exynos_pcie_of_match);
 -- 
 1.7.10.4
