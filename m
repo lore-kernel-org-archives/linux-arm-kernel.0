@@ -1,36 +1,84 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 16 Apr 2014 14:23:23 +0200
-Subject: [PATCH] ARM i.MX51: Add Efika MX Smartbook devicetree
-In-Reply-To: <1397650038.299778344@f431.i.mail.ru> (Alexander Shiyan's message
- of "Wed, 16 Apr 2014 16:07:18 +0400")
-References: <1397641298-25392-1-git-send-email-shc_work@mail.ru>
- <87tx9to71v.fsf@lebrac.rtp-net.org>
- <1397650038.299778344@f431.i.mail.ru>
-Message-ID: <87ppkho43o.fsf@lebrac.rtp-net.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Apr 2014 13:28:44 +0100
+Subject: [PATCH v2] ARM: mm: support big-endian page tables
+In-Reply-To: <534DEEDD.5030203@huawei.com>
+References: <5301B4AF.1040305@huawei.com> <5327F75F.1010406@huawei.com>
+ <20140414104300.GA3530@arm.com> <534BC31A.7060705@arm.com>
+ <534DEEDD.5030203@huawei.com>
+Message-ID: <534E777C.1090605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Shiyan <shc_work@mail.ru> writes:
+On 16/04/14 03:45, Jianguo Wu wrote:
+> On 2014/4/14 19:14, Marc Zyngier wrote:
+> 
+>> On 14/04/14 11:43, Will Deacon wrote:
+>>> (catching up on old email)
+>>>
+>>> On Tue, Mar 18, 2014 at 07:35:59AM +0000, Jianguo Wu wrote:
+>>>> Cloud you please take a look at this?
+>>>
+>>> [...]
+>>>
+>>>> On 2014/2/17 15:05, Jianguo Wu wrote:
+>>>>> When enable LPAE and big-endian in a hisilicon board, while specify
+>>>>> mem=384M mem=512M at 7680M, will get bad page state:
+>>>>>
+>>>>> Freeing unused kernel memory: 180K (c0466000 - c0493000)
+>>>>> BUG: Bad page state in process init  pfn:fa442
+>>>>> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+>>>>> page flags: 0x40000400(reserved)
+>>>>> Modules linked in:
+>>>>> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+>>>>> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+>>>>> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+>>>>> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+>>>>> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+>>>>> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+>>>>> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+>>>>> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+>>>>> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+>>>>> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
+>>>
+>>> [...]
+>>>
+>>>>> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+>>>>> when pte is 64-bit, for little-endian, will store low 32-bit in r2,
+>>>>> high 32-bit in r3; for big-endian, will store low 32-bit in r3,
+>>>>> high 32-bit in r2, this will cause wrong pfn stored in pte,
+>>>>> so we should exchange r2 and r3 for big-endian.
+>>>
+> 
+> Hi Marc,
+> How about this:
+> 
+> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+> - It tests the L_PTE_NONE in one word on the other, and possibly clear L_PTE_VALID
+>   tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
+>   bicne	r2, #L_PTE_VALID
+> - Same for L_PTE_DIRTY, respectively setting L_PTE_RDONLY
+> 
+> As for LPAE, the pte is 64-bits, and the value of r2/r3 is depending on the endianness,
+> for little-endian, will store low 32-bit in r2, high 32-bit in r3,
+> for big-endian, will store low 32-bit in r3, high 32-bit in r2, 
+> this will cause wrong bit is cleared or set, and get wrong pfn.
+> So we should exchange r2 and r3 for big-endian.
 
-> Wed, 16 Apr 2014 13:19:40 +0200 ?? Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>:
->> Alexander Shiyan <shc_work@mail.ru> writes:
->> 
->> > This patch adds support for Efika MX Smartbook.
->> 
->> I'm curious, how did you test that ? From a very quick look,
->> seems it has no chance to work with the uboot shipped with the devices.
->
-> Uboot it is not the only option for booting.
-> With any loader, this can be used with "appended DTB" option in the kernel.
->
-> This board support was be introduced by Sascha Hauer for the "barebox".
-> So I think he was checking its workability.
+May I suggest the following instead:
 
-As I said, I'm talking of the uboot shipped with the devices. I do know
-that barebox is doing things differently than this uboot. For
-instance, with this DTB and barebox, usb should(?) work but for sure, it
-won't work with this uboot.
-If we merge something, it should work with all bootloaders otherwise it
-would mean that the dtb is bootloader specific...
+"An LPAE PTE is a 64bit quantity, passed to cpu_v7_set_pte_ext in the
+ r2 and r3 registers.
+ On an LE kernel, r2 contains the LSB of the PTE, and r3 the MSB.
+ On a BE kernel, the assignment is reversed.
 
-Arnaud
+ Unfortunately, the current code always assumes the LE case,
+ leading to corruption of the PTE when clearing/setting bits.
+
+ This patch fixes this issue much like it has been done already in the
+ cpu_v7_switch_mm case."
+
+Cheers,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
