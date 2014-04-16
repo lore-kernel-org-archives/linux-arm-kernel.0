@@ -1,70 +1,31 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 16 Apr 2014 15:23:13 +0200
-Subject: [PATCH 3/4] ARM: dts: berlin: add the SDHCI nodes for the BG2Q
-In-Reply-To: <20140416130915.GC11310@lunn.ch>
-References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397652011-21284-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140416130915.GC11310@lunn.ch>
-Message-ID: <20140416132313.GA6253@kwain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Apr 2014 14:29:31 +0100
+Subject: [PATCH v5 4/4] arm64: is_compat_task is defined both in
+ asm/compat.h and linux/compat.h
+In-Reply-To: <1394861948-28712-5-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394861948-28712-5-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140416132931.GB1001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On Wed, Apr 16, 2014 at 03:09:15PM +0200, Andrew Lunn wrote:
-> On Wed, Apr 16, 2014 at 02:40:10PM +0200, Antoine T?nart wrote:
-> > Add the SDHCI nodes for the Marvell Berlin BG2Q, using the berlin-sdhci
-> > driver.
-> > 
-> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/berlin2q.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 40 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> > index 5925e6a16749..8f897d461460 100644
-> > --- a/arch/arm/boot/dts/berlin2q.dtsi
-> > +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> > @@ -67,6 +67,14 @@
-> >  		clock-div = <3>;
-> >  	};
-> >  
-> > +	sdio1clk: sdio1clk {
-> > +		compatible = "fixed-factor-clock";
-> > +		#clock-cells = <0>;
-> > +		clocks = <&syspll>;
-> > +		clock-mult = <1>;
-> > +		clock-div = <4>;
-> > +	};
-> > +
-> >  	soc {
-> >  		compatible = "simple-bus";
-> >  		#address-cells = <1>;
-> > @@ -75,6 +83,38 @@
-> >  		ranges = <0 0xf7000000 0x1000000>;
-> >  		interrupt-parent = <&gic>;
-> >  
-> > +		sdhci0: sdhci at ab0000 {
-> > +			compatible = "marvell,berlin2q-sdhci";
-> > +			reg = <0xab0000 0x200>;
-> > +			clocks = <&sdio1clk>;
-> > +			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> > +			keep-power-in-suspend;
-> > +			enable-sdio-wakeup;
-> > +			broken-cd;
+On Sat, Mar 15, 2014 at 05:39:08AM +0000, AKASHI Takahiro wrote:
+> Some kernel files may include both linux/compat.h and asm/compat.h directly
+> or indirectly. Since both header files contain is_compat_task() under
+> !CONFIG_COMPAT, compiling them with !CONFIG_COMPAT will eventually fail.
+> Such files include kernel/auditsc.c, kernel/seccomp.c and init/do_mountfs.c
+> (do_mountfs.c may read asm/compat.h via asm/ftrace.h once ftrace is
+> implemented).
 > 
-> Hi Antoine
+> So this patch proactively
+> 1) removes is_compat_task() under !CONFIG_COMPAT from asm/compat.h
+> 2) replaces asm/compat.h to linux/compat.h in kernel/*.c,
+>    but asm/compat.h is still necessary in ptrace.c and process.c because
+>    they use is_compat_thread().
 > 
-> I would expect these three last properties to be a property of the
-> board, not the SoC. Or am i missing something?
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-No reason, I'll move them.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks !
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
