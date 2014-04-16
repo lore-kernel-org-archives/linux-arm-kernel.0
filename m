@@ -1,37 +1,40 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 16 Apr 2014 17:11:12 +0800
-Subject: [PATCH v2 0/2] ARM: berlin: add GPIO support for the BG2Q
-In-Reply-To: <1397634395-7456-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397634395-7456-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140416171112.31757110@xhacker>
+From: minggr@gmail.com (Lin Ming)
+Date: Wed, 16 Apr 2014 11:11:39 -0700
+Subject: kmalloc and uncached memory
+Message-ID: <CAF1ivSaAQ_8byv+a9NQebtL4kBYFEPOTJHn-JA-bYY=wLFpv2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Apr 2014 00:46:33 -0700
-Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+Hi Peter,
 
-> This series add the support for the GPIOs of the Berlin BG2Q. We use the
-> newly integrated dwapb GPIO driver here.
-> 
-> This applies on top of Alexandre's BG2Q symbol introduction[1] and the dwapb
-> gpio patch fixing IRQ initialization[2].
-> 
-> [1] https://patchwork.kernel.org/patch/3876141/
-> [2] https://lkml.org/lkml/2014/4/7/96
-> 
-> Changes since v1:
-> 	- s/gpio-controller@/gpio-port@/ in device tree
-> 	- moved ARCH_REQUIRE_GPIOLIB to ARCH_BERLIN in Kconfig
-> 
-> Antoine T?nart (2):
->   ARM: berlin: add the LIBGPIO as a dependency for the BG2Q
->   ARM: dts: berlin: add GPIO nodes for the BG2Q
-> 
->  arch/arm/boot/dts/berlin2q.dtsi | 102
-> ++++++++++++++++++++++++++++++++++++++++ arch/arm/mach-berlin/Kconfig
-> |   1 + 2 files changed, 103 insertions(+)
-> 
+I have a performance problem(on ARM board) that cpu is very bus at
+cache invalidation.
+So I'm trying to alloc an uncached memory to eliminate cache invalidation.
 
-All the two patches look good
+But I also have problem with dma_alloc_coherent().
+If I don't use dma_alloc_coherent(), is it OK to use below code to
+alloc uncached memory?
 
-Thanks very much
+struct page *page;
+pgd_t *pgd;
+pud_t *pud;
+pmd_t *pmd;
+pte_t *pte;
+void *cpu_addr;
+dma_addr_t dma_addr;
+unsigned int vaddr;
+
+cpu_addr = kmalloc(PAGE_SIZE, GFP_KERNEL);
+dma_addr = pci_map_single(NULL, cpu_addr, PAGE_SIZE, (int)DMA_FROM_DEVICE);
+vaddr = (unsigned int)uncached->cpu_addr;
+pgd = pgd_offset_k(vaddr);
+pud = pud_offset(pgd, vaddr);
+pmd = pmd_offset(pud, vaddr);
+pte = pte_offset_kernel(pmd, vaddr);
+page = virt_to_page(vaddr);
+set_pte_ext(pte, mk_pte(page,  pgprot_dmacoherent(pgprot_kernel)), 0);
+
+/* This kmalloc memory won't be freed  */
+
+Thanks,
+Ming
