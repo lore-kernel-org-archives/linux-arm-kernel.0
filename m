@@ -1,41 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Apr 2014 08:42:13 -0500
-Subject: [PATCH] ARM: fix missing CLKSRC_OF on multi-platform
-Message-ID: <1397655733-15514-1-git-send-email-robherring2@gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 16 Apr 2014 21:50:21 +0800
+Subject: [PATCH] hwrng: remove unbuildable picoxcell TRNG
+In-Reply-To: <20140415100614.GA2037@page.Home>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-7-git-send-email-richard@nod.at>
+ <1391977683.25855.27.camel@x220> <1397552118.1985.16.camel@x220>
+ <20140415100614.GA2037@page.Home>
+Message-ID: <20140416135021.GI4684@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+On Tue, Apr 15, 2014 at 11:06:14AM +0100, Jamie Iles wrote:
+> Hi Paul,
+> 
+> On Tue, Apr 15, 2014 at 10:55:18AM +0200, Paul Bolle wrote:
+> > The driver for the "Picochip picoXcell true random number generator" was
+> > added in v2.6.39. Its Kconfig symbol has always depended on
+> > PICOXCELL_PC3X3. But that Kconfig symbol has never been part of the
+> > tree. This means this driver has never been buildable. Let's remove it.
+> > It can be re-added if its dependencies are actually part of the tree.
+> > 
+> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> 
+> I wish I had the bandwidth to get this properly supported, but this 
+> seems sensible to me.
+> 
+> Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-In commit ddb902cc34593e (ARM: centralize common multi-platform kconfig
-options), CLKSRC_OF was removed from some platforms, but not added to
-ARCH_MULTIPLATFORM. Fix this.
-
-Reported-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
-Signed-off-by: Rob Herring <robh@kernel.org>
----
-Arnd, Kevin, Olof,
-
-Please apply this rather than the various patches fixing single 
-platforms. Really, CLKSRC_OF should be selected in each timer config 
-option, but this is a much more simple fix.
-
-Rob
-
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ab438cb..a48712e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -311,6 +311,7 @@ config ARCH_MULTIPLATFORM
- 	select ARM_HAS_SG_CHAIN
- 	select ARM_PATCH_PHYS_VIRT
- 	select AUTO_ZRELADDR
-+	select CLKSRC_OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
- 	select MULTI_IRQ_HANDLER
+Patch applied.
 -- 
-1.9.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
