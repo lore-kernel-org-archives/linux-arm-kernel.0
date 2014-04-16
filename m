@@ -1,43 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 16 Apr 2014 16:44:15 +0100
-Subject: [PATCH v4 1/9] mfd: AXP20x: Add mfd driver for AXP20x PMIC
-In-Reply-To: <20140416154350.GF19671@lee--X1>
-References: <1397209093-10077-1-git-send-email-carlo@caione.org>
- <1397209093-10077-2-git-send-email-carlo@caione.org>
- <20140416154350.GF19671@lee--X1>
-Message-ID: <20140416154415.GG19671@lee--X1>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 16 Apr 2014 11:44:35 -0400
+Subject: [PATCH 4/6] thermal: armada: Support Armada 375 SoC
+In-Reply-To: <1397657720-10893-5-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1397657720-10893-5-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140416154435.GG28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > This patch introduces the preliminary support for PMICs X-Powers AXP202
-> > and AXP209. The AXP209 and AXP202 are the PMUs (Power Management Unit)
-> > used by A10, A13 and A20 SoCs and developed by X-Powers, a sister company
-> > of Allwinner.
-> > 
-> > The core enables support for two subsystems:
-> > - PEK (Power Enable Key)
-> > - Regulators
-> > 
-> > Signed-off-by: Carlo Caione <carlo@caione.org>
-> > ---
-> >  drivers/mfd/Kconfig        |  12 +++
-> >  drivers/mfd/Makefile       |   1 +
-> >  drivers/mfd/axp20x.c       | 249 +++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/axp20x.h | 180 ++++++++++++++++++++++++++++++++
-> >  4 files changed, 442 insertions(+)
-> >  create mode 100644 drivers/mfd/axp20x.c
-> >  create mode 100644 include/linux/mfd/axp20x.h
-> 
-> This looks good to me know.
-> 
-> Once you have all the other Acks you need I'd be happy to create an
-> immutable branch for the other maintainers to pull from.
+On Wed, Apr 16, 2014 at 11:15:18AM -0300, Ezequiel Garcia wrote:
+> In addition, we also add support for the Z1 SoC stepping, which needs
+> an initialization-quirk to work properly.
+...
+> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> index fff93d5..745d241 100644
+> --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> @@ -4,8 +4,15 @@ Required properties:
+>  
+>  - compatible:	Should be set to one of the following:
+>  		marvell,armada370-thermal
+> +		marvell,armada375-thermal
+> +		marvell,armada375-z1-thermal
+>  		marvell,armadaxp-thermal
+>  
+> +		Note: As the name suggests, "marvell,armada375-z1-thermal"
+> +		applies for the SoC Z1 stepping only. The operating system
+> +		may auto-detect the SoC stepping and update the compatible
+> +		at runtime.
 
-Whoops, forgot this:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Please also include a statement in here regarding the register quirk for
+the z1 stepping.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+thx,
+
+Jason.
