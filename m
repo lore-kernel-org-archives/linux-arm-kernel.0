@@ -1,130 +1,95 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 16 Apr 2014 09:27:38 +0200
-Subject: [PATCH v3 09/18] ASoC: fsl-ssi: Only enable baudclk when used
-In-Reply-To: <20140414152850.GB7197@MrMyself>
-References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
- <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
- <20140414152850.GB7197@MrMyself>
-Message-ID: <20140416072738.GC6159@pengutronix.de>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 16 Apr 2014 17:30:53 +1000
+Subject: [PATCH] dtc: add ability to make nodes conditional on them being
+ referenced
+In-Reply-To: <199290403.sj4aYrj8FC@diego>
+References: <199290403.sj4aYrj8FC@diego>
+Message-ID: <20140416073053.GB12216@voom.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Apr 14, 2014 at 11:28:51PM +0800, Nicolin Chen wrote:
-> On Mon, Apr 14, 2014 at 03:35:39PM +0200, Markus Pargmann wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > Enable baudclk only when it is used. The baudclock is only needed in master
-> > mode and only when thr driver is active, so move enabling to fsl_ssi_startup
-> > and disabling to fsl_ssi_shutdown.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  sound/soc/fsl/fsl_ssi.c | 37 ++++++++++++++++++++++++++++++-------
-> >  1 file changed, 30 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> > index f2255cb..d6d3f0a3 100644
-> > --- a/sound/soc/fsl/fsl_ssi.c
-> > +++ b/sound/soc/fsl/fsl_ssi.c
-> > @@ -236,6 +236,12 @@ static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
-> >  	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
-> >  }
-> >  
-> > +static bool fsl_ssi_is_i2s_master(struct fsl_ssi_private *ssi_private)
-> > +{
-> > +	return (ssi_private->dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) ==
-> > +		SND_SOC_DAIFMT_CBS_CFS;
-> > +}
-> > +
-> >  /**
-> >   * fsl_ssi_isr: SSI interrupt handler
-> >   *
-> > @@ -489,6 +495,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
-> >  	struct fsl_ssi_private *ssi_private =
-> >  		snd_soc_dai_get_drvdata(rtd->cpu_dai);
-> >  	unsigned long flags;
-> > +	int ret;
-> >  
-> >  	if (!dai->active && !fsl_ssi_is_ac97(ssi_private)) {
-> >  		spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
-> > @@ -496,6 +503,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
-> >  		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
-> >  	}
-> >  
-> > +	if (fsl_ssi_is_i2s_master(ssi_private)) {
-> > +		ret = clk_prepare_enable(ssi_private->baudclk);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> >  	/* When using dual fifo mode, it is safer to ensure an even period
-> >  	 * size. If appearing to an odd number while DMA always starts its
-> >  	 * task from fifo0, fifo1 would be neglected at the end of each
-> > @@ -508,6 +521,17 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
-> >  	return 0;
-> >  }
-> >  
-> > +static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
-> > +		struct snd_soc_dai *dai)
-> > +{
-> > +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> > +	struct fsl_ssi_private *ssi_private =
-> > +		snd_soc_dai_get_drvdata(rtd->cpu_dai);
-> > +
-> > +	if (fsl_ssi_is_i2s_master(ssi_private))
-> > +		clk_disable_unprepare(ssi_private->baudclk);
-> > +}
-> > +
-> >  /**
-> >   * fsl_ssi_hw_params - program the sample size
-> >   *
-> > @@ -576,6 +600,11 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
-> >  
-> >  	ssi_private->dai_fmt = fmt;
-> >  
-> > +	if (fsl_ssi_is_i2s_master(ssi_private) && IS_ERR(ssi_private->baudclk)) {
-> > +		dev_err(cpu_dai->dev, "no baudclk needed for master mode\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
+On Sun, Mar 16, 2014 at 10:22:02PM +0100, Heiko St?bner wrote:
+> From: Heiko Stuebner <heiko.stuebner@bq.com>
 > 
-> I was wondering what if machine driver doesn't set fmt to master during
-> its probe(), in another word -- before fsl_ssi_startup(), but leave that
-> into its hw_params() via snd_soc_dai_set_fmt() which then would run after
-> fsl_ssi_startup() while having no baud clock enabled in this case.
+> On i.MX, which carries a lot of pin-groups of which most are unused on
+> individual boards, they noticed that this plethora of nodes also results
+> in the runtime-lookup-performance also degrading [0].
 > 
-> A better solution may be to wrap clk_prepare_enable() and master mode
-> clock dividing code into fsl_ssi_hw_params(), a bit like the ESAI driver
-> even though it doesn't contain the clk_prepare_enable() part currently,
-> and then to put clk_disable_unprepare() into hw_free() for symmetry.
+> A i.MX-specific solution defining the pingroups in the board files but
+> using macros to reference the pingroup-data was not well received.
 > 
-> Any suggestion?
+> This patch is trying to solve this issue in a more general way, by
+> adding the ability to mark nodes as needing to be referenced somewhere
+> in the tree.
+> 
+> To mark a node a needing to be referenced it must be prefixed with
+> /delete-unreferenced/. This makes dtc check the nodes reference-status
+> when creating the flattened tree, dropping it if unreferenced.
+> 
+> For example, the i.MX6SL pingroup
+> 
+> 	/delete-unreferenced/ pinctrl_ecspi1_1: ecspi1grp-1 {
+> 		fsl,pins = <
+> 			MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO 0x100b1
+> 			MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI 0x100b1
+> 			MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK 0x100b1
+> 		>;
+> 	};
+> 
+> would only be included in the dtb if it got referenced somewhere
+> as pingroup via
+> 
+> 	node {
+> 		pinctrl-0 <&pinctrl_ecscpi1_1>;
+> 	};
 
-Yes this is a problem. Although I am not really convinced of the concept
-of setting up the DAIs in hw_params, we should support it as there are
-some users.
+Sorry for the delay - I'm pretty busy with non-dtc things.
 
-Is there always exactly one hw_free call for one hw_params call? There
-is a comment above the function:
-"Frees resources allocated by hw_params, can be called multiple times",
-so I am not sure if we can directly use clk_prepare_enable or if we need
-to remember the clock state?
+Concept looks fine to me.  It's perhaps a bit special use case, but
+the syntax is well isolated (that is, unlikely to mix badly with other
+possible syntax changes), so I'm happy enough to include it for those
+who want it.
 
-Thanks,
+Maybe change the keyword to /delete-if-unreferenced/, it's a little
+bit more accurate.  It's a bit long-winded, but I can't think of a
+more succinct term, so it will do.
 
-Markus
+It needs testcases.
+
+There are a few minor problems in the implementation.
+
+With those things fixed, I'd be happy to apply.
+
+Some detailed comments on the implementation below:
+
+[snip]
+> @@ -472,6 +472,8 @@ static void fixup_phandle_references(struct check *c, struct node *dt,
+>  
+>  		phandle = get_node_phandle(dt, refnode);
+>  		*((cell_t *)(prop->val.val + m->offset)) = cpu_to_fdt32(phandle);
+> +
+> +		reference_node(refnode);
+
+This may have some slightly unexpected behaviour when combined with
+/delete-node/ and or /delete-prop/.  At worst it should include the
+unnecessary node though, so I don't think it's a big problem.
+
+[snip]
+> +struct node *check_node_referenced(struct node *node)
+
+This function needs a different name, since it doesn't actually check
+anything (it just triggers a later check).  Maybe
+mark_node_needs_reference().
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/e9b7b118/attachment.sig>
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/3608e549/attachment.sig>
