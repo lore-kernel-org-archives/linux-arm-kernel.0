@@ -1,127 +1,216 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 16 Apr 2014 18:39:28 +0800
-Subject: [linux-sunxi] Re: [PATCH 7/7] ARM: sun7i: cubietruck: enable
- bluetooth module
-In-Reply-To: <20140416094428.GK3207@lukather>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-8-git-send-email-wens@csie.org>
- <20140415144215.GG3207@lukather>
- <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
- <20140416094428.GK3207@lukather>
-Message-ID: <CAGb2v67HzB22a3huRRZyufXkdTFE410MhXqAHyC-MmVo0-GCFA@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Apr 2014 12:41:05 +0200
+Subject: [PATCHv3 1/2] iio: adc: exynos_adc: Control special clock of ADC
+ to support Exynos3250 ADC
+In-Reply-To: <1397643118-6934-2-git-send-email-cw00.choi@samsung.com>
+References: <1397643118-6934-1-git-send-email-cw00.choi@samsung.com>
+ <1397643118-6934-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <534E5E41.4090400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Chanwoo,
 
-On Wed, Apr 16, 2014 at 5:44 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+On 16.04.2014 12:11, Chanwoo Choi wrote:
+> This patch control special clock for ADC in Exynos series's FSYS block.
+> If special clock of ADC is registerd on clock list of common clk framework,
+> Exynos ADC drvier have to control this clock.
 >
-> Please try to keep me in CC, even though the ML doesn't make it easy..
-
-Sorry about that.
-
-> On Wed, Apr 16, 2014 at 12:06:59AM +0800, Chen-Yu Tsai wrote:
->> >> @@ -139,4 +152,16 @@
->> >>       reg_usb2_vbus: usb2-vbus {
->> >>               status = "okay";
->> >>       };
->> >> +
->> >> +     rfkill_bt {
->> >> +             compatible = "rfkill-gpio";
->> >> +             pinctrl-names = "default";
->> >> +             pinctrl-0 = <&bt_pwr_pin_cubietruck>, <&clk_out_a_pins_a>;
->> >> +             clocks = <&clk_out_a>;
->> >> +             clock-frequency = <32768>;
->> >> +             gpios = <&pio 7 18 0>; /* PH18 */
->> >> +             gpio-names = "reset";
->> >> +             rfkill-name = "bt";
->> >> +             rfkill-type = <2>;
->> >> +     };
->> >
->> > Hmmm, I don't think that's actually right.
->> >
->> > If you have such a device, then I'd expect it to be represented as a
->> > full device in the DT, probably with one part for the WiFi, one part
->> > for the Bluetooth, and here the definition of the rfkill device that
->> > controls it.
->>
->> The AP6210 is not one device, but 2 separate chips in one module. Each
->> chip has its own controls and interface. They just so happen to share
->> the same enclosure. Even 2-in-1 chips by Broadcom have separate controls
->> and interfaces. The WiFi side is most likely connected via SDIO, while
->> the Bluetooth side is connected to a UART, and optionally I2S for sound.
+> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+> - 'adc' clock: bus clock for ADC
 >
-> It's even easier to represent then.
+> Exynos3250 has additional 'sclk_tsadc' clock as following:
+> - 'sclk_tsadc' clock: special clock for ADC which provide clock to internal ADC
 >
->> > But tying parts of the device to the rfkill that controls it, such as
->> > the clocks, or the frequency it runs at seems just wrong.
->>
->> I understand where you're coming from. For devices on buses that require
->> drivers (such as USB, SDIO) these properties probably should be tied to
->> the device node.
->>
->> For our use case here, which is a bluetooth chip connected on the UART,
->> there is no in kernel representation or driver to tie them to. Same goes
->> for UART based GPS chips. They just so happen to require toggling a GPIO,
->> and maybe enabling a specific clock, to get it running. Afterwards,
->> accessing it is done solely from userspace. For our Broadcom chips, the
->> user has to upload its firmware first, then designate the tty as a Bluetooth
->> HCI using hciattach.
->>
->> We are using the rfkill device as a on-off switch.
+> Exynos 4210/4212/4412 and Exynos5250/5420 has not included 'sclk_tsadc' clock
+> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included 'sclk_tsadc'
+> clock in FSYS_BLK.
 >
-> I understand your point, but the fact that it's implemented in
-> user-space, or that UART is not a bus (which probably should be), is
-> only a Linux specific story, and how it's implemented in Linux (even
-> if the whole rfkill node is another one, but let's stay on topic).
-
-I gave it some thought last night. You are right. My whole approach
-is wrong. But let's try to make it right.
-
-So considering the fact that it's primarily connected to a UART,
-maybe I should make it a sub-node to the UART node it's actually
-connected to? Something like:
-
-        uart2: serial at 01c28800 {
-                pinctrl-names = "default";
-                pinctrl-0 = <&uart2_pins_a>;
-                status = "okay";
-
-                bt: bt_hci {
-                        compatible = "brcm,bcm20710";
-                        /* maybe add some generic compatible */
-                        pinctrl-names = "default";
-                        pinctrl-0 = <&clk_out_a_pins_a>,
-<&bt_pwr_pin_cubietruck>;
-                        clocks = <&clk_out_a>;
-                        clock-frequency = <32768>;
-                        gpios = <&pio 7 18 0>; /* PH18 */
-                };
-        };
-
-And let the uart core handle power sequencing for sub-nodes.
-
-The rfkill node would still have the gpios and clocks, but not the
-clock-frequency property. It's sole purpose would be to toggle the
-controls. But I think the placement is still odd. Perhaps these
-virtual devices shouldn't live in the DT at all.
-
-> This is a huge abstraction leak.
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Naveen Krishna Chatradhi
+> Cc: linux-iio at vger.kernel.org
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>   drivers/iio/adc/exynos_adc.c | 86 +++++++++++++++++++++++++++++++++++++-------
+>   1 file changed, 73 insertions(+), 13 deletions(-)
 >
-> Let's say you need the I2S stream you mentionned for some
-> reason. Would you tie the audio stream to the rfkill node as well?
-> I'm sorry, but from an hardware description perspective, it makes no
-> sense.
+> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+> index d25b262..486771e 100644
+> --- a/drivers/iio/adc/exynos_adc.c
+> +++ b/drivers/iio/adc/exynos_adc.c
+> @@ -40,8 +40,9 @@
+>   #include <linux/iio/driver.h>
+>
+>   enum adc_version {
+> -	ADC_V1,
+> -	ADC_V2
+> +	ADC_V1 = 0x1,
+> +	ADC_V2 = 0x2,
+> +	ADC_V3 = (ADC_V1 | ADC_V2),
 
-The above revision should be better, from a hardware perspective. I'm
-not sure how to tie in the I2S stream, and there I haven't found any
-examples in the DT tree.
+I don't think Exynos3250 has really a V3 of the ADC block. It looks like 
+a V2, just with different integration details. This approach is 
+confusing and will create problems if real V3 shows up.
 
-> What's the feeling of the DT maintainers?
+In general, using a version enum and a lot of ifs for particular 
+versions in the code is rather a bad practice, especially when multiple 
+versions happen to require the same quirks.
 
+Instead, a variant struct should be introduced with bitfields for 
+particular quirks and/or register offsets and/or function pointers. Let 
+me show example solutions inline with your changes below.
 
-Cheers
+>   };
+>
+>   /* EXYNOS4412/5250 ADC_V1 registers definitions */
+> @@ -85,9 +86,11 @@ enum adc_version {
+>   #define EXYNOS_ADC_TIMEOUT	(msecs_to_jiffies(1000))
+>
+>   struct exynos_adc {
+> +	struct device		*dev;
+>   	void __iomem		*regs;
+>   	void __iomem		*enable_reg;
+>   	struct clk		*clk;
+> +	struct clk		*sclk;
+>   	unsigned int		irq;
+>   	struct regulator	*vdd;
+>
+> @@ -100,6 +103,7 @@ struct exynos_adc {
+>   static const struct of_device_id exynos_adc_match[] = {
+>   	{ .compatible = "samsung,exynos-adc-v1", .data = (void *)ADC_V1 },
+>   	{ .compatible = "samsung,exynos-adc-v2", .data = (void *)ADC_V2 },
+> +	{ .compatible = "samsung,exynos-adc-v3", .data = (void *)ADC_V3 },
+>   	{},
+>   };
+>   MODULE_DEVICE_TABLE(of, exynos_adc_match);
+> @@ -128,7 +132,7 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
+>   	mutex_lock(&indio_dev->mlock);
+>
+>   	/* Select the channel to be used and Trigger conversion */
+> -	if (info->version == ADC_V2) {
+> +	if (info->version >= ADC_V2) {
+>   		con2 = readl(ADC_V2_CON2(info->regs));
+>   		con2 &= ~ADC_V2_CON2_ACH_MASK;
+>   		con2 |= ADC_V2_CON2_ACH_SEL(chan->address);
 
-ChenYu
+This function should be split into exynos_adc_v1_read_raw() and 
+exynos_adc_v2_read_raw(). Then a function pointer for int 
+(*read_raw)(...) should be added to the variant struct I mentioned 
+above. Then the generic part of existing exynos_read_raw() would just 
+call variant->read_raw().
+
+> @@ -165,7 +169,7 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+>   	info->value = readl(ADC_V1_DATX(info->regs)) &
+>   						ADC_DATX_MASK;
+>   	/* clear irq */
+> -	if (info->version == ADC_V2)
+> +	if (info->version >= ADC_V2)
+>   		writel(1, ADC_V2_INT_ST(info->regs));
+>   	else
+>   		writel(1, ADC_V1_INTCLR(info->regs));
+
+void (*clear_irq)().
+
+> @@ -226,11 +230,43 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
+>   	return 0;
+>   }
+>
+> +static int exynos_adc_enable_clock(struct exynos_adc *info, bool enable)
+> +{
+> +	int ret;
+> +
+> +	if (enable) {
+> +		ret = clk_prepare_enable(info->clk);
+> +		if (ret) {
+> +			dev_err(info->dev, "failed to enable adc clock\n");
+> +			return ret;
+> +		}
+> +		if (info->version == ADC_V3) {
+
+Here, a bitfield bool needs_sclk:1; in the variant struct would be 
+sufficient.
+
+> +			ret = clk_prepare_enable(info->sclk);
+> +			if (ret) {
+> +				dev_err(info->dev,
+> +					"failed to enable sclk_tsadc clock\n");
+> +				goto err;
+> +			}
+> +		}
+> +
+> +	} else {
+> +		if (info->version == ADC_V3)
+> +			clk_disable_unprepare(info->sclk);
+> +		clk_disable_unprepare(info->clk);
+> +	}
+> +
+> +	return 0;
+> +err:
+> +	clk_disable_unprepare(info->clk);
+> +
+> +	return ret;
+> +}
+
+Ugh. Please split this into exynos_adc_enable_clock() and 
+exynos_adc_disable_clock().
+
+> +
+>   static void exynos_adc_hw_init(struct exynos_adc *info)
+>   {
+>   	u32 con1, con2;
+>
+> -	if (info->version == ADC_V2) {
+> +	if (info->version >= ADC_V2) {
+>   		con1 = ADC_V2_CON1_SOFT_RESET;
+>   		writel(con1, ADC_V2_CON1(info->regs));
+>
+
+This function should be completely split into v1_hw_init() and 
+v2_hw_init() and the code calling currently exynos_adc_hw_init() could 
+call variant->hw_init() directly.
+
+> @@ -287,6 +323,7 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>   	}
+>
+>   	info->irq = irq;
+> +	info->dev = &pdev->dev;
+>
+>   	init_completion(&info->completion);
+>
+> @@ -300,6 +337,8 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>
+>   	writel(1, info->enable_reg);
+>
+> +	info->version = exynos_adc_get_version(pdev);
+> +
+
+Instead of getting version, here a pointer to variant struct could be 
+retrieved.
+
+>   	info->clk = devm_clk_get(&pdev->dev, "adc");
+>   	if (IS_ERR(info->clk)) {
+>   		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
+> @@ -308,6 +347,16 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>   		goto err_irq;
+>   	}
+>
+> +	if (info->version == ADC_V3) {
+
+if (info->variant->needs_sclk) {
+
+> +		info->sclk = devm_clk_get(&pdev->dev, "sclk_tsadc");
+> +		if (IS_ERR(info->sclk)) {
+> +			ret = PTR_ERR(info->sclk);
+> +			dev_warn(&pdev->dev,
+> +				"failed getting sclk clock, err = %d\n", ret);
+> +			goto err_irq;
+> +		}
+> +	}
+> +
+
+etc., etc.
+
+Best regards,
+Tomasz
