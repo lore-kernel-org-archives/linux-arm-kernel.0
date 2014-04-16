@@ -1,28 +1,48 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Apr 2014 14:39:24 +0530
-Subject: [PATCH RESEND] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <534E4172.8030401@zonque.org>
-References: <1392636546-15541-1-git-send-email-zonque@gmail.com>
- <20140319151352.GJ1976@intel.com> <534576C3.2020409@zonque.org>
- <20140416064534.GL32284@intel.com> <534E3F3D.5080003@zonque.org>
- <20140416082326.GM32284@intel.com> <534E4172.8030401@zonque.org>
-Message-ID: <20140416090923.GR32284@intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Apr 2014 10:21:28 +0100
+Subject: [PATCH] ARM: prima2: remove L2 cache size override
+In-Reply-To: <6113510.ZYPB60x7iK@wuerfel>
+References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
+ <CAGsJ_4zt4KMLk7v93e40Zj1A7fHBnvE2_c94nAbGAr9xcCFnwg@mail.gmail.com>
+ <20140415215615.GZ24070@n2100.arm.linux.org.uk> <6113510.ZYPB60x7iK@wuerfel>
+Message-ID: <20140416092128.GE24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 10:38:10AM +0200, Daniel Mack wrote:
-> >> It might add to the readability of the drivers, but for the current
-> >> case, I don't think it's really necessary.
-> > That is because you are maintaining the current descriptors in chain_running. If
-> > we use above method then you dont need to use this, right?
+On Wed, Apr 16, 2014 at 10:52:27AM +0200, Arnd Bergmann wrote:
+> On Tuesday 15 April 2014 22:56:15 Russell King - ARM Linux wrote:
+> > On Tue, Apr 15, 2014 at 06:13:27PM +0800, Barry Song wrote:
+> > > 
+> > > ok, it seems we still need to hook this into the callback of this
+> > > specific machine instead of using a global early_initcall(). since now
+> > > the dt compatible field has been generic enough, it will cause other
+> > > platforms to execute l2x0_of_init() too.
+> > 
+> > What I did for Versatile Express was to move it to the init_irq stage.
+> > I'm not condoning using init_irq() for non-IRQ stuff, but that was
+> > just to see whether it was possible (the .init_early is too early for
+> > it.)  Let me put it another way: I'm not thrilled by the idea of
+> > having it in init_irq() but that's a better location to call L2 cache
+> > initialisation than half-way through the kernel's initialisation.
 > 
-> Jup, but that would result in a rewrite of larger parts of the code. The
-> concept of hot-linking the two list so there's only one resulting list
-> of currently active descriptors is built-in deeply into the driver's
-> concept.
-Ah I suspected so :)
+> Would it help to introduce a new .init_l2_cache() callback? That
+> way, the architecture code can default to initializing any l2x0
+> that it finds in DT, and have give platforms the option of
+> overriding the call if they need to, and we can do it at the
+> same point during early boot for everyone.
 
-I think for now this is fine you can perhaps upgrade this later :)
+As my ideal target is to remove l2x0_*init from platforms, I'd rather
+not do that unless we have a clear idea that we are going to keep this
+around.
+
+Another potential solution would be to have the two auxctl values
+specified, and do nothing if they're both zero.
+
+First though, we really need to work out what each platform requires
+from these, and turn everything else into either something the core
+code handles, or if there is no good reason for it, it is simply
+removed.
 
 -- 
-~Vinod
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
