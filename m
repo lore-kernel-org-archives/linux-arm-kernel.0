@@ -1,28 +1,26 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 16 Apr 2014 22:36:11 +0100
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <534EF153.5050603@codeaurora.org>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <534EF153.5050603@codeaurora.org>
-Message-ID: <CAFEAcA9bqdHvFyGz_mhdU9=rPYaSc2h8Syccv3OEqH8FRhf=dA@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 16 Apr 2014 16:45:17 -0500
+Subject: [PATCH 0/2] dmaengine: qcom_bam_dma: Add support for v1.3.0
+Message-ID: <1397684719-30065-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 April 2014 22:08, Christopher Covington <cov@codeaurora.org> wrote:
-> On 04/16/2014 03:14 PM, Nicolas Pitre wrote:
->> But both QEMU and the boot-wrapper should deal with zImage. That's the
->> only image format with documented load offset is guaranteed not to
->> change i.e. it can be loaded at about any offset as zImage knows how to
->> relocate itself as needed.  There is nowhere a guarantee that
->> TEXT_OFFSET can't change.
->
-> QEMU definitely does support zImage and I believe it's promoted as the main
-> boot method.
+This set of patches adds support for the v1.3.0 version of the QCOM BAM
+dmaengine driver.  The older version of the BAM is present in the MSM8x64,
+APQ8064, and IPQ8064 processors.
 
-Yes; we also support uImage. The code nominally handling Image
-actually currently loads at 0x10000, so the set of people who actually
-try to use it is obviously not very large :-)
+Due to register address space changes between versions, all of the register
+accesses have to be calculated using different offsets and multipliers that are
+specific to that version of the IP block.
 
-thanks
--- PMM
+Andy Gross (2):
+  dmaengine: qcom_bam_dma: Add v1.3.0 driver support
+  dmaengine: qcom_bam_dma: Add binding for v1.3.0
+
+ .../devicetree/bindings/dma/qcom_bam_dma.txt       |    4 +-
+ drivers/dma/qcom_bam_dma.c                         |  177 +++++++++++++-------
+ 2 files changed, 117 insertions(+), 64 deletions(-)
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
