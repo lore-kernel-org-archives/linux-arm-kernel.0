@@ -1,117 +1,53 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 16 Apr 2014 15:41:28 +0900
-Subject: [PATCH] ARM: integrator: add MMCI device to IM-PD1
-In-Reply-To: <1397550819-8209-1-git-send-email-linus.walleij@linaro.org>
-References: <1397550819-8209-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAAVeFuLsGvqSLRCtxmQY8qZMy-nAXUL=knWQWUazcbEa0hJsZA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 16 Apr 2014 12:04:27 +0530
+Subject: [PATCH] dma: fix eDMA driver as a subsys_initcall
+In-Reply-To: <1396585675-32729-1-git-send-email-yao.yuan@freescale.com>
+References: <1396585675-32729-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20140416063427.GK32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 5:33 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> The IM-PD1 logic module daughterboard holds an MMCI block, which
-> we can now provide using platform resources such as proper GPIO
-> lines etc. We add the GPIO table dynamically and using the new
-> GPIO descriptor mechanism. Tested and hey, it works:
+On Fri, Apr 04, 2014 at 12:27:55PM +0800, Yuan Yao wrote:
+> Because of some driver base on DMA, changed the initcall order as subsys_initcall.
 
-Wow, what do you know! ;)
+Changelog could have mentioned "which" driver and elobrated on it
+> 
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
 
->
-> root at integrator:/ mount /dev/mmcblk0p1 /mnt/
-> root at integrator:/ ls /mnt/
-> ARM          U-BOOT.EXE   u-boot.bin   u-boot.srec  u-pad.bin
->
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Applied, nevertheless
+
+-- 
+~Vinod
 > ---
->  arch/arm/mach-integrator/impd1.c | 48 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
->
-> diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
-> index 0e870ea818c4..29767cfc98bc 100644
-> --- a/arch/arm/mach-integrator/impd1.c
-> +++ b/arch/arm/mach-integrator/impd1.c
-> @@ -20,10 +20,13 @@
->  #include <linux/mm.h>
->  #include <linux/amba/bus.h>
->  #include <linux/amba/clcd.h>
-> +#include <linux/amba/mmci.h>
-> +#include <linux/amba/pl061.h>
->  #include <linux/io.h>
->  #include <linux/platform_data/clk-integrator.h>
->  #include <linux/slab.h>
->  #include <linux/irqchip/arm-vic.h>
-> +#include <linux/gpio/driver.h>
->
->  #include <asm/sizes.h>
->  #include "lm.h"
-> @@ -52,6 +55,14 @@ void impd1_tweak_control(struct device *dev, u32 mask, u32 val)
->  EXPORT_SYMBOL(impd1_tweak_control);
->
->  /*
-> + * MMC support
-> + */
-> +static struct mmci_platform_data mmc_data = {
-> +       .ocr_mask       = MMC_VDD_32_33|MMC_VDD_33_34,
-> +       .cd_invert      = 1,
-> +};
+>  drivers/dma/fsl-edma.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+> index 381e793..b396a7f 100644
+> --- a/drivers/dma/fsl-edma.c
+> +++ b/drivers/dma/fsl-edma.c
+> @@ -968,7 +968,17 @@ static struct platform_driver fsl_edma_driver = {
+>  	.remove		= fsl_edma_remove,
+>  };
+>  
+> -module_platform_driver(fsl_edma_driver);
+> +static int __init fsl_edma_init(void)
+> +{
+> +	return platform_driver_register(&fsl_edma_driver);
+> +}
+> +subsys_initcall(fsl_edma_init);
 > +
-> +/*
->   * CLCD support
->   */
->  #define PANEL          PROSPECTOR
-> @@ -291,6 +302,7 @@ static struct impd1_device impd1_devs[] = {
->                 .offset = 0x00700000,
->                 .irq    = { 7, 8 },
->                 .id     = 0x00041181,
-> +               .platform_data = &mmc_data,
+> +static void __exit fsl_edma_exit(void)
+> +{
+> +	platform_driver_unregister(&fsl_edma_driver);
+> +}
+> +module_exit(fsl_edma_exit);
+>  
+>  MODULE_ALIAS("platform:fsl-edma");
+>  MODULE_DESCRIPTION("Freescale eDMA engine driver");
+> -- 
+> 1.8.4
+> 
+> 
 
-How is this first part connected to the rest of the patch? I also do
-not see any mention to it in the commit message.
-
->         }, {
->                 .offset = 0x00800000,
->                 .irq    = { 9 },
-> @@ -367,6 +379,42 @@ static int __init impd1_probe(struct lm_device *dev)
->
->                 pc_base = dev->resource.start + idev->offset;
->                 snprintf(devname, 32, "lm%x:%5.5lx", dev->id, idev->offset >> 12);
-> +
-> +               /* Add GPIO descriptor lookup table for the PL061 block */
-> +               if (idev->offset == 0x00400000) {
-> +                       struct gpiod_lookup_table *lookup;
-> +                       char *chipname;
-> +                       char *mmciname;
-> +
-> +                       lookup = devm_kzalloc(&dev->dev,
-> +                                             sizeof(*lookup) + 3 * sizeof(struct gpiod_lookup),
-> +                                             GFP_KERNEL);
-> +                       chipname = devm_kstrdup(&dev->dev, devname, GFP_KERNEL);
-> +                       mmciname = kasprintf(GFP_KERNEL, "lm%x:00700", dev->id);
-> +                       lookup->dev_id = mmciname;
-> +                       /*
-> +                        * Offsets on GPIO block 1:
-> +                        * 3 = MMC WP (write protect)
-> +                        * 4 = MMC CD (card detect)
-> +                        *
-> +                        * Offsets on GPIO block 2:
-> +                        * 0 = Up key
-> +                        * 1 = Down key
-> +                        * 2 = Left key
-> +                        * 3 = Right key
-> +                        * 4 = Key lower left
-> +                        * 5 = Key lower right
-> +                        */
-> +                       /* We need the two MMCI GPIO entries */
-> +                       lookup->table[0].chip_label = chipname;
-> +                       lookup->table[0].chip_hwnum = 3;
-> +                       lookup->table[0].con_id = "wp";
-> +                       lookup->table[1].chip_label = chipname;
-> +                       lookup->table[1].chip_hwnum = 4;
-> +                       lookup->table[1].con_id = "cd";
-> +                       gpiod_add_lookup_table(lookup);
-> +               }
-> +
-
-Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
-
-For the GPIO lookup table part.
+-- 
