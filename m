@@ -1,29 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Apr 2014 12:52:47 -0300
-Subject: USB OTG support on mx27pdk
-In-Reply-To: <20140416150316.GR13429@pengutronix.de>
-References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
- <1397627716.685483508@f399.i.mail.ru>
- <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
- <1397649526.601497269@f431.i.mail.ru>
- <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
- <20140416150316.GR13429@pengutronix.de>
-Message-ID: <CAOMZO5D2bkYuCqX5HYrh6qoer=i_MdqxdKQvnYHaGJ1VtL_CaQ@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 16 Apr 2014 12:53:03 -0300
+Subject: [PATCH 4/6] thermal: armada: Support Armada 375 SoC
+In-Reply-To: <20140416154435.GG28159@titan.lakedaemon.net>
+References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1397657720-10893-5-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140416154435.GG28159@titan.lakedaemon.net>
+Message-ID: <20140416155303.GC1892@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 12:03 PM, Michael Grzeschik <mgr@pengutronix.de> wrote:
-> Yes, when this patch got reverted it will probably break usb support
-> on mx6 machines. We have seen different behaviour on several mxc/mxs
-> machines regarding the order of PORTSC and phy configuration.
->
-> We will probably need to test all platforms before reordering this
-> function call again and again for every machine using this driver.
+On Apr 16, Jason Cooper wrote:
+> On Wed, Apr 16, 2014 at 11:15:18AM -0300, Ezequiel Garcia wrote:
+> > In addition, we also add support for the Z1 SoC stepping, which needs
+> > an initialization-quirk to work properly.
+> ...
+> > diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> > index fff93d5..745d241 100644
+> > --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> > +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> > @@ -4,8 +4,15 @@ Required properties:
+> >  
+> >  - compatible:	Should be set to one of the following:
+> >  		marvell,armada370-thermal
+> > +		marvell,armada375-thermal
+> > +		marvell,armada375-z1-thermal
+> >  		marvell,armadaxp-thermal
+> >  
+> > +		Note: As the name suggests, "marvell,armada375-z1-thermal"
+> > +		applies for the SoC Z1 stepping only. The operating system
+> > +		may auto-detect the SoC stepping and update the compatible
+> > +		at runtime.
+> 
+> Please also include a statement in here regarding the register quirk for
+> the z1 stepping.
+> 
 
-Ok, I managed to fix the issue on mx27 without touching the chipidea driver.
-
-Will submit the fix later today.
-
-Regards,
-
-Fabio Estevam
+Sure, no problem.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
