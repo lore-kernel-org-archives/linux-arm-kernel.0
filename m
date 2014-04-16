@@ -1,59 +1,85 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 16 Apr 2014 18:05:04 +0800
-Subject: [PATCH 0/4] pinctrl: sirf: switch to one gpiolib and
- gpiolib_irqchip helpers
-In-Reply-To: <CABxcv=khupV0gpnCUOPeRON_v2wcRCNkL2Ao1B5dOB9-OB0wyQ@mail.gmail.com>
-References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
- <CABxcv=khupV0gpnCUOPeRON_v2wcRCNkL2Ao1B5dOB9-OB0wyQ@mail.gmail.com>
-Message-ID: <CAGsJ_4zZQRPS6RuP2FfJyB=eskuM6A4c0XFvEwrOS=SWuJ5+Cg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 16 Apr 2014 15:39:23 +0530
+Subject: [PATCH][next] phy: core: make NULL a valid phy reference if
+ !CONFIG_GENERIC_PHY
+In-Reply-To: <5321B4B4.9010806@ti.com>
+References: <1394709073-1980-1-git-send-email-grygorii.strashko@ti.com>
+ <5321B4B4.9010806@ti.com>
+Message-ID: <534E56D3.3040907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-16 17:54 GMT+08:00 Javier Martinez Canillas <javier@dowhile0.org>:
-> Hello Barry,
->
-> On Tue, Apr 15, 2014 at 8:43 AM, Barry Song <21cnbao@gmail.com> wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> This patchset depends on Linus Walleij's "pinctrl: sirf: rename inlined accessor".
->> and "pinctrl: sirf: switch driver to use gpiolib irqchip helpers" is rebased
->> from Linus Walleij's patch too.
->>
->> Barry Song (3):
->>   pinctrl: sirf: wrap all gpio banks into one gpio_chip
->>   gpio: make handler_data configurable while using gpiolib_irqchip
->>   pinctrl: sirf: move to use irq_get_handler_data
->> Linus Walleij (1):
->>   pinctrl: sirf: switch driver to use gpiolib irqchip helpers
->>
->>  drivers/gpio/gpiolib.c              |   10 +-
->>  drivers/pinctrl/Kconfig             |    1 +
->>  drivers/pinctrl/sirf/pinctrl-sirf.c |  264 ++++++++++++-----------------------
->>  include/linux/gpio/driver.h         |    2 +-
->>  4 files changed, 97 insertions(+), 180 deletions(-)
->>
->> --
->> 1.7.5.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> Maybe you can first do the parameter change to
-> gpiochip_set_chained_irqchip() and then just convert to gpiolib
-> irqchip passing the struct sirfsoc_gpio_bank pointer instead of a
-> struct gpio_chip. I think there is no need to split PATCH 2 and PATCH
-> 4 but it is up to you.
->
+Hi,
 
-Javier, thanks. the reason for splitting 2 and 4 is that i don't want
-to lose the contribution of Linus for "gpiolib irqchip helpers".
-otherwise, i will be the author of the merged patch.
+On Thursday 13 March 2014 07:07 PM, Santosh Shilimkar wrote:
+> On Thursday 13 March 2014 07:11 PM, Strashko, Grygorii wrote:
+>> This fixes a regression on Keystone 2 platforms caused by patch
+>> 57303488cd37da58263e842de134dc65f7c626d5
+>> "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
+>> optional support of generic phy in DWC3 core.
+>>
+>> On Keystone 2 platforms the USB is not working now because
+>> CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
+>> return -ENOSYS always. The log shows:
+>>  dwc3 2690000.dwc3: failed to initialize core
+>>  dwc3: probe of 2690000.dwc3 failed with error -38
+>>
+>> Hence, fix it by making NULL a valid phy reference in Generic PHY
+>> APIs stubs in the same way as it was done by the patch
+>> 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
+>> a valid phy reference".
+>>
+>> CC: Kishon Vijay Abraham I <kishon@ti.com>
+>> CC: Felipe Balbi <balbi@ti.com>
+>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+> This fixes the regression seen in Linux next and patch seems
+> reasonable to me.
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Felipe, Kishon,
+> Can you guys pick this fix if you are ok by it. Thanks
+> 
+> 
+>>  include/linux/phy/phy.h |    8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>>
+>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+>> index e2f5ca9..5a9b193 100644
+>> --- a/include/linux/phy/phy.h
+>> +++ b/include/linux/phy/phy.h
+>> @@ -204,21 +204,29 @@ static inline void phy_pm_runtime_forbid(struct phy *phy)
+>>  
+>>  static inline int phy_init(struct phy *phy)
+>>  {
+>> +	if (!phy)
+>> +		return 0;
+>>  	return -ENOSYS;
+>>  }
+>>  
+>>  static inline int phy_exit(struct phy *phy)
+>>  {
+>> +	if (!phy)
+>> +		return 0;
+>>  	return -ENOSYS;
+>>  }
+>>  
+>>  static inline int phy_power_on(struct phy *phy)
+>>  {
+>> +	if (!phy)
+>> +		return 0;
+>>  	return -ENOSYS;
+>>  }
+>>  
+>>  static inline int phy_power_off(struct phy *phy)
+>>  {
+>> +	if (!phy)
+>> +		return 0;
+>>  	return -ENOSYS;
+>>  }
 
+Can you add these checks for other stubs in phy.h too?
 
-> The series looks good to me:
->
-> Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
-
--barry
+Thanks
+Kishon
