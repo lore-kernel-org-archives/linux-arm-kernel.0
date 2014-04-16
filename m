@@ -1,39 +1,37 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Apr 2014 16:28:04 +0200
-Subject: [PATCHv2 5/8] ARM: EXYNOS: Support secondary CPU boot of
- Exynos3250
-In-Reply-To: <1397527192-21988-6-git-send-email-cw00.choi@samsung.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-6-git-send-email-cw00.choi@samsung.com>
-Message-ID: <534E9374.6010807@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Apr 2014 16:31:54 +0200
+Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
+In-Reply-To: <534E8AE1.4010402@samsung.com>
+References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+ <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
+ <534E8AE1.4010402@samsung.com>
+Message-ID: <4516298.kO98TB1Ozz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Wednesday 16 April 2014 15:51:29 Tomasz Figa wrote:
+> On 15.04.2014 11:28, Sachin Kamat wrote:
+> > From: Arnd Bergmann <arnd@arndb.de>
+> >
+> > This makes it possible to enable the exynos platform as part of a
+> > multiplatform kernel, in addition to keeping the single-platform
+> > Exynos support.
+> > sparsemem is currently not supported in multiplatform.
+> 
+> Is this still true as of today?
+> 
+> Otherwise looks fine.
 
-On 15.04.2014 03:59, Chanwoo Choi wrote:
-> This patch fix the offset of CPU boot address and don't operate smc call
-> of SMC_CMD_CPU1BOOT command for Exynos3250.
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->   arch/arm/mach-exynos/firmware.c | 7 +++++--
->   1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-> index aa01c42..6205d4f 100644
-> --- a/arch/arm/mach-exynos/firmware.c
-> +++ b/arch/arm/mach-exynos/firmware.c
-> @@ -30,13 +30,16 @@ static int exynos_do_idle(void)
->
->   static int exynos_cpu_boot(int cpu)
->   {
-> +	if (soc_is_exynos3250()) {
-> +		return 0;
+sparsemem is still not supported in multiplatform, but after I looked
+at it in more detail, I came to the conclusion that there is no
+reason why it couldn't be. It just needs testing so we are confident
+that it doesn't break other platforms, and we need to find good
+platform-independent values for MAX_PHYSMEM_BITS and SECTION_SIZE_BITS
+to put into asm/memory.h, since we can't have them set in mach/memory.h
+for multiplatform.
 
-This is strange. How the firmware knows when to boot the CPU then, if 
-CPU1BOOT command is not called?
+Looking at my patch again now, I would actually prefer to kill off
+the single-platform support for exynos right away. I don't see
+any reason to keep it now, and it complicates the test matrix.
 
-Best regards,
-Tomasz
+	Arnd
