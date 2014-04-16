@@ -1,55 +1,69 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Apr 2014 19:08:54 +0200
-Subject: [PATCH 5/6] ARM: mvebu: Add thermal quirk for the Armada 375 DB
- board
-In-Reply-To: <20140416165548.GI28159@titan.lakedaemon.net>
-References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1397657720-10893-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <534EA8C9.7010907@gmail.com> <20140416180315.5153c3f7@skate>
- <20140416160824.GA14842@lunn.ch> <20140416181938.6e8f8f4b@skate>
- <20140416163447.GB14842@lunn.ch>
- <20140416165548.GI28159@titan.lakedaemon.net>
-Message-ID: <20140416190854.52e2a4bb@skate>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Apr 2014 14:10:15 -0300
+Subject: [PATCH 1/3] ARM: dts: imx27: Use the correct usb clock gate
+Message-ID: <1397668217-17551-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On Wed, 16 Apr 2014 12:55:48 -0400, Jason Cooper wrote:
+USB Host1, Host2 and OTG are gated via 'usb_ipg_gate' clock, so fix it in order
+to avoid the following kernel oops:
 
-> > Sounds like a good plan. Try to keep all the mess to support Z1 in one
-> > place so that it can be easily taken out once people have A0.
-> 
-> Agreed.  Thomas, do you think you'll be able to get a definitive answer
-> from Marvell re the number of Z1 boards in the wild?  Once they've moved
-> to the A0, of course.
+usbcore: registered new interface driver usb-storage
+10024000.usb supply vbus not found, using dummy regulator
+Unhandled fault: external abort on non-linefetch (0x808) at 0xf4424184
+Internal error: : 808 [#1] PREEMPT ARM
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.15.0-rc1-26325-g971f9fd-dirty #64
+task: c7829aa0 ti: c7836000 task.ti: c7836000
+PC is at ci_hdrc_probe+0x3a4/0x634
+LR is at ci_hdrc_probe+0x100/0x634
+pc : [<c036cc78>]    lr : [<c036c9d4>]    psr: 60000013
+sp : c7837d48  ip : 00000001  fp : 00000000
+r10: 00000000  r9 : 00000000  r8 : c791b6c0
+r7 : c7945000  r6 : f4424000  r5 : c7945010  r4 : c794e010
+r3 : f4424184  r2 : 00000000  r1 : 8c000004  r0 : 0c000004
+Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 0005317f  Table: a0004000  DAC: 00000017
+Process swapper (pid: 1, stack limit = 0xc78361c0)
+Stack: (0xc7837d48 to 0xc7838000)
 
-My understanding is that Marvell has never been interested in having
-mainline support for the Z1 stepping. It just happens to be a necessary
-step to make progress with the general goal of supporting 375 in
-mainline, but I don't expect Marvell to be interested in supporting the
-Z1 boards in the wild.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx27.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> Unless we can get a hard answer on that, I doubt we'll ever withdraw
-> support for the Z1.  Not that that's a bad thing, just trying to be
-> realistic.  If we add code, expect to support it.
-
-Yes, indeed.
-
-> And keeping it all in one place is kind of an impossibility.  Just for
-> thermal Z1, there are changes to the binding docs, the thermal driver,
-> and the soc code.
-> 
-> I'd say it's more important to keep it clean, with dts files targeting
-> the A0+ SoCs, and the Z1 being the exception case(s).
-
-That's what we've tried to do so far: the thermal driver works for the
-A0+ by default, and only as an exception supports Z1.
-
-Thanks!
-
-Thomas
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 00cf66c..948354e 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -465,7 +465,7 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024000 0x200>;
+ 				interrupts = <56>;
+-				clocks = <&clks 15>;
++				clocks = <&clks 75>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				fsl,usbphy = <&usbphy0>;
+ 				status = "disabled";
+@@ -475,7 +475,7 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024200 0x200>;
+ 				interrupts = <54>;
+-				clocks = <&clks 15>;
++				clocks = <&clks 75>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				status = "disabled";
+ 			};
+@@ -484,7 +484,7 @@
+ 				compatible = "fsl,imx27-usb";
+ 				reg = <0x10024400 0x200>;
+ 				interrupts = <55>;
+-				clocks = <&clks 15>;
++				clocks = <&clks 75>;
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				fsl,usbphy = <&usbphy2>;
+ 				status = "disabled";
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.2
