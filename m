@@ -1,49 +1,38 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 16 Apr 2014 16:58:31 +0300
-Subject: [PATCH 02/11] ARM: OMAP3: Fix idle mode signaling for sys_clkreq
- and sys_off_mode
-In-Reply-To: <20140415225559.GA5313@atomide.com>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-3-git-send-email-tony@atomide.com>
- <CANOLnOO=O8xkTV9LiH+JTtmEXd9ihu0+ZYoHtrQK2QsFWOWVbg@mail.gmail.com>
- <20140415225559.GA5313@atomide.com>
-Message-ID: <CANOLnONGTJb7D_jqsHbUzc7RG28oC433BCcXR_HSiW7DapwPWw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 16 Apr 2014 08:58:19 -0500
+Subject: [PATCH] ARM: efm32: drop selecting CLKSRC_MMIO
+In-Reply-To: <1392886514-6577-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1392886514-6577-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAL_JsqKXYOdpCkixBLg8kAXwpkaLHhckJnTkzdNVeOQDYzxK3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 1:56 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Grazvydas Ignotas <notasas@gmail.com> [140414 15:51]:
->> On Fri, Apr 11, 2014 at 2:47 AM, Tony Lindgren <tony@atomide.com> wrote:
->> > @@ -282,6 +283,7 @@ void omap_sram_idle(void)
->> >
->> >         /* CORE */
->> >         if (core_next_state < PWRDM_POWER_ON) {
->> > +               omap3_vc_set_pmic_signaling(core_next_state);
->>
->> I wonder how is it going to affect latencies, adding stuff to suspend
->> path hurts things like NAND transfers, which consist of lots of small
->> blocks with an interrupt after each..
+On Thu, Feb 20, 2014 at 2:55 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> CLKSRC_MMIO is needed on efm32 because the clocksource driver
+> (CLKSRC_EFM32) uses clocksource_mmio_init() and
+> clocksource_mmio_readl_up(). Since commit 09ca27579ee5 (clocksource:
+> time-efm32: Select CLKSRC_MMIO) CLKSRC_EFM32 does the necessary select
+> itself and ARCH_EFM32 doesn't need to select it explicitly any more.
 >
-> For most part this is the completely idle path, so there should
-> not be much of hurry. Most devices should already block the deeper
-> idle states for the devices listed in cm_idlest_per, cm_idlest1_core
-> and cm_idlest3_core registers. So it should be mostly automatic with
-> runtime PM.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/Kconfig | 3 ---
+>  1 file changed, 3 deletions(-)
 >
-> No idea what happens with GPMC though for NAND transfers :) Might
-> be worth checking.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c5e0fa693fbd..44881c07883b 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -421,9 +421,6 @@ config ARCH_EFM32
+>         depends on !MMU
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_NVIC
+> -       # CLKSRC_MMIO is wrong here, but needed until a proper fix is merged,
+> -       # i.e. CLKSRC_EFM32 selecting CLKSRC_MMIO
+> -       select CLKSRC_MMIO
+>         select CLKSRC_OF
 
-What happens there is that the interrupt arrives shortly after the
-transfer was issued, but arm_pm_idle() would already be entered and
-interrupts disabled, so it then has to go through all those slow
-register accesses in omap_sram_idle(), which is just useless work in
-such particular case (WFI will just return) and cause interrupt
-response latency and loss of throughput. But this is mostly a problem
-caused by pwrdm_pre_transition() and pwrdm_post_transition() calls
-(they were optimized a bit at one point but later reverted),
-core_next_state would probably stay ON and your function wouldn't be
-called here, yes.
+The same applies to CLKSRC_OF. It should be selected by CLKSRC_EFM32.
 
-
--- 
-Gra?vydas
+Rob
