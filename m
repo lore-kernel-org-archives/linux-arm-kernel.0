@@ -1,58 +1,29 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 16 Apr 2014 15:51:53 +0200
-Subject: [PATCH v2 0/6] Further cleanup and enable multiplat build
-In-Reply-To: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
-References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <534E8AF9.4050206@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Apr 2014 14:48:15 +0100
+Subject: [PATCH v7 5/7] arm64: ftrace: Add dynamic ftrace support
+In-Reply-To: <1394862353-28963-6-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394862353-28963-6-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140416134815.GE1001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+On Sat, Mar 15, 2014 at 05:45:51AM +0000, AKASHI Takahiro wrote:
+> This patch allows "dynamic ftrace" if CONFIG_DYNAMIC_FTRACE is enabled.
+> Here we can turn on and off tracing dynamically per-function base.
+> 
+> On arm64, this is done by patching single branch instruction to _mcount()
+> inserted by gcc -pg option. The branch is replaced to NOP initially at
+> kernel start up, and later on, NOP to branch to ftrace_caller() when
+> enabled or branch to NOP when disabled.
+> Please note that ftrace_caller() is a counterpart of _mcount() in case of
+> 'static' ftrace.
+> 
+> More details on architecture specific requirements are described in
+> Documentation/trace/ftrace-design.txt.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-On 15.04.2014 11:28, Sachin Kamat wrote:
-> This series is based on latest linux-next and depends on the
-> following patch:
-> ARM: EXYNOS: Consolidate Kconfig entries
-> http://article.gmane.org/gmane.linux.kernel.samsung-soc/28642
->
-> Changes since v2:
-> Replaced patch 2, "ARM: EXYNOS: Staticize exynos_subsys"
-> with "ARM: EXYNOS: Remove exynos_subsys registration" as that
-> code is no more used.
->
-> Tested on Exynos4210, 4412, 5250 and 5420 based boards.
->
-> Arnd Bergmann (1):
->    ARM: EXYNOS: Enable multi-platform build support
->
-> Sachin Kamat (5):
->    ARM: EXYNOS: Remove duplicate lines in Makefile
->    ARM: EXYNOS: Remove exynos_subsys registration
->    ARM: EXYNOS: Migrate Exynos specific macros from plat to mach
->    ARM: EXYNOS: Remove unnecessary inclusion of cpu.h
->    ARM: multi_v7_defconfig: Enable Exynos platform
->
->   arch/arm/Kconfig                         |   27 ++---------
->   arch/arm/configs/exynos_defconfig        |    2 +-
->   arch/arm/configs/multi_v7_defconfig      |   10 +++++
->   arch/arm/mach-exynos/Kconfig             |   27 +++++++++++
->   arch/arm/mach-exynos/Makefile            |    9 ++--
->   arch/arm/mach-exynos/common.h            |   72 ++++++++++++++++++++++++++++++
->   arch/arm/mach-exynos/cpuidle.c           |    1 -
->   arch/arm/mach-exynos/exynos.c            |   13 ------
->   arch/arm/mach-exynos/hotplug.c           |    2 -
->   arch/arm/mach-exynos/platsmp.c           |    2 -
->   arch/arm/mach-exynos/pm.c                |    1 -
->   arch/arm/mach-exynos/pmu.c               |    2 -
->   arch/arm/plat-samsung/Makefile           |    3 ++
->   arch/arm/plat-samsung/include/plat/cpu.h |   61 -------------------------
->   14 files changed, 119 insertions(+), 113 deletions(-)
->
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-For the whole series:
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
---
-Best regards,
-Tomasz
+Will
