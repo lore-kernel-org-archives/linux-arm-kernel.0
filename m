@@ -1,348 +1,130 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 16 Apr 2014 11:24:55 +0400
-Subject: [PATCH 6/8] ARM: dts: imx51-babbage: Sort nodes by name
-In-Reply-To: <1397633097-1640-1-git-send-email-shc_work@mail.ru>
-References: <1397633097-1640-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1397633097-1640-6-git-send-email-shc_work@mail.ru>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 16 Apr 2014 09:27:38 +0200
+Subject: [PATCH v3 09/18] ASoC: fsl-ssi: Only enable baudclk when used
+In-Reply-To: <20140414152850.GB7197@MrMyself>
+References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
+ <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
+ <20140414152850.GB7197@MrMyself>
+Message-ID: <20140416072738.GC6159@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sorts nodes by name and moves "iomux" configuration at
-the bottom of file.
+Hi,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx51-babbage.dts | 266 ++++++++++++++++++------------------
- 1 file changed, 133 insertions(+), 133 deletions(-)
+On Mon, Apr 14, 2014 at 11:28:51PM +0800, Nicolin Chen wrote:
+> On Mon, Apr 14, 2014 at 03:35:39PM +0200, Markus Pargmann wrote:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > Enable baudclk only when it is used. The baudclock is only needed in master
+> > mode and only when thr driver is active, so move enabling to fsl_ssi_startup
+> > and disabling to fsl_ssi_shutdown.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  sound/soc/fsl/fsl_ssi.c | 37 ++++++++++++++++++++++++++++++-------
+> >  1 file changed, 30 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+> > index f2255cb..d6d3f0a3 100644
+> > --- a/sound/soc/fsl/fsl_ssi.c
+> > +++ b/sound/soc/fsl/fsl_ssi.c
+> > @@ -236,6 +236,12 @@ static bool fsl_ssi_is_ac97(struct fsl_ssi_private *ssi_private)
+> >  	return !!(ssi_private->dai_fmt & SND_SOC_DAIFMT_AC97);
+> >  }
+> >  
+> > +static bool fsl_ssi_is_i2s_master(struct fsl_ssi_private *ssi_private)
+> > +{
+> > +	return (ssi_private->dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) ==
+> > +		SND_SOC_DAIFMT_CBS_CFS;
+> > +}
+> > +
+> >  /**
+> >   * fsl_ssi_isr: SSI interrupt handler
+> >   *
+> > @@ -489,6 +495,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+> >  	struct fsl_ssi_private *ssi_private =
+> >  		snd_soc_dai_get_drvdata(rtd->cpu_dai);
+> >  	unsigned long flags;
+> > +	int ret;
+> >  
+> >  	if (!dai->active && !fsl_ssi_is_ac97(ssi_private)) {
+> >  		spin_lock_irqsave(&ssi_private->baudclk_lock, flags);
+> > @@ -496,6 +503,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+> >  		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
+> >  	}
+> >  
+> > +	if (fsl_ssi_is_i2s_master(ssi_private)) {
+> > +		ret = clk_prepare_enable(ssi_private->baudclk);
+> > +		if (ret)
+> > +			return ret;
+> > +	}
+> > +
+> >  	/* When using dual fifo mode, it is safer to ensure an even period
+> >  	 * size. If appearing to an odd number while DMA always starts its
+> >  	 * task from fifo0, fifo1 would be neglected at the end of each
+> > @@ -508,6 +521,17 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+> >  	return 0;
+> >  }
+> >  
+> > +static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
+> > +		struct snd_soc_dai *dai)
+> > +{
+> > +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> > +	struct fsl_ssi_private *ssi_private =
+> > +		snd_soc_dai_get_drvdata(rtd->cpu_dai);
+> > +
+> > +	if (fsl_ssi_is_i2s_master(ssi_private))
+> > +		clk_disable_unprepare(ssi_private->baudclk);
+> > +}
+> > +
+> >  /**
+> >   * fsl_ssi_hw_params - program the sample size
+> >   *
+> > @@ -576,6 +600,11 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+> >  
+> >  	ssi_private->dai_fmt = fmt;
+> >  
+> > +	if (fsl_ssi_is_i2s_master(ssi_private) && IS_ERR(ssi_private->baudclk)) {
+> > +		dev_err(cpu_dai->dev, "no baudclk needed for master mode\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> 
+> I was wondering what if machine driver doesn't set fmt to master during
+> its probe(), in another word -- before fsl_ssi_startup(), but leave that
+> into its hw_params() via snd_soc_dai_set_fmt() which then would run after
+> fsl_ssi_startup() while having no baud clock enabled in this case.
+> 
+> A better solution may be to wrap clk_prepare_enable() and master mode
+> clock dividing code into fsl_ssi_hw_params(), a bit like the ESAI driver
+> even though it doesn't contain the clk_prepare_enable() part currently,
+> and then to put clk_disable_unprepare() into hw_free() for symmetry.
+> 
+> Any suggestion?
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index ed9d769..6484b73 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -21,6 +21,20 @@
- 		reg = <0x90000000 0x20000000>;
- 	};
- 
-+	clocks {
-+		ckih1 {
-+			clock-frequency = <22579200>;
-+		};
-+
-+		clk_26M: codec_clock {
-+			compatible = "fixed-clock";
-+			reg=<0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <26000000>;
-+			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
- 	display0: display at di0 {
- 		compatible = "fsl,imx-parallel-display";
- 		interface-pix-fmt = "rgb24";
-@@ -104,34 +118,6 @@
- 		};
- 	};
- 
--	sound {
--		compatible = "fsl,imx51-babbage-sgtl5000",
--			     "fsl,imx-audio-sgtl5000";
--		model = "imx51-babbage-sgtl5000";
--		ssi-controller = <&ssi2>;
--		audio-codec = <&sgtl5000>;
--		audio-routing =
--			"MIC_IN", "Mic Jack",
--			"Mic Jack", "Mic Bias",
--			"Headphone Jack", "HP_OUT";
--		mux-int-port = <2>;
--		mux-ext-port = <3>;
--	};
--
--	clocks {
--		ckih1 {
--			clock-frequency = <22579200>;
--		};
--
--		clk_26M: codec_clock {
--			compatible = "fixed-clock";
--			reg=<0>;
--			#clock-cells = <0>;
--			clock-frequency = <26000000>;
--			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
--		};
--	};
--
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -162,6 +148,20 @@
- 		};
- 	};
- 
-+	sound {
-+		compatible = "fsl,imx51-babbage-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx51-babbage-sgtl5000";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <2>;
-+		mux-ext-port = <3>;
-+	};
-+
- 	usbphy {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -176,26 +176,9 @@
- 	};
- };
- 
--&esdhc1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_esdhc1>;
--	fsl,cd-controller;
--	fsl,wp-controller;
--	status = "okay";
--};
--
--&esdhc2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_esdhc2>;
--	cd-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
--	wp-gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
--	status = "okay";
--};
--
--&uart3 {
-+&audmux {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart3>;
--	fsl,uart-has-rtscts;
-+	pinctrl-0 = <&pinctrl_audmux>;
- 	status = "okay";
- };
- 
-@@ -327,6 +310,47 @@
- 	};
- };
- 
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	fsl,cd-controller;
-+	fsl,wp-controller;
-+	status = "okay";
-+};
-+
-+&esdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc2>;
-+	cd-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
-+	wp-gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
-+	phy-mode = "mii";
-+	phy-reset-gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
-+	phy-reset-duration = <1>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	sgtl5000: codec at 0a {
-+		compatible = "fsl,sgtl5000";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_clkcodec>;
-+		reg = <0x0a>;
-+		clocks = <&clk_26M>;
-+		VDDA-supply = <&vdig_reg>;
-+		VDDIO-supply = <&vvideo_reg>;
-+	};
-+};
-+
- &ipu_di0_disp0 {
- 	remote-endpoint = <&display0_in>;
- };
-@@ -335,11 +359,72 @@
- 	remote-endpoint = <&display1_in>;
- };
- 
-+&kpp {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_kpp>;
-+	linux,keymap = <
-+		MATRIX_KEY(0, 0, KEY_UP)
-+		MATRIX_KEY(0, 1, KEY_DOWN)
-+		MATRIX_KEY(0, 2, KEY_VOLUMEDOWN)
-+		MATRIX_KEY(0, 3, KEY_HOME)
-+		MATRIX_KEY(1, 0, KEY_RIGHT)
-+		MATRIX_KEY(1, 1, KEY_LEFT)
-+		MATRIX_KEY(1, 2, KEY_ENTER)
-+		MATRIX_KEY(1, 3, KEY_VOLUMEUP)
-+		MATRIX_KEY(2, 0, KEY_F6)
-+		MATRIX_KEY(2, 1, KEY_F8)
-+		MATRIX_KEY(2, 2, KEY_F9)
-+		MATRIX_KEY(2, 3, KEY_F10)
-+		MATRIX_KEY(3, 0, KEY_F1)
-+		MATRIX_KEY(3, 1, KEY_F2)
-+		MATRIX_KEY(3, 2, KEY_F3)
-+		MATRIX_KEY(3, 3, KEY_POWER)
-+	>;
-+	status = "okay";
-+};
-+
- &ssi2 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
- };
- 
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh1>;
-+	vbus-supply = <&reg_usbh1_vbus>;
-+	fsl,usbphy = <&usbh1phy>;
-+	phy_type = "ulpi";
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	dr_mode = "otg";
-+	disable-over-current;
-+	phy_type = "utmi_wide";
-+	vbus-supply = <&reg_usbotg_vbus>;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	imx51-babbage {
- 		pinctrl_audmux: audmuxgrp {
-@@ -412,7 +497,7 @@
- 				MX51_PAD_NANDF_CS6__FEC_TDATA3		0x80000000
- 				MX51_PAD_NANDF_CS7__FEC_TX_EN		0x80000000
- 				MX51_PAD_NANDF_RDY_INT__FEC_TX_CLK	0x80000000
--				MX51_PAD_EIM_A20__GPIO2_14 0x85 /* Reset */
-+				MX51_PAD_EIM_A20__GPIO2_14		0x85 /* Reset */
- 			>;
- 		};
- 
-@@ -564,88 +649,3 @@
- 		};
- 	};
- };
--
--&uart1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart1>;
--	fsl,uart-has-rtscts;
--	status = "okay";
--};
--
--&uart2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_uart2>;
--	status = "okay";
--};
--
--&i2c2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_i2c2>;
--	status = "okay";
--
--	sgtl5000: codec at 0a {
--		compatible = "fsl,sgtl5000";
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_clkcodec>;
--		reg = <0x0a>;
--		clocks = <&clk_26M>;
--		VDDA-supply = <&vdig_reg>;
--		VDDIO-supply = <&vvideo_reg>;
--	};
--};
--
--&audmux {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_audmux>;
--	status = "okay";
--};
--
--&fec {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_fec>;
--	phy-mode = "mii";
--	phy-reset-gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
--	phy-reset-duration = <1>;
--	status = "okay";
--};
--
--&kpp {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_kpp>;
--	linux,keymap = <
--		MATRIX_KEY(0, 0, KEY_UP)
--		MATRIX_KEY(0, 1, KEY_DOWN)
--		MATRIX_KEY(0, 2, KEY_VOLUMEDOWN)
--		MATRIX_KEY(0, 3, KEY_HOME)
--		MATRIX_KEY(1, 0, KEY_RIGHT)
--		MATRIX_KEY(1, 1, KEY_LEFT)
--		MATRIX_KEY(1, 2, KEY_ENTER)
--		MATRIX_KEY(1, 3, KEY_VOLUMEUP)
--		MATRIX_KEY(2, 0, KEY_F6)
--		MATRIX_KEY(2, 1, KEY_F8)
--		MATRIX_KEY(2, 2, KEY_F9)
--		MATRIX_KEY(2, 3, KEY_F10)
--		MATRIX_KEY(3, 0, KEY_F1)
--		MATRIX_KEY(3, 1, KEY_F2)
--		MATRIX_KEY(3, 2, KEY_F3)
--		MATRIX_KEY(3, 3, KEY_POWER)
--		>;
--	status = "okay";
--};
--
--&usbh1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usbh1>;
--	vbus-supply = <&reg_usbh1_vbus>;
--	fsl,usbphy = <&usbh1phy>;
--	phy_type = "ulpi";
--	status = "okay";
--};
--
--&usbotg {
--	dr_mode = "otg";
--	disable-over-current;
--	phy_type = "utmi_wide";
--	vbus-supply = <&reg_usbotg_vbus>;
--	status = "okay";
--};
+Yes this is a problem. Although I am not really convinced of the concept
+of setting up the DAIs in hw_params, we should support it as there are
+some users.
+
+Is there always exactly one hw_free call for one hw_params call? There
+is a comment above the function:
+"Frees resources allocated by hw_params, can be called multiple times",
+so I am not sure if we can directly use clk_prepare_enable or if we need
+to remember the clock state?
+
+Thanks,
+
+Markus
+
 -- 
-1.8.3.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/e9b7b118/attachment.sig>
