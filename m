@@ -1,55 +1,44 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 16 Apr 2014 15:57:00 -0500
-Subject: [PATCH 1/2] clk: socfpga: add divider registers to the main pll
- outputs
-In-Reply-To: <20140416204950.GK16054@pengutronix.de>
-References: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
- <534EE6AF.4040001@gmail.com> <20140416204950.GK16054@pengutronix.de>
-Message-ID: <534EEE9C.6070806@gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Thu, 17 Apr 2014 00:59:08 +0400
+Subject: [PATCH v4 00/21] ARM: support for ICP DAS LP-8x4x (with dts)
+In-Reply-To: <534EC04F.9010408@gmail.com>
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1397668411-27162-1-git-send-email-ynvich@gmail.com>
+ <534EC04F.9010408@gmail.com>
+Message-ID: <610ed273-1e54-4d44-b523-cbe0d042cf48@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Daniel Mack <zonque@gmail.com> wrote:
+>Hi,
+>
+>On 04/16/2014 07:13 PM, Sergei Ianovich wrote:
+>> We had an intensive discussion of the series in the beginning of
+>> December 2013 [1]. The discussion resulted in 3 versions of the
+>series
+>> in less than 3 weeks. Then there was a decision to block this series
+>> until Daniel Mack's DMA-engine-for-PXA series is ready.
+>
+>For whatever reason, I only received patches 1-8 out of 21 in this
+>series.
 
+The rest is related to exotic parts of the tree and 'scripts/get_maintainer.pl' decided not to spam you. The whole series is sent to both lkml and arm lists. I can add you to cc by hand if you are interested. 
 
-On 04/16/2014 03:49 PM, Steffen Trumtrar wrote:
-> Hi!
+>> Unfortunately Daniel neigther agrees to review my trivial temporary
+>> solution to the DMA-in-device-tree (patch 7 of 21), nor he is active
+>> in DMA series development. There is no progress for 3 months.
 >
-> On Wed, Apr 16, 2014 at 03:23:11PM -0500, Dinh Nguyen wrote:
->>
->>
->> On 04/16/2014 03:14 PM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> The C0(mpu_clk), C1(main_clk), and C2(dbg_base_clk) outputs from the main
->>> PLL go through a pre-divider before coming into the system. These registers
->>> were hidden for the CycloneV platform, but are not used for the ArriaV
->>
->> Sorry but this should be "but are now used"
->>
->
-> ???
->
-> I don't get it. Do we have these registers on the cyclone V AND arria V or do
-> we only have them on the arria V ?
+>Well, IIRC, I asked you to look into the MMC performance regressions
+>that you reported and see what we can do about them. I currently don't
+>have hardware to reproduce this, so I can't do it myself.
 
-These registers are there for both CycloneV and ArriaV.They are 
-configured by the preloader, so it was "hidden" as a fixed-divider. I 
-could have designated these values as fixed for the ArriaV as well, but 
-it would be better if I just read this "hidden" register to get the 
-divider value.
+I hate to point fingers, but you promissed to refresh the code on several occasions. It is from 3.8 tree at the moment. The regression may be introduced by an error in my merging of your patches. I published the one I tested in one piece with the results. 
 
-Dinh
->
-> IIRC I had made a patch that adds dividers to some place in the clocktree, but
-> I can't remember if these are the same.
->
-> Regards,
-> Steffen
->
->>> platform.
->>>
->>> This patch updates the clock driver to read the div-reg property for the
->>> socfpga-periph-clk clocks. Also moves the div_mask define to clk.h for re-use.
->>>
->>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->
+>My impression is that the transisiton will only be painless if the
+>mmp_pdma driver provides comparable performance to the existing
+>implementation. I also still think that adding hacks to the drivers to
+>manually parse the dma properties (as in #8) brings us further away
+>from
+>a proper solution, not closer
+
+No doubt about that. But the regression is not the only problem. Driver for video capture requires an extensive rewrite as well. The result is that a working pxa DT device is kept out of the tree and there is no supported DT devices in tree. So no proper examples for new devices and no drive-by improvements. All of this prevents rather than facilitates eventual DT migration of tha PXA platform.
