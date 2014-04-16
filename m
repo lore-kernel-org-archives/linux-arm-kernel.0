@@ -1,96 +1,52 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 16 Apr 2014 11:15:15 -0300
-Subject: [PATCH 1/6] thermal: armada: Rename armada_thermal_ops struct
-In-Reply-To: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1397657720-10893-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Wed, 16 Apr 2014 11:15:14 -0300
+Subject: [PATCH 0/6] thermal: Add Armada 375 SoC support
+Message-ID: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As preparation work to add a generic infrastructure to support
-different SoC variants, the armada_thermal_ops will be used
-to host the SoC-specific fields, such as formula values and
-register offsets.
+This patchset adds the support for the thermal sensor in the recently
+introduced Armada 375 SoC.
 
-For this reason, the name armada_thermal_ops is no longer suitable,
-and this commit replaces it with armada_thermal_data.
+The first three patches are preparation work. They add a generic
+infrastructure that allows to support similar thermal sensors in
+a non-intrusive way.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/thermal/armada_thermal.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+Patch four uses the infrastructure to support the Armada 375 SoC
+thermal sensor.
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 5e53212..c5db071 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -38,16 +38,16 @@
- #define PMU_TDC0_OTF_CAL_MASK		(0x1 << 30)
- #define PMU_TDC0_START_CAL_MASK		(0x1 << 25)
- 
--struct armada_thermal_ops;
-+struct armada_thermal_data;
- 
- /* Marvell EBU Thermal Sensor Dev Structure */
- struct armada_thermal_priv {
- 	void __iomem *sensor;
- 	void __iomem *control;
--	struct armada_thermal_ops *ops;
-+	struct armada_thermal_data *data;
- };
- 
--struct armada_thermal_ops {
-+struct armada_thermal_data {
- 	/* Initialize the sensor */
- 	void (*init_sensor)(struct armada_thermal_priv *);
- 
-@@ -113,7 +113,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 	unsigned long reg;
- 
- 	/* Valid check */
--	if (priv->ops->is_valid && !priv->ops->is_valid(priv)) {
-+	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
- 		dev_err(&thermal->device,
- 			"Temperature sensor reading not valid\n");
- 		return -EIO;
-@@ -129,11 +129,11 @@ static struct thermal_zone_device_ops ops = {
- 	.get_temp = armada_get_temp,
- };
- 
--static const struct armada_thermal_ops armadaxp_ops = {
-+static const struct armada_thermal_data armadaxp_data = {
- 	.init_sensor = armadaxp_init_sensor,
- };
- 
--static const struct armada_thermal_ops armada370_ops = {
-+static const struct armada_thermal_data armada370_data = {
- 	.is_valid = armada_is_valid,
- 	.init_sensor = armada370_init_sensor,
- };
-@@ -141,11 +141,11 @@ static const struct armada_thermal_ops armada370_ops = {
- static const struct of_device_id armada_thermal_id_table[] = {
- 	{
- 		.compatible = "marvell,armadaxp-thermal",
--		.data       = &armadaxp_ops,
-+		.data       = &armadaxp_data,
- 	},
- 	{
- 		.compatible = "marvell,armada370-thermal",
--		.data       = &armada370_ops,
-+		.data       = &armada370_data,
- 	},
- 	{
- 		/* sentinel */
-@@ -178,8 +178,8 @@ static int armada_thermal_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->control))
- 		return PTR_ERR(priv->control);
- 
--	priv->ops = (struct armada_thermal_ops *)match->data;
--	priv->ops->init_sensor(priv);
-+	priv->data = (struct armada_thermal_data *)match->data;
-+	priv->data->init_sensor(priv);
- 
- 	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
- 					       priv, &ops, NULL, 0, 0);
+Since there are some issues in the Z1 SoC thermal sensor, patch five
+adds a quirk to workaround such issues. The Z1 stepping is detected
+and the compatible string is updated, so the driver can perform
+a special sensor initialization. Also, the quirk moves the offset of
+the thermal control register, and allows to specifiy the correct
+(A0 stepping) offset in the devicetree.
+
+This quirk is applied only for the A375-DB board, being the only
+board with the problematic Z1 SoC.
+
+Finally, the last patch enables the thermal sensor in the devicetree.
+for the Armada 375 A0 stepping SoC.
+
+The series applies on v3.15-rc1, and has been tested on A375-DB board and
+A370-RD board.
+
+Feedback and comments are welcome!
+
+Ezequiel Garcia (6):
+  thermal: armada: Rename armada_thermal_ops struct
+  thermal: armada: Add infrastructure to support generic formulas
+  thermal: armada: Add generic infrastructure to handle the sensor
+  thermal: armada: Support Armada 375 SoC
+  ARM: mvebu: Add thermal quirk for the Armada 375 DB board
+  ARM: mvebu: Enable the thermal sensor in Armada 375 SoC
+
+ .../devicetree/bindings/thermal/armada-thermal.txt |   7 ++
+ arch/arm/boot/dts/armada-375.dtsi                  |   6 +
+ arch/arm/mach-mvebu/board-v7.c                     |  57 +++++++++
+ arch/arm/mach-mvebu/mvebu-soc-id.h                 |   3 +
+ drivers/thermal/armada_thermal.c                   | 140 ++++++++++++++++++---
+ 5 files changed, 197 insertions(+), 16 deletions(-)
+
 -- 
 1.9.1
