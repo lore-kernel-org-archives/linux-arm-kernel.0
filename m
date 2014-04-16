@@ -1,83 +1,107 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 16 Apr 2014 12:20:26 +0200
-Subject: [PATCH 0/4] pinctrl: sirf: switch to one gpiolib and
- gpiolib_irqchip helpers
-In-Reply-To: <CAGsJ_4zZQRPS6RuP2FfJyB=eskuM6A4c0XFvEwrOS=SWuJ5+Cg@mail.gmail.com>
-References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
- <CABxcv=khupV0gpnCUOPeRON_v2wcRCNkL2Ao1B5dOB9-OB0wyQ@mail.gmail.com>
- <CAGsJ_4zZQRPS6RuP2FfJyB=eskuM6A4c0XFvEwrOS=SWuJ5+Cg@mail.gmail.com>
-Message-ID: <CABxcv=n0nCvWgEAYkikZ17uSCu6TrDrFKyP3e3cBa7N9VaOJCw@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 16 Apr 2014 19:23:49 +0900
+Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
+In-Reply-To: <534E4089.9070804@arm.com>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
+ <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
+ <534CF847.5040008@arm.com> <534CF9B4.306@samsung.com>
+ <534CFAD7.4030508@arm.com> <534E3DC0.40502@samsung.com>
+ <534E4089.9070804@arm.com>
+Message-ID: <534E5A35.7050708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 12:05 PM, Barry Song <21cnbao@gmail.com> wrote:
-> 2014-04-16 17:54 GMT+08:00 Javier Martinez Canillas <javier@dowhile0.org>:
->> Hello Barry,
+Hi Marc,
+
+On 04/16/2014 05:34 PM, Marc Zyngier wrote:
+> On 16/04/14 09:22, Chanwoo Choi wrote:
+>> Hi Marc,
 >>
->> On Tue, Apr 15, 2014 at 8:43 AM, Barry Song <21cnbao@gmail.com> wrote:
->>> From: Barry Song <Baohua.Song@csr.com>
+>> On 04/15/2014 06:24 PM, Marc Zyngier wrote:
+>>> On 15/04/14 10:19, Chanwoo Choi wrote:
+>>>> On 04/15/2014 06:13 PM, Marc Zyngier wrote:
+>>>>> On 15/04/14 09:27, Chanwoo Choi wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
+>>>>>>> On 15/04/14 02:59, Chanwoo Choi wrote:
+>>>>>>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>>>>>>
+>>>>>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
+>>>>>>>> dual core and includes following dt nodes:
+>>>>>>>>
+>>>>>>>> - GIC interrupt controller
+>>>>>>>> - Pinctrl to control GPIOs
+>>>>>>>> - Clock controller
+>>>>>>>> - CPU information (Cortex-A7 dual core)
+>>>>>>>> - UART to support serial port
+>>>>>>>> - MCT (Multi Core Timer)
+>>>>>>>> - ADC (Analog Digital Converter)
+>>>>>>>> - I2C/SPI bus
+>>>>>>>> - Power domain
+>>>>>>>> - PMU (Performance Monitoring Unit)
+>>>>>>>> - MSHC (Mobile Storage Host Controller)
+>>>>>>>> - PWM (Pluse Width Modulation)
+>>>>>>>> - AMBA bus
+>>>>>>>
+>>>>>>> [...]
+>>>>>>>
+>>>>>>> Where is the arch timer node?
+>>>>>>
+>>>>>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
+>>>>>> - in drivers/clocksource/exynos_mct.c
+>>>>>
+>>>>> Don't you have a Cortex-A7? If so, you have the arch timer.
+>>>>
+>>>> Do you means that 'arch timer" is ARM_ARCH_TIMER?
 >>>
->>> This patchset depends on Linus Walleij's "pinctrl: sirf: rename inlined accessor".
->>> and "pinctrl: sirf: switch driver to use gpiolib irqchip helpers" is rebased
->>> from Linus Walleij's patch too.
+>>> Yes.
 >>>
->>> Barry Song (3):
->>>   pinctrl: sirf: wrap all gpio banks into one gpio_chip
->>>   gpio: make handler_data configurable while using gpiolib_irqchip
->>>   pinctrl: sirf: move to use irq_get_handler_data
->>> Linus Walleij (1):
->>>   pinctrl: sirf: switch driver to use gpiolib irqchip helpers
+>>>> As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
+>>>> But, Exynos SoC used MCT clocksource for system timer.
+>>>>
+>>>> Exynos dts file didn't include arch timer node but only include mct node.
 >>>
->>>  drivers/gpio/gpiolib.c              |   10 +-
->>>  drivers/pinctrl/Kconfig             |    1 +
->>>  drivers/pinctrl/sirf/pinctrl-sirf.c |  264 ++++++++++++-----------------------
->>>  include/linux/gpio/driver.h         |    2 +-
->>>  4 files changed, 97 insertions(+), 180 deletions(-)
+>>> Well, it is a bug, and a recurrent one. A Cortex-A7 has the arch timers
+>>> implemented. Always.
 >>>
->>> --
->>> 1.7.5.4
+>>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0464f/BABFEBJJ.html
 >>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> All Cortex-A7 have it, and so do A12, A15, A17, A53, A57.
 >>
->> Maybe you can first do the parameter change to
->> gpiochip_set_chained_irqchip() and then just convert to gpiolib
->> irqchip passing the struct sirfsoc_gpio_bank pointer instead of a
->> struct gpio_chip. I think there is no need to split PATCH 2 and PATCH
->> 4 but it is up to you.
+>> I tested 'arch_timer'(drivers/clocksource/arm_arch_timer.c) on Exynos3250 based on Cortex-A7.
 >>
->
-> Javier, thanks. the reason for splitting 2 and 4 is that i don't want
-> to lose the contribution of Linus for "gpiolib irqchip helpers".
-> otherwise, i will be the author of the merged patch.
->
-
-Right, I didn't notice PATCH 2 was from Linus because it didn't have
-his Signed-off-by but yours (although now I notice that it was sent
-with him as the author).
-
-AFAIK you can still squash both patches and in that case the
-convention is to add the original author s-o-b and then explain your
-contributions on top. i.e:
-
-From: Linus Walleij <linus.walleij@linaro.org>
-
-This switches the SiRF pinctrl driver over to using the gpiolib
-irqchip helpers simplifying some of the code.
-
-[Baohua.Song at csr.com: move to use irq_get_handler_data]
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-But it's also OK to have split in two patches, I just asked out of curiosity :-)
-
-Best regards,
-Javier
-
->
->> The series looks good to me:
+>> To test arch timer, I used the clocksource of arch_timer for timekeeping instead of clocksource
+>> of Exynos MCT. But, I faced with issue. The following function return only same value(zero)
+>> as following kernel log:
+>> - arch_counter_get_cntvct() in arch/arm/include/asm/arch_timer.h
 >>
->> Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
->
-> -barry
+>> Uncompressing Linux... done, booting the kernel.
+>> [    0.000000] Booting Linux on physical CPU 0x0
+>> [    0.000000] Initializing cgroup subsys cpuset
+>> [    0.000000] Initializing cgroup subsys cpu
+>> [    0.000000] Initializing cgroup subsys cpuacct
+>> [    0.000000] Linux version 3.15.0-rc1-00020-gf452826-dirty ...
+>> [    0.000000] CPU: ARMv7 Processor ...
+>> ...
+>> [    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
+>> [    0.000000] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
+>> ...
+>>
+>> Could you give me a solution to resolve this issue or a expected cause?
+> 
+> My guess is that you need to enable some clock for the timer to tick.
+> Ask your HW guys how they have wired this clock.
+> 
+> Also, I cannot help but notice that you are entering your kernel at SVC
+> instead of HYP. I suggest you fix your bootloader/firmware to allow all
+> CPUs to enter the kernel in HYP.
+
+I think again that I would like to add arch_timer dt node to exynos3250.dtsi
+as separated patchset after finishing the test arch_timer clocksource for timekeeping.
+
+Thanks for your review.
+
+Best Regards,
+Chanwoo Choi
