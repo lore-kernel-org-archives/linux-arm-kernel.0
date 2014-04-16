@@ -1,22 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Apr 2014 12:30:03 +0100
-Subject: [PATCH_v8 2/2] arm64: audit: Add audit hook in
- syscall_trace_enter/exit()
-In-Reply-To: <1394862548-29060-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1394705767-12423-1-git-send-email-takahiro.akashi@linaro.org>
- <1394862548-29060-1-git-send-email-takahiro.akashi@linaro.org>
- <1394862548-29060-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140416113002.GG29754@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Apr 2014 08:32:55 -0300
+Subject: USB OTG support on mx27pdk
+In-Reply-To: <1397627716.685483508@f399.i.mail.ru>
+References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
+ <2394b8be344646358b23a105c8725961@BL2PR03MB226.namprd03.prod.outlook.com>
+ <1397627716.685483508@f399.i.mail.ru>
+Message-ID: <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 05:49:08AM +0000, AKASHI Takahiro wrote:
-> This patch adds auditing functions on entry to or exit from
-> every system call invocation.
-> 
-> Acked-by: Richard Guy Briggs <rgb@redhat.com>
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+On Wed, Apr 16, 2014 at 2:55 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-I think I already acked this patch.
+> ci_hdrc ci_hdrc.0: EHCI Host Controller
+> ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
+> ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
+> usb usb1: New USB device found, idVendor=1d6b, idProduct=0002
+> usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+> usb usb1: Product: EHCI Host Controller
+> usb usb1: Manufacturer: Linux 3.15.0-rc1-next-20140415-dirty ehci_hcd
+> usb usb1: SerialNumber: ci_hdrc.0
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 1 port detected
 
-Will
+Thanks for testing, Alexander.
+
+Does your bootloader have USB support?
+
+If so, would it be possible to remove the USB support from the
+bootloader, please?
+
+I am wondering if the bootloader is doing some USB related init that
+the kernel is missing.
+
+Thanks,
+
+Fabio Estevam
