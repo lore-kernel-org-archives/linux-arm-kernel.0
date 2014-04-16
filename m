@@ -1,46 +1,45 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Apr 2014 13:38:31 -0400 (EDT)
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <20140416164310.GA15739@redhat.com>
-References: <20140416145107.GA11039@redhat.com>
- <20140416.110031.1269128188581361698.davem@davemloft.net>
- <20140416164310.GA15739@redhat.com>
-Message-ID: <20140416.133831.364304583096073299.davem@davemloft.net>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 16 Apr 2014 19:39:27 +0200
+Subject: [PATCH v4 00/21] ARM: support for ICP DAS LP-8x4x (with dts)
+In-Reply-To: <1397668411-27162-1-git-send-email-ynvich@gmail.com>
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1397668411-27162-1-git-send-email-ynvich@gmail.com>
+Message-ID: <534EC04F.9010408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleg Nesterov <oleg@redhat.com>
-Date: Wed, 16 Apr 2014 18:43:10 +0200
+Hi,
 
-> But did you really mean get_unmapped_area(pgoff => page_to_pfn(area->page)) ?
+On 04/16/2014 07:13 PM, Sergei Ianovich wrote:
+> We had an intensive discussion of the series in the beginning of
+> December 2013 [1]. The discussion resulted in 3 versions of the series
+> in less than 3 weeks. Then there was a decision to block this series
+> until Daniel Mack's DMA-engine-for-PXA series is ready.
 
-Yes.
+For whatever reason, I only received patches 1-8 out of 21 in this series.
 
-> I simply can't understand how this can work, arm (and x86) really use it as
-> "pgoff << PAGE_SHIFT" align_offset accounted in unmapped_area() ?
+> Unfortunately Daniel neigther agrees to review my trivial temporary
+> solution to the DMA-in-device-tree (patch 7 of 21), nor he is active
+> in DMA series development. There is no progress for 3 months.
 
-When a platform has D-cache aliasing issues, it must make sure that
-every shared page is mapped to the same D-cache alias in all such
-shared mappings.
+Well, IIRC, I asked you to look into the MMC performance regressions
+that you reported and see what we can do about them. I currently don't
+have hardware to reproduce this, so I can't do it myself.
 
-The way this is done is to map each pgoff to a page in the D-cache.
-For example, pgoff 0 would be given a virtual address that maps to the
-first page in the D-cache, pgoff 1 to the second, and so forth.
+My impression is that the transisiton will only be painless if the
+mmp_pdma driver provides comparable performance to the existing
+implementation. I also still think that adding hacks to the drivers to
+manually parse the dma properties (as in #8) brings us further away from
+a proper solution, not closer.
 
-What we're doing with this get_unmapped_area() call is to make it so
-that userspace's virtual address will land@the same virtual alias
-as the kernel one does.
+> As with any big out of tree series, its support is painful. It requires
+> extensive merging when doing bisects, on each step.
 
-So that stores on the kernel side will be seen properly, without any
-cache flushing, by the user side mapping.
+I know that, and I'm not violently against getting your patches in. I
+was just hoping for some help around here in order to sort out things
+and implement it properly. The reason why I haven't been working on
+these drivers lately is simply the sheer lack of time :(
 
->> So we end up with all of the benefits of storing directly to
->> userspace, along with what you're trying to achieve.
-> 
-> And in this case we can avoid copy_to_user(), right ?
 
-Yes, that's the whole idea, you can forget about the VM_WRITE etc.
-that caused your concerns.
-
-It'd be just memcpy to kernel side mapping of the page + i-cache flush
-where necessary.
+Thanks,
+Daniel
