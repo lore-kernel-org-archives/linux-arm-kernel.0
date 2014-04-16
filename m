@@ -1,155 +1,204 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Apr 2014 10:57:33 +0900
-Subject: [PATCH v5 19/20] ARM: shmobile: Remove Marzen reference DTS
-In-Reply-To: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
-References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1397613454-7522-20-git-send-email-horms+renesas@verge.net.au>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Tue, 15 Apr 2014 19:07:45 -0700
+Subject: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <534D2EB7.6020904@arm.com>
+References: <1397439742-28337-1-git-send-email-zhangwm@marvell.com>
+ <534D2EB7.6020904@arm.com>
+Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE55075F1995@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the DTS file r8a7779-marzen.dts can be used with
-board-marzen.c and board-marzen-reference.c, proceed with removing
-r8a7779-marzen-reference.dts.
+Hi Sudeep,
 
-Based on work for the Koelsch board by Laurent Pinchart.
 
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: 2014?4?15? 21:06
+> To: Neil Zhang
+> Cc: Will Deacon; linux at arm.linux.org.uk; Sudeep Holla;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v2] ARM: perf: save/restore pmu registers in pm notifier
+> 
+> Hi Will,
+> 
+> Thanks for the response.
+> 
+> Hi Neil,
+> 
+> On 14/04/14 02:42, Neil Zhang wrote:
+> > From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> >
+> > This adds core support for saving and restoring CPU PMU registers for
+> > suspend/resume support i.e. deeper C-states in cpuidle terms.
+> > This patch adds support only to ARMv7 PMU registers save/restore.
+> > It needs to be extended to xscale and ARMv6 if needed.
+> >
+> > [Neil] We found that DS-5 not work on our CA7 based SoCs.
+> > After debuging, found PMU registers were lost because of core power down.
+> > Then i found Sudeep had a patch to fix it about two years ago but not
+> > in the mainline, just port it.
+> >
+> 
+> The patch was written as PoC to support multiple PMUs back then and was
+> clearly not intended for upstream. Will has already mentioned what this patch
+> needs to improve on.
 
----
-v5
-* As suggested by Magnus Damm
-  - Refer to r8a7779 instead of r8a7790 in the changelog
----
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 120 -------------------------
- 1 file changed, 120 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
+Thanks for the comments.
+I think it can help others if it can be accepted by mainline.
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-deleted file mode 100644
-index 76f5eef..0000000
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ /dev/null
-@@ -1,120 +0,0 @@
--/*
-- * Reference Device Tree Source for the Marzen board
-- *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-- * Copyright (C) 2013 Simon Horman
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--
--/dts-v1/;
--#include "r8a7779.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/interrupt-controller/irq.h>
--
--/ {
--	model = "marzen";
--	compatible = "renesas,marzen-reference", "renesas,r8a7779";
--
--	chosen {
--		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on rw";
--	};
--
--	memory {
--		device_type = "memory";
--		reg = <0x60000000 0x40000000>;
--	};
--
--	fixedregulator3v3: fixedregulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-3.3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
--
--	lan0 at 18000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x18000000 0x100>;
--		pinctrl-0 = <&lan0_pins>;
--		pinctrl-names = "default";
--
--		phy-mode = "mii";
--		interrupt-parent = <&irqpin0>;
--		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
--		reg-io-width = <4>;
--		vddvario-supply = <&fixedregulator3v3>;
--		vdd33a-supply = <&fixedregulator3v3>;
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		led2 {
--			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
--		};
--		led3 {
--			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
--		};
--		led4 {
--			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
--		};
--	};
--};
--
--&irqpin0 {
--	status = "okay";
--};
--
--&pfc {
--	pinctrl-0 = <&scif2_pins &scif4_pins>;
--	pinctrl-names = "default";
--
--	lan0_pins: lan0 {
--		intc {
--			renesas,groups = "intc_irq1_b";
--			renesas,function = "intc";
--		};
--		lbsc {
--			renesas,groups = "lbsc_ex_cs0";
--			renesas,function = "lbsc";
--		};
--	};
--
--	scif2_pins: serial2 {
--		renesas,groups = "scif2_data_c";
--		renesas,function = "scif2";
--	};
--
--	scif4_pins: serial4 {
--		renesas,groups = "scif4_data";
--		renesas,function = "scif4";
--	};
--
--	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
--		renesas,function = "sdhi0";
--	};
--
--	hspi0_pins: hspi0 {
--		renesas,groups = "hspi0";
--		renesas,function = "hspi0";
--	};
--};
--
--&sdhi0 {
--	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
--
--	vmmc-supply = <&fixedregulator3v3>;
--	bus-width = <4>;
--	status = "okay";
--};
--
--&hspi0 {
--	pinctrl-0 = <&hspi0_pins>;
--	pinctrl-names = "default";
--	status = "okay";
--};
--- 
-1.8.5.2
+> 
+> I have mentioned few comments which IMO is necessary.
+> 
+> > Signed-off-by: Sudeep KarkadaNagesha
+> <sudeep.karkadanagesha@arm.com>
+> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+> > ---
+> >  arch/arm/include/asm/pmu.h       |   11 +++++++++
+> >  arch/arm/kernel/perf_event_cpu.c |   29 ++++++++++++++++++++++-
+> >  arch/arm/kernel/perf_event_v7.c  |   47
+> ++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 86 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+> > index ae1919b..f37f048 100644
+> > --- a/arch/arm/include/asm/pmu.h
+> > +++ b/arch/arm/include/asm/pmu.h
+> > @@ -62,6 +62,15 @@ struct pmu_hw_events {
+> >  	raw_spinlock_t		pmu_lock;
+> >  };
+> >
+> > +struct cpupmu_regs {
+> > +	u32 pmc;
+> > +	u32 pmcntenset;
+> > +	u32 pmuseren;
+> > +	u32 pmintenset;
+> > +	u32 pmxevttype[8];
+> > +	u32 pmxevtcnt[8];
+> > +};
+> > +
+> 
+> This can't be generic, it needs to be specific to each PMU implementations.
+> I have clearly mentioned it in the commit log. It's better to move this out to
+> each PMU specific implementations.
+> 
+> >  struct arm_pmu {
+> >  	struct pmu	pmu;
+> >  	cpumask_t	active_irqs;
+> > @@ -83,6 +92,8 @@ struct arm_pmu {
+> >  	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
+> >  	void		(*free_irq)(struct arm_pmu *);
+> >  	int		(*map_event)(struct perf_event *event);
+> > +	void		(*save_regs)(struct arm_pmu *, struct cpupmu_regs *);
+> > +	void		(*restore_regs)(struct arm_pmu *, struct cpupmu_regs *);
+> 
+> Once cpupmu_regs becomes PMU specific, you can remove it from the above
+> 2 function pointers.
+> 
+> >  	int		num_events;
+> >  	atomic_t	active_events;
+> >  	struct mutex	reserve_mutex;
+> > diff --git a/arch/arm/kernel/perf_event_cpu.c
+> > b/arch/arm/kernel/perf_event_cpu.c
+> > index 51798d7..7f1c756 100644
+> > --- a/arch/arm/kernel/perf_event_cpu.c
+> > +++ b/arch/arm/kernel/perf_event_cpu.c
+> > @@ -19,6 +19,7 @@
+> >  #define pr_fmt(fmt) "CPU PMU: " fmt
+> >
+> >  #include <linux/bitmap.h>
+> > +#include <linux/cpu_pm.h>
+> >  #include <linux/export.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/of.h>
+> > @@ -39,6 +40,7 @@ static DEFINE_PER_CPU(struct arm_pmu *,
+> percpu_pmu);
+> > static DEFINE_PER_CPU(struct perf_event * [ARMPMU_MAX_HWEVENTS],
+> > hw_events);  static DEFINE_PER_CPU(unsigned long
+> > [BITS_TO_LONGS(ARMPMU_MAX_HWEVENTS)], used_mask);  static
+> > DEFINE_PER_CPU(struct pmu_hw_events, cpu_hw_events);
+> > +static DEFINE_PER_CPU(struct cpupmu_regs, cpu_pmu_regs);
+> >
+> >  /*
+> >   * Despite the names, these two functions are CPU-specific and are
+> > used @@ -217,6 +219,23 @@ static struct notifier_block
+> cpu_pmu_hotplug_notifier = {
+> >  	.notifier_call = cpu_pmu_notify,
+> >  };
+> >
+> > +static int cpu_pmu_pm_notify(struct notifier_block *b,
+> > +					unsigned long action, void *hcpu)
+> 
+> hcpu is misleading, the cpu_pm_notify doesn't pass the logical cpu index.
+> IIRC its NULL, rename it.
+
+Thanks for the detailed suggestions, I will refine it later.
+
+> 
+> > +{
+> > +	struct cpupmu_regs *pmuregs = this_cpu_ptr(&cpu_pmu_regs);
+> > +
+> > +	if (action == CPU_PM_ENTER && cpu_pmu->save_regs)
+> > +		cpu_pmu->save_regs(cpu_pmu, pmuregs);
+> > +	else if (action == CPU_PM_EXIT && cpu_pmu->restore_regs)
+> > +		cpu_pmu->restore_regs(cpu_pmu, pmuregs);
+> > +
+> > +	return NOTIFY_OK;
+> > +}
+> > +
+> > +static struct notifier_block cpu_pmu_pm_notifier = {
+> > +	.notifier_call = cpu_pmu_pm_notify,
+> > +};
+> > +
+> >  /*
+> >   * PMU platform driver and devicetree bindings.
+> >   */
+> > @@ -349,9 +368,17 @@ static int __init register_pmu_driver(void)
+> >  	if (err)
+> >  		return err;
+> >
+> > +	err = cpu_pm_register_notifier(&cpu_pmu_pm_notifier);
+> > +	if (err) {
+> > +		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
+> > +		return err;
+> > +	}
+> > +
+> >  	err = platform_driver_register(&cpu_pmu_driver);
+> > -	if (err)
+> > +	if (err) {
+> > +		cpu_pm_unregister_notifier(&cpu_pmu_pm_notifier);
+> >  		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
+> > +	}
+> >
+> >  	return err;
+> >  }
+> > diff --git a/arch/arm/kernel/perf_event_v7.c
+> > b/arch/arm/kernel/perf_event_v7.c index f4ef398..29ae8f1 100644
+> > --- a/arch/arm/kernel/perf_event_v7.c
+> > +++ b/arch/arm/kernel/perf_event_v7.c
+> > @@ -1237,6 +1237,51 @@ static void armv7_pmnc_dump_regs(struct
+> arm_pmu
+> > *cpu_pmu)  }  #endif
+> >
+> > +static void armv7pmu_save_regs(struct arm_pmu *cpu_pmu,
+> > +					struct cpupmu_regs *regs)
+> > +{
+> > +	unsigned int cnt;
+> > +	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (regs->pmc));
+> > +	if (!(regs->pmc & ARMV7_PMNC_E))
+> > +		return;
+> > +
+> > +	asm volatile("mrc p15, 0, %0, c9, c12, 1" : "=r" (regs->pmcntenset));
+> > +	asm volatile("mrc p15, 0, %0, c9, c14, 0" : "=r" (regs->pmuseren));
+> > +	asm volatile("mrc p15, 0, %0, c9, c14, 1" : "=r" (regs->pmintenset));
+> > +	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (regs->pmxevtcnt[0]));
+> > +	for (cnt = ARMV7_IDX_COUNTER0;
+> > +			cnt <= ARMV7_IDX_COUNTER_LAST(cpu_pmu); cnt++) {
+> 
+> As Will suggested better to use used_mask to save/restore only active events.
+> 
+> Regards,
+> Sudeep
+
+
+Best Regards,
+Neil Zhang
