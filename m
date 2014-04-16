@@ -1,31 +1,76 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Apr 2014 00:28:37 -0300
-Subject: USB OTG support on mx27pdk
-In-Reply-To: <2394b8be344646358b23a105c8725961@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
- <2394b8be344646358b23a105c8725961@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <CAOMZO5Bf67mf_8eTnHpx3mB6nrON4Nriwzb+En4BE6-DOwNS8Q@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Wed, 16 Apr 2014 03:45:56 +0000
+Subject: [RFC][PATCH 3/3] clocksource: Add Freescale FlexTimer Module
+ (FTM) timer support
+In-Reply-To: <d4863b3b92ef4aebbc05ca5e6cb9aede@BN1PR03MB188.namprd03.prod.outlook.com>
+References: <1397614787-8300-1-git-send-email-Li.Xiubo@freescale.com>
+ <1397614787-8300-4-git-send-email-Li.Xiubo@freescale.com>
+ <d4863b3b92ef4aebbc05ca5e6cb9aede@BN1PR03MB188.namprd03.prod.outlook.com>
+Message-ID: <0f09e4ff3a4e42e6818bc2ab8a622b26@DM2PR03MB509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 12:23 AM, Peter Chen <Peter.Chen@freescale.com> wrote:
-> Please check if below patch is existed
->
-> commit 3b5d3e6845bfe68777d069886b0d1cd5f23b9d58
-> Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
-> Date:   Fri Jan 10 13:51:29 2014 +0800
->
->     usb: chipidea: Fix Internal error: : 808 [#1] ARM related to STS flag
->
->     * init the sts flag to 0 (missed)
->     * fix write the real bit not sts value
->     * Set PORTCS_STS and DEVLC_STS only if sts = 1
->
->
-> I cced chris who has imx27 hardware.
+[...]
+> > +static void ftm_set_mode(enum clock_event_mode mode,
+> > +				struct clock_event_device *evt)
+> > +{
+> > +	switch (mode) {
+> > +	case CLOCK_EVT_MODE_PERIODIC:
+> > +		ftm_set_next_event(peroidic_cyc, evt);
+> > +		break;
+> > +	default:
+> > +		break;
+> 
+> Remove this break;
+> 
 
-Yes, this patch is applied in 3.15-rc1, but does not help here.
+I'll revise this.
 
-Regards,
 
-Fabio Estevam
+> > +	}
+> > +}
+
+
+[...]
+> > +static void __init ftm_timer_init(struct device_node *np)
+> > +{
+> > +	struct clk *ftm_clk;
+> > +	void __iomem *timer_base;
+> > +	unsigned long freq;
+> > +	int irq;
+> > +
+> > +	timer_base = of_iomap(np, 0);
+> > +	BUG_ON(!timer_base);
+> > +
+> > +	clksrc_base = timer_base + FTM_OFFSET(1);
+> > +	clkevt_base = timer_base + FTM_OFFSET(0);
+> > +
+> > +	irq = irq_of_parse_and_map(np, 0);
+> > +	BUG_ON(irq <= 0);
+> > +
+> > +	ftm_clk = of_clk_get_by_name(np, "ftm0_counter_en");
+> > +	BUG_ON(IS_ERR(ftm_clk));
+> > +	BUG_ON(clk_prepare_enable(ftm_clk));
+> > +
+> > +	ftm_clk = of_clk_get_by_name(np, "ftm1_counter_en");
+> > +	BUG_ON(IS_ERR(ftm_clk));
+> > +	BUG_ON(clk_prepare_enable(ftm_clk));
+> > +
+> > +	ftm_clk = of_clk_get_by_name(np, "ftm0");
+> > +	BUG_ON(IS_ERR(ftm_clk));
+> > +	BUG_ON(clk_prepare_enable(ftm_clk));
+> > +
+> > +	ftm_clk = of_clk_get_by_name(np, "ftm1");
+> 
+> Why dts is not have ftm1 node?
+> 
+
+Because the 'ftm0: ftm at 40038000' node is used to ftm0
+and ftm1 device nodes at the same time.
+
+May using 'ftm: ftm at 40038000' will be much better ?
+
+Thanks,
+
+BRs
+Xiubo
