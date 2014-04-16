@@ -1,51 +1,65 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 16 Apr 2014 16:51:07 +0200
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <1397626297-23873-2-git-send-email-victor.kamensky@linaro.org>
-References: <1397626297-23873-1-git-send-email-victor.kamensky@linaro.org>
- <1397626297-23873-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140416145107.GA11039@redhat.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Wed, 16 Apr 2014 20:25:24 +0530
+Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
+In-Reply-To: <534E9859.7000307@samsung.com>
+References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+ <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
+ <534E8AE1.4010402@samsung.com> <4516298.kO98TB1Ozz@wuerfel>
+ <534E9859.7000307@samsung.com>
+Message-ID: <CAJuA9ajXa+mejdUvWATHjmmin8hoRhX0wueg5g8rDbJR4AWZ7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15, Victor Kamensky wrote:
+On Wed, Apr 16, 2014 at 8:18 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> On 16.04.2014 16:31, Arnd Bergmann wrote:
+>>
+>> On Wednesday 16 April 2014 15:51:29 Tomasz Figa wrote:
+>>>
+>>> On 15.04.2014 11:28, Sachin Kamat wrote:
+>>>>
+>>>> From: Arnd Bergmann <arnd@arndb.de>
+>>>>
+>>>> This makes it possible to enable the exynos platform as part of a
+>>>> multiplatform kernel, in addition to keeping the single-platform
+>>>> Exynos support.
+>>>> sparsemem is currently not supported in multiplatform.
+>>>
+>>>
+>>> Is this still true as of today?
+>>>
+>>> Otherwise looks fine.
+>>
+>>
+>> sparsemem is still not supported in multiplatform, but after I looked
+>> at it in more detail, I came to the conclusion that there is no
+>> reason why it couldn't be. It just needs testing so we are confident
+>> that it doesn't break other platforms, and we need to find good
+>> platform-independent values for MAX_PHYSMEM_BITS and SECTION_SIZE_BITS
+>> to put into asm/memory.h, since we can't have them set in mach/memory.h
+>> for multiplatform.
+>>
+>> Looking at my patch again now, I would actually prefer to kill off
+>> the single-platform support for exynos right away. I don't see
+>> any reason to keep it now, and it complicates the test matrix.
 >
-> --- a/kernel/events/uprobes.c
-> +++ b/kernel/events/uprobes.c
-> @@ -1149,7 +1149,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
->  	}
 >
->  	ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
-> -				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
-> +				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO|VM_WRITE, &area->page);
+> That would be the best option, assuming that it wouldn't introduce feature
+> regressions. Unfortunately there is still ongoing work on cpufreq driver to
+> make it multiplatform-aware, so dropping single platform support right now
+> would introduce at least this one regression.
+>
+> Thomas, is there any progress on new version of Exynos cpufreq rework
+> series?
 
-Yes, this is nasty.
+Hi Tomasz,
 
-I would like to have a reason to nack this change ;) Unfortunately the current
-code is buggy too and we need to protect the kernel from malicious applications
-which can rewrite the insn we are going to step over in UTASK_SSTEP state anyway.
+Yes, I am preparing the fourth version of the cpufreq patches and will
+post it next week. Mostly, the changes will be addressing your review
+comments.
 
-> +void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-> +				  void *src, unsigned long len)
-> +{
-> +	/*
-> +	 * Note if CPU does not support instructions write snooping
-> +	 * from dcache it needs to define its own version of this
-> +	 * function that would take care of proper cache flushes.
-> +	 *
-> +	 * Nothing we can do if it fails, added if to make unused
-> +	 * result warning happy. If xol write failed because process
-> +	 * unmapped xol area by mistake, process will crash in some
-> +	 * other place.
-> +	 */
-> +	if (__copy_to_user((void *) vaddr, src, len));
-> +}
+Thanks,
+Thomas.
 
-Plus, again, this can write to another mapping, say to file-backed memory.
-
-Finally, with this change it won't be possible to share this xol memory with
-other tasks.
-
-But it seems that it is pointless to argue.
-
-Oleg.
+>
+> Best regards,
+> Tomasz
