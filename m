@@ -1,55 +1,140 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 16 Apr 2014 17:13:18 +0800
-Subject: [PATCH] ARM: prima2: remove L2 cache size override
-In-Reply-To: <6113510.ZYPB60x7iK@wuerfel>
-References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
- <CAGsJ_4zt4KMLk7v93e40Zj1A7fHBnvE2_c94nAbGAr9xcCFnwg@mail.gmail.com>
- <20140415215615.GZ24070@n2100.arm.linux.org.uk> <6113510.ZYPB60x7iK@wuerfel>
-Message-ID: <CAGsJ_4w4SNzPnDKXCY5sshpDiAi-MKP-teKQd3t=nTY9s-FeeA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 16 Apr 2014 14:36:05 +0530
+Subject: [PATCH v7 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <1396008222-7058-3-git-send-email-sthokal@xilinx.com>
+References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
+ <1396008222-7058-3-git-send-email-sthokal@xilinx.com>
+Message-ID: <20140416090605.GP32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-16 16:52 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 15 April 2014 22:56:15 Russell King - ARM Linux wrote:
->> On Tue, Apr 15, 2014 at 06:13:27PM +0800, Barry Song wrote:
->> >
->> > ok, it seems we still need to hook this into the callback of this
->> > specific machine instead of using a global early_initcall(). since now
->> > the dt compatible field has been generic enough, it will cause other
->> > platforms to execute l2x0_of_init() too.
->>
->> What I did for Versatile Express was to move it to the init_irq stage.
->> I'm not condoning using init_irq() for non-IRQ stuff, but that was
->> just to see whether it was possible (the .init_early is too early for
->> it.)  Let me put it another way: I'm not thrilled by the idea of
->> having it in init_irq() but that's a better location to call L2 cache
->> initialisation than half-way through the kernel's initialisation.
->
-> Would it help to introduce a new .init_l2_cache() callback? That
-> way, the architecture code can default to initializing any l2x0
-> that it finds in DT, and have give platforms the option of
-> overriding the call if they need to, and we can do it at the
-> same point during early boot for everyone.
->
-> A number of platforms currently have the same
->
-> static void __init this_platform_init(void)
-> {
->       l2x0_of_init(0, ~0UL);
->       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> }
->
-> Where the second line is already the default for .init_machine,
-> and it would be nice to get rid of the callback entirely, especially
-> for the machines that don't do anything else in their platform
-> code.
+On Fri, Mar 28, 2014 at 05:33:42PM +0530, Srikanth Thokala wrote:
+> This is the driver for the AXI Video Direct Memory Access (AXI
+> VDMA) core, which is a soft Xilinx IP core that provides high-
+> bandwidth direct memory access between memory and AXI4-Stream
+> type video target peripherals. The core provides efficient two
+> dimensional DMA operations with independent asynchronous read
+> and write channel operation.
+> 
+> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
 
-it seems you mean put a general customize_l2x0_init() like customize_machine().
+Okay the series is fine and was going to apply it BUT
+1) need ack on DT patch..
+2) issues below on managing the descriptor and resetting the cookie :(
 
-what is the reason stopping l2x0 from becoming a standalone driver
-which can initialize itself?
+> +
+> +/**
+> + * xilinx_vdma_tx_descriptor - Allocate transaction descriptor
+> + * @chan: Driver specific VDMA channel
+> + *
+> + * Return: The allocated descriptor on success and NULL on failure.
+> + */
+> +static struct xilinx_vdma_tx_descriptor *
+> +xilinx_vdma_alloc_tx_descriptor(struct xilinx_vdma_chan *chan)
+> +{
+> +	struct xilinx_vdma_tx_descriptor *desc;
+> +	unsigned long flags;
+> +
+> +	if (chan->allocated_desc)
+> +		return chan->allocated_desc;
+??
 
->
->         Arnd
+> +
+> +	desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+> +	if (!desc)
+> +		return NULL;
+> +
+> +	spin_lock_irqsave(&chan->lock, flags);
+> +	chan->allocated_desc = desc;
+ah why do you need this? 
 
--barry
+So this essentailly prevents you from preparing two trasactions at same time as
+you would overwrite??
+
+You should maintain a list for pending and submitted.
+
+> +	spin_unlock_irqrestore(&chan->lock, flags);
+> +
+> +	INIT_LIST_HEAD(&desc->segments);
+> +
+> +	return desc;
+> +}
+> +
+
+> +/**
+> + * xilinx_vdma_tx_submit - Submit DMA transaction
+> + * @tx: Async transaction descriptor
+> + *
+> + * Return: cookie value on success and failure value on error
+> + */
+> +static dma_cookie_t xilinx_vdma_tx_submit(struct dma_async_tx_descriptor *tx)
+> +{
+> +	struct xilinx_vdma_tx_descriptor *desc = to_vdma_tx_descriptor(tx);
+> +	struct xilinx_vdma_chan *chan = to_xilinx_chan(tx->chan);
+> +	dma_cookie_t cookie;
+> +	unsigned long flags;
+> +	int err;
+> +
+> +	if (chan->err) {
+> +		/*
+> +		 * If reset fails, need to hard reset the system.
+> +		 * Channel is no longer functional
+> +		 */
+> +		err = xilinx_vdma_chan_reset(chan);
+> +		if (err < 0)
+> +			return err;
+> +	}
+> +
+> +	spin_lock_irqsave(&chan->lock, flags);
+> +
+> +	cookie = dma_cookie_assign(tx);
+> +
+> +	/* Append the transaction to the pending transactions queue. */
+> +	list_add_tail(&desc->node, &chan->pending_list);
+> +
+> +	/* Free the allocated desc */
+> +	chan->allocated_desc = NULL;
+> +
+> +	spin_unlock_irqrestore(&chan->lock, flags);
+> +
+> +	return cookie;
+> +}
+> +
+> +/**
+> + * xilinx_vdma_dma_prep_interleaved - prepare a descriptor for a
+> + *	DMA_SLAVE transaction
+> + * @dchan: DMA channel
+> + * @xt: Interleaved template pointer
+> + * @flags: transfer ack flags
+> + *
+> + * Return: Async transaction descriptor on success and NULL on failure
+> + */
+> +static struct dma_async_tx_descriptor *
+> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
+> +				 struct dma_interleaved_template *xt,
+> +				 unsigned long flags)
+> +{
+> +	struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
+> +	struct xilinx_vdma_tx_descriptor *desc;
+> +	struct xilinx_vdma_tx_segment *segment, *prev = NULL;
+> +	struct xilinx_vdma_desc_hw *hw;
+> +
+> +	if (!is_slave_direction(xt->dir))
+> +		return NULL;
+> +
+> +	if (!xt->numf || !xt->sgl[0].size)
+> +		return NULL;
+> +
+> +	/* Allocate a transaction descriptor. */
+> +	desc = xilinx_vdma_alloc_tx_descriptor(chan);
+> +	if (!desc)
+> +		return NULL;
+> +
+> +	dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
+> +	desc->async_tx.tx_submit = xilinx_vdma_tx_submit;
+> +	desc->async_tx.cookie = 0;
+why this is initialized in submit.. when you call dma_cookie_assign()
+
+-- 
+~Vinod
