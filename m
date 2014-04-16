@@ -1,127 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 16 Apr 2014 15:22:05 +0100
-Subject: [PATCH 04/12] clocksource: Sched clock source for Versatile
- Express
-In-Reply-To: <CAL_JsqLiFE_D+PSFg62sVm3wO0uvZT+pwAVyn7Lwn2ma3+3DoA@mail.gmail.com>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-5-git-send-email-pawel.moll@arm.com>
- <CAL_JsqLiFE_D+PSFg62sVm3wO0uvZT+pwAVyn7Lwn2ma3+3DoA@mail.gmail.com>
-Message-ID: <1397658125.3407.84.camel@hornet>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Apr 2014 15:22:06 +0100
+Subject: [PATCH 0/2] ARM SMMU fixes
+In-Reply-To: <15544035.e9eK8n7TO4@avalon>
+References: <1393601830-4677-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <53440057.6020703@arm.com> <20140414165858.GI12916@arm.com>
+ <15544035.e9eK8n7TO4@avalon>
+Message-ID: <20140416142206.GB2005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, Apr 15, 2014 at 04:55:07PM +0100, Laurent Pinchart wrote:
+> Hi Will,
 
-Thanks for reminding me about this stuff. I'll get around and re-spin
-the series this week.
+Hi Laurent,
 
-On Wed, 2014-04-16 at 14:56 +0100, Rob Herring wrote:
-> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> > index cd6950f..9799744 100644
-> > --- a/drivers/clocksource/Kconfig
-> > +++ b/drivers/clocksource/Kconfig
-> > @@ -140,3 +140,12 @@ config VF_PIT_TIMER
-> >         bool
-> >         help
-> >           Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
-> > +
-> > +config CLKSRC_VEXPRESS
-> > +       bool
-> > +       depends on MFD_VEXPRESS_SYSREG
-> 
-> But you don't really depend on this...
+> On a different but related topic, I've written an ipmmu-vmsa.c driver for a 
+> Renesas IOMMU. The IP core has custom registers but uses VMSA-compatible page 
+> tables. What would you think about sharing the page table management code 
+> between the two drivers ? The biggest difference between the two 
+> implementations is that I've hardcoded the long descriptor format, while you 
+> have reused more system MMU macros that make the arm-smmu driver use 2 or 3 
+> levels of page tables depending on whether LPAE is disabled or enabled.
 
-Hm. Strictly speaking it's true (no code level dependency) but if one
-doesn't build sysreg driver, one doesn't care 
+Actually, my driver also only supports the long-descriptor format, so the
+code should be shareable. Things I support that you might have issues with
+are:
 
-> > +       depends on GENERIC_SCHED_CLOCK
-> 
-> I think this should be a select, not a depends.
+ - Stage-1 and Stage-2 formats (although long-descriptor only)
+ - 4k and 64k pages (the latter for arm64 only)
+ - Contiguous pte hints
 
-Don't think so, no. It's being selected by an arch. 
+Do you have support for section mappings in your driver? That is something
+I'd be keen to add for the ARM SMMU, but it really complicates the code.
 
-> > +       select CLKSRC_OF
-> > +       default y
-> > +       help
-> > +         Simple provider of sched clock on ARM Versatile Express platform.
-> > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> > index c7ca50a..1051a23 100644
-> > --- a/drivers/clocksource/Makefile
-> > +++ b/drivers/clocksource/Makefile
-> > @@ -37,3 +37,4 @@ obj-$(CONFIG_ARM_ARCH_TIMER)          += arm_arch_timer.o
-> >  obj-$(CONFIG_ARM_GLOBAL_TIMER)         += arm_global_timer.o
-> >  obj-$(CONFIG_CLKSRC_METAG_GENERIC)     += metag_generic.o
-> >  obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)  += dummy_timer.o
-> > +obj-$(CONFIG_CLKSRC_VEXPRESS)  += vexpress.o
-> > diff --git a/drivers/clocksource/vexpress.c b/drivers/clocksource/vexpress.c
-> > new file mode 100644
-> > index 0000000..55b8ab4
-> > --- /dev/null
-> > +++ b/drivers/clocksource/vexpress.c
-> > @@ -0,0 +1,40 @@
-> > +/*
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * Copyright (C) 2013 ARM Limited
-> 
-> Did you write this last year?
-
-Yes. Can bump it up anyway.
-
-> > + */
-> > +
-> > +#include <linux/clocksource.h>
-> > +#include <linux/io.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/sched_clock.h>
-> > +
-> > +#define SYS_24MHZ 0x05c
-> > +
-> > +static void __iomem *vexpress_sys_24mhz;
-> > +
-> > +static u32 notrace vexpress_sys_24mhz_read(void)
-> > +{
-> > +       return readl(vexpress_sys_24mhz);
-> > +}
-> > +
-> > +static void __init vexpress_sched_clock_init(struct device_node *node)
-> > +{
-> > +       void __iomem *base = of_iomap(node, 0);
-> > +
-> > +       if (!base)
-> > +               return;
-> > +
-> > +       vexpress_sys_24mhz = base + SYS_24MHZ;
-> > +
-> > +       setup_sched_clock(vexpress_sys_24mhz_read, 32, 24000000);
-> 
-> This frequency should come from a DT clock binding. You will have to
-> fallback to 24MHz for backwards compatibility though.
-
-I don't see why would it go to the binding. You may have noticed the
-register is called "SYS_24MHZ", not "SYS_RANDOMCLOCK". The driver
-*knows* what the frequency is.
-
-> > +}
-> 
-> Wouldn't this code work for Versatile and Realview ARM reference
-> boards? Even the register offset is the same.
-> 
-> > +CLOCKSOURCE_OF_DECLARE(vexpress, "arm,vexpress-sysreg",
-> > +               vexpress_sched_clock_init);
-
-I guess it would, yes. The sysregs are annoyingly similar and different
-at the same time.
-
-One could of course try to come up with a "generic mmio clock source"
-binding, taking the frequency as a property, but don't count on me doing
-this... ;-)
-
-Pawel
+Will
