@@ -1,30 +1,52 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 16 Apr 2014 17:06:46 +0200
-Subject: [RFC PATCH v3] ARM: uprobes need icache flush after xol write
-In-Reply-To: <1397623112-3211-2-git-send-email-victor.kamensky@linaro.org>
-References: <1397623112-3211-1-git-send-email-victor.kamensky@linaro.org>
- <1397623112-3211-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140416150646.GB11039@redhat.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 16 Apr 2014 11:07:34 -0400 (EDT)
+Subject: [PATCH v3 3/4] USB: ohci-pxa27x: Add support for external vbus
+ regulators
+In-Reply-To: <1397654215-23699-4-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <Pine.LNX.4.44L0.1404161102020.1334-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15, Victor Kamensky wrote:
->
->  arch/arm/include/asm/cacheflush.h |  2 ++
->  arch/arm/kernel/uprobes.c         | 22 ++++++++++++++++++++++
->  arch/arm/mm/flush.c               | 33 ++++++++++++++++++++++++++++-----
->  include/linux/uprobes.h           |  3 +++
->  kernel/events/uprobes.c           | 25 +++++++++++++++++--------
+On Wed, 16 Apr 2014, Laurent Pinchart wrote:
 
-Obviously I can't comment the changes in arm/ ;)
+> Override the hub control operation to enable and disable external
+> regulators for the ports vbus power supply in response to clear/set
+> USB_PORT_FEAT_POWER requests.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-But I'd vote for this patch.
+> @@ -417,6 +467,16 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+>  	pxa_ohci->clk = usb_clk;
+>  	pxa_ohci->mmio_base = (void __iomem *)hcd->regs;
+>  
+> +	for (i = 0; i < 3; ++i) {
+> +		char name[6];
+> +
+> +		if (!(inf->flags & (ENABLE_PORT1 << i)))
+> +			continue;
+> +
+> +		sprintf(name, "vbus%u", i + 1);
+> +		pxa_ohci->vbus[i] = devm_regulator_get(&pdev->dev, name);
+> +	}
+> +
+>  	retval = pxa27x_start_hc(pxa_ohci, &pdev->dev);
+>  	if (retval < 0) {
+>  		pr_debug("pxa27x_start_hc failed");
+> @@ -462,6 +522,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+>  void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *pdev)
+>  {
+>  	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
+> +	unsigned int i;
+> +
+> +	for (i = 0; i < 3; ++i)
+> +		pxa27x_ohci_set_vbus_power(pxa_ohci, i, false);
+>  
+>  	usb_remove_hcd(hcd);
+>  	pxa27x_stop_hc(pxa_ohci, &pdev->dev);
 
+You probably should leave the port power enabled until after 
+usb_remove_hcd() returns.  Apart from that,
 
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-Off-topic, I am just curious... can't someone explain why flush_pfn_alias()
-or flush_icache_alias() can't race with itself ? I have no idea what they do,
-but what if another thread calls the same function with the same CACHE_COLOUR()
-right after set_pte_ext?
-
-Oleg.
+Alan Stern
