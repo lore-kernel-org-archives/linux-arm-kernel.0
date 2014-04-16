@@ -1,49 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Apr 2014 10:57:32 +0900
-Subject: [PATCH v5 18/20] ARM: shmobile: Let Marzen multiplatform boot with
- Marzen DTB
+Date: Wed, 16 Apr 2014 10:57:29 +0900
+Subject: [PATCH v5 15/20] ARM: shmobile: marzen-reference: Work around core
+ clock issues
 In-Reply-To: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
 References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1397613454-7522-19-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1397613454-7522-16-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the multiplatform Marzen support boot with the legacy DTS for
-Marzen as well as the Marzen reference DTS.
+From: Simon Horman <horms@verge.net.au>
 
-Based on work for the Koelsch board by Laurent Pinchart.
+Due to issues with runtime PM clock management, clocks not explicitly
+managed by their drivers may not be enabled at all, or be inadvertently
+disabled by the clk_disable_unused() late initcall.
 
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Until this is fixed, add a temporary workaround, calling
+shmobile_clk_workaround() with enable == true.
+
+For now this enables the clocks for: sdhi0, and thermal.
+More clocks can be added if needed.
+
+Based on work by Geert Uytterhoeven for the Koelsch board.
+
+Cc: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/Makefile                      | 2 +-
- arch/arm/mach-shmobile/board-marzen-reference.c | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b1c26e1..7091646 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -322,7 +322,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- 	r7s72100-genmai-reference.dtb \
- 	r8a7791-koelsch.dtb \
- 	r8a7790-lager.dtb \
--	r8a7779-marzen-reference.dtb
-+	r8a7779-marzen.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_cyclone5_socdk.dtb \
- 	socfpga_cyclone5_sockit.dtb \
+---
+v5
+* First post
+---
+ arch/arm/mach-shmobile/board-marzen-reference.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
 diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index 1fb5768..529c2b4 100644
+index 5823c83..1fb5768 100644
 --- a/arch/arm/mach-shmobile/board-marzen-reference.c
 +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -77,6 +77,7 @@ static void __init marzen_init(void)
- }
- 
- static const char *marzen_boards_compat_dt[] __initdata = {
-+	"renesas,marzen",
- 	"renesas,marzen-reference",
- 	NULL,
+@@ -55,10 +55,19 @@ static const struct clk_name clk_names[] __initconst = {
  };
+ #endif
+ 
++/*
++ * This is a really crude hack to work around core platform clock issues
++ */
++static const struct clk_name clk_enables[] __initconst = {
++	{ "sdhi0", NULL, "ffe4c000.sd" },
++	{ "thermal", NULL, "ffc48000.thermal" },
++};
++
+ static void __init marzen_init(void)
+ {
+ #ifdef CONFIG_COMMON_CLK
+ 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
++	shmobile_clk_workaround(clk_enables, ARRAY_SIZE(clk_enables), true);
+ #else
+ 	r8a7779_clock_init();
+ #endif
 -- 
 1.8.5.2
