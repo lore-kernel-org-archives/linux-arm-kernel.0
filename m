@@ -1,37 +1,132 @@
-From: lee.essen@nowonline.co.uk (Lee Essen)
-Date: Wed, 16 Apr 2014 19:55:08 +0400
-Subject: dma_alloc_coherent and cache?
-In-Reply-To: <534DAA8E.1090904@boundarydevices.com>
-References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
- <534DAA8E.1090904@boundarydevices.com>
-Message-ID: <D5AF0C4C-8B70-4443-994B-361D39AA3C28@nowonline.co.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 16 Apr 2014 17:59:05 +0200
+Subject: [PATCH 5/6] ARM: mvebu: Add thermal quirk for the Armada 375
+ DB board
+In-Reply-To: <1397657720-10893-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1397657720-10893-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <534EA8C9.7010907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/16/2014 04:15 PM, Ezequiel Garcia wrote:
+> The initial release of the Armada 375 DB board has an Armada 375
+> Z1 stepping silicon. This commit introduces a quirk that allows
+> to workaround a series of issues with the thermal sensor in this
+> stepping, but updating the devicetree:
+>
+>    * Updates the compatible string for the thermal, so the driver
+>      can perform a specific initialization of the sensor.
+>
+>    * Moves the offset of the thermal control register. This quirk
+>      allows to specifiy the correct (A0 stepping) offset in the
+>      devicetree.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>   arch/arm/mach-mvebu/board-v7.c     | 57 ++++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-mvebu/mvebu-soc-id.h |  3 ++
+>   2 files changed, 60 insertions(+)
+>
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 333fca8..93f50f2 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -96,10 +96,66 @@ static void __init i2c_quirk(void)
+>   	return;
+>   }
+>
+> +#define A375_Z1_THERMAL_FIXUP_OFFSET 0xc
+> +
+> +static void __init thermal_quirk(void)
 
-On 16 Apr 2014, at 01:54, Troy Kisky <troy.kisky@boundarydevices.com> wrote:
+Are we sure, we want to fixup quirks like this the way below?
 
-> On 4/14/2014 10:43 PM, Lee Essen wrote:
->> Hi,
->> 
->> I'm working on a driver for a Marvell switch device (98dx4122) where the basic interface closely resembles the mv643xx_eth device.
->> 
->> (I should say this is a bit of a personal project to experiment with a trendnet switch, not affiliated with any commercial activities.)
->> 
->> GPL code from Marvell is available for an old kernel, so I have been working to use the mv643xx_eth concepts and at least get basic functionality up an running on the current kernel version.
->> 
->> At a high level I have it working, however I get regular (reproducible) hangs and I suspect it's to do with the writes to the descriptiors (from dma_alloc_coherent) being buffered or cached and not making it to the device when dma is triggered.
->> 
-> 
-> Have you verified that a wmb() precedes transferring ownership of the descriptor to the controller
-> and the cpu does not touch the descriptor afterwards?
+Alternatively, we can also keep some armada-375-z1.dtsi and one
+for the board including it.
 
-Hi Troy,
+Sebastian
 
-Yes, there?s a smb() before the write of the register that starts the DMA, and nothing else that touches it.  The hang happens almost instantly (probably it is instantly) after the dma start.
-
-It still feels like a cache/buffering issue, but nobody can see any obvious problems ? the other possibility is that it?s interrupt related, since an interrupt will occur pretty quickly after the dma is enabled.
-
-I am going to try to rework the driver slightly to be entirely polling, just to eliminate the interrupt side of things ? although it will increase the delay between the descriptor write and the dma start which may also mask the problem.
-
-Lee.
+> +{
+> +	struct device_node *np;
+> +	u32 dev, rev;
+> +
+> +	if (mvebu_get_soc_id(&dev, &rev) && rev > ARMADA_375_Z1_REV)
+> +		return;
+> +
+> +	for_each_compatible_node(np, NULL, "marvell,armada375-thermal") {
+> +		struct property *prop;
+> +		__be32 newval, *newprop, *oldprop;
+> +		int len;
+> +
+> +		/*
+> +		 * The register offset is at a wrong location. This quirk
+> +		 * creates a new reg property as a clone of the previous
+> +		 * one and corrects the offset.
+> +		 */
+> +		oldprop = (__be32 *)of_get_property(np, "reg", &len);
+> +		if (!oldprop)
+> +			continue;
+> +
+> +		/* Create a duplicate of the 'reg' property */
+> +		prop = kzalloc(sizeof(*prop), GFP_KERNEL);
+> +		prop->length = len;
+> +		prop->name = kstrdup("reg", GFP_KERNEL);
+> +		prop->value = kzalloc(len, GFP_KERNEL);
+> +		memcpy(prop->value, oldprop, len);
+> +
+> +		/* Fixup the register offset of the second entry */
+> +		oldprop += 2;
+> +		newprop = (__be32 *)prop->value + 2;
+> +		newval = cpu_to_be32(be32_to_cpu(*oldprop) -
+> +				     A375_Z1_THERMAL_FIXUP_OFFSET);
+> +		*newprop = newval;
+> +		of_update_property(np, prop);
+> +
+> +		/*
+> +		 * The thermal controller needs some quirk too, so let's change
+> +		 * the compatible string to reflect this.
+> +		 */
+> +		prop = kzalloc(sizeof(*prop), GFP_KERNEL);
+> +		prop->name = kstrdup("compatible", GFP_KERNEL);
+> +		prop->length = sizeof("marvell,armada375-z1-thermal");
+> +		prop->value = kstrdup("marvell,armada375-z1-thermal",
+> +						GFP_KERNEL);
+> +		of_update_property(np, prop);
+> +	}
+> +	return;
+> +}
+> +
+>   static void __init mvebu_dt_init(void)
+>   {
+>   	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
+>   		i2c_quirk();
+> +	if (of_machine_is_compatible("marvell,a375-db"))
+> +		thermal_quirk();
+> +
+>   	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>   }
+>
+> @@ -123,6 +179,7 @@ static const char * const armada_375_dt_compat[] = {
+>
+>   DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
+>   	.init_time	= mvebu_timer_and_clk_init,
+> +	.init_machine	= mvebu_dt_init,
+>   	.restart	= mvebu_restart,
+>   	.dt_compat	= armada_375_dt_compat,
+>   MACHINE_END
+> diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.h b/arch/arm/mach-mvebu/mvebu-soc-id.h
+> index 3165425..294a443 100644
+> --- a/arch/arm/mach-mvebu/mvebu-soc-id.h
+> +++ b/arch/arm/mach-mvebu/mvebu-soc-id.h
+> @@ -20,6 +20,9 @@
+>   #define MV78XX0_A0_REV	    0x1
+>   #define MV78XX0_B0_REV	    0x2
+>
+> +/* Armada 375 */
+> +#define ARMADA_375_Z1_REV   0x0
+> +
+>   #ifdef CONFIG_ARCH_MVEBU
+>   int mvebu_get_soc_id(u32 *dev, u32 *rev);
+>   #else
+>
