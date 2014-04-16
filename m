@@ -1,12 +1,18 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 16 Apr 2014 21:13:13 +0400
-Subject: [PATCH v4 03/21] ARM: dts: fix pxa27x-gpio interrupts
+Date: Wed, 16 Apr 2014 21:13:14 +0400
+Subject: [PATCH v4 04/21] ARM: dts: pxa3xx: move declaration to header
 In-Reply-To: <1397668411-27162-1-git-send-email-ynvich@gmail.com>
 References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
  <1397668411-27162-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1397668411-27162-4-git-send-email-ynvich@gmail.com>
+Message-ID: <1397668411-27162-5-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This way it will be more difficult to change the declaration in one
+place, but not the other.
+
+In addition, the change allows to use the binding for pxa-gpio on
+other PXA CPUs.
 
 Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
 CC: Daniel Mack <zonque@gmail.com>
@@ -15,27 +21,39 @@ CC: Arnd Bergmann <arnd@arndb.de>
 ---
    v3..v4
    v2..v3
-   v1..v2
    * no changes
 
- arch/arm/boot/dts/pxa27x.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+   v1..v2
+   * drop #ifdef in header file
+   * number changed from 6 to 4 (dropped patches)
 
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index a705469..39bed5e 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -34,5 +34,11 @@
- 			reg = <0x40c00010 0x10>;
- 			#pwm-cells = <1>;
- 		};
+ arch/arm/mach-pxa/include/mach/irqs.h | 2 ++
+ arch/arm/mach-pxa/pxa3xx.c            | 2 --
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
+index 48c2fd8..732315d 100644
+--- a/arch/arm/mach-pxa/include/mach/irqs.h
++++ b/arch/arm/mach-pxa/include/mach/irqs.h
+@@ -113,4 +113,6 @@ void ichp_handle_irq(struct pt_regs *);
+ void pxa_init_irq(int irq_nr, int (*set_wake)(struct irq_data *, unsigned int));
+ #endif
+ 
++extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
 +
-+		gpio: gpio at 40e00000 {
-+			compatible = "intel,pxa27x-gpio";
-+			interrupts = <8>, <9>, <10>;
-+			interrupt-names = "gpio0", "gpio1", "gpio_mux";
-+		};
- 	};
- };
+ #endif /* __ASM_MACH_IRQS_H */
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 87011f3..2397dec 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -42,8 +42,6 @@
+ #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
+ #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
+ 
+-extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
+-
+ static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
+ static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
 -- 
 1.8.4.2
