@@ -1,108 +1,161 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Apr 2014 20:14:27 +0200
-Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
-In-Reply-To: <534E9AA3.10409@samsung.com>
-References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
- <CAJuA9ajXa+mejdUvWATHjmmin8hoRhX0wueg5g8rDbJR4AWZ7A@mail.gmail.com>
- <534E9AA3.10409@samsung.com>
-Message-ID: <5094962.iM2Kd6gfjd@wuerfel>
+Date: Wed, 16 Apr 2014 20:26:15 +0200
+Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
+In-Reply-To: <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+ <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
+Message-ID: <16730530.rJ9T0MsYmt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 April 2014 16:58:43 Tomasz Figa wrote:
-
-> On 16.04.2014 16:55, Thomas Abraham wrote:
-> > On Wed, Apr 16, 2014 at 8:18 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> >> On 16.04.2014 16:31, Arnd Bergmann wrote:
-> >>> sparsemem is still not supported in multiplatform, but after I looked
-> >>> at it in more detail, I came to the conclusion that there is no
-> >>> reason why it couldn't be. It just needs testing so we are confident
-> >>> that it doesn't break other platforms, and we need to find good
-> >>> platform-independent values for MAX_PHYSMEM_BITS and SECTION_SIZE_BITS
-> >>> to put into asm/memory.h, since we can't have them set in mach/memory.h
-> >>> for multiplatform.
-> >>>
-> >>> Looking at my patch again now, I would actually prefer to kill off
-> >>> the single-platform support for exynos right away. I don't see
-> >>> any reason to keep it now, and it complicates the test matrix.
-> >>
-> >>
-> >> That would be the best option, assuming that it wouldn't introduce feature
-> >> regressions. Unfortunately there is still ongoing work on cpufreq driver to
-> >> make it multiplatform-aware, so dropping single platform support right now
-> >> would introduce at least this one regression.
-> >>
-> >> Thomas, is there any progress on new version of Exynos cpufreq rework
-> >> series?
-> >
-> > Hi Tomasz,
-> >
-> > Yes, I am preparing the fourth version of the cpufreq patches and will
-> > post it next week. Mostly, the changes will be addressing your review
-> > comments.
+On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
+> Jingoo,
 > 
-> OK. Looking forward to it. Thanks for an update on this.
+> Thanks for taking a stab at trying to convert a host bridge
+> driver to use the new generic host bridge code.
 > 
+> I do however have concerns on the direction you took. You have split
+> your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
+> even if (with my series) it should be no reason why the host bridge
+> driver should not work on other architectures as well once they are
+> converted.
 
-Cool! This is the only major issue I'm aware of, so I think we're good.
+Right.
 
-If SPARSEMEM support is still relevant to anybody, I'm sure we can
-get that to work as well.
+> Also, some of the functions that you use have identical names but different
+> signatures depending on what arch you have selected. This is really bad
+> in my books!
 
-There is one small issue with the sound drivers that came up, and I
-assume it was just a mistake. If not, some more work on that might
-be needed. See patch below.
+It's only the sys_to_pcie() function, right?
 
-	Arnd
+You can probably simplify that to take a void pointer and have only one line
+difference.
 
-8<-------
->From 6f3921c3218509114e855a8ea5932aeea5d3ddfd Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 18 Mar 2014 17:04:59 +0100
-Subject: [PATCH] ASoC: samsung: don't build pcm and spdif on exynos
+> What about creating functions that use my series directly if CONFIG_ARM64 is
+> defined (or any CONFIG_ you want to create for your driver that you select
+> from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
+> way your driver will call only one API without any #ifdef and when arm code
+> gets converted you drop your adaptation functions. Or (better yet), have a
+> stab at converting bios32 (Rob Herring has already provided some hints on
+> how to do it for arch/arm).
 
-In commit d37bdf736d9b "ASoC: samsung: Use ASoC dmaengine code where
-possible", Mark Brown changed the EXYNOS ASoC code to no longer
-use the private dma interfaces that are standing in the way of
-multiplatform enablement.
+That would of course be best.
 
-However, in 313367e7bfa "ASoC: Samsung: Update Kconfig for I2S,SPDIF
-and PCM audio", two new users of that interface appeared, since it
-is now possible to enable SND_SOC_SAMSUNG_SMDK_SPDIF and
-SND_SOC_SMDK_WM8994_PCM on all Samsung SoCs including EXYNOS.
+> To give an example on how things are not going well in your version (not obvious
+> from your patch, but you can see it once you apply it): dw_pcie_host_init()
+> will still carry the handcoded version of DT parsing and that is not guarded
+> against CONFIG_ARM64 being defined, where the parsing will happen again
+> when you call of_create_pci_host_bridge().
 
-This patch does a partial revert of 313367e7bfa by allowing these
-drivers on all samsung platforms except EXYNOS, so we can proceed
-with the multiplatform patches.
+How about making the generic DT parsing code from of_create_pci_host_bridge()
+an exported function that can be called by drivers that don't use
+of_create_pci_host_bridge?
 
-If support for these drivers is actually needed on EXYNOS machines,
-the drivers should first be moved over to use the dmaengine code.
+> Speaking of the handcoded DT parsing of resources: you are using restype == 0
+> as a way of selecting config space, *and then split the range size into two
+> halves*. From what Jason Gunthorpe and Arnd were saying, config ranges in the DT
+> tree should only be used for ECAM space, so no split is allowed.
+> 
+> Arnd, are you allowing this non-standard use to creep in the bindings?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Sangsu Park <sangsu4u.park@samsung.com>
-Cc: Sangbeom Kim <sbkim73@samsung.com>
-Cc: Padmavathi Venna <padma.v@samsung.com>
-Cc: Mark Brown <broonie@kernel.org>
+I fear it's too late to change that now. In retrospect we probably shoulnd't
+have defined the binding like that.
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 7b610a8..efc01e0 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -167,7 +167,7 @@ config SND_SOC_GONI_AQUILA_WM8994
- 
- config SND_SOC_SAMSUNG_SMDK_SPDIF
- 	tristate "SoC S/PDIF Audio support for SMDK"
--	depends on SND_SOC_SAMSUNG
-+	depends on SND_SOC_SAMSUNG && !ARCH_EXYNOS
- 	select SND_SAMSUNG_SPDIF
- 	help
- 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
-@@ -183,7 +183,7 @@ config SND_SOC_SMDK_WM8580_PCM
- 
- config SND_SOC_SMDK_WM8994_PCM
- 	tristate "SoC PCM Audio support for WM8994 on SMDK"
--	depends on SND_SOC_SAMSUNG
-+	depends on SND_SOC_SAMSUNG && !ARCH_EXYNOS
- 	depends on I2C=y
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
+Overall, my impression of the patch is that it should be possible to do
+the same with much fewer #ifdefs by first rearranging the code in one patch
+and then doing another patch on top to add the generic arm64 support.
+
+> > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> > index 6d23d8c..fac0440 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -65,14 +65,27 @@
+> >  #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+> >  #define PCIE_ATU_UPPER_TARGET		0x91C
+> >  
+> > +#ifdef CONFIG_ARM
+> >  static struct hw_pci dw_pci;
+> > +#endif
+> >  
+> >  static unsigned long global_io_offset;
+> >  
+> > +#ifdef CONFIG_ARM
+> >  static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+> >  {
+> >  	return sys->private_data;
+> >  }
+> > +#endif
+> > +
+> > +#ifdef CONFIG_ARM64
+> > +static inline struct pcie_port *sys_to_pcie(struct pcie_port *pp)
+> > +{
+> > +	return pp;
+> > +}
+> > +
+> > +static struct pci_ops dw_pcie_ops;
+> > +#endif
+> >  
+> >  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+> >  {
+> > @@ -381,7 +394,9 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> >  {
+> >  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+> >  	irq_set_chip_data(irq, domain->host_data);
+> > +#ifdef CONFIG_ARM
+> >  	set_irq_flags(irq, IRQF_VALID);
+> > +#endif
+> >  
+> >  	return 0;
+> >  }
+> > @@ -397,6 +412,10 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >  	struct of_pci_range_parser parser;
+> >  	u32 val;
+> >  	int i;
+> > +#ifdef CONFIG_ARM64
+> > +	struct pci_host_bridge *bridge;
+> > +	resource_size_t lastbus;
+> > +#endif
+> >  
+> >  	if (of_pci_range_parser_init(&parser, np)) {
+> >  		dev_err(pp->dev, "missing ranges property\n");
+> > @@ -489,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >  	val |= PORT_LOGIC_SPEED_CHANGE;
+> >  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> >  
+> > +#ifdef CONFIG_ARM
+> >  	dw_pci.nr_controllers = 1;
+> >  	dw_pci.private_data = (void **)&pp;
+> >  
+> > @@ -497,6 +517,16 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >  #ifdef CONFIG_PCI_DOMAINS
+> >  	dw_pci.domain++;
+> >  #endif
+> > +#endif
+> > +
+> > +#ifdef CONFIG_ARM64
+> > +	bridge = of_create_pci_host_bridge(pp->dev, &dw_pcie_ops, pp);
+> > +	if (IS_ERR_OR_NULL(bridge))
+> > +		return PTR_ERR(bridge);
+> > +
+> > +	lastbus = pci_rescan_bus(bridge->bus);
+> > +	pci_bus_update_busn_res_end(bridge->bus, lastbus);
+> > +#endif
+> >  
+> >  	return 0;
+> >  }
+> > @@ -695,6 +725,7 @@ static struct pci_ops dw_pcie_ops = {
+> >  	.write = dw_pcie_wr_conf,
+> >  };
+> >  
+> > +#ifdef CONFIG_ARM
+> >  static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+> >  {
+> >  	struct pcie_port *pp;
+> > @@ -758,6 +789,7 @@ static struct hw_pci dw_pci = {
+> >  	.map_irq	= dw_pcie_map_irq,
+> >  	.add_bus	= dw_pcie_add_bus,
+> >  };
+> > +#endif /* CONFIG_ARM */
+> >  
+> >  void dw_pcie_setup_rc(struct pcie_port *pp)
