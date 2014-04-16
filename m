@@ -1,69 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Apr 2014 09:35:27 -0700
-Subject: [PATCH] power: twl4030_charger: clear IRQs after handling them
-In-Reply-To: <1397661299-31342-1-git-send-email-balbi@ti.com>
-References: <1397661299-31342-1-git-send-email-balbi@ti.com>
-Message-ID: <20140416163526.GA3049@atomide.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Apr 2014 18:37:32 +0200
+Subject: [PATCH 01/11] clk: divider: add CLK_DIVIDER_READ_ONLY flag
+In-Reply-To: <3673317.X1crLrrlCS@phil>
+References: <3673317.X1crLrrlCS@phil>
+Message-ID: <1613263.L2UpUtBNCh@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [140416 08:18]:
-> TRM says we *must* write 1 to each bit we're handling
-> in order to clear the IRQ status and bring IRQ line
-> low. This patch implements that.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> Russell, I don't have HW to test, but this should
-> solve the problem you saw when not using battery
-> with Zoom board. Let me know if it doesn't.
+Similar to muxes which already have a read-only flag there sometimes
+exist dividers which should not be changed by the clock framework
+but whose value still should be readable.
 
-BTW, looks like we're enabling BCI automatically in twl4030.dtsi
-while the legacy booting does not have TWL_COMMON_PDATA_BCI
-enabled for LDP. Anyways, for LDP BCI should be enabled for
-sure, that's the only way to power at least the earlier LDP
-revisions.
+Therefore add a READ_ONLY flag similar to the mux-one to clk-divider
 
->  drivers/power/twl4030_charger.c | 16 ++++++++++++++--
->  1 file changed, 14 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/power/twl4030_charger.c b/drivers/power/twl4030_charger.c
-> index f141088..b090842 100644
-> --- a/drivers/power/twl4030_charger.c
-> +++ b/drivers/power/twl4030_charger.c
-> @@ -301,12 +301,24 @@ static irqreturn_t twl4030_bci_interrupt(int irq, void *arg)
->  	ret = twl_i2c_read_u8(TWL4030_MODULE_INTERRUPTS, &irqs1,
->  			      TWL4030_INTERRUPTS_BCIISR1A);
->  	if (ret < 0)
-> -		return IRQ_HANDLED;
-> +		return IRQ_NONE;
-> +
-> +	/* clear IRQs early */
-> +	ret = twl_i2c_write_u8(TWL4030_MODULE_INTERRUPTS, irqs1,
-> +			TWL4030_INTERRUPTS_BCIISR1A);
-> +	if (ret < 0)
-> +		return IRQ_NONE;
->  
->  	ret = twl_i2c_read_u8(TWL4030_MODULE_INTERRUPTS, &irqs2,
->  			      TWL4030_INTERRUPTS_BCIISR2A);
->  	if (ret < 0)
-> -		return IRQ_HANDLED;
-> +		return IRQ_NONE;
-> +
-> +	/* clear IRQs early */
-> +	ret = twl_i2c_write_u8(TWL4030_MODULE_INTERRUPTS, irqs2,
-> +			      TWL4030_INTERRUPTS_BCIISR2A);
-> +	if (ret < 0)
-> +		return IRQ_NONE;
->  
->  	dev_dbg(bci->dev, "BCI irq %02x %02x\n", irqs2, irqs1);
->  
-> -- 
-> 1.9.1.286.g5172cb3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/clk-divider.c    | 10 +++++++++-
+ include/linux/clk-provider.h |  4 ++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index ec22112..f7e5df5 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -249,6 +249,11 @@ const struct clk_ops clk_divider_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_divider_ops);
+ 
++const struct clk_ops clk_divider_ro_ops = {
++	.recalc_rate = clk_divider_recalc_rate,
++};
++EXPORT_SYMBOL_GPL(clk_divider_ro_ops);
++
+ static struct clk *_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+@@ -274,7 +279,10 @@ static struct clk *_register_divider(struct device *dev, const char *name,
+ 	}
+ 
+ 	init.name = name;
+-	init.ops = &clk_divider_ops;
++	if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
++		init.ops = &clk_divider_ro_ops;
++	else
++		init.ops = &clk_divider_ops;
+ 	init.flags = flags | CLK_IS_BASIC;
+ 	init.parent_names = (parent_name ? &parent_name: NULL);
+ 	init.num_parents = (parent_name ? 1 : 0);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5119174..6a72c70 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -312,6 +312,8 @@ struct clk_div_table {
+  *   of this register, and mask of divider bits are in higher 16-bit of this
+  *   register.  While setting the divider bits, higher 16-bit should also be
+  *   updated to indicate changing divider bits.
++ * CLK_DIVIDER_READ_ONLY - The divider settings are preconfigured and should
++ *	not be changed by the clock framework.
+  */
+ struct clk_divider {
+ 	struct clk_hw	hw;
+@@ -327,8 +329,10 @@ struct clk_divider {
+ #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
+ #define CLK_DIVIDER_ALLOW_ZERO		BIT(2)
+ #define CLK_DIVIDER_HIWORD_MASK		BIT(3)
++#define CLK_DIVIDER_READ_ONLY		BIT(4)
+ 
+ extern const struct clk_ops clk_divider_ops;
++extern const struct clk_ops clk_divider_ro_ops;
+ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+-- 
+1.9.0
