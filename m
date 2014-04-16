@@ -1,40 +1,69 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Apr 2014 11:22:19 -0500
-Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
-In-Reply-To: <20140416161619.GH28035@saruman.home>
-References: <1381402195-29257-1-git-send-email-kishon@ti.com>
- <1381402195-29257-2-git-send-email-kishon@ti.com>
- <52580F34.8030809@ti.com> <20140416161619.GH28035@saruman.home>
-Message-ID: <20140416162219.GI28035@saruman.home>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 16 Apr 2014 10:29:31 -0600
+Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
+ possible
+In-Reply-To: <1397636445.5070.8.camel@weser.hi.pengutronix.de>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-3-git-send-email-l.stach@pengutronix.de>
+ <20140404165559.GE9007@google.com>
+ <1397556454.4574.13.camel@weser.hi.pengutronix.de>
+ <20140415182651.GA17721@google.com>
+ <1397636445.5070.8.camel@weser.hi.pengutronix.de>
+Message-ID: <20140416162931.GA13168@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 11:16:19AM -0500, Felipe Balbi wrote:
-> On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
-> > Hi,
-> > 
-> > On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
-> > > From: George Cherian <george.cherian@ti.com>
+On Wed, Apr 16, 2014 at 10:20:45AM +0200, Lucas Stach wrote:
+> Am Dienstag, den 15.04.2014, 12:30 -0600 schrieb Bjorn Helgaas:
+> > On Tue, Apr 15, 2014 at 12:07:34PM +0200, Lucas Stach wrote:
+> > > Hi Bjorn,
 > > > 
-> > > Added dr_mode property in dwc3 and set its default mode to device.
+> > > Am Freitag, den 04.04.2014, 10:55 -0600 schrieb Bjorn Helgaas:
+> > > > On Wed, Mar 05, 2014 at 02:25:47PM +0100, Lucas Stach wrote:
+> > > > > This is the recommended method of doing the IRQ
+> > > > > mapping. For old devicetrees we fall back to the
+> > > > > previous practice.
+> > > > > 
+> > > > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > > 
+> > > > Applied with Stephen's Tested-by to my pending/host-tegra branch.  I'll
+> > > > rebase and rename it after v3.15-rc1, and I think we can squeeze it into
+> > > > v3.15 shortly after that.  Thanks.
+> > > > 
+> > > 
+> > > Are you still planning to push this into 3.15, or has this slipped to
+> > > 3.16?
 > > 
-> > If there is a specific reason why this is not set to "otg", we need
-> > to explain it here.
+> > Yes, I'm hoping to put them in v3.15.  I assume these actually
+> > fix something, e.g., we need these changes to boot with new devicetrees, or
+> > something?
 > > 
-> > AFAIK the port is meant to be used as OTG port.
+> > The changelogs don't make it clear that these are fixes, and I want to heed
+> > Linus' guidance: "Anyway, because -rc1 is already pretty darn big, I do
+> > *not* want to hear about 'sorry this missed the window, can I still sneak
+> > in'.  Fixes only."
+> > 
+> > I should have applied these sooner to make the merge window; I apologize
+> > for that.  Anyway, if you outline what these fix, I'll update the
+> > changelogs in my tree.
+> > 
+> Actually they are a bit on the fence.
 > 
-> we still don't have the workaround for dual role ports, I've been
-> working on it but still need to retest and make sure it's working fine
-> before merging upstream.
+> The i.MX and thus the designware patch actually fixes wrong behavior,
+> where all PCI legacy interrupts would be mapped to a single GIC
+> interrupt, which would leave INT B,C,D nonfunctional on i.MX.
+> 
+> The others only make DT interrupt mapping functional for all drivers, so
+> they would be useful if you need to remap interrupts across bridges or
+> something. But apparently nobody had the need to to this on platforms
+> other than i.MX until now, so those patches only fix a theoretical
+> issue.
 
-man, I went back in time. Nevermind :-)
+It sounds like the others should fix real problems; it's just that nobody
+has actually tested relevant configurations yet.  I think that's fair game,
+so I updated the changelogs and put them in my for-linus branch for v3.15.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/eea76e95/attachment.sig>
+This includes the designware, rcar, and tegra patches.
+
+Bjorn
