@@ -1,123 +1,37 @@
-From: sajjan.linux@gmail.com (Vikas Sajjan)
-Date: Wed, 16 Apr 2014 11:04:15 +0530
-Subject: [PATCH v2 2/3] ARM: EXYNOS: Add initial support of PMU for
- Exynos5260
-In-Reply-To: <534D7BAB.30503@gmail.com>
-References: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
- <1395061795-17777-3-git-send-email-vikas.sajjan@samsung.com>
- <534D7BAB.30503@gmail.com>
-Message-ID: <CAGm_ybhzQLbK8K5mj0WK8ww61PqurumkwkHqah2=5v-=VACJzA@mail.gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Wed, 16 Apr 2014 05:47:58 +0000
+Subject: USB OTG support on mx27pdk
+In-Reply-To: <CAOMZO5Bf67mf_8eTnHpx3mB6nrON4Nriwzb+En4BE6-DOwNS8Q@mail.gmail.com>
+References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
+ <2394b8be344646358b23a105c8725961@BL2PR03MB226.namprd03.prod.outlook.com>
+ <CAOMZO5Bf67mf_8eTnHpx3mB6nrON4Nriwzb+En4BE6-DOwNS8Q@mail.gmail.com>
+Message-ID: <19fff80e08e9451a99f9333421e41264@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+ 
+> On Wed, Apr 16, 2014 at 12:23 AM, Peter Chen <Peter.Chen@freescale.com>
+> wrote:
+> > Please check if below patch is existed
+> >
+> > commit 3b5d3e6845bfe68777d069886b0d1cd5f23b9d58
+> > Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+> > Date:   Fri Jan 10 13:51:29 2014 +0800
+> >
+> >     usb: chipidea: Fix Internal error: : 808 [#1] ARM related to STS
+> flag
+> >
+> >     * init the sts flag to 0 (missed)
+> >     * fix write the real bit not sts value
+> >     * Set PORTCS_STS and DEVLC_STS only if sts = 1
+> >
+> >
+> > I cced chris who has imx27 hardware.
+> 
+> Yes, this patch is applied in 3.15-rc1, but does not help here.
+> 
 
-On Wed, Apr 16, 2014 at 12:04 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Vikas,
->
->
-> On 17.03.2014 14:09, Vikas Sajjan wrote:
->>
->> Adds PMU support of PMU for Exynos5260. Suspend-to-RAM can be built on
->> top this.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
->> ---
->>   arch/arm/mach-exynos/common.h            |   26 ++++
->>   arch/arm/mach-exynos/pm.c                |   34 +++--
->>   arch/arm/mach-exynos/pmu.c               |  238
->> ++++++++++++++++++++++++++++++
->>   arch/arm/mach-exynos/regs-pmu.h          |  232
->> +++++++++++++++++++++++++++++
->>   arch/arm/plat-samsung/include/plat/cpu.h |    8 +
->>   5 files changed, 529 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
->> index aba6a2a..a17f701 100644
->> --- a/arch/arm/mach-exynos/common.h
->> +++ b/arch/arm/mach-exynos/common.h
->> @@ -56,6 +56,32 @@ enum sys_powerdown {
->>         NUM_SYS_POWERDOWN,
->>   };
->>
->> +enum running_cpu {
->> +       EXYNOS5_KFC,
->> +       EXYNOS5_ARM,
->> +};
->> +
->> +enum reg_op {
->> +       REG_INIT,       /* write new value */
->> +       REG_RESET,      /* clear with zero */
->> +       REG_SET,        /* bit set */
->> +       REG_CLEAR,      /* bit clear */
->> +};
->> +
->> +/* reg/value set */
->> +#define EXYNOS_PMU_REG(REG, VAL, OP)           \
->> +{                                              \
->> +       .reg    =       (void __iomem *)REG,    \
->> +       .val    =       VAL,                    \
->> +       .op     =       OP,                     \
->> +}
->> +
->> +struct exynos_pmu_init_reg {
->> +       void __iomem *reg;
->> +       unsigned int val;
->> +       enum reg_op op;
->> +};
->> +
->>   extern unsigned long l2x0_regs_phys;
->>   struct exynos_pmu_conf {
->>         void __iomem *reg;
->> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->> index 15af0ce..dbe9670 100644
->> --- a/arch/arm/mach-exynos/pm.c
->> +++ b/arch/arm/mach-exynos/pm.c
->> @@ -109,7 +109,7 @@ static int exynos_cpu_suspend(unsigned long arg)
->>         outer_flush_all();
->>   #endif
->>
->> -       if (soc_is_exynos5250())
->> +       if (soc_is_exynos5250() || soc_is_exynos5260())
->>                 flush_cache_all();
->
->
-> I think it's the right time for this code to be restructured. Adding more
-> and more SoCs over this cruft is making this code worse and worse.
->
+Just tried one imx6dl board, it works well.
+Have a look if it is related to phy_type at dts or phy driver please.
 
- I recently came across RFC [1] posted by pankaj on similar lines, did
-you get a chance to have look at this series.
-
-[1] https://lkml.org/lkml/2014/4/2/69
-
-
-> I believe this should be done as follows:
->
->  - a generic struct describing particular PMU variant should be defined,
-> with things like
->
->         bool flush_cache_on_suspend;
->         struct exynos_pmu_conf *pmu_conf;
->
-> or even function pointers, like
->
->         void (*cpu_suspend)(unsigned long arg);
->
-> to handle things done currently using soc_is_*() macros, which we should get
-> rid of.
->
-> - a DT match table would bind particular compatible strings with respective
-> PMU variants structs,
->
-> - in general, this code should be made more like a normal driver, e.g. bind
-> to a DT node and map registers dynamically.
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Peter
