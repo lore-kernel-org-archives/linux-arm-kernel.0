@@ -1,76 +1,41 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Wed, 16 Apr 2014 18:05:45 +0100
-Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
-In-Reply-To: <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
-References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
- <1395270762-6055-3-git-send-email-tinamdar@apm.com>
- <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
-Message-ID: <20140416170545.GD4858@bart>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 16 Apr 2014 13:07:05 -0400
+Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
+In-Reply-To: <20140414204455.5d83513d@skate>
+References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <16639486.i0jTGsaDYr@amdc1032> <20140414180142.0dd63a1f@skate>
+ <10589751.qhi630WAFs@amdc1032> <20140414181920.1e309019@skate>
+ <20140414174606.GB10416@htj.dyndns.org>
+ <20140414204455.5d83513d@skate>
+Message-ID: <20140416170705.GK28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 26, 2014 at 09:28:42AM -0500, Rob Herring wrote:
-> On Wed, Mar 19, 2014 at 6:12 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
-> > This patch adds the device tree nodes for APM X-Gene PCIe controller and
-> > PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts
-> > nodes are added.
+On Mon, Apr 14, 2014 at 08:44:55PM +0200, Thomas Petazzoni wrote:
+> On Mon, 14 Apr 2014 13:46:06 -0400, Tejun Heo wrote:
+> > Also, how do you want the patches to be routed?  Can all go through libata?
 > 
-> [snip]
+> As written in the cover letter, I'd expect patches 1 and 2 to go
+> through libata, and then patches 3, 4 and 5 to go through arm-soc. The
+> reason is that patches 3, 4 and 5 modifies the Device Tree files and
+> the ARM defconfigs, which are likely to also be changed by other
+> commits in the same cycle. However, the DT binding documentation change
+> and the driver change are independent, so they can go through libata.
 > 
-> > +               pcie0: pcie at 1f2b0000 {
-> > +                       status = "disabled";
-> > +                       device_type = "pci";
-> > +                       compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
-> > +                       #interrupt-cells = <1>;
-> > +                       #size-cells = <2>;
-> > +                       #address-cells = <3>;
-> > +                       reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
-> > +                               0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
-> 
+> I guess Jason Cooper, who handles the patch merging for mvebu
+> platforms, can confirm (or not?) this proposal.
 
-Resurecting an old thread as this is relevant to what I'm doing at the moment:
+Yep, this is how we do it.  The only caveat is if there are going to be
+changes during this window that depend on the driver changes in this
+series.  Then we would ask to set up a topic branch.
 
-> Where is the right place for config space? This binding has it here
-> and others have it in ranges. Given that config space type is defined
-> for ranges, I would think that is the right place. But Liviu's patches
-> do not process config space entries in ranges. Perhaps we need a
-> config space resource populated in the bridge struct.
+That happens a little more frequently now that we have boards in the
+boot farm testing linux-next and other trees.  It means we also care
+about boot-time dependencies as well as build deps.
 
-I have found out that we cannot pasd the config ranges from the DT into the
-pci_host_bridge structure as the PCI framework doesn't have a resource type
-for config resources. Leaving the translation between range flags and
-resource type as is (filtered through the IORESOURCE_TYPE_BITS) will lead
-to a resource type of value zero, which is not recognised by any resource
-handling API so bridge configuration and bus scanning will barf.
+I'll take a closer look at this series in the next few days and let you
+know.
 
-I'm looking for suggestions here, as Jason Gunthorpe suggested that we
-should be able to parse config ranges if they conform to the ECAM part
-of the PCI standard.
+thx,
 
-Best regards,
-Liviu
-
-> 
-> Rob
-> 
-> 
-> > +                       reg-names = "csr", "cfg";
-> > +                       ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
-> > +                                 0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+Jason.
