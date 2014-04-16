@@ -1,271 +1,59 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Wed, 16 Apr 2014 13:33:31 +0900
-Subject: [PATCH v2 7/7] arm64: KVM: Implement 4 levels of translation tables
- for HYP and stage2
-Message-ID: <004701cf592d$053b3380$0fb19a80$@samsung.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 15 Apr 2014 21:38:31 -0700
+Subject: [RFC PATCH v3] ARM: uprobes need icache flush after xol write
+Message-ID: <1397623112-3211-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds 4 levels of translation tables implementation for both
-HYP and stage2. A combination of 4KB + 4 levels host and 4KB + 4 levels
-guest can run on ARMv8 architecture as introducing this feature.
+Hi,
 
-Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
-Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
----
- arch/arm/include/asm/kvm_mmu.h   |   10 +++++
- arch/arm/kvm/mmu.c               |   88 +++++++++++++++++++++++++++++++++-----
- arch/arm64/include/asm/kvm_arm.h |   20 +++++++++
- arch/arm64/include/asm/kvm_mmu.h |   10 +++++
- 4 files changed, 117 insertions(+), 11 deletions(-)
+As it was discussed on [1] today, here is potential ARM specific
+fix for uprobes dcache/icache flush problem. I am aware that
+other options are still under discussion. This patch is provided for
+reference only as one of possible solutions.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 5c7aa3c..6f7906e 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -37,6 +37,11 @@
-  */
- #define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
- 
-+/*
-+ * NUM_OBJS depends on the number of page table translation levels
-+ */
-+#define NUM_OBJS		2
-+
- #ifndef __ASSEMBLY__
- 
- #include <asm/cacheflush.h>
-@@ -94,6 +99,11 @@ static inline void kvm_clean_pgd(pgd_t *pgd)
- 	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
- }
- 
-+static inline void kvm_clean_pmd(pmd_t *pmd)
-+{
-+	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t));
-+}
-+
- static inline void kvm_clean_pmd_entry(pmd_t *pmd)
- {
- 	clean_pmd_entry(pmd);
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 80bb1e6..7fc9e55 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -388,13 +388,44 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
- 	return 0;
- }
- 
-+static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
-+				   unsigned long end, unsigned long pfn,
-+				   pgprot_t prot)
-+{
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	unsigned long addr, next;
-+
-+	addr = start;
-+	do {
-+		pud = pud_offset(pgd, addr);
-+
-+		if (pud_none_or_clear_bad(pud)) {
-+			pmd = pmd_alloc_one(NULL, addr);
-+			if (!pmd) {
-+				kvm_err("Cannot allocate Hyp pmd\n");
-+				return -ENOMEM;
-+			}
-+			pud_populate(NULL, pud, pmd);
-+			get_page(virt_to_page(pud));
-+			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-+		}
-+
-+		next = pud_addr_end(addr, end);
-+
-+		create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
-+		pfn += (next - addr) >> PAGE_SHIFT;
-+	} while (addr = next, addr != end);
-+
-+	return 0;
-+}
-+
- static int __create_hyp_mappings(pgd_t *pgdp,
- 				 unsigned long start, unsigned long end,
- 				 unsigned long pfn, pgprot_t prot)
- {
- 	pgd_t *pgd;
- 	pud_t *pud;
--	pmd_t *pmd;
- 	unsigned long addr, next;
- 	int err = 0;
- 
-@@ -403,22 +434,23 @@ static int __create_hyp_mappings(pgd_t *pgdp,
- 	end = PAGE_ALIGN(end);
- 	do {
- 		pgd = pgdp + pgd_index(addr);
--		pud = pud_offset(pgd, addr);
- 
--		if (pud_none_or_clear_bad(pud)) {
--			pmd = pmd_alloc_one(NULL, addr);
--			if (!pmd) {
--				kvm_err("Cannot allocate Hyp pmd\n");
-+		if (pgd_none(*pgd)) {
-+			pud = pud_alloc_one(NULL, addr);
-+			if (!pud) {
-+				kvm_err("Cannot allocate Hyp pud\n");
- 				err = -ENOMEM;
- 				goto out;
- 			}
--			pud_populate(NULL, pud, pmd);
--			get_page(virt_to_page(pud));
--			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-+			pgd_populate(NULL, pgd, pud);
-+			get_page(virt_to_page(pgd));
-+			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
- 		}
- 
- 		next = pgd_addr_end(addr, end);
--		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
-+
-+		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
-+
- 		if (err)
- 			goto out;
- 		pfn += (next - addr) >> PAGE_SHIFT;
-@@ -563,6 +595,24 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	kvm->arch.pgd = NULL;
- }
- 
-+static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-+			     phys_addr_t addr)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+
-+	pgd = kvm->arch.pgd + pgd_index(addr);
-+	if (pgd_none(*pgd)) {
-+		if (!cache)
-+			return NULL;
-+		pud = mmu_memory_cache_alloc(cache);
-+		pgd_populate(NULL, pgd, pud);
-+		get_page(virt_to_page(pgd));
-+	}
-+
-+	return pud_offset(pgd, addr);
-+}
-+
- static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 			     phys_addr_t addr)
- {
-@@ -617,6 +667,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
- 
-+	pud_t *pud;
-+
-+	/* Create stage-2 page table mapping - Level 0 */
-+	pud = stage2_get_pud(kvm, cache, addr);
-+	if (!pud)
-+		return 0;
-+
-+	if (pud_none(*pud)) {
-+		if (!cache)
-+			return 0;
-+		pmd = mmu_memory_cache_alloc(cache);
-+		kvm_clean_pmd(pmd);
-+		pud_populate(NULL, pud, pmd);
-+		get_page(virt_to_page(pud));
-+	}
-+
- 	/* Create stage-2 page table mapping - Level 1 */
- 	pmd = stage2_get_pmd(kvm, cache, addr);
- 	if (!pmd) {
-@@ -675,7 +741,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
- 		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
- 
--		ret = mmu_topup_memory_cache(&cache, 2, 2);
-+		ret = mmu_topup_memory_cache(&cache, NUM_OBJS, NUM_OBJS);
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 3d69030..295eda6 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -117,9 +117,11 @@
- #define VTCR_EL2_IRGN0_MASK	(3 << 8)
- #define VTCR_EL2_IRGN0_WBWA	(1 << 8)
- #define VTCR_EL2_SL0_MASK	(3 << 6)
-+#define VTCR_EL2_SL0_LVL0	(2 << 6)
- #define VTCR_EL2_SL0_LVL1	(1 << 6)
- #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_T0SZ_40B	24
-+#define VTCR_EL2_T0SZ_48B	16
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- /*
-@@ -134,6 +136,7 @@
- 				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
- #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
- #else
-+#ifndef CONFIG_ARM64_4_LEVELS
- /*
-  * Stage2 translation configuration:
-  * 40bits output (PS = 2)
-@@ -145,10 +148,27 @@
- 				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
- 				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
- #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
-+#else
-+/*
-+ * Stage2 translation configuration:
-+ * 40bits output (PS = 2)
-+ * 48bits input  (T0SZ = 16)
-+ * 4kB pages (TG0 = 0)
-+ * 4 level page tables (SL = 2)
-+ */
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
-+				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-+				 VTCR_EL2_SL0_LVL0 | VTCR_EL2_T0SZ_48B)
-+#define VTTBR_X		(29 - VTCR_EL2_T0SZ_48B)
-+#endif
- #endif
- 
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
-+#ifndef CONFIG_ARM64_4_LEVELS
- #define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#else
-+#define VTTBR_BADDR_MASK  (((1LLU << (48 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#endif
- #define VTTBR_VMID_SHIFT  (48LLU)
- #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 7d29847..f7fb2d0 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -41,6 +41,15 @@
-  */
- #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
- 
-+/*
-+ * NUM_OBJS depends on the number of page table translation levels
-+ */
-+#ifndef CONFIG_ARM64_4_LEVELS
-+#define NUM_OBJS		2
-+#else
-+#define NUM_OBJS		3
-+#endif
-+
- #ifdef __ASSEMBLY__
- 
- /*
-@@ -107,6 +116,7 @@ static inline bool kvm_is_write_fault(unsigned long esr)
- }
- 
- static inline void kvm_clean_pgd(pgd_t *pgd) {}
-+static inline void kvm_clean_pmd(pmd_t *pmd) {}
- static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
- static inline void kvm_clean_pte(pte_t *pte) {}
- static inline void kvm_clean_pte_entry(pte_t *pte) {}
+The xol slot flush code shares code with ARM backend of
+copy_to_user_page - flush_ptrace_access function. But code and new 
+implementation of flush_uprobe_xol_access modified in such way that
+xol flush does need vma.
+
+Changes since V2 [2] version:
+
+x) address Dave Long's comment about passing checkpatch
+
+x) addressed Oleg's comment and instead of arch_uprobe_flush_xol_access
+function use arch_uprobe_copy_ixol function that maps kernel pages, 
+copies, and flush caches
+
+x) removed FLAG_UA_BROADCAST, during discussion on [1] it was
+elaborated that task executing xol single step could be 
+migrated to another CPU, so we need to take care of remote
+icaches if CPU does not support remote snooping. I.e
+flush_uprobe_xol_access will check cache_ops_need_broadcast()
+and perform smp_call_function on SMP CPUs that do not
+support remote snooping.
+
+x) added preempt_disable/preempt_enable in arch_uprobe_copy_ixol as
+copy_to_user_page does. I admit that I have some guesses, but I 
+don't completely understand why copy_to_user_page does that, so 
+playing on safe side - added it similar to copy_to_user_page code.
+
+Thanks,
+Victor
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/247611.html
+
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/245743.html
+
+Victor Kamensky (1):
+  ARM: uprobes need icache flush after xol write
+
+ arch/arm/include/asm/cacheflush.h |  2 ++
+ arch/arm/kernel/uprobes.c         | 22 ++++++++++++++++++++++
+ arch/arm/mm/flush.c               | 33 ++++++++++++++++++++++++++++-----
+ include/linux/uprobes.h           |  3 +++
+ kernel/events/uprobes.c           | 25 +++++++++++++++++--------
+ 5 files changed, 72 insertions(+), 13 deletions(-)
+
 -- 
-1.7.10.4
+1.8.1.4
