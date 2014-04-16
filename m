@@ -1,22 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Apr 2014 15:37:34 -0400 (EDT)
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <20140416191825.GA22246@redhat.com>
-References: <20140416164310.GA15739@redhat.com>
- <20140416.133831.364304583096073299.davem@davemloft.net>
- <20140416191825.GA22246@redhat.com>
-Message-ID: <20140416.153734.675854782374654510.davem@davemloft.net>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Wed, 16 Apr 2014 23:53:58 +0400
+Subject: [PATCH v4 13/21] misc: support for LP-8x4x custom parallel bus
+In-Reply-To: <20140416194109.3ef914d2@alan.etchedpixels.co.uk>
+References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-1-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-7-git-send-email-ynvich@gmail.com>
+ <20140416194109.3ef914d2@alan.etchedpixels.co.uk>
+Message-ID: <fff1a89e-346c-45fd-9832-7484bdc3561a@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleg Nesterov <oleg@redhat.com>
-Date: Wed, 16 Apr 2014 21:18:25 +0200
+One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
+>On Wed, 16 Apr 2014 21:17:18 +0400
+>Sergei Ianovich <ynvich@gmail.com> wrote:
+>
+>> This patch implements probing for the bus and reporting the number
+>> of available expansion slots.
+>
+>This appears to be a bus not a misc device. I don't think it belongs in
+>misc. As you've got devices on this bus (or nailed into the 'bus'
+>driver)
+>perhaps this belongs as drivers/platform/lp8x4x or similar with any
+>specific drivers split out - or even drivers/lp8x4x if there will be
+>more
+>of them and more than one platform using it ?
 
-> The last question... area->page = alloc_page(GFP_HIGHUSER), and I am
-> not sure that arch/arm/mm/highmem.c:kmap_atomic() can't break the
-> aliasing, __fix_to_virt() in this case will use the same (per-cpu) idx.
-> 
-> Looks like, __kunmap_atomic()->__cpuc_flush_dcache_area() should take
-> care, but could you please ack/nack my understanding?
+Thanks again for responding. I don't have a clear idea about proper code organization concering this bus.
 
-Good point, it might therefore make sense to use a low-mem page.
+The total number of possible bus devices is quite large, around 30. Half of them would take less than 10 extra lines to get support. The rest is more complicated.
+
+LP-8x4x has several features that would require a misc device anyway. It has a rotary switch which isn't an input device, because it produces no interrupts. The device also has a similar DIP switch. In addition, it acts as a kind of RS-485-port-to-multi-RS-232-ports logical bridge. It has a multiplexer which allows to talk to several serial modules which support a custom protocol designed for RS-485 using a RS-232 port.
