@@ -1,62 +1,104 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Wed, 16 Apr 2014 15:01:48 -0700
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <20140416.172153.646525167994615191.davem@davemloft.net>
-References: <20140416191825.GA22246@redhat.com>
- <20140416.153734.675854782374654510.davem@davemloft.net>
- <534EE6F2.3050005@linaro.org>
- <20140416.172153.646525167994615191.davem@davemloft.net>
-Message-ID: <CAA3XUr2N5S8o8imk4MmY2R=5Aa_-TdVOjqg1ArOC34J-RmAKqw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 16 Apr 2014 17:14:28 -0500
+Subject: [PATCH 6/8] tty/serial: pl011: add generic earlycon support
+In-Reply-To: <20140324112821.GE3850@arm.com>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <1395436128-11244-7-git-send-email-robherring2@gmail.com>
+ <20140324112821.GE3850@arm.com>
+Message-ID: <CAL_Jsq+rQA8p9oYk-Urh_z6MTqCy0RNr=k0nz7r0OTuMCPUNWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 April 2014 14:21, David Miller <davem@davemloft.net> wrote:
-> From: David Long <dave.long@linaro.org>
-> Date: Wed, 16 Apr 2014 16:24:18 -0400
->
->> On 04/16/14 15:37, David Miller wrote:
->>> From: Oleg Nesterov <oleg@redhat.com>
->>> Date: Wed, 16 Apr 2014 21:18:25 +0200
->>>
->>>> The last question... area->page = alloc_page(GFP_HIGHUSER), and I am
->>>> not sure that arch/arm/mm/highmem.c:kmap_atomic() can't break the
->>>> aliasing, __fix_to_virt() in this case will use the same (per-cpu) idx.
->>>>
->>>> Looks like, __kunmap_atomic()->__cpuc_flush_dcache_area() should take
->>>> care, but could you please ack/nack my understanding?
->>>
->>> Good point, it might therefore make sense to use a low-mem page.
->>>
+On Mon, Mar 24, 2014 at 6:28 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Mar 21, 2014 at 09:08:46PM +0000, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
 >>
->> The following test code seems to have the same problems with stale user
->> icache.  It works if I put the dcache flush back in.  Am I missing
->> something?
+>> Add earlycon support for the pl011 serial port. This allows enabling
+>> the pl011 for console when early_params are processed. This is based
+>> on the arm64 earlyprintk support and is intended to replace it.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Jiri Slaby <jslaby@suse.cz>
+>> ---
+>>  Documentation/kernel-parameters.txt |  5 +++--
+>>  drivers/tty/serial/amba-pl011.c     | 30 +++++++++++++++++++++++++++++-
+>>  2 files changed, 32 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+>> index 5ce8b7a..81bdd52 100644
+>> --- a/Documentation/kernel-parameters.txt
+>> +++ b/Documentation/kernel-parameters.txt
+>> @@ -887,8 +887,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>               uart[8250],io,<addr>[,options]
+>>               uart[8250],mmio,<addr>[,options]
+>>               uart[8250],mmio32,<addr>[,options]
+>> -                     Start an early, polled-mode console on the 8250/16550
+>> -                     UART at the specified I/O port or MMIO address.
+>> +             pl011,<addr>
+>> +                     Start an early, polled-mode console on a serial port
+>> +                     at the specified I/O port or MMIO address. 8250
+>>                       MMIO inter-register address stride is either 8-bit
+>>                       (mmio) or 32-bit (mmio32).
+>>                       The options are the same as for ttyS, above.
 >
-> Weird, if we store to the kernel side it should be just a matter of
-> clearing the I-cache out.  There should be no D-cache aliasing
-> whatsoever.
+> I think the last line is a bit misleading. Or did you intend to leave it
+> with the uart[8250] parameter? See below:
 
-I don't think there is dcache aliasing, but dcache should be flushed anyway
-otherwise icache will not see updated values even it is invalidated. I.e
-dcache should be flushed up to dcache/icache unification layer.
-I.e icache does not read anything from dcache directly. It reads from L2.
-As it was noted below flush_cache_user_range will take care of both,
-but just __flush_icache_all is not enough.
+How about this (excuse the gmail lack of tabs):
 
-I will try to add non-aliased mapping logic from Dave's patch on top
-of previously posted patch (which goes under "write directly"), has
-default/arm split, etc ...
+earlycon= [KNL] Output early console device and options.
 
-Thanks,
-Victor
+ uart[8250],io,<addr>[,options]
+ uart[8250],mmio,<addr>[,options]
+ uart[8250],mmio32,<addr>[,options]
+  Start an early, polled-mode console on an 8250 serial
+  port at the specified I/O port or MMIO address. 8250
+  MMIO inter-register address stride is either 8-bit
+  (mmio) or 32-bit (mmio32).
 
->  Maybe you could print out area->vaddr and
-> page_to_virt(area->page) so we can see if area->vaddr is choosen
-> correctly?
+  The options are the same as for ttyS, above.
+
+ pl011,<addr>
+  Start an early, polled-mode console on a pl011 serial
+  port at the specified address. The pl011 serial port
+  must already be setup and configured. Options are not
+  yet supported.
+
+ smh Use ARM semihosting calls for early console.
+
+
 >
-> Although I notice that flush_cache_user_range() on ARM flushes both D
-> and I caches.  And I think that's what userspace ends up triggering
-> when it uses the system call that exists to support self-modifying and
-> JIT code generators.
+>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>> index d4eda24..4227c0a 100644
+>> --- a/drivers/tty/serial/amba-pl011.c
+>> +++ b/drivers/tty/serial/amba-pl011.c
+> [...]
+>> +static int __init pl011_early_console_setup(struct earlycon_device *device,
+>> +                                         const char *opt)
+>> +{
+>> +     if (!device->port.membase)
+>> +             return -ENODEV;
+>> +
+>> +     device->con->write = pl011_early_write;
+>> +     return 0;
+>> +}
+>> +EARLYCON_DECLARE(pl011, pl011_early_console_setup);
 >
-> An ARM expert will have to chime in...
+> Here we expect the PL011 to be already initialised by the boot loader
+> and the kernel continues using the same settings. So maybe clarify this
+> in the pl011 kernel parameter doc and we can add proper configuration
+> using a separate patch.
+
+Enabling and setup would not be too hard, but either baud rate will
+always have to be configured or we'll have to specify the input clock
+rate too. The 8250 driver basically does the former or assumes a fixed
+clock.
+
+Adding any setup will also break any non-pl011 based SBSA compliant
+uart since the configuration registers are not standardized. I guess
+we can add "sbsauart" when/if that happens.
+
+Rob
