@@ -1,67 +1,106 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 16 Apr 2014 17:40:43 +0200
-Subject: [PATCH v3 3/4] USB: ohci-pxa27x: Add support for external vbus
- regulators
-In-Reply-To: <Pine.LNX.4.44L0.1404161102020.1334-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1404161102020.1334-100000@iolanthe.rowland.org>
-Message-ID: <3809376.jpq2vXsk1Y@avalon>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 16 Apr 2014 16:44:54 +0100
+Subject: [PATCH RFC v2 4/4] arm64: boot: dts: update rtsm aemv8 dts with PSCI
+ and idle states
+In-Reply-To: <1397663094-28027-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1397663094-28027-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1397663094-28027-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+This patch updates the RTSM dts file with PSCI bindings and nodes
+describing the AEMv8 model idle states parameters.
 
-On Wednesday 16 April 2014 11:07:34 Alan Stern wrote:
-> On Wed, 16 Apr 2014, Laurent Pinchart wrote:
-> > Override the hub control operation to enable and disable external
-> > regulators for the ports vbus power supply in response to clear/set
-> > USB_PORT_FEAT_POWER requests.
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > @@ -417,6 +467,16 @@ int usb_hcd_pxa27x_probe (const struct hc_driver
-> > *driver, struct platform_device> 
-> >  	pxa_ohci->clk = usb_clk;
-> >  	pxa_ohci->mmio_base = (void __iomem *)hcd->regs;
-> > 
-> > +	for (i = 0; i < 3; ++i) {
-> > +		char name[6];
-> > +
-> > +		if (!(inf->flags & (ENABLE_PORT1 << i)))
-> > +			continue;
-> > +
-> > +		sprintf(name, "vbus%u", i + 1);
-> > +		pxa_ohci->vbus[i] = devm_regulator_get(&pdev->dev, name);
-> > +	}
-> > +
-> > 
-> >  	retval = pxa27x_start_hc(pxa_ohci, &pdev->dev);
-> >  	if (retval < 0) {
-> >  	
-> >  		pr_debug("pxa27x_start_hc failed");
-> > 
-> > @@ -462,6 +522,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver
-> > *driver, struct platform_device> 
-> >  void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device
-> >  *pdev) {
-> >  
-> >  	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
-> > 
-> > +	unsigned int i;
-> > +
-> > +	for (i = 0; i < 3; ++i)
-> > +		pxa27x_ohci_set_vbus_power(pxa_ohci, i, false);
-> > 
-> >  	usb_remove_hcd(hcd);
-> >  	pxa27x_stop_hc(pxa_ohci, &pdev->dev);
-> 
-> You probably should leave the port power enabled until after
-> usb_remove_hcd() returns.  Apart from that,
-> 
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+PSCI function IDs compliancy with PSCI v0.2 is still under development
+so this patch provides PSCI function IDs for demonstration purposes only.
 
-Good point, I'll fix that and submit v4. Thank you.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 49 ++++++++++++++++++++++++++++------
+ 1 file changed, 41 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+index d79de9c..fd23737 100644
+--- a/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
++++ b/arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+@@ -27,37 +27,70 @@
+ 		serial3 = &v2m_serial3;
+ 	};
+ 
++	psci {
++		compatible = "arm,psci";
++		method = "smc";
++		/*
++		 * Function IDs usage and compliancy with PSCI v0.2 still
++		 * under discussion.  Current IDs should be considered
++		 * temporary for demonstration purposes.
++		 */
++		cpu_suspend = <0x84000001>;
++		cpu_off = <0x84000002>;
++		cpu_on = <0x84000003>;
++	};
++
+ 	cpus {
+ 		#address-cells = <2>;
+ 		#size-cells = <0>;
+ 
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP_0: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				entry-method-param = <0x0010000>;
++				entry-latency-us = <40>;
++				exit-latency-us = <100>;
++				min-residency-us = <150>;
++			};
++
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				entry-method-param = <0x1010000>;
++				entry-latency-us = <500>;
++				exit-latency-us = <1000>;
++				min-residency-us = <2500>;
++			};
++		};
++
+ 		cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x0>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x1>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 		cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x2>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 		cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,armv8";
+ 			reg = <0x0 0x3>;
+-			enable-method = "spin-table";
+-			cpu-release-addr = <0x0 0x8000fff8>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 	};
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.4
