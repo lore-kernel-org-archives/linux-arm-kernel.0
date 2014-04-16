@@ -1,72 +1,32 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Wed, 16 Apr 2014 21:00:51 +0100
-Subject: [PATCH v4 12/21] serial: support for 16550A serial ports on
- LP-8x4x
-In-Reply-To: <c4533da6-30bd-4ea4-9011-a7e3b7258e62@email.android.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Thu, 17 Apr 2014 00:06:40 +0400
+Subject: [PATCH v4 21/21] misc: support for I-8024 in LP-8x4x
+In-Reply-To: <20140416205644.396709aa@alan.etchedpixels.co.uk>
 References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
  <1397668667-27328-1-git-send-email-ynvich@gmail.com>
- <1397668667-27328-6-git-send-email-ynvich@gmail.com>
- <20140416193532.0782f045@alan.etchedpixels.co.uk>
- <c4533da6-30bd-4ea4-9011-a7e3b7258e62@email.android.com>
-Message-ID: <20140416210051.01bef49e@alan.etchedpixels.co.uk>
+ <1397668667-27328-15-git-send-email-ynvich@gmail.com>
+ <20140416193949.47f4ea68@alan.etchedpixels.co.uk>
+ <9eb6a7ac-e8c0-4c05-8f8a-e047d2614cba@email.android.com>
+ <20140416205644.396709aa@alan.etchedpixels.co.uk>
+Message-ID: <f36fdc97-7cc3-49a8-9643-f7096defd829@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Apr 2014 23:01:47 +0400
-Sergei Ianovich <ynvich@gmail.com> wrote:
+One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
+>> I've closely examined a dozen or two of drivers, but of them was
+>close enough for I-8024 in terms of speed. Its channel takes 0.1 us to
+>set up from kernel. Real user space programs can setup all for channels
+>in 1 us with interface provided by this patch. That's said I don't have
+>data on time that it takes for output to stabilize at the desired
+>levels.
+>> 
+>> I've chosen drivers/misc as a location that looked to provide the
+>shortest path for my driver to land. The driver needs support for the
+>bus, and here it can be in one driver.
+>> 
+>> It would be great to have some more detailed input on this issue.
+>
+>IIO is where we are trying to standardise all the industrial control
+>devices. There is stuff in places like misc for historical reasons.
 
-> One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
-> >> +	baud = uart_get_baud_rate(port, termios, old,
-> >> +				  port->uartclk / 16 / 0xffff,
-> >> +				  port->uartclk / 16);
-> >> +	switch (baud) {
-> >> +	case 2400:
-> >> +		len |= 1;
-> >> +		break;
-> >> +	case 4800:
-> >> +		len |= 2;
-> >> +		break;
-> >> +	case 19200:
-> >> +		len |= 4;
-> >> +		break;
-> >> +	case 38400:
-> >> +		len |= 5;
-> >> +		break;
-> >> +	case 57600:
-> >> +		len |= 6;
-> >> +		break;
-> >> +	case 115200:
-> >> +		len |= 7;
-> >> +		break;
-> >> +	case 9600:
-> >> +	default:
-> >> +		len |= 3;
-> >> +		break;
-> >> +	};
-> >
-> >Some explanation of this would be useful - eg why is it set to 7 for
-> >115200 baud and 3 for 115201 baud ?
-> 
-> I am not related to the device vendor in any way, so please take my answers for what they are worth.
-> 
-> It seems that there is not enough pins to properly connect the chips to the memory bus and just you the standard 8250 UART driver. Instead, clock divisor is set using this register.
-> 
-> So, if you know you're asking for (115200) you get it. If you don't or guess (115201), you get the default 9600.
-
-Thats not quite what the code actually implements though.
-
-> This is a policy, it may not be the right way to write a driver, but it is cheap and it works.
-
-If thats how the hardware works and only supports a few fixed rates then
-fine, but for default: you need to actually update he baudrate in the
-passed termios struct so that the userspace knows its request was not
-matched.
-
-Take a look how the standard 8250 termios does it.
-
-Also looking at this and some of the other serial bits I see no
-dependencies on the problematic DMA driver, so does that mean you've got
-a set of pieces that can be submitted anyway while the DMA driver
-discussion continues ?
-
-Alan
+Great. I'll rewrite the driver using IIO, but the bus issue needs to be settled first.
