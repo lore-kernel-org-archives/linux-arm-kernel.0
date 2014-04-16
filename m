@@ -1,45 +1,34 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 16 Apr 2014 14:11:39 +0800
-Subject: [PATCH 02/10] ARM: dts: Add Phytec pbab01 with i.MX6 DualLite/Solo
-In-Reply-To: <1397489852-1669-2-git-send-email-p.zabel@pengutronix.de>
-References: <1397489852-1669-1-git-send-email-p.zabel@pengutronix.de>
- <1397489852-1669-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140416061138.GD2523@dragon>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 16 Apr 2014 15:12:26 +0900
+Subject: [PATCH 1/7] gpiolib: gpiolib-of: Implement device tree gpio-names
+ based lookup
+In-Reply-To: <20140415142024.GD3207@lukather>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-2-git-send-email-wens@csie.org>
+ <20140415142024.GD3207@lukather>
+Message-ID: <CAAVeFuLDhTVGDnmYtnxEY8hhn6HE6tU9OB24WDPtmxEHjiRiuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 05:37:24PM +0200, Philipp Zabel wrote:
-> The PBA-B-01 carrier board can be equipped with either Quad or DualLite/Solo
-> phyFLEX i.MX6 modules (PFL-A-02).
-> This moves all common devices into imx6qdl-phytec-pbab01.dtsi. The SoC specific
-> device trees then just include the pfla01 and pbab01 dtsi files corresponding
-> to the SoC variant.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  arch/arm/boot/dts/Makefile                   |  1 +
->  arch/arm/boot/dts/imx6dl-phytec-pbab01.dts   | 19 ++++++++++++++
->  arch/arm/boot/dts/imx6q-phytec-pbab01.dts    | 31 ++---------------------
->  arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 38 ++++++++++++++++++++++++++++
->  4 files changed, 60 insertions(+), 29 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6dl-phytec-pbab01.dts
->  create mode 100644 arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 35c146f..1afa764 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -197,6 +197,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx6q-gw54xx.dtb \
->  	imx6q-nitrogen6x.dtb \
->  	imx6q-phytec-pbab01.dtb \
-> +	imx6dl-phytec-pbab01.dtb \
+On Tue, Apr 15, 2014 at 11:20 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> On Tue, Apr 15, 2014 at 02:41:35PM +0800, Chen-Yu Tsai wrote:
+>> This patch provides of_get_gpiod_flags_by_name(), which looks up GPIO
+>> phandles by name only, through gpios/gpio-names, and not by index.
+>
+> IIRC, gpios only uses the *-gpios properties, and not gpios/gpio-names
+> pattern seen on various other things.
+>
+> Is it some new property you introduce? If so, please add it to the
+> documentation.
+>
+> Now, I'm not sure that having two distinct representations of GPIOs in
+> the DT is a good thing. Yes, it's looking odd compared to other
+> similar bindings, but it's what we have to deal with.
 
-Forgot mentioning that it should be put alphabetically in there.  I
-fixed it up when applying.
-
-Shawn
-
->  	imx6q-sabreauto.dtb \
->  	imx6q-sabrelite.dtb \
->  	imx6q-sabresd.dtb \
+Mmmm I *think* I somehow remember a discussion about this topic
+recently, but I cannot find it. Maybe Chen-yu could point us to the
+conclusion of this discussion and the rationale for (re)implementing
+named GPIOs this way?
