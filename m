@@ -1,58 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 16 Apr 2014 15:09:15 +0200
-Subject: [PATCH 3/4] ARM: dts: berlin: add the SDHCI nodes for the BG2Q
-In-Reply-To: <1397652011-21284-4-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397652011-21284-4-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140416130915.GC11310@lunn.ch>
+From: archit@ti.com (Archit Taneja)
+Date: Wed, 16 Apr 2014 18:44:20 +0530
+Subject: [RFC 1/4] ARM: OMAP2+: Add CTRL_MODULE_CORE as a master clock
+ provider for DRA7
+Message-ID: <1397654063-8055-1-git-send-email-archit@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 02:40:10PM +0200, Antoine T?nart wrote:
-> Add the SDHCI nodes for the Marvell Berlin BG2Q, using the berlin-sdhci
-> driver.
-> 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  arch/arm/boot/dts/berlin2q.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index 5925e6a16749..8f897d461460 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -67,6 +67,14 @@
->  		clock-div = <3>;
->  	};
->  
-> +	sdio1clk: sdio1clk {
-> +		compatible = "fixed-factor-clock";
-> +		#clock-cells = <0>;
-> +		clocks = <&syspll>;
-> +		clock-mult = <1>;
-> +		clock-div = <4>;
-> +	};
-> +
->  	soc {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
-> @@ -75,6 +83,38 @@
->  		ranges = <0 0xf7000000 0x1000000>;
->  		interrupt-parent = <&gic>;
->  
-> +		sdhci0: sdhci at ab0000 {
-> +			compatible = "marvell,berlin2q-sdhci";
-> +			reg = <0xab0000 0x200>;
-> +			clocks = <&sdio1clk>;
-> +			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> +			keep-power-in-suspend;
-> +			enable-sdio-wakeup;
-> +			broken-cd;
+The control module isn't actually a clock management module, but there are a few
+register bits which perform gating and muxing of clocks.
 
-Hi Antoine
+Add CTRL_MODULE_CORE sub block as a clock provider for DRA7. The control module
+has 2 sub modules: CTRL_MODULE_CORE, and CTRL_MODULE_WKUP. Out of these, only
+the CORE sub module has clock related register fields. We ignore the WKUP sub
+module.
 
-I would expect these three last properties to be a property of the
-board, not the SoC. Or am i missing something?
+Signed-off-by: Archit Taneja <archit@ti.com>
+---
+ arch/arm/mach-omap2/prm_common.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-       Thanks
-	Andrew
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index b4c4ab9..f86029a 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -489,6 +489,7 @@ static struct of_device_id omap_prcm_dt_match_table[] = {
+ 	{ .compatible = "ti,dra7-prm" },
+ 	{ .compatible = "ti,dra7-cm-core-aon" },
+ 	{ .compatible = "ti,dra7-cm-core" },
++	{ .compatible = "ti,dra7-ctrl-core" },
+ 	{ }
+ };
+ 
+-- 
+1.8.3.2
