@@ -1,67 +1,44 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 16 Apr 2014 21:18:25 +0200
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <20140416.133831.364304583096073299.davem@davemloft.net>
-References: <20140416145107.GA11039@redhat.com>
- <20140416.110031.1269128188581361698.davem@davemloft.net>
- <20140416164310.GA15739@redhat.com>
- <20140416.133831.364304583096073299.davem@davemloft.net>
-Message-ID: <20140416191825.GA22246@redhat.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 16 Apr 2014 21:21:23 +0200
+Subject: [PATCH v2 0/2] ARM: berlin: add GPIO support for the BG2Q
+In-Reply-To: <20140416171112.31757110@xhacker>
+References: <1397634395-7456-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140416171112.31757110@xhacker>
+Message-ID: <534ED833.9080004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16, David Miller wrote:
->
-> From: Oleg Nesterov <oleg@redhat.com>
-> Date: Wed, 16 Apr 2014 18:43:10 +0200
->
-> > But did you really mean get_unmapped_area(pgoff => page_to_pfn(area->page)) ?
->
-> Yes.
->
-> > I simply can't understand how this can work, arm (and x86) really use it as
-> > "pgoff << PAGE_SHIFT" align_offset accounted in unmapped_area() ?
->
-> When a platform has D-cache aliasing issues, it must make sure that
-> every shared page is mapped to the same D-cache alias in all such
-> shared mappings.
->
-> The way this is done is to map each pgoff to a page in the D-cache.
-> For example, pgoff 0 would be given a virtual address that maps to the
-> first page in the D-cache, pgoff 1 to the second, and so forth.
->
-> What we're doing with this get_unmapped_area() call is to make it so
-> that userspace's virtual address will land at the same virtual alias
-> as the kernel one does.
-         ^^^^^^^^^^^^^^^
+On 04/16/2014 11:11 AM, Jisheng Zhang wrote:
+> On Wed, 16 Apr 2014 00:46:33 -0700
+> Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+> 
+>> This series add the support for the GPIOs of the Berlin BG2Q. We use the
+>> newly integrated dwapb GPIO driver here.
+>>
+>> This applies on top of Alexandre's BG2Q symbol introduction[1] and the dwapb
+>> gpio patch fixing IRQ initialization[2].
+>>
+>> [1] https://patchwork.kernel.org/patch/3876141/
+>> [2] https://lkml.org/lkml/2014/4/7/96
+>>
+>> Changes since v1:
+>> 	- s/gpio-controller@/gpio-port@/ in device tree
+>> 	- moved ARCH_REQUIRE_GPIOLIB to ARCH_BERLIN in Kconfig
+>>
+>> Antoine T?nart (2):
+>>   ARM: berlin: add the LIBGPIO as a dependency for the BG2Q
+>>   ARM: dts: berlin: add GPIO nodes for the BG2Q
+>>
+>>  arch/arm/boot/dts/berlin2q.dtsi | 102
+>> ++++++++++++++++++++++++++++++++++++++++ arch/arm/mach-berlin/Kconfig
+>> |   1 + 2 files changed, 103 insertions(+)
+>>
+> 
+> All the two patches look good
 
-and page_address() == xxx + (pfn << PAGE_SHIFT), I seem to understand...
+Patch 1 applied to berlin/soc,
+Patch 2 applied to berlin/dt,
 
-David, thanks a lot. I am not saying I fully understand this all, I'll
-try to reread your email tomorrow, but it seems that I see the light.
-
-The last question... area->page = alloc_page(GFP_HIGHUSER), and I am
-not sure that arch/arm/mm/highmem.c:kmap_atomic() can't break the
-aliasing, __fix_to_virt() in this case will use the same (per-cpu) idx.
-
-Looks like, __kunmap_atomic()->__cpuc_flush_dcache_area() should take
-care, but could you please ack/nack my understanding?
+both with Jisheng's Reviewed-by.
 
 Thanks!
-
-> >> So we end up with all of the benefits of storing directly to
-> >> userspace, along with what you're trying to achieve.
-> >
-> > And in this case we can avoid copy_to_user(), right ?
->
-> Yes, that's the whole idea, you can forget about the VM_WRITE etc.
-> that caused your concerns.
->
-> It'd be just memcpy to kernel side mapping of the page + i-cache flush
-> where necessary.
-
-Great.
-
-Victor, Russel, what do you think? It seems that this patch can be updated.
-
-Oleg.
