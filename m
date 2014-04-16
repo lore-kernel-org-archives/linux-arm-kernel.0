@@ -1,42 +1,168 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 16 Apr 2014 12:55:48 -0400
-Subject: [PATCH 5/6] ARM: mvebu: Add thermal quirk for the Armada 375
- DB board
-In-Reply-To: <20140416163447.GB14842@lunn.ch>
-References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1397657720-10893-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <534EA8C9.7010907@gmail.com> <20140416180315.5153c3f7@skate>
- <20140416160824.GA14842@lunn.ch> <20140416181938.6e8f8f4b@skate>
- <20140416163447.GB14842@lunn.ch>
-Message-ID: <20140416165548.GI28159@titan.lakedaemon.net>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 16 Apr 2014 17:57:24 +0100
+Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
+In-Reply-To: <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+Message-ID: <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 06:34:47PM +0200, Andrew Lunn wrote:
-> > So, I would like to see the Z1 stepping supported for now, and have the
-> > freedom to remove its support later once we are all ready to switch to
-> > A0.
+Jingoo,
+
+Thanks for taking a stab at trying to convert a host bridge
+driver to use the new generic host bridge code.
+
+I do however have concerns on the direction you took. You have split
+your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
+even if (with my series) it should be no reason why the host bridge
+driver should not work on other architectures as well once they are
+converted.
+
+Also, some of the functions that you use have identical names but different
+signatures depending on what arch you have selected. This is really bad
+in my books!
+
+What about creating functions that use my series directly if CONFIG_ARM64 is
+defined (or any CONFIG_ you want to create for your driver that you select
+from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
+way your driver will call only one API without any #ifdef and when arm code
+gets converted you drop your adaptation functions. Or (better yet), have a
+stab at converting bios32 (Rob Herring has already provided some hints on
+how to do it for arch/arm).
+
+To give an example on how things are not going well in your version (not obvious
+from your patch, but you can see it once you apply it): dw_pcie_host_init()
+will still carry the handcoded version of DT parsing and that is not guarded
+against CONFIG_ARM64 being defined, where the parsing will happen again
+when you call of_create_pci_host_bridge().
+
+Speaking of the handcoded DT parsing of resources: you are using restype == 0
+as a way of selecting config space, *and then split the range size into two
+halves*. From what Jason Gunthorpe and Arnd were saying, config ranges in the DT
+tree should only be used for ECAM space, so no split is allowed.
+
+Arnd, are you allowing this non-standard use to creep in the bindings?
+
+Best regards,
+Liviu
+
+On Wed, Apr 16, 2014 at 05:42:56AM +0100, Jingoo Han wrote:
+> Add ARM64 PCI support for Synopsys designware PCIe, by using
+> pcie arm64 arch support and creating generic pcie bridge from
+> device tree.
 > 
-> Hi Thomas
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  drivers/pci/host/pcie-designware.c |   32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> Sounds like a good plan. Try to keep all the mess to support Z1 in one
-> place so that it can be easily taken out once people have A0.
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 6d23d8c..fac0440 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -65,14 +65,27 @@
+>  #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+>  #define PCIE_ATU_UPPER_TARGET		0x91C
+>  
+> +#ifdef CONFIG_ARM
+>  static struct hw_pci dw_pci;
+> +#endif
+>  
+>  static unsigned long global_io_offset;
+>  
+> +#ifdef CONFIG_ARM
+>  static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+>  {
+>  	return sys->private_data;
+>  }
+> +#endif
+> +
+> +#ifdef CONFIG_ARM64
+> +static inline struct pcie_port *sys_to_pcie(struct pcie_port *pp)
+> +{
+> +	return pp;
+> +}
+> +
+> +static struct pci_ops dw_pcie_ops;
+> +#endif
+>  
+>  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+>  {
+> @@ -381,7 +394,9 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> +#ifdef CONFIG_ARM
+>  	set_irq_flags(irq, IRQF_VALID);
+> +#endif
+>  
+>  	return 0;
+>  }
+> @@ -397,6 +412,10 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  	struct of_pci_range_parser parser;
+>  	u32 val;
+>  	int i;
+> +#ifdef CONFIG_ARM64
+> +	struct pci_host_bridge *bridge;
+> +	resource_size_t lastbus;
+> +#endif
+>  
+>  	if (of_pci_range_parser_init(&parser, np)) {
+>  		dev_err(pp->dev, "missing ranges property\n");
+> @@ -489,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  	val |= PORT_LOGIC_SPEED_CHANGE;
+>  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+>  
+> +#ifdef CONFIG_ARM
+>  	dw_pci.nr_controllers = 1;
+>  	dw_pci.private_data = (void **)&pp;
+>  
+> @@ -497,6 +517,16 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+>  #ifdef CONFIG_PCI_DOMAINS
+>  	dw_pci.domain++;
+>  #endif
+> +#endif
+> +
+> +#ifdef CONFIG_ARM64
+> +	bridge = of_create_pci_host_bridge(pp->dev, &dw_pcie_ops, pp);
+> +	if (IS_ERR_OR_NULL(bridge))
+> +		return PTR_ERR(bridge);
+> +
+> +	lastbus = pci_rescan_bus(bridge->bus);
+> +	pci_bus_update_busn_res_end(bridge->bus, lastbus);
+> +#endif
+>  
+>  	return 0;
+>  }
+> @@ -695,6 +725,7 @@ static struct pci_ops dw_pcie_ops = {
+>  	.write = dw_pcie_wr_conf,
+>  };
+>  
+> +#ifdef CONFIG_ARM
+>  static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+>  {
+>  	struct pcie_port *pp;
+> @@ -758,6 +789,7 @@ static struct hw_pci dw_pci = {
+>  	.map_irq	= dw_pcie_map_irq,
+>  	.add_bus	= dw_pcie_add_bus,
+>  };
+> +#endif /* CONFIG_ARM */
+>  
+>  void dw_pcie_setup_rc(struct pcie_port *pp)
+>  {
+> -- 
+> 1.7.10.4
+> 
+> 
+> 
 
-Agreed.  Thomas, do you think you'll be able to get a definitive answer
-from Marvell re the number of Z1 boards in the wild?  Once they've moved
-to the A0, of course.
-
-Unless we can get a hard answer on that, I doubt we'll ever withdraw
-support for the Z1.  Not that that's a bad thing, just trying to be
-realistic.  If we add code, expect to support it.
-
-And keeping it all in one place is kind of an impossibility.  Just for
-thermal Z1, there are changes to the binding docs, the thermal driver,
-and the soc code.
-
-I'd say it's more important to keep it clean, with dts files targeting
-the A0+ SoCs, and the Z1 being the exception case(s).
-
-thx,
-
-Jason.
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
