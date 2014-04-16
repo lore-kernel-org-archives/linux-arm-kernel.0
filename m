@@ -1,38 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Apr 2014 08:58:19 -0500
-Subject: [PATCH] ARM: efm32: drop selecting CLKSRC_MMIO
-In-Reply-To: <1392886514-6577-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1392886514-6577-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAL_JsqKXYOdpCkixBLg8kAXwpkaLHhckJnTkzdNVeOQDYzxK3w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Apr 2014 14:52:17 +0100
+Subject: [PATCH v7 6/7] arm64: ftrace: Add CALLER_ADDRx macros
+In-Reply-To: <1394862353-28963-7-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394862353-28963-7-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140416135217.GF1001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 2:55 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> CLKSRC_MMIO is needed on efm32 because the clocksource driver
-> (CLKSRC_EFM32) uses clocksource_mmio_init() and
-> clocksource_mmio_readl_up(). Since commit 09ca27579ee5 (clocksource:
-> time-efm32: Select CLKSRC_MMIO) CLKSRC_EFM32 does the necessary select
-> itself and ARCH_EFM32 doesn't need to select it explicitly any more.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Sat, Mar 15, 2014 at 05:45:52AM +0000, AKASHI Takahiro wrote:
+> CALLER_ADDRx returns caller's address at specified level in call stacks.
+> They are used for several tracers like irqsoff and preemptoff.
+> Strange to say, however, they are refered even without FTRACE.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
->  arch/arm/Kconfig | 3 ---
->  1 file changed, 3 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c5e0fa693fbd..44881c07883b 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -421,9 +421,6 @@ config ARCH_EFM32
->         depends on !MMU
->         select ARCH_REQUIRE_GPIOLIB
->         select ARM_NVIC
-> -       # CLKSRC_MMIO is wrong here, but needed until a proper fix is merged,
-> -       # i.e. CLKSRC_EFM32 selecting CLKSRC_MMIO
-> -       select CLKSRC_MMIO
->         select CLKSRC_OF
+>  arch/arm64/include/asm/ftrace.h    | 13 ++++++++-
+>  arch/arm64/kernel/Makefile         |  3 ++-
+>  arch/arm64/kernel/return_address.c | 55 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 69 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/kernel/return_address.c
+> 
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index ed5c448..c44c4b1 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -18,6 +18,7 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  extern void _mcount(unsigned long);
+> +extern void *return_address(unsigned int);
+>  
+>  struct dyn_arch_ftrace {
+>  	/* No extra data needed for arm64 */
+> @@ -33,6 +34,16 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>  	 */
+>  	return addr;
+>  }
+> -#endif /* __ASSEMBLY__ */
+> +
+> +#define HAVE_ARCH_CALLER_ADDR
+> +
+> +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
+> +#define CALLER_ADDR1 ((unsigned long)return_address(1))
+> +#define CALLER_ADDR2 ((unsigned long)return_address(2))
+> +#define CALLER_ADDR3 ((unsigned long)return_address(3))
+> +#define CALLER_ADDR4 ((unsigned long)return_address(4))
+> +#define CALLER_ADDR5 ((unsigned long)return_address(5))
+> +#define CALLER_ADDR6 ((unsigned long)return_address(6))
+> +#endif /* ifndef __ASSEMBLY__ */
 
-The same applies to CLKSRC_OF. It should be selected by CLKSRC_EFM32.
+Hmm, I thought you were going to take a look at reworking the core code for
+this, as Steve and I suggested?
 
-Rob
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/240239.html
+
+Will
