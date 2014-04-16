@@ -1,38 +1,45 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 16 Apr 2014 11:45:52 +0200
-Subject: [PATCH 0/3] net: mvneta: fix usage as a module,
- and support QSGMII properly
-In-Reply-To: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140416094551.GA1524@1wt.eu>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 16 Apr 2014 12:47:43 +0300
+Subject: [PATCH v2] mtd: davinci-nand: disable subpage write for
+ keystone-nand
+In-Reply-To: <20140416070833.GA5512@norris-Latitude-E6410>
+References: <1395346112-13350-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <532B4C36.8060405@ti.com> <5343F0D6.2010804@ti.com>
+ <20140416070833.GA5512@norris-Latitude-E6410>
+Message-ID: <534E51BF.9050508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
 
-On Tue, Apr 15, 2014 at 03:50:18PM +0200, Thomas Petazzoni wrote:
-(...)
-> This set of patches has been tested on:
-> 
->  * Armada XP GP (four QSGMII interfaces)
->  * Armada XP DB (two RGMII interfaces and two SGMII interfaces)
->  * Armada 370 Mirabox (two RGMII interfaces)
-> 
-> I've tested both the driver built-in, and compiled as a module.
-> 
-> Since the last attempt at fixing this was quite a fiasco, I'd like
-> this new attempt to be tested more widely before being applied. I'll
-> try to do some testing on other Armada boards I have, but independent
-> testing from other persons would also be appreciated.
-> 
-> Note that these patches apply after reverting the previous attempt,
-> obviously.
+On 04/16/2014 10:08 AM, Brian Norris wrote:
+> On Tue, Apr 08, 2014 at 03:51:34PM +0300, Ivan Khoronzhuk wrote:
+>> On 03/20/2014 10:14 PM, Santosh Shilimkar wrote:
+>>> On Thursday 20 March 2014 04:08 PM, Ivan Khoronzhuk wrote:
+>>>> From: Murali Karicheri <m-karicheri2@ti.com>
+>>>> Sub page write doesn't work because of hw issue in controller found on
+>>>> Keystone SOCs. AEMIF controller is also used on DaVinci SOCs which
+>>>> don't seems to have any issue. So add "ti,keysone-nand" compatible
+>>>> to nand driver in order to set NAND_NO_SUBPAGE_WRITE option.
+>>>>
+>>>> Cc: Brian Norris <computersforpeace@gmail.com>
+>>>> Cc: Warner Losh <imp@bsdimp.com>
+>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>>
+>>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>>> ---
+>>>>
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Brian,
+>> Could you pick up subj patch?
+> Pushed to l2-mtd.git. Is it critical this goes in for 3.15? It's
+> currently queued for -next (3.16).
+>
+> Brian
 
-Just tried on the AX3 using 3.14 with the last fix reverted, and it
-works fine here as well both built-in and as a module. Feel free to
-add my :
+This is a critical fix and it should be for 3.15.
+Thanks.
 
-  Tested-by: Willy Tarreau <w@1wt.eu>
-
-Great work!
-Willy
+-- 
+Regards,
+Ivan Khoronzhuk
