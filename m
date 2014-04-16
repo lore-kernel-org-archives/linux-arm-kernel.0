@@ -1,48 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Apr 2014 00:02:26 +0100
-Subject: [PATCH RFC 5/5] ahci_imx: add disable for spread-spectrum
-In-Reply-To: <20140416225721.GP24070@n2100.arm.linux.org.uk>
-References: <20140416084227.GD24070@n2100.arm.linux.org.uk>
- <E1WaLRa-0002yX-7L@rmk-PC.arm.linux.org.uk>
- <CAL_JsqK_BbhXs0gcn=w=1KPKOD0HZzmYx5zAaS5_z=UvQDPNjw@mail.gmail.com>
- <20140416225721.GP24070@n2100.arm.linux.org.uk>
-Message-ID: <20140416230226.GQ24070@n2100.arm.linux.org.uk>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 16 Apr 2014 16:08:36 -0700
+Subject: [PATCH v2 0/3] Tegra SD/MMC fixes
+In-Reply-To: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1397689719-28882-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 11:57:21PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 16, 2014 at 05:46:47PM -0500, Rob Herring wrote:
-> > On Wed, Apr 16, 2014 at 3:43 AM, Russell King
-> > <rmk+kernel@arm.linux.org.uk> wrote:
-> > > Spread-spectrum doesn't work with Cubox-i hardware, so we have to
-> > > disable this feature.  Add a DT property so that platforms can
-> > > indicate that this feature should not be enabled.
-> > 
-> > This is for spread-spectrum tx or rx? Transmit SS is optional to
-> > support, but the receiver must support SS. Otherwise random drives
-> > won't work which makes for a good user experience. Is this really a
-> > board quirk rather than a Si issue?
-> 
-> No idea.  This bit controls clock generation, and one reason given to
-> disable it is if the reference clock being supplied is already spread
-> spectrum.  I don't think that applies here.  It doesn't say which
-> clock(s) this is applied to - I would guess it's the transmit clock.
-> 
-> All I know is that with SS enabled, the drive is not detected, and
-> SolidRun's original port disables SS.  Disabling SS allows the external
-> drive to be detected.
-> 
-> I have no capability to check the eye pattern, so I've no idea if
-> there's a problem with the electrical setup which stops SS from
-> working.  All I know is with the parameters I give here (which are
-> those which SolidRun's original port uses) and with SS disabled,
-> it works.
+The following patches fix a couple of issues which prevented Venice2
+boards from booting via eMMC and SD card reliably.  Note that this
+includes disabling UHS support since SDR50 and above require a
+Tegra-specific tuning procedure which is not supported yet (and still
+seems to have issues even in downstream kernels).
 
-I'll correct that - it _is_ detected with SS enabled, but things go
-awry very quickly with errors, which then result in corrupted IDENTIFY
-responses, the link dropping back to 1.5Gbps, more errors and corruption
-and eventually the SATA layer gives up and declares the port dead.
+This depends on the following patches which fix an issue where the
+eMMC's power supply gets toggled, causing eMMC failures:
+  http://patchwork.ozlabs.org/patch/339386/
+  http://patchwork.ozlabs.org/patch/339710/
+
+Tested on Tegra124-based Venice2 and Norrin boards.
+
+Andrew Bresticker (3):
+  mmc: tegra: disable UHS modes
+  mmc: tegra: fix reporting of base clock frequency
+  ARM: tegra: fix Venice2 SD card VQMMC supply
+
+ arch/arm/boot/dts/tegra124-venice2.dts |  2 +-
+ drivers/mmc/host/sdhci-tegra.c         | 40 +++++++++++++++++++++++++---------
+ 2 files changed, 31 insertions(+), 11 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.9.1.423.g4596e3a
