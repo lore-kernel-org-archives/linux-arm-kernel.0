@@ -1,73 +1,127 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Apr 2014 15:56:57 +0530
-Subject: [PATCH v7 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <CA+mB=1LDGCY3sN5sL1giOwwqHjD8gG74Yy0dXRS8s+MtDOvxHw@mail.gmail.com>
-References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
- <1396008222-7058-3-git-send-email-sthokal@xilinx.com>
- <20140416090605.GP32284@intel.com>
- <CA+mB=1LDGCY3sN5sL1giOwwqHjD8gG74Yy0dXRS8s+MtDOvxHw@mail.gmail.com>
-Message-ID: <20140416102657.GS32284@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 16 Apr 2014 18:39:28 +0800
+Subject: [linux-sunxi] Re: [PATCH 7/7] ARM: sun7i: cubietruck: enable
+ bluetooth module
+In-Reply-To: <20140416094428.GK3207@lukather>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-8-git-send-email-wens@csie.org>
+ <20140415144215.GG3207@lukather>
+ <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
+ <20140416094428.GK3207@lukather>
+Message-ID: <CAGb2v67HzB22a3huRRZyufXkdTFE410MhXqAHyC-MmVo0-GCFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 03:41:34PM +0530, Srikanth Thokala wrote:
-> On Wed, Apr 16, 2014 at 2:36 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Fri, Mar 28, 2014 at 05:33:42PM +0530, Srikanth Thokala wrote:
-> >> This is the driver for the AXI Video Direct Memory Access (AXI
-> >> VDMA) core, which is a soft Xilinx IP core that provides high-
-> >> bandwidth direct memory access between memory and AXI4-Stream
-> >> type video target peripherals. The core provides efficient two
-> >> dimensional DMA operations with independent asynchronous read
-> >> and write channel operation.
-> >>
-> >> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
-> >
-> > Okay the series is fine and was going to apply it BUT
-> > 1) need ack on DT patch..
-> > 2) issues below on managing the descriptor and resetting the cookie :(
-> 
-> Ok.
-> 
-> >
-> >> +
-> >> +/**
-> >> + * xilinx_vdma_tx_descriptor - Allocate transaction descriptor
-> >> + * @chan: Driver specific VDMA channel
-> >> + *
-> >> + * Return: The allocated descriptor on success and NULL on failure.
-> >> + */
-> >> +static struct xilinx_vdma_tx_descriptor *
-> >> +xilinx_vdma_alloc_tx_descriptor(struct xilinx_vdma_chan *chan)
-> >> +{
-> >> +     struct xilinx_vdma_tx_descriptor *desc;
-> >> +     unsigned long flags;
-> >> +
-> >> +     if (chan->allocated_desc)
-> >> +             return chan->allocated_desc;
-> > ??
-> >
-> >> +
-> >> +     desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-> >> +     if (!desc)
-> >> +             return NULL;
-> >> +
-> >> +     spin_lock_irqsave(&chan->lock, flags);
-> >> +     chan->allocated_desc = desc;
-> > ah why do you need this?
-> >
-> > So this essentailly prevents you from preparing two trasactions at same time as
-> > you would overwrite??
-> 
-> This will allow to queue up multiple segments on to a single
-> transaction descriptor.
-> User will submit this single desc and in the issue_pending() we decode multiple
-> segments and submit to SG HW engine.  We free up the allocated_desc when it is
-> submitted to the HW.  This is added after my discussion with Jaswinder, to best
-> utilize HW SG engine.
+Hi,
 
-I think best utilization of HW SG engine would happen if we collate the pending
-list when you start dma....
+On Wed, Apr 16, 2014 at 5:44 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> Please try to keep me in CC, even though the ML doesn't make it easy..
 
--- 
-~Vinod
+Sorry about that.
+
+> On Wed, Apr 16, 2014 at 12:06:59AM +0800, Chen-Yu Tsai wrote:
+>> >> @@ -139,4 +152,16 @@
+>> >>       reg_usb2_vbus: usb2-vbus {
+>> >>               status = "okay";
+>> >>       };
+>> >> +
+>> >> +     rfkill_bt {
+>> >> +             compatible = "rfkill-gpio";
+>> >> +             pinctrl-names = "default";
+>> >> +             pinctrl-0 = <&bt_pwr_pin_cubietruck>, <&clk_out_a_pins_a>;
+>> >> +             clocks = <&clk_out_a>;
+>> >> +             clock-frequency = <32768>;
+>> >> +             gpios = <&pio 7 18 0>; /* PH18 */
+>> >> +             gpio-names = "reset";
+>> >> +             rfkill-name = "bt";
+>> >> +             rfkill-type = <2>;
+>> >> +     };
+>> >
+>> > Hmmm, I don't think that's actually right.
+>> >
+>> > If you have such a device, then I'd expect it to be represented as a
+>> > full device in the DT, probably with one part for the WiFi, one part
+>> > for the Bluetooth, and here the definition of the rfkill device that
+>> > controls it.
+>>
+>> The AP6210 is not one device, but 2 separate chips in one module. Each
+>> chip has its own controls and interface. They just so happen to share
+>> the same enclosure. Even 2-in-1 chips by Broadcom have separate controls
+>> and interfaces. The WiFi side is most likely connected via SDIO, while
+>> the Bluetooth side is connected to a UART, and optionally I2S for sound.
+>
+> It's even easier to represent then.
+>
+>> > But tying parts of the device to the rfkill that controls it, such as
+>> > the clocks, or the frequency it runs at seems just wrong.
+>>
+>> I understand where you're coming from. For devices on buses that require
+>> drivers (such as USB, SDIO) these properties probably should be tied to
+>> the device node.
+>>
+>> For our use case here, which is a bluetooth chip connected on the UART,
+>> there is no in kernel representation or driver to tie them to. Same goes
+>> for UART based GPS chips. They just so happen to require toggling a GPIO,
+>> and maybe enabling a specific clock, to get it running. Afterwards,
+>> accessing it is done solely from userspace. For our Broadcom chips, the
+>> user has to upload its firmware first, then designate the tty as a Bluetooth
+>> HCI using hciattach.
+>>
+>> We are using the rfkill device as a on-off switch.
+>
+> I understand your point, but the fact that it's implemented in
+> user-space, or that UART is not a bus (which probably should be), is
+> only a Linux specific story, and how it's implemented in Linux (even
+> if the whole rfkill node is another one, but let's stay on topic).
+
+I gave it some thought last night. You are right. My whole approach
+is wrong. But let's try to make it right.
+
+So considering the fact that it's primarily connected to a UART,
+maybe I should make it a sub-node to the UART node it's actually
+connected to? Something like:
+
+        uart2: serial at 01c28800 {
+                pinctrl-names = "default";
+                pinctrl-0 = <&uart2_pins_a>;
+                status = "okay";
+
+                bt: bt_hci {
+                        compatible = "brcm,bcm20710";
+                        /* maybe add some generic compatible */
+                        pinctrl-names = "default";
+                        pinctrl-0 = <&clk_out_a_pins_a>,
+<&bt_pwr_pin_cubietruck>;
+                        clocks = <&clk_out_a>;
+                        clock-frequency = <32768>;
+                        gpios = <&pio 7 18 0>; /* PH18 */
+                };
+        };
+
+And let the uart core handle power sequencing for sub-nodes.
+
+The rfkill node would still have the gpios and clocks, but not the
+clock-frequency property. It's sole purpose would be to toggle the
+controls. But I think the placement is still odd. Perhaps these
+virtual devices shouldn't live in the DT at all.
+
+> This is a huge abstraction leak.
+>
+> Let's say you need the I2S stream you mentionned for some
+> reason. Would you tie the audio stream to the rfkill node as well?
+> I'm sorry, but from an hardware description perspective, it makes no
+> sense.
+
+The above revision should be better, from a hardware perspective. I'm
+not sure how to tie in the I2S stream, and there I haven't found any
+examples in the DT tree.
+
+> What's the feeling of the DT maintainers?
+
+
+Cheers
+
+ChenYu
