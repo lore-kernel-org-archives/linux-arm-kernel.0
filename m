@@ -1,62 +1,83 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 16 Apr 2014 11:01:52 -0400 (EDT)
-Subject: [PATCH v3 0/4] Allow OHCI/EHCI drivers to override more hub
- operations
-In-Reply-To: <1397654215-23699-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <Pine.LNX.4.44L0.1404161101090.1334-100000@iolanthe.rowland.org>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Wed, 16 Apr 2014 17:03:16 +0200
+Subject: USB OTG support on mx27pdk
+In-Reply-To: <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
+References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
+ <1397627716.685483508@f399.i.mail.ru>
+ <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
+ <1397649526.601497269@f431.i.mail.ru>
+ <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
+Message-ID: <20140416150316.GR13429@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Apr 2014, Laurent Pinchart wrote:
+Hi,
 
-> Hello,
+On Wed, Apr 16, 2014 at 09:53:34AM -0300, Fabio Estevam wrote:
+> On Wed, Apr 16, 2014 at 8:58 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 > 
-> The PXA27x OHCI implementation doesn't perform automatic control of port power
-> supplies for all ports. While the PPS and LSDA bits of the HcRhPortStatus
-> register are implemented, only a subset of ports have an external power enable
-> pin controlled by the port status register. Other ports need their power supply
-> to be controlled manually.
+> > I can tell immediately without further testing,
+> > this will not work without the USB support in the bootoader because
+> > we do not have DT support for ULPI.
 > 
-> In order to do so I've implemented manual regulator control in the ohci-pxa27x
-> driver. This requires overriding the default behaviour of the CLEAR_FEATURE
-> and SET_FEATURE requests for USB_PORT_FEAT_POWER with a custom hub control
-> operation. In turn this requires calling the currently static ohci_hub_control
-> function from the ohci-pxa27x driver.
+> The generic nop usb phy should work just fine.
 > 
-> The ohci-at91 and ohci-s3c2410 drivers already implement a similar feature,
-> and access the ohci_hub_control and ohci_hub_status_data functions by saving
-> the struct hc_driver hub_control and hub_status_data values to a variables
-> right after calling ohci_init_driver. This vtable-like implementation can be
-> optimized by exporting the ohci_hub_control and ohci_hub_status_data functions
-> and calling them directly. As the ohci-pxa27x driver needs to override hub
-> control operations as well I've decided to export the functions.
+> I have tried Uwe's suggestion from a previous post and reverted:
 > 
-> For the sake of completeness I've also exported the ehci_hub_control function
-> and modified the ehci-tegra driver to call it directly.
+> commit cd0b42c2a6d2a74244f0053f8960f5dad5842278
+> Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+> Date:   Fri Jan 10 13:51:30 2014 +0800
 > 
-> As a side note regarding the ohci-at91 driver, the "atmel,vbus-gpio" DT
-> property should really have referenced a regulator instead of a GPIO. Fixing
-> this in a backward-compatible way would be messy :-(
+>     usb: chipidea: put hw_phymode_configure before ci_usb_phy_init
 > 
-> Please note that I haven't been able to test the third and fourth patches due
-> to lack of hardware. I've however tested a similar implementation for OHCI on
-> an out of tree PXA270 board.
+>     hw_phymode_configure configures the PORTSC registers and allow the
+>     following phy_inits to operate on the right parameters. This fix a problem
+>     where the UPLI (ISP1504) could not be detected, because the Viewport was not
+>     available and read the viewport return 0's only.
 > 
-> Changes compared to v2:
+>     Signed-off-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+>     Signed-off-by: Peter Chen <peter.chen@freescale.com>
+>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > 
-> - Export ohci_hub_status_data()
-> - Call ohci_hub_status_data() directly from ohci-at91 and ohci-s3c2410
 > 
-> Changes compared to v1:
+> Then USB OTG port detected the USB pen driver fine:
 > 
-> - Export ehci_hub_control()
-> - Call ehci_hub_control() directly from ehci-tegra
-> - Call ohci_hub_control() directly from ohci-at91
+> usbcore: registered new interface driver usb-storage
+> 10024000.usb supply vbus not found, using dummy regulator
+> ci_hdrc ci_hdrc.0: EHCI Host Controller
+> ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
+> ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 1 port detected
+> ...
+> scsi 0:0:0:0: Direct-Access     ChipsBnk Flash Disk       2.00 PQ: 0 ANSI: 2
+> sd 0:0:0:0: [sda] 1035200 512-byte logical blocks: (530 MB/505 MiB)
+> sd 0:0:0:0: [sda] Write Protect is off
+> sd 0:0:0:0: [sda] No Caching mode page found
+> sd 0:0:0:0: [sda] Assuming drive cache: write through
+>  sda: sda1
+> sd 0:0:0:0: [sda] Attached SCSI removable disk
+> 
+> If I understand correctly commit cd0b42c2a was only needed because
+> Chris was trying to add DT support for ULPI, which never got merged
+> into mainline.
+> 
+> If we use the generic nop usb phy instead, we should just revert this commit.
+> 
+> Any objections?
 
-For patches 1 and 2:
+Yes, when this patch got reverted it will probably break usb support
+on mx6 machines. We have seen different behaviour on several mxc/mxs
+machines regarding the order of PORTSC and phy configuration.
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+We will probably need to test all platforms before reordering this
+function call again and again for every machine using this driver.
 
-Comments on patch 3 sent separately.
+Regards,
+Michael
 
-Alan Stern
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
