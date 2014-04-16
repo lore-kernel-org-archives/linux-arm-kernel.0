@@ -1,31 +1,53 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 16 Apr 2014 23:28:42 +0400
-Subject: [PATCH v4 21/21] misc: support for I-8024 in LP-8x4x
-In-Reply-To: <20140416193949.47f4ea68@alan.etchedpixels.co.uk>
-References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
- <1397668667-27328-1-git-send-email-ynvich@gmail.com>
- <1397668667-27328-15-git-send-email-ynvich@gmail.com>
- <20140416193949.47f4ea68@alan.etchedpixels.co.uk>
-Message-ID: <9eb6a7ac-e8c0-4c05-8f8a-e047d2614cba@email.android.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 16 Apr 2014 21:30:36 +0200
+Subject: [PATCH] clocksource: efm32: let CLKSRC_EFM32 select CLKSRC_OF
+In-Reply-To: <CAL_Jsq+Wm-jxeZoYXpC+W3Was5WTS2UqLJ__N5uPB43ZHUmrLw@mail.gmail.com>
+References: <CAL_JsqKXYOdpCkixBLg8kAXwpkaLHhckJnTkzdNVeOQDYzxK3w@mail.gmail.com>
+ <1397673612-24247-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAL_Jsq+Wm-jxeZoYXpC+W3Was5WTS2UqLJ__N5uPB43ZHUmrLw@mail.gmail.com>
+Message-ID: <20140416193036.GS5969@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
->On Wed, 16 Apr 2014 21:17:26 +0400
->Sergei Ianovich <ynvich@gmail.com> wrote:
->
->> Status of I-8042 4 analog output channels can be managed via
->> sysfs.
->
->Surely this is an iio interface and should follow the same API as
->everyone else ?
+Hello,
 
-Thanks for the feedback. It's the first response to this particular driver ever.
+On Wed, Apr 16, 2014 at 01:51:17PM -0500, Rob Herring wrote:
+> On Wed, Apr 16, 2014 at 1:40 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > The efm32 timer driver is only usable with CLKSRC_OF, so it makes sense
+> > to let its Kconfig symbol select it. For compile coverage testing it's not
+> > needed though, so only select it if ARCH_EFM32 is enabled.
+> >
+> > This allows to drop ARCH_EFM32 selecting CLKSRC_OF which is done here
+> > for simplicity, too.
+> >
+> > Reported-by: Rob Herring <robherring2@gmail.com>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > [...]
+> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> > @@ -80,6 +80,7 @@ config CLKSRC_EFM32
+> >         bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
+> >         depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
+> >         select CLKSRC_MMIO
+> > +       select CLKSRC_OF if ARCH_EFM32
+> 
+> You already depend on OF, so I believe you don't need the if here.
+Rob and I discussed this shortly on irc, the summary is that the if is
+not needed to prevent Kconfig breakage but adds more flexibility for the
+COMPILE_TEST case. In the end Rob said:
 
-I've looked around the tree and found tons of industrial io device drivers in different places: drivers/iio, drivers/misc, drivers/staging/comedi to name a few.
+	1397676012 < robher> you can add my ack.
 
-I've closely examined a dozen or two of drivers, but of them was close enough for I-8024 in terms of speed. Its channel takes 0.1 us to set up from kernel. Real user space programs can setup all for channels in 1 us with interface provided by this patch. That's said I don't have data on time that it takes for output to stabilize at the desired levels.
+which would be:
 
-I've chosen drivers/misc as a location that looked to provide the shortest path for my driver to land. The driver needs support for the bus, and here it can be in one driver.
+Acked-by: Rob Herring <robherring2@gmail.com>
 
-It would be great to have some more detailed input on this issue.
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
