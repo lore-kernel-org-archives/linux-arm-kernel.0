@@ -1,18 +1,21 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Apr 2014 14:37:45 -0400 (EDT)
-Subject: [PATCH 0/3] net: mvneta: fix usage as a module, and support
- QSGMII properly
-In-Reply-To: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140416.143745.337570411656324513.davem@davemloft.net>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Wed, 16 Apr 2014 19:39:49 +0100
+Subject: [PATCH v4 21/21] misc: support for I-8024 in LP-8x4x
+In-Reply-To: <1397668667-27328-15-git-send-email-ynvich@gmail.com>
+References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-1-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-15-git-send-email-ynvich@gmail.com>
+Message-ID: <20140416193949.47f4ea68@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Tue, 15 Apr 2014 15:50:18 +0200
+On Wed, 16 Apr 2014 21:17:26 +0400
+Sergei Ianovich <ynvich@gmail.com> wrote:
 
-> PATCH 1 and 2 would be merged by David Miller, through the net tree,
-> while PATCH 3 would be merged by the mach-mvebu maintainers, through
-> their tree and arm-soc.
+> Status of I-8042 4 analog output channels can be managed via
+> sysfs.
 
-Patches 1 and 2 applied, thanks.
+Surely this is an iio interface and should follow the same API as
+everyone else ?
+
+Alan
