@@ -1,69 +1,47 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Wed, 16 Apr 2014 23:39:32 +0900
-Subject: [PATCHv2 6/8] ARM: EXYNOS: Enter a15 lowpower mode for Exynos3250
- based on Cortex-a7
-In-Reply-To: <534E9517.2040409@samsung.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-7-git-send-email-cw00.choi@samsung.com>
- <534E9517.2040409@samsung.com>
-Message-ID: <CAGTfZH1Dc0YctmGjhS93GpF3aRmw9t4cOBSakO3C3gEKRE9mSg@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 16 Apr 2014 16:48:57 +0200
+Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
+In-Reply-To: <4516298.kO98TB1Ozz@wuerfel>
+References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+ <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
+ <534E8AE1.4010402@samsung.com> <4516298.kO98TB1Ozz@wuerfel>
+Message-ID: <534E9859.7000307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On 16.04.2014 16:31, Arnd Bergmann wrote:
+> On Wednesday 16 April 2014 15:51:29 Tomasz Figa wrote:
+>> On 15.04.2014 11:28, Sachin Kamat wrote:
+>>> From: Arnd Bergmann <arnd@arndb.de>
+>>>
+>>> This makes it possible to enable the exynos platform as part of a
+>>> multiplatform kernel, in addition to keeping the single-platform
+>>> Exynos support.
+>>> sparsemem is currently not supported in multiplatform.
+>>
+>> Is this still true as of today?
+>>
+>> Otherwise looks fine.
+>
+> sparsemem is still not supported in multiplatform, but after I looked
+> at it in more detail, I came to the conclusion that there is no
+> reason why it couldn't be. It just needs testing so we are confident
+> that it doesn't break other platforms, and we need to find good
+> platform-independent values for MAX_PHYSMEM_BITS and SECTION_SIZE_BITS
+> to put into asm/memory.h, since we can't have them set in mach/memory.h
+> for multiplatform.
+>
+> Looking at my patch again now, I would actually prefer to kill off
+> the single-platform support for exynos right away. I don't see
+> any reason to keep it now, and it complicates the test matrix.
 
-On Wed, Apr 16, 2014 at 11:35 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Chanwoo,
->
->
-> On 15.04.2014 03:59, Chanwoo Choi wrote:
->>
->> This patch decide proper lowpower mode of either a15 or a9 according to
->> own ID
->> from Main ID register.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>   arch/arm/mach-exynos/hotplug.c | 16 +++++++++++-----
->>   1 file changed, 11 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/hotplug.c
->> b/arch/arm/mach-exynos/hotplug.c
->> index 5eead53..99e54e0 100644
->> --- a/arch/arm/mach-exynos/hotplug.c
->> +++ b/arch/arm/mach-exynos/hotplug.c
->> @@ -135,16 +135,22 @@ void __ref exynos_cpu_die(unsigned int cpu)
->>         int primary_part = 0;
->>
->>         /*
->> -        * we're ready for shutdown now, so do it.
->> -        * Exynos4 is A9 based while Exynos5 is A15; check the CPU part
->> +        * we're ready for shutdown now, so do it. Exynos4 is A9 based
->> +        * while Exynos5 is A15/Exynos3 is A7; check the CPU part
->>          * number by reading the Main ID register and then perform the
->>          * appropriate sequence for entering low power.
->
->
-> If changing this comment anyway, I'd suggest removing particular SoC series
-> from it and also correct writing style. My suggestion is:
+That would be the best option, assuming that it wouldn't introduce 
+feature regressions. Unfortunately there is still ongoing work on 
+cpufreq driver to make it multiplatform-aware, so dropping single 
+platform support right now would introduce at least this one regression.
 
-OK, I'll fix it.
+Thomas, is there any progress on new version of Exynos cpufreq rework 
+series?
 
 Best regards,
-Chanwoo Choi
-
->
-> /*
->  * Prepare the CPU for shutting down. The required sequence of
->  * operations depends on core type. CPUID part number can be used to
->  * determine the right way.
->  */
->
-> Best regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Tomasz
