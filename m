@@ -1,50 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Apr 2014 13:51:17 -0500
-Subject: [PATCH] clocksource: efm32: let CLKSRC_EFM32 select CLKSRC_OF
-In-Reply-To: <1397673612-24247-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <CAL_JsqKXYOdpCkixBLg8kAXwpkaLHhckJnTkzdNVeOQDYzxK3w@mail.gmail.com>
- <1397673612-24247-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAL_Jsq+Wm-jxeZoYXpC+W3Was5WTS2UqLJ__N5uPB43ZHUmrLw@mail.gmail.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Wed, 16 Apr 2014 23:01:47 +0400
+Subject: [PATCH v4 12/21] serial: support for 16550A serial ports on
+ LP-8x4x
+In-Reply-To: <20140416193532.0782f045@alan.etchedpixels.co.uk>
+References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-1-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-6-git-send-email-ynvich@gmail.com>
+ <20140416193532.0782f045@alan.etchedpixels.co.uk>
+Message-ID: <c4533da6-30bd-4ea4-9011-a7e3b7258e62@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 1:40 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> The efm32 timer driver is only usable with CLKSRC_OF, so it makes sense
-> to let its Kconfig symbol select it. For compile coverage testing it's not
-> needed though, so only select it if ARCH_EFM32 is enabled.
+One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
+>> +	baud = uart_get_baud_rate(port, termios, old,
+>> +				  port->uartclk / 16 / 0xffff,
+>> +				  port->uartclk / 16);
+>> +	switch (baud) {
+>> +	case 2400:
+>> +		len |= 1;
+>> +		break;
+>> +	case 4800:
+>> +		len |= 2;
+>> +		break;
+>> +	case 19200:
+>> +		len |= 4;
+>> +		break;
+>> +	case 38400:
+>> +		len |= 5;
+>> +		break;
+>> +	case 57600:
+>> +		len |= 6;
+>> +		break;
+>> +	case 115200:
+>> +		len |= 7;
+>> +		break;
+>> +	case 9600:
+>> +	default:
+>> +		len |= 3;
+>> +		break;
+>> +	};
 >
-> This allows to drop ARCH_EFM32 selecting CLKSRC_OF which is done here
-> for simplicity, too.
->
-> Reported-by: Rob Herring <robherring2@gmail.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/Kconfig            | 1 -
->  drivers/clocksource/Kconfig | 1 +
->  2 files changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index ab438cb5af55..e345419fb112 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -424,7 +424,6 @@ config ARCH_EFM32
->         select ARCH_REQUIRE_GPIOLIB
->         select AUTO_ZRELADDR
->         select ARM_NVIC
-> -       select CLKSRC_OF
->         select COMMON_CLK
->         select CPU_V7M
->         select GENERIC_CLOCKEVENTS
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -80,6 +80,7 @@ config CLKSRC_EFM32
->         bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
->         depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
->         select CLKSRC_MMIO
-> +       select CLKSRC_OF if ARCH_EFM32
+>Some explanation of this would be useful - eg why is it set to 7 for
+>115200 baud and 3 for 115201 baud ?
 
-You already depend on OF, so I believe you don't need the if here.
+I am not related to the device vendor in any way, so please take my answers for what they are worth.
 
-Rob
+It seems that there is not enough pins to properly connect the chips to the memory bus and just you the standard 8250 UART driver. Instead, clock divisor is set using this register.
+
+So, if you know you're asking for (115200) you get it. If you don't or guess (115201), you get the default 9600.
+
+This is a policy, it may not be the right way to write a driver, but it is cheap and it works.
