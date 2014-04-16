@@ -1,83 +1,46 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 16 Apr 2014 21:30:44 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzNdIEFSTTogZHRzOiBpbXgyNzogUGxhY2UgdGhlIHVz?=
- =?UTF-8?B?YiBwaHkgbm9kZXMgaW4gdGhlIGJvYXJkIGR0cyBmaWxlcw==?=
-In-Reply-To: <1397668217-17551-2-git-send-email-festevam@gmail.com>
-References: <1397668217-17551-1-git-send-email-festevam@gmail.com>
- <1397668217-17551-2-git-send-email-festevam@gmail.com>
-Message-ID: <1397669444.19723407@f371.i.mail.ru>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 16 Apr 2014 13:38:31 -0400 (EDT)
+Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
+In-Reply-To: <20140416164310.GA15739@redhat.com>
+References: <20140416145107.GA11039@redhat.com>
+ <20140416.110031.1269128188581361698.davem@davemloft.net>
+ <20140416164310.GA15739@redhat.com>
+Message-ID: <20140416.133831.364304583096073299.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wed, 16 Apr 2014 14:10:16 -0300 ?? Fabio Estevam <festevam@gmail.com>:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+From: Oleg Nesterov <oleg@redhat.com>
+Date: Wed, 16 Apr 2014 18:43:10 +0200
+
+> But did you really mean get_unmapped_area(pgoff => page_to_pfn(area->page)) ?
+
+Yes.
+
+> I simply can't understand how this can work, arm (and x86) really use it as
+> "pgoff << PAGE_SHIFT" align_offset accounted in unmapped_area() ?
+
+When a platform has D-cache aliasing issues, it must make sure that
+every shared page is mapped to the same D-cache alias in all such
+shared mappings.
+
+The way this is done is to map each pgoff to a page in the D-cache.
+For example, pgoff 0 would be given a virtual address that maps to the
+first page in the D-cache, pgoff 1 to the second, and so forth.
+
+What we're doing with this get_unmapped_area() call is to make it so
+that userspace's virtual address will land@the same virtual alias
+as the kernel one does.
+
+So that stores on the kernel side will be seen properly, without any
+cache flushing, by the user side mapping.
+
+>> So we end up with all of the benefits of storing directly to
+>> userspace, along with what you're trying to achieve.
 > 
-> It is not a good approach to have the USB PHY nodes inside imx27.dtsi since
-> the USB PHYs on mx27 are not internal to the SoC.
-> 
-> Place the USB PHY nodes in the board dts files instead.
-> 
-> Also, each board may have a different clock source for the USB PHY, so do not
-> hardcode it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Applies on top of "[PATCH] ARM: dts: imx27-phytec-phycore-som: Move PMIC IRQ GPIO into a separate pin group"
-...
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> index 33c5dc2..c48b9f8 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> @@ -20,6 +20,15 @@
->  		reg = <0xa0000000 0x08000000>;
->  	};
->  
-> +	clocks {
-> +		clk_26M: codec_clock {
+> And in this case we can avoid copy_to_user(), right ?
 
-codec? 26M? Why?
+Yes, that's the whole idea, you can forget about the VM_WRITE etc.
+that caused your concerns.
 
-> +			compatible = "fixed-clock";
-> +			reg = <0>;
-> +			#clock-cells = <0>;
-> +			clock-frequency = <26000000>;
-> +		};
-> +	};
-> +
->  	regulators {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
-> @@ -41,6 +50,28 @@
->  			regulator-max-microvolt = <5000000>;
->  		};
->  	};
-> +
-> +	usbphy {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		usbphy0: usbphy at 0 {
-> +			compatible = "usb-nop-xceiv";
-> +			reg = <0>;
-> +			vcc-supply = <&sw3_reg>;
-> +			clocks = <&clk_26M>;
-
-Just <&clks 0> is enough in this case.
-
-> +			clock-names = "main_clk";
-> +		};
-> +
-> +		usbphy2: usbphy at 2 {
-> +			compatible = "usb-nop-xceiv";
-> +			reg = <0>;
-> +			vcc-supply = <&reg_5v0>;
-> +			clocks = <&clk_26M>;
-> +			clock-names = "main_clk";
-> +		};
-> +	};
-
-SOM has no second ULPI.
-So this should be moved to RDK.
-
----
+It'd be just memcpy to kernel side mapping of the page + i-cache flush
+where necessary.
