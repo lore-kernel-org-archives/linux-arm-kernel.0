@@ -1,167 +1,28 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 16 Apr 2014 15:41:34 +0530
-Subject: [PATCH v7 2/2] dma: Add Xilinx AXI Video Direct Memory Access
- Engine driver support
-In-Reply-To: <20140416090605.GP32284@intel.com>
-References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
- <1396008222-7058-3-git-send-email-sthokal@xilinx.com>
- <20140416090605.GP32284@intel.com>
-Message-ID: <CA+mB=1LDGCY3sN5sL1giOwwqHjD8gG74Yy0dXRS8s+MtDOvxHw@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 16 Apr 2014 19:11:56 +0900
+Subject: [PATCHv3 0/2] iio: adc: exynos_adc: Support Exynos3250 ADC
+Message-ID: <1397643118-6934-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 2:36 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Fri, Mar 28, 2014 at 05:33:42PM +0530, Srikanth Thokala wrote:
->> This is the driver for the AXI Video Direct Memory Access (AXI
->> VDMA) core, which is a soft Xilinx IP core that provides high-
->> bandwidth direct memory access between memory and AXI4-Stream
->> type video target peripherals. The core provides efficient two
->> dimensional DMA operations with independent asynchronous read
->> and write channel operation.
->>
->> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
->
-> Okay the series is fine and was going to apply it BUT
-> 1) need ack on DT patch..
-> 2) issues below on managing the descriptor and resetting the cookie :(
+This patchset support Exynos3250 ADC (Analog Digital Converter) because
+Exynos3250 has additional special clock for ADC IP.
 
-Ok.
+Changes from v2:
+- Check return value of clock function to deal with error exception
+- Fix minor coding style to improve readability
 
->
->> +
->> +/**
->> + * xilinx_vdma_tx_descriptor - Allocate transaction descriptor
->> + * @chan: Driver specific VDMA channel
->> + *
->> + * Return: The allocated descriptor on success and NULL on failure.
->> + */
->> +static struct xilinx_vdma_tx_descriptor *
->> +xilinx_vdma_alloc_tx_descriptor(struct xilinx_vdma_chan *chan)
->> +{
->> +     struct xilinx_vdma_tx_descriptor *desc;
->> +     unsigned long flags;
->> +
->> +     if (chan->allocated_desc)
->> +             return chan->allocated_desc;
-> ??
->
->> +
->> +     desc = kzalloc(sizeof(*desc), GFP_KERNEL);
->> +     if (!desc)
->> +             return NULL;
->> +
->> +     spin_lock_irqsave(&chan->lock, flags);
->> +     chan->allocated_desc = desc;
-> ah why do you need this?
->
-> So this essentailly prevents you from preparing two trasactions at same time as
-> you would overwrite??
+Changes from v1:
+- Add new "samsung,exynos-adc-v3" compatible to support Exynos3250 ADC
+- Add a patch about DT binding documentation
 
-This will allow to queue up multiple segments on to a single
-transaction descriptor.
-User will submit this single desc and in the issue_pending() we decode multiple
-segments and submit to SG HW engine.  We free up the allocated_desc when it is
-submitted to the HW.  This is added after my discussion with Jaswinder, to best
-utilize HW SG engine.
+Chanwoo Choi (2):
+  iio: adc: exynos_adc: Control special clock of ADC to support Exynos3250 ADC
+  iio: devicetree: Add DT binding documentation for Exynos3250 ADC
 
->
-> You should maintain a list for pending and submitted.
+ .../devicetree/bindings/arm/samsung/exynos-adc.txt | 20 +++++
+ drivers/iio/adc/exynos_adc.c                       | 86 ++++++++++++++++++----
+ 2 files changed, 93 insertions(+), 13 deletions(-)
 
-Yes, we maintain two lists pending_list and done_list.
-
->
->> +     spin_unlock_irqrestore(&chan->lock, flags);
->> +
->> +     INIT_LIST_HEAD(&desc->segments);
->> +
->> +     return desc;
->> +}
->> +
->
->> +/**
->> + * xilinx_vdma_tx_submit - Submit DMA transaction
->> + * @tx: Async transaction descriptor
->> + *
->> + * Return: cookie value on success and failure value on error
->> + */
->> +static dma_cookie_t xilinx_vdma_tx_submit(struct dma_async_tx_descriptor *tx)
->> +{
->> +     struct xilinx_vdma_tx_descriptor *desc = to_vdma_tx_descriptor(tx);
->> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(tx->chan);
->> +     dma_cookie_t cookie;
->> +     unsigned long flags;
->> +     int err;
->> +
->> +     if (chan->err) {
->> +             /*
->> +              * If reset fails, need to hard reset the system.
->> +              * Channel is no longer functional
->> +              */
->> +             err = xilinx_vdma_chan_reset(chan);
->> +             if (err < 0)
->> +                     return err;
->> +     }
->> +
->> +     spin_lock_irqsave(&chan->lock, flags);
->> +
->> +     cookie = dma_cookie_assign(tx);
->> +
->> +     /* Append the transaction to the pending transactions queue. */
->> +     list_add_tail(&desc->node, &chan->pending_list);
->> +
->> +     /* Free the allocated desc */
->> +     chan->allocated_desc = NULL;
->> +
->> +     spin_unlock_irqrestore(&chan->lock, flags);
->> +
->> +     return cookie;
->> +}
->> +
->> +/**
->> + * xilinx_vdma_dma_prep_interleaved - prepare a descriptor for a
->> + *   DMA_SLAVE transaction
->> + * @dchan: DMA channel
->> + * @xt: Interleaved template pointer
->> + * @flags: transfer ack flags
->> + *
->> + * Return: Async transaction descriptor on success and NULL on failure
->> + */
->> +static struct dma_async_tx_descriptor *
->> +xilinx_vdma_dma_prep_interleaved(struct dma_chan *dchan,
->> +                              struct dma_interleaved_template *xt,
->> +                              unsigned long flags)
->> +{
->> +     struct xilinx_vdma_chan *chan = to_xilinx_chan(dchan);
->> +     struct xilinx_vdma_tx_descriptor *desc;
->> +     struct xilinx_vdma_tx_segment *segment, *prev = NULL;
->> +     struct xilinx_vdma_desc_hw *hw;
->> +
->> +     if (!is_slave_direction(xt->dir))
->> +             return NULL;
->> +
->> +     if (!xt->numf || !xt->sgl[0].size)
->> +             return NULL;
->> +
->> +     /* Allocate a transaction descriptor. */
->> +     desc = xilinx_vdma_alloc_tx_descriptor(chan);
->> +     if (!desc)
->> +             return NULL;
->> +
->> +     dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
->> +     desc->async_tx.tx_submit = xilinx_vdma_tx_submit;
->> +     desc->async_tx.cookie = 0;
-> why this is initialized in submit.. when you call dma_cookie_assign()
-
-This is while preparing the descs, but I see your point.  I will fix
-it in my next version.
-
-Srikanth
-
->
-> --
-> ~Vinod
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+1.8.0
