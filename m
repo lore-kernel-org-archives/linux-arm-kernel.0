@@ -1,31 +1,49 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Wed, 16 Apr 2014 21:29:19 +0100
-Subject: [PATCH v4 13/21] misc: support for LP-8x4x custom parallel bus
-In-Reply-To: <6356054.sn5XpK65Cm@wuerfel>
-References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
- <1397668667-27328-7-git-send-email-ynvich@gmail.com>
- <20140416194109.3ef914d2@alan.etchedpixels.co.uk>
- <6356054.sn5XpK65Cm@wuerfel>
-Message-ID: <20140416212919.7f6f35ac@alan.etchedpixels.co.uk>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 16 Apr 2014 22:49:50 +0200
+Subject: [PATCH 1/2] clk: socfpga: add divider registers to the main pll
+ outputs
+In-Reply-To: <534EE6AF.4040001@gmail.com>
+References: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
+ <534EE6AF.4040001@gmail.com>
+Message-ID: <20140416204950.GK16054@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Apr 2014 20:42:39 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+Hi!
 
-> On Wednesday 16 April 2014 19:41:09 One Thousand Gnomes wrote:
-> > On Wed, 16 Apr 2014 21:17:18 +0400
-> > Sergei Ianovich <ynvich@gmail.com> wrote:
-> > 
-> > > This patch implements probing for the bus and reporting the number
-> > > of available expansion slots.
-> > 
-> > This appears to be a bus not a misc device. I don't think it belongs in
-> > misc. As you've got devices on this bus (or nailed into the 'bus' driver)
-> > perhaps this belongs as drivers/platform/lp8x4x or similar with any
-> > specific drivers split out - or even drivers/lp8x4x if there will be more
-> > of them and more than one platform using it ?
+On Wed, Apr 16, 2014 at 03:23:11PM -0500, Dinh Nguyen wrote:
 > 
-> We have drivers/bus now, I think it could fit well in there.
+> 
+> On 04/16/2014 03:14 PM, dinguyen at altera.com wrote:
+> >From: Dinh Nguyen <dinguyen@altera.com>
+> >
+> >The C0(mpu_clk), C1(main_clk), and C2(dbg_base_clk) outputs from the main
+> >PLL go through a pre-divider before coming into the system. These registers
+> >were hidden for the CycloneV platform, but are not used for the ArriaV
+> 
+> Sorry but this should be "but are now used"
+> 
 
-Agreed
+???
+
+I don't get it. Do we have these registers on the cyclone V AND arria V or do
+we only have them on the arria V ?
+
+IIRC I had made a patch that adds dividers to some place in the clocktree, but
+I can't remember if these are the same.
+
+Regards,
+Steffen
+
+> >platform.
+> >
+> >This patch updates the clock driver to read the div-reg property for the
+> >socfpga-periph-clk clocks. Also moves the div_mask define to clk.h for re-use.
+> >
+> >Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
