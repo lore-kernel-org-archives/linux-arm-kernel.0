@@ -1,84 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Apr 2014 09:55:06 +0200
-Subject: [PATCH v2] pinctrl/at91: Fix mask creation in at91_gpio_dbg_show
-In-Reply-To: <1397501588-19730-1-git-send-email-alexanders83@web.de>
-References: <20140414081438.GI2967@piout.net>
- <1397501588-19730-1-git-send-email-alexanders83@web.de>
-Message-ID: <534E375A.8040205@atmel.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 16 Apr 2014 09:57:55 +0200
+Subject: [PATCH v8 1/3] ARM: EXYNOS: initial board support for exynos5260
+ SoC
+In-Reply-To: <1397620738-14431-2-git-send-email-rahul.sharma@samsung.com>
+References: <1397620738-14431-1-git-send-email-rahul.sharma@samsung.com>
+ <1397620738-14431-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <534E3803.5010404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/2014 20:53, Alexander Stein :
-> pin_to_mask expects a bank pin number. So do not add the chip base.
-> 
-> Without that patch cat /sys/kernel/debug/gpio looks like that:
-> GPIOs 0-31, platform/fffff200.gpio, fffff200.gpio:
-> [spi32766.0] GPIOfffff200.gpio5: [gpio] set
-> [ads7846_pendown] GPIOfffff200.gpio15: [gpio] set
-> [ohci_vbus] GPIOfffff200.gpio21: [gpio] set
-> [ohci_vbus] GPIOfffff200.gpio24: [gpio] set
-> [button1] GPIOfffff200.gpio28: [gpio] clear
-> [button2] GPIOfffff200.gpio29: [gpio] clear
-> 
-> GPIOs 32-63, platform/fffff400.gpio, fffff400.gpio:
-> [sda] GPIOfffff400.gpio4: [periph A]
-> [scl] GPIOfffff400.gpio5: [periph A]
-> [spi32766.3] GPIOfffff400.gpio11: [periph A]
-> [error] GPIOfffff400.gpio22: [periph A]
-> [run] GPIOfffff400.gpio23: [periph A]
-> 
-> GPIOs 64-95, platform/fffff600.gpio, fffff600.gpio:
-> [reset_pin] GPIOfffff600.gpio29: [periph A]
-> 
-> GPIOs 96-127, platform/fffff800.gpio, fffff800.gpio:
-> [led1] GPIOfffff800.gpio5: [periph A]
-> [led2] GPIOfffff800.gpio6: [periph A]
-> [led3] GPIOfffff800.gpio7: [periph A]
-> [led4] GPIOfffff800.gpio8: [periph A]
-> 
-> GPIOs 128-159, platform/fffffa00.gpio, fffffa00.gpio:
-> [button3] GPIOfffffa00.gpio10: [periph A]
-> [button4] GPIOfffffa00.gpio12: [periph A]
+Hi Rahul,
 
-Maybe a little bit less context to the commit message: Linus might
-remove some lines to it...
-
-> Note that every bank despite bank 0 only shows "periph A" which are
-> obviously used as GPIOs.
-> 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Okay, actually this patch have to be routed to Linus Walleij, I add him
-in the destination field.
-
-Thanks,
-
+On 16.04.2014 05:58, Rahul Sharma wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> This patch add basic arch side support for exynos5260 SoC.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 > ---
-> Changes in v2:
-> * Added 2 Acked-by's
-> * Add an example of wrong output
-> 
->  drivers/pinctrl/pinctrl-at91.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 63176f2..2da0e6e 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1205,8 +1205,7 @@ static void at91_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
->  	void __iomem *pio = at91_gpio->regbase;
->  
->  	for (i = 0; i < chip->ngpio; i++) {
-> -		unsigned pin = chip->base + i;
-> -		unsigned mask = pin_to_mask(pin);
-> +		unsigned mask = pin_to_mask(i);
->  		const char *gpio_label;
->  		u32 pdsr;
->  
-> 
+>   arch/arm/mach-exynos/Kconfig |    5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index fc8bf18..bf4ed87 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -84,6 +84,11 @@ config SOC_EXYNOS5250
+>   	help
+>   	  Enable EXYNOS5250 SoC support
+>
+> +config SOC_EXYNOS5260
+> +	bool "SAMSUNG EXYNOS5260"
+> +	default y
+> +	depends on ARCH_EXYNOS5
+> +
+>   config SOC_EXYNOS5420
+>   	bool "SAMSUNG EXYNOS5420"
+>   	default y
+>
 
+Is this patch necessary now? After Sachin's consolidation series there 
+are no per SoC entries anymore.
 
--- 
-Nicolas Ferre
+Best regards,
+Tomasz
