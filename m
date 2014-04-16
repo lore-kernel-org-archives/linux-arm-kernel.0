@@ -1,97 +1,65 @@
-From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Wed, 16 Apr 2014 16:08:29 +0800
-Subject: [PATCH v3 09/18] ASoC: fsl-ssi: Only enable baudclk when used
-In-Reply-To: <20140416072738.GC6159@pengutronix.de>
-References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
- <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
- <20140414152850.GB7197@MrMyself>
- <20140416072738.GC6159@pengutronix.de>
-Message-ID: <20140416080826.GA13449@MrMyself>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 16 Apr 2014 10:20:45 +0200
+Subject: [PATCH v2 2/6] PCI: tegra: use new OF interrupt mapping when
+ possible
+In-Reply-To: <20140415182651.GA17721@google.com>
+References: <1394025951-32438-1-git-send-email-l.stach@pengutronix.de>
+ <1394025951-32438-3-git-send-email-l.stach@pengutronix.de>
+ <20140404165559.GE9007@google.com>
+ <1397556454.4574.13.camel@weser.hi.pengutronix.de>
+ <20140415182651.GA17721@google.com>
+Message-ID: <1397636445.5070.8.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
-
-Please allow me to drop some content.
-
-On Wed, Apr 16, 2014 at 09:27:38AM +0200, Markus Pargmann wrote:
-> On Mon, Apr 14, 2014 at 11:28:51PM +0800, Nicolin Chen wrote:
-> > On Mon, Apr 14, 2014 at 03:35:39PM +0200, Markus Pargmann wrote:
-> > > +static bool fsl_ssi_is_i2s_master(struct fsl_ssi_private *ssi_private)
-> > > +{
-> > > +	return (ssi_private->dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) ==
-> > > +		SND_SOC_DAIFMT_CBS_CFS;
-> > > +}
-
-> > > @@ -496,6 +503,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
-> > >  		spin_unlock_irqrestore(&ssi_private->baudclk_lock, flags);
-> > >  	}
-> > >  
-> > > +	if (fsl_ssi_is_i2s_master(ssi_private)) {
-> > > +		ret = clk_prepare_enable(ssi_private->baudclk);
-> > > +		if (ret)
-> > > +			return ret;
-> > > +	}
-
-> > > +static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
-> > > +		struct snd_soc_dai *dai)
-> > > +{
-> > > +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> > > +	struct fsl_ssi_private *ssi_private =
-> > > +		snd_soc_dai_get_drvdata(rtd->cpu_dai);
-> > > +
-> > > +	if (fsl_ssi_is_i2s_master(ssi_private))
-> > > +		clk_disable_unprepare(ssi_private->baudclk);
-> > > +}
-
-> > > @@ -576,6 +600,11 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
-> > >  
-> > >  	ssi_private->dai_fmt = fmt;
-> > >  
-> > > +	if (fsl_ssi_is_i2s_master(ssi_private) && IS_ERR(ssi_private->baudclk)) {
-> > > +		dev_err(cpu_dai->dev, "no baudclk needed for master mode\n");
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
+Am Dienstag, den 15.04.2014, 12:30 -0600 schrieb Bjorn Helgaas:
+> On Tue, Apr 15, 2014 at 12:07:34PM +0200, Lucas Stach wrote:
+> > Hi Bjorn,
 > > 
-> > I was wondering what if machine driver doesn't set fmt to master during
-> > its probe(), in another word -- before fsl_ssi_startup(), but leave that
-> > into its hw_params() via snd_soc_dai_set_fmt() which then would run after
-> > fsl_ssi_startup() while having no baud clock enabled in this case.
+> > Am Freitag, den 04.04.2014, 10:55 -0600 schrieb Bjorn Helgaas:
+> > > On Wed, Mar 05, 2014 at 02:25:47PM +0100, Lucas Stach wrote:
+> > > > This is the recommended method of doing the IRQ
+> > > > mapping. For old devicetrees we fall back to the
+> > > > previous practice.
+> > > > 
+> > > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > 
+> > > Applied with Stephen's Tested-by to my pending/host-tegra branch.  I'll
+> > > rebase and rename it after v3.15-rc1, and I think we can squeeze it into
+> > > v3.15 shortly after that.  Thanks.
+> > > 
 > > 
-> > A better solution may be to wrap clk_prepare_enable() and master mode
-> > clock dividing code into fsl_ssi_hw_params(), a bit like the ESAI driver
-> > even though it doesn't contain the clk_prepare_enable() part currently,
-> > and then to put clk_disable_unprepare() into hw_free() for symmetry.
-> > 
-> > Any suggestion?
+> > Are you still planning to push this into 3.15, or has this slipped to
+> > 3.16?
 > 
-> Yes this is a problem. Although I am not really convinced of the concept
-> of setting up the DAIs in hw_params, we should support it as there are
-> some users.
+> Yes, I'm hoping to put them in v3.15.  I assume these actually
+> fix something, e.g., we need these changes to boot with new devicetrees, or
+> something?
+> 
+> The changelogs don't make it clear that these are fixes, and I want to heed
+> Linus' guidance: "Anyway, because -rc1 is already pretty darn big, I do
+> *not* want to hear about 'sorry this missed the window, can I still sneak
+> in'.  Fixes only."
+> 
+> I should have applied these sooner to make the merge window; I apologize
+> for that.  Anyway, if you outline what these fix, I'll update the
+> changelogs in my tree.
+> 
+Actually they are a bit on the fence.
 
-I think it might be an old fashion way. I saw quite a lot machine drivers
-doing the DAI format setting in its hw_params(). Even in the current tree
-we can also grep some out by using:
+The i.MX and thus the designware patch actually fixes wrong behavior,
+where all PCI legacy interrupts would be mapped to a single GIC
+interrupt, which would leave INT B,C,D nonfunctional on i.MX.
 
-find ./sound/soc/ -name "*.c" |xargs grep "snd_soc_dai_set_fmt"
+The others only make DT interrupt mapping functional for all drivers, so
+they would be useful if you need to remap interrupts across bridges or
+something. But apparently nobody had the need to to this on platforms
+other than i.MX until now, so those patches only fix a theoretical
+issue.
 
-So it should be plausible considering there might be some special cases,
-using CBS_CFS for 44.1KHz groups and CBM_CFM for 48KHz groups for example.
-
-> Is there always exactly one hw_free call for one hw_params call? There
-> is a comment above the function:
-> "Frees resources allocated by hw_params, can be called multiple times",
-
-That's a good question. IIRC, snd_pcm_release_substream() would call its
-hw_free() right before calling snd_pcm_close(). So there would be at least
-twice for hw_free()'s execution.
-
-> so I am not sure if we can directly use clk_prepare_enable or if we need
-> to remember the clock state?
-
-We need to if applying that. Or put them into trigger() as an alternative
-approach even if it sounds weird to me.
-
-Thanks,
-Nicolin
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
