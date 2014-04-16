@@ -1,62 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 16 Apr 2014 17:56:54 +0800
-Subject: [PATCH 1/7] gpiolib: gpiolib-of: Implement device tree gpio-names
- based lookup
-In-Reply-To: <CAAVeFu+rJXH=Uat5_qWPu6OfmDAFxHj2b+n=OSmwtSw4s+fv6w@mail.gmail.com>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-2-git-send-email-wens@csie.org>
- <20140415142024.GD3207@lukather>
- <CAAVeFuLDhTVGDnmYtnxEY8hhn6HE6tU9OB24WDPtmxEHjiRiuQ@mail.gmail.com>
- <CAAVeFu+rJXH=Uat5_qWPu6OfmDAFxHj2b+n=OSmwtSw4s+fv6w@mail.gmail.com>
-Message-ID: <CAGb2v65PF=i3pL58JycJLyp-TjsEeVxO-uDuZ6xrEob5oJLj5g@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 16 Apr 2014 18:05:04 +0800
+Subject: [PATCH 0/4] pinctrl: sirf: switch to one gpiolib and
+ gpiolib_irqchip helpers
+In-Reply-To: <CABxcv=khupV0gpnCUOPeRON_v2wcRCNkL2Ao1B5dOB9-OB0wyQ@mail.gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+ <CABxcv=khupV0gpnCUOPeRON_v2wcRCNkL2Ao1B5dOB9-OB0wyQ@mail.gmail.com>
+Message-ID: <CAGsJ_4zZQRPS6RuP2FfJyB=eskuM6A4c0XFvEwrOS=SWuJ5+Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Apr 16, 2014 at 3:06 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Wed, Apr 16, 2014 at 3:12 PM, Alexandre Courbot <gnurou@gmail.com> wrote:
->> On Tue, Apr 15, 2014 at 11:20 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>> Hi Chen-Yu,
->>>
->>> On Tue, Apr 15, 2014 at 02:41:35PM +0800, Chen-Yu Tsai wrote:
->>>> This patch provides of_get_gpiod_flags_by_name(), which looks up GPIO
->>>> phandles by name only, through gpios/gpio-names, and not by index.
->>>
->>> IIRC, gpios only uses the *-gpios properties, and not gpios/gpio-names
->>> pattern seen on various other things.
->>>
->>> Is it some new property you introduce? If so, please add it to the
->>> documentation.
->>>
->>> Now, I'm not sure that having two distinct representations of GPIOs in
->>> the DT is a good thing. Yes, it's looking odd compared to other
->>> similar bindings, but it's what we have to deal with.
+2014-04-16 17:54 GMT+08:00 Javier Martinez Canillas <javier@dowhile0.org>:
+> Hello Barry,
+>
+> On Tue, Apr 15, 2014 at 8:43 AM, Barry Song <21cnbao@gmail.com> wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
 >>
->> Mmmm I *think* I somehow remember a discussion about this topic
->> recently, but I cannot find it. Maybe Chen-yu could point us to the
->> conclusion of this discussion and the rationale for (re)implementing
->> named GPIOs this way?
+>> This patchset depends on Linus Walleij's "pinctrl: sirf: rename inlined accessor".
+>> and "pinctrl: sirf: switch driver to use gpiolib irqchip helpers" is rebased
+>> from Linus Walleij's patch too.
+>>
+>> Barry Song (3):
+>>   pinctrl: sirf: wrap all gpio banks into one gpio_chip
+>>   gpio: make handler_data configurable while using gpiolib_irqchip
+>>   pinctrl: sirf: move to use irq_get_handler_data
+>> Linus Walleij (1):
+>>   pinctrl: sirf: switch driver to use gpiolib irqchip helpers
+>>
+>>  drivers/gpio/gpiolib.c              |   10 +-
+>>  drivers/pinctrl/Kconfig             |    1 +
+>>  drivers/pinctrl/sirf/pinctrl-sirf.c |  264 ++++++++++++-----------------------
+>>  include/linux/gpio/driver.h         |    2 +-
+>>  4 files changed, 97 insertions(+), 180 deletions(-)
+>>
+>> --
+>> 1.7.5.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
-> Aha, here maybe:
+> Maybe you can first do the parameter change to
+> gpiochip_set_chained_irqchip() and then just convert to gpiolib
+> irqchip passing the struct sirfsoc_gpio_bank pointer instead of a
+> struct gpio_chip. I think there is no need to split PATCH 2 and PATCH
+> 4 but it is up to you.
 >
-> https://lkml.org/lkml/2014/1/21/164
 
-They're also mentioned in:
-
-https://lkml.org/lkml/2014/2/25/581
-
-> However I don't see a clear conclusion that we should implement that
-> scheme. Not that I am strongly against it, but I'd like to see a
-> practical purpose for it.
-
-Again no clear conclusion on this. I wrote this as it was one possible
-way out of the index-based GPIO stuff.
-
-Hopefully others will chime in and we can decide whether this is what
-we want or not.
+Javier, thanks. the reason for splitting 2 and 4 is that i don't want
+to lose the contribution of Linus for "gpiolib irqchip helpers".
+otherwise, i will be the author of the merged patch.
 
 
-Cheers
-ChenYu
+> The series looks good to me:
+>
+> Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
+
+-barry
