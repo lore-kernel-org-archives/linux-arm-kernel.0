@@ -1,72 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 16 Apr 2014 10:17:54 +0200
-Subject: [PATCH v2 0/4] ARM: mvebu: fix bus width handling in mvebu-devbus
-In-Reply-To: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <534E3CB2.3010505@free-electrons.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 16 Apr 2014 11:18:35 +0300
+Subject: [PATCH] ARM: tegra: define Jetson TK1 regulators
+In-Reply-To: <CAL1qeaF+Kha6bS27OLoWw-G2Tv6PzeB6=GcK6dM6s_hWidvLiA@mail.gmail.com>
+References: <1397516120-18220-1-git-send-email-swarren@wwwdotorg.org>
+ <CAL1qeaF+Kha6bS27OLoWw-G2Tv6PzeB6=GcK6dM6s_hWidvLiA@mail.gmail.com>
+Message-ID: <20140416081835.GB30476@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 14/04/2014 17:29, Thomas Petazzoni wrote:
-> Jason, Greg, Andrew, Sebastian,
+On Wed, Apr 16, 2014 at 02:24:42AM +0200, Andrew Bresticker wrote:
+> > +                               ldo11 {
+> > +                                       regulator-name = "+1.8V_RUN_VPP_FUSE";
+> > +                                       regulator-min-microvolt = <1800000>;
+> > +                                       regulator-max-microvolt = <1800000>;
+> > +                               };
+> > +                       };
+> >                 };
+> >         };
+> >
+> > @@ -1462,6 +1611,7 @@
+> >                 cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_LOW>;
+> >                 power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
+> >                 bus-width = <4>;
+> > +               vmmc-supply = <&vddio_sdmmc3>;
 > 
-> This set of patches fix a bug in the mvebu-devbus driver, which was
-> leading to a misinterpretation of Device Tree provided value: a NOR
-> bus width declared as 8 bits in the Device Tree was in fact configured
-> as 16 bits at the hardware level.
-> 
-> This bug was not noticed until now, because it was compensated by a
-> symetric mistake in the Device Tree files.
-> 
-> This set of commits therefore fix both the driver itself, and the
-> incorrect Device Tree files. The patches for the Device Tree files
-> have been separated, because some of them should apply all the way to
-> v3.10, while some of them apply only up to v3.11.
-> 
-> Changes since v1:
-> 
->  * Added patches to fix the Device Tree files to indicate the correct
->    bus width, as documented in the board schematics. Noticed by
->    Ezequiel Garcia.
-> 
->  * Changed the bus_width conversion logic in the driver to only accept
->    valid values: 8 bits and 16 bits. All other values lead to an error
->    being returned. Suggested by Sebastian Hesselbarth.
-> 
->  * Rebased on top of v3.15-rc1.
-
-Everything looks good so for the whole series:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (4):
->   memory: mvebu-devbus: fix the conversion of the bus width
->   ARM: mvebu: fix NOR bus-width in Armada XP GP Device Tree
->   ARM: mvebu: fix NOR bus-width in Armada XP DB Device Tree
->   ARM: mvebu: fix NOR bus-width in Armada XP OpenBlocks AX3 Device Tree
-> 
->  arch/arm/boot/dts/armada-xp-db.dts               |  2 +-
->  arch/arm/boot/dts/armada-xp-gp.dts               |  2 +-
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  2 +-
->  drivers/memory/mvebu-devbus.c                    | 15 +++++++++++++--
->  4 files changed, 16 insertions(+), 5 deletions(-)
+> I don't have schematics for this board, but I suspect you mean
+> vqmmc-supply here, per the discussion in the Venice2 VQMMC thread.
 > 
 
+Schematics can be found at https://developer.nvidia.com/jetson-tk1-support
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers,
+
+Peter.
