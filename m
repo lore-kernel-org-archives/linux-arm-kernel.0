@@ -1,63 +1,108 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 16 Apr 2014 13:11:55 -0500
-Subject: [PATCH v3 00/10] dma: edma: Fixes for cyclic (audio) operation
-In-Reply-To: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1397475725-5036-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <534EC7EB.8030602@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Apr 2014 20:14:27 +0200
+Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
+In-Reply-To: <534E9AA3.10409@samsung.com>
+References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
+ <CAJuA9ajXa+mejdUvWATHjmmin8hoRhX0wueg5g8rDbJR4AWZ7A@mail.gmail.com>
+ <534E9AA3.10409@samsung.com>
+Message-ID: <5094962.iM2Kd6gfjd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2014 06:41 AM, Peter Ujfalusi wrote:
-> Hi,
+On Wednesday 16 April 2014 16:58:43 Tomasz Figa wrote:
+
+> On 16.04.2014 16:55, Thomas Abraham wrote:
+> > On Wed, Apr 16, 2014 at 8:18 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> >> On 16.04.2014 16:31, Arnd Bergmann wrote:
+> >>> sparsemem is still not supported in multiplatform, but after I looked
+> >>> at it in more detail, I came to the conclusion that there is no
+> >>> reason why it couldn't be. It just needs testing so we are confident
+> >>> that it doesn't break other platforms, and we need to find good
+> >>> platform-independent values for MAX_PHYSMEM_BITS and SECTION_SIZE_BITS
+> >>> to put into asm/memory.h, since we can't have them set in mach/memory.h
+> >>> for multiplatform.
+> >>>
+> >>> Looking at my patch again now, I would actually prefer to kill off
+> >>> the single-platform support for exynos right away. I don't see
+> >>> any reason to keep it now, and it complicates the test matrix.
+> >>
+> >>
+> >> That would be the best option, assuming that it wouldn't introduce feature
+> >> regressions. Unfortunately there is still ongoing work on cpufreq driver to
+> >> make it multiplatform-aware, so dropping single platform support right now
+> >> would introduce at least this one regression.
+> >>
+> >> Thomas, is there any progress on new version of Exynos cpufreq rework
+> >> series?
+> >
+> > Hi Tomasz,
+> >
+> > Yes, I am preparing the fourth version of the cpufreq patches and will
+> > post it next week. Mostly, the changes will be addressing your review
+> > comments.
 > 
-> Changes since v2:
-> - Dropped patch 10 from v2 (simplify direction configuration...)
-> - Dropped the channel priority related patches since we are going to go via
->   different route for configuring the priority.
-> - Added ACK from Joel for the patches since they are not changed since v2
-> 
-> Changes since v1:
-> - ASoC patches removed
-> - Comments from Andriy Shevchenko addressed
-> - patch added to fix cases when src/dst_maxburst is set to 0
-> 
-> The series contains now only:
-> Support for DMA pause/resume in cyclic mode
-> device_slave_caps callback and DMA_CYCLIC flag correction.
-> While debugging the edma to get things sorted out I noticed that the debug was
-> too verbose and the important information was hidden even when the we did not
-> asked for verbose dmaengine debug.
-> I have included some debug cleanups for the edma dmaengine driver also.
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (10):
->   platform_data: edma: Be precise with the paRAM struct
->   arm: common: edma: Save the number of event queues/TCs
->   dmaengine: edma: Correct the handling of src/dst_maxburst == 0
->   dmaengine: edma: Add support for DMA_PAUSE/RESUME operation
->   dmaengine: edma: Set DMA_CYCLIC capability flag
->   dmaengine: edma: Implement device_slave_caps callback
->   dmaengine: edma: Reduce debug print verbosity for non verbose
->     debugging
->   dmaengine: edma: Prefix debug prints where the text were identical in
->     prep callbacks
->   dmaengine: edma: Add channel number to debug prints
->   dmaengine: edma: Print the direction value as well when it is not
->     supported
-> 
->  arch/arm/common/edma.c             |  4 ++
->  drivers/dma/edma.c                 | 87 ++++++++++++++++++++++++++++++--------
->  include/linux/platform_data/edma.h | 18 ++++----
->  3 files changed, 83 insertions(+), 26 deletions(-)
+> OK. Looking forward to it. Thanks for an update on this.
 > 
 
-I reviewed and tested all the patches in the new series to make sure it
-doesn't break anything with non-cyclic users (MMC and Crypto).
+Cool! This is the only major issue I'm aware of, so I think we're good.
 
-Reviewed-and-Tested-by: Joel Fernandes <joelf@ti.com>
+If SPARSEMEM support is still relevant to anybody, I'm sure we can
+get that to work as well.
 
+There is one small issue with the sound drivers that came up, and I
+assume it was just a mistake. If not, some more work on that might
+be needed. See patch below.
 
-regards,
--Joel
+	Arnd
+
+8<-------
+>From 6f3921c3218509114e855a8ea5932aeea5d3ddfd Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 18 Mar 2014 17:04:59 +0100
+Subject: [PATCH] ASoC: samsung: don't build pcm and spdif on exynos
+
+In commit d37bdf736d9b "ASoC: samsung: Use ASoC dmaengine code where
+possible", Mark Brown changed the EXYNOS ASoC code to no longer
+use the private dma interfaces that are standing in the way of
+multiplatform enablement.
+
+However, in 313367e7bfa "ASoC: Samsung: Update Kconfig for I2S,SPDIF
+and PCM audio", two new users of that interface appeared, since it
+is now possible to enable SND_SOC_SAMSUNG_SMDK_SPDIF and
+SND_SOC_SMDK_WM8994_PCM on all Samsung SoCs including EXYNOS.
+
+This patch does a partial revert of 313367e7bfa by allowing these
+drivers on all samsung platforms except EXYNOS, so we can proceed
+with the multiplatform patches.
+
+If support for these drivers is actually needed on EXYNOS machines,
+the drivers should first be moved over to use the dmaengine code.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Sangsu Park <sangsu4u.park@samsung.com>
+Cc: Sangbeom Kim <sbkim73@samsung.com>
+Cc: Padmavathi Venna <padma.v@samsung.com>
+Cc: Mark Brown <broonie@kernel.org>
+
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 7b610a8..efc01e0 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -167,7 +167,7 @@ config SND_SOC_GONI_AQUILA_WM8994
+ 
+ config SND_SOC_SAMSUNG_SMDK_SPDIF
+ 	tristate "SoC S/PDIF Audio support for SMDK"
+-	depends on SND_SOC_SAMSUNG
++	depends on SND_SOC_SAMSUNG && !ARCH_EXYNOS
+ 	select SND_SAMSUNG_SPDIF
+ 	help
+ 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
+@@ -183,7 +183,7 @@ config SND_SOC_SMDK_WM8580_PCM
+ 
+ config SND_SOC_SMDK_WM8994_PCM
+ 	tristate "SoC PCM Audio support for WM8994 on SMDK"
+-	depends on SND_SOC_SAMSUNG
++	depends on SND_SOC_SAMSUNG && !ARCH_EXYNOS
+ 	depends on I2C=y
+ 	select MFD_WM8994
+ 	select SND_SOC_WM8994
