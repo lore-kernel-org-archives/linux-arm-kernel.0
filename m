@@ -1,32 +1,164 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Apr 2014 18:42:16 +0100
-Subject: [PATCH v3 09/18] ASoC: fsl-ssi: Only enable baudclk when used
-In-Reply-To: <20140416080826.GA13449@MrMyself>
-References: <1397482548-28463-1-git-send-email-mpa@pengutronix.de>
- <1397482548-28463-10-git-send-email-mpa@pengutronix.de>
- <20140414152850.GB7197@MrMyself>
- <20140416072738.GC6159@pengutronix.de>
- <20140416080826.GA13449@MrMyself>
-Message-ID: <20140416174216.GW12304@sirena.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Apr 2014 14:53:19 -0300
+Subject: [PATCH v2 2/3] ARM: dts: imx27: Place the usb phy nodes in the board
+ dts files
+In-Reply-To: <1397670800-23358-1-git-send-email-festevam@gmail.com>
+References: <1397670800-23358-1-git-send-email-festevam@gmail.com>
+Message-ID: <1397670800-23358-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 04:08:29PM +0800, Nicolin Chen wrote:
-> On Wed, Apr 16, 2014 at 09:27:38AM +0200, Markus Pargmann wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> > Is there always exactly one hw_free call for one hw_params call? There
-> > is a comment above the function:
-> > "Frees resources allocated by hw_params, can be called multiple times",
+It is not a good approach to have the USB PHY nodes inside imx27.dtsi since
+the USB PHYs on mx27 are not internal to the SoC.
 
-> That's a good question. IIRC, snd_pcm_release_substream() would call its
-> hw_free() right before calling snd_pcm_close(). So there would be at least
-> twice for hw_free()'s execution.
+Place the USB PHY nodes in the board dts files instead.
 
-There may be any number of hw_params() calls.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/6decb35f/attachment.sig>
+Also, each board may have a different clock source for the USB PHY, so do not
+hardcode it.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Applies on top of "[PATCH] ARM: dts: imx27-phytec-phycore-som: Move PMIC IRQ GPIO into a separate pin group"
+
+Changes since v1:
+- Use a dummy clock for USB PHY
+- Put usbphy2 into the rdk dts file
+
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts  | 19 +++++++++++++++----
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 19 +++++++++++++++----
+ arch/arm/boot/dts/imx27.dtsi                    | 22 ----------------------
+ 3 files changed, 30 insertions(+), 30 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index 8b4181b..0875327 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -37,6 +37,20 @@
+ 			};
+ 		};
+ 	};
++
++	usbphy {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		usbphy2: usbphy at 2 {
++			compatible = "usb-nop-xceiv";
++			reg = <0>;
++			vcc-supply = <&reg_5v0>;
++			clocks = <&clks 0>;
++			clock-names = "main_clk";
++		};
++	};
+ };
+ 
+ &cspi1 {
+@@ -268,14 +282,11 @@
+ 	dr_mode = "host";
+ 	phy_type = "ulpi";
+ 	vbus-supply = <&reg_5v0>;
++	fsl,usbphy = <&usbphy2>;
+ 	disable-over-current;
+ 	status = "okay";
+ };
+ 
+-&usbphy2 {
+-	vcc-supply = <&reg_5v0>;
+-};
+-
+ &weim {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_weim>;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index 33c5dc2..32cc7dac9a 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -41,6 +41,20 @@
+ 			regulator-max-microvolt = <5000000>;
+ 		};
+ 	};
++
++	usbphy {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		usbphy0: usbphy at 0 {
++			compatible = "usb-nop-xceiv";
++			reg = <0>;
++			vcc-supply = <&sw3_reg>;
++			clocks = <&clks 0>;
++			clock-names = "main_clk";
++		};
++	};
+ };
+ 
+ &audmux {
+@@ -307,14 +321,11 @@
+ 	pinctrl-0 = <&pinctrl_usbotg>;
+ 	dr_mode = "otg";
+ 	phy_type = "ulpi";
++	fsl,usbphy = <&usbphy0>;
+ 	vbus-supply = <&sw3_reg>;
+ 	status = "okay";
+ };
+ 
+-&usbphy0 {
+-	vcc-supply = <&sw3_reg>;
+-};
+-
+ &weim {
+ 	status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 948354e..b2c103e 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -72,26 +72,6 @@
+ 		};
+ 	};
+ 
+-	usbphy {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		usbphy0: usbphy at 0 {
+-			compatible = "usb-nop-xceiv";
+-			reg = <0>;
+-			clocks = <&clks 75>;
+-			clock-names = "main_clk";
+-		};
+-
+-		usbphy2: usbphy at 2 {
+-			compatible = "usb-nop-xceiv";
+-			reg = <2>;
+-			clocks = <&clks 75>;
+-			clock-names = "main_clk";
+-		};
+-	};
+-
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -467,7 +447,6 @@
+ 				interrupts = <56>;
+ 				clocks = <&clks 75>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+-				fsl,usbphy = <&usbphy0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -486,7 +465,6 @@
+ 				interrupts = <55>;
+ 				clocks = <&clks 75>;
+ 				fsl,usbmisc = <&usbmisc 2>;
+-				fsl,usbphy = <&usbphy2>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.8.3.2
