@@ -1,56 +1,101 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 16 Apr 2014 13:53:27 +0530
-Subject: [PATCH RESEND] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <534E3F3D.5080003@zonque.org>
-References: <1392636546-15541-1-git-send-email-zonque@gmail.com>
- <20140319151352.GJ1976@intel.com> <534576C3.2020409@zonque.org>
- <20140416064534.GL32284@intel.com> <534E3F3D.5080003@zonque.org>
-Message-ID: <20140416082326.GM32284@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Apr 2014 09:34:17 +0100
+Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
+In-Reply-To: <534E3DC0.40502@samsung.com>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
+ <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
+ <534CF847.5040008@arm.com> <534CF9B4.306@samsung.com>
+ <534CFAD7.4030508@arm.com> <534E3DC0.40502@samsung.com>
+Message-ID: <534E4089.9070804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 10:28:45AM +0200, Daniel Mack wrote:
-> Hi Vinod,
+On 16/04/14 09:22, Chanwoo Choi wrote:
+> Hi Marc,
 > 
-> On 04/16/2014 08:45 AM, Vinod Koul wrote:
-> > On Wed, Apr 09, 2014 at 06:35:15PM +0200, Daniel Mack wrote:
+> On 04/15/2014 06:24 PM, Marc Zyngier wrote:
+>> On 15/04/14 10:19, Chanwoo Choi wrote:
+>>> On 04/15/2014 06:13 PM, Marc Zyngier wrote:
+>>>> On 15/04/14 09:27, Chanwoo Choi wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
+>>>>>> On 15/04/14 02:59, Chanwoo Choi wrote:
+>>>>>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>>>>>
+>>>>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
+>>>>>>> dual core and includes following dt nodes:
+>>>>>>>
+>>>>>>> - GIC interrupt controller
+>>>>>>> - Pinctrl to control GPIOs
+>>>>>>> - Clock controller
+>>>>>>> - CPU information (Cortex-A7 dual core)
+>>>>>>> - UART to support serial port
+>>>>>>> - MCT (Multi Core Timer)
+>>>>>>> - ADC (Analog Digital Converter)
+>>>>>>> - I2C/SPI bus
+>>>>>>> - Power domain
+>>>>>>> - PMU (Performance Monitoring Unit)
+>>>>>>> - MSHC (Mobile Storage Host Controller)
+>>>>>>> - PWM (Pluse Width Modulation)
+>>>>>>> - AMBA bus
+>>>>>>
+>>>>>> [...]
+>>>>>>
+>>>>>> Where is the arch timer node?
+>>>>>
+>>>>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
+>>>>> - in drivers/clocksource/exynos_mct.c
+>>>>
+>>>> Don't you have a Cortex-A7? If so, you have the arch timer.
+>>>
+>>> Do you means that 'arch timer" is ARM_ARCH_TIMER?
+>>
+>> Yes.
+>>
+>>> As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
+>>> But, Exynos SoC used MCT clocksource for system timer.
+>>>
+>>> Exynos dts file didn't include arch timer node but only include mct node.
+>>
+>> Well, it is a bug, and a recurrent one. A Cortex-A7 has the arch timers
+>> implemented. Always.
+>>
+>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0464f/BABFEBJJ.html
+>>
+>> All Cortex-A7 have it, and so do A12, A15, A17, A53, A57.
 > 
-> >> 5. The cookie comparison in the end simply exists to address the fact
-> >>    that we might have operated on an unreleated descriptor, and we have
-> >>    to start over.
-> >>
-> >> So in short, the logic will return the bytes that are not yet processed
-> >> for a specific transaction, which is the expected thing to do, right?
-> > Looks fine then BUT I have another questions.
-> > 
-> > Assuming that you have two txn submitted and driver split them to 3 descriptors
-> > each, then in that case the driver would walk over all 6 descriptors and sum up
-> > the value, which would lead to incorrect residue. It will work for single
-> > pending txn only, right?
+> I tested 'arch_timer'(drivers/clocksource/arm_arch_timer.c) on Exynos3250 based on Cortex-A7.
 > 
-> No, because each of the two txn would have a different cookie set, and
-> the residue function is called for one specific cookie so we know which
-> one we're looking for. That's the reason why we start over if at the end
-> of an iterated transaction chain, if we recognize that the cookie
-> doesn't match, we start over.
+> To test arch timer, I used the clocksource of arch_timer for timekeeping instead of clocksource
+> of Exynos MCT. But, I faced with issue. The following function return only same value(zero)
+> as following kernel log:
+> - arch_counter_get_cntvct() in arch/arm/include/asm/arch_timer.h
 > 
-> > While at it and looking at the code again, I think right solution maybe to
-> > update the parent child in the descriptors. So on query you simply walk the
-> > list for all child descriptors and continue. But the parent and child are
-> > defined under CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH.
+> Uncompressing Linux... done, booting the kernel.
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Initializing cgroup subsys cpuset
+> [    0.000000] Initializing cgroup subsys cpu
+> [    0.000000] Initializing cgroup subsys cpuacct
+> [    0.000000] Linux version 3.15.0-rc1-00020-gf452826-dirty ...
+> [    0.000000] CPU: ARMv7 Processor ...
+> ...
+> [    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
+> [    0.000000] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
+> ...
 > 
-> That's another solution, but it's redundant information after all.
-> Ultimately, it makes the driver more complicated and introduces one more
-> area of potentially inconsistent pointers.
-> 
-> > So adding Dan (his updated email id), would it be okay if we make these as
-> > generic in descriptor and use them to manage larger length transactions in
-> > drivers?
-> 
-> It might add to the readability of the drivers, but for the current
-> case, I don't think it's really necessary.
-That is because you are maintaining the current descriptors in chain_running. If
-we use above method then you dont need to use this, right?
+> Could you give me a solution to resolve this issue or a expected cause?
 
+My guess is that you need to enable some clock for the timer to tick.
+Ask your HW guys how they have wired this clock.
+
+Also, I cannot help but notice that you are entering your kernel at SVC
+instead of HYP. I suggest you fix your bootloader/firmware to allow all
+CPUs to enter the kernel in HYP.
+
+Thanks,
+
+	M.
 -- 
-~Vinod
+Jazz is not dead. It just smells funny...
