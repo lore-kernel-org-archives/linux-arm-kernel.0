@@ -1,41 +1,101 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Apr 2014 14:27:16 +0100
-Subject: [PATCH v5 2/4] arm64: split syscall_trace() into separate
- functions for enter/exit
-In-Reply-To: <1394861948-28712-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1394705491-12343-1-git-send-email-takahiro.akashi@linaro.org>
- <1394861948-28712-1-git-send-email-takahiro.akashi@linaro.org>
- <1394861948-28712-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140416132716.GA1001@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Apr 2014 14:39:42 +0100
+Subject: [PATCH v3 10/19] KVM: ARM: vgic: move underflow handling to vgic_ops
+In-Reply-To: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1397655591-2761-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+Move the code dealing with LR underflow handling to its own functions,
+and make them accessible through vgic_ops.
 
-On Sat, Mar 15, 2014 at 05:39:06AM +0000, AKASHI Takahiro wrote:
-> As done in arm, this change makes it easy to confirm we invoke syscall
-> related hooks, including syscall tracepoint, audit and seccomp which would
-> be implemented later, in correct order. That is, undoing operations in the
-> opposite order on exit that they were done on entry.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/vgic.c    | 28 +++++++++++++++++++++++++---
+ 2 files changed, 27 insertions(+), 3 deletions(-)
 
-[...]
-
-> +static void tracehook_report_syscall(struct pt_regs *regs,
-> +				     enum ptrace_syscall_dir dir)
->  {
-> +	int scrach;
-
-s/scrach/scratch/
-
-Although, I'd rather have a variable with a more meaningful name. How about
-regno?
-
-With that,
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Cheers,
-
-Will
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 98208e0..831b9f5 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -87,6 +87,8 @@ struct vgic_ops {
+ 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
+ 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
+ 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
++	void	(*set_underflow)(struct kvm_vcpu *vcpu);
++	void	(*clear_underflow)(struct kvm_vcpu *vcpu);
+ };
+ 
+ struct vgic_dist {
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 9e100f6..13dad1f 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1047,12 +1047,24 @@ static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
+ 	return ret;
+ }
+ 
++static void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr |= GICH_HCR_UIE;
++}
++
++static void vgic_v2_clear_underflow(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++}
++
+ static const struct vgic_ops vgic_ops = {
+ 	.get_lr			= vgic_v2_get_lr,
+ 	.set_lr			= vgic_v2_set_lr,
+ 	.get_elrsr		= vgic_v2_get_elrsr,
+ 	.get_eisr		= vgic_v2_get_eisr,
+ 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
++	.set_underflow		= vgic_v2_set_underflow,
++	.clear_underflow	= vgic_v2_clear_underflow,
+ };
+ 
+ static inline struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
+@@ -1081,6 +1093,16 @@ static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
+ 	return vgic_ops.get_interrupt_status(vcpu);
+ }
+ 
++static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
++{
++	vgic_ops.set_underflow(vcpu);
++}
++
++static inline void vgic_clear_underflow(struct kvm_vcpu *vcpu)
++{
++	vgic_ops.clear_underflow(vcpu);
++}
++
+ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+@@ -1262,9 +1284,9 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 
+ epilog:
+ 	if (overflow) {
+-		vgic_cpu->vgic_v2.vgic_hcr |= GICH_HCR_UIE;
++		vgic_set_underflow(vcpu);
+ 	} else {
+-		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++		vgic_clear_underflow(vcpu);
+ 		/*
+ 		 * We're about to run this VCPU, and we've consumed
+ 		 * everything the distributor had in store for
+@@ -1311,7 +1333,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	if (status & INT_STATUS_UNDERFLOW)
+-		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++		vgic_clear_underflow(vcpu);
+ 
+ 	return level_pending;
+ }
+-- 
+1.8.3.4
