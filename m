@@ -1,133 +1,123 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 15 Apr 2014 22:31:37 -0700
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <1397626297-23873-1-git-send-email-victor.kamensky@linaro.org>
-References: <1397626297-23873-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1397626297-23873-2-git-send-email-victor.kamensky@linaro.org>
+From: sajjan.linux@gmail.com (Vikas Sajjan)
+Date: Wed, 16 Apr 2014 11:04:15 +0530
+Subject: [PATCH v2 2/3] ARM: EXYNOS: Add initial support of PMU for
+ Exynos5260
+In-Reply-To: <534D7BAB.30503@gmail.com>
+References: <1395061795-17777-1-git-send-email-vikas.sajjan@samsung.com>
+ <1395061795-17777-3-git-send-email-vikas.sajjan@samsung.com>
+ <534D7BAB.30503@gmail.com>
+Message-ID: <CAGm_ybhzQLbK8K5mj0WK8ww61PqurumkwkHqah2=5v-=VACJzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After instruction write into xol area, on ARM V7
-architecture code need to flush dcache and icache to sync
-them up for given set of addresses. Having just
-'flush_dcache_page(page)' call is not enough - it is
-possible to have stale instruction sitting in icache
-for given xol area slot address.
+Hi Tomasz,
 
-Introduce arch_uprobe_ixol_copy weak function
-that by default calls __copy_to_user function, and
-that sufficient for CPUs that can snoop instruction
-writes from dcache. On ARM define new one
-that handles xol slot copy in ARM specific way.
+On Wed, Apr 16, 2014 at 12:04 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Vikas,
+>
+>
+> On 17.03.2014 14:09, Vikas Sajjan wrote:
+>>
+>> Adds PMU support of PMU for Exynos5260. Suspend-to-RAM can be built on
+>> top this.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/common.h            |   26 ++++
+>>   arch/arm/mach-exynos/pm.c                |   34 +++--
+>>   arch/arm/mach-exynos/pmu.c               |  238
+>> ++++++++++++++++++++++++++++++
+>>   arch/arm/mach-exynos/regs-pmu.h          |  232
+>> +++++++++++++++++++++++++++++
+>>   arch/arm/plat-samsung/include/plat/cpu.h |    8 +
+>>   5 files changed, 529 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+>> index aba6a2a..a17f701 100644
+>> --- a/arch/arm/mach-exynos/common.h
+>> +++ b/arch/arm/mach-exynos/common.h
+>> @@ -56,6 +56,32 @@ enum sys_powerdown {
+>>         NUM_SYS_POWERDOWN,
+>>   };
+>>
+>> +enum running_cpu {
+>> +       EXYNOS5_KFC,
+>> +       EXYNOS5_ARM,
+>> +};
+>> +
+>> +enum reg_op {
+>> +       REG_INIT,       /* write new value */
+>> +       REG_RESET,      /* clear with zero */
+>> +       REG_SET,        /* bit set */
+>> +       REG_CLEAR,      /* bit clear */
+>> +};
+>> +
+>> +/* reg/value set */
+>> +#define EXYNOS_PMU_REG(REG, VAL, OP)           \
+>> +{                                              \
+>> +       .reg    =       (void __iomem *)REG,    \
+>> +       .val    =       VAL,                    \
+>> +       .op     =       OP,                     \
+>> +}
+>> +
+>> +struct exynos_pmu_init_reg {
+>> +       void __iomem *reg;
+>> +       unsigned int val;
+>> +       enum reg_op op;
+>> +};
+>> +
+>>   extern unsigned long l2x0_regs_phys;
+>>   struct exynos_pmu_conf {
+>>         void __iomem *reg;
+>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+>> index 15af0ce..dbe9670 100644
+>> --- a/arch/arm/mach-exynos/pm.c
+>> +++ b/arch/arm/mach-exynos/pm.c
+>> @@ -109,7 +109,7 @@ static int exynos_cpu_suspend(unsigned long arg)
+>>         outer_flush_all();
+>>   #endif
+>>
+>> -       if (soc_is_exynos5250())
+>> +       if (soc_is_exynos5250() || soc_is_exynos5260())
+>>                 flush_cache_all();
+>
+>
+> I think it's the right time for this code to be restructured. Adding more
+> and more SoCs over this cruft is making this code worse and worse.
+>
 
-Arm implementation of arch_uprobe_ixol_copy function
-makes __copy_to_user call which does not have dcache
-aliasing issues and then flush_cache_user_range to
-push dcache out and invalidate corresponding icache
-entries.
+ I recently came across RFC [1] posted by pankaj on similar lines, did
+you get a chance to have look at this series.
 
-Note in order to write into uprobes xol area had
-to add VM_WRITE to xol area mapping.
+[1] https://lkml.org/lkml/2014/4/2/69
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
----
- arch/arm/kernel/uprobes.c |  8 ++++++++
- include/linux/uprobes.h   |  3 +++
- kernel/events/uprobes.c   | 28 +++++++++++++++++++---------
- 3 files changed, 30 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-index f9bacee..4836e54 100644
---- a/arch/arm/kernel/uprobes.c
-+++ b/arch/arm/kernel/uprobes.c
-@@ -113,6 +113,14 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 	return 0;
- }
- 
-+void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+			   void *src, unsigned long len)
-+{
-+	if (!__copy_to_user((void *) vaddr, src, len))
-+		flush_cache_user_range(vaddr, len);
-+}
-+
-+
- int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
- {
- 	struct uprobe_task *utask = current->utask;
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index edff2b9..c52f827 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -32,6 +32,7 @@ struct vm_area_struct;
- struct mm_struct;
- struct inode;
- struct notifier_block;
-+struct page;
- 
- #define UPROBE_HANDLER_REMOVE		1
- #define UPROBE_HANDLER_MASK		1
-@@ -127,6 +128,8 @@ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned l
- extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
- extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
- extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+					 void *src, unsigned long len);
- #else /* !CONFIG_UPROBES */
- struct uprobes_state {
- };
-diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 04709b6..1038e57 100644
---- a/kernel/events/uprobes.c
-+++ b/kernel/events/uprobes.c
-@@ -1149,7 +1149,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
- 	}
- 
- 	ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
--				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
-+				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO|VM_WRITE, &area->page);
- 	if (ret)
- 		goto fail;
- 
-@@ -1296,14 +1296,8 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe)
- 	if (unlikely(!xol_vaddr))
- 		return 0;
- 
--	/* Initialize the slot */
--	copy_to_page(area->page, xol_vaddr,
--			&uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
--	/*
--	 * We probably need flush_icache_user_range() but it needs vma.
--	 * This should work on supported architectures too.
--	 */
--	flush_dcache_page(area->page);
-+	arch_uprobe_copy_ixol(area->page, xol_vaddr,
-+			      &uprobe->arch.ixol, sizeof(uprobe->arch.ixol));
- 
- 	return xol_vaddr;
- }
-@@ -1346,6 +1340,22 @@ static void xol_free_insn_slot(struct task_struct *tsk)
- 	}
- }
- 
-+void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+				  void *src, unsigned long len)
-+{
-+	/*
-+	 * Note if CPU does not support instructions write snooping
-+	 * from dcache it needs to define its own version of this
-+	 * function that would take care of proper cache flushes.
-+	 *
-+	 * Nothing we can do if it fails, added if to make unused
-+	 * result warning happy. If xol write failed because process
-+	 * unmapped xol area by mistake, process will crash in some
-+	 * other place.
-+	 */
-+	if (__copy_to_user((void *) vaddr, src, len));
-+}
-+
- /**
-  * uprobe_get_swbp_addr - compute address of swbp given post-swbp regs
-  * @regs: Reflects the saved state of the task after it has hit a breakpoint
--- 
-1.8.1.4
+> I believe this should be done as follows:
+>
+>  - a generic struct describing particular PMU variant should be defined,
+> with things like
+>
+>         bool flush_cache_on_suspend;
+>         struct exynos_pmu_conf *pmu_conf;
+>
+> or even function pointers, like
+>
+>         void (*cpu_suspend)(unsigned long arg);
+>
+> to handle things done currently using soc_is_*() macros, which we should get
+> rid of.
+>
+> - a DT match table would bind particular compatible strings with respective
+> PMU variants structs,
+>
+> - in general, this code should be made more like a normal driver, e.g. bind
+> to a DT node and map registers dynamically.
+>
+> Best regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
