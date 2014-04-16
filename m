@@ -1,118 +1,61 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 16 Apr 2014 15:23:11 -0500
-Subject: [PATCH 1/2] clk: socfpga: add divider registers to the main pll
- outputs
-In-Reply-To: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
-References: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
-Message-ID: <534EE6AF.4040001@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Apr 2014 21:22:43 +0100
+Subject: [RFC PATCH v3] ARM: uprobes need icache flush after xol write
+In-Reply-To: <20140416.114740.1805744923904673839.davem@davemloft.net>
+References: <20140416150646.GB11039@redhat.com>
+ <20140416.111028.831710940640195974.davem@davemloft.net>
+ <20140416152946.GA13564@redhat.com>
+ <20140416.114740.1805744923904673839.davem@davemloft.net>
+Message-ID: <20140416202243.GI24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 16, 2014 at 11:47:40AM -0400, David Miller wrote:
+> From: Oleg Nesterov <oleg@redhat.com>
+> Date: Wed, 16 Apr 2014 17:29:46 +0200
+> 
+> > On 04/16, David Miller wrote:
+> >>
+> >> From: Oleg Nesterov <oleg@redhat.com>
+> >> Date: Wed, 16 Apr 2014 17:06:46 +0200
+> >>
+> >> > Off-topic, I am just curious... can't someone explain why flush_pfn_alias()
+> >> > or flush_icache_alias() can't race with itself ? I have no idea what they do,
+> >> > but what if another thread calls the same function with the same CACHE_COLOUR()
+> >> > right after set_pte_ext?
+> >>
+> >> PTE modifications are supposed to run with the page table lock held.
+> > 
+> > OK, but __access_remote_vm() doesn't take ptl?
+> > 
+> > And on arm copy_to_user_page()->flush_ptrace_access()->flush_pfn_alias()
+> > does this.
+> 
+> Well, for one thing, PTE's can't gain permissions except under mmap_sem
+> which __access_remote_vm() does hold.
+> 
+> But I see what you're saying, flush_pfn_alias() is doing something
+> different.  It's not making user mappings, but kernel ones in order
+> to implement the cache flush.
+> 
+> On sparc64 we handle this situation by hand-loading the mappings into
+> the TLB, doing the operation using the mappings, then flushing it out
+> of the TLB, all with interrupts disabled.
+> 
+> Furthermore, in ARMs case, the code explicitly states that these
+> mappings are not used on SMP.  See the comment above the FLUSH_ALIAS_START
+> definition in arch/arm/mm/mm.h
 
+Yes, thankfully SMP on ARM requires non-aliasing data caches... and now
+you've got me wondering whether that stuff is safe on preempt UP...
 
-On 04/16/2014 03:14 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
->
-> The C0(mpu_clk), C1(main_clk), and C2(dbg_base_clk) outputs from the main
-> PLL go through a pre-divider before coming into the system. These registers
-> were hidden for the CycloneV platform, but are not used for the ArriaV
+I'm thinking that both flush_icache_alias() and flush_pfn_alias() want
+at least a preemption disabled around each so that we don't end up with
+two threads being preempted here.
 
-Sorry but this should be "but are now used"
+Thankfully, there's not many ARM CPUs with VIPT aliasing caches, which
+is probably why no one has noticed.
 
-> platform.
->
-> This patch updates the clock driver to read the div-reg property for the
-> socfpga-periph-clk clocks. Also moves the div_mask define to clk.h for re-use.
->
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> ---
->   drivers/clk/socfpga/clk-gate.c   |    1 -
->   drivers/clk/socfpga/clk-periph.c |   22 +++++++++++++++++++---
->   drivers/clk/socfpga/clk.h        |    4 ++++
->   3 files changed, 23 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
-> index 501d513..dd3a78c 100644
-> --- a/drivers/clk/socfpga/clk-gate.c
-> +++ b/drivers/clk/socfpga/clk-gate.c
-> @@ -32,7 +32,6 @@
->   #define SOCFPGA_MMC_CLK			"sdmmc_clk"
->   #define SOCFPGA_GPIO_DB_CLK_OFFSET	0xA8
->
-> -#define div_mask(width)	((1 << (width)) - 1)
->   #define streq(a, b) (strcmp((a), (b)) == 0)
->
->   #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
-> diff --git a/drivers/clk/socfpga/clk-periph.c b/drivers/clk/socfpga/clk-periph.c
-> index 81623a3..46531c3 100644
-> --- a/drivers/clk/socfpga/clk-periph.c
-> +++ b/drivers/clk/socfpga/clk-periph.c
-> @@ -29,12 +29,18 @@ static unsigned long clk_periclk_recalc_rate(struct clk_hw *hwclk,
->   					     unsigned long parent_rate)
->   {
->   	struct socfpga_periph_clk *socfpgaclk = to_socfpga_periph_clk(hwclk);
-> -	u32 div;
-> +	u32 div, val;
->
-> -	if (socfpgaclk->fixed_div)
-> +	if (socfpgaclk->fixed_div) {
->   		div = socfpgaclk->fixed_div;
-> -	else
-> +	} else {
-> +		if (socfpgaclk->div_reg) {
-> +			val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
-> +			val &= div_mask(socfpgaclk->width);
-> +			parent_rate /= (val + 1);
-> +		}
->   		div = ((readl(socfpgaclk->hw.reg) & 0x1ff) + 1);
-> +	}
->
->   	return parent_rate / div;
->   }
-> @@ -54,6 +60,7 @@ static __init void __socfpga_periph_init(struct device_node *node,
->   	struct clk_init_data init;
->   	int rc;
->   	u32 fixed_div;
-> +	u32 div_reg[3];
->
->   	of_property_read_u32(node, "reg", &reg);
->
-> @@ -63,6 +70,15 @@ static __init void __socfpga_periph_init(struct device_node *node,
->
->   	periph_clk->hw.reg = clk_mgr_base_addr + reg;
->
-> +	rc = of_property_read_u32_array(node, "div-reg", div_reg, 3);
-> +	if (!rc) {
-> +		periph_clk->div_reg = clk_mgr_base_addr + div_reg[0];
-> +		periph_clk->shift = div_reg[1];
-> +		periph_clk->width = div_reg[2];
-> +	} else {
-> +		periph_clk->div_reg = 0;
-> +	}
-> +
->   	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
->   	if (rc)
->   		periph_clk->fixed_div = 0;
-> diff --git a/drivers/clk/socfpga/clk.h b/drivers/clk/socfpga/clk.h
-> index d2e5401..d291f60 100644
-> --- a/drivers/clk/socfpga/clk.h
-> +++ b/drivers/clk/socfpga/clk.h
-> @@ -27,6 +27,7 @@
->   #define CLKMGR_PERPLL_SRC	0xAC
->
->   #define SOCFPGA_MAX_PARENTS		3
-> +#define div_mask(width) ((1 << (width)) - 1)
->
->   extern void __iomem *clk_mgr_base_addr;
->
-> @@ -52,6 +53,9 @@ struct socfpga_periph_clk {
->   	struct clk_gate hw;
->   	char *parent_name;
->   	u32 fixed_div;
-> +	void __iomem *div_reg;
-> +	u32 width;      /* only valid if div_reg != 0 */
-> +	u32 shift;      /* only valid if div_reg != 0 */
->   };
->
->   #endif /* SOCFPGA_CLK_H */
->
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
