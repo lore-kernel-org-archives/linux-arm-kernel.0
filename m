@@ -1,325 +1,181 @@
-From: Dongsheng.Wang@freescale.com (Dongsheng.Wang at freescale.com)
-Date: Wed, 16 Apr 2014 03:18:43 +0000
-Subject: [RFC][PATCH 3/3] clocksource: Add Freescale FlexTimer Module
- (FTM) timer support
-In-Reply-To: <1397614787-8300-4-git-send-email-Li.Xiubo@freescale.com>
-References: <1397614787-8300-1-git-send-email-Li.Xiubo@freescale.com>
- <1397614787-8300-4-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <d4863b3b92ef4aebbc05ca5e6cb9aede@BN1PR03MB188.namprd03.prod.outlook.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Wed, 16 Apr 2014 03:23:54 +0000
+Subject: USB OTG support on mx27pdk
+In-Reply-To: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
+References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
+Message-ID: <2394b8be344646358b23a105c8725961@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-> -----Original Message-----
-> From: Xiubo Li [mailto:Li.Xiubo at freescale.com]
-> Sent: Wednesday, April 16, 2014 10:20 AM
-> To: daniel.lezcano at linaro.org; tglx at linutronix.de; shawn.guo at linaro.org; Lu
-> Jingchang-B35083; Jin Zhengxiong-R64188; Wang Dongsheng-B40534
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Xiubo Li-B47053
-> Subject: [RFC][PATCH 3/3] clocksource: Add Freescale FlexTimer Module (FTM)
-> timer support
+ 
+> Hi,
 > 
-> The Freescale FlexTimer Module time reference is a 16-bit counter
-> that can be used as an unsigned or signed counter.one 16-bits
-> increase counter.
+> I am trying to add USBOTG support to mx27pdk with the following dts patch:
 > 
-> Here using the FTM0 as clock event device and the FTM1 as clock
-> source device.
+> --- a/arch/arm/boot/dts/imx27-pdk.dts
+> +++ b/arch/arm/boot/dts/imx27-pdk.dts
+> @@ -78,6 +78,14 @@
+>         status = "okay";
+>  };
 > 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Jingchang Lu <b35083@freescale.com>
-> ---
->  drivers/clocksource/Kconfig         |   5 +
->  drivers/clocksource/Makefile        |   1 +
->  drivers/clocksource/fsl_ftm_timer.c | 238 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 244 insertions(+)
->  create mode 100644 drivers/clocksource/fsl_ftm_timer.c
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index cd6950f..28321c5 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -136,6 +136,11 @@ config CLKSRC_SAMSUNG_PWM
->  	  for all devicetree enabled platforms. This driver will be
->  	  needed only on systems that do not have the Exynos MCT available.
-> 
-> +config FSL_FTM_TIMER
-> +	bool
-> +	help
-> +	  Support for Freescale FlexTimer Module (FTM) timer.
-> +
->  config VF_PIT_TIMER
->  	bool
->  	help
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index c7ca50a..ce0a967 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -31,6 +31,7 @@ obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
->  obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
->  obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
->  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
-> +obj-$(CONFIG_FSL_FTM_TIMER)	+= fsl_ftm_timer.o
->  obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
-> 
->  obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
-> diff --git a/drivers/clocksource/fsl_ftm_timer.c
-> b/drivers/clocksource/fsl_ftm_timer.c
-> new file mode 100644
-> index 0000000..988449e
-> --- /dev/null
-> +++ b/drivers/clocksource/fsl_ftm_timer.c
-> @@ -0,0 +1,238 @@
-> +/*
-> + * Freescale FlexTimer Module (FTM) timer driver.
-> + *
-> + * Copyright 2014 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/sched_clock.h>
-> +
-> +#define FTM_OFFSET(n)	(0x1000 * n)
-> +
-> +#define FTM_SC		0x00
-> +#define FTM_SC_CLK_SHIFT	3
-> +#define FTM_SC_CLK_MASK	(0x3 << FTM_SC_CLK_SHIFT)
-> +#define FTM_SC_CLK(c)	((c) << FTM_SC_CLK_SHIFT)
-> +#define FTM_SC_PS_MASK	0x7
-> +#define FTM_SC_TOIE	BIT(6)
-> +#define FTM_SC_TOF	BIT(7)
-> +
-> +#define FTM_CNT		0x04
-> +#define FTM_MOD		0x08
-> +
-> +#define FTM_CSC_BASE	0x0C
-> +#define FTM_CSC_MSB	BIT(5)
-> +#define FTM_CSC_MSA	BIT(4)
-> +#define FTM_CSC_ELSB	BIT(3)
-> +#define FTM_CSC_ELSA	BIT(2)
-> +
-> +#define FTM_CV_BASE	0x10
-> +#define FTM_CNTIN	0x4C
-> +#define FTM_STATUS	0x50
-> +
-> +#define FTM_MODE	0x54
-> +#define FTM_MODE_FTMEN	BIT(0)
-> +#define FTM_MODE_WPDIS	BIT(2)
-> +#define FTM_MODE_PWMSYNC	BIT(3)
-> +
-> +#define FTM_SYNC	0x58
-> +#define FTM_OUTINIT	0x5C
-> +#define FTM_OUTMASK	0x60
-> +#define FTM_COMBINE	0x64
-> +#define FTM_DEADTIME	0x68
-> +#define FTM_EXTTRIG	0x6C
-> +#define FTM_POL		0x70
-> +#define FTM_FMS		0x74
-> +#define FTM_FILTER	0x78
-> +#define FTM_FLTCTRL	0x7C
-> +#define FTM_QDCTRL	0x80
-> +#define FTM_CONF	0x84
-> +#define FTM_FLTPOL	0x88
-> +#define FTM_SYNCONF	0x8C
-> +#define FTM_INVCTRL	0x90
-> +#define FTM_SWOCTRL	0x94
-> +#define FTM_PWMLOAD	0x98
-> +
-> +static void __iomem *clksrc_base;
-> +static void __iomem *clkevt_base;
-> +static unsigned long peroidic_cyc;
-> +
-> +static inline void __init ftm_timer_enable(void __iomem *base)
-> +{
-> +	u32 val;
-> +
-> +	/* select and enable counter clock source */
-> +	val = __raw_readl(base + FTM_SC);
-> +	val &= ~FTM_SC_CLK_MASK;
-> +	val |= FTM_SC_CLK(1);
-> +	__raw_writel(val, base + FTM_SC);
-> +}
-> +
-> +static u64 ftm_read_sched_clock(void)
-> +{
-> +	return __raw_readl(clksrc_base + FTM_CNT);
-> +}
-> +
-> +static int __init ftm_clocksource_init(unsigned long freq)
-> +{
-> +	int ret;
-> +
-> +	__raw_writel(0x00, clksrc_base + FTM_CNTIN);
-> +	__raw_writel(~0UL, clksrc_base + FTM_MOD);
-> +	__raw_writel(0x1, clksrc_base + FTM_CNT);
-> +
-> +	sched_clock_register(ftm_read_sched_clock, 16, freq);
-> +	ret = clocksource_mmio_init(clksrc_base + FTM_CNT, "fsl-ftm",
-> +				freq, 300, 16, clocksource_mmio_readl_up);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ftm_timer_enable(clksrc_base);
-> +
-> +	return 0;
-> +}
-> +
-> +static inline void ftm_irq_acknowledge(void)
-> +{
-> +	u32 val;
-> +
-> +	val = __raw_readl(clkevt_base + FTM_SC);
-> +	val &= ~FTM_SC_TOF;
-> +	__raw_writel(val, clkevt_base + FTM_SC);
-> +}
-> +
-> +static int ftm_set_next_event(unsigned long delta,
-> +				struct clock_event_device *unused)
-> +{
-> +	__raw_writel(delta, clkevt_base + FTM_MOD);
-> +
-> +	return 0;
-> +}
-> +
-> +static void ftm_set_mode(enum clock_event_mode mode,
-> +				struct clock_event_device *evt)
-> +{
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_PERIODIC:
-> +		ftm_set_next_event(peroidic_cyc, evt);
-> +		break;
-> +	default:
-> +		break;
-
-Remove this break;
-
-> +	}
-> +}
-> +
-> +static irqreturn_t ftm_timer_interrupt(int irq, void *dev_id)
-> +{
-> +	struct clock_event_device *evt = dev_id;
-> +
-> +	ftm_irq_acknowledge();
-> +
-> +	evt->event_handler(evt);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static struct clock_event_device clockevent_ftm = {
-> +	.name		= "Freescale ftm timer",
-> +	.features	= CLOCK_EVT_FEAT_PERIODIC,
-> +	.set_mode	= ftm_set_mode,
-> +	.set_next_event	= ftm_set_next_event,
-> +	.rating		= 300,
+> +&usbotg {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_usbotg>;
+> +       dr_mode = "otg";
+> +       phy_type = "ulpi";
+> +       status = "okay";
 > +};
 > +
-> +static struct irqaction ftm_timer_irq = {
-> +	.name		= "Freescale ftm timer",
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-> +	.handler	= ftm_timer_interrupt,
-> +	.dev_id		= &clockevent_ftm,
-> +};
+>  &iomuxc {
+>         imx27-pdk {
+>                 pinctrl_cspi2: cspi2grp { @@ -121,5 +129,22 @@
+>                                 MX27_PAD_UART1_RTS__UART1_RTS 0x0
+>                         >;
+>                 };
 > +
-> +static int __init ftm_clockevent_init(unsigned long freq, int irq)
-> +{
-> +	u32 val;
-> +
-> +	__raw_writel(0x00, clkevt_base + FTM_CNTIN);
-> +	__raw_writel(~0UL, clkevt_base + FTM_MOD);
-> +	__raw_writel(0x1, clksrc_base + FTM_CNT);
-> +
-> +	val = __raw_readl(clkevt_base + FTM_SC);
-> +	val |= FTM_SC_TOIE;
-> +	__raw_writel(val, clkevt_base + FTM_SC);
-> +
-> +	BUG_ON(setup_irq(irq, &ftm_timer_irq));
-> +
-> +	clockevent_ftm.cpumask = cpumask_of(0);
-> +	clockevent_ftm.irq = irq;
-> +
-> +	clockevents_config_and_register(&clockevent_ftm, freq, 1, 0xffff);
-> +
-> +	ftm_timer_enable(clkevt_base);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init calc_closest_cound_cyc(unsigned long freq)
-> +{
-> +	unsigned long ps = 0;
-> +
-> +	do {
-> +		peroidic_cyc = DIV_ROUND_CLOSEST(freq, HZ * (1 << ps++));
-> +	} while (peroidic_cyc > 0xFFFF);
-> +
-> +}
-> +
-> +static void __init ftm_timer_init(struct device_node *np)
-> +{
-> +	struct clk *ftm_clk;
-> +	void __iomem *timer_base;
-> +	unsigned long freq;
-> +	int irq;
-> +
-> +	timer_base = of_iomap(np, 0);
-> +	BUG_ON(!timer_base);
-> +
-> +	clksrc_base = timer_base + FTM_OFFSET(1);
-> +	clkevt_base = timer_base + FTM_OFFSET(0);
-> +
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	BUG_ON(irq <= 0);
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm0_counter_en");
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm1_counter_en");
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm0");
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm1");
+> +               pinctrl_usbotg: usbotggrp {
+> +                       fsl,pins = <
+> +                               MX27_PAD_USBOTG_NXT__USBOTG_NXT 0x0
+> +                               MX27_PAD_USBOTG_STP__USBOTG_STP 0x0
+> +                               MX27_PAD_USBOTG_DIR__USBOTG_DIR 0x0
+> +                               MX27_PAD_USBOTG_CLK__USBOTG_CLK 0x0
+> +                               MX27_PAD_USBOTG_DATA0__USBOTG_DATA0 0x0
+> +                               MX27_PAD_USBOTG_DATA1__USBOTG_DATA1 0x0
+> +                               MX27_PAD_USBOTG_DATA2__USBOTG_DATA2 0x0
+> +                               MX27_PAD_USBOTG_DATA3__USBOTG_DATA3 0x0
+> +                               MX27_PAD_USBOTG_DATA4__USBOTG_DATA4 0x0
+> +                               MX27_PAD_USBOTG_DATA5__USBOTG_DATA5 0x0
+> +                               MX27_PAD_USBOTG_DATA6__USBOTG_DATA6 0x0
+> +                               MX27_PAD_USBOTG_DATA7__USBOTG_DATA7 0x0
+> +                       >;
+> +               };
+>         };
+>  }
+> 
+> 
+> However on kernel boot the following is seen:
+> 
+> 
+> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> ehci-mxc: Freescale On-Chip EHCI Host driver
+> usbcore: registered new interface driver usb-storage 10024000.usb supply
+> vbus not found, using dummy regulator Unhandled fault: external abort on
+> non-linefetch (0x808) at 0xf4424184 Internal error: : 808 [#1] PREEMPT
+> ARM Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper Not tainted 3.15.0-rc1-26325-g971f9fd-dirty
+> #64
+> task: c7829aa0 ti: c7836000 task.ti: c7836000 PC is at
+> ci_hdrc_probe+0x3a4/0x634 LR is at ci_hdrc_probe+0x100/0x634
+> pc : [<c036cc78>]    lr : [<c036c9d4>]    psr: 60000013
+> sp : c7837d48  ip : 00000001  fp : 00000000
+> r10: 00000000  r9 : 00000000  r8 : c791b6c0
+> r7 : c7945000  r6 : f4424000  r5 : c7945010  r4 : c794e010
+> r3 : f4424184  r2 : 00000000  r1 : 8c000004  r0 : 0c000004
+> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> Control: 0005317f  Table: a0004000  DAC: 00000017 Process swapper (pid: 1,
+> stack limit = 0xc78361c0)
+> Stack: (0xc7837d48 to 0xc7838000)
+> 7d40:                   00000000 c012e294 c7945010 c06f471c c073dc90
+> c06f471c
+> 7d60: 00000000 c02b9d84 c02b9d6c c7945010 00000000 c02b8874 c02b8a1c
+> 00000000
+> 7d80: c7945010 c02b8a1c c78bc010 c02b6fcc c7828c7c c7a150d4 c7945010
+> c7945044
+> 7da0: c7945010 c02b8744 c7945010 c06e6780 c7945010 c02b7e58 c7945010
+> 00000000
+> 7dc0: c7945018 c02b6440 c7829aa0 c06cd748 c791b6c0 c7945010 00000000
+> 00000002
+> 7de0: c7945000 c7945010 c7945000 00000002 c7893340 c02b9f28 10024000
+> 00000000
+> 7e00: 00000000 c7837e34 c7945000 c036d1d4 00000000 00000000 c78bc010
+> c78bc000
+> 7e20: 00000000 00000091 c7875670 c036e358 c7836000 c78a8aa0 00000100
+> 00000000
+> 7e40: c7881b90 00000003 0000000a 00000003 00000000 c793b9c0 00000000
+> c78bc010
+> 7e60: c06f48c4 c073dc90 c06f48c4 c7836000 c06a4aa0 c02b9d84 c02b9d6c
+> c78bc010
+> 7e80: 00000000 c02b8874 00000000 c78bc010 c06f48c4 c78bc044 00000000
+> c02b8a18
+> 7ea0: 00000000 c06f48c4 c02b898c c02b7070 c7828c6c c78905b0 c06f48c4
+> c7943ee0
+> 7ec0: c06e6780 c02b8050 c05ff4b8 c024a414 c06f48c4 c06f48c4 00000006
+> c06b21c4
+> 7ee0: c0707240 c02b9088 00000000 c06bdd8c 00000006 c0008974 c7866280
+> c01236c0
+> 7f00: c070f434 c7866280 c04c9900 0000004f 00000000 00000000 00000000
+> c01239f4
+> 7f20: 60000053 c06cec64 c7ffc890 c04ec5c0 00000091 c0034300 c064db3c
+> 00000006
+> 7f40: c7ffc897 00000006 c06cec3c c06bdd8c 00000006 c06b21c4 c0707240
+> c0679480
+> 7f60: 00000091 c06b21d0 00000000 c0679af0 00000006 00000006 c0679480
+> ffffffff
+> 7f80: c7837f9c c003f8c0 00000000 c04b8dd0 00000000 00000000 00000000
+> 00000000
+> 7fa0: 00000000 c04b8dd8 00000000 c00095b0 00000000 00000000 00000000
+> 00000000
+> 7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 00000000
+> 7fe0: 00000000 00000000 00000000 00000000 00000013 00000000 ffffffff
+> ffffffff [<c036cc78>] (ci_hdrc_probe) from [<c02b9d84>]
+> (platform_drv_probe+0x18/0x48) [<c02b9d84>] (platform_drv_probe) from
+> [<c02b8874>] (driver_probe_device+0x104/) [<c02b8874>]
+> (driver_probe_device) from [<c02b6fcc>] (bus_for_each_drv+0x48/0x9)
+> [<c02b6fcc>] (bus_for_each_drv) from [<c02b8744>]
+> (device_attach+0x74/0x80) [<c02b8744>] (device_attach) from [<c02b7e58>]
+> (bus_probe_device+0x88/0xb0) [<c02b7e58>] (bus_probe_device) from
+> [<c02b6440>] (device_add+0x3e0/0x4e4) [<c02b6440>] (device_add) from
+> [<c02b9f28>] (platform_device_add+0xac/0x20c) [<c02b9f28>]
+> (platform_device_add) from [<c036d1d4>] (ci_hdrc_add_device+0x198/)
+> [<c036d1d4>] (ci_hdrc_add_device) from [<c036e358>]
+> (ci_hdrc_imx_probe+0x1b4/0x) [<c036e358>] (ci_hdrc_imx_probe) from
+> [<c02b9d84>] (platform_drv_probe+0x18/0x4) [<c02b9d84>]
+> (platform_drv_probe) from [<c02b8874>] (driver_probe_device+0x104/)
+> [<c02b8874>] (driver_probe_device) from [<c02b8a18>]
+> (__driver_attach+0x8c/0x90) [<c02b8a18>] (__driver_attach) from
+> [<c02b7070>] (bus_for_each_dev+0x5c/0x8c) [<c02b7070>] (bus_for_each_dev)
+> from [<c02b8050>] (bus_add_driver+0xd8/0x1d8) [<c02b8050>]
+> (bus_add_driver) from [<c02b9088>] (driver_register+0x78/0xf4)
+> [<c02b9088>] (driver_register) from [<c0008974>]
+> (do_one_initcall+0xf8/0x15c) [<c0008974>] (do_one_initcall) from
+> [<c0679af0>] (kernel_init_freeable+0xec/0x1) [<c0679af0>]
+> (kernel_init_freeable) from [<c04b8dd8>] (kernel_init+0x8/0xec)
+> [<c04b8dd8>] (kernel_init) from [<c00095b0>] (ret_from_fork+0x14/0x24)
+> Code: e3520000 1a000003 e3c004d2 e1801001 (e5831000) ---[ end trace
+> 4042b4d525025a88 ]--- Kernel panic - not syncing: Attempted to kill init!
+> exitcode=0x0000000b
+> 
+> ---[ end Kernel panic - not syncing: Attempted to kill init!
+> exitcode=0x0000000b
+> 
+> 
 
-Why dts is not have ftm1 node?
+Please check if below patch is existed 
 
-Regards,
--Dongsheng
+commit 3b5d3e6845bfe68777d069886b0d1cd5f23b9d58
+Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+Date:   Fri Jan 10 13:51:29 2014 +0800
 
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	freq = clk_get_rate(ftm_clk);
-> +
-> +	calc_closest_cound_cyc(freq);
-> +
-> +	BUG_ON(ftm_clocksource_init(freq));
-> +
-> +	BUG_ON(ftm_clockevent_init(freq, irq));
-> +}
-> +CLOCKSOURCE_OF_DECLARE(vf610, "fsl,vf610-ftm-timer", ftm_timer_init);
-> --
-> 1.8.4
+    usb: chipidea: Fix Internal error: : 808 [#1] ARM related to STS flag
+    
+    * init the sts flag to 0 (missed)
+    * fix write the real bit not sts value
+    * Set PORTCS_STS and DEVLC_STS only if sts = 1
+
+
+I cced chris who has imx27 hardware.
+
+Peter
+
+
+> Does anyone know if USB otg is functional on any mx27 hardware with 3.15-
+> rc1?
+> 
+> 
+> Thanks,
+> 
+> Fabio Estevam
 > 
