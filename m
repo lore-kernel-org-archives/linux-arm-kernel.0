@@ -1,34 +1,38 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 16 Apr 2014 21:50:21 +0800
-Subject: [PATCH] hwrng: remove unbuildable picoxcell TRNG
-In-Reply-To: <20140415100614.GA2037@page.Home>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-7-git-send-email-richard@nod.at>
- <1391977683.25855.27.camel@x220> <1397552118.1985.16.camel@x220>
- <20140415100614.GA2037@page.Home>
-Message-ID: <20140416135021.GI4684@gondor.apana.org.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Apr 2014 14:45:06 +0100
+Subject: [PATCH v7 4/7] arm64: Add ftrace support
+In-Reply-To: <1394862353-28963-5-git-send-email-takahiro.akashi@linaro.org>
+References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
+ <1394862353-28963-5-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140416134506.GD1001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 11:06:14AM +0100, Jamie Iles wrote:
-> Hi Paul,
+On Sat, Mar 15, 2014 at 05:45:50AM +0000, AKASHI Takahiro wrote:
+> This patch implements arm64 specific part to support function tracers,
+> such as function (CONFIG_FUNCTION_TRACER), function_graph
+> (CONFIG_FUNCTION_GRAPH_TRACER) and function profiler
+> (CONFIG_FUNCTION_PROFILER).
 > 
-> On Tue, Apr 15, 2014 at 10:55:18AM +0200, Paul Bolle wrote:
-> > The driver for the "Picochip picoXcell true random number generator" was
-> > added in v2.6.39. Its Kconfig symbol has always depended on
-> > PICOXCELL_PC3X3. But that Kconfig symbol has never been part of the
-> > tree. This means this driver has never been buildable. Let's remove it.
-> > It can be re-added if its dependencies are actually part of the tree.
-> > 
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> With 'function' tracer, all the functions in the kernel are traced with
+> timestamps in ${sysfs}/tracing/trace. If function_graph tracer is
+> specified, call graph is generated.
 > 
-> I wish I had the bandwidth to get this properly supported, but this 
-> seems sensible to me.
+> The kernel must be compiled with -pg option so that _mcount() is inserted
+> at the beginning of functions. This function is called on every function's
+> entry as long as tracing is enabled.
+> In addition, function_graph tracer also needs to be able to probe function's
+> exit. ftrace_graph_caller() & return_to_handler do this by faking link
+> register's value to intercept function's return path.
 > 
-> Acked-by: Jamie Iles <jamie@jamieiles.com>
+> More details on architecture specific requirements are described in
+> Documentation/trace/ftrace-design.txt.
+> 
+> Reviewed-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Patch applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+I'm still slightly suspicious about the alignment of your ASCII art, but:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
