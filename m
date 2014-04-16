@@ -1,18 +1,12 @@
 From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 16 Apr 2014 21:13:14 +0400
-Subject: [PATCH v4 04/21] ARM: dts: pxa3xx: move declaration to header
+Date: Wed, 16 Apr 2014 21:13:15 +0400
+Subject: [PATCH v4 05/21] ARM: dts: pxa27x: irq init using device tree
 In-Reply-To: <1397668411-27162-1-git-send-email-ynvich@gmail.com>
 References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
  <1397668411-27162-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1397668411-27162-5-git-send-email-ynvich@gmail.com>
+Message-ID: <1397668411-27162-6-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This way it will be more difficult to change the declaration in one
-place, but not the other.
-
-In addition, the change allows to use the binding for pxa-gpio on
-other PXA CPUs.
 
 Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
 CC: Daniel Mack <zonque@gmail.com>
@@ -24,36 +18,53 @@ CC: Arnd Bergmann <arnd@arndb.de>
    * no changes
 
    v1..v2
+   * use of_have_populated_dt() instead of a static variable
    * drop #ifdef in header file
-   * number changed from 6 to 4 (dropped patches)
+   * number changed from 8 to 5 (dropped patches)
 
- arch/arm/mach-pxa/include/mach/irqs.h | 2 ++
- arch/arm/mach-pxa/pxa3xx.c            | 2 --
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/include/mach/pxa27x.h |  1 +
+ arch/arm/mach-pxa/pxa27x.c              | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-index 48c2fd8..732315d 100644
---- a/arch/arm/mach-pxa/include/mach/irqs.h
-+++ b/arch/arm/mach-pxa/include/mach/irqs.h
-@@ -113,4 +113,6 @@ void ichp_handle_irq(struct pt_regs *);
- void pxa_init_irq(int irq_nr, int (*set_wake)(struct irq_data *, unsigned int));
- #endif
+diff --git a/arch/arm/mach-pxa/include/mach/pxa27x.h b/arch/arm/mach-pxa/include/mach/pxa27x.h
+index 7cff640..34a4d6f 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa27x.h
++++ b/arch/arm/mach-pxa/include/mach/pxa27x.h
+@@ -23,6 +23,7 @@ extern void __init pxa27x_map_io(void);
+ extern void __init pxa27x_init_irq(void);
+ extern int __init pxa27x_set_pwrmode(unsigned int mode);
+ extern void pxa27x_cpu_pm_enter(suspend_state_t state);
++extern void __init pxa27x_dt_init_irq(void);
  
-+extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
+ #define pxa27x_handle_irq	ichp_handle_irq
+ 
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index 301471a..c6b54f8 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -398,6 +398,13 @@ void __init pxa27x_init_irq(void)
+ 	pxa_init_irq(34, pxa27x_set_wake);
+ }
+ 
++#ifdef CONFIG_OF
++void __init pxa27x_dt_init_irq(void)
++{
++	pxa_dt_irq_init(pxa27x_set_wake);
++}
++#endif  /* CONFIG_OF */
 +
- #endif /* __ASM_MACH_IRQS_H */
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index 87011f3..2397dec 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -42,8 +42,6 @@
- #define PECR_IE(n)	((1 << ((n) * 2)) << 28)
- #define PECR_IS(n)	((1 << ((n) * 2)) << 29)
+ static struct map_desc pxa27x_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
+@@ -471,6 +478,9 @@ static int __init pxa27x_init(void)
+ 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
+ 		register_syscore_ops(&pxa2xx_clock_syscore_ops);
  
--extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *, unsigned int));
--
- static DEFINE_PXA3_CKEN(pxa3xx_ffuart, FFUART, 14857000, 1);
- static DEFINE_PXA3_CKEN(pxa3xx_btuart, BTUART, 14857000, 1);
- static DEFINE_PXA3_CKEN(pxa3xx_stuart, STUART, 14857000, 1);
++		if (of_have_populated_dt())
++			return 0;
++
+ 		pxa_register_device(&pxa27x_device_gpio, &pxa27x_gpio_info);
+ 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	}
 -- 
 1.8.4.2
