@@ -1,107 +1,73 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 16 Apr 2014 19:23:49 +0900
-Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
-In-Reply-To: <534E4089.9070804@arm.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
- <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
- <534CF847.5040008@arm.com> <534CF9B4.306@samsung.com>
- <534CFAD7.4030508@arm.com> <534E3DC0.40502@samsung.com>
- <534E4089.9070804@arm.com>
-Message-ID: <534E5A35.7050708@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 16 Apr 2014 15:56:57 +0530
+Subject: [PATCH v7 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <CA+mB=1LDGCY3sN5sL1giOwwqHjD8gG74Yy0dXRS8s+MtDOvxHw@mail.gmail.com>
+References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
+ <1396008222-7058-3-git-send-email-sthokal@xilinx.com>
+ <20140416090605.GP32284@intel.com>
+ <CA+mB=1LDGCY3sN5sL1giOwwqHjD8gG74Yy0dXRS8s+MtDOvxHw@mail.gmail.com>
+Message-ID: <20140416102657.GS32284@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 04/16/2014 05:34 PM, Marc Zyngier wrote:
-> On 16/04/14 09:22, Chanwoo Choi wrote:
->> Hi Marc,
->>
->> On 04/15/2014 06:24 PM, Marc Zyngier wrote:
->>> On 15/04/14 10:19, Chanwoo Choi wrote:
->>>> On 04/15/2014 06:13 PM, Marc Zyngier wrote:
->>>>> On 15/04/14 09:27, Chanwoo Choi wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
->>>>>>> On 15/04/14 02:59, Chanwoo Choi wrote:
->>>>>>>> From: Tomasz Figa <t.figa@samsung.com>
->>>>>>>>
->>>>>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
->>>>>>>> dual core and includes following dt nodes:
->>>>>>>>
->>>>>>>> - GIC interrupt controller
->>>>>>>> - Pinctrl to control GPIOs
->>>>>>>> - Clock controller
->>>>>>>> - CPU information (Cortex-A7 dual core)
->>>>>>>> - UART to support serial port
->>>>>>>> - MCT (Multi Core Timer)
->>>>>>>> - ADC (Analog Digital Converter)
->>>>>>>> - I2C/SPI bus
->>>>>>>> - Power domain
->>>>>>>> - PMU (Performance Monitoring Unit)
->>>>>>>> - MSHC (Mobile Storage Host Controller)
->>>>>>>> - PWM (Pluse Width Modulation)
->>>>>>>> - AMBA bus
->>>>>>>
->>>>>>> [...]
->>>>>>>
->>>>>>> Where is the arch timer node?
->>>>>>
->>>>>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
->>>>>> - in drivers/clocksource/exynos_mct.c
->>>>>
->>>>> Don't you have a Cortex-A7? If so, you have the arch timer.
->>>>
->>>> Do you means that 'arch timer" is ARM_ARCH_TIMER?
->>>
->>> Yes.
->>>
->>>> As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
->>>> But, Exynos SoC used MCT clocksource for system timer.
->>>>
->>>> Exynos dts file didn't include arch timer node but only include mct node.
->>>
->>> Well, it is a bug, and a recurrent one. A Cortex-A7 has the arch timers
->>> implemented. Always.
->>>
->>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0464f/BABFEBJJ.html
->>>
->>> All Cortex-A7 have it, and so do A12, A15, A17, A53, A57.
->>
->> I tested 'arch_timer'(drivers/clocksource/arm_arch_timer.c) on Exynos3250 based on Cortex-A7.
->>
->> To test arch timer, I used the clocksource of arch_timer for timekeeping instead of clocksource
->> of Exynos MCT. But, I faced with issue. The following function return only same value(zero)
->> as following kernel log:
->> - arch_counter_get_cntvct() in arch/arm/include/asm/arch_timer.h
->>
->> Uncompressing Linux... done, booting the kernel.
->> [    0.000000] Booting Linux on physical CPU 0x0
->> [    0.000000] Initializing cgroup subsys cpuset
->> [    0.000000] Initializing cgroup subsys cpu
->> [    0.000000] Initializing cgroup subsys cpuacct
->> [    0.000000] Linux version 3.15.0-rc1-00020-gf452826-dirty ...
->> [    0.000000] CPU: ARMv7 Processor ...
->> ...
->> [    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
->> [    0.000000] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
->> ...
->>
->> Could you give me a solution to resolve this issue or a expected cause?
+On Wed, Apr 16, 2014 at 03:41:34PM +0530, Srikanth Thokala wrote:
+> On Wed, Apr 16, 2014 at 2:36 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Fri, Mar 28, 2014 at 05:33:42PM +0530, Srikanth Thokala wrote:
+> >> This is the driver for the AXI Video Direct Memory Access (AXI
+> >> VDMA) core, which is a soft Xilinx IP core that provides high-
+> >> bandwidth direct memory access between memory and AXI4-Stream
+> >> type video target peripherals. The core provides efficient two
+> >> dimensional DMA operations with independent asynchronous read
+> >> and write channel operation.
+> >>
+> >> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
+> >
+> > Okay the series is fine and was going to apply it BUT
+> > 1) need ack on DT patch..
+> > 2) issues below on managing the descriptor and resetting the cookie :(
 > 
-> My guess is that you need to enable some clock for the timer to tick.
-> Ask your HW guys how they have wired this clock.
+> Ok.
 > 
-> Also, I cannot help but notice that you are entering your kernel at SVC
-> instead of HYP. I suggest you fix your bootloader/firmware to allow all
-> CPUs to enter the kernel in HYP.
+> >
+> >> +
+> >> +/**
+> >> + * xilinx_vdma_tx_descriptor - Allocate transaction descriptor
+> >> + * @chan: Driver specific VDMA channel
+> >> + *
+> >> + * Return: The allocated descriptor on success and NULL on failure.
+> >> + */
+> >> +static struct xilinx_vdma_tx_descriptor *
+> >> +xilinx_vdma_alloc_tx_descriptor(struct xilinx_vdma_chan *chan)
+> >> +{
+> >> +     struct xilinx_vdma_tx_descriptor *desc;
+> >> +     unsigned long flags;
+> >> +
+> >> +     if (chan->allocated_desc)
+> >> +             return chan->allocated_desc;
+> > ??
+> >
+> >> +
+> >> +     desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+> >> +     if (!desc)
+> >> +             return NULL;
+> >> +
+> >> +     spin_lock_irqsave(&chan->lock, flags);
+> >> +     chan->allocated_desc = desc;
+> > ah why do you need this?
+> >
+> > So this essentailly prevents you from preparing two trasactions at same time as
+> > you would overwrite??
+> 
+> This will allow to queue up multiple segments on to a single
+> transaction descriptor.
+> User will submit this single desc and in the issue_pending() we decode multiple
+> segments and submit to SG HW engine.  We free up the allocated_desc when it is
+> submitted to the HW.  This is added after my discussion with Jaswinder, to best
+> utilize HW SG engine.
 
-I think again that I would like to add arch_timer dt node to exynos3250.dtsi
-as separated patchset after finishing the test arch_timer clocksource for timekeeping.
+I think best utilization of HW SG engine would happen if we collate the pending
+list when you start dma....
 
-Thanks for your review.
-
-Best Regards,
-Chanwoo Choi
+-- 
+~Vinod
