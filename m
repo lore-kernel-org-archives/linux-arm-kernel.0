@@ -1,101 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Apr 2014 09:34:17 +0100
-Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
-In-Reply-To: <534E3DC0.40502@samsung.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
- <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
- <534CF847.5040008@arm.com> <534CF9B4.306@samsung.com>
- <534CFAD7.4030508@arm.com> <534E3DC0.40502@samsung.com>
-Message-ID: <534E4089.9070804@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 16 Apr 2014 16:34:49 +0800
+Subject: [PATCH] ARM: mach-mxs: readd just removed select CLKSRC_OF
+In-Reply-To: <1397546439-25153-1-git-send-email-lauri.hintsala@bluegiga.com>
+References: <1397546439-25153-1-git-send-email-lauri.hintsala@bluegiga.com>
+Message-ID: <20140416083447.GB11602@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/14 09:22, Chanwoo Choi wrote:
-> Hi Marc,
+On Tue, Apr 15, 2014 at 10:20:39AM +0300, Lauri Hintsala wrote:
+> MXS based apx4devkit doesn't boot with latest Linux v3.15-rc1
+> because commit ddb902cc34593ecb88c368f6e15db3cf829c56fe removed
+> "select CLKSRC_OF" from the machine config.
 > 
-> On 04/15/2014 06:24 PM, Marc Zyngier wrote:
->> On 15/04/14 10:19, Chanwoo Choi wrote:
->>> On 04/15/2014 06:13 PM, Marc Zyngier wrote:
->>>> On 15/04/14 09:27, Chanwoo Choi wrote:
->>>>> Hi,
->>>>>
->>>>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
->>>>>> On 15/04/14 02:59, Chanwoo Choi wrote:
->>>>>>> From: Tomasz Figa <t.figa@samsung.com>
->>>>>>>
->>>>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
->>>>>>> dual core and includes following dt nodes:
->>>>>>>
->>>>>>> - GIC interrupt controller
->>>>>>> - Pinctrl to control GPIOs
->>>>>>> - Clock controller
->>>>>>> - CPU information (Cortex-A7 dual core)
->>>>>>> - UART to support serial port
->>>>>>> - MCT (Multi Core Timer)
->>>>>>> - ADC (Analog Digital Converter)
->>>>>>> - I2C/SPI bus
->>>>>>> - Power domain
->>>>>>> - PMU (Performance Monitoring Unit)
->>>>>>> - MSHC (Mobile Storage Host Controller)
->>>>>>> - PWM (Pluse Width Modulation)
->>>>>>> - AMBA bus
->>>>>>
->>>>>> [...]
->>>>>>
->>>>>> Where is the arch timer node?
->>>>>
->>>>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
->>>>> - in drivers/clocksource/exynos_mct.c
->>>>
->>>> Don't you have a Cortex-A7? If so, you have the arch timer.
->>>
->>> Do you means that 'arch timer" is ARM_ARCH_TIMER?
->>
->> Yes.
->>
->>> As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
->>> But, Exynos SoC used MCT clocksource for system timer.
->>>
->>> Exynos dts file didn't include arch timer node but only include mct node.
->>
->> Well, it is a bug, and a recurrent one. A Cortex-A7 has the arch timers
->> implemented. Always.
->>
->> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0464f/BABFEBJJ.html
->>
->> All Cortex-A7 have it, and so do A12, A15, A17, A53, A57.
-> 
-> I tested 'arch_timer'(drivers/clocksource/arm_arch_timer.c) on Exynos3250 based on Cortex-A7.
-> 
-> To test arch timer, I used the clocksource of arch_timer for timekeeping instead of clocksource
-> of Exynos MCT. But, I faced with issue. The following function return only same value(zero)
-> as following kernel log:
-> - arch_counter_get_cntvct() in arch/arm/include/asm/arch_timer.h
-> 
-> Uncompressing Linux... done, booting the kernel.
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Initializing cgroup subsys cpuset
-> [    0.000000] Initializing cgroup subsys cpu
-> [    0.000000] Initializing cgroup subsys cpuacct
-> [    0.000000] Linux version 3.15.0-rc1-00020-gf452826-dirty ...
-> [    0.000000] CPU: ARMv7 Processor ...
-> ...
-> [    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
-> [    0.000000] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
-> ...
-> 
-> Could you give me a solution to resolve this issue or a expected cause?
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: Rob Herring <robh@kernel.org>
+> CC: Shawn Guo <shawn.guo@linaro.org>
 
-My guess is that you need to enable some clock for the timer to tick.
-Ask your HW guys how they have wired this clock.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Also, I cannot help but notice that you are entering your kernel at SVC
-instead of HYP. I suggest you fix your bootloader/firmware to allow all
-CPUs to enter the kernel in HYP.
+Hi, arm-soc folks,
 
-Thanks,
+I just sent a batch of fixes for 3.15 off my hand to you guys.  Can you
+please apply this fix directly on arm-soc for 3.15?  Thanks.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Shawn
+
+> Signed-off-by: Lauri Hintsala <lauri.hintsala@bluegiga.com>
+> ---
+> I think commit ddb902cc34593ecb88c368f6e15db3cf829c56fe might break
+> also other armv4/5 based boards which are using CLKSRC_OF. There is
+> already patch for MOXA ART SoCs: https://lkml.org/lkml/2014/4/11/308
+> 
+>  arch/arm/mach-mxs/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 8479413..b3eb28c 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -17,6 +17,7 @@ config ARCH_MXS
+>  	depends on ARCH_MULTI_V5
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CLKSRC_MMIO
+> +	select CLKSRC_OF
+>  	select PINCTRL
+>  	select SOC_BUS
+>  	select SOC_IMX23
+> -- 
+> 1.8.3.2
+> 
