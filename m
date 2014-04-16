@@ -1,41 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 16 Apr 2014 13:07:05 -0400
-Subject: [PATCH v2 0/5] Support for Marvell AHCI interface on Armada 38x
-In-Reply-To: <20140414204455.5d83513d@skate>
-References: <1397486055-16303-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <16639486.i0jTGsaDYr@amdc1032> <20140414180142.0dd63a1f@skate>
- <10589751.qhi630WAFs@amdc1032> <20140414181920.1e309019@skate>
- <20140414174606.GB10416@htj.dyndns.org>
- <20140414204455.5d83513d@skate>
-Message-ID: <20140416170705.GK28159@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Apr 2014 18:06:39 +0100
+Subject: [PATCH] regmap: i2c: fallback to SMBus if the adapter does not
+ support standard I2C
+In-Reply-To: <1397636170-664-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <20140415223849.GJ12304@sirena.org.uk>
+ <1397636170-664-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140416170638.GT12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 08:44:55PM +0200, Thomas Petazzoni wrote:
-> On Mon, 14 Apr 2014 13:46:06 -0400, Tejun Heo wrote:
-> > Also, how do you want the patches to be routed?  Can all go through libata?
-> 
-> As written in the cover letter, I'd expect patches 1 and 2 to go
-> through libata, and then patches 3, 4 and 5 to go through arm-soc. The
-> reason is that patches 3, 4 and 5 modifies the Device Tree files and
-> the ARM defconfigs, which are likely to also be changed by other
-> commits in the same cycle. However, the DT binding documentation change
-> and the driver change are independent, so they can go through libata.
-> 
-> I guess Jason Cooper, who handles the patch merging for mvebu
-> platforms, can confirm (or not?) this proposal.
+On Wed, Apr 16, 2014 at 10:16:10AM +0200, Boris BREZILLON wrote:
 
-Yep, this is how we do it.  The only caveat is if there are going to be
-changes during this window that depend on the driver changes in this
-series.  Then we would ask to set up a topic branch.
+> +	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
+> +		return &regmap_i2c;
+> +	} else if (config->val_bits == 16 &&
+> +		   i2c_check_functionality(i2c->adapter,
+> +					   I2C_FUNC_SMBUS_WORD_DATA)) {
+> +                config->reg_read = regmap_smbus_word_reg_read;
+> +                config->reg_write = regmap_smbus_word_reg_write;
+> +		return NULL;
 
-That happens a little more frequently now that we have boards in the
-boot farm testing linux-next and other trees.  It means we also care
-about boot-time dependencies as well as build deps.
-
-I'll take a closer look at this series in the next few days and let you
-know.
-
-thx,
-
-Jason.
+This all looks good to me except we shouldn't be modifying the config
+struct (it's supposed to be const).  We should instead add the ability
+for the bus to set these ops - that'll also be useful for things like
+AC'97.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/575bc83b/attachment.sig>
