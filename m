@@ -1,88 +1,115 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 16 Apr 2014 15:09:43 +0200
-Subject: [PATCH 1/4] mmc: sdhci: add a driver for Berlin SoCs
-In-Reply-To: <1397652994.30935.5.camel@joe-AO722>
-References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
- <1397652994.30935.5.camel@joe-AO722>
-Message-ID: <20140416130943.GF17754@kwain>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 16 Apr 2014 15:09:22 +0200
+Subject: [linux-sunxi] Re: [PATCH 7/7] ARM: sun7i: cubietruck: enable
+ bluetooth module
+In-Reply-To: <CAGb2v67HzB22a3huRRZyufXkdTFE410MhXqAHyC-MmVo0-GCFA@mail.gmail.com>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-8-git-send-email-wens@csie.org>
+ <20140415144215.GG3207@lukather>
+ <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
+ <20140416094428.GK3207@lukather>
+ <CAGb2v67HzB22a3huRRZyufXkdTFE410MhXqAHyC-MmVo0-GCFA@mail.gmail.com>
+Message-ID: <534E8102.4070404@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joe,
+Hi,
 
-On Wed, Apr 16, 2014 at 05:56:34AM -0700, Joe Perches wrote:
-> On Wed, 2014-04-16 at 14:40 +0200, Antoine T?nart wrote:
-> > Add a Driver to support the SDHCI controller of the Marvell Berlin SoCs.
-> > This controller supports 3 sockets.
+On 04/16/2014 12:39 PM, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> trivial notes:
+> On Wed, Apr 16, 2014 at 5:44 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> Hi,
+>>
+>> Please try to keep me in CC, even though the ML doesn't make it easy..
 > 
-> > diff --git a/drivers/mmc/host/sdhci-berlin.c b/drivers/mmc/host/sdhci-berlin.c
-> []
-> > +static struct sdhci_ops sdhci_berlin_ops = {
-> > +	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-> > +};
-> > +
-> > +static struct sdhci_pltfm_data sdhci_berlin2_pdata = {
-> > +	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
-> > +		  SDHCI_QUIRK_BROKEN_ADMA |
-> > +		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
-> > +	.ops = &sdhci_berlin_ops,
-> > +};
-> > +
-> > +static struct sdhci_pltfm_data sdhci_berlin2q_pdata = {
-> > +	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
-> > +		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
-> > +		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
-> > +	.ops = &sdhci_berlin_ops,
-> > +};
+> Sorry about that.
 > 
-> Perhaps const?
-
-Yes, sure. I'll fix that.
-
+>> On Wed, Apr 16, 2014 at 12:06:59AM +0800, Chen-Yu Tsai wrote:
+>>>>> @@ -139,4 +152,16 @@
+>>>>>       reg_usb2_vbus: usb2-vbus {
+>>>>>               status = "okay";
+>>>>>       };
+>>>>> +
+>>>>> +     rfkill_bt {
+>>>>> +             compatible = "rfkill-gpio";
+>>>>> +             pinctrl-names = "default";
+>>>>> +             pinctrl-0 = <&bt_pwr_pin_cubietruck>, <&clk_out_a_pins_a>;
+>>>>> +             clocks = <&clk_out_a>;
+>>>>> +             clock-frequency = <32768>;
+>>>>> +             gpios = <&pio 7 18 0>; /* PH18 */
+>>>>> +             gpio-names = "reset";
+>>>>> +             rfkill-name = "bt";
+>>>>> +             rfkill-type = <2>;
+>>>>> +     };
+>>>>
+>>>> Hmmm, I don't think that's actually right.
+>>>>
+>>>> If you have such a device, then I'd expect it to be represented as a
+>>>> full device in the DT, probably with one part for the WiFi, one part
+>>>> for the Bluetooth, and here the definition of the rfkill device that
+>>>> controls it.
+>>>
+>>> The AP6210 is not one device, but 2 separate chips in one module. Each
+>>> chip has its own controls and interface. They just so happen to share
+>>> the same enclosure. Even 2-in-1 chips by Broadcom have separate controls
+>>> and interfaces. The WiFi side is most likely connected via SDIO, while
+>>> the Bluetooth side is connected to a UART, and optionally I2S for sound.
+>>
+>> It's even easier to represent then.
+>>
+>>>> But tying parts of the device to the rfkill that controls it, such as
+>>>> the clocks, or the frequency it runs at seems just wrong.
+>>>
+>>> I understand where you're coming from. For devices on buses that require
+>>> drivers (such as USB, SDIO) these properties probably should be tied to
+>>> the device node.
+>>>
+>>> For our use case here, which is a bluetooth chip connected on the UART,
+>>> there is no in kernel representation or driver to tie them to. Same goes
+>>> for UART based GPS chips. They just so happen to require toggling a GPIO,
+>>> and maybe enabling a specific clock, to get it running. Afterwards,
+>>> accessing it is done solely from userspace. For our Broadcom chips, the
+>>> user has to upload its firmware first, then designate the tty as a Bluetooth
+>>> HCI using hciattach.
+>>>
+>>> We are using the rfkill device as a on-off switch.
+>>
+>> I understand your point, but the fact that it's implemented in
+>> user-space, or that UART is not a bus (which probably should be), is
+>> only a Linux specific story, and how it's implemented in Linux (even
+>> if the whole rfkill node is another one, but let's stay on topic).
 > 
-> > +static int sdhci_berlin_probe(struct platform_device *pdev)
-> > +{
-> []
-> > +	host = sdhci_pltfm_init(pdev,
-> > +				(struct sdhci_pltfm_data *)device->data, 0);
+> I gave it some thought last night. You are right. My whole approach
+> is wrong. But let's try to make it right.
 > 
-> Unnecessary cast?  Maybe:
+> So considering the fact that it's primarily connected to a UART,
+> maybe I should make it a sub-node to the UART node it's actually
+> connected to? Something like:
 > 
-> 	host = sdhci_pltfm_init(pdev, device->data, 0);
-
-Right.
-
+>         uart2: serial at 01c28800 {
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&uart2_pins_a>;
+>                 status = "okay";
 > 
-> > +	if (IS_ERR(host))
-> > +		return PTR_ERR(host);
-> > +
-> > +	pltfm_host = sdhci_priv(host);
-> > +
-> > +	clk = devm_clk_get(dev, NULL);
-> > +	if (IS_ERR(clk)) {
-> > +		dev_err(dev, "could not get clock: %ld\n", PTR_ERR(clk));
-> > +		ret = PTR_ERR(clk);
+>                 bt: bt_hci {
+>                         compatible = "brcm,bcm20710";
+>                         /* maybe add some generic compatible */
+>                         pinctrl-names = "default";
+>                         pinctrl-0 = <&clk_out_a_pins_a>,
+> <&bt_pwr_pin_cubietruck>;
+>                         clocks = <&clk_out_a>;
+>                         clock-frequency = <32768>;
+>                         gpios = <&pio 7 18 0>; /* PH18 */
+>                 };
+>         };
 > 
-> PTR_ERR is an int.  Does this produce a compile warning?
+> And let the uart core handle power sequencing for sub-nodes.
 
-It does, I had a warning.
+Great, I missed this reply when I typed my mail I send a few minutes
+ago. I agree that this approach is how thing should be.
 
-> Maybe reverse these lines and use ret?
-> 
-> 		ret = PTR_ERR(clk);
-> 		dev_err(dev, count not get clock: %d\n", ret);
+Regards,
 
-That's better. Will do.
-
-Thanks !
-
-Antoine
-
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Hans
