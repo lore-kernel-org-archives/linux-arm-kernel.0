@@ -1,52 +1,211 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 15 Apr 2014 17:54:59 -0700
-Subject: [PATCH] ARM: tegra: make Venice's +3.3V_RUN regulator always on
-In-Reply-To: <1397600984-25198-1-git-send-email-swarren@wwwdotorg.org>
-References: <1397600984-25198-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAL1qeaGek9H74s00T-O7P7F6Uraa9juW=3LCMjTUjCuQCZ0pBw@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 16 Apr 2014 10:13:39 +0900
+Subject: [PATCHv2 1/2] iio: adc: exynos_adc: Control special clock of ADC
+ to support Exynos3250 ADC
+In-Reply-To: <1397466426-13870-2-git-send-email-cw00.choi@samsung.com>
+References: <1397466426-13870-1-git-send-email-cw00.choi@samsung.com>
+ <1397466426-13870-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <534DD943.8050707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 3:29 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> This regulator supplies power to pretty much everything on the board, so
-> it doesn't make sense to allow it to turn off. Mark it boot-on and
-> always-on so it doesn't get turned off. Without this, I see issues with
-> the eMMC device; it can't be correctly detected during boot.
+Hi Jonathan,
 
-This actually isn't a complete fix.  +3V3_RUN will still toggle on a
-cold boot because the GPIO1_INVERT bit is initialized by the PMIC to
-1, but when the regulator core requests the GPIO as an output,
-as3722_gpio_direction_output() first sets the output value to 1
-(without considering the INVERT bit!) and then clears the invert bit
-when setting the mode in as3722_pinctrl_gpio_set_direction().  The
-as3722 driver should probably not touch the INVERT bit and instead
-just take it into account when setting the GPIO value.
+Any comment of this patchset?
 
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Best Regards,
+Chanwoo Choi
+
+On 04/14/2014 06:07 PM, Chanwoo Choi wrote:
+> This patch control special clock for ADC in Exynos series's FSYS block.
+> If special clock of ADC is registerd on clock list of common clk framework,
+> Exynos ADC drvier have to control this clock.
+> 
+> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+> - 'adc' clock: bus clock for ADC
+> 
+> Exynos3250 has additional 'sclk_tsadc' clock as following:
+> - 'sclk_tsadc' clock: special clock for ADC which provide clock to internal ADC
+> 
+> Exynos 4210/4212/4412 and Exynos5250/5420 has not included 'sclk_tsadc' clock
+> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included 'sclk_tsadc'
+> clock in FSYS_BLK.
+> 
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Naveen Krishna Chatradhi
+> Cc: linux-iio at vger.kernel.org
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/tegra124-venice2.dts | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
-> index c17283c04598..87537f499875 100644
-> --- a/arch/arm/boot/dts/tegra124-venice2.dts
-> +++ b/arch/arm/boot/dts/tegra124-venice2.dts
-> @@ -1060,6 +1060,8 @@
->                         regulator-name = "+3.3V_RUN";
->                         regulator-min-microvolt = <3300000>;
->                         regulator-max-microvolt = <3300000>;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
->                         gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
->                         enable-active-high;
->                         vin-supply = <&vdd_3v3_sys>;
-> --
-> 1.8.1.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  drivers/iio/adc/exynos_adc.c | 54 +++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 41 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+> index d25b262..3c99243 100644
+> --- a/drivers/iio/adc/exynos_adc.c
+> +++ b/drivers/iio/adc/exynos_adc.c
+> @@ -40,8 +40,9 @@
+>  #include <linux/iio/driver.h>
+>  
+>  enum adc_version {
+> -	ADC_V1,
+> -	ADC_V2
+> +	ADC_V1 = 0x1,
+> +	ADC_V2 = 0x2,
+> +	ADC_V3 = (ADC_V1 | ADC_V2),
+>  };
+>  
+>  /* EXYNOS4412/5250 ADC_V1 registers definitions */
+> @@ -88,6 +89,7 @@ struct exynos_adc {
+>  	void __iomem		*regs;
+>  	void __iomem		*enable_reg;
+>  	struct clk		*clk;
+> +	struct clk		*sclk;
+>  	unsigned int		irq;
+>  	struct regulator	*vdd;
+>  
+> @@ -100,6 +102,7 @@ struct exynos_adc {
+>  static const struct of_device_id exynos_adc_match[] = {
+>  	{ .compatible = "samsung,exynos-adc-v1", .data = (void *)ADC_V1 },
+>  	{ .compatible = "samsung,exynos-adc-v2", .data = (void *)ADC_V2 },
+> +	{ .compatible = "samsung,exynos-adc-v3", .data = (void *)ADC_V3 },
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, exynos_adc_match);
+> @@ -128,7 +131,7 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
+>  	mutex_lock(&indio_dev->mlock);
+>  
+>  	/* Select the channel to be used and Trigger conversion */
+> -	if (info->version == ADC_V2) {
+> +	if (info->version & ADC_V2) {
+>  		con2 = readl(ADC_V2_CON2(info->regs));
+>  		con2 &= ~ADC_V2_CON2_ACH_MASK;
+>  		con2 |= ADC_V2_CON2_ACH_SEL(chan->address);
+> @@ -165,7 +168,7 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+>  	info->value = readl(ADC_V1_DATX(info->regs)) &
+>  						ADC_DATX_MASK;
+>  	/* clear irq */
+> -	if (info->version == ADC_V2)
+> +	if (info->version & ADC_V2)
+>  		writel(1, ADC_V2_INT_ST(info->regs));
+>  	else
+>  		writel(1, ADC_V1_INTCLR(info->regs));
+> @@ -226,11 +229,25 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
+>  	return 0;
+>  }
+>  
+> +static void exynos_adc_enable_clock(struct exynos_adc *info, bool enable)
+> +{
+> +	if (enable) {
+> +		clk_prepare_enable(info->clk);
+> +		if (info->version == ADC_V3)
+> +			clk_prepare_enable(info->sclk);
+> +
+> +	} else {
+> +		if (info->version == ADC_V3)
+> +			clk_disable_unprepare(info->sclk);
+> +		clk_disable_unprepare(info->clk);
+> +	}
+> +}
+> +
+>  static void exynos_adc_hw_init(struct exynos_adc *info)
+>  {
+>  	u32 con1, con2;
+>  
+> -	if (info->version == ADC_V2) {
+> +	if (info->version & ADC_V2) {
+>  		con1 = ADC_V2_CON1_SOFT_RESET;
+>  		writel(con1, ADC_V2_CON1(info->regs));
+>  
+> @@ -300,6 +317,8 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>  
+>  	writel(1, info->enable_reg);
+>  
+> +	info->version = exynos_adc_get_version(pdev);
+> +
+>  	info->clk = devm_clk_get(&pdev->dev, "adc");
+>  	if (IS_ERR(info->clk)) {
+>  		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
+> @@ -308,6 +327,17 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>  		goto err_irq;
+>  	}
+>  
+> +	if (info->version == ADC_V3) {
+> +		info->sclk = devm_clk_get(&pdev->dev, "sclk_tsadc");
+> +		if (IS_ERR(info->sclk)) {
+> +			dev_warn(&pdev->dev,
+> +				"failed getting sclk clock, err = %ld\n",
+> +				PTR_ERR(info->sclk));
+> +			ret = PTR_ERR(info->sclk);
+> +			goto err_irq;
+> +		}
+> +	}
+> +
+>  	info->vdd = devm_regulator_get(&pdev->dev, "vdd");
+>  	if (IS_ERR(info->vdd)) {
+>  		dev_err(&pdev->dev, "failed getting regulator, err = %ld\n",
+> @@ -316,8 +346,6 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>  		goto err_irq;
+>  	}
+>  
+> -	info->version = exynos_adc_get_version(pdev);
+> -
+>  	platform_set_drvdata(pdev, indio_dev);
+>  
+>  	indio_dev->name = dev_name(&pdev->dev);
+> @@ -340,7 +368,7 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_iio_dev;
+>  
+> -	clk_prepare_enable(info->clk);
+> +	exynos_adc_enable_clock(info, true);
+>  
+>  	exynos_adc_hw_init(info);
+>  
+> @@ -356,7 +384,7 @@ err_of_populate:
+>  	device_for_each_child(&pdev->dev, NULL,
+>  				exynos_adc_remove_devices);
+>  	regulator_disable(info->vdd);
+> -	clk_disable_unprepare(info->clk);
+> +	exynos_adc_enable_clock(info, false);
+>  err_iio_dev:
+>  	iio_device_unregister(indio_dev);
+>  err_irq:
+> @@ -372,7 +400,7 @@ static int exynos_adc_remove(struct platform_device *pdev)
+>  	device_for_each_child(&pdev->dev, NULL,
+>  				exynos_adc_remove_devices);
+>  	regulator_disable(info->vdd);
+> -	clk_disable_unprepare(info->clk);
+> +	exynos_adc_enable_clock(info, false);
+>  	writel(0, info->enable_reg);
+>  	iio_device_unregister(indio_dev);
+>  	free_irq(info->irq, info);
+> @@ -387,7 +415,7 @@ static int exynos_adc_suspend(struct device *dev)
+>  	struct exynos_adc *info = iio_priv(indio_dev);
+>  	u32 con;
+>  
+> -	if (info->version == ADC_V2) {
+> +	if (info->version & ADC_V2) {
+>  		con = readl(ADC_V2_CON1(info->regs));
+>  		con &= ~ADC_CON_EN_START;
+>  		writel(con, ADC_V2_CON1(info->regs));
+> @@ -397,7 +425,7 @@ static int exynos_adc_suspend(struct device *dev)
+>  		writel(con, ADC_V1_CON(info->regs));
+>  	}
+>  
+> -	clk_disable_unprepare(info->clk);
+> +	exynos_adc_enable_clock(info, false);
+>  	writel(0, info->enable_reg);
+>  	regulator_disable(info->vdd);
+>  
+> @@ -415,7 +443,7 @@ static int exynos_adc_resume(struct device *dev)
+>  		return ret;
+>  
+>  	writel(1, info->enable_reg);
+> -	clk_prepare_enable(info->clk);
+> +	exynos_adc_enable_clock(info, true);
+>  
+>  	exynos_adc_hw_init(info);
+>  
+> 
