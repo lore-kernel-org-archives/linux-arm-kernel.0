@@ -1,58 +1,27 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 16 Apr 2014 21:56:26 +0200
-Subject: [PATCH] clocksource: efm32: let CLKSRC_EFM32 select CLKSRC_OF
-In-Reply-To: <20140416193036.GS5969@pengutronix.de>
-References: <CAL_JsqKXYOdpCkixBLg8kAXwpkaLHhckJnTkzdNVeOQDYzxK3w@mail.gmail.com>
- <1397673612-24247-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAL_Jsq+Wm-jxeZoYXpC+W3Was5WTS2UqLJ__N5uPB43ZHUmrLw@mail.gmail.com>
- <20140416193036.GS5969@pengutronix.de>
-Message-ID: <534EE06A.4020904@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Apr 2014 20:53:42 +0100
+Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
+In-Reply-To: <20140416191825.GA22246@redhat.com>
+References: <20140416145107.GA11039@redhat.com>
+ <20140416.110031.1269128188581361698.davem@davemloft.net>
+ <20140416164310.GA15739@redhat.com>
+ <20140416.133831.364304583096073299.davem@davemloft.net>
+ <20140416191825.GA22246@redhat.com>
+Message-ID: <20140416195342.GH24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2014 09:30 PM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> On Wed, Apr 16, 2014 at 01:51:17PM -0500, Rob Herring wrote:
->> On Wed, Apr 16, 2014 at 1:40 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->>> The efm32 timer driver is only usable with CLKSRC_OF, so it makes sense
->>> to let its Kconfig symbol select it. For compile coverage testing it's not
->>> needed though, so only select it if ARCH_EFM32 is enabled.
->>>
->>> This allows to drop ARCH_EFM32 selecting CLKSRC_OF which is done here
->>> for simplicity, too.
->>>
->>> Reported-by: Rob Herring <robherring2@gmail.com>
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>> ---
->>> [...]
->>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>> --- a/drivers/clocksource/Kconfig
->>> +++ b/drivers/clocksource/Kconfig
->>> @@ -80,6 +80,7 @@ config CLKSRC_EFM32
->>>          bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
->>>          depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
->>>          select CLKSRC_MMIO
->>> +       select CLKSRC_OF if ARCH_EFM32
->>
->> You already depend on OF, so I believe you don't need the if here.
-> Rob and I discussed this shortly on irc, the summary is that the if is
-> not needed to prevent Kconfig breakage but adds more flexibility for the
-> COMPILE_TEST case. In the end Rob said:
->
-> 	1397676012 < robher> you can add my ack.
->
-> which would be:
->
-> Acked-by: Rob Herring <robherring2@gmail.com>
+On Wed, Apr 16, 2014 at 09:18:25PM +0200, Oleg Nesterov wrote:
+> Looks like, __kunmap_atomic()->__cpuc_flush_dcache_area() should take
+> care, but could you please ack/nack my understanding?
 
-Ok, thanks.
+flush_dcache_area() doesn't touch the I-cache... the hint is in the
+name. :)  This is also the function which is used for flush_dcache_page()
+which we've already established isn't sufficient (for the same reason.)
 
+Plus... we still would need to know the user address(es) to flush for
+the I-cache side...
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
