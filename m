@@ -1,136 +1,64 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 16 Apr 2014 18:44:43 +0200
-Subject: [PATCH 09/11] ARM: dts: rk3188: add cru node and update device clocks
- to use it
-In-Reply-To: <3673317.X1crLrrlCS@phil>
-References: <3673317.X1crLrrlCS@phil>
-Message-ID: <11461186.nd51CUGcXx@phil>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 16 Apr 2014 18:43:10 +0200
+Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
+In-Reply-To: <20140416.110031.1269128188581361698.davem@davemloft.net>
+References: <1397626297-23873-1-git-send-email-victor.kamensky@linaro.org>
+ <1397626297-23873-2-git-send-email-victor.kamensky@linaro.org>
+ <20140416145107.GA11039@redhat.com>
+ <20140416.110031.1269128188581361698.davem@davemloft.net>
+Message-ID: <20140416164310.GA15739@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a node for the clock and reset unit on rk3188 SoCs and updates
-the device nodes retrieve their clocks from there, instead of the previous
-gate clock nodes.
+On 04/16, David Miller wrote:
+>
+> From: Oleg Nesterov <oleg@redhat.com>
+> Date: Wed, 16 Apr 2014 16:51:07 +0200
+>
+> > On 04/15, Victor Kamensky wrote:
+> >>
+> >> --- a/kernel/events/uprobes.c
+> >> +++ b/kernel/events/uprobes.c
+> >> @@ -1149,7 +1149,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
+> >>  	}
+> >>
+> >>  	ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
+> >> -				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
+> >> +				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO|VM_WRITE, &area->page);
+> >
+> > Yes, this is nasty.
+> >
+> > I would like to have a reason to nack this change ;) Unfortunately the current
+> > code is buggy too and we need to protect the kernel from malicious applications
+> > which can rewrite the insn we are going to step over in UTASK_SSTEP state anyway.
+>
+> I think there may be a way to achieve your objectives.
+>
+> Pass MAP_SHARED into the flags argument of get_unmapped_area(), and
+> pass the pfn of the xol page in as "pgoff".
+>
+> This will make the xol page get mapped into the user process at an
+> address which is "D-cache congruent" to the kernel side mapping.
+>
+> So all kernel stores to the page will use the same D-cache line that
+> user space accesses to it will.
 
-As the clocks diverge a bit until rk3066 can catch up, the shared nodes
-between rk3066 and rk3188 get separated clocks-properties in the rk3188.dtsi.
+Thanks... I didn't know..
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3188.dtsi | 55 +++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 51 insertions(+), 4 deletions(-)
+But did you really mean get_unmapped_area(pgoff => page_to_pfn(area->page)) ?
 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index bb36596..dc3e986 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -15,6 +15,7 @@
- 
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/pinctrl/rockchip.h>
-+#include <dt-bindings/clock/rk3188-cru.h>
- #include "rk3xxx.dtsi"
- #include "rk3188-clocks.dtsi"
- 
-@@ -54,10 +55,12 @@
- 	soc {
- 		global-timer at 1013c200 {
- 			interrupts = <GIC_PPI 11 0xf04>;
-+			clocks = <&cru CORE_PERI>;
- 		};
- 
- 		local-timer at 1013c600 {
- 			interrupts = <GIC_PPI 13 0xf04>;
-+			clocks = <&cru CORE_PERI>;
- 		};
- 
- 		sram: sram at 10080000 {
-@@ -73,6 +76,50 @@
- 			};
- 		};
- 
-+		uart0: serial at 10124000 {
-+			clocks = <&cru SCLK_UART0>;
-+		};
-+
-+		uart1: serial at 10126000 {
-+			clocks = <&cru SCLK_UART1>;
-+		};
-+
-+		uart2: serial at 20064000 {
-+			clocks = <&cru SCLK_UART2>;
-+		};
-+
-+		uart3: serial at 20068000 {
-+			clocks = <&cru SCLK_UART3>;
-+		};
-+
-+		dwmmc at 10214000 {
-+			clocks = <&cru HCLK_MMC0>, <&cru SCLK_MMC0>;
-+			clock-names = "biu", "ciu";
-+		};
-+
-+		dwmmc at 10218000 {
-+			clocks = <&cru HCLK_MMC1>, <&cru SCLK_MMC1>;
-+			clock-names = "biu", "ciu";
-+		};
-+
-+		cru: cru at 20000000 {
-+			compatible = "rockchip,rk3188-cru";
-+			reg = <0x20000000 0x1000>,
-+			      <0x200080ac 0x4>;
-+
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+
-+			#rockchip,armclk-cells = <3>;
-+			rockchip,armclk-divider-table = <1608000 2 3>,
-+							<1416000 2 3>,
-+							<1200000 2 3>,
-+							<1008000 2 3>,
-+							< 816000 2 3>,
-+							< 504000 1 3>,
-+							< 312000 0 1>;
-+		};
-+
- 		pinctrl at 20008000 {
- 			compatible = "rockchip,rk3188-pinctrl";
- 			reg = <0x20008000 0xa0>,
-@@ -87,7 +134,7 @@
- 				reg = <0x2000a000 0x100>,
- 				      <0x20004064 0x8>;
- 				interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clk_gates8 9>;
-+				clocks = <&cru PCLK_GPIO0>;
- 
- 				gpio-controller;
- 				#gpio-cells = <2>;
-@@ -100,7 +147,7 @@
- 				compatible = "rockchip,gpio-bank";
- 				reg = <0x2003c000 0x100>;
- 				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clk_gates8 10>;
-+				clocks = <&cru PCLK_GPIO1>;
- 
- 				gpio-controller;
- 				#gpio-cells = <2>;
-@@ -113,7 +160,7 @@
- 				compatible = "rockchip,gpio-bank";
- 				reg = <0x2003e000 0x100>;
- 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clk_gates8 11>;
-+				clocks = <&cru PCLK_GPIO2>;
- 
- 				gpio-controller;
- 				#gpio-cells = <2>;
-@@ -126,7 +173,7 @@
- 				compatible = "rockchip,gpio-bank";
- 				reg = <0x20080000 0x100>;
- 				interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
--				clocks = <&clk_gates8 12>;
-+				clocks = <&cru PCLK_GPIO3>;
- 
- 				gpio-controller;
- 				#gpio-cells = <2>;
--- 
-1.9.0
+I simply can't understand how this can work, arm (and x86) really use it as
+"pgoff << PAGE_SHIFT" align_offset accounted in unmapped_area() ?
+
+_Perhaps_ this can help as a "random number" unique for every xol mapping ?
+Hmm, no, I don't understand this COLOUR_ALIGN() magic on arm, but unlikely
+this is true.
+
+Help!
+
+> So we end up with all of the benefits of storing directly to
+> userspace, along with what you're trying to achieve.
+
+And in this case we can avoid copy_to_user(), right ?
+
+Oleg.
