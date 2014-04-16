@@ -1,112 +1,85 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Wed, 16 Apr 2014 12:26:35 +0100
-Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
-Message-ID: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Wed, 16 Apr 2014 17:01:10 +0530
+Subject: [PATCH v7 2/2] dma: Add Xilinx AXI Video Direct Memory Access
+ Engine driver support
+In-Reply-To: <20140416102657.GS32284@intel.com>
+References: <1396008222-7058-1-git-send-email-sthokal@xilinx.com>
+ <1396008222-7058-3-git-send-email-sthokal@xilinx.com>
+ <20140416090605.GP32284@intel.com>
+ <CA+mB=1LDGCY3sN5sL1giOwwqHjD8gG74Yy0dXRS8s+MtDOvxHw@mail.gmail.com>
+ <20140416102657.GS32284@intel.com>
+Message-ID: <CA+mB=1KJv=mZ8m6YU5q9KTv-LK59Dmb+p=aFJkvtCbrksojhaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In "ARM: dts: am33xx: correcting dt node unit address for usb", the
-usb_ctrl_mod and cppi41dma nodes were updated with the correct register
-addresses.  However, the dts files that reference these nodes were not
-updated, and those devices are no longer being enabled.
+On Wed, Apr 16, 2014 at 3:56 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, Apr 16, 2014 at 03:41:34PM +0530, Srikanth Thokala wrote:
+>> On Wed, Apr 16, 2014 at 2:36 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Fri, Mar 28, 2014 at 05:33:42PM +0530, Srikanth Thokala wrote:
+>> >> This is the driver for the AXI Video Direct Memory Access (AXI
+>> >> VDMA) core, which is a soft Xilinx IP core that provides high-
+>> >> bandwidth direct memory access between memory and AXI4-Stream
+>> >> type video target peripherals. The core provides efficient two
+>> >> dimensional DMA operations with independent asynchronous read
+>> >> and write channel operation.
+>> >>
+>> >> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
+>> >
+>> > Okay the series is fine and was going to apply it BUT
+>> > 1) need ack on DT patch..
+>> > 2) issues below on managing the descriptor and resetting the cookie :(
+>>
+>> Ok.
+>>
+>> >
+>> >> +
+>> >> +/**
+>> >> + * xilinx_vdma_tx_descriptor - Allocate transaction descriptor
+>> >> + * @chan: Driver specific VDMA channel
+>> >> + *
+>> >> + * Return: The allocated descriptor on success and NULL on failure.
+>> >> + */
+>> >> +static struct xilinx_vdma_tx_descriptor *
+>> >> +xilinx_vdma_alloc_tx_descriptor(struct xilinx_vdma_chan *chan)
+>> >> +{
+>> >> +     struct xilinx_vdma_tx_descriptor *desc;
+>> >> +     unsigned long flags;
+>> >> +
+>> >> +     if (chan->allocated_desc)
+>> >> +             return chan->allocated_desc;
+>> > ??
+>> >
+>> >> +
+>> >> +     desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+>> >> +     if (!desc)
+>> >> +             return NULL;
+>> >> +
+>> >> +     spin_lock_irqsave(&chan->lock, flags);
+>> >> +     chan->allocated_desc = desc;
+>> > ah why do you need this?
+>> >
+>> > So this essentailly prevents you from preparing two trasactions at same time as
+>> > you would overwrite??
+>>
+>> This will allow to queue up multiple segments on to a single
+>> transaction descriptor.
+>> User will submit this single desc and in the issue_pending() we decode multiple
+>> segments and submit to SG HW engine.  We free up the allocated_desc when it is
+>> submitted to the HW.  This is added after my discussion with Jaswinder, to best
+>> utilize HW SG engine.
+>
+> I think best utilization of HW SG engine would happen if we collate the pending
+> list when you start dma....
 
-This patch corrects the references for the affected dts files.
+Is that ok if I revisit this code as an enhancement at a later time?
 
-Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
----
- arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
- arch/arm/boot/dts/am335x-evm.dts          | 4 ++--
- arch/arm/boot/dts/am335x-evmsk.dts        | 4 ++--
- arch/arm/boot/dts/am335x-igep0033.dtsi    | 4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
+Srikanth
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index e3f27ec..2e7d932 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -183,7 +183,7 @@
- &usb {
- 	status = "okay";
- 
--	control at 44e10000 {
-+	control at 44e10620 {
- 		status = "okay";
- 	};
- 
-@@ -204,7 +204,7 @@
- 		dr_mode = "host";
- 	};
- 
--	dma-controller at 07402000  {
-+	dma-controller at 47402000  {
- 		status = "okay";
- 	};
- };
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 28ae040..77df10d 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -331,7 +331,7 @@
- &usb {
- 	status = "okay";
- 
--	control at 44e10000 {
-+	control at 44e10620 {
- 		status = "okay";
- 	};
- 
-@@ -352,7 +352,7 @@
- 		dr_mode = "host";
- 	};
- 
--	dma-controller at 07402000  {
-+	dma-controller at 47402000  {
- 		status = "okay";
- 	};
- };
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index ec08f6f..ab23885 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -364,7 +364,7 @@
- &usb {
- 	status = "okay";
- 
--	control at 44e10000 {
-+	control at 44e10620 {
- 		status = "okay";
- 	};
- 
-@@ -385,7 +385,7 @@
- 		dr_mode = "host";
- 	};
- 
--	dma-controller at 07402000  {
-+	dma-controller at 47402000  {
- 		status = "okay";
- 	};
- };
-diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-index 7063311..5942e7d 100644
---- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-@@ -202,7 +202,7 @@
- &usb {
- 	status = "okay";
- 
--	control at 44e10000 {
-+	control at 44e10620 {
- 		status = "okay";
- 	};
- 
-@@ -223,7 +223,7 @@
- 		dr_mode = "host";
- 	};
- 
--	dma-controller at 07402000  {
-+	dma-controller at 47402000  {
- 		status = "okay";
- 	};
- };
--- 
-1.9.1
+>
+> --
+> ~Vinod
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
