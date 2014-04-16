@@ -1,34 +1,45 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 16 Apr 2014 15:12:26 +0900
-Subject: [PATCH 1/7] gpiolib: gpiolib-of: Implement device tree gpio-names
- based lookup
-In-Reply-To: <20140415142024.GD3207@lukather>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-2-git-send-email-wens@csie.org>
- <20140415142024.GD3207@lukather>
-Message-ID: <CAAVeFuLDhTVGDnmYtnxEY8hhn6HE6tU9OB24WDPtmxEHjiRiuQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 Apr 2014 14:16:12 +0800
+Subject: [PATCH] ARM: dts: imx6qdl: Add VDOA compatible and clocks
+ properties
+In-Reply-To: <1397499525-6478-1-git-send-email-philipp.zabel@gmail.com>
+References: <1397499525-6478-1-git-send-email-philipp.zabel@gmail.com>
+Message-ID: <20140416061610.GF2523@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 11:20 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Chen-Yu,
->
-> On Tue, Apr 15, 2014 at 02:41:35PM +0800, Chen-Yu Tsai wrote:
->> This patch provides of_get_gpiod_flags_by_name(), which looks up GPIO
->> phandles by name only, through gpios/gpio-names, and not by index.
->
-> IIRC, gpios only uses the *-gpios properties, and not gpios/gpio-names
-> pattern seen on various other things.
->
-> Is it some new property you introduce? If so, please add it to the
-> documentation.
->
-> Now, I'm not sure that having two distinct representations of GPIOs in
-> the DT is a good thing. Yes, it's looking odd compared to other
-> similar bindings, but it's what we have to deal with.
+On Mon, Apr 14, 2014 at 08:18:45PM +0200, Philipp Zabel wrote:
+> This adds a compatible property and the correct clock for the
+> i.MX6Q Video Data Order Adapter.
+> 
+> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index c05a501..8aea954 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -976,8 +976,10 @@
+>  			};
+>  
+>  			vdoa at 021e4000 {
+> +				compatible = "fsl,imx6q-vdoa";
 
-Mmmm I *think* I somehow remember a discussion about this topic
-recently, but I cannot find it. Maybe Chen-yu could point us to the
-conclusion of this discussion and the rationale for (re)implementing
-named GPIOs this way?
+I would like to see this to be documented in
+Documentation/devicetree/bindings/ first.
+
+Shawn
+
+>  				reg = <0x021e4000 0x4000>;
+>  				interrupts = <0 18 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks 202>;
+>  			};
+>  
+>  			uart2: serial at 021e8000 {
+> -- 
+> 1.9.1
+> 
+> 
+> 
