@@ -1,64 +1,50 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 16 Apr 2014 10:10:15 +0200
-Subject: [PATCH v8 1/3] ARM: EXYNOS: initial board support for exynos5260
- SoC
-In-Reply-To: <CAK9yfHztqGWhUJ=PNc7L-epu48PkEM6=v6JFDZ1n52NBeOUB8w@mail.gmail.com>
-References: <1397620738-14431-1-git-send-email-rahul.sharma@samsung.com>	<1397620738-14431-2-git-send-email-rahul.sharma@samsung.com>	<534E3803.5010404@gmail.com>
- <CAK9yfHztqGWhUJ=PNc7L-epu48PkEM6=v6JFDZ1n52NBeOUB8w@mail.gmail.com>
-Message-ID: <534E3AE7.10907@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 16 Apr 2014 10:12:32 +0200
+Subject: [PATCH v5 08/20] ARM: shmobile: r8a7779: Add helper to read mode
+ pins
+In-Reply-To: <20140416075501.GE12344@verge.net.au>
+References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
+ <1397613454-7522-9-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXVAaU=eEBr4hwfbz3TGL+k0NHxGtzh-uuzFwuUqeNA9Q@mail.gmail.com>
+ <20140416075501.GE12344@verge.net.au>
+Message-ID: <CAMuHMdUuswCe7XB=PkVkP6nD9bvQ1oXCokSDveoZ9_R--Z6Ogw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
-
-On 16.04.2014 10:08, Sachin Kamat wrote:
-> Hi Tomasz,
->
-> On 16 April 2014 13:27, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Rahul,
+On Wed, Apr 16, 2014 at 9:55 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > +u32 __init r8a7779_read_mode_pins(void)
+>> > +{
+>> > +       void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+>> > +       u32 mode;
+>> > +
+>> > +       BUG_ON(!modemr);
+>> > +       mode = ioread32(modemr);
+>> > +       iounmap(modemr);
+>> > +
+>> > +       return mode;
+>> > +}
 >>
->>
->> On 16.04.2014 05:58, Rahul Sharma wrote:
->>>
->>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>
->>> This patch add basic arch side support for exynos5260 SoC.
->>>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
->>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->>> ---
->>>    arch/arm/mach-exynos/Kconfig |    5 +++++
->>>    1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->>> index fc8bf18..bf4ed87 100644
->>> --- a/arch/arm/mach-exynos/Kconfig
->>> +++ b/arch/arm/mach-exynos/Kconfig
->>> @@ -84,6 +84,11 @@ config SOC_EXYNOS5250
->>>          help
->>>            Enable EXYNOS5250 SoC support
->>>
->>> +config SOC_EXYNOS5260
->>> +       bool "SAMSUNG EXYNOS5260"
->>> +       default y
->>> +       depends on ARCH_EXYNOS5
->>> +
->>>    config SOC_EXYNOS5420
->>>          bool "SAMSUNG EXYNOS5420"
->>>          default y
->>>
->>
->> Is this patch necessary now? After Sachin's consolidation series there are
->> no per SoC entries anymore.
+>> No caching, cfr. rcar_gen2_read_mode_pins()?
 >
-> Kukjin still wanted individual SoCs to be selectable. Please refer [1].
->
-> [1] http://www.spinics.net/lists/devicetree/msg27040.html
+> I have one question about caching, which IIRC you
+> implemented for R-Car Gen 2. Is the code called often enough
+> that it makes any difference?
 
-I don't think any valid reason was presented there. Features in code 
-should not be selected using #ifdef CONFIG_ anymore, so I don't really 
-see any reason to not proceed with this consolidation. Olof, Arnd?
+2 times. (Add 1 more time with "[PATCH 1/5] [DEBUG] ARM: shmobile:
+ r8a7791: Disable MSTP clocks during boot" applied).
 
-Best regards,
-Tomasz
+I agree it's not much, I'm mostly concerned about the ioremap()/iounmap()
+pair, which is expensive compared to using a cached integer value.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
