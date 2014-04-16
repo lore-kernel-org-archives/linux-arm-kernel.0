@@ -1,40 +1,76 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 16 Apr 2014 13:01:54 -0400
-Subject: [PATCH 1/2] ARM: mvebu: Enable nfsroot in the defconfig
-In-Reply-To: <20140416155212.GB1892@arch.cereza>
-References: <1396539014-8673-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140416155212.GB1892@arch.cereza>
-Message-ID: <20140416170154.GJ28159@titan.lakedaemon.net>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Wed, 16 Apr 2014 18:05:45 +0100
+Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
+References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
+ <1395270762-6055-3-git-send-email-tinamdar@apm.com>
+ <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
+Message-ID: <20140416170545.GD4858@bart>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 12:52:12PM -0300, Ezequiel Garcia wrote:
-> Hello guys,
+On Wed, Mar 26, 2014 at 09:28:42AM -0500, Rob Herring wrote:
+> On Wed, Mar 19, 2014 at 6:12 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+> > This patch adds the device tree nodes for APM X-Gene PCIe controller and
+> > PCIe clock interface. Since X-Gene SOC supports maximum 5 ports, 5 dts
+> > nodes are added.
 > 
-> On Apr 03, Ezequiel Garcia wrote:
-> > NFSroot is very frequently used by developers to boot, so let's make
-> > our lives simpler and enable it by default.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  arch/arm/configs/mvebu_v7_defconfig | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
+> [snip]
 > 
-> Any comments about this two defconfig changes?
+> > +               pcie0: pcie at 1f2b0000 {
+> > +                       status = "disabled";
+> > +                       device_type = "pci";
+> > +                       compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
+> > +                       #interrupt-cells = <1>;
+> > +                       #size-cells = <2>;
+> > +                       #address-cells = <3>;
+> > +                       reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+> > +                               0xe0 0xd0000000 0x0 0x00200000>; /* PCI config space */
+> 
 
-Nope.
+Resurecting an old thread as this is relevant to what I'm doing at the moment:
 
-> After the recent systemd debug mess, now I'm not sure we should add a defconfig,
-> just because systemd breaks without it.
+> Where is the right place for config space? This binding has it here
+> and others have it in ranges. Given that config space type is defined
+> for ranges, I would think that is the right place. But Liviu's patches
+> do not process config space entries in ranges. Perhaps we need a
+> config space resource populated in the bridge struct.
 
-If we (mvebu maintainers) don't mind changing the mvebu_*_defconfigs,
-who's going to complain?  If it helps your workflow, then we'll add it.
+I have found out that we cannot pasd the config ranges from the DT into the
+pci_host_bridge structure as the PCI framework doesn't have a resource type
+for config resources. Leaving the translation between range flags and
+resource type as is (filtered through the IORESOURCE_TYPE_BITS) will lead
+to a resource type of value zero, which is not recognised by any resource
+handling API so bridge configuration and bus scanning will barf.
 
-My only issue would be if the change breaks the bootfarm testing.
+I'm looking for suggestions here, as Jason Gunthorpe suggested that we
+should be able to parse config ranges if they conform to the ECAM part
+of the PCI standard.
 
-The debug thread and this series are completely orthogonal.
+Best regards,
+Liviu
 
-thx,
+> 
+> Rob
+> 
+> 
+> > +                       reg-names = "csr", "cfg";
+> > +                       ranges = <0x01000000 0x00 0x00000000 0xe0 0x00000000 0x00 0x00010000   /* io */
+> > +                                 0x02000000 0x00 0x10000000 0xe0 0x10000000 0x00 0x80000000>; /* mem */
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-Jason.
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
