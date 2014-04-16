@@ -1,84 +1,192 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Apr 2014 13:28:44 +0100
-Subject: [PATCH v2] ARM: mm: support big-endian page tables
-In-Reply-To: <534DEEDD.5030203@huawei.com>
-References: <5301B4AF.1040305@huawei.com> <5327F75F.1010406@huawei.com>
- <20140414104300.GA3530@arm.com> <534BC31A.7060705@arm.com>
- <534DEEDD.5030203@huawei.com>
-Message-ID: <534E777C.1090605@arm.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Wed, 16 Apr 2014 18:02:08 +0530
+Subject: [PATCH 1/5] drivers: w1: omap_hdq: cleanup and bug fixes.
+In-Reply-To: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
+References: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <1397651532-31456-2-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/14 03:45, Jianguo Wu wrote:
-> On 2014/4/14 19:14, Marc Zyngier wrote:
-> 
->> On 14/04/14 11:43, Will Deacon wrote:
->>> (catching up on old email)
->>>
->>> On Tue, Mar 18, 2014 at 07:35:59AM +0000, Jianguo Wu wrote:
->>>> Cloud you please take a look at this?
->>>
->>> [...]
->>>
->>>> On 2014/2/17 15:05, Jianguo Wu wrote:
->>>>> When enable LPAE and big-endian in a hisilicon board, while specify
->>>>> mem=384M mem=512M at 7680M, will get bad page state:
->>>>>
->>>>> Freeing unused kernel memory: 180K (c0466000 - c0493000)
->>>>> BUG: Bad page state in process init  pfn:fa442
->>>>> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
->>>>> page flags: 0x40000400(reserved)
->>>>> Modules linked in:
->>>>> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
->>>>> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
->>>>> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
->>>>> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
->>>>> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
->>>>> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
->>>>> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
->>>>> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
->>>>> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
->>>>> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
->>>
->>> [...]
->>>
->>>>> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
->>>>> when pte is 64-bit, for little-endian, will store low 32-bit in r2,
->>>>> high 32-bit in r3; for big-endian, will store low 32-bit in r3,
->>>>> high 32-bit in r2, this will cause wrong pfn stored in pte,
->>>>> so we should exchange r2 and r3 for big-endian.
->>>
-> 
-> Hi Marc,
-> How about this:
-> 
-> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
-> - It tests the L_PTE_NONE in one word on the other, and possibly clear L_PTE_VALID
->   tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
->   bicne	r2, #L_PTE_VALID
-> - Same for L_PTE_DIRTY, respectively setting L_PTE_RDONLY
-> 
-> As for LPAE, the pte is 64-bits, and the value of r2/r3 is depending on the endianness,
-> for little-endian, will store low 32-bit in r2, high 32-bit in r3,
-> for big-endian, will store low 32-bit in r3, high 32-bit in r2, 
-> this will cause wrong bit is cleared or set, and get wrong pfn.
-> So we should exchange r2 and r3 for big-endian.
+The patch adds the following to the omap hdq driver.
+1. HDQ Device reset call in probe.
+2. Enabling '1 wire mode' and checking for presence pulse bit.
+3. Proper disabling and enabling of interrupts during read path.
+4. Add re-initialization code during SKIP ROM command execution.
+5. Miscellaneous cleanup(formatting, return error checks).
 
-May I suggest the following instead:
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+ drivers/w1/masters/omap_hdq.c |   85 ++++++++++++++++++++++++++++++++---------
+ 1 file changed, 68 insertions(+), 17 deletions(-)
 
-"An LPAE PTE is a 64bit quantity, passed to cpu_v7_set_pte_ext in the
- r2 and r3 registers.
- On an LE kernel, r2 contains the LSB of the PTE, and r3 the MSB.
- On a BE kernel, the assignment is reversed.
-
- Unfortunately, the current code always assumes the LE case,
- leading to corruption of the PTE when clearing/setting bits.
-
- This patch fixes this issue much like it has been done already in the
- cpu_v7_switch_mm case."
-
-Cheers,
-
-	M.
+diff --git a/drivers/w1/masters/omap_hdq.c b/drivers/w1/masters/omap_hdq.c
+index 9900e8e..0a7bf7f 100644
+--- a/drivers/w1/masters/omap_hdq.c
++++ b/drivers/w1/masters/omap_hdq.c
+@@ -27,21 +27,22 @@
+ #define OMAP_HDQ_TX_DATA			0x04
+ #define OMAP_HDQ_RX_DATA			0x08
+ #define OMAP_HDQ_CTRL_STATUS			0x0c
+-#define OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK	(1<<6)
+-#define OMAP_HDQ_CTRL_STATUS_CLOCKENABLE	(1<<5)
+-#define OMAP_HDQ_CTRL_STATUS_GO			(1<<4)
+-#define OMAP_HDQ_CTRL_STATUS_INITIALIZATION	(1<<2)
+-#define OMAP_HDQ_CTRL_STATUS_DIR		(1<<1)
+-#define OMAP_HDQ_CTRL_STATUS_MODE		(1<<0)
++#define OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK	(1 << 6)
++#define OMAP_HDQ_CTRL_STATUS_CLOCKENABLE	(1 << 5)
++#define OMAP_HDQ_CTRL_STATUS_PRESENCE		(1 << 3)
++#define OMAP_HDQ_CTRL_STATUS_GO                 (1 << 4)
++#define OMAP_HDQ_CTRL_STATUS_INITIALIZATION	(1 << 2)
++#define OMAP_HDQ_CTRL_STATUS_DIR		(1 << 1)
++#define OMAP_HDQ_CTRL_STATUS_MODE		(1 << 0)
+ #define OMAP_HDQ_INT_STATUS			0x10
+-#define OMAP_HDQ_INT_STATUS_TXCOMPLETE		(1<<2)
+-#define OMAP_HDQ_INT_STATUS_RXCOMPLETE		(1<<1)
+-#define OMAP_HDQ_INT_STATUS_TIMEOUT		(1<<0)
++#define OMAP_HDQ_INT_STATUS_TXCOMPLETE		(1 << 2)
++#define OMAP_HDQ_INT_STATUS_RXCOMPLETE		(1 << 1)
++#define OMAP_HDQ_INT_STATUS_TIMEOUT		(1 << 0)
+ #define OMAP_HDQ_SYSCONFIG			0x14
+-#define OMAP_HDQ_SYSCONFIG_SOFTRESET		(1<<1)
+-#define OMAP_HDQ_SYSCONFIG_AUTOIDLE		(1<<0)
++#define OMAP_HDQ_SYSCONFIG_SOFTRESET		(1 << 1)
++#define OMAP_HDQ_SYSCONFIG_AUTOIDLE		(1 << 0)
+ #define OMAP_HDQ_SYSSTATUS			0x18
+-#define OMAP_HDQ_SYSSTATUS_RESETDONE		(1<<0)
++#define OMAP_HDQ_SYSSTATUS_RESETDONE		(1 << 0)
+ 
+ #define OMAP_HDQ_FLAG_CLEAR			0
+ #define OMAP_HDQ_FLAG_SET			1
+@@ -115,6 +116,15 @@ static inline u8 hdq_reg_merge(struct hdq_data *hdq_data, u32 offset,
+ 	return new_val;
+ }
+ 
++static void hdq_disable_interrupt(struct hdq_data *hdq_data, u32 offset,
++				  u8 mask)
++{
++	u32 ie;
++
++	ie = readl(hdq_data->hdq_base + offset);
++	writel(ie & mask, hdq_data->hdq_base + offset);
++}
++
+ /*
+  * Wait for one or more bits in flag change.
+  * HDQ_FLAG_SET: wait until any bit in the flag is set.
+@@ -263,8 +273,7 @@ static int _omap_hdq_reset(struct hdq_data *hdq_data)
+ 	 * interrupt.
+ 	 */
+ 	hdq_reg_out(hdq_data, OMAP_HDQ_CTRL_STATUS,
+-		OMAP_HDQ_CTRL_STATUS_CLOCKENABLE |
+-		OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK);
++		OMAP_HDQ_CTRL_STATUS_CLOCKENABLE);
+ 
+ 	/* wait for reset to complete */
+ 	ret = hdq_wait_for_flag(hdq_data, OMAP_HDQ_SYSSTATUS,
+@@ -275,7 +284,8 @@ static int _omap_hdq_reset(struct hdq_data *hdq_data)
+ 	else {
+ 		hdq_reg_out(hdq_data, OMAP_HDQ_CTRL_STATUS,
+ 			OMAP_HDQ_CTRL_STATUS_CLOCKENABLE |
+-			OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK);
++			OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK |
++			OMAP_HDQ_CTRL_STATUS_MODE);
+ 		hdq_reg_out(hdq_data, OMAP_HDQ_SYSCONFIG,
+ 			OMAP_HDQ_SYSCONFIG_AUTOIDLE);
+ 	}
+@@ -327,6 +337,18 @@ static int omap_hdq_break(struct hdq_data *hdq_data)
+ 		ret = -ETIMEDOUT;
+ 		goto out;
+ 	}
++
++	/*
++	 * check for the presence detect bit to get
++	 * set to show that the slave is responding
++	 */
++	if (hdq_reg_in(hdq_data, OMAP_HDQ_CTRL_STATUS) &
++			OMAP_HDQ_CTRL_STATUS_PRESENCE) {
++		dev_dbg(hdq_data->dev, "Presence bit not set\n");
++		ret = -ETIMEDOUT;
++		goto out;
++	}
++
+ 	/*
+ 	 * wait for both INIT and GO bits rerurn to zero.
+ 	 * zero wait time expected for interrupt mode.
+@@ -361,6 +383,8 @@ static int hdq_read_byte(struct hdq_data *hdq_data, u8 *val)
+ 		goto out;
+ 	}
+ 
++	hdq_data->hdq_irqstatus = 0;
++
+ 	if (!(hdq_data->hdq_irqstatus & OMAP_HDQ_INT_STATUS_RXCOMPLETE)) {
+ 		hdq_reg_merge(hdq_data, OMAP_HDQ_CTRL_STATUS,
+ 			OMAP_HDQ_CTRL_STATUS_DIR | OMAP_HDQ_CTRL_STATUS_GO,
+@@ -426,7 +450,8 @@ static int omap_hdq_get(struct hdq_data *hdq_data)
+ 				/* select HDQ mode & enable clocks */
+ 				hdq_reg_out(hdq_data, OMAP_HDQ_CTRL_STATUS,
+ 					OMAP_HDQ_CTRL_STATUS_CLOCKENABLE |
+-					OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK);
++					OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK |
++					OMAP_HDQ_CTRL_STATUS_MODE);
+ 				hdq_reg_out(hdq_data, OMAP_HDQ_SYSCONFIG,
+ 					OMAP_HDQ_SYSCONFIG_AUTOIDLE);
+ 				hdq_reg_in(hdq_data, OMAP_HDQ_INT_STATUS);
+@@ -471,6 +496,10 @@ static u8 omap_w1_read_byte(void *_hdq)
+ 	u8 val = 0;
+ 	int ret;
+ 
++	/* First write to initialize the transfer */
++	if (hdq_data->init_trans == 0)
++		omap_hdq_get(hdq_data);
++
+ 	ret = hdq_read_byte(hdq_data, &val);
+ 	if (ret) {
+ 		ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
+@@ -484,6 +513,10 @@ static u8 omap_w1_read_byte(void *_hdq)
+ 		return -1;
+ 	}
+ 
++	hdq_disable_interrupt(hdq_data, OMAP_HDQ_CTRL_STATUS,
++			      ~OMAP_HDQ_CTRL_STATUS_INTERRUPTMASK);
++	hdq_data->hdq_usecount = 0;
++
+ 	/* Write followed by a read, release the module */
+ 	if (hdq_data->init_trans) {
+ 		ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
+@@ -510,6 +543,14 @@ static void omap_w1_write_byte(void *_hdq, u8 byte)
+ 	if (hdq_data->init_trans == 0)
+ 		omap_hdq_get(hdq_data);
+ 
++	/*
++	 * We need to reset the slave before
++	 * issuing the SKIP ROM command, else
++	 * the slave will not work.
++	 */
++	if (byte == W1_SKIP_ROM)
++		omap_hdq_break(hdq_data);
++
+ 	ret = mutex_lock_interruptible(&hdq_data->hdq_mutex);
+ 	if (ret < 0) {
+ 		dev_dbg(hdq_data->dev, "Could not acquire mutex\n");
+@@ -563,7 +604,17 @@ static int omap_hdq_probe(struct platform_device *pdev)
+ 	mutex_init(&hdq_data->hdq_mutex);
+ 
+ 	pm_runtime_enable(&pdev->dev);
+-	pm_runtime_get_sync(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		dev_dbg(&pdev->dev, "pm_runtime_get_sync failed\n");
++		goto err_w1;
++	}
++
++	ret = _omap_hdq_reset(hdq_data);
++	if (ret) {
++		dev_dbg(&pdev->dev, "reset failed\n");
++		return -EINVAL;
++	}
+ 
+ 	rev = hdq_reg_in(hdq_data, OMAP_HDQ_REVISION);
+ 	dev_info(&pdev->dev, "OMAP HDQ Hardware Rev %c.%c. Driver in %s mode\n",
 -- 
-Jazz is not dead. It just smells funny...
+1.7.9.5
