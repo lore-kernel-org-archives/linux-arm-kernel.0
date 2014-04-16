@@ -1,54 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 16 Apr 2014 09:45:43 -0500
-Subject: [PATCH 04/12] clocksource: Sched clock source for Versatile
- Express
-In-Reply-To: <1397658125.3407.84.camel@hornet>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-5-git-send-email-pawel.moll@arm.com>
- <CAL_JsqLiFE_D+PSFg62sVm3wO0uvZT+pwAVyn7Lwn2ma3+3DoA@mail.gmail.com>
- <1397658125.3407.84.camel@hornet>
-Message-ID: <CAL_JsqLp5o9OnW5kk33BwdnOP97bjgfpMrR=PKEVH4nP4Tnrfg@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 16 Apr 2014 16:51:07 +0200
+Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
+In-Reply-To: <1397626297-23873-2-git-send-email-victor.kamensky@linaro.org>
+References: <1397626297-23873-1-git-send-email-victor.kamensky@linaro.org>
+ <1397626297-23873-2-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140416145107.GA11039@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 9:22 AM, Pawel Moll <pawel.moll@arm.com> wrote:
-> Hi Rob,
+On 04/15, Victor Kamensky wrote:
 >
-> Thanks for reminding me about this stuff. I'll get around and re-spin
-> the series this week.
+> --- a/kernel/events/uprobes.c
+> +++ b/kernel/events/uprobes.c
+> @@ -1149,7 +1149,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
+>  	}
 >
+>  	ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
+> -				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
+> +				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO|VM_WRITE, &area->page);
 
-[snip]
+Yes, this is nasty.
 
->> > +       setup_sched_clock(vexpress_sys_24mhz_read, 32, 24000000);
->>
->> This frequency should come from a DT clock binding. You will have to
->> fallback to 24MHz for backwards compatibility though.
->
-> I don't see why would it go to the binding. You may have noticed the
-> register is called "SYS_24MHZ", not "SYS_RANDOMCLOCK". The driver
-> *knows* what the frequency is.
+I would like to have a reason to nack this change ;) Unfortunately the current
+code is buggy too and we need to protect the kernel from malicious applications
+which can rewrite the insn we are going to step over in UTASK_SSTEP state anyway.
 
-A 24MHz clock is fed to this h/w block to be used by the counter in
-the block. The DT should describe that.
+> +void __weak arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
+> +				  void *src, unsigned long len)
+> +{
+> +	/*
+> +	 * Note if CPU does not support instructions write snooping
+> +	 * from dcache it needs to define its own version of this
+> +	 * function that would take care of proper cache flushes.
+> +	 *
+> +	 * Nothing we can do if it fails, added if to make unused
+> +	 * result warning happy. If xol write failed because process
+> +	 * unmapped xol area by mistake, process will crash in some
+> +	 * other place.
+> +	 */
+> +	if (__copy_to_user((void *) vaddr, src, len));
+> +}
 
->
->> > +}
->>
->> Wouldn't this code work for Versatile and Realview ARM reference
->> boards? Even the register offset is the same.
->>
->> > +CLOCKSOURCE_OF_DECLARE(vexpress, "arm,vexpress-sysreg",
->> > +               vexpress_sched_clock_init);
->
-> I guess it would, yes. The sysregs are annoyingly similar and different
-> at the same time.
->
-> One could of course try to come up with a "generic mmio clock source"
-> binding, taking the frequency as a property, but don't count on me doing
-> this... ;-)
+Plus, again, this can write to another mapping, say to file-backed memory.
 
-I'm not asking for that. Just take care of all ARM Ltd boards which
-have the exact same 24MHz counter at offset 0x5C.
+Finally, with this change it won't be possible to share this xol memory with
+other tasks.
 
-Rob
+But it seems that it is pointless to argue.
+
+Oleg.
