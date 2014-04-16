@@ -1,275 +1,174 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 16 Apr 2014 13:43:26 +0900
-Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
-In-Reply-To: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
-Message-ID: <000a01cf592e$67e592e0$37b0b8a0$%han@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 16 Apr 2014 13:44:16 +0900
+Subject: [PATCHv2 1/2] iio: adc: exynos_adc: Control special clock of ADC
+ to support Exynos3250 ADC
+In-Reply-To: <CAK9yfHzdPu67JKrww-VFjFvKni7S_y_hvLKKUdeQe-_pxjoBAQ@mail.gmail.com>
+References: <1397466426-13870-1-git-send-email-cw00.choi@samsung.com>
+ <1397466426-13870-2-git-send-email-cw00.choi@samsung.com>
+ <CAK9yfHzdPu67JKrww-VFjFvKni7S_y_hvLKKUdeQe-_pxjoBAQ@mail.gmail.com>
+Message-ID: <534E0AA0.6010207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung GH7 has four PCIe controllers which can be used as root
-complex for PCIe interface.
+Hi Sachin,
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- drivers/pci/host/Kconfig      |    2 +-
- drivers/pci/host/pci-exynos.c |  135 ++++++++++++++++++++++++++++++++++++++---
- 2 files changed, 126 insertions(+), 11 deletions(-)
+On 04/16/2014 12:48 PM, Sachin Kamat wrote:
+> Hi Chanwoo,
+> 
+> On 14 April 2014 14:37, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patch control special clock for ADC in Exynos series's FSYS block.
+>> If special clock of ADC is registerd on clock list of common clk framework,
+>> Exynos ADC drvier have to control this clock.
+>>
+>> Exynos3250/Exynos4/Exynos5 has 'adc' clock as following:
+>> - 'adc' clock: bus clock for ADC
+>>
+>> Exynos3250 has additional 'sclk_tsadc' clock as following:
+>> - 'sclk_tsadc' clock: special clock for ADC which provide clock to internal ADC
+>>
+>> Exynos 4210/4212/4412 and Exynos5250/5420 has not included 'sclk_tsadc' clock
+>> in FSYS_BLK. But, Exynos3250 based on Cortex-A7 has only included 'sclk_tsadc'
+>> clock in FSYS_BLK.
+>>
+>> Cc: Jonathan Cameron <jic23@kernel.org>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Naveen Krishna Chatradhi
+>> Cc: linux-iio at vger.kernel.org
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  drivers/iio/adc/exynos_adc.c | 54 +++++++++++++++++++++++++++++++++-----------
+>>  1 file changed, 41 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+>> index d25b262..3c99243 100644
+>> --- a/drivers/iio/adc/exynos_adc.c
+>> +++ b/drivers/iio/adc/exynos_adc.c
+>> @@ -40,8 +40,9 @@
+>>  #include <linux/iio/driver.h>
+>>
+>>  enum adc_version {
+>> -       ADC_V1,
+>> -       ADC_V2
+>> +       ADC_V1 = 0x1,
+>> +       ADC_V2 = 0x2,
+>> +       ADC_V3 = (ADC_V1 | ADC_V2),
+> 
+> Can't this be simply 0x3? Or is this not really a h/w version?
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index a6f67ec..3be047c 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -11,7 +11,7 @@ config PCIE_DW
- 
- config PCI_EXYNOS
- 	bool "Samsung Exynos PCIe controller"
--	depends on SOC_EXYNOS5440
-+	depends on SOC_EXYNOS5440 || ARCH_GH7
- 	select PCIEPORTBUS
- 	select PCIE_DW
- 
-diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
-index 3de6bfb..6e845ca 100644
---- a/drivers/pci/host/pci-exynos.c
-+++ b/drivers/pci/host/pci-exynos.c
-@@ -57,6 +57,8 @@ struct exynos_pcie {
- #define PCIE_NONSTICKY_RESET		0x024
- #define PCIE_APP_INIT_RESET		0x028
- #define PCIE_APP_LTSSM_ENABLE		0x02c
-+#define PCIE_SYS_AUX_PWR_DET		0x038
-+#define PCIE_SYS_AUX_PWR_ENABLE		(0x1 << 0)
- #define PCIE_ELBI_RDLH_LINKUP		0x064
- #define PCIE_ELBI_LTSSM_ENABLE		0x1
- #define PCIE_ELBI_SLV_AWMISC		0x11c
-@@ -72,6 +74,23 @@ struct exynos_pcie {
- #define PCIE_PHY_TRSVREG_RESET		0x020
- #define PCIE_PHY_TRSV_RESET		0x024
- 
-+/* PCIe PHY glue registers */
-+#define PCIE_PHY_GLUE_REG0		0x000
-+#define PCIE_PHY_GLUE_GLOBAL_RESET	(0x1 << 0)
-+#define PCIE_PHY_GLUE_COMMON_RESET	(0x1 << 1)
-+#define PCIE_PHY_GLUE_MAC_RESET		(0x1 << 11)
-+#define PCIE_PHY_GLUE_REG2		0x008
-+#define PCIE_PHY_GLUE_CLK100M_DS_MAX	(0x7 << 0)
-+#define PCIE_PHY_GLUE_CLK100M_RFCLK	(0x1 << 3)
-+#define PCIE_PHY_GLUE_CLK100M_ENABLE	(0x1 << 4)
-+#define PCIE_PHY_GLUE_PLL_BUF_ENABLE	(0x1 << 8)
-+#define PCIE_PHY_GLUE_PLL_DIV_ENABLE	(0x1 << 9)
-+#define PCIE_PHY_GLUE_REFCLK_IN(x)	(((x) & 0xf) << 10)
-+#define PCIE_PHY_GLUE_REG3		0x00c
-+#define PCIE_PHY_GLUE_REF_RATE_100MHZ	(0x2 << 0)
-+#define PCIE_PHY_GLUE_REG4		0x010
-+#define PCIE_PHY_GLUE_MODE_PCIE		(0x0 << 0)
-+
- /* PCIe PHY registers */
- #define PCIE_PHY_IMPEDANCE		0x004
- #define PCIE_PHY_PLL_DIV_0		0x008
-@@ -164,11 +183,45 @@ static void exynos_pcie_sideband_dbi_r_mode(struct pcie_port *pp, bool on)
- 	}
- }
- 
-+static void exynos_pcie_set_phy_mode(struct pcie_port *pp)
-+{
-+	u32 val;
-+	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
-+
-+	if (!of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
-+		return;
-+
-+	/* configure phy reference clock setting */
-+	val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG2);
-+	val |= PCIE_PHY_GLUE_CLK100M_ENABLE | PCIE_PHY_GLUE_CLK100M_RFCLK |
-+		PCIE_PHY_GLUE_CLK100M_DS_MAX;
-+	exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG2);
-+
-+	val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG2);
-+	val |= PCIE_PHY_GLUE_PLL_DIV_ENABLE | PCIE_PHY_GLUE_PLL_BUF_ENABLE;
-+	exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG2);
-+
-+	val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG2);
-+	val |= PCIE_PHY_GLUE_REFCLK_IN(6);
-+	exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG2);
-+
-+	/* set phy reference clock  */
-+	exynos_blk_writel(exynos_pcie, PCIE_PHY_GLUE_REF_RATE_100MHZ,
-+			  PCIE_PHY_GLUE_REG3);
-+
-+	/* set phy mode to pcie mode */
-+	exynos_blk_writel(exynos_pcie, PCIE_PHY_GLUE_MODE_PCIE,
-+			  PCIE_PHY_GLUE_REG4);
-+}
-+
- static void exynos_pcie_assert_core_reset(struct pcie_port *pp)
- {
- 	u32 val;
- 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
- 
-+	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
-+		return;
-+
- 	val = exynos_elb_readl(exynos_pcie, PCIE_CORE_RESET);
- 	val &= ~PCIE_CORE_RESET_ENABLE;
- 	exynos_elb_writel(exynos_pcie, val, PCIE_CORE_RESET);
-@@ -190,27 +243,48 @@ static void exynos_pcie_deassert_core_reset(struct pcie_port *pp)
- 	exynos_elb_writel(exynos_pcie, 1, PCIE_NONSTICKY_RESET);
- 	exynos_elb_writel(exynos_pcie, 1, PCIE_APP_INIT_RESET);
- 	exynos_elb_writel(exynos_pcie, 0, PCIE_APP_INIT_RESET);
--	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_MAC_RESET);
-+
-+	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
-+		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
-+		val |= PCIE_PHY_GLUE_MAC_RESET;
-+		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
-+	} else {
-+		exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_MAC_RESET);
-+	}
- }
- 
- static void exynos_pcie_assert_phy_reset(struct pcie_port *pp)
- {
- 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
- 
-+	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
-+		return;
-+
- 	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_MAC_RESET);
- 	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_GLOBAL_RESET);
- }
- 
- static void exynos_pcie_deassert_phy_reset(struct pcie_port *pp)
- {
-+	u32 val;
- 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
- 
--	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_GLOBAL_RESET);
--	exynos_elb_writel(exynos_pcie, 1, PCIE_PWR_RESET);
--	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
--	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_CMN_REG);
--	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSVREG_RESET);
--	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSV_RESET);
-+	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
-+		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
-+		val |= PCIE_PHY_GLUE_GLOBAL_RESET;
-+		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
-+		exynos_elb_writel(exynos_pcie, 1, PCIE_PWR_RESET);
-+		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
-+		val |= PCIE_PHY_GLUE_COMMON_RESET;
-+		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
-+	} else {
-+		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_GLOBAL_RESET);
-+		exynos_elb_writel(exynos_pcie, 1, PCIE_PWR_RESET);
-+		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
-+		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_CMN_REG);
-+		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSVREG_RESET);
-+		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_TRSV_RESET);
-+	}
- }
- 
- static void exynos_pcie_power_on_phy(struct pcie_port *pp)
-@@ -269,6 +343,9 @@ static void exynos_pcie_init_phy(struct pcie_port *pp)
- {
- 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
- 
-+	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie"))
-+		return;
-+
- 	/* DCC feedback control off */
- 	exynos_phy_writel(exynos_pcie, 0x29, PCIE_PHY_DCC_FEEDBACK);
- 
-@@ -305,6 +382,26 @@ static void exynos_pcie_init_phy(struct pcie_port *pp)
- 	exynos_phy_writel(exynos_pcie, 0xa0, PCIE_PHY_TRSV3_LVCC);
- }
- 
-+static void exynos_pcie_pulse_common_reset(struct pcie_port *pp)
-+{
-+	u32 val;
-+	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
-+
-+	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
-+		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
-+		val &= ~PCIE_PHY_GLUE_COMMON_RESET;
-+		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
-+		udelay(500);
-+		val = exynos_blk_readl(exynos_pcie, PCIE_PHY_GLUE_REG0);
-+		val |= PCIE_PHY_GLUE_COMMON_RESET;
-+		exynos_blk_writel(exynos_pcie, val, PCIE_PHY_GLUE_REG0);
-+	} else {
-+		exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_COMMON_RESET);
-+		udelay(500);
-+		exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
-+	}
-+}
-+
- static void exynos_pcie_assert_reset(struct pcie_port *pp)
- {
- 	struct exynos_pcie *exynos_pcie = to_exynos_pcie(pp);
-@@ -326,6 +423,9 @@ static int exynos_pcie_establish_link(struct pcie_port *pp)
- 		return 0;
- 	}
- 
-+	/* set phy mode */
-+	exynos_pcie_set_phy_mode(pp);
-+
- 	/* assert reset signals */
- 	exynos_pcie_assert_core_reset(pp);
- 	exynos_pcie_assert_phy_reset(pp);
-@@ -340,9 +440,7 @@ static int exynos_pcie_establish_link(struct pcie_port *pp)
- 	exynos_pcie_init_phy(pp);
- 
- 	/* pulse for common reset */
--	exynos_blk_writel(exynos_pcie, 1, PCIE_PHY_COMMON_RESET);
--	udelay(500);
--	exynos_blk_writel(exynos_pcie, 0, PCIE_PHY_COMMON_RESET);
-+	exynos_pcie_pulse_common_reset(pp);
- 
- 	/* de-assert core reset */
- 	exynos_pcie_deassert_core_reset(pp);
-@@ -357,6 +455,12 @@ static int exynos_pcie_establish_link(struct pcie_port *pp)
- 	exynos_elb_writel(exynos_pcie, PCIE_ELBI_LTSSM_ENABLE,
- 			  PCIE_APP_LTSSM_ENABLE);
- 
-+	if (of_device_is_compatible(pp->dev->of_node, "samsung,gh7-pcie")) {
-+		/* supply auxiliary power */
-+		exynos_elb_writel(exynos_pcie, PCIE_SYS_AUX_PWR_ENABLE,
-+				  PCIE_SYS_AUX_PWR_DET);
-+	}
-+
- 	/* check if the link is up or not */
- 	while (!dw_pcie_link_up(pp)) {
- 		mdelay(100);
-@@ -564,6 +668,7 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
- 	struct resource *elbi_base;
- 	struct resource *phy_base;
- 	struct resource *block_base;
-+	 struct resource *dbi_base;
- 	int ret;
- 
- 	exynos_pcie = devm_kzalloc(&pdev->dev, sizeof(*exynos_pcie),
-@@ -619,6 +724,15 @@ static int __init exynos_pcie_probe(struct platform_device *pdev)
- 		goto fail_bus_clk;
- 	}
- 
-+	if (of_device_is_compatible(pdev->dev.of_node, "samsung,gh7-pcie")) {
-+		dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 3);
-+		pp->dbi_base = devm_ioremap_resource(&pdev->dev, dbi_base);
-+		if (IS_ERR(pp->dbi_base)) {
-+			ret = PTR_ERR(pp->dbi_base);
-+			goto fail_bus_clk;
-+		}
-+	}
-+
- 	ret = add_pcie_port(pp, pdev);
- 	if (ret < 0)
- 		goto fail_bus_clk;
-@@ -645,6 +759,7 @@ static int __exit exynos_pcie_remove(struct platform_device *pdev)
- 
- static const struct of_device_id exynos_pcie_of_match[] = {
- 	{ .compatible = "samsung,exynos5440-pcie", },
-+	{ .compatible = "samsung,gh7-pcie", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, exynos_pcie_of_match);
--- 
-1.7.10.4
+Even thought ADC_V3 isn't h/w revision, ADC_V3 include all featues of ADC_V2
+and only one difference of clock(sclk_tsadc) from ADC_V2.
+I want to describethat ADC_V3 include ADC_V2 feature So, I add as following:
+	>> +       ADC_V3 = (ADC_V1 | ADC_V2),
+
+> 
+>>  };
+>>
+>>  /* EXYNOS4412/5250 ADC_V1 registers definitions */
+>> @@ -88,6 +89,7 @@ struct exynos_adc {
+>>         void __iomem            *regs;
+>>         void __iomem            *enable_reg;
+>>         struct clk              *clk;
+>> +       struct clk              *sclk;
+>>         unsigned int            irq;
+>>         struct regulator        *vdd;
+>>
+>> @@ -100,6 +102,7 @@ struct exynos_adc {
+>>  static const struct of_device_id exynos_adc_match[] = {
+>>         { .compatible = "samsung,exynos-adc-v1", .data = (void *)ADC_V1 },
+>>         { .compatible = "samsung,exynos-adc-v2", .data = (void *)ADC_V2 },
+>> +       { .compatible = "samsung,exynos-adc-v3", .data = (void *)ADC_V3 },
+>>         {},
+>>  };
+>>  MODULE_DEVICE_TABLE(of, exynos_adc_match);
+>> @@ -128,7 +131,7 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
+>>         mutex_lock(&indio_dev->mlock);
+>>
+>>         /* Select the channel to be used and Trigger conversion */
+>> -       if (info->version == ADC_V2) {
+>> +       if (info->version & ADC_V2) {
+> 
+> So, now this would be applicable for ADC_V3 too, right?
+> 
+> 
+>>                 con2 = readl(ADC_V2_CON2(info->regs));
+>>                 con2 &= ~ADC_V2_CON2_ACH_MASK;
+>>                 con2 |= ADC_V2_CON2_ACH_SEL(chan->address);
+>> @@ -165,7 +168,7 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+>>         info->value = readl(ADC_V1_DATX(info->regs)) &
+>>                                                 ADC_DATX_MASK;
+>>         /* clear irq */
+>> -       if (info->version == ADC_V2)
+>> +       if (info->version & ADC_V2)
+>>                 writel(1, ADC_V2_INT_ST(info->regs));
+>>         else
+>>                 writel(1, ADC_V1_INTCLR(info->regs));
+>> @@ -226,11 +229,25 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
+>>         return 0;
+>>  }
+>>
+>> +static void exynos_adc_enable_clock(struct exynos_adc *info, bool enable)
+>> +{
+>> +       if (enable) {
+>> +               clk_prepare_enable(info->clk);
+> 
+> This could fail. Is it OK without any checks?
+
+OK, I'll check return value.
+> 
+>> +               if (info->version == ADC_V3)
+>> +                       clk_prepare_enable(info->sclk);
+> 
+> ditto.
+
+ditto.
+
+> 
+>> +
+>> +       } else {
+>> +               if (info->version == ADC_V3)
+>> +                       clk_disable_unprepare(info->sclk);
+>> +               clk_disable_unprepare(info->clk);
+>> +       }
+>> +}
+>> +
+>>  static void exynos_adc_hw_init(struct exynos_adc *info)
+>>  {
+>>         u32 con1, con2;
+>>
+>> -       if (info->version == ADC_V2) {
+>> +       if (info->version & ADC_V2) {
+>>                 con1 = ADC_V2_CON1_SOFT_RESET;
+>>                 writel(con1, ADC_V2_CON1(info->regs));
+>>
+>> @@ -300,6 +317,8 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>>
+>>         writel(1, info->enable_reg);
+>>
+>> +       info->version = exynos_adc_get_version(pdev);
+>> +
+>>         info->clk = devm_clk_get(&pdev->dev, "adc");
+>>         if (IS_ERR(info->clk)) {
+>>                 dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
+>> @@ -308,6 +327,17 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>>                 goto err_irq;
+>>         }
+>>
+>> +       if (info->version == ADC_V3) {
+>> +               info->sclk = devm_clk_get(&pdev->dev, "sclk_tsadc");
+>> +               if (IS_ERR(info->sclk)) {
+>> +                       dev_warn(&pdev->dev,
+>> +                               "failed getting sclk clock, err = %ld\n",
+>> +                               PTR_ERR(info->sclk));
+>> +                       ret = PTR_ERR(info->sclk);
+> 
+> nit: you could move this line above dev_warn and use 'ret' in the print
+> statement.
+
+As I knew, usually show log meesage and then initialize return value.
+But If you find this code ugly, I can fix it.
+
+Thanks for your review.
+
+Best Regards,
+Chanwoo Choi
