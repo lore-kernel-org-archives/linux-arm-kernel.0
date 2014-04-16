@@ -1,97 +1,113 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 16 Apr 2014 19:19:44 -0400
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <20140416222548.GL24070@n2100.arm.linux.org.uk>
-References: <20140416191825.GA22246@redhat.com>
- <20140416.153734.675854782374654510.davem@davemloft.net>
- <534EE6F2.3050005@linaro.org>
- <20140416.172153.646525167994615191.davem@davemloft.net>
- <20140416222548.GL24070@n2100.arm.linux.org.uk>
-Message-ID: <534F1010.8080605@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 16 Apr 2014 19:21:12 -0400 (EDT)
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <534EF153.5050603@codeaurora.org>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <534EF153.5050603@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/14 18:25, Russell King - ARM Linux wrote:
-> On Wed, Apr 16, 2014 at 05:21:53PM -0400, David Miller wrote:
->> Weird, if we store to the kernel side it should be just a matter of
->> clearing the I-cache out.  There should be no D-cache aliasing
->> whatsoever.  Maybe you could print out area->vaddr and
->> page_to_virt(area->page) so we can see if area->vaddr is choosen
->> correctly?
->>
->> Although I notice that flush_cache_user_range() on ARM flushes both D
->> and I caches.  And I think that's what userspace ends up triggering
->> when it uses the system call that exists to support self-modifying and
->> JIT code generators.
->>
->> An ARM expert will have to chime in...
-> 
-> So, David's patch is against the existing kernel (I checked the blob ID
-> in the patch.)
+On Wed, 16 Apr 2014, Christopher Covington wrote:
 
-Sorry, that patch was against my uprobes-v7 branch which means it was v3.14-rc5
-plus the uprobes work you pulled from me for v3.15.  Thanks for reminding me
-it's time to update my repo.
+> On 04/16/2014 03:14 PM, Nicolas Pitre wrote:
+> > On Wed, 16 Apr 2014, Christopher Covington wrote:
+> > 
+> >> It seems to me that if external/uncompressed image loaders could query the
+> >> text offset in a straightforward manner, variance between images could be
+> >> easily dealt with. Would reading it out of ELF metadata be a reasonable
+> >> mechanism? Could the ELF format vmlinux be a suitable general replacement for
+> >> the raw Image?
+> > 
+> > The ELF image only has virtual addresses in it.  And the virtual address 
+> > of the kernel may be changed independently of TEXT_OFFSET with 
+> > CONFIG_VMSPLIT_*.
+> 
+> Do you know why this is the case? The ELF format is capable of storing
+> physical addresses as mentioned below.
 
-> It looks like David just replaced flush_dcache_page() with
-> flush_icache_all() as a hack. So my question is... between
-> flush_dcache_page() and flush_icache_all(), what was the intermediary
-> (if any) that was attempted?
+We don't know at build time what the physical address of the kernel will 
+be.  Back when the kernel could boot on a single SOC family then the 
+physical address was hardcoded in the kernel binary.  And with some 
+special configs (running a XIP kernel is the most obvious example) it is 
+still the case.  But in general we don't want to hardcode any physical 
+address in order to boot the same kernel binary on as many different 
+machines as possible.  Therefore the physical address is determined at 
+run time in most cases and having it in the ELF file would be 
+meaningless.
 
-The other combinations I tried were: 1) existing dcache flush followed by
-flush_icache_all, which works;  2) existing dcache flush followed by:
+The virtual address for the kernel, including TEXT_OFFSET, is determined 
+at build time.  And that's what the ELF file carries.
 
-	flush_icache_range(xol_vaddr, sizeof uprobe->arch.ixol);
+> What I meant to ask about was variance from one kernel version and build to
+> the next, given a single platform. Platform-to-platform variation can probably
+> be abstracted where needed by the scripts controlling the external load.
 
-...which also worked (xol_vaddr is the beginning of the two instruction
-out-of-line sequence, and the sizeof works out to be 8).
+Right.  The platform script must know where physical RAM is and load the 
+kernel accordingly.  In case of zImage you need to load it anywhere in 
+the first 128MB of RAM.  In the uncompressed Image it is at TEXT_OFFSET 
+from start of physical RAM.  
 
-I didn't bother trying flush_icache_user_range() because that is #define'd
-to be just flush_dcache_page() on ARM, which I don't understand at all.
+> In any case, CONFIG_VMSPLIT_* that you mentioned above would be an 
+> example where it would vary in an inconvenient manner, so this 
+> approach wouldn't be an improvement.
 
-> 
-> Now, I'm going to fill in some details for DaveM.  The type of the I/D
-> L1 caches found on any particular architecture version of CPU can be:
-> 
-> Arch	D-cache			I-cache
-> ARMv7	VIPT nonaliasing	VIVT ASID tagged
-> 				PIPT
-> -------------------------------------------------
-> ARMv6	VIPT nonalising		VIPT nonaliasing
-> 	VIPT aliasing		VIPT aliasing
-> -------------------------------------------------
-> ARMv5	VIVT			VIVT
-> &older
-> 
-> (For ARMv6, each can be either/or, though practically, there's no point
-> to I-aliasing and D-nonaliasing since it implies the I-cache is bigger
-> than the D-cache.)
-> 
-> Our I-caches don't snoop/see the D-cache at all - so writes need to be
-> pushed out to what we call the "point of unification" where the I and D
-> streams meet.  For anything we care about, that's normally the L2 cache -
-> L1 cache is harvard, L2 cache is unified.
-> 
-> Hence, we don't care which D-alias (if any) the data is written, so long
-> as it's pushed out of the L1 data cache so that it's visible to the L1
-> instruction cache.
-> 
-> If we're writing via a different mapping to that which is being executed,
-> I think the safest thing to do is to flush it out of the L1 D-cache at
-> the address it was written, and then flush any stale line from the L1
-> I-cache using the user address.  This is quite a unique requirement, and
-> we don't have anything which covers it.  The closest you could get is
-> to that using existing calls is:
-> 
-> 1. write the new instruction
-> 2. flush_dcache_page()
-> 3. flush_cache_user_range() using the user address
-> 
-> and I think that should be safe on all the above cache types.
-> 
+Well.  This config option changes the virtual address the kernel is 
+going to set up for itself.  And that is going to be reflected in the 
+ELF file as well.  That part is pretty machine independent and can be 
+obtained easily with tools like debuggers.  you pretty much need the ELF 
+file if you want to have symbolic debugging anyway.  So no issue there.
 
-OK, still needing the dcache flush makes sense to me.  I thought I was
-reading from (the other) David that it shouldn't be necessary, but I
-could not understand why.
+> >> Or could we patch up the linker script to set zero-based ELF load
+> >> memory addresses (LMAs) [4] so that the physical addresses are almost right,
+> >> you just might have to add a system-specific RAM offset, perhaps pulled out of
+> 
+> I don't think I made this very clear, but adding the offset would happen at
+> load/run-time, controlled by JTAG scripts or simulator equivalent.
 
--dl
+Sure.  To load and debug the code before the MMU is turned on, you need 
+to know the physical address of RAM (the kernel binary doesn't carry it) 
+and the value of TEXT_OFFSET (this is hardcoded in the kernel binary at 
+build time).
+
+> > If you really really want to get at the TEXT_OFFSET value in the 
+> > uncompressed image, the simplest way would be:
+> > 
+> > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> > index f8c08839ed..de84d0635a 100644
+> > --- a/arch/arm/kernel/head.S
+> > +++ b/arch/arm/kernel/head.S
+> > @@ -78,6 +78,11 @@
+> >  
+> >  	__HEAD
+> >  ENTRY(stext)
+> > +
+> > +	b	1f
+> > +	.word	TEXT_OFFSET		@ located at a 4-byte offset in Image
+> > +1:
+> > +
+> >   ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+> >  
+> >   THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
+> > 
+> > This way the first word for Image would always be 0xea000000 and the 
+> > second one would be TEXT_OFFSET.  No other kernel Image binaries ever 
+> > had 0xea000000 as their first word so that also let you validate whether 
+> > or not the TEXT_OFFSET value is there.
+> 
+> Thank you for the suggestion. This approach also came to mind, but it would
+> require new documentation and tooling in the JTAG scripts or simulator
+> equivalent. That's another aspect of the ELF-based approaches that I
+> like--hopefully existing documentation and tool support could be reused.
+
+The above is useful for loading the raw uncompressed Image without 
+carrying the full ELF baggage.  With the ELF file we could simply store 
+a symbol which value would be TEXT_OFFSET.  But the physical start of 
+RAM has to come from outside the kernel image.
+
+But whatever you do, new documentation and tooling is required anyway if 
+you want to automate this into your debugging script.
+
+
+Nicolas
