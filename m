@@ -1,27 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Apr 2014 20:53:42 +0100
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <20140416191825.GA22246@redhat.com>
-References: <20140416145107.GA11039@redhat.com>
- <20140416.110031.1269128188581361698.davem@davemloft.net>
- <20140416164310.GA15739@redhat.com>
- <20140416.133831.364304583096073299.davem@davemloft.net>
- <20140416191825.GA22246@redhat.com>
-Message-ID: <20140416195342.GH24070@n2100.arm.linux.org.uk>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Wed, 16 Apr 2014 20:56:44 +0100
+Subject: [PATCH v4 21/21] misc: support for I-8024 in LP-8x4x
+In-Reply-To: <9eb6a7ac-e8c0-4c05-8f8a-e047d2614cba@email.android.com>
+References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-1-git-send-email-ynvich@gmail.com>
+ <1397668667-27328-15-git-send-email-ynvich@gmail.com>
+ <20140416193949.47f4ea68@alan.etchedpixels.co.uk>
+ <9eb6a7ac-e8c0-4c05-8f8a-e047d2614cba@email.android.com>
+Message-ID: <20140416205644.396709aa@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 09:18:25PM +0200, Oleg Nesterov wrote:
-> Looks like, __kunmap_atomic()->__cpuc_flush_dcache_area() should take
-> care, but could you please ack/nack my understanding?
+> I've closely examined a dozen or two of drivers, but of them was close enough for I-8024 in terms of speed. Its channel takes 0.1 us to set up from kernel. Real user space programs can setup all for channels in 1 us with interface provided by this patch. That's said I don't have data on time that it takes for output to stabilize at the desired levels.
+> 
+> I've chosen drivers/misc as a location that looked to provide the shortest path for my driver to land. The driver needs support for the bus, and here it can be in one driver.
+> 
+> It would be great to have some more detailed input on this issue.
 
-flush_dcache_area() doesn't touch the I-cache... the hint is in the
-name. :)  This is also the function which is used for flush_dcache_page()
-which we've already established isn't sufficient (for the same reason.)
-
-Plus... we still would need to know the user address(es) to flush for
-the I-cache side...
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+IIO is where we are trying to standardise all the industrial control
+devices. There is stuff in places like misc for historical reasons.
