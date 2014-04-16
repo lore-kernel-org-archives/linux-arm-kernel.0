@@ -1,169 +1,147 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 16 Apr 2014 18:00:09 +0200
-Subject: [PATCH v4 1/4] USB: OHCI: Export the OHCI hub control and status_data
- functions
+Date: Wed, 16 Apr 2014 18:00:11 +0200
+Subject: [PATCH v4 3/4] USB: ohci-pxa27x: Add support for external vbus
+ regulators
 In-Reply-To: <1397664012-28022-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1397664012-28022-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397664012-28022-2-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1397664012-28022-4-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platform drivers sometimes need to perform specific handling of hub
-control requests and status data. Make this possible by exporting the
-ohci_hub_control() and ohci_hub_status_data() functions which can then
-be called from custom hub operations in the default case.
+Override the hub control operation to enable and disable external
+regulators for the ports vbus power supply in response to clear/set
+USB_PORT_FEAT_POWER requests.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- drivers/usb/host/ohci-at91.c    | 11 ++---------
- drivers/usb/host/ohci-hub.c     |  8 ++++----
- drivers/usb/host/ohci-s3c2410.c | 13 +++----------
- drivers/usb/host/ohci.h         |  3 +++
- 4 files changed, 12 insertions(+), 23 deletions(-)
+ drivers/usb/host/ohci-pxa27x.c | 68 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 091ae49..e49eb4f 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -46,9 +46,6 @@ static const char hcd_name[] = "ohci-atmel";
+diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
+index d21d5fe..e68f3d0 100644
+--- a/drivers/usb/host/ohci-pxa27x.c
++++ b/drivers/usb/host/ohci-pxa27x.c
+@@ -30,6 +30,7 @@
+ #include <linux/platform_data/usb-ohci-pxa27x.h>
+ #include <linux/platform_data/usb-pxa3xx-ulpi.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/signal.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
+@@ -120,6 +121,8 @@ static struct hc_driver __read_mostly ohci_pxa27x_hc_driver;
+ struct pxa27x_ohci {
+ 	struct clk	*clk;
+ 	void __iomem	*mmio_base;
++	struct regulator *vbus[3];
++	bool		vbus_enabled[3];
+ };
  
- static struct hc_driver __read_mostly ohci_at91_hc_driver;
- static int clocked;
--static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
--			u16 wValue, u16 wIndex, char *buf, u16 wLength);
--static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
- 
- extern int usb_disabled(void);
- 
-@@ -262,7 +259,7 @@ static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
- static int ohci_at91_hub_status_data(struct usb_hcd *hcd, char *buf)
- {
- 	struct at91_usbh_data *pdata = hcd->self.controller->platform_data;
--	int length = orig_ohci_hub_status_data(hcd, buf);
-+	int length = ohci_hub_status_data(hcd, buf);
- 	int port;
- 
- 	at91_for_each_port(port) {
-@@ -340,8 +337,7 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 		break;
- 	}
- 
--	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex + 1,
--				buf, wLength);
-+	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex + 1, buf, wLength);
- 	if (ret)
- 		goto out;
- 
-@@ -690,9 +686,6 @@ static int __init ohci_at91_init(void)
- 	 * too easy.
- 	 */
- 
--	orig_ohci_hub_control = ohci_at91_hc_driver.hub_control;
--	orig_ohci_hub_status_data = ohci_at91_hc_driver.hub_status_data;
--
- 	ohci_at91_hc_driver.hub_status_data	= ohci_at91_hub_status_data;
- 	ohci_at91_hc_driver.hub_control		= ohci_at91_hub_control;
- 
-diff --git a/drivers/usb/host/ohci-hub.c b/drivers/usb/host/ohci-hub.c
-index c81c872..3d53208 100644
---- a/drivers/usb/host/ohci-hub.c
-+++ b/drivers/usb/host/ohci-hub.c
-@@ -438,8 +438,7 @@ static int ohci_root_hub_state_changes(struct ohci_hcd *ohci, int changed,
- 
- /* build "status change" packet (one or two bytes) from HC registers */
- 
--static int
--ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
-+int ohci_hub_status_data(struct usb_hcd *hcd, char *buf)
- {
- 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
- 	int		i, changed = 0, length = 1;
-@@ -504,6 +503,7 @@ done:
- 
- 	return changed ? length : 0;
- }
-+EXPORT_SYMBOL_GPL(ohci_hub_status_data);
- 
- /*-------------------------------------------------------------------------*/
- 
-@@ -646,7 +646,7 @@ static inline int root_port_reset (struct ohci_hcd *ohci, unsigned port)
+ #define to_pxa27x_ohci(hcd)	(struct pxa27x_ohci *)(hcd_to_ohci(hcd)->priv)
+@@ -166,6 +169,52 @@ static int pxa27x_ohci_select_pmm(struct pxa27x_ohci *pxa_ohci, int mode)
  	return 0;
  }
  
--static int ohci_hub_control (
-+int ohci_hub_control(
- 	struct usb_hcd	*hcd,
- 	u16		typeReq,
- 	u16		wValue,
-@@ -772,4 +772,4 @@ error:
- 	}
- 	return retval;
++static int pxa27x_ohci_set_vbus_power(struct pxa27x_ohci *pxa_ohci,
++				      unsigned int port, bool enable)
++{
++	struct regulator *vbus = pxa_ohci->vbus[port];
++	int ret = 0;
++
++	if (IS_ERR_OR_NULL(vbus))
++		return 0;
++
++	if (enable && !pxa_ohci->vbus_enabled[port])
++		ret = regulator_enable(vbus);
++	else if (!enable && pxa_ohci->vbus_enabled[port])
++		ret = regulator_disable(vbus);
++
++	if (ret < 0)
++		return ret;
++
++	pxa_ohci->vbus_enabled[port] = enable;
++
++	return 0;
++}
++
++static int pxa27x_ohci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
++				   u16 wIndex, char *buf, u16 wLength)
++{
++	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
++	int ret;
++
++	switch (typeReq) {
++	case SetPortFeature:
++	case ClearPortFeature:
++		if (!wIndex || wIndex > 3)
++			return -EPIPE;
++
++		if (wValue != USB_PORT_FEAT_POWER)
++			break;
++
++		ret = pxa27x_ohci_set_vbus_power(pxa_ohci, wIndex - 1,
++						 typeReq == SetPortFeature);
++		if (ret)
++			return ret;
++		break;
++	}
++
++	return ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
++}
+ /*-------------------------------------------------------------------------*/
+ 
+ static inline void pxa27x_setup_hc(struct pxa27x_ohci *pxa_ohci,
+@@ -372,6 +421,7 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+ 	struct ohci_hcd *ohci;
+ 	struct resource *r;
+ 	struct clk *usb_clk;
++	unsigned int i;
+ 
+ 	retval = ohci_pxa_of_init(pdev);
+ 	if (retval)
+@@ -417,6 +467,16 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+ 	pxa_ohci->clk = usb_clk;
+ 	pxa_ohci->mmio_base = (void __iomem *)hcd->regs;
+ 
++	for (i = 0; i < 3; ++i) {
++		char name[6];
++
++		if (!(inf->flags & (ENABLE_PORT1 << i)))
++			continue;
++
++		sprintf(name, "vbus%u", i + 1);
++		pxa_ohci->vbus[i] = devm_regulator_get(&pdev->dev, name);
++	}
++
+ 	retval = pxa27x_start_hc(pxa_ohci, &pdev->dev);
+ 	if (retval < 0) {
+ 		pr_debug("pxa27x_start_hc failed");
+@@ -462,9 +522,14 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
+ void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *pdev)
+ {
+ 	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
++	unsigned int i;
+ 
+ 	usb_remove_hcd(hcd);
+ 	pxa27x_stop_hc(pxa_ohci, &pdev->dev);
++
++	for (i = 0; i < 3; ++i)
++		pxa27x_ohci_set_vbus_power(pxa_ohci, i, false);
++
+ 	usb_put_hcd(hcd);
  }
--
-+EXPORT_SYMBOL_GPL(ohci_hub_control);
-diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
-index ff7c8f1..3d753a9 100644
---- a/drivers/usb/host/ohci-s3c2410.c
-+++ b/drivers/usb/host/ohci-s3c2410.c
-@@ -45,10 +45,6 @@ static struct clk *usb_clk;
  
- /* forward definitions */
+@@ -563,7 +628,10 @@ static int __init ohci_pxa27x_init(void)
+ 		return -ENODEV;
  
--static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq,
--			u16 wValue, u16 wIndex, char *buf, u16 wLength);
--static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
--
- static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
- 
- /* conversion functions */
-@@ -110,7 +106,7 @@ ohci_s3c2410_hub_status_data(struct usb_hcd *hcd, char *buf)
- 	int orig;
- 	int portno;
- 
--	orig = orig_ohci_hub_status_data(hcd, buf);
-+	orig = ohci_hub_status_data(hcd, buf);
- 
- 	if (info == NULL)
- 		return orig;
-@@ -181,7 +177,7 @@ static int ohci_s3c2410_hub_control(
- 	 * process the request straight away and exit */
- 
- 	if (info == NULL) {
--		ret = orig_ohci_hub_control(hcd, typeReq, wValue,
-+		ret = ohci_hub_control(hcd, typeReq, wValue,
- 				       wIndex, buf, wLength);
- 		goto out;
- 	}
-@@ -231,7 +227,7 @@ static int ohci_s3c2410_hub_control(
- 		break;
- 	}
- 
--	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
- 	if (ret)
- 		goto out;
- 
-@@ -489,9 +485,6 @@ static int __init ohci_s3c2410_init(void)
- 	 * override these functions by making it too easy.
- 	 */
- 
--	orig_ohci_hub_control = ohci_s3c2410_hc_driver.hub_control;
--	orig_ohci_hub_status_data = ohci_s3c2410_hc_driver.hub_status_data;
--
- 	ohci_s3c2410_hc_driver.hub_status_data	= ohci_s3c2410_hub_status_data;
- 	ohci_s3c2410_hc_driver.hub_control	= ohci_s3c2410_hub_control;
- 
-diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
-index 9250cad..a116583 100644
---- a/drivers/usb/host/ohci.h
-+++ b/drivers/usb/host/ohci.h
-@@ -727,3 +727,6 @@ extern int	ohci_setup(struct usb_hcd *hcd);
- extern int	ohci_suspend(struct usb_hcd *hcd, bool do_wakeup);
- extern int	ohci_resume(struct usb_hcd *hcd, bool hibernated);
- #endif
-+extern int	ohci_hub_control(struct usb_hcd	*hcd, u16 typeReq, u16 wValue,
-+				 u16 wIndex, char *buf, u16 wLength);
-+extern int	ohci_hub_status_data(struct usb_hcd *hcd, char *buf);
+ 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
++
+ 	ohci_init_driver(&ohci_pxa27x_hc_driver, &pxa27x_overrides);
++	ohci_pxa27x_hc_driver.hub_control = pxa27x_ohci_hub_control;
++
+ 	return platform_driver_register(&ohci_hcd_pxa27x_driver);
+ }
+ module_init(ohci_pxa27x_init);
 -- 
 1.8.3.2
