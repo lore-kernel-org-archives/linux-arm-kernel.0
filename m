@@ -1,187 +1,427 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 16 Apr 2014 21:17:26 +0400
-Subject: [PATCH v4 21/21] misc: support for I-8024 in LP-8x4x
-In-Reply-To: <1397668667-27328-1-git-send-email-ynvich@gmail.com>
-References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
- <1397668667-27328-1-git-send-email-ynvich@gmail.com>
-Message-ID: <1397668667-27328-15-git-send-email-ynvich@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Apr 2014 19:25:31 +0200
+Subject: [PATCH Resend] ARM: EXYNOS: Map SYSRAM address through DT
+In-Reply-To: <5721231.s2ATyWsK21@wuerfel>
+References: <1397649051-3288-1-git-send-email-sachin.kamat@linaro.org>
+ <5721231.s2ATyWsK21@wuerfel>
+Message-ID: <1493367.CDjMd4ghZP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Status of I-8042 4 analog output channels can be managed via
-sysfs.
+Hi,
 
-http://www.icpdas.com/root/product/solutions/remote_io/rs-485/i-8k_i-87k/i-8024w.html
+Am Mittwoch, 16. April 2014, 16:35:36 schrieb Arnd Bergmann:
+> On Wednesday 16 April 2014 17:20:51 Sachin Kamat wrote:
+> > Instead of hardcoding the SYSRAM details for each SoC,
+> > pass this information through device tree (DT) and make
+> > the code SoC agnostic.
+> > 
+> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> > ---
+> > Rebased on latest linux-next.
+> 
+> Thanks for sending this again. I'd like Heiko to have a look
+> and provide an Ack if he's happy with it.
+> 
+> It seems similar to what he did with the SRAM for mach-rockchip,
+> and if it is we should use the same binding that he introduced,
+> which would be a minor variation of this.
 
-Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
----
-   v3..v4
-   * no changes
+The sram binding is derived from the generic reserved-memory bindings to 
+enable the sram in general to be used generically through the sram driver, 
+while still retaining some areas for special purposes, like the smp-trampoline 
+in my case.
 
-   v2..v3
-   * use usleep_range instead of custom nsleep
-   * number change (16/16 -> 21/21)
+>From my reading of platsmp.c, it looks like offset+0x4 starts the so called 
+boot-registesr, which get the smp-start-address written to.
 
-   v0..v2
-   * no changes
+So I guess it all depends on what is contained in the rest of the sysram. If 
+it is all covered with such special registers or other special uses, the code 
+below is fine. But if the most of the area is just general purpose sram, a 
+solution like on rockchip might be nicer - i.e. handling the sysram via the 
+sram driver and declaring a reserved section for the boot registers.
 
- Documentation/misc-devices/lp8x4x_bus.txt | 15 ++++++
- drivers/misc/lp8x4x_bus.c                 | 78 +++++++++++++++++++++++++++++++
- 2 files changed, 93 insertions(+)
+So, depending on the above:
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 
-diff --git a/Documentation/misc-devices/lp8x4x_bus.txt b/Documentation/misc-devices/lp8x4x_bus.txt
-index 3ea257d..6076e01 100644
---- a/Documentation/misc-devices/lp8x4x_bus.txt
-+++ b/Documentation/misc-devices/lp8x4x_bus.txt
-@@ -66,3 +66,18 @@ input_status
- output_status
- 	RW - set status of digital output channels on the module in
- 	     the expansion slot. Value can be read back.
-+
-+analog_output
-+	RW - set status of analog output channels on the module in
-+	     the expansion slot. Tested with voltage output. Bits 0-13:
-+	     0x00c0 is -10.0V
-+	     0x2000 is   0.0V
-+	     0x3f40 is +10.0V
-+
-+	     So 1 unit of output is 1.25 mV.
-+
-+	     Bits 15 and 14 determine which channel to apply the value:
-+	     0x0000 is channel 1
-+	     0x4000 is channel 2
-+	     0x8000 is channel 3
-+	     0xc000 is channel 4
-diff --git a/drivers/misc/lp8x4x_bus.c b/drivers/misc/lp8x4x_bus.c
-index 3fb227d..72cd0b2 100644
---- a/drivers/misc/lp8x4x_bus.c
-+++ b/drivers/misc/lp8x4x_bus.c
-@@ -8,6 +8,7 @@
-  *  it under the terms of the GNU General Public License version 2 as
-  *  published by the Free Software Foundation or any later version.
-  */
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/gpio/consumer.h>
- #include <linux/init.h>
-@@ -23,6 +24,7 @@ MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Sergei Ianovich <ynvich@gmail.com>");
- MODULE_DESCRIPTION("ICP DAS LP-8x4x parallel bus driver");
- 
-+#define LP8X4X_MAX_AO_CHANNELS	4
- struct lp8x4x_slot {
- 	void			*data_addr;
- 	unsigned int		model;
-@@ -31,6 +33,8 @@ struct lp8x4x_slot {
- 	u32			DO;
- 	unsigned int		DI_len;
- 	u32			DI;
-+	unsigned int		AO_len;
-+	u32			AO[LP8X4X_MAX_AO_CHANNELS];
- 	struct device		dev;
- };
- 
-@@ -120,6 +124,26 @@ static void lp8x4x_slot_set_DO(struct lp8x4x_slot *s)
- 	mutex_unlock(&s->lock);
- }
- 
-+static void lp8x4x_slot_reset_AO(struct lp8x4x_slot *s)
-+{
-+	int i;
-+	mutex_lock(&s->lock);
-+	for (i = 0; i < s->AO_len; i++)
-+		s->AO[i] = 0x2000;
-+	iowrite8(0x00, s->data_addr);
-+	usleep_range(1, 2);
-+	iowrite8(0xff, s->data_addr);
-+	mutex_unlock(&s->lock);
-+}
-+
-+static void lp8x4x_slot_set_AO(struct lp8x4x_slot *s, u32 val)
-+{
-+	mutex_lock(&s->lock);
-+	iowrite8(val & 0xff, s->data_addr + 2);
-+	iowrite8((val >> 8) & 0xff, s->data_addr + 4);
-+	mutex_unlock(&s->lock);
-+}
-+
- static ssize_t input_status_show(struct device *dev,
- 		struct device_attribute *attr, char *buf)
- {
-@@ -191,6 +215,48 @@ static ssize_t output_status_store(struct device *dev,
- 
- static DEVICE_ATTR_RW(output_status);
- 
-+static ssize_t analog_output_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
-+{
-+	struct lp8x4x_slot *s = container_of(dev, struct lp8x4x_slot, dev);
-+	int i, c = 0;
-+
-+	for (i = 0; i < s->AO_len; i++)
-+		c += sprintf(&buf[c], "0x%04x\n", s->AO[i]);
-+	return c;
-+}
-+
-+static ssize_t analog_output_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	struct lp8x4x_slot *s = container_of(dev, struct lp8x4x_slot, dev);
-+	u32 AO;
-+	int i;
-+
-+	if (!buf)
-+		return count;
-+	if (0 == count)
-+		return count;
-+
-+	if (kstrtouint(buf, 16, &AO) != 0) {
-+		dev_err(dev, "bad input\n");
-+		return count;
-+	}
-+
-+	if (AO & 0xffff0000) {
-+		dev_err(dev, "bad input\n");
-+		return count;
-+	}
-+
-+	i = AO >> 14;
-+	s->AO[i] = AO & 0x3fff;
-+	lp8x4x_slot_set_AO(s, AO);
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR_RW(analog_output);
-+
- static ssize_t model_show(struct device *dev,
- 		struct device_attribute *attr, char *buf)
- {
-@@ -222,6 +288,13 @@ static struct attribute *dio_slot_dev_attrs[] = {
- };
- ATTRIBUTE_GROUPS(dio_slot_dev);
- 
-+static struct attribute *ao_slot_dev_attrs[] = {
-+	&dev_attr_model.attr,
-+	&dev_attr_analog_output.attr,
-+	NULL,
-+};
-+ATTRIBUTE_GROUPS(ao_slot_dev);
-+
- static void lp8x4x_master_release(struct device *dev)
- {
- 	struct lp8x4x_master *m = container_of(dev, struct lp8x4x_master, dev);
-@@ -382,6 +455,11 @@ static void __init lp8x4x_bus_probe_slot(struct lp8x4x_master *m, int i,
- 	mutex_init(&s->lock);
- 
- 	switch (model) {
-+	case 24:
-+		s->AO_len = 4;
-+		lp8x4x_slot_reset_AO(s);
-+		s->dev.groups = ao_slot_dev_groups;
-+		break;
- 	case 41:
- 		s->DO_len = 4;
- 		lp8x4x_slot_set_DO(s);
--- 
-1.8.4.2
+
+Heiko
+
+> 
+> 	Arnd
+> 
+> >  .../devicetree/bindings/arm/samsung-boards.txt     |   11 +++
+> >  arch/arm/boot/dts/exynos4210-universal_c210.dts    |    9 ++
+> >  arch/arm/boot/dts/exynos4210.dtsi                  |   10 ++
+> >  arch/arm/boot/dts/exynos4x12.dtsi                  |   10 ++
+> >  arch/arm/boot/dts/exynos5.dtsi                     |    5 +
+> >  arch/arm/boot/dts/exynos5250.dtsi                  |    5 +
+> >  arch/arm/boot/dts/exynos5420.dtsi                  |    5 +
+> >  arch/arm/mach-exynos/exynos.c                      |  104
+> >  ++++++++------------ arch/arm/mach-exynos/include/mach/map.h           
+> >  |    7 --
+> >  9 files changed, 95 insertions(+), 71 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> > b/Documentation/devicetree/bindings/arm/samsung-boards.txt index
+> > 2168ed31e1b0..f79710eb7e79 100644
+> > --- a/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> > +++ b/Documentation/devicetree/bindings/arm/samsung-boards.txt
+> > 
+> > @@ -7,6 +7,17 @@ Required root node properties:
+> >          (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
+> >          (b) "samsung,exynos4210"  - for boards based on Exynos4210 SoC.
+> > 
+> > +    - sysram node, specifying the type (secure or non-secure) of SYSRAM
+> > +	- compatible: following types are supported
+> > +		"samsung,exynos4210-sysram" : Secure SYSRAM
+> > +		"samsung,exynos4210-sysram-ns" : Non-secure SYSRAM
+> > +	- reg: address of SYSRAM bank
+> > +
+> > +	sysram at 02020000 {
+> > +		compatible = "samsung,exynos4210-sysram";
+> > +		reg = <0x02020000 0x1000>;
+> > +	};
+> > +
+> > 
+> >  Optional:
+> >      - firmware node, specifying presence and type of secure firmware:
+> >          - compatible: only "samsung,secure-firmware" is currently
+> >          supported
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> > b/arch/arm/boot/dts/exynos4210-universal_c210.dts index
+> > 63e34b24b04f..cf4158728108 100644
+> > --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> > +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+> > @@ -28,6 +28,15 @@
+> > 
+> >  		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw 
+rootwait
+> >  		earlyprintk panic=5 maxcpus=1";>  	
+> >  	};
+> > 
+> > +	sysram at 02020000 {
+> > +		status = "disabled";
+> > +	};
+> > +
+> > +	sysram at 02025000 {
+> > +		compatible = "samsung,exynos4210-sysram";
+> > +		reg = <0x02025000 0x1000>;
+> > +	};
+> > +
+> > 
+> >  	mct at 10050000 {
+> >  	
+> >  		compatible = "none";
+> >  	
+> >  	};
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos4210.dtsi
+> > b/arch/arm/boot/dts/exynos4210.dtsi index cacf6140dd2f..a3f4bba099e6
+> > 100644
+> > --- a/arch/arm/boot/dts/exynos4210.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> > @@ -31,6 +31,16 @@
+> > 
+> >  		pinctrl2 = &pinctrl_2;
+> >  	
+> >  	};
+> > 
+> > +	sysram at 02020000 {
+> > +		compatible = "samsung,exynos4210-sysram";
+> > +		reg = <0x02020000 0x1000>;
+> > +	};
+> > +
+> > +	sysram-ns at 0203F000 {
+> > +		compatible = "samsung,exynos4210-sysram-ns";
+> > +		reg = <0x0203F000 0x1000>;
+> > +	};
+> > +
+> > 
+> >  	pd_lcd1: lcd1-power-domain at 10023CA0 {
+> >  	
+> >  		compatible = "samsung,exynos4210-pd";
+> >  		reg = <0x10023CA0 0x20>;
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos4x12.dtsi
+> > b/arch/arm/boot/dts/exynos4x12.dtsi index c4a9306f8529..d57e3120223f
+> > 100644
+> > --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> > @@ -37,6 +37,16 @@
+> > 
+> >  		interrupts = <2 2>, <3 2>, <18 2>, <19 2>;
+> >  	
+> >  	};
+> > 
+> > +	sysram at 02020000 {
+> > +		compatible = "samsung,exynos4210-sysram";
+> > +		reg = <0x02020000 0x1000>;
+> > +	};
+> > +
+> > +	sysram-ns at 0204F000 {
+> > +		compatible = "samsung,exynos4210-sysram-ns";
+> > +		reg = <0x0204F000 0x1000>;
+> > +	};
+> > +
+> > 
+> >  	pd_isp: isp-power-domain at 10023CA0 {
+> >  	
+> >  		compatible = "samsung,exynos4210-pd";
+> >  		reg = <0x10023CA0 0x20>;
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5.dtsi
+> > b/arch/arm/boot/dts/exynos5.dtsi index 79d0608d6dcc..c03bd09ec37d 100644
+> > --- a/arch/arm/boot/dts/exynos5.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5.dtsi
+> > @@ -18,6 +18,11 @@
+> > 
+> >  / {
+> >  
+> >  	interrupt-parent = <&gic>;
+> > 
+> > +	sysram at 02020000 {
+> > +		compatible = "samsung,exynos4210-sysram";
+> > +		reg = <0x02020000 0x1000>;
+> > +	};
+> > +
+> > 
+> >  	chipid at 10000000 {
+> >  	
+> >  		compatible = "samsung,exynos4210-chipid";
+> >  		reg = <0x10000000 0x100>;
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> > b/arch/arm/boot/dts/exynos5250.dtsi index 37423314a028..bae6c3f253f0
+> > 100644
+> > --- a/arch/arm/boot/dts/exynos5250.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> > @@ -72,6 +72,11 @@
+> > 
+> >  		};
+> >  	
+> >  	};
+> > 
+> > +	sysram-ns at 0204F000 {
+> > +		compatible = "samsung,exynos4210-sysram-ns";
+> > +		reg = <0x0204F000 0x1000>;
+> > +	};
+> > +
+> > 
+> >  	pd_gsc: gsc-power-domain at 10044000 {
+> >  	
+> >  		compatible = "samsung,exynos4210-pd";
+> >  		reg = <0x10044000 0x20>;
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+> > b/arch/arm/boot/dts/exynos5420.dtsi index c3a9a66c5767..217376fe1d82
+> > 100644
+> > --- a/arch/arm/boot/dts/exynos5420.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> > @@ -110,6 +110,11 @@
+> > 
+> >  		};
+> >  	
+> >  	};
+> > 
+> > +	sysram-ns at 02073000 {
+> > +		compatible = "samsung,exynos4210-sysram-ns";
+> > +		reg = <0x02073000 0x1000>;
+> > +	};
+> > +
+> > 
+> >  	clock: clock-controller at 10010000 {
+> >  	
+> >  		compatible = "samsung,exynos5420-clock";
+> >  		reg = <0x10010000 0x30000>;
+> > 
+> > diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> > index b32a907d021d..6a5fe18ec9b1 100644
+> > --- a/arch/arm/mach-exynos/exynos.c
+> > +++ b/arch/arm/mach-exynos/exynos.c
+> > @@ -114,51 +114,6 @@ static struct map_desc exynos4_iodesc[] __initdata =
+> > {
+> > 
+> >  	},
+> >  
+> >  };
+> > 
+> > -static struct map_desc exynos4_iodesc0[] __initdata = {
+> > -	{
+> > -		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+> > -		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM0),
+> > -		.length		= SZ_4K,
+> > -		.type		= MT_DEVICE,
+> > -	},
+> > -};
+> > -
+> > -static struct map_desc exynos4_iodesc1[] __initdata = {
+> > -	{
+> > -		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+> > -		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM1),
+> > -		.length		= SZ_4K,
+> > -		.type		= MT_DEVICE,
+> > -	},
+> > -};
+> > -
+> > -static struct map_desc exynos4210_iodesc[] __initdata = {
+> > -	{
+> > -		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+> > -		.pfn		= __phys_to_pfn(EXYNOS4210_PA_SYSRAM_NS),
+> > -		.length		= SZ_4K,
+> > -		.type		= MT_DEVICE,
+> > -	},
+> > -};
+> > -
+> > -static struct map_desc exynos4x12_iodesc[] __initdata = {
+> > -	{
+> > -		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+> > -		.pfn		= __phys_to_pfn(EXYNOS4x12_PA_SYSRAM_NS),
+> > -		.length		= SZ_4K,
+> > -		.type		= MT_DEVICE,
+> > -	},
+> > -};
+> > -
+> > -static struct map_desc exynos5250_iodesc[] __initdata = {
+> > -	{
+> > -		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
+> > -		.pfn		= __phys_to_pfn(EXYNOS5250_PA_SYSRAM_NS),
+> > -		.length		= SZ_4K,
+> > -		.type		= MT_DEVICE,
+> > -	},
+> > -};
+> > -
+> > 
+> >  static struct map_desc exynos5_iodesc[] __initdata = {
+> >  
+> >  	{
+> >  	
+> >  		.virtual	= (unsigned long)S3C_VA_SYS,
+> > 
+> > @@ -181,11 +136,6 @@ static struct map_desc exynos5_iodesc[] __initdata =
+> > {
+> > 
+> >  		.length		= SZ_4K,
+> >  		.type		= MT_DEVICE,
+> >  	
+> >  	}, {
+> > 
+> > -		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+> > -		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSRAM),
+> > -		.length		= SZ_4K,
+> > -		.type		= MT_DEVICE,
+> > -	}, {
+> > 
+> >  		.virtual	= (unsigned long)S5P_VA_CMU,
+> >  		.pfn		= __phys_to_pfn(EXYNOS5_PA_CMU),
+> >  		.length		= 144 * SZ_1K,
+> > 
+> > @@ -268,6 +218,44 @@ static int __init exynos_fdt_map_chipid(unsigned long
+> > node, const char *uname,> 
+> >  	return 1;
+> >  
+> >  }
+> > 
+> > +struct __sysram_desc {
+> > +	char name[32];
+> > +	unsigned long addr;
+> > +};
+> > +
+> > +static struct __sysram_desc sysram_desc[] __initdata = {
+> > +	{
+> > +		.name = "samsung,exynos4210-sysram",
+> > +		.addr = (unsigned long)S5P_VA_SYSRAM,
+> > +	}, {
+> > +		.name = "samsung,exynos4210-sysram-ns",
+> > +		.addr = (unsigned long)S5P_VA_SYSRAM_NS,
+> > +	},
+> > +};
+> > +
+> > +static int __init exynos_fdt_map_sysram(unsigned long node, const char
+> > *uname, +					int depth, void *data)
+> > +{
+> > +	struct map_desc iodesc;
+> > +	__be32 *reg;
+> > +	unsigned long len;
+> > +	int i;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(sysram_desc); i++) {
+> > +		if (of_flat_dt_is_compatible(node, sysram_desc[i].name)) {
+> > +			reg = of_get_flat_dt_prop(node, "reg", &len);
+> > +			if (!reg || len != (sizeof(unsigned long) * 2))
+> > +				return -ENODEV;
+> > +			iodesc.virtual = sysram_desc[i].addr;
+> > +			iodesc.pfn = __phys_to_pfn(be32_to_cpu(reg[0]));
+> > +			iodesc.length = be32_to_cpu(reg[1]);
+> > +			iodesc.type = MT_DEVICE;
+> > +			iotable_init(&iodesc, 1);
+> > +		}
+> > +	}
+> > +	return 0;
+> > +}
+> > +
+> > 
+> >  /*
+> >  
+> >   * exynos_map_io
+> >   *
+> > 
+> > @@ -280,20 +268,6 @@ static void __init exynos_map_io(void)
+> > 
+> >  	if (soc_is_exynos5())
+> >  	
+> >  		iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
+> > 
+> > -
+> > -	if (soc_is_exynos4210()) {
+> > -		if (samsung_rev() == EXYNOS4210_REV_0)
+> > -			iotable_init(exynos4_iodesc0,
+> > -						ARRAY_SIZE(exynos4_iodesc0));
+> > -		else
+> > -			iotable_init(exynos4_iodesc1,
+> > -						ARRAY_SIZE(exynos4_iodesc1));
+> > -		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
+> > -	}
+> > -	if (soc_is_exynos4212() || soc_is_exynos4412())
+> > -		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
+> > -	if (soc_is_exynos5250())
+> > -		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
+> > 
+> >  }
+> >  
+> >  void __init exynos_init_io(void)
+> > 
+> > @@ -306,6 +280,8 @@ void __init exynos_init_io(void)
+> > 
+> >  	s5p_init_cpu(S5P_VA_CHIPID);
+> >  	
+> >  	exynos_map_io();
+> > 
+> > +
+> > +	of_scan_flat_dt(exynos_fdt_map_sysram, NULL);
+> > 
+> >  }
+> >  
+> >  struct bus_type exynos_subsys = {
+> > 
+> > diff --git a/arch/arm/mach-exynos/include/mach/map.h
+> > b/arch/arm/mach-exynos/include/mach/map.h index
+> > 7b046b59d9ec..548269a60634 100644
+> > --- a/arch/arm/mach-exynos/include/mach/map.h
+> > +++ b/arch/arm/mach-exynos/include/mach/map.h
+> > @@ -23,13 +23,6 @@
+> > 
+> >  #include <plat/map-s5p.h>
+> > 
+> > -#define EXYNOS4_PA_SYSRAM0		0x02025000
+> > -#define EXYNOS4_PA_SYSRAM1		0x02020000
+> > -#define EXYNOS5_PA_SYSRAM		0x02020000
+> > -#define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
+> > -#define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
+> > -#define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
+> > -
+> > 
+> >  #define EXYNOS_PA_CHIPID		0x10000000
+> >  
+> >  #define EXYNOS4_PA_SYSCON		0x10010000
