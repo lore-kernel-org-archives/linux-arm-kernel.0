@@ -1,53 +1,99 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 16 Apr 2014 18:40:22 +0200
-Subject: [PATCH RESEND] dma: mmp_pdma: add support for residue reporting
-In-Reply-To: <20140416160109.GU32284@intel.com>
-References: <1392636546-15541-1-git-send-email-zonque@gmail.com>
- <20140319151352.GJ1976@intel.com> <534576C3.2020409@zonque.org>
- <20140416064534.GL32284@intel.com> <534E3F3D.5080003@zonque.org>
- <20140416082326.GM32284@intel.com> <534E4172.8030401@zonque.org>
- <20140416090923.GR32284@intel.com> <534E9AC1.1040706@zonque.org>
- <20140416160109.GU32284@intel.com>
-Message-ID: <534EB276.4000408@zonque.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 16 Apr 2014 18:42:25 +0200
+Subject: [PATCH 06/11] dt-bindings: add documentation for rk3188 clock and
+ reset unit
+In-Reply-To: <3673317.X1crLrrlCS@phil>
+References: <3673317.X1crLrrlCS@phil>
+Message-ID: <2756214.EPIkc1d4cv@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2014 06:01 PM, Vinod Koul wrote:
-> On Wed, Apr 16, 2014 at 04:59:13PM +0200, Daniel Mack wrote:
->> On 04/16/2014 11:09 AM, Vinod Koul wrote:
->>> On Wed, Apr 16, 2014 at 10:38:10AM +0200, Daniel Mack wrote:
->>>>>> It might add to the readability of the drivers, but for the current
->>>>>> case, I don't think it's really necessary.
->>>>> That is because you are maintaining the current descriptors in chain_running. If
->>>>> we use above method then you dont need to use this, right?
->>>>
->>>> Jup, but that would result in a rewrite of larger parts of the code. The
->>>> concept of hot-linking the two list so there's only one resulting list
->>>> of currently active descriptors is built-in deeply into the driver's
->>>> concept.
->>> Ah I suspected so :)
->>>
->>> I think for now this is fine you can perhaps upgrade this later :)
->>
->> So, do you want me to resend with the minor dma_set_residue() change?
-> Yes please...
-> 
+This add bindings documentation for the clock and reset unit found on
+rk3188 SoCs from Rockchip.
 
-Ah, just checked again and my call to
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ .../bindings/clock/rockchip,rk3188-cru.txt         | 72 ++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
 
-	dma_set_residue(txstate, mmp_pdma_residue(chan, cookie));
-
-resolves to ...
-
-static inline void dma_set_residue(struct dma_tx_state *state, u32 residue)
-{
-        if (state)
-                state->residue = residue;
-}
-
-
-So there's no need to check for txstate != NULL on the caller side :)
-
-
-Thanks,
-Daniel
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
+new file mode 100644
+index 0000000..26ad529
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3188-cru.txt
+@@ -0,0 +1,72 @@
++* Rockchip RK3188 Clock and Reset Unit
++
++The RK3188 clock controller generates and supplies clock to various controllers
++within the SoC and also implements a reset controller for SoC peripherals.
++
++Required Properties:
++
++- compatible: should be "rockchip,rk3188-cru"
++- reg: physical base address of the controller and length of memory mapped
++  region. The first element should be the cru register space and the second
++  element should be the address of the GRF_SOC_STATUS register providing the
++  pll lock status.
++- #clock-cells: should be 1.
++- #reset-cells: should be 1.
++
++- rockchip,armclk-divider-table: when the frequency of the APLL is changed
++  some core divider clocks also need to be updated. These divider clocks have
++  SoC specific divider clock output requirements for a specific APLL clock
++  speeds. When APLL clock rate is changed, these divider clocks are
++  reprogrammed with pre-determined values in order to maintain the SoC
++  specific divider clock outputs. This property lists the divider values
++  for these clocks for supported APLL clock speeds.
++  The format of each entry included in the arm-frequency-table should be
++  defined as
++
++      cell #1: arm clock parent frequency
++      cell #2 ~ cell 3#: value of clock divider of core_peri and aclk_core.
++
++- #rockchip,armclk-cells: defines the number of cells in
++  rockchip,armclk-divider-table property. The value of this property depends on
++  the SoC type. For RK3188 SoCs it should be 3.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. All available clocks are defined as
++preprocessor macros in dt-bindings/clock/rk3188-cru.h header and can be used
++in device tree sources.
++
++External clocks:
++
++The basic input clock is generated outside the SoC. It is expected that it is
++defined using standard clock bindings with a clock-output-name of "xin24m".
++
++Example: Clock controller node:
++
++	cru: cru at 20000000 {
++		compatible = "rockchip,rk3188-cru";
++		reg = <0x20000000 0x1000>,
++		      <0x200080ac 0x4>;
++
++		#clock-cells = <1>;
++
++		#rockchip,armclk-cells = <3>;
++		rockchip,armclk-divider-table =	<1608000 2 3>,
++						<1416000 2 3>,
++						<1200000 2 3>,
++						<1008000 2 3>,
++						< 816000 2 3>,
++						< 504000 1 3>,
++						< 312000 0 1>;
++	};
++
++Example: UART controller node that consumes the clock generated by the clock
++  controller:
++
++	uart0: serial at 10124000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x10124000 0x400>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <1>;
++		clocks = <&cru SCLK_UART0>;
++	};
+-- 
+1.9.0
