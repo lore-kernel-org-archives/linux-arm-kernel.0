@@ -1,79 +1,39 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 16 Apr 2014 09:43:46 +0100
-Subject: [PATCH RFC 5/5] ahci_imx: add disable for spread-spectrum
-In-Reply-To: <20140416084227.GD24070@n2100.arm.linux.org.uk>
-References: <20140416084227.GD24070@n2100.arm.linux.org.uk>
-Message-ID: <E1WaLRa-0002yX-7L@rmk-PC.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 16 Apr 2014 10:44:53 +0200
+Subject: [PATCH 0/5] fixing regressions caused by Dove in MULTI_V7
+In-Reply-To: <1397585763-23482-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <20140414151236.75f8816d@skate>
+ <1397585763-23482-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140416104453.571c8d10@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Spread-spectrum doesn't work with Cubox-i hardware, so we have to
-disable this feature.  Add a DT property so that platforms can
-indicate that this feature should not be enabled.
+Dear Sebastian Hesselbarth,
 
-Having it as a negative property keeps existing DT files working.
+On Tue, 15 Apr 2014 20:15:58 +0200, Sebastian Hesselbarth wrote:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/imx6q-cubox-i.dts |  1 +
- drivers/ata/ahci_imx.c              | 14 +++++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+> Sebastian Hesselbarth (5):
+>   ARM: iwmmxt: explicitly check for supported architectures
+>   ARM: pj4: enable iWMMXt only if CONFIG_IWMMXT is set
+>   ARM: pj4: properly detect existence of iWMMXt coprocessor
+>   ARM: pj4: fix cpu_is_pj4 check
+>   ARM: iwmmxt: allow to build iWMMXt on Marvell PJ4B
 
-diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
-index 941365d7ee65..9efd8b0c8011 100644
---- a/arch/arm/boot/dts/imx6q-cubox-i.dts
-+++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
-@@ -16,4 +16,5 @@
- 	fsl,transmit-level-mV = <1104>;
- 	fsl,transmit-boost-mdB = <0>;
- 	fsl,transmit-atten-16ths = <9>;
-+	fsl,no-spread-spectrum;
- };
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index 1251d719cc73..f3221b8bfafa 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -208,6 +208,7 @@ struct reg_property {
- 	const struct reg_value *values;
- 	size_t num_values;
- 	u32 def_value;
-+	u32 set_value;
- };
- 
- static const struct reg_value gpr13_tx_level[] = {
-@@ -305,6 +306,10 @@ static const struct reg_property gpr13_props[] = {
- 		.values = gpr13_rx_eq,
- 		.num_values = ARRAY_SIZE(gpr13_rx_eq),
- 		.def_value = IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB,
-+	}, {
-+		.name = "fsl,no-spread-spectrum",
-+		.def_value = IMX6Q_GPR13_SATA_MPLL_SS_EN,
-+		.set_value = 0,
- 	},
- };
- 
-@@ -318,6 +323,14 @@ static u32 imx_ahci_parse_props(struct device *dev,
- 	for (i = 0; i < num; i++, prop++) {
- 		u32 of_val;
- 
-+		if (prop->num_values == 0) {
-+			if (of_property_read_bool(np, prop->name))
-+				reg_value |= prop->set_value;
-+			else
-+				reg_value |= prop->def_value;
-+			continue;
-+		}
-+
- 		if (of_property_read_u32(np, prop->name, &of_val)) {
- 			dev_info(dev, "%s not specified, using %08x\n",
- 				prop->name, prop->def_value);
-@@ -392,7 +405,6 @@ static int imx_ahci_probe(struct platform_device *pdev)
- 				   IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
- 				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
- 				   IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
--				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
- 				   reg_value;
- 	}
- 
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>.
+
+It does fix the boot on PJ4B-MP based processors that don't have iWMMXt
+extensions such as the Armada XP. I've tested the following cases:
+
+ * Armada XP (PJ4B-MP), with CONFIG_MACH_DOVE disabled and enabled
+ * Armada 370 (PJ4B), with CONFIG_MACH_DOVE disabled and enabled
+
+and all of them boot, while before your patch series, 3.15-rc1 fails to
+boot on Armada XP with CONFIG_MACH_DOVE enabled.
+
+Thanks!
+
+Thomas
 -- 
-1.8.3.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
