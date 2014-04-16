@@ -1,69 +1,163 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Apr 2014 14:10:15 -0300
-Subject: [PATCH 1/3] ARM: dts: imx27: Use the correct usb clock gate
-Message-ID: <1397668217-17551-1-git-send-email-festevam@gmail.com>
+Date: Wed, 16 Apr 2014 14:10:16 -0300
+Subject: [PATCH 2/3] ARM: dts: imx27: Place the usb phy nodes in the board dts
+ files
+In-Reply-To: <1397668217-17551-1-git-send-email-festevam@gmail.com>
+References: <1397668217-17551-1-git-send-email-festevam@gmail.com>
+Message-ID: <1397668217-17551-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-USB Host1, Host2 and OTG are gated via 'usb_ipg_gate' clock, so fix it in order
-to avoid the following kernel oops:
+It is not a good approach to have the USB PHY nodes inside imx27.dtsi since
+the USB PHYs on mx27 are not internal to the SoC.
 
-usbcore: registered new interface driver usb-storage
-10024000.usb supply vbus not found, using dummy regulator
-Unhandled fault: external abort on non-linefetch (0x808) at 0xf4424184
-Internal error: : 808 [#1] PREEMPT ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.15.0-rc1-26325-g971f9fd-dirty #64
-task: c7829aa0 ti: c7836000 task.ti: c7836000
-PC is at ci_hdrc_probe+0x3a4/0x634
-LR is at ci_hdrc_probe+0x100/0x634
-pc : [<c036cc78>]    lr : [<c036c9d4>]    psr: 60000013
-sp : c7837d48  ip : 00000001  fp : 00000000
-r10: 00000000  r9 : 00000000  r8 : c791b6c0
-r7 : c7945000  r6 : f4424000  r5 : c7945010  r4 : c794e010
-r3 : f4424184  r2 : 00000000  r1 : 8c000004  r0 : 0c000004
-Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 0005317f  Table: a0004000  DAC: 00000017
-Process swapper (pid: 1, stack limit = 0xc78361c0)
-Stack: (0xc7837d48 to 0xc7838000)
+Place the USB PHY nodes in the board dts files instead.
+
+Also, each board may have a different clock source for the USB PHY, so do not
+hardcode it.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx27.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Applies on top of "[PATCH] ARM: dts: imx27-phytec-phycore-som: Move PMIC IRQ GPIO into a separate pin group"
 
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts  |  5 +---
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 36 ++++++++++++++++++++++---
+ arch/arm/boot/dts/imx27.dtsi                    | 22 ---------------
+ 3 files changed, 33 insertions(+), 30 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index 8b4181b..7c23649 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -268,14 +268,11 @@
+ 	dr_mode = "host";
+ 	phy_type = "ulpi";
+ 	vbus-supply = <&reg_5v0>;
++	fsl,usbphy = <&usbphy2>;
+ 	disable-over-current;
+ 	status = "okay";
+ };
+ 
+-&usbphy2 {
+-	vcc-supply = <&reg_5v0>;
+-};
+-
+ &weim {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_weim>;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index 33c5dc2..c48b9f8 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -20,6 +20,15 @@
+ 		reg = <0xa0000000 0x08000000>;
+ 	};
+ 
++	clocks {
++		clk_26M: codec_clock {
++			compatible = "fixed-clock";
++			reg = <0>;
++			#clock-cells = <0>;
++			clock-frequency = <26000000>;
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -41,6 +50,28 @@
+ 			regulator-max-microvolt = <5000000>;
+ 		};
+ 	};
++
++	usbphy {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		usbphy0: usbphy at 0 {
++			compatible = "usb-nop-xceiv";
++			reg = <0>;
++			vcc-supply = <&sw3_reg>;
++			clocks = <&clk_26M>;
++			clock-names = "main_clk";
++		};
++
++		usbphy2: usbphy at 2 {
++			compatible = "usb-nop-xceiv";
++			reg = <0>;
++			vcc-supply = <&reg_5v0>;
++			clocks = <&clk_26M>;
++			clock-names = "main_clk";
++		};
++	};
+ };
+ 
+ &audmux {
+@@ -307,14 +338,11 @@
+ 	pinctrl-0 = <&pinctrl_usbotg>;
+ 	dr_mode = "otg";
+ 	phy_type = "ulpi";
++	fsl,usbphy = <&usbphy0>;
+ 	vbus-supply = <&sw3_reg>;
+ 	status = "okay";
+ };
+ 
+-&usbphy0 {
+-	vcc-supply = <&sw3_reg>;
+-};
+-
+ &weim {
+ 	status = "okay";
+ 
 diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 00cf66c..948354e 100644
+index 948354e..b2c103e 100644
 --- a/arch/arm/boot/dts/imx27.dtsi
 +++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -465,7 +465,7 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024000 0x200>;
+@@ -72,26 +72,6 @@
+ 		};
+ 	};
+ 
+-	usbphy {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		usbphy0: usbphy at 0 {
+-			compatible = "usb-nop-xceiv";
+-			reg = <0>;
+-			clocks = <&clks 75>;
+-			clock-names = "main_clk";
+-		};
+-
+-		usbphy2: usbphy at 2 {
+-			compatible = "usb-nop-xceiv";
+-			reg = <2>;
+-			clocks = <&clks 75>;
+-			clock-names = "main_clk";
+-		};
+-	};
+-
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -467,7 +447,6 @@
  				interrupts = <56>;
--				clocks = <&clks 15>;
-+				clocks = <&clks 75>;
+ 				clocks = <&clks 75>;
  				fsl,usbmisc = <&usbmisc 0>;
- 				fsl,usbphy = <&usbphy0>;
- 				status = "disabled";
-@@ -475,7 +475,7 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024200 0x200>;
- 				interrupts = <54>;
--				clocks = <&clks 15>;
-+				clocks = <&clks 75>;
- 				fsl,usbmisc = <&usbmisc 1>;
+-				fsl,usbphy = <&usbphy0>;
  				status = "disabled";
  			};
-@@ -484,7 +484,7 @@
- 				compatible = "fsl,imx27-usb";
- 				reg = <0x10024400 0x200>;
+ 
+@@ -486,7 +465,6 @@
  				interrupts = <55>;
--				clocks = <&clks 15>;
-+				clocks = <&clks 75>;
+ 				clocks = <&clks 75>;
  				fsl,usbmisc = <&usbmisc 2>;
- 				fsl,usbphy = <&usbphy2>;
+-				fsl,usbphy = <&usbphy2>;
  				status = "disabled";
+ 			};
+ 
 -- 
 1.8.3.2
