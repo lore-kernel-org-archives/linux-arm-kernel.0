@@ -1,51 +1,64 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Apr 2014 14:39:42 +0100
-Subject: [PATCH v3 10/19] KVM: ARM: vgic: move underflow handling to vgic_ops
+Date: Wed, 16 Apr 2014 14:39:41 +0100
+Subject: [PATCH v3 09/19] KVM: ARM: vgic: abstract MISR decoding
 In-Reply-To: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
 References: <1397655591-2761-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1397655591-2761-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1397655591-2761-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the code dealing with LR underflow handling to its own functions,
-and make them accessible through vgic_ops.
+Instead of directly dealing with the GICH_MISR bits, move the code to
+its own function and use a couple of public flags to represent the
+actual state.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h |  2 ++
- virt/kvm/arm/vgic.c    | 28 +++++++++++++++++++++++++---
+ include/kvm/arm_vgic.h |  4 ++++
+ virt/kvm/arm/vgic.c    | 26 +++++++++++++++++++++++---
  2 files changed, 27 insertions(+), 3 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 98208e0..831b9f5 100644
+index 5dbc8ee..98208e0 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -87,6 +87,8 @@ struct vgic_ops {
+@@ -86,6 +86,7 @@ struct vgic_ops {
+ 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
  	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
  	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
- 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
-+	void	(*set_underflow)(struct kvm_vcpu *vcpu);
-+	void	(*clear_underflow)(struct kvm_vcpu *vcpu);
++	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
  };
  
  struct vgic_dist {
+@@ -164,6 +165,9 @@ struct vgic_cpu {
+ 
+ #define LR_EMPTY	0xff
+ 
++#define INT_STATUS_EOI		(1 << 0)
++#define INT_STATUS_UNDERFLOW	(1 << 1)
++
+ struct kvm;
+ struct kvm_vcpu;
+ struct kvm_run;
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 9e100f6..13dad1f 100644
+index 896359f..9e100f6 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1047,12 +1047,24 @@ static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
- 	return ret;
+@@ -1034,11 +1034,25 @@ static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
+ 	return *(u64 *)eisr;
  }
  
-+static void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
++static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
 +{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr |= GICH_HCR_UIE;
-+}
++	u32 misr = vcpu->arch.vgic_cpu.vgic_v2.vgic_misr;
++	u32 ret = 0;
 +
-+static void vgic_v2_clear_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
++	if (misr & GICH_MISR_EOI)
++		ret |= INT_STATUS_EOI;
++	if (misr & GICH_MISR_U)
++		ret |= INT_STATUS_UNDERFLOW;
++
++	return ret;
 +}
 +
  static const struct vgic_ops vgic_ops = {
@@ -53,49 +66,45 @@ index 9e100f6..13dad1f 100644
  	.set_lr			= vgic_v2_set_lr,
  	.get_elrsr		= vgic_v2_get_elrsr,
  	.get_eisr		= vgic_v2_get_eisr,
- 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
-+	.set_underflow		= vgic_v2_set_underflow,
-+	.clear_underflow	= vgic_v2_clear_underflow,
++	.get_interrupt_status	= vgic_v2_get_interrupt_status,
  };
  
  static inline struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -1081,6 +1093,16 @@ static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
- 	return vgic_ops.get_interrupt_status(vcpu);
+@@ -1062,6 +1076,11 @@ static inline u64 vgic_get_eisr(struct kvm_vcpu *vcpu)
+ 	return vgic_ops.get_eisr(vcpu);
  }
  
-+static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
++static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
 +{
-+	vgic_ops.set_underflow(vcpu);
-+}
-+
-+static inline void vgic_clear_underflow(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops.clear_underflow(vcpu);
++	return vgic_ops.get_interrupt_status(vcpu);
 +}
 +
  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1262,9 +1284,9 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+@@ -1259,11 +1278,12 @@ epilog:
+ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	u32 status = vgic_get_interrupt_status(vcpu);
+ 	bool level_pending = false;
  
- epilog:
- 	if (overflow) {
--		vgic_cpu->vgic_v2.vgic_hcr |= GICH_HCR_UIE;
-+		vgic_set_underflow(vcpu);
- 	} else {
--		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+		vgic_clear_underflow(vcpu);
+-	kvm_debug("MISR = %08x\n", vgic_cpu->vgic_v2.vgic_misr);
++	kvm_debug("STATUS = %08x\n", status);
+ 
+-	if (vgic_cpu->vgic_v2.vgic_misr & GICH_MISR_EOI) {
++	if (status & INT_STATUS_EOI) {
  		/*
- 		 * We're about to run this VCPU, and we've consumed
- 		 * everything the distributor had in store for
-@@ -1311,7 +1333,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 		 * Some level interrupts have been EOIed. Clear their
+ 		 * active bit.
+@@ -1290,7 +1310,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 		}
  	}
  
- 	if (status & INT_STATUS_UNDERFLOW)
--		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
-+		vgic_clear_underflow(vcpu);
+-	if (vgic_cpu->vgic_v2.vgic_misr & GICH_MISR_U)
++	if (status & INT_STATUS_UNDERFLOW)
+ 		vgic_cpu->vgic_v2.vgic_hcr &= ~GICH_HCR_UIE;
  
  	return level_pending;
- }
 -- 
 1.8.3.4
