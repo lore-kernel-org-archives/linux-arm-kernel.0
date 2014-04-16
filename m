@@ -1,57 +1,44 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 16 Apr 2014 09:21:13 +0400
-Subject: [PATCH v3 10/21] mtd: support BB SRAM on ICP DAS LP-8x4x
-In-Reply-To: <20140416050449.GJ3131@norris-Latitude-E6410>
-References: <1386901645-28895-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-1-git-send-email-ynvich@gmail.com>
- <1387309071-22382-11-git-send-email-ynvich@gmail.com>
- <20140416050449.GJ3131@norris-Latitude-E6410>
-Message-ID: <1397625673.22465.8.camel@host5.omatika.ru>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 15 Apr 2014 22:31:36 -0700
+Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
+Message-ID: <1397626297-23873-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-15 at 22:04 -0700, Brian Norris wrote:
-> Hi Sergei,
-> 
-> On Tue, Dec 17, 2013 at 11:37:40PM +0400, Sergei Ianovich wrote:
-> > This provides an MTD device driver for 512kB of battery backed up SRAM
-> > on ICPDAS LP-8X4X programmable automation controllers.
-> > 
-> > SRAM chip is connected via FPGA and is not accessible without a driver,
-> > unlike flash memory which is wired to CPU MMU.
-> > 
-> > This SRAM becomes an excellent persisent storage of volatile process
-> > data like counter values and sensor statuses. Storing those data in
-> > flash or mmc card is not a viable solution.
-> > 
-> > Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
-> > ---
-> >    v2..v3
-> >    * no changes (except number 08/16 -> 10/21)
-> > 
-> >    v0..v2
-> >    * use device tree
-> >    * use devm helpers where possible
-> 
-> What's the status of this series? Is the rest of this platform support
-> going in via other trees yet? I have a few trivial comments, but this
-> driver mostly looks good as-is.
+Hi Guys,
 
-(...)
+Here is my understanding of Dave's and Russell's suggestion on [1] 
+to use direct write of xol slot instructions to user space. Now 
+posting patch through 'git send-email' since, as it was noted, my
+mailer corrupts patches otherwise.
 
-> You'll need a (trivial) DT binding doc in
-> Documentation/devicetree/bindings/ to go with this. You might also need
-> to split the arch/arm/boot/dts/ stuff out to a separate patch, so the
-> MTD driver can go in the MTD tree separate from the ARM tree bits.
+Note default case with __copy_to_user is NOT tested. It addresses
+David's remark.
 
-(...)
+Personally, I am very concerned about this patch because it creates
+writable and executable page in traced process. The way how uprobes
+is implemented such page will stay in process even if all uprobes
+are detached from process. IMHO it may create possible attack hole.
+I would prefer to see any executable memory read-only all the time.
 
-> With that, you have my:
-> 
-> 	Reviewed-by: Brian Norris <computersforpeace@gmail.com>
-> 
-> and I can merge this to the MTD tree if/when you'd like.
+On top of that, at least in ARM case xol page address is not even 
+randomized, which was perfectly fine with current nowrite/noread,
+just execute permissions.
 
-Thanks for response, the rest of the series is stuck on a DMA driver
-with no development activity. I'll fix the comments, separate ARM staff
-and refile the patch.
+Patch follows this cover letter.
+
+Thanks,
+Victor
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/247763.html
+
+Victor Kamensky (1):
+  ARM: uprobes xol write directly to userspace
+
+ arch/arm/kernel/uprobes.c |  8 ++++++++
+ include/linux/uprobes.h   |  3 +++
+ kernel/events/uprobes.c   | 28 +++++++++++++++++++---------
+ 3 files changed, 30 insertions(+), 9 deletions(-)
+
+-- 
+1.8.1.4
