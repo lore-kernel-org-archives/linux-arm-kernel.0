@@ -1,55 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 16 Apr 2014 18:19:38 +0200
-Subject: [PATCH 5/6] ARM: mvebu: Add thermal quirk for the Armada 375 DB
- board
-In-Reply-To: <20140416160824.GA14842@lunn.ch>
-References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1397657720-10893-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <534EA8C9.7010907@gmail.com> <20140416180315.5153c3f7@skate>
- <20140416160824.GA14842@lunn.ch>
-Message-ID: <20140416181938.6e8f8f4b@skate>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 16 Apr 2014 10:20:09 -0600
+Subject: [PATCH] ARM: tegra: make Venice's +3.3V_RUN regulator always
+ on
+In-Reply-To: <CAL1qeaGek9H74s00T-O7P7F6Uraa9juW=3LCMjTUjCuQCZ0pBw@mail.gmail.com>
+References: <1397600984-25198-1-git-send-email-swarren@wwwdotorg.org>
+ <CAL1qeaGek9H74s00T-O7P7F6Uraa9juW=3LCMjTUjCuQCZ0pBw@mail.gmail.com>
+Message-ID: <534EADB9.1010605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
-
-On Wed, 16 Apr 2014 18:08:24 +0200, Andrew Lunn wrote:
-> > For minor differences such as SoC stepping, I personally prefer to not
-> > have separate Device Trees. We already have many of them, for each
-> > variant of the various SOCs. If we add the different steppings, it's
-> > going to be even more complicated. Also, there will be a new iteration
-> > of the Armada 375 DB with an A0 chip, which does not have the Z1 bug.
+On 04/15/2014 06:54 PM, Andrew Bresticker wrote:
+> On Tue, Apr 15, 2014 at 3:29 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> This regulator supplies power to pretty much everything on the board, so
+>> it doesn't make sense to allow it to turn off. Mark it boot-on and
+>> always-on so it doesn't get turned off. Without this, I see issues with
+>> the eMMC device; it can't be correctly detected during boot.
 > 
-> How many Z1 are there out and about? Would it be simpler to just
-> disable thermal on Z1? If only development boards have Z1, this could
-> be reasonable.
+> This actually isn't a complete fix.  +3V3_RUN will still toggle on a
+> cold boot because the GPIO1_INVERT bit is initialized by the PMIC to
+> 1, but when the regulator core requests the GPIO as an output,
+> as3722_gpio_direction_output() first sets the output value to 1
+> (without considering the INVERT bit!) and then clears the invert bit
+> when setting the mode in as3722_pinctrl_gpio_set_direction().  The
+> as3722 driver should probably not touch the INVERT bit and instead
+> just take it into account when setting the GPIO value.
 
-Not many, but we also need workarounds for other Z1 issues, such as the
-I/O coherency workaround (see the 375 coherency patches) and the SMP
-issue (see the 375 SMP patches).
-
-For now, Gregory, Ezequiel and myself only have access to Z1 boards, so
-we would like to support this stepping at least until all of us have
-access to A0 boards. If we don't do this, then we need to keep an ugly
-pile of out-of-tree patches just to get our boards running, which is
-clearly not the best way of ensuring that mainline has all the
-necessary fixes.
-
-So, I would like to see the Z1 stepping supported for now, and have the
-freedom to remove its support later once we are all ready to switch to
-A0.
-
-For 375 and 38x, we have the chance of having started the mainlining
-process very early compared to the life cycle of the SoC, and part of
-the consequences of this chance is that we work on early steppings. It
-would seem weird for the kernel community to ask silicon vendors to
-mainline their code earlier, and at the same time refuse workarounds
-needed to bring up early SoC variants.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I'll take that as a heads-up on the existence of the AS3722 GPIO patch,
+rather than an objection to this patch.
