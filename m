@@ -1,38 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 16 Apr 2014 12:40:16 -0400
-Subject: [PATCH 4/6] thermal: armada: Support Armada 375 SoC
-In-Reply-To: <20140416154927.GA1892@arch.cereza>
-References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1397657720-10893-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140416153819.GF28159@titan.lakedaemon.net>
- <20140416154927.GA1892@arch.cereza>
-Message-ID: <20140416164016.GH28159@titan.lakedaemon.net>
+From: daniel@zonque.org (Daniel Mack)
+Date: Wed, 16 Apr 2014 18:40:22 +0200
+Subject: [PATCH RESEND] dma: mmp_pdma: add support for residue reporting
+In-Reply-To: <20140416160109.GU32284@intel.com>
+References: <1392636546-15541-1-git-send-email-zonque@gmail.com>
+ <20140319151352.GJ1976@intel.com> <534576C3.2020409@zonque.org>
+ <20140416064534.GL32284@intel.com> <534E3F3D.5080003@zonque.org>
+ <20140416082326.GM32284@intel.com> <534E4172.8030401@zonque.org>
+ <20140416090923.GR32284@intel.com> <534E9AC1.1040706@zonque.org>
+ <20140416160109.GU32284@intel.com>
+Message-ID: <534EB276.4000408@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 12:49:27PM -0300, Ezequiel Garcia wrote:
-> On Apr 16, Jason Cooper wrote:
-> > On Wed, Apr 16, 2014 at 11:15:18AM -0300, Ezequiel Garcia wrote:
-> > > +	/* This is only needed on A375 Z1 SoC silicon revision */
-> > > +	reg |= A375_Z1_WORKAROUND_BIT;
-> > 
-> > and this seem to be the only differences between the two init functions.
-> > 
-> > It also appears to be the only reason for having two data structs below.
-> > Is it worth checking for the compatible string in the init function so
-> > you only have one init and one data struct?
-> > 
+On 04/16/2014 06:01 PM, Vinod Koul wrote:
+> On Wed, Apr 16, 2014 at 04:59:13PM +0200, Daniel Mack wrote:
+>> On 04/16/2014 11:09 AM, Vinod Koul wrote:
+>>> On Wed, Apr 16, 2014 at 10:38:10AM +0200, Daniel Mack wrote:
+>>>>>> It might add to the readability of the drivers, but for the current
+>>>>>> case, I don't think it's really necessary.
+>>>>> That is because you are maintaining the current descriptors in chain_running. If
+>>>>> we use above method then you dont need to use this, right?
+>>>>
+>>>> Jup, but that would result in a rewrite of larger parts of the code. The
+>>>> concept of hot-linking the two list so there's only one resulting list
+>>>> of currently active descriptors is built-in deeply into the driver's
+>>>> concept.
+>>> Ah I suspected so :)
+>>>
+>>> I think for now this is fine you can perhaps upgrade this later :)
+>>
+>> So, do you want me to resend with the minor dma_set_residue() change?
+> Yes please...
 > 
-> Yes, thought about it at one point but I guess it seemed to me cleaner
-> this way.
-> 
-> I'll squash it if you think keeping two structs is stupid bloat.
 
-Well, it's really up to the thermal maintainer.  Either way will work.
-I personally think it's easier to grok using the compatible string.
-Unfortunately, you're going to have the either check it twice, or set a
-variable.
+Ah, just checked again and my call to
 
-thx,
+	dma_set_residue(txstate, mmp_pdma_residue(chan, cookie));
 
-Jason.
+resolves to ...
+
+static inline void dma_set_residue(struct dma_tx_state *state, u32 residue)
+{
+        if (state)
+                state->residue = residue;
+}
+
+
+So there's no need to check for txstate != NULL on the caller side :)
+
+
+Thanks,
+Daniel
