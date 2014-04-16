@@ -1,45 +1,128 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 16 Apr 2014 19:16:14 +0200
-Subject: [PATCH] regmap: i2c: fallback to SMBus if the adapter does not
- support standard I2C
-In-Reply-To: <20140416170638.GT12304@sirena.org.uk>
-References: <20140415223849.GJ12304@sirena.org.uk>
- <1397636170-664-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140416170638.GT12304@sirena.org.uk>
-Message-ID: <534EBADE.1000608@free-electrons.com>
+From: ynvich@gmail.com (Sergei Ianovich)
+Date: Wed, 16 Apr 2014 21:17:12 +0400
+Subject: [PATCH v4 07/21] ARM: dts: parse DMA config in pxamci
+In-Reply-To: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
+References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
+Message-ID: <1397668667-27328-1-git-send-email-ynvich@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+The existing PXA MMC driver cannot get DMA channels in a proper
+way from the respective device tree binding.
 
-On 16/04/2014 19:06, Mark Brown wrote:
-> On Wed, Apr 16, 2014 at 10:16:10AM +0200, Boris BREZILLON wrote:
->
->> +	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
->> +		return &regmap_i2c;
->> +	} else if (config->val_bits == 16 &&
->> +		   i2c_check_functionality(i2c->adapter,
->> +					   I2C_FUNC_SMBUS_WORD_DATA)) {
->> +                config->reg_read = regmap_smbus_word_reg_read;
->> +                config->reg_write = regmap_smbus_word_reg_write;
->> +		return NULL;
-> This all looks good to me except we shouldn't be modifying the config
-> struct (it's supposed to be const).  We should instead add the ability
-> for the bus to set these ops - that'll also be useful for things like
-> AC'97.
+This patch provides temporary workaround which allows using the
+existing driver in DT machines by pointing to the proper
+dmaengine-based "marvell,pdma-1.0" DMA.
 
-Actually I do not modify the passed config struct, I copy the config
-values into a local instance and then modify this local instance
-appropriately.
-But I agree that having a proper way to overload config parameters would
-be better.
-Any suggestion on how this should be done ?
+Even though the new DMA provider is not present we can parse device node
+attributes manually and use channel numbers to acquire DMA channel
+from the existing non-dmaengine provider.
 
-Best Regards,
+When Daniel's DMA series is merged there will be no need to manually
+parse for "dmas" and this patch can be safely reverted.
 
-Boris
+Signed-off-by: Sergei Ianovich <ynvich@gmail.com>
+CC: Daniel Mack <zonque@gmail.com>
+CC: Haojian Zhuang <haojian.zhuang@gmail.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+   v3..v4
+   * no changes
 
+   v2..v3
+   * split into good (PATCH 07/21) and temporary (this one) parts
+
+   v1..v2
+   * add binding for next-gen dma controller
+   * use correct dma declararion
+   * number changed from 5 to 3
+
+ drivers/mmc/host/pxamci.c | 59 ++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 48 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 32fe113..6b67764 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -613,11 +613,46 @@ static int pxamci_of_init(struct platform_device *pdev)
+ 
+         return 0;
+ }
++
++static int pxamci_of_init_dma(struct platform_device *pdev,
++		struct pxamci_host *host)
++{
++	struct device_node *np = pdev->dev.of_node;
++	u32 tmp;
++	int i;
++	int ret;
++
++	i = of_property_match_string(np, "dma-names", "rx");
++	if (i < 0)
++		return i;
++
++	ret = of_property_read_u32_index(np, "dmas", 2 * i + 1, &tmp);
++	if (ret < 0)
++		return ret;
++	host->dma_drcmrrx = tmp;
++
++	i = of_property_match_string(np, "dma-names", "tx");
++	if (i < 0)
++		return i;
++
++	ret = of_property_read_u32_index(np, "dmas", 2 * i + 1, &tmp);
++	if (ret < 0)
++		return ret;
++	host->dma_drcmrtx = tmp;
++
++	return 0;
++}
+ #else
+ static int pxamci_of_init(struct platform_device *pdev)
+ {
+         return 0;
+ }
++
++static int pxamci_of_init_dma(struct platform_device *pdev,
++		struct pxamci_host *host)
++{
++	return -ENODATA;
++}
+ #endif
+ 
+ static int pxamci_probe(struct platform_device *pdev)
+@@ -741,19 +776,21 @@ static int pxamci_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, mmc);
+ 
+-	dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+-	if (!dmarx) {
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-	host->dma_drcmrrx = dmarx->start;
++	if (pxamci_of_init_dma(pdev, host) < 0) {
++		dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++		if (!dmarx) {
++			ret = -ENXIO;
++			goto out;
++		}
++		host->dma_drcmrrx = dmarx->start;
+ 
+-	dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+-	if (!dmatx) {
+-		ret = -ENXIO;
+-		goto out;
++		dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++		if (!dmatx) {
++			ret = -ENXIO;
++			goto out;
++		}
++		host->dma_drcmrtx = dmatx->start;
+ 	}
+-	host->dma_drcmrtx = dmatx->start;
+ 
+ 	if (host->pdata) {
+ 		gpio_cd = host->pdata->gpio_card_detect;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.4.2
