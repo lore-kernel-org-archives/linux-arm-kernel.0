@@ -1,52 +1,83 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Wed, 16 Apr 2014 20:26:35 +0800
-Subject: [PATCH v2] arm64: initialize spinlock for init_mm's context
-Message-ID: <1397651195-5763-1-git-send-email-leoy@marvell.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 16 Apr 2014 21:30:44 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzNdIEFSTTogZHRzOiBpbXgyNzogUGxhY2UgdGhlIHVz?=
+ =?UTF-8?B?YiBwaHkgbm9kZXMgaW4gdGhlIGJvYXJkIGR0cyBmaWxlcw==?=
+In-Reply-To: <1397668217-17551-2-git-send-email-festevam@gmail.com>
+References: <1397668217-17551-1-git-send-email-festevam@gmail.com>
+ <1397668217-17551-2-git-send-email-festevam@gmail.com>
+Message-ID: <1397669444.19723407@f371.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 has defined the spinlock for init_mm's context, so need initialize
-the spinlock structure; otherwise during the suspend flow it will dump
-the info for spinlock's bad magic warning as below:
+Wed, 16 Apr 2014 14:10:16 -0300 ?? Fabio Estevam <festevam@gmail.com>:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> It is not a good approach to have the USB PHY nodes inside imx27.dtsi since
+> the USB PHYs on mx27 are not internal to the SoC.
+> 
+> Place the USB PHY nodes in the board dts files instead.
+> 
+> Also, each board may have a different clock source for the USB PHY, so do not
+> hardcode it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Applies on top of "[PATCH] ARM: dts: imx27-phytec-phycore-som: Move PMIC IRQ GPIO into a separate pin group"
+...
+> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+> index 33c5dc2..c48b9f8 100644
+> --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+> @@ -20,6 +20,15 @@
+>  		reg = <0xa0000000 0x08000000>;
+>  	};
+>  
+> +	clocks {
+> +		clk_26M: codec_clock {
 
-[   39.084394] Disabling non-boot CPUs ...
-[   39.092871] BUG: spinlock bad magic on CPU#1, swapper/1/0
-[   39.092896]  lock: init_mm+0x338/0x3e0, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
-[   39.092907] CPU: 1 PID: 0 Comm: swapper/1 Tainted: G           O 3.10.33 #125
-[   39.092912] Call trace:
-[   39.092927] [<ffffffc000087e64>] dump_backtrace+0x0/0x16c
-[   39.092934] [<ffffffc000087fe0>] show_stack+0x10/0x1c
-[   39.092947] [<ffffffc000765334>] dump_stack+0x1c/0x28
-[   39.092953] [<ffffffc0007653b8>] spin_dump+0x78/0x88
-[   39.092960] [<ffffffc0007653ec>] spin_bug+0x24/0x34
-[   39.092971] [<ffffffc000300a28>] do_raw_spin_lock+0x98/0x17c
-[   39.092979] [<ffffffc00076cf08>] _raw_spin_lock_irqsave+0x4c/0x60
-[   39.092990] [<ffffffc000094044>] set_mm_context+0x1c/0x6c
-[   39.092996] [<ffffffc0000941c8>] __new_context+0x94/0x10c
-[   39.093007] [<ffffffc0000d63d4>] idle_task_exit+0x104/0x1b0
-[   39.093014] [<ffffffc00008d91c>] cpu_die+0x14/0x74
-[   39.093021] [<ffffffc000084f74>] arch_cpu_idle_dead+0x8/0x14
-[   39.093030] [<ffffffc0000e7f18>] cpu_startup_entry+0x1ec/0x258
-[   39.093036] [<ffffffc00008d810>] secondary_start_kernel+0x114/0x124
+codec? 26M? Why?
 
-Signed-off-by: Leo Yan <leoy@marvell.com>
+> +			compatible = "fixed-clock";
+> +			reg = <0>;
+> +			#clock-cells = <0>;
+> +			clock-frequency = <26000000>;
+> +		};
+> +	};
+> +
+>  	regulators {
+>  		compatible = "simple-bus";
+>  		#address-cells = <1>;
+> @@ -41,6 +50,28 @@
+>  			regulator-max-microvolt = <5000000>;
+>  		};
+>  	};
+> +
+> +	usbphy {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		usbphy0: usbphy at 0 {
+> +			compatible = "usb-nop-xceiv";
+> +			reg = <0>;
+> +			vcc-supply = <&sw3_reg>;
+> +			clocks = <&clk_26M>;
+
+Just <&clks 0> is enough in this case.
+
+> +			clock-names = "main_clk";
+> +		};
+> +
+> +		usbphy2: usbphy at 2 {
+> +			compatible = "usb-nop-xceiv";
+> +			reg = <0>;
+> +			vcc-supply = <&reg_5v0>;
+> +			clocks = <&clk_26M>;
+> +			clock-names = "main_clk";
+> +		};
+> +	};
+
+SOM has no second ULPI.
+So this should be moved to RDK.
+
 ---
- arch/arm64/include/asm/mmu.h |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index f600d40..aff0292 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -22,6 +22,9 @@ typedef struct {
- 	void *vdso;
- } mm_context_t;
- 
-+#define INIT_MM_CONTEXT(name) \
-+	.context.id_lock = __RAW_SPIN_LOCK_UNLOCKED(name.context.id_lock),
-+
- #define ASID(mm)	((mm)->context.id & 0xffff)
- 
- extern void paging_init(void);
--- 
-1.7.9.5
