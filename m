@@ -1,21 +1,54 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 16 Apr 2014 13:19:40 +0200
-Subject: [PATCH] ARM i.MX51: Add Efika MX Smartbook devicetree
-In-Reply-To: <1397641298-25392-1-git-send-email-shc_work@mail.ru> (Alexander
- Shiyan's message of "Wed, 16 Apr 2014 13:41:38 +0400")
-References: <1397641298-25392-1-git-send-email-shc_work@mail.ru>
-Message-ID: <87tx9to71v.fsf@lebrac.rtp-net.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Apr 2014 08:25:56 -0300
+Subject: [PATCH] ARM: dts: imx27-phytec-phycore-som: Move PMIC IRQ GPIO into a
+ separate pin group
+Message-ID: <1397647556-10096-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Shiyan <shc_work@mail.ru> writes:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> This patch adds support for Efika MX Smartbook.
+The hardware is better described if we place the PMIC IRQ GPIO into its own
+pingroup. 
 
-I'm curious, how did you test that ? From a very quick look,
-seems it has no chance to work with the uboot shipped with the devices.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-What about the  mtl017 ? do you have a driver ready to be submitted
-mainline ?
-
-Arnaud
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index d7ed63c..9b3c759 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -69,6 +69,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "fsl,mc13783";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic>;
+ 		reg = <0>;
+ 		spi-cs-high;
+ 		spi-max-frequency = <20000000>;
+@@ -204,7 +206,6 @@
+ 				MX27_PAD_CSPI1_MOSI__CSPI1_MOSI 0x0
+ 				MX27_PAD_CSPI1_SCLK__CSPI1_SCLK 0x0
+ 				MX27_PAD_CSPI1_SS0__GPIO4_28	0x0 /* SPI1 CS0 */
+-				MX27_PAD_USB_PWR__GPIO2_23	0x0 /* PMIC IRQ */
+ 			>;
+ 		};
+ 
+@@ -251,6 +252,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pmic: pmicgrp {
++			fsl,pins = <
++				MX27_PAD_USB_PWR__GPIO2_23	0x0 /* PMIC IRQ */
++			>;
++		};
++
+ 		pinctrl_ssi1: ssi1grp {
+ 			fsl,pins = <
+ 				MX27_PAD_SSI1_FS__SSI1_FS 0x0
+-- 
+1.8.3.2
