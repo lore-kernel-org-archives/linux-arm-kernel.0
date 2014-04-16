@@ -1,95 +1,57 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Wed, 16 Apr 2014 17:30:53 +1000
-Subject: [PATCH] dtc: add ability to make nodes conditional on them being
- referenced
-In-Reply-To: <199290403.sj4aYrj8FC@diego>
-References: <199290403.sj4aYrj8FC@diego>
-Message-ID: <20140416073053.GB12216@voom.fritz.box>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 16 Apr 2014 09:29:33 +0200
+Subject: [PATCH v5 08/20] ARM: shmobile: r8a7779: Add helper to read mode
+ pins
+In-Reply-To: <1397613454-7522-9-git-send-email-horms+renesas@verge.net.au>
+References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
+ <1397613454-7522-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXVAaU=eEBr4hwfbz3TGL+k0NHxGtzh-uuzFwuUqeNA9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 16, 2014 at 10:22:02PM +0100, Heiko St?bner wrote:
-> From: Heiko Stuebner <heiko.stuebner@bq.com>
-> 
-> On i.MX, which carries a lot of pin-groups of which most are unused on
-> individual boards, they noticed that this plethora of nodes also results
-> in the runtime-lookup-performance also degrading [0].
-> 
-> A i.MX-specific solution defining the pingroups in the board files but
-> using macros to reference the pingroup-data was not well received.
-> 
-> This patch is trying to solve this issue in a more general way, by
-> adding the ability to mark nodes as needing to be referenced somewhere
-> in the tree.
-> 
-> To mark a node a needing to be referenced it must be prefixed with
-> /delete-unreferenced/. This makes dtc check the nodes reference-status
-> when creating the flattened tree, dropping it if unreferenced.
-> 
-> For example, the i.MX6SL pingroup
-> 
-> 	/delete-unreferenced/ pinctrl_ecspi1_1: ecspi1grp-1 {
-> 		fsl,pins = <
-> 			MX6SL_PAD_ECSPI1_MISO__ECSPI1_MISO 0x100b1
-> 			MX6SL_PAD_ECSPI1_MOSI__ECSPI1_MOSI 0x100b1
-> 			MX6SL_PAD_ECSPI1_SCLK__ECSPI1_SCLK 0x100b1
-> 		>;
-> 	};
-> 
-> would only be included in the dtb if it got referenced somewhere
-> as pingroup via
-> 
-> 	node {
-> 		pinctrl-0 <&pinctrl_ecscpi1_1>;
-> 	};
+On Wed, Apr 16, 2014 at 3:57 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add and use helper to read mode pins.
+> This will be re-used when moving marzen-reference to
+> the common clock framework.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Sorry for the delay - I'm pretty busy with non-dtc things.
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Concept looks fine to me.  It's perhaps a bit special use case, but
-the syntax is well isolated (that is, unlikely to mix badly with other
-possible syntax changes), so I'm happy enough to include it for those
-who want it.
-
-Maybe change the keyword to /delete-if-unreferenced/, it's a little
-bit more accurate.  It's a bit long-winded, but I can't think of a
-more succinct term, so it will do.
-
-It needs testcases.
-
-There are a few minor problems in the implementation.
-
-With those things fixed, I'd be happy to apply.
-
-Some detailed comments on the implementation below:
-
-[snip]
-> @@ -472,6 +472,8 @@ static void fixup_phandle_references(struct check *c, struct node *dt,
->  
->  		phandle = get_node_phandle(dt, refnode);
->  		*((cell_t *)(prop->val.val + m->offset)) = cpu_to_fdt32(phandle);
+> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+> @@ -802,6 +802,20 @@ void __init r8a7779_add_standard_devices_dt(void)
+>         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+>
+> +#define MODEMR         0xffcc0020
 > +
-> +		reference_node(refnode);
+> +u32 __init r8a7779_read_mode_pins(void)
+> +{
+> +       void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+> +       u32 mode;
+> +
+> +       BUG_ON(!modemr);
+> +       mode = ioread32(modemr);
+> +       iounmap(modemr);
+> +
+> +       return mode;
+> +}
 
-This may have some slightly unexpected behaviour when combined with
-/delete-node/ and or /delete-prop/.  At worst it should include the
-unnecessary node though, so I don't think it's a big problem.
+No caching, cfr. rcar_gen2_read_mode_pins()?
 
-[snip]
-> +struct node *check_node_referenced(struct node *node)
+BTW, I know you don't trust "R-Car Gen1" similarities, but the code for
+r8a7778 is identical. And this is code, not DT, so perhaps this can be
+rcar_gen_read_mode_pins() in arch/arm/mach-shmobile/setup-rcar-gen1.c?
 
-This function needs a different name, since it doesn't actually check
-anything (it just triggers a later check).  Maybe
-mark_node_needs_reference().
+Gr{oetje,eeting}s,
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/3608e549/attachment.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
