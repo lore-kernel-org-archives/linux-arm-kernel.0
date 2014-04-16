@@ -1,20 +1,19 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Apr 2014 17:13:54 -0400 (EDT)
-Subject: [RFC PATCH v3] ARM: uprobes need icache flush after xol write
-In-Reply-To: <20140416202243.GI24070@n2100.arm.linux.org.uk>
-References: <20140416152946.GA13564@redhat.com>
- <20140416.114740.1805744923904673839.davem@davemloft.net>
- <20140416202243.GI24070@n2100.arm.linux.org.uk>
-Message-ID: <20140416.171354.2030799647571837439.davem@davemloft.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 16 Apr 2014 23:16:12 +0200 (CEST)
+Subject: [patch 0/4] genirq/exynos timers: Fix the CPU hotplug wreckage
+ sanely
+In-Reply-To: <1397663995.19782.4.camel@AMDC1943>
+References: <20140416142106.537575971@linutronix.de>
+ <1397663995.19782.4.camel@AMDC1943>
+Message-ID: <alpine.DEB.2.02.1404162315270.22697@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Date: Wed, 16 Apr 2014 21:22:43 +0100
+On Wed, 16 Apr 2014, Krzysztof Kozlowski wrote:
+> On ?ro, 2014-04-16 at 14:36 +0000, Thomas Gleixner wrote:
+> > @Krzysztof: Can you please retest the series? I've changed the core
+> > implementation versus the first attempt to make it less intrusive.
+> 
+> Works fine. Tested whole patchset on board with Exynos 3250.
 
-> I'm thinking that both flush_icache_alias() and flush_pfn_alias() want
-> at least a preemption disabled around each so that we don't end up with
-> two threads being preempted here.
-
-Yes, you would need to disable preemption to keep another thread of
-control from potentially using the same flush slot.
+Great! Now I just need to sell it :)
