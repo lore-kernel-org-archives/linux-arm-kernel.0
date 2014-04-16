@@ -1,52 +1,85 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 16 Apr 2014 11:15:14 -0300
-Subject: [PATCH 0/6] thermal: Add Armada 375 SoC support
-Message-ID: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Wed, 16 Apr 2014 11:15:17 -0300
+Subject: [PATCH 3/6] thermal: armada: Add generic infrastructure to handle the
+ sensor
+In-Reply-To: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1397657720-10893-4-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds the support for the thermal sensor in the recently
-introduced Armada 375 SoC.
+In order to support similar SoC where the sensor value and valid
+bit can have different offset and/or mask, we add such fields to the
+per-variant structure, instead of having the values hardcoded.
 
-The first three patches are preparation work. They add a generic
-infrastructure that allows to support similar thermal sensors in
-a non-intrusive way.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/thermal/armada_thermal.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
-Patch four uses the infrastructure to support the Armada 375 SoC
-thermal sensor.
-
-Since there are some issues in the Z1 SoC thermal sensor, patch five
-adds a quirk to workaround such issues. The Z1 stepping is detected
-and the compatible string is updated, so the driver can perform
-a special sensor initialization. Also, the quirk moves the offset of
-the thermal control register, and allows to specifiy the correct
-(A0 stepping) offset in the devicetree.
-
-This quirk is applied only for the A375-DB board, being the only
-board with the problematic Z1 SoC.
-
-Finally, the last patch enables the thermal sensor in the devicetree.
-for the Armada 375 A0 stepping SoC.
-
-The series applies on v3.15-rc1, and has been tested on A375-DB board and
-A370-RD board.
-
-Feedback and comments are welcome!
-
-Ezequiel Garcia (6):
-  thermal: armada: Rename armada_thermal_ops struct
-  thermal: armada: Add infrastructure to support generic formulas
-  thermal: armada: Add generic infrastructure to handle the sensor
-  thermal: armada: Support Armada 375 SoC
-  ARM: mvebu: Add thermal quirk for the Armada 375 DB board
-  ARM: mvebu: Enable the thermal sensor in Armada 375 SoC
-
- .../devicetree/bindings/thermal/armada-thermal.txt |   7 ++
- arch/arm/boot/dts/armada-375.dtsi                  |   6 +
- arch/arm/mach-mvebu/board-v7.c                     |  57 +++++++++
- arch/arm/mach-mvebu/mvebu-soc-id.h                 |   3 +
- drivers/thermal/armada_thermal.c                   | 140 ++++++++++++++++++---
- 5 files changed, 197 insertions(+), 16 deletions(-)
-
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 4de6e56..3e4d8ef 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -24,10 +24,7 @@
+ #include <linux/of_device.h>
+ #include <linux/thermal.h>
+ 
+-#define THERMAL_VALID_OFFSET		9
+ #define THERMAL_VALID_MASK		0x1
+-#define THERMAL_TEMP_OFFSET		10
+-#define THERMAL_TEMP_MASK		0x1ff
+ 
+ /* Thermal Manager Control and Status Register */
+ #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
+@@ -58,6 +55,11 @@ struct armada_thermal_data {
+ 	unsigned long coef_b;
+ 	unsigned long coef_m;
+ 	unsigned long coef_div;
++
++	/* Offset and mask to access the sensor temperature */
++	unsigned int temp_offset;
++	unsigned int temp_mask;
++	unsigned int is_valid_offset;
+ };
+ 
+ static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
+@@ -108,7 +110,7 @@ static bool armada_is_valid(struct armada_thermal_priv *priv)
+ {
+ 	unsigned long reg = readl_relaxed(priv->sensor);
+ 
+-	return (reg >> THERMAL_VALID_OFFSET) & THERMAL_VALID_MASK;
++	return (reg >> priv->data->is_valid_offset) & THERMAL_VALID_MASK;
+ }
+ 
+ static int armada_get_temp(struct thermal_zone_device *thermal,
+@@ -126,7 +128,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+ 	}
+ 
+ 	reg = readl_relaxed(priv->sensor);
+-	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
++	reg = (reg >> priv->data->temp_offset) & priv->data->temp_mask;
+ 
+ 	/* Get formula coeficients */
+ 	b = priv->data->coef_b;
+@@ -143,6 +145,8 @@ static struct thermal_zone_device_ops ops = {
+ 
+ static const struct armada_thermal_data armadaxp_data = {
+ 	.init_sensor = armadaxp_init_sensor,
++	.temp_offset = 10,
++	.temp_mask = 0x1ff,
+ 	.coef_b = 3153000000UL,
+ 	.coef_m = 10000000UL,
+ 	.coef_div = 13825,
+@@ -151,6 +155,9 @@ static const struct armada_thermal_data armadaxp_data = {
+ static const struct armada_thermal_data armada370_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada370_init_sensor,
++	.is_valid_offset = 9,
++	.temp_offset = 10,
++	.temp_mask = 0x1ff,
+ 	.coef_b = 3153000000UL,
+ 	.coef_m = 10000000UL,
+ 	.coef_div = 13825,
 -- 
 1.9.1
