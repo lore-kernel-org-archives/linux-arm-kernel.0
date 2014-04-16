@@ -1,32 +1,58 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Wed, 16 Apr 2014 23:53:58 +0400
-Subject: [PATCH v4 13/21] misc: support for LP-8x4x custom parallel bus
-In-Reply-To: <20140416194109.3ef914d2@alan.etchedpixels.co.uk>
-References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
- <1397668667-27328-1-git-send-email-ynvich@gmail.com>
- <1397668667-27328-7-git-send-email-ynvich@gmail.com>
- <20140416194109.3ef914d2@alan.etchedpixels.co.uk>
-Message-ID: <fff1a89e-346c-45fd-9832-7484bdc3561a@email.android.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 16 Apr 2014 21:56:26 +0200
+Subject: [PATCH] clocksource: efm32: let CLKSRC_EFM32 select CLKSRC_OF
+In-Reply-To: <20140416193036.GS5969@pengutronix.de>
+References: <CAL_JsqKXYOdpCkixBLg8kAXwpkaLHhckJnTkzdNVeOQDYzxK3w@mail.gmail.com>
+ <1397673612-24247-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAL_Jsq+Wm-jxeZoYXpC+W3Was5WTS2UqLJ__N5uPB43ZHUmrLw@mail.gmail.com>
+ <20140416193036.GS5969@pengutronix.de>
+Message-ID: <534EE06A.4020904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
->On Wed, 16 Apr 2014 21:17:18 +0400
->Sergei Ianovich <ynvich@gmail.com> wrote:
+On 04/16/2014 09:30 PM, Uwe Kleine-K?nig wrote:
+> Hello,
 >
->> This patch implements probing for the bus and reporting the number
->> of available expansion slots.
+> On Wed, Apr 16, 2014 at 01:51:17PM -0500, Rob Herring wrote:
+>> On Wed, Apr 16, 2014 at 1:40 PM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>>> The efm32 timer driver is only usable with CLKSRC_OF, so it makes sense
+>>> to let its Kconfig symbol select it. For compile coverage testing it's not
+>>> needed though, so only select it if ARCH_EFM32 is enabled.
+>>>
+>>> This allows to drop ARCH_EFM32 selecting CLKSRC_OF which is done here
+>>> for simplicity, too.
+>>>
+>>> Reported-by: Rob Herring <robherring2@gmail.com>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>> ---
+>>> [...]
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -80,6 +80,7 @@ config CLKSRC_EFM32
+>>>          bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
+>>>          depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
+>>>          select CLKSRC_MMIO
+>>> +       select CLKSRC_OF if ARCH_EFM32
+>>
+>> You already depend on OF, so I believe you don't need the if here.
+> Rob and I discussed this shortly on irc, the summary is that the if is
+> not needed to prevent Kconfig breakage but adds more flexibility for the
+> COMPILE_TEST case. In the end Rob said:
 >
->This appears to be a bus not a misc device. I don't think it belongs in
->misc. As you've got devices on this bus (or nailed into the 'bus'
->driver)
->perhaps this belongs as drivers/platform/lp8x4x or similar with any
->specific drivers split out - or even drivers/lp8x4x if there will be
->more
->of them and more than one platform using it ?
+> 	1397676012 < robher> you can add my ack.
+>
+> which would be:
+>
+> Acked-by: Rob Herring <robherring2@gmail.com>
 
-Thanks again for responding. I don't have a clear idea about proper code organization concering this bus.
+Ok, thanks.
 
-The total number of possible bus devices is quite large, around 30. Half of them would take less than 10 extra lines to get support. The rest is more complicated.
 
-LP-8x4x has several features that would require a misc device anyway. It has a rotary switch which isn't an input device, because it produces no interrupts. The device also has a similar DIP switch. In addition, it acts as a kind of RS-485-port-to-multi-RS-232-ports logical bridge. It has a multiplexer which allows to talk to several serial modules which support a custom protocol designed for RS-485 using a RS-232 port.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
