@@ -1,131 +1,128 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 16 Apr 2014 10:57:21 +0900
-Subject: [PATCH v5 07/20] ARM: shmobile: r8a7779: Reference clocks
+Date: Wed, 16 Apr 2014 10:57:26 +0900
+Subject: [PATCH v5 12/20] ARM: shmobile: r8a7779: Initial multiplatform support
 In-Reply-To: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
 References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1397613454-7522-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1397613454-7522-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference clocks using a "clocks" property in all nodes corresponding to
-devices that require a clock.
+Add Marzen and r8a7779 to CONFIG_SHMOBILE_MULTI. At this
+point CCF is not yet supported so you cannot run this code
+yet. For CCF support to happen several different components
+are needed, and this is one simple portion that moves us
+forward. Other patches need to build on top of this one.
 
-Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoC.
+Marzen board support exists in 3 flavours:
+1) SHMOBILE_MULTI, MACH_MARZEN - board-marzen-reference.c (CCF + DT)
+2) SHMOBILE, MACH_MARZEN_REFERENCE - board-marzen-reference.c (DT)
+3) SHMOBILE, MACH_MARZEN - board-marzen.c (legacy C code)
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+When CCF is done then 2) will be removed. When 1) includes same features
+as 3) then 3) will be removed.
+
+Based on work for the Koelsch and r8a7791 by Magnus Damm.
+
+Cc: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
-v4 - v5
+v5
+* Select SYS_SUPPORTS_SH_TMU
+
+v4
 * No change
 
 v3
-* Also update the following nodes which are now present
-  - hspi{0,1,2}
-  - sata: Suggested by Laurent Pinchart
----
- arch/arm/boot/dts/r8a7779.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+* Select RENESAS_INTC_IRQPIN
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 1eccd7c..e924f96 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -166,6 +166,7 @@
- 		reg = <0xffc70000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 79 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C0>;
- 		status = "disabled";
- 	};
+fix ARCH_R8A7779
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/Makefile                      |  3 ++-
+ arch/arm/mach-shmobile/Kconfig                  | 10 ++++++++++
+ arch/arm/mach-shmobile/Makefile                 |  1 +
+ arch/arm/mach-shmobile/board-marzen-reference.c |  5 +++++
+ 4 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 178aa08..1e0ff95 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -322,7 +322,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai-reference.dtb \
+ 	r8a7791-koelsch.dtb \
+-	r8a7790-lager.dtb
++	r8a7790-lager.dtb \
++	r8a7779-marzen-reference.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
+ 	socfpga_cyclone5_sockit.dtb \
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 037c006..28d7e86 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -26,6 +26,11 @@ config ARCH_R7S72100
+ 	bool "RZ/A1H (R7S72100)"
+ 	select SYS_SUPPORTS_SH_MTU2
  
-@@ -176,6 +177,7 @@
- 		reg = <0xffc71000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C1>;
- 		status = "disabled";
- 	};
++config ARCH_R8A7779
++	bool "R-Car H1 (R8A77790)"
++	select RENESAS_INTC_IRQPIN
++	select SYS_SUPPORTS_SH_TMU
++
+ config ARCH_R8A7790
+ 	bool "R-Car H2 (R8A77900)"
+ 	select RENESAS_IRQC
+@@ -52,6 +57,11 @@ config MACH_LAGER
+ 	depends on ARCH_R8A7790
+ 	select MICREL_PHY if SH_ETH
  
-@@ -186,6 +188,7 @@
- 		reg = <0xffc72000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C2>;
- 		status = "disabled";
- 	};
++config MACH_MARZEN
++	bool "MARZEN board"
++	depends on ARCH_R8A7779
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++
+ comment "Renesas ARM SoCs System Configuration"
+ endif
  
-@@ -196,6 +199,7 @@
- 		reg = <0xffc73000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C3>;
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 9c5cd8c..ed49315 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -59,6 +59,7 @@ ifdef CONFIG_ARCH_SHMOBILE_MULTI
+ obj-$(CONFIG_MACH_GENMAI)	+= board-genmai-reference.o
+ obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager-reference.o
++obj-$(CONFIG_MACH_MARZEN)	+= board-marzen-reference.o
+ else
+ obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
+ obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index c22e5c2..d3e8319 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -19,6 +19,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
  
-@@ -214,6 +218,7 @@
- 		reg = <0xfc600000 0x2000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7779_CLK_SATA>;
- 	};
++#include <linux/clk-provider.h>
+ #include <linux/of_platform.h>
+ #include <mach/r8a7779.h>
+ #include <mach/common.h>
+@@ -28,7 +29,11 @@
  
- 	sdhi0: sd at ffe4c000 {
-@@ -221,6 +226,7 @@
- 		reg = <0xffe4c000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI0>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -231,6 +237,7 @@
- 		reg = <0xffe4d000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI1>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -241,6 +248,7 @@
- 		reg = <0xffe4e000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI2>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -251,6 +259,7 @@
- 		reg = <0xffe4f000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI3>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -263,6 +272,7 @@
- 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&mstp0_clks R8A7779_CLK_HSPI>;
- 		status = "disabled";
- 	};
- 
-@@ -273,6 +283,7 @@
- 		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&mstp0_clks R8A7779_CLK_HSPI>;
- 		status = "disabled";
- 	};
- 
-@@ -283,6 +294,7 @@
- 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		clocks = <&mstp0_clks R8A7779_CLK_HSPI>;
- 		status = "disabled";
- 	};
- 
+ static void __init marzen_init(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	of_clk_init(NULL);
++#else
+ 	r8a7779_clock_init();
++#endif
+ 	r8a7779_add_standard_devices_dt();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
 -- 
 1.8.5.2
