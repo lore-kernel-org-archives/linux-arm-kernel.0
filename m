@@ -1,111 +1,130 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 16 Apr 2014 15:14:29 -0500
-Subject: [PATCH 1/2] clk: socfpga: add divider registers to the main pll
- outputs
-Message-ID: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 16 Apr 2014 16:18:25 -0400 (EDT)
+Subject: [PATCH 1/5] ARM: bL_switcher: Don't enable bL switcher on systems
+ without CCI
+In-Reply-To: <CAM4voanduaJ32ztj6ZDMOPXNd9W6Ttwae_PQ68VGxPKZEsj3kA@mail.gmail.com>
+References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+ <1397239311-27717-2-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1404111406210.980@knanqh.ubzr>
+ <CAM4voanduaJ32ztj6ZDMOPXNd9W6Ttwae_PQ68VGxPKZEsj3kA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1404161524050.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Thu, 17 Apr 2014, Abhilash Kesavan wrote:
 
-The C0(mpu_clk), C1(main_clk), and C2(dbg_base_clk) outputs from the main
-PLL go through a pre-divider before coming into the system. These registers
-were hidden for the CycloneV platform, but are not used for the ArriaV
-platform.
+> Hi Nicolas,
+> 
+> On Fri, Apr 11, 2014 at 11:44 PM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+> > On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
+> >
+> >> From: Andrew Bresticker <abrestic@chromium.org>
+> >>
+> >> Do not enable the big.LITTLE switcher on systems that do not have an
+> >> ARM CCI (cache-coherent interconnect) present.  Since the CCI is used
+> >> to maintain cache coherency between multiple clusters and peripherals,
+> >> it is unlikely that a system without CCI would support big.LITTLE.
+> >>
+> >> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> >
+> > The b.L switcher depends on MCPM, and it also expects only 2 clusters
+> > which is evaluated at run time or it bails out.
+> >
+> > There might be in theory other ways than the CCI to enforce coherency
+> > between clusters.  And that should all be encapsulated by the MCPM
+> > layer.  The switcher module should not be concerned at all by the
+> > underlying hardware mechanism.
+> >
+> > So if the goal is to determine at run time whether or not the switcher
+> > should be activated in a multi-config kernel, then the criteria should
+> > be whether or not MCPM is initialized, and not if there is a CCI.
+> 
+> Yes, we have a multi-SoC enabled kernel (with MCPM and BL_SWITCHER
+> configs enabled); one SoC has a single cluster while the other is a
+> dual cluster. We wanted a run-time check to prevent bL_switcher from
+> running on the single cluster one and zeroed in on CCI. But, I get
+> your point as to why CCI should not be used as a distinguishing factor
+> for switcher initialization.
+> 
+> For now, I can use the no_bL_switcher parameter to disable it on
+> certain platforms. However, can you elaborate on the MCPM
+> initialization check you suggested ?
 
-This patch updates the clock driver to read the div-reg property for the
-socfpga-periph-clk clocks. Also moves the div_mask define to clk.h for re-use.
+Here's what I mean:
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
----
- drivers/clk/socfpga/clk-gate.c   |    1 -
- drivers/clk/socfpga/clk-periph.c |   22 +++++++++++++++++++---
- drivers/clk/socfpga/clk.h        |    4 ++++
- 3 files changed, 23 insertions(+), 4 deletions(-)
+----- >8
 
-diff --git a/drivers/clk/socfpga/clk-gate.c b/drivers/clk/socfpga/clk-gate.c
-index 501d513..dd3a78c 100644
---- a/drivers/clk/socfpga/clk-gate.c
-+++ b/drivers/clk/socfpga/clk-gate.c
-@@ -32,7 +32,6 @@
- #define SOCFPGA_MMC_CLK			"sdmmc_clk"
- #define SOCFPGA_GPIO_DB_CLK_OFFSET	0xA8
- 
--#define div_mask(width)	((1 << (width)) - 1)
- #define streq(a, b) (strcmp((a), (b)) == 0)
- 
- #define to_socfpga_gate_clk(p) container_of(p, struct socfpga_gate_clk, hw.hw)
-diff --git a/drivers/clk/socfpga/clk-periph.c b/drivers/clk/socfpga/clk-periph.c
-index 81623a3..46531c3 100644
---- a/drivers/clk/socfpga/clk-periph.c
-+++ b/drivers/clk/socfpga/clk-periph.c
-@@ -29,12 +29,18 @@ static unsigned long clk_periclk_recalc_rate(struct clk_hw *hwclk,
- 					     unsigned long parent_rate)
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date: Wed, 16 Apr 2014 15:43:59 -0400
+Subject: [PATCH] ARM: bL_switcher: fix validation check before its activation
+
+The switcher should not depend on MAX_CLUSTER which is a build time
+limit to  determine ifit should be activated or not. In a multiplatform
+kernel binary it is possible to have dual-cluster and quad-cluster
+platforms configured in. In that case MAX_CLUSTER should be 4 and that
+shouldn't prevent the switcher from working if the kernel is booted on a
+b.L dual-cluster system.
+
+In bL_switcher_halve_cpus() we already have a runtime validation check
+to make sure we're dealing with only two clusters, so booting on a quad
+cluster system will be caught and switcher activation aborted.
+
+However, the b.L switcher must ensure the MCPM layer is initialized on
+the booted hardware before doing anything.  The mcpm_is_available()
+function is added to that effect.
+
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+
+diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+index 5774b6ea7a..f01c0ee0c8 100644
+--- a/arch/arm/common/bL_switcher.c
++++ b/arch/arm/common/bL_switcher.c
+@@ -797,10 +797,8 @@ static int __init bL_switcher_init(void)
  {
- 	struct socfpga_periph_clk *socfpgaclk = to_socfpga_periph_clk(hwclk);
--	u32 div;
-+	u32 div, val;
+ 	int ret;
  
--	if (socfpgaclk->fixed_div)
-+	if (socfpgaclk->fixed_div) {
- 		div = socfpgaclk->fixed_div;
--	else
-+	} else {
-+		if (socfpgaclk->div_reg) {
-+			val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
-+			val &= div_mask(socfpgaclk->width);
-+			parent_rate /= (val + 1);
-+		}
- 		div = ((readl(socfpgaclk->hw.reg) & 0x1ff) + 1);
-+	}
+-	if (MAX_NR_CLUSTERS != 2) {
+-		pr_err("%s: only dual cluster systems are supported\n", __func__);
+-		return -EINVAL;
+-	}
++	if (!mcpm_is_available())
++		return -ENODEV;
  
- 	return parent_rate / div;
+ 	cpu_notifier(bL_switcher_hotplug_callback, 0);
+ 
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index 1e361abc29..86fd60fefb 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -48,6 +48,11 @@ int __init mcpm_platform_register(const struct mcpm_platform_ops *ops)
+ 	return 0;
  }
-@@ -54,6 +60,7 @@ static __init void __socfpga_periph_init(struct device_node *node,
- 	struct clk_init_data init;
- 	int rc;
- 	u32 fixed_div;
-+	u32 div_reg[3];
  
- 	of_property_read_u32(node, "reg", &reg);
- 
-@@ -63,6 +70,15 @@ static __init void __socfpga_periph_init(struct device_node *node,
- 
- 	periph_clk->hw.reg = clk_mgr_base_addr + reg;
- 
-+	rc = of_property_read_u32_array(node, "div-reg", div_reg, 3);
-+	if (!rc) {
-+		periph_clk->div_reg = clk_mgr_base_addr + div_reg[0];
-+		periph_clk->shift = div_reg[1];
-+		periph_clk->width = div_reg[2];
-+	} else {
-+		periph_clk->div_reg = 0;
-+	}
++bool mcpm_is_available(void)
++{
++	return (platform_ops) ? true : false;
++}
 +
- 	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
- 	if (rc)
- 		periph_clk->fixed_div = 0;
-diff --git a/drivers/clk/socfpga/clk.h b/drivers/clk/socfpga/clk.h
-index d2e5401..d291f60 100644
---- a/drivers/clk/socfpga/clk.h
-+++ b/drivers/clk/socfpga/clk.h
-@@ -27,6 +27,7 @@
- #define CLKMGR_PERPLL_SRC	0xAC
+ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
+ {
+ 	if (!platform_ops)
+diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+index 608516ebab..a5ff410dcd 100644
+--- a/arch/arm/include/asm/mcpm.h
++++ b/arch/arm/include/asm/mcpm.h
+@@ -54,6 +54,13 @@ void mcpm_set_early_poke(unsigned cpu, unsigned cluster,
+  */
  
- #define SOCFPGA_MAX_PARENTS		3
-+#define div_mask(width) ((1 << (width)) - 1)
- 
- extern void __iomem *clk_mgr_base_addr;
- 
-@@ -52,6 +53,9 @@ struct socfpga_periph_clk {
- 	struct clk_gate hw;
- 	char *parent_name;
- 	u32 fixed_div;
-+	void __iomem *div_reg;
-+	u32 width;      /* only valid if div_reg != 0 */
-+	u32 shift;      /* only valid if div_reg != 0 */
- };
- 
- #endif /* SOCFPGA_CLK_H */
--- 
-1.7.9.5
+ /**
++ * mcpm_is_available - returns whether MCPM is initialized and available
++ *
++ * This returns true or false accordingly.
++ */
++bool mcpm_is_available(void);
++
++/**
+  * mcpm_cpu_power_up - make given CPU in given cluster runable
+  *
+  * @cpu: CPU number within given cluster
