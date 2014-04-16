@@ -1,579 +1,92 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 16 Apr 2014 13:41:38 +0400
-Subject: [PATCH] ARM i.MX51: Add Efika MX Smartbook devicetree
-Message-ID: <1397641298-25392-1-git-send-email-shc_work@mail.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 16 Apr 2014 11:44:28 +0200
+Subject: [linux-sunxi] Re: [PATCH 7/7] ARM: sun7i: cubietruck: enable
+ bluetooth module
+In-Reply-To: <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-8-git-send-email-wens@csie.org>
+ <20140415144215.GG3207@lukather>
+ <CAGb2v643HyvFdhQ0znreB8ENXHWpcx6tFwdeU7VuU8KYWcT4ZA@mail.gmail.com>
+Message-ID: <20140416094428.GK3207@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for Efika MX Smartbook.
+Hi,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/imx51-genesi-efika-sb.dts | 543 ++++++++++++++++++++++++++++
- 2 files changed, 544 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx51-genesi-efika-sb.dts
+Please try to keep me in CC, even though the ML doesn't make it easy..
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 470616f..e01d250 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -167,6 +167,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx51-babbage.dtb \
- 	imx51-digi-connectcore-jsk.dtb \
- 	imx51-eukrea-mbimxsd51-baseboard.dtb \
-+	imx51-genesi-efika-sb.dtb \
- 	imx53-ard.dtb \
- 	imx53-m53evk.dtb \
- 	imx53-mba53.dtb \
-diff --git a/arch/arm/boot/dts/imx51-genesi-efika-sb.dts b/arch/arm/boot/dts/imx51-genesi-efika-sb.dts
-new file mode 100644
-index 0000000..9d35b3e
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-genesi-efika-sb.dts
-@@ -0,0 +1,543 @@
-+/*
-+ * Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
-+ * Based on file by Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx51.dtsi"
-+
-+/ {
-+	model = "Genesi Efika MX Smartbook";
-+	compatible = "genesi,imx51-sb", "fsl,imx51";
-+
-+	chosen {
-+		linux,stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x90000000 0x20000000>;
-+	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight>;
-+		pwms = <&pwm1 0 78770>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		enable-gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <6>;
-+        };
-+
-+	clk12288: clk12288 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <12288000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpiokeys>;
-+
-+		lid {
-+			label = "Lid";
-+			gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
-+			linux,input-type = <5>; /* EV_SW */
-+			linux,code = <0>; /* SW_LID */
-+			debounce-interval = <1>;
-+			gpio-key,wakeup;
-+		};
-+
-+		power {
-+			label = "Power";
-+			gpios = <&gpio2 31 GPIO_ACTIVE_HIGH>;
-+			linux,code = <KEY_POWER>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpioleds>;
-+
-+		mail {
-+			label = "::mail";
-+			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		white {
-+			label = "::white";
-+			gpios = <&gpio2 25 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	regulators {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "simple-bus";
-+
-+		reg_usbh2_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usbh2reg>;
-+			reg = <0>;
-+			regulator-name = "usbh2_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio2 9 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+
-+		reg_usbotg_vbus: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usbotgreg>;
-+			reg = <1>;
-+			regulator-name = "usbotg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx51-efikasb-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx51-efikasb-sgtl5000";
-+		ssi-controller = <&ssi1>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing = "Headphone Jack", "HP_OUT";
-+		mux-int-port = <1>;
-+		mux-ext-port = <3>;
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	sgtl5000: codec at 0a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&clk12288>;
-+		VDDA-supply = <&vdig_reg>;
-+		VDDD-supply = <&vdig_reg>;
-+		VDDIO-supply = <&vvideo_reg>;
-+	};
-+
-+	battery: battery at 0b {
-+		compatible = "sbs,sbs-battery";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_battery>;
-+		reg = <0x0b>;
-+		sbs,battery-detect-gpios = <&gpio3 6 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	lvds: mtl017 at 3a {
-+		compatible = "mtl017";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp1>;
-+		reg = <0x3a>;
-+		crtcs = <&ipu 1>;
-+		edid-i2c = <&i2c2>;
-+		interface-pix-fmt = "rgb565";
-+	};
-+};
-+
-+&ecspi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
-+	fsl,spi-num-chipselects = <2>;
-+	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>,
-+		   <&gpio4 25 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+
-+	pmic: mc13892 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "fsl,mc13892";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pmic>;
-+		reg = <0>;
-+		spi-max-frequency = <20000000>;
-+		spi-cs-high;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <6 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		regulators {
-+			sw1_reg: sw1 {
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1375000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3_reg: sw3 {
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vpll_reg: vpll {
-+				regulator-min-microvolt = <1050000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vdig_reg: vdig {
-+				regulator-min-microvolt = <1650000>;
-+				regulator-max-microvolt = <1650000>;
-+			};
-+
-+			vsd_reg: vsd {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3150000>;
-+			};
-+
-+			vusb2_reg: vusb2 {
-+				regulator-min-microvolt = <2400000>;
-+				regulator-max-microvolt = <2775000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vvideo_reg: vvideo {
-+				regulator-min-microvolt = <2775000>;
-+				regulator-max-microvolt = <2775000>;
-+			};
-+
-+			vaudio_reg: vaudio {
-+				regulator-min-microvolt = <2300000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+
-+			vcam_reg: vcam {
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3150000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <2900000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+
-+	flash: m25p80 at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "sst,sst25vf032b", "m25p80";
-+		reg = <1>;
-+		spi-max-frequency = <15000000>;
-+	};
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	cd-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
-+	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&esdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc2>;
-+	cd-gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
-+	wp-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&pata {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pata>;
-+	status = "okay";
-+};
-+
-+&ssi1 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh1>;
-+	phy_type = "ulpi";
-+	status = "okay";
-+};
-+
-+&usbh2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh2>;
-+	phy_type = "ulpi";
-+	vbus-supply = <&reg_usbh2_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	dr_mode = "host";
-+	phy_type = "ulpi";
-+	vbus-supply = <&reg_usbotg_vbus>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	imx51-genesi-efika-sb {
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX51_PAD_AUD3_BB_TXD__AUD3_TXD		0x80000000
-+				MX51_PAD_AUD3_BB_RXD__AUD3_RXD		0x80000000
-+				MX51_PAD_AUD3_BB_CK__AUD3_TXC		0x80000000
-+				MX51_PAD_AUD3_BB_FS__AUD3_TXFS		0x80000000
-+			>;
-+		};
-+
-+		pinctrl_backlight: backlightgrp {
-+			fsl,pins = <
-+				MX51_PAD_GPIO1_2__PWM1_PWMO		0x80000000
-+				MX51_PAD_CSI2_D19__GPIO4_12		0x85
-+			>;
-+		};
-+
-+		pinctrl_battery: batterygrp {
-+			fsl,pins = <
-+				MX51_PAD_DISPB2_SER_DIO__GPIO3_6	0xe5
-+			>;
-+		};
-+
-+		pinctrl_ecspi1: ecspi1grp {
-+			fsl,pins = <
-+				MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
-+				MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	0x185
-+				MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK	0x185
-+				MX51_PAD_CSPI1_SS0__GPIO4_24		0x85 /* CS0 */
-+				MX51_PAD_CSPI1_SS1__GPIO4_25		0x85 /* CS1 */
-+			>;
-+		};
-+
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <
-+				MX51_PAD_SD1_CMD__SD1_CMD		0x400020d5
-+				MX51_PAD_SD1_CLK__SD1_CLK		0x20d5
-+				MX51_PAD_SD1_DATA0__SD1_DATA0		0x20d5
-+				MX51_PAD_SD1_DATA1__SD1_DATA1		0x20d5
-+				MX51_PAD_SD1_DATA2__SD1_DATA2		0x20d5
-+				MX51_PAD_SD1_DATA3__SD1_DATA3		0x20d5
-+				MX51_PAD_GPIO1_1__GPIO1_1		0xe5 /* WP */
-+				MX51_PAD_EIM_CS2__GPIO2_27		0xe5 /* CD */
-+			>;
-+		};
-+
-+		pinctrl_esdhc2: esdhc2grp {
-+			fsl,pins = <
-+				MX51_PAD_SD2_CMD__SD2_CMD		0x400020d5
-+				MX51_PAD_SD2_CLK__SD2_CLK		0x20d5
-+				MX51_PAD_SD2_DATA0__SD2_DATA0		0x20d5
-+				MX51_PAD_SD2_DATA1__SD2_DATA1		0x20d5
-+				MX51_PAD_SD2_DATA2__SD2_DATA2		0x20d5
-+				MX51_PAD_SD2_DATA3__SD2_DATA3		0x20d5
-+				MX51_PAD_GPIO1_7__GPIO1_7		0xe5 /* WP */
-+				MX51_PAD_GPIO1_8__GPIO1_8		0xe5 /* CD */
-+			>;
-+		};
-+
-+		pinctrl_gpiokeys: gpiokeysgrp {
-+			fsl,pins = <
-+				MX51_PAD_EIM_DTACK__GPIO2_31		0xe5
-+				MX51_PAD_CSI1_VSYNC__GPIO3_14		0xe5
-+			>;
-+		};
-+
-+		pinctrl_gpioleds: gpioledsgrp {
-+			fsl,pins = <
-+				MX51_PAD_GPIO1_3__GPIO1_3		0x85
-+				MX51_PAD_EIM_CS0__GPIO2_25		0x85
-+			>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX51_PAD_KEY_COL4__I2C2_SCL		0x400001ed
-+				MX51_PAD_KEY_COL5__I2C2_SDA		0x400001ed
-+			>;
-+		};
-+
-+		pinctrl_ipu_disp1: ipudisp1grp {
-+			fsl,pins = <
-+				MX51_PAD_DISP1_DAT0__DISP1_DAT0		0x5
-+				MX51_PAD_DISP1_DAT1__DISP1_DAT1		0x5
-+				MX51_PAD_DISP1_DAT2__DISP1_DAT2		0x5
-+				MX51_PAD_DISP1_DAT3__DISP1_DAT3		0x5
-+				MX51_PAD_DISP1_DAT4__DISP1_DAT4		0x5
-+				MX51_PAD_DISP1_DAT5__DISP1_DAT5		0x5
-+				MX51_PAD_DISP1_DAT6__DISP1_DAT6		0x5
-+				MX51_PAD_DISP1_DAT7__DISP1_DAT7		0x5
-+				MX51_PAD_DISP1_DAT8__DISP1_DAT8		0x5
-+				MX51_PAD_DISP1_DAT9__DISP1_DAT9		0x5
-+				MX51_PAD_DISP1_DAT10__DISP1_DAT10	0x5
-+				MX51_PAD_DISP1_DAT11__DISP1_DAT11	0x5
-+				MX51_PAD_DISP1_DAT12__DISP1_DAT12	0x5
-+				MX51_PAD_DISP1_DAT13__DISP1_DAT13	0x5
-+				MX51_PAD_DISP1_DAT14__DISP1_DAT14	0x5
-+				MX51_PAD_DISP1_DAT15__DISP1_DAT15	0x5
-+				MX51_PAD_DISP1_DAT16__DISP1_DAT16	0x5
-+				MX51_PAD_DISP1_DAT17__DISP1_DAT17	0x5
-+				MX51_PAD_DISP1_DAT18__DISP1_DAT18	0x5
-+				MX51_PAD_DISP1_DAT19__DISP1_DAT19	0x5
-+				MX51_PAD_DISP1_DAT20__DISP1_DAT20	0x5
-+				MX51_PAD_DISP1_DAT21__DISP1_DAT21	0x5
-+				MX51_PAD_DISP1_DAT22__DISP1_DAT22	0x5
-+				MX51_PAD_DISP1_DAT23__DISP1_DAT23	0x5
-+				MX51_PAD_DI1_PIN2__DI1_PIN2		0x5
-+				MX51_PAD_DI1_PIN3__DI1_PIN3		0x5
-+			>;
-+		};
-+
-+		pinctrl_pata: patagrp {
-+			fsl,pins = <
-+				MX51_PAD_NANDF_WE_B__PATA_DIOW		0x2004
-+				MX51_PAD_NANDF_RE_B__PATA_DIOR		0x2004
-+				MX51_PAD_NANDF_ALE__PATA_BUFFER_EN	0x2004
-+				MX51_PAD_NANDF_CLE__PATA_RESET_B	0x2004
-+				MX51_PAD_NANDF_WP_B__PATA_DMACK		0x2004
-+				MX51_PAD_NANDF_RB0__PATA_DMARQ		0x2004
-+				MX51_PAD_NANDF_RB1__PATA_IORDY		0x2004
-+				MX51_PAD_GPIO_NAND__PATA_INTRQ		0x2004
-+				MX51_PAD_NANDF_CS2__PATA_CS_0		0x2004
-+				MX51_PAD_NANDF_CS3__PATA_CS_1		0x2004
-+				MX51_PAD_NANDF_CS4__PATA_DA_0		0x2004
-+				MX51_PAD_NANDF_CS5__PATA_DA_1		0x2004
-+				MX51_PAD_NANDF_CS6__PATA_DA_2		0x2004
-+				MX51_PAD_NANDF_D0__PATA_DATA0		0x2004
-+				MX51_PAD_NANDF_D1__PATA_DATA1		0x2004
-+				MX51_PAD_NANDF_D2__PATA_DATA2		0x2004
-+				MX51_PAD_NANDF_D3__PATA_DATA3		0x2004
-+				MX51_PAD_NANDF_D4__PATA_DATA4		0x2004
-+				MX51_PAD_NANDF_D5__PATA_DATA5		0x2004
-+				MX51_PAD_NANDF_D6__PATA_DATA6		0x2004
-+				MX51_PAD_NANDF_D7__PATA_DATA7		0x2004
-+				MX51_PAD_NANDF_D8__PATA_DATA8		0x2004
-+				MX51_PAD_NANDF_D9__PATA_DATA9		0x2004
-+				MX51_PAD_NANDF_D10__PATA_DATA10		0x2004
-+				MX51_PAD_NANDF_D11__PATA_DATA11		0x2004
-+				MX51_PAD_NANDF_D12__PATA_DATA12		0x2004
-+				MX51_PAD_NANDF_D13__PATA_DATA13		0x2004
-+				MX51_PAD_NANDF_D14__PATA_DATA14		0x2004
-+				MX51_PAD_NANDF_D15__PATA_DATA15		0x2004
-+			>;
-+		};
-+
-+		pinctrl_pmic: pmicgrp {
-+			fsl,pins = <
-+				MX51_PAD_GPIO1_6__GPIO1_6		0xe5 /* IRQ */
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX51_PAD_UART1_RXD__UART1_RXD		0x1c5
-+				MX51_PAD_UART1_TXD__UART1_TXD		0x1c5
-+				MX51_PAD_UART1_RTS__UART1_RTS		0x1c5
-+				MX51_PAD_UART1_CTS__UART1_CTS		0x1c5
-+			>;
-+		};
-+
-+		pinctrl_usbh1: usbh1grp {
-+			fsl,pins = <
-+				MX51_PAD_USBH1_DATA0__USBH1_DATA0	0x1e5
-+				MX51_PAD_USBH1_DATA1__USBH1_DATA1	0x1e5
-+				MX51_PAD_USBH1_DATA2__USBH1_DATA2	0x1e5
-+				MX51_PAD_USBH1_DATA3__USBH1_DATA3	0x1e5
-+				MX51_PAD_USBH1_DATA4__USBH1_DATA4	0x1e5
-+				MX51_PAD_USBH1_DATA5__USBH1_DATA5	0x1e5
-+				MX51_PAD_USBH1_DATA6__USBH1_DATA6	0x1e5
-+				MX51_PAD_USBH1_DATA7__USBH1_DATA7	0x1e5
-+				MX51_PAD_USBH1_CLK__USBH1_CLK		0x1e5
-+				MX51_PAD_USBH1_DIR__USBH1_DIR		0x1e5
-+				MX51_PAD_USBH1_NXT__USBH1_NXT		0x1e5
-+				MX51_PAD_USBH1_STP__USBH1_STP		0x1e5
-+			>;
-+		};
-+
-+		pinctrl_usbh2: usbh2grp {
-+			fsl,pins = <
-+				MX51_PAD_EIM_D16__USBH2_DATA0		0x1e5
-+				MX51_PAD_EIM_D17__USBH2_DATA1		0x1e5
-+				MX51_PAD_EIM_D18__USBH2_DATA2		0x1e5
-+				MX51_PAD_EIM_D19__USBH2_DATA3		0x1e5
-+				MX51_PAD_EIM_D20__USBH2_DATA4		0x1e5
-+				MX51_PAD_EIM_D21__USBH2_DATA5		0x1e5
-+				MX51_PAD_EIM_D22__USBH2_DATA6		0x1e5
-+				MX51_PAD_EIM_D23__USBH2_DATA7		0x1e5
-+				MX51_PAD_EIM_A24__USBH2_CLK		0x1e5
-+				MX51_PAD_EIM_A25__USBH2_DIR		0x1e5
-+				MX51_PAD_EIM_A27__USBH2_NXT		0x1e5
-+				MX51_PAD_EIM_A26__USBH2_STP		0x1e5
-+			>;
-+		};
-+
-+		pinctrl_usbh2reg: usbh2reggrp {
-+			fsl,pins = <
-+				MX51_PAD_EIM_D27__GPIO2_9		0x85
-+			>;
-+		};
-+
-+		pinctrl_usbotgreg: usbotgreggrp {
-+			fsl,pins = <
-+				MX51_PAD_GPIO1_5__GPIO1_5		0x85
-+			>;
-+		};
-+	};
-+};
+On Wed, Apr 16, 2014 at 12:06:59AM +0800, Chen-Yu Tsai wrote:
+> >> @@ -139,4 +152,16 @@
+> >>       reg_usb2_vbus: usb2-vbus {
+> >>               status = "okay";
+> >>       };
+> >> +
+> >> +     rfkill_bt {
+> >> +             compatible = "rfkill-gpio";
+> >> +             pinctrl-names = "default";
+> >> +             pinctrl-0 = <&bt_pwr_pin_cubietruck>, <&clk_out_a_pins_a>;
+> >> +             clocks = <&clk_out_a>;
+> >> +             clock-frequency = <32768>;
+> >> +             gpios = <&pio 7 18 0>; /* PH18 */
+> >> +             gpio-names = "reset";
+> >> +             rfkill-name = "bt";
+> >> +             rfkill-type = <2>;
+> >> +     };
+> >
+> > Hmmm, I don't think that's actually right.
+> >
+> > If you have such a device, then I'd expect it to be represented as a
+> > full device in the DT, probably with one part for the WiFi, one part
+> > for the Bluetooth, and here the definition of the rfkill device that
+> > controls it.
+> 
+> The AP6210 is not one device, but 2 separate chips in one module. Each
+> chip has its own controls and interface. They just so happen to share
+> the same enclosure. Even 2-in-1 chips by Broadcom have separate controls
+> and interfaces. The WiFi side is most likely connected via SDIO, while
+> the Bluetooth side is connected to a UART, and optionally I2S for sound.
+
+It's even easier to represent then.
+
+> > But tying parts of the device to the rfkill that controls it, such as
+> > the clocks, or the frequency it runs at seems just wrong.
+> 
+> I understand where you're coming from. For devices on buses that require
+> drivers (such as USB, SDIO) these properties probably should be tied to
+> the device node.
+> 
+> For our use case here, which is a bluetooth chip connected on the UART,
+> there is no in kernel representation or driver to tie them to. Same goes
+> for UART based GPS chips. They just so happen to require toggling a GPIO,
+> and maybe enabling a specific clock, to get it running. Afterwards,
+> accessing it is done solely from userspace. For our Broadcom chips, the
+> user has to upload its firmware first, then designate the tty as a Bluetooth
+> HCI using hciattach.
+> 
+> We are using the rfkill device as a on-off switch.
+
+I understand your point, but the fact that it's implemented in
+user-space, or that UART is not a bus (which probably should be), is
+only a Linux specific story, and how it's implemented in Linux (even
+if the whole rfkill node is another one, but let's stay on topic).
+
+This is a huge abstraction leak.
+
+Let's say you need the I2S stream you mentionned for some
+reason. Would you tie the audio stream to the rfkill node as well?
+I'm sorry, but from an hardware description perspective, it makes no
+sense.
+
+What's the feeling of the DT maintainers?
+
 -- 
-1.8.3.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140416/c0798416/attachment-0001.sig>
