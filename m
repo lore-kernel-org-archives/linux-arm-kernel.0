@@ -1,139 +1,54 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Wed, 16 Apr 2014 09:46:35 +0200
-Subject: [PATCH v2 2/2] ARM: dts: berlin: add GPIO nodes for the BG2Q
-In-Reply-To: <1397634395-7456-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397634395-7456-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1397634395-7456-3-git-send-email-antoine.tenart@free-electrons.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 Apr 2014 15:47:13 +0800
+Subject: [RFC PATCH] imx6: imx6duallite/solo i2c4 clock
+In-Reply-To: <534CF8A3.3010404@gmail.com>
+References: <534CF8A3.3010404@gmail.com>
+Message-ID: <20140416074712.GK2523@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Berlin BG2Q has 6 GPIO ports compatible with the snps,dw-apb-gpio
-driver. This patch add the corresponding device tree nodes.
+On Tue, Apr 15, 2014 at 10:15:15AM +0100, Iain Paton wrote:
+> I'm working on a board using the imx6solo that implements i2c4 and while 
+> building the devicetree it became clear that the devicetree fragment for 
+> i2c4 in imx6dl.dtsi it's missing the necessary clock.
+> 
+> Investigating further turned up that the ecspi5 clock in CCM_CCGR1 on the 
+> quad/dual is replaced with the i2c4 clock on duallite/solo.
+> 
+> Would the following patch be sufficient to allow correct use of this clock?
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 102 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 102 insertions(+)
+Yes, Iain.  It looks correct to me.  Care to send a formal patch for it?
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index e6e556055dfc..82bf6910e227 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -109,6 +109,78 @@
- 			ranges = <0 0xe80000 0x10000>;
- 			interrupt-parent = <&aic>;
- 
-+			gpio0: gpio at 0400 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0400 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porta: gpio-port at 0 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <0>;
-+				};
-+			};
-+
-+			gpio1: gpio at 0800 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0800 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portb: gpio-port at 1 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <1>;
-+				};
-+			};
-+
-+			gpio2: gpio at 0c00 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0c00 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portc: gpio-port at 2 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <2>;
-+				};
-+			};
-+
-+			gpio3: gpio at 1000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x1000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portd: gpio-port at 3 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <3>;
-+				};
-+			};
-+
- 			timer0: timer at 2c00 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c00 0x14>;
-@@ -181,6 +253,36 @@
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
- 			};
-+
-+			gpio4: gpio at 5000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x5000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porte: gpio-port at 4 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+				};
-+			};
-+
-+			gpio5: gpio at c000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0xc000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portf: gpio-port at 5 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		pinctrl: pinctrl at 0 {
--- 
-1.8.3.2
+Shawn
+
+> 
+> I'm not familiar enough with the clock framework to be sure I'm not missing
+> something here, but have tested this patch on the board and found it to work.
+> 
+> The board is element14's RIoTboard http://www.riotboard.org and I have dts
+> mostly ready to submit for it pending resolving this and a couple of other 
+> minor things, and assuming Eric doesn't beat me to it.
+> 
+> Iain
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index b0e7f9d..2961b16 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -352,7 +352,13 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  	clk[ecspi2]       = imx_clk_gate2("ecspi2",        "ecspi_root",        base + 0x6c, 2);
+>  	clk[ecspi3]       = imx_clk_gate2("ecspi3",        "ecspi_root",        base + 0x6c, 4);
+>  	clk[ecspi4]       = imx_clk_gate2("ecspi4",        "ecspi_root",        base + 0x6c, 6);
+> -	clk[ecspi5]       = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+> +	if (cpu_is_imx6dl())
+> +		/*
+> +		 * ecspi5 is replaced with i2c4 on imx6dl & imx6s
+> +		 */
+> +		clk[ecspi5] = imx_clk_gate2("i2c4",        "ipg_per",           base + 0x6c, 8);
+> +	else
+> +		clk[ecspi5] = imx_clk_gate2("ecspi5",      "ecspi_root",        base + 0x6c, 8);
+>  	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
+>  	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
+>  	clk[gpt_ipg]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
+> 
+> 
