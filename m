@@ -1,54 +1,58 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 16 Apr 2014 15:47:13 +0800
-Subject: [RFC PATCH] imx6: imx6duallite/solo i2c4 clock
-In-Reply-To: <534CF8A3.3010404@gmail.com>
-References: <534CF8A3.3010404@gmail.com>
-Message-ID: <20140416074712.GK2523@dragon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 16 Apr 2014 08:51:44 +0100
+Subject: [PATCH] Fix for the arm64 kern_addr_valid() function
+In-Reply-To: <1397584404-28762-1-git-send-email-anderson@redhat.com>
+References: <1397584404-28762-1-git-send-email-anderson@redhat.com>
+Message-ID: <20140416075144.GA29754@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 10:15:15AM +0100, Iain Paton wrote:
-> I'm working on a board using the imx6solo that implements i2c4 and while 
-> building the devicetree it became clear that the devicetree fragment for 
-> i2c4 in imx6dl.dtsi it's missing the necessary clock.
-> 
-> Investigating further turned up that the ecspi5 clock in CCM_CCGR1 on the 
-> quad/dual is replaced with the i2c4 clock on duallite/solo.
-> 
-> Would the following patch be sufficient to allow correct use of this clock?
+Hi Dave,
 
-Yes, Iain.  It looks correct to me.  Care to send a formal patch for it?
+On Tue, Apr 15, 2014 at 06:53:24PM +0100, Dave Anderson wrote:
+>  Fix for the arm64 kern_addr_valid() function to recognize
+>  virtual addresses in the kernel logical memory map.  The
+>  function fails as written because it does not check whether
+>  the addresses in that region are mapped at the pmd level to
+>  2MB or 512MB pages, continues the page table walk to the
+>  pte level, and issues a garbage value to pfn_valid().
+> 
+>  Tested on 4K-page and 64K-page kernels.
+> 
+> Signed-off-by: Dave Anderson <anderson@redhat.com>
+> ---
+>  arch/arm64/mm/mmu.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 6b7e895..0a472c4 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -374,6 +374,9 @@ int kern_addr_valid(unsigned long addr)
+>  	if (pmd_none(*pmd))
+>  		return 0;
+>  
+> +	if (pmd_sect(*pmd))
+> +		return pfn_valid(pmd_pfn(*pmd));
+> +
+>  	pte = pte_offset_kernel(pmd, addr);
+>  	if (pte_none(*pte))
+>  		return 0;
 
-Shawn
+Whilst this patch looks fine to me, I wonder whether walking the page tables
+is really necessary for this function? The only user is fs/proc/kcore.c,
+which basically wants to know if a lowmem address is actually backed by
+physical memory. Our current implementation of kern_addr_valid will return
+true even for MMIO mappings, whilst I think we could actually just do
+something like:
 
-> 
-> I'm not familiar enough with the clock framework to be sure I'm not missing
-> something here, but have tested this patch on the board and found it to work.
-> 
-> The board is element14's RIoTboard http://www.riotboard.org and I have dts
-> mostly ready to submit for it pending resolving this and a couple of other 
-> minor things, and assuming Eric doesn't beat me to it.
-> 
-> Iain
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index b0e7f9d..2961b16 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -352,7 +352,13 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  	clk[ecspi2]       = imx_clk_gate2("ecspi2",        "ecspi_root",        base + 0x6c, 2);
->  	clk[ecspi3]       = imx_clk_gate2("ecspi3",        "ecspi_root",        base + 0x6c, 4);
->  	clk[ecspi4]       = imx_clk_gate2("ecspi4",        "ecspi_root",        base + 0x6c, 6);
-> -	clk[ecspi5]       = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
-> +	if (cpu_is_imx6dl())
-> +		/*
-> +		 * ecspi5 is replaced with i2c4 on imx6dl & imx6s
-> +		 */
-> +		clk[ecspi5] = imx_clk_gate2("i2c4",        "ipg_per",           base + 0x6c, 8);
-> +	else
-> +		clk[ecspi5] = imx_clk_gate2("ecspi5",      "ecspi_root",        base + 0x6c, 8);
->  	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
->  	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
->  	clk[gpt_ipg]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
-> 
-> 
+
+	if ((((long)addr) >> VA_BITS) != -1UL)
+		return 0;
+
+	return pfn_valid(__pa(addr) >> PAGE_SHIFT);
+
+
+Am I missing something here?
+
+Will
