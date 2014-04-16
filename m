@@ -1,56 +1,84 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 16 Apr 2014 16:55:02 +0900
-Subject: [PATCH v5 08/20] ARM: shmobile: r8a7779: Add helper to read mode
- pins
-In-Reply-To: <CAMuHMdXVAaU=eEBr4hwfbz3TGL+k0NHxGtzh-uuzFwuUqeNA9Q@mail.gmail.com>
-References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
- <1397613454-7522-9-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXVAaU=eEBr4hwfbz3TGL+k0NHxGtzh-uuzFwuUqeNA9Q@mail.gmail.com>
-Message-ID: <20140416075501.GE12344@verge.net.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Apr 2014 09:55:06 +0200
+Subject: [PATCH v2] pinctrl/at91: Fix mask creation in at91_gpio_dbg_show
+In-Reply-To: <1397501588-19730-1-git-send-email-alexanders83@web.de>
+References: <20140414081438.GI2967@piout.net>
+ <1397501588-19730-1-git-send-email-alexanders83@web.de>
+Message-ID: <534E375A.8040205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 09:29:33AM +0200, Geert Uytterhoeven wrote:
-> On Wed, Apr 16, 2014 at 3:57 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Add and use helper to read mode pins.
-> > This will be re-used when moving marzen-reference to
-> > the common clock framework.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 14/04/2014 20:53, Alexander Stein :
+> pin_to_mask expects a bank pin number. So do not add the chip base.
 > 
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Without that patch cat /sys/kernel/debug/gpio looks like that:
+> GPIOs 0-31, platform/fffff200.gpio, fffff200.gpio:
+> [spi32766.0] GPIOfffff200.gpio5: [gpio] set
+> [ads7846_pendown] GPIOfffff200.gpio15: [gpio] set
+> [ohci_vbus] GPIOfffff200.gpio21: [gpio] set
+> [ohci_vbus] GPIOfffff200.gpio24: [gpio] set
+> [button1] GPIOfffff200.gpio28: [gpio] clear
+> [button2] GPIOfffff200.gpio29: [gpio] clear
 > 
-> > --- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> > +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> > @@ -802,6 +802,20 @@ void __init r8a7779_add_standard_devices_dt(void)
-> >         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> >  }
-> >
-> > +#define MODEMR         0xffcc0020
-> > +
-> > +u32 __init r8a7779_read_mode_pins(void)
-> > +{
-> > +       void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
-> > +       u32 mode;
-> > +
-> > +       BUG_ON(!modemr);
-> > +       mode = ioread32(modemr);
-> > +       iounmap(modemr);
-> > +
-> > +       return mode;
-> > +}
+> GPIOs 32-63, platform/fffff400.gpio, fffff400.gpio:
+> [sda] GPIOfffff400.gpio4: [periph A]
+> [scl] GPIOfffff400.gpio5: [periph A]
+> [spi32766.3] GPIOfffff400.gpio11: [periph A]
+> [error] GPIOfffff400.gpio22: [periph A]
+> [run] GPIOfffff400.gpio23: [periph A]
 > 
-> No caching, cfr. rcar_gen2_read_mode_pins()?
+> GPIOs 64-95, platform/fffff600.gpio, fffff600.gpio:
+> [reset_pin] GPIOfffff600.gpio29: [periph A]
+> 
+> GPIOs 96-127, platform/fffff800.gpio, fffff800.gpio:
+> [led1] GPIOfffff800.gpio5: [periph A]
+> [led2] GPIOfffff800.gpio6: [periph A]
+> [led3] GPIOfffff800.gpio7: [periph A]
+> [led4] GPIOfffff800.gpio8: [periph A]
+> 
+> GPIOs 128-159, platform/fffffa00.gpio, fffffa00.gpio:
+> [button3] GPIOfffffa00.gpio10: [periph A]
+> [button4] GPIOfffffa00.gpio12: [periph A]
 
-I have one question about caching, which IIRC you
-implemented for R-Car Gen 2. Is the code called often enough
-that it makes any difference?
+Maybe a little bit less context to the commit message: Linus might
+remove some lines to it...
 
+> Note that every bank despite bank 0 only shows "periph A" which are
+> obviously used as GPIOs.
 > 
-> BTW, I know you don't trust "R-Car Gen1" similarities, but the code for
-> r8a7778 is identical. And this is code, not DT, so perhaps this can be
-> rcar_gen_read_mode_pins() in arch/arm/mach-shmobile/setup-rcar-gen1.c?
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Yes, I agree that is a good idea.
-But I think its best done as a next-step.
+Okay, actually this patch have to be routed to Linus Walleij, I add him
+in the destination field.
+
+Thanks,
+
+> ---
+> Changes in v2:
+> * Added 2 Acked-by's
+> * Add an example of wrong output
+> 
+>  drivers/pinctrl/pinctrl-at91.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 63176f2..2da0e6e 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1205,8 +1205,7 @@ static void at91_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  	void __iomem *pio = at91_gpio->regbase;
+>  
+>  	for (i = 0; i < chip->ngpio; i++) {
+> -		unsigned pin = chip->base + i;
+> -		unsigned mask = pin_to_mask(pin);
+> +		unsigned mask = pin_to_mask(i);
+>  		const char *gpio_label;
+>  		u32 pdsr;
+>  
+> 
+
+
+-- 
+Nicolas Ferre
