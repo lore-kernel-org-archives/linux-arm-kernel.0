@@ -1,61 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Apr 2014 21:22:43 +0100
-Subject: [RFC PATCH v3] ARM: uprobes need icache flush after xol write
-In-Reply-To: <20140416.114740.1805744923904673839.davem@davemloft.net>
-References: <20140416150646.GB11039@redhat.com>
- <20140416.111028.831710940640195974.davem@davemloft.net>
- <20140416152946.GA13564@redhat.com>
- <20140416.114740.1805744923904673839.davem@davemloft.net>
-Message-ID: <20140416202243.GI24070@n2100.arm.linux.org.uk>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 16 Apr 2014 22:23:12 +0200
+Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
+In-Reply-To: <20140416195342.GH24070@n2100.arm.linux.org.uk>
+References: <20140416145107.GA11039@redhat.com>
+ <20140416.110031.1269128188581361698.davem@davemloft.net>
+ <20140416164310.GA15739@redhat.com>
+ <20140416.133831.364304583096073299.davem@davemloft.net>
+ <20140416191825.GA22246@redhat.com>
+ <20140416195342.GH24070@n2100.arm.linux.org.uk>
+Message-ID: <20140416202312.GA26292@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 11:47:40AM -0400, David Miller wrote:
-> From: Oleg Nesterov <oleg@redhat.com>
-> Date: Wed, 16 Apr 2014 17:29:46 +0200
-> 
-> > On 04/16, David Miller wrote:
-> >>
-> >> From: Oleg Nesterov <oleg@redhat.com>
-> >> Date: Wed, 16 Apr 2014 17:06:46 +0200
-> >>
-> >> > Off-topic, I am just curious... can't someone explain why flush_pfn_alias()
-> >> > or flush_icache_alias() can't race with itself ? I have no idea what they do,
-> >> > but what if another thread calls the same function with the same CACHE_COLOUR()
-> >> > right after set_pte_ext?
-> >>
-> >> PTE modifications are supposed to run with the page table lock held.
-> > 
-> > OK, but __access_remote_vm() doesn't take ptl?
-> > 
-> > And on arm copy_to_user_page()->flush_ptrace_access()->flush_pfn_alias()
-> > does this.
-> 
-> Well, for one thing, PTE's can't gain permissions except under mmap_sem
-> which __access_remote_vm() does hold.
-> 
-> But I see what you're saying, flush_pfn_alias() is doing something
-> different.  It's not making user mappings, but kernel ones in order
-> to implement the cache flush.
-> 
-> On sparc64 we handle this situation by hand-loading the mappings into
-> the TLB, doing the operation using the mappings, then flushing it out
-> of the TLB, all with interrupts disabled.
-> 
-> Furthermore, in ARMs case, the code explicitly states that these
-> mappings are not used on SMP.  See the comment above the FLUSH_ALIAS_START
-> definition in arch/arm/mm/mm.h
+It is too late for me to even try to read emails ;) perhaps I am totally
+confused.
 
-Yes, thankfully SMP on ARM requires non-aliasing data caches... and now
-you've got me wondering whether that stuff is safe on preempt UP...
+On 04/16, Russell King - ARM Linux wrote:
+>
+> On Wed, Apr 16, 2014 at 09:18:25PM +0200, Oleg Nesterov wrote:
+> > Looks like, __kunmap_atomic()->__cpuc_flush_dcache_area() should take
+> > care, but could you please ack/nack my understanding?
+>
+> flush_dcache_area() doesn't touch the I-cache... the hint is in the
+> name. :)  This is also the function which is used for flush_dcache_page()
+> which we've already established isn't sufficient (for the same reason.)
 
-I'm thinking that both flush_icache_alias() and flush_pfn_alias() want
-at least a preemption disabled around each so that we don't end up with
-two threads being preempted here.
+Yes, we still need "i-cache flush where necessary" as David pointed.
 
-Thankfully, there's not many ARM CPUs with VIPT aliasing caches, which
-is probably why no one has noticed.
+> Plus... we still would need to know the user address(es) to flush for
+> the I-cache side...
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+We know it, it is xol_vaddr in xol_get_insn_slot().
+
+Oleg.
