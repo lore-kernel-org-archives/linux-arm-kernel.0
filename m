@@ -1,98 +1,35 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Wed, 16 Apr 2014 18:02:12 +0530
-Subject: [PATCH 5/5] arm: hwmod: am437x: Add hwmod data for hdq1w.
-In-Reply-To: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
-References: <1397651532-31456-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <1397651532-31456-6-git-send-email-sourav.poddar@ti.com>
+From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
+Date: Wed, 16 Apr 2014 14:40:07 +0200
+Subject: [PATCH 0/4] ARM: berlin: add SDHCI support
+Message-ID: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These adds hwmod data for hdq/1w driver.
+This series adds the support for the SDHCI controller for Marvell Berlin
+SoCs and enable the SD card reader and eMMC for the BG2Q DMP. The
+controller supports 3 sockets.
 
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c |   36 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prcm43xx.h             |    1 +
- 2 files changed, 37 insertions(+)
+Tested on the BG2Q DMP.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-index 5c2cc80..3a8ca96 100644
---- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
-@@ -19,6 +19,7 @@
- #include "omap_hwmod.h"
- #include "omap_hwmod_33xx_43xx_common_data.h"
- #include "prcm43xx.h"
-+#include "hdq1w.h"
- 
- /* IP blocks */
- static struct omap_hwmod am43xx_l4_hs_hwmod = {
-@@ -415,6 +416,32 @@ static struct omap_hwmod am43xx_qspi_hwmod = {
- 	},
- };
- 
-+static struct omap_hwmod_class_sysconfig am43xx_hdq1w_sysc = {
-+	.rev_offs       = 0x0000,
-+	.sysc_offs      = 0x0014,
-+	.syss_offs      = 0x0018,
-+	.sysc_flags     = (SYSC_HAS_SOFTRESET),
-+	.sysc_fields    = &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class am43xx_hdq1w_hwmod_class = {
-+	.name   = "hdq1w",
-+	.sysc   = &am43xx_hdq1w_sysc,
-+	.reset  = &omap_hdq1w_reset,
-+};
-+
-+static struct omap_hwmod am43xx_hdq1w_hwmod = {
-+	.name           = "hdq1w",
-+	.class          = &am43xx_hdq1w_hwmod_class,
-+	.clkdm_name     = "l4ls_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
-+		},
-+	},
-+};
-+
- /* Interfaces */
- static struct omap_hwmod_ocp_if am43xx_l3_main__l4_hs = {
- 	.master		= &am33xx_l3_main_hwmod,
-@@ -654,6 +681,14 @@ static struct omap_hwmod_ocp_if am43xx_l3_s__qspi = {
- 	.user           = OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_per -> hdq1w */
-+static struct omap_hwmod_ocp_if am43xx_l4_ls__hdq1w = {
-+	.master         = &am33xx_l4_ls_hwmod,
-+	.slave          = &am43xx_hdq1w_hwmod,
-+	.clk            = "l4ls_gclk",
-+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l4_wkup__synctimer,
- 	&am43xx_l4_ls__timer8,
-@@ -748,6 +783,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
- 	&am43xx_l4_ls__ocp2scp1,
- 	&am43xx_l3_s__usbotgss0,
- 	&am43xx_l3_s__usbotgss1,
-+	&am43xx_l4_ls__hdq1w,
- 	NULL,
- };
- 
-diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
-index 7785be9..cabff53 100644
---- a/arch/arm/mach-omap2/prcm43xx.h
-+++ b/arch/arm/mach-omap2/prcm43xx.h
-@@ -142,5 +142,6 @@
- #define AM43XX_CM_PER_USBPHYOCP2SCP0_CLKCTRL_OFFSET	0x05B8
- #define AM43XX_CM_PER_USB_OTG_SS1_CLKCTRL_OFFSET        0x0268
- #define AM43XX_CM_PER_USBPHYOCP2SCP1_CLKCTRL_OFFSET	0x05C0
-+#define AM43XX_CM_PER_HDQ1W_CLKCTRL_OFFSET		0x04a0
- 
- #endif
+This series applies on top of Alexandre's patches for the Berlin's pll:
+https://patchwork.kernel.org/patch/3890341/
+https://patchwork.kernel.org/patch/3876271/
+
+Antoine T?nart (4):
+  mmc: sdhci: add a driver for Berlin SoCs
+  Documentation: bindings: add the sdhci-berlin
+  ARM: dts: berlin: add the SDHCI nodes for the BG2Q
+  ARM: dts: berlin: enable SD card reader and eMMC for the BG2Q DMP
+
+ .../devicetree/bindings/mmc/sdhci-berlin.txt       |  18 +++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   8 ++
+ arch/arm/boot/dts/berlin2q.dtsi                    |  40 +++++++
+ drivers/mmc/host/Kconfig                           |  11 ++
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/sdhci-berlin.c                    | 129 +++++++++++++++++++++
+ 6 files changed, 207 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-berlin.txt
+ create mode 100644 drivers/mmc/host/sdhci-berlin.c
+
 -- 
-1.7.9.5
+1.8.3.2
