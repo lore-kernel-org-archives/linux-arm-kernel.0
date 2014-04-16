@@ -1,57 +1,174 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Apr 2014 09:15:06 +0100
-Subject: [PATCH] arm64: initialize spinlock for init_mm's context
-In-Reply-To: <1397550050-5321-1-git-send-email-leoy@marvell.com>
-References: <1397550050-5321-1-git-send-email-leoy@marvell.com>
-Message-ID: <20140416081506.GB29754@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 16 Apr 2014 10:16:10 +0200
+Subject: [PATCH] regmap: i2c: fallback to SMBus if the adapter does not
+ support standard I2C
+In-Reply-To: <20140415223849.GJ12304@sirena.org.uk>
+References: <20140415223849.GJ12304@sirena.org.uk>
+Message-ID: <1397636170-664-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 09:20:50AM +0100, Leo Yan wrote:
-> ARM64 has defined the spinlock for init_mm's context, so need initialize
-> the spinlock structure; otherwise during the suspend flow it will dump
-> the info for spinlock's bad magic warning as below:
-> 
-> [   39.084394] Disabling non-boot CPUs ...
-> [   39.092871] BUG: spinlock bad magic on CPU#1, swapper/1/0
-> [   39.092896]  lock: init_mm+0x338/0x3e0, .magic: 00000000, .owner: <none>/-1, .owner_cpu: 0
-> [   39.092907] CPU: 1 PID: 0 Comm: swapper/1 Tainted: G           O 3.10.33 #125
-> [   39.092912] Call trace:
-> [   39.092927] [<ffffffc000087e64>] dump_backtrace+0x0/0x16c
-> [   39.092934] [<ffffffc000087fe0>] show_stack+0x10/0x1c
-> [   39.092947] [<ffffffc000765334>] dump_stack+0x1c/0x28
-> [   39.092953] [<ffffffc0007653b8>] spin_dump+0x78/0x88
-> [   39.092960] [<ffffffc0007653ec>] spin_bug+0x24/0x34
-> [   39.092971] [<ffffffc000300a28>] do_raw_spin_lock+0x98/0x17c
-> [   39.092979] [<ffffffc00076cf08>] _raw_spin_lock_irqsave+0x4c/0x60
-> [   39.092990] [<ffffffc000094044>] set_mm_context+0x1c/0x6c
-> [   39.092996] [<ffffffc0000941c8>] __new_context+0x94/0x10c
-> [   39.093007] [<ffffffc0000d63d4>] idle_task_exit+0x104/0x1b0
-> [   39.093014] [<ffffffc00008d91c>] cpu_die+0x14/0x74
-> [   39.093021] [<ffffffc000084f74>] arch_cpu_idle_dead+0x8/0x14
-> [   39.093030] [<ffffffc0000e7f18>] cpu_startup_entry+0x1ec/0x258
-> [   39.093036] [<ffffffc00008d810>] secondary_start_kernel+0x114/0x124
-> 
-> Signed-off-by: Leo Yan <leoy@marvell.com>
-> ---
->  arch/arm64/include/asm/mmu.h |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index f600d40..06a19bd 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -22,6 +22,9 @@ typedef struct {
->  	void *vdso;
->  } mm_context_t;
->  
-> +#define INIT_MM_CONTEXT(name) \
-> +	.context.id_lock = __RAW_SPIN_LOCK_INITIALIZER(name.context.id_lock),
+Some I2C adapters are only compatible with the SMBus protocol and do not
+support standard I2C transfers.
 
-This should probably be __RAW_SPIN_LOCK_UNLOCKED instead.
+Fallback to SMBus transfers if we encounter such kind of adapters.
+The transfer type is chosen according to the val_bits field in the regmap
+config.
 
-Other than that, the patch looks fine to me. I should really get around to
-porting the ASID allocator from arch/arm/, then we could kill this lock
-altogether.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+Hello Mark, Lars,
 
-Will
+Would this patch be acceptable ?
+
+I'm still not convinced that we can decide which kind of protocol should
+be used based only on the adapter functionalities and the val_bytes field.
+
+But doing this as a first step should work in my case (my adapter only
+supports SMBus byte transfers :-)).
+
+Note that this patch has not been tested yet. I'll test it and resend a
+proper version, if you agree on the implementation.
+
+Best Regards,
+
+Boris
+
+ drivers/base/regmap/regmap-i2c.c | 101 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 99 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
+index ebd1895..80051c5 100644
+--- a/drivers/base/regmap/regmap-i2c.c
++++ b/drivers/base/regmap/regmap-i2c.c
+@@ -14,6 +14,69 @@
+ #include <linux/i2c.h>
+ #include <linux/module.h>
+ 
++
++static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg > 0xff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_byte_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
++}
++
++static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (val > 0xff || reg > 0xff)
++		return -EINVAL;
++
++	return i2c_smbus_write_byte_data(i2c, reg, val);
++}
++
++static int regmap_smbus_word_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg > 0xffff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_word_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
++}
++
++static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (val > 0xffff || reg > 0xffff)
++		return -EINVAL;
++
++	return i2c_smbus_write_word_data(i2c, reg, val);
++}
++
+ static int regmap_i2c_write(void *context, const void *data, size_t count)
+ {
+ 	struct device *dev = context;
+@@ -97,6 +160,28 @@ static struct regmap_bus regmap_i2c = {
+ 	.read = regmap_i2c_read,
+ };
+ 
++const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
++					    struct regmap_config *config)
++{
++	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
++		return &regmap_i2c;
++	} else if (config->val_bits == 16 &&
++		   i2c_check_functionality(i2c->adapter,
++					   I2C_FUNC_SMBUS_WORD_DATA)) {
++                config->reg_read = regmap_smbus_word_reg_read;
++                config->reg_write = regmap_smbus_word_reg_write;
++		return NULL;
++	} else if (config->val_bits == 8 &&
++		   i2c_check_functionality(i2c->adapter,
++					   I2C_FUNC_SMBUS_BYTE_DATA)) {
++                config->reg_read = regmap_smbus_byte_reg_read;
++                config->reg_write = regmap_smbus_byte_reg_write;
++		return NULL;
++	}
++
++	return ERR_PTR(-ENOTSUPP);
++}
++
+ /**
+  * regmap_init_i2c(): Initialise register map
+  *
+@@ -109,7 +194,13 @@ static struct regmap_bus regmap_i2c = {
+ struct regmap *regmap_init_i2c(struct i2c_client *i2c,
+ 			       const struct regmap_config *config)
+ {
+-	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	struct regmap_config upd_conf = *config;
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, &upd_conf);
++
++	if (IS_ERR(bus))
++		return ERR_PTR(PTR_ERR(bus));
++
++	return regmap_init(&i2c->dev, bus, &i2c->dev, &upd_conf);
+ }
+ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ 
+@@ -126,7 +217,13 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
+ 				    const struct regmap_config *config)
+ {
+-	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	struct regmap_config upd_conf = *config;
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, &upd_conf);
++
++	if (IS_ERR(bus))
++		return ERR_PTR(PTR_ERR(bus));
++
++	return devm_regmap_init(&i2c->dev, bus, &i2c->dev, &upd_conf);
+ }
+ EXPORT_SYMBOL_GPL(devm_regmap_init_i2c);
+ 
+-- 
+1.8.3.2
