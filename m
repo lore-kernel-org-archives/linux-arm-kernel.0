@@ -1,49 +1,44 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 16 Apr 2014 11:24:56 +0400
-Subject: [PATCH 7/8] ARM: dts: imx51-babbage: Add devicetree node for I2C1
-In-Reply-To: <1397633097-1640-1-git-send-email-shc_work@mail.ru>
-References: <1397633097-1640-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1397633097-1640-7-git-send-email-shc_work@mail.ru>
+Date: Wed, 16 Apr 2014 11:24:50 +0400
+Subject: [PATCH 1/8] ARM: dts: i.MX51: Allow to define partitions onto NFC
+Message-ID: <1397633097-1640-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds devicetree node and pinctrl group for I2C1.
+This patch allow to define partitions onto NFC in user defined
+devicetrees.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx51-babbage.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi | 2 --
+ arch/arm/boot/dts/imx51.dtsi                      | 2 ++
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 6484b73..5a50bbf 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -335,6 +335,12 @@
+diff --git a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+index 7787f46..321662f 100644
+--- a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
++++ b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+@@ -195,8 +195,6 @@
+ 	nand-bus-width = <8>;
+ 	nand-ecc-mode = "hw";
+ 	nand-on-flash-bbt;
+-	#address-cells = <1>;
+-	#size-cells = <1>;
  	status = "okay";
  };
  
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+};
-+
- &i2c2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c2>;
-@@ -513,6 +519,13 @@
- 			>;
- 		};
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 51b8670..bebbf3b 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -538,6 +538,8 @@
+ 			};
  
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				MX51_PAD_EIM_D19__I2C1_SCL		0x400001ed
-+				MX51_PAD_EIM_D16__I2C1_SDA		0x400001ed
-+			>;
-+		};
-+
- 		pinctrl_i2c2: i2c2grp {
- 			fsl,pins = <
- 				MX51_PAD_KEY_COL4__I2C2_SCL		0x400001ed
+ 			nfc: nand at 83fdb000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
+ 				compatible = "fsl,imx51-nand";
+ 				reg = <0x83fdb000 0x1000 0xcfff0000 0x10000>;
+ 				interrupts = <8>;
 -- 
 1.8.3.2
