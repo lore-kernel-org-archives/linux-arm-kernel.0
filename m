@@ -1,127 +1,115 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Thu, 17 Apr 2014 00:41:31 +0530
-Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <20140415083615.GC3596@e103592.cambridge.arm.com>
-References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
- <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
- <20140414104116.GA3844@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1404140956060.980@knanqh.ubzr>
- <20140415083615.GC3596@e103592.cambridge.arm.com>
-Message-ID: <CAM4voamo5iiOQ5P1JyO8kekU6cuxoj4oAT+VpS14LNvWqw_T4g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 16 Apr 2014 15:14:19 -0400 (EDT)
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <534EAD6C.3040502@codeaurora.org>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+Message-ID: <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Wed, 16 Apr 2014, Christopher Covington wrote:
 
-On Tue, Apr 15, 2014 at 2:06 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Mon, Apr 14, 2014 at 10:01:27AM -0400, Nicolas Pitre wrote:
->> On Mon, 14 Apr 2014, Dave Martin wrote:
->>
->> > On Fri, Apr 11, 2014 at 04:23:04PM -0400, Nicolas Pitre wrote:
->> > > On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
->> > >
->> > > > Add machine-dependent MCPM call-backs for Exynos5420. These are used
->> > > > to power up/down the secondary CPUs during boot, shutdown, s2r and
->> > > > switching.
->> > > >
->> > > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> > > > Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
->> > > > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> > > > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> > >
->> > > See comments inline.
->> >
->> > I won't duplicate Nico's review, but I have a couple of extra comments/
->> > questions, below.
->> >
->> > [...]
->> >
->> > > > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
->> > > > new file mode 100644
->> > > > index 0000000..46d4968
->> > > > --- /dev/null
->> > > > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->> > > > @@ -0,0 +1,444 @@
->> >
->> > [...]
->> >
->> > > > +static void exynos_cluster_power_control(unsigned int cluster, int enable)
->> > > > +{
->> > > > +       unsigned long timeout = jiffies + msecs_to_jiffies(20);
->> > > > +       unsigned int status, val = EXYNOS_CORE_LOCAL_PWR_DIS;
->> > > > +
->> > > > +       if (enable)
->> > > > +               val = EXYNOS_CORE_LOCAL_PWR_EN;
->> > > > +
->> > > > +       status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
->> > > > +       if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
->> > > > +               return;
->> > > > +
->> > > > +       __raw_writel(val, EXYNOS_COMMON_CONFIGURATION(cluster));
->> > > > +       /* Wait until cluster power control is applied */
->> > > > +       while (time_before(jiffies, timeout)) {
->> > > > +               status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
->> > > > +
->> > > > +               if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
->> > > > +                       return;
->> > > > +
->> > > > +               cpu_relax();
->> > > > +       }
->> > > > +       pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
->> > > > +               enable ? "on" : "off");
->> > >
->> > > You should not have to wait for the power status to change here.
->> > > Simply signaling the desired state and returning is all that is
->> > > expected.  And because IRQs are turned off, it is likely that
->> > > time_before(jiffies, timeout) will always be true anyway because jiffies
->> > > are not updated if there is no other CPU to service the timer interrupt.
->> > >
->> > > The actual power status should be polled for in the mcpm_finish()
->> > > method only.
->> >
+> On 04/15/2014 06:44 AM, Daniel Thompson wrote:
+> > Hi Folks
+> > 
+> > I've just been rebasing some of my development branches against v3.15rc1
+> > and observed some boot regressions due to TEXT_OFFSET changing from
+> > 0x8000 to 0x208000.
+> > 
+> > Now the boot regression turned out to be fault in the JTAG boot tools I
+> > was using (it had internally hardcoded to TEXT_OFFSET to 0x8000 when
+> > calculating what physical load address to use). I've fixed the JTAG
+> > loader and my own boards now boots fine.
+> 
+> Your tools are not alone in being affected by this change. QEMU is considering
+> changing their hard-coded value to 0x8000 [1], which I was eager to see until
+> being reminded of this (that patch would still be an improvement, but not
+> enough for users of new multiplatform kernels).
+> 
+> The boot-wrapper [2] (the default bootloader for ARM's proprietary models
+> which could potentially be used on other systems) is also affected.
 
->> > Depending on the power controller, it might be possible for writes to
->> > the controller to be lost or not acted upon, if a previous change is
->> > still pending.
->> >
->> > Does this issue apply to the exynos power controller?
->>
->> Given the way the code is structured now, I suppose that has not been
->> the case so far.
->
-> It depends on the purpose of the polling loop.  If it was added to resolve
-> a race between a power-up and a power-down that is complete in MCPM but
-> still pending in the hardware, than that would suggest the power controller
-> does have this behaviour.
->
-> But I'm just guessing.
->
-> Abhilash, can you comment?
-The polling loop in the above function was added to ensure that the
-cluster is switched on before we power on the individual cores in
-exynos_power_up. This is only required when the first man comes up.
+Why would QEMU and the ARM boot-wrap-per care about the kernel 
+TEXT_OFFSET value?
 
-Regards,
-Abhilash
->
->> >
->> > If this is the case, it might be necessary to ensure before a power-up
->> > request, that the power controller has caught up and reports the
->> > cluster/CPU as down.  Putting this poll before the write to the
->> > power controller maximises the chance of pipelining useful work
->> > in the meantime.  Putting the poll after the write is the worst case.
->>
->> More useful might be a check on the actual _control_ bit.  If the
->> control bits may be read back then I expect the indicated state will
->> happen even if delayed.
->
-> Quite likely, yes.  It just depends on what the hardware specs say.
->
-> Cheers
-> ---Dave
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I may understand the desire to boot a plain uncompressed Image over JTAG 
+and in this case you are amongst a very small group of people doing so 
+and therefore should be knowing what you're doing.  In other words this 
+is a minor inconvenient to a few people.
+
+But both QEMU and the boot-wrapper should deal with zImage. That's the 
+only image format with documented load offset is guaranteed not to 
+change i.e. it can be loaded at about any offset as zImage knows how to 
+relocate itself as needed.  There is nowhere a guarantee that 
+TEXT_OFFSET can't change.
+
+And if you think booting zImage on ARM models is too slow, then simply 
+try out CONFIG_KERNEL_LZO.
+
+> My current thinking is that even if we temporarily removed variance (the
+> jumping about) by maybe building every image with the maximum offset that any
+> image could have, there would still be variance between images built before
+> and after that change, and maybe also when some new platform gets added with
+> an even higher offset. So if there's going to be variance, could we maybe make
+> it no longer a problem?
+
+There is already no problem with zImage.
+
+> It seems to me that if external/uncompressed image loaders could query the
+> text offset in a straightforward manner, variance between images could be
+> easily dealt with. Would reading it out of ELF metadata be a reasonable
+> mechanism? Could the ELF format vmlinux be a suitable general replacement for
+> the raw Image?
+
+The ELF image only has virtual addresses in it.  And the virtual address 
+of the kernel may be changed independently of TEXT_OFFSET with 
+CONFIG_VMSPLIT_*.
+
+> Now at least with my current .config, the vmlinux only has virtual addresses.
+> Documentation/arm/Booting says the MMU has to be off at boot time so this
+> still might not be the ideal input for image loaders. Tools could hard-code
+> the phsyical-to-virtual offset instead of the TEXT_OFFSET. Is that less likely
+> to vary?
+
+Physical offset does vary from one platform to another, so this 
+particular physical-to-virtual offset is actually determined at run time 
+and the kernel runtime patched during early boot -- see __fixup_pv_table 
+in arch/arm/kernel/head.S.
+
+> Or could we patch up the linker script to set zero-based ELF load
+> memory addresses (LMAs) [4] so that the physical addresses are almost right,
+> you just might have to add a system-specific RAM offset, perhaps pulled out of
+> the device tree? If that won't work, we could generate some kind of
+> vmlinux-phys with physical addresses. The latter two options might also
+> simplify external debugging before __turn_mmu_on(). I like the sound of the
+> LMA approach best, assuming it doesn't break existing stuff (I notice a few AT
+> directives in vmlinux.lds.S). Some of this might transfer to arm64 as well.
+> What do you all think?
+
+If you really really want to get at the TEXT_OFFSET value in the 
+uncompressed image, the simplest way would be:
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index f8c08839ed..de84d0635a 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -78,6 +78,11 @@
+ 
+ 	__HEAD
+ ENTRY(stext)
++
++	b	1f
++	.word	TEXT_OFFSET		@ located at a 4-byte offset in Image
++1:
++
+  ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+ 
+  THUMB(	adr	r9, BSYM(1f)	)	@ Kernel is always entered in ARM.
+
+This way the first word for Image would always be 0xea000000 and the 
+second one would be TEXT_OFFSET.  No other kernel Image binaries ever 
+had 0xea000000 as their first word so that also let you validate whether 
+or not the TEXT_OFFSET value is there.
+
+
+Nicolas
