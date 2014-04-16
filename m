@@ -1,67 +1,72 @@
-From: archit@ti.com (Archit Taneja)
-Date: Wed, 16 Apr 2014 18:44:23 +0530
-Subject: [RFC 4/4] CLK: TI: Enable dss_deshdcp clock in dra7xx_clk_init
-In-Reply-To: <1397654063-8055-1-git-send-email-archit@ti.com>
-References: <1397654063-8055-1-git-send-email-archit@ti.com>
-Message-ID: <1397654063-8055-4-git-send-email-archit@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 16 Apr 2014 15:16:51 +0200
+Subject: [PATCH v3 0/4] Allow OHCI/EHCI drivers to override more hub operations
+Message-ID: <1397654215-23699-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DESHDCP clock is required only by the DES-HDCP block within HDMI in DSS.
-However, if the clock isn't set before DSS clock domian is enabled, the clock
-domain never comes out of idle state.
+Hello,
 
-This is because the DSS IP is designed in such a way that if DES-HDCP block
-can't transition from idle state, the entire DSS clock domain also cannot
-transition from idle to enabled. DES-HDCP block needs the DESHDCP clock
-enabled to transition from idle successfully.
+The PXA27x OHCI implementation doesn't perform automatic control of port power
+supplies for all ports. While the PPS and LSDA bits of the HcRhPortStatus
+register are implemented, only a subset of ports have an external power enable
+pin controlled by the port status register. Other ports need their power supply
+to be controlled manually.
 
-We enable the deshdcp clock in dra7xx_clk_init() which happens before omap
-hwmods are setup. This clock is effectively a gate clock with the parent as
-DSS_L3_GICLK. The parent is an automatically controlled clock by DSS clock
-domain and hence doesn't have a clock node associated to it. Since
-DSS_L3_GICLK is derived from the OCP clock, we set the dss_deshdcp_clk's
-parent as l3_iclk_div.
+In order to do so I've implemented manual regulator control in the ohci-pxa27x
+driver. This requires overriding the default behaviour of the CLEAR_FEATURE
+and SET_FEATURE requests for USB_PORT_FEAT_POWER with a custom hub control
+operation. In turn this requires calling the currently static ohci_hub_control
+function from the ohci-pxa27x driver.
 
-Leaving this bit enabled doesn't prevent DSS or the system to suspend, and only
-a very few flops get this clock all the time. So there is negligible impact.
+The ohci-at91 and ohci-s3c2410 drivers already implement a similar feature,
+and access the ohci_hub_control and ohci_hub_status_data functions by saving
+the struct hc_driver hub_control and hub_status_data values to a variables
+right after calling ohci_init_driver. This vtable-like implementation can be
+optimized by exporting the ohci_hub_control and ohci_hub_status_data functions
+and calling them directly. As the ohci-pxa27x driver needs to override hub
+control operations as well I've decided to export the functions.
 
-Signed-off-by: Archit Taneja <archit@ti.com>
----
- drivers/clk/ti/clk-7xx.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+For the sake of completeness I've also exported the ehci_hub_control function
+and modified the ehci-tegra driver to call it directly.
 
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index f7e4073..3f73a02 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -179,6 +179,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- 	DT_CLK(NULL, "dss_hdmi_clk", "dss_hdmi_clk"),
- 	DT_CLK(NULL, "dss_video1_clk", "dss_video1_clk"),
- 	DT_CLK(NULL, "dss_video2_clk", "dss_video2_clk"),
-+	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
- 	DT_CLK(NULL, "gpio1_dbclk", "gpio1_dbclk"),
- 	DT_CLK(NULL, "gpio2_dbclk", "gpio2_dbclk"),
- 	DT_CLK(NULL, "gpio3_dbclk", "gpio3_dbclk"),
-@@ -306,7 +307,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- int __init dra7xx_dt_clk_init(void)
- {
- 	int rc;
--	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
-+	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *dss_deshdcp_ck;
- 
- 	ti_dt_clocks_register(dra7xx_clks);
- 
-@@ -327,5 +328,10 @@ int __init dra7xx_dt_clk_init(void)
- 	if (rc)
- 		pr_err("%s: failed to configure GMAC DPLL!\n", __func__);
- 
-+	dss_deshdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
-+	rc = clk_prepare_enable(dss_deshdcp_ck);
-+	if (rc)
-+		pr_err("%s: failed to enable DESHDCP clock\n", __func__);
-+
- 	return rc;
- }
+As a side note regarding the ohci-at91 driver, the "atmel,vbus-gpio" DT
+property should really have referenced a regulator instead of a GPIO. Fixing
+this in a backward-compatible way would be messy :-(
+
+Please note that I haven't been able to test the third and fourth patches due
+to lack of hardware. I've however tested a similar implementation for OHCI on
+an out of tree PXA270 board.
+
+Changes compared to v2:
+
+- Export ohci_hub_status_data()
+- Call ohci_hub_status_data() directly from ohci-at91 and ohci-s3c2410
+
+Changes compared to v1:
+
+- Export ehci_hub_control()
+- Call ehci_hub_control() directly from ehci-tegra
+- Call ohci_hub_control() directly from ohci-at91
+
+Laurent Pinchart (4):
+  USB: OHCI: Export the OHCI hub control and status_data functions
+  USB: EHCI: Export the ehci_hub_control function
+  USB: ohci-pxa27x: Add support for external vbus regulators
+  ARM: pxa: zeus: Replace OHCI init/exit functions with a regulator
+
+ arch/arm/mach-pxa/zeus.c        | 89 ++++++++++++++++++++++-------------------
+ drivers/usb/host/ehci-hub.c     | 12 +-----
+ drivers/usb/host/ehci-tegra.c   |  8 +---
+ drivers/usb/host/ehci.h         |  3 ++
+ drivers/usb/host/ohci-at91.c    | 11 +----
+ drivers/usb/host/ohci-hub.c     |  8 ++--
+ drivers/usb/host/ohci-pxa27x.c  | 67 +++++++++++++++++++++++++++++++
+ drivers/usb/host/ohci-s3c2410.c | 13 ++----
+ drivers/usb/host/ohci.h         |  3 ++
+ 9 files changed, 133 insertions(+), 81 deletions(-)
+
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
