@@ -1,33 +1,97 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 16 Apr 2014 16:08:36 -0700
-Subject: [PATCH v2 0/3] Tegra SD/MMC fixes
-In-Reply-To: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
+Date: Wed, 16 Apr 2014 16:08:37 -0700
+Subject: [PATCH v2 1/3] mmc: tegra: disable UHS modes
+In-Reply-To: <1397689719-28882-1-git-send-email-abrestic@chromium.org>
 References: <1397526163-20126-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1397689719-28882-1-git-send-email-abrestic@chromium.org>
+ <1397689719-28882-1-git-send-email-abrestic@chromium.org>
+Message-ID: <1397689719-28882-2-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches fix a couple of issues which prevented Venice2
-boards from booting via eMMC and SD card reliably.  Note that this
-includes disabling UHS support since SDR50 and above require a
-Tegra-specific tuning procedure which is not supported yet (and still
-seems to have issues even in downstream kernels).
+Program TEGRA_SDHCI_VENDOR_MISC_CTRL so that UHS modes aren't advertised
+in SDHCI_CAPABILITIES_1.  While the Tegra SDHCI controller does support
+these modes, they require Tegra-specific tuning and calibration routines
+which the driver does not support yet.
 
-This depends on the following patches which fix an issue where the
-eMMC's power supply gets toggled, causing eMMC failures:
-  http://patchwork.ozlabs.org/patch/339386/
-  http://patchwork.ozlabs.org/patch/339710/
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+---
+No changes from v1
+---
+ drivers/mmc/host/sdhci-tegra.c | 30 +++++++++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 7 deletions(-)
 
-Tested on Tegra124-based Venice2 and Norrin boards.
-
-Andrew Bresticker (3):
-  mmc: tegra: disable UHS modes
-  mmc: tegra: fix reporting of base clock frequency
-  ARM: tegra: fix Venice2 SD card VQMMC supply
-
- arch/arm/boot/dts/tegra124-venice2.dts |  2 +-
- drivers/mmc/host/sdhci-tegra.c         | 40 +++++++++++++++++++++++++---------
- 2 files changed, 31 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index a835898..3cadd9c 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -32,11 +32,17 @@
+ 
+ /* Tegra SDHOST controller vendor register definitions */
+ #define SDHCI_TEGRA_VENDOR_MISC_CTRL		0x120
++#define SDHCI_MISC_CTRL_ENABLE_SDR104		0x8
++#define SDHCI_MISC_CTRL_ENABLE_SDR50		0x10
+ #define SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300	0x20
++#define SDHCI_MISC_CTRL_ENABLE_DDR50		0x200
+ 
+ #define NVQUIRK_FORCE_SDHCI_SPEC_200	BIT(0)
+ #define NVQUIRK_ENABLE_BLOCK_GAP_DET	BIT(1)
+ #define NVQUIRK_ENABLE_SDHCI_SPEC_300	BIT(2)
++#define NVQUIRK_DISABLE_SDR50		BIT(3)
++#define NVQUIRK_DISABLE_SDR104		BIT(4)
++#define NVQUIRK_DISABLE_DDR50		BIT(5)
+ 
+ struct sdhci_tegra_soc_data {
+ 	const struct sdhci_pltfm_data *pdata;
+@@ -113,18 +119,23 @@ static void tegra_sdhci_reset_exit(struct sdhci_host *host, u8 mask)
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+ 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
++	u32 misc_ctrl;
+ 
+ 	if (!(mask & SDHCI_RESET_ALL))
+ 		return;
+ 
++	misc_ctrl = sdhci_readw(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+ 	/* Erratum: Enable SDHCI spec v3.00 support */
+-	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300) {
+-		u32 misc_ctrl;
+-
+-		misc_ctrl = sdhci_readb(host, SDHCI_TEGRA_VENDOR_MISC_CTRL);
++	if (soc_data->nvquirks & NVQUIRK_ENABLE_SDHCI_SPEC_300)
+ 		misc_ctrl |= SDHCI_MISC_CTRL_ENABLE_SDHCI_SPEC_300;
+-		sdhci_writeb(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+-	}
++	/* Don't advertise UHS modes which aren't supported yet */
++	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR50)
++		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR50;
++	if (soc_data->nvquirks & NVQUIRK_DISABLE_DDR50)
++		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_DDR50;
++	if (soc_data->nvquirks & NVQUIRK_DISABLE_SDR104)
++		misc_ctrl &= ~SDHCI_MISC_CTRL_ENABLE_SDR104;
++	sdhci_writew(host, misc_ctrl, SDHCI_TEGRA_VENDOR_MISC_CTRL);
+ }
+ 
+ static int tegra_sdhci_buswidth(struct sdhci_host *host, int bus_width)
+@@ -181,7 +192,9 @@ static const struct sdhci_pltfm_data sdhci_tegra30_pdata = {
+ 
+ static struct sdhci_tegra_soc_data soc_data_tegra30 = {
+ 	.pdata = &sdhci_tegra30_pdata,
+-	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300,
++	.nvquirks = NVQUIRK_ENABLE_SDHCI_SPEC_300 |
++		    NVQUIRK_DISABLE_SDR50 |
++		    NVQUIRK_DISABLE_SDR104,
+ };
+ 
+ static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
+@@ -195,6 +208,9 @@ static const struct sdhci_pltfm_data sdhci_tegra114_pdata = {
+ 
+ static struct sdhci_tegra_soc_data soc_data_tegra114 = {
+ 	.pdata = &sdhci_tegra114_pdata,
++	.nvquirks = NVQUIRK_DISABLE_SDR50 |
++		    NVQUIRK_DISABLE_DDR50 |
++		    NVQUIRK_DISABLE_SDR104,
+ };
+ 
+ static const struct of_device_id sdhci_tegra_dt_match[] = {
 -- 
 1.9.1.423.g4596e3a
