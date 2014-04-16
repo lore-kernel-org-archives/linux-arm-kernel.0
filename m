@@ -1,45 +1,49 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Wed, 16 Apr 2014 12:47:43 +0300
-Subject: [PATCH v2] mtd: davinci-nand: disable subpage write for
- keystone-nand
-In-Reply-To: <20140416070833.GA5512@norris-Latitude-E6410>
-References: <1395346112-13350-1-git-send-email-ivan.khoronzhuk@ti.com>
- <532B4C36.8060405@ti.com> <5343F0D6.2010804@ti.com>
- <20140416070833.GA5512@norris-Latitude-E6410>
-Message-ID: <534E51BF.9050508@ti.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 16 Apr 2014 11:54:35 +0200
+Subject: [PATCH 0/4] pinctrl: sirf: switch to one gpiolib and
+ gpiolib_irqchip helpers
+In-Reply-To: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CABxcv=khupV0gpnCUOPeRON_v2wcRCNkL2Ao1B5dOB9-OB0wyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Barry,
 
-On 04/16/2014 10:08 AM, Brian Norris wrote:
-> On Tue, Apr 08, 2014 at 03:51:34PM +0300, Ivan Khoronzhuk wrote:
->> On 03/20/2014 10:14 PM, Santosh Shilimkar wrote:
->>> On Thursday 20 March 2014 04:08 PM, Ivan Khoronzhuk wrote:
->>>> From: Murali Karicheri <m-karicheri2@ti.com>
->>>> Sub page write doesn't work because of hw issue in controller found on
->>>> Keystone SOCs. AEMIF controller is also used on DaVinci SOCs which
->>>> don't seems to have any issue. So add "ti,keysone-nand" compatible
->>>> to nand driver in order to set NAND_NO_SUBPAGE_WRITE option.
->>>>
->>>> Cc: Brian Norris <computersforpeace@gmail.com>
->>>> Cc: Warner Losh <imp@bsdimp.com>
->>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>
->>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>> ---
->>>>
->>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Brian,
->> Could you pick up subj patch?
-> Pushed to l2-mtd.git. Is it critical this goes in for 3.15? It's
-> currently queued for -next (3.16).
+On Tue, Apr 15, 2014 at 8:43 AM, Barry Song <21cnbao@gmail.com> wrote:
+> From: Barry Song <Baohua.Song@csr.com>
 >
-> Brian
+> This patchset depends on Linus Walleij's "pinctrl: sirf: rename inlined accessor".
+> and "pinctrl: sirf: switch driver to use gpiolib irqchip helpers" is rebased
+> from Linus Walleij's patch too.
+>
+> Barry Song (3):
+>   pinctrl: sirf: wrap all gpio banks into one gpio_chip
+>   gpio: make handler_data configurable while using gpiolib_irqchip
+>   pinctrl: sirf: move to use irq_get_handler_data
+> Linus Walleij (1):
+>   pinctrl: sirf: switch driver to use gpiolib irqchip helpers
+>
+>  drivers/gpio/gpiolib.c              |   10 +-
+>  drivers/pinctrl/Kconfig             |    1 +
+>  drivers/pinctrl/sirf/pinctrl-sirf.c |  264 ++++++++++++-----------------------
+>  include/linux/gpio/driver.h         |    2 +-
+>  4 files changed, 97 insertions(+), 180 deletions(-)
+>
+> --
+> 1.7.5.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-This is a critical fix and it should be for 3.15.
-Thanks.
+Maybe you can first do the parameter change to
+gpiochip_set_chained_irqchip() and then just convert to gpiolib
+irqchip passing the struct sirfsoc_gpio_bank pointer instead of a
+struct gpio_chip. I think there is no need to split PATCH 2 and PATCH
+4 but it is up to you.
 
--- 
-Regards,
-Ivan Khoronzhuk
+The series looks good to me:
+
+Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
