@@ -1,176 +1,108 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 16 Apr 2014 12:06:03 +0100
-Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
- address space
-In-Reply-To: <1397501428-8857-3-git-send-email-mporter@linaro.org>
-References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
- <1397501428-8857-3-git-send-email-mporter@linaro.org>
-Message-ID: <20140416110603.GA19671@lee--X1>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Apr 2014 08:16:58 -0300
+Subject: [PATCH v3] ARM: dts: imx27-pdk: Add PMIC support
+Message-ID: <1397647018-9048-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Apr 2014, Matt Porter wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> BCM590xx utilizes a second i2c slave address to access additional
+imx27-pdk has a MC13783 PMIC connected to CSPI2 port.
 
-s/i2c/I2C
+Add support for it.
 
-> register space. Add support for the second address space by
-> instantiated a dummy i2c device with the appropriate secondary
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- Add PMIC group under PMIC node instead of CSPI
+Changes since v1:
+- Place the PMIC IRQ into a separate pingroup.
+ arch/arm/boot/dts/imx27-pdk.dts | 59 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
 
-s/instantiated/instantiating
-
-> i2c slave address. Expose a second regmap register space so that
-
-s/i2c/I2C
-
-Exposing?
-
-s/regmap/Regmap
-
-> mfd drivers can access this secondary i2c slave address space.
-
-s/mfd/MFD
-
-s/i2c/I2C
-
-> Signed-off-by: Matt Porter <mporter@linaro.org>
-> ---
->  drivers/mfd/bcm590xx.c       | 60 +++++++++++++++++++++++++++++++++-----------
->  include/linux/mfd/bcm590xx.h |  9 ++++---
->  2 files changed, 52 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/mfd/bcm590xx.c b/drivers/mfd/bcm590xx.c
-> index e9a33c7..b710ffa 100644
-> --- a/drivers/mfd/bcm590xx.c
-> +++ b/drivers/mfd/bcm590xx.c
-> @@ -28,39 +28,71 @@ static const struct mfd_cell bcm590xx_devs[] = {
->  	},
->  };
->  
-> -static const struct regmap_config bcm590xx_regmap_config = {
-> +static const struct regmap_config bcm590xx_regmap_config_0 = {
-
-Not loving _0 and _1 appendages.
-
-Is one of them {primary|master} and the other {secondary|slave}?
-
->  	.reg_bits	= 8,
->  	.val_bits	= 8,
-> -	.max_register	= BCM590XX_MAX_REGISTER,
-> +	.max_register	= BCM590XX_MAX_REGISTER_0,
->  	.cache_type	= REGCACHE_RBTREE,
->  };
->  
-> -static int bcm590xx_i2c_probe(struct i2c_client *i2c,
-> +static const struct regmap_config bcm590xx_regmap_config_1 = {
-> +	.reg_bits	= 8,
-> +	.val_bits	= 8,
-> +	.max_register	= BCM590XX_MAX_REGISTER_1,
-> +	.cache_type	= REGCACHE_RBTREE,
-> +};
-> +
-> +static int bcm590xx_i2c_probe(struct i2c_client *addmap0,
-
-Would this be best left as i2c, then naming the other one
-i2c_secondary for instance?
-
-addmap{0,1} doesn't quite sit right with me.
-
-REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
-as I first thought, but still, is there a better naming convention you
-could use?
-
->  			      const struct i2c_device_id *id)
->  {
->  	struct bcm590xx *bcm590xx;
->  	int ret;
->  
-> -	bcm590xx = devm_kzalloc(&i2c->dev, sizeof(*bcm590xx), GFP_KERNEL);
-> +	bcm590xx = devm_kzalloc(&addmap0->dev, sizeof(*bcm590xx), GFP_KERNEL);
->  	if (!bcm590xx)
->  		return -ENOMEM;
->  
-> -	i2c_set_clientdata(i2c, bcm590xx);
-> -	bcm590xx->dev = &i2c->dev;
-> -	bcm590xx->i2c_client = i2c;
-> +	i2c_set_clientdata(addmap0, bcm590xx);
-> +	bcm590xx->dev = &addmap0->dev;
-> +	bcm590xx->addmap0 = addmap0;
->  
-> -	bcm590xx->regmap = devm_regmap_init_i2c(i2c, &bcm590xx_regmap_config);
-> -	if (IS_ERR(bcm590xx->regmap)) {
-> -		ret = PTR_ERR(bcm590xx->regmap);
-> -		dev_err(&i2c->dev, "regmap initialization failed: %d\n", ret);
-> +	bcm590xx->regmap0 = devm_regmap_init_i2c(addmap0,
-> +						 &bcm590xx_regmap_config_0);
-> +	if (IS_ERR(bcm590xx->regmap0)) {
-> +		ret = PTR_ERR(bcm590xx->regmap0);
-> +		dev_err(&addmap0->dev, "regmap 0 init failed: %d\n", ret);
->  		return ret;
->  	}
->  
-> -	ret = mfd_add_devices(&i2c->dev, -1, bcm590xx_devs,
-> +	/* Second I2C slave address is the base address with A(2) asserted */
-> +	bcm590xx->addmap1 = i2c_new_dummy(addmap0->adapter,
-> +					  addmap0->addr | BIT(2));
-> +	if (IS_ERR_OR_NULL(bcm590xx->addmap1)) {
-> +		dev_err(&addmap0->dev, "failed to add address map 1 device\n");
-> +		return -ENODEV;
-> +	}
-> +	i2c_set_clientdata(bcm590xx->addmap1, bcm590xx);
-> +
-> +	bcm590xx->regmap1 = devm_regmap_init_i2c(bcm590xx->addmap1,
-> +						&bcm590xx_regmap_config_1);
-> +	if (IS_ERR(bcm590xx->regmap1)) {
-> +		ret = PTR_ERR(bcm590xx->regmap1);
-> +		dev_err(&bcm590xx->addmap1->dev,
-> +			"regmap 1 init failed: %d\n", ret);
-> +		goto err;
-> +	}
-> +
-> +	ret = mfd_add_devices(&addmap0->dev, -1, bcm590xx_devs,
->  			      ARRAY_SIZE(bcm590xx_devs), NULL, 0, NULL);
-> -	if (ret < 0)
-> -		dev_err(&i2c->dev, "failed to add sub-devices: %d\n", ret);
-> +	if (ret < 0) {
-> +		dev_err(&addmap0->dev, "failed to add sub-devices: %d\n", ret);
-> +		goto err;
-> +	}
-> +
-> +	return 0;
->  
-> +err:
-> +	i2c_unregister_device(bcm590xx->addmap1);
->  	return ret;
->  }
->  
-> diff --git a/include/linux/mfd/bcm590xx.h b/include/linux/mfd/bcm590xx.h
-> index 434df2d..a2723f2 100644
-> --- a/include/linux/mfd/bcm590xx.h
-> +++ b/include/linux/mfd/bcm590xx.h
-> @@ -19,12 +19,15 @@
->  #include <linux/regmap.h>
->  
->  /* max register address */
-> -#define BCM590XX_MAX_REGISTER	0xe7
-> +#define BCM590XX_MAX_REGISTER_0	0xe7
-> +#define BCM590XX_MAX_REGISTER_1	0xf0
->  
->  struct bcm590xx {
->  	struct device *dev;
-> -	struct i2c_client *i2c_client;
-> -	struct regmap *regmap;
-> +	struct i2c_client *addmap0;
-> +	struct i2c_client *addmap1;
-> +	struct regmap *regmap0;
-> +	struct regmap *regmap1;
->  	unsigned int id;
->  };
->  
-
+diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
+index 430b72b..37d7bde 100644
+--- a/arch/arm/boot/dts/imx27-pdk.dts
++++ b/arch/arm/boot/dts/imx27-pdk.dts
+@@ -21,6 +21,50 @@
+ 	};
+ };
+ 
++&cspi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_cspi2>;
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio4 21 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++
++	pmic: mc13783 at 0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "fsl,mc13783";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic>;
++		reg = <0>;
++		spi-cs-high;
++		spi-max-frequency = <1000000>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <14 IRQ_TYPE_LEVEL_HIGH>;
++
++		regulators {
++			vgen_reg: vgen {
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			vmmc1_reg: vmmc1 {
++				regulator-min-microvolt = <1600000>;
++				regulator-max-microvolt = <3000000>;
++			};
++
++			gpo1_reg: gpo1 {
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			gpo3_reg: gpo3 {
++				regulator-always-on;
++				regulator-boot-on;
++			};
++		};
++	};
++};
+ 
+ &fec {
+ 	phy-mode = "mii";
+@@ -38,6 +82,15 @@
+ 
+ &iomuxc {
+ 	imx27-pdk {
++		pinctrl_cspi2: cspi2grp {
++			fsl,pins = <
++				MX27_PAD_CSPI2_MISO__CSPI2_MISO 0x0
++				MX27_PAD_CSPI2_MOSI__CSPI2_MOSI 0x0
++				MX27_PAD_CSPI2_SCLK__CSPI2_SCLK 0x0
++				MX27_PAD_CSPI2_SS0__GPIO4_21	0x0 /* SPI2 CS0 */
++			>;
++		};
++
+ 		pinctrl_fec: fecgrp {
+ 			fsl,pins = <
+ 				MX27_PAD_SD3_CMD__FEC_TXD0 0x0
+@@ -61,6 +114,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pmic: pmicgrp {
++			fsl,pins = <
++				MX27_PAD_TOUT__GPIO3_14		0x0 /* PMIC IRQ */
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX27_PAD_UART1_TXD__UART1_TXD 0x0
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.3.2
