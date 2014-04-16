@@ -1,58 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Apr 2014 14:52:17 +0100
-Subject: [PATCH v7 6/7] arm64: ftrace: Add CALLER_ADDRx macros
-In-Reply-To: <1394862353-28963-7-git-send-email-takahiro.akashi@linaro.org>
-References: <1394705630-12384-1-git-send-email-takahiro.akashi@linaro.org>
- <1394862353-28963-7-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140416135217.GF1001@arm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 16 Apr 2014 11:15:16 -0300
+Subject: [PATCH 2/6] thermal: armada: Add infrastructure to support generic
+ formulas
+In-Reply-To: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1397657720-10893-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1397657720-10893-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 15, 2014 at 05:45:52AM +0000, AKASHI Takahiro wrote:
-> CALLER_ADDRx returns caller's address at specified level in call stacks.
-> They are used for several tracers like irqsoff and preemptoff.
-> Strange to say, however, they are refered even without FTRACE.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/ftrace.h    | 13 ++++++++-
->  arch/arm64/kernel/Makefile         |  3 ++-
->  arch/arm64/kernel/return_address.c | 55 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 69 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm64/kernel/return_address.c
-> 
-> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-> index ed5c448..c44c4b1 100644
-> --- a/arch/arm64/include/asm/ftrace.h
-> +++ b/arch/arm64/include/asm/ftrace.h
-> @@ -18,6 +18,7 @@
->  
->  #ifndef __ASSEMBLY__
->  extern void _mcount(unsigned long);
-> +extern void *return_address(unsigned int);
->  
->  struct dyn_arch_ftrace {
->  	/* No extra data needed for arm64 */
-> @@ -33,6 +34,16 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
->  	 */
->  	return addr;
->  }
-> -#endif /* __ASSEMBLY__ */
-> +
-> +#define HAVE_ARCH_CALLER_ADDR
-> +
-> +#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-> +#define CALLER_ADDR1 ((unsigned long)return_address(1))
-> +#define CALLER_ADDR2 ((unsigned long)return_address(2))
-> +#define CALLER_ADDR3 ((unsigned long)return_address(3))
-> +#define CALLER_ADDR4 ((unsigned long)return_address(4))
-> +#define CALLER_ADDR5 ((unsigned long)return_address(5))
-> +#define CALLER_ADDR6 ((unsigned long)return_address(6))
-> +#endif /* ifndef __ASSEMBLY__ */
+In order to support other similar SoC, with different sensor
+coeficients, this commit adds the coeficients to the per-variant
+structure, instead of having the formula hardcoded.
 
-Hmm, I thought you were going to take a look at reworking the core code for
-this, as Steve and I suggested?
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/thermal/armada_thermal.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/240239.html
-
-Will
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index c5db071..4de6e56 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -53,6 +53,11 @@ struct armada_thermal_data {
+ 
+ 	/* Test for a valid sensor value (optional) */
+ 	bool (*is_valid)(struct armada_thermal_priv *);
++
++	/* Formula coeficients: temp = (b + m * reg) / div */
++	unsigned long coef_b;
++	unsigned long coef_m;
++	unsigned long coef_div;
+ };
+ 
+ static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
+@@ -111,6 +116,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+ {
+ 	struct armada_thermal_priv *priv = thermal->devdata;
+ 	unsigned long reg;
++	unsigned long m, b, div;
+ 
+ 	/* Valid check */
+ 	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
+@@ -121,7 +127,13 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+ 
+ 	reg = readl_relaxed(priv->sensor);
+ 	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
+-	*temp = (3153000000UL - (10000000UL*reg)) / 13825;
++
++	/* Get formula coeficients */
++	b = priv->data->coef_b;
++	m = priv->data->coef_m;
++	div = priv->data->coef_div;
++
++	*temp = (b - (m * reg)) / div;
+ 	return 0;
+ }
+ 
+@@ -131,11 +143,17 @@ static struct thermal_zone_device_ops ops = {
+ 
+ static const struct armada_thermal_data armadaxp_data = {
+ 	.init_sensor = armadaxp_init_sensor,
++	.coef_b = 3153000000UL,
++	.coef_m = 10000000UL,
++	.coef_div = 13825,
+ };
+ 
+ static const struct armada_thermal_data armada370_data = {
+ 	.is_valid = armada_is_valid,
+ 	.init_sensor = armada370_init_sensor,
++	.coef_b = 3153000000UL,
++	.coef_m = 10000000UL,
++	.coef_div = 13825,
+ };
+ 
+ static const struct of_device_id armada_thermal_id_table[] = {
+-- 
+1.9.1
