@@ -1,67 +1,44 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 16 Apr 2014 16:24:34 +0800
-Subject: [PATCH] ARM: prima2: remove L2 cache size override
-In-Reply-To: <20140415215615.GZ24070@n2100.arm.linux.org.uk>
-References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
- <20140415100002.GQ24070@n2100.arm.linux.org.uk>
- <CAGsJ_4zt4KMLk7v93e40Zj1A7fHBnvE2_c94nAbGAr9xcCFnwg@mail.gmail.com>
- <20140415215615.GZ24070@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4zKz=O8FAkuTj8uw=J840qpCb5FWq_sarJBfMHZvz1-sg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 16 Apr 2014 17:26:01 +0900
+Subject: [PATCH v5 08/20] ARM: shmobile: r8a7779: Add helper to read mode
+ pins
+In-Reply-To: <CAMuHMdUuswCe7XB=PkVkP6nD9bvQ1oXCokSDveoZ9_R--Z6Ogw@mail.gmail.com>
+References: <1397613454-7522-1-git-send-email-horms+renesas@verge.net.au>
+ <1397613454-7522-9-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXVAaU=eEBr4hwfbz3TGL+k0NHxGtzh-uuzFwuUqeNA9Q@mail.gmail.com>
+ <20140416075501.GE12344@verge.net.au>
+ <CAMuHMdUuswCe7XB=PkVkP6nD9bvQ1oXCokSDveoZ9_R--Z6Ogw@mail.gmail.com>
+Message-ID: <20140416082558.GF12344@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-16 5:56 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Apr 15, 2014 at 06:13:27PM +0800, Barry Song wrote:
->> 2014-04-15 18:00 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Tue, Apr 15, 2014 at 05:49:02PM +0800, Barry Song wrote:
->> >> From: Barry Song <Baohua.Song@csr.com>
->> >>
->> >> L2 cache size has been read by l2x0_init(), it is useless to set
->> >> WAY_SIZE and ASSOCIATIVITY in prima2.
->> >>
->> >> Cc: Russell King <linux@arm.linux.org.uk>
->> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> >> ---
->> >>  -Derived from Russell's "ARM: l2c: prima2: remove cache size override"
->> >
->> > You're a SMP architecture... it would be much better to initialise the
->> > L2 cache before the secondary CPUs are brought online.
->>
->> ok, it seems we still need to hook this into the callback of this
->> specific machine instead of using a global early_initcall(). since now
->> the dt compatible field has been generic enough, it will cause other
->> platforms to execute l2x0_of_init() too.
->
-> What I did for Versatile Express was to move it to the init_irq stage.
-> I'm not condoning using init_irq() for non-IRQ stuff, but that was
-> just to see whether it was possible (the .init_early is too early for
-> it.)  Let me put it another way: I'm not thrilled by the idea of
-> having it in init_irq() but that's a better location to call L2 cache
-> initialisation than half-way through the kernel's initialisation.
+On Wed, Apr 16, 2014 at 10:12:32AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, Apr 16, 2014 at 9:55 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > +u32 __init r8a7779_read_mode_pins(void)
+> >> > +{
+> >> > +       void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+> >> > +       u32 mode;
+> >> > +
+> >> > +       BUG_ON(!modemr);
+> >> > +       mode = ioread32(modemr);
+> >> > +       iounmap(modemr);
+> >> > +
+> >> > +       return mode;
+> >> > +}
+> >>
+> >> No caching, cfr. rcar_gen2_read_mode_pins()?
+> >
+> > I have one question about caching, which IIRC you
+> > implemented for R-Car Gen 2. Is the code called often enough
+> > that it makes any difference?
+> 
+> 2 times. (Add 1 more time with "[PATCH 1/5] [DEBUG] ARM: shmobile:
+>  r8a7791: Disable MSTP clocks during boot" applied).
+> 
+> I agree it's not much, I'm mostly concerned about the ioremap()/iounmap()
+> pair, which is expensive compared to using a cached integer value.
 
-i would like to believe you are right since you have dug into the
-callbacks and finally thinks init_irq() is the suitable stage for it
-even though it looks misnamed.
-
->
->> > In any case, across the board, it's preferable that the L2 cache is
->> > enabled before the delay loop calibration as it can have an effect on
->> > the calibrated value.
->>
->> what if the real case is that l2x0 has been enabled in bootloader?
->
-> If the L2 cache has already been enabled, l2x0_of_init() handles it -
-> in that situation, we can't re-do the enable (because writing to the
-> aux ctrl register is not allowed) so we merely setup the outer cache
-> function pointers and don't try to do any configuration or enabling.
-
-yes. i meant if that has been done in bootloader, it turns out we
-don't care about which callback is better any more. and for linux
-running in non-security, same.
-
->
-> --
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
-
-- barry
+Thanks, I understand. I agree its reasonable
+to implement caching for this.
