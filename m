@@ -1,32 +1,72 @@
-From: ynvich@gmail.com (Sergei Ianovich)
-Date: Thu, 17 Apr 2014 00:06:40 +0400
-Subject: [PATCH v4 21/21] misc: support for I-8024 in LP-8x4x
-In-Reply-To: <20140416205644.396709aa@alan.etchedpixels.co.uk>
-References: <1397668411-27162-7-git-send-email-ynvich@gmail.com>
- <1397668667-27328-1-git-send-email-ynvich@gmail.com>
- <1397668667-27328-15-git-send-email-ynvich@gmail.com>
- <20140416193949.47f4ea68@alan.etchedpixels.co.uk>
- <9eb6a7ac-e8c0-4c05-8f8a-e047d2614cba@email.android.com>
- <20140416205644.396709aa@alan.etchedpixels.co.uk>
-Message-ID: <f36fdc97-7cc3-49a8-9643-f7096defd829@email.android.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 16 Apr 2014 15:14:30 -0500
+Subject: [PATCH 2/2] ARM: socfpga: dts: Add div-reg to the main_pll clocks
+In-Reply-To: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
+References: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1397679270-29695-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
->> I've closely examined a dozen or two of drivers, but of them was
->close enough for I-8024 in terms of speed. Its channel takes 0.1 us to
->set up from kernel. Real user space programs can setup all for channels
->in 1 us with interface provided by this patch. That's said I don't have
->data on time that it takes for output to stabilize at the desired
->levels.
->> 
->> I've chosen drivers/misc as a location that looked to provide the
->shortest path for my driver to land. The driver needs support for the
->bus, and here it can be in one driver.
->> 
->> It would be great to have some more detailed input on this issue.
->
->IIO is where we are trying to standardise all the industrial control
->devices. There is stuff in places like misc for historical reasons.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Great. I'll rewrite the driver using IIO, but the bus issue needs to be settled first.
+The mpu_clk, main_clk, and dbg_base_clk outputs from the main PLL go through a
+pre-divider. Update socfpga.dtsi to represent those dividers for these
+clocks.
+
+Re-use the "div-reg" property that was used for the socfpga-gate-clock as this
+is the same thing. Also update the documentation.
+
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ .../devicetree/bindings/clock/altr_socfpga.txt     |    4 ++--
+ arch/arm/boot/dts/socfpga.dtsi                     |    6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/clock/altr_socfpga.txt b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+index 5dfd145..f72e80e 100644
+--- a/Documentation/devicetree/bindings/clock/altr_socfpga.txt
++++ b/Documentation/devicetree/bindings/clock/altr_socfpga.txt
+@@ -21,8 +21,8 @@ Optional properties:
+ - fixed-divider : If clocks have a fixed divider value, use this property.
+ - clk-gate : For "socfpga-gate-clk", clk-gate contains the gating register
+         and the bit index.
+-- div-reg : For "socfpga-gate-clk", div-reg contains the divider register, bit shift,
+-        and width.
++- div-reg : For "socfpga-gate-clk" and "socfpga-periph-clock", div-reg contains
++	the divider register, bit shift, and width.
+ - clk-phase : For the sdmmc_clk, contains the value of the clock phase that controls
+ 	the SDMMC CIU clock. The first value is the clk_sample(smpsel), and the second
+ 	value is the cclk_in_drv(drvsel). The clk-phase is used to enable the correct
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 56fc214..291eff1 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -124,7 +124,7 @@
+ 							#clock-cells = <0>;
+ 							compatible = "altr,socfpga-perip-clk";
+ 							clocks = <&main_pll>;
+-							fixed-divider = <2>;
++							div-reg = <0xe0 0 9>;
+ 							reg = <0x48>;
+ 						};
+ 
+@@ -132,7 +132,7 @@
+ 							#clock-cells = <0>;
+ 							compatible = "altr,socfpga-perip-clk";
+ 							clocks = <&main_pll>;
+-							fixed-divider = <4>;
++							div-reg = <0xe4 0 9>;
+ 							reg = <0x4C>;
+ 						};
+ 
+@@ -140,7 +140,7 @@
+ 							#clock-cells = <0>;
+ 							compatible = "altr,socfpga-perip-clk";
+ 							clocks = <&main_pll>;
+-							fixed-divider = <4>;
++							div-reg = <0xe8 0 9>;
+ 							reg = <0x50>;
+ 						};
+ 
+-- 
+1.7.9.5
