@@ -1,156 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 16 Apr 2014 15:16:55 +0200
-Subject: [PATCH v3 4/4] ARM: pxa: zeus: Replace OHCI init/exit functions with
- a regulator
-In-Reply-To: <1397654215-23699-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1397654215-23699-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397654215-23699-5-git-send-email-laurent.pinchart@ideasonboard.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Wed, 16 Apr 2014 15:23:13 +0200
+Subject: [PATCH 3/4] ARM: dts: berlin: add the SDHCI nodes for the BG2Q
+In-Reply-To: <20140416130915.GC11310@lunn.ch>
+References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397652011-21284-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140416130915.GC11310@lunn.ch>
+Message-ID: <20140416132313.GA6253@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- arch/arm/mach-pxa/zeus.c | 89 ++++++++++++++++++++++++++----------------------
- 1 file changed, 48 insertions(+), 41 deletions(-)
+Hi Andrew,
 
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index b19d1c3..205f9bf 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -413,7 +413,7 @@ static struct fixed_voltage_config can_regulator_pdata = {
- 
- static struct platform_device can_regulator_device = {
- 	.name	= "reg-fixed-volage",
--	.id	= -1,
-+	.id	= 0,
- 	.dev	= {
- 		.platform_data	= &can_regulator_pdata,
- 	},
-@@ -510,18 +510,6 @@ struct platform_device zeus_max6369_device = {
- 	.num_resources	= 1,
- };
- 
--static struct platform_device *zeus_devices[] __initdata = {
--	&zeus_serial_device,
--	&zeus_mtd_devices[0],
--	&zeus_dm9k0_device,
--	&zeus_dm9k1_device,
--	&zeus_sram_device,
--	&zeus_leds_device,
--	&zeus_pcmcia_device,
--	&zeus_max6369_device,
--	&can_regulator_device,
--};
--
- /* AC'97 */
- static pxa2xx_audio_ops_t zeus_ac97_info = {
- 	.reset_gpio = 95,
-@@ -532,44 +520,50 @@ static pxa2xx_audio_ops_t zeus_ac97_info = {
-  * USB host
-  */
- 
--static int zeus_ohci_init(struct device *dev)
--{
--	int err;
--
--	/* Switch on port 2. */
--	if ((err = gpio_request(ZEUS_USB2_PWREN_GPIO, "USB2_PWREN"))) {
--		dev_err(dev, "Can't request USB2_PWREN\n");
--		return err;
--	}
--
--	if ((err = gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 1))) {
--		gpio_free(ZEUS_USB2_PWREN_GPIO);
--		dev_err(dev, "Can't enable USB2_PWREN\n");
--		return err;
--	}
-+static struct regulator_consumer_supply zeus_ohci_regulator_supplies[] = {
-+	REGULATOR_SUPPLY("vbus2", "pxa27x-ohci"),
-+};
- 
--	/* Port 2 is shared between host and client interface. */
--	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
-+static struct regulator_init_data zeus_ohci_regulator_data = {
-+	.constraints = {
-+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(zeus_ohci_regulator_supplies),
-+	.consumer_supplies	= zeus_ohci_regulator_supplies,
-+};
- 
--	return 0;
--}
-+static struct fixed_voltage_config zeus_ohci_regulator_config = {
-+	.supply_name		= "vbus2",
-+	.microvolts		= 5000000, /* 5.0V */
-+	.gpio			= ZEUS_USB2_PWREN_GPIO,
-+	.enable_high		= 1,
-+	.startup_delay		= 0,
-+	.init_data		= &zeus_ohci_regulator_data,
-+};
- 
--static void zeus_ohci_exit(struct device *dev)
--{
--	/* Power-off port 2 */
--	gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 0);
--	gpio_free(ZEUS_USB2_PWREN_GPIO);
--}
-+static struct platform_device zeus_ohci_regulator_device = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 1,
-+	.dev = {
-+		.platform_data = &zeus_ohci_regulator_config,
-+	},
-+};
- 
- static struct pxaohci_platform_data zeus_ohci_platform_data = {
- 	.port_mode	= PMM_NPS_MODE,
- 	/* Clear Power Control Polarity Low and set Power Sense
- 	 * Polarity Low. Supply power to USB ports. */
- 	.flags		= ENABLE_PORT_ALL | POWER_SENSE_LOW,
--	.init		= zeus_ohci_init,
--	.exit		= zeus_ohci_exit,
- };
- 
-+static void zeus_register_ohci(void)
-+{
-+	/* Port 2 is shared between host and client interface. */
-+	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
-+
-+	pxa_set_ohci_info(&zeus_ohci_platform_data);
-+}
-+
- /*
-  * Flat Panel
-  */
-@@ -677,6 +671,19 @@ static struct pxa2xx_udc_mach_info zeus_udc_info = {
- 	.udc_command = zeus_udc_command,
- };
- 
-+static struct platform_device *zeus_devices[] __initdata = {
-+	&zeus_serial_device,
-+	&zeus_mtd_devices[0],
-+	&zeus_dm9k0_device,
-+	&zeus_dm9k1_device,
-+	&zeus_sram_device,
-+	&zeus_leds_device,
-+	&zeus_pcmcia_device,
-+	&zeus_max6369_device,
-+	&can_regulator_device,
-+	&zeus_ohci_regulator_device,
-+};
-+
- #ifdef CONFIG_PM
- static void zeus_power_off(void)
- {
-@@ -847,7 +854,7 @@ static void __init zeus_init(void)
- 
- 	platform_add_devices(zeus_devices, ARRAY_SIZE(zeus_devices));
- 
--	pxa_set_ohci_info(&zeus_ohci_platform_data);
-+	zeus_register_ohci();
- 
- 	if (zeus_setup_fb_gpios())
- 		pr_err("Failed to setup fb gpios\n");
+On Wed, Apr 16, 2014 at 03:09:15PM +0200, Andrew Lunn wrote:
+> On Wed, Apr 16, 2014 at 02:40:10PM +0200, Antoine T?nart wrote:
+> > Add the SDHCI nodes for the Marvell Berlin BG2Q, using the berlin-sdhci
+> > driver.
+> > 
+> > Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/berlin2q.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 40 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> > index 5925e6a16749..8f897d461460 100644
+> > --- a/arch/arm/boot/dts/berlin2q.dtsi
+> > +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> > @@ -67,6 +67,14 @@
+> >  		clock-div = <3>;
+> >  	};
+> >  
+> > +	sdio1clk: sdio1clk {
+> > +		compatible = "fixed-factor-clock";
+> > +		#clock-cells = <0>;
+> > +		clocks = <&syspll>;
+> > +		clock-mult = <1>;
+> > +		clock-div = <4>;
+> > +	};
+> > +
+> >  	soc {
+> >  		compatible = "simple-bus";
+> >  		#address-cells = <1>;
+> > @@ -75,6 +83,38 @@
+> >  		ranges = <0 0xf7000000 0x1000000>;
+> >  		interrupt-parent = <&gic>;
+> >  
+> > +		sdhci0: sdhci at ab0000 {
+> > +			compatible = "marvell,berlin2q-sdhci";
+> > +			reg = <0xab0000 0x200>;
+> > +			clocks = <&sdio1clk>;
+> > +			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> > +			keep-power-in-suspend;
+> > +			enable-sdio-wakeup;
+> > +			broken-cd;
+> 
+> Hi Antoine
+> 
+> I would expect these three last properties to be a property of the
+> board, not the SoC. Or am i missing something?
+
+No reason, I'll move them.
+
+Thanks !
+
+Antoine
+
 -- 
-1.8.3.2
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
