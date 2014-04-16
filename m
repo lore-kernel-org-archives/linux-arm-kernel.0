@@ -1,161 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Apr 2014 20:26:15 +0200
-Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
-In-Reply-To: <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
- <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
-Message-ID: <16730530.rJ9T0MsYmt@wuerfel>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 16 Apr 2014 11:33:15 -0700
+Subject: kmalloc and uncached memory
+In-Reply-To: <CAF1ivSaAQ_8byv+a9NQebtL4kBYFEPOTJHn-JA-bYY=wLFpv2Q@mail.gmail.com>
+References: <CAF1ivSaAQ_8byv+a9NQebtL4kBYFEPOTJHn-JA-bYY=wLFpv2Q@mail.gmail.com>
+Message-ID: <534ECCEB.6090007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
-> Jingoo,
+On 4/16/2014 11:11 AM, Lin Ming wrote:
+> Hi Peter,
 > 
-> Thanks for taking a stab at trying to convert a host bridge
-> driver to use the new generic host bridge code.
+> I have a performance problem(on ARM board) that cpu is very bus at
+> cache invalidation.
+> So I'm trying to alloc an uncached memory to eliminate cache invalidation.
 > 
-> I do however have concerns on the direction you took. You have split
-> your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
-> even if (with my series) it should be no reason why the host bridge
-> driver should not work on other architectures as well once they are
-> converted.
-
-Right.
-
-> Also, some of the functions that you use have identical names but different
-> signatures depending on what arch you have selected. This is really bad
-> in my books!
-
-It's only the sys_to_pcie() function, right?
-
-You can probably simplify that to take a void pointer and have only one line
-difference.
-
-> What about creating functions that use my series directly if CONFIG_ARM64 is
-> defined (or any CONFIG_ you want to create for your driver that you select
-> from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
-> way your driver will call only one API without any #ifdef and when arm code
-> gets converted you drop your adaptation functions. Or (better yet), have a
-> stab at converting bios32 (Rob Herring has already provided some hints on
-> how to do it for arch/arm).
-
-That would of course be best.
-
-> To give an example on how things are not going well in your version (not obvious
-> from your patch, but you can see it once you apply it): dw_pcie_host_init()
-> will still carry the handcoded version of DT parsing and that is not guarded
-> against CONFIG_ARM64 being defined, where the parsing will happen again
-> when you call of_create_pci_host_bridge().
-
-How about making the generic DT parsing code from of_create_pci_host_bridge()
-an exported function that can be called by drivers that don't use
-of_create_pci_host_bridge?
-
-> Speaking of the handcoded DT parsing of resources: you are using restype == 0
-> as a way of selecting config space, *and then split the range size into two
-> halves*. From what Jason Gunthorpe and Arnd were saying, config ranges in the DT
-> tree should only be used for ECAM space, so no split is allowed.
+> But I also have problem with dma_alloc_coherent().
+> If I don't use dma_alloc_coherent(), is it OK to use below code to
+> alloc uncached memory?
 > 
-> Arnd, are you allowing this non-standard use to creep in the bindings?
+> struct page *page;
+> pgd_t *pgd;
+> pud_t *pud;
+> pmd_t *pmd;
+> pte_t *pte;
+> void *cpu_addr;
+> dma_addr_t dma_addr;
+> unsigned int vaddr;
+> 
+> cpu_addr = kmalloc(PAGE_SIZE, GFP_KERNEL);
+> dma_addr = pci_map_single(NULL, cpu_addr, PAGE_SIZE, (int)DMA_FROM_DEVICE);
+> vaddr = (unsigned int)uncached->cpu_addr;
+> pgd = pgd_offset_k(vaddr);
+> pud = pud_offset(pgd, vaddr);
+> pmd = pmd_offset(pud, vaddr);
+> pte = pte_offset_kernel(pmd, vaddr);
+> page = virt_to_page(vaddr);
+> set_pte_ext(pte, mk_pte(page,  pgprot_dmacoherent(pgprot_kernel)), 0);
+> 
+> /* This kmalloc memory won't be freed  */
+> 
 
-I fear it's too late to change that now. In retrospect we probably shoulnd't
-have defined the binding like that.
+No, that will not work. lowmem pages are mapped with 1MB sections underneath
+which cannot be (easily) changed at runtime. You really want to be using
+dma_alloc_coherent here.
 
-Overall, my impression of the patch is that it should be possible to do
-the same with much fewer #ifdefs by first rearranging the code in one patch
-and then doing another patch on top to add the generic arm64 support.
+Laura
 
-> > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> > index 6d23d8c..fac0440 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -65,14 +65,27 @@
-> >  #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
-> >  #define PCIE_ATU_UPPER_TARGET		0x91C
-> >  
-> > +#ifdef CONFIG_ARM
-> >  static struct hw_pci dw_pci;
-> > +#endif
-> >  
-> >  static unsigned long global_io_offset;
-> >  
-> > +#ifdef CONFIG_ARM
-> >  static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
-> >  {
-> >  	return sys->private_data;
-> >  }
-> > +#endif
-> > +
-> > +#ifdef CONFIG_ARM64
-> > +static inline struct pcie_port *sys_to_pcie(struct pcie_port *pp)
-> > +{
-> > +	return pp;
-> > +}
-> > +
-> > +static struct pci_ops dw_pcie_ops;
-> > +#endif
-> >  
-> >  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
-> >  {
-> > @@ -381,7 +394,9 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
-> >  {
-> >  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
-> >  	irq_set_chip_data(irq, domain->host_data);
-> > +#ifdef CONFIG_ARM
-> >  	set_irq_flags(irq, IRQF_VALID);
-> > +#endif
-> >  
-> >  	return 0;
-> >  }
-> > @@ -397,6 +412,10 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> >  	struct of_pci_range_parser parser;
-> >  	u32 val;
-> >  	int i;
-> > +#ifdef CONFIG_ARM64
-> > +	struct pci_host_bridge *bridge;
-> > +	resource_size_t lastbus;
-> > +#endif
-> >  
-> >  	if (of_pci_range_parser_init(&parser, np)) {
-> >  		dev_err(pp->dev, "missing ranges property\n");
-> > @@ -489,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> >  	val |= PORT_LOGIC_SPEED_CHANGE;
-> >  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-> >  
-> > +#ifdef CONFIG_ARM
-> >  	dw_pci.nr_controllers = 1;
-> >  	dw_pci.private_data = (void **)&pp;
-> >  
-> > @@ -497,6 +517,16 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> >  #ifdef CONFIG_PCI_DOMAINS
-> >  	dw_pci.domain++;
-> >  #endif
-> > +#endif
-> > +
-> > +#ifdef CONFIG_ARM64
-> > +	bridge = of_create_pci_host_bridge(pp->dev, &dw_pcie_ops, pp);
-> > +	if (IS_ERR_OR_NULL(bridge))
-> > +		return PTR_ERR(bridge);
-> > +
-> > +	lastbus = pci_rescan_bus(bridge->bus);
-> > +	pci_bus_update_busn_res_end(bridge->bus, lastbus);
-> > +#endif
-> >  
-> >  	return 0;
-> >  }
-> > @@ -695,6 +725,7 @@ static struct pci_ops dw_pcie_ops = {
-> >  	.write = dw_pcie_wr_conf,
-> >  };
-> >  
-> > +#ifdef CONFIG_ARM
-> >  static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
-> >  {
-> >  	struct pcie_port *pp;
-> > @@ -758,6 +789,7 @@ static struct hw_pci dw_pci = {
-> >  	.map_irq	= dw_pcie_map_irq,
-> >  	.add_bus	= dw_pcie_add_bus,
-> >  };
-> > +#endif /* CONFIG_ARM */
-> >  
-> >  void dw_pcie_setup_rc(struct pcie_port *pp)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
