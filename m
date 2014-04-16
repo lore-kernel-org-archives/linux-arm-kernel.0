@@ -1,174 +1,72 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 16 Apr 2014 10:16:10 +0200
-Subject: [PATCH] regmap: i2c: fallback to SMBus if the adapter does not
- support standard I2C
-In-Reply-To: <20140415223849.GJ12304@sirena.org.uk>
-References: <20140415223849.GJ12304@sirena.org.uk>
-Message-ID: <1397636170-664-1-git-send-email-boris.brezillon@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 16 Apr 2014 10:17:54 +0200
+Subject: [PATCH v2 0/4] ARM: mvebu: fix bus width handling in mvebu-devbus
+In-Reply-To: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <534E3CB2.3010505@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some I2C adapters are only compatible with the SMBus protocol and do not
-support standard I2C transfers.
+Hi Thomas,
 
-Fallback to SMBus transfers if we encounter such kind of adapters.
-The transfer type is chosen according to the val_bits field in the regmap
-config.
+On 14/04/2014 17:29, Thomas Petazzoni wrote:
+> Jason, Greg, Andrew, Sebastian,
+> 
+> This set of patches fix a bug in the mvebu-devbus driver, which was
+> leading to a misinterpretation of Device Tree provided value: a NOR
+> bus width declared as 8 bits in the Device Tree was in fact configured
+> as 16 bits at the hardware level.
+> 
+> This bug was not noticed until now, because it was compensated by a
+> symetric mistake in the Device Tree files.
+> 
+> This set of commits therefore fix both the driver itself, and the
+> incorrect Device Tree files. The patches for the Device Tree files
+> have been separated, because some of them should apply all the way to
+> v3.10, while some of them apply only up to v3.11.
+> 
+> Changes since v1:
+> 
+>  * Added patches to fix the Device Tree files to indicate the correct
+>    bus width, as documented in the board schematics. Noticed by
+>    Ezequiel Garcia.
+> 
+>  * Changed the bus_width conversion logic in the driver to only accept
+>    valid values: 8 bits and 16 bits. All other values lead to an error
+>    being returned. Suggested by Sebastian Hesselbarth.
+> 
+>  * Rebased on top of v3.15-rc1.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
-Hello Mark, Lars,
+Everything looks good so for the whole series:
 
-Would this patch be acceptable ?
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I'm still not convinced that we can decide which kind of protocol should
-be used based only on the adapter functionalities and the val_bytes field.
+Thanks,
 
-But doing this as a first step should work in my case (my adapter only
-supports SMBus byte transfers :-)).
+Gregory
 
-Note that this patch has not been tested yet. I'll test it and resend a
-proper version, if you agree on the implementation.
 
-Best Regards,
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (4):
+>   memory: mvebu-devbus: fix the conversion of the bus width
+>   ARM: mvebu: fix NOR bus-width in Armada XP GP Device Tree
+>   ARM: mvebu: fix NOR bus-width in Armada XP DB Device Tree
+>   ARM: mvebu: fix NOR bus-width in Armada XP OpenBlocks AX3 Device Tree
+> 
+>  arch/arm/boot/dts/armada-xp-db.dts               |  2 +-
+>  arch/arm/boot/dts/armada-xp-gp.dts               |  2 +-
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  2 +-
+>  drivers/memory/mvebu-devbus.c                    | 15 +++++++++++++--
+>  4 files changed, 16 insertions(+), 5 deletions(-)
+> 
 
-Boris
 
- drivers/base/regmap/regmap-i2c.c | 101 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 99 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
-index ebd1895..80051c5 100644
---- a/drivers/base/regmap/regmap-i2c.c
-+++ b/drivers/base/regmap/regmap-i2c.c
-@@ -14,6 +14,69 @@
- #include <linux/i2c.h>
- #include <linux/module.h>
- 
-+
-+static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
-+				      unsigned int *val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+	int ret;
-+
-+	if (reg > 0xff)
-+		return -EINVAL;
-+
-+	ret = i2c_smbus_read_byte_data(i2c, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	*val = ret;
-+
-+	return 0;
-+}
-+
-+static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
-+				       unsigned int val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+
-+	if (val > 0xff || reg > 0xff)
-+		return -EINVAL;
-+
-+	return i2c_smbus_write_byte_data(i2c, reg, val);
-+}
-+
-+static int regmap_smbus_word_reg_read(void *context, unsigned int reg,
-+				      unsigned int *val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+	int ret;
-+
-+	if (reg > 0xffff)
-+		return -EINVAL;
-+
-+	ret = i2c_smbus_read_word_data(i2c, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	*val = ret;
-+
-+	return 0;
-+}
-+
-+static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
-+				       unsigned int val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+
-+	if (val > 0xffff || reg > 0xffff)
-+		return -EINVAL;
-+
-+	return i2c_smbus_write_word_data(i2c, reg, val);
-+}
-+
- static int regmap_i2c_write(void *context, const void *data, size_t count)
- {
- 	struct device *dev = context;
-@@ -97,6 +160,28 @@ static struct regmap_bus regmap_i2c = {
- 	.read = regmap_i2c_read,
- };
- 
-+const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
-+					    struct regmap_config *config)
-+{
-+	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
-+		return &regmap_i2c;
-+	} else if (config->val_bits == 16 &&
-+		   i2c_check_functionality(i2c->adapter,
-+					   I2C_FUNC_SMBUS_WORD_DATA)) {
-+                config->reg_read = regmap_smbus_word_reg_read;
-+                config->reg_write = regmap_smbus_word_reg_write;
-+		return NULL;
-+	} else if (config->val_bits == 8 &&
-+		   i2c_check_functionality(i2c->adapter,
-+					   I2C_FUNC_SMBUS_BYTE_DATA)) {
-+                config->reg_read = regmap_smbus_byte_reg_read;
-+                config->reg_write = regmap_smbus_byte_reg_write;
-+		return NULL;
-+	}
-+
-+	return ERR_PTR(-ENOTSUPP);
-+}
-+
- /**
-  * regmap_init_i2c(): Initialise register map
-  *
-@@ -109,7 +194,13 @@ static struct regmap_bus regmap_i2c = {
- struct regmap *regmap_init_i2c(struct i2c_client *i2c,
- 			       const struct regmap_config *config)
- {
--	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-+	struct regmap_config upd_conf = *config;
-+	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, &upd_conf);
-+
-+	if (IS_ERR(bus))
-+		return ERR_PTR(PTR_ERR(bus));
-+
-+	return regmap_init(&i2c->dev, bus, &i2c->dev, &upd_conf);
- }
- EXPORT_SYMBOL_GPL(regmap_init_i2c);
- 
-@@ -126,7 +217,13 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
- struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
- 				    const struct regmap_config *config)
- {
--	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-+	struct regmap_config upd_conf = *config;
-+	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, &upd_conf);
-+
-+	if (IS_ERR(bus))
-+		return ERR_PTR(PTR_ERR(bus));
-+
-+	return devm_regmap_init(&i2c->dev, bus, &i2c->dev, &upd_conf);
- }
- EXPORT_SYMBOL_GPL(devm_regmap_init_i2c);
- 
 -- 
-1.8.3.2
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
