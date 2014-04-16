@@ -1,58 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 16 Apr 2014 11:08:03 +0200
-Subject: [RFC][PATCH 1/3] ARM: dts: vf610: Add Freescale FlexTimer Module
- timer node.
-In-Reply-To: <1397614787-8300-2-git-send-email-Li.Xiubo@freescale.com>
-References: <1397614787-8300-1-git-send-email-Li.Xiubo@freescale.com>
- <1397614787-8300-2-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <534E4873.5070308@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 16 Apr 2014 17:13:18 +0800
+Subject: [PATCH] ARM: prima2: remove L2 cache size override
+In-Reply-To: <6113510.ZYPB60x7iK@wuerfel>
+References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
+ <CAGsJ_4zt4KMLk7v93e40Zj1A7fHBnvE2_c94nAbGAr9xcCFnwg@mail.gmail.com>
+ <20140415215615.GZ24070@n2100.arm.linux.org.uk> <6113510.ZYPB60x7iK@wuerfel>
+Message-ID: <CAGsJ_4w4SNzPnDKXCY5sshpDiAi-MKP-teKQd3t=nTY9s-FeeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2014 04:19 AM, Xiubo Li wrote:
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Jingchang Lu <b35083@freescale.com>
-
-That deserves a patch description and an update of the documentation.
-
-Thanks
-   -- Daniel
-
-> ---
->   arch/arm/boot/dts/vf610.dtsi | 13 +++++++++++++
->   1 file changed, 13 insertions(+)
+2014-04-16 16:52 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 15 April 2014 22:56:15 Russell King - ARM Linux wrote:
+>> On Tue, Apr 15, 2014 at 06:13:27PM +0800, Barry Song wrote:
+>> >
+>> > ok, it seems we still need to hook this into the callback of this
+>> > specific machine instead of using a global early_initcall(). since now
+>> > the dt compatible field has been generic enough, it will cause other
+>> > platforms to execute l2x0_of_init() too.
+>>
+>> What I did for Versatile Express was to move it to the init_irq stage.
+>> I'm not condoning using init_irq() for non-IRQ stuff, but that was
+>> just to see whether it was possible (the .init_early is too early for
+>> it.)  Let me put it another way: I'm not thrilled by the idea of
+>> having it in init_irq() but that's a better location to call L2 cache
+>> initialisation than half-way through the kernel's initialisation.
 >
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index 107e2c0..c3a276f 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -153,6 +153,19 @@
->   				clock-names = "pit";
->   			};
+> Would it help to introduce a new .init_l2_cache() callback? That
+> way, the architecture code can default to initializing any l2x0
+> that it finds in DT, and have give platforms the option of
+> overriding the call if they need to, and we can do it at the
+> same point during early boot for everyone.
 >
-> +			ftm0: ftm at 40038000 {
-> +				compatible = "fsl,vf610-ftm-timer";
-> +				reg = <0x40038000 0x2000>;
-> +				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
-> +				clock-names = "ftm0", "ftm1",
-> +					"ftm0_counter_en", "ftm1_counter_en";
-> +				clocks = <&clks VF610_CLK_FTM0>,
-> +					<&clks VF610_CLK_FTM1>,
-> +					<&clks VF610_CLK_FTM0_EXT_FIX_EN>,
-> +					<&clks VF610_CLK_FTM1_EXT_FIX_EN>;
-> +				status = "disabled";
-> +			};
-> +
->   			wdog at 4003e000 {
->   				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
->   				reg = <0x4003e000 0x1000>;
+> A number of platforms currently have the same
 >
+> static void __init this_platform_init(void)
+> {
+>       l2x0_of_init(0, ~0UL);
+>       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> }
+>
+> Where the second line is already the default for .init_machine,
+> and it would be nice to get rid of the callback entirely, especially
+> for the machines that don't do anything else in their platform
+> code.
 
+it seems you mean put a general customize_l2x0_init() like customize_machine().
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+what is the reason stopping l2x0 from becoming a standalone driver
+which can initialize itself?
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>
+>         Arnd
+
+-barry
