@@ -1,142 +1,156 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 16 Apr 2014 15:16:54 +0200
-Subject: [PATCH v3 3/4] USB: ohci-pxa27x: Add support for external vbus
- regulators
+Date: Wed, 16 Apr 2014 15:16:55 +0200
+Subject: [PATCH v3 4/4] ARM: pxa: zeus: Replace OHCI init/exit functions with
+ a regulator
 In-Reply-To: <1397654215-23699-1-git-send-email-laurent.pinchart@ideasonboard.com>
 References: <1397654215-23699-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1397654215-23699-4-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1397654215-23699-5-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Override the hub control operation to enable and disable external
-regulators for the ports vbus power supply in response to clear/set
-USB_PORT_FEAT_POWER requests.
-
 Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/usb/host/ohci-pxa27x.c | 67 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+ arch/arm/mach-pxa/zeus.c | 89 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 48 insertions(+), 41 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-pxa27x.c b/drivers/usb/host/ohci-pxa27x.c
-index d21d5fe..0c31265 100644
---- a/drivers/usb/host/ohci-pxa27x.c
-+++ b/drivers/usb/host/ohci-pxa27x.c
-@@ -30,6 +30,7 @@
- #include <linux/platform_data/usb-ohci-pxa27x.h>
- #include <linux/platform_data/usb-pxa3xx-ulpi.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/signal.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
-@@ -120,6 +121,8 @@ static struct hc_driver __read_mostly ohci_pxa27x_hc_driver;
- struct pxa27x_ohci {
- 	struct clk	*clk;
- 	void __iomem	*mmio_base;
-+	struct regulator *vbus[3];
-+	bool		vbus_enabled[3];
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index b19d1c3..205f9bf 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -413,7 +413,7 @@ static struct fixed_voltage_config can_regulator_pdata = {
+ 
+ static struct platform_device can_regulator_device = {
+ 	.name	= "reg-fixed-volage",
+-	.id	= -1,
++	.id	= 0,
+ 	.dev	= {
+ 		.platform_data	= &can_regulator_pdata,
+ 	},
+@@ -510,18 +510,6 @@ struct platform_device zeus_max6369_device = {
+ 	.num_resources	= 1,
  };
  
- #define to_pxa27x_ohci(hcd)	(struct pxa27x_ohci *)(hcd_to_ohci(hcd)->priv)
-@@ -166,6 +169,52 @@ static int pxa27x_ohci_select_pmm(struct pxa27x_ohci *pxa_ohci, int mode)
- 	return 0;
- }
+-static struct platform_device *zeus_devices[] __initdata = {
+-	&zeus_serial_device,
+-	&zeus_mtd_devices[0],
+-	&zeus_dm9k0_device,
+-	&zeus_dm9k1_device,
+-	&zeus_sram_device,
+-	&zeus_leds_device,
+-	&zeus_pcmcia_device,
+-	&zeus_max6369_device,
+-	&can_regulator_device,
+-};
+-
+ /* AC'97 */
+ static pxa2xx_audio_ops_t zeus_ac97_info = {
+ 	.reset_gpio = 95,
+@@ -532,44 +520,50 @@ static pxa2xx_audio_ops_t zeus_ac97_info = {
+  * USB host
+  */
  
-+static int pxa27x_ohci_set_vbus_power(struct pxa27x_ohci *pxa_ohci,
-+				      unsigned int port, bool enable)
+-static int zeus_ohci_init(struct device *dev)
+-{
+-	int err;
+-
+-	/* Switch on port 2. */
+-	if ((err = gpio_request(ZEUS_USB2_PWREN_GPIO, "USB2_PWREN"))) {
+-		dev_err(dev, "Can't request USB2_PWREN\n");
+-		return err;
+-	}
+-
+-	if ((err = gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 1))) {
+-		gpio_free(ZEUS_USB2_PWREN_GPIO);
+-		dev_err(dev, "Can't enable USB2_PWREN\n");
+-		return err;
+-	}
++static struct regulator_consumer_supply zeus_ohci_regulator_supplies[] = {
++	REGULATOR_SUPPLY("vbus2", "pxa27x-ohci"),
++};
+ 
+-	/* Port 2 is shared between host and client interface. */
+-	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
++static struct regulator_init_data zeus_ohci_regulator_data = {
++	.constraints = {
++		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(zeus_ohci_regulator_supplies),
++	.consumer_supplies	= zeus_ohci_regulator_supplies,
++};
+ 
+-	return 0;
+-}
++static struct fixed_voltage_config zeus_ohci_regulator_config = {
++	.supply_name		= "vbus2",
++	.microvolts		= 5000000, /* 5.0V */
++	.gpio			= ZEUS_USB2_PWREN_GPIO,
++	.enable_high		= 1,
++	.startup_delay		= 0,
++	.init_data		= &zeus_ohci_regulator_data,
++};
+ 
+-static void zeus_ohci_exit(struct device *dev)
+-{
+-	/* Power-off port 2 */
+-	gpio_direction_output(ZEUS_USB2_PWREN_GPIO, 0);
+-	gpio_free(ZEUS_USB2_PWREN_GPIO);
+-}
++static struct platform_device zeus_ohci_regulator_device = {
++	.name		= "reg-fixed-voltage",
++	.id		= 1,
++	.dev = {
++		.platform_data = &zeus_ohci_regulator_config,
++	},
++};
+ 
+ static struct pxaohci_platform_data zeus_ohci_platform_data = {
+ 	.port_mode	= PMM_NPS_MODE,
+ 	/* Clear Power Control Polarity Low and set Power Sense
+ 	 * Polarity Low. Supply power to USB ports. */
+ 	.flags		= ENABLE_PORT_ALL | POWER_SENSE_LOW,
+-	.init		= zeus_ohci_init,
+-	.exit		= zeus_ohci_exit,
+ };
+ 
++static void zeus_register_ohci(void)
 +{
-+	struct regulator *vbus = pxa_ohci->vbus[port];
-+	int ret = 0;
++	/* Port 2 is shared between host and client interface. */
++	UP2OCR = UP2OCR_HXOE | UP2OCR_HXS | UP2OCR_DMPDE | UP2OCR_DPPDE;
 +
-+	if (IS_ERR_OR_NULL(vbus))
-+		return 0;
-+
-+	if (enable && !pxa_ohci->vbus_enabled[port])
-+		ret = regulator_enable(vbus);
-+	else if (!enable && pxa_ohci->vbus_enabled[port])
-+		ret = regulator_disable(vbus);
-+
-+	if (ret < 0)
-+		return ret;
-+
-+	pxa_ohci->vbus_enabled[port] = enable;
-+
-+	return 0;
++	pxa_set_ohci_info(&zeus_ohci_platform_data);
 +}
 +
-+static int pxa27x_ohci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
-+				   u16 wIndex, char *buf, u16 wLength)
-+{
-+	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
-+	int ret;
-+
-+	switch (typeReq) {
-+	case SetPortFeature:
-+	case ClearPortFeature:
-+		if (!wIndex || wIndex > 3)
-+			return -EPIPE;
-+
-+		if (wValue != USB_PORT_FEAT_POWER)
-+			break;
-+
-+		ret = pxa27x_ohci_set_vbus_power(pxa_ohci, wIndex - 1,
-+						 typeReq == SetPortFeature);
-+		if (ret)
-+			return ret;
-+		break;
-+	}
-+
-+	return ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
-+}
- /*-------------------------------------------------------------------------*/
+ /*
+  * Flat Panel
+  */
+@@ -677,6 +671,19 @@ static struct pxa2xx_udc_mach_info zeus_udc_info = {
+ 	.udc_command = zeus_udc_command,
+ };
  
- static inline void pxa27x_setup_hc(struct pxa27x_ohci *pxa_ohci,
-@@ -372,6 +421,7 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- 	struct ohci_hcd *ohci;
- 	struct resource *r;
- 	struct clk *usb_clk;
-+	unsigned int i;
- 
- 	retval = ohci_pxa_of_init(pdev);
- 	if (retval)
-@@ -417,6 +467,16 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- 	pxa_ohci->clk = usb_clk;
- 	pxa_ohci->mmio_base = (void __iomem *)hcd->regs;
- 
-+	for (i = 0; i < 3; ++i) {
-+		char name[6];
++static struct platform_device *zeus_devices[] __initdata = {
++	&zeus_serial_device,
++	&zeus_mtd_devices[0],
++	&zeus_dm9k0_device,
++	&zeus_dm9k1_device,
++	&zeus_sram_device,
++	&zeus_leds_device,
++	&zeus_pcmcia_device,
++	&zeus_max6369_device,
++	&can_regulator_device,
++	&zeus_ohci_regulator_device,
++};
 +
-+		if (!(inf->flags & (ENABLE_PORT1 << i)))
-+			continue;
-+
-+		sprintf(name, "vbus%u", i + 1);
-+		pxa_ohci->vbus[i] = devm_regulator_get(&pdev->dev, name);
-+	}
-+
- 	retval = pxa27x_start_hc(pxa_ohci, &pdev->dev);
- 	if (retval < 0) {
- 		pr_debug("pxa27x_start_hc failed");
-@@ -462,6 +522,10 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver, struct platform_device
- void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *pdev)
+ #ifdef CONFIG_PM
+ static void zeus_power_off(void)
  {
- 	struct pxa27x_ohci *pxa_ohci = to_pxa27x_ohci(hcd);
-+	unsigned int i;
-+
-+	for (i = 0; i < 3; ++i)
-+		pxa27x_ohci_set_vbus_power(pxa_ohci, i, false);
+@@ -847,7 +854,7 @@ static void __init zeus_init(void)
  
- 	usb_remove_hcd(hcd);
- 	pxa27x_stop_hc(pxa_ohci, &pdev->dev);
-@@ -563,7 +627,10 @@ static int __init ohci_pxa27x_init(void)
- 		return -ENODEV;
+ 	platform_add_devices(zeus_devices, ARRAY_SIZE(zeus_devices));
  
- 	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+
- 	ohci_init_driver(&ohci_pxa27x_hc_driver, &pxa27x_overrides);
-+	ohci_pxa27x_hc_driver.hub_control = pxa27x_ohci_hub_control;
-+
- 	return platform_driver_register(&ohci_hcd_pxa27x_driver);
- }
- module_init(ohci_pxa27x_init);
+-	pxa_set_ohci_info(&zeus_ohci_platform_data);
++	zeus_register_ohci();
+ 
+ 	if (zeus_setup_fb_gpios())
+ 		pr_err("Failed to setup fb gpios\n");
 -- 
 1.8.3.2
