@@ -1,213 +1,82 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 16 Apr 2014 20:19:16 +0530
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <534E892B.6090409@samsung.com>
+Date: Wed, 16 Apr 2014 20:12:39 +0530
+Subject: [PATCH V4 5/5] usb-phy: samsung-usb3: Remove older
+ phy-samsung-usb3 driver
+In-Reply-To: <CACQ1gAgbiQJmpJDebeKSRGKhDjOcmOAdt8L3CmNAO=h5i7yV1A@mail.gmail.com>
 References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
- <534529B2.2020107@samsung.com>
- <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
- <53454C11.7060607@samsung.com>
- <CAFp+6iHU0YXj18ajDwOqPh_SJWr6GkMPRr6qaGdmPoCc0+tz5g@mail.gmail.com>
- <CAFp+6iH7-O8pNNMrk7Yhg1u+DXcXD1Tp9RYdiFg+-Om5Toojfw@mail.gmail.com>
- <534E892B.6090409@samsung.com>
-Message-ID: <CAFp+6iGYfz+ZT9zxgeVefLhtb0mb-=K4faUZC+1FtQoO0hMoqw@mail.gmail.com>
+ <1396967803-28868-6-git-send-email-gautam.vivek@samsung.com>
+ <53452B59.8030901@samsung.com>
+ <CAFp+6iGQMS5_YAimBRdV-P2h3LczQEHMq_cXGrOtHJSZqM7UfQ@mail.gmail.com>
+ <CACQ1gAgbiQJmpJDebeKSRGKhDjOcmOAdt8L3CmNAO=h5i7yV1A@mail.gmail.com>
+Message-ID: <CAFp+6iEyyfQprhNO5wt_f53QcXCriL_rvTtJBxsFZ0BON=fiFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Richard,
 
 
-On Wed, Apr 16, 2014 at 7:14 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+On Wed, Apr 16, 2014 at 7:03 PM, Richard Genoud
+<richard.genoud@gmail.com> wrote:
 > Hi Vivek,
 >
->
-> On 15.04.2014 08:09, Vivek Gautam wrote:
->>
+> 2014-04-09 13:34 GMT+02:00 Vivek Gautam <gautam.vivek@samsung.com>:
 >> Hi Tomasz,
+>> '
 >>
+>> On Wed, Apr 9, 2014 at 4:43 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>>> Hi Vivek,
+>>>
+>> Thanks for reviewing the patch series.
 >>
->> On Thu, Apr 10, 2014 at 5:09 PM, Vivek Gautam <gautamvivek1987@gmail.com>
->> wrote:
 >>>
->>> On Wed, Apr 9, 2014 at 7:03 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>>> On 08.04.2014 16:36, Vivek Gautam wrote:
 >>>>
->>>> On 09.04.2014 13:49, Vivek Gautam wrote:
->>>>>
->>>>>
->>>>> Hi,
->>>>>
->>>>>
->>>>> On Wed, Apr 9, 2014 at 4:36 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->>>>>>
->>>>>>
->>>>>> Hi Vivek,
->>>>>>
->>>>>> Please see my comments inline.
->>>>>>
->>>>>>
->>>>>> On 08.04.2014 16:36, Vivek Gautam wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Add a new driver for the USB 3.0 PHY on Exynos5 series of SoCs.
->>>>>>> The new driver uses the generic PHY framework and will interact
->>>>>>> with DWC3 controller present on Exynos5 series of SoCs.
->>>>>>> Thereby, removing old phy-samsung-usb3 driver and related code
->>>>>>> used untill now which was based on usb/phy framework.
->>>>>>>
->>>>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>>>>>> ---
->>>>>>>     .../devicetree/bindings/phy/samsung-phy.txt        |   42 ++
->>>>>>>     drivers/phy/Kconfig                                |   11 +
->>>>>>>     drivers/phy/Makefile                               |    1 +
->>>>>>>     drivers/phy/phy-exynos5-usbdrd.c                   |  668
->>>>>>> ++++++++++++++++++++
->>>>>>>     4 files changed, 722 insertions(+)
->>>>>>>     create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> [snip]
->>>>>>
->>>>>>
->>>>>>> +       Additional clock required for Exynos5420:
->>>>>>> +       - usb30_sclk_100m: Additional special clock used for PHY
->>>>>>> operation
->>>>>>> +                          depicted as 'sclk_usbphy30' in CMU of
->>>>>>> Exynos5420.
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> Are you sure this isn't simply a gate for the ref clock, as it can be
->>>>>> found
->>>>>> on another SoC that is not upstream yet? I don't have documentation
->>>>>> for
->>>>>> Exynos 5420 so I can't tell, but I'd like to ask you to recheck this.
->>>>>
->>>>>
->>>>>
->>>>>>  From what i can see in the manual :
->>>>>
->>>>>
->>>>> sclk_usbphy30 is derived from OSCCLK.
->>>>> It is coming from a MUX (default input line to this is OSCCLK)  and
->>>>> then through a DIV
->>>>> there's this gate.
->>>>>
->>>>>         {OSCCLK  + other sources} --->[MUX] ---> [DIV] --> [GATE for
->>>>> sclk_usbphy30]
->>>>>
->>>>> the {rate of sclk_usbphy30} == OSCCLK
->>>>>
->>>>> However the 'ref' clock that we have been using is the actual
->>>>> oscillator
->>>>> clock.
->>>>> And on SoC Exynos5250, we don't have any such gate (sclk_usbphy30).
->>>>> So should this mean that ref clock and sclk_usbphy30 are still be
->>>>> controlled by
->>>>> two different gates ?
->>>>>
+>>>> Removing this older USB 3.0 DRD controller PHY driver, since
+>>>> a new driver based on generic phy framework is now available.
 >>>>
->>>> Is there maybe a diagram of PHY input clocks in the datasheet, like for
->>>> USB
->>>> 2.0 PHY in Exynos4210/4412/5250 datasheets in the chapter about USB2.0
->>>> Device? Something like:
+>>>> Also removing the dt node for older driver from Exynos5250
+>>>> device tree and updating the dt node for DWC3 controller.
 >>>>
->>>>                       ____________________________________
->>>>                      |                                    |
->>>>                      |                         ___________|
->>>> XusbXTI             |   Phy_fsel[2:0]        |  _______  |
->>>>     _______[X]_______|    |         __________|_|___|\__|_|
->>>>    |                 |   _v___     |  _____   ^ |   |/  | |
->>>> _____               |  |     |    | |     |  | |  ___  | |
->>>>   ___                |  |     |    | |     |  | | |   |_|_|
->>>> |___|               |  | X 0 |____|_| PLL |__|_|_|CLK|_|_|
->>>> _____               |  |     |      |     |    | |DIV|_|_|
->>>>    |_______[X]       |  |_____| 12   |_____|480 | |___| | |
->>>>                      |          MHz         MHz |Digital| |
->>>> XusbXTO             |   USB PHY                |_______| |
->>>>                      |____________________________________|
+>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>>> ---
 >>>>
+>>>> NOTE: This patch should be merged only when the new USB 3.0
+>>>> DRD phy controller driver is available in the tree from the
+>>>> patches:
+>>>>         phy: Add new Exynos5 USB 3.0 PHY driver; and
+>>>>         dt: exynos5250: Enable support for generic USB DRD phy
 >>>>
+>>>>   arch/arm/boot/dts/exynos5250.dtsi  |   17 +-
+>>>>   drivers/usb/phy/phy-samsung-usb.h  |   83 ---------
+>>>>   drivers/usb/phy/phy-samsung-usb3.c |  350
+>>>> ------------------------------------
+>>>>   3 files changed, 2 insertions(+), 448 deletions(-)
+>>>>   delete mode 100644 drivers/usb/phy/phy-samsung-usb3.c
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+>>>> b/arch/arm/boot/dts/exynos5250.dtsi
+>>>> index 92c6fcd..1cb1e91 100644
+>>>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
 >>>
->>> Below is the block diagram given for DRD controller.
 >>>
->>> ___________________
->>> |                                |
->>> |      ____________     |
->>> |      | PHY           |      |
->>> |      | controller
->>> |-----|-----------------------------------------------
->>> |      |__________  |     |
->>> |
->>> |                                |
->>>            |
->>> |         USB 3.0           |
->>> V
->>> |           DRD              |
->>> -----------------------
->>> |        Controller          |                                      |
->>>                       |
->>> |                                |    USB30_SCLK_100M    | USB 3.0 DRD  |
->>> |      ----------------          |           ----------------------->
->>> |       PHY         |
->>> |     | Link cont. |         |                                      |
->>>                       |
->>> |      -------------             |
->>>   |                       |
->>> |___________________|                                     |_____________|
->>>
->>> Does this help ?
->>>
->>> So, USB30_SCLK_100M is the SCLK that we are talking in the driver. I
->>> don't see any reference to XXTI in the USB 3.0 DRD controller chapter
->>> (in both Exynos5250 and 5420)
->>> In addition to this there's one more point to be noticed here.
->>> On Exynos5420 system, the sclk_usbphy300 (which is the sclk_usbphy30
->>> for USB DRD channel 0), is also the PICO phy clock, i.e. USB 2.0 phy
->>> clock.
->>> So we should add a similar clk_get() for this clock in the
->>> phy-exynos5250-usb2 driver too, to support Exynos5420.
+>>> IMHO driver and dts changes should be separated into two patches, first
+>>> updating device tree to use the new driver and second removing the driver.
 >>
+>> Sure will separate the patch into driver and dts change.
 >>
->> Is something clear from the above block diagram ? (although the
->> diagram looks weird - space and tabs problem :-(  )
->> Basically there's the clock USB30_SCLK_100M which is going into the
->> USB 3.0 DRD PHY controller.
->> And this is the only sclk mentioned in the block diagram for USB 3.0
->> DRD controller in Exynos5420.
->> Same is not there in the block diagram in Exynos5250 UM.
->
->
-> From what I can see in the documentation, there are 4 USB 3.0 related clocks
-> generated in CMU:
->
->  - sclk_usbphy300,
->  - sclk_usbphy301,
->  - sclk_usbdrd300,
->  - sclk_usbdrd301,
->
-> They are all rated to max. 24 MHz and the recommended operating frequency is
-> 24 MHz, so it looks exactly like USB PHY reference, which is usually a 24
-> MHz clock.
->
-> To me, this looks like on Exynos5420 a separate special clock path is used
-> instead of xusbxti as reference of USB 3.0 PHY and so the sclk should be
-> simply passed as the "ref" clock.
+>>>
+>>> After fixing this issue,
+>>>
+>>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>>>
+> I guess you should also remove phy-samsung-usb3.c references in the
+> Makefile, Kconfig and exynos_defconfig
 
-Ok, i will clear on this with the hardware engineer also once.
-May be Jingoo can help me with this.
+You are correct. In fact i identified this issue once i submitted the patch :-(
 
-Jingoo,
-Can you please enquire about the clock path of usbphy30 reference
-clocks on Exynos5420.
-As mentioned by Tomasz above, we have sclk_usbphy300 and
-sclk_usbphy301 as the reference clocks for USB3.0 DRD phy. *Also*
-sclk_usbphy300 is used for Pico phy (which is the USb 2.0 phy used by
-ehci/ohci controller on Exynos5420).
-It will be of great help.
+I have amended the things in my next series which i will be posting soon.
+
 
 
 Thanks
