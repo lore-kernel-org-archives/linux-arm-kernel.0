@@ -1,44 +1,62 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 16 Apr 2014 11:00:31 -0400 (EDT)
-Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
-In-Reply-To: <20140416145107.GA11039@redhat.com>
-References: <1397626297-23873-1-git-send-email-victor.kamensky@linaro.org>
- <1397626297-23873-2-git-send-email-victor.kamensky@linaro.org>
- <20140416145107.GA11039@redhat.com>
-Message-ID: <20140416.110031.1269128188581361698.davem@davemloft.net>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 16 Apr 2014 11:01:52 -0400 (EDT)
+Subject: [PATCH v3 0/4] Allow OHCI/EHCI drivers to override more hub
+ operations
+In-Reply-To: <1397654215-23699-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <Pine.LNX.4.44L0.1404161101090.1334-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleg Nesterov <oleg@redhat.com>
-Date: Wed, 16 Apr 2014 16:51:07 +0200
+On Wed, 16 Apr 2014, Laurent Pinchart wrote:
 
-> On 04/15, Victor Kamensky wrote:
->>
->> --- a/kernel/events/uprobes.c
->> +++ b/kernel/events/uprobes.c
->> @@ -1149,7 +1149,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
->>  	}
->>
->>  	ret = install_special_mapping(mm, area->vaddr, PAGE_SIZE,
->> -				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO, &area->page);
->> +				VM_EXEC|VM_MAYEXEC|VM_DONTCOPY|VM_IO|VM_WRITE, &area->page);
+> Hello,
 > 
-> Yes, this is nasty.
+> The PXA27x OHCI implementation doesn't perform automatic control of port power
+> supplies for all ports. While the PPS and LSDA bits of the HcRhPortStatus
+> register are implemented, only a subset of ports have an external power enable
+> pin controlled by the port status register. Other ports need their power supply
+> to be controlled manually.
 > 
-> I would like to have a reason to nack this change ;) Unfortunately the current
-> code is buggy too and we need to protect the kernel from malicious applications
-> which can rewrite the insn we are going to step over in UTASK_SSTEP state anyway.
+> In order to do so I've implemented manual regulator control in the ohci-pxa27x
+> driver. This requires overriding the default behaviour of the CLEAR_FEATURE
+> and SET_FEATURE requests for USB_PORT_FEAT_POWER with a custom hub control
+> operation. In turn this requires calling the currently static ohci_hub_control
+> function from the ohci-pxa27x driver.
+> 
+> The ohci-at91 and ohci-s3c2410 drivers already implement a similar feature,
+> and access the ohci_hub_control and ohci_hub_status_data functions by saving
+> the struct hc_driver hub_control and hub_status_data values to a variables
+> right after calling ohci_init_driver. This vtable-like implementation can be
+> optimized by exporting the ohci_hub_control and ohci_hub_status_data functions
+> and calling them directly. As the ohci-pxa27x driver needs to override hub
+> control operations as well I've decided to export the functions.
+> 
+> For the sake of completeness I've also exported the ehci_hub_control function
+> and modified the ehci-tegra driver to call it directly.
+> 
+> As a side note regarding the ohci-at91 driver, the "atmel,vbus-gpio" DT
+> property should really have referenced a regulator instead of a GPIO. Fixing
+> this in a backward-compatible way would be messy :-(
+> 
+> Please note that I haven't been able to test the third and fourth patches due
+> to lack of hardware. I've however tested a similar implementation for OHCI on
+> an out of tree PXA270 board.
+> 
+> Changes compared to v2:
+> 
+> - Export ohci_hub_status_data()
+> - Call ohci_hub_status_data() directly from ohci-at91 and ohci-s3c2410
+> 
+> Changes compared to v1:
+> 
+> - Export ehci_hub_control()
+> - Call ehci_hub_control() directly from ehci-tegra
+> - Call ohci_hub_control() directly from ohci-at91
 
-I think there may be a way to achieve your objectives.
+For patches 1 and 2:
 
-Pass MAP_SHARED into the flags argument of get_unmapped_area(), and
-pass the pfn of the xol page in as "pgoff".
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
-This will make the xol page get mapped into the user process at an
-address which is "D-cache congruent" to the kernel side mapping.
+Comments on patch 3 sent separately.
 
-So all kernel stores to the page will use the same D-cache line that
-user space accesses to it will.
-
-So we end up with all of the benefits of storing directly to
-userspace, along with what you're trying to achieve.
+Alan Stern
