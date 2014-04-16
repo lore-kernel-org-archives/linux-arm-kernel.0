@@ -1,90 +1,67 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 16 Apr 2014 17:22:24 +0900
-Subject: [PATCHv2 8/8] ARM: dts: Add device tree sources for Exynos3250
-In-Reply-To: <534CFAD7.4030508@arm.com>
-References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
- <1397527192-21988-9-git-send-email-cw00.choi@samsung.com>
- <534CEAB7.6020600@arm.com> <534CED76.9010302@samsung.com>
- <534CF847.5040008@arm.com> <534CF9B4.306@samsung.com>
- <534CFAD7.4030508@arm.com>
-Message-ID: <534E3DC0.40502@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 16 Apr 2014 16:24:34 +0800
+Subject: [PATCH] ARM: prima2: remove L2 cache size override
+In-Reply-To: <20140415215615.GZ24070@n2100.arm.linux.org.uk>
+References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
+ <20140415100002.GQ24070@n2100.arm.linux.org.uk>
+ <CAGsJ_4zt4KMLk7v93e40Zj1A7fHBnvE2_c94nAbGAr9xcCFnwg@mail.gmail.com>
+ <20140415215615.GZ24070@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4zKz=O8FAkuTj8uw=J840qpCb5FWq_sarJBfMHZvz1-sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 04/15/2014 06:24 PM, Marc Zyngier wrote:
-> On 15/04/14 10:19, Chanwoo Choi wrote:
->> On 04/15/2014 06:13 PM, Marc Zyngier wrote:
->>> On 15/04/14 09:27, Chanwoo Choi wrote:
->>>> Hi,
->>>>
->>>> On 04/15/2014 05:15 PM, Marc Zyngier wrote:
->>>>> On 15/04/14 02:59, Chanwoo Choi wrote:
->>>>>> From: Tomasz Figa <t.figa@samsung.com>
->>>>>>
->>>>>> This patch add new exynos3250.dtsi to support Exynos3250 SoC based on Cortex-A7
->>>>>> dual core and includes following dt nodes:
->>>>>>
->>>>>> - GIC interrupt controller
->>>>>> - Pinctrl to control GPIOs
->>>>>> - Clock controller
->>>>>> - CPU information (Cortex-A7 dual core)
->>>>>> - UART to support serial port
->>>>>> - MCT (Multi Core Timer)
->>>>>> - ADC (Analog Digital Converter)
->>>>>> - I2C/SPI bus
->>>>>> - Power domain
->>>>>> - PMU (Performance Monitoring Unit)
->>>>>> - MSHC (Mobile Storage Host Controller)
->>>>>> - PWM (Pluse Width Modulation)
->>>>>> - AMBA bus
->>>>>
->>>>> [...]
->>>>>
->>>>> Where is the arch timer node?
->>>>
->>>> Exynos3250 uses MCT (Multi Core Timer) instead of ARM_ARCH_TIMER.
->>>> - in drivers/clocksource/exynos_mct.c
->>>
->>> Don't you have a Cortex-A7? If so, you have the arch timer.
+2014-04-16 5:56 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Apr 15, 2014 at 06:13:27PM +0800, Barry Song wrote:
+>> 2014-04-15 18:00 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>> > On Tue, Apr 15, 2014 at 05:49:02PM +0800, Barry Song wrote:
+>> >> From: Barry Song <Baohua.Song@csr.com>
+>> >>
+>> >> L2 cache size has been read by l2x0_init(), it is useless to set
+>> >> WAY_SIZE and ASSOCIATIVITY in prima2.
+>> >>
+>> >> Cc: Russell King <linux@arm.linux.org.uk>
+>> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> >> ---
+>> >>  -Derived from Russell's "ARM: l2c: prima2: remove cache size override"
+>> >
+>> > You're a SMP architecture... it would be much better to initialise the
+>> > L2 cache before the secondary CPUs are brought online.
 >>
->> Do you means that 'arch timer" is ARM_ARCH_TIMER?
-> 
-> Yes.
-> 
->> As I knew, ARM_ARCH_TIMER is clocksource driver for system timer.
->> But, Exynos SoC used MCT clocksource for system timer.
+>> ok, it seems we still need to hook this into the callback of this
+>> specific machine instead of using a global early_initcall(). since now
+>> the dt compatible field has been generic enough, it will cause other
+>> platforms to execute l2x0_of_init() too.
+>
+> What I did for Versatile Express was to move it to the init_irq stage.
+> I'm not condoning using init_irq() for non-IRQ stuff, but that was
+> just to see whether it was possible (the .init_early is too early for
+> it.)  Let me put it another way: I'm not thrilled by the idea of
+> having it in init_irq() but that's a better location to call L2 cache
+> initialisation than half-way through the kernel's initialisation.
+
+i would like to believe you are right since you have dug into the
+callbacks and finally thinks init_irq() is the suitable stage for it
+even though it looks misnamed.
+
+>
+>> > In any case, across the board, it's preferable that the L2 cache is
+>> > enabled before the delay loop calibration as it can have an effect on
+>> > the calibrated value.
 >>
->> Exynos dts file didn't include arch timer node but only include mct node.
-> 
-> Well, it is a bug, and a recurrent one. A Cortex-A7 has the arch timers
-> implemented. Always.
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0464f/BABFEBJJ.html
-> 
-> All Cortex-A7 have it, and so do A12, A15, A17, A53, A57.
+>> what if the real case is that l2x0 has been enabled in bootloader?
+>
+> If the L2 cache has already been enabled, l2x0_of_init() handles it -
+> in that situation, we can't re-do the enable (because writing to the
+> aux ctrl register is not allowed) so we merely setup the outer cache
+> function pointers and don't try to do any configuration or enabling.
 
-I tested 'arch_timer'(drivers/clocksource/arm_arch_timer.c) on Exynos3250 based on Cortex-A7.
+yes. i meant if that has been done in bootloader, it turns out we
+don't care about which callback is better any more. and for linux
+running in non-security, same.
 
-To test arch timer, I used the clocksource of arch_timer for timekeeping instead of clocksource
-of Exynos MCT. But, I faced with issue. The following function return only same value(zero)
-as following kernel log:
-- arch_counter_get_cntvct() in arch/arm/include/asm/arch_timer.h
+>
+> --
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
 
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Initializing cgroup subsys cpuset
-[    0.000000] Initializing cgroup subsys cpu
-[    0.000000] Initializing cgroup subsys cpuacct
-[    0.000000] Linux version 3.15.0-rc1-00020-gf452826-dirty ...
-[    0.000000] CPU: ARMv7 Processor ...
-...
-[    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
-[    0.000000] sched_clock: 56 bits at 24MHz, resolution 41ns, wraps every 2863311519744ns
-...
-
-Could you give me a solution to resolve this issue or a expected cause?
-
-Best Regards,
-Chanwoo Choi
+- barry
