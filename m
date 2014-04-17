@@ -1,54 +1,61 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 17 Apr 2014 09:35:34 +0200
-Subject: [PATCH 9/10] ARM: dts: tx28: restructure and update DTS file
-In-Reply-To: <534F7710.8050801@de.bosch.com>
-References: <1375281480-25775-1-git-send-email-LW@KARO-electronics.de>
- <1375281480-25775-9-git-send-email-LW@KARO-electronics.de>
- <534F7710.8050801@de.bosch.com>
-Message-ID: <20140417093534.5a513b05@ipc1.ka-ro>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 17 Apr 2014 09:36:50 +0200
+Subject: [PATCH] clocksource: efm32: let CLKSRC_EFM32 select CLKSRC_OF
+In-Reply-To: <20140416193036.GS5969@pengutronix.de>
+References: <CAL_JsqKXYOdpCkixBLg8kAXwpkaLHhckJnTkzdNVeOQDYzxK3w@mail.gmail.com>
+ <1397673612-24247-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAL_Jsq+Wm-jxeZoYXpC+W3Was5WTS2UqLJ__N5uPB43ZHUmrLw@mail.gmail.com>
+ <20140416193036.GS5969@pengutronix.de>
+Message-ID: <534F8492.3070206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/16/2014 09:30 PM, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Wed, Apr 16, 2014 at 01:51:17PM -0500, Rob Herring wrote:
+>> On Wed, Apr 16, 2014 at 1:40 PM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>>> The efm32 timer driver is only usable with CLKSRC_OF, so it makes sense
+>>> to let its Kconfig symbol select it. For compile coverage testing it's not
+>>> needed though, so only select it if ARCH_EFM32 is enabled.
+>>>
+>>> This allows to drop ARCH_EFM32 selecting CLKSRC_OF which is done here
+>>> for simplicity, too.
+>>>
+>>> Reported-by: Rob Herring <robherring2@gmail.com>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>> ---
+>>> [...]
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -80,6 +80,7 @@ config CLKSRC_EFM32
+>>>          bool "Clocksource for Energy Micro's EFM32 SoCs" if !ARCH_EFM32
+>>>          depends on OF && ARM && (ARCH_EFM32 || COMPILE_TEST)
+>>>          select CLKSRC_MMIO
+>>> +       select CLKSRC_OF if ARCH_EFM32
+>>
+>> You already depend on OF, so I believe you don't need the if here.
+> Rob and I discussed this shortly on irc, the summary is that the if is
+> not needed to prevent Kconfig breakage but adds more flexibility for the
+> COMPILE_TEST case. In the end Rob said:
+>
+> 	1397676012 < robher> you can add my ack.
+>
+> which would be:
+>
+> Acked-by: Rob Herring <robherring2@gmail.com>
 
-Dirk Behme wrote:
-> On 31.07.2013 16:37, Lothar Wa?mann wrote:
-> >
-> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> > ---
-> ...
-> > +&lcdif {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&lcdif_24bit_pins_a &lcdif_sync_pins_a &lcdif_ctrl_pins_a>;
-> > +       lcd-supply = <&reg_lcd>;
-> > +       display = <&display>;
-> > +       status = "okay";
-> > +
-> > +       display: display at 0 {
-> > +               bits-per-pixel = <32>;
-> > +               bus-width = <24>;
-> > +
-> > +               display-timings {
-> > +                       native-mode = <&timing5>;
-> > +                       timing0: timing0 {
-> > +                               panel-name = "VGA";
-> ...
-> 
-> I've been looking for any user or documentation of 'panel-name'. But 
-> couldn't find anything. Anything I missed?
-> 
-Our U-Boot uses this to find the active video setting according to an
-environment variable setting.
+Hi Rob,
+
+shall I use the mail address above or robh at kernel.org ?
 
 
-Lothar Wa?mann
+
 -- 
-___________________________________________________________
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
