@@ -1,40 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Apr 2014 21:16:45 +0100
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
- <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
-Message-ID: <20140417201645.GU24070@n2100.arm.linux.org.uk>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Thu, 17 Apr 2014 13:14:12 -0700
+Subject: [PATCH] ARM: fix big endian __pv_phys_pfn_offset size related issue
+Message-ID: <1397765652-21623-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 04:06:16PM -0400, Nicolas Pitre wrote:
-> On Thu, 17 Apr 2014, Rob Herring wrote:
-> > Better yet, we should adopt the arm64 Image header which has this and
-> > other fields for arm Image files. We're going to have to deal with raw
-> > Image (and Image.gz) in bootloaders for arm64, so we might as well
-> > align things.
-> 
-> We could use the same header as ARM64 if we want to add more information 
-> to the uncompressed kernel image.
-> 
-> However I really don't want to encourage the proliferation of yet 
-> another kernel image formats on ARM32.  We've had zImage for the last 20 
-> years and that's what ARM32 bootloaders should support.  The 
-> introduction of the uImage format caused enough pain already.
-> 
-> Booting uncompressed kernel image on ARM32 may be useful for some 
-> debugging setups.  I don't see other cases where it would be legitimate 
-> to break existing practices.
+Fix e26a9e00afc482b971afcaef1db8c9034d4d6d7c 'ARM: Better
+virt_to_page() handling' replaced __pv_phys_offset with
+__pv_phys_pfn_offset. Also note that size of __pv_phys_offset
+was quad but size of __pv_phys_pfn_offset is word. Instruction
+that used to update __pv_phys_offset which address is in r6
+had to update low word of __pv_phys_offset so it used #LOW_OFFSET
+macro for store offset. Now when size of __pv_phys_pfn_offset is
+word, no difference between little endian and big endian should
+exist - i.e no offset should be used when __pv_phys_pfn_offset
+is stored.
 
-Me neither.  We even have good enough reasons (such as the issue in this
-thread to do with where the image should be placed) no longer support
-uncompressed images anymore.  (Yes, they'll still be generated because
-we need the input to compress them, but we should stop advertising them
-as a make target.)
+Note that for little endian image proposed change is noop,
+since in little endian case #LOW_OFFSET is defined 0 anyway.
 
+Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+---
+ arch/arm/kernel/head.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index f8c0883..591d6e4 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -587,7 +587,7 @@ __fixup_pv_table:
+ 	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
+ 	add	r7, r7, r3	@ adjust __pv_offset address
+ 	mov	r0, r8, lsr #12	@ convert to PFN
+-	str	r0, [r6, #LOW_OFFSET]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
++	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
+ 	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
+ 	mov	r6, r3, lsr #24	@ constant for add/sub instructions
+ 	teq	r3, r6, lsl #24 @ must be 16MiB aligned
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.1.4
