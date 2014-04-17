@@ -1,60 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Apr 2014 23:04:12 +0100
-Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
- components tracking
-In-Reply-To: <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
-References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
- <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
-Message-ID: <20140417220412.GZ24070@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Apr 2014 17:03:29 -0500
+Subject: [PATCH V2 05/19] bus: omap_l3_noc: switch over to relaxed
+ variants of readl/writel
+In-Reply-To: <53504DFF.7090907@ti.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1397767775-10965-1-git-send-email-nm@ti.com>
+ <1397767775-10965-6-git-send-email-nm@ti.com>
+ <20140417215228.GD8504@saruman.home> <53504DFF.7090907@ti.com>
+Message-ID: <20140417220329.GF8504@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
-> +static int exynos_drm_add_blocker(struct device *dev, void *data)
-> +{
-> +	struct device_driver *drv = data;
-> +
-> +	if (!platform_bus_type.match(dev, drv))
-> +		return 0;
-> +
-> +	device_lock(dev);
-> +	if (!dev->driver)
-> +		exynos_drm_dev_busy(dev);
-> +	device_unlock(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static void exynos_drm_init_blockers(struct device_driver *drv)
-> +{
-> +	bus_for_each_dev(&platform_bus_type, NULL, drv, exynos_drm_add_blocker);
-> +}
+On Thu, Apr 17, 2014 at 05:56:15PM -0400, Santosh Shilimkar wrote:
+> On Thursday 17 April 2014 05:52 PM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Thu, Apr 17, 2014 at 03:49:21PM -0500, Nishanth Menon wrote:
+> >> Currently we use __raw_readl and writel in this driver, however, there
+> > 
+> > __raw_* and *_relaxed variants are the same, just have a look <asm/io.h>
+> > 
+> Except the relaxed version can take care of endian conversion if
+> needed. :-)
 
-This feels very wrong to be dumping the above code into every driver which
-wants to make use of some kind of componentised support.
-
-You also appear to need to know the struct device_driver's for every
-component.  While that may work for exynos, it doesn't work elsewhere
-where the various components of the system are very real separate
-kernel modules - for example, a separate I2C driver such as the TDA998x
-case I mentioned in my first reply.
-
-I can't see how your solution would be usable in that circumstance.
-
-The third issue I have is that you're still needing to have internal
-exynos sub-device management - you're having to add the individual
-devices to some kind of list, array or static data, and during DRM
-probe you're having to then walk these lists/arrays/static data to
-locate these sub-devices and finish each of their individual
-initialisations.  So you're ending up with a two-tier initialisation.
-
-That's not particularly good because it means you're exposed to
-problems where the state is different between two initialisations -
-when the device is recreated, your component attempts to re-finalise
-the initialisation a second time.  It wouldn't take much for a field
-to be assumed to be zero at init time somewhere for a bug to creep
-in.
+right, but according to commit log, this commit is more concerned about
+the memory barriers which writel()/readl() add, not endianness. Just a
+matter of fixing up commit log.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140417/56000f8f/attachment.sig>
