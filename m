@@ -1,44 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Apr 2014 12:27:13 +0100
-Subject: [PATCH] ARM: mcs lock: implement wfe-based polling for MCS locking
-Message-ID: <1397734033-11931-1-git-send-email-will.deacon@arm.com>
+Date: Thu, 17 Apr 2014 12:27:56 +0100
+Subject: [PATCH] ARM: rwsem: use asm-generic rwsem implementation
+Message-ID: <1397734076-11999-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a wfe-based polling loop for spinning on contended
-MCS locks and waking up corresponding waiters when the lock is released.
+asm-generic offers an atomic-add based rwsem implementation, which
+can avoid the need for heavier, spinlock-based synchronisation on the
+fast path.
+
+This patch makes use of the optimised implementation for ARM CPUs.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/mcs_spinlock.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 arch/arm/include/asm/mcs_spinlock.h
+ arch/arm/Kconfig            | 5 +----
+ arch/arm/include/asm/Kbuild | 1 +
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/mcs_spinlock.h b/arch/arm/include/asm/mcs_spinlock.h
-new file mode 100644
-index 000000000000..f32f97e81471
---- /dev/null
-+++ b/arch/arm/include/asm/mcs_spinlock.h
-@@ -0,0 +1,20 @@
-+#ifndef __ASM_MCS_LOCK_H
-+#define __ASM_MCS_LOCK_H
-+
-+/* MCS spin-locking. */
-+#define arch_mcs_spin_lock_contended(lock)				\
-+do {									\
-+	/* Ensure prior stores are observed before we enter wfe. */	\
-+	smp_mb();							\
-+	while (!(smp_load_acquire(lock)))				\
-+		wfe();							\
-+} while (0)								\
-+
-+#define arch_mcs_spin_unlock_contended(lock)				\
-+do {									\
-+	smp_store_release(lock, 1);					\
-+	dsb(ishst);							\
-+	sev();								\
-+} while (0)
-+
-+#endif	/* __ASM_MCS_LOCK_H */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ec962e0b2c9d..b5bf06757052 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -165,12 +165,9 @@ config TRACE_IRQFLAGS_SUPPORT
+ 	bool
+ 	default y
+ 
+-config RWSEM_GENERIC_SPINLOCK
+-	bool
+-	default y
+-
+ config RWSEM_XCHGADD_ALGORITHM
+ 	bool
++	default y
+ 
+ config ARCH_HAS_ILOG2_U32
+ 	bool
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index 23e728ecf8ab..f5a357601983 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -21,6 +21,7 @@ generic-y += parport.h
+ generic-y += poll.h
+ generic-y += preempt.h
+ generic-y += resource.h
++generic-y += rwsem.h
+ generic-y += sections.h
+ generic-y += segment.h
+ generic-y += sembuf.h
 -- 
 1.9.1
