@@ -1,40 +1,41 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 16 Apr 2014 19:00:00 -0500
-Subject: [PATCH 0/9] dmtimer code clean-up first pass
-Message-ID: <1397692800-7395-1-git-send-email-joelf@ti.com>
+Date: Wed, 16 Apr 2014 19:03:12 -0500
+Subject: [PATCH 2/9] ARM: OMAP: dmtimer: Add comments on OMAP1 clock framework
+In-Reply-To: <1397692999-7800-1-git-send-email-joelf@ti.com>
+References: <1397692999-7800-1-git-send-email-joelf@ti.com>
+Message-ID: <1397692999-7800-2-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some minor cleanups for dmtimer code in preparation for moving it out
-to drivers.
+OMAP1 doesn't support clock framework, add a comment where needed
+and correct a FIXME.
 
-There is OMAP1 specific dmtimer code earlier, that are handled in mach-omap1
-directly now.   Other than this, few functions and code has been refactored to
-reduce redundancy and some minor cleanups.
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ arch/arm/plat-omap/dmtimer.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-OMAP1 hasn't been tested so I welcome anyone with HW to test this.
-
-Joel Fernandes (9):
-  ARM: OMAP: dmtimer: Remove setting of clk parent indirectly through
-    platform hook
-  ARM: OMAP: dmtimer: Add comments on OMAP1 clock framework
-  ARM: OMAP: dmtimer: Add note to set parent from DT
-  ARM: OMAP: dmtimer: Add function to check if timer is running
-  ARM: OMAP1: dmtimer: Rewrite modify of IDLECT mask to use new
-    is_running function
-  ARM: OMAP: dmtimer: Add a write_ctrl function to simplify bit setting
-  ARM: OMAP: dmtimer: Have __omap_dm_timer_load_start set ST bit in
-    CTRL instead of caller
-  ARM: OMAP: dmtimer: Add function to check for timer availability
-  ARM: OMAP: dmtimer: Get rid of check for mem resource error
-
- arch/arm/mach-omap1/include/mach/hardware.h |    2 +
- arch/arm/mach-omap1/timer.c                 |   34 ++++-
- arch/arm/mach-omap2/timer.c                 |    6 +-
- arch/arm/plat-omap/dmtimer.c                |  185 +++++++++++++--------------
- arch/arm/plat-omap/include/plat/dmtimer.h   |    4 +-
- include/linux/platform_data/dmtimer-omap.h  |    2 -
- 6 files changed, 129 insertions(+), 104 deletions(-)
-
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index ecd3f97..f5a674c 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -142,8 +142,7 @@ static int omap_dm_timer_prepare(struct omap_dm_timer *timer)
+ 	int rc;
+ 
+ 	/*
+-	 * FIXME: OMAP1 devices do not use the clock framework for dmtimers so
+-	 * do not call clk_get() for these devices.
++	 * Do not call clk_get() for OMAP1 due to no clock framework support.
+ 	 */
+ 	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
+ 		timer->fclk = clk_get(&timer->pdev->dev, "fck");
+@@ -461,6 +460,7 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+ 	if (unlikely(!timer))
+ 		return -EINVAL;
+ 
++	/* OMAP1 is not converted to clk framework so avoid clk_get_rate here */
+ 	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET))
+ 		rate = clk_get_rate(timer->fclk);
+ 
 -- 
 1.7.9.5
