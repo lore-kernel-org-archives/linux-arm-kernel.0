@@ -1,50 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:32:13 +0900
-Subject: [PATCH 5/5] ARM: shmobile: koelsch: correct renesas, gpios to renesas,
- groups in sd[012] pfc
+Date: Thu, 17 Apr 2014 09:32:10 +0900
+Subject: [PATCH 2/5] ARM: shmobile: armadillo800eva: fixup
+ SND_SOC_DAIFMT_CBx_CFx flags
 In-Reply-To: <cover.1397694064.git.horms+renesas@verge.net.au>
 References: <cover.1397694064.git.horms+renesas@verge.net.au>
-Message-ID: <d5dda0381f826326071b027f288372f682c24d55.1397694064.git.horms+renesas@verge.net.au>
+Message-ID: <7b707277e734c553a8043e9b4d530eb47f4d60c8.1397694064.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Fix typo of renesas,groups in the koeslch dt. The kernel has no
-renesas,gpios but this should match renesas,groups.
+c7a507eea1db1430476289f525f9c853d5d485e8
+(ASoC: fsi: fixup SND_SOC_DAIFMT_CBx_CFx flags)
+exchanged sound flags, but armadillo800eva flags needs IB_NF.
+The recorded sound will be noise without this patch.
 
-Noticed thanks to similar fix for Lager by Rob Taylor and Ben Dooks.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index bdd73e6..de1b697 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -230,17 +230,17 @@
- 	};
- 
- 	sdhi0_pins: sd0 {
--		renesas,gpios = "sdhi0_data4", "sdhi0_ctrl";
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
- 		renesas,function = "sdhi0";
- 	};
- 
- 	sdhi1_pins: sd1 {
--		renesas,gpios = "sdhi1_data4", "sdhi1_ctrl";
-+		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
- 		renesas,function = "sdhi1";
- 	};
- 
- 	sdhi2_pins: sd2 {
--		renesas,gpios = "sdhi2_data4", "sdhi2_ctrl";
-+		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
- 		renesas,function = "sdhi2";
- 	};
- 
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 2858f38..486063d 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -992,6 +992,7 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
+ 	.platform	= "sh_fsi2",
+ 	.daifmt		= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
+ 	.cpu_dai = {
++		.fmt	= SND_SOC_DAIFMT_IB_NF,
+ 		.name	= "fsia-dai",
+ 	},
+ 	.codec_dai = {
 -- 
 1.8.4
