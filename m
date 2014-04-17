@@ -1,53 +1,58 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 17 Apr 2014 18:22:24 +0200
-Subject: [PATCH 3/4] ARM: MVEBU: Add LaCie 2Big and 5Big Network v2
-In-Reply-To: <1397750938-25381-4-git-send-email-andrew@lunn.ch>
-References: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
- <1397750938-25381-4-git-send-email-andrew@lunn.ch>
-Message-ID: <534FFFC0.6010908@free-electrons.com>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Thu, 17 Apr 2014 18:29:56 +0200
+Subject: BUG: spinlock trylock failure on UP - reverting timer patches
+ helps
+In-Reply-To: <534DADF1.6060608@meduna.org>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org>
+Message-ID: <53500184.4050309@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On 16.04.2014 00:08, Stanislav Meduna wrote:
 
-Why do you use capital for mvebu in the topic?
-The arm-soc people asked us to use ARM in capital but for
-mvebu I would prefer to keep it in small letter.
-
-About the content of the patch itself I have no objection:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-
-On 17/04/2014 18:08, Andrew Lunn wrote:
-> Enable building LaCie 2Big and 5Big Network v2 in the MVEBU v5 kernel.
+>>> BUG: spinlock trylock failure on UP on CPU#0, ksoftirqd/0/3
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/configs/mvebu_v5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-> index 36484a37a1ca..58acd057e236 100644
-> --- a/arch/arm/configs/mvebu_v5_defconfig
-> +++ b/arch/arm/configs/mvebu_v5_defconfig
-> @@ -12,6 +12,7 @@ CONFIG_MODULE_UNLOAD=y
->  CONFIG_ARCH_MVEBU=y
->  CONFIG_MACH_KIRKWOOD=y
->  CONFIG_MACH_T5325=y
-> +CONFIG_MACH_NETXBIG=y
->  # CONFIG_CPU_FEROCEON_OLD_ID is not set
->  CONFIG_PCI_MVEBU=y
->  CONFIG_PREEMPT=y
-> 
+> I am now getting this quite reproducibly a few seconds into
+> the boot and the path is always similar. Depending on what modules
+> I am loading the source changes, but it is nearly always
+> a schedule_timeout with a following timer interrupt.
 
+Note: the bug goes away reverting the very same patches that are
+helping the Jordan's problms. I did follow
 
+http://www.spinics.net/lists/linux-rt-users/msg11639.html
+
+and no BUG while booting anymore. I'll try to let it run some
+more time.
+
+> [   11.797460] BUG: spinlock trylock failure on UP on CPU#0, rcu_preempt/11
+> [   11.797522]  lock: boot_tvec_bases+0x0/0x10c0, .magic: dead4ead, .owner: rcu_preempt/11, .owner_cpu: 0
+> [   11.797550] CPU: 0 PID: 11 Comm: rcu_preempt Not tainted 3.12.15-rt25+ #52
+> [   11.797630] [<c00151bc>] (unwind_backtrace+0x0/0xf4) from [<c0012c00>] (show_stack+0x10/0x14)
+> [   11.797691] [<c0012c00>] (show_stack+0x10/0x14) from [<c01b2758>] (do_raw_spin_trylock+0x4c/0x58)
+> [   11.797748] [<c01b2758>] (do_raw_spin_trylock+0x4c/0x58) from [<c02e0194>] (_raw_spin_trylock+0x20/0x98)
+> [   11.797792] [<c02e0194>] (_raw_spin_trylock+0x20/0x98) from [<c02df734>] (rt_spin_trylock+0x14/0xd0)
+> [   11.797851] [<c02df734>] (rt_spin_trylock+0x14/0xd0) from [<c0028e7c>] (run_local_timers+0x24/0x78)
+> [   11.797892] [<c0028e7c>] (run_local_timers+0x24/0x78) from [<c0028f04>] (update_process_times+0x34/0x68)
+> [   11.797940] [<c0028f04>] (update_process_times+0x34/0x68) from [<c0060920>] (tick_sched_timer+0x58/0x22c)
+> [   11.797990] [<c0060920>] (tick_sched_timer+0x58/0x22c) from [<c0040820>] (__run_hrtimer+0x88/0x2b8)
+> [   11.798029] [<c0040820>] (__run_hrtimer+0x88/0x2b8) from [<c0040bb0>] (hrtimer_interrupt+0x104/0x30c)
+> [   11.798076] [<c0040bb0>] (hrtimer_interrupt+0x104/0x30c) from [<c0246c50>] (mxs_timer_interrupt+0x20/0x2c)
+> [   11.798123] [<c0246c50>] (mxs_timer_interrupt+0x20/0x2c) from [<c00534d8>] (handle_irq_event_percpu+0x80/0x2f8)
+> [   11.798161] [<c00534d8>] (handle_irq_event_percpu+0x80/0x2f8) from [<c005378c>] (handle_irq_event+0x3c/0x5c)
+> [   11.798201] [<c005378c>] (handle_irq_event+0x3c/0x5c) from [<c0055f68>] (handle_level_irq+0x8c/0x118)
+> [   11.798239] [<c0055f68>] (handle_level_irq+0x8c/0x118) from [<c0053448>] (generic_handle_irq+0x28/0x30)
+> [   11.798281] [<c0053448>] (generic_handle_irq+0x28/0x30) from [<c00101dc>] (handle_IRQ+0x30/0x84)
+> [   11.798322] [<c00101dc>] (handle_IRQ+0x30/0x84) from [<c0013484>] (__irq_svc+0x44/0x88)
+> [   11.798364] [<c0013484>] (__irq_svc+0x44/0x88) from [<c02deb18>] (rt_spin_lock_slowlock+0x60/0x204)
+> [   11.798402] [<c02deb18>] (rt_spin_lock_slowlock+0x60/0x204) from [<c02df4d0>] (rt_spin_lock+0x28/0x60)
+> [   11.798451] [<c02df4d0>] (rt_spin_lock+0x28/0x60) from [<c0028874>] (lock_timer_base+0x28/0x48)
+> [   11.798494] [<c0028874>] (lock_timer_base+0x28/0x48) from [<c02dcb28>] (schedule_timeout+0x78/0x254)
+> [   11.798531] [<c02dcb28>] (schedule_timeout+0x78/0x254) from [<c00763a4>] (rcu_gp_kthread+0x2d4/0x5f0)
+> [   11.798578] [<c00763a4>] (rcu_gp_kthread+0x2d4/0x5f0) from [<c003cf24>] (kthread+0xa0/0xa8)
+> [   11.798621] [<c003cf24>] (kthread+0xa0/0xa8) from [<c000f3e0>] (ret_from_fork+0x14/0x34)
+
+Thanks
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+                                                      Stano
