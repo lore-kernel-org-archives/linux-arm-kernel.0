@@ -1,39 +1,74 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:32:12 +0900
-Subject: [PATCH 4/5] ARM: shmobile: r8a7740: drop address cells from GIC node
-In-Reply-To: <cover.1397694064.git.horms+renesas@verge.net.au>
-References: <cover.1397694064.git.horms+renesas@verge.net.au>
-Message-ID: <64c04a79c377e23449c59060727fcd34cc798eb6.1397694064.git.horms+renesas@verge.net.au>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 16 Apr 2014 19:24:34 -0600
+Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
+In-Reply-To: <20140417002041.GE4858@bart>
+References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
+ <1395270762-6055-3-git-send-email-tinamdar@apm.com>
+ <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
+ <20140416170545.GD4858@bart>
+ <20140416212104.GA3469@obsidianresearch.com>
+ <20140417002041.GE4858@bart>
+Message-ID: <20140417012434.GA8734@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <l.stach@pengutronix.de>
+On Thu, Apr 17, 2014 at 01:20:42AM +0100, Liviu Dudau wrote:
 
-This is likely a copy-and-paste error from the
-ARM GIC documentation, that has already been fixed.
+> > No spec says you can put config space into the ranges at all, nobody
+> > should be doing that today, obviously some cases were missed during
+> > review..
+> 
+> ePAPR documents allows that when ss == 00.
 
-address-cells should have been set to 0, as with the size
-cells. As having those properties set to 0 is the
-same thing as not specifying them, drop them completely.
+Which do you mean? The 'PCI Bus Binding' spec has fairly specific
+language on how ranges should be used and interpreted, and it
+precludes doing anything meaningful with config space (like requiring
+b,d,f and r to be zeroed when doing compares against ranges, requiring
+the ranges to represent the bridge windows, etc).
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7740.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+There is certainly room to invent something (like ECAM mapping) but
+nothing is specified in that document.
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 8280884..2551e94 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -28,7 +28,6 @@
- 	gic: interrupt-controller at c2800000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--		#address-cells = <1>;
- 		interrupt-controller;
- 		reg = <0xc2800000 0x1000>,
- 		      <0xc2000000 0x1000>;
--- 
-1.8.4
+The ePAPR document I have doesn't talk about PCI..
+
+If you've found a document that defines how it works then that changes
+things.. ;)
+
+> > The comment about ECAM was intended as a general guidance on what
+> > config space in ranges could/should be used for.
+> > 
+> > Right now config space shouldn't propagate out side any driver, so you
+> > can probably just filter it in your generic code, and make it very hard
+> > and obviously wrong for a driver to parse ranges for config space, so
+> > we don't get more usages.
+> 
+> OK, this goes slightly against your email from 26th March:
+> 
+> "When we talked about this earlier on the DT bindings list the
+> consensus seemed to be that configuration MMIO ranges should only be
+> used if the underlying memory was exactly ECAM, and was not to be used
+> for random configuration related register blocks.
+> 
+> The rational being that generic code, upon seeing that ranges entry,
+> could just go ahead and assume ECAM mapping."
+> 
+> What I'm saying is that the only code that will see this ranges entry will
+> be the parsing code as if we try to create a resource out of the range
+> and add it to the host bridge structure (not driver) we will confuse the
+> rest of the pci_host_bridge API. So we cannot do any ECAM accesses (yet?).
+
+Sorry if this seems unclear, what you quoted was from a specification
+standpoint - someday defining config space ranges to be the ECAM
+window makes the most sense. This is from the direction of precluding
+drivers from using it for random purposes.
+
+>From a Linux standpoint, there is simply no infrastructure for generic
+config access outside the driver, so config space must remain
+contained in the driver, and shouldn't leak into the host bridge or
+other core structures.
+
+I think the shared code you are working on should simply ignore config
+ss ranges entirely, they have no defined meaning..
+
+Regards,
+Jason
