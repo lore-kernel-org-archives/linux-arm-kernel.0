@@ -1,123 +1,144 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 Apr 2014 10:05:10 +0800
-Subject: [PATCH 2/2] ahci: imx: software workaround for phy reset issue
- in resume
-In-Reply-To: <20140416140112.GB1257@htj.dyndns.org>
-References: <1397529703-21165-1-git-send-email-shawn.guo@freescale.com>
- <1397529703-21165-2-git-send-email-shawn.guo@freescale.com>
- <20140415161018.GN1863@htj.dyndns.org>
- <20140416073823.GJ2523@dragon>
- <20140416140112.GB1257@htj.dyndns.org>
-Message-ID: <20140417020509.GM2523@dragon>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Wed, 16 Apr 2014 19:06:47 -0700
+Subject: [PATCH v2 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
+ support.
+In-Reply-To: <534BEB20.3080501@codethink.co.uk>
+References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
+ <1397271984-23405-5-git-send-email-isubramanian@apm.com>
+ <534BEB20.3080501@codethink.co.uk>
+Message-ID: <CAKh23FmM6L4PeL+GOz=neQac4ZDj+_LmH5=zTLtVZxfUe9HQVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 10:01:12AM -0400, Tejun Heo wrote:
-> Hello,
-> 
-> On Wed, Apr 16, 2014 at 03:38:24PM +0800, Shawn Guo wrote:
-> > The hardware manual suggests that an ACK will normally be given within
-> > 100us.  So using msleep() will have it sleep longer than necessary for
-> > normal case.  Basically, we're following the suggestion from
-> > Documentation/timers/timers-howto.txt to use usleep_range() over
-> > msleep().
-> > 
-> > SLEEPING FOR ~USECS OR SMALL MSECS ( 10us - 20ms):
-> > 	* Use usleep_range
-> > 
-> > 	- Why not msleep for (1ms - 20ms)?
-> > 		Explained originally here:
-> > 			http://lkml.org/lkml/2007/8/3/250
-> > 		msleep(1~20) may not do what the caller intends, and
-> > 		will often sleep longer (~20 ms actual sleep for any
-> > 		value given in the 1~20ms range). In many cases this
-> > 		is not the desired behavior.
-> 
-> But we don't care whether the minimum wait is actually 100us here, do
-> we?  It's a reset path.  Let's please just be simple.  msleep(1) not
-> actually sleeping 1ms is an implementation detail which may change in
-> the future.  If this were in the command execution path, sure, but not
-> here.
+Hi,
 
-Functions imx_phy_reg_[addressing|write|read]() implement the phy
-control register bus interface.  Though the interface is used only for
-phy reset right now, it's not limited to phy reset but anything that
-needs to access phy.
+Please find my response inline.
 
-Even for reset path, we still care about the time.  I just quickly
-tested it with replacing all those usleep_range() calls with msleep(1),
-and found that the resume time increases dramatically, from 10.880 msecs
-to 69.431 msecs.  The system resume speed is quite critical to some of
-our customers.  If every device sleeps longer than necessary like that,
-the system resume speed will be unacceptably slow.  So, please, allow
-the use of usleep_range() here.
+On Mon, Apr 14, 2014 at 7:05 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 12/04/14 04:06, Iyappan Subramanian wrote:
+>>
+>> This patch adds network driver for APM X-Gene SoC ethernet.
+>>
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Signed-off-by: Ravi Patel <rapatel@apm.com>
+>
+>
+> [snip]
+>
+>
+>> +{
+>> +       struct xgene_enet_pdata *pdata = netdev_priv(ndev);
+>> +       struct phy_device *phydev;
+>> +       unsigned char phy_id[MII_BUS_ID_SIZE+3];
+>> +       int ret = 0;
+>> +
+>> +       phydev = phy_find_first(pdata->mdio_bus);
+>> +       if (!phydev) {
+>> +               netdev_info(ndev, "no PHY found\n");
+>> +               ret = -1;
+>> +               goto out;
+>> +       }
+>> +
+>> +       /* attach the mac to the phy */
+>> +       snprintf(phy_id, sizeof(phy_id), PHY_ID_FMT, pdata->mdio_bus->id,
+>> +                pdata->phy_addr);
+>> +       phydev = phy_connect(ndev, phy_id,
+>> +                            &xgene_enet_mdio_link_change,
+>> pdata->phy_mode);
+>> +       if (IS_ERR(phydev)) {
+>> +               netdev_err(ndev, "Could not attach to PHY\n");
+>> +               ret = PTR_ERR(phydev);
+>> +               phydev = NULL;
+>> +               goto out;
+>> +       }
+>> +
+>
+>
+> You should be using of_phy_connect or similar so that the
+> necessary PHY<>OF data is properly initialised
+>
 
-Shawn
+I will use of_phy_connect function to connect to PHY.
 
-=== usleep_range ===
-$ echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-Freezing user space processes ... (elapsed 0.001 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-PM: Entering mem sleep
-sd 0:0:0:0: [sda] Synchronizing SCSI cache
-sd 0:0:0:0: [sda] Stopping disk
-PM: suspend of devices complete after 51.209 msecs
-PM: suspend devices took 0.060 seconds
-PM: late suspend of devices complete after 4.651 msecs
-PM: noirq suspend of devices complete after 4.869 msecs
-Disabling non-boot CPUs ...
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-Enabling non-boot CPUs ...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-PM: noirq resume of devices complete after 4.010 msecs
-PM: early resume of devices complete after 4.619 msecs
-sd 0:0:0:0: [sda] Starting disk
-PM: resume of devices complete after 10.880 msecs
-PM: resume devices took 0.020 seconds
-PM: Finishing wakeup.
-Restarting tasks ... done.
-$ ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-ata1.00: configured for UDMA/133
+>
+>> +       netdev_info(ndev, "phy_id=0x%08x phy_drv=\"%s\"",
+>> +                   phydev->phy_id, phydev->drv->name);
+>> +out:
+>> +       pdata->phy_link = 0;
+>> +       pdata->phy_speed = 0;
+>> +       pdata->phy_dev = phydev;
+>> +
+>> +       return ret;
+>> +}
+>> +
+>
+>
+>
+> [snip]
+>
+>
+>> +struct xgene_enet_desc {
+>> +       u64 m0;
+>> +       u64 m1;
+>> +       u64 m2;
+>> +       u64 m3;
+>> +};
+>> +
+>> +struct xgene_enet_desc16 {
+>> +       u64 m0;
+>> +       u64 m1;
+>> +};
+>> +
+>> +static inline void xgene_enet_cpu_to_le64(struct xgene_enet_desc *desc,
+>> +                                         int count)
+>> +{
+>> +#ifdef CONFIG_CPU_BIG_ENDIAN
+>> +       int i;
+>> +
+>> +       for (i = 0; i < count; i++)
+>> +               ((u64 *)desc)[i] = cpu_to_le64(((u64 *)desc)[i]);
+>> +#endif
+>> +}
+>> +
+>> +static inline void xgene_enet_le64_to_cpu(struct xgene_enet_desc *desc,
+>> +                                         int count)
+>> +{
+>> +#ifdef CONFIG_CPU_BIG_ENDIAN
+>> +       int i;
+>> +
+>> +       for (i = 0; i < count; i++)
+>> +               ((u64 *)desc)[i] = le64_to_cpu(((u64 *)desc)[i]);
+>> +#endif
+>> +}
+>> +
+>> +static inline void xgene_enet_desc16_to_le64(struct xgene_enet_desc
+>> *desc)
+>> +{
+>> +#ifdef CONFIG_CPU_BIG_ENDIAN
+>> +       ((u64 *)desc)[1] = cpu_to_le64(((u64 *)desc)[1]);
+>> +#endif
+>> +}
+>> +
+>> +static inline void xgene_enet_le64_to_desc16(struct xgene_enet_desc
+>> *desc)
+>> +{
+>> +#ifdef CONFIG_CPU_BIG_ENDIAN
+>> +       ((u64 *)desc)[1] = le64_to_cpu(((u64 *)desc)[1]);
+>> +#endif
+>> +}
+>
+>
+> With this do you not risk confusing the hardware by swapping the
+> format of the descriptors?
+>
+> Why not use xxx_to_cpu() and cpu_to_xxx() functions when reading or
+> writing the descriptors? It would also remove a lot of the #ifdef in
+> this code.
 
-=== msleep(1) ===
-$ echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-Freezing user space processes ... (elapsed 0.002 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-PM: Entering mem sleep
-sd 0:0:0:0: [sda] Synchronizing SCSI cache
-sd 0:0:0:0: [sda] Stopping disk
-PM: suspend of devices complete after 35.751 msecs
-PM: suspend devices took 0.040 seconds
-PM: late suspend of devices complete after 4.190 msecs
-PM: noirq suspend of devices complete after 4.450 msecs
-Disabling non-boot CPUs ...
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-Enabling non-boot CPUs ...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-PM: noirq resume of devices complete after 2.328 msecs
-PM: early resume of devices complete after 2.774 msecs
-sd 0:0:0:0: [sda] Starting disk
-PM: resume of devices complete after 69.431 msecs
-PM: resume devices took 0.070 seconds
-PM: Finishing wakeup.
-Restarting tasks ... done.
-$ ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
-ata1.00: configured for UDMA/133
+Our hardware expects descriptor in the little endian format.  I will remove the
+#ifdef.
+
+>
+> --
+> Ben Dooks                               http://www.codethink.co.uk/
+> Senior Engineer                         Codethink - Providing Genius
