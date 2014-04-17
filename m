@@ -1,71 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Apr 2014 08:37:23 -0700
-Subject: [PATCH 10/11] mfd: twl-core: Fix idle mode signaling for omaps
- when booted with device tree
-In-Reply-To: <20140417080051.GE28725@lee--X1>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-11-git-send-email-tony@atomide.com>
- <20140417080051.GE28725@lee--X1>
-Message-ID: <20140417153722.GA23385@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 17 Apr 2014 16:38:12 +0100
+Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <alpine.LFD.2.11.1404171114370.980@knanqh.ubzr>
+References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+ <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
+ <20140414104116.GA3844@e103592.cambridge.arm.com>
+ <CAM4voa=-29EsNRCebri1C9D5cWopTT4Ux_0UPGAvdjP60ADZZQ@mail.gmail.com>
+ <20140417095925.GA18864@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404171114370.980@knanqh.ubzr>
+Message-ID: <20140417153812.GD18864@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [140417 01:01]:
-> > I noticed a regression where the omap sys_clkreq signal will never
-> > trigger for omap3 when booted with device tree while it triggers
-> > when booted in legacy mode. This means voltage scaling does not
-> > do anything when booted with device tree.
-> > 
-> > Turns out the reason is we fail to initialize the SmartReflex
-> > enable bit in twl4030 with the following error:
-> > 
-> > twl: not initialized
-> > 
-> > And that happens because we are wrongly tinkering with the twl4030
-> > registers in arch/arm/mach-omap2/omap_twl.c before the driver is
-> > initialized. Looking at the the SmartReflex bit enable code in
-> > omap_twl.c, we need to always set it.
-> > 
-> > So let's fix the issue by always enabling the twl4030 SmartReflex
-> > bit in the drivers/mfd/twl-core.c probe, and drop the related
-> > code in omap_twl.c.
-> > 
-> > Note that we still have some twl4030 tinkering left in omap_twl.c
-> > for the twl6030 case, but that's a different patch.
-> > 
-> > Cc: Kevin Hilman <khilman@linaro.org>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Cc: Nishanth Menon <nm@ti.com>
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Tero Kristo <t-kristo@ti.com>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_twl.c | 60 ------------------------------------------
-> >  drivers/mfd/twl-core.c         | 15 +++++++++++
-> >  2 files changed, 15 insertions(+), 60 deletions(-)
+On Thu, Apr 17, 2014 at 04:20:26PM +0100, Nicolas Pitre wrote:
+> On Thu, 17 Apr 2014, Dave Martin wrote:
 > 
-> Patch looks okay to me, and removes lots of code which is nice to
-> see. How do you want to handle this patch? How about if I set up an
-> MFD-OMAP immutable branch for us to use leading up to the v3.16 merge
-> window?
-
-Yes, that would be good thanks. Can you please set up the immutable
-branch against v3.14 for this, that should merge just fine against
-v3.15-rc AFAIK.
-
-I have also DT support coming up for drivers/mfd/twl4030-power.c
-generic configuration that can then go into the same branch when 
-ready.
-
-Regards,
-
-Tony
- 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+> > On Thu, Apr 17, 2014 at 12:41:22AM +0530, Abhilash Kesavan wrote:
+> > 
+> > [...]
+> > 
+> > > > The fact that there is no C interface for enabling ACE ports is
+> > > > deliberate.  For CPUs connected to ACE and managed via MCPM,
+> > > > it is incorrect to enable CCI via C code, since the safe window
+> > > > is the window during which all outbound CPUs have reached CLUSTER_DOWN
+> > > > and all inbound CPUs have not turned their MMU on yet (and thus cannot
+> > > > execute any general Linux C code).
+> > > >
+> > > > There might be scenarios involving GPUs and other non-CPU devices
+> > > > connected to ACE ports where the device cannot enable CCI snoops
+> > > > for itself -- but this would require a holding-pen protocol to enable
+> > > > the device to wait and signal a CPU to enable CCI snoops on the device's
+> > > > behalf before the device proceeds.  It is not the correct solution for
+> > > > CPU clusters attached to ACE, precisely because we can be more efficient
+> > > > in that case.
+> > > >
+> > > > In fact, because you implement a power_up_setup method that calls
+> > > > cci_enable_port_for_self, CCI snoops are actually enabled twice, making
+> > > > the above code appear redundant.   Have I missed something?
+> > > When a cluster is being turned off the snoops for both the clusters
+> > > are being turned off. When the other cluster comes back the snoops are
+> > > being turned on for the incoming cluster via power_up_setup and here
+> > > for the other cluster. As previously mentioned, I will be dropping
+> > > this change.
+> > 
+> > That's a fair point.  If there is only one cluster alive, turning off
+> > snoops for it should be safe, because there is no second cluster for
+> > it to maintain coherency with.
 > 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> But that's not that simple as I explained in a previous email.  If the 
+> other cluster has gone down via cpuidle, it may come back up at any 
+> moment without warning.  We do have the infrastructure in place to cope 
+> with possible races handling the CCI within a cluster.  We do not have 
+> anything for cross cluster races.  And before we do, it is necessary to 
+> know if it is worth it.
+
+Agreed.  It could be done, perhaps by the approach I already considered
+for handling multilevel clusters, but it is far from trivial, and I
+would like to see some measurement of the potential benefit before
+getting into it.
+
+Cheers
+---Dave
