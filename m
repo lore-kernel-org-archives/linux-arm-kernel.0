@@ -1,72 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Apr 2014 10:23:36 -0400
-Subject: [PATCH v2 2/4] ARM: mvebu: fix NOR bus-width in Armada XP GP
- Device Tree
-In-Reply-To: <20140417090936.387c79c6@skate>
-References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397489361-5833-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140417050832.GP28159@titan.lakedaemon.net>
- <20140417090936.387c79c6@skate>
-Message-ID: <20140417142336.GU28159@titan.lakedaemon.net>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Thu, 17 Apr 2014 16:35:00 +0200
+Subject: dma_alloc_coherent and cache?
+In-Reply-To: <20140415081004.GJ22546@lunn.ch>
+References: <45E047AA-4C3B-4645-A590-5B75A1729ADA@nowonline.co.uk>
+ <20140415081004.GJ22546@lunn.ch>
+Message-ID: <534FE694.8090102@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 09:09:36AM +0200, Thomas Petazzoni wrote:
-> On Thu, 17 Apr 2014 01:08:32 -0400, Jason Cooper wrote:
-> > Also, a gentle nit:  You're doing all the -stable info digging, would
-> > you mind putting it in the following format so I don't have to hand edit
-> > each patch?
+On 04/15/2014 10:10 AM, Andrew Lunn wrote:
+> On Tue, Apr 15, 2014 at 09:43:38AM +0400, Lee Essen wrote:
+>> Hi,
+>>
+>> I'm working on a driver for a Marvell switch device (98dx4122) where the basic interface closely resembles the mv643xx_eth device.
 > 
-> Sure! So far I've just been blindly following
-> Documentation/stable_kernel_rules.txt, and besides the "Cc:
-> stable at vger.kernel.org" it doesn't say anything else of what you're
-> suggesting below.
+> There is basic support for this SoC in the kernel. See
+> arch/arm/boot/dts/kirkwood-98dx4122.dtsi and
+> arch/arm/boot/dts/kirkwood-km_kirkwood.dts which is keymile's
+> reference design.
 > 
-> > ------
-> > Link: ...
+> Keymile are the experts for this device within the kernel community,
+> so maybe they can comment?
 > 
-> What should this link point to?
 
-Oops, it was late.  I thought I was copying the relevant lines you added
-under your SoB.  I forgot that I added code to my import script that
-automagically adds a line:
+Hi Lee and Andrew,
 
-Link: https://lkml.kernel.org/r/1397489361-5833-2-git-send-email-thomas.petazzoni at free-electrons.com
+Sorry for the quite late answer. At Keymile we rely on the driver (CPSS) Marvell
+provides to manage the switch but personally I am not very happy about this
+situation and I think your effort is great.
 
-built from the Message-Id of the email.  Very helpful to lookup ML
-conversations for a given commit.
+As you know, there are several ways to access the Switch from the CPU, one of
+them is through the "internal" RGMII that you use, and another one is through
+the CPU internal bus that we use at Keymile (thus we have to reserve a Mbus
+window for the switch that then can be ioremapped). Since I have never used the
+RGMII device, I cannot really give you some interesting hints here.
 
-Anyway, ignore that line because I automatically add it when I pull the
-patch in.
+If we are talking about feroceon and caches, we have experienced a lot of
+problems with the L2 cache that was sometimes not coherent with the CPU, but
+with the latest versions of u-boot and Linux we do not see that anymore, so I
+don't think you problem is this one.
 
-> > Fixes: da8d1b383568 ('ARM: mvebu: Add support for NOR flash device on Armada XP-GP board')
-> 
-> Ok. But this is not described in Documentation/stable_kernel_rules.txt.
+That's unfortunately all the information I can provide to this thread.
 
-It's what we settled on at 2013 KS.  I could have sworn we updated the
-docs to reflect that...  A quick grep says no. :(
-
-> > Cc: stable at vger.kernel.org # v3.10+
-> 
-> The Cc: to stable@ is documented, but the use of a comment with the
-> kernel version afterwards is only mentioned when the commit in question
-> requires other commits as dependencies to be applied to stable. When
-> the commit is self-sufficient, stable_kernel_rules.txt doesn't indicate
-> that a comment is needed.
-
-Indeed, I've always added the comment even for single patches because it
-makes the -stable teams job easier.  We know the code better, so it's
-easier for us to determine how far back it should go.
-
-Just to be clear, I'm not asking you or anyone else to do the above for
-patch submissions.  Only if you're inclined to do the digging for me, it
-would be nice to have it in the proper format.
-
-> Maybe an update to stable_kernel_rules.txt is in order? :-)
-
-Yes, it would seem so.  Perhaps some young, motivated, new kernel hacker
-would like to take a stab at it? :-)
-
-thx,
-
-Jason.
+Valentin
