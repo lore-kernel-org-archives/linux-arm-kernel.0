@@ -1,113 +1,160 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 17 Apr 2014 11:40:11 +0200
-Subject: [PATCH v2 1/2] regmap: add reg_read/reg_write callbacks to regmap_bus
- struct
+Date: Thu, 17 Apr 2014 11:40:12 +0200
+Subject: [PATCH v2 2/2] regmap: i2c: fallback to SMBus if the adapter does not
+ support standard I2C
 In-Reply-To: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397727612-32103-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397727612-32103-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some busses do not support sending/receiving multiple registers in one go.
-Such kind of busses just unpack the registers that have been previously
-packed by the regmap core or pack registers that will be later unpacked by
-the core code.
+Some I2C adapters are only compatible with the SMBus protocol and do not
+support standard I2C transfers.
 
-Add reg_write and reg_read callbacks in order to optimize access through
-this kind of busses.
+Fallback to SMBus transfers if we encounter such kind of adapters.
+The transfer type is chosen according to the val_bits field in the regmap
+config.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/base/regmap/regmap.c | 26 ++++++++++++++++++++++++++
- include/linux/regmap.h       |  6 ++++++
- 2 files changed, 32 insertions(+)
+ drivers/base/regmap/regmap-i2c.c | 104 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 102 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index d0a0724..c2a9933 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -35,10 +35,14 @@ static int _regmap_update_bits(struct regmap *map, unsigned int reg,
- 			       unsigned int mask, unsigned int val,
- 			       bool *change);
+diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
+index ebd1895..d82830b 100644
+--- a/drivers/base/regmap/regmap-i2c.c
++++ b/drivers/base/regmap/regmap-i2c.c
+@@ -14,6 +14,79 @@
+ #include <linux/i2c.h>
+ #include <linux/module.h>
  
-+static int _regmap_bus_reg_read(void *context, unsigned int reg,
-+				unsigned int *val);
- static int _regmap_bus_read(void *context, unsigned int reg,
- 			    unsigned int *val);
- static int _regmap_bus_formatted_write(void *context, unsigned int reg,
- 				       unsigned int val);
-+static int _regmap_bus_reg_write(void *context, unsigned int reg,
-+				 unsigned int val);
- static int _regmap_bus_raw_write(void *context, unsigned int reg,
- 				 unsigned int val);
- 
-@@ -495,6 +499,12 @@ struct regmap *regmap_init(struct device *dev,
- 
- 		map->defer_caching = false;
- 		goto skip_format_initialization;
-+	} else if (!bus->read || !bus->write) {
-+		map->reg_read = _regmap_bus_reg_read;
-+		map->reg_write = _regmap_bus_reg_write;
 +
-+		map->defer_caching = false;
-+		goto skip_format_initialization;
- 	} else {
- 		map->reg_read  = _regmap_bus_read;
- 	}
-@@ -1283,6 +1293,14 @@ static int _regmap_bus_formatted_write(void *context, unsigned int reg,
- 	return ret;
- }
- 
-+static int _regmap_bus_reg_write(void *context, unsigned int reg,
-+				 unsigned int val)
++static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
 +{
-+	struct regmap *map = context;
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
 +
-+	return map->bus->reg_write(map->bus_context, reg, val);
++	if (reg > 0xff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_byte_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
 +}
 +
- static int _regmap_bus_raw_write(void *context, unsigned int reg,
- 				 unsigned int val)
- {
-@@ -1924,6 +1942,14 @@ static int _regmap_raw_read(struct regmap *map, unsigned int reg, void *val,
- 	return ret;
- }
- 
-+static int _regmap_bus_reg_read(void *context, unsigned int reg,
-+				unsigned int *val)
++static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
 +{
-+	struct regmap *map = context;
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
 +
-+	return map->bus->reg_read(map->bus_context, reg, val);
++	if (val > 0xff || reg > 0xff)
++		return -EINVAL;
++
++	return i2c_smbus_write_byte_data(i2c, reg, val);
 +}
 +
- static int _regmap_bus_read(void *context, unsigned int reg,
- 			    unsigned int *val)
++static struct regmap_bus regmap_smbus_byte = {
++	.reg_write = regmap_smbus_byte_reg_write,
++	.reg_read = regmap_smbus_byte_reg_read,
++};
++
++static int regmap_smbus_word_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg > 0xffff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_word_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
++}
++
++static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (val > 0xffff || reg > 0xffff)
++		return -EINVAL;
++
++	return i2c_smbus_write_word_data(i2c, reg, val);
++}
++
++static struct regmap_bus regmap_smbus_word = {
++	.reg_write = regmap_smbus_word_reg_write,
++	.reg_read = regmap_smbus_word_reg_read,
++};
++
+ static int regmap_i2c_write(void *context, const void *data, size_t count)
  {
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index 34ef2c7..0c23ed5 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -276,6 +276,10 @@ typedef int (*regmap_hw_async_write)(void *context,
- typedef int (*regmap_hw_read)(void *context,
- 			      const void *reg_buf, size_t reg_size,
- 			      void *val_buf, size_t val_size);
-+typedef int (*regmap_hw_reg_read)(void *context, unsigned int reg,
-+				  unsigned int *val);
-+typedef int (*regmap_hw_reg_write)(void *context, unsigned int reg,
-+				   unsigned int val);
- typedef struct regmap_async *(*regmap_hw_async_alloc)(void);
- typedef void (*regmap_hw_free_context)(void *context);
+ 	struct device *dev = context;
+@@ -97,6 +170,23 @@ static struct regmap_bus regmap_i2c = {
+ 	.read = regmap_i2c_read,
+ };
  
-@@ -309,7 +313,9 @@ struct regmap_bus {
- 	regmap_hw_write write;
- 	regmap_hw_gather_write gather_write;
- 	regmap_hw_async_write async_write;
-+	regmap_hw_reg_write reg_write;
- 	regmap_hw_read read;
-+	regmap_hw_reg_read reg_read;
- 	regmap_hw_free_context free_context;
- 	regmap_hw_async_alloc async_alloc;
- 	u8 read_flag_mask;
++const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
++					    const struct regmap_config *config)
++{
++	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
++		return &regmap_i2c;
++	else if (config->val_bits == 16 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_WORD_DATA))
++		return &regmap_smbus_word;
++	else if (config->val_bits == 8 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_BYTE_DATA))
++		return &regmap_smbus_byte;
++
++	return ERR_PTR(-ENOTSUPP);
++}
++
+ /**
+  * regmap_init_i2c(): Initialise register map
+  *
+@@ -109,7 +199,12 @@ static struct regmap_bus regmap_i2c = {
+ struct regmap *regmap_init_i2c(struct i2c_client *i2c,
+ 			       const struct regmap_config *config)
+ {
+-	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
++
++	if (IS_ERR(bus))
++		return ERR_PTR(PTR_ERR(bus));
++
++	return regmap_init(&i2c->dev, bus, &i2c->dev, config);
+ }
+ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ 
+@@ -126,7 +221,12 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
+ 				    const struct regmap_config *config)
+ {
+-	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
++
++	if (IS_ERR(bus))
++		return ERR_PTR(PTR_ERR(bus));
++
++	return devm_regmap_init(&i2c->dev, bus, &i2c->dev, config);
+ }
+ EXPORT_SYMBOL_GPL(devm_regmap_init_i2c);
+ 
 -- 
 1.8.3.2
