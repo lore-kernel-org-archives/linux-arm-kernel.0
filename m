@@ -1,278 +1,330 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 17 Apr 2014 18:08:55 +0200
-Subject: [PATCH 1/4] ARM: Kirkwood: Add board file for netxbig LEDs
+Date: Thu, 17 Apr 2014 18:08:56 +0200
+Subject: [PATCH 2/4] ARM: Kirkwood: Add DT descriptions for net2big and
+ net5big.
 In-Reply-To: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
 References: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1397750938-25381-2-git-send-email-andrew@lunn.ch>
+Message-ID: <1397750938-25381-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is currently no DT binding for the CPLD which controls the LEDs
-on the Net 2Big and Net 5Big. So use a platform device.
+Describe LaCie 2Big and 5Big Network v2 using device tree.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-mvebu/Kconfig         |   7 ++
- arch/arm/mach-mvebu/Makefile        |   1 +
- arch/arm/mach-mvebu/board-netxbig.c | 191 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mvebu/board.h         |   6 ++
- arch/arm/mach-mvebu/kirkwood.c      |   3 +
- 5 files changed, 208 insertions(+)
- create mode 100644 arch/arm/mach-mvebu/board-netxbig.c
+ arch/arm/boot/dts/Makefile              |   2 +
+ arch/arm/boot/dts/kirkwood-net2big.dts  |  25 +++++
+ arch/arm/boot/dts/kirkwood-net5big.dts  |  67 ++++++++++++
+ arch/arm/boot/dts/kirkwood-netxbig.dtsi | 182 ++++++++++++++++++++++++++++++++
+ 4 files changed, 276 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-net2big.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-net5big.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-netxbig.dtsi
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 3f73eecbcfb0..711ffd4fef85 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -97,6 +97,13 @@ config MACH_KIRKWOOD
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Kirkwood device tree.
- 
-+config MACH_NETXBIG
-+	bool "LaCie 2Big and 5Big Network v2"
-+	depends on MACH_KIRKWOOD
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  LaCie 2Big and 5Big Network v2
-+
- config MACH_T5325
- 	bool "HP T5325 thin client"
- 	depends on MACH_KIRKWOOD
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index a63e43b6b451..014f32d87ebd 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -10,4 +10,5 @@ obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
- obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
- obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
-+obj-$(CONFIG_MACH_NETXBIG)	 += board-netxbig.o
- obj-$(CONFIG_MACH_T5325)	 += board-t5325.o
-diff --git a/arch/arm/mach-mvebu/board-netxbig.c b/arch/arm/mach-mvebu/board-netxbig.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 35c146f31e46..79dd68d27621 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -118,6 +118,8 @@ kirkwood := \
+ 	kirkwood-lsxhl.dtb \
+ 	kirkwood-mplcec4.dtb \
+ 	kirkwood-mv88f6281gtw-ge.dtb \
++	kirkwood-net2big.dtb \
++	kirkwood-net5big.dtb \
+ 	kirkwood-netgear_readynas_duo_v2.dtb \
+ 	kirkwood-netgear_readynas_nv+_v2.dtb \
+ 	kirkwood-ns2.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-net2big.dts b/arch/arm/boot/dts/kirkwood-net2big.dts
 new file mode 100644
-index 000000000000..e6f2f547b1c7
+index 000000000000..b781d30775e7
 --- /dev/null
-+++ b/arch/arm/mach-mvebu/board-netxbig.c
-@@ -0,0 +1,191 @@
++++ b/arch/arm/boot/dts/kirkwood-net2big.dts
+@@ -0,0 +1,25 @@
 +/*
-+ * arch/arm/mach-mvbu/board-netxbig.c
++ * Device Tree file for LaCie 2Big Network v2
 + *
-+ * LaCie 2Big and 5Big Network v2 board setup
++ * Copyright (C) 2014
 + *
++ * Andrew Lunn <andrew@lunn.ch>
++ *
++ * Based on netxbig_v2-setup.c,
 + * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++*/
 +
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/platform_data/leds-kirkwood-netxbig.h>
-+#include "common.h"
++/dts-v1/;
 +
-+/*****************************************************************************
-+ * GPIO extension LEDs
-+ ****************************************************************************/
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
++#include "kirkwood-netxbig.dtsi"
 +
++/ {
++	model = "LaCie 2Big Network v2";
++	compatible = "lacie,net2big", "lacie,netxbig", "marvell,kirkwood-88f6192", "marvell,kirkwood";
++};
+diff --git a/arch/arm/boot/dts/kirkwood-net5big.dts b/arch/arm/boot/dts/kirkwood-net5big.dts
+new file mode 100644
+index 000000000000..4c013e4f62f0
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-net5big.dts
+@@ -0,0 +1,67 @@
 +/*
-+ * The LEDs are controlled by a CPLD and can be configured through a GPIO
-+ * extension bus:
++ * Device Tree file for LaCie 5Big Network v2
 + *
-+ * - address register : bit [0-2] -> GPIO [47-49]
-+ * - data register    : bit [0-2] -> GPIO [44-46]
-+ * - enable register  : GPIO 29
-+ */
++ * Copyright (C) 2014
++ *
++ * Andrew Lunn <andrew@lunn.ch>
++ *
++ * Based on netxbig_v2-setup.c,
++ * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++*/
 +
-+static int netxbig_v2_gpio_ext_addr[] = { 47, 48, 49 };
-+static int netxbig_v2_gpio_ext_data[] = { 44, 45, 46 };
++/dts-v1/;
 +
-+static struct netxbig_gpio_ext netxbig_v2_gpio_ext = {
-+	.addr		= netxbig_v2_gpio_ext_addr,
-+	.num_addr	= ARRAY_SIZE(netxbig_v2_gpio_ext_addr),
-+	.data		= netxbig_v2_gpio_ext_data,
-+	.num_data	= ARRAY_SIZE(netxbig_v2_gpio_ext_data),
-+	.enable		= 29,
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
++#include "kirkwood-netxbig.dtsi"
++
++/ {
++	model = "LaCie 5Big Network v2";
++	compatible = "lacie,net2big", "lacie,netxbig", "marvell,kirkwood-88f6192", "marvell,kirkwood";
 +};
 +
++&regulators {
++	regulator at 3 {
++		compatible = "regulator-fixed";
++		reg = <3>;
++		regulator-name = "hdd2power";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		regulator-boot-on;
++		gpio = <&gpio0 19 GPIO_ACTIVE_HIGH>;
++	};
++
++	regulator at 4 {
++		compatible = "regulator-fixed";
++		reg = <4>;
++		regulator-name = "hdd3power";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		regulator-boot-on;
++		gpio = <&gpio0 20 GPIO_ACTIVE_HIGH>;
++	};
++
++	regulator at 5 {
++		compatible = "regulator-fixed";
++		reg = <5>;
++		regulator-name = "hdd4power";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		regulator-boot-on;
++		gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++&eth1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/kirkwood-netxbig.dtsi b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
+new file mode 100644
+index 000000000000..7ce6006f3ea0
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
+@@ -0,0 +1,182 @@
 +/*
-+ * Address register selection:
++ * Device Tree common file for LaCie 2Big and 5Big Network v2
 + *
-+ * addr | register
-+ * ----------------------------
-+ *   0  | front LED
-+ *   1  | front LED brightness
-+ *   2  | SATA LED brightness
-+ *   3  | SATA0 LED
-+ *   4  | SATA1 LED
-+ *   5  | SATA2 LED
-+ *   6  | SATA3 LED
-+ *   7  | SATA4 LED
++ * Copyright (C) 2014
 + *
-+ * Data register configuration:
++ * Andrew Lunn <andrew@lunn.ch>
 + *
-+ * data | LED brightness
-+ * -------------------------------------------------
-+ *   0  | min (off)
-+ *   -  | -
-+ *   7  | max
++ * Based on netxbig_v2-setup.c,
++ * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
 + *
-+ * data | front LED mode
-+ * -------------------------------------------------
-+ *   0  | fix off
-+ *   1  | fix blue on
-+ *   2  | fix red on
-+ *   3  | blink blue on=1 sec and blue off=1 sec
-+ *   4  | blink red on=1 sec and red off=1 sec
-+ *   5  | blink blue on=2.5 sec and red on=0.5 sec
-+ *   6  | blink blue on=1 sec and red on=1 sec
-+ *   7  | blink blue on=0.5 sec and blue off=2.5 sec
-+ *
-+ * data | SATA LED mode
-+ * -------------------------------------------------
-+ *   0  | fix off
-+ *   1  | SATA activity blink
-+ *   2  | fix red on
-+ *   3  | blink blue on=1 sec and blue off=1 sec
-+ *   4  | blink red on=1 sec and red off=1 sec
-+ *   5  | blink blue on=2.5 sec and red on=0.5 sec
-+ *   6  | blink blue on=1 sec and red on=1 sec
-+ *   7  | fix blue on
-+ */
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++*/
 +
-+static int netxbig_v2_red_mled[NETXBIG_LED_MODE_NUM] = {
-+	[NETXBIG_LED_OFF]	= 0,
-+	[NETXBIG_LED_ON]	= 2,
-+	[NETXBIG_LED_SATA]	= NETXBIG_LED_INVALID_MODE,
-+	[NETXBIG_LED_TIMER1]	= 4,
-+	[NETXBIG_LED_TIMER2]	= NETXBIG_LED_INVALID_MODE,
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
++
++/ {
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8";
++	};
++
++	ocp at f1000000 {
++		serial at 12000 {
++			status = "ok";
++		};
++
++		spi at 10600 {
++			pinctrl-0 = <&pmx_spi>;
++			pinctrl-names = "default";
++			status = "okay";
++
++			flash at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "mxicy,mx25l4005a";
++				reg = <0>;
++				spi-max-frequency = <20000000>;
++				mode = <0>;
++
++				partition at 0 {
++					reg = <0x0 0x80000>;
++					label = "u-boot";
++				};
++			};
++		};
++
++		sata at 80000 {
++			status = "okay";
++			nr-ports = <2>;
++		};
++
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/*
++		 * button at 1 and button at 2 represent a three position rocker
++		 * switch. Thus the conventional KEY_POWER does not fit
++		 */
++		button at 1 {
++			label = "Back power switch (on|auto)";
++			linux,code = <KEY_ESC>;
++			linux,input-type = <5>;
++			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
++		};
++		button at 2 {
++			label = "Back power switch (auto|off)";
++			linux,code = <KEY_1>;
++			linux,input-type = <5>;
++			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
++		};
++		button at 3 {
++			label = "Function button";
++			linux,code = <KEY_OPTION>;
++			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
++		};
++
++	};
++
++	gpio_poweroff {
++		compatible = "gpio-poweroff";
++		gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
++	};
++
++       	regulators: regulators {
++                status = "okay";
++                compatible = "simple-bus";
++                #address-cells = <1>;
++                #size-cells = <0>;
++                pinctrl-names = "default";
++
++                regulator at 1 {
++                        compatible = "regulator-fixed";
++                        reg = <1>;
++                        regulator-name = "hdd0power";
++                        regulator-min-microvolt = <5000000>;
++                        regulator-max-microvolt = <5000000>;
++                        enable-active-high;
++                        regulator-always-on;
++                        regulator-boot-on;
++                        gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
++                };
++
++                regulator at 2 {
++                        compatible = "regulator-fixed";
++                        reg = <2>;
++                        regulator-name = "hdd1power";
++                        regulator-min-microvolt = <5000000>;
++                        regulator-max-microvolt = <5000000>;
++                        enable-active-high;
++                        regulator-always-on;
++                        regulator-boot-on;
++                        gpio = <&gpio0 17 GPIO_ACTIVE_HIGH>;
++                };
++
++        };
 +};
 +
-+static int netxbig_v2_blue_pwr_mled[NETXBIG_LED_MODE_NUM] = {
-+	[NETXBIG_LED_OFF]	= 0,
-+	[NETXBIG_LED_ON]	= 1,
-+	[NETXBIG_LED_SATA]	= NETXBIG_LED_INVALID_MODE,
-+	[NETXBIG_LED_TIMER1]	= 3,
-+	[NETXBIG_LED_TIMER2]	= 7,
++&mdio {
++	status = "okay";
++
++	ethphy0: ethernet-phy at 0 {
++		reg = <8>;
++	};
++
++	ethphy1: ethernet-phy at 1 {
++		reg = <0>;
++	};
 +};
 +
-+static int netxbig_v2_blue_sata_mled[NETXBIG_LED_MODE_NUM] = {
-+	[NETXBIG_LED_OFF]	= 0,
-+	[NETXBIG_LED_ON]	= 7,
-+	[NETXBIG_LED_SATA]	= 1,
-+	[NETXBIG_LED_TIMER1]	= 3,
-+	[NETXBIG_LED_TIMER2]	= NETXBIG_LED_INVALID_MODE,
++&eth0 {
++	status = "okay";
++	ethernet0-port at 0 {
++		phy-handle = <&ethphy0>;
++	};
 +};
 +
-+static struct netxbig_led_timer netxbig_v2_led_timer[] = {
-+	[0] = {
-+		.delay_on	= 500,
-+		.delay_off	= 500,
-+		.mode		= NETXBIG_LED_TIMER1,
-+	},
-+	[1] = {
-+		.delay_on	= 500,
-+		.delay_off	= 1000,
-+		.mode		= NETXBIG_LED_TIMER2,
-+	},
++&eth1 {
++	ethernet1-port at 0 {
++		phy-handle = <&ethphy1>;
++	};
 +};
 +
-+#define NETXBIG_LED(_name, maddr, mval, baddr)			\
-+	{ .name		= _name,				\
-+	  .mode_addr	= maddr,				\
-+	  .mode_val	= mval,					\
-+	  .bright_addr	= baddr }
++&pinctrl {
++	pinctrl-names = "default";
 +
-+static struct netxbig_led net2big_v2_leds_ctrl[] = {
-+	NETXBIG_LED("net2big-v2:blue:power", 0, netxbig_v2_blue_pwr_mled,  1),
-+	NETXBIG_LED("net2big-v2:red:power",  0, netxbig_v2_red_mled,       1),
-+	NETXBIG_LED("net2big-v2:blue:sata0", 3, netxbig_v2_blue_sata_mled, 2),
-+	NETXBIG_LED("net2big-v2:red:sata0",  3, netxbig_v2_red_mled,       2),
-+	NETXBIG_LED("net2big-v2:blue:sata1", 4, netxbig_v2_blue_sata_mled, 2),
-+	NETXBIG_LED("net2big-v2:red:sata1",  4, netxbig_v2_red_mled,       2),
++	pmx_button_function: pmx-button-function {
++		marvell,pins = "mpp34";
++		marvell,function = "gpio";
++	};
++	pmx_button_power_off: pmx-button-power-off {
++		marvell,pins = "mpp15";
++		marvell,function = "gpio";
++	};
++	pmx_button_power_on: pmx-button-power-on {
++		marvell,pins = "mpp13";
++		marvell,function = "gpio";
++	};
 +};
 +
-+static struct netxbig_led_platform_data net2big_v2_leds_data = {
-+	.gpio_ext	= &netxbig_v2_gpio_ext,
-+	.timer		= netxbig_v2_led_timer,
-+	.num_timer	= ARRAY_SIZE(netxbig_v2_led_timer),
-+	.leds		= net2big_v2_leds_ctrl,
-+	.num_leds	= ARRAY_SIZE(net2big_v2_leds_ctrl),
++&i2c0 {
++	pinctrl-0 = <&pmx_twsi0>;
++	pinctrl-names = "default";
++	status = "okay";
++
++	eeprom at 50 {
++		compatible = "at,24c04";
++		pagesize = <16>;
++		reg = <0x50>;
++	};
 +};
 +
-+static struct netxbig_led net5big_v2_leds_ctrl[] = {
-+	NETXBIG_LED("net5big-v2:blue:power", 0, netxbig_v2_blue_pwr_mled,  1),
-+	NETXBIG_LED("net5big-v2:red:power",  0, netxbig_v2_red_mled,       1),
-+	NETXBIG_LED("net5big-v2:blue:sata0", 3, netxbig_v2_blue_sata_mled, 2),
-+	NETXBIG_LED("net5big-v2:red:sata0",  3, netxbig_v2_red_mled,       2),
-+	NETXBIG_LED("net5big-v2:blue:sata1", 4, netxbig_v2_blue_sata_mled, 2),
-+	NETXBIG_LED("net5big-v2:red:sata1",  4, netxbig_v2_red_mled,       2),
-+	NETXBIG_LED("net5big-v2:blue:sata2", 5, netxbig_v2_blue_sata_mled, 2),
-+	NETXBIG_LED("net5big-v2:red:sata2",  5, netxbig_v2_red_mled,       2),
-+	NETXBIG_LED("net5big-v2:blue:sata3", 6, netxbig_v2_blue_sata_mled, 2),
-+	NETXBIG_LED("net5big-v2:red:sata3",  6, netxbig_v2_red_mled,       2),
-+	NETXBIG_LED("net5big-v2:blue:sata4", 7, netxbig_v2_blue_sata_mled, 2),
-+	NETXBIG_LED("net5big-v2:red:sata5",  7, netxbig_v2_red_mled,       2),
-+};
-+
-+static struct netxbig_led_platform_data net5big_v2_leds_data = {
-+	.gpio_ext	= &netxbig_v2_gpio_ext,
-+	.timer		= netxbig_v2_led_timer,
-+	.num_timer	= ARRAY_SIZE(netxbig_v2_led_timer),
-+	.leds		= net5big_v2_leds_ctrl,
-+	.num_leds	= ARRAY_SIZE(net5big_v2_leds_ctrl),
-+};
-+
-+static struct platform_device netxbig_v2_leds = {
-+	.name		= "leds-netxbig",
-+	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &net2big_v2_leds_data,
-+	},
-+};
-+
-+void __init netxbig_init(void)
-+{
-+
-+	if (of_machine_is_compatible("lacie,net5big"))
-+		netxbig_v2_leds.dev.platform_data = &net5big_v2_leds_data;
-+	platform_device_register(&netxbig_v2_leds);
-+}
-diff --git a/arch/arm/mach-mvebu/board.h b/arch/arm/mach-mvebu/board.h
-index de7f0a191394..f130d8079b68 100644
---- a/arch/arm/mach-mvebu/board.h
-+++ b/arch/arm/mach-mvebu/board.h
-@@ -19,4 +19,10 @@ void t5325_init(void);
- static inline void t5325_init(void) {};
- #endif
- 
-+#ifdef CONFIG_MACH_NETXBIG
-+void netxbig_init(void);
-+#else
-+static inline void netxbig_init(void) {};
-+#endif
-+
- #endif
-diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
-index 120207fc36f1..c0b4828970fc 100644
---- a/arch/arm/mach-mvebu/kirkwood.c
-+++ b/arch/arm/mach-mvebu/kirkwood.c
-@@ -183,6 +183,9 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("hp,t5325"))
- 		t5325_init();
- 
-+	if (of_machine_is_compatible("lacie,netxbig"))
-+		netxbig_init();
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, auxdata, NULL);
- }
- 
 -- 
 1.9.2
