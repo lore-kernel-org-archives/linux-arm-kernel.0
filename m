@@ -1,157 +1,67 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 17 Apr 2014 15:49:35 -0500
-Subject: [PATCH V2 19/19] bus: omap_l3_noc: Add AM4372 interconnect error data
+Date: Thu, 17 Apr 2014 15:49:20 -0500
+Subject: [PATCH V2 04/19] bus: omap_l3_noc: populate l3->dev and use it
 In-Reply-To: <1397767775-10965-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
  <1397767775-10965-1-git-send-email-nm@ti.com>
-Message-ID: <1397767775-10965-20-git-send-email-nm@ti.com>
+Message-ID: <1397767775-10965-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Afzal Mohammed <afzal@ti.com>
+l3->dev is not populated, so populate it and use it to print information
+relevant to the device instead of using a generic pr_*.
 
-Add AM4372 information to handle L3 error.
-
-AM4372 has two clk domains 100f and 200s. Provide flagmux and data
-associated with it.
-
-NOTE: Timeout doesn't have STDERRLOG_MAIN register. And per hardware
-team, L3 timeout error cannot be cleared the normal way (by setting
-bit 31 in STDERRLOG_MAIN), instead it may be required to do system
-reset. L3 error handler can't help in such scenarios.
-
-Hence indicate timeout target offset as L3_TARGET_NOT_SUPPORTED as
-done for undocumented bits.
-
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-V2: no change.
-V1: https://patchwork.kernel.org/patch/3984121/
- .../devicetree/bindings/arm/omap/l3-noc.txt        |    1 +
- drivers/bus/omap_l3_noc.c                          |    1 +
- drivers/bus/omap_l3_noc.h                          |   85 ++++++++++++++++++++
- 3 files changed, 87 insertions(+)
+v2: reordering, dropped the warn change as centralizing patch follows
+v1: https://patchwork.kernel.org/patch/3984221/
+ drivers/bus/omap_l3_noc.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
-index 45d0fc2..974624e 100644
---- a/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/l3-noc.txt
-@@ -7,6 +7,7 @@ Required properties:
- - compatible : Should be "ti,omap3-l3-smx" for OMAP3 family
-                Should be "ti,omap4-l3-noc" for OMAP4 family
- 	       Should be "ti,dra7-l3-noc" for DRA7 family
-+               Should be "ti,am4372-l3-noc" for AM43 family
- - reg:	Contains L3 register address range for each noc domain.
- - ti,hwmods: "l3_main_1", ... One hwmod for each noc domain.
- 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index aa7a759..440bf22 100644
+index 800486c..37d71b7 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -226,6 +226,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- static const struct of_device_id l3_noc_match[] = {
- 	{.compatible = "ti,omap4-l3-noc", .data = &omap_l3_data},
- 	{.compatible = "ti,dra7-l3-noc", .data = &dra_l3_data},
-+	{.compatible = "ti,am4372-l3-noc", .data = &am4372_l3_data},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, l3_noc_match);
-diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index acfeb5e..e0e02a2 100644
---- a/drivers/bus/omap_l3_noc.h
-+++ b/drivers/bus/omap_l3_noc.h
-@@ -371,4 +371,89 @@ static const struct omap_l3 dra_l3_data = {
- 	.num_masters = ARRAY_SIZE(dra_l3_masters),
- };
+@@ -131,6 +131,7 @@ static int omap_l3_probe(struct platform_device *pdev)
+ 	if (!l3)
+ 		return -ENOMEM;
  
-+/* AM4372 data */
-+static struct l3_target_data am4372_l3_target_data_200f[] = {
-+	{0xf00,  "EMIF",},
-+	{0x1200, "DES",},
-+	{0x400,  "OCMCRAM",},
-+	{0x700,  "TPTC0",},
-+	{0x800,  "TPTC1",},
-+	{0x900,  "TPTC2"},
-+	{0xb00,  "TPCC",},
-+	{0xd00,  "DEBUGSS",},
-+	{0xdead, L3_TARGET_NOT_SUPPORTED,},
-+	{0x200,  "SHA",},
-+	{0xc00,  "SGX530",},
-+	{0x500,  "AES0",},
-+	{0xa00,  "L4_FAST",},
-+	{0x300,  "MPUSS_L2_RAM",},
-+	{0x100,  "ICSS",},
-+};
-+
-+static struct l3_flagmux_data am4372_l3_flagmux_200f = {
-+	.offset = 0x1000,
-+	.l3_targ = am4372_l3_target_data_200f,
-+	.num_targ_data = ARRAY_SIZE(am4372_l3_target_data_200f),
-+};
-+
-+static struct l3_target_data am4372_l3_target_data_100s[] = {
-+	{0x100, "L4_PER_0",},
-+	{0x200, "L4_PER_1",},
-+	{0x300, "L4_PER_2",},
-+	{0x400, "L4_PER_3",},
-+	{0x800, "McASP0",},
-+	{0x900, "McASP1",},
-+	{0xC00, "MMCHS2",},
-+	{0x700, "GPMC",},
-+	{0xD00, "L4_FW",},
-+	{0xdead, L3_TARGET_NOT_SUPPORTED,},
-+	{0x500, "ADCTSC",},
-+	{0xE00, "L4_WKUP",},
-+	{0xA00, "MAG_CARD",},
-+};
-+
-+static struct l3_flagmux_data am4372_l3_flagmux_100s = {
-+	.offset = 0x600,
-+	.l3_targ = am4372_l3_target_data_100s,
-+	.num_targ_data = ARRAY_SIZE(am4372_l3_target_data_100s),
-+};
-+
-+static struct l3_masters_data am4372_l3_masters[] = {
-+	{ 0x0, "M1 (128-bit)"},
-+	{ 0x0, "M2 (64-bit)"},
-+	{ 0x4, "DAP"},
-+	{ 0x5, "P1500"},
-+	{ 0xC, "ICSS0"},
-+	{ 0xD, "ICSS1"},
-+	{ 0x18, "TPTC0 Read"},
-+	{ 0x19, "TPTC0 Write"},
-+	{ 0x1A, "TPTC1 Read"},
-+	{ 0x1B, "TPTC1 Write"},
-+	{ 0x1C, "TPTC2 Read"},
-+	{ 0x1D, "TPTC2 Write"},
-+	{ 0x20, "SGX530"},
-+	{ 0x25, "DSS"},
-+	{ 0x28, "Crypto DMA RD"},
-+	{ 0x29, "Crypto DMA WR"},
-+	{ 0x2C, "VPFE0"},
-+	{ 0x2D, "VPFE1"},
-+	{ 0x30, "GEMAC"},
-+	{ 0x34, "USB0 RD"},
-+	{ 0x35, "USB0 WR"},
-+	{ 0x36, "USB1 RD"},
-+	{ 0x37, "USB1 WR"},
-+};
-+
-+static struct l3_flagmux_data *am4372_l3_flagmux[] = {
-+	&am4372_l3_flagmux_200f,
-+	&am4372_l3_flagmux_100s,
-+};
-+
-+static const struct omap_l3 am4372_l3_data = {
-+	.l3_flagmux = am4372_l3_flagmux,
-+	.num_modules = ARRAY_SIZE(am4372_l3_flagmux),
-+	.l3_masters = am4372_l3_masters,
-+	.num_masters = ARRAY_SIZE(am4372_l3_masters),
-+};
-+
- #endif	/* __OMAP_L3_NOC_H */
++	l3->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, l3);
+ 
+ 	/* Get mem resources */
+@@ -140,7 +141,7 @@ static int omap_l3_probe(struct platform_device *pdev)
+ 
+ 		l3->l3_base[i] = devm_ioremap_resource(&pdev->dev, res);
+ 		if (IS_ERR(l3->l3_base[i])) {
+-			dev_err(&pdev->dev, "ioremap %d failed\n", i);
++			dev_err(l3->dev, "ioremap %d failed\n", i);
+ 			return PTR_ERR(l3->l3_base[i]);
+ 		}
+ 	}
+@@ -149,19 +150,19 @@ static int omap_l3_probe(struct platform_device *pdev)
+ 	 * Setup interrupt Handlers
+ 	 */
+ 	l3->debug_irq = platform_get_irq(pdev, 0);
+-	ret = devm_request_irq(&pdev->dev, l3->debug_irq, l3_interrupt_handler,
++	ret = devm_request_irq(l3->dev, l3->debug_irq, l3_interrupt_handler,
+ 			       IRQF_DISABLED, "l3-dbg-irq", l3);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "request_irq failed for %d\n",
++		dev_err(l3->dev, "request_irq failed for %d\n",
+ 			l3->debug_irq);
+ 		return ret;
+ 	}
+ 
+ 	l3->app_irq = platform_get_irq(pdev, 1);
+-	ret = devm_request_irq(&pdev->dev, l3->app_irq, l3_interrupt_handler,
++	ret = devm_request_irq(l3->dev, l3->app_irq, l3_interrupt_handler,
+ 			       IRQF_DISABLED, "l3-app-irq", l3);
+ 	if (ret)
+-		dev_err(&pdev->dev, "request_irq failed for %d\n", l3->app_irq);
++		dev_err(l3->dev, "request_irq failed for %d\n", l3->app_irq);
+ 
+ 	return ret;
+ }
 -- 
 1.7.9.5
