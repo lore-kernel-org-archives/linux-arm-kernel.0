@@ -1,44 +1,43 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Apr 2014 07:45:03 +0900
-Subject: [PATCH 14/14] ARM: shmobile: lager legacy: Enable Quad SPI transfers
- for the SPI FLASH
-In-Reply-To: <cover.1397774190.git.horms+renesas@verge.net.au>
-References: <cover.1397774190.git.horms+renesas@verge.net.au>
-Message-ID: <a09b2f0ba170dc89a67d6c4c4f027b37a085dad9.1397774191.git.horms+renesas@verge.net.au>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Fri, 18 Apr 2014 00:55:19 +0200
+Subject: BUG: spinlock trylock failure on UP - reverting timer patches
+ helps
+In-Reply-To: <53500184.4050309@meduna.org>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org> <53500184.4050309@meduna.org>
+Message-ID: <53505BD7.9050004@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On 17.04.2014 18:29, Stanislav Meduna wrote:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-lager.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+> Note: the bug goes away reverting the very same patches that are
+> helping the Jordan's problms. I did follow
+> 
+> http://www.spinics.net/lists/linux-rt-users/msg11639.html
+> 
+> and no BUG while booting anymore. I'll try to let it run some
+> more time.
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 6af09e1..6c4fcfe 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -325,12 +325,12 @@ static const struct rspi_plat_data qspi_pdata __initconst = {
- 
- static const struct spi_board_info spi_info[] __initconst = {
- 	{
--		.modalias               = "m25p80",
--		.platform_data          = &spi_flash_data,
--		.mode                   = SPI_MODE_0,
--		.max_speed_hz           = 30000000,
--		.bus_num                = 0,
--		.chip_select            = 0,
-+		.modalias	= "m25p80",
-+		.platform_data	= &spi_flash_data,
-+		.mode		= SPI_MODE_0 | SPI_TX_QUAD | SPI_RX_QUAD,
-+		.max_speed_hz	= 30000000,
-+		.bus_num	= 0,
-+		.chip_select	= 0,
- 	},
- };
- 
+Erm.. nope
+
+# (cat /proc/meminfo ; cat /proc/meminfo) |  grep KernelStack
+KernelStack:        5920 kB
+KernelStack:        5928 kB
+
+# (cat /proc/meminfo ; cat /proc/meminfo) |  grep KernelStack
+KernelStack:        5952 kB
+KernelStack:        5960 kB
+
+maybe interrupt nesting ad nauseum? How does one debug
+such issues?
+
+It is possible that my previous posting was also caused by this -
+disregard, I'll post again if the problem persists.
+
+Jordan, could you check whether your kernel stack remains
+stable with only the 3 patches reverted?
+
+Thanks
 -- 
-1.8.4
+                                     Stano
