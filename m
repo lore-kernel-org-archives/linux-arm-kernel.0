@@ -1,66 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Apr 2014 07:44:59 +0900
-Subject: [PATCH 10/14] ARM: shmobile: bockw: remove old style audio clock
+Date: Fri, 18 Apr 2014 07:44:58 +0900
+Subject: [PATCH 09/14] ARM: shmobile: Add Koelsch clock workarounds for SDHI
 In-Reply-To: <cover.1397774190.git.horms+renesas@verge.net.au>
 References: <cover.1397774190.git.horms+renesas@verge.net.au>
-Message-ID: <115897dab004f580fc8b4c6bab057940ccb64989.1397774191.git.horms+renesas@verge.net.au>
+Message-ID: <f278ea78beeb17ea07d11fc3372d4f98c94dcf46.1397774191.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Current audio clock didn't have dependency to device/driver,
-but, it was not good design for DT support.
-To avoid branch merge conflict issue,
-it is using this load map, and this patch is 3) part.
- 1) add new style clock in platform
- 2) add new style clock method in driver
- 3) remove old tyle clock from platform
+Add SDHI0, SDHI1 and SDHI2 to the clock workaround list for
+Koelsch multiplatform. Without these additional lines wakeup
+from Suspend-to-RAM never happens.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index b4122f8..1aca107 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -591,6 +591,7 @@ static void __init bockw_init(void)
- {
- 	void __iomem *base;
- 	struct clk *clk;
-+	struct platform_device *pdev;
- 	int i;
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index 63117d52..941f8b3 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -115,6 +115,9 @@ static const struct clk_name clk_enables[] __initconst = {
+ 	{ "i2c2", NULL, "e6530000.i2c" },
+ 	{ "msiof0", NULL, "e6e20000.spi" },
+ 	{ "qspi_mod", NULL, "e6b10000.spi" },
++	{ "sdhi0", NULL, "ee100000.sd" },
++	{ "sdhi1", NULL, "ee140000.sd" },
++	{ "sdhi2", NULL, "ee160000.sd" },
+ 	{ "thermal", NULL, "e61f0000.thermal" },
+ };
  
- 	r8a7778_clock_init();
-@@ -673,9 +674,6 @@ static void __init bockw_init(void)
- 	}
- 
- 	/* for Audio */
--	clk = clk_get(NULL, "audio_clk_b");
--	clk_set_rate(clk, 24576000);
--	clk_put(clk);
- 	rsnd_codec_power(5, 1); /* enable ak4642 */
- 
- 	platform_device_register_simple(
-@@ -684,11 +682,15 @@ static void __init bockw_init(void)
- 	platform_device_register_simple(
- 		"ak4554-adc-dac", 1, NULL, 0);
- 
--	platform_device_register_resndata(
-+	pdev = platform_device_register_resndata(
- 		&platform_bus, "rcar_sound", -1,
- 		rsnd_resources, ARRAY_SIZE(rsnd_resources),
- 		&rsnd_info, sizeof(rsnd_info));
- 
-+	clk = clk_get(&pdev->dev, "clk_b");
-+	clk_set_rate(clk, 24576000);
-+	clk_put(clk);
-+
- 	for (i = 0; i < ARRAY_SIZE(rsnd_card_info); i++) {
- 		struct platform_device_info cardinfo = {
- 			.parent         = &platform_bus,
 -- 
 1.8.4
