@@ -1,24 +1,25 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 17 Apr 2014 10:45:29 +0200
-Subject: [PATCH 2/2] ARM: dts: berlin: add the BG2CD GPIO nodes
+Date: Thu, 17 Apr 2014 10:45:28 +0200
+Subject: [PATCH 1/2] ARM: dts: berlin: add the BG2 GPIO nodes
 In-Reply-To: <1397724329-14154-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1397724329-14154-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1397724329-14154-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1397724329-14154-2-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin BG2CD has 32 GPIOs in SoC power domain and 16 in the SM one.
+The Berlin BG2 has 32 GPIOs in SoC power domain and 16 in the SM one.
+Only the first 8 SM GPIOs have interrupt support.
 
 Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 102 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 102 insertions(+)
+ arch/arm/boot/dts/berlin2.dtsi | 105 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 105 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 094968c27533..6eb1bdae23ac 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -87,6 +87,78 @@
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 4d85312dc17a..57cadd31f4e1 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -99,6 +99,78 @@
  			ranges = <0 0xe80000 0x10000>;
  			interrupt-parent = <&aic>;
  
@@ -97,7 +98,7 @@ index 094968c27533..6eb1bdae23ac 100644
  			timer0: timer at 2c00 {
  				compatible = "snps,dw-apb-timer";
  				reg = <0x2c00 0x14>;
-@@ -177,6 +249,36 @@
+@@ -194,6 +266,39 @@
  			ranges = <0 0xfc0000 0x10000>;
  			interrupt-parent = <&sic>;
  
@@ -128,6 +129,9 @@ index 094968c27533..6eb1bdae23ac 100644
 +					#gpio-cells = <2>;
 +					snps,nr-gpios = <8>;
 +					reg = <0>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					interrupts = <11>;
 +				};
 +			};
 +
