@@ -1,124 +1,123 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 17 Apr 2014 10:37:32 +0900
-Subject: [PATCH 01/27] ARM: EXYNOS: Add Exynos3250 SoC ID
-In-Reply-To: <534EA773.30006@samsung.com>
-References: <1397122658-16013-1-git-send-email-cw00.choi@samsung.com>
- <1397122658-16013-2-git-send-email-cw00.choi@samsung.com>
- <20140411014650.GB14934@quad.lixom.net> <53478C75.60302@samsung.com>
- <5347AA35.4010504@samsung.com> <534B6E8E.20506@samsung.com>
- <534EA773.30006@samsung.com>
-Message-ID: <534F305C.2050407@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 Apr 2014 10:05:10 +0800
+Subject: [PATCH 2/2] ahci: imx: software workaround for phy reset issue
+ in resume
+In-Reply-To: <20140416140112.GB1257@htj.dyndns.org>
+References: <1397529703-21165-1-git-send-email-shawn.guo@freescale.com>
+ <1397529703-21165-2-git-send-email-shawn.guo@freescale.com>
+ <20140415161018.GN1863@htj.dyndns.org>
+ <20140416073823.GJ2523@dragon>
+ <20140416140112.GB1257@htj.dyndns.org>
+Message-ID: <20140417020509.GM2523@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On 04/17/2014 12:53 AM, Tomasz Figa wrote:
-> Hi Chanwoo,
+On Wed, Apr 16, 2014 at 10:01:12AM -0400, Tejun Heo wrote:
+> Hello,
 > 
-> On 14.04.2014 07:13, Chanwoo Choi wrote:
->> On 04/11/2014 05:39 PM, Tomasz Figa wrote:
->>> On 11.04.2014 08:32, Chanwoo Choi wrote:
->>>> On 04/11/2014 10:46 AM, Olof Johansson wrote:
->>>>> On Thu, Apr 10, 2014 at 06:37:12PM +0900, Chanwoo Choi wrote:
->>>>>> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
->>>>>> index 5992b8d..3d808f6b 100644
->>>>>> --- a/arch/arm/plat-samsung/include/plat/cpu.h
->>>>>> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
->>>>>> @@ -43,6 +43,9 @@ extern unsigned long samsung_cpu_id;
->>>>>>    #define S5PV210_CPU_ID        0x43110000
->>>>>>    #define S5PV210_CPU_MASK    0xFFFFF000
->>>>>>
->>>>>> +#define EXYNOS3250_SOC_ID       0xE3472000
->>>>>> +#define EXYNOS3_SOC_MASK        0xFFFFF000
->>>>>> +
->>>>>>    #define EXYNOS4210_CPU_ID    0x43210000
->>>>>>    #define EXYNOS4212_CPU_ID    0x43220000
->>>>>>    #define EXYNOS4412_CPU_ID    0xE4412200
->>>>>> @@ -68,6 +71,7 @@ IS_SAMSUNG_CPU(s5p6440, S5P6440_CPU_ID, S5P64XX_CPU_MASK)
->>>>>>    IS_SAMSUNG_CPU(s5p6450, S5P6450_CPU_ID, S5P64XX_CPU_MASK)
->>>>>>    IS_SAMSUNG_CPU(s5pc100, S5PC100_CPU_ID, S5PC100_CPU_MASK)
->>>>>>    IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
->>>>>> +IS_SAMSUNG_CPU(exynos3250, EXYNOS3250_SOC_ID, EXYNOS3_SOC_MASK)
->>>>>>    IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
->>>>>>    IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
->>>>>>    IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
->>>>>> @@ -126,6 +130,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
->>>>>>    # define soc_is_s5pv210()    0
->>>>>>    #endif
->>>>>>
->>>>>> +#if defined(CONFIG_SOC_EXYNOS3250)
->>>>>> +# define soc_is_exynos3250()    is_samsung_exynos3250()
->>>>>> +#else
->>>>>> +# define soc_is_exynos3250()    0
->>>>>> +#endif
->>>>>
->>>>> In general, I think we have too much code littered with soc_is_<foo>() going
->>>>> on, so please try to avoid adding more for this SoC. Especially in cases where
->>>>> you just want to bail out of certain features where we might already have
->>>>> function pointers to control if a function is called or not, such as the
->>>>> firmware interfaces.
->>>>>
->>>>
->>>> Do you prefer dt helper function such as following function instead of new soc_is_xx() ?
->>>> - of_machine_is_compatible("samsung,exynos3250")
->>>>
->>>> If you are OK, I'll use of_machine_is_compatible() instead of soc_is_xx().
->>>
->>> First of all, there is still a lot of code in mach-exynos/ using the soc_is_xx() macros, so having some SoCs use them and other SoCs use of_machine_is_compatible() wouldn't make the code cleaner.
->>>
->>> For now, I wouldn't mind adding soc_is_exynos3250(), but in general such code surrounded with if (soc_is_xx()) blocks should be reworked to use something better, for example function pointers, as Olof suggested.
->>
->> I thought 'function pointers' method instead of soc_is_xxx() macro as following two case:
->> I need more detailed explanation/example of "for example function pointers, as Olof suggested." sentence.
->>
->> [case 1]
->> Each Exynos SoC has other function pointers according to compatible name of DT.
->>
->> For example, arch/arm/mach-exynos/firmware.c
->>
->> static const struct firmware_ops exynos_firmware_ops = {
->>     .do_idle        = exynos_do_idle,
->>     .set_cpu_boot_addr    = exynos_set_cpu_boot_addr,
->>     .cpu_boot        = exynos_cpu_boot,
->> };
->> static const struct firmware_ops exynos3250_firmware_ops = {
->>     .do_idle        = exynos_do_idle,
->>     .set_cpu_boot_addr    = exynos4212_set_cpu_boot_addr,
->>     .cpu_boot        = exynos3250_cpu_boot,
->> };
->>
->> static const struct firmware_ops exynos4212_firmware_ops = {
->>     .do_idle        = exynos_do_idle,
->>     .set_cpu_boot_addr    = exynos4212_set_cpu_boot_addr,
->>     .cpu_boot        = exynos4212_cpu_boot,
->> };
->>
->> struct secure_firmware {
->>     char *name;
->>     const struct firmware_ops *ops;
->> } exynos_secure_firmware[] __initconst = {
->>     { "samsung,secure-firmware",        &exynos_firmware_ops },
->>     { "samsung,exynos3250-secure-firmware", &exynos3250_firmware_ops },
->>     { "samsung,exynos4212-secure-firmware", &exynos4212_firmware_ops },
->> };
->>
+> On Wed, Apr 16, 2014 at 03:38:24PM +0800, Shawn Guo wrote:
+> > The hardware manual suggests that an ACK will normally be given within
+> > 100us.  So using msleep() will have it sleep longer than necessary for
+> > normal case.  Basically, we're following the suggestion from
+> > Documentation/timers/timers-howto.txt to use usleep_range() over
+> > msleep().
+> > 
+> > SLEEPING FOR ~USECS OR SMALL MSECS ( 10us - 20ms):
+> > 	* Use usleep_range
+> > 
+> > 	- Why not msleep for (1ms - 20ms)?
+> > 		Explained originally here:
+> > 			http://lkml.org/lkml/2007/8/3/250
+> > 		msleep(1~20) may not do what the caller intends, and
+> > 		will often sleep longer (~20 ms actual sleep for any
+> > 		value given in the 1~20ms range). In many cases this
+> > 		is not the desired behavior.
 > 
-> This is probably the right solution. Another would be to detect which firmware ops to use by matching root node with particular SoC compatible strings.
-> 
+> But we don't care whether the minimum wait is actually 100us here, do
+> we?  It's a reset path.  Let's please just be simple.  msleep(1) not
+> actually sleeping 1ms is an implementation detail which may change in
+> the future.  If this were in the command execution path, sure, but not
+> here.
 
-OK, I'll modify firmware.c using this method on separated patch apart from Exynos3250 patchset.
-But, I want to implment it after completed Exynos3250 patchset.
-Because Exynos3250 patchset needs other patch such as following patch:
-Following patches has not yet to be confirmed or merged.
+Functions imx_phy_reg_[addressing|write|read]() implement the phy
+control register bus interface.  Though the interface is used only for
+phy reset right now, it's not limited to phy reset but anything that
+needs to access phy.
 
-[PATCH Resend] ARM: EXYNOS: Map SYSRAM address through DT
-- http://www.spinics.net/lists/arm-kernel/msg323011.html
+Even for reset path, we still care about the time.  I just quickly
+tested it with replacing all those usleep_range() calls with msleep(1),
+and found that the resume time increases dramatically, from 10.880 msecs
+to 69.431 msecs.  The system resume speed is quite critical to some of
+our customers.  If every device sleeps longer than necessary like that,
+the system resume speed will be unacceptably slow.  So, please, allow
+the use of usleep_range() here.
 
-[PATCH v2 1/3] ARM: EXYNOS: Map PMU address through DT
-- http://www.spinics.net/lists/arm-kernel/msg316013.html
- 
-Thanks for your review.
+Shawn
 
-Best regards,
-Chanwoo Choi
+=== usleep_range ===
+$ echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+PM: Preparing system for mem sleep
+Freezing user space processes ... (elapsed 0.001 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+PM: Entering mem sleep
+sd 0:0:0:0: [sda] Synchronizing SCSI cache
+sd 0:0:0:0: [sda] Stopping disk
+PM: suspend of devices complete after 51.209 msecs
+PM: suspend devices took 0.060 seconds
+PM: late suspend of devices complete after 4.651 msecs
+PM: noirq suspend of devices complete after 4.869 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+PM: noirq resume of devices complete after 4.010 msecs
+PM: early resume of devices complete after 4.619 msecs
+sd 0:0:0:0: [sda] Starting disk
+PM: resume of devices complete after 10.880 msecs
+PM: resume devices took 0.020 seconds
+PM: Finishing wakeup.
+Restarting tasks ... done.
+$ ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+ata1.00: configured for UDMA/133
+
+=== msleep(1) ===
+$ echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+PM: Preparing system for mem sleep
+Freezing user space processes ... (elapsed 0.002 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
+PM: Entering mem sleep
+sd 0:0:0:0: [sda] Synchronizing SCSI cache
+sd 0:0:0:0: [sda] Stopping disk
+PM: suspend of devices complete after 35.751 msecs
+PM: suspend devices took 0.040 seconds
+PM: late suspend of devices complete after 4.190 msecs
+PM: noirq suspend of devices complete after 4.450 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+CPU1 is up
+CPU2: Booted secondary processor
+CPU2 is up
+CPU3: Booted secondary processor
+CPU3 is up
+PM: noirq resume of devices complete after 2.328 msecs
+PM: early resume of devices complete after 2.774 msecs
+sd 0:0:0:0: [sda] Starting disk
+PM: resume of devices complete after 69.431 msecs
+PM: resume devices took 0.070 seconds
+PM: Finishing wakeup.
+Restarting tasks ... done.
+$ ata1: SATA link up 3.0 Gbps (SStatus 123 SControl 300)
+ata1.00: configured for UDMA/133
