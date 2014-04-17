@@ -1,29 +1,56 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 17 Apr 2014 21:54:26 +0100
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <53503E5D.8000301@codeaurora.org>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <534EF153.5050603@codeaurora.org>
- <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
- <53501E87.6070307@codeaurora.org>
- <alpine.LFD.2.11.1404171543350.980@knanqh.ubzr>
- <53503E5D.8000301@codeaurora.org>
-Message-ID: <CAFEAcA_HZoPDoF-mJaB0tALJGr5U1xQ7Y=34nJvn3jU4Y0sT7Q@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 17 Apr 2014 16:57:37 -0400
+Subject: [PATCH V2 00/19] bus: omap_l3_noc: driver cleanups and support
+ for DRA7/AM4372
+In-Reply-To: <1397767775-10965-1-git-send-email-nm@ti.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1397767775-10965-1-git-send-email-nm@ti.com>
+Message-ID: <53504041.7090906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2014 21:49, Christopher Covington <cov@codeaurora.org> wrote:
-> In any case, when performing boot debugging I'm not as interested in
-> traditional self-hosted bootloaders as I am external loaders, like those built
-> into software models (QEMU, Fast Models, etc.) or available to JTAG scripts
-> (OpenOCD, Trace32, etc.). These seem to generally have ELF support.
+Nishant,
 
-FWIW ARM QEMU won't boot an ELF kernel -- the assumption is
-that an ELF file is not a kernel and should just be put into RAM
-and run, whereas a non-ELF file is a kernel and gets the special
-setup/handling of secondary CPUs/etc that the Booting document
-requires.
+On Thursday 17 April 2014 04:49 PM, Nishanth Menon wrote:
+> The following V2 of the series is based on v3.15-rc1 + peter's patch series:
+> 	patch #1: https://patchwork.kernel.org/patch/3923141/
+> 	(drivers: bus: omap_l3: Convert to use devm_kzalloc)
+> 
+> 	patch #2: https://patchwork.kernel.org/patch/3923061/
+> 	(drivers: bus: omap_l3: Convert to use devm_ioremap_resource() )
+> 
+> 	patch #3: https://patchwork.kernel.org/patch/3923101/
+> 	(drivers: bus: omap_l3: Convert to use devm_request_irq())
+> 
+> 	patch #4: https://patchwork.kernel.org/patch/3923081/
+> 	(drivers: bus: omap_l3: Remove the platform driver's remove function)
+> 
+> 	patch #5: https://patchwork.kernel.org/patch/3923121/
+> 	(drivers: bus: omap_l3: Change pr_crit() to dev_err() when IRQ request
+> 	fails)
+> 
+> V1 was originally posted here: http://marc.info/?l=linux-omap&m=139749383932575&w=2
+> 
+> V2 introduces the following changes:
+> 	- Additional bug fix detected during additional testing (all tests complete now). patch #12
+> 	- reordering of patches to order logical changes and reduce code churn.
+> 	- interrupt handler split up and additional information now provided in log to aid debug when error occur
+> 	- patches are marked where new (12,14,15,16).
+> 	- DRA7 updated from master document for all DRA7 variants.
+> 
+> This series cleansup omap_l3_noc driver and adds data to support DRA7
+> and AM437x SoCs.
+> 
+I looked at the series and its looks pretty good. Thanks for fixups, updates.
+For whole series,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-thanks
--- PMM
+> Patches(including Peter's) is available here:
+> https://github.com/nmenon/linux-2.6-playground/commits/l3noc/driver-fixes-v2
+> 
+Can Tony pull this branch for 3.16 then which includes Peter's series as well ?
+
+Tony, Will you be able to line these up via arm-soc tree ?
+
+Regards,
+Santosh
