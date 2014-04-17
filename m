@@ -1,20 +1,36 @@
-From: cminyard@mvista.com (Corey Minyard)
-Date: Thu, 17 Apr 2014 12:15:11 -0500
-Subject: kgdb on ARM printing a bogus OOPs
-Message-ID: <53500C1F.3040505@mvista.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Thu, 17 Apr 2014 18:41:59 +0100
+Subject: [PATCH 1/3] arm: dts: add device_type="memory" for ste-ccu8540
+In-Reply-To: <1397756521-29387-1-git-send-email-leif.lindholm@linaro.org>
+References: <1397756521-29387-1-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1397756521-29387-2-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was playing with kgdb on ARM, and I noticed that every time it hits a
-breakpoint I get the following:
+The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
+its memory node, relying on an old ppc quirk in order to discover its
+memory. Add this, to permit that quirk to be made ppc only.
 
-  Internal error: Oops - undefined instruction: 0 [#3] PREEMPT SMP ARM
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/ste-ccu8540.dts |    1 +
+ 1 file changed, 1 insertion(+)
 
-It's mostly harmless, the breakpoints still work, but all the printks
-could be troublesome in some debugging situations.  It's there because
-the notify_die() call was added after the printk in question.  I'd guess
-it should be before the printk, but is there a reason it was added after?
-
-Thanks,
-
--corey
+diff --git a/arch/arm/boot/dts/ste-ccu8540.dts b/arch/arm/boot/dts/ste-ccu8540.dts
+index 7f3baf5..32dd55e 100644
+--- a/arch/arm/boot/dts/ste-ccu8540.dts
++++ b/arch/arm/boot/dts/ste-ccu8540.dts
+@@ -18,6 +18,7 @@
+ 	compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
+ 
+ 	memory at 0 {
++		device_type = "memory";
+ 		reg = <0x20000000 0x1f000000>, <0xc0000000 0x3f000000>;
+ 	};
+ 
+-- 
+1.7.10.4
