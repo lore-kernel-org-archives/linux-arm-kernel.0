@@ -1,33 +1,24 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 17 Apr 2014 10:42:30 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: select CONFIG_GPIO_DWAPB
-Message-ID: <1397724150-14055-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Thu, 17 Apr 2014 10:45:27 +0200
+Subject: [PATCH 0/2] Add GPIO nodes for Berlin BG2 and BG2CD
+Message-ID: <1397724329-14154-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly integrated dwapb gpio driver handles the Berlin SoCs GPIOs.
-Add this driver to the multi_v7_defconfig.
+After adding support for the Berlin BG2Q GPIOs, this series uses the
+same GPIO dwapb driver to support the Berlin BG2 and BG2CD GPIOs.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- This patch applies on top of Alexandre's one selecting
- CONFIG_MACH_BERLIN_BG2Q:
- https://patchwork.kernel.org/patch/3876171/
+Applies on top of Sebastian's for-next branch[1].
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+[1] https://github.com/shesselba/linux-berlin/commits/berlin/for-next
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index b61a211cc221..ded037aff67d 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -192,6 +192,7 @@ CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
-+CONFIG_GPIO_DWAPB=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_GPIO_PALMAS=y
+Antoine T?nart (2):
+  ARM: dts: berlin: add the BG2 GPIO nodes
+  ARM: dts: berlin: add the BG2CD GPIO nodes
+
+ arch/arm/boot/dts/berlin2.dtsi   | 105 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi | 102 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 207 insertions(+)
+
 -- 
 1.8.3.2
