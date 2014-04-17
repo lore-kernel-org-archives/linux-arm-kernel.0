@@ -1,43 +1,35 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Fri, 18 Apr 2014 00:55:19 +0200
-Subject: BUG: spinlock trylock failure on UP - reverting timer patches
- helps
-In-Reply-To: <53500184.4050309@meduna.org>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org> <53500184.4050309@meduna.org>
-Message-ID: <53505BD7.9050004@meduna.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 18 Apr 2014 08:05:49 +0900
+Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
+Message-ID: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.04.2014 18:29, Stanislav Meduna wrote:
+Hi Mike,
 
-> Note: the bug goes away reverting the very same patches that are
-> helping the Jordan's problms. I did follow
-> 
-> http://www.spinics.net/lists/linux-rt-users/msg11639.html
-> 
-> and no BUG while booting anymore. I'll try to let it run some
-> more time.
+please consider applying this series.
 
-Erm.. nope
+It is the first step on the way towards using the common clock framework
+and in turn multi-platform on the r8a7779 (R-Car H1) SoC.
 
-# (cat /proc/meminfo ; cat /proc/meminfo) |  grep KernelStack
-KernelStack:        5920 kB
-KernelStack:        5928 kB
+It has been acked by Laurent Pinchart who did similar work
+for the R-Car Gen-2 family of SoCs. This work is based on that work.
 
-# (cat /proc/meminfo ; cat /proc/meminfo) |  grep KernelStack
-KernelStack:        5952 kB
-KernelStack:        5960 kB
+The bindings added in this series have not been changed since
+v4 was posted with devicetree at vger.kernel.org CCed on the 13th of March.
 
-maybe interrupt nesting ad nauseum? How does one debug
-such issues?
+Simon Horman (2):
+  clk: shmobile: r8a7779: Add clocks support
+  clk: shmobile: r8a7779: Add MSTP clock support
 
-It is possible that my previous posting was also caused by this -
-disregard, I'll post again if the problem persists.
+ .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
+ .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  27 ++++
+ drivers/clk/shmobile/Makefile                      |   1 +
+ drivers/clk/shmobile/clk-r8a7779.c                 | 180 +++++++++++++++++++++
+ include/linux/clk/shmobile.h                       |   3 +
+ 5 files changed, 212 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
+ create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
 
-Jordan, could you check whether your kernel stack remains
-stable with only the 3 patches reverted?
-
-Thanks
 -- 
-                                     Stano
+1.8.4
