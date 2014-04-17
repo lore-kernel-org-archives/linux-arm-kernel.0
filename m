@@ -1,27 +1,55 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Thu, 17 Apr 2014 13:38:03 -0700
-Subject: [PATCH v7 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <CADHgK6vyWU1HCueN=F5D0JxzknV==h-jOG9JmcXeOrH_RGV4JQ@mail.gmail.com>
-References: <1394016605-24120-1-git-send-email-sebastian.capella@linaro.org>
- <1394016605-24120-3-git-send-email-sebastian.capella@linaro.org>
- <20140416101243.GA6952@n2100.arm.linux.org.uk>
- <CADHgK6vyWU1HCueN=F5D0JxzknV==h-jOG9JmcXeOrH_RGV4JQ@mail.gmail.com>
-Message-ID: <CADHgK6v43=KSpe2FRG374nbHSMOt9hb+xEhO7z20vhEAQsx0tQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Apr 2014 21:38:15 +0100
+Subject: [patch 0/6] dma: edma: Provide granular residue accounting
+In-Reply-To: <alpine.DEB.2.02.1404172214230.22697@ionos.tec.linutronix.de>
+References: <20140417133737.892475126@linutronix.de>
+ <20140417200725.GT24070@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1404172214230.22697@ionos.tec.linutronix.de>
+Message-ID: <20140417203815.GV24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Thu, Apr 17, 2014 at 10:31:44PM +0200, Thomas Gleixner wrote:
+> On Thu, 17 Apr 2014, Russell King - ARM Linux wrote:
+> 
+> > On Thu, Apr 17, 2014 at 02:40:43PM -0000, Thomas Gleixner wrote:
+> > > The next obstacle was the missing per SG element reporting. We really
+> > > can't wait for a full SG list for notification.
+> > 
+> > Err, dmaengine doesn't have per-SG element reporting.
+> 
+> enum dma_residue_granularity {
+>         DMA_RESIDUE_GRANULARITY_DESCRIPTOR = 0,
+> 	DMA_RESIDUE_GRANULARITY_SEGMENT = 1,
+>         DMA_RESIDUE_GRANULARITY_BURST = 2,
+> };
+> 
+> tells a different story.
 
-It seems to work fine with your virt_to_phys on the 3.13 + OMAP
-patches kernel, and I checked on the 3.15-rc1 kernel + hibernation and
-it compiled and ran fine.  I tried a couple of hibernations on this
-version as well and they worked (aside from the crash in kernel_halt
-we're discussing separately).  I believe this just works by chance
-though because the omap platform has no real hibernation support
-there.
+That's to do with the residue though, not to do with callbacks.
 
-I'll try now to merge up the omap patches to 3.15-rc1.
+> > If it's just that the FIFO is spread over 4 consecutive locations
+> > (effectively due to not decoding bits 2,3 of the address bus for the
+> > register) then reading the first register four times is just as
+> > acceptable as reading them consecutively.
+> 
+> It's not a FIFO. It's four different consecutive registers, which are
+> DMA readable. And you need to read all of them...
+>  
+> > The reason that kind of thing was done in old days was to allow the
+> > ARM ldmia/stmia instructions to be used to access FIFOs, thereby
+> > allowing multiple words to be transferred with a single instruction.
+> > I can't believe that there's still people designing for that
+> > especially if they have a DMA engine...
+> 
+> In that case it's a magic DMA extension superglued beside the already
+> horrible register interface of that particular IP block.
 
-Thanks,
+So it's more a copy-from-peripheral-to-memory - a DMA copy operation
+triggered in a similar manner to the DMA slave mode.  There are a
+number of use cases for this, but no one has yet put their head above
+the parapet to spear-head that cause. :)
 
-Sebastian
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
