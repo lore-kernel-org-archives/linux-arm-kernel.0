@@ -1,108 +1,40 @@
-From: wujianguo@huawei.com (Jianguo Wu)
-Date: Thu, 17 Apr 2014 17:31:37 +0800
-Subject: [PATCH v3] ARM: mm: support big-endian page tables
-Message-ID: <534F9F79.9050503@huawei.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 17 Apr 2014 11:40:10 +0200
+Subject: [PATCH v2 0/2] regmap: support regmap over SMBus
+Message-ID: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When enable LPAE and big-endian in a hisilicon board, while specify
-mem=384M mem=512M at 7680M, will get bad page state:
+Hello,
 
-Freeing unused kernel memory: 180K (c0466000 - c0493000)
-BUG: Bad page state in process init  pfn:fa442
-page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
-page flags: 0x40000400(reserved)
-Modules linked in:
-CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
-[<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
-[<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
-[<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
-[<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
-[<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
-[<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
-[<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
-[<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
-[<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
+This patch series adds support for remap over SMBus in case your i2c
+adapter does not support regular I2C transfers.
 
-The bad pfn:fa442 is not system memory(mem=384M mem=512M at 7680M), after debugging,
-I find in page fault handler, will get wrong pfn from pte just after set pte,
-as follow:
-do_anonymous_page()
-{
-	...
-	set_pte_at(mm, address, page_table, entry);
-	
-	//debug code
-	pfn = pte_pfn(entry);
-	pr_info("pfn:0x%lx, pte:0x%llx\n", pfn, pte_val(entry));
+SMBus is a subset of the I2C protocol, often used to access registers
+on external devices.
 
-	//read out the pte just set
-	new_pte = pte_offset_map(pmd, address);
-	new_pfn = pte_pfn(*new_pte);
-	pr_info("new pfn:0x%lx, new pte:0x%llx\n", pfn, pte_val(entry));
-	...
-}
+I2C adapters are able to access SMBus devices thanks to the SMBus
+emulation layer. In the other hand SMBus adapters may not provide
+regular I2C transfers, and thus you may not be able to expose a regmap
+if your device is connected to such kind of adapter.
+Hence why we need this regmap over SMBus implementation.
 
-pfn:   0x1fa4f5,     pte:0xc00001fa4f575f
-new_pfn:0xfa4f5, new_pte:0xc00000fa4f5f5f	//new pfn/pte is wrong.
+Best Regards,
 
-The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
-An LPAE PTE is a 64bit quantity, passed to cpu_v7_set_pte_ext in the r2 and r3 registers.
-On an LE kernel, r2 contains the LSB of the PTE, and r3 the MSB.
-On a BE kernel, the assignment is reversed.
+Boris
 
-Unfortunately, the current code always assumes the LE case,
-leading to corruption of the PTE when clearing/setting bits.
+Changes since v1:
+ - add reg_read/reg_write callbacks to the regmap_bus struct
 
-This patch fixes this issue much like it has been done already in the
-cpu_v7_switch_mm case.
+Boris BREZILLON (2):
+  regmap: add reg_read/reg_write callbacks to regmap_bus struct
+  regmap: i2c: fallback to SMBus if the adapter does not support
+    standard I2C
 
-Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
-Cc: stable at vger.kernel.org
----
--v2: Refactoring code suggested by Ben Dooks.
--v3: Rewrite commit message suggested by Marc Zyngier.
----
- arch/arm/mm/proc-v7-3level.S |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+ drivers/base/regmap/regmap-i2c.c | 104 ++++++++++++++++++++++++++++++++++++++-
+ drivers/base/regmap/regmap.c     |  26 ++++++++++
+ include/linux/regmap.h           |   6 +++
+ 3 files changed, 134 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 01a719e..22e3ad6 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -64,6 +64,14 @@ ENTRY(cpu_v7_switch_mm)
- 	mov	pc, lr
- ENDPROC(cpu_v7_switch_mm)
- 
-+#ifdef __ARMEB__
-+#define rl r3
-+#define rh r2
-+#else
-+#define rl r2
-+#define rh r3
-+#endif
-+
- /*
-  * cpu_v7_set_pte_ext(ptep, pte)
-  *
-@@ -73,13 +81,13 @@ ENDPROC(cpu_v7_switch_mm)
-  */
- ENTRY(cpu_v7_set_pte_ext)
- #ifdef CONFIG_MMU
--	tst	r2, #L_PTE_VALID
-+	tst	rl, #L_PTE_VALID
- 	beq	1f
--	tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
--	bicne	r2, #L_PTE_VALID
-+	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
-+	bicne	rl, #L_PTE_VALID
- 	bne	1f
--	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
--	orreq	r2, #L_PTE_RDONLY
-+	tst	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
-+	orreq	rl, #L_PTE_RDONLY
- 1:	strd	r2, r3, [r0]
- 	ALT_SMP(W(nop))
- 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
 -- 
-1.7.1
+1.8.3.2
