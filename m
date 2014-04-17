@@ -1,33 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Apr 2014 17:37:01 -0400
-Subject: [PATCH 2/5] ARM: Kirkwood: Use DT to instansiate codec
-In-Reply-To: <1397749994-24983-3-git-send-email-andrew@lunn.ch>
-References: <1397749994-24983-1-git-send-email-andrew@lunn.ch>
- <1397749994-24983-3-git-send-email-andrew@lunn.ch>
-Message-ID: <20140417213701.GV28159@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Apr 2014 22:47:09 +0100
+Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
+ components tracking
+In-Reply-To: <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
+ <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+Message-ID: <20140417214709.GY24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
+> +out:
+> +	if (ret != -EPROBE_DEFER)
+> +		exynos_drm_dev_ready(&pdev->dev);
 
-First, thanks for following through with the kirkwood DT conversion.
+So we end up with everyone needing a "ready" call in each sub-driver
+back into the main driver... this makes it impossible to write a
+generic subcomponent driver which is not tied in any way to the
+main driver.
 
-I have one small request below:
+That is quite some restriction, and would prevent, for example, the
+TDA998x driver being used both with Armada DRM, tilcdc and any other
+driver.
 
-On Thu, Apr 17, 2014 at 05:53:11PM +0200, Andrew Lunn wrote:
-> Now that the ALC5623 codec has a DT binding, instansiate it using DT
-> rather than a platform device.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/boot/dts/kirkwood-t5325.dts |  8 ++++++++
->  arch/arm/mach-mvebu/board-t5325.c    | 15 ---------------
->  2 files changed, 8 insertions(+), 15 deletions(-)
+So, while your solution may work for exynos, it's not suitable for
+general use.
 
-Since the audio device isn't critical to boot, can we split this patch
-and the other DT patch in two?  That'll prevent branch
-dependency/merge conflicts between mvebu/dt and mvebu/soc.
-
-thx,
-
-Jason.
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
