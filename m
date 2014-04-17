@@ -1,147 +1,60 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 17 Apr 2014 17:04:02 -0500
-Subject: [PATCH] dmaengine: qcom_bam_dma: Add descriptor flag APIs
-Message-ID: <1397772242-4048-1-git-send-email-agross@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Apr 2014 23:04:12 +0100
+Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
+ components tracking
+In-Reply-To: <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
+ <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+Message-ID: <20140417220412.GZ24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APIs that allow for BAM hardware flags to be set per
-descriptor.  Each one of the new flags informs the attached peripheral of a
-special behavior that is required.
+On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
+> +static int exynos_drm_add_blocker(struct device *dev, void *data)
+> +{
+> +	struct device_driver *drv = data;
+> +
+> +	if (!platform_bus_type.match(dev, drv))
+> +		return 0;
+> +
+> +	device_lock(dev);
+> +	if (!dev->driver)
+> +		exynos_drm_dev_busy(dev);
+> +	device_unlock(dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static void exynos_drm_init_blockers(struct device_driver *drv)
+> +{
+> +	bus_for_each_dev(&platform_bus_type, NULL, drv, exynos_drm_add_blocker);
+> +}
 
-The EOT flag requests that the peripheral assert an end of transaction interrupt
-when that descriptor is complete.  It also results in special signaling protocol
-that is used between the attached peripheral and the core using the DMA
-controller.
+This feels very wrong to be dumping the above code into every driver which
+wants to make use of some kind of componentised support.
 
-The NWD flag requests that the peripheral wait until the data has been fully
-processed before signaling an interrupt.
+You also appear to need to know the struct device_driver's for every
+component.  While that may work for exynos, it doesn't work elsewhere
+where the various components of the system are very real separate
+kernel modules - for example, a separate I2C driver such as the TDA998x
+case I mentioned in my first reply.
 
-The CMD flag informs the peripheral that the descriptor payload contains
-command descriptors and not data descriptors.
+I can't see how your solution would be usable in that circumstance.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/dma/qcom_bam_dma.c       |   48 ++++++++++++++++++++++++++++++++++++--
- include/linux/dma/qcom_bam_dma.h |   23 ++++++++++++++++++
- 2 files changed, 69 insertions(+), 2 deletions(-)
- create mode 100644 include/linux/dma/qcom_bam_dma.h
+The third issue I have is that you're still needing to have internal
+exynos sub-device management - you're having to add the individual
+devices to some kind of list, array or static data, and during DRM
+probe you're having to then walk these lists/arrays/static data to
+locate these sub-devices and finish each of their individual
+initialisations.  So you're ending up with a two-tier initialisation.
 
-diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-index 02f7fef..f6c8ef1 100644
---- a/drivers/dma/qcom_bam_dma.c
-+++ b/drivers/dma/qcom_bam_dma.c
-@@ -61,12 +61,18 @@ struct bam_desc_hw {
- #define DESC_FLAG_INT BIT(15)
- #define DESC_FLAG_EOT BIT(14)
- #define DESC_FLAG_EOB BIT(13)
-+#define DESC_FLAG_NWD BIT(12)
-+#define DESC_FLAG_CMD BIT(11)
- 
- struct bam_async_desc {
- 	struct virt_dma_desc vd;
- 
- 	u32 num_desc;
- 	u32 xfer_len;
-+
-+	/* transaction flags, EOT|EOB|NWD|CMD */
-+	u16 flags;
-+
- 	struct bam_desc_hw *curr_desc;
- 
- 	enum dma_transfer_direction dir;
-@@ -800,6 +806,34 @@ static void bam_apply_new_config(struct bam_chan *bchan,
- 	bchan->reconfigure = 0;
- }
- 
-+void qcom_bam_set_desc_eot(struct dma_async_tx_descriptor *txd)
-+{
-+	struct bam_async_desc *async_desc = container_of(txd,
-+			struct bam_async_desc, vd.tx);
-+
-+	async_desc->flags |= DESC_FLAG_EOT;
-+}
-+EXPORT_SYMBOL(qcom_bam_set_desc_eot);
-+
-+void qcom_bam_set_desc_cmd(struct dma_async_tx_descriptor *txd)
-+{
-+	struct bam_async_desc *async_desc = container_of(txd,
-+			struct bam_async_desc, vd.tx);
-+
-+	async_desc->flags |= DESC_FLAG_CMD;
-+}
-+EXPORT_SYMBOL(qcom_bam_set_desc_cmd);
-+
-+void qcom_bam_set_desc_nwd(struct dma_async_tx_descriptor *txd)
-+{
-+	struct bam_async_desc *async_desc = container_of(txd,
-+			struct bam_async_desc, vd.tx);
-+
-+	async_desc->flags |= DESC_FLAG_NWD;
-+}
-+EXPORT_SYMBOL(qcom_bam_set_desc_nwd);
-+
-+
- /**
-  * bam_start_dma - start next transaction
-  * @bchan - bam dma channel
-@@ -812,6 +846,7 @@ static void bam_start_dma(struct bam_chan *bchan)
- 	struct bam_desc_hw *desc;
- 	struct bam_desc_hw *fifo = PTR_ALIGN(bchan->fifo_virt,
- 					sizeof(struct bam_desc_hw));
-+	int i;
- 
- 	lockdep_assert_held(&bchan->vc.lock);
- 
-@@ -838,8 +873,17 @@ static void bam_start_dma(struct bam_chan *bchan)
- 	else
- 		async_desc->xfer_len = async_desc->num_desc;
- 
--	/* set INT on last descriptor */
--	desc[async_desc->xfer_len - 1].flags |= DESC_FLAG_INT;
-+	/* set command descriptor flag, if applicable */
-+	if (async_desc->flags & DESC_FLAG_CMD)
-+		for (i = 0; i < async_desc->xfer_len; i++)
-+			desc[i].flags |= DESC_FLAG_CMD;
-+
-+	/* set EOT or INT based on flag settings and if final transaction */
-+	if (async_desc->flags & DESC_FLAG_EOT &&
-+		async_desc->num_desc == async_desc->xfer_len)
-+		desc[async_desc->xfer_len - 1].flags |= DESC_FLAG_EOT;
-+	else
-+		desc[async_desc->xfer_len - 1].flags |= DESC_FLAG_INT;
- 
- 	if (bchan->tail + async_desc->xfer_len > MAX_DESCRIPTORS) {
- 		u32 partial = MAX_DESCRIPTORS - bchan->tail;
-diff --git a/include/linux/dma/qcom_bam_dma.h b/include/linux/dma/qcom_bam_dma.h
-new file mode 100644
-index 0000000..65a371eb
---- /dev/null
-+++ b/include/linux/dma/qcom_bam_dma.h
-@@ -0,0 +1,23 @@
-+#ifndef _QCOM_BAM_DMA_H_
-+#define _QCOM_BAM_DMA_H_
-+/*
-+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/dmaengine.h>
-+
-+void qcom_bam_set_desc_cmd(struct dma_async_tx_descriptor *);
-+void qcom_bam_set_desc_eot(struct dma_async_tx_descriptor *);
-+void qcom_bam_set_desc_nwd(struct dma_async_tx_descriptor *);
-+
-+#endif
+That's not particularly good because it means you're exposed to
+problems where the state is different between two initialisations -
+when the device is recreated, your component attempts to re-finalise
+the initialisation a second time.  It wouldn't take much for a field
+to be assumed to be zero at init time somewhere for a bug to creep
+in.
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
