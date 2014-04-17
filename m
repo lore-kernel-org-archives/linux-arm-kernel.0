@@ -1,70 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 17 Apr 2014 13:27:46 -0500
-Subject: [PATCH 4/8] tty/serial: add generic serial earlycon
-In-Reply-To: <21117957.8m9iUdR1VN@wuerfel>
-References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
- <9368307.RXEGmQia1C@wuerfel>
- <CAL_JsqJh1R8wxReCvTfE7GecZa0vMaAqnGa0ZoRBMace9qtzvQ@mail.gmail.com>
- <21117957.8m9iUdR1VN@wuerfel>
-Message-ID: <CAL_JsqJwKQ_KuWWQNZHrMh8NwwiubB2jR+g-Y2n_dH4kJ5zVow@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 17 Apr 2014 14:33:43 -0400
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <534EF153.5050603@codeaurora.org>
+ <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
+Message-ID: <53501E87.6070307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 24, 2014 at 10:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 24 March 2014 08:36:46 Rob Herring wrote:
->> On Mon, Mar 24, 2014 at 6:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday 24 March 2014 11:22:03 Catalin Marinas wrote:
->> >> On Fri, Mar 21, 2014 at 09:08:44PM +0000, Rob Herring wrote:
->> >> > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
->> >> > new file mode 100644
->> >> > index 0000000..241757a
->> >> > --- /dev/null
->> >> > +++ b/drivers/tty/serial/earlycon.c
->> >> [...]
->> >> > +static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
->> >> > +{
->> >> > +   void __iomem *base;
->> >> > +#ifdef CONFIG_FIX_EARLYCON_MEM
->> >> > +   set_fixmap_nocache(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
->> >> > +   base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
->> >> > +   base += paddr & ~PAGE_MASK;
->> >> > +#else
->> >> > +   base = ioremap_nocache(paddr, size);
->> >> > +#endif
->> >>
->> >> Just curious why not set_fixmap_io (and plain ioremap)?
->> >
->> > Good point. Note that ioremap_nocache() is the same as ioremap()
->> > on *all* architectures.
+On 04/16/2014 07:21 PM, Nicolas Pitre wrote:
+> On Wed, 16 Apr 2014, Christopher Covington wrote:
 
-Did you mean "not the same"? Why are there 2 flavors if they are
-always the same.
+>> Thank you for the suggestion. This approach also came to mind, but it would
+>> require new documentation and tooling in the JTAG scripts or simulator
+>> equivalent. That's another aspect of the ELF-based approaches that I
+>> like--hopefully existing documentation and tool support could be reused.
+> 
+> The above is useful for loading the raw uncompressed Image without 
+> carrying the full ELF baggage.
 
+What exactly is the full ELF baggage? Aren't there existing mechanisms to omit
+debugging symbols, for example, if size is of concern?
 
->> I investigated this before adding this to arm64. set_fixmap_io and
->> set_fixmap_nocache are not the same settings on x86. Whether the
->> mapping type really matters on x86 or not, I don't know. So I added
->> the nocache variant to arm64 to avoid a change to x86.
->
-> My best guess is that it's an x86 bug. ioremap() always uses an uncached
-> mapping on x86, so it's strange to see early_ioremap() and set_fixmap_io()
-> use a cached mapping. It probably doesn't matter as long as the mtrr is
-> set up to treat all MMIO registers as non-cacheable, but I think there
-> should not be a difference.
+Thanks,
+Christopher
 
-At some point it was believed to be needed on the 8250 driver. Perhaps
-Alan can comment since the commit message tells us nothing:
-
-commit 6f441fe99814f64315b8c11890744230b990c460
-Author: Alan Cox <alan@lxorguk.ukuu.org.uk>
-Date:   Thu May 1 04:34:59 2008 -0700
-
-    8250: switch 8250 drivers to use _nocache ioremaps
-
-    Signed-off-by: Alan Cox <alan@redhat.com>
-    Cc: Russell King <rmk@arm.linux.org.uk>
-    Cc: Ingo Molnar <mingo@elte.hu>
-    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
-    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
-
-Rob
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
