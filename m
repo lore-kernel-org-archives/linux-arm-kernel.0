@@ -1,75 +1,98 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Apr 2014 16:06:16 -0400 (EDT)
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Apr 2014 21:07:25 +0100
+Subject: [patch 0/6] dma: edma: Provide granular residue accounting
+In-Reply-To: <20140417133737.892475126@linutronix.de>
+References: <20140417133737.892475126@linutronix.de>
+Message-ID: <20140417200725.GT24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Apr 2014, Rob Herring wrote:
+On Thu, Apr 17, 2014 at 02:40:43PM -0000, Thomas Gleixner wrote:
+> The next obstacle was the missing per SG element reporting. We really
+> can't wait for a full SG list for notification.
 
-> On Wed, Apr 16, 2014 at 2:14 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Wed, 16 Apr 2014, Christopher Covington wrote:
-> >
-> >> On 04/15/2014 06:44 AM, Daniel Thompson wrote:
-> >> > Hi Folks
+Err, dmaengine doesn't have per-SG element reporting.
+
+What it does allow is several transactions to be submitted consecutively,
+so that the DMA engine can move to the next transaction once the previous
+one has been submitted.
+
+Where it's important that this happens with the minimum of delay, there's
+nothing in the API that prevents the hardware scatterlist of the previous
+transaction being linked directly to the following transaction, provided
+of course the hardware can do that.
+
+Many DMA engine implementations are just lazy - they implement stuff as:
+setup hardware, run scatter list, get to the end, raise interrupt.  Fire
+off tasklet.  Tasklet runs, calls the callback, checks to see if there's
+another transaction, sets up hardware for the next one.  That (as you
+would expect) gives quite a high latency to the following transaction.
+
+I've coded at least one DMA engine driver to start the next transaction
+immediately that the previous one completes, before the tasklet is run.
+As I say above, there's really no reason to even wait for the interrupt...
+if people can be bothered to think about all the implications that brings
+(f.e. reporting completion status, and how many bytes remaining of a
+transaction, etc.)
+
+> So we'd trade the CAN interrupt per packet against the EDMA interrupt
+> per packet. And the notification which is done via a tasklet is not
+> really helpful either.
+
+Again, the DMA engine API allows for the reception of the interrupt to
+be turned off (not every DMA engine implementation supports it though.)
+However, no interrupts means no callbacks (or an implementation may
+decide that the presence of a callback means that you do want interrupts -
+that's because a number of buggy drivers forget to give DMA_PREP_INTERRUPT.)
+
+However, not using the callbacks then means you need to poll for
+completion - that's where tracking the cookies for the submitted
+transactions, calling dmaengine_tx_status() with a state argument, or
+dma_async_is_tx_complete() then allows you to use dma_async_is_complete()
+to quickly ascertain whether any of the other cookies have completed.
+
+What you can't do though is decide whether you want an interrupt after
+submission.
+
+> The DCAN readout is 4 consecutive 32bit registers. The only way I got
+> that working is by configuring the engine with:
 > 
-> [snip]
+>        cfg.direction = DMA_DEV_TO_MEM;
+>        cfg.src_addr_width = 16;
+
+Hmm.  This is an enum, and the expected values are limited to 1, 2, 4,
+and 8 for 8-bit, 16-bit, 32-bit and 64-bit respectively.  The width is
+supposed to represent the width of the access used on the bus to the
+peripheral.
+
+So, if we did have a DMA engine which supported 128-bit accesses, it
+would end up doing a 128-bit access for the above...
+
+>        cfg.src_maxburst = 1;
+
+This is supposed to indicate the maximum number of accesses in a burst
+to the same register.  It kind of makes sense, but I'm not sure it's in
+the spirit of the DMA engine API.  I think strictly, to have a DMA engine
+perform 4 consecutive 32-bit accesses is quite a special requirement that
+we don't have a way to represent it at present.
+
+> With
+>        cfg.src_addr_width = 4;
+>        cfg.src_maxburst = 4;
 > 
-> >> Or could we patch up the linker script to set zero-based ELF load
-> >> memory addresses (LMAs) [4] so that the physical addresses are almost right,
-> >> you just might have to add a system-specific RAM offset, perhaps pulled out of
-> >> the device tree? If that won't work, we could generate some kind of
-> >> vmlinux-phys with physical addresses. The latter two options might also
-> >> simplify external debugging before __turn_mmu_on(). I like the sound of the
-> >> LMA approach best, assuming it doesn't break existing stuff (I notice a few AT
-> >> directives in vmlinux.lds.S). Some of this might transfer to arm64 as well.
-> >> What do you all think?
-> >
-> > If you really really want to get at the TEXT_OFFSET value in the
-> > uncompressed image, the simplest way would be:
-> >
-> > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> > index f8c08839ed..de84d0635a 100644
-> > --- a/arch/arm/kernel/head.S
-> > +++ b/arch/arm/kernel/head.S
-> > @@ -78,6 +78,11 @@
-> >
-> >         __HEAD
-> >  ENTRY(stext)
-> > +
-> > +       b       1f
-> > +       .word   TEXT_OFFSET             @ located at a 4-byte offset in Image
-> > +1:
-> > +
-> >   ARM_BE8(setend        be )                    @ ensure we are in BE8 mode
-> >
-> >   THUMB(        adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
-> >
-> > This way the first word for Image would always be 0xea000000 and the
-> > second one would be TEXT_OFFSET.  No other kernel Image binaries ever
-> > had 0xea000000 as their first word so that also let you validate whether
-> > or not the TEXT_OFFSET value is there.
-> 
-> Better yet, we should adopt the arm64 Image header which has this and
-> other fields for arm Image files. We're going to have to deal with raw
-> Image (and Image.gz) in bootloaders for arm64, so we might as well
-> align things.
+> it reads just 4 times the first register.
 
-We could use the same header as ARM64 if we want to add more information 
-to the uncompressed kernel image.
+If it's just that the FIFO is spread over 4 consecutive locations
+(effectively due to not decoding bits 2,3 of the address bus for the
+register) then reading the first register four times is just as
+acceptable as reading them consecutively.
 
-However I really don't want to encourage the proliferation of yet 
-another kernel image formats on ARM32.  We've had zImage for the last 20 
-years and that's what ARM32 bootloaders should support.  The 
-introduction of the uImage format caused enough pain already.
+The reason that kind of thing was done in old days was to allow the
+ARM ldmia/stmia instructions to be used to access FIFOs, thereby
+allowing multiple words to be transferred with a single instruction.
+I can't believe that there's still people designing for that
+especially if they have a DMA engine...
 
-Booting uncompressed kernel image on ARM32 may be useful for some 
-debugging setups.  I don't see other cases where it would be legitimate 
-to break existing practices.
-
-
-Nicolas
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
