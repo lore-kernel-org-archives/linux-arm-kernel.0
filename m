@@ -1,39 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:32:11 +0900
-Subject: [PATCH 3/5] ARM: shmobile: sh73a0: drop address cells from GIC node
+Date: Thu, 17 Apr 2014 09:32:13 +0900
+Subject: [PATCH 5/5] ARM: shmobile: koelsch: correct renesas, gpios to renesas,
+ groups in sd[012] pfc
 In-Reply-To: <cover.1397694064.git.horms+renesas@verge.net.au>
 References: <cover.1397694064.git.horms+renesas@verge.net.au>
-Message-ID: <de66b584042b8f2cfe4c34ef4faa804dcd8d5843.1397694064.git.horms+renesas@verge.net.au>
+Message-ID: <d5dda0381f826326071b027f288372f682c24d55.1397694064.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <l.stach@pengutronix.de>
+From: Magnus Damm <damm@opensource.se>
 
-This is likely a copy-and-paste error from the
-ARM GIC documentation, that has already been fixed.
+Fix typo of renesas,groups in the koeslch dt. The kernel has no
+renesas,gpios but this should match renesas,groups.
 
-address-cells should have been set to 0, as with the size
-cells. As having those properties set to 0 is the
-same thing as not specifying them, drop them completely.
+Noticed thanks to similar fix for Lager by Rob Taylor and Ben Dooks.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index b7bd3b9..5ecf552 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -34,7 +34,6 @@
- 	gic: interrupt-controller at f0001000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
--		#address-cells = <1>;
- 		interrupt-controller;
- 		reg = <0xf0001000 0x1000>,
- 		      <0xf0000100 0x100>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index bdd73e6..de1b697 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -230,17 +230,17 @@
+ 	};
+ 
+ 	sdhi0_pins: sd0 {
+-		renesas,gpios = "sdhi0_data4", "sdhi0_ctrl";
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		renesas,function = "sdhi0";
+ 	};
+ 
+ 	sdhi1_pins: sd1 {
+-		renesas,gpios = "sdhi1_data4", "sdhi1_ctrl";
++		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
+ 		renesas,function = "sdhi1";
+ 	};
+ 
+ 	sdhi2_pins: sd2 {
+-		renesas,gpios = "sdhi2_data4", "sdhi2_ctrl";
++		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
+ 		renesas,function = "sdhi2";
+ 	};
+ 
 -- 
 1.8.4
