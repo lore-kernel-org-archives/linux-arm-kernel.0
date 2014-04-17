@@ -1,75 +1,36 @@
-From: triplesquarednine@gmail.com (jordan)
-Date: Thu, 17 Apr 2014 19:10:14 -0400
-Subject: BUG: spinlock trylock failure on UP - reverting timer patches
- helps
-In-Reply-To: <53505BD7.9050004@meduna.org>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org> <53500184.4050309@meduna.org>
- <53505BD7.9050004@meduna.org>
-Message-ID: <CAOcfFMyTmQH-FwGE2YWoA76ypzBtWPYVTyi+4QpEMnrRtw8QVg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 18 Apr 2014 00:10:12 +0100
+Subject: Rockchip RK3188 I2C driver
+In-Reply-To: <1917043.Q4CxE5T68K@phil>
+References: <3748421.ND1tAjvgKS@typ> <20140415185025.GH12304@sirena.org.uk>
+ <5059282.MitP6iZ8n1@typ> <1917043.Q4CxE5T68K@phil>
+Message-ID: <20140417231012.GI12304@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Stano,
+On Thu, Apr 17, 2014 at 03:27:36PM +0200, Heiko St?bner wrote:
 
-On Thu, Apr 17, 2014 at 6:55 PM, Stanislav Meduna <stano@meduna.org> wrote:
-> On 17.04.2014 18:29, Stanislav Meduna wrote:
->
->> Note: the bug goes away reverting the very same patches that are
->> helping the Jordan's problms. I did follow
->>
->> http://www.spinics.net/lists/linux-rt-users/msg11639.html
->>
->> and no BUG while booting anymore. I'll try to let it run some
->> more time.
+> Interestingly, when looking through the regmap_config struct, it already 
+> contains the "write_flag_mask", described as "Mask to be set in the top byte of 
+> the register when doing  a write.", which sounds a lot like what we need, only 
+> that it's two bytes for us instead of the current one.
 
-Yeah, i know a handful of people [amd users] that have now reported
-success booting into 3.14-rt1 reverting those patches.  Personally, I
-have disabled NO_HZ_FULL and have switched back to 'old tick' method
-in kconfig. I don't think the latest no_hz stuff is stable enough...
+> So I guess the easiest way would be to make write_flag_mask somehow usable for 
+> us, because it looks like regmap will handle the rest on its own already.
 
-> Erm.. nope
->
-> # (cat /proc/meminfo ; cat /proc/meminfo) |  grep KernelStack
-> KernelStack:        5920 kB
-> KernelStack:        5928 kB
->
-> # (cat /proc/meminfo ; cat /proc/meminfo) |  grep KernelStack
-> KernelStack:        5952 kB
-> KernelStack:        5960 kB
->
-> maybe interrupt nesting ad nauseum? How does one debug
-> such issues?
->
-> It is possible that my previous posting was also caused by this -
-> disregard, I'll post again if the problem persists.
->
-> Jordan, could you check whether your kernel stack remains
-> stable with only the 3 patches reverted?
+> And then teach syscon to set this flag and about volatile registers in general, 
+> because it doesn't seem to handle them yet.
 
-I'll have to re-install that kernel and get back to you [ give me an
-hour or so. i desperately need to eat some food ;) ]. My current
-kernel differs in a couple of ways [ but yes, the KernelStack is
-stable]. My running/installed rt-kernel is using the 'threadsirq'
-patch for linux-rt and isn't vanilla linux-rt anyway, as i patch in
-UKSM [in-kernel memory deduplication and BFQ [is scheduler]... but
-yes, I'm still reverting those 3 timer[s] patches, since my machine
-[and other users i know] won't boot without doing that. Here's my
-running kernel's kstack;
+How about a val_set_bits_mask or something?  That's not a good name, I'm
+short on inspiration right now though.
 
-[ninez at localhost ~]$  (cat /proc/meminfo ; cat /proc/meminfo) |  grep
-KernelStack
-KernelStack:        3728 kB
-KernelStack:        3728 kB
-[ninez at localhost ~]$  (cat /proc/meminfo ; cat /proc/meminfo) |  grep
-KernelStack
-KernelStack:        3696 kB
-KernelStack:        3696 kB
-
-I'll post from my old kernel in a bit.
-
-> Thanks
-
-No problem
-
-Jordan
+Another option is to do something with pad_bits to tell regmap to insert
+a block of set bits.  Not sure if that's sensible for MMIO though, it's
+more sensible for I2C or SPI style register maps.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140418/dc6a2150/attachment.sig>
