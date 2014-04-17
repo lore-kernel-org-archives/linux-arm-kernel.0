@@ -1,22 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 17 Apr 2014 10:12:34 -0300
-Subject: [PATCH 1/2] ARM: dts: imx27-pdk: Add NAND support
-In-Reply-To: <1397739692.667087851@f420.i.mail.ru>
-References: <1397738561-3335-1-git-send-email-festevam@gmail.com>
- <1397739692.667087851@f420.i.mail.ru>
-Message-ID: <CAOMZO5A6waVSFtaT=HobuBv=-4B7bAN_zwDd-W9JRaty6XGZug@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Thu, 17 Apr 2014 15:13:57 +0200
+Subject: [PATCH RESEND 3/5] ARM: berlin: add the pinctrl dependency for
+ the Marvell Berlin SoCs
+In-Reply-To: <5347B065.8060001@gmail.com>
+References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397135274-10764-4-git-send-email-antoine.tenart@free-electrons.com>
+ <5347B065.8060001@gmail.com>
+Message-ID: <20140417131357.GA31034@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 10:01 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+Sebastian,
 
->> +&nfc {
->> +     status = "okay";
->> +     nand-ecc-mode = "hw";
->> +     nand-on-flash-bbt;
->> +};
->
-> You also should add pin definitions.
+On Fri, Apr 11, 2014 at 11:05:41AM +0200, Sebastian Hesselbarth wrote:
+> On 04/10/2014 03:07 PM, Antoine T?nart wrote:
+> >Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> >---
+> >  arch/arm/mach-berlin/Kconfig | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> >diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+> >index d3c5f14dc142..291f1cac6c3d 100644
+> >--- a/arch/arm/mach-berlin/Kconfig
+> >+++ b/arch/arm/mach-berlin/Kconfig
+> >@@ -4,6 +4,8 @@ config ARCH_BERLIN
+> >  	select GENERIC_IRQ_CHIP
+> >  	select DW_APB_ICTL
+> >  	select DW_APB_TIMER_OF
+> >+	select PINCTRL
+> >+	select PINCTRL_BERLIN
+> 
+> As said in the review of the previous patch, drop PINCTRL here
+> and select it in the PINCTRL_BERLIN Kconfig. Also, you'll need
+> PINCTRL_BERLIN_BG2 and PINCTRL_BERLIN_BG2Q as we don't want to
+> bloat each Berlin kernel with both drivers.
 
-NAND is detected even without the pin definitions.
-arch/arm/mach-imx/mach-mx27_3ds.c also does not define the NAND pins.
+Regarding PINCTRL, I can't drop it, pin-controller drivers depend on it.
+drivers/pinctrl/Kconfig begins with:
+	if PINCTRL
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
