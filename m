@@ -1,95 +1,93 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 17 Apr 2014 17:53:13 +0200
-Subject: [PATCH 4/5] ASoC: simple-card: Support setting mclk via a fixed factor
+Date: Thu, 17 Apr 2014 17:53:10 +0200
+Subject: [PATCH 1/5] ASoC: alc5623: Add device tree binding
 In-Reply-To: <1397749994-24983-1-git-send-email-andrew@lunn.ch>
 References: <1397749994-24983-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1397749994-24983-5-git-send-email-andrew@lunn.ch>
+Message-ID: <1397749994-24983-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms require that the codecs mclk is a fixed multiplication
-factor of the audio stream rate. Add a optional property to the
-binding to hold this factor and implement a hw_params() function to
-make use of it.
+Let the ALC5623 codec be instantiated from DT. Add a simple binding
+for the additional control register and the jack detect register.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../devicetree/bindings/sound/simple-card.txt      |  2 ++
- sound/soc/generic/simple-card.c                    | 28 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+I followed the example of the WM8903 binding which allows register
+values to be placed into DT.
+---
+ .../devicetree/bindings/sound/alc5623.txt          | 23 ++++++++++++++++++++++
+ sound/soc/codecs/alc5623.c                         | 13 ++++++++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/alc5623.txt
 
-diff --git a/Documentation/devicetree/bindings/sound/simple-card.txt b/Documentation/devicetree/bindings/sound/simple-card.txt
-index 131aa2ad7f1a..c4379c9f9f03 100644
---- a/Documentation/devicetree/bindings/sound/simple-card.txt
-+++ b/Documentation/devicetree/bindings/sound/simple-card.txt
-@@ -18,6 +18,8 @@ Optional properties:
- 					  Each entry is a pair of strings, the first being the
- 					  connection's sink, the second being the connection's
- 					  source.
-+- simple-audio-card,mclk-factor		: Multiplication factor between stream rate and codec
-+					  mclk.
- - dai-tdm-slot-num			: Please refer to tdm-slot.txt.
- - dai-tdm-slot-width			: Please refer to tdm-slot.txt.
- 
-diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
-index 21f1ccbdf582..5ecaf57ab712 100644
---- a/sound/soc/generic/simple-card.c
-+++ b/sound/soc/generic/simple-card.c
-@@ -24,6 +24,7 @@ struct simple_card_data {
- 		struct asoc_simple_dai cpu_dai;
- 		struct asoc_simple_dai codec_dai;
- 	} *dai_props;
-+	unsigned int mclk_factor;
- 	struct snd_soc_dai_link dai_link[];	/* dynamically allocated */
- };
- 
-@@ -151,6 +152,28 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
- 	return 0;
- }
- 
-+static int simple_card_hw_params(struct snd_pcm_substream *substream,
-+				 struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	struct simple_card_data *priv = snd_soc_card_get_drvdata(rtd->card);
-+	unsigned int mclk;
-+	int ret = 0;
+diff --git a/Documentation/devicetree/bindings/sound/alc5623.txt b/Documentation/devicetree/bindings/sound/alc5623.txt
+new file mode 100644
+index 000000000000..f7f71346e338
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/alc5623.txt
+@@ -0,0 +1,23 @@
++ALC5621/ALC5622/ALC5623 audio Codec
 +
-+	if (priv->mclk_factor) {
-+		mclk = params_rate(params) * priv->mclk_factor;
-+		ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
-+					     SND_SOC_CLOCK_IN);
-+	}
++Required properties:
 +
-+	return ret;
-+}
++ - compatible:	"realtek,alc5623"
++ - reg:		the I2C address of the device.
 +
-+static struct snd_soc_ops simple_card_ops = {
-+	.hw_params = simple_card_hw_params,
-+};
++Optional properties:
 +
- static int simple_card_cpu_codec_of(struct device_node *node,
- 				int daifmt,
- 				struct snd_soc_dai_link *dai_link,
-@@ -255,6 +278,7 @@ static int asoc_simple_card_parse_of(struct device_node *node,
- 		sprintf(name, "%s-%s", dai_link->cpu_dai_name,
- 					dai_link->codec_dai_name);
- 		dai_link->name = dai_link->stream_name = name;
-+		dai_link->ops = &simple_card_ops;
++  - add-ctrl:	Default register value for Reg-40h, Additional Control Register.
++		If absent, the default is 0.
++
++  - jack-det-ctrl:	Default register value for Reg-5Ah, Jack Detect
++			Control Register. If absent, the default is 0.
++
++Example:
++
++			alc5621: alc5621 at 1a {
++				compatible = "alc5621";
++				reg = <0x1a>;
++				add-ctrl = <0x3700>;
++				jack-det-ctrl = <0x4810>;
++			};
+diff --git a/sound/soc/codecs/alc5623.c b/sound/soc/codecs/alc5623.c
+index 2acf82f4a08a..1f9273d20b39 100644
+--- a/sound/soc/codecs/alc5623.c
++++ b/sound/soc/codecs/alc5623.c
+@@ -23,6 +23,7 @@
+ #include <linux/i2c.h>
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ #include <sound/core.h>
+ #include <sound/pcm.h>
+ #include <sound/pcm_params.h>
+@@ -998,8 +999,10 @@ static int alc5623_i2c_probe(struct i2c_client *client,
+ {
+ 	struct alc5623_platform_data *pdata;
+ 	struct alc5623_priv *alc5623;
++	struct device_node *np;
+ 	unsigned int vid1, vid2;
+ 	int ret;
++	u32 val32;
  
- 		if (!multi)
- 			break;
-@@ -263,6 +287,10 @@ static int asoc_simple_card_parse_of(struct device_node *node,
- 		dai_props++;
+ 	alc5623 = devm_kzalloc(&client->dev, sizeof(struct alc5623_priv),
+ 			       GFP_KERNEL);
+@@ -1040,6 +1043,16 @@ static int alc5623_i2c_probe(struct i2c_client *client,
+ 	if (pdata) {
+ 		alc5623->add_ctrl = pdata->add_ctrl;
+ 		alc5623->jack_det_ctrl = pdata->jack_det_ctrl;
++	} else {
++		if (client->dev.of_node) {
++			np = client->dev.of_node;
++			ret = of_property_read_u32(np, "add-ctrl", &val32);
++			if (ret >= 0)
++				alc5623->add_ctrl = val32;
++			ret = of_property_read_u32(np, "jack-det-ctrl", &val32);
++			if (ret >= 0)
++				alc5623->jack_det_ctrl = val32;
++		}
  	}
  
-+	/* Factor to mclk, used in hw_params() */
-+	of_property_read_u32(node, "simple-audio-card,mclk-factor",
-+			     &priv->mclk_factor);
-+
- 	/* card name is created from CPU/CODEC dai name */
- 	dai_link = priv->snd_card.dai_link;
- 	if (!priv->snd_card.name)
+ 	alc5623->id = vid2;
 -- 
 1.9.2
