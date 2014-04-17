@@ -1,74 +1,108 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 17 Apr 2014 11:29:00 +0200
-Subject: [PATCH 4/5] exynos4-is: Remove requirement for "simple-bus"
- compatible
-In-Reply-To: <CAL_JsqKH8o-0H4+2jv-6xh96Twh9UCXZV+LtmiUGHJmhUxCUVA@mail.gmail.com>
-References: <1397583272-28295-1-git-send-email-s.nawrocki@samsung.com>
- <1397583272-28295-5-git-send-email-s.nawrocki@samsung.com>
- <CAL_Jsq+VRGpVZwFs1QwCz6YY8WmPUO7ZJtWQ3kVY8p1jWe0LGg@mail.gmail.com>
- <534EBB88.9020109@samsung.com>
- <CAL_JsqKH8o-0H4+2jv-6xh96Twh9UCXZV+LtmiUGHJmhUxCUVA@mail.gmail.com>
-Message-ID: <534F9EDC.4030202@samsung.com>
+From: wujianguo@huawei.com (Jianguo Wu)
+Date: Thu, 17 Apr 2014 17:31:37 +0800
+Subject: [PATCH v3] ARM: mm: support big-endian page tables
+Message-ID: <534F9F79.9050503@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(restoring the Cc list I cleared accidentally in previous reply)
+When enable LPAE and big-endian in a hisilicon board, while specify
+mem=384M mem=512M at 7680M, will get bad page state:
 
-On 16/04/14 21:29, Rob Herring wrote:
-> On Wed, Apr 16, 2014 at 12:19 PM, Sylwester Nawrocki
-> <s.nawrocki@samsung.com> wrote:
->> On 16/04/14 17:34, Rob Herring wrote:
->>> On Tue, Apr 15, 2014 at 12:34 PM, Sylwester Nawrocki
->>> <s.nawrocki@samsung.com> wrote:
->>>>> This patch makes the driver instantiating its child devices itself,
->>>>> rather than relying on an OS to instantiate devices as children
->>>>> of "simple-bus". This removes an incorrect usage of "simple-bus"
->>>>> compatible.
->>>
->>> Good, but why can't you use of_platform_populate with the root being
->>> the "samsung,fimc" node? The code to instantiate the devices belongs
->>> in the core OF code.
->>
->> As I mentioned in other thread, I couldn't see anything like
->> of_platform_unpopulate(), which would allow to destroy any created
->> devices. I can't have of_platform_populate() called as last thing
->> in probe() as some drivers do, so at least deferred probe works.
->> Anyway, it wouldn't be a solution since on a driver removal the
->> created devices must be unregistered.
-> 
-> I think the deferred probe will get fixed in 3.16, but I'm not
-> following how deferred probe is relevant here.
+Freeing unused kernel memory: 180K (c0466000 - c0493000)
+BUG: Bad page state in process init  pfn:fa442
+page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+page flags: 0x40000400(reserved)
+Modules linked in:
+CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+[<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+[<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+[<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+[<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+[<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+[<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+[<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+[<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+[<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
 
-What I meant was that when something fails in the middle of probe() 
-callback and of_platform_populate() was already called any devices 
-created by it must be destroyed before returning an error from probe().
-And some drivers seem to never free their devices created by 
-of_platform_populate().
+The bad pfn:fa442 is not system memory(mem=384M mem=512M at 7680M), after debugging,
+I find in page fault handler, will get wrong pfn from pte just after set pte,
+as follow:
+do_anonymous_page()
+{
+	...
+	set_pte_at(mm, address, page_table, entry);
+	
+	//debug code
+	pfn = pte_pfn(entry);
+	pr_info("pfn:0x%lx, pte:0x%llx\n", pfn, pte_val(entry));
 
->> I read through thread [1] and I didn't immediately have an idea how
->> to fix the core OF code. So I thought I'd come up with this partial
->> solution.
->>
->> I was wondering if creating functions like of_platform_device_delete(),
->> of_amba_device_delete() and a function that would walk device tree and
->> call them would be a way to go ? I could spend some time on that, any
->> suggestions would be appreciated.
-> 
-> I need to look at the other removal case, but perhaps the way you did
-> using children of the struct device parent is the right way. I'm fine
-> with that, but I just want to see this in the core code.
+	//read out the pte just set
+	new_pte = pte_offset_map(pmd, address);
+	new_pfn = pte_pfn(*new_pte);
+	pr_info("new pfn:0x%lx, new pte:0x%llx\n", pfn, pte_val(entry));
+	...
+}
 
-All right, I'll have a closer look then if it can be done that way.
+pfn:   0x1fa4f5,     pte:0xc00001fa4f575f
+new_pfn:0xfa4f5, new_pte:0xc00000fa4f5f5f	//new pfn/pte is wrong.
+
+The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+An LPAE PTE is a 64bit quantity, passed to cpu_v7_set_pte_ext in the r2 and r3 registers.
+On an LE kernel, r2 contains the LSB of the PTE, and r3 the MSB.
+On a BE kernel, the assignment is reversed.
+
+Unfortunately, the current code always assumes the LE case,
+leading to corruption of the PTE when clearing/setting bits.
+
+This patch fixes this issue much like it has been done already in the
+cpu_v7_switch_mm case.
+
+Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
+Cc: stable at vger.kernel.org
+---
+-v2: Refactoring code suggested by Ben Dooks.
+-v3: Rewrite commit message suggested by Marc Zyngier.
+---
+ arch/arm/mm/proc-v7-3level.S |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 01a719e..22e3ad6 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -64,6 +64,14 @@ ENTRY(cpu_v7_switch_mm)
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_switch_mm)
  
-> Rob
-> 
->>
->> --
->> Regards,
->> Sylwester
->>
->> [1] http://www.spinics.net/lists/linux-omap/msg94484.html
-
---
-Thanks,
-Sylwester
++#ifdef __ARMEB__
++#define rl r3
++#define rh r2
++#else
++#define rl r2
++#define rh r3
++#endif
++
+ /*
+  * cpu_v7_set_pte_ext(ptep, pte)
+  *
+@@ -73,13 +81,13 @@ ENDPROC(cpu_v7_switch_mm)
+  */
+ ENTRY(cpu_v7_set_pte_ext)
+ #ifdef CONFIG_MMU
+-	tst	r2, #L_PTE_VALID
++	tst	rl, #L_PTE_VALID
+ 	beq	1f
+-	tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
+-	bicne	r2, #L_PTE_VALID
++	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
++	bicne	rl, #L_PTE_VALID
+ 	bne	1f
+-	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
+-	orreq	r2, #L_PTE_RDONLY
++	tst	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
++	orreq	rl, #L_PTE_RDONLY
+ 1:	strd	r2, r3, [r0]
+ 	ALT_SMP(W(nop))
+ 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+-- 
+1.7.1
