@@ -1,144 +1,40 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Thu, 17 Apr 2014 01:38:01 +0200
-Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
-In-Reply-To: <20140413013049.GB28990@core.coreip.homeip.net>
- <20140413012557.GA28990@core.coreip.homeip.net>
-Message-ID: <20140416233801.GF5545@type.youpi.perso.aquilenet.fr>
+From: joelf@ti.com (Joel Fernandes)
+Date: Wed, 16 Apr 2014 19:00:00 -0500
+Subject: [PATCH 0/9] dmtimer code clean-up first pass
+Message-ID: <1397692800-7395-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Here are some minor cleanups for dmtimer code in preparation for moving it out
+to drivers.
 
-Dmitry Torokhov, le Sat 12 Apr 2014 18:25:57 -0700, a ?crit :
-> On Fri, Apr 11, 2014 at 08:12:02AM +0200, Samuel Thibault wrote:
-> > I'm sorry this went out with a few mistakes.
-> > 
-> > Samuel Thibault, le Wed 09 Apr 2014 01:33:06 +0200, a ?crit :
-> > > Dmitry Torokhov, le Tue 08 Apr 2014 01:39:40 -0700, a ?crit :
-> > > > It is not about the VT, I am talking about pure input core. If I
-> > > > repurpose CapsLock LED for my WiFi indicator I do not want to go into
-> > > > other programs and teach them that they should stay away from trying to
-> > > > control this LED.
-> > > 
-> > > Err, but even without talking about repurposing Capslock LED for WiFi...
-> > > How is managed the conflict between the normal capslock behavior and
-> > > other programs' action on the underlying input device?  I don't think
-> > > this patch does not introduce the problem.
-> > 
-> > I of course meant "I don't think this patch introduces the problem".
-> 
-> The difference in my eyes is that with old interface both players knew
-> that they would be affecting (and potentially interfering) with the
-> state of CapsLock LED. With your proposed changes users of old
-> interfaces have no idea if they are actually toggling CapsLock LED or if
-> they are affecting something that is no longer a CapsLock LED.
+There is OMAP1 specific dmtimer code earlier, that are handled in mach-omap1
+directly now.   Other than this, few functions and code has been refactored to
+reduce redundancy and some minor cleanups.
 
-Mmm, I thought you were talking about evdev programs (which would always
-get to manipulate the hardware capslock leds anyway)?
+OMAP1 hasn't been tested so I welcome anyone with HW to test this.
 
-Are you here talking about KDSETLEDS?  This is a very odd ioctl
-actually.  Its name suggests that its purpose is to just light LEDs,
-but AFAIK it is essentially used by users to change the status of the
-keyboard state, and the LED change is just a side effect for them.  So
-if e.g. the numlock LED is repurposed to wifi, should KDSETLEDS really
-just switch on the LED (thus defeating the wifi purpose), while the user
-probably used setleds +num only to get its numlock enabled by default
-(and doesn't care about seeing that on the keyboard, on the contrary, he
-preferred to see the wifi state).
+Joel Fernandes (9):
+  ARM: OMAP: dmtimer: Remove setting of clk parent indirectly through
+    platform hook
+  ARM: OMAP: dmtimer: Add comments on OMAP1 clock framework
+  ARM: OMAP: dmtimer: Add note to set parent from DT
+  ARM: OMAP: dmtimer: Add function to check if timer is running
+  ARM: OMAP1: dmtimer: Rewrite modify of IDLECT mask to use new
+    is_running function
+  ARM: OMAP: dmtimer: Add a write_ctrl function to simplify bit setting
+  ARM: OMAP: dmtimer: Have __omap_dm_timer_load_start set ST bit in
+    CTRL instead of caller
+  ARM: OMAP: dmtimer: Add function to check for timer availability
+  ARM: OMAP: dmtimer: Get rid of check for mem resource error
 
-> > > How to decide which one to prioritize?
-> > > 
-> > > Is it just because console-setup happens to repurpose the capslock LED
-> > > key that applications should suddenly not have capslock LED control
-> > > at all?  That's contradictory with the use case you have given.
-> > 
-> > Oops, not the use case you have given, but a typical use-case of wanting
-> > to use a program which does nice things with the capslock LED, and then
-> > having to teach console-setup not to repurpose the capslock LED.
-> 
-> I believe that applications should be able to control sate of CapsLock
-> and other LEDs and that the affected LED should not be the physical LED
-> but rather LED that is currently tied to CapsLock trigger (if any).
+ arch/arm/mach-omap1/include/mach/hardware.h |    2 +
+ arch/arm/mach-omap1/timer.c                 |   34 ++++-
+ arch/arm/mach-omap2/timer.c                 |    6 +-
+ arch/arm/plat-omap/dmtimer.c                |  185 +++++++++++++--------------
+ arch/arm/plat-omap/include/plat/dmtimer.h   |    4 +-
+ include/linux/platform_data/dmtimer-omap.h  |    2 -
+ 6 files changed, 129 insertions(+), 104 deletions(-)
 
-Which kind of applications are you talking about?  What I have heard
-from users was that they either wanted to have an effect on the physical
-LED, or on the keyboard state, but not really "on the LED which shows
-the keyboard state", which would just be a side consequence of what they
-really want to achieve.
-
-> This
-> way everything works as is by default and if I decide to have my
-> physical CapsLock LED to be repurposed for Wifi or HDD activity or
-> whatever I do not need to teach unrelated applications to stop touching
-> it.
-
-Again, which applications are you thinking about precisely?  If a
-user has an application which wants to really show something on the
-capslock LED, then the user's intent was really the physical LED, and he
-hurted himself in the foot.  Otherwise, what was the intention of the
-application?  I don't understand why an application would want to light
-"the LED which shows the capslock state", and not simply the keyboard
-capslock status (which thus may or may not be reflected on some physical
-LED, depending whether some LED is plugged on the keyboard capslock
-status).
-
-> > > That
-> > > leads me into believing that we should not try to push a hard rule, and
-> > > just let the user manage what accesses it.  We could indeed make the VT
-> > > always take priority, but then that would probably break some existing
-> > > applications.
-> > 
-> > Such as the example above, with the capslock LED.
-> 
-> I am not saying that VT shoudl have priority, I am saying we need to
-> come up with implementation that does not result in inconsistent
-> behavior.
-
-Ok, but for now I don't see in which exact case we'd have an
-inconsistency.
-
-Dmitry Torokhov, le Sat 12 Apr 2014 18:30:49 -0700, a ?crit :
-> > I'd say that applications using direct EV_LED interface should just
-> > stop doing it. Yes, you can probably use led API and still toggle the
-> > led using gpio api behind leds back (not tested, perhaps there are
-> > interlocks that prevent that)... and it is same situation with
-> > EV_LED. We should just teach applications not to do that.
-> > 
-> > Would solution where EV_LED would be ignored when there's non-default
-> > trigger selected work for you?
-> 
-> Not ignored but rather routed to the LED that is currently selected for
-> given function. This way if I re-purposed CapsLock LED for Wifi and do
-> not provide a replacement EV_LED will be effectively dropped, but if I
-> switch CapsLock with NumLock I want the event to affect the appropriate
-> LED.
-
-Err, but are we really talking about the same layer?  I thought
-EV_LED was meant to drive hardware, not to drive any kind of software
-abstraction on top of it.  Adding an indirection to what EV_LED actually
-means at least surely needs quite some heavy patching in the input
-layer, I'm not even sure I really want to dive into that.
-
-Adding an indirection there also looks to me like confusing the picture
-even more.  The way I see it is (using a monospace font):
-
-kbd state -> kbd led -> kbd trigger -> vt led -> vt trigger -> input led
-  ^^                                ^^                      ^^    ^^
-KDSETLED                            XX                      YY   EV_LED
-
-XX is vt::capsl/trigger, and YY is input*::capsl/trigger. Applications
-can either modify the keyboard state through KDSETLED, which may or may
-not be shown by some LEDs depending on XX and YY, or modify the hardware
-leds through EV_LED, which thus doesn't care about XX and YY.
-
-The only "case" I see "broken" is applications which would be using
-KDSETLED to just flash some keyboard LEDs (and happen to also tamper
-with keyboard state...). With a default configuration they will still
-work.  If the LEDs are repurposed, the application effect won't show up
-(unless the scroll/caps/num still appear in the LED reassignation, and
-then the application effect will show up, with the repurpose exchanges).
-
-In the end, I really don't see which use case you are thinking about
-precisely.
-
-Samuel
+-- 
+1.7.9.5
