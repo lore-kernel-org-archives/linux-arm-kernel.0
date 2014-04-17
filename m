@@ -1,30 +1,44 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 17 Apr 2014 13:07:44 +0200
-Subject: [PATCH 0/5] defconfigs: add MTD_SPI_NOR (dependency for M25P80)
-In-Reply-To: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <201404171307.44214.marex@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Apr 2014 12:27:13 +0100
+Subject: [PATCH] ARM: mcs lock: implement wfe-based polling for MCS locking
+Message-ID: <1397734033-11931-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 17, 2014 at 09:21:44 AM, Brian Norris wrote:
-> Hi all,
-> 
-> We are introducing a new SPI-NOR library/framework for MTD, to support
-> various types of SPI-NOR flash controllers which require (or benefit from)
-> intimate knowledge of the flash interface, rather than just the relatively
-> dumb SPI interface. This library borrows much of the m25p80 driver for its
-> abstraction and moves this code into a spi-nor module.
-> 
-> This means CONFIG_M25P80 now has a dependency on CONFIG_MTD_SPI_NOR, which
-> should be added to the defconfigs. I'm not sure what is the best process
-> for doing this. Should each $ARCH maintainer just take their respective
-> patch, even if the MTD_SPI_NOR Kconfig symbol is not defined for them yet?
-> Or should maintainers plan on merging the relevant SPI-NOR code into their
-> trees during the development cycle? Or some third option?
+This patch introduces a wfe-based polling loop for spinning on contended
+MCS locks and waking up corresponding waiters when the lock is released.
 
-Shouldn't the M25P80 driver just "select" the SPI NOR framework? Then you won't 
-need the adjustment to defconfigs at all I think.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/mcs_spinlock.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 arch/arm/include/asm/mcs_spinlock.h
 
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/include/asm/mcs_spinlock.h b/arch/arm/include/asm/mcs_spinlock.h
+new file mode 100644
+index 000000000000..f32f97e81471
+--- /dev/null
++++ b/arch/arm/include/asm/mcs_spinlock.h
+@@ -0,0 +1,20 @@
++#ifndef __ASM_MCS_LOCK_H
++#define __ASM_MCS_LOCK_H
++
++/* MCS spin-locking. */
++#define arch_mcs_spin_lock_contended(lock)				\
++do {									\
++	/* Ensure prior stores are observed before we enter wfe. */	\
++	smp_mb();							\
++	while (!(smp_load_acquire(lock)))				\
++		wfe();							\
++} while (0)								\
++
++#define arch_mcs_spin_unlock_contended(lock)				\
++do {									\
++	smp_store_release(lock, 1);					\
++	dsb(ishst);							\
++	sev();								\
++} while (0)
++
++#endif	/* __ASM_MCS_LOCK_H */
+-- 
+1.9.1
