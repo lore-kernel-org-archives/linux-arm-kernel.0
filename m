@@ -1,116 +1,347 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 17 Apr 2014 10:43:01 +0100
-Subject: [PATCH v3] ARM: mm: support big-endian page tables
-In-Reply-To: <534F9F79.9050503@huawei.com> (Jianguo Wu's message of "Thu, 17
- Apr 2014 10:31:37 +0100")
-References: <534F9F79.9050503@huawei.com>
-Message-ID: <87ob00wau2.fsf@approximate.cambridge.arm.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Thu, 17 Apr 2014 18:01:10 +0800
+Subject: [PATCH v1] dma: imx-sdma: add support for sdma memory copy
+Message-ID: <1397728870-22086-1-git-send-email-b38343@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17 2014 at 10:31:37 am BST, Jianguo Wu <wujianguo@huawei.com> wrote:
-> When enable LPAE and big-endian in a hisilicon board, while specify
-> mem=384M mem=512M at 7680M, will get bad page state:
->
-> Freeing unused kernel memory: 180K (c0466000 - c0493000)
-> BUG: Bad page state in process init  pfn:fa442
-> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
-> page flags: 0x40000400(reserved)
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
-> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
-> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
-> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
-> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
-> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
-> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
-> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
-> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
-> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
->
-> The bad pfn:fa442 is not system memory(mem=384M mem=512M at 7680M), after debugging,
-> I find in page fault handler, will get wrong pfn from pte just after set pte,
-> as follow:
-> do_anonymous_page()
-> {
-> 	...
-> 	set_pte_at(mm, address, page_table, entry);
-> 	
-> 	//debug code
-> 	pfn = pte_pfn(entry);
-> 	pr_info("pfn:0x%lx, pte:0x%llx\n", pfn, pte_val(entry));
->
-> 	//read out the pte just set
-> 	new_pte = pte_offset_map(pmd, address);
-> 	new_pfn = pte_pfn(*new_pte);
-> 	pr_info("new pfn:0x%lx, new pte:0x%llx\n", pfn, pte_val(entry));
-> 	...
-> }
->
-> pfn:   0x1fa4f5,     pte:0xc00001fa4f575f
-> new_pfn:0xfa4f5, new_pte:0xc00000fa4f5f5f	//new pfn/pte is wrong.
->
-> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
-> An LPAE PTE is a 64bit quantity, passed to cpu_v7_set_pte_ext in the r2 and r3 registers.
-> On an LE kernel, r2 contains the LSB of the PTE, and r3 the MSB.
-> On a BE kernel, the assignment is reversed.
->
-> Unfortunately, the current code always assumes the LE case,
-> leading to corruption of the PTE when clearing/setting bits.
->
-> This patch fixes this issue much like it has been done already in the
-> cpu_v7_switch_mm case.
->
-> Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
-> Cc: stable at vger.kernel.org
+add "device_prep_dma_memcpy" and "device_prep_dma_sg" for memory copy by sdma.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Robin Gong <b38343@freescale.com>
+---
+ drivers/dma/imx-sdma.c |  188 +++++++++++++++++++++++++++++++++++++++++------
+ 1 files changed, 164 insertions(+), 24 deletions(-)
 
-> ---
-> -v2: Refactoring code suggested by Ben Dooks.
-> -v3: Rewrite commit message suggested by Marc Zyngier.
-> ---
->  arch/arm/mm/proc-v7-3level.S |   18 +++++++++++++-----
->  1 files changed, 13 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> index 01a719e..22e3ad6 100644
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -64,6 +64,14 @@ ENTRY(cpu_v7_switch_mm)
->  	mov	pc, lr
->  ENDPROC(cpu_v7_switch_mm)
->  
-> +#ifdef __ARMEB__
-> +#define rl r3
-> +#define rh r2
-> +#else
-> +#define rl r2
-> +#define rh r3
-> +#endif
-> +
->  /*
->   * cpu_v7_set_pte_ext(ptep, pte)
->   *
-> @@ -73,13 +81,13 @@ ENDPROC(cpu_v7_switch_mm)
->   */
->  ENTRY(cpu_v7_set_pte_ext)
->  #ifdef CONFIG_MMU
-> -	tst	r2, #L_PTE_VALID
-> +	tst	rl, #L_PTE_VALID
->  	beq	1f
-> -	tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
-> -	bicne	r2, #L_PTE_VALID
-> +	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
-> +	bicne	rl, #L_PTE_VALID
->  	bne	1f
-> -	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
-> -	orreq	r2, #L_PTE_RDONLY
-> +	tst	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
-> +	orreq	rl, #L_PTE_RDONLY
->  1:	strd	r2, r3, [r0]
->  	ALT_SMP(W(nop))
->  	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
-
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 4e79183..2a97e03 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -229,6 +229,7 @@ struct sdma_context_data {
+ } __attribute__ ((packed));
+ 
+ #define NUM_BD (int)(PAGE_SIZE / sizeof(struct sdma_buffer_descriptor))
++#define SDMA_BD_MAX_CNT	(0xfffc) /* align with 4 bytes */
+ 
+ struct sdma_engine;
+ 
+@@ -260,6 +261,7 @@ struct sdma_channel {
+ 	unsigned int			pc_from_device, pc_to_device;
+ 	unsigned long			flags;
+ 	dma_addr_t			per_address;
++	unsigned int                    pc_to_pc;
+ 	unsigned long			event_mask[2];
+ 	unsigned long			watermark_level;
+ 	u32				shp_addr, per_addr;
+@@ -694,6 +696,7 @@ static void sdma_get_pc(struct sdma_channel *sdmac,
+ 
+ 	sdmac->pc_from_device = 0;
+ 	sdmac->pc_to_device = 0;
++	sdmac->pc_to_pc = 0;
+ 
+ 	switch (peripheral_type) {
+ 	case IMX_DMATYPE_MEMORY:
+@@ -763,6 +766,7 @@ static void sdma_get_pc(struct sdma_channel *sdmac,
+ 
+ 	sdmac->pc_from_device = per_2_emi;
+ 	sdmac->pc_to_device = emi_2_per;
++	sdmac->pc_to_pc = emi_2_emi;
+ }
+ 
+ static int sdma_load_context(struct sdma_channel *sdmac)
+@@ -775,11 +779,12 @@ static int sdma_load_context(struct sdma_channel *sdmac)
+ 	int ret;
+ 	unsigned long flags;
+ 
+-	if (sdmac->direction == DMA_DEV_TO_MEM) {
++	if (sdmac->direction == DMA_DEV_TO_MEM)
+ 		load_address = sdmac->pc_from_device;
+-	} else {
++	else if (sdmac->direction == DMA_MEM_TO_MEM)
++		load_address = sdmac->pc_to_pc;
++	else
+ 		load_address = sdmac->pc_to_device;
+-	}
+ 
+ 	if (load_address < 0)
+ 		return load_address;
+@@ -1010,16 +1015,118 @@ static void sdma_free_chan_resources(struct dma_chan *chan)
+ 	clk_disable(sdma->clk_ahb);
+ }
+ 
+-static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+-		struct dma_chan *chan, struct scatterlist *sgl,
+-		unsigned int sg_len, enum dma_transfer_direction direction,
+-		unsigned long flags, void *context)
++static struct dma_async_tx_descriptor *sdma_prep_memcpy(
++		struct dma_chan *chan, dma_addr_t dma_dst,
++		dma_addr_t dma_src, size_t len, unsigned long flags)
++{
++	struct sdma_channel *sdmac = to_sdma_chan(chan);
++	struct sdma_engine *sdma = sdmac->sdma;
++	int channel = sdmac->channel;
++	size_t count;
++	int i = 0, param, ret;
++	struct sdma_buffer_descriptor *bd;
++
++	if (!chan || !len || sdmac->status == DMA_IN_PROGRESS)
++		return NULL;
++
++	if (len >= NUM_BD * SDMA_BD_MAX_CNT) {
++		dev_err(sdma->dev, "channel%d: maximum bytes exceeded:%d > %d\n"
++			, channel, len, NUM_BD * SDMA_BD_MAX_CNT);
++		goto err_out;
++	}
++
++	sdmac->status = DMA_IN_PROGRESS;
++
++	sdmac->buf_tail = 0;
++
++	dev_dbg(sdma->dev, "memcpy: %x->%x, len=%d, channel=%d.\n",
++		dma_src, dma_dst, len, channel);
++
++	sdmac->direction = DMA_MEM_TO_MEM;
++
++	ret = sdma_load_context(sdmac);
++	if (ret)
++		goto err_out;
++
++	sdmac->chn_count = 0;
++
++	do {
++		count = min_t(size_t, len, SDMA_BD_MAX_CNT);
++		bd = &sdmac->bd[i];
++		bd->buffer_addr = dma_src;
++		bd->ext_buffer_addr = dma_dst;
++		bd->mode.count = count;
++
++		if (sdmac->word_size > DMA_SLAVE_BUSWIDTH_4_BYTES) {
++			ret =  -EINVAL;
++			goto err_out;
++		}
++
++		switch (sdmac->word_size) {
++		case DMA_SLAVE_BUSWIDTH_4_BYTES:
++			bd->mode.command = 0;
++			if (count & 3 || dma_dst & 3 || dma_src & 3)
++				return NULL;
++			break;
++		case DMA_SLAVE_BUSWIDTH_2_BYTES:
++			bd->mode.command = 2;
++			if (count & 1 || dma_dst & 1 || dma_src & 1)
++				return NULL;
++			break;
++		case DMA_SLAVE_BUSWIDTH_1_BYTE:
++			bd->mode.command = 1;
++			break;
++		default:
++			return NULL;
++		}
++
++		dma_src += count;
++		dma_dst += count;
++		len -= count;
++		i++;
++
++		param = BD_DONE | BD_EXTD | BD_CONT;
++		/* last bd */
++		if (!len) {
++			param |= BD_INTR;
++			param |= BD_LAST;
++			param &= ~BD_CONT;
++		}
++
++		dev_dbg(sdma->dev, "entry %d: count: %d dma: 0x%08x %s%s\n",
++				i, count, bd->buffer_addr,
++				param & BD_WRAP ? "wrap" : "",
++				param & BD_INTR ? " intr" : "");
++
++		bd->mode.status = param;
++		sdmac->chn_count += count;
++	} while (len);
++
++	sdmac->num_bd = i;
++	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
++
++	return &sdmac->desc;
++err_out:
++	sdmac->status = DMA_ERROR;
++	return NULL;
++}
++
++/*
++ * Please ensure dst_nents no smaller than src_nents , also every sg_len of
++ * dst_sg node no smaller than src_sg. To simply things, please use the same
++ * size of dst_sg as src_sg.
++ */
++static struct dma_async_tx_descriptor *sdma_prep_sg(
++		struct dma_chan *chan,
++		struct scatterlist *dst_sg, unsigned int dst_nents,
++		struct scatterlist *src_sg, unsigned int src_nents,
++		enum dma_transfer_direction direction)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+ 	struct sdma_engine *sdma = sdmac->sdma;
+ 	int ret, i, count;
+ 	int channel = sdmac->channel;
+-	struct scatterlist *sg;
++	struct scatterlist *sg_src = src_sg, *sg_dst = dst_sg;
+ 
+ 	if (sdmac->status == DMA_IN_PROGRESS)
+ 		return NULL;
+@@ -1030,32 +1137,38 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 	sdmac->buf_tail = 0;
+ 
+ 	dev_dbg(sdma->dev, "setting up %d entries for channel %d.\n",
+-			sg_len, channel);
++			src_nents, channel);
+ 
+ 	sdmac->direction = direction;
++
+ 	ret = sdma_load_context(sdmac);
+ 	if (ret)
+ 		goto err_out;
+ 
+-	if (sg_len > NUM_BD) {
++	if (src_nents > NUM_BD) {
+ 		dev_err(sdma->dev, "SDMA channel %d: maximum number of sg exceeded: %d > %d\n",
+-				channel, sg_len, NUM_BD);
++				channel, src_nents, NUM_BD);
+ 		ret = -EINVAL;
+ 		goto err_out;
+ 	}
+ 
+ 	sdmac->chn_count = 0;
+-	for_each_sg(sgl, sg, sg_len, i) {
++	for_each_sg(src_sg, sg_src, src_nents, i) {
+ 		struct sdma_buffer_descriptor *bd = &sdmac->bd[i];
+ 		int param;
+ 
+-		bd->buffer_addr = sg->dma_address;
++		bd->buffer_addr = sg_src->dma_address;
+ 
+-		count = sg_dma_len(sg);
++		if (direction == DMA_MEM_TO_MEM) {
++			BUG_ON(!sg_dst);
++			bd->ext_buffer_addr = sg_dst->dma_address;
++		}
++
++		count = sg_dma_len(sg_src);
+ 
+-		if (count > 0xffff) {
++		if (count > SDMA_BD_MAX_CNT) {
+ 			dev_err(sdma->dev, "SDMA channel %d: maximum bytes for sg entry exceeded: %d > %d\n",
+-					channel, count, 0xffff);
++					channel, count, SDMA_BD_MAX_CNT);
+ 			ret = -EINVAL;
+ 			goto err_out;
+ 		}
+@@ -1071,12 +1184,14 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		switch (sdmac->word_size) {
+ 		case DMA_SLAVE_BUSWIDTH_4_BYTES:
+ 			bd->mode.command = 0;
+-			if (count & 3 || sg->dma_address & 3)
++			if (count & 3 || sg_src->dma_address & 3 ||
++				(sg_dst && (sg_dst->dma_address & 3)))
+ 				return NULL;
+ 			break;
+ 		case DMA_SLAVE_BUSWIDTH_2_BYTES:
+ 			bd->mode.command = 2;
+-			if (count & 1 || sg->dma_address & 1)
++			if (count & 1 || sg_src->dma_address & 1 ||
++				(sg_dst && (sg_dst->dma_address & 1)))
+ 				return NULL;
+ 			break;
+ 		case DMA_SLAVE_BUSWIDTH_1_BYTE:
+@@ -1088,21 +1203,23 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 
+ 		param = BD_DONE | BD_EXTD | BD_CONT;
+ 
+-		if (i + 1 == sg_len) {
++		if (i + 1 == src_nents) {
+ 			param |= BD_INTR;
+ 			param |= BD_LAST;
+ 			param &= ~BD_CONT;
+ 		}
+ 
+-		dev_dbg(sdma->dev, "entry %d: count: %d dma: %#llx %s%s\n",
+-				i, count, (u64)sg->dma_address,
++		dev_dbg(sdma->dev, "entry %d: count: %d dma: 0x%08x %s%s\n",
++				i, count, sg_src->dma_address,
+ 				param & BD_WRAP ? "wrap" : "",
+ 				param & BD_INTR ? " intr" : "");
+ 
+ 		bd->mode.status = param;
++		if (direction == DMA_MEM_TO_MEM)
++			sg_dst = sg_next(sg_dst);
+ 	}
+ 
+-	sdmac->num_bd = sg_len;
++	sdmac->num_bd = src_nents;
+ 	sdma->channel_control[channel].current_bd_ptr = sdmac->bd_phys;
+ 
+ 	return &sdmac->desc;
+@@ -1111,6 +1228,24 @@ err_out:
+ 	return NULL;
+ }
+ 
++static struct dma_async_tx_descriptor *sdma_prep_memcpy_sg(
++		struct dma_chan *chan,
++		struct scatterlist *dst_sg, unsigned int dst_nents,
++		struct scatterlist *src_sg, unsigned int src_nents,
++		unsigned long flags)
++{
++	return sdma_prep_sg(chan, dst_sg, dst_nents, src_sg, src_nents,
++			   DMA_MEM_TO_MEM);
++}
++
++static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
++		struct dma_chan *chan, struct scatterlist *sgl,
++		unsigned int sg_len, enum dma_transfer_direction direction,
++		unsigned long flags, void *context)
++{
++	return sdma_prep_sg(chan, NULL, 0, sgl, sg_len, direction);
++}
++
+ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 		struct dma_chan *chan, dma_addr_t dma_addr, size_t buf_len,
+ 		size_t period_len, enum dma_transfer_direction direction,
+@@ -1143,9 +1278,9 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 		goto err_out;
+ 	}
+ 
+-	if (period_len > 0xffff) {
++	if (period_len > SDMA_BD_MAX_CNT) {
+ 		dev_err(sdma->dev, "SDMA channel %d: maximum period size exceeded: %d > %d\n",
+-				channel, period_len, 0xffff);
++				channel, period_len, SDMA_BD_MAX_CNT);
+ 		goto err_out;
+ 	}
+ 
+@@ -1206,6 +1341,8 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 			sdmac->watermark_level = dmaengine_cfg->src_maxburst *
+ 						dmaengine_cfg->src_addr_width;
+ 			sdmac->word_size = dmaengine_cfg->src_addr_width;
++		} else if (dmaengine_cfg->direction == DMA_MEM_TO_MEM) {
++			sdmac->word_size = dmaengine_cfg->dst_addr_width;
+ 		} else {
+ 			sdmac->per_address = dmaengine_cfg->dst_addr;
+ 			sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
+@@ -1516,6 +1653,7 @@ static int __init sdma_probe(struct platform_device *pdev)
+ 
+ 	dma_cap_set(DMA_SLAVE, sdma->dma_device.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, sdma->dma_device.cap_mask);
++	dma_cap_set(DMA_MEMCPY, sdma->dma_device.cap_mask);
+ 
+ 	INIT_LIST_HEAD(&sdma->dma_device.channels);
+ 	/* Initialize channel parameters */
+@@ -1578,6 +1716,8 @@ static int __init sdma_probe(struct platform_device *pdev)
+ 	sdma->dma_device.device_tx_status = sdma_tx_status;
+ 	sdma->dma_device.device_prep_slave_sg = sdma_prep_slave_sg;
+ 	sdma->dma_device.device_prep_dma_cyclic = sdma_prep_dma_cyclic;
++	sdma->dma_device.device_prep_dma_memcpy = sdma_prep_memcpy;
++	sdma->dma_device.device_prep_dma_sg = sdma_prep_memcpy_sg;
+ 	sdma->dma_device.device_control = sdma_control;
+ 	sdma->dma_device.device_issue_pending = sdma_issue_pending;
+ 	sdma->dma_device.dev->dma_parms = &sdma->dma_parms;
 -- 
-Jazz is not dead. It just smells funny.
+1.7.5.4
