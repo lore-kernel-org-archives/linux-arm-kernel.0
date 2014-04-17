@@ -1,37 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:32:10 +0900
-Subject: [PATCH 2/5] ARM: shmobile: armadillo800eva: fixup
- SND_SOC_DAIFMT_CBx_CFx flags
+Date: Thu, 17 Apr 2014 09:32:12 +0900
+Subject: [PATCH 4/5] ARM: shmobile: r8a7740: drop address cells from GIC node
 In-Reply-To: <cover.1397694064.git.horms+renesas@verge.net.au>
 References: <cover.1397694064.git.horms+renesas@verge.net.au>
-Message-ID: <7b707277e734c553a8043e9b4d530eb47f4d60c8.1397694064.git.horms+renesas@verge.net.au>
+Message-ID: <64c04a79c377e23449c59060727fcd34cc798eb6.1397694064.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Lucas Stach <l.stach@pengutronix.de>
 
-c7a507eea1db1430476289f525f9c853d5d485e8
-(ASoC: fsi: fixup SND_SOC_DAIFMT_CBx_CFx flags)
-exchanged sound flags, but armadillo800eva flags needs IB_NF.
-The recorded sound will be noise without this patch.
+This is likely a copy-and-paste error from the
+ARM GIC documentation, that has already been fixed.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+address-cells should have been set to 0, as with the size
+cells. As having those properties set to 0 is the
+same thing as not specifying them, drop them completely.
+
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 2858f38..486063d 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -992,6 +992,7 @@ static struct asoc_simple_card_info fsi_wm8978_info = {
- 	.platform	= "sh_fsi2",
- 	.daifmt		= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
- 	.cpu_dai = {
-+		.fmt	= SND_SOC_DAIFMT_IB_NF,
- 		.name	= "fsia-dai",
- 	},
- 	.codec_dai = {
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 8280884..2551e94 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -28,7 +28,6 @@
+ 	gic: interrupt-controller at c2800000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+-		#address-cells = <1>;
+ 		interrupt-controller;
+ 		reg = <0xc2800000 0x1000>,
+ 		      <0xc2000000 0x1000>;
 -- 
 1.8.4
