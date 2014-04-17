@@ -1,69 +1,49 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Apr 2014 20:50:10 +0100
-Subject: [PATCH v6 3/3] ARM: Check if a CPU has gone offline
-In-Reply-To: <1397762146-8337-4-git-send-email-ashwin.chaugule@linaro.org>
-References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
- <1397762146-8337-4-git-send-email-ashwin.chaugule@linaro.org>
-Message-ID: <20140417195009.GC24195@e106331-lin.cambridge.arm.com>
+Date: Thu, 17 Apr 2014 20:53:42 +0100
+Subject: [PATCH V2] arm64: Fix PSCI part of booting.txt
+In-Reply-To: <1397763592.30572.56.camel@smoke>
+References: <1397758623.30572.53.camel@smoke> <1397763592.30572.56.camel@smoke>
+Message-ID: <20140417195342.GD24195@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 08:15:46PM +0100, Ashwin Chaugule wrote:
-> PSCIv0.2 adds a new function called AFFINITY_INFO, which
-> can be used to query if a specified CPU has actually gone
-> offline. Calling this function via cpu_kill ensures that
-> a CPU has quiesced after a call to cpu_die.
+On Thu, Apr 17, 2014 at 08:39:52PM +0100, Geoff Levand wrote:
+> Correct the PSCI booting text to reflect the requirements
+> of the PSCI spec.
 > 
-> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
 > ---
->  arch/arm/kernel/psci_smp.c | 21 +++++++++++++++++++++
->  include/uapi/linux/psci.h  |  5 +++++
->  2 files changed, 26 insertions(+)
+> v2: Change to mention online CPUs only.
 > 
-> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> index 570a48c..c6f1420 100644
-> --- a/arch/arm/kernel/psci_smp.c
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -16,6 +16,7 @@
->  #include <linux/init.h>
->  #include <linux/smp.h>
->  #include <linux/of.h>
-> +#include <uapi/linux/psci.h>
+>  Documentation/arm64/booting.txt | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/arm64/booting.txt
+> b/Documentation/arm64/booting.txt
+> index beb754e..e5b9c81 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -167,13 +167,12 @@ following manner:
+>    value, so CPUs must convert the read value to their native endianness
+>    before jumping to it.
 >  
->  #include <asm/psci.h>
->  #include <asm/smp_plat.h>
-> @@ -66,6 +67,25 @@ void __ref psci_cpu_die(unsigned int cpu)
->         /* We should never return */
->         panic("psci: cpu %d failed to shutdown\n", cpu);
->  }
-> +
-> +int __ref psci_cpu_kill(unsigned int cpu)
-> +{
-> +	int err;
-> +
-> +	if (!psci_ops.affinity_info)
-> +		return 1;
-> +
-> +	err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
-> +
-> +	if (err != PSCI_AFFINITY_INFO_RET_OFF) {
-> +		pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
-> +				cpu, err);
-> +		/* Make platform_cpu_kill() fail. */
-> +		return 0;
-> +	}
+> -- CPUs with a "psci" enable method should remain outside of
+> -  the kernel (i.e. outside of the regions of memory described to the
+> -  kernel in the memory node, or in a reserved area of memory described
+> -  to the kernel by a /memreserve/ region in the device tree).  The
+> -  kernel will issue CPU_ON calls as described in ARM document number
+> ARM
+> -  DEN 0022A ("Power State Coordination Interface System Software on ARM
+> -  processors") to bring CPUs into the kernel.
+> +- CPUs with a "psci" enable method should use the PSCI CPU control
+> +  functions described in ARM document number ARM DEN 0022A or newer
+> +  ("Power State Coordination Interface System Software on ARM
+> +  processors").  The boot loader must power off any of these CPUs that
+> +  have been brought online using the PSCI CPU_OFF function.  The kernel
+> +  will issue CPU_ON calls to bring CPUs into the kernel.
 
-We can race with the dying CPU here -- if we call AFFINITY_INFO before
-the dying cpu is sufficiently far through its CPU_OFF call it won't
-register as OFF. 
+Can we not just say that the bootloader must ensure these CPUs are in
+the OFF state? That covers those onlined then offlined by the bootloader
+and any others (which we don't currently define the state of).
 
-Could we poll here instead (with a reasonable limit on the number of
-iterations)? That would enable us to not spuriously declare a CPU to be
-dead when it happened to take slightly longer than we expect to turn
-off.
-
-Otherwise, this looks good. Thanks for implementing this :)
-
-Cheers,
 Mark.
