@@ -1,144 +1,66 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 16 Apr 2014 19:06:47 -0700
-Subject: [PATCH v2 4/4] drivers: net: Add APM X-Gene SoC ethernet driver
- support.
-In-Reply-To: <534BEB20.3080501@codethink.co.uk>
-References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
- <1397271984-23405-5-git-send-email-isubramanian@apm.com>
- <534BEB20.3080501@codethink.co.uk>
-Message-ID: <CAKh23FmM6L4PeL+GOz=neQac4ZDj+_LmH5=zTLtVZxfUe9HQVw@mail.gmail.com>
+Date: Wed, 16 Apr 2014 19:39:24 -0700
+Subject: [PATCH v3 0/4] net: Add APM X-Gene SoC Ethernet driver support
+Message-ID: <1397702368-4846-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Adding APM X-Gene SoC Ethernet driver.
 
-Please find my response inline.
+v3: Address comments from v2 review
+* cleaned up set_desc and get_desc functions
+* added dtb mdio node and phy-handle subnode
+* renamed dtb phy-mode to phy-connection-type
+* added of_phy_connect call to connec to PHY
+* added empty line after last local variable declaration
+* removed type casting when not required
+* removed inline keyword from source files
+* removed CONFIG_CPU_BIG_ENDIAN ifdef
 
-On Mon, Apr 14, 2014 at 7:05 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 12/04/14 04:06, Iyappan Subramanian wrote:
->>
->> This patch adds network driver for APM X-Gene SoC ethernet.
->>
->> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
->> Signed-off-by: Ravi Patel <rapatel@apm.com>
->
->
-> [snip]
->
->
->> +{
->> +       struct xgene_enet_pdata *pdata = netdev_priv(ndev);
->> +       struct phy_device *phydev;
->> +       unsigned char phy_id[MII_BUS_ID_SIZE+3];
->> +       int ret = 0;
->> +
->> +       phydev = phy_find_first(pdata->mdio_bus);
->> +       if (!phydev) {
->> +               netdev_info(ndev, "no PHY found\n");
->> +               ret = -1;
->> +               goto out;
->> +       }
->> +
->> +       /* attach the mac to the phy */
->> +       snprintf(phy_id, sizeof(phy_id), PHY_ID_FMT, pdata->mdio_bus->id,
->> +                pdata->phy_addr);
->> +       phydev = phy_connect(ndev, phy_id,
->> +                            &xgene_enet_mdio_link_change,
->> pdata->phy_mode);
->> +       if (IS_ERR(phydev)) {
->> +               netdev_err(ndev, "Could not attach to PHY\n");
->> +               ret = PTR_ERR(phydev);
->> +               phydev = NULL;
->> +               goto out;
->> +       }
->> +
->
->
-> You should be using of_phy_connect or similar so that the
-> necessary PHY<>OF data is properly initialised
->
+v2
+* Completely redesigned ethernet driver
+* Added support to work with big endian kernel
+* Renamed dtb phyid entry to phy_addr
+* Changed dtb local-mac-address entry to byte string format
+* Renamed dtb eth8clk entry to menetclk
 
-I will use of_phy_connect function to connect to PHY.
+v1
+* Initial version
 
->
->> +       netdev_info(ndev, "phy_id=0x%08x phy_drv=\"%s\"",
->> +                   phydev->phy_id, phydev->drv->name);
->> +out:
->> +       pdata->phy_link = 0;
->> +       pdata->phy_speed = 0;
->> +       pdata->phy_dev = phydev;
->> +
->> +       return ret;
->> +}
->> +
->
->
->
-> [snip]
->
->
->> +struct xgene_enet_desc {
->> +       u64 m0;
->> +       u64 m1;
->> +       u64 m2;
->> +       u64 m3;
->> +};
->> +
->> +struct xgene_enet_desc16 {
->> +       u64 m0;
->> +       u64 m1;
->> +};
->> +
->> +static inline void xgene_enet_cpu_to_le64(struct xgene_enet_desc *desc,
->> +                                         int count)
->> +{
->> +#ifdef CONFIG_CPU_BIG_ENDIAN
->> +       int i;
->> +
->> +       for (i = 0; i < count; i++)
->> +               ((u64 *)desc)[i] = cpu_to_le64(((u64 *)desc)[i]);
->> +#endif
->> +}
->> +
->> +static inline void xgene_enet_le64_to_cpu(struct xgene_enet_desc *desc,
->> +                                         int count)
->> +{
->> +#ifdef CONFIG_CPU_BIG_ENDIAN
->> +       int i;
->> +
->> +       for (i = 0; i < count; i++)
->> +               ((u64 *)desc)[i] = le64_to_cpu(((u64 *)desc)[i]);
->> +#endif
->> +}
->> +
->> +static inline void xgene_enet_desc16_to_le64(struct xgene_enet_desc
->> *desc)
->> +{
->> +#ifdef CONFIG_CPU_BIG_ENDIAN
->> +       ((u64 *)desc)[1] = cpu_to_le64(((u64 *)desc)[1]);
->> +#endif
->> +}
->> +
->> +static inline void xgene_enet_le64_to_desc16(struct xgene_enet_desc
->> *desc)
->> +{
->> +#ifdef CONFIG_CPU_BIG_ENDIAN
->> +       ((u64 *)desc)[1] = le64_to_cpu(((u64 *)desc)[1]);
->> +#endif
->> +}
->
->
-> With this do you not risk confusing the hardware by swapping the
-> format of the descriptors?
->
-> Why not use xxx_to_cpu() and cpu_to_xxx() functions when reading or
-> writing the descriptors? It would also remove a lot of the #ifdef in
-> this code.
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Ravi Patel <rapatel@apm.com>
+Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+---
+Iyappan Subramanian (4):
+  MAINTAINERS: Add entry for APM X-Gene SoC ethernet driver
+  Documentation: dts: Add bindings for APM X-Gene SoC ethernet driver
+  dts: Add bindings for APM X-Gene SoC ethernet driver
+  drivers: net: Add APM X-Gene SoC ethernet driver support.
 
-Our hardware expects descriptor in the little endian format.  I will remove the
-#ifdef.
+ .../devicetree/bindings/net/apm-xgene-enet.txt     |   66 ++
+ MAINTAINERS                                        |    8 +
+ arch/arm64/boot/dts/apm-mustang.dts                |    4 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   27 +-
+ drivers/net/ethernet/Kconfig                       |    1 +
+ drivers/net/ethernet/Makefile                      |    1 +
+ drivers/net/ethernet/apm/Kconfig                   |    1 +
+ drivers/net/ethernet/apm/Makefile                  |    5 +
+ drivers/net/ethernet/apm/xgene/Kconfig             |   10 +
+ drivers/net/ethernet/apm/xgene/Makefile            |    6 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |  846 +++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  380 ++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   |  952 ++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  136 +++
+ 14 files changed, 2440 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+ create mode 100644 drivers/net/ethernet/apm/Kconfig
+ create mode 100644 drivers/net/ethernet/apm/Makefile
+ create mode 100644 drivers/net/ethernet/apm/xgene/Kconfig
+ create mode 100644 drivers/net/ethernet/apm/xgene/Makefile
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+ create mode 100644 drivers/net/ethernet/apm/xgene/xgene_enet_main.h
 
->
-> --
-> Ben Dooks                               http://www.codethink.co.uk/
-> Senior Engineer                         Codethink - Providing Genius
+-- 
+1.7.9.5
