@@ -1,32 +1,22 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 17 Apr 2014 17:04:40 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCAyLzJdIEFSTTogZHRzOiBpbXgyNy1wZGs6IEFkZCBrZXlw?=
- =?UTF-8?B?YWQgc3VwcG9ydA==?=
-In-Reply-To: <1397738561-3335-2-git-send-email-festevam@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 17 Apr 2014 10:12:34 -0300
+Subject: [PATCH 1/2] ARM: dts: imx27-pdk: Add NAND support
+In-Reply-To: <1397739692.667087851@f420.i.mail.ru>
 References: <1397738561-3335-1-git-send-email-festevam@gmail.com>
- <1397738561-3335-2-git-send-email-festevam@gmail.com>
-Message-ID: <1397739880.499030540@f420.i.mail.ru>
+ <1397739692.667087851@f420.i.mail.ru>
+Message-ID: <CAOMZO5A6waVSFtaT=HobuBv=-4B7bAN_zwDd-W9JRaty6XGZug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thu, 17 Apr 2014 09:42:41 -0300 ?? Fabio Estevam <festevam@gmail.com>:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx27-pdk.dts | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-> index c629a8c..2b7b24f 100644
-> --- a/arch/arm/boot/dts/imx27-pdk.dts
-> +++ b/arch/arm/boot/dts/imx27-pdk.dts
-> @@ -10,6 +10,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/input/input.h>
+On Thu, Apr 17, 2014 at 10:01 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-I think we can include this into imx27.dtsi, same as other files.
+>> +&nfc {
+>> +     status = "okay";
+>> +     nand-ecc-mode = "hw";
+>> +     nand-on-flash-bbt;
+>> +};
+>
+> You also should add pin definitions.
 
----
+NAND is detected even without the pin definitions.
+arch/arm/mach-imx/mach-mx27_3ds.c also does not define the NAND pins.
