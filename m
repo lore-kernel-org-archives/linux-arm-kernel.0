@@ -1,133 +1,307 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 17 Apr 2014 15:49:25 -0500
-Subject: [PATCH V2 09/19] bus: omap_l3_noc: Add support for discountinous flag
- mux input numbers
+Date: Thu, 17 Apr 2014 15:49:26 -0500
+Subject: [PATCH V2 10/19] bus: omap_l3_noc: use of_match_data to pick up SoC
+ information
 In-Reply-To: <1397767775-10965-1-git-send-email-nm@ti.com>
 References: <1397492726-17203-1-git-send-email-nm@ti.com>
  <1397767775-10965-1-git-send-email-nm@ti.com>
-Message-ID: <1397767775-10965-10-git-send-email-nm@ti.com>
+Message-ID: <1397767775-10965-11-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+From: Sricharan R <r.sricharan@ti.com>
 
-On DRA7, unlike on OMAP4 and OMAP5, the flag mux input numbers used
-to indicate the source of errors are not continous. Have a way in the
-driver to catch these and WARN the user of the flag mux input thats
-either undocumented or wrong.
+DRA7xx SoC has the same l3-noc interconnect ip (as OMAP4 and OMAP5), but
+AM437x SoC has just 2 modules instead of 3 which other SoCs have.
 
-In the similar vein, Timeout errors in AM43x can't be cleared per h/w
-team, neither does it have a STDERRLOG_MAIN to clear the error.
+So, stop using direct access of array indices and use of->match data and
+simplify implementation to benefit future usage.
 
-Further, the mux bit offset might not even be indexed into our array
-of known mux input description, in which case we'd have a abort.
+While at it, rename a few very generic variables to make them omap
+specific. This helps us differentiate from DRA7 and AM43xx data in the
+future.
 
-So, define a static range check for bit description and any definition
-which has target_name set to NULL (the ones that are not populated or
-ones that are specifically marked in the case of discontinous input
-numbers), can handle the same gracefully. Upon occurance of error from
-such sources, mask it. Otherwise, we'd have an infinite interrupt
-source without any means to clear it.
+NOTE: None of the platforms that use omap_l3_noc are non-device tree
+anymore. So, it is safe to assume OF match here.
 
-[nm at ti.com: rebase, squash and improve]
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
+[nm at ti.com: split, refactor and optimize logic]
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
-V2: reordering changes, There can be max upto 31 clkdm targets possible
-V1: https://patchwork.kernel.org/patch/3984021/
- drivers/bus/omap_l3_noc.c |   31 +++++++++++++++++++++++++++++++
- drivers/bus/omap_l3_noc.h |   11 ++++++++---
- 2 files changed, 39 insertions(+), 3 deletions(-)
+V2: reordering only.
+V1: https://patchwork.kernel.org/patch/3984101/
+ drivers/bus/omap_l3_noc.c |   55 +++++++++++++++++++---------------
+ drivers/bus/omap_l3_noc.h |   72 ++++++++++++++++++++++++++++++++-------------
+ 2 files changed, 84 insertions(+), 43 deletions(-)
 
 diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-index 343f002..27c6ce2 100644
+index 27c6ce2..fd31d37 100644
 --- a/drivers/bus/omap_l3_noc.c
 +++ b/drivers/bus/omap_l3_noc.c
-@@ -75,10 +75,41 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
- 		if (err_reg) {
- 			/* Identify the source from control status register */
- 			err_src = __ffs(err_reg);
-+
-+			/* We DONOT expect err_src to go out of bounds */
-+			BUG_ON(err_src > MAX_CLKDM_TARGETS);
-+
- 			l3_targ_inst = &l3_targ[i][err_src];
+@@ -14,12 +14,14 @@
+  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-#include <linux/module.h>
+ #include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/platform_device.h>
+ #include <linux/interrupt.h>
++#include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+ #include "omap_l3_noc.h"
+@@ -58,17 +60,18 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 	void __iomem *l3_targ_stderr, *l3_targ_slvofslsb, *l3_targ_mstaddr;
+ 	char *target_name, *master_name = "UN IDENTIFIED";
+ 	struct l3_target_data *l3_targ_inst;
++	struct l3_masters_data *master;
+ 
+ 	/* Get the Type of interrupt */
+ 	inttype = irq == l3->app_irq ? L3_APPLICATION_ERROR : L3_DEBUG_ERROR;
+ 
+-	for (i = 0; i < L3_MODULES; i++) {
++	for (i = 0; i < l3->num_modules; i++) {
+ 		/*
+ 		 * Read the regerr register of the clock domain
+ 		 * to determine the source
+ 		 */
+ 		base = l3->l3_base[i];
+-		err_reg = readl_relaxed(base + l3_flagmux[i] +
++		err_reg = readl_relaxed(base + l3->l3_flagmux[i] +
+ 					L3_FLAGMUX_REGERR0 + (inttype << 3));
+ 
+ 		/* Get the corresponding error and analyse */
+@@ -79,7 +82,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 			/* We DONOT expect err_src to go out of bounds */
+ 			BUG_ON(err_src > MAX_CLKDM_TARGETS);
+ 
+-			l3_targ_inst = &l3_targ[i][err_src];
++			l3_targ_inst = &l3->l3_targ[i][err_src];
  			target_name = l3_targ_inst->name;
  			l3_targ_base = base + l3_targ_inst->offset;
  
-+			/*
-+			 * If we do not know of a register offset to decode
-+			 * and clear, then mask.
-+			 */
-+			if (target_name == L3_TARGET_NOT_SUPPORTED) {
-+				u32 mask_val;
-+				void __iomem *mask_reg;
+@@ -101,7 +104,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 					inttype ? "debug" : "application",
+ 					err_src, i, "(unclearable)");
+ 
+-				mask_reg = base + l3_flagmux[i] +
++				mask_reg = base + l3->l3_flagmux[i] +
+ 					   L3_FLAGMUX_MASK0 + (inttype << 3);
+ 				mask_val = readl(mask_reg);
+ 				mask_val &= ~(1 << err_src);
+@@ -131,10 +134,12 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 				break;
+ 
+ 			case CUSTOM_ERROR:
+-				for (k = 0; k < NUM_OF_L3_MASTERS; k++) {
+-					if (masterid == l3_masters[k].id)
+-						master_name =
+-							l3_masters[k].name;
++				for (k = 0, master = l3->l3_masters;
++				     k < l3->num_masters; k++, master++) {
++					if (masterid == master->id) {
++						master_name = master->name;
++						break;
++					}
+ 				}
+ 				WARN(true, "L3 custom error: MASTER:%s TARGET:%s\n",
+ 					master_name, target_name);
+@@ -154,20 +159,34 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
+ 	return IRQ_HANDLED;
+ }
+ 
++static const struct of_device_id l3_noc_match[] = {
++	{.compatible = "ti,omap4-l3-noc", .data = &omap_l3_data},
++	{},
++};
++MODULE_DEVICE_TABLE(of, l3_noc_match);
 +
-+				/*
-+				 * Certain plaforms may have "undocumented"
-+				 * status pending on boot.. So dont generate
-+				 * a severe warning here.
-+				 */
-+				dev_err(l3->dev,
-+					"L3 %s error: target %d mod:%d %s\n",
-+					inttype ? "debug" : "application",
-+					err_src, i, "(unclearable)");
+ static int omap_l3_probe(struct platform_device *pdev)
+ {
++	const struct of_device_id *of_id;
+ 	static struct omap_l3 *l3;
+ 	int ret, i;
+ 
++	of_id = of_match_device(l3_noc_match, &pdev->dev);
++	if (!of_id) {
++		dev_err(&pdev->dev, "OF data missing\n");
++		return -EINVAL;
++	}
 +
-+				mask_reg = base + l3_flagmux[i] +
-+					   L3_FLAGMUX_MASK0 + (inttype << 3);
-+				mask_val = readl(mask_reg);
-+				mask_val &= ~(1 << err_src);
-+				writel(mask_val, mask_reg);
-+
-+				break;
-+			}
-+
- 			/* Read the stderrlog_main_source from clk domain */
- 			l3_targ_stderr = l3_targ_base + L3_TARG_STDERRLOG_MAIN;
- 			l3_targ_slvofslsb = l3_targ_base +
+ 	l3 = devm_kzalloc(&pdev->dev, sizeof(*l3), GFP_KERNEL);
+ 	if (!l3)
+ 		return -ENOMEM;
+ 
++	memcpy(l3, of_id->data, sizeof(*l3));
+ 	l3->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, l3);
+ 
+ 	/* Get mem resources */
+-	for (i = 0; i < L3_MODULES; i++) {
++	for (i = 0; i < l3->num_modules; i++) {
+ 		struct resource	*res = platform_get_resource(pdev,
+ 							     IORESOURCE_MEM, i);
+ 
+@@ -199,22 +218,12 @@ static int omap_l3_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-#if defined(CONFIG_OF)
+-static const struct of_device_id l3_noc_match[] = {
+-	{.compatible = "ti,omap4-l3-noc", },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, l3_noc_match);
+-#else
+-#define l3_noc_match NULL
+-#endif
+-
+ static struct platform_driver omap_l3_driver = {
+ 	.probe		= omap_l3_probe,
+ 	.driver		= {
+ 		.name		= "omap_l3_noc",
+ 		.owner		= THIS_MODULE,
+-		.of_match_table = l3_noc_match,
++		.of_match_table = of_match_ptr(l3_noc_match),
+ 	},
+ };
+ 
 diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index ae28784..66caece 100644
+index 66caece..e60865f 100644
 --- a/drivers/bus/omap_l3_noc.h
 +++ b/drivers/bus/omap_l3_noc.h
-@@ -30,6 +30,11 @@
- #define L3_TARG_STDERRLOG_SLVOFSLSB	0x5c
- #define L3_TARG_STDERRLOG_MSTADDR	0x68
- #define L3_FLAGMUX_REGERR0		0xc
-+#define L3_FLAGMUX_MASK0		0x8
-+
-+#define L3_TARGET_NOT_SUPPORTED		NULL
-+
-+#define MAX_CLKDM_TARGETS		31
+@@ -17,7 +17,9 @@
+ #ifndef __OMAP_L3_NOC_H
+ #define __OMAP_L3_NOC_H
  
- #define NUM_OF_L3_MASTERS	(sizeof(l3_masters)/sizeof(l3_masters[0]))
+-#define L3_MODULES			3
++#define OMAP_L3_MODULES			3
++#define MAX_L3_MODULES			3
++
+ #define CLEAR_STDERR_LOG		(1 << 31)
+ #define CUSTOM_ERROR			0x2
+ #define STANDARD_ERROR			0x0
+@@ -36,8 +38,6 @@
  
-@@ -61,7 +66,7 @@ static u32 l3_flagmux[L3_MODULES] = {
+ #define MAX_CLKDM_TARGETS		31
+ 
+-#define NUM_OF_L3_MASTERS	(sizeof(l3_masters)/sizeof(l3_masters[0]))
+-
+ /**
+  * struct l3_masters_data - L3 Master information
+  * @id:		ID of the L3 Master
+@@ -60,13 +60,47 @@ struct l3_target_data {
+ 	char *name;
+ };
+ 
+-static u32 l3_flagmux[L3_MODULES] = {
++
++/**
++ * struct omap_l3 - Description of data relevant for L3 bus.
++ * @dev:	device representing the bus (populated runtime)
++ * @l3_base:	base addresses of modules (populated runtime)
++ * @l3_flag_mux: array containing offsets to flag mux per module
++ *		 offset from corresponding module base indexed per
++ *		 module.
++ * @num_modules: number of clock domains / modules.
++ * @l3_masters:	array pointing to master data containing name and register
++ *		offset for the master.
++ * @num_master: number of masters
++ * @l3_targ:	array indexed by flagmux index (bit offset) pointing to the
++ *		target data. unsupported ones are marked with
++ *		L3_TARGET_NOT_SUPPORTED
++ * @debug_irq:	irq number of the debug interrupt (populated runtime)
++ * @app_irq:	irq number of the application interrupt (populated runtime)
++ */
++struct omap_l3 {
++	struct device *dev;
++
++	void __iomem *l3_base[MAX_L3_MODULES];
++	u32 *l3_flagmux;
++	int num_modules;
++
++	struct l3_masters_data *l3_masters;
++	int num_masters;
++
++	struct l3_target_data **l3_targ;
++
++	int debug_irq;
++	int app_irq;
++};
++
++static u32 omap_l3_flagmux[OMAP_L3_MODULES] = {
+ 	0x500,
+ 	0x1000,
  	0X0200
  };
  
--static struct l3_target_data l3_target_inst_data_clk1[] = {
-+static struct l3_target_data l3_target_inst_data_clk1[MAX_CLKDM_TARGETS] = {
+-static struct l3_target_data l3_target_inst_data_clk1[MAX_CLKDM_TARGETS] = {
++static struct l3_target_data omap_l3_target_data_clk1[MAX_CLKDM_TARGETS] = {
  	{0x100,	"DMM1",},
  	{0x200,	"DMM2",},
  	{0x300,	"ABE",},
-@@ -71,7 +76,7 @@ static struct l3_target_data l3_target_inst_data_clk1[] = {
+@@ -76,7 +110,7 @@ static struct l3_target_data l3_target_inst_data_clk1[MAX_CLKDM_TARGETS] = {
  	{0x900,	"L4WAKEUP",},
  };
  
--static struct l3_target_data l3_target_inst_data_clk2[] = {
-+static struct l3_target_data l3_target_inst_data_clk2[MAX_CLKDM_TARGETS] = {
+-static struct l3_target_data l3_target_inst_data_clk2[MAX_CLKDM_TARGETS] = {
++static struct l3_target_data omap_l3_target_data_clk2[MAX_CLKDM_TARGETS] = {
  	{0x500,	"CORTEXM3",},
  	{0x300,	"DSS",},
  	{0x100,	"GPMC",},
-@@ -95,7 +100,7 @@ static struct l3_target_data l3_target_inst_data_clk2[] = {
+@@ -100,13 +134,13 @@ static struct l3_target_data l3_target_inst_data_clk2[MAX_CLKDM_TARGETS] = {
  	{0x1700, "LLI",},
  };
  
--static struct l3_target_data l3_target_inst_data_clk3[] = {
-+static struct l3_target_data l3_target_inst_data_clk3[MAX_CLKDM_TARGETS] = {
+-static struct l3_target_data l3_target_inst_data_clk3[MAX_CLKDM_TARGETS] = {
++static struct l3_target_data omap_l3_target_data_clk3[MAX_CLKDM_TARGETS] = {
  	{0x0100, "EMUSS",},
  	{0x0300, "DEBUG SOURCE",},
  	{0x0,	"HOST CLK3",},
+ };
+ 
+-static struct l3_masters_data l3_masters[] = {
++static struct l3_masters_data omap_l3_masters[] = {
+ 	{ 0x0 , "MPU"},
+ 	{ 0x10, "CS_ADP"},
+ 	{ 0x14, "xxx"},
+@@ -134,20 +168,18 @@ static struct l3_masters_data l3_masters[] = {
+ 	{ 0xC8, "USBHOSTFS"}
+ };
+ 
+-static struct l3_target_data *l3_targ[L3_MODULES] = {
+-	l3_target_inst_data_clk1,
+-	l3_target_inst_data_clk2,
+-	l3_target_inst_data_clk3,
++static struct l3_target_data *omap_l3_targ[OMAP_L3_MODULES] = {
++	omap_l3_target_data_clk1,
++	omap_l3_target_data_clk2,
++	omap_l3_target_data_clk3,
+ };
+ 
+-struct omap_l3 {
+-	struct device *dev;
+-
+-	/* memory base */
+-	void __iomem *l3_base[L3_MODULES];
+-
+-	int debug_irq;
+-	int app_irq;
++static const struct omap_l3 omap_l3_data = {
++	.l3_flagmux = omap_l3_flagmux,
++	.num_modules = OMAP_L3_MODULES,
++	.l3_masters = omap_l3_masters,
++	.num_masters = ARRAY_SIZE(omap_l3_masters),
++	.l3_targ = omap_l3_targ,
+ };
+ 
+ #endif	/* __OMAP_L3_NOC_H */
 -- 
 1.7.9.5
