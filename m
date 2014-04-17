@@ -1,43 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:31:39 +0900
-Subject: [PATCH 3/8] ARM: shmobile: r8a7790: Fix the I2C clocks parents in
- legacy code
+Date: Thu, 17 Apr 2014 09:31:42 +0900
+Subject: [PATCH 6/8] ARM: shmobile: r8a7791: Rename VSP1_SY clocks to VSP1_S
 In-Reply-To: <cover.1397694178.git.horms+renesas@verge.net.au>
 References: <cover.1397694178.git.horms+renesas@verge.net.au>
-Message-ID: <ab077bfdc4eaffa5328a9843d4d7970718ac0b8a.1397694178.git.horms+renesas@verge.net.au>
+Message-ID: <58ea1d53ba93620ac50fef9d9720b2323971f243.1397694178.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-All I2C clocks derive from the HP clock, not from the P clock. Fix them.
+The r8a7791 has three VSP1 instances, one of them being named VSPS (which
+stands for "VSP Standard"). The clock section in the SoC datasheet
+misunderstood the abbreviation as meaning VSP System, and named the
+corresponding clock VSP1(SY). This mistake has been carried over to the
+kernel code.
+
+Fix this by renaming the VSP1_SY clock to VSP1_S.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Reviewed-by: Wolfram Sang <wsa@sang-engineering.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi            | 2 +-
+ include/dt-bindings/clock/r8a7791-clock.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 3f93503..3310139 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -249,10 +249,10 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP1007] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR10, 7, MSTPSR10, 0), /* SSI8 */
- 	[MSTP1006] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR10, 6, MSTPSR10, 0), /* SSI9 */
- 	[MSTP1005] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR10, 5, MSTPSR10, 0), /* SSI ALL */
--	[MSTP931] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 31, MSTPSR9, 0), /* I2C0 */
--	[MSTP930] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 30, MSTPSR9, 0), /* I2C1 */
--	[MSTP929] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
--	[MSTP928] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
-+	[MSTP931] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 31, MSTPSR9, 0), /* I2C0 */
-+	[MSTP930] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 30, MSTPSR9, 0), /* I2C1 */
-+	[MSTP929] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
-+	[MSTP928] = SH_CLK_MSTP32_STS(&hp_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
- 	[MSTP917] = SH_CLK_MSTP32_STS(&qspi_clk, SMSTPCR9, 17, MSTPSR9, 0), /* QSPI */
- 	[MSTP815] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 15, MSTPSR8, 0), /* SATA0 */
- 	[MSTP814] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 14, MSTPSR8, 0), /* SATA1 */
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 4618170..aa1cba9 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -688,7 +688,7 @@
+ 			renesas,clock-indices = <
+ 				R8A7791_CLK_TMU1 R8A7791_CLK_TMU3 R8A7791_CLK_TMU2
+ 				R8A7791_CLK_CMT0 R8A7791_CLK_TMU0 R8A7791_CLK_VSP1_DU1
+-				R8A7791_CLK_VSP1_DU0 R8A7791_CLK_VSP1_SY
++				R8A7791_CLK_VSP1_DU0 R8A7791_CLK_VSP1_S
+ 			>;
+ 			clock-output-names =
+ 				"tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
+diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
+index 30f82f2..f069bc6 100644
+--- a/include/dt-bindings/clock/r8a7791-clock.h
++++ b/include/dt-bindings/clock/r8a7791-clock.h
+@@ -32,7 +32,7 @@
+ #define R8A7791_CLK_TMU0		25
+ #define R8A7791_CLK_VSP1_DU1		27
+ #define R8A7791_CLK_VSP1_DU0		28
+-#define R8A7791_CLK_VSP1_SY		31
++#define R8A7791_CLK_VSP1_S		31
+ 
+ /* MSTP2 */
+ #define R8A7791_CLK_SCIFA2		2
 -- 
 1.8.4
