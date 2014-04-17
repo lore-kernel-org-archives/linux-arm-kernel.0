@@ -1,99 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Apr 2014 09:34:07 -0700
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
-In-Reply-To: <53319A7D.1060904@ti.com>
-References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
- <53319A7D.1060904@ti.com>
-Message-ID: <20140417163407.GB23385@atomide.com>
+From: agnel.joel@gmail.com (Joel Fernandes)
+Date: Thu, 17 Apr 2014 11:53:19 -0500
+Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
+ friendly address
+In-Reply-To: <534FD87C.4090708@codeaurora.org>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+ <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+ <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
+ <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+ <CAFEAcA96XGvwPM=OpqW8EU5nFksiEruGgncwqUPEWeU2ryCoJg@mail.gmail.com>
+ <534FD87C.4090708@codeaurora.org>
+Message-ID: <CAD=GYpaoNyFcgFNo50EUaGfDsiNkgpAAUgXrVa30kihqRbcJzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140325 08:05]:
-> On 03/21/2014 12:20 AM, Lokesh Vutla wrote:
-> > From: Dave Gerlach <d-gerlach@ti.com>
-> > 
-> > Do not reset GPIO5 at boot-up because GPIO5_7 is used
-> > on AM437x GP-EVM to control VTT regulators on DDR3.
-> > Without this some GP-EVM boards will fail to boot because
-> > of DDR3 corruption.
+On Thu, Apr 17, 2014 at 8:34 AM, Christopher Covington
+<cov@codeaurora.org> wrote:
+> On 04/17/2014 06:02 AM, Peter Maydell wrote:
+>> On 2 April 2014 13:47, Peter Maydell <peter.maydell@linaro.org> wrote:
+>>> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
+>>>> Like others, I have been carrying this change locally. Good to see it up!
+>>>
+>>> Why are you all booting raw Images anyway (just out of curiosity)?
+>>
+>> Given the recent feedback from the kernel mailing list (viz "don't boot
+>> Image unless you really know what you're doing, the correct load
+>> image may change randomly depending what other board support
+>> is in a multikernel image, etc") maybe we should just remove the
+>> Image booting support instead? Clearly nobody who hasn't locally
+>> patched QEMU is using it at the moment...
+>
+> An opportunity for a fresh start at low-level loading facilities, should
+> anyone be inclined to pursue it, sounds good to me.
+>
+> Christopher
+>
+> --
 
-How funny :)
+I'm still wondering here, multi-arch may break, but we can put a
+disclaimer in the Qemu code stating so that Image loading is not
+recommended and risky. Clearly that's better than just deleting raw
+Image loading functionality from Qemu boot loader altogether?
 
-Ideally we would be able to specify which GPIO pins should
-maintain their state during the boot.
+We can load the Image at any good address to make sure maximum number
+of TEXT_OFFSETs are happy. I found this exercise in part making
+__fixup_pv_table happy. Again I'm *not* advocating a hack, but I'm a
+bit against the idea of just removing the code.
 
-AFAIK, this patch currently means that the kernel has no idea
-what state the whole GPIO bank is in. At minimum we should
-parse the GPIO bank state so the kernel knows it and then it
-should be safe to set the no reset flag.
+Nicholas idea is great to store TEXT_OFFSET in the start of stext and
+parse it from bootloader but we wouldn't want to mainline those kernel
+changes for just those few users, makes sense.
 
-So for the workaround, can you guys please try to see test
-if the old mux trick in the bootloader works to mux the pin
-into something PIN_INPUT_PULLUP | MUX_MODE7? Or a PULLDOWN
-depending on the direction naturally. That would allow
-leaving out the GPIO completely from this.
+Peter, were you saying instead that we deprecate Image loading and
+switch to uImage for those folks requiring uncompressed loading in
+Qemu? IIRC uImage just wraps zImage so doesn't help folks not
+requiring compression, but no reason why mkimage can't be made to do
+that- just that the kernel doesn't do it by default (Correct me if I'm
+wrong).
 
-Regards,
+I'm not a big fan of raw image loading for that matter ;-) I only did
+it because at one point, compressed image loading was breaking with
+OMAP1 on Qemu and uncompressed Image loading was breaking because of
+offset.
 
-Tony
- 
-> > Reported-by: Nishanth Menon <nm@ti.com>
-> > Tested-by: Nishanth Menon <nm@ti.com>
-> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> > ---
-> > This is applied on top of current linux-next.
-> > git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git master
-> > 
-> >  arch/arm/boot/dts/am437x-gp-evm.dts |    5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-> > index df8798e..a055f7f 100644
-> > --- a/arch/arm/boot/dts/am437x-gp-evm.dts
-> > +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-> > @@ -117,6 +117,11 @@
-> >  	status = "okay";
-> >  };
-> >  
-> > +&gpio5 {
-> > +	status = "okay";
-> > +	ti,no-reset-on-init;
-> > +};
-> > +
-> >  &mmc1 {
-> >  	status = "okay";
-> >  	vmmc-supply = <&vmmcsd_fixed>;
-> > 
-> 
-> 
-> Tony,
-> any chance of having this in 3.15 cycle?
-> 
-> as of today's linux-next tag, the only platform I have that does not
-> boot is due to the lack of this patch.
-> 
-> 
-> next-20140325-omap2plus_defconfig
->  1: am335x-evm:  Boot PASS: http://slexy.org/raw/s20o6CfGL8
->  2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2Ogu1zPtD
->  3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2m2WhHYO8
->  4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2jOybaVno
->  5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21tt52N4b
->  6: am43xx-gpevm:  Boot FAIL: http://slexy.org/raw/s21eDQmFWJ
->  7: beagleboard:  Boot PASS: http://slexy.org/raw/s2q7vzrZHb
->  8: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2HCAJVz0H
->  9: beaglebone:  Boot PASS: http://slexy.org/raw/s2NioACYsM
-> 10: craneboard:  Boot PASS: http://slexy.org/raw/s2s7jyo52c
-> 11:       dra7:  Boot PASS: http://slexy.org/raw/s2OQ1BMerx
-> 12:        ldp:  Boot PASS: http://slexy.org/raw/s2cWgQrdjb
-> 13: pandaboard-es:  Boot PASS: http://slexy.org/raw/s2lOaznVLO
-> 14:    sdp2430:  Boot PASS: http://slexy.org/raw/s21RCJlUDU
-> 15:    sdp3430:  Boot PASS: http://slexy.org/raw/s2181J9eWO
-> 16:    sdp4430:  Boot PASS: http://slexy.org/raw/s20UumAiXK
-> 17: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s21ypXvTNc
-> TOTAL = 17 boards, Booted Boards = 16, No Boot boards = 1
-> 
-> -- 
-> Regards,
-> Nishanth Menon
+thanks,
+  -Joel
