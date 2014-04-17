@@ -1,40 +1,30 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 17 Apr 2014 18:08:54 +0200
-Subject: [PATCH 0/4] Add a DT description of LaCie 2Big and 5Big Network v2
-Message-ID: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
+Date: Thu, 17 Apr 2014 18:08:57 +0200
+Subject: [PATCH 3/4] ARM: MVEBU: Add LaCie 2Big and 5Big Network v2
+In-Reply-To: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
+References: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1397750938-25381-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds a DT description for LaCie 2Big and 5Big, one of
-the last remaining boards in mach-kirkwood. The LEDs cannot be
-described in DT, since there is no binding yet for the device which
-controls them. So a board file is added for that part.
+Enable building LaCie 2Big and 5Big Network v2 in the MVEBU v5 kernel.
 
-These patches are build tested only. It would be good if somebody
-could boot them.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/configs/mvebu_v5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Andrew Lunn (4):
-  ARM: Kirkwood: Add board file for netxbig LEDs
-  ARM: Kirkwood: Add DT descriptions for net2big and net5big.
-  ARM: MVEBU: Add LaCie 2Big and 5Big Network v2
-  ARM: MULTI_V5: Enable LaCie 2Big and 5Big Network v2
-
- arch/arm/boot/dts/Makefile              |   2 +
- arch/arm/boot/dts/kirkwood-net2big.dts  |  25 +++++
- arch/arm/boot/dts/kirkwood-net5big.dts  |  67 +++++++++++
- arch/arm/boot/dts/kirkwood-netxbig.dtsi | 182 ++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v5_defconfig     |   1 +
- arch/arm/configs/mvebu_v5_defconfig     |   1 +
- arch/arm/mach-mvebu/Kconfig             |   7 ++
- arch/arm/mach-mvebu/Makefile            |   1 +
- arch/arm/mach-mvebu/board-netxbig.c     | 191 ++++++++++++++++++++++++++++++++
- arch/arm/mach-mvebu/board.h             |   6 +
- arch/arm/mach-mvebu/kirkwood.c          |   3 +
- 11 files changed, 486 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-net2big.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-net5big.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-netxbig.dtsi
- create mode 100644 arch/arm/mach-mvebu/board-netxbig.c
-
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index 36484a37a1ca..58acd057e236 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -12,6 +12,7 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_KIRKWOOD=y
+ CONFIG_MACH_T5325=y
++CONFIG_MACH_NETXBIG=y
+ # CONFIG_CPU_FEROCEON_OLD_ID is not set
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PREEMPT=y
 -- 
 1.9.2
