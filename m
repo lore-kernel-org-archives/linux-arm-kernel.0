@@ -1,31 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Apr 2014 12:53:03 +0200
-Subject: [PATCH 0/5] defconfigs: add MTD_SPI_NOR (dependency for M25P80)
-In-Reply-To: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 17 Apr 2014 13:08:34 +0200
+Subject: [PATCH 1/5] ARM: defconfigs: add MTD_SPI_NOR (new dependency for
+ M25P80)
+In-Reply-To: <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
 References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <20140417105302.GA32603@ulmo>
+ <1397719309-2022-2-git-send-email-computersforpeace@gmail.com>
+Message-ID: <201404171308.34570.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 12:21:44AM -0700, Brian Norris wrote:
-> Hi all,
+On Thursday, April 17, 2014 at 09:21:45 AM, Brian Norris wrote:
+> These defconfigs contain the CONFIG_M25P80 symbol, which is now
+> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to the
+> relevant defconfigs.
 > 
-> We are introducing a new SPI-NOR library/framework for MTD, to support various
-> types of SPI-NOR flash controllers which require (or benefit from) intimate
-> knowledge of the flash interface, rather than just the relatively dumb SPI
-> interface. This library borrows much of the m25p80 driver for its abstraction
-> and moves this code into a spi-nor module.
+> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> 
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
 
-If this is a common library, then the more common approach to solve this
-would be to have each driver that uses it to select MTD_SPI_NOR rather
-than depend on it. That way you can drop this whole series to update the
-default configurations.
+mxs_defconfig is
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140417/d37d6536/attachment-0001.sig>
+Best regards,
+Marek Vasut
