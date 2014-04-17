@@ -1,59 +1,20 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 17 Apr 2014 12:11:24 -0500
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
-Message-ID: <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
+From: cminyard@mvista.com (Corey Minyard)
+Date: Thu, 17 Apr 2014 12:15:11 -0500
+Subject: kgdb on ARM printing a bogus OOPs
+Message-ID: <53500C1F.3040505@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 2:14 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 16 Apr 2014, Christopher Covington wrote:
->
->> On 04/15/2014 06:44 AM, Daniel Thompson wrote:
->> > Hi Folks
+I was playing with kgdb on ARM, and I noticed that every time it hits a
+breakpoint I get the following:
 
-[snip]
+  Internal error: Oops - undefined instruction: 0 [#3] PREEMPT SMP ARM
 
->> Or could we patch up the linker script to set zero-based ELF load
->> memory addresses (LMAs) [4] so that the physical addresses are almost right,
->> you just might have to add a system-specific RAM offset, perhaps pulled out of
->> the device tree? If that won't work, we could generate some kind of
->> vmlinux-phys with physical addresses. The latter two options might also
->> simplify external debugging before __turn_mmu_on(). I like the sound of the
->> LMA approach best, assuming it doesn't break existing stuff (I notice a few AT
->> directives in vmlinux.lds.S). Some of this might transfer to arm64 as well.
->> What do you all think?
->
-> If you really really want to get at the TEXT_OFFSET value in the
-> uncompressed image, the simplest way would be:
->
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index f8c08839ed..de84d0635a 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -78,6 +78,11 @@
->
->         __HEAD
->  ENTRY(stext)
-> +
-> +       b       1f
-> +       .word   TEXT_OFFSET             @ located at a 4-byte offset in Image
-> +1:
-> +
->   ARM_BE8(setend        be )                    @ ensure we are in BE8 mode
->
->   THUMB(        adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
->
-> This way the first word for Image would always be 0xea000000 and the
-> second one would be TEXT_OFFSET.  No other kernel Image binaries ever
-> had 0xea000000 as their first word so that also let you validate whether
-> or not the TEXT_OFFSET value is there.
+It's mostly harmless, the breakpoints still work, but all the printks
+could be troublesome in some debugging situations.  It's there because
+the notify_die() call was added after the printk in question.  I'd guess
+it should be before the printk, but is there a reason it was added after?
 
-Better yet, we should adopt the arm64 Image header which has this and
-other fields for arm Image files. We're going to have to deal with raw
-Image (and Image.gz) in bootloaders for arm64, so we might as well
-align things.
+Thanks,
 
-Rob
+-corey
