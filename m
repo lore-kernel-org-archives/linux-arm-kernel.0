@@ -1,326 +1,72 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 17 Apr 2014 16:22:57 +0200
-Subject: [RFC][PATCH 3/3] clocksource: Add Freescale FlexTimer Module
- (FTM) timer support
-In-Reply-To: <1397614787-8300-4-git-send-email-Li.Xiubo@freescale.com>
-References: <1397614787-8300-1-git-send-email-Li.Xiubo@freescale.com>
- <1397614787-8300-4-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <534FE3C1.4060509@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 17 Apr 2014 10:23:36 -0400
+Subject: [PATCH v2 2/4] ARM: mvebu: fix NOR bus-width in Armada XP GP
+ Device Tree
+In-Reply-To: <20140417090936.387c79c6@skate>
+References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397489361-5833-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140417050832.GP28159@titan.lakedaemon.net>
+ <20140417090936.387c79c6@skate>
+Message-ID: <20140417142336.GU28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2014 04:19 AM, Xiubo Li wrote:
-> The Freescale FlexTimer Module time reference is a 16-bit counter
-> that can be used as an unsigned or signed counter.one 16-bits
-> increase counter.
->
-> Here using the FTM0 as clock event device and the FTM1 as clock
-> source device.
+On Thu, Apr 17, 2014 at 09:09:36AM +0200, Thomas Petazzoni wrote:
+> On Thu, 17 Apr 2014 01:08:32 -0400, Jason Cooper wrote:
+> > Also, a gentle nit:  You're doing all the -stable info digging, would
+> > you mind putting it in the following format so I don't have to hand edit
+> > each patch?
+> 
+> Sure! So far I've just been blindly following
+> Documentation/stable_kernel_rules.txt, and besides the "Cc:
+> stable at vger.kernel.org" it doesn't say anything else of what you're
+> suggesting below.
+> 
+> > ------
+> > Link: ...
+> 
+> What should this link point to?
 
-As it is a new driver, please add a more elaborated description of the 
-timer.
+Oops, it was late.  I thought I was copying the relevant lines you added
+under your SoB.  I forgot that I added code to my import script that
+automagically adds a line:
 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Jingchang Lu <b35083@freescale.com>
-> ---
->   drivers/clocksource/Kconfig         |   5 +
->   drivers/clocksource/Makefile        |   1 +
->   drivers/clocksource/fsl_ftm_timer.c | 238 ++++++++++++++++++++++++++++++++++++
->   3 files changed, 244 insertions(+)
->   create mode 100644 drivers/clocksource/fsl_ftm_timer.c
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index cd6950f..28321c5 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -136,6 +136,11 @@ config CLKSRC_SAMSUNG_PWM
->   	  for all devicetree enabled platforms. This driver will be
->   	  needed only on systems that do not have the Exynos MCT available.
->
-> +config FSL_FTM_TIMER
-> +	bool
-> +	help
-> +	  Support for Freescale FlexTimer Module (FTM) timer.
-> +
->   config VF_PIT_TIMER
->   	bool
->   	help
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index c7ca50a..ce0a967 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -31,6 +31,7 @@ obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
->   obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
->   obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
->   obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
-> +obj-$(CONFIG_FSL_FTM_TIMER)	+= fsl_ftm_timer.o
->   obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
->
->   obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
-> diff --git a/drivers/clocksource/fsl_ftm_timer.c b/drivers/clocksource/fsl_ftm_timer.c
-> new file mode 100644
-> index 0000000..988449e
-> --- /dev/null
-> +++ b/drivers/clocksource/fsl_ftm_timer.c
-> @@ -0,0 +1,238 @@
-> +/*
-> + * Freescale FlexTimer Module (FTM) timer driver.
-> + *
-> + * Copyright 2014 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/sched_clock.h>
+Link: https://lkml.kernel.org/r/1397489361-5833-2-git-send-email-thomas.petazzoni at free-electrons.com
 
-Could you check all these headers are effectively needed ?
+built from the Message-Id of the email.  Very helpful to lookup ML
+conversations for a given commit.
 
-> +#define FTM_OFFSET(n)	(0x1000 * n)
-> +
-> +#define FTM_SC		0x00
-> +#define FTM_SC_CLK_SHIFT	3
-> +#define FTM_SC_CLK_MASK	(0x3 << FTM_SC_CLK_SHIFT)
-> +#define FTM_SC_CLK(c)	((c) << FTM_SC_CLK_SHIFT)
-> +#define FTM_SC_PS_MASK	0x7
-> +#define FTM_SC_TOIE	BIT(6)
-> +#define FTM_SC_TOF	BIT(7)
-> +
-> +#define FTM_CNT		0x04
-> +#define FTM_MOD		0x08
-> +
-> +#define FTM_CSC_BASE	0x0C
-> +#define FTM_CSC_MSB	BIT(5)
-> +#define FTM_CSC_MSA	BIT(4)
-> +#define FTM_CSC_ELSB	BIT(3)
-> +#define FTM_CSC_ELSA	BIT(2)
-> +
-> +#define FTM_CV_BASE	0x10
-> +#define FTM_CNTIN	0x4C
-> +#define FTM_STATUS	0x50
-> +
-> +#define FTM_MODE	0x54
-> +#define FTM_MODE_FTMEN	BIT(0)
-> +#define FTM_MODE_WPDIS	BIT(2)
-> +#define FTM_MODE_PWMSYNC	BIT(3)
-> +
-> +#define FTM_SYNC	0x58
-> +#define FTM_OUTINIT	0x5C
-> +#define FTM_OUTMASK	0x60
-> +#define FTM_COMBINE	0x64
-> +#define FTM_DEADTIME	0x68
-> +#define FTM_EXTTRIG	0x6C
-> +#define FTM_POL		0x70
-> +#define FTM_FMS		0x74
-> +#define FTM_FILTER	0x78
-> +#define FTM_FLTCTRL	0x7C
-> +#define FTM_QDCTRL	0x80
-> +#define FTM_CONF	0x84
-> +#define FTM_FLTPOL	0x88
-> +#define FTM_SYNCONF	0x8C
-> +#define FTM_INVCTRL	0x90
-> +#define FTM_SWOCTRL	0x94
-> +#define FTM_PWMLOAD	0x98
+Anyway, ignore that line because I automatically add it when I pull the
+patch in.
 
-Please remove the unused macros.
+> > Fixes: da8d1b383568 ('ARM: mvebu: Add support for NOR flash device on Armada XP-GP board')
+> 
+> Ok. But this is not described in Documentation/stable_kernel_rules.txt.
 
-> +
-> +static void __iomem *clksrc_base;
-> +static void __iomem *clkevt_base;
-> +static unsigned long peroidic_cyc;
-> +
-> +static inline void __init ftm_timer_enable(void __iomem *base)
-> +{
-> +	u32 val;
-> +
-> +	/* select and enable counter clock source */
-> +	val = __raw_readl(base + FTM_SC);
-> +	val &= ~FTM_SC_CLK_MASK;
-> +	val |= FTM_SC_CLK(1);
-> +	__raw_writel(val, base + FTM_SC);
-> +}
-> +
-> +static u64 ftm_read_sched_clock(void)
-> +{
-> +	return __raw_readl(clksrc_base + FTM_CNT);
-> +}
-> +
-> +static int __init ftm_clocksource_init(unsigned long freq)
-> +{
-> +	int ret;
-> +
-> +	__raw_writel(0x00, clksrc_base + FTM_CNTIN);
-> +	__raw_writel(~0UL, clksrc_base + FTM_MOD);
-> +	__raw_writel(0x1, clksrc_base + FTM_CNT);
-> +
-> +	sched_clock_register(ftm_read_sched_clock, 16, freq);
-> +	ret = clocksource_mmio_init(clksrc_base + FTM_CNT, "fsl-ftm",
-> +				freq, 300, 16, clocksource_mmio_readl_up);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ftm_timer_enable(clksrc_base);
-> +
-> +	return 0;
-> +}
-> +
-> +static inline void ftm_irq_acknowledge(void)
-> +{
-> +	u32 val;
-> +
-> +	val = __raw_readl(clkevt_base + FTM_SC);
-> +	val &= ~FTM_SC_TOF;
-> +	__raw_writel(val, clkevt_base + FTM_SC);
-> +}
-> +
-> +static int ftm_set_next_event(unsigned long delta,
-> +				struct clock_event_device *unused)
-> +{
-> +	__raw_writel(delta, clkevt_base + FTM_MOD);
-> +
-> +	return 0;
-> +}
-> +
-> +static void ftm_set_mode(enum clock_event_mode mode,
-> +				struct clock_event_device *evt)
-> +{
-> +	switch (mode) {
-> +	case CLOCK_EVT_MODE_PERIODIC:
-> +		ftm_set_next_event(peroidic_cyc, evt);
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +}
-> +
-> +static irqreturn_t ftm_timer_interrupt(int irq, void *dev_id)
-> +{
-> +	struct clock_event_device *evt = dev_id;
-> +
-> +	ftm_irq_acknowledge();
-> +
-> +	evt->event_handler(evt);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static struct clock_event_device clockevent_ftm = {
-> +	.name		= "Freescale ftm timer",
-> +	.features	= CLOCK_EVT_FEAT_PERIODIC,
-> +	.set_mode	= ftm_set_mode,
-> +	.set_next_event	= ftm_set_next_event,
-> +	.rating		= 300,
-> +};
-> +
-> +static struct irqaction ftm_timer_irq = {
-> +	.name		= "Freescale ftm timer",
-> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-> +	.handler	= ftm_timer_interrupt,
-> +	.dev_id		= &clockevent_ftm,
-> +};
-> +
-> +static int __init ftm_clockevent_init(unsigned long freq, int irq)
-> +{
-> +	u32 val;
-> +
-> +	__raw_writel(0x00, clkevt_base + FTM_CNTIN);
-> +	__raw_writel(~0UL, clkevt_base + FTM_MOD);
-> +	__raw_writel(0x1, clksrc_base + FTM_CNT);
-> +
-> +	val = __raw_readl(clkevt_base + FTM_SC);
-> +	val |= FTM_SC_TOIE;
-> +	__raw_writel(val, clkevt_base + FTM_SC);
-> +
-> +	BUG_ON(setup_irq(irq, &ftm_timer_irq));
-> +
-> +	clockevent_ftm.cpumask = cpumask_of(0);
-> +	clockevent_ftm.irq = irq;
-> +
-> +	clockevents_config_and_register(&clockevent_ftm, freq, 1, 0xffff);
-> +
-> +	ftm_timer_enable(clkevt_base);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init calc_closest_cound_cyc(unsigned long freq)
-> +{
-> +	unsigned long ps = 0;
-> +
-> +	do {
-> +		peroidic_cyc = DIV_ROUND_CLOSEST(freq, HZ * (1 << ps++));
-> +	} while (peroidic_cyc > 0xFFFF);
-> +
-> +}
-> +
-> +static void __init ftm_timer_init(struct device_node *np)
-> +{
-> +	struct clk *ftm_clk;
-> +	void __iomem *timer_base;
-> +	unsigned long freq;
-> +	int irq;
-> +
-> +	timer_base = of_iomap(np, 0);
-> +	BUG_ON(!timer_base);
-> +
-> +	clksrc_base = timer_base + FTM_OFFSET(1);
-> +	clkevt_base = timer_base + FTM_OFFSET(0);
-> +
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	BUG_ON(irq <= 0);
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm0_counter_en");
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm1_counter_en");
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm0");
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	ftm_clk = of_clk_get_by_name(np, "ftm1");
-> +	BUG_ON(IS_ERR(ftm_clk));
-> +	BUG_ON(clk_prepare_enable(ftm_clk));
-> +
-> +	freq = clk_get_rate(ftm_clk);
-> +
-> +	calc_closest_cound_cyc(freq);
-> +
-> +	BUG_ON(ftm_clocksource_init(freq));
-> +
-> +	BUG_ON(ftm_clockevent_init(freq, irq));
-> +}
-> +CLOCKSOURCE_OF_DECLARE(vf610, "fsl,vf610-ftm-timer", ftm_timer_init);
+It's what we settled on at 2013 KS.  I could have sworn we updated the
+docs to reflect that...  A quick grep says no. :(
 
+> > Cc: stable at vger.kernel.org # v3.10+
+> 
+> The Cc: to stable@ is documented, but the use of a comment with the
+> kernel version afterwards is only mentioned when the commit in question
+> requires other commits as dependencies to be applied to stable. When
+> the commit is self-sufficient, stable_kernel_rules.txt doesn't indicate
+> that a comment is needed.
 
-I am not a big fan of those BUG_ON every line. Could you please replace 
-it by dev_err().
+Indeed, I've always added the comment even for single patches because it
+makes the -stable teams job easier.  We know the code better, so it's
+easier for us to determine how far back it should go.
 
-That is also not in the logic of a single zImage.
+Just to be clear, I'm not asking you or anyone else to do the above for
+patch submissions.  Only if you're inclined to do the digging for me, it
+would be nice to have it in the proper format.
 
-Thanks
-   -- Daniel
+> Maybe an update to stable_kernel_rules.txt is in order? :-)
 
+Yes, it would seem so.  Perhaps some young, motivated, new kernel hacker
+would like to take a stab at it? :-)
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+thx,
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jason.
