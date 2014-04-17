@@ -1,36 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Apr 2014 12:37:14 +0100
-Subject: [PATCH] arm64: debug: remove noisy, pointless warning
-Message-ID: <1397734634-14464-1-git-send-email-will.deacon@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 17 Apr 2014 20:52:17 +0900
+Subject: [PATCHv3 2/2] iio: devicetree: Add DT binding documentation for
+ Exynos3250 ADC
+In-Reply-To: <534E6E4E.4020807@samsung.com>
+References: <1397643118-6934-1-git-send-email-cw00.choi@samsung.com>
+ <1397643118-6934-3-git-send-email-cw00.choi@samsung.com>
+ <534E6E4E.4020807@samsung.com>
+Message-ID: <534FC071.9080502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sending a SIGTRAP to a user task after execution of a BRK instruction at
-EL0 is fundamental to the way in which software breakpoints work and
-doesn't deserve a warning to be logged in dmesg. Whilst the warning can
-be justified from EL1, do_debug_exception will already do the right thing,
-so simply remove the code altogether.
+Hi Tomasz,
 
-Cc: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-Reported-by: Kyrylo Tkachov <kyrylo.tkachov@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/debug-monitors.c | 3 ---
- 1 file changed, 3 deletions(-)
+On 04/16/2014 08:49 PM, Tomasz Figa wrote:
+> Hi Chanwoo,
+> 
+> On 16.04.2014 12:11, Chanwoo Choi wrote:
+>> This patch add DT binding documentation for Exynos3250 ADC IP. Exynos3250 has
+>> special clock ('sclk_tsadc') for ADC which provide clock to internal ADC.
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Cc: Randy Dunlap <rdunlap@infradead.org>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> Cc: Tomasz Figa <t.figa@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>   .../devicetree/bindings/arm/samsung/exynos-adc.txt   | 20 ++++++++++++++++++++
+>>   1 file changed, 20 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+>> index 5d49f2b..7532ec3 100644
+>> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+>> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+>> @@ -14,6 +14,8 @@ Required properties:
+>>                   for exynos4412/5250 controllers.
+>>               Must be "samsung,exynos-adc-v2" for
+>>                   future controllers.
+>> +            Must be "samsung,exynos-adc-v3" for
+>> +                for exynos3250 controllers.
+> 
+> I don't think adc-v3 is correct here. It looks like a normal V2 with additional special clock input. Possibly "samsung,exynos3250-adc-v2" or "samsung,exynos-adc-v2-sclk" would be better choices.
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index ed3955a95747..a7fb874b595e 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -318,9 +318,6 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 	if (call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
- 		return 0;
- 
--	pr_warn("unexpected brk exception at %lx, esr=0x%x\n",
--			(long)instruction_pointer(regs), esr);
--
- 	if (!user_mode(regs))
- 		return -EFAULT;
- 
--- 
-1.9.1
+OK, I'll fix it with following compatible
+- "samsung,exynos-adc-v2-sclk"
+
+> 
+>>   - reg:            Contains ADC register address range (base address and
+>>               length) and the address of the phy enable register.
+>>   - interrupts:         Contains the interrupt information for the timer. The
+>> @@ -21,7 +23,11 @@ Required properties:
+>>               the Samsung device uses.
+>>   - #io-channel-cells = <1>; As ADC has multiple outputs
+>>   - clocks        From common clock binding: handle to adc clock.
+>> +            From common clock binding: handle to sclk_tsadc clock
+>> +            if using Exynos3250.
+>>   - clock-names        From common clock binding: Shall be "adc".
+>> +            From common clock binding: Shall be "sclk_tsadc"
+>> +            if using Exynos3250.
+>>   - vdd-supply        VDD input supply.
+>>
+>>   Note: child nodes can be added for auto probing from device tree.
+>> @@ -41,6 +47,20 @@ adc: adc at 12D10000 {
+>>       vdd-supply = <&buck5_reg>;
+>>   };
+>>
+>> +If Exynos3250 uses ADC,
+> 
+> Please keep proper formatting:
+> 
+> Example: Node for ADC of Exynos3250 with additional special clock
+
+Thanks, I'll fix it.
+
+Best regards,
+Chanwoo Choi
