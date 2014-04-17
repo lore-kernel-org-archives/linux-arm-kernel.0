@@ -1,38 +1,53 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Apr 2014 17:03:29 -0500
-Subject: [PATCH V2 05/19] bus: omap_l3_noc: switch over to relaxed
- variants of readl/writel
-In-Reply-To: <53504DFF.7090907@ti.com>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1397767775-10965-1-git-send-email-nm@ti.com>
- <1397767775-10965-6-git-send-email-nm@ti.com>
- <20140417215228.GD8504@saruman.home> <53504DFF.7090907@ti.com>
-Message-ID: <20140417220329.GF8504@saruman.home>
+From: mporter@linaro.org (Matt Porter)
+Date: Thu, 17 Apr 2014 18:26:16 -0400
+Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
+ address space
+In-Reply-To: <20140417065753.GC28725@lee--X1>
+References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
+ <1397501428-8857-3-git-send-email-mporter@linaro.org>
+ <20140416110603.GA19671@lee--X1>
+ <20140416213141.GD12304@sirena.org.uk>
+ <20140417065753.GC28725@lee--X1>
+Message-ID: <20140417222616.GK23695@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 05:56:15PM -0400, Santosh Shilimkar wrote:
-> On Thursday 17 April 2014 05:52 PM, Felipe Balbi wrote:
-> > Hi,
+On Thu, Apr 17, 2014 at 07:57:53AM +0100, Lee Jones wrote:
+> > > s/regmap/Regmap
 > > 
-> > On Thu, Apr 17, 2014 at 03:49:21PM -0500, Nishanth Menon wrote:
-> >> Currently we use __raw_readl and writel in this driver, however, there
+> > It's consistently written regmap in all the documentation and so on :)
+> 
+> Furry muff; but the comments still stand for the acronyms.
+> 
+> > > addmap{0,1} doesn't quite sit right with me.
 > > 
-> > __raw_* and *_relaxed variants are the same, just have a look <asm/io.h>
+> > > REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
+> > > as I first thought, but still, is there a better naming convention you
+> > > could use?
 > > 
-> Except the relaxed version can take care of endian conversion if
-> needed. :-)
+> > addrmap or something?
+> 
+> Right, that was what I was thinking. However, I prefer something along
+> the lines of 'i2c' and 'i2c_sec' or 'client' and 'client_slv' etc.
 
-right, but according to commit log, this commit is more concerned about
-the memory barriers which writel()/readl() add, not endianness. Just a
-matter of fixing up commit log.
+FWIW, the reason it's addmap{0,1} is that the datasheet has documents
+ADDMAP=0 and the first bank of registers and ADDMAP=1 as the second bank
+of registers. I adopted that to match the docs for the part.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140417/56000f8f/attachment.sig>
+I guess we could do i2c and i2c_sec, I'll just have to put a comment
+correlating it to the h/w. Calling it 'slv' implies something else
+so we should avoid that here. The notion of a "secondary" i2c device
+is completely a Linux I2C subsystem fabrication which wouldn't exist
+if it allowed multiple slave addresses per device. From a h/w
+perspective there is really no primary and secondary relationship.
+
+I'm fine with i2c/i2c_sec or addrmap0/1 and I will just comment to
+correlate with the datasheet..pick one.
+
+-Matt
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
