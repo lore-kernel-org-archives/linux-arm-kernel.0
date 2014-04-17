@@ -1,60 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:32:08 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes Updates for v3.15
-Message-ID: <cover.1397694064.git.horms+renesas@verge.net.au>
+Date: Thu, 17 Apr 2014 09:32:09 +0900
+Subject: [PATCH 1/5] ARM: shmobile: lager: fixup SND_SOC_DAIFMT_CBx_CFx flags
+In-Reply-To: <cover.1397694064.git.horms+renesas@verge.net.au>
+References: <cover.1397694064.git.horms+renesas@verge.net.au>
+Message-ID: <9f85ff849c21b429c1e2137f2646f9cc667d8ded.1397694064.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Please consider these Renesas ARM Based SoC Fixes Updates for v3.15.
+e1508289404ab6ca28e0dc931612600f0441c417
+(ASoC: rcar: fixup SND_SOC_DAIFMT_CBx_CFx flags)
+corrected SND_SOC_DAIFMT_CBx_CFx definition.
+But then, Lager board was maintenanced other branch.
+This patch correct SND_SOC_DAIFMT_CBx_CFx flag for lager
 
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-lager.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
-
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.15
-
-for you to fetch changes up to d5dda0381f826326071b027f288372f682c24d55:
-
-  ARM: shmobile: koelsch: correct renesas,gpios to renesas,groups in sd[012] pfc (2014-04-15 07:39:11 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Fixes Updates for v3.15
-
-r8a7791 (R-Car M2) based koelsch board
-* Correct renesas,gpios to renesas,groups in sd[012] pfc
-
-8a7790 (R-Car H2) based lager board
-* Correct SND_SOC_DAIFMT_CBx_CFx flags
-
-r8a7740 (R-Mobile A1) SoC
-* Drop address cells from GIC node
-
-r8a7740 (R-Mobile A1) based Armadillo800 EVA board
-* Correct SND_SOC_DAIFMT_CBx_CFx flags
-
-sh73a0 (SH-Mobile AG5) SoC
-* Drop address cells from GIC node
-
-----------------------------------------------------------------
-Kuninori Morimoto (2):
-      ARM: shmobile: lager: fixup SND_SOC_DAIFMT_CBx_CFx flags
-      ARM: shmobile: armadillo800eva: fixup SND_SOC_DAIFMT_CBx_CFx flags
-
-Lucas Stach (2):
-      ARM: shmobile: sh73a0: drop address cells from GIC node
-      ARM: shmobile: r8a7740: drop address cells from GIC node
-
-Magnus Damm (1):
-      ARM: shmobile: koelsch: correct renesas,gpios to renesas,groups in sd[012] pfc
-
- arch/arm/boot/dts/r8a7740.dtsi                 | 1 -
- arch/arm/boot/dts/r8a7791-koelsch.dts          | 6 +++---
- arch/arm/boot/dts/sh73a0.dtsi                  | 1 -
- arch/arm/mach-shmobile/board-armadillo800eva.c | 1 +
- arch/arm/mach-shmobile/board-lager.c           | 4 +---
- 5 files changed, 5 insertions(+), 8 deletions(-)
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index f0104bf..18c7e03 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -588,14 +588,12 @@ static struct asoc_simple_card_info rsnd_card_info = {
+ 	.card		= "SSI01-AK4643",
+ 	.codec		= "ak4642-codec.2-0012",
+ 	.platform	= "rcar_sound",
+-	.daifmt		= SND_SOC_DAIFMT_LEFT_J,
++	.daifmt		= SND_SOC_DAIFMT_LEFT_J | SND_SOC_DAIFMT_CBM_CFM,
+ 	.cpu_dai = {
+ 		.name	= "rcar_sound",
+-		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
+ 	},
+ 	.codec_dai = {
+ 		.name	= "ak4642-hifi",
+-		.fmt	= SND_SOC_DAIFMT_CBM_CFM,
+ 		.sysclk	= 11289600,
+ 	},
+ };
+-- 
+1.8.4
