@@ -1,83 +1,70 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Thu, 17 Apr 2014 01:20:42 +0100
-Subject: [PATCH v5 2/4] arm64: dts: APM X-Gene PCIe device tree nodes
-In-Reply-To: <20140416212104.GA3469@obsidianresearch.com>
-References: <1395270762-6055-1-git-send-email-tinamdar@apm.com>
- <1395270762-6055-3-git-send-email-tinamdar@apm.com>
- <CAL_Jsq+XxAtUeNKFi0hH=ehb_fhFvkM0U1Zm_j1LdtQZbvSzfA@mail.gmail.com>
- <20140416170545.GD4858@bart>
- <20140416212104.GA3469@obsidianresearch.com>
-Message-ID: <20140417002041.GE4858@bart>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 17 Apr 2014 09:23:59 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Clock Updates for v3.16
+Message-ID: <cover.1397694178.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 03:21:04PM -0600, Jason Gunthorpe wrote:
-> On Wed, Apr 16, 2014 at 06:05:45PM +0100, Liviu Dudau wrote:
-> 
-> > I have found out that we cannot pasd the config ranges from the DT into the
-> > pci_host_bridge structure as the PCI framework doesn't have a resource type
-> > for config resources. Leaving the translation between range flags and
-> > resource type as is (filtered through the IORESOURCE_TYPE_BITS) will lead
-> > to a resource type of value zero, which is not recognised by any resource
-> > handling API so bridge configuration and bus scanning will barf.
-> > 
-> > I'm looking for suggestions here, as Jason Gunthorpe suggested that we
-> > should be able to parse config ranges if they conform to the ECAM part
-> > of the PCI standard.
-> 
-> The thinking here is the ranges should be well defined and general, it
-> isn't a dumping ground for driver specific stuff.
-> 
-> No spec says you can put config space into the ranges at all, nobody
-> should be doing that today, obviously some cases were missed during
-> review..
+Hi Olof, Hi Kevin, Hi Arnd,
 
-ePAPR documents allows that when ss == 00.
-
-> 
-> The comment about ECAM was intended as a general guidance on what
-> config space in ranges could/should be used for.
-> 
-> Right now config space shouldn't propagate out side any driver, so you
-> can probably just filter it in your generic code, and make it very hard
-> and obviously wrong for a driver to parse ranges for config space, so
-> we don't get more usages.
-
-OK, this goes slightly against your email from 26th March:
-
-"When we talked about this earlier on the DT bindings list the
-consensus seemed to be that configuration MMIO ranges should only be
-used if the underlying memory was exactly ECAM, and was not to be used
-for random configuration related register blocks.
-
-The rational being that generic code, upon seeing that ranges entry,
-could just go ahead and assume ECAM mapping."
-
-What I'm saying is that the only code that will see this ranges entry will
-be the parsing code as if we try to create a resource out of the range
-and add it to the host bridge structure (not driver) we will confuse the
-rest of the pci_host_bridge API. So we cannot do any ECAM accesses (yet?).
+Please consider these Renesas ARM Based SoC Clock Updates for v3.16.
 
 
-Best regards,
-Liviu
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-> 
-> Jason
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
+are available in the git repository at:
 
- One small step
-   for me ...
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock-for-v3.16
+
+for you to fetch changes up to 932616eed0308cbebbb20a079e4bed3674bf1117:
+
+  ARM: shmobile: r8a7790: remove old style audio clock (2014-04-14 12:49:43 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Clock Updates for v3.16
+
+SH Mobile shared clock code
+* Introduce shmobile_clk_workaround()
+
+r8a7791 (R-Car M2) SoC
+* Rename VSP1_SY clocks to VSP1_S
+* Correct the I2C clocks parents
+
+r8a7790 (R-Car H2) SoC
+* Remove old style audio clock
+* Rename VSP1_(SY|RT) clocks to VSP1_(S|R)
+* Fix the I2C clocks parents
+
+r8a7778 (R-Car M1) SoC
+* Remove old style audio clock
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: r8a7791: Use rcar_gen2_read_mode_pins() helper
+
+Kuninori Morimoto (2):
+      ARM: shmobile: r8a7778: remove old style audio clock
+      ARM: shmobile: r8a7790: remove old style audio clock
+
+Laurent Pinchart (4):
+      ARM: shmobile: r8a7790: Fix the I2C clocks parents in legacy code
+      ARM: shmobile: r8a7791: Fix the I2C clocks parents in legacy code
+      ARM: shmobile: r8a7790: Rename VSP1_(SY|RT) clocks to VSP1_(S|R)
+      ARM: shmobile: r8a7791: Rename VSP1_SY clocks to VSP1_S
+
+Magnus Damm (1):
+      ARM: shmobile: Introduce shmobile_clk_workaround()
+
+ arch/arm/boot/dts/r8a7790.dtsi              |  2 +-
+ arch/arm/boot/dts/r8a7791.dtsi              |  2 +-
+ arch/arm/mach-shmobile/Makefile             |  2 +-
+ arch/arm/mach-shmobile/clock-r8a7778.c      | 22 ++++++++------------
+ arch/arm/mach-shmobile/clock-r8a7790.c      | 32 +++++++++++++----------------
+ arch/arm/mach-shmobile/clock-r8a7791.c      | 23 ++++++++-------------
+ arch/arm/mach-shmobile/clock.c              | 28 +++++++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/clock.h | 16 +++++++++++++++
+ include/dt-bindings/clock/r8a7790-clock.h   |  4 ++--
+ include/dt-bindings/clock/r8a7791-clock.h   |  2 +-
+ 10 files changed, 81 insertions(+), 52 deletions(-)
