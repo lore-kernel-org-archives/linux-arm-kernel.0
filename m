@@ -1,106 +1,61 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 17 Apr 2014 23:14:13 +0200 (CEST)
-Subject: [patch 0/6] dma: edma: Provide granular residue accounting
-In-Reply-To: <20140417203815.GV24070@n2100.arm.linux.org.uk>
-References: <20140417133737.892475126@linutronix.de>
- <20140417200725.GT24070@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1404172214230.22697@ionos.tec.linutronix.de>
- <20140417203815.GV24070@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1404172249320.22697@ionos.tec.linutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Apr 2014 16:18:45 -0500
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <20140417201645.GU24070@n2100.arm.linux.org.uk>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
+ <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
+ <20140417201645.GU24070@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqL65bXBh1_dcud6XaDqFBnY1L69dMXWeNHvFAvcDizzhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Apr 2014, Russell King - ARM Linux wrote:
+On Thu, Apr 17, 2014 at 3:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 17, 2014 at 04:06:16PM -0400, Nicolas Pitre wrote:
+>> On Thu, 17 Apr 2014, Rob Herring wrote:
+>> > Better yet, we should adopt the arm64 Image header which has this and
+>> > other fields for arm Image files. We're going to have to deal with raw
+>> > Image (and Image.gz) in bootloaders for arm64, so we might as well
+>> > align things.
+>>
+>> We could use the same header as ARM64 if we want to add more information
+>> to the uncompressed kernel image.
+>>
+>> However I really don't want to encourage the proliferation of yet
+>> another kernel image formats on ARM32.  We've had zImage for the last 20
+>> years and that's what ARM32 bootloaders should support.  The
+>> introduction of the uImage format caused enough pain already.
+>>
+>> Booting uncompressed kernel image on ARM32 may be useful for some
+>> debugging setups.  I don't see other cases where it would be legitimate
+>> to break existing practices.
+>
+> Me neither.  We even have good enough reasons (such as the issue in this
+> thread to do with where the image should be placed) no longer support
+> uncompressed images anymore.  (Yes, they'll still be generated because
+> we need the input to compress them, but we should stop advertising them
+> as a make target.)
 
-> On Thu, Apr 17, 2014 at 10:31:44PM +0200, Thomas Gleixner wrote:
-> > On Thu, 17 Apr 2014, Russell King - ARM Linux wrote:
-> > 
-> > > On Thu, Apr 17, 2014 at 02:40:43PM -0000, Thomas Gleixner wrote:
-> > > > The next obstacle was the missing per SG element reporting. We really
-> > > > can't wait for a full SG list for notification.
-> > > 
-> > > Err, dmaengine doesn't have per-SG element reporting.
-> > 
-> > enum dma_residue_granularity {
-> >         DMA_RESIDUE_GRANULARITY_DESCRIPTOR = 0,
-> > 	DMA_RESIDUE_GRANULARITY_SEGMENT = 1,
-> >         DMA_RESIDUE_GRANULARITY_BURST = 2,
-> > };
-> > 
-> > tells a different story.
-> 
-> That's to do with the residue though, not to do with callbacks.
+The problem here is more than just the TEXT_OFFSET changed. From what
+I've heard, there are some QC chips which need much more reserved RAM
+than the 2MB discussed here. Changing the TEXT_OFFSET is a hack that
+doesn't scale.
 
-Right. That's what I tripped over. Sorry for mixing up the naming
-conventions.
+A simple issue is you are now wasting 2MB of low memory on every
+platform. Not such a big deal I guess. But what if more is needed?
 
-I don't care about per element reporting in terms of callbacks as
-that's completely counterproductive if you deal with a network
-device.
+The zImage requires that the kernel be placed at a 128M aligned
+address plus TEXT_OFFSET. The v2p patching then requires the kernel to
+be located within the first 16MB of RAM. So the Image can only ever be
+placed at 0x8000 - 15.?MB from a 128MB aligned address. You can never
+have the first 16-127MB of RAM reserved. The only way to have reserved
+memory (in chucks of 16MB) is by loading an Image file directly
+instead. The bootloaders will know the start of RAM and any reserved
+memory size because they can simply parse DT.
 
-What I care about is the ability to figure out how many packets have
-been transmitted into the DMA buffer.
+Bootloaders are going to have to change for arm64 Image support
+anyway, so we should have an aligned solution here.
 
-In the particular case of DCAN the cyclic buffer is the most optimal
-one, because if I use skb based SG then I cannot just drop the skb as
-is into the network stack. I still need to get the information from
-the skb and bring it into the required CAN skb frame format, write it
-back and then submit a new SG element. So just reading the data from
-the cyclic buffer, formatting it and storing the result into the skb
-is way more efficient.
- 
-> > > If it's just that the FIFO is spread over 4 consecutive locations
-> > > (effectively due to not decoding bits 2,3 of the address bus for the
-> > > register) then reading the first register four times is just as
-> > > acceptable as reading them consecutively.
-> > 
-> > It's not a FIFO. It's four different consecutive registers, which are
-> > DMA readable. And you need to read all of them...
-> >  
-> > > The reason that kind of thing was done in old days was to allow the
-> > > ARM ldmia/stmia instructions to be used to access FIFOs, thereby
-> > > allowing multiple words to be transferred with a single instruction.
-> > > I can't believe that there's still people designing for that
-> > > especially if they have a DMA engine...
-> > 
-> > In that case it's a magic DMA extension superglued beside the already
-> > horrible register interface of that particular IP block.
-> 
-> So it's more a copy-from-peripheral-to-memory - a DMA copy operation
-> triggered in a similar manner to the DMA slave mode.  There are a
-> number of use cases for this, but no one has yet put their head above
-> the parapet to spear-head that cause. :)
-
-The EDMA and most other DMA engines have HW support for this, we just
-have no interface to make use of it. My burst=1/width=16 workaround is
-just abusing the internal implementation details of EDMA.
-
-That's why I was asking.
-
-Would extending the dma_slave_config struct by the following fields
-make sense?
-
- struct dma_slave_config {
-        enum dma_transfer_direction direction;
-        dma_addr_t src_addr;
-        dma_addr_t dst_addr;
-        enum dma_slave_buswidth src_addr_width;
-        enum dma_slave_buswidth dst_addr_width;
-	u32 src_maxburst;
-        u32 dst_maxburst;
-+       u32 src_stride;
-+       u32 dst_stride;
-        bool device_fc;
-        unsigned int slave_id;
- };
-
-The default for these fields would be 0, so no change for existing
-implementations. If set to !0 the hardware driver can either bail out
-if not supported (in HW or SW) or setup the transfer in the right way
-to increment the src/dst field for the burst by stride.
-
-Thoughts?
-
-Thanks,
-
-	tglx
+Rob
