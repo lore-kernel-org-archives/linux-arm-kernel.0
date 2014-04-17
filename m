@@ -1,30 +1,70 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Thu, 17 Apr 2014 11:23:50 -0700
-Subject: [PATCH 0/7] Add cros_ec changes for newer boards
-In-Reply-To: <1397757570-19750-1-git-send-email-dianders@chromium.org>
-References: <1397757570-19750-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAL1qeaE+8km8K4gJvFaYiBxvVO+SD16f17w8pqdHS=OQB4SEoA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 17 Apr 2014 13:27:46 -0500
+Subject: [PATCH 4/8] tty/serial: add generic serial earlycon
+In-Reply-To: <21117957.8m9iUdR1VN@wuerfel>
+References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
+ <9368307.RXEGmQia1C@wuerfel>
+ <CAL_JsqJh1R8wxReCvTfE7GecZa0vMaAqnGa0ZoRBMace9qtzvQ@mail.gmail.com>
+ <21117957.8m9iUdR1VN@wuerfel>
+Message-ID: <CAL_JsqJwKQ_KuWWQNZHrMh8NwwiubB2jR+g-Y2n_dH4kJ5zVow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
+On Mon, Mar 24, 2014 at 10:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 24 March 2014 08:36:46 Rob Herring wrote:
+>> On Mon, Mar 24, 2014 at 6:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Monday 24 March 2014 11:22:03 Catalin Marinas wrote:
+>> >> On Fri, Mar 21, 2014 at 09:08:44PM +0000, Rob Herring wrote:
+>> >> > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+>> >> > new file mode 100644
+>> >> > index 0000000..241757a
+>> >> > --- /dev/null
+>> >> > +++ b/drivers/tty/serial/earlycon.c
+>> >> [...]
+>> >> > +static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
+>> >> > +{
+>> >> > +   void __iomem *base;
+>> >> > +#ifdef CONFIG_FIX_EARLYCON_MEM
+>> >> > +   set_fixmap_nocache(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
+>> >> > +   base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
+>> >> > +   base += paddr & ~PAGE_MASK;
+>> >> > +#else
+>> >> > +   base = ioremap_nocache(paddr, size);
+>> >> > +#endif
+>> >>
+>> >> Just curious why not set_fixmap_io (and plain ioremap)?
+>> >
+>> > Good point. Note that ioremap_nocache() is the same as ioremap()
+>> > on *all* architectures.
 
-> This series adds the most critical cros_ec changes for newer boards
-> using cros_ec.  Specifically:
-> * Fixes timing/locking issues with the previously upstreamed (but
->   never used upstream) cros_ec_spi driver.
-> * Updates the cros_ec header file to the latest version which allows
->   us to use newer EC features like i2c tunneling.
-> * Adds an i2c tunnel driver to allow communication to the EC's i2c
->   devices.
+Did you mean "not the same"? Why are there 2 flavors if they are
+always the same.
+
+
+>> I investigated this before adding this to arm64. set_fixmap_io and
+>> set_fixmap_nocache are not the same settings on x86. Whether the
+>> mapping type really matters on x86 or not, I don't know. So I added
+>> the nocache variant to arm64 to avoid a change to x86.
 >
-> This _doesn't_ get the EC driver fully up to speed with what's in the
-> current Chromium OS trees.  There are a whole slew of cleanup patches
-> there, an addition of an LPC transport mode, and exports of functions
-> to userspace.  Once these patches land and we have functionality we
-> can continue to pick more cleanup patches.
+> My best guess is that it's an x86 bug. ioremap() always uses an uncached
+> mapping on x86, so it's strange to see early_ioremap() and set_fixmap_io()
+> use a cached mapping. It probably doesn't matter as long as the mtrr is
+> set up to treat all MMIO registers as non-cacheable, but I think there
+> should not be a difference.
 
-I can now talk to the charger and battery over the tunnel on my
-Venice2 and other communication with the EC still works, so:
+At some point it was believed to be needed on the 8250 driver. Perhaps
+Alan can comment since the commit message tells us nothing:
 
-Tested-by: Andrew Bresticker <abrestic@chromium.org>
+commit 6f441fe99814f64315b8c11890744230b990c460
+Author: Alan Cox <alan@lxorguk.ukuu.org.uk>
+Date:   Thu May 1 04:34:59 2008 -0700
+
+    8250: switch 8250 drivers to use _nocache ioremaps
+
+    Signed-off-by: Alan Cox <alan@redhat.com>
+    Cc: Russell King <rmk@arm.linux.org.uk>
+    Cc: Ingo Molnar <mingo@elte.hu>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+Rob
