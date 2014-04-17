@@ -1,78 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 17 Apr 2014 00:57:54 -0400
-Subject: [GIT PULL] ARM: mvebu: DT fixes-non-critical for v3.15-rc1
-In-Reply-To: <20140410140257.GC28159@titan.lakedaemon.net>
-References: <20140410140257.GC28159@titan.lakedaemon.net>
-Message-ID: <20140417045754.GO28159@titan.lakedaemon.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 Apr 2014 13:01:19 +0800
+Subject: [PATCH] ARM: imx6: clk: i.MX6 DualLite/Solo i2c4 clock
+In-Reply-To: <534ECCF4.9040108@gmail.com>
+References: <534ECCF4.9040108@gmail.com>
+Message-ID: <20140417050118.GS2523@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 10:02:57AM -0400, Jason Cooper wrote:
-> All,
+On Wed, Apr 16, 2014 at 07:33:24PM +0100, Iain Paton wrote:
+> Compared to i.MX6 Quad/Dual the CCM_CCGR1 register in the i.MX6 Solo/DualLite
+> replaces the ecspi5 clock with the i2c4 clock.
 > 
-> Here are a few small changes I've picked up for the mvebu DT files.
-> They've been in -next a few days, and are fairly minimal fixes.
+> Handle this difference using cpu_is_imx6dl().
 > 
-> This branch is based on top of mvebu/dt, specifically,
-> tags/mvebu-dt-3.15-5.  As the changes are on top of changes in that
-> branch.
+> Signed-off-by: Iain Paton <ipaton0@gmail.com>
+> ---
+>  arch/arm/mach-imx/clk-imx6q.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
-> Please pull.
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index b0e7f9d..2961b16 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -352,7 +352,13 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+>  	clk[ecspi2]       = imx_clk_gate2("ecspi2",        "ecspi_root",        base + 0x6c, 2);
+>  	clk[ecspi3]       = imx_clk_gate2("ecspi3",        "ecspi_root",        base + 0x6c, 4);
+>  	clk[ecspi4]       = imx_clk_gate2("ecspi4",        "ecspi_root",        base + 0x6c, 6);
+> -	clk[ecspi5]       = imx_clk_gate2("ecspi5",        "ecspi_root",        base + 0x6c, 8);
+> +	if (cpu_is_imx6dl())
+> +		/*
+> +		 * ecspi5 is replaced with i2c4 on imx6dl & imx6s
+> +		 */
 
-Well, I sent this a little late for v3.15-rc1, so please ignore.  I'm
-going to rebase these patches into dt-fixes.
+Single line comment should be like /* bla ... */.
 
-Sorry for the noise.
+I fixed it up and applied the patch.  Thanks.
 
-thx,
+Shawn
 
-Jason.
-
-> The following changes since commit 4de29e636946dbc97586de6136a3c496a55fd5e6:
+> +		clk[ecspi5] = imx_clk_gate2("i2c4",        "ipg_per",           base + 0x6c, 8);
+> +	else
+> +		clk[ecspi5] = imx_clk_gate2("ecspi5",      "ecspi_root",        base + 0x6c, 8);
+>  	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
+>  	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
+>  	clk[gpt_ipg]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
+> -- 
+> 1.8.5.1
 > 
->   ARM: mvebu: Enable NAND controller in Armada 385-DB (2014-03-13 23:37:17 +0000)
 > 
-> are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-fixes-non-crit-3.15
-> 
-> for you to fetch changes up to 33faf20b8ebe2770f2d7b52796f5f35eeb87ab6f:
-> 
->   ARM: mvebu: ensure the mdio node has a clock reference on Armada 38x (2014-04-07 17:23:56 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu DT fixes-non-critical (for v3.15-rc1)
-> 
->  - kirkwood
->     - add some missing vendor prefixes to keep checkpatch happy
-> 
->  - mvebu
->     - add clock ref to mdio node on 370/XP/38x
-> 
-> ----------------------------------------------------------------
-> Andrew Lunn (2):
->       ARM: Kirkwood: Fix Atmel vendor prefix
->       ARM: Kirkwood: DT: Add missing vendor prefix
-> 
-> Thomas Petazzoni (2):
->       ARM: mvebu: ensure the mdio node has a clock reference on Armada 370/XP
->       ARM: mvebu: ensure the mdio node has a clock reference on Armada 38x
-> 
->  arch/arm/boot/dts/armada-370-xp.dtsi           | 1 +
->  arch/arm/boot/dts/armada-38x.dtsi              | 1 +
->  arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
->  arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
->  arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
->  arch/arm/boot/dts/kirkwood-laplug.dts          | 2 +-
->  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
->  arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 4 ++--
->  arch/arm/boot/dts/kirkwood-nsa310.dts          | 2 +-
->  arch/arm/boot/dts/kirkwood-nsa310a.dts         | 2 +-
->  arch/arm/boot/dts/kirkwood-openblocks_a6.dts   | 2 +-
->  arch/arm/boot/dts/kirkwood-openblocks_a7.dts   | 2 +-
->  12 files changed, 13 insertions(+), 11 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
