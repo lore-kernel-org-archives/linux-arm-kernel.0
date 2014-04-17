@@ -1,42 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Apr 2014 07:44:51 +0900
-Subject: [PATCH 02/14] ARM: shmobile: Use shmobile_clk_workaround() on Koelsch
+Date: Fri, 18 Apr 2014 07:44:50 +0900
+Subject: [PATCH 01/14] ARM: shmobile: Use shmobile_clk_workaround() on Lager
 In-Reply-To: <cover.1397774190.git.horms+renesas@verge.net.au>
 References: <cover.1397774190.git.horms+renesas@verge.net.au>
-Message-ID: <89aff406dbc3ea3dfc008e8472181532c0c0f4ea.1397774190.git.horms+renesas@verge.net.au>
+Message-ID: <e6597e0e19bbabfdd1983dbe79892d8ba210a180.1397774190.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Convert the Koelsch DT reference code to use the newly introduced
+Convert the Lager DT reference code to use the newly introduced
 function shmobile_clk_workaround().
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch-reference.c | 71 ++++++++++--------------
- 1 file changed, 28 insertions(+), 43 deletions(-)
+ arch/arm/mach-shmobile/board-lager-reference.c | 65 ++++++++++----------------
+ 1 file changed, 25 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index a3fd302..a760f7f 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -19,12 +19,11 @@
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 440aac3..c76248b 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -18,12 +18,11 @@
   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   */
  
 -#include <linux/clk.h>
 -#include <linux/clkdev.h>
  #include <linux/dma-mapping.h>
- #include <linux/kernel.h>
+ #include <linux/init.h>
  #include <linux/of_platform.h>
  #include <linux/platform_data/rcar-du.h>
 +#include <mach/clock.h>
  #include <mach/common.h>
  #include <mach/irqs.h>
  #include <mach/rcar-gen2.h>
-@@ -82,49 +81,35 @@ static void __init koelsch_add_du_device(void)
+@@ -86,46 +85,32 @@ static void __init lager_add_du_device(void)
  	platform_device_register_full(&info);
  }
  
@@ -54,23 +54,20 @@ index a3fd302..a760f7f 100644
 +	{ "scifa2", NULL, "sh-sci.5" },
 +	{ "scif0", NULL, "sh-sci.6" },
 +	{ "scif1", NULL, "sh-sci.7" },
-+	{ "scif2", NULL, "sh-sci.8" },
-+	{ "scif3", NULL, "sh-sci.9" },
-+	{ "scif4", NULL, "sh-sci.10" },
-+	{ "scif5", NULL, "sh-sci.11" },
-+	{ "scifa3", NULL, "sh-sci.12" },
-+	{ "scifa4", NULL, "sh-sci.13" },
-+	{ "scifa5", NULL, "sh-sci.14" },
-+	{ "du0", "du.0", "rcar-du-r8a7791" },
-+	{ "du1", "du.1", "rcar-du-r8a7791" },
-+	{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
++	{ "hscif0", NULL, "sh-sci.8" },
++	{ "hscif1", NULL, "sh-sci.9" },
++	{ "du0", "du.0", "rcar-du-r8a7790" },
++	{ "du1", "du.1", "rcar-du-r8a7790" },
++	{ "du2", "du.2", "rcar-du-r8a7790" },
++	{ "lvds0", "lvds.0", "rcar-du-r8a7790" },
++	{ "lvds1", "lvds.1", "rcar-du-r8a7790" },
 +};
 +
- static void __init koelsch_add_standard_devices(void)
+ static void __init lager_add_standard_devices(void)
  {
 -	/*
--	 * This is a really crude hack to provide clkdev support to the CMT and
--	 * DU devices until they get moved to DT.
+-	 * This is a really crude hack to provide clkdev support to platform
+-	 * devices until they get moved to DT.
 -	 */
 -	static const struct clk_name {
 -		const char *clk;
@@ -86,16 +83,13 @@ index a3fd302..a760f7f 100644
 -		{ "scifa2", NULL, "sh-sci.5" },
 -		{ "scif0", NULL, "sh-sci.6" },
 -		{ "scif1", NULL, "sh-sci.7" },
--		{ "scif2", NULL, "sh-sci.8" },
--		{ "scif3", NULL, "sh-sci.9" },
--		{ "scif4", NULL, "sh-sci.10" },
--		{ "scif5", NULL, "sh-sci.11" },
--		{ "scifa3", NULL, "sh-sci.12" },
--		{ "scifa4", NULL, "sh-sci.13" },
--		{ "scifa5", NULL, "sh-sci.14" },
--		{ "du0", "du.0", "rcar-du-r8a7791" },
--		{ "du1", "du.1", "rcar-du-r8a7791" },
--		{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
+-		{ "hscif0", NULL, "sh-sci.8" },
+-		{ "hscif1", NULL, "sh-sci.9" },
+-		{ "du0", "du.0", "rcar-du-r8a7790" },
+-		{ "du1", "du.1", "rcar-du-r8a7790" },
+-		{ "du2", "du.2", "rcar-du-r8a7790" },
+-		{ "lvds0", "lvds.0", "rcar-du-r8a7790" },
+-		{ "lvds1", "lvds.1", "rcar-du-r8a7790" },
 -	};
 -	struct clk *clk;
 -	unsigned int i;
@@ -110,7 +104,7 @@ index a3fd302..a760f7f 100644
 -	}
 -
 +	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
- 	r8a7791_add_dt_devices();
+ 	r8a7790_add_dt_devices();
  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  
 -- 
