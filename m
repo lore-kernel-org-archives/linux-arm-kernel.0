@@ -1,36 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 Apr 2014 00:10:12 +0100
-Subject: Rockchip RK3188 I2C driver
-In-Reply-To: <1917043.Q4CxE5T68K@phil>
-References: <3748421.ND1tAjvgKS@typ> <20140415185025.GH12304@sirena.org.uk>
- <5059282.MitP6iZ8n1@typ> <1917043.Q4CxE5T68K@phil>
-Message-ID: <20140417231012.GI12304@sirena.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 17 Apr 2014 19:33:47 -0400 (EDT)
+Subject: [PATCH] ARM: fix big endian __pv_phys_pfn_offset size related
+ issue
+In-Reply-To: <1397765652-21623-1-git-send-email-victor.kamensky@linaro.org>
+References: <1397765652-21623-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <alpine.LFD.2.11.1404171933150.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 03:27:36PM +0200, Heiko St?bner wrote:
+On Thu, 17 Apr 2014, Victor Kamensky wrote:
 
-> Interestingly, when looking through the regmap_config struct, it already 
-> contains the "write_flag_mask", described as "Mask to be set in the top byte of 
-> the register when doing  a write.", which sounds a lot like what we need, only 
-> that it's two bytes for us instead of the current one.
+> Fix e26a9e00afc482b971afcaef1db8c9034d4d6d7c 'ARM: Better
+> virt_to_page() handling' replaced __pv_phys_offset with
+> __pv_phys_pfn_offset. Also note that size of __pv_phys_offset
+> was quad but size of __pv_phys_pfn_offset is word. Instruction
+> that used to update __pv_phys_offset which address is in r6
+> had to update low word of __pv_phys_offset so it used #LOW_OFFSET
+> macro for store offset. Now when size of __pv_phys_pfn_offset is
+> word, no difference between little endian and big endian should
+> exist - i.e no offset should be used when __pv_phys_pfn_offset
+> is stored.
+> 
+> Note that for little endian image proposed change is noop,
+> since in little endian case #LOW_OFFSET is defined 0 anyway.
+> 
+> Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 
-> So I guess the easiest way would be to make write_flag_mask somehow usable for 
-> us, because it looks like regmap will handle the rest on its own already.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-> And then teach syscon to set this flag and about volatile registers in general, 
-> because it doesn't seem to handle them yet.
-
-How about a val_set_bits_mask or something?  That's not a good name, I'm
-short on inspiration right now though.
-
-Another option is to do something with pad_bits to tell regmap to insert
-a block of set bits.  Not sure if that's sensible for MMIO though, it's
-more sensible for I2C or SPI style register maps.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140418/dc6a2150/attachment.sig>
+> ---
+>  arch/arm/kernel/head.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index f8c0883..591d6e4 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -587,7 +587,7 @@ __fixup_pv_table:
+>  	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
+>  	add	r7, r7, r3	@ adjust __pv_offset address
+>  	mov	r0, r8, lsr #12	@ convert to PFN
+> -	str	r0, [r6, #LOW_OFFSET]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
+> +	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
+>  	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
+>  	mov	r6, r3, lsr #24	@ constant for add/sub instructions
+>  	teq	r3, r6, lsl #24 @ must be 16MiB aligned
+> -- 
+> 1.8.1.4
+> 
