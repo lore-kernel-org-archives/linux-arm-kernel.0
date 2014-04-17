@@ -1,35 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Apr 2014 08:05:49 +0900
-Subject: [PATCH v6 0/2] clk: shmobile: r8a7779: Add clocks support
-Message-ID: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 18 Apr 2014 08:05:51 +0900
+Subject: [PATCH v6 2/2] clk: shmobile: r8a7779: Add MSTP clock support
+In-Reply-To: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+References: <1397775951-30992-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1397775951-30992-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Add MSTP clock support for the r8a7779 SoC
 
-please consider applying this series.
+The only change required appears to be to note a new
+compatibility string in the bindings.
 
-It is the first step on the way towards using the common clock framework
-and in turn multi-platform on the r8a7779 (R-Car H1) SoC.
+Cc: devicetree at vger.kernel.org
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-It has been acked by Laurent Pinchart who did similar work
-for the R-Car Gen-2 family of SoCs. This work is based on that work.
+---
+v4 - v6
+* No Change
 
-The bindings added in this series have not been changed since
-v4 was posted with devicetree at vger.kernel.org CCed on the 13th of March.
+v3
+* As suggested by Laurent Pinchart
+  - Add entry in numerical order
+---
+ Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Simon Horman (2):
-  clk: shmobile: r8a7779: Add clocks support
-  clk: shmobile: r8a7779: Add MSTP clock support
-
- .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
- .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  27 ++++
- drivers/clk/shmobile/Makefile                      |   1 +
- drivers/clk/shmobile/clk-r8a7779.c                 | 180 +++++++++++++++++++++
- include/linux/clk/shmobile.h                       |   3 +
- 5 files changed, 212 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
- create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
-
+diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+index 5992dce..0708937 100644
+--- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+@@ -10,6 +10,7 @@ index in the group, from 0 to 31.
+ Required Properties:
+ 
+   - compatible: Must be one of the following
++    - "renesas,r8a7779-mstp-clocks" for R8A7779 (R-Car H1) MSTP gate clocks
+     - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
+     - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
+     - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
 -- 
 1.8.4
