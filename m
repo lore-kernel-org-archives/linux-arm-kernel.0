@@ -1,160 +1,116 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 17 Apr 2014 11:40:12 +0200
-Subject: [PATCH v2 2/2] regmap: i2c: fallback to SMBus if the adapter does not
- support standard I2C
-In-Reply-To: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397727612-32103-3-git-send-email-boris.brezillon@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Apr 2014 10:43:01 +0100
+Subject: [PATCH v3] ARM: mm: support big-endian page tables
+In-Reply-To: <534F9F79.9050503@huawei.com> (Jianguo Wu's message of "Thu, 17
+ Apr 2014 10:31:37 +0100")
+References: <534F9F79.9050503@huawei.com>
+Message-ID: <87ob00wau2.fsf@approximate.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some I2C adapters are only compatible with the SMBus protocol and do not
-support standard I2C transfers.
+On Thu, Apr 17 2014 at 10:31:37 am BST, Jianguo Wu <wujianguo@huawei.com> wrote:
+> When enable LPAE and big-endian in a hisilicon board, while specify
+> mem=384M mem=512M at 7680M, will get bad page state:
+>
+> Freeing unused kernel memory: 180K (c0466000 - c0493000)
+> BUG: Bad page state in process init  pfn:fa442
+> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+> page flags: 0x40000400(reserved)
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
+>
+> The bad pfn:fa442 is not system memory(mem=384M mem=512M at 7680M), after debugging,
+> I find in page fault handler, will get wrong pfn from pte just after set pte,
+> as follow:
+> do_anonymous_page()
+> {
+> 	...
+> 	set_pte_at(mm, address, page_table, entry);
+> 	
+> 	//debug code
+> 	pfn = pte_pfn(entry);
+> 	pr_info("pfn:0x%lx, pte:0x%llx\n", pfn, pte_val(entry));
+>
+> 	//read out the pte just set
+> 	new_pte = pte_offset_map(pmd, address);
+> 	new_pfn = pte_pfn(*new_pte);
+> 	pr_info("new pfn:0x%lx, new pte:0x%llx\n", pfn, pte_val(entry));
+> 	...
+> }
+>
+> pfn:   0x1fa4f5,     pte:0xc00001fa4f575f
+> new_pfn:0xfa4f5, new_pte:0xc00000fa4f5f5f	//new pfn/pte is wrong.
+>
+> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+> An LPAE PTE is a 64bit quantity, passed to cpu_v7_set_pte_ext in the r2 and r3 registers.
+> On an LE kernel, r2 contains the LSB of the PTE, and r3 the MSB.
+> On a BE kernel, the assignment is reversed.
+>
+> Unfortunately, the current code always assumes the LE case,
+> leading to corruption of the PTE when clearing/setting bits.
+>
+> This patch fixes this issue much like it has been done already in the
+> cpu_v7_switch_mm case.
+>
+> Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
+> Cc: stable at vger.kernel.org
 
-Fallback to SMBus transfers if we encounter such kind of adapters.
-The transfer type is chosen according to the val_bits field in the regmap
-config.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- drivers/base/regmap/regmap-i2c.c | 104 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 102 insertions(+), 2 deletions(-)
+> ---
+> -v2: Refactoring code suggested by Ben Dooks.
+> -v3: Rewrite commit message suggested by Marc Zyngier.
+> ---
+>  arch/arm/mm/proc-v7-3level.S |   18 +++++++++++++-----
+>  1 files changed, 13 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 01a719e..22e3ad6 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -64,6 +64,14 @@ ENTRY(cpu_v7_switch_mm)
+>  	mov	pc, lr
+>  ENDPROC(cpu_v7_switch_mm)
+>  
+> +#ifdef __ARMEB__
+> +#define rl r3
+> +#define rh r2
+> +#else
+> +#define rl r2
+> +#define rh r3
+> +#endif
+> +
+>  /*
+>   * cpu_v7_set_pte_ext(ptep, pte)
+>   *
+> @@ -73,13 +81,13 @@ ENDPROC(cpu_v7_switch_mm)
+>   */
+>  ENTRY(cpu_v7_set_pte_ext)
+>  #ifdef CONFIG_MMU
+> -	tst	r2, #L_PTE_VALID
+> +	tst	rl, #L_PTE_VALID
+>  	beq	1f
+> -	tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
+> -	bicne	r2, #L_PTE_VALID
+> +	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
+> +	bicne	rl, #L_PTE_VALID
+>  	bne	1f
+> -	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
+> -	orreq	r2, #L_PTE_RDONLY
+> +	tst	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
+> +	orreq	rl, #L_PTE_RDONLY
+>  1:	strd	r2, r3, [r0]
+>  	ALT_SMP(W(nop))
+>  	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
 
-diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
-index ebd1895..d82830b 100644
---- a/drivers/base/regmap/regmap-i2c.c
-+++ b/drivers/base/regmap/regmap-i2c.c
-@@ -14,6 +14,79 @@
- #include <linux/i2c.h>
- #include <linux/module.h>
- 
-+
-+static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
-+				      unsigned int *val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+	int ret;
-+
-+	if (reg > 0xff)
-+		return -EINVAL;
-+
-+	ret = i2c_smbus_read_byte_data(i2c, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	*val = ret;
-+
-+	return 0;
-+}
-+
-+static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
-+				       unsigned int val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+
-+	if (val > 0xff || reg > 0xff)
-+		return -EINVAL;
-+
-+	return i2c_smbus_write_byte_data(i2c, reg, val);
-+}
-+
-+static struct regmap_bus regmap_smbus_byte = {
-+	.reg_write = regmap_smbus_byte_reg_write,
-+	.reg_read = regmap_smbus_byte_reg_read,
-+};
-+
-+static int regmap_smbus_word_reg_read(void *context, unsigned int reg,
-+				      unsigned int *val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+	int ret;
-+
-+	if (reg > 0xffff)
-+		return -EINVAL;
-+
-+	ret = i2c_smbus_read_word_data(i2c, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	*val = ret;
-+
-+	return 0;
-+}
-+
-+static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
-+				       unsigned int val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+
-+	if (val > 0xffff || reg > 0xffff)
-+		return -EINVAL;
-+
-+	return i2c_smbus_write_word_data(i2c, reg, val);
-+}
-+
-+static struct regmap_bus regmap_smbus_word = {
-+	.reg_write = regmap_smbus_word_reg_write,
-+	.reg_read = regmap_smbus_word_reg_read,
-+};
-+
- static int regmap_i2c_write(void *context, const void *data, size_t count)
- {
- 	struct device *dev = context;
-@@ -97,6 +170,23 @@ static struct regmap_bus regmap_i2c = {
- 	.read = regmap_i2c_read,
- };
- 
-+const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
-+					    const struct regmap_config *config)
-+{
-+	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
-+		return &regmap_i2c;
-+	else if (config->val_bits == 16 &&
-+		 i2c_check_functionality(i2c->adapter,
-+					 I2C_FUNC_SMBUS_WORD_DATA))
-+		return &regmap_smbus_word;
-+	else if (config->val_bits == 8 &&
-+		 i2c_check_functionality(i2c->adapter,
-+					 I2C_FUNC_SMBUS_BYTE_DATA))
-+		return &regmap_smbus_byte;
-+
-+	return ERR_PTR(-ENOTSUPP);
-+}
-+
- /**
-  * regmap_init_i2c(): Initialise register map
-  *
-@@ -109,7 +199,12 @@ static struct regmap_bus regmap_i2c = {
- struct regmap *regmap_init_i2c(struct i2c_client *i2c,
- 			       const struct regmap_config *config)
- {
--	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-+	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
-+
-+	if (IS_ERR(bus))
-+		return ERR_PTR(PTR_ERR(bus));
-+
-+	return regmap_init(&i2c->dev, bus, &i2c->dev, config);
- }
- EXPORT_SYMBOL_GPL(regmap_init_i2c);
- 
-@@ -126,7 +221,12 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
- struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
- 				    const struct regmap_config *config)
- {
--	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-+	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
-+
-+	if (IS_ERR(bus))
-+		return ERR_PTR(PTR_ERR(bus));
-+
-+	return devm_regmap_init(&i2c->dev, bus, &i2c->dev, config);
- }
- EXPORT_SYMBOL_GPL(devm_regmap_init_i2c);
- 
 -- 
-1.8.3.2
+Jazz is not dead. It just smells funny.
