@@ -1,60 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 17 Apr 2014 15:23:31 -0300
-Subject: [PATCH v2 2/2] ARM: dts: imx27-pdk: Add keypad support
-In-Reply-To: <1397759011-6717-1-git-send-email-festevam@gmail.com>
-References: <1397759011-6717-1-git-send-email-festevam@gmail.com>
-Message-ID: <1397759011-6717-2-git-send-email-festevam@gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Thu, 17 Apr 2014 11:23:50 -0700
+Subject: [PATCH 0/7] Add cros_ec changes for newer boards
+In-Reply-To: <1397757570-19750-1-git-send-email-dianders@chromium.org>
+References: <1397757570-19750-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAL1qeaE+8km8K4gJvFaYiBxvVO+SD16f17w8pqdHS=OQB4SEoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Doug,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Add the input header into imx27.dtsi
+> This series adds the most critical cros_ec changes for newer boards
+> using cros_ec.  Specifically:
+> * Fixes timing/locking issues with the previously upstreamed (but
+>   never used upstream) cros_ec_spi driver.
+> * Updates the cros_ec header file to the latest version which allows
+>   us to use newer EC features like i2c tunneling.
+> * Adds an i2c tunnel driver to allow communication to the EC's i2c
+>   devices.
+>
+> This _doesn't_ get the EC driver fully up to speed with what's in the
+> current Chromium OS trees.  There are a whole slew of cleanup patches
+> there, an addition of an LPC transport mode, and exports of functions
+> to userspace.  Once these patches land and we have functionality we
+> can continue to pick more cleanup patches.
 
- arch/arm/boot/dts/imx27-pdk.dts | 15 +++++++++++++++
- arch/arm/boot/dts/imx27.dtsi    |  1 +
- 2 files changed, 16 insertions(+)
+I can now talk to the charger and battery over the tunnel on my
+Venice2 and other communication with the EC still works, so:
 
-diff --git a/arch/arm/boot/dts/imx27-pdk.dts b/arch/arm/boot/dts/imx27-pdk.dts
-index 042d7ff..764cf79 100644
---- a/arch/arm/boot/dts/imx27-pdk.dts
-+++ b/arch/arm/boot/dts/imx27-pdk.dts
-@@ -84,6 +84,21 @@
- 	status = "okay";
- };
- 
-+&kpp {
-+	linux,keymap = <
-+		MATRIX_KEY(0, 0, KEY_UP)
-+		MATRIX_KEY(0, 1, KEY_DOWN)
-+		MATRIX_KEY(1, 0, KEY_RIGHT)
-+		MATRIX_KEY(1, 1, KEY_LEFT)
-+		MATRIX_KEY(1, 2, KEY_ENTER)
-+		MATRIX_KEY(2, 0, KEY_F6)
-+		MATRIX_KEY(2, 1, KEY_F8)
-+		MATRIX_KEY(2, 2, KEY_F9)
-+		MATRIX_KEY(2, 3, KEY_F10)
-+	>;
-+	status = "okay";
-+};
-+
- &nfc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_nand>;
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index b2c103e..a75555c 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -11,6 +11,7 @@
- 
- #include "skeleton.dtsi"
- #include "imx27-pinfunc.h"
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
- 
--- 
-1.8.3.2
+Tested-by: Andrew Bresticker <abrestic@chromium.org>
