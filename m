@@ -1,35 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Apr 2014 07:57:53 +0100
-Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
- address space
-In-Reply-To: <20140416213141.GD12304@sirena.org.uk>
-References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
- <1397501428-8857-3-git-send-email-mporter@linaro.org>
- <20140416110603.GA19671@lee--X1>
- <20140416213141.GD12304@sirena.org.uk>
-Message-ID: <20140417065753.GC28725@lee--X1>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 17 Apr 2014 09:09:36 +0200
+Subject: [PATCH v2 2/4] ARM: mvebu: fix NOR bus-width in Armada XP GP
+ Device Tree
+In-Reply-To: <20140417050832.GP28159@titan.lakedaemon.net>
+References: <1397489361-5833-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397489361-5833-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140417050832.GP28159@titan.lakedaemon.net>
+Message-ID: <20140417090936.387c79c6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > s/regmap/Regmap
-> 
-> It's consistently written regmap in all the documentation and so on :)
+Dear Jason Cooper,
 
-Furry muff; but the comments still stand for the acronyms.
+On Thu, 17 Apr 2014 01:08:32 -0400, Jason Cooper wrote:
 
-> > addmap{0,1} doesn't quite sit right with me.
-> 
-> > REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
-> > as I first thought, but still, is there a better naming convention you
-> > could use?
-> 
-> addrmap or something?
+> Patches 2, 3, and 4 applied to mvebu/dt-fixes for stable with Gregory
+> and Ezequiel's Acks.
 
-Right, that was what I was thinking. However, I prefer something along
-the lines of 'i2c' and 'i2c_sec' or 'client' and 'client_slv' etc.
+Thanks.
 
+> Also, a gentle nit:  You're doing all the -stable info digging, would
+> you mind putting it in the following format so I don't have to hand edit
+> each patch?
+
+Sure! So far I've just been blindly following
+Documentation/stable_kernel_rules.txt, and besides the "Cc:
+stable at vger.kernel.org" it doesn't say anything else of what you're
+suggesting below.
+
+> ------
+> Link: ...
+
+What should this link point to?
+
+> Fixes: da8d1b383568 ('ARM: mvebu: Add support for NOR flash device on Armada XP-GP board')
+
+Ok. But this is not described in Documentation/stable_kernel_rules.txt.
+
+> Cc: stable at vger.kernel.org # v3.10+
+
+The Cc: to stable@ is documented, but the use of a comment with the
+kernel version afterwards is only mentioned when the commit in question
+requires other commits as dependencies to be applied to stable. When
+the commit is self-sufficient, stable_kernel_rules.txt doesn't indicate
+that a comment is needed.
+
+Maybe an update to stable_kernel_rules.txt is in order? :-)
+
+Thanks again!
+
+Thomas
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
