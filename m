@@ -1,55 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:31:42 +0900
-Subject: [PATCH 6/8] ARM: shmobile: r8a7791: Rename VSP1_SY clocks to VSP1_S
+Date: Thu, 17 Apr 2014 09:31:43 +0900
+Subject: [PATCH 7/8] ARM: shmobile: r8a7778: remove old style audio clock
 In-Reply-To: <cover.1397694178.git.horms+renesas@verge.net.au>
 References: <cover.1397694178.git.horms+renesas@verge.net.au>
-Message-ID: <58ea1d53ba93620ac50fef9d9720b2323971f243.1397694178.git.horms+renesas@verge.net.au>
+Message-ID: <a9d83bd6abc00e14e2db1660e2c7d889745bb3aa.1397694178.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The r8a7791 has three VSP1 instances, one of them being named VSPS (which
-stands for "VSP Standard"). The clock section in the SoC datasheet
-misunderstood the abbreviation as meaning VSP System, and named the
-corresponding clock VSP1(SY). This mistake has been carried over to the
-kernel code.
+Current sound driver moves to new style clock,
+but is keeping compatiblity at this point.
+Move to new style on r8a7778
 
-Fix this by renaming the VSP1_SY clock to VSP1_S.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi            | 2 +-
- include/dt-bindings/clock/r8a7791-clock.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7778.c | 22 +++++++++-------------
+ 1 file changed, 9 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 4618170..aa1cba9 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -688,7 +688,7 @@
- 			renesas,clock-indices = <
- 				R8A7791_CLK_TMU1 R8A7791_CLK_TMU3 R8A7791_CLK_TMU2
- 				R8A7791_CLK_CMT0 R8A7791_CLK_TMU0 R8A7791_CLK_VSP1_DU1
--				R8A7791_CLK_VSP1_DU0 R8A7791_CLK_VSP1_SY
-+				R8A7791_CLK_VSP1_DU0 R8A7791_CLK_VSP1_S
- 			>;
- 			clock-output-names =
- 				"tmu1", "tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index 30f82f2..f069bc6 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -32,7 +32,7 @@
- #define R8A7791_CLK_TMU0		25
- #define R8A7791_CLK_VSP1_DU1		27
- #define R8A7791_CLK_VSP1_DU0		28
--#define R8A7791_CLK_VSP1_SY		31
-+#define R8A7791_CLK_VSP1_S		31
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 2009a9b..201fc48 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -175,10 +175,6 @@ static struct clk mstp_clks[MSTP_NR] = {
  
- /* MSTP2 */
- #define R8A7791_CLK_SCIFA2		2
+ static struct clk_lookup lookups[] = {
+ 	/* main */
+-	CLKDEV_CON_ID("audio_clk_a",	&audio_clk_a),
+-	CLKDEV_CON_ID("audio_clk_b",	&audio_clk_b),
+-	CLKDEV_CON_ID("audio_clk_c",	&audio_clk_c),
+-	CLKDEV_CON_ID("audio_clk_internal",	&s1_clk),
+ 	CLKDEV_CON_ID("shyway_clk",	&s_clk),
+ 	CLKDEV_CON_ID("peripheral_clk",	&p_clk),
+ 
+@@ -234,15 +230,15 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_ICK_ID("ssi.6", "rcar_sound", &mstp_clks[MSTP309]),
+ 	CLKDEV_ICK_ID("ssi.7", "rcar_sound", &mstp_clks[MSTP308]),
+ 	CLKDEV_ICK_ID("ssi.8", "rcar_sound", &mstp_clks[MSTP307]),
+-	CLKDEV_ICK_ID("scu.0", "rcar_sound", &mstp_clks[MSTP531]),
+-	CLKDEV_ICK_ID("scu.1", "rcar_sound", &mstp_clks[MSTP530]),
+-	CLKDEV_ICK_ID("scu.2", "rcar_sound", &mstp_clks[MSTP529]),
+-	CLKDEV_ICK_ID("scu.3", "rcar_sound", &mstp_clks[MSTP528]),
+-	CLKDEV_ICK_ID("scu.4", "rcar_sound", &mstp_clks[MSTP527]),
+-	CLKDEV_ICK_ID("scu.5", "rcar_sound", &mstp_clks[MSTP526]),
+-	CLKDEV_ICK_ID("scu.6", "rcar_sound", &mstp_clks[MSTP525]),
+-	CLKDEV_ICK_ID("scu.7", "rcar_sound", &mstp_clks[MSTP524]),
+-	CLKDEV_ICK_ID("scu.8", "rcar_sound", &mstp_clks[MSTP523]),
++	CLKDEV_ICK_ID("src.0", "rcar_sound", &mstp_clks[MSTP531]),
++	CLKDEV_ICK_ID("src.1", "rcar_sound", &mstp_clks[MSTP530]),
++	CLKDEV_ICK_ID("src.2", "rcar_sound", &mstp_clks[MSTP529]),
++	CLKDEV_ICK_ID("src.3", "rcar_sound", &mstp_clks[MSTP528]),
++	CLKDEV_ICK_ID("src.4", "rcar_sound", &mstp_clks[MSTP527]),
++	CLKDEV_ICK_ID("src.5", "rcar_sound", &mstp_clks[MSTP526]),
++	CLKDEV_ICK_ID("src.6", "rcar_sound", &mstp_clks[MSTP525]),
++	CLKDEV_ICK_ID("src.7", "rcar_sound", &mstp_clks[MSTP524]),
++	CLKDEV_ICK_ID("src.8", "rcar_sound", &mstp_clks[MSTP523]),
+ };
+ 
+ void __init r8a7778_clock_init(void)
 -- 
 1.8.4
