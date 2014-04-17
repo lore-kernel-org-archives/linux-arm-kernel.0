@@ -1,38 +1,59 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 17 Apr 2014 11:58:21 -0500
-Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
- friendly address
-In-Reply-To: <CAFEAcA96XGvwPM=OpqW8EU5nFksiEruGgncwqUPEWeU2ryCoJg@mail.gmail.com>
-References: <1395718484-20424-1-git-send-email-joelf@ti.com>
- <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
- <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
- <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
- <CAFEAcA96XGvwPM=OpqW8EU5nFksiEruGgncwqUPEWeU2ryCoJg@mail.gmail.com>
-Message-ID: <CAL_JsqKxsR6-pKv9sP4z1nnp+sy7GncGDyL+kMkF60efn2=DsA@mail.gmail.com>
+Date: Thu, 17 Apr 2014 12:11:24 -0500
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+Message-ID: <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 5:02 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 2 April 2014 13:47, Peter Maydell <peter.maydell@linaro.org> wrote:
->> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
->>> Like others, I have been carrying this change locally. Good to see it up!
->>
->> Why are you all booting raw Images anyway (just out of curiosity)?
+On Wed, Apr 16, 2014 at 2:14 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Wed, 16 Apr 2014, Christopher Covington wrote:
 >
-> Given the recent feedback from the kernel mailing list (viz "don't boot
-> Image unless you really know what you're doing, the correct load
-> image may change randomly depending what other board support
-> is in a multikernel image, etc") maybe we should just remove the
-> Image booting support instead? Clearly nobody who hasn't locally
-> patched QEMU is using it at the moment...
+>> On 04/15/2014 06:44 AM, Daniel Thompson wrote:
+>> > Hi Folks
 
-Including AArch64, too? :) It happens to be correct ATM, but really we
-should be looking the Image header to determine the offset. I heard
-Mark Rutland has some patches to do TEXT_OFFSET randomization in fact.
+[snip]
 
-The choice of 0x10000 is not really a good one either as this forces
-the decompressor to move itself out of the way first. I guess it is a
-good choice if your goal is to test the worst possible code path for
-the decompressor.
+>> Or could we patch up the linker script to set zero-based ELF load
+>> memory addresses (LMAs) [4] so that the physical addresses are almost right,
+>> you just might have to add a system-specific RAM offset, perhaps pulled out of
+>> the device tree? If that won't work, we could generate some kind of
+>> vmlinux-phys with physical addresses. The latter two options might also
+>> simplify external debugging before __turn_mmu_on(). I like the sound of the
+>> LMA approach best, assuming it doesn't break existing stuff (I notice a few AT
+>> directives in vmlinux.lds.S). Some of this might transfer to arm64 as well.
+>> What do you all think?
+>
+> If you really really want to get at the TEXT_OFFSET value in the
+> uncompressed image, the simplest way would be:
+>
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index f8c08839ed..de84d0635a 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -78,6 +78,11 @@
+>
+>         __HEAD
+>  ENTRY(stext)
+> +
+> +       b       1f
+> +       .word   TEXT_OFFSET             @ located at a 4-byte offset in Image
+> +1:
+> +
+>   ARM_BE8(setend        be )                    @ ensure we are in BE8 mode
+>
+>   THUMB(        adr     r9, BSYM(1f)    )       @ Kernel is always entered in ARM.
+>
+> This way the first word for Image would always be 0xea000000 and the
+> second one would be TEXT_OFFSET.  No other kernel Image binaries ever
+> had 0xea000000 as their first word so that also let you validate whether
+> or not the TEXT_OFFSET value is there.
+
+Better yet, we should adopt the arm64 Image header which has this and
+other fields for arm Image files. We're going to have to deal with raw
+Image (and Image.gz) in bootloaders for arm64, so we might as well
+align things.
 
 Rob
