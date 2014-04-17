@@ -1,89 +1,227 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 17 Apr 2014 15:27:36 +0200
-Subject: Rockchip RK3188 I2C driver
-In-Reply-To: <5059282.MitP6iZ8n1@typ>
-References: <3748421.ND1tAjvgKS@typ> <20140415185025.GH12304@sirena.org.uk>
- <5059282.MitP6iZ8n1@typ>
-Message-ID: <1917043.Q4CxE5T68K@phil>
+From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
+Date: Thu, 17 Apr 2014 15:33:59 +0200
+Subject: [PATCH 1/4] mmc: sdhci: add a driver for Berlin SoCs
+In-Reply-To: <534E92FE.8010400@gmail.com>
+References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
+ <534E92FE.8010400@gmail.com>
+Message-ID: <20140417133359.GB31034@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. April 2014, 02:04:20 schrieb Max Schwarz:
-> On Tuesday 15 April 2014 at 19:50:25, Mark Brown wrote:
-> > Perhaps I'm missing something about why this is helpful but it does seem
-> > like the hardware designers have good drugs here.
+Sebastian,
+
+On Wed, Apr 16, 2014 at 04:26:06PM +0200, Sebastian Hesselbarth wrote:
+> On 04/16/2014 02:40 PM, Antoine T?nart wrote:
+> >Add a Driver to support the SDHCI controller of the Marvell Berlin SoCs.
+> >This controller supports 3 sockets.
 > 
-> I assume that the point is to avoid read/write cycles for bit-level
-> set/clear. You can do a "change bit X, leave everything else intact" in a
-> single write without reading the previous value, be it from the register
-> itself or from some cache.
+> nit: Isn't it three controller with one socket each?
+
+It's a little bit confusing, there are 3 different register regions and
+I can see 3 separate data lines but, I quote: "The SD host controller
+supports three sockets".
+
+Maybe Jisheng can advise on that matter ?
+
 > 
-> > For non-volatile registers this should work fine if the write enable
-> > bits are just latched on at probe time, we'll never actually look at the
-> > what the hardware reads back once things are in cache.  For ones that
-> > are volatile we'll need to teach the framework about it...  a write
-> > enable mask setting that we splat into the value perhaps?
+> >Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> >---
+> >  drivers/mmc/host/Kconfig        |  11 ++++
+> >  drivers/mmc/host/Makefile       |   1 +
+> >  drivers/mmc/host/sdhci-berlin.c | 129 ++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 141 insertions(+)
+> >  create mode 100644 drivers/mmc/host/sdhci-berlin.c
+> >
+> >diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> >index 1384f67abe21..42db70031eb2 100644
+> >--- a/drivers/mmc/host/Kconfig
+> >+++ b/drivers/mmc/host/Kconfig
+> >@@ -283,6 +283,17 @@ config MMC_SDHCI_BCM2835
+> >
+> >  	  If unsure, say N.
+> >
+> >+config MMC_SDHCI_BERLIN
+> >+	tristate "Marvell Berlin SD/MMC Host Controller support"
+> >+	depends on ARCH_BERLIN
+> >+	depends on MMC_SDHCI_PLTFM
+> >+	select MMC_SDHCI_IO_ACCESSORS
+> >+	help
+> >+	  This selects the Berlin SD/MMC controller. If you have a Berlin
+> >+	  platform with SD or MMC devices, say Y or M here.
+> >+
+> >+	  If unsure, say N.
+> >+
+> >  config MMC_OMAP
+> >  	tristate "TI OMAP Multimedia Card Interface support"
+> >  	depends on ARCH_OMAP
+> >diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> >index 3483b6b6b880..b0256290530c 100644
+> >--- a/drivers/mmc/host/Makefile
+> >+++ b/drivers/mmc/host/Makefile
+> >@@ -64,6 +64,7 @@ obj-$(CONFIG_MMC_SDHCI_OF_ESDHC)	+= sdhci-of-esdhc.o
+> >  obj-$(CONFIG_MMC_SDHCI_OF_HLWD)		+= sdhci-of-hlwd.o
+> >  obj-$(CONFIG_MMC_SDHCI_BCM_KONA)	+= sdhci-bcm-kona.o
+> >  obj-$(CONFIG_MMC_SDHCI_BCM2835)		+= sdhci-bcm2835.o
+> >+obj-$(CONFIG_MMC_SDHCI_BERLIN)		+= sdhci-berlin.o
+> >
+> >  ifeq ($(CONFIG_CB710_DEBUG),y)
+> >  	CFLAGS-cb710-mmc	+= -DDEBUG
+> >diff --git a/drivers/mmc/host/sdhci-berlin.c b/drivers/mmc/host/sdhci-berlin.c
+> >new file mode 100644
+> >index 000000000000..ece8f7863937
+> >--- /dev/null
+> >+++ b/drivers/mmc/host/sdhci-berlin.c
+> >@@ -0,0 +1,129 @@
+> >+/*
+> >+ * Marvell Berlin SDHCI driver
+> >+ *
+> >+ * Copyright (C) 2014 Marvell Technology Group Ltd.
+> >+ *
+> >+ * Antoine T?nart <antoine.tenart@free-electrons.com>
+> >+ *
+> >+ * This file is licensed under the terms of the GNU General Public
+> >+ * License version 2. This program is licensed "as is" without any
+> >+ * warranty of any kind, whether express or implied
+> >+ */
+> >+
+> >+#include <linux/clk.h>
+> >+#include <linux/err.h>
+> >+#include <linux/io.h>
+> >+#include <linux/mmc/host.h>
+> >+#include <linux/module.h>
+> >+#include <linux/of.h>
+> >+#include <linux/of_device.h>
+> >+
+> >+#include "sdhci-pltfm.h"
+> >+
+> >+static struct sdhci_ops sdhci_berlin_ops = {
+> >+	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+> >+};
+> >+
+> >+static struct sdhci_pltfm_data sdhci_berlin2_pdata = {
+> >+	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
+> >+		  SDHCI_QUIRK_BROKEN_ADMA |
+> >+		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
+> >+	.ops = &sdhci_berlin_ops,
+> >+};
+> >+
+> >+static struct sdhci_pltfm_data sdhci_berlin2q_pdata = {
+> >+	.quirks	= SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
+> >+		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
+> >+		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
+> >+	.ops = &sdhci_berlin_ops,
+> >+};
+> >+
+> >+static const struct of_device_id sdhci_berlin_of_match_table[] = {
+> >+	{
+> >+		.compatible = "marvell,berlin2-sdhci",
+> >+		.data = &sdhci_berlin2_pdata,
+> >+	},
+> >+	{
+> >+		.compatible = "marvell,berlin2cd-sdhci",
+> >+		.data = &sdhci_berlin2_pdata,
+> >+	},
+> >+	{
+> >+		.compatible = "marvell,berlin2q-sdhci",
+> >+		.data = &sdhci_berlin2q_pdata,
+> >+	},
+> >+	{}
+> >+};
+> >+MODULE_DEVICE_TABLE(of, sdhci_berlin_of_match_table);
+> >+
+> >+static int sdhci_berlin_probe(struct platform_device *pdev)
+> >+{
+> >+	struct device *dev = &pdev->dev;
+> >+	struct sdhci_host *host;
+> >+	struct sdhci_pltfm_host *pltfm_host;
+> >+	struct clk *clk;
+> >+	const struct of_device_id *device =
+> >+		of_match_device(sdhci_berlin_of_match_table, dev);
+> >+	int ret;
+> >+
+> >+	host = sdhci_pltfm_init(pdev,
+> >+				(struct sdhci_pltfm_data *)device->data, 0);
+> >+	if (IS_ERR(host))
+> >+		return PTR_ERR(host);
+> >+
+> >+	pltfm_host = sdhci_priv(host);
+> >+
+> >+	clk = devm_clk_get(dev, NULL);
+> >+	if (IS_ERR(clk)) {
+> >+		dev_err(dev, "could not get clock: %ld\n", PTR_ERR(clk));
+> >+		ret = PTR_ERR(clk);
+> >+		goto err_clk_get;
+> >+	}
+> >+
+> >+	clk_prepare_enable(clk);
+> >+	pltfm_host->clk = clk;
+> >+
+> >+	sdhci_get_of_property(pdev);
+> >+
+> >+	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+> >+		host->mmc->caps |= MMC_CAP_NONREMOVABLE;
 > 
-> The regmap is not volatile at the moment, but it should probably be. We
-> don't have documentation on the registers (or do you know more, Heiko?), so
-> we can't be sure how the bits we don't know about behave.
+> Documentation/devicetree/bindings/mmc/mmc.txt names "non-removable"
+> as a standard property. Any chance we can shove this two lines above
+> right into sdhci_get_of_property()?
 
->From a cursory glance through the register docs, only GRF_SOC_STATUS0, 
-GRF_SOC_STATUS1 and GRF_DDRC_STAT seem to be volatile, but they are also not 
-writeable at all. All others look like they only receive settings, but do not 
-contain volatile information.
+Well, I gave it a try without this quirk and it seemed to work fine.
+If we find out we do need it, I agree to add this quirk in
+sdhci_get_of_property().
 
-Apart from GRF_SOC_STATUS1 (whose only entry gpu-idle-state is simply 
-contained in DDRC_STAT on the rk3066), the shared GRF registers are very much 
-alike between rk3188 and the leaked rk3066 trm.
+Antoine
 
-
-> I see three possible solutions to our problem:
 > 
-> 1) Ideally, regmap_update_bits(map, reg, mask, val) & co would directly boil
-> down to a single register write of (mask << 16) | val, even for volatile
-> registers. That's a rather big change to regmap though, isn't it?
+> Besides the other comments from Joe, this looks good to me,
 > 
-> 2) A smaller change would be to always use 0xFFFF as the write enable mask
->    while writing. That would mean that write accesses to volatile registers
->    would always need a read access before to determine the previous value,
->    though.
+> Reviewed-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > 
-> 3) Make the GRF/syscon device give direct register access to the drivers
-> (i.e. passing a pointer to the mapped registers) and bypass regmap
-> entirely.
+> >+
+> >+	ret = sdhci_add_host(host);
+> >+	if (ret)
+> >+		goto err_add_host;
+> >+
+> >+	return 0;
+> >+
+> >+err_add_host:
+> >+	clk_disable_unprepare(pltfm_host->clk);
+> >+err_clk_get:
+> >+	sdhci_pltfm_free(pdev);
+> >+
+> >+	return ret;
+> >+}
+> >+
+> >+static int sdhci_berlin_remove(struct platform_device *pdev)
+> >+{
+> >+	struct sdhci_host *host = platform_get_drvdata(pdev);
+> >+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> >+
+> >+	sdhci_pltfm_unregister(pdev);
+> >+	clk_disable_unprepare(pltfm_host->clk);
+> >+
+> >+	return 0;
+> >+}
+> >+
+> >+static struct platform_driver sdhci_berlin_driver = {
+> >+	.driver		= {
+> >+		.name	= "berlin-sdhci",
+> >+		.owner	= THIS_MODULE,
+> >+		.pm	= SDHCI_PLTFM_PMOPS,
+> >+		.of_match_table = sdhci_berlin_of_match_table,
+> >+	},
+> >+	.probe		= sdhci_berlin_probe,
+> >+	.remove		= sdhci_berlin_remove,
+> >+};
+> >+module_platform_driver(sdhci_berlin_driver);
+> >+
+> >+MODULE_DESCRIPTION("SDHCI driver for Marvell Berlin SoC");
+> >+MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
+> >+MODULE_LICENSE("GPL");
+> >
 > 
->    That would make sense to me because we are AFAIK not using any of
-> regmap's features here:
-> 
->    * Caching is not that useful because a) we are only doing a few init-time
-> accesses and b) the write-mask provides similar functionality. * The bus
-> for register access is always going to be MMIO.
->    * All the drivers using the GRF are rockchip-specific and can know about
->      the write-mask thing.
-> 
-> From the outcome, I would prefer (1). From the complexity, (3). Thoughts?
 
-I don't think I like (3) :-) . So far we've seen Rockchip and Hisilicon use 
-this "hiword-mask" scheme on at least some of their registers. Enabling syscon 
-to also share the raw mapped registers might encourage abuse of it slipping 
-in, on platforms which need the concurrency handling regmap provides.
-
-For (2), regmap already does the necessary read in _update_bits ... either 
-from its cache or from the register itself for volatile ones. So in our case, 
-we'd simply fall back to use the register like a regular one.
-
-Interestingly, when looking through the regmap_config struct, it already 
-contains the "write_flag_mask", described as "Mask to be set in the top byte of 
-the register when doing  a write.", which sounds a lot like what we need, only 
-that it's two bytes for us instead of the current one.
-
-
-So I guess the easiest way would be to make write_flag_mask somehow usable for 
-us, because it looks like regmap will handle the rest on its own already.
-
-And then teach syscon to set this flag and about volatile registers in general, 
-because it doesn't seem to handle them yet.
-
-
-Heiko
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
