@@ -1,131 +1,74 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Thu, 17 Apr 2014 10:24:20 +0100
-Subject: [PATCH] mcpm: Rename the power_down_finish() functions to be less
- confusing
-Message-ID: <20140417092420.GA3430@e103592.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 17 Apr 2014 11:29:00 +0200
+Subject: [PATCH 4/5] exynos4-is: Remove requirement for "simple-bus"
+ compatible
+In-Reply-To: <CAL_JsqKH8o-0H4+2jv-6xh96Twh9UCXZV+LtmiUGHJmhUxCUVA@mail.gmail.com>
+References: <1397583272-28295-1-git-send-email-s.nawrocki@samsung.com>
+ <1397583272-28295-5-git-send-email-s.nawrocki@samsung.com>
+ <CAL_Jsq+VRGpVZwFs1QwCz6YY8WmPUO7ZJtWQ3kVY8p1jWe0LGg@mail.gmail.com>
+ <534EBB88.9020109@samsung.com>
+ <CAL_JsqKH8o-0H4+2jv-6xh96Twh9UCXZV+LtmiUGHJmhUxCUVA@mail.gmail.com>
+Message-ID: <534F9EDC.4030202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name "power_down_finish" seems to be causing some confusion,
-because it suggests that this function is responsible for taking
-some action to cause the specified CPU to complete its power down.
+(restoring the Cc list I cleared accidentally in previous reply)
 
-This patch renames the affected functions to "wait_for_powerdown"
-and similar, since this function's intended purpose is just to wait
-for the hardware to finish a powerdown initiated by a previous
-cpu_power_down.
+On 16/04/14 21:29, Rob Herring wrote:
+> On Wed, Apr 16, 2014 at 12:19 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> On 16/04/14 17:34, Rob Herring wrote:
+>>> On Tue, Apr 15, 2014 at 12:34 PM, Sylwester Nawrocki
+>>> <s.nawrocki@samsung.com> wrote:
+>>>>> This patch makes the driver instantiating its child devices itself,
+>>>>> rather than relying on an OS to instantiate devices as children
+>>>>> of "simple-bus". This removes an incorrect usage of "simple-bus"
+>>>>> compatible.
+>>>
+>>> Good, but why can't you use of_platform_populate with the root being
+>>> the "samsung,fimc" node? The code to instantiate the devices belongs
+>>> in the core OF code.
+>>
+>> As I mentioned in other thread, I couldn't see anything like
+>> of_platform_unpopulate(), which would allow to destroy any created
+>> devices. I can't have of_platform_populate() called as last thing
+>> in probe() as some drivers do, so at least deferred probe works.
+>> Anyway, it wouldn't be a solution since on a driver removal the
+>> created devices must be unregistered.
+> 
+> I think the deferred probe will get fixed in 3.16, but I'm not
+> following how deferred probe is relevant here.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
+What I meant was that when something fails in the middle of probe() 
+callback and of_platform_populate() was already called any devices 
+created by it must be destroyed before returning an error from probe().
+And some drivers seem to never free their devices created by 
+of_platform_populate().
 
-Based on the current discussions, it sounds like this rename might be
-helpful to people implementing mcpm backends.  What do people think of
-it?
+>> I read through thread [1] and I didn't immediately have an idea how
+>> to fix the core OF code. So I thought I'd come up with this partial
+>> solution.
+>>
+>> I was wondering if creating functions like of_platform_device_delete(),
+>> of_amba_device_delete() and a function that would walk device tree and
+>> call them would be a way to go ? I could spend some time on that, any
+>> suggestions would be appreciated.
+> 
+> I need to look at the other removal case, but perhaps the way you did
+> using children of the struct device parent is the right way. I'm fine
+> with that, but I just want to see this in the core code.
 
-Thanks to Nico for the suggestion.
+All right, I'll have a closer look then if it can be done that way.
+ 
+> Rob
+> 
+>>
+>> --
+>> Regards,
+>> Sylwester
+>>
+>> [1] http://www.spinics.net/lists/linux-omap/msg94484.html
 
-
- arch/arm/common/mcpm_entry.c    |    6 +++---
- arch/arm/common/mcpm_platsmp.c  |    2 +-
- arch/arm/include/asm/mcpm.h     |    8 ++++----
- arch/arm/mach-vexpress/tc2_pm.c |    4 ++--
- 4 files changed, 10 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index 1e361ab..7522c87 100644
---- a/arch/arm/common/mcpm_entry.c
-+++ b/arch/arm/common/mcpm_entry.c
-@@ -101,14 +101,14 @@ void mcpm_cpu_power_down(void)
- 	BUG();
- }
- 
--int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
-+int mcpm_wait_for_cpu_powerdown(unsigned int cpu, unsigned int cluster)
- {
- 	int ret;
- 
--	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
-+	if (WARN_ON_ONCE(!platform_ops || !platform_ops->wait_for_powerdown))
- 		return -EUNATCH;
- 
--	ret = platform_ops->power_down_finish(cpu, cluster);
-+	ret = platform_ops->wait_for_powerdown(cpu, cluster);
- 	if (ret)
- 		pr_warn("%s: cpu %u, cluster %u failed to power down (%d)\n",
- 			__func__, cpu, cluster, ret);
-diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
-index 177251a..92e54d7 100644
---- a/arch/arm/common/mcpm_platsmp.c
-+++ b/arch/arm/common/mcpm_platsmp.c
-@@ -62,7 +62,7 @@ static int mcpm_cpu_kill(unsigned int cpu)
- 
- 	cpu_to_pcpu(cpu, &pcpu, &pcluster);
- 
--	return !mcpm_cpu_power_down_finish(pcpu, pcluster);
-+	return !mcpm_wait_for_cpu_powerdown(pcpu, pcluster);
- }
- 
- static int mcpm_cpu_disable(unsigned int cpu)
-diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-index 608516e..90ed219 100644
---- a/arch/arm/include/asm/mcpm.h
-+++ b/arch/arm/include/asm/mcpm.h
-@@ -91,14 +91,14 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
-  * previously in which case the caller should take appropriate action.
-  *
-  * On success, the CPU is not guaranteed to be truly halted until
-- * mcpm_cpu_power_down_finish() subsequently returns non-zero for the
-+ * mcpm_wait_for_cpu_powerdown() subsequently returns non-zero for the
-  * specified cpu.  Until then, other CPUs should make sure they do not
-  * trash memory the target CPU might be executing/accessing.
-  */
- void mcpm_cpu_power_down(void);
- 
- /**
-- * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
-+ * mcpm_wait_for_cpu_powerdown - wait for a specified CPU to halt, and
-  *	make sure it is powered off
-  *
-  * @cpu: CPU number within given cluster
-@@ -120,7 +120,7 @@ void mcpm_cpu_power_down(void);
-  *	- zero if the CPU is in a safely parked state
-  *	- nonzero otherwise (e.g., timeout)
-  */
--int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster);
-+int mcpm_wait_for_cpu_powerdown(unsigned int cpu, unsigned int cluster);
- 
- /**
-  * mcpm_cpu_suspend - bring the calling CPU in a suspended state
-@@ -164,7 +164,7 @@ int mcpm_cpu_powered_up(void);
- struct mcpm_platform_ops {
- 	int (*power_up)(unsigned int cpu, unsigned int cluster);
- 	void (*power_down)(void);
--	int (*power_down_finish)(unsigned int cpu, unsigned int cluster);
-+	int (*wait_for_powerdown)(unsigned int cpu, unsigned int cluster);
- 	void (*suspend)(u64);
- 	void (*powered_up)(void);
- };
-diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-index 29e7785..b743a0a 100644
---- a/arch/arm/mach-vexpress/tc2_pm.c
-+++ b/arch/arm/mach-vexpress/tc2_pm.c
-@@ -209,7 +209,7 @@ static int tc2_core_in_reset(unsigned int cpu, unsigned int cluster)
- #define POLL_MSEC 10
- #define TIMEOUT_MSEC 1000
- 
--static int tc2_pm_power_down_finish(unsigned int cpu, unsigned int cluster)
-+static int tc2_pm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
- {
- 	unsigned tries;
- 
-@@ -290,7 +290,7 @@ static void tc2_pm_powered_up(void)
- static const struct mcpm_platform_ops tc2_pm_power_ops = {
- 	.power_up		= tc2_pm_power_up,
- 	.power_down		= tc2_pm_power_down,
--	.power_down_finish	= tc2_pm_power_down_finish,
-+	.wait_for_powerdown	= tc2_pm_wait_for_powerdown,
- 	.suspend		= tc2_pm_suspend,
- 	.powered_up		= tc2_pm_powered_up,
- };
--- 
-1.7.10.4
+--
+Thanks,
+Sylwester
