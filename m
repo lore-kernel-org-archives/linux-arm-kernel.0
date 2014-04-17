@@ -1,51 +1,78 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 17 Apr 2014 11:36:47 -0700
-Subject: [RESEND PATCH 0/7] Add cros_ec changes for newer boards
-Message-ID: <1397759814-3588-1-git-send-email-dianders@chromium.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Apr 2014 19:37:30 +0100
+Subject: [PATCH] arm64: Fix PSCI part of booting.txt
+In-Reply-To: <1397758623.30572.53.camel@smoke>
+References: <1397758623.30572.53.camel@smoke>
+Message-ID: <20140417183730.GB24195@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the most critical cros_ec changes for newer boards
-using cros_ec.  Specifically:
-* Fixes timing/locking issues with the previously upstreamed (but
-  never used upstream) cros_ec_spi driver.
-* Updates the cros_ec header file to the latest version which allows
-  us to use newer EC features like i2c tunneling.
-* Adds an i2c tunnel driver to allow communication to the EC's i2c
-  devices.
+Hi Geoff,
 
-This _doesn't_ get the EC driver fully up to speed with what's in the
-current Chromium OS trees.  There are a whole slew of cleanup patches
-there, an addition of an LPC transport mode, and exports of functions
-to userspace.  Once these patches land and we have functionality we
-can continue to pick more cleanup patches.
+On Thu, Apr 17, 2014 at 07:17:03PM +0100, Geoff Levand wrote:
+> Correct the PSCI booting text to match the requirements
+> of the PSCI spec.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+> Hi Will,
+> 
+> Based on the PSCI doc (DEN 0022B.b), to use CPU_ON the
+> cpu can only be powered down with CPU_OFF, and it seems
+> from the doc that the code that calls CPU_OFF could be
+> anywhere in memory, since once the CPU_OFF call is made
+> the cpu is powered off and never executes any more 
+> instructions from memory.  CPU_ON is given an
+> entry_point_address parameter, which would be specific
+> to the code calling CPU_ON.
+> 
+> Did I misunderstand something, or should we change this
+> text as below?
 
+The current wording is my fault and is an artifact of working on the
+bootwrapper, where CPUs which are off from the perspective of the PSCI
+state machine are actually spinning within the PSCI implementation.
 
-Bill Richardson (1):
-  mfd: cros_ec: Sync to the latest cros_ec_commands.h from EC sources
+This admittedly is an implementation detail that does not matter to the
+kernel, and in a real implementation I would certainly not expect the
+CPUs to be spinning in a non-secure pen.
 
-David Hendricks (1):
-  mfd: cros_ec: spi: calculate delay between transfers correctly
+> 
+> -Geoff
+> 
+>  Documentation/arm64/booting.txt | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index beb754e..8f9074f 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -167,13 +167,12 @@ following manner:
+>    value, so CPUs must convert the read value to their native endianness
+>    before jumping to it.
+>  
+> -- CPUs with a "psci" enable method should remain outside of
+> -  the kernel (i.e. outside of the regions of memory described to the
+> -  kernel in the memory node, or in a reserved area of memory described
+> -  to the kernel by a /memreserve/ region in the device tree).  The
+> -  kernel will issue CPU_ON calls as described in ARM document number ARM
+> -  DEN 0022A ("Power State Coordination Interface System Software on ARM
+> -  processors") to bring CPUs into the kernel.
+> +- CPUs with a "psci" enable method should use the PSCI CPU control
+> +  functions described in ARM document number ARM DEN 0022A or newer
+> +  ("Power State Coordination Interface System Software on ARM
+> +  processors").  The boot loader must power off these CPU's using the
 
-Doug Anderson (5):
-  mfd: cros_ec: spi: Add mutex to cros_ec_spi
-  mfd: cros_ec: spi: Make the cros_ec_spi timeout more reliable
-  mfd: cros_ec: spi: Increase cros_ec_spi deadline from 5ms to 100ms
-  i2c: ChromeOS EC tunnel driver
-  ARM: tegra: Add the EC i2c tunnel to tegra124-venice2
+Nit: s/CPU's/CPUs/
 
- .../devicetree/bindings/i2c/i2c-cros-ec-tunnel.txt |   36 +
- arch/arm/boot/dts/tegra124-venice2.dts             |   27 +
- drivers/i2c/busses/Kconfig                         |    9 +
- drivers/i2c/busses/Makefile                        |    1 +
- drivers/i2c/busses/i2c-cros-ec-tunnel.c            |  304 ++++++
- drivers/mfd/cros_ec.c                              |    7 +-
- drivers/mfd/cros_ec_spi.c                          |   67 +-
- include/linux/mfd/cros_ec.h                        |    4 +-
- include/linux/mfd/cros_ec_commands.h               | 1128 ++++++++++++++++++--
- 9 files changed, 1491 insertions(+), 92 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cros-ec-tunnel.txt
- create mode 100644 drivers/i2c/busses/i2c-cros-ec-tunnel.c
+> +  PSCI CPU_OFF function.  The kernel will issue CPU_ON calls to bring
+> +  CPUs into the kernel.
 
--- 
-1.9.1.423.g4596e3a
+As the bootloader might never bring those secondaries online, it would
+be better to state that those secondaries are in OFF state from the
+perspective of the PSCI state machine.
+
+Otherwise, this looks fine to me.
+
+Cheers,
+Mark.
