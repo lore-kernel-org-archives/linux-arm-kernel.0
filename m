@@ -1,54 +1,115 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 17 Apr 2014 09:37:00 +0200
-Subject: [PATCH 1/2] clk: socfpga: add divider registers to the main pll
- outputs
-In-Reply-To: <534EEE9C.6070806@gmail.com>
-References: <1397679270-29695-1-git-send-email-dinguyen@altera.com>
- <534EE6AF.4040001@gmail.com> <20140416204950.GK16054@pengutronix.de>
- <534EEE9C.6070806@gmail.com>
-Message-ID: <73ppkg1k6b.fsf@unicorn.hi.pengutronix.de>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Thu, 17 Apr 2014 09:38:01 +0100
+Subject: [PATCH RFC] arm64: 32-bit tolerant sync bitops
+Message-ID: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Xen assumes that bit operations are able to operate on 32-bit size and
+alignment [1]. For arm64 bitops are based on atomic exclusive load/store
+instructions to guarantee that changes are made atomically. However, these
+instructions require that address to be aligned to the data size. Because, by
+default, bitops operates on 64-bit size it implies that address should be
+aligned appropriately. All these lead to breakage of Xen assumption for bitops
+properties.
 
-Dinh Nguyen <dinh.linux@gmail.com> writes:
+With this patch 32-bit sized/aligned bitops is implemented. 
 
-> On 04/16/2014 03:49 PM, Steffen Trumtrar wrote:
->> Hi!
->>
->> On Wed, Apr 16, 2014 at 03:23:11PM -0500, Dinh Nguyen wrote:
->>>
->>>
->>> On 04/16/2014 03:14 PM, dinguyen at altera.com wrote:
->>>> From: Dinh Nguyen <dinguyen@altera.com>
->>>>
->>>> The C0(mpu_clk), C1(main_clk), and C2(dbg_base_clk) outputs from the main
->>>> PLL go through a pre-divider before coming into the system. These registers
->>>> were hidden for the CycloneV platform, but are not used for the ArriaV
->>>
->>> Sorry but this should be "but are now used"
->>>
->>
->> ???
->>
->> I don't get it. Do we have these registers on the cyclone V AND arria V or do
->> we only have them on the arria V ?
->
-> These registers are there for both CycloneV and ArriaV.They are 
-> configured by the preloader, so it was "hidden" as a fixed-divider. I 
-> could have designated these values as fixed for the ArriaV as well, but 
-> it would be better if I just read this "hidden" register to get the 
-> divider value.
->
+[1] http://www.gossamer-threads.com/lists/xen/devel/325613
 
-Ah, okay, now I get it. Then we want to have these represented in the
-clock tree of course. Especially when they are not fixed.
+Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+---
+ Apart this patch other approaches were implemented:
+ 1. turn bitops to be 32-bit size/align tolerant.
+    the changes are minimal, but I'm not sure how broad side effect might be
+ 2. separate 32-bit size/aligned operations.
+    it exports new API, which might not be good
 
-Regards,
-Steffen
+ All implementations based on arm64 version of bitops and were boot tested
+ only. Hope, I didn't miss something ;) 
 
+ arch/arm64/include/asm/sync_bitops.h | 60 ++++++++++++++++++++++++++++++++----
+ 1 file changed, 54 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/include/asm/sync_bitops.h b/arch/arm64/include/asm/sync_bitops.h
+index 8da0bf4..809926f 100644
+--- a/arch/arm64/include/asm/sync_bitops.h
++++ b/arch/arm64/include/asm/sync_bitops.h
+@@ -3,6 +3,7 @@
+ 
+ #include <asm/bitops.h>
+ #include <asm/cmpxchg.h>
++#include <linux/stringify.h>
+ 
+ /* sync_bitops functions are equivalent to the SMP implementation of the
+  * original functions, independently from CONFIG_SMP being defined.
+@@ -12,14 +13,61 @@
+  * who might be on another CPU (e.g. two uniprocessor guests communicating
+  * via event channels and grant tables). So we need a variant of the bit
+  * ops which are SMP safe even on a UP kernel.
++ *
++ * Xen assumes that bitops are 32-bit sized/aligned
+  */
+ 
+-#define sync_set_bit(nr, p)            set_bit(nr, p)
+-#define sync_clear_bit(nr, p)          clear_bit(nr, p)
+-#define sync_change_bit(nr, p)         change_bit(nr, p)
+-#define sync_test_and_set_bit(nr, p)   test_and_set_bit(nr, p)
+-#define sync_test_and_clear_bit(nr, p) test_and_clear_bit(nr, p)
+-#define sync_test_and_change_bit(nr, p)        test_and_change_bit(nr, p)
++#define sync_bitop32(name, instr)					\
++static inline void sync_##name(int nr, volatile unsigned long *addr)	\
++{									\
++	unsigned tmp1, tmp2;						\
++	asm volatile(							\
++	"	and	%w1, %w2, #31\n"				\
++	"	eor	%w2, %w2, %w1\n"				\
++	"	mov	%w0, #1\n"					\
++	"	add	%3, %3, %2, lsr #2\n"				\
++	"	lsl	%w1, %w0, %w1\n"				\
++	"1:	ldxr	%w0, [%3]\n"					\
++	__stringify(instr)" %w0, %w0, %w1\n"				\
++	"	stxr	%w2, %w0, [%3]\n"				\
++	"	cbnz	%w2, 1b\n"					\
++	: "=&r"(tmp1), "=&r"(tmp2)		 			\
++	: "r"(nr), "r"(addr)						\
++	: "memory");							\
++}
++
++#define sync_testop32(name, instr)					\
++static inline int sync_##name(int nr, volatile unsigned long *addr)	\
++{									\
++	int oldbit;							\
++	unsigned tmp1, tmp2, tmp3;	  				\
++	asm volatile(							\
++	"	and	%w1, %w4, #31\n"				\
++	"	eor	%w4, %w4, %w1\n"				\
++	"	mov	%w0, #1\n"					\
++	"	add	%5, %5, %4, lsr #2\n"				\
++	"	lsl	%w2, %w0, %w1\n"				\
++	"1:	ldxr	%w0, [%5]\n"					\
++	"	lsr	%w3, %w0, %w1\n"				\
++	__stringify(instr)" %w0, %w0, %w2\n"				\
++	"	stlxr	%w4, %w0, [%5]\n"				\
++	"	cbnz	%w4, 1b\n"					\
++	"	dmb	ish\n"						\
++	"	and	%w3, %w3, #1\n"					\
++	: "=&r"(tmp1), "=&r"(tmp2), "=&r"(tmp3), "=&r"(oldbit)		\
++	: "r"(nr), "r"(addr)						\
++	: "memory");							\
++	return oldbit;							\
++}
++
++sync_bitop32(set_bit, orr)
++sync_bitop32(clear_bit, bic)
++sync_bitop32(change_bit, eor)
++
++sync_testop32(test_and_set_bit, orr)
++sync_testop32(test_and_clear_bit, bic)
++sync_testop32(test_and_change_bit, eor)
++
+ #define sync_test_bit(nr, addr)                test_bit(nr, addr)
+ #define sync_cmpxchg                   cmpxchg
+ 
 -- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.8.3.2
