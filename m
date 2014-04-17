@@ -1,42 +1,77 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 17 Apr 2014 13:14:12 -0700
-Subject: [PATCH] ARM: fix big endian __pv_phys_pfn_offset size related issue
-Message-ID: <1397765652-21623-1-git-send-email-victor.kamensky@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 17 Apr 2014 22:31:44 +0200 (CEST)
+Subject: [patch 0/6] dma: edma: Provide granular residue accounting
+In-Reply-To: <20140417200725.GT24070@n2100.arm.linux.org.uk>
+References: <20140417133737.892475126@linutronix.de>
+ <20140417200725.GT24070@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1404172214230.22697@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix e26a9e00afc482b971afcaef1db8c9034d4d6d7c 'ARM: Better
-virt_to_page() handling' replaced __pv_phys_offset with
-__pv_phys_pfn_offset. Also note that size of __pv_phys_offset
-was quad but size of __pv_phys_pfn_offset is word. Instruction
-that used to update __pv_phys_offset which address is in r6
-had to update low word of __pv_phys_offset so it used #LOW_OFFSET
-macro for store offset. Now when size of __pv_phys_pfn_offset is
-word, no difference between little endian and big endian should
-exist - i.e no offset should be used when __pv_phys_pfn_offset
-is stored.
+On Thu, 17 Apr 2014, Russell King - ARM Linux wrote:
 
-Note that for little endian image proposed change is noop,
-since in little endian case #LOW_OFFSET is defined 0 anyway.
+> On Thu, Apr 17, 2014 at 02:40:43PM -0000, Thomas Gleixner wrote:
+> > The next obstacle was the missing per SG element reporting. We really
+> > can't wait for a full SG list for notification.
+> 
+> Err, dmaengine doesn't have per-SG element reporting.
 
-Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
----
- arch/arm/kernel/head.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+enum dma_residue_granularity {
+        DMA_RESIDUE_GRANULARITY_DESCRIPTOR = 0,
+	DMA_RESIDUE_GRANULARITY_SEGMENT = 1,
+        DMA_RESIDUE_GRANULARITY_BURST = 2,
+};
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index f8c0883..591d6e4 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -587,7 +587,7 @@ __fixup_pv_table:
- 	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
- 	add	r7, r7, r3	@ adjust __pv_offset address
- 	mov	r0, r8, lsr #12	@ convert to PFN
--	str	r0, [r6, #LOW_OFFSET]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
-+	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
- 	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
- 	mov	r6, r3, lsr #24	@ constant for add/sub instructions
- 	teq	r3, r6, lsl #24 @ must be 16MiB aligned
--- 
-1.8.1.4
+tells a different story.
+ 
+> What it does allow is several transactions to be submitted consecutively,
+> so that the DMA engine can move to the next transaction once the previous
+> one has been submitted.
+> 
+> Where it's important that this happens with the minimum of delay, there's
+> nothing in the API that prevents the hardware scatterlist of the previous
+> transaction being linked directly to the following transaction, provided
+> of course the hardware can do that.
+
+Right. I hoped that this would be the case, as you would expect from
+DMA, but as you observed correctly:
+ 
+> Many DMA engine implementations are just lazy - they implement stuff as:
+> setup hardware, run scatter list, get to the end, raise interrupt.  Fire
+> off tasklet.  Tasklet runs, calls the callback, checks to see if there's
+> another transaction, sets up hardware for the next one.  That (as you
+> would expect) gives quite a high latency to the following transaction.
+
+Yep. It's just unusable for low latency applications.
+ 
+> I've coded at least one DMA engine driver to start the next transaction
+> immediately that the previous one completes, before the tasklet is run.
+> As I say above, there's really no reason to even wait for the interrupt...
+> if people can be bothered to think about all the implications that brings
+> (f.e. reporting completion status, and how many bytes remaining of a
+> transaction, etc.)
+
+The EDMA HW would allow that as well, but the driver is definitely not
+up to it and to be honest I didnt have the cycles to rewrite it from
+scratch as that would be the only way to make that work.
+ 
+> If it's just that the FIFO is spread over 4 consecutive locations
+> (effectively due to not decoding bits 2,3 of the address bus for the
+> register) then reading the first register four times is just as
+> acceptable as reading them consecutively.
+
+It's not a FIFO. It's four different consecutive registers, which are
+DMA readable. And you need to read all of them...
+ 
+> The reason that kind of thing was done in old days was to allow the
+> ARM ldmia/stmia instructions to be used to access FIFOs, thereby
+> allowing multiple words to be transferred with a single instruction.
+> I can't believe that there's still people designing for that
+> especially if they have a DMA engine...
+
+In that case it's a magic DMA extension superglued beside the already
+horrible register interface of that particular IP block.
+
+Thanks,
+
+	tglx
