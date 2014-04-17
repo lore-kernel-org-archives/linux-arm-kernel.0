@@ -1,39 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Apr 2014 07:44:57 +0900
-Subject: [PATCH 08/14] ARM: shmobile: Add Lager clock workarounds for SDHI and
- MMCIF
+Date: Fri, 18 Apr 2014 07:44:59 +0900
+Subject: [PATCH 10/14] ARM: shmobile: bockw: remove old style audio clock
 In-Reply-To: <cover.1397774190.git.horms+renesas@verge.net.au>
 References: <cover.1397774190.git.horms+renesas@verge.net.au>
-Message-ID: <f98b55d730492e664fb2649bd7054fec0fe81acd.1397774191.git.horms+renesas@verge.net.au>
+Message-ID: <115897dab004f580fc8b4c6bab057940ccb64989.1397774191.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add MMCIF1, SDHI0 and SDHI2 to the clock workaround list for
-Lager multiplatform. Without these additional lines wakeup
-from Suspend-to-RAM never happens.
+Current audio clock didn't have dependency to device/driver,
+but, it was not good design for DT support.
+To avoid branch merge conflict issue,
+it is using this load map, and this patch is 3) part.
+ 1) add new style clock in platform
+ 2) add new style clock method in driver
+ 3) remove old tyle clock from platform
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager-reference.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-shmobile/board-bockw.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
-index 313118c..1eb48cf 100644
---- a/arch/arm/mach-shmobile/board-lager-reference.c
-+++ b/arch/arm/mach-shmobile/board-lager-reference.c
-@@ -114,7 +114,10 @@ static const struct clk_name clk_names[] __initconst = {
- static const struct clk_name clk_enables[] __initconst = {
- 	{ "ether", NULL, "ee700000.ethernet" },
- 	{ "msiof1", NULL, "e6e10000.spi" },
-+	{ "mmcif1", NULL, "ee220000.mmc" },
- 	{ "qspi_mod", NULL, "e6b10000.spi" },
-+	{ "sdhi0", NULL, "ee100000.sd" },
-+	{ "sdhi2", NULL, "ee140000.sd" },
- 	{ "thermal", NULL, "e61f0000.thermal" },
- };
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index b4122f8..1aca107 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -591,6 +591,7 @@ static void __init bockw_init(void)
+ {
+ 	void __iomem *base;
+ 	struct clk *clk;
++	struct platform_device *pdev;
+ 	int i;
  
+ 	r8a7778_clock_init();
+@@ -673,9 +674,6 @@ static void __init bockw_init(void)
+ 	}
+ 
+ 	/* for Audio */
+-	clk = clk_get(NULL, "audio_clk_b");
+-	clk_set_rate(clk, 24576000);
+-	clk_put(clk);
+ 	rsnd_codec_power(5, 1); /* enable ak4642 */
+ 
+ 	platform_device_register_simple(
+@@ -684,11 +682,15 @@ static void __init bockw_init(void)
+ 	platform_device_register_simple(
+ 		"ak4554-adc-dac", 1, NULL, 0);
+ 
+-	platform_device_register_resndata(
++	pdev = platform_device_register_resndata(
+ 		&platform_bus, "rcar_sound", -1,
+ 		rsnd_resources, ARRAY_SIZE(rsnd_resources),
+ 		&rsnd_info, sizeof(rsnd_info));
+ 
++	clk = clk_get(&pdev->dev, "clk_b");
++	clk_set_rate(clk, 24576000);
++	clk_put(clk);
++
+ 	for (i = 0; i < ARRAY_SIZE(rsnd_card_info); i++) {
+ 		struct platform_device_info cardinfo = {
+ 			.parent         = &platform_bus,
 -- 
 1.8.4
