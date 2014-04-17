@@ -1,72 +1,131 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Apr 2014 11:06:45 +0200
-Subject: [PATCH v3 1/2] clocksource: sun5i: Add support for reset controller
-In-Reply-To: <1397725606-18000-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1397725606-18000-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1397725606-18000-2-git-send-email-maxime.ripard@free-electrons.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Thu, 17 Apr 2014 10:24:20 +0100
+Subject: [PATCH] mcpm: Rename the power_down_finish() functions to be less
+ confusing
+Message-ID: <20140417092420.GA3430@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31 that uses this timer has the timer IP asserted in reset.
-Add an optional reset property to the DT, and deassert the timer from reset if
-it's there.
+The name "power_down_finish" seems to be causing some confusion,
+because it suggests that this function is responsible for taking
+some action to cause the specified CPU to complete its power down.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This patch renames the affected functions to "wait_for_powerdown"
+and similar, since this function's intended purpose is just to wait
+for the hardware to finish a powerdown initiated by a previous
+cpu_power_down.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- .../devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt       | 4 ++++
- drivers/clocksource/timer-sun5i.c                                   | 6 ++++++
- 2 files changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
-index 7c26154b8bbb..27cfc7d7ccd7 100644
---- a/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
-+++ b/Documentation/devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt
-@@ -9,6 +9,9 @@ Required properties:
- 		one)
- - clocks: phandle to the source clock (usually the AHB clock)
+Based on the current discussions, it sounds like this rename might be
+helpful to people implementing mcpm backends.  What do people think of
+it?
+
+Thanks to Nico for the suggestion.
+
+
+ arch/arm/common/mcpm_entry.c    |    6 +++---
+ arch/arm/common/mcpm_platsmp.c  |    2 +-
+ arch/arm/include/asm/mcpm.h     |    8 ++++----
+ arch/arm/mach-vexpress/tc2_pm.c |    4 ++--
+ 4 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index 1e361ab..7522c87 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -101,14 +101,14 @@ void mcpm_cpu_power_down(void)
+ 	BUG();
+ }
  
-+Optionnal properties:
-+- resets: phandle to a reset controller asserting the timer
-+
- Example:
- 
- timer at 01c60000 {
-@@ -19,4 +22,5 @@ timer at 01c60000 {
- 		     <0 53 1>,
- 		     <0 54 1>;
- 	clocks = <&ahb1_gates 19>;
-+	resets = <&ahb1rst 19>;
- };
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index deebcd6469fc..02268448dc85 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -16,6 +16,7 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/irqreturn.h>
-+#include <linux/reset.h>
- #include <linux/sched_clock.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -143,6 +144,7 @@ static u64 sun5i_timer_sched_read(void)
- 
- static void __init sun5i_timer_init(struct device_node *node)
+-int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
++int mcpm_wait_for_cpu_powerdown(unsigned int cpu, unsigned int cluster)
  {
-+	struct reset_control *rstc;
- 	unsigned long rate;
- 	struct clk *clk;
- 	int ret, irq;
-@@ -162,6 +164,10 @@ static void __init sun5i_timer_init(struct device_node *node)
- 	clk_prepare_enable(clk);
- 	rate = clk_get_rate(clk);
+ 	int ret;
  
-+	rstc = of_reset_control_get(node, NULL);
-+	if (!IS_ERR(rstc))
-+		reset_control_deassert(rstc);
-+
- 	writel(~0, timer_base + TIMER_INTVAL_LO_REG(1));
- 	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
- 	       timer_base + TIMER_CTL_REG(1));
+-	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
++	if (WARN_ON_ONCE(!platform_ops || !platform_ops->wait_for_powerdown))
+ 		return -EUNATCH;
+ 
+-	ret = platform_ops->power_down_finish(cpu, cluster);
++	ret = platform_ops->wait_for_powerdown(cpu, cluster);
+ 	if (ret)
+ 		pr_warn("%s: cpu %u, cluster %u failed to power down (%d)\n",
+ 			__func__, cpu, cluster, ret);
+diff --git a/arch/arm/common/mcpm_platsmp.c b/arch/arm/common/mcpm_platsmp.c
+index 177251a..92e54d7 100644
+--- a/arch/arm/common/mcpm_platsmp.c
++++ b/arch/arm/common/mcpm_platsmp.c
+@@ -62,7 +62,7 @@ static int mcpm_cpu_kill(unsigned int cpu)
+ 
+ 	cpu_to_pcpu(cpu, &pcpu, &pcluster);
+ 
+-	return !mcpm_cpu_power_down_finish(pcpu, pcluster);
++	return !mcpm_wait_for_cpu_powerdown(pcpu, pcluster);
+ }
+ 
+ static int mcpm_cpu_disable(unsigned int cpu)
+diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+index 608516e..90ed219 100644
+--- a/arch/arm/include/asm/mcpm.h
++++ b/arch/arm/include/asm/mcpm.h
+@@ -91,14 +91,14 @@ int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster);
+  * previously in which case the caller should take appropriate action.
+  *
+  * On success, the CPU is not guaranteed to be truly halted until
+- * mcpm_cpu_power_down_finish() subsequently returns non-zero for the
++ * mcpm_wait_for_cpu_powerdown() subsequently returns non-zero for the
+  * specified cpu.  Until then, other CPUs should make sure they do not
+  * trash memory the target CPU might be executing/accessing.
+  */
+ void mcpm_cpu_power_down(void);
+ 
+ /**
+- * mcpm_cpu_power_down_finish - wait for a specified CPU to halt, and
++ * mcpm_wait_for_cpu_powerdown - wait for a specified CPU to halt, and
+  *	make sure it is powered off
+  *
+  * @cpu: CPU number within given cluster
+@@ -120,7 +120,7 @@ void mcpm_cpu_power_down(void);
+  *	- zero if the CPU is in a safely parked state
+  *	- nonzero otherwise (e.g., timeout)
+  */
+-int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster);
++int mcpm_wait_for_cpu_powerdown(unsigned int cpu, unsigned int cluster);
+ 
+ /**
+  * mcpm_cpu_suspend - bring the calling CPU in a suspended state
+@@ -164,7 +164,7 @@ int mcpm_cpu_powered_up(void);
+ struct mcpm_platform_ops {
+ 	int (*power_up)(unsigned int cpu, unsigned int cluster);
+ 	void (*power_down)(void);
+-	int (*power_down_finish)(unsigned int cpu, unsigned int cluster);
++	int (*wait_for_powerdown)(unsigned int cpu, unsigned int cluster);
+ 	void (*suspend)(u64);
+ 	void (*powered_up)(void);
+ };
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index 29e7785..b743a0a 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -209,7 +209,7 @@ static int tc2_core_in_reset(unsigned int cpu, unsigned int cluster)
+ #define POLL_MSEC 10
+ #define TIMEOUT_MSEC 1000
+ 
+-static int tc2_pm_power_down_finish(unsigned int cpu, unsigned int cluster)
++static int tc2_pm_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+ {
+ 	unsigned tries;
+ 
+@@ -290,7 +290,7 @@ static void tc2_pm_powered_up(void)
+ static const struct mcpm_platform_ops tc2_pm_power_ops = {
+ 	.power_up		= tc2_pm_power_up,
+ 	.power_down		= tc2_pm_power_down,
+-	.power_down_finish	= tc2_pm_power_down_finish,
++	.wait_for_powerdown	= tc2_pm_wait_for_powerdown,
+ 	.suspend		= tc2_pm_suspend,
+ 	.powered_up		= tc2_pm_powered_up,
+ };
 -- 
-1.9.1
+1.7.10.4
