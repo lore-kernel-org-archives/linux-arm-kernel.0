@@ -1,142 +1,56 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Thu, 17 Apr 2014 10:45:28 +0200
-Subject: [PATCH 1/2] ARM: dts: berlin: add the BG2 GPIO nodes
-In-Reply-To: <1397724329-14154-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397724329-14154-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1397724329-14154-2-git-send-email-antoine.tenart@free-electrons.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 Apr 2014 16:45:44 +0800
+Subject: [PATCH RFC 2/5] ata: ahci_imx: avoid reprobing ahci_imx driver
+ when using DT
+In-Reply-To: <E1WaLRK-0002yJ-T1@rmk-PC.arm.linux.org.uk>
+References: <20140416084227.GD24070@n2100.arm.linux.org.uk>
+ <E1WaLRK-0002yJ-T1@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140417084543.GB22160@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Berlin BG2 has 32 GPIOs in SoC power domain and 16 in the SM one.
-Only the first 8 SM GPIOs have interrupt support.
+On Wed, Apr 16, 2014 at 09:43:30AM +0100, Russell King wrote:
+> Avoid matching our child platform device, which can happen as we copy the
+> DT node to the child device.  This allows the child platform device to be
+> matched against the ahci-imx driver and should this happen, it will cause
+> another platform device to be allocated, resulting in failure.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2.dtsi | 105 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
+This is not the case anymore, since commit 90870d7 (ahci-imx: Port to
+library-ised ahci_platform) is merged into v3.15-rc1.
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index 4d85312dc17a..57cadd31f4e1 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -99,6 +99,78 @@
- 			ranges = <0 0xe80000 0x10000>;
- 			interrupt-parent = <&aic>;
- 
-+			gpio0: gpio at 0400 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0400 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porta: gpio-port at 0 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <8>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <0>;
-+				};
-+			};
-+
-+			gpio1: gpio at 0800 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0800 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portb: gpio-port at 1 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <8>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <1>;
-+				};
-+			};
-+
-+			gpio2: gpio at 0c00 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x0c00 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portc: gpio-port at 2 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <8>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <2>;
-+				};
-+			};
-+
-+			gpio3: gpio at 1000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x1000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portd: gpio-port at 3 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <8>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <3>;
-+				};
-+			};
-+
- 			timer0: timer at 2c00 {
- 				compatible = "snps,dw-apb-timer";
- 				reg = <0x2c00 0x14>;
-@@ -194,6 +266,39 @@
- 			ranges = <0 0xfc0000 0x10000>;
- 			interrupt-parent = <&sic>;
- 
-+			sm_gpio1: gpio at 5000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x5000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portf: gpio-port at 5 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <8>;
-+					reg = <0>;
-+				};
-+			};
-+
-+			sm_gpio0: gpio at c000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0xc000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porte: gpio-port at 4 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <8>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <11>;
-+				};
-+			};
-+
- 			uart0: serial at 9000 {
- 				compatible = "snps,dw-apb-uart";
- 				reg = <0x9000 0x100>;
--- 
-1.8.3.2
+Shawn
+
+> 
+> Ideally, we shouldn't be copying the of_node, but this is unavoidable as
+> prevents ahci_platform() obtaining its resources.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/ata/ahci_imx.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+> index 6a56a561a80b..26ee412127b3 100644
+> --- a/drivers/ata/ahci_imx.c
+> +++ b/drivers/ata/ahci_imx.c
+> @@ -213,6 +213,10 @@ static int imx_ahci_probe(struct platform_device *pdev)
+>  	unsigned int reg_val;
+>  	int ret;
+>  
+> +	/* Prevent our child ahci device coming back to us */
+> +	if (!strcmp(dev_name(&pdev->dev), "ahci"))
+> +		return -ENODEV;
+> +
+>  	of_id = of_match_device(imx_ahci_of_match, dev);
+>  	if (!of_id)
+>  		return -EINVAL;
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
