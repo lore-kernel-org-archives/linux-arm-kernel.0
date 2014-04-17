@@ -1,64 +1,39 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 17 Apr 2014 16:38:12 +0100
-Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <alpine.LFD.2.11.1404171114370.980@knanqh.ubzr>
-References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
- <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
- <20140414104116.GA3844@e103592.cambridge.arm.com>
- <CAM4voa=-29EsNRCebri1C9D5cWopTT4Ux_0UPGAvdjP60ADZZQ@mail.gmail.com>
- <20140417095925.GA18864@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1404171114370.980@knanqh.ubzr>
-Message-ID: <20140417153812.GD18864@e103592.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 17 Apr 2014 17:53:09 +0200
+Subject: [PATCH 0/5] Simple-audio-card support for HP t5325
+Message-ID: <1397749994-24983-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 04:20:26PM +0100, Nicolas Pitre wrote:
-> On Thu, 17 Apr 2014, Dave Martin wrote:
-> 
-> > On Thu, Apr 17, 2014 at 12:41:22AM +0530, Abhilash Kesavan wrote:
-> > 
-> > [...]
-> > 
-> > > > The fact that there is no C interface for enabling ACE ports is
-> > > > deliberate.  For CPUs connected to ACE and managed via MCPM,
-> > > > it is incorrect to enable CCI via C code, since the safe window
-> > > > is the window during which all outbound CPUs have reached CLUSTER_DOWN
-> > > > and all inbound CPUs have not turned their MMU on yet (and thus cannot
-> > > > execute any general Linux C code).
-> > > >
-> > > > There might be scenarios involving GPUs and other non-CPU devices
-> > > > connected to ACE ports where the device cannot enable CCI snoops
-> > > > for itself -- but this would require a holding-pen protocol to enable
-> > > > the device to wait and signal a CPU to enable CCI snoops on the device's
-> > > > behalf before the device proceeds.  It is not the correct solution for
-> > > > CPU clusters attached to ACE, precisely because we can be more efficient
-> > > > in that case.
-> > > >
-> > > > In fact, because you implement a power_up_setup method that calls
-> > > > cci_enable_port_for_self, CCI snoops are actually enabled twice, making
-> > > > the above code appear redundant.   Have I missed something?
-> > > When a cluster is being turned off the snoops for both the clusters
-> > > are being turned off. When the other cluster comes back the snoops are
-> > > being turned on for the incoming cluster via power_up_setup and here
-> > > for the other cluster. As previously mentioned, I will be dropping
-> > > this change.
-> > 
-> > That's a fair point.  If there is only one cluster alive, turning off
-> > snoops for it should be safe, because there is no second cluster for
-> > it to maintain coherency with.
-> 
-> But that's not that simple as I explained in a previous email.  If the 
-> other cluster has gone down via cpuidle, it may come back up at any 
-> moment without warning.  We do have the infrastructure in place to cope 
-> with possible races handling the CCI within a cluster.  We do not have 
-> anything for cross cluster races.  And before we do, it is necessary to 
-> know if it is worth it.
+This patchset allows the Kirkwood based HP t5325 device make use of
+simple-card to instantiate its audio hardware.
 
-Agreed.  It could be done, perhaps by the approach I already considered
-for handling multilevel clusters, but it is far from trivial, and I
-would like to see some measurement of the potential benefit before
-getting into it.
+Patch 1 Adds a DT binding to the ALC5623 codec
+Patch 2 Makes use of this new binding
+Patch 3 Add fixes up the kirkwood sound node in DT
+Patch 4 Extends simple-card to support the hw_params() needed
+        when using MVEBU sound hardware.
+Patch 5 Swaps t5323 to using DT, removing all need for C code.
 
-Cheers
----Dave
+Andrew Lunn (5):
+  ASoC: alc5623: Add device tree binding
+  ARM: Kirkwood: Use DT to instansiate codec
+  ARM: Kirkwood: DT: Add missing #sound-dai-cells property
+  ASoC: simple-card: Support setting mclk via a fixed factor
+  ARM: Kirkwood: t5325: Use simple-card to instantiate audio
+
+ .../devicetree/bindings/sound/alc5623.txt          | 23 ++++++++++++
+ .../devicetree/bindings/sound/simple-card.txt      |  2 ++
+ arch/arm/boot/dts/kirkwood-t5325.dts               | 33 +++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |  1 +
+ arch/arm/mach-mvebu/board-t5325.c                  | 41 ----------------------
+ arch/arm/mach-mvebu/board.h                        |  6 ----
+ arch/arm/mach-mvebu/kirkwood.c                     |  3 --
+ sound/soc/codecs/alc5623.c                         | 13 +++++++
+ sound/soc/generic/simple-card.c                    | 28 +++++++++++++++
+ 9 files changed, 100 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/alc5623.txt
+ delete mode 100644 arch/arm/mach-mvebu/board-t5325.c
+
+-- 
+1.9.2
