@@ -1,55 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Apr 2014 21:38:15 +0100
-Subject: [patch 0/6] dma: edma: Provide granular residue accounting
-In-Reply-To: <alpine.DEB.2.02.1404172214230.22697@ionos.tec.linutronix.de>
-References: <20140417133737.892475126@linutronix.de>
- <20140417200725.GT24070@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1404172214230.22697@ionos.tec.linutronix.de>
-Message-ID: <20140417203815.GV24070@n2100.arm.linux.org.uk>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 17 Apr 2014 16:49:33 -0400
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <alpine.LFD.2.11.1404171543350.980@knanqh.ubzr>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <534EF153.5050603@codeaurora.org>
+ <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
+ <53501E87.6070307@codeaurora.org>
+ <alpine.LFD.2.11.1404171543350.980@knanqh.ubzr>
+Message-ID: <53503E5D.8000301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 10:31:44PM +0200, Thomas Gleixner wrote:
-> On Thu, 17 Apr 2014, Russell King - ARM Linux wrote:
+On 04/17/2014 03:48 PM, Nicolas Pitre wrote:
+> On Thu, 17 Apr 2014, Christopher Covington wrote:
 > 
-> > On Thu, Apr 17, 2014 at 02:40:43PM -0000, Thomas Gleixner wrote:
-> > > The next obstacle was the missing per SG element reporting. We really
-> > > can't wait for a full SG list for notification.
-> > 
-> > Err, dmaengine doesn't have per-SG element reporting.
+>> On 04/16/2014 07:21 PM, Nicolas Pitre wrote:
+>>> On Wed, 16 Apr 2014, Christopher Covington wrote:
+>>
+>>>> Thank you for the suggestion. This approach also came to mind, but it would
+>>>> require new documentation and tooling in the JTAG scripts or simulator
+>>>> equivalent. That's another aspect of the ELF-based approaches that I
+>>>> like--hopefully existing documentation and tool support could be reused.
+>>>
+>>> The above is useful for loading the raw uncompressed Image without 
+>>> carrying the full ELF baggage.
+>>
+>> What exactly is the full ELF baggage? Aren't there existing mechanisms to omit
+>> debugging symbols, for example, if size is of concern?
 > 
-> enum dma_residue_granularity {
->         DMA_RESIDUE_GRANULARITY_DESCRIPTOR = 0,
-> 	DMA_RESIDUE_GRANULARITY_SEGMENT = 1,
->         DMA_RESIDUE_GRANULARITY_BURST = 2,
-> };
-> 
-> tells a different story.
+> Most existing bootloaders don't have the ability to parse ELF files.  
+> This is therefore not the typical kernel image format.  The uncompressed 
+> kernel image is not very typical either, but like zImage it doesn't rely 
+> on any parser in the bootloader.
 
-That's to do with the residue though, not to do with callbacks.
+It's not obvious to me how you reached that conclusion.
 
-> > If it's just that the FIFO is spread over 4 consecutive locations
-> > (effectively due to not decoding bits 2,3 of the address bus for the
-> > register) then reading the first register four times is just as
-> > acceptable as reading them consecutively.
-> 
-> It's not a FIFO. It's four different consecutive registers, which are
-> DMA readable. And you need to read all of them...
->  
-> > The reason that kind of thing was done in old days was to allow the
-> > ARM ldmia/stmia instructions to be used to access FIFOs, thereby
-> > allowing multiple words to be transferred with a single instruction.
-> > I can't believe that there's still people designing for that
-> > especially if they have a DMA engine...
-> 
-> In that case it's a magic DMA extension superglued beside the already
-> horrible register interface of that particular IP block.
+http://en.wikipedia.org/wiki/Comparison_of_boot_loaders#Technical_information
 
-So it's more a copy-from-peripheral-to-memory - a DMA copy operation
-triggered in a similar manner to the DMA slave mode.  There are a
-number of use cases for this, but no one has yet put their head above
-the parapet to spear-head that cause. :)
+(It looks like syslinux now supports ELF as well:
+http://git.kernel.org/cgit/boot/syslinux/syslinux.git/plain/com32/modules/elf.c?id=HEAD)
+
+In any case, when performing boot debugging I'm not as interested in
+traditional self-hosted bootloaders as I am external loaders, like those built
+into software models (QEMU, Fast Models, etc.) or available to JTAG scripts
+(OpenOCD, Trace32, etc.). These seem to generally have ELF support.
+
+I'll play around with Jason's patch (thanks!) and see how things look in practice.
+
+Christopher
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
