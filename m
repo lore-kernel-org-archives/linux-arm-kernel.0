@@ -1,51 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Apr 2014 19:33:47 -0400 (EDT)
-Subject: [PATCH] ARM: fix big endian __pv_phys_pfn_offset size related
- issue
-In-Reply-To: <1397765652-21623-1-git-send-email-victor.kamensky@linaro.org>
-References: <1397765652-21623-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <alpine.LFD.2.11.1404171933150.980@knanqh.ubzr>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 17 Apr 2014 16:44:56 -0700
+Subject: [PATCH] ARM: mach-bcm: add ARM_ERRATA_775420
+Message-ID: <1397778296-27537-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Apr 2014, Victor Kamensky wrote:
+ARM_ERRATA_775420 needs to be enabled.
 
-> Fix e26a9e00afc482b971afcaef1db8c9034d4d6d7c 'ARM: Better
-> virt_to_page() handling' replaced __pv_phys_offset with
-> __pv_phys_pfn_offset. Also note that size of __pv_phys_offset
-> was quad but size of __pv_phys_pfn_offset is word. Instruction
-> that used to update __pv_phys_offset which address is in r6
-> had to update low word of __pv_phys_offset so it used #LOW_OFFSET
-> macro for store offset. Now when size of __pv_phys_pfn_offset is
-> word, no difference between little endian and big endian should
-> exist - i.e no offset should be used when __pv_phys_pfn_offset
-> is stored.
-> 
-> Note that for little endian image proposed change is noop,
-> since in little endian case #LOW_OFFSET is defined 0 anyway.
-> 
-> Reported-by: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+A data cache maintenance operation which aborts, followed by an ISB,
+without any DSB in-between, might lead to deadlock.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Affects: bug present in Cortex-A9 r3p0 and earlier. Fixed in r4p0.
 
-> ---
->  arch/arm/kernel/head.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index f8c0883..591d6e4 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -587,7 +587,7 @@ __fixup_pv_table:
->  	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
->  	add	r7, r7, r3	@ adjust __pv_offset address
->  	mov	r0, r8, lsr #12	@ convert to PFN
-> -	str	r0, [r6, #LOW_OFFSET]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
-> +	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
->  	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
->  	mov	r6, r3, lsr #24	@ constant for add/sub instructions
->  	teq	r3, r6, lsl #24 @ must be 16MiB aligned
-> -- 
-> 1.8.1.4
-> 
+Cortex-A9 r3p0 is used in a multitude of Broadcom parts including
+the bcm21664, bcm281xx, 5301x families of devices.
+
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+Tested-by: Markus Mayer <markus.mayer@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+Reviewed-by: Alex Edler <edler@linaro.org>
+Acked-by: Matt Porter <mporter@linaro.org>
+---
+ arch/arm/mach-bcm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 49c914c..9ef7f65 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -15,6 +15,7 @@ config ARCH_BCM_MOBILE
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_764369 if SMP
++	select ARM_ERRATA_775420
+ 	select ARM_GIC
+ 	select GPIO_BCM_KONA
+ 	select TICK_ONESHOT
+-- 
+1.7.9.5
