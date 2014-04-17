@@ -1,56 +1,85 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Apr 2014 07:44:54 +0900
-Subject: [PATCH 05/14] ARM: shmobile: koelsch-reference: Work around core
- clock issues
-In-Reply-To: <cover.1397774190.git.horms+renesas@verge.net.au>
-References: <cover.1397774190.git.horms+renesas@verge.net.au>
-Message-ID: <53cf0cf7ba2ef785b339826a0765bb6b1756adeb.1397774191.git.horms+renesas@verge.net.au>
+Date: Fri, 18 Apr 2014 07:44:53 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Boards Updates for v3.16
+Message-ID: <cover.1397774190.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Due to issues with runtime PM clock management, clocks not explicitly
-managed by their drivers may not be enabled at all, or be inadvertently
-disabled by the clk_disable_unused() late initcall.
+Please consider these Renesas ARM Based SoC Boards Updates for v3.16.
 
-Until this is fixed, add a temporary workaround, calling
-shmobile_clk_workaround() with enable == true.
 
-For now this enables the clocks for: ether, i2c2, msiof0, qspi_mod, and
-thermal. More clocks can be added if needed.
+This pull request is based on
+3984ba10dddc5a10 ("ARM: shmobile: r8a7791: Rename VSP1_SY clocks to VSP1_S").
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-koelsch-reference.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+That commit is part of the pull request
+"Renesas ARM Based SoC Clock Updates for v3.16",
+tagged as renesas-clock-for-v3.16, which I have previously sent.
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 1e6a436..a39114a 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -107,9 +107,21 @@ static const struct clk_name clk_names[] __initconst = {
- 	{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
- };
- 
-+/*
-+ * This is a really crude hack to work around core platform clock issues
-+ */
-+static const struct clk_name clk_enables[] = {
-+	{ "ether", NULL, "ee700000.ethernet" },
-+	{ "i2c2", NULL, "e6530000.i2c" },
-+	{ "msiof0", NULL, "e6e20000.spi" },
-+	{ "qspi_mod", NULL, "e6b10000.spi" },
-+	{ "thermal", NULL, "e61f0000.thermal" },
-+};
-+
- static void __init koelsch_add_standard_devices(void)
- {
- 	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
-+	shmobile_clk_workaround(clk_enables, ARRAY_SIZE(clk_enables), true);
- 	r8a7791_add_dt_devices();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
--- 
-1.8.4
+I have not rebased this pull-request on top of renesas-clock-for-v3.16
+in order to avoid churn in linux-next.
+
+The reason for basing this pull-request on clock updates is
+that many of its patches depend on shmobile_clk_workaround() which
+is added as part of the clock updates.
+
+
+The following changes since commit 58ea1d53ba93620ac50fef9d9720b2323971f243:
+
+  ARM: shmobile: r8a7791: Rename VSP1_SY clocks to VSP1_S (2014-04-14 11:30:11 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-for-v3.16
+
+for you to fetch changes up to a09b2f0ba170dc89a67d6c4c4f027b37a085dad9:
+
+  ARM: shmobile: lager legacy: Enable Quad SPI transfers for the SPI FLASH (2014-04-15 08:13:22 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Boards Updates for v3.16
+
+r8a7791 (R-Car M2) based Koelsch board
+* Enable Quad SPI transfers for the SPI FLASH
+* Clock workarounds for Ether, I2C, MSIOF, Quad SPI and SDHI
+* Use shmobile_clk_workaround()
+
+r8a7790 (R-Car H2) based Lager board
+* Enable Quad SPI transfers for the SPI FLASH
+* Switch to use dai info for R-Car sound
+* Clock workarounds for Ether, MSIOF, MMCIF, Quad SPI and SDHI
+* Use shmobile_clk_workaround()
+
+r8a7778 (R-Car M1) based Bock-W board
+* Switch to use dai info for R-Car sound
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: koelsch-reference: Work around core clock issues
+      ARM: shmobile: koelsch legacy: Enable Quad SPI transfers for the SPI FLASH
+      ARM: shmobile: lager legacy: Enable Quad SPI transfers for the SPI FLASH
+
+Kuninori Morimoto (3):
+      ARM: shmobile: bockw: remove old style audio clock
+      ARM: shmobile: bockw: switch to use dai info for R-Car sound
+      ARM: shmobile: lager: switch to use dai info for R-Car sound
+
+Magnus Damm (4):
+      ARM: shmobile: Use shmobile_clk_workaround() on Lager
+      ARM: shmobile: Use shmobile_clk_workaround() on Koelsch
+      ARM: shmobile: Add Lager clock workarounds for SDHI and MMCIF
+      ARM: shmobile: Add Koelsch clock workarounds for SDHI
+
+Simon Horman (4):
+      ARM: shmobile: koelsch: Annotate clk_names with __initconst
+      ARM: shmobile: lager: Annotate clk_names with __initconst
+      ARM: shmobile: koelsch-reference: Annotate clk_enables as __initconst
+      ARM: shmobile: lager-reference: Work around core clock issues
+
+ arch/arm/mach-shmobile/board-bockw.c             | 63 +++++++++++------
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 86 ++++++++++++------------
+ arch/arm/mach-shmobile/board-koelsch.c           |  2 +-
+ arch/arm/mach-shmobile/board-lager-reference.c   | 79 +++++++++++-----------
+ arch/arm/mach-shmobile/board-lager.c             | 29 +++++---
+ 5 files changed, 142 insertions(+), 117 deletions(-)
