@@ -1,78 +1,77 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Wed, 16 Apr 2014 19:03:14 -0500
-Subject: [PATCH 4/9] ARM: OMAP: dmtimer: Add function to check if timer is
- running
+Date: Wed, 16 Apr 2014 19:03:17 -0500
+Subject: [PATCH 7/9] ARM: OMAP: dmtimer: Have __omap_dm_timer_load_start set
+ ST bit in CTRL instead of caller
 In-Reply-To: <1397692999-7800-1-git-send-email-joelf@ti.com>
 References: <1397692999-7800-1-git-send-email-joelf@ti.com>
-Message-ID: <1397692999-7800-4-git-send-email-joelf@ti.com>
+Message-ID: <1397692999-7800-7-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inorder to move non-DM timer specific code that modifies the "idlect"
-mask on OMAP1, from dmtimer code, to OMAP1 specific timer initialization code,
-we introduce a new function that can possibly be reused for other purposes in
-the future. The function just checks if a timer is running based on the timer ID
-which should be same as pdev->id. This allows us to cleanly separate the timer vs
-non-timer bits and keep the timer bits in the dmtimer code.
+"load_start" implies start, so it makes sense to set the ST bit in
+__omap_dm_timer_load_start instead of callers.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c              |   29 +++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/dmtimer.h |    2 ++
- 2 files changed, 31 insertions(+)
+ arch/arm/mach-omap2/timer.c               |    6 +++---
+ arch/arm/plat-omap/dmtimer.c              |    1 -
+ arch/arm/plat-omap/include/plat/dmtimer.h |    1 +
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 74044aa..dfb19df 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -95,7 +95,7 @@ static struct irqaction omap2_gp_timer_irq = {
+ static int omap2_gp_timer_set_next_event(unsigned long cycles,
+ 					 struct clock_event_device *evt)
+ {
+-	__omap_dm_timer_load_start(&clkev, OMAP_TIMER_CTRL_ST,
++	__omap_dm_timer_load_start(&clkev, 0,
+ 				   0xffffffff - cycles, OMAP_TIMER_POSTED);
+ 
+ 	return 0;
+@@ -116,7 +116,7 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+ 		__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
+ 				      0xffffffff - period, OMAP_TIMER_POSTED);
+ 		__omap_dm_timer_load_start(&clkev,
+-					OMAP_TIMER_CTRL_AR | OMAP_TIMER_CTRL_ST,
++					OMAP_TIMER_CTRL_AR,
+ 					0xffffffff - period, OMAP_TIMER_POSTED);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+@@ -469,7 +469,7 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
+ 	BUG_ON(res);
+ 
+ 	__omap_dm_timer_load_start(&clksrc,
+-				   OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0,
++				   OMAP_TIMER_CTRL_AR, 0,
+ 				   OMAP_TIMER_NONPOSTED);
+ 	sched_clock_register(dmtimer_read_sched_clock, 32, clksrc.rate);
+ 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 4debb3d..86b2641 100644
+index 782ff10..8a4a97c 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -187,6 +187,35 @@ int omap_dm_timer_reserve_systimer(int id)
- 	return 0;
- }
+@@ -573,7 +573,6 @@ int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+ 	} else {
+ 		l &= ~OMAP_TIMER_CTRL_AR;
+ 	}
+-	l |= OMAP_TIMER_CTRL_ST;
  
-+/*
-+ * Check if a timer is running based on timer_id, used for OMAP1 currently.
-+ */
-+int omap_dm_timer_is_running(int timer_id)
-+{
-+	int i = 1, ret = 0;
-+	struct omap_dm_timer *timer = NULL;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&dm_timer_lock, flags);
-+	list_for_each_entry(timer, &omap_timer_list, node) {
-+		if (i == timer_id) {
-+			u32 l;
-+			l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-+			if (l & OMAP_TIMER_CTRL_ST) {
-+				ret = 1;
-+				goto done;
-+			} else {
-+				goto done;
-+			}
-+		}
-+		i++;
-+	}
-+done:
-+	spin_unlock_irqrestore(&dm_timer_lock, flags);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(omap_dm_timer_is_running);
-+
- static struct omap_dm_timer *_omap_dm_timer_request(int req_type, void *data)
- {
- 	struct omap_dm_timer *timer = NULL, *t;
+ 	__omap_dm_timer_load_start(timer, l, load, timer->posted);
+ 
 diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 2861b15..41df0a6 100644
+index 16ea9fd..fe3780a 100644
 --- a/arch/arm/plat-omap/include/plat/dmtimer.h
 +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -135,6 +135,8 @@ void omap_dm_timer_disable(struct omap_dm_timer *timer);
- 
- int omap_dm_timer_get_irq(struct omap_dm_timer *timer);
- 
-+int omap_dm_timer_is_running(int timer_id);
-+
- u32 omap_dm_timer_modify_idlect_mask(u32 inputmask);
- struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer);
- 
+@@ -393,6 +393,7 @@ static inline void __omap_dm_timer_load_start(struct omap_dm_timer *timer,
+ 						u32 ctrl, unsigned int load,
+ 						int posted)
+ {
++	ctrl |= OMAP_TIMER_CTRL_ST;
+ 	__omap_dm_timer_write(timer, OMAP_TIMER_COUNTER_REG, load, posted);
+ 	__omap_dm_timer_write(timer, OMAP_TIMER_CTRL_REG, ctrl, posted);
+ }
 -- 
 1.7.9.5
