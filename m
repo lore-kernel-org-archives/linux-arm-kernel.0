@@ -1,45 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Apr 2014 09:32:09 +0900
-Subject: [PATCH 1/5] ARM: shmobile: lager: fixup SND_SOC_DAIFMT_CBx_CFx flags
+Date: Thu, 17 Apr 2014 09:32:11 +0900
+Subject: [PATCH 3/5] ARM: shmobile: sh73a0: drop address cells from GIC node
 In-Reply-To: <cover.1397694064.git.horms+renesas@verge.net.au>
 References: <cover.1397694064.git.horms+renesas@verge.net.au>
-Message-ID: <9f85ff849c21b429c1e2137f2646f9cc667d8ded.1397694064.git.horms+renesas@verge.net.au>
+Message-ID: <de66b584042b8f2cfe4c34ef4faa804dcd8d5843.1397694064.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Lucas Stach <l.stach@pengutronix.de>
 
-e1508289404ab6ca28e0dc931612600f0441c417
-(ASoC: rcar: fixup SND_SOC_DAIFMT_CBx_CFx flags)
-corrected SND_SOC_DAIFMT_CBx_CFx definition.
-But then, Lager board was maintenanced other branch.
-This patch correct SND_SOC_DAIFMT_CBx_CFx flag for lager
+This is likely a copy-and-paste error from the
+ARM GIC documentation, that has already been fixed.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+address-cells should have been set to 0, as with the size
+cells. As having those properties set to 0 is the
+same thing as not specifying them, drop them completely.
+
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index f0104bf..18c7e03 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -588,14 +588,12 @@ static struct asoc_simple_card_info rsnd_card_info = {
- 	.card		= "SSI01-AK4643",
- 	.codec		= "ak4642-codec.2-0012",
- 	.platform	= "rcar_sound",
--	.daifmt		= SND_SOC_DAIFMT_LEFT_J,
-+	.daifmt		= SND_SOC_DAIFMT_LEFT_J | SND_SOC_DAIFMT_CBM_CFM,
- 	.cpu_dai = {
- 		.name	= "rcar_sound",
--		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
- 	},
- 	.codec_dai = {
- 		.name	= "ak4642-hifi",
--		.fmt	= SND_SOC_DAIFMT_CBM_CFM,
- 		.sysclk	= 11289600,
- 	},
- };
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index b7bd3b9..5ecf552 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -34,7 +34,6 @@
+ 	gic: interrupt-controller at f0001000 {
+ 		compatible = "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
+-		#address-cells = <1>;
+ 		interrupt-controller;
+ 		reg = <0xf0001000 0x1000>,
+ 		      <0xf0000100 0x100>;
 -- 
 1.8.4
