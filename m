@@ -1,58 +1,99 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Thu, 17 Apr 2014 18:29:56 +0200
-Subject: BUG: spinlock trylock failure on UP - reverting timer patches
- helps
-In-Reply-To: <534DADF1.6060608@meduna.org>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org>
-Message-ID: <53500184.4050309@meduna.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Apr 2014 09:34:07 -0700
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Do not reset gpio5
+In-Reply-To: <53319A7D.1060904@ti.com>
+References: <1395379213-15451-1-git-send-email-lokeshvutla@ti.com>
+ <53319A7D.1060904@ti.com>
+Message-ID: <20140417163407.GB23385@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.04.2014 00:08, Stanislav Meduna wrote:
+* Nishanth Menon <nm@ti.com> [140325 08:05]:
+> On 03/21/2014 12:20 AM, Lokesh Vutla wrote:
+> > From: Dave Gerlach <d-gerlach@ti.com>
+> > 
+> > Do not reset GPIO5 at boot-up because GPIO5_7 is used
+> > on AM437x GP-EVM to control VTT regulators on DDR3.
+> > Without this some GP-EVM boards will fail to boot because
+> > of DDR3 corruption.
 
->>> BUG: spinlock trylock failure on UP on CPU#0, ksoftirqd/0/3
+How funny :)
+
+Ideally we would be able to specify which GPIO pins should
+maintain their state during the boot.
+
+AFAIK, this patch currently means that the kernel has no idea
+what state the whole GPIO bank is in. At minimum we should
+parse the GPIO bank state so the kernel knows it and then it
+should be safe to set the no reset flag.
+
+So for the workaround, can you guys please try to see test
+if the old mux trick in the bootloader works to mux the pin
+into something PIN_INPUT_PULLUP | MUX_MODE7? Or a PULLDOWN
+depending on the direction naturally. That would allow
+leaving out the GPIO completely from this.
+
+Regards,
+
+Tony
+ 
+> > Reported-by: Nishanth Menon <nm@ti.com>
+> > Tested-by: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> > ---
+> > This is applied on top of current linux-next.
+> > git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git master
+> > 
+> >  arch/arm/boot/dts/am437x-gp-evm.dts |    5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+> > index df8798e..a055f7f 100644
+> > --- a/arch/arm/boot/dts/am437x-gp-evm.dts
+> > +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+> > @@ -117,6 +117,11 @@
+> >  	status = "okay";
+> >  };
+> >  
+> > +&gpio5 {
+> > +	status = "okay";
+> > +	ti,no-reset-on-init;
+> > +};
+> > +
+> >  &mmc1 {
+> >  	status = "okay";
+> >  	vmmc-supply = <&vmmcsd_fixed>;
+> > 
 > 
-> I am now getting this quite reproducibly a few seconds into
-> the boot and the path is always similar. Depending on what modules
-> I am loading the source changes, but it is nearly always
-> a schedule_timeout with a following timer interrupt.
-
-Note: the bug goes away reverting the very same patches that are
-helping the Jordan's problms. I did follow
-
-http://www.spinics.net/lists/linux-rt-users/msg11639.html
-
-and no BUG while booting anymore. I'll try to let it run some
-more time.
-
-> [   11.797460] BUG: spinlock trylock failure on UP on CPU#0, rcu_preempt/11
-> [   11.797522]  lock: boot_tvec_bases+0x0/0x10c0, .magic: dead4ead, .owner: rcu_preempt/11, .owner_cpu: 0
-> [   11.797550] CPU: 0 PID: 11 Comm: rcu_preempt Not tainted 3.12.15-rt25+ #52
-> [   11.797630] [<c00151bc>] (unwind_backtrace+0x0/0xf4) from [<c0012c00>] (show_stack+0x10/0x14)
-> [   11.797691] [<c0012c00>] (show_stack+0x10/0x14) from [<c01b2758>] (do_raw_spin_trylock+0x4c/0x58)
-> [   11.797748] [<c01b2758>] (do_raw_spin_trylock+0x4c/0x58) from [<c02e0194>] (_raw_spin_trylock+0x20/0x98)
-> [   11.797792] [<c02e0194>] (_raw_spin_trylock+0x20/0x98) from [<c02df734>] (rt_spin_trylock+0x14/0xd0)
-> [   11.797851] [<c02df734>] (rt_spin_trylock+0x14/0xd0) from [<c0028e7c>] (run_local_timers+0x24/0x78)
-> [   11.797892] [<c0028e7c>] (run_local_timers+0x24/0x78) from [<c0028f04>] (update_process_times+0x34/0x68)
-> [   11.797940] [<c0028f04>] (update_process_times+0x34/0x68) from [<c0060920>] (tick_sched_timer+0x58/0x22c)
-> [   11.797990] [<c0060920>] (tick_sched_timer+0x58/0x22c) from [<c0040820>] (__run_hrtimer+0x88/0x2b8)
-> [   11.798029] [<c0040820>] (__run_hrtimer+0x88/0x2b8) from [<c0040bb0>] (hrtimer_interrupt+0x104/0x30c)
-> [   11.798076] [<c0040bb0>] (hrtimer_interrupt+0x104/0x30c) from [<c0246c50>] (mxs_timer_interrupt+0x20/0x2c)
-> [   11.798123] [<c0246c50>] (mxs_timer_interrupt+0x20/0x2c) from [<c00534d8>] (handle_irq_event_percpu+0x80/0x2f8)
-> [   11.798161] [<c00534d8>] (handle_irq_event_percpu+0x80/0x2f8) from [<c005378c>] (handle_irq_event+0x3c/0x5c)
-> [   11.798201] [<c005378c>] (handle_irq_event+0x3c/0x5c) from [<c0055f68>] (handle_level_irq+0x8c/0x118)
-> [   11.798239] [<c0055f68>] (handle_level_irq+0x8c/0x118) from [<c0053448>] (generic_handle_irq+0x28/0x30)
-> [   11.798281] [<c0053448>] (generic_handle_irq+0x28/0x30) from [<c00101dc>] (handle_IRQ+0x30/0x84)
-> [   11.798322] [<c00101dc>] (handle_IRQ+0x30/0x84) from [<c0013484>] (__irq_svc+0x44/0x88)
-> [   11.798364] [<c0013484>] (__irq_svc+0x44/0x88) from [<c02deb18>] (rt_spin_lock_slowlock+0x60/0x204)
-> [   11.798402] [<c02deb18>] (rt_spin_lock_slowlock+0x60/0x204) from [<c02df4d0>] (rt_spin_lock+0x28/0x60)
-> [   11.798451] [<c02df4d0>] (rt_spin_lock+0x28/0x60) from [<c0028874>] (lock_timer_base+0x28/0x48)
-> [   11.798494] [<c0028874>] (lock_timer_base+0x28/0x48) from [<c02dcb28>] (schedule_timeout+0x78/0x254)
-> [   11.798531] [<c02dcb28>] (schedule_timeout+0x78/0x254) from [<c00763a4>] (rcu_gp_kthread+0x2d4/0x5f0)
-> [   11.798578] [<c00763a4>] (rcu_gp_kthread+0x2d4/0x5f0) from [<c003cf24>] (kthread+0xa0/0xa8)
-> [   11.798621] [<c003cf24>] (kthread+0xa0/0xa8) from [<c000f3e0>] (ret_from_fork+0x14/0x34)
-
-Thanks
--- 
-                                                      Stano
+> 
+> Tony,
+> any chance of having this in 3.15 cycle?
+> 
+> as of today's linux-next tag, the only platform I have that does not
+> boot is due to the lack of this patch.
+> 
+> 
+> next-20140325-omap2plus_defconfig
+>  1: am335x-evm:  Boot PASS: http://slexy.org/raw/s20o6CfGL8
+>  2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2Ogu1zPtD
+>  3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2m2WhHYO8
+>  4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s2jOybaVno
+>  5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s21tt52N4b
+>  6: am43xx-gpevm:  Boot FAIL: http://slexy.org/raw/s21eDQmFWJ
+>  7: beagleboard:  Boot PASS: http://slexy.org/raw/s2q7vzrZHb
+>  8: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2HCAJVz0H
+>  9: beaglebone:  Boot PASS: http://slexy.org/raw/s2NioACYsM
+> 10: craneboard:  Boot PASS: http://slexy.org/raw/s2s7jyo52c
+> 11:       dra7:  Boot PASS: http://slexy.org/raw/s2OQ1BMerx
+> 12:        ldp:  Boot PASS: http://slexy.org/raw/s2cWgQrdjb
+> 13: pandaboard-es:  Boot PASS: http://slexy.org/raw/s2lOaznVLO
+> 14:    sdp2430:  Boot PASS: http://slexy.org/raw/s21RCJlUDU
+> 15:    sdp3430:  Boot PASS: http://slexy.org/raw/s2181J9eWO
+> 16:    sdp4430:  Boot PASS: http://slexy.org/raw/s20UumAiXK
+> 17: OMAP5432uEVM:  Boot PASS: http://slexy.org/raw/s21ypXvTNc
+> TOTAL = 17 boards, Booted Boards = 16, No Boot boards = 1
+> 
+> -- 
+> Regards,
+> Nishanth Menon
