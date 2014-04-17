@@ -1,57 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 17 Apr 2014 09:00:51 +0100
-Subject: [PATCH 10/11] mfd: twl-core: Fix idle mode signaling for omaps
- when booted with device tree
-In-Reply-To: <1397173639-29587-11-git-send-email-tony@atomide.com>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-11-git-send-email-tony@atomide.com>
-Message-ID: <20140417080051.GE28725@lee--X1>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 17 Apr 2014 17:04:33 +0900
+Subject: [PATCHv2 5/8] ARM: EXYNOS: Support secondary CPU boot of
+ Exynos3250
+In-Reply-To: <534E9374.6010807@samsung.com>
+References: <1397527192-21988-1-git-send-email-cw00.choi@samsung.com>
+ <1397527192-21988-6-git-send-email-cw00.choi@samsung.com>
+ <534E9374.6010807@samsung.com>
+Message-ID: <534F8B11.8090808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I noticed a regression where the omap sys_clkreq signal will never
-> trigger for omap3 when booted with device tree while it triggers
-> when booted in legacy mode. This means voltage scaling does not
-> do anything when booted with device tree.
-> 
-> Turns out the reason is we fail to initialize the SmartReflex
-> enable bit in twl4030 with the following error:
-> 
-> twl: not initialized
-> 
-> And that happens because we are wrongly tinkering with the twl4030
-> registers in arch/arm/mach-omap2/omap_twl.c before the driver is
-> initialized. Looking at the the SmartReflex bit enable code in
-> omap_twl.c, we need to always set it.
-> 
-> So let's fix the issue by always enabling the twl4030 SmartReflex
-> bit in the drivers/mfd/twl-core.c probe, and drop the related
-> code in omap_twl.c.
-> 
-> Note that we still have some twl4030 tinkering left in omap_twl.c
-> for the twl6030 case, but that's a different patch.
-> 
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/omap_twl.c | 60 ------------------------------------------
->  drivers/mfd/twl-core.c         | 15 +++++++++++
->  2 files changed, 15 insertions(+), 60 deletions(-)
+Hi Tomasz,
 
-Patch looks okay to me, and removes lots of code which is nice to
-see. How do you want to handle this patch? How about if I set up an
-MFD-OMAP immutable branch for us to use leading up to the v3.16 merge
-window?
+On 04/16/2014 11:28 PM, Tomasz Figa wrote:
+> Hi Chanwoo,
+> 
+> On 15.04.2014 03:59, Chanwoo Choi wrote:
+>> This patch fix the offset of CPU boot address and don't operate smc call
+>> of SMC_CMD_CPU1BOOT command for Exynos3250.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/firmware.c | 7 +++++--
+>>   1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+>> index aa01c42..6205d4f 100644
+>> --- a/arch/arm/mach-exynos/firmware.c
+>> +++ b/arch/arm/mach-exynos/firmware.c
+>> @@ -30,13 +30,16 @@ static int exynos_do_idle(void)
+>>
+>>   static int exynos_cpu_boot(int cpu)
+>>   {
+>> +    if (soc_is_exynos3250()) {
+>> +        return 0;
+> 
+> This is strange. How the firmware knows when to boot the CPU then, if CPU1BOOT command is not called?
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+As I knew, Exynos3250 doesn't need smc for secondary boot
+because WFE in secure mode for Exynos3250 is removed.
+So, Exynos3250 doesn't need to send IPI_WAKEUP after call_firmware_op(cpu_boot, ...).
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards,
+Chanwoo Choi
