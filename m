@@ -1,31 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Apr 2014 22:47:09 +0100
-Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
- components tracking
-In-Reply-To: <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
-References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
- <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
-Message-ID: <20140417214709.GY24070@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Apr 2014 16:52:28 -0500
+Subject: [PATCH V2 05/19] bus: omap_l3_noc: switch over to relaxed
+ variants of readl/writel
+In-Reply-To: <1397767775-10965-6-git-send-email-nm@ti.com>
+References: <1397492726-17203-1-git-send-email-nm@ti.com>
+ <1397767775-10965-1-git-send-email-nm@ti.com>
+ <1397767775-10965-6-git-send-email-nm@ti.com>
+Message-ID: <20140417215228.GD8504@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
-> +out:
-> +	if (ret != -EPROBE_DEFER)
-> +		exynos_drm_dev_ready(&pdev->dev);
+Hi,
 
-So we end up with everyone needing a "ready" call in each sub-driver
-back into the main driver... this makes it impossible to write a
-generic subcomponent driver which is not tied in any way to the
-main driver.
+On Thu, Apr 17, 2014 at 03:49:21PM -0500, Nishanth Menon wrote:
+> Currently we use __raw_readl and writel in this driver, however, there
 
-That is quite some restriction, and would prevent, for example, the
-TDA998x driver being used both with Armada DRM, tilcdc and any other
-driver.
+__raw_* and *_relaxed variants are the same, just have a look <asm/io.h>
 
-So, while your solution may work for exynos, it's not suitable for
-general use.
+297 #define readb_relaxed(c) ({ u8  __r = __raw_readb(c); __r; })
+298 #define readw_relaxed(c) ({ u16 __r = le16_to_cpu((__force __le16) \
+299                                         __raw_readw(c)); __r; })
+300 #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
+301                                         __raw_readl(c)); __r; })
+302 
+303 #define writeb_relaxed(v,c)     __raw_writeb(v,c)
+304 #define writew_relaxed(v,c)     __raw_writew((__force u16) cpu_to_le16(v),c)
+305 #define writel_relaxed(v,c)     __raw_writel((__force u32) cpu_to_le32(v),c)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140417/b242d210/attachment.sig>
