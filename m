@@ -1,68 +1,112 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Apr 2014 08:51:08 -0700
-Subject: [PATCHv3 19/41] OMAPDSS: panel-dpi: Add DT support
-In-Reply-To: <1390301833-24944-20-git-send-email-tomi.valkeinen@ti.com>
-References: <1390301833-24944-1-git-send-email-tomi.valkeinen@ti.com>
- <1390301833-24944-20-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <20140418155107.GB5354@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Apr 2014 17:53:25 +0200
+Subject: [PATCH 1/2] dt-bindings: clock: Move at91.h to dt-bindigs/clock
+In-Reply-To: <1394085884-13081-2-git-send-email-tushar.behera@linaro.org>
+References: <1394085884-13081-1-git-send-email-tushar.behera@linaro.org>
+ <1394085884-13081-2-git-send-email-tushar.behera@linaro.org>
+Message-ID: <53514A75.2030908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/03/2014 07:04, Tushar Behera :
+> Most of the clock related dt-binding header files are located in
+> dt-bindings/clock folder. It would be good to keep all the similar
+> header files at a single location.
+> 
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> CC: Rob Landley <rob@landley.net>
+> CC: Andrew Victor <linux@maxim.org.za>
+> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 
-Just trying to summarize what has been discussed so far in
-various threads regarding changes needed to this patch.
+I have just added at91sam9261 and at91sam9rl which appeared in 3.15
+merge window and stacked this patch on top of at91-3.15-fixes.
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [140121 03:01]:
-> --- a/drivers/video/omap2/displays-new/panel-dpi.c
-> +++ b/drivers/video/omap2/displays-new/panel-dpi.c
-> @@ -182,6 +186,52 @@ static int panel_dpi_probe_pdata(struct platform_device *pdev)
->  	return 0;
->  }
+I hope that it will be accepted for 3.15.
+
+Bye,
+
+
+> ---
+>  .../devicetree/bindings/clock/at91-clock.txt       |    2 +-
+>  arch/arm/boot/dts/sama5d3.dtsi                     |    2 +-
+>  arch/arm/boot/dts/sama5d3_mci2.dtsi                |    2 +-
+>  arch/arm/boot/dts/sama5d3_tcb1.dtsi                |    2 +-
+>  arch/arm/boot/dts/sama5d3_uart.dtsi                |    2 +-
+>  include/dt-bindings/{clk => clock}/at91.h          |    0
+>  6 files changed, 5 insertions(+), 5 deletions(-)
+>  rename include/dt-bindings/{clk => clock}/at91.h (100%)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> index cd5e239..6794cdc 100644
+> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> @@ -62,7 +62,7 @@ Required properties for PMC node:
+>  - interrupt-controller : tell that the PMC is an interrupt controller.
+>  - #interrupt-cells : must be set to 1. The first cell encodes the interrupt id,
+>  	and reflect the bit position in the PMC_ER/DR/SR registers.
+> -	You can use the dt macros defined in dt-bindings/clk/at91.h.
+> +	You can use the dt macros defined in dt-bindings/clock/at91.h.
+>  	0 (AT91_PMC_MOSCS) -> main oscillator ready
+>  	1 (AT91_PMC_LOCKA) -> PLL A ready
+>  	2 (AT91_PMC_LOCKB) -> PLL B ready
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 3d5faf8..8c977b5 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -13,7 +13,7 @@
+>  #include <dt-bindings/pinctrl/at91.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/gpio/gpio.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
 >  
-> +static int panel_dpi_probe_of(struct platform_device *pdev)
-> +{
-> +	struct panel_drv_data *ddata = platform_get_drvdata(pdev);
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct omap_dss_device *in;
-> +	int r;
-> +	struct display_timing timing;
-> +	struct videomode vm;
-> +	int gpio;
-> +
-> +	gpio = of_get_gpio(node, 0);
-> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
-> +		ddata->enable_gpio = gpio;
-> +	} else {
-> +		dev_err(&pdev->dev, "failed to parse enable gpio\n");
-> +		return gpio;
-> +	}
+>  / {
+>  	model = "Atmel SAMA5D3 family SoC";
+> diff --git a/arch/arm/boot/dts/sama5d3_mci2.dtsi b/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> index b029fe7..1b02208 100644
+> --- a/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_mci2.dtsi
+> @@ -9,7 +9,7 @@
+>  
+>  #include <dt-bindings/pinctrl/at91.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
+>  
+>  / {
+>  	ahb {
+> diff --git a/arch/arm/boot/dts/sama5d3_tcb1.dtsi b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> index 382b044..0284845 100644
+> --- a/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_tcb1.dtsi
+> @@ -9,7 +9,7 @@
+>  
+>  #include <dt-bindings/pinctrl/at91.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
+>  
+>  / {
+>  	aliases {
+> diff --git a/arch/arm/boot/dts/sama5d3_uart.dtsi b/arch/arm/boot/dts/sama5d3_uart.dtsi
+> index a9fa75e..7a8d4c6 100644
+> --- a/arch/arm/boot/dts/sama5d3_uart.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_uart.dtsi
+> @@ -9,7 +9,7 @@
+>  
+>  #include <dt-bindings/pinctrl/at91.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> -#include <dt-bindings/clk/at91.h>
+> +#include <dt-bindings/clock/at91.h>
+>  
+>  / {
+>  	aliases {
+> diff --git a/include/dt-bindings/clk/at91.h b/include/dt-bindings/clock/at91.h
+> similarity index 100%
+> rename from include/dt-bindings/clk/at91.h
+> rename to include/dt-bindings/clock/at91.h
+> 
 
-We should set the GPIO polarity based on the OF_GPIO_ACTIVE_LOW like
-gpio_backlight_probe_dt is doing. 
 
-Then do we really want to do the dev_err for each -EPROBE_DEFER here?
-
-> +	gpio = of_get_gpio(node, 1);
-> +	if (gpio_is_valid(gpio) || gpio == -ENOENT) {
-> +		ddata->backlight_gpio = gpio;
-> +	} else {
-> +		dev_err(&pdev->dev, "failed to parse backlight gpio\n");
-> +		return gpio;
-> +	}
-
-How about let's drop the backlight_gpio as discussed since it
-can be handled with gpio-backlight?
-
-Instead, let's add the panel specific reset_gpio as suggested by
-Joachim. That seems common to some dpi using panels.
-
-Then support for the other panel specific GPIOs can then be added
-as a follow-up patch when we know how we want to handle them.
-
-Oh, and this patch needs the related binding documentation too in
-Documentation/devicetree/bindings.
-
-Regards,
-
-Tony
+-- 
+Nicolas Ferre
