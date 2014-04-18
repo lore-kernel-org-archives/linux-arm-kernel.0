@@ -1,97 +1,67 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 Apr 2014 16:48:10 +0200
-Subject: [PATCH v2 10/14] clocksource: sh_mtu2: Add DT support
+Date: Fri, 18 Apr 2014 16:48:14 +0200
+Subject: [PATCH v2 14/14] ARM: shmobile: koelsch-reference: Enable CMT0 in
+ device tree
 In-Reply-To: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1397832494-20607-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1397832494-20607-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Wolfram Sang <wsa@sang-engineering.com>
----
- .../devicetree/bindings/timer/renesas,mtu2.txt     | 40 ++++++++++++++++++++++
- drivers/clocksource/sh_mtu2.c                      |  8 +++++
- 2 files changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+Enable the CMT0 device and configure channel 0 as a clock event
+provider.
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-new file mode 100644
-index 0000000..c5dd032
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-@@ -0,0 +1,40 @@
-+* Renesas R-Car Multi-Function Timer Pulse Unit 2 (MTU2)
-+
-+The MTU2 is a multi-purpose, multi-channel timer/counter with configurable
-+clock inputs and programmable compare match.
-+
-+Channels share hardware resources but their counter and compare match value
-+are independent. The MTU2 hardware supports five channels indexed from 0 to 4.
-+
-+Required Properties:
-+
-+  - compatible: must contain "renesas,mtu2"
-+
-+  - reg: base address and length of the registers block for the timer module.
-+
-+  - interrupt-parent, interrupts: interrupt specifiers for the timer, one for
-+    each entry in interrupt-names.
-+  - interrupt-names: must contain one entry named "tgi?a" for each enabled
-+    channel, where "?" is the channel index expressed as one digit from "0" to
-+    "4".
-+
-+  - clocks: a list of phandle + clock-specifier pairs, one for each entry
-+    in clock-names.
-+  - clock-names: must contain "fck" for the functional clock.
-+
-+
-+Example: R7S72100 (RZ/A1H) MTU2 node
-+
-+	mtu2: timer at fcff0000 {
-+		compatible = "renesas,mtu2";
-+		reg = <0xfcff0000 0x400>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 146 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 150 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 154 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 159 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "tgi0a", "tgi1a", "tgi2a", "tgi3a", "tgi4a";
-+		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
-+		clock-names = "fck";
-+	};
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index ebdf9d1..79387af 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -23,6 +23,7 @@
- #include <linux/ioport.h>
- #include <linux/irq.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
-@@ -502,11 +503,18 @@ static const struct platform_device_id sh_mtu2_id_table[] = {
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts            | 4 ++++
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 1 -
+ arch/arm/mach-shmobile/setup-r8a7791.c           | 2 +-
+ 3 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 0d69813..45334c3 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -290,6 +290,10 @@
+ 	};
  };
- MODULE_DEVICE_TABLE(platform, sh_mtu2_id_table);
  
-+static const struct of_device_id sh_mtu2_of_table[] = {
-+	{ .compatible = "renesas,mtu2" },
-+	{ }
++&cmt0 {
++	status = "ok";
 +};
-+MODULE_DEVICE_TABLE(of, sh_mtu2_of_table);
 +
- static struct platform_driver sh_mtu2_device_driver = {
- 	.probe		= sh_mtu2_probe,
- 	.remove		= sh_mtu2_remove,
- 	.driver		= {
- 		.name	= "sh_mtu2",
-+		.of_match_table = of_match_ptr(sh_mtu2_of_table),
- 	},
- 	.id_table	= sh_mtu2_id_table,
- };
+ &ether {
+ 	pinctrl-0 = <&ether_pins &phy1_pins>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index bd90932..6b3b354 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -86,7 +86,6 @@ static void __init koelsch_add_du_device(void)
+  * devices until they get moved to DT.
+  */
+ static const struct clk_name clk_names[] __initconst = {
+-	{ "cmt0", "fck", "sh-cmt-48-gen2.0" },
+ 	{ "scifa0", NULL, "sh-sci.0" },
+ 	{ "scifa1", NULL, "sh-sci.1" },
+ 	{ "scifb0", NULL, "sh-sci.2" },
+diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
+index 9839dac..e66f777 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7791.c
++++ b/arch/arm/mach-shmobile/setup-r8a7791.c
+@@ -197,12 +197,12 @@ void __init r8a7791_add_dt_devices(void)
+ 	r8a7791_register_scif(12);
+ 	r8a7791_register_scif(13);
+ 	r8a7791_register_scif(14);
+-	r8a7791_register_cmt(0);
+ }
+ 
+ void __init r8a7791_add_standard_devices(void)
+ {
+ 	r8a7791_add_dt_devices();
++	r8a7791_register_cmt(0);
+ 	r8a7791_register_irqc(0);
+ 	r8a7791_register_thermal();
+ }
 -- 
 1.8.3.2
