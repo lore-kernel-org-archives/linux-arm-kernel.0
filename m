@@ -1,119 +1,128 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 17 Apr 2014 19:47:24 -0500
-Subject: [patch 5/6] edma: Make reading the position of active channels
- work
-In-Reply-To: <20140417143249.889774979@linutronix.de>
+Date: Thu, 17 Apr 2014 19:02:31 -0500
+Subject: [patch 1/6] dma: edma: Sanitize residue reporting
+In-Reply-To: <20140417143249.095049101@linutronix.de>
 References: <20140417133737.892475126@linutronix.de>
- <20140417143249.889774979@linutronix.de>
-Message-ID: <5350761C.6010109@ti.com>
+ <20140417143249.095049101@linutronix.de>
+Message-ID: <53506B97.2060605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
+
 On 04/17/2014 09:40 AM, Thomas Gleixner wrote:
-> Reading destination and source is pointless. In DEV_TO_MEM transfers
-> we are only interested in the destination, in MEM_TO_DEV we care about
-> the source. In MEM_TO_MEM it really does not matter which one you
-> read.
+> The residue reporting in edma_tx_status() is just broken. It blindly
+> walks the psets and recalculates the lenght of the transfer from the
+> hardware parameters. For cyclic transfers it adds the link pset, which
+> results in interestingly large residues. For non-cyclic it adds the
+> dummy pset, which is stupid as well.
+> Aside of that it's silly to walk through the pset params when the per
+> descriptor residue is known at the point of creating it.
+
+Yes this bit had to be rewritten, after we added support to DMA SGs.
+Thanks. It was written before I took over the driver ;-)
+
 > 
-> Remove the extra pointer and select dest/source via a bool.
-> 
-> Reading the src/dst data from an active parameter set in the EDMA
-> parameter RAM is not reliable, as there might be a concurrent update
-> from the controller.
-> 
-> But experimentation showed, that a double readout with comparing the
-> results and a limited loop works nicely. I've actually never found a
-> case where the loop limit triggered, but we have it there for sanity
-> reasons. In case it triggers we return -EBUSY and let the caller deal
-> with it.
-> 
-> Remove the export of this function while at it. The only potential
-> user is the dmaengine and that's always builtin.
+> Store the information in edma_desc and use it.
 > 
 > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 > ---
->  arch/arm/common/edma.c             |   48 ++++++++++++++++++++++++++-----------
->  include/linux/platform_data/edma.h |    2 -
->  2 files changed, 35 insertions(+), 15 deletions(-)
+>  drivers/dma/edma.c |   34 +++++++++-------------------------
+>  1 file changed, 9 insertions(+), 25 deletions(-)
 > 
-> Index: linux/arch/arm/common/edma.c
+> Index: linux-2.6/drivers/dma/edma.c
 > ===================================================================
-> --- linux.orig/arch/arm/common/edma.c
-> +++ linux/arch/arm/common/edma.c
-> @@ -994,29 +994,49 @@ void edma_set_dest(unsigned slot, dma_ad
->  EXPORT_SYMBOL(edma_set_dest);
+> --- linux-2.6.orig/drivers/dma/edma.c
+> +++ linux-2.6/drivers/dma/edma.c
+> @@ -64,6 +64,7 @@ struct edma_desc {
+>  	int				absync;
+>  	int				pset_nr;
+>  	int				processed;
+> +	u32				residue;
+>  	struct edmacc_param		pset[0];
+>  };
 >  
->  /**
-> - * edma_get_position - returns the current transfer points
-> + * edma_get_position - returns the current transfer point
->   * @slot: parameter RAM slot being examined
-> - * @src: pointer to source port position
-> - * @dst: pointer to destination port position
-> + * @pos:  where to store the data
-> + * @dst:  true selects the dest position, false the source
->   *
-> - * Returns current source and destination addresses for a particular
-> - * parameter RAM slot.  Its channel should not be active when this is called.
-> + * Return 0 indicates a stable readout. -EBUSY indicates that the
-> + * readout failed due to concurrent updates.
-> + *
-> + * Call this on active channels with care. For inactive channels this
-> + * never fails.
->   */
-> -void edma_get_position(unsigned slot, dma_addr_t *src, dma_addr_t *dst)
-> +int edma_get_position(unsigned slot, dma_addr_t *pos, bool dst)
->  {
-> -	struct edmacc_param temp;
-> -	unsigned ctlr;
-> +	u32 dat, ctlr, offs;
-> +	int i;
+> @@ -416,6 +417,7 @@ static struct dma_async_tx_descriptor *e
+>  	}
 >  
->  	ctlr = EDMA_CTLR(slot);
->  	slot = EDMA_CHAN_SLOT(slot);
+>  	edesc->pset_nr = sg_len;
+> +	edesc->residue = 0;
 >  
-> -	edma_read_slot(EDMA_CTLR_CHAN(ctlr, slot), &temp);
-> -	if (src != NULL)
-> -		*src = temp.src;
-> -	if (dst != NULL)
-> -		*dst = temp.dst;
-> +	if (slot >= edma_cc[ctlr]->num_slots)
-> +		return -EINVAL;
-> +
-> +	offs = PARM_OFFSET(slot);
-> +	offs += dst ? PARM_DST : PARM_SRC;
-> +
-> +	/*
-> +	 * If the channel is active, we need to double read as we
-> +	 * might see half updated data. We limit this to 5
-> +	 * attempts. If that fails we return -EBUSY and let the caller
-> +	 * deal with it.
-> +	 */
-> +	dat = edma_read(ctlr, offs);
-> +	for (i = 0; i < 5; i++) {
-> +		u32 tmp = edma_read(ctlr, offs);
-> +
-> +		if (tmp == dat) {
-> +			*pos = dat;
-> +			return 0;
-> +		}
-> +		dat = tmp;
-> +	}
-> +	return -EBUSY;
+>  	/* Allocate a PaRAM slot, if needed */
+>  	nslots = min_t(unsigned, MAX_NR_SG, sg_len);
+> @@ -450,6 +452,7 @@ static struct dma_async_tx_descriptor *e
+>  		}
+>  
+>  		edesc->absync = ret;
+> +		edesc->residue += sg_dma_len(sg);
+>  
+>  		/* If this is the last in a current SG set of transactions,
+>  		   enable interrupts so that next set is processed */
+> @@ -527,6 +530,7 @@ static struct dma_async_tx_descriptor *e
+>  
+>  	edesc->cyclic = 1;
+>  	edesc->pset_nr = nslots;
+> +	edesc->residue = buf_len;
+>  
+>  	dev_dbg(dev, "%s: nslots=%d\n", __func__, nslots);
+>  	dev_dbg(dev, "%s: period_len=%d\n", __func__, period_len);
+> @@ -622,6 +626,7 @@ static void edma_callback(unsigned ch_nu
+>  				vchan_cyclic_callback(&edesc->vdesc);
+>  			} else if (edesc->processed == edesc->pset_nr) {
+>  				dev_dbg(dev, "Transfer complete, stopping channel %d\n", ch_num);
+> +				edesc->residue = 0;
+>  				edma_stop(echan->ch_num);
+>  				vchan_cookie_complete(&edesc->vdesc);
+>  				edma_execute(echan);
+> @@ -754,25 +759,6 @@ static void edma_issue_pending(struct dm
+>  	spin_unlock_irqrestore(&echan->vchan.lock, flags);
 >  }
-> -EXPORT_SYMBOL(edma_get_position);
 >  
->  /**
+> -static size_t edma_desc_size(struct edma_desc *edesc)
+> -{
+> -	int i;
+> -	size_t size;
+> -
+> -	if (edesc->absync)
+> -		for (size = i = 0; i < edesc->pset_nr; i++)
+> -			size += (edesc->pset[i].a_b_cnt & 0xffff) *
+> -				(edesc->pset[i].a_b_cnt >> 16) *
+> -				 edesc->pset[i].ccnt;
+> -	else
+> -		size = (edesc->pset[0].a_b_cnt & 0xffff) *
+> -			(edesc->pset[0].a_b_cnt >> 16) +
+> -			(edesc->pset[0].a_b_cnt & 0xffff) *
+> -			(SZ_64K - 1) * edesc->pset[0].ccnt;
+> -
+> -	return size;
+> -}
+> -
+>  /* Check request completion status */
+>  static enum dma_status edma_tx_status(struct dma_chan *chan,
+>  				      dma_cookie_t cookie,
+> @@ -789,12 +775,10 @@ static enum dma_status edma_tx_status(st
+>  
+>  	spin_lock_irqsave(&echan->vchan.lock, flags);
+>  	vdesc = vchan_find_desc(&echan->vchan, cookie);
+> -	if (vdesc) {
+> -		txstate->residue = edma_desc_size(to_edma_desc(&vdesc->tx));
+> -	} else if (echan->edesc && echan->edesc->vdesc.tx.cookie == cookie) {
+> -		struct edma_desc *edesc = echan->edesc;
+> -		txstate->residue = edma_desc_size(edesc);
+> -	}
+> +	if (vdesc)
+> +		txstate->residue = to_edma_desc(&vdesc->tx)->residue;
+> +	else if (echan->edesc && echan->edesc->vdesc.tx.cookie == cookie)
+> +		txstate->residue = echan->edesc->residue;
+>  	spin_unlock_irqrestore(&echan->vchan.lock, flags);
+>  
+>  	return ret;
 
-The access is synchronized though and you shouldn't see unreliable
-results, unless you _are_ seeing unreliable results in which case it
-could be a silicon issue.
+Peter, its ok, can you ensure this works for Audio
+(snd_dmaengine_pcm_pointer) users of EDMA (unless Thomas may already have).
 
-The original code also doesn't have the double read so I would just drop
-that, unless you are seeing reliability issues.
-
-Here's a thread that discusses it and the end conclusion is that it
-should be fine (Kyle Kastile is one of the EDMA hardware designers).
-http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
+Looks fine to me otherwise,
+Reviewed-by: Joel Fernandes <joelf@ti.com>
 
 thanks,
   -Joel
