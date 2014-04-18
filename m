@@ -1,81 +1,35 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 18 Apr 2014 14:05:43 +0800
-Subject: [PATCH v3 00/13] enable Hisilicon HiP04 SoC
-Message-ID: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 18 Apr 2014 14:06:39 +0800
+Subject: [PATCH 1/4] mmc: sdhci: add a driver for Berlin SoCs
+In-Reply-To: <20140417133359.GB31034@kwain>
+References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
+ <534E92FE.8010400@gmail.com> <20140417133359.GB31034@kwain>
+Message-ID: <20140418140639.03c450f3@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v3:
-  * Replace CONFIG_ARCH_MULTI_V7 by CONFIG_ARCH_MULTI_V7_LPAE in some SoC.
-  * Update MCPM code based on Dave's patch.
-  * Remove MCPM node in DTS file. Use sysctrl & fabric node instead.
-  * Move hardcoding on bootwrapper into DTS file.
-  * Append the CONFIG_MCPM_QUAD_CLUSTER for HiP04.
-  * Fix the return value from gic_get_cpumask() if it's used in standard gic.
-  * Add the vgic support on HiP04 GIC.
-  * Add virtualization support in HiP04 defconfig.
+Hi,
 
-v2:
-  * Append ARCH_MULTI_V7_LPAE configuration. Define ARCH_MULTI_V7 to only
-    support non-LPAE platform.
-  * Append document of DT supporting.
-  * Append ARCH_HISI in hi3xxx_defconfig.
-  * Enable errata 798181 for HiP04 SoC.
-  * Add PMU support.
+On Thu, 17 Apr 2014 06:33:59 -0700
+Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
 
-Haojian Zhuang (11):
-  ARM: debug: add HiP04 debug uart
-  ARM: append ARCH_MULTI_V7_LPAE
-  ARM: hisi: add ARCH_HISI
-  irq: gic: use mask field in GICC_IAR
-  irq: gic: support hip04 gic
-  ARM: mcpm: support 4 clusters in HiP04
-  ARM: hisi: add hip04 SoC support
-  ARM: dts: add hip04-d01 dts file
-  ARM: config: append hip04_defconfig
-  ARM: config: select ARCH_HISI in hi3xxx_defconfig
-  virt: arm: support hip04 gic
+> Sebastian,
+> 
+> On Wed, Apr 16, 2014 at 04:26:06PM +0200, Sebastian Hesselbarth wrote:
+> > On 04/16/2014 02:40 PM, Antoine T?nart wrote:
+> > >Add a Driver to support the SDHCI controller of the Marvell Berlin SoCs.
+> > >This controller supports 3 sockets.
+> > 
+> > nit: Isn't it three controller with one socket each?
+> 
+> It's a little bit confusing, there are 3 different register regions and
+> I can see 3 separate data lines but, I quote: "The SD host controller
+> supports three sockets".
+> 
+> Maybe Jisheng can advise on that matter ?
 
-Kefeng Wang (2):
-  ARM: hisi: enable erratum 798181 of A15 on HiP04
-  ARM: dts: Add PMU support in HiP04
 
- Documentation/devicetree/bindings/arm/gic.txt      |   1 +
- .../bindings/arm/hisilicon/hisilicon.txt           |  10 +
- .../devicetree/bindings/clock/hip04-clock.txt      |  20 ++
- arch/arm/Kconfig                                   |  19 +-
- arch/arm/Kconfig.debug                             |  10 +
- arch/arm/Makefile                                  |   2 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/hip04-d01.dts                    |  74 +++++
- arch/arm/boot/dts/hip04.dtsi                       | 259 ++++++++++++++++
- arch/arm/configs/hi3xxx_defconfig                  |   1 +
- arch/arm/configs/hip04_defconfig                   |  74 +++++
- arch/arm/include/asm/mcpm.h                        |   5 +
- arch/arm/kvm/interrupts_head.S                     |  23 +-
- arch/arm/mach-berlin/Kconfig                       |   2 +-
- arch/arm/mach-highbank/Kconfig                     |   2 +-
- arch/arm/mach-hisi/Kconfig                         |  26 +-
- arch/arm/mach-hisi/Makefile                        |   1 +
- arch/arm/mach-hisi/core.h                          |   2 +
- arch/arm/mach-hisi/hisilicon.c                     |  12 +
- arch/arm/mach-hisi/platmcpm.c                      | 334 +++++++++++++++++++++
- arch/arm/mach-mvebu/Kconfig                        |   6 +-
- arch/arm/mach-omap2/Kconfig                        |   4 +-
- arch/arm/mach-qcom/Kconfig                         |   2 +-
- arch/arm/mach-shmobile/Kconfig                     |   2 +-
- arch/arm/mach-tegra/Kconfig                        |   2 +-
- arch/arm/mach-vexpress/Kconfig                     |   2 +-
- drivers/irqchip/irq-gic.c                          | 155 +++++++---
- include/linux/irqchip/arm-gic.h                    |   5 +
- virt/kvm/arm/vgic.c                                |  10 +-
- 29 files changed, 998 insertions(+), 68 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/hip04-clock.txt
- create mode 100644 arch/arm/boot/dts/hip04-d01.dts
- create mode 100644 arch/arm/boot/dts/hip04.dtsi
- create mode 100644 arch/arm/configs/hip04_defconfig
- create mode 100644 arch/arm/mach-hisi/platmcpm.c
+It's three controller with one socket each ;)
 
--- 
-1.8.3.2
+Thanks
