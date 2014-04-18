@@ -1,62 +1,86 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 18 Apr 2014 17:19:53 -0500
-Subject: [PATCH v2 0/7] Generic serial earlycon
-Message-ID: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Apr 2014 15:25:55 -0700
+Subject: [PATCH trivial 1/3] ARM: dts: Grammar /is uses/ is used/
+In-Reply-To: <1396001499-17638-1-git-send-email-geert@linux-m68k.org>
+References: <1396001499-17638-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <20140418222554.GE21823@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+* Geert Uytterhoeven <geert@linux-m68k.org> [140328 03:16]:
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This started out as an attempt to add arm64's earlyprintk support to ARM
-in order to get an earlier, runtime setup console on multi-platform
-kernels. The first issue was needing the fixmap support which
-conveniently Mark Salter was working on and is mostly in place now. Like
-many things on ARM and arm64 now, it then became where do I put the now
-common, shared code. After digging more into various early console/printk
-support, it turns out the 8250_early.c setup code was the best starting
-point. 
+Applying this into omap-for-v3.15/fixes thanks.
 
-This is tested on arm64 and ARM with pl011 and 8250. The ARM support
-also requires fixmap and fixed mapping support which are not yet in place.
-I have some patches in my tree to support fixmap, but they need some more
-work. Fortunately, once fixmap is in place, it is just a Kconfig option
-to enable earlycon support on ARM. A git tree is available here[1].
-
-I'm also working on a follow on series which adds DT based earlycon
-setup, but that is dependent on some FDT improvements to support FDT
-based address translation.
-
-Rob
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git earlycon
-
-Rob Herring (7):
-  x86: move FIX_EARLYCON_MEM kconfig into x86
-  tty/serial: add generic serial earlycon
-  tty/serial: convert 8250 to generic earlycon
-  tty/serial: pl011: add generic earlycon support
-  tty/serial: add arm/arm64 semihosting earlycon
-  arm64: enable FIX_EARLYCON_MEM kconfig
-  arm64: remove arch specific earlyprintk
-
- Documentation/kernel-parameters.txt        |   9 ++
- arch/arm64/Kconfig                         |   3 +
- arch/arm64/Kconfig.debug                   |   9 --
- arch/arm64/kernel/Makefile                 |   1 -
- arch/arm64/kernel/early_printk.c           | 158 -----------------------------
- arch/x86/Kconfig                           |   3 +
- drivers/tty/serial/8250/8250_early.c       | 138 +++----------------------
- drivers/tty/serial/8250/Kconfig            |   6 +-
- drivers/tty/serial/Kconfig                 |  18 ++++
- drivers/tty/serial/Makefile                |   3 +
- drivers/tty/serial/amba-pl011.c            |  30 +++++-
- drivers/tty/serial/earlycon-arm-semihost.c |  61 +++++++++++
- drivers/tty/serial/earlycon.c              | 152 +++++++++++++++++++++++++++
- include/linux/serial_core.h                |  16 +++
- 14 files changed, 310 insertions(+), 297 deletions(-)
- delete mode 100644 arch/arm64/kernel/early_printk.c
- create mode 100644 drivers/tty/serial/earlycon-arm-semihost.c
- create mode 100644 drivers/tty/serial/earlycon.c
-
--- 
-1.9.1
+Tony
+ 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/boot/dts/am33xx.dtsi |    2 +-
+>  arch/arm/boot/dts/dra7.dtsi   |    2 +-
+>  arch/arm/boot/dts/omap4.dtsi  |    2 +-
+>  arch/arm/boot/dts/omap5.dtsi  |    2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 6d95d3df33c7..70f7f3eb5fb4 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -68,7 +68,7 @@
+>  	};
+>  
+>  	/*
+> -	 * The soc node represents the soc top level view. It is uses for IPs
+> +	 * The soc node represents the soc top level view. It is used for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU itself.
+>  	 */
+>  	soc {
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 1fd75aa4639d..c19e90ecf95e 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -75,7 +75,7 @@
+>  	};
+>  
+>  	/*
+> -	 * The soc node represents the soc top level view. It is uses for IPs
+> +	 * The soc node represents the soc top level view. It is used for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU itself.
+>  	 */
+>  	soc {
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index d3f8a6e8ca20..a07ea359ae20 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -67,7 +67,7 @@
+>  	};
+>  
+>  	/*
+> -	 * The soc node represents the soc top level view. It is uses for IPs
+> +	 * The soc node represents the soc top level view. It is used for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU itself.
+>  	 */
+>  	soc {
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index a72813a9663e..aa9878c0aaad 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -87,7 +87,7 @@
+>  	};
+>  
+>  	/*
+> -	 * The soc node represents the soc top level view. It is uses for IPs
+> +	 * The soc node represents the soc top level view. It is used for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU itself.
+>  	 */
+>  	soc {
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
