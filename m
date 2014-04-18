@@ -1,57 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 18 Apr 2014 00:34:56 -0400 (EDT)
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <CAL_JsqKCGg25wrTq8SyXK3zebo+uJG61083K6--mJ9Fxek03XQ@mail.gmail.com>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
- <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
- <20140417201645.GU24070@n2100.arm.linux.org.uk>
- <CAL_JsqL65bXBh1_dcud6XaDqFBnY1L69dMXWeNHvFAvcDizzhQ@mail.gmail.com>
- <20140417213502.GX24070@n2100.arm.linux.org.uk>
- <CAL_JsqKCGg25wrTq8SyXK3zebo+uJG61083K6--mJ9Fxek03XQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1404180019410.980@knanqh.ubzr>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 18 Apr 2014 08:41:31 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNIGkuTVg1MTogQWRkIEVmaWthIE1YIFNtYXJ0Ym9v?=
+ =?UTF-8?B?ayBkZXZpY2V0cmVl?=
+In-Reply-To: <87ppkho43o.fsf@lebrac.rtp-net.org>
+References: <1397641298-25392-1-git-send-email-shc_work@mail.ru>
+ <1397650038.299778344@f431.i.mail.ru>
+ <87ppkho43o.fsf@lebrac.rtp-net.org>
+Message-ID: <1397796091.847101962@f244.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Apr 2014, Rob Herring wrote:
-
-> Here's a simple test of what I was trying to point out. I took a
-> working kernel with TEXT_OFFSET of 0x8000 and booted it on QEMU using
-> the "virt" machine which RAM normally starts at 0x40000000. Then
-> varying the RAM base, I get these results:
+Wed, 16 Apr 2014 14:23:23 +0200 ?? Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>:
+> Alexander Shiyan <shc_work@mail.ru> writes:
 > 
-> 0x40000000 - boots
-> 0x41000000 - no output because the decompressor will still put the
-> Image at 0x40008000.
-
-If you want this to work, you have to disable CONFIG_AUTO_ZRELADDR.
-
-In practice there is no actual hardware with physical RAM not aligned to 
-a 128MB boundary.  That's why this particular alignment was selected.
-
-> 0x48000000 - boots
+> > Wed, 16 Apr 2014 13:19:40 +0200 ?? Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>:
+> >> Alexander Shiyan <shc_work@mail.ru> writes:
+> >> 
+> >> > This patch adds support for Efika MX Smartbook.
+> >> 
+> >> I'm curious, how did you test that ? From a very quick look,
+> >> seems it has no chance to work with the uboot shipped with the devices.
+> >
+> > Uboot it is not the only option for booting.
+> > With any loader, this can be used with "appended DTB" option in the kernel.
+> >
+> > This board support was be introduced by Sascha Hauer for the "barebox".
+> > So I think he was checking its workability.
 > 
-> So without changing TEXT_OFFSET, you can only vary the PHYS_OFFSET in
-> 128MB steps. For anything in between you have to use TEXT_OFFSET. Is
-> that really the right solution?
+> As I said, I'm talking of the uboot shipped with the devices. I do know
+> that barebox is doing things differently than this uboot. For
+> instance, with this DTB and barebox, usb should(?) work but for sure, it
+> won't work with this uboot.
+> If we merge something, it should work with all bootloaders otherwise it
+> would mean that the dtb is bootloader specific...
 
-What "solution" are you looking for?  I'm under the impression you're 
-getting confused about what TEXT_OFFSET is for.
+Why do you think that the USB will not work with this DTB and uboot?
+What makes you think so? Something incorrect in the DT representation?
 
-> I'm not suggesting to break anything or changing existing platforms,
-> but how do we improve the Image format in a compatible way. If
-> bootloaders want to support booting Image files or vmlinux directly,
-> then we should support that including any compatible changes to make
-> things work better.
-
-And why would bootloaders want that?  Just to create confusion with 
-the established boot protocol?
-
-There is really not much to share between ARM32 and ARM64 bootloader 
-implementation wise given the major platform initialization differences, 
-so trying to consolidate the very little code to actually boot the image 
-is rather futile.
-
-
-Nicolas
+---
