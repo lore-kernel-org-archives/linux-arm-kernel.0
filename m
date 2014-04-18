@@ -1,41 +1,101 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 Apr 2014 16:15:51 +0100
-Subject: [PATCH v4 7/9] ARM: sun7i/sun4i: dt: Add AXP209 support to
- various boards
-In-Reply-To: <CAOQ7t2YO_MjUZkkoEe1Grft+fVttWoOro85Sru2P3LXbx8Kjbg@mail.gmail.com>
-References: <1397209093-10077-8-git-send-email-carlo@caione.org>
- <20140411122901.GE28800@sirena.org.uk>
- <CAOQ7t2Y2B7f+eZApDHKiKm9=bOXo6oUA2RLY7ENn7qPLQEboMA@mail.gmail.com>
- <20140411161813.GF28800@sirena.org.uk>
- <CAOQ7t2YO_MjUZkkoEe1Grft+fVttWoOro85Sru2P3LXbx8Kjbg@mail.gmail.com>
-Message-ID: <20140418151551.GZ12304@sirena.org.uk>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 18 Apr 2014 11:21:22 -0400
+Subject: [PATCH v6 3/3] ARM: Check if a CPU has gone offline
+In-Reply-To: <20140417195009.GC24195@e106331-lin.cambridge.arm.com>
+References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1397762146-8337-4-git-send-email-ashwin.chaugule@linaro.org>
+ <20140417195009.GC24195@e106331-lin.cambridge.arm.com>
+Message-ID: <CAJ5Y-eZMKZYOaQnFPu31Vzg6KXDy7J5gFKh3hAy+GuLz66Wgwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 12:06:34PM +0200, Carlo Caione wrote:
+Hi Mark,
 
-> I'm fighting with a small issue when using the
-> regulator_bulk_register_supply_alias(). Problem is that when using the
-> .parent_supplies entry in the MFD driver, I hit the
-> 
-> WARN_ON(!list_empty(&dev->devres_head));
-> 
-> in linux/drivers/base/dd.c#L272, but, apart from the warning,
-> everything seems to work correctly.
-> A possible explanation I gave myself is that in the mfd_add_device()
-> we try to use the devm_* API when the regulator device is not bound to
-> the driver yet (I found some information here
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/104442.html).
-> Is this the case?
 
-Without knowing more about the case you're hitting it's hard to say - I
-do run a board which exercises the API for a MFD (with the arizona
-drivers) regularly and haven't noticed an issue so there must be
-something different about what you're trying to do.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140418/b18fbf1d/attachment.sig>
+On 17 April 2014 15:50, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Apr 17, 2014 at 08:15:46PM +0100, Ashwin Chaugule wrote:
+>> PSCIv0.2 adds a new function called AFFINITY_INFO, which
+>> can be used to query if a specified CPU has actually gone
+>> offline. Calling this function via cpu_kill ensures that
+>> a CPU has quiesced after a call to cpu_die.
+>>
+>> Signed-off-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  arch/arm/kernel/psci_smp.c | 21 +++++++++++++++++++++
+>>  include/uapi/linux/psci.h  |  5 +++++
+>>  2 files changed, 26 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+>> index 570a48c..c6f1420 100644
+>> --- a/arch/arm/kernel/psci_smp.c
+>> +++ b/arch/arm/kernel/psci_smp.c
+>> @@ -16,6 +16,7 @@
+>>  #include <linux/init.h>
+>>  #include <linux/smp.h>
+>>  #include <linux/of.h>
+>> +#include <uapi/linux/psci.h>
+>>
+>>  #include <asm/psci.h>
+>>  #include <asm/smp_plat.h>
+>> @@ -66,6 +67,25 @@ void __ref psci_cpu_die(unsigned int cpu)
+>>         /* We should never return */
+>>         panic("psci: cpu %d failed to shutdown\n", cpu);
+>>  }
+>> +
+>> +int __ref psci_cpu_kill(unsigned int cpu)
+>> +{
+>> +     int err;
+>> +
+>> +     if (!psci_ops.affinity_info)
+>> +             return 1;
+>> +
+>> +     err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
+>> +
+>> +     if (err != PSCI_AFFINITY_INFO_RET_OFF) {
+>> +             pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
+>> +                             cpu, err);
+>> +             /* Make platform_cpu_kill() fail. */
+>> +             return 0;
+>> +     }
+>
+> We can race with the dying CPU here -- if we call AFFINITY_INFO before
+> the dying cpu is sufficiently far through its CPU_OFF call it won't
+> register as OFF.
+>
+> Could we poll here instead (with a reasonable limit on the number of
+> iterations)? That would enable us to not spuriously declare a CPU to be
+> dead when it happened to take slightly longer than we expect to turn
+> off.
+
+True. How about something like this?
+
+ int __ref psci_cpu_kill(unsigned int cpu)
+ {
+-       int err;
++       int err, retries;
+
+        if (!psci_ops.affinity_info)
+                return 1;
+-
++       /*
++        * cpu_kill could race with cpu_die and we can
++        * potentially end up declaring this cpu undead
++        * while it is dying. So retry a couple of times.
++        */
++retry:
+        err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
+
+        if (err != PSCI_AFFINITY_INFO_RET_OFF) {
++               if (++retries < 3) {
++                       pr_info("Retrying check for CPU kill: %d\n", retries);
++                       goto retry;
++               }
+                pr_err("psci: Cannot kill CPU:%d, psci ret val: %d\n",
+                                cpu, err);
+                /* Make platform_cpu_kill() fail. */
+
+
+
+Cheers,
+Ashwin
