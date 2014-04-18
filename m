@@ -1,26 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 Apr 2014 21:38:17 +0100
-Subject: [PATCH 0/8] ARM: at91: sama5d3: enable sound support
-In-Reply-To: <53518C76.2020005@atmel.com>
-References: <1395049541-28128-1-git-send-email-voice.shen@atmel.com>
- <53518C76.2020005@atmel.com>
-Message-ID: <20140418203817.GA3479@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Apr 2014 21:42:49 +0100
+Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
+ device is disabled
+In-Reply-To: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
+References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140418204249.GG24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 10:35:02PM +0200, Nicolas Ferre wrote:
+On Mon, Apr 14, 2014 at 10:02:26AM +0800, Shawn Guo wrote:
+> In a board setup which disables LDB device node completely by changing
+> status to 'disabled', and only enables HDMI device, we're running into
+> the problem that imx-drm master never succeeds in binding, and hence
+> HDMI does not come up either.
+> 
+> &ldb {
+> 	status = "disabled";
+> 
+> 	lvds-channel at 1 {
+> 		...
+> 		status = "okay";
+> 	};
+> };
+> 
+> The imx-drm-core should really skip the LVDS channels no matter what
+> lvds-channel's status is, if LDB device is disabled.  Let's consider
+> such setup a misconfiguration, give a warning in there and not add the
+> component.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Changes since v1:
+> * Put a warning on such misconfiguration
 
-> For this series I am a little bit puzzled: should I take the ASoC part
-> of it? I see no acknowledgement from Mark and I also read some messages
-> still discussing about CCF and wm8904 afterwards.
+Thanks Shawn, I've added it to my queue for Greg.
 
-I've not seen these patches, judging by where this message went they
-weren't sent to the address in MAINTAINERS (broonie at kernel.org) but to
-my work address instead.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140418/80df41c9/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
