@@ -1,42 +1,49 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Fri, 18 Apr 2014 16:54:34 +0100
-Subject: [PATCH] arm/xen: Remove definiition of virt_to_pfn in asm/xen/page.h
-Message-ID: <1397836474-10478-1-git-send-email-julien.grall@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Apr 2014 08:57:22 -0700
+Subject: [PATCH 1/4] ARM: dts: Add support for OMAP4 Variscite OM44 family
+In-Reply-To: <1397833849-22396-2-git-send-email-manabian@gmail.com>
+References: <1397833849-22396-1-git-send-email-manabian@gmail.com>
+ <1397833849-22396-2-git-send-email-manabian@gmail.com>
+Message-ID: <20140418155721.GC5354@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-virt_to_pfn has been defined in asm/memory.h by the commit e26a9e0 "ARM: Better
-virt_to_page() handling"
+* Joachim Eastwood <manabian@gmail.com> [140418 08:11]:
+> Add support for VAR-SOM-OM44[1] SODIMM system on module from Variscite. SoM
+> features a OMAP4460, 1GB RAM, Gigabit Ethernet (LAN7500) and optional WLAN/BT.
+> 
+> Also add support for VAR-STK-OM44 development board from Variscite. This kit
+> features a VAR-SOM-OM44 and the carrier board VAR-OM44CustomBoard[2]. The
+> VAR-STK-OM44 is the same as VAR-DVK-OM44 but without the LCD display.
+> 
+> omap4-var-stk-om44.dts replace the old and very limited omap4-var-som.dts.
+> 
+> [1] http://www.variscite.com/products/system-on-module-som/cortex-a9/var-som-om44-cpu-ti-omap-4-omap4460
+> [2] http://www.variscite.com/products/single-board-computers/var-om44customboard
+> 
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  arch/arm/boot/dts/Makefile                         |   2 +-
+>  arch/arm/boot/dts/omap4-var-om44customboard.dtsi   | 235 ++++++++++++++
+>  arch/arm/boot/dts/omap4-var-som-om44.dtsi          | 343 +++++++++++++++++++++
+>  arch/arm/boot/dts/omap4-var-som.dts                |  96 ------
+>  arch/arm/boot/dts/omap4-var-stk-om44.dts           |  16 +
+>  7 files changed, 599 insertions(+), 97 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap4-var-om44customboard.dtsi
+>  create mode 100644 arch/arm/boot/dts/omap4-var-som-om44.dtsi
+>  delete mode 100644 arch/arm/boot/dts/omap4-var-som.dts
+>  create mode 100644 arch/arm/boot/dts/omap4-var-stk-om44.dts
 
-This will result of a compilation warning when CONFIG_XEN is enabled.
+Hmm don't you still need to keep omap4-var-som.dts to build just the
+core SoC module without any add-on boards?
 
-arch/arm/include/asm/xen/page.h:80:0: warning: "virt_to_pfn" redefined [enabled by default]
- #define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
- ^
-In file included from arch/arm/include/asm/page.h:163:0,
-                 from arch/arm/include/asm/xen/page.h:4,
-                 from include/xen/page.h:4,
-                 from arch/arm/xen/grant-table.c:33:
+Also, you might want to use the OMAP4_CORE_IOPAD and OMAP4_WKUP_IOPAD
+macros in include/dt-bindings/pinctrl/omap.h to be able to check the
+registers against the TRM easier as you can use the physical register
+offset listed in the TRM.
 
-The definition in memory.h is nearly the same (it directly expand PFN_DOWN),
-so we can safely drop virt_to_pfn in xen include.
+Regards,
 
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
----
- arch/arm/include/asm/xen/page.h |    1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index cf4f3e8..ded062f 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -77,7 +77,6 @@ static inline xpaddr_t machine_to_phys(xmaddr_t machine)
- }
- /* VIRT <-> MACHINE conversion */
- #define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
--#define virt_to_pfn(v)          (PFN_DOWN(__pa(v)))
- #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
- #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
- 
--- 
-1.7.10.4
+Tony 
