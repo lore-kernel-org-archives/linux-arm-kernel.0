@@ -1,41 +1,64 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Apr 2014 15:39:48 -0700
-Subject: [PATCH] arm/omap4: add twd clock to DT
-In-Reply-To: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
-References: <1396901139-17268-1-git-send-email-gilles.chanteperdrix@xenomai.org>
-Message-ID: <20140418223948.GK21823@atomide.com>
+Date: Fri, 18 Apr 2014 15:41:15 -0700
+Subject: [PATCH] ARM: dts: OMAP2+: remove uses of obsolete gpmc,device-nand
+In-Reply-To: <1396948817-29362-1-git-send-email-jhovold@gmail.com>
+References: <1396948817-29362-1-git-send-email-jhovold@gmail.com>
+Message-ID: <20140418224115.GL21823@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org> [140407 13:09]:
-> Booting Linux 3.14 on Pandaboard currently gets the following
-> message displayed:
-> 
-> smp_twd: clock not found -2
-> 
-> Define "mpu_periphclk" as the twd clock in omap4 dts to avoid this.
+* Johan Hovold <jhovold@gmail.com> [140408 02:25]:
+> Remove all remaining uses of gpmc,device-nand that have been added since
+> the property was removed by commit f40739faba8e ("ARM: dts: OMAP2+:
+> Simplify NAND support").
 
-Tero, care to ack?
+Thanks applying into omap-for-v3.15/fixes.
 
 Tony
  
-> Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
+> Signed-off-by: Johan Hovold <jhovold@gmail.com>
 > ---
->  arch/arm/boot/dts/omap4.dtsi |    1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/am335x-igep0033.dtsi  | 1 -
+>  arch/arm/boot/dts/omap3-devkit8000.dts  | 1 -
+>  arch/arm/boot/dts/omap3-lilly-a83x.dtsi | 1 -
+>  3 files changed, 3 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index d3f8a6e..a7f1d3a 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -62,6 +62,7 @@
+> diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+> index 7063311a58d9..06c822a48b71 100644
+> --- a/arch/arm/boot/dts/am335x-igep0033.dtsi
+> +++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+> @@ -118,7 +118,6 @@
+>  		reg = <0 0 0>; /* CS0, offset 0 */
+>  		nand-bus-width = <8>;
+>  		ti,nand-ecc-opt = "bch8";
+> -		gpmc,device-nand = "true";
+>  		gpmc,device-width = <1>;
+>  		gpmc,sync-clk-ps = <0>;
+>  		gpmc,cs-on-ns = <0>;
+> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+> index bf5a515a3247..da402f0fdab4 100644
+> --- a/arch/arm/boot/dts/omap3-devkit8000.dts
+> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+> @@ -112,7 +112,6 @@
+>  		reg = <0 0 0>; /* CS0, offset 0 */
+>  		nand-bus-width = <16>;
 >  
->  	local-timer at 48240600 {
->  		compatible = "arm,cortex-a9-twd-timer";
-> +		clocks = <&mpu_periphclk>;
->  		reg = <0x48240600 0x20>;
->  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(3) | IRQ_TYPE_LEVEL_HIGH)>;
->  	};
+> -		gpmc,device-nand;
+>  		gpmc,sync-clk-ps = <0>;
+>  		gpmc,cs-on-ns = <0>;
+>  		gpmc,cs-rd-off-ns = <44>;
+> diff --git a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
+> index 6369d9f43ca2..cc1dce6978f5 100644
+> --- a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
+> +++ b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
+> @@ -368,7 +368,6 @@
+>  		/* no elm on omap3 */
+>  
+>  		gpmc,mux-add-data = <0>;
+> -		gpmc,device-nand;
+>  		gpmc,device-width = <2>;
+>  		gpmc,wait-pin = <0>;
+>  		gpmc,wait-monitoring-ns = <0>;
 > -- 
-> 1.7.10.4
+> 1.8.3.2
 > 
