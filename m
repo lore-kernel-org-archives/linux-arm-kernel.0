@@ -1,295 +1,118 @@
-From: jays.lee@samsung.com (Jungseok Lee)
-Date: Fri, 18 Apr 2014 12:42:42 +0900
-Subject: [PATCH v2 7/7] arm64: KVM: Implement 4 levels of translation
- tables for HYP and stage2
-In-Reply-To: <878ur4w3vu.fsf@approximate.cambridge.arm.com>
-References: <004701cf592d$053b3380$0fb19a80$@samsung.com>
- <878ur4w3vu.fsf@approximate.cambridge.arm.com>
-Message-ID: <000b01cf5ab8$412a0970$c37e1c50$@samsung.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Fri, 18 Apr 2014 03:47:22 +0000
+Subject: [RFC][PATCH 3/3] clocksource: Add Freescale FlexTimer Module
+ (FTM) timer support
+In-Reply-To: <534FE3C1.4060509@linaro.org>
+References: <1397614787-8300-1-git-send-email-Li.Xiubo@freescale.com>
+ <1397614787-8300-4-git-send-email-Li.Xiubo@freescale.com>
+ <534FE3C1.4060509@linaro.org>
+Message-ID: <0604781786e540b5baa98a07d0809c92@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 17, 2014 9:13 PM, Marc Zyngier wrote:
-> On Wed, Apr 16 2014 at  5:33:31 am BST, Jungseok Lee <jays.lee@samsung.com> wrote:
-> > This patch adds 4 levels of translation tables implementation for both
-> > HYP and stage2. A combination of 4KB + 4 levels host and 4KB + 4
-> > levels guest can run on ARMv8 architecture as introducing this feature.
+> > Here using the FTM0 as clock event device and the FTM1 as clock
+> > source device.
 > 
-> Just to be sure: have you tested it with asymetric configurations (4kB host, 64kB guest, and the
-> oposite configuration)?
-
-Dear Marc
-
-Yes, I've tested all asymmetric configurations using 4K+3Level, 4K+4Level
-and 64K+2Level. I will add all test configurations in the commit message
-from the next version.
-
-> > Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
-> > Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
-> > ---
-> >  arch/arm/include/asm/kvm_mmu.h   |   10 +++++
-> >  arch/arm/kvm/mmu.c               |   88 +++++++++++++++++++++++++++++++++-----
-> >  arch/arm64/include/asm/kvm_arm.h |   20 +++++++++
-> >  arch/arm64/include/asm/kvm_mmu.h |   10 +++++
-> >  4 files changed, 117 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/arch/arm/include/asm/kvm_mmu.h
-> > b/arch/arm/include/asm/kvm_mmu.h index 5c7aa3c..6f7906e 100644
-> > --- a/arch/arm/include/asm/kvm_mmu.h
-> > +++ b/arch/arm/include/asm/kvm_mmu.h
-> > @@ -37,6 +37,11 @@
-> >   */
-> >  #define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
-> >
-> > +/*
-> > + * NUM_OBJS depends on the number of page table translation levels
-> > +*/
-> > +#define NUM_OBJS		2
+> As it is a new driver, please add a more elaborated description of the
+> timer.
 > 
-> I'm afraid this is way too generic. Use something along the lines of MMU_CACHE_MIN_PAGES, that makes
-> it obvious what we're talking about.
 
-Okay, I will change it.
+Please see the next version.
+
+
+> > +#include <linux/clk.h>
+> > +#include <linux/clockchips.h>
+> > +#include <linux/clocksource.h>
+> > +#include <linux/err.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/io.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/sched_clock.h>
+> 
+> Could you check all these headers are effectively needed ?
+> 
+
+Yes, I will.
+
+
+
+> > +#define FTM_OFFSET(n)	(0x1000 * n)
+> > +
+> > +#define FTM_SC		0x00
+> > +#define FTM_SC_CLK_SHIFT	3
+> > +#define FTM_SC_CLK_MASK	(0x3 << FTM_SC_CLK_SHIFT)
+> > +#define FTM_SC_CLK(c)	((c) << FTM_SC_CLK_SHIFT)
+> > +#define FTM_SC_PS_MASK	0x7
+> > +#define FTM_SC_TOIE	BIT(6)
+> > +#define FTM_SC_TOF	BIT(7)
+> > +
+> > +#define FTM_CNT		0x04
+> > +#define FTM_MOD		0x08
+> > +
+> > +#define FTM_CSC_BASE	0x0C
+> > +#define FTM_CSC_MSB	BIT(5)
+> > +#define FTM_CSC_MSA	BIT(4)
+> > +#define FTM_CSC_ELSB	BIT(3)
+> > +#define FTM_CSC_ELSA	BIT(2)
+> > +
+> > +#define FTM_CV_BASE	0x10
+> > +#define FTM_CNTIN	0x4C
+> > +#define FTM_STATUS	0x50
+> > +
+> > +#define FTM_MODE	0x54
+> > +#define FTM_MODE_FTMEN	BIT(0)
+> > +#define FTM_MODE_WPDIS	BIT(2)
+> > +#define FTM_MODE_PWMSYNC	BIT(3)
+> > +
+> > +#define FTM_SYNC	0x58
+> > +#define FTM_OUTINIT	0x5C
+> > +#define FTM_OUTMASK	0x60
+> > +#define FTM_COMBINE	0x64
+> > +#define FTM_DEADTIME	0x68
+> > +#define FTM_EXTTRIG	0x6C
+> > +#define FTM_POL		0x70
+> > +#define FTM_FMS		0x74
+> > +#define FTM_FILTER	0x78
+> > +#define FTM_FLTCTRL	0x7C
+> > +#define FTM_QDCTRL	0x80
+> > +#define FTM_CONF	0x84
+> > +#define FTM_FLTPOL	0x88
+> > +#define FTM_SYNCONF	0x8C
+> > +#define FTM_INVCTRL	0x90
+> > +#define FTM_SWOCTRL	0x94
+> > +#define FTM_PWMLOAD	0x98
+> 
+> Please remove the unused macros.
+> 
+
+Okay.
+
 
 > > +
-> >  #ifndef __ASSEMBLY__
-> >
-> >  #include <asm/cacheflush.h>
-> > @@ -94,6 +99,11 @@ static inline void kvm_clean_pgd(pgd_t *pgd)
-> >  	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));  }
-> >
-> > +static inline void kvm_clean_pmd(pmd_t *pmd) {
-> > +	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t)); }
+> > +	freq = clk_get_rate(ftm_clk);
 > > +
-> >  static inline void kvm_clean_pmd_entry(pmd_t *pmd)  {
-> >  	clean_pmd_entry(pmd);
-> > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c index
-> > 80bb1e6..7fc9e55 100644
-> > --- a/arch/arm/kvm/mmu.c
-> > +++ b/arch/arm/kvm/mmu.c
-> > @@ -388,13 +388,44 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
-> >  	return 0;
-> >  }
-> >
-> > +static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
-> > +				   unsigned long end, unsigned long pfn,
-> > +				   pgprot_t prot)
-> > +{
-> > +	pud_t *pud;
-> > +	pmd_t *pmd;
-> > +	unsigned long addr, next;
+> > +	calc_closest_cound_cyc(freq);
 > > +
-> > +	addr = start;
-> > +	do {
-> > +		pud = pud_offset(pgd, addr);
+> > +	BUG_ON(ftm_clocksource_init(freq));
 > > +
-> > +		if (pud_none_or_clear_bad(pud)) {
-> > +			pmd = pmd_alloc_one(NULL, addr);
-> > +			if (!pmd) {
-> > +				kvm_err("Cannot allocate Hyp pmd\n");
-> > +				return -ENOMEM;
-> > +			}
-> > +			pud_populate(NULL, pud, pmd);
-> > +			get_page(virt_to_page(pud));
-> > +			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-> > +		}
-> > +
-> > +		next = pud_addr_end(addr, end);
-> > +
-> > +		create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
-> > +		pfn += (next - addr) >> PAGE_SHIFT;
-> > +	} while (addr = next, addr != end);
-> > +
-> > +	return 0;
+> > +	BUG_ON(ftm_clockevent_init(freq, irq));
 > > +}
-> > +
-> >  static int __create_hyp_mappings(pgd_t *pgdp,
-> >  				 unsigned long start, unsigned long end,
-> >  				 unsigned long pfn, pgprot_t prot)  {
-> >  	pgd_t *pgd;
-> >  	pud_t *pud;
-> > -	pmd_t *pmd;
-> >  	unsigned long addr, next;
-> >  	int err = 0;
-> >
-> > @@ -403,22 +434,23 @@ static int __create_hyp_mappings(pgd_t *pgdp,
-> >  	end = PAGE_ALIGN(end);
-> >  	do {
-> >  		pgd = pgdp + pgd_index(addr);
-> > -		pud = pud_offset(pgd, addr);
-> >
-> > -		if (pud_none_or_clear_bad(pud)) {
-> > -			pmd = pmd_alloc_one(NULL, addr);
-> > -			if (!pmd) {
-> > -				kvm_err("Cannot allocate Hyp pmd\n");
-> > +		if (pgd_none(*pgd)) {
-> > +			pud = pud_alloc_one(NULL, addr);
-> > +			if (!pud) {
-> > +				kvm_err("Cannot allocate Hyp pud\n");
-> >  				err = -ENOMEM;
-> >  				goto out;
-> >  			}
-> > -			pud_populate(NULL, pud, pmd);
-> > -			get_page(virt_to_page(pud));
-> > -			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
-> > +			pgd_populate(NULL, pgd, pud);
-> > +			get_page(virt_to_page(pgd));
-> > +			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
-> >  		}
-> >
-> >  		next = pgd_addr_end(addr, end);
-> > -		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
-> > +
-> > +		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
-> > +
-> >  		if (err)
-> >  			goto out;
-> >  		pfn += (next - addr) >> PAGE_SHIFT; @@ -563,6 +595,24 @@ void
-> > kvm_free_stage2_pgd(struct kvm *kvm)
-> >  	kvm->arch.pgd = NULL;
-> >  }
-> >
-> > +static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> > +			     phys_addr_t addr)
-> > +{
-> > +	pgd_t *pgd;
-> > +	pud_t *pud;
-> > +
-> > +	pgd = kvm->arch.pgd + pgd_index(addr);
-> > +	if (pgd_none(*pgd)) {
-> > +		if (!cache)
-> > +			return NULL;
-> > +		pud = mmu_memory_cache_alloc(cache);
-> > +		pgd_populate(NULL, pgd, pud);
-> > +		get_page(virt_to_page(pgd));
-> > +	}
-> > +
-> > +	return pud_offset(pgd, addr);
-> > +}
-> > +
-> >  static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> >  			     phys_addr_t addr)
-> >  {
-> > @@ -617,6 +667,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> >  	pmd_t *pmd;
-> >  	pte_t *pte, old_pte;
-> >
-> > +	pud_t *pud;
-> > +
-> > +	/* Create stage-2 page table mapping - Level 0 */
-> > +	pud = stage2_get_pud(kvm, cache, addr);
-> > +	if (!pud)
-> > +		return 0;
-> > +
-> > +	if (pud_none(*pud)) {
-> > +		if (!cache)
-> > +			return 0;
-> > +		pmd = mmu_memory_cache_alloc(cache);
-> > +		kvm_clean_pmd(pmd);
-> > +		pud_populate(NULL, pud, pmd);
-> > +		get_page(virt_to_page(pud));
-> > +	}
-> > +
-> >  	/* Create stage-2 page table mapping - Level 1 */
-> >  	pmd = stage2_get_pmd(kvm, cache, addr);
-> >  	if (!pmd) {
-> > @@ -675,7 +741,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-> >  	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
-> >  		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
-> >
-> > -		ret = mmu_topup_memory_cache(&cache, 2, 2);
-> > +		ret = mmu_topup_memory_cache(&cache, NUM_OBJS, NUM_OBJS);
-> >  		if (ret)
-> >  			goto out;
-> >  		spin_lock(&kvm->mmu_lock);
-> > diff --git a/arch/arm64/include/asm/kvm_arm.h
-> > b/arch/arm64/include/asm/kvm_arm.h
-> > index 3d69030..295eda6 100644
-> > --- a/arch/arm64/include/asm/kvm_arm.h
-> > +++ b/arch/arm64/include/asm/kvm_arm.h
-> > @@ -117,9 +117,11 @@
-> >  #define VTCR_EL2_IRGN0_MASK	(3 << 8)
-> >  #define VTCR_EL2_IRGN0_WBWA	(1 << 8)
-> >  #define VTCR_EL2_SL0_MASK	(3 << 6)
-> > +#define VTCR_EL2_SL0_LVL0	(2 << 6)
-> >  #define VTCR_EL2_SL0_LVL1	(1 << 6)
-> >  #define VTCR_EL2_T0SZ_MASK	0x3f
-> >  #define VTCR_EL2_T0SZ_40B	24
-> > +#define VTCR_EL2_T0SZ_48B	16
+> > +CLOCKSOURCE_OF_DECLARE(vf610, "fsl,vf610-ftm-timer", ftm_timer_init);
 > 
-> How about having
-> #define	VTCR_EL2_TOSZ(bits)	(64 - (bits))
-> and using that everywhere?
-
-It sounds good. I will fix it.
-
-> >
-> >  #ifdef CONFIG_ARM64_64K_PAGES
-> >  /*
-> > @@ -134,6 +136,7 @@
-> >  				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
-> >  #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
-> >  #else
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  /*
-> >   * Stage2 translation configuration:
-> >   * 40bits output (PS = 2)
-> > @@ -145,10 +148,27 @@
-> >  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-> >  				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
-> >  #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
-> > +#else
-> > +/*
-> > + * Stage2 translation configuration:
-> > + * 40bits output (PS = 2)
-> > + * 48bits input  (T0SZ = 16)
-> > + * 4kB pages (TG0 = 0)
-> > + * 4 level page tables (SL = 2)
-> > + */
-> > +#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
-> > +				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
-> > +				 VTCR_EL2_SL0_LVL0 | VTCR_EL2_T0SZ_48B)
-> > +#define VTTBR_X		(29 - VTCR_EL2_T0SZ_48B)
-> > +#endif
-> >  #endif
-> >
-> >  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
-> > +#ifndef CONFIG_ARM64_4_LEVELS
-> >  #define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) <<
-> > VTTBR_BADDR_SHIFT)
-> > +#else
-> > +#define VTTBR_BADDR_MASK  (((1LLU << (48 - VTTBR_X)) - 1) <<
-> > +VTTBR_BADDR_SHIFT) #endif
 > 
-> Have a global #define for the number of output bits, and unify these two definitions.
-
-Okay, I will introduce a new macro for output bits.
-
-> >  #define VTTBR_VMID_SHIFT  (48LLU)
-> >  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
-> >
-> > diff --git a/arch/arm64/include/asm/kvm_mmu.h
-> > b/arch/arm64/include/asm/kvm_mmu.h
-> > index 7d29847..f7fb2d0 100644
-> > --- a/arch/arm64/include/asm/kvm_mmu.h
-> > +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > @@ -41,6 +41,15 @@
-> >   */
-> >  #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
-> >
-> > +/*
-> > + * NUM_OBJS depends on the number of page table translation levels
-> > +*/ #ifndef CONFIG_ARM64_4_LEVELS
-> > +#define NUM_OBJS		2
-> > +#else
-> > +#define NUM_OBJS		3
-> > +#endif
+> I am not a big fan of those BUG_ON every line. Could you please replace
+> it by dev_err().
 > 
-> What about 64kB pages with two levels? Only one page should be necessary.
+> That is also not in the logic of a single zImage.
+> 
 
-Okay, I will add it.
+Yes, if so, I will revise this.
 
-I really thank you for the comments.
 
-Best Regards
-Jungseok Lee
+Thanks,
+
+BRs
+Xiubo
