@@ -1,72 +1,56 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 18 Apr 2014 14:19:51 +0200
-Subject: [PATCH 5/7] bus: mvebu-mbus: Avoid setting an undefined window size
+Date: Fri, 18 Apr 2014 14:19:50 +0200
+Subject: [PATCH 4/7] pci: mvebu: fix off-by-one in the computed size of the
+ mbus windows
 In-Reply-To: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397823593-1932-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397823593-1932-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+From: Willy Tarreau <w@1wt.eu>
 
-The mbus hardware requires a power of two size, and size aligned base.
-Currently, if a non-power of two is passed in to the low level routines
-they configure the register in a way that results in undefined behaviour.
+mvebu_pcie_handle_membase_change() and
+mvebu_pcie_handle_iobase_change() do not correctly compute the window
+size. PCI uses an inclusive start/end address pair, which requires a
++1 when converting to size.
 
-Call WARN and return EINVAL instead.
+This only worked because a bug in the mbus driver allowed it to
+silently accept and round up bogus sizes.
 
-Also, update the debugfs routines to show a message if there is an
-invalid register setting.
+Fix this by adding one to the computed size.
 
-All together this makes the recent problems with silent failure
-of PCI very obvious, noisy and debuggable.
-
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Fixes: 45361a4fe4464180815157654aabbd2afb4848ad ('PCIe driver for Marvell Armada 370/XP systems')
+Cc: <stable@vger.kernel.org> # v3.11+
+Signed-off-by: Willy Tarreau <w@1wt.eu>
+Reviewed-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
 ---
- drivers/bus/mvebu-mbus.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/pci/host/pci-mvebu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 293e2e0..afee0f7 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -56,6 +56,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/debugfs.h>
-+#include <linux/log2.h>
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index d3d1cfd..4829921 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -331,7 +331,7 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+ 	port->iowin_base = port->pcie->io.start + iobase;
+ 	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+ 			    (port->bridge.iolimitupper << 16)) -
+-			    iobase);
++			    iobase) + 1;
  
- /*
-  * DDR target is the same on all platforms.
-@@ -266,6 +267,17 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
- 		mbus->soc->win_cfg_offset(win);
- 	u32 ctrl, remap_addr;
+ 	mvebu_mbus_add_window_remap_by_id(port->io_target, port->io_attr,
+ 					  port->iowin_base, port->iowin_size,
+@@ -364,7 +364,7 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+ 	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
+ 	port->memwin_size  =
+ 		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+-		port->memwin_base;
++		port->memwin_base + 1;
  
-+	if (!is_power_of_2(size)) {
-+		WARN(true, "Invalid MBus window size: 0x%zx\n", size);
-+		return -EINVAL;
-+	}
-+
-+	if ((base & (phys_addr_t)(size - 1)) != 0) {
-+		WARN(true, "Invalid MBus base/size: %pa len 0x%zx\n", &base,
-+		     size);
-+		return -EINVAL;
-+	}
-+
- 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
- 		(attr << WIN_CTRL_ATTR_SHIFT)    |
- 		(target << WIN_CTRL_TGT_SHIFT)   |
-@@ -413,6 +425,10 @@ static int mvebu_devs_debug_show(struct seq_file *seq, void *v)
- 			   win, (unsigned long long)wbase,
- 			   (unsigned long long)(wbase + wsize), wtarget, wattr);
- 
-+		if (!is_power_of_2(wsize) ||
-+		    ((wbase & (u64)(wsize - 1)) != 0))
-+			seq_puts(seq, " (Invalid base/size!!)");
-+
- 		if (win < mbus->soc->num_remappable_wins) {
- 			seq_printf(seq, " (remap %016llx)\n",
- 				   (unsigned long long)wremap);
+ 	mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+ 				    port->memwin_base, port->memwin_size);
 -- 
 1.9.2
