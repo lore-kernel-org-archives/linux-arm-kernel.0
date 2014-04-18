@@ -1,122 +1,89 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 17 Apr 2014 20:02:30 -0500
-Subject: [patch 5/6] edma: Make reading the position of active channels
- work
-In-Reply-To: <5350761C.6010109@ti.com>
-References: <20140417133737.892475126@linutronix.de>
- <20140417143249.889774979@linutronix.de> <5350761C.6010109@ti.com>
-Message-ID: <535079A6.6090301@ti.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 18 Apr 2014 10:15:21 +0900
+Subject: [PATCHv3 0/7] Support new Exynos3250 SoC based on Cortex-A7 dual core
+Message-ID: <1397783728-6193-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2014 07:47 PM, Joel Fernandes wrote:
-> On 04/17/2014 09:40 AM, Thomas Gleixner wrote:
->> Reading destination and source is pointless. In DEV_TO_MEM transfers
->> we are only interested in the destination, in MEM_TO_DEV we care about
->> the source. In MEM_TO_MEM it really does not matter which one you
->> read.
->>
->> Remove the extra pointer and select dest/source via a bool.
->>
->> Reading the src/dst data from an active parameter set in the EDMA
->> parameter RAM is not reliable, as there might be a concurrent update
->> from the controller.
->>
->> But experimentation showed, that a double readout with comparing the
->> results and a limited loop works nicely. I've actually never found a
->> case where the loop limit triggered, but we have it there for sanity
->> reasons. In case it triggers we return -EBUSY and let the caller deal
->> with it.
->>
->> Remove the export of this function while at it. The only potential
->> user is the dmaengine and that's always builtin.
->>
->> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
->> ---
->>  arch/arm/common/edma.c             |   48 ++++++++++++++++++++++++++-----------
->>  include/linux/platform_data/edma.h |    2 -
->>  2 files changed, 35 insertions(+), 15 deletions(-)
->>
->> Index: linux/arch/arm/common/edma.c
->> ===================================================================
->> --- linux.orig/arch/arm/common/edma.c
->> +++ linux/arch/arm/common/edma.c
->> @@ -994,29 +994,49 @@ void edma_set_dest(unsigned slot, dma_ad
->>  EXPORT_SYMBOL(edma_set_dest);
->>  
->>  /**
->> - * edma_get_position - returns the current transfer points
->> + * edma_get_position - returns the current transfer point
->>   * @slot: parameter RAM slot being examined
->> - * @src: pointer to source port position
->> - * @dst: pointer to destination port position
->> + * @pos:  where to store the data
->> + * @dst:  true selects the dest position, false the source
->>   *
->> - * Returns current source and destination addresses for a particular
->> - * parameter RAM slot.  Its channel should not be active when this is called.
->> + * Return 0 indicates a stable readout. -EBUSY indicates that the
->> + * readout failed due to concurrent updates.
->> + *
->> + * Call this on active channels with care. For inactive channels this
->> + * never fails.
->>   */
->> -void edma_get_position(unsigned slot, dma_addr_t *src, dma_addr_t *dst)
->> +int edma_get_position(unsigned slot, dma_addr_t *pos, bool dst)
->>  {
->> -	struct edmacc_param temp;
->> -	unsigned ctlr;
->> +	u32 dat, ctlr, offs;
->> +	int i;
->>  
->>  	ctlr = EDMA_CTLR(slot);
->>  	slot = EDMA_CHAN_SLOT(slot);
->>  
->> -	edma_read_slot(EDMA_CTLR_CHAN(ctlr, slot), &temp);
->> -	if (src != NULL)
->> -		*src = temp.src;
->> -	if (dst != NULL)
->> -		*dst = temp.dst;
->> +	if (slot >= edma_cc[ctlr]->num_slots)
->> +		return -EINVAL;
->> +
->> +	offs = PARM_OFFSET(slot);
->> +	offs += dst ? PARM_DST : PARM_SRC;
->> +
->> +	/*
->> +	 * If the channel is active, we need to double read as we
->> +	 * might see half updated data. We limit this to 5
->> +	 * attempts. If that fails we return -EBUSY and let the caller
->> +	 * deal with it.
->> +	 */
->> +	dat = edma_read(ctlr, offs);
->> +	for (i = 0; i < 5; i++) {
->> +		u32 tmp = edma_read(ctlr, offs);
->> +
->> +		if (tmp == dat) {
->> +			*pos = dat;
->> +			return 0;
->> +		}
->> +		dat = tmp;
->> +	}
->> +	return -EBUSY;
->>  }
->> -EXPORT_SYMBOL(edma_get_position);
->>  
->>  /**
-> 
-> The access is synchronized though and you shouldn't see unreliable
-> results, unless you _are_ seeing unreliable results in which case it
-> could be a silicon issue.
-> 
-> The original code also doesn't have the double read so I would just drop
-> that, unless you are seeing reliability issues.
-> 
-> Here's a thread that discusses it and the end conclusion is that it
-> should be fine (Kyle Kastile is one of the EDMA hardware designers).
-> http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
+This patchset support new Exynos3250 Samsung SoC based on Cortex-A7 dual core.
+Exynos3250 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
+for Smartphone. It is desigend with the 28nm low-power high-K metal gate process
+and provides the best performance features.
 
-I'm sorry to have messed up Kyle's name, its Kyle Castille ;-)
+This patchset include some patches such as:
+- Support secondary CPU of Exynos3250 (cpu up/down)
+- Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/pwm/amba
+- Support the clock control for Exynos3250 using common clk framework
 
-thanks,
- -Joel
+This patchset is based on following git repo/branch.
+- git repo : git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+- branch   : for-next (Linux 3.15-rc1)
+
+Additional patch description about static memory mapping:
+This patchset must need to map memory mapping about SYSRAM/PMU for CPU UP/DOWN.
+So, this patchset need to merge following patchset to remove static memory
+mapping for SYSRAM[1] / PMU ([2] or [3]).
+
+[1] http://www.spinics.net/lists/arm-kernel/msg323011.html
+[2] https://lkml.org/lkml/2014/4/2/48
+[3] http://www.spinics.net/lists/arm-kernel/msg316013.html
+
+And,
+The pinctrl patch for Exynos3250 was posted as separated patch[4].
+[4] https://lkml.org/lkml/2014/4/13/156
+
+Changes from v2:
+- Remove static memory mapping about SYSRAM/PMU such as following patches:
+  ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of Exynos3250
+  ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
+- Add description for secondary CPU boot of Exynos4212/Exynos3250
+- Fix description in exynos_cpu_die() to remove particular SoC series
+- Fix minor coding style
+- Add documentation for Exynos3250 clock controller
+
+Changes from v1:
+- Add new "samsung,exynos3" compatible name
+- Add comment about exynos_cpu_boot in Exynos4212
+- Remove unnecessary 'goto' statement in firmware.c
+- Use read_cpuid_part_number() function instead of assembler directly
+- Post separated pinctrl patch from this patchset
+  : https://lkml.org/lkml/2014/4/13/156
+- Remove unused pmu interrupts due to Exynos3250 dual-core
+- Cosolidate all the patches related to exynos3250.dtsi into one patch
+- Fix gic compatible name to "cortex-a15-gic" because Cortex-A7 GIC is same
+- Add sign-off of sender to all this patches
+- Fix minor typo
+
+Chanwoo Choi (4):
+  ARM: EXYNOS: Add Exynos3250 SoC ID
+  ARM: EXYNOS: Support secondary CPU boot of Exynos3250
+  ARM: EXYNOS: Enter a15 lowpower mode for Exynos3250 based on Cortex-a7
+  dt-bindings: add documentation for Exynos3250 clock controller
+
+Kyungmin Park (1):
+  ARM: EXYNOS: Support secondary CPU boot of Exynos4212
+
+Tomasz Figa (2):
+  clk: samsung: exynos3250: Add clocks using common clock framework
+  ARM: dts: Add device tree sources for Exynos3250
+
+ .../devicetree/bindings/clock/exynos3250-clock.txt |  41 ++
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi          | 477 +++++++++++++
+ arch/arm/boot/dts/exynos3250.dtsi                  | 427 +++++++++++
+ arch/arm/mach-exynos/Kconfig                       |  22 +
+ arch/arm/mach-exynos/exynos.c                      |   2 +
+ arch/arm/mach-exynos/firmware.c                    |  21 +-
+ arch/arm/mach-exynos/hotplug.c                     |  19 +-
+ arch/arm/plat-samsung/include/plat/cpu.h           |  10 +
+ drivers/clk/samsung/Makefile                       |   1 +
+ drivers/clk/samsung/clk-exynos3250.c               | 785 +++++++++++++++++++++
+ include/dt-bindings/clock/exynos3250.h             | 256 +++++++
+ 11 files changed, 2053 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos3250-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos3250.c
+ create mode 100644 include/dt-bindings/clock/exynos3250.h
+
+-- 
+1.8.0
