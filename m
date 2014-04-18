@@ -1,182 +1,122 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Thu, 17 Apr 2014 18:56:32 -0500
-Subject: [patch 3/6] dma: edma: Create private pset struct
-In-Reply-To: <20140417143249.489574612@linutronix.de>
+Date: Thu, 17 Apr 2014 20:02:30 -0500
+Subject: [patch 5/6] edma: Make reading the position of active channels
+ work
+In-Reply-To: <5350761C.6010109@ti.com>
 References: <20140417133737.892475126@linutronix.de>
- <20140417143249.489574612@linutronix.de>
-Message-ID: <53506A30.4060701@ti.com>
+ <20140417143249.889774979@linutronix.de> <5350761C.6010109@ti.com>
+Message-ID: <535079A6.6090301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2014 09:40 AM, Thomas Gleixner wrote:
-> Preparatory patch to support finer grained accounting.
+On 04/17/2014 07:47 PM, Joel Fernandes wrote:
+> On 04/17/2014 09:40 AM, Thomas Gleixner wrote:
+>> Reading destination and source is pointless. In DEV_TO_MEM transfers
+>> we are only interested in the destination, in MEM_TO_DEV we care about
+>> the source. In MEM_TO_MEM it really does not matter which one you
+>> read.
+>>
+>> Remove the extra pointer and select dest/source via a bool.
+>>
+>> Reading the src/dst data from an active parameter set in the EDMA
+>> parameter RAM is not reliable, as there might be a concurrent update
+>> from the controller.
+>>
+>> But experimentation showed, that a double readout with comparing the
+>> results and a limited loop works nicely. I've actually never found a
+>> case where the loop limit triggered, but we have it there for sanity
+>> reasons. In case it triggers we return -EBUSY and let the caller deal
+>> with it.
+>>
+>> Remove the export of this function while at it. The only potential
+>> user is the dmaengine and that's always builtin.
+>>
+>> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>>  arch/arm/common/edma.c             |   48 ++++++++++++++++++++++++++-----------
+>>  include/linux/platform_data/edma.h |    2 -
+>>  2 files changed, 35 insertions(+), 15 deletions(-)
+>>
+>> Index: linux/arch/arm/common/edma.c
+>> ===================================================================
+>> --- linux.orig/arch/arm/common/edma.c
+>> +++ linux/arch/arm/common/edma.c
+>> @@ -994,29 +994,49 @@ void edma_set_dest(unsigned slot, dma_ad
+>>  EXPORT_SYMBOL(edma_set_dest);
+>>  
+>>  /**
+>> - * edma_get_position - returns the current transfer points
+>> + * edma_get_position - returns the current transfer point
+>>   * @slot: parameter RAM slot being examined
+>> - * @src: pointer to source port position
+>> - * @dst: pointer to destination port position
+>> + * @pos:  where to store the data
+>> + * @dst:  true selects the dest position, false the source
+>>   *
+>> - * Returns current source and destination addresses for a particular
+>> - * parameter RAM slot.  Its channel should not be active when this is called.
+>> + * Return 0 indicates a stable readout. -EBUSY indicates that the
+>> + * readout failed due to concurrent updates.
+>> + *
+>> + * Call this on active channels with care. For inactive channels this
+>> + * never fails.
+>>   */
+>> -void edma_get_position(unsigned slot, dma_addr_t *src, dma_addr_t *dst)
+>> +int edma_get_position(unsigned slot, dma_addr_t *pos, bool dst)
+>>  {
+>> -	struct edmacc_param temp;
+>> -	unsigned ctlr;
+>> +	u32 dat, ctlr, offs;
+>> +	int i;
+>>  
+>>  	ctlr = EDMA_CTLR(slot);
+>>  	slot = EDMA_CHAN_SLOT(slot);
+>>  
+>> -	edma_read_slot(EDMA_CTLR_CHAN(ctlr, slot), &temp);
+>> -	if (src != NULL)
+>> -		*src = temp.src;
+>> -	if (dst != NULL)
+>> -		*dst = temp.dst;
+>> +	if (slot >= edma_cc[ctlr]->num_slots)
+>> +		return -EINVAL;
+>> +
+>> +	offs = PARM_OFFSET(slot);
+>> +	offs += dst ? PARM_DST : PARM_SRC;
+>> +
+>> +	/*
+>> +	 * If the channel is active, we need to double read as we
+>> +	 * might see half updated data. We limit this to 5
+>> +	 * attempts. If that fails we return -EBUSY and let the caller
+>> +	 * deal with it.
+>> +	 */
+>> +	dat = edma_read(ctlr, offs);
+>> +	for (i = 0; i < 5; i++) {
+>> +		u32 tmp = edma_read(ctlr, offs);
+>> +
+>> +		if (tmp == dat) {
+>> +			*pos = dat;
+>> +			return 0;
+>> +		}
+>> +		dat = tmp;
+>> +	}
+>> +	return -EBUSY;
+>>  }
+>> -EXPORT_SYMBOL(edma_get_position);
+>>  
+>>  /**
 > 
-> Move the edma_params array out of edma_desc so we can add further per
-> pset data to it.
+> The access is synchronized though and you shouldn't see unreliable
+> results, unless you _are_ seeing unreliable results in which case it
+> could be a silicon issue.
 > 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  drivers/dma/edma.c |   67 ++++++++++++++++++++++++++++-------------------------
->  1 file changed, 36 insertions(+), 31 deletions(-)
+> The original code also doesn't have the double read so I would just drop
+> that, unless you are seeing reliability issues.
 > 
-> Index: linux-2.6/drivers/dma/edma.c
-> ===================================================================
-> --- linux-2.6.orig/drivers/dma/edma.c
-> +++ linux-2.6/drivers/dma/edma.c
-> @@ -57,6 +57,10 @@
->  #define EDMA_MAX_SLOTS		MAX_NR_SG
->  #define EDMA_DESCRIPTORS	16
->  
-> +struct edma_pset {
-> +	struct edmacc_param		hwpar;
+> Here's a thread that discusses it and the end conclusion is that it
+> should be fine (Kyle Kastile is one of the EDMA hardware designers).
+> http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
 
-If its ok, can this be renamed to param instead of hwpar through out the
-patch? I feel that's more readable. Thanks.
+I'm sorry to have messed up Kyle's name, its Kyle Castille ;-)
 
-
-> +};
-> +
->  struct edma_desc {
->  	struct virt_dma_desc		vdesc;
->  	struct list_head		node;
-> @@ -65,7 +69,7 @@ struct edma_desc {
->  	int				pset_nr;
->  	int				processed;
->  	u32				residue;
-> -	struct edmacc_param		pset[0];
-> +	struct edma_pset		pset[0];
->  };
->  
->  struct edma_cc;
-> @@ -141,7 +145,7 @@ static void edma_execute(struct edma_cha
->  	/* Write descriptor PaRAM set(s) */
->  	for (i = 0; i < nslots; i++) {
->  		j = i + edesc->processed;
-> -		edma_write_slot(echan->slot[i], &edesc->pset[j]);
-> +		edma_write_slot(echan->slot[i], &edesc->pset[j].hwpar);
->  		dev_dbg(echan->vchan.chan.device->dev,
->  			"\n pset[%d]:\n"
->  			"  chnum\t%d\n"
-> @@ -155,14 +159,14 @@ static void edma_execute(struct edma_cha
->  			"  cidx\t%08x\n"
->  			"  lkrld\t%08x\n",
->  			j, echan->ch_num, echan->slot[i],
-> -			edesc->pset[j].opt,
-> -			edesc->pset[j].src,
-> -			edesc->pset[j].dst,
-> -			edesc->pset[j].a_b_cnt,
-> -			edesc->pset[j].ccnt,
-> -			edesc->pset[j].src_dst_bidx,
-> -			edesc->pset[j].src_dst_cidx,
-> -			edesc->pset[j].link_bcntrld);
-> +			edesc->pset[j].hwpar.opt,
-> +			edesc->pset[j].hwpar.src,
-> +			edesc->pset[j].hwpar.dst,
-> +			edesc->pset[j].hwpar.a_b_cnt,
-> +			edesc->pset[j].hwpar.ccnt,
-> +			edesc->pset[j].hwpar.src_dst_bidx,
-> +			edesc->pset[j].hwpar.src_dst_cidx,
-> +			edesc->pset[j].hwpar.link_bcntrld);
->  		/* Link to the previous slot if not the last set */
->  		if (i != (nslots - 1))
->  			edma_link(echan->slot[i], echan->slot[i+1]);
-> @@ -274,13 +278,14 @@ static int edma_control(struct dma_chan
->   * @dma_length: Total length of the DMA transfer
->   * @direction: Direction of the transfer
->   */
-> -static int edma_config_pset(struct dma_chan *chan, struct edmacc_param *pset,
-> +static int edma_config_pset(struct dma_chan *chan, struct edma_pset *epset,
->  	dma_addr_t src_addr, dma_addr_t dst_addr, u32 burst,
->  	enum dma_slave_buswidth dev_width, unsigned int dma_length,
->  	enum dma_transfer_direction direction)
->  {
->  	struct edma_chan *echan = to_edma_chan(chan);
->  	struct device *dev = chan->device->dev;
-> +	struct edmacc_param *hwpar = &epset->hwpar;
->  	int acnt, bcnt, ccnt, cidx;
->  	int src_bidx, dst_bidx, src_cidx, dst_cidx;
->  	int absync;
-> @@ -351,26 +356,26 @@ static int edma_config_pset(struct dma_c
->  		return -EINVAL;
->  	}
->  
-> -	pset->opt = EDMA_TCC(EDMA_CHAN_SLOT(echan->ch_num));
-> +	hwpar->opt = EDMA_TCC(EDMA_CHAN_SLOT(echan->ch_num));
->  	/* Configure A or AB synchronized transfers */
->  	if (absync)
-> -		pset->opt |= SYNCDIM;
-> +		hwpar->opt |= SYNCDIM;
->  
-> -	pset->src = src_addr;
-> -	pset->dst = dst_addr;
-> +	hwpar->src = src_addr;
-> +	hwpar->dst = dst_addr;
->  
-> -	pset->src_dst_bidx = (dst_bidx << 16) | src_bidx;
-> -	pset->src_dst_cidx = (dst_cidx << 16) | src_cidx;
-> +	hwpar->src_dst_bidx = (dst_bidx << 16) | src_bidx;
-> +	hwpar->src_dst_cidx = (dst_cidx << 16) | src_cidx;
->  
-> -	pset->a_b_cnt = bcnt << 16 | acnt;
-> -	pset->ccnt = ccnt;
-> +	hwpar->a_b_cnt = bcnt << 16 | acnt;
-> +	hwpar->ccnt = ccnt;
->  	/*
->  	 * Only time when (bcntrld) auto reload is required is for
->  	 * A-sync case, and in this case, a requirement of reload value
->  	 * of SZ_64K-1 only is assured. 'link' is initially set to NULL
->  	 * and then later will be populated by edma_execute.
->  	 */
-> -	pset->link_bcntrld = 0xffffffff;
-> +	hwpar->link_bcntrld = 0xffffffff;
->  	return absync;
->  }
->  
-> @@ -457,11 +462,11 @@ static struct dma_async_tx_descriptor *e
->  		/* If this is the last in a current SG set of transactions,
->  		   enable interrupts so that next set is processed */
->  		if (!((i+1) % MAX_NR_SG))
-> -			edesc->pset[i].opt |= TCINTEN;
-> +			edesc->pset[i].hwpar.opt |= TCINTEN;
->  
->  		/* If this is the last set, enable completion interrupt flag */
->  		if (i == sg_len - 1)
-> -			edesc->pset[i].opt |= TCINTEN;
-> +			edesc->pset[i].hwpar.opt |= TCINTEN;
->  	}
->  
->  	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
-> @@ -582,14 +587,14 @@ static struct dma_async_tx_descriptor *e
->  			"  cidx\t%08x\n"
->  			"  lkrld\t%08x\n",
->  			i, echan->ch_num, echan->slot[i],
-> -			edesc->pset[i].opt,
-> -			edesc->pset[i].src,
-> -			edesc->pset[i].dst,
-> -			edesc->pset[i].a_b_cnt,
-> -			edesc->pset[i].ccnt,
-> -			edesc->pset[i].src_dst_bidx,
-> -			edesc->pset[i].src_dst_cidx,
-> -			edesc->pset[i].link_bcntrld);
-> +			edesc->pset[i].hwpar.opt,
-> +			edesc->pset[i].hwpar.src,
-> +			edesc->pset[i].hwpar.dst,
-> +			edesc->pset[i].hwpar.a_b_cnt,
-> +			edesc->pset[i].hwpar.ccnt,
-> +			edesc->pset[i].hwpar.src_dst_bidx,
-> +			edesc->pset[i].hwpar.src_dst_cidx,
-> +			edesc->pset[i].hwpar.link_bcntrld);
->  
->  		edesc->absync = ret;
->  
-> @@ -597,7 +602,7 @@ static struct dma_async_tx_descriptor *e
->  		 * Enable interrupts for every period because callback
->  		 * has to be called for every period.
->  		 */
-> -		edesc->pset[i].opt |= TCINTEN;
-> +		edesc->pset[i].hwpar.opt |= TCINTEN;
->  	}
->  
->  	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
-> 
-> 
+thanks,
+ -Joel
