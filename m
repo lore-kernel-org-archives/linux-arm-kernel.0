@@ -1,52 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Apr 2014 09:50:43 +0200
-Subject: [PATCH 5/5] ARM: mvebu: don't use clocks property in UART node
- for Netgear RN2120
-In-Reply-To: <1397806908-7550-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1397806908-7550-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397806908-7550-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5350D953.8010904@free-electrons.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Fri, 18 Apr 2014 16:58:59 +0900
+Subject: [PATCH v3 0/7] Support 4 levels of translation tables for ARM64
+Message-ID: <000101cf5adc$0e403e70$2ac0bb50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/2014 09:41, Thomas Petazzoni wrote:
-> The Netgear RN2120 was not using the same strategy as the other Armada
-> 370/375/38x/XP boards: it was using a 'clocks' property and not the
-> 'clock-frequency' property in its UART controller Device Tree node.
-> 
-> However, now that this clock reference is present at the SoC-level,
-> there is no point in duplicating it at the board-level.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Hi All,
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+This the 3rd patchset supports 4 levels of tranlsation tables for ARM64.
 
+Firstly, The patchset decouples page size from level of translation tables
+as taking account into the comment from Catalin Marinas:
+http://www.spinics.net/linux/lists/arm-kernel/msg319552.html
 
-Thanks,
+Then, it implements 4 levels of translation tables for native, HYP
+and stage2 sides.
 
-Gregory
+All ARMv8 and ARMv7 related changes are validated with FastModels+kvmtool
+and A15+QEMU, respectively.
 
-> ---
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> index ff049ee..0cf999a 100644
-> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
-> @@ -138,7 +138,6 @@
->  			};
->  
->  			serial at 12000 {
-> -				clocks = <&coreclk 0>;
->  				status = "okay";
->  			};
->  
-> 
+Changes since v1:
+- fixed unmatched data types as per Steve's comment
+- removed unnecessary #ifdef in arch/arm64/mm/* as per Steve's comment
+- revised create_pgd_entry to deal with PUD entry as per Steve's comment
+- introduced a macro for initial memblock limit as per Steve's comment
+- dropped "Fix line length exceeding 80 characters" patch as per Marc's comment
+- removed unnecessary #ifdef in arch/arm/kvm/mmu.c as per Marc's comment
+- added a macro for a number of objects of as per Marc's comment
 
+Changes since v2:
+- revised some macros in a generic way as per Marc's comment
+- added a 2 level option for kvm mmu cache allocation as per Marc's comment
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jungseok Lee (7):
+      arm64: Use pr_* instead of printk
+      arm64: Decouple page size from level of translation tables
+      arm64: Introduce a kernel configuration option for VA_BITS
+      arm64: Add a description on 48-bit address space with 4KB pages
+      arm64: Add 4 levels of page tables definition with 4KB pages
+      arm64: mm: Implement 4 levels of translation tables
+      arm64: KVM: Implement 4 levels of translation tables for HYP and stage2
+
+ Documentation/arm64/memory.txt                |   59 +++++++++--
+ arch/arm/include/asm/kvm_mmu.h                |   10 ++
+ arch/arm/kvm/mmu.c                            |   88 ++++++++++++++---
+ arch/arm64/Kconfig                            |   51 +++++++++-
+ arch/arm64/include/asm/kvm_arm.h              |   34 +++++--
+ arch/arm64/include/asm/kvm_mmu.h              |   12 +++
+ arch/arm64/include/asm/memblock.h             |    6 ++
+ arch/arm64/include/asm/memory.h               |    6 +-
+ arch/arm64/include/asm/page.h                 |    6 +-
+ arch/arm64/include/asm/pgalloc.h              |   24 ++++-
+ arch/arm64/include/asm/pgtable-4level-hwdef.h |   50 ++++++++++
+ arch/arm64/include/asm/pgtable-4level-types.h |   71 +++++++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h        |    8 +-
+ arch/arm64/include/asm/pgtable.h              |   52 ++++++++--
+ arch/arm64/include/asm/tlb.h                  |   10 +-
+ arch/arm64/kernel/head.S                      |   40 +++++---
+ arch/arm64/kernel/traps.c                     |   19 ++--
+ arch/arm64/mm/fault.c                         |    1 +
+ arch/arm64/mm/mmu.c                           |   16 ++-
+ 19 files changed, 495 insertions(+), 68 deletions(-)
