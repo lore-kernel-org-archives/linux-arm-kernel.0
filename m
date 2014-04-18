@@ -1,87 +1,124 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 18 Apr 2014 15:02:44 +0200
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <20140411163129.GA20565@obsidianresearch.com>
-References: <20140410181953.50ccfcc3@skate>
- <20140410165733.GB23104@obsidianresearch.com>
- <20140410200153.46669e0c@skate>
- <20140410201201.GA12661@obsidianresearch.com>
- <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
- <20140411122314.220614bf@skate>
- <20140411163129.GA20565@obsidianresearch.com>
-Message-ID: <20140418150244.4b3d5229@skate>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Apr 2014 15:09:01 +0200
+Subject: [PATCH v2 04/11] clk: at91: add slow clk documentation
+In-Reply-To: <1395649643-9146-5-git-send-email-b.brezillon.dev@gmail.com>
+References: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1395649643-9146-5-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <535123ED.9070303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+On 24/03/2014 09:27, Boris BREZILLON :
+> Add slow clk, and slow oscillators documentation.
+> 
+> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> ---
+>  .../devicetree/bindings/clock/at91-clock.txt       |   72 ++++++++++++++++++++
+>  1 file changed, 72 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> index 9a7025b..820061c 100644
+> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> @@ -6,6 +6,16 @@ This binding uses the common clock binding[1].
+>  
+>  Required properties:
+>  - compatible : shall be one of the following:
+> +	"atmel,at91sam9x5-sckc":
+> +		at91 SCKC (Slow Clock Controller)
+> +		This node contains the slow clock definitions.
+> +
+> +	"atmel,at91sam9x5-clk-slow-osc":
+> +		at91 slow oscillator
+> +
+> +	"atmel,at91sam9x5-clk-slow-rc-osc":
+> +		at91 internal slow RC oscillator
+> +
+>  	"atmel,at91rm9200-pmc" or
+>  	"atmel,at91sam9g45-pmc" or
+>  	"atmel,at91sam9n12-pmc" or
+> @@ -15,6 +25,11 @@ Required properties:
+>  		All at91 specific clocks (clocks defined below) must be child
+>  		node of the PMC node.
+>  
+> +	"atmel,at91sam9x5-clk-slow" (under sckc node)
+> +	or
+> +	"atmel,at91sam9260-clk-slow" (under pmc node):
+> +		at91 slow clk
+> +
+>  	"atmel,at91rm9200-clk-main-osc"
+>  	"atmel,at91sam9x5-clk-main-rc-osc"
+>  		at91 main clk sources
+> @@ -59,6 +74,63 @@ Required properties:
+>  	"atmel,at91sam9x5-clk-utmi":
+>  		at91 utmi clock
+>  
+> +Required properties for SCKC node:
+> +- reg : defines the IO memory reserved for the SCKC.
+> +- #size-cells : shall be 0 (reg is used to encode clk id).
+> +- #address-cells : shall be 1 (reg is used to encode clk id).
+> +
+> +
+> +For example:
+> +	ckc: sckc at fffffe50 {
 
-On Fri, 11 Apr 2014 10:31:29 -0600, Jason Gunthorpe wrote:
+s/ckc/sckc/ ?
 
-> > Moreover, I am not entirely convinced that a PHY reset is needed here.
-> > In my tests, doing just a wait after setting the local dev number was
-> > sufficient. The fact is works with earlyprintk also indicates that we
-> > don't need to do any specific action with the PHY, just to wait a bit
-> > of time. I am worried that resetting the PHY might actually take more
-> > time than what is needed, and may have other consequences that we don't
-> > necessarily understand at this point.
-> 
-> I really disagree - clearly the fundamental problem is suspending one
-> side of the PEX link while the other remains operating. That isn't
-> specified to work and really shouldn't work.
-> 
-> If you suspend one side of the PEX you *MUST* reset the
-> link. Absolutely. No Doubt In My Mind.
-> 
-> Remember, PCI-E is a serial shared state protocol. The two sides must
-> remain in sync or a link reset is required to recover the shared
-> state. Halting one side obviously destroys this invariant.
-> 
-> I think in many cases the reset happens autonomously. The remote side
-> will force it to happen. This is what the debugging from Neil shows -
-> the link just resets at some inconvenient point. Now we know why.
-> 
-> The timing sensitivity also makes sense, if you suspend for a very
-> short time window the other side might not notice. If you suspend for
-> longer the other side will reset the link autonomously and your local
-> side will quickly notice the reset once it comes back.
-> 
-> If you suspend for a little bit the link might not retrain immediately
-> but the shared state can become corrupted (eg sequence number
-> mismatch) this will eventually trigger a reset, after the local PEX
-> has been operating again.
-> 
-> The LinkUp bit after resume is also clearly a lie - most likely the
-> PEX takes some time to detect the change in remote state to trigger a
-> link down. After all, it was suspended while the remote was busy
-> trying to recover.
 
-Ok, fair enough. However, Neil's patch (which is basically your patch
-with longer delays) isn't working here, as I just reported in a
-separate e-mail.
-
-So we don't have a solution right now. Do you have another proposal to
-try ?
-
-> The fundamental problem here is the clock driver. It should not be
-> gating PEX clocks so naively. A PEX suspend needs to be sequenced to
-> ensure the link is cleanly brought down before the PEX is put to
-> sleep. That way it can cleanly and unambiguously be started up when it
-> resumes. No risk of glitching/corrupting the far side with some kind
-> of crap on the serial bus.
+> +		compatible = "atmel,sama5d3-pmc";
+> +		reg = <0xfffffe50 0x4>
+> +		#size-cells = <0>;
+> +		#address-cells = <1>;
+> +
+> +		/* put at91 slow clocks here */
+> +	};
+> +
+> +
+> +Required properties for internal slow RC oscillator:
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clock-frequency : define the internal RC oscillator frequency.
+> +
+> +Optional properties:
+> +- clock-accuracy : define the internal RC oscillator accuracy.
+> +
+> +For example:
+> +	slow_rc_osc: slow_rc_osc {
+> +		compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
+> +		clock-frequency = <32768>;
+> +		clock-accuracy = <50000000>;
+> +	};
+> +
+> +Required properties for slow oscillator:
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : shall encode the main osc source clk sources (see atmel datasheet).
+> +
+> +Optional properties:
+> +- atmel,osc-bypass : boolean property. Set this when a clock signal is directly
+> +  provided on XIN.
+> +
+> +For example:
+> +	slow_osc: slow_osc {
+> +		compatible = "atmel,at91rm9200-clk-slow-osc";
+> +		#clock-cells = <0>;
+> +		clocks = <&slow_xtal>;
+> +	};
+> +
+> +Required properties for slow clock:
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : shall encode the slow clk sources (see atmel datasheet).
+> +
+> +For example:
+> +	clk32k: slck {
+> +		compatible = "atmel,at91sam9x5-clk-slow";
+> +		#clock-cells = <0>;
+> +		clocks = <&slow_rc_osc &slow_osc>;
+> +	};
+> +
+>  Required properties for PMC node:
+>  - reg : defines the IO memory reserved for the PMC.
+>  - #size-cells : shall be 0 (reg is used to encode clk id).
 > 
-> In any event, the most important required patch here is one that fixes
-> socid. It must not turn off the PEX clock. Then we can talk about how
-> to fix pci-mvebu to work as a module...
 
-I don't really understand this: all clocks are gated at boot time, so
-regardless of mvebu-soc-id behavior, the PCIe driver should take care
-of doing all the necessary initialization without making the
-assumptions that the clocks were left turned on from the bootloader
-time. This is needed if we want to support pci-mvebu as a module, so I
-don't see why hacking mvebu-soc-id is going to solve this.
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Nicolas Ferre
