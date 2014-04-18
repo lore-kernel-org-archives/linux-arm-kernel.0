@@ -1,58 +1,124 @@
-From: wuqixuan@huawei.com (Wuqixuan)
-Date: Fri, 18 Apr 2014 09:53:07 +0000
-Subject: [PATCH] ARM: armv7 no need update SCTLR for alignment 
-Message-ID: <BB7C62C2B0732E4DA93834A501E846456C8F1A92@szxema505-mbx.china.huawei.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 18 Apr 2014 11:01:27 +0100
+Subject: [PATCH] ARM: imx: add HDMI support for SolidRun HummingBoard and
+ Cubox-i
+Message-ID: <E1Wb5br-0002ZE-T3@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Armv7, cr_alignment and cr_no_alignment are always same, in alignment_init both 
-cr_alignment and cr_no_alignment will be updated by clearing A bit. So there is no 
-meaning to update SCTLR if interrupt and exception disturbs the user-space. 
+Add the HDMI DT configuration for the SolidRun HummingBoard and Cubox-i.
 
-Signed-off-by: Wuqixuan <wuqixuan@huawei.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-diff -git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -323,12 +323,6 @@
-   A710( bne .Larm710bug      )
+ arch/arm/boot/dts/imx6dl-hummingboard.dts | 28 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+index 5bfae54fb780..d3095f58bf7b 100644
+--- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
++++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+@@ -67,6 +67,14 @@
+ 	status = "okay";
+ };
  
- #endif
--#if defined(CONFIG_ALIGNMENT_TRAP)
-+#if defined(CONFIG_ALIGNMENT_TRAP) && !(__LINUX_ARM_ARCH__ >= 7)
- ldr ip, __cr_alignment
- ldr ip, [ip]
- mcr p15, 0, ip, c1, c0  @ update control register
-#endif
-  enable_irq
++&hdmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hummingboard_hdmi>;
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++	crtcs = <&ipu1 0>;
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hummingboard_i2c1>;
+@@ -82,6 +90,13 @@
+ 	 */
+ };
  
-  get_thread_info tsk
-@@ -393,11 +387,6 @@
-  b ret_slow_syscall
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hummingboard_i2c2>;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	hummingboard {
+ 		pinctrl_hummingboard_flexcan1: hummingboard-flexcan1 {
+@@ -97,6 +112,12 @@
+ 			>;
+ 		};
  
-  .align 5
--#ifdef CONFIG_ALIGNMENT_TRAP
-+#if defined(CONFIG_ALIGNMENT_TRAP) && !(__LINUX_ARM_ARCH__ >= 7)
- .type __cr_alignment, #object
-__cr_alignment:
- .word cr_alignment
-#endif
-  .ltorg
++		pinctrl_hummingboard_hdmi: hummingboard-hdmi {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
++			>;
++		};
++
+ 		pinctrl_hummingboard_i2c1: hummingboard-i2c1 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
+@@ -104,6 +125,13 @@
+ 			>;
+ 		};
  
- /*
-diff -git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -44,11 +44,6 @@
-  .endm
++		pinctrl_hummingboard_i2c2: hummingboard-i2c2 {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_hummingboard_spdif: hummingboard-spdif {
+ 			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
+ 		};
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index c2a24888a276..5b9e7bceedaa 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -55,6 +55,21 @@
+ 	};
+ };
  
-  .macro alignment_trap, rtemp
--#ifdef CONFIG_ALIGNMENT_TRAP 
-+#if defined(CONFIG_ALIGNMENT_TRAP) && !(__LINUX_ARM_ARCH__ >= 7)
- ldr \rtemp, .LCcralign
- ldr \rtemp, [\rtemp]
- mcr p15, 0, \rtemp, c1, c0
-#endif
-  .endm
++&hdmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_cubox_i_hdmi>;
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++	crtcs = <&ipu1 0>;
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_cubox_i_i2c2>;
++	status = "okay";
++};
++
+ &i2c3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_cubox_i_i2c3>;
+@@ -69,6 +84,19 @@
  
-  @
+ &iomuxc {
+ 	cubox_i {
++		pinctrl_cubox_i_hdmi: cubox-i-hdmi {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
++			>;
++		};
++
++		pinctrl_cubox_i_i2c2: cubox-i-i2c2 {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
++			>;
++		};
++
+ 		pinctrl_cubox_i_i2c3: cubox-i-i2c3 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_EIM_D17__I2C3_SCL 0x4001b8b1
+-- 
+1.8.3.1
