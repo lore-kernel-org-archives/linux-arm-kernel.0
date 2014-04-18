@@ -1,141 +1,124 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Apr 2014 14:19:49 +0200
-Subject: [PATCH 4/8] ARM: mvebu: Add USB3 UTMI support
-In-Reply-To: <53510A4D.8050706@gmail.com>
-References: <1397816563-9000-1-git-send-email-gregory.clement@free-electrons.com>
- <1397816563-9000-5-git-send-email-gregory.clement@free-electrons.com>
- <53510A4D.8050706@gmail.com>
-Message-ID: <53511865.701@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 18 Apr 2014 14:19:46 +0200
+Subject: [PATCH 0/7] Fixes for Armada 370/XP PCIe
+Message-ID: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+Hello,
 
-On 18/04/2014 13:19, Sebastian Hesselbarth wrote:
-> On 04/18/2014 12:22 PM, Gregory CLEMENT wrote:
->> The usb3-utmi registers allow to configure the internal USB PHY of the
->> Armada 380/385 SoCs. A small initialization is needed to be able to use
->> the USB3 ports.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm/mach-mvebu/Makefile   |  2 +-
->>  arch/arm/mach-mvebu/usb-utmi.c | 64 ++++++++++++++++++++++++++++++++++++++++++
-> 
-> Gregory,
-> 
-> there is the generic PHY framework, that could possibly be used to
-> avoid adding more code to arch/arm/mach-mvebu.
+This set of commits fixes a number of problems in the PCIe support of
+the Armada 370 and Armada XP SoCs, allowing to use PCIe devices that
+were not properly supported until now.
 
-Given the very low information I have about UTMI I was a bit reluctant to
-write a driver. This is, for me, more a platform specific initialization than
-something which can be used for a driver. However I will have a look on it.
+Due to the interaction of PCIe with other subsystems, the fixes are
+not limited to drivers/pci, but also touch drivers/bus and
+drivers/irqchip.
 
-> 
->>  2 files changed, 65 insertions(+), 1 deletion(-)
->>  create mode 100644 arch/arm/mach-mvebu/usb-utmi.c
->>
->> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
->> index a63e43b6b451..2d98a3eeecf6 100644
->> --- a/arch/arm/mach-mvebu/Makefile
->> +++ b/arch/arm/mach-mvebu/Makefile
->> @@ -4,7 +4,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->>  AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
->>  
->>  obj-y				 += system-controller.o mvebu-soc-id.o
->> -obj-$(CONFIG_MACH_MVEBU_V7)      += board-v7.o
->> +obj-$(CONFIG_MACH_MVEBU_V7)      += board-v7.o  usb-utmi.o
->>  obj-$(CONFIG_MACH_DOVE)		 += dove.o
->>  obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
->>  obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
->> diff --git a/arch/arm/mach-mvebu/usb-utmi.c b/arch/arm/mach-mvebu/usb-utmi.c
->> new file mode 100644
->> index 000000000000..e91e86f85eb4
->> --- /dev/null
->> +++ b/arch/arm/mach-mvebu/usb-utmi.c
->> @@ -0,0 +1,64 @@
->> +/*
->> + * USB UTMI support for Armada 38x platform.
->> + *
->> + * Copyright (C) 2014 Marvell
->> + *
->> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + *
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/of_address.h>
->> +#include <linux/io.h>
->> +#include <linux/slab.h>
-> 
-> nit: sort alphabetically
+Here are the details of the patches:
 
-Right
+ * The first three patches are fixes in the MSI handling. They fix
+   problems with PCIe device drivers trying to use MSI-X (which we
+   don't support), and incorrect freeing of MSIs causing kernel panics
+   when PCIe device drivers try to allocate/free MSIs several times.
 
-> 
->> +#define USB_UTMI_PHY_CTRL_STATUS(i)	(0x20+i*4)
->> +#define		USB_UTMI_TX_BITSTUFF_EN BIT(1)
->> +#define		USB_UTMI_PU_PHY		BIT(5)
->> +#define		USB_UTMI_VBUS_ON_PHY	BIT(6)
-> 
-> nit: two TABs in front of the defines above.
+   They touch drivers/irqchip/ only, and they are independent from the
+   rest of the series, both from a build and a runtime point of view.
 
-Right
+   These bugs exist since the MSI support was added, in v3.13. The
+   commits carry the necessary Fixes and Cc to stable informations.
 
-> 
->> +static struct of_device_id of_usb_utmi_table[] = {
->> +	{ .compatible = "marvell,armada-380-usb-utmi", },
->> +	{ /* end of list */ },
->> +};
->> +
->> +static int __init mvebu_usb_utmi_init(void)
->> +{
->> +	struct device_node *np;
->> +
->> +	np = of_find_matching_node(NULL, of_usb_utmi_table);
->> +	if (np) {
->> +		void __iomem *usb_utmi_base, *utmi_base;
->> +
->> +		usb_utmi_base = of_iomap(np, 0);
->> +		BUG_ON(!usb_utmi_base);
->> +
->> +		utmi_base = of_iomap(np, 1);
->> +		BUG_ON(!utmi_base);
->> +
->> +		writel(USB_UTMI_TX_BITSTUFF_EN |
->> +			   USB_UTMI_PU_PHY |
->> +			   USB_UTMI_VBUS_ON_PHY,
->> +			   usb_utmi_base + USB_UTMI_PHY_CTRL_STATUS(0));
->> +
->> +		/*
->> +		 * Magic init... the registers and their value are not
->> +		 * documented
->> +		 */
->> +		writel(0x40605205, utmi_base);
->> +		writel(0x409, utmi_base + 4);
->> +		writel(0x1be7f6f, utmi_base + 0xc);
-> 
-> nit: decimal/hexadecimal offsets, also IMHO filling the values
+ * The fourth patch fixes an off-by-one in the computed size of MBus
+   windows. This only worked because the mvebu-mbus driver was
+   silently accepting invalid sizes. I've marked it for stable because
+   it really is bug, but even though it's not visible by itself, it is
+   needed for other patches in the series.
 
-OK
+   This patch touches drivers/pci/host, and should probably be taken
+   by the mvebu maintainers, with the Ack of the PCI maintainer, as it
+   is a runtime dependency for the next patch.
 
-> written with leading zeros improves readability of "magic init"
-> alot :)
+   This patch is marked for stable all the way to when the PCI driver
+   was introduced.
 
-Well it still remains magic! But I will do it.
+ * The fifth patch make the mvebu-mbus driver check (and loudly
+   complain) if it is asked to create invalid regions (whose base
+   address or size are not compatible with the documented MBus
+   requirements).
+
+   This patch touches drivers/bus, and should probably be taken by the
+   mvebu maintainers. As explained above, it is mandatory to have
+   PATCH 4 applied before PATCH 5: there is a runtime dependency
+   between the two (but no build time dependency).
+
+   This patch is not marked for stable, as it only adds some
+   additional debugging information, which while very useful, is not
+   technically stable material.
+
+ * The sixth patch relaxes a check in mvebu-mbus driver about
+   conflicting windows, which is necessary
+
+   This patch touches drivers/bus, and should probably be taken by the
+   mvebu maintainers. It is not a fix by itself, but it is required
+   for the last patch, which is a fix. Therefore, it is marked for
+   stable, all the way to when the mvebu-mbus driver was introduced.
+
+ * The seventh patch improves the pci-mvebu driver to allow the
+   creation of multiple MBus windows when the PCI BAR calculated by
+   the Linux PCI core has a non power-of-two size. This is needed
+   because MBus windows can only have power-of-two sizes. Until now,
+   we were configuring invalid MBus windows, which with certain PCIe
+   devices, was either causing kernel panics at boot time or
+   misfunction of the device.
+
+These patches have been tested by Neil Greatorex
+<neil@fatboyfat.co.uk> who initially reported the issues, have also
+been tested by Willy Tarreau and Matthew Winter (even though they
+didn't give their formal Tested-by [1] [2]), and have been heavily
+discussed with Jason Gunthorpe.
+
+Note that there are still two known issues in the mvebu PCIe handling:
+
+ 1/ When earlyprintk is disabled, we have a timing / PHY reset issue
+    which leads to the PCIe device connected on the first interface to
+    not be detected. We already have patches floating around, but
+    nothing that we are all happy with yet.
+
+ 2/ When a PCI IGB card is plugged with many other PCI devices in a
+    system, the IGB card initialization doesn't work ('igb
+    0000:01:00.0: The NVM Checksum Is Not Valid'). We are still
+    working on this issue.
+
+These two issues will be handled separately.
 
 Thanks,
 
-Gregory
+Thomas
 
+[1] http://www.spinics.net/lists/linux-pci/msg30406.html
+[2] http://www.spinics.net/lists/linux-pci/msg30444.html
+
+Jason Gunthorpe (1):
+  bus: mvebu-mbus: Avoid setting an undefined window size
+
+Neil Greatorex (1):
+  irqchip: armada-370-xp: Fix releasing of MSIs
+
+Thomas Petazzoni (4):
+  irqchip: armada-370-xp: fix invalid cast of signed value into unsigned
+    variable
+  irqchip: armada-370-xp: implement the ->check_device() msi_chip
+    operation
+  bus: mvebu-mbus: allow several windows with the same target/attribute
+  pci: pci-mvebu: split PCIe BARs into multiple MBus windows when needed
+
+Willy Tarreau (1):
+  pci: mvebu: fix off-by-one in the computed size of the mbus windows
+
+ drivers/bus/mvebu-mbus.c            | 22 ++++++---
+ drivers/irqchip/irq-armada-370-xp.c | 17 +++++--
+ drivers/pci/host/pci-mvebu.c        | 92 ++++++++++++++++++++++++++++++-------
+ 3 files changed, 106 insertions(+), 25 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.2
