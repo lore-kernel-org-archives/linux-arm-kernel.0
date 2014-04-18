@@ -1,33 +1,113 @@
-From: triplesquarednine@gmail.com (jordan)
-Date: Thu, 17 Apr 2014 21:15:50 -0400
-Subject: BUG: spinlock trylock failure on UP - reverting timer patches
- helps
-In-Reply-To: <CAOcfFMyTmQH-FwGE2YWoA76ypzBtWPYVTyi+4QpEMnrRtw8QVg@mail.gmail.com>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org> <53500184.4050309@meduna.org>
- <53505BD7.9050004@meduna.org>
- <CAOcfFMyTmQH-FwGE2YWoA76ypzBtWPYVTyi+4QpEMnrRtw8QVg@mail.gmail.com>
-Message-ID: <CAOcfFMz6U+w_h+0GoAB4OMbEGsDo_h=vCobvgxuBtLTijW3VmQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 18 Apr 2014 11:20:33 +0900
+Subject: [PATCH 1/2] cpufreq: exynos: Use dev_err/info function instead of
+ pr_err/info
+In-Reply-To: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>
+References: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1397787634-9334-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey again,
+This patch uses dev_err/info function to show accurate log message with device name
+instead of pr_err/info function.
 
-> [ninez at localhost ~]$  (cat /proc/meminfo ; cat /proc/meminfo) |  grep
-> KernelStack
-> KernelStack:        3728 kB
-> KernelStack:        3728 kB
-> [ninez at localhost ~]$  (cat /proc/meminfo ; cat /proc/meminfo) |  grep
-> KernelStack
-> KernelStack:        3696 kB
-> KernelStack:        3696 kB
->
-> I'll post from my old kernel in a bit.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/cpufreq/exynos-cpufreq.c | 21 ++++++++++++---------
+ drivers/cpufreq/exynos-cpufreq.h |  1 +
+ 2 files changed, 13 insertions(+), 9 deletions(-)
 
-my other machines all report kstack as being stable/consistent - I
-also had an Archlinux user of my kernel check his box - his was
-consistent too. [all of those boxes reverted those timer patches].
-
-cheerz
-
-Jordan
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index f99cfe2..8b4bb4a 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -49,6 +49,7 @@ static int exynos_cpufreq_scale(unsigned int target_freq)
+ 	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+ 	unsigned int arm_volt, safe_arm_volt = 0;
+ 	unsigned int mpll_freq_khz = exynos_info->mpll_freq_khz;
++	struct device *dev = exynos_info->dev;
+ 	unsigned int old_freq;
+ 	int index, old_index;
+ 	int ret = 0;
+@@ -90,8 +91,8 @@ static int exynos_cpufreq_scale(unsigned int target_freq)
+ 		/* Firstly, voltage up to increase frequency */
+ 		ret = regulator_set_voltage(arm_regulator, arm_volt, arm_volt);
+ 		if (ret) {
+-			pr_err("%s: failed to set cpu voltage to %d\n",
+-				__func__, arm_volt);
++			dev_err(dev, "failed to set cpu voltage to %d\n",
++				arm_volt);
+ 			return ret;
+ 		}
+ 	}
+@@ -100,8 +101,8 @@ static int exynos_cpufreq_scale(unsigned int target_freq)
+ 		ret = regulator_set_voltage(arm_regulator, safe_arm_volt,
+ 				      safe_arm_volt);
+ 		if (ret) {
+-			pr_err("%s: failed to set cpu voltage to %d\n",
+-				__func__, safe_arm_volt);
++			dev_err(dev, "failed to set cpu voltage to %d\n",
++				safe_arm_volt);
+ 			return ret;
+ 		}
+ 	}
+@@ -115,8 +116,8 @@ static int exynos_cpufreq_scale(unsigned int target_freq)
+ 		ret = regulator_set_voltage(arm_regulator, arm_volt,
+ 				arm_volt);
+ 		if (ret) {
+-			pr_err("%s: failed to set cpu voltage to %d\n",
+-				__func__, arm_volt);
++			dev_err(dev, "failed to set cpu voltage to %d\n",
++				arm_volt);
+ 			goto out;
+ 		}
+ 	}
+@@ -163,6 +164,8 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+ 	if (!exynos_info)
+ 		return -ENOMEM;
+ 
++	exynos_info->dev = &pdev->dev;
++
+ 	if (soc_is_exynos4210())
+ 		ret = exynos4210_cpufreq_init(exynos_info);
+ 	else if (soc_is_exynos4212() || soc_is_exynos4412())
+@@ -176,13 +179,13 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+ 		goto err_vdd_arm;
+ 
+ 	if (exynos_info->set_freq == NULL) {
+-		pr_err("%s: No set_freq function (ERR)\n", __func__);
++		dev_err(&pdev->dev, "No set_freq function (ERR)\n");
+ 		goto err_vdd_arm;
+ 	}
+ 
+ 	arm_regulator = regulator_get(NULL, "vdd_arm");
+ 	if (IS_ERR(arm_regulator)) {
+-		pr_err("%s: failed to get resource vdd_arm\n", __func__);
++		dev_err(&pdev->dev, "failed to get resource vdd_arm\n");
+ 		goto err_vdd_arm;
+ 	}
+ 
+@@ -192,7 +195,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+ 	if (!cpufreq_register_driver(&exynos_driver))
+ 		return 0;
+ 
+-	pr_err("%s: failed to register cpufreq driver\n", __func__);
++	dev_err(&pdev->dev, "failed to register cpufreq driver\n");
+ 	regulator_put(arm_regulator);
+ err_vdd_arm:
+ 	kfree(exynos_info);
+diff --git a/drivers/cpufreq/exynos-cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
+index 3ddade8..b72ff10 100644
+--- a/drivers/cpufreq/exynos-cpufreq.h
++++ b/drivers/cpufreq/exynos-cpufreq.h
+@@ -34,6 +34,7 @@ struct apll_freq {
+ };
+ 
+ struct exynos_dvfs_info {
++	struct device	*dev;
+ 	unsigned long	mpll_freq_khz;
+ 	unsigned int	pll_safe_idx;
+ 	struct clk	*cpu_clk;
+-- 
+1.8.0
