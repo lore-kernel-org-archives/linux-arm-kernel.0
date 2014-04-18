@@ -1,28 +1,37 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 18 Apr 2014 11:24:10 +0200 (CEST)
-Subject: [patch 5/6] edma: Make reading the position of active channels
- work
-In-Reply-To: <alpine.DEB.2.02.1404180834520.22697@ionos.tec.linutronix.de>
-References: <20140417133737.892475126@linutronix.de>
- <20140417143249.889774979@linutronix.de> <5350761C.6010109@ti.com>
- <alpine.DEB.2.02.1404180834520.22697@ionos.tec.linutronix.de>
-Message-ID: <alpine.DEB.2.02.1404181123150.22697@ionos.tec.linutronix.de>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Fri, 18 Apr 2014 11:30:21 +0200
+Subject: Rockchip RK3188 I2C driver
+In-Reply-To: <1437066.E9nAxXbK6K@phil>
+References: <3748421.ND1tAjvgKS@typ> <15224827.56gI5cqpbK@typ>
+ <1437066.E9nAxXbK6K@phil>
+Message-ID: <2664026.dY5rX8rfNU@typ>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Apr 2014, Thomas Gleixner wrote:
-> On Thu, 17 Apr 2014, Joel Fernandes wrote:
-> > Here's a thread that discusses it and the end conclusion is that it
-> > should be fine (Kyle Kastile is one of the EDMA hardware designers).
-> > http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
+On Friday 18 April 2014 at 11:06:56, Heiko St?bner wrote:
+> > I think Heiko and I have been operating under the misconception that
+> > caching is somehow enabled by default - which is not the case. Thanks for
+> > clearing that up ;-)
 > 
-> Gah, right I saw the issues with the original code, which does a
-> memcpy_fromio which copies byte by byte. Did not think about retrying
-> with the edma_read() based one.
+> Actually I think it's the other way around :-).
+> 
+> See regmap_read() calling _reagmap_read(), which in turn calls
+> regcache_read(), except when map->cache_bypass is enabled, which then checks
+> the volatile setting for the individual register.
 
-Actually I did expect memcpy_fromio to be more clever. But you are
-right, using the 32bit wide read works like a charm.
+But map->cache_bypass *is* enabled by regcache_init() in regcache.c when 
+cache_type is REGCACHE_NONE, which is the default value:
 
-Thanks,
+if (map->cache_type == REGCACHE_NONE) {
+	map->cache_bypass = true;
+	return 0;
+}
 
-	tglx
+You can see the behaviour in detail if you compile with event tracing and boot 
+with trace_event=regmap:* .
+
+If you think about it, it would be quite insane to enable caching in syscon 
+without knowing anything about the registers.
+
+Cheers,
+  Max
