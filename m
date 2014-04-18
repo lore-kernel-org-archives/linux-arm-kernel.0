@@ -1,131 +1,217 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 18 Apr 2014 16:43:01 +0200
-Subject: [PATCH 4/4] ARM: dts: exynos4: Add CPU topology data
+Date: Fri, 18 Apr 2014 16:43:00 +0200
+Subject: [PATCH 3/4] irqchip: gic: Add support for per CPU bank offset
+ specification in DT
 In-Reply-To: <1397832181-5153-1-git-send-email-t.figa@samsung.com>
 References: <1397832181-5153-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1397832181-5153-5-git-send-email-t.figa@samsung.com>
+Message-ID: <1397832181-5153-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After fixing non-banked GIC support in GIC driver, CPU nodes can be
-safely added to Exynos4 device tree sources, along with appropriate
-gic-offset properties.
+On most platforms GIC registers are banked, so each CPU can access its
+registers at the same address. However there is a small number of SoCs
+on which the banking is not implemented and each CPU has its GIC
+register set at different offset from GIC base address.
+
+Originally the driver used simple maths to calculate the address, i.e.
+multiplying constant percpu_offset by cpu_logical_map(cpu). However this
+assumed the namespace of cpu_logical_map() to be from 0 to num_cpus-1,
+but if CPU topology is specified via DT, this changes to full ID in
+the same format as MPIDR register and thus breaks the assumption.
+
+This patch adds support for per CPU GIC bank offset specification
+through device tree to separate SoC-internal core wiring from CPU
+multi-processor IDs.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/boot/dts/exynos4210.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/exynos4212.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/exynos4412.dtsi | 37 +++++++++++++++++++++++++++++++++----
- 3 files changed, 71 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/arm/cpus.txt |  7 ++
+ Documentation/devicetree/bindings/arm/gic.txt  | 34 +++++++++-
+ drivers/irqchip/irq-gic.c                      | 94 ++++++++++++++++++--------
+ 3 files changed, 105 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index cacf614..e463361 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -25,6 +25,25 @@
- / {
- 	compatible = "samsung,exynos4210", "samsung,exynos4";
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 333f4ae..47654e6 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -209,6 +209,13 @@ nodes to be present and contain the properties described below.
+ 		Value type: <phandle>
+ 		Definition: Specifies the ACC[2] node associated with this CPU.
  
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 900 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0x900>;
-+			gic-offset = <0x0000>;
-+		};
-+
-+		cpu at 901 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0x901>;
-+			gic-offset = <0x8000>;
-+		};
-+	};
-+
- 	aliases {
- 		pinctrl0 = &pinctrl_0;
- 		pinctrl1 = &pinctrl_1;
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 3c00e6e..211e129 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -22,6 +22,25 @@
- / {
- 	compatible = "samsung,exynos4212", "samsung,exynos4";
++	- gic-offset
++		Usage: required for systems that have non-banked GIC
++		       implementation that requires each CPU to use different
++		       offset to access its set of GIC registers
++		Value type: <u32>
++		Definition: Specifies the offset of GIC registers specific to
++			    this CPU.
  
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+ 
+diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+index 5573c08..2bd03406 100644
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@ -48,7 +48,7 @@ Optional
+ 
+ - cpu-offset	: per-cpu offset within the distributor and cpu interface
+   regions, used when the GIC doesn't have banked registers. The offset is
+-  cpu-offset * cpu-nr.
++  cpu-offset * cpu-nr. (DEPRECATED, see per-CPU 'gic-offset' property.)
+ 
+ - arm,routable-irqs : Total number of gic irq inputs which are not directly
+ 		  connected from the peripherals, but are routed dynamically
+@@ -67,6 +67,38 @@ Example:
+ 		      <0xfff10100 0x100>;
+ 	};
+ 
++* Per-CPU register offset specification for non-banked GIC
++
++On most platforms GIC registers are banked, so each CPU can access its
++registers at the same address. However there is a small number of SoCs
++on which the banking is not implemented and each CPU has its GIC
++register set at different offset from GIC base address. These offsets
++need to be be provided from device tree, as described below.
++
++Optional properties in node of each CPU in the system:
++
++ - gic-offset : A single u32 value that needs to be added to GIC base
++   address to calculate address of GIC registers for that CPU.
++
++See [1] for more details about ARM CPU bindings.
++
++Example:
++
 +	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++		/* ... */
 +
 +		cpu at a00 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0xa00>;
++			/* ... */
 +			gic-offset = <0x0000>;
 +		};
 +
 +		cpu at a01 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0xa01>;
++			/* ... */
 +			gic-offset = <0x8000>;
 +		};
 +	};
 +
- 	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <18>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 15d3c0a..04530ef 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -22,11 +22,40 @@
- / {
- 	compatible = "samsung,exynos4412", "samsung,exynos4";
++[1] Documentation/devicetree/bindings/arm/cpus.txt
  
--	combiner: interrupt-controller at 10440000 {
--		samsung,combiner-nr = <20>;
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at a00 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0xa00>;
-+			gic-offset = <0x0000>;
-+		};
-+
-+		cpu at a01 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0xa01>;
-+			gic-offset = <0x4000>;
-+		};
-+
-+		cpu at a02 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0xa02>;
-+			gic-offset = <0x8000>;
-+		};
-+
-+		cpu at a03 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0xa03>;
-+			gic-offset = <0xc000>;
-+		};
- 	};
+ * GIC virtualization extensions (VGIC)
  
--	gic: interrupt-controller at 10490000 {
--		cpu-offset = <0x4000>;
-+	combiner: interrupt-controller at 10440000 {
-+		samsung,combiner-nr = <20>;
- 	};
- };
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 4300b66..ad6f4fe 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -924,6 +924,69 @@ const struct irq_domain_ops gic_default_routable_irq_domain_ops = {
+ const struct irq_domain_ops *gic_routable_irq_domain_ops =
+ 					&gic_default_routable_irq_domain_ops;
+ 
++static int gic_setup_bases(struct gic_chip_data *gic, void __iomem *dist_base,
++			   void __iomem *cpu_base, u32 percpu_offset)
++{
++	bool use_cpu_nodes = true;
++	u32 offset;
++	unsigned int cpu;
++
++	for_each_possible_cpu(cpu) {
++		struct device_node *cpu_node = of_get_cpu_node(cpu, NULL);
++
++		if (!cpu_node
++		    || of_property_read_u32(cpu_node, "gic-offset", &offset)) {
++			use_cpu_nodes = false;
++			break;
++		}
++	}
++
++	if (!(percpu_offset || use_cpu_nodes)
++	    || !IS_ENABLED(CONFIG_GIC_NON_BANKED)) {
++		/* Normal, sane GIC... (or non-banked unsupported) */
++		WARN(percpu_offset || use_cpu_nodes,
++		     "GIC_NON_BANKED not enabled, ignoring %08x offset!",
++		     percpu_offset);
++
++		gic->dist_base.common_base = dist_base;
++		gic->cpu_base.common_base = cpu_base;
++		gic_set_base_accessor(gic, gic_get_common_base);
++
++		return 0;
++	}
++
++	/* Frankein-GIC without banked registers... */
++	gic->dist_base.percpu_base = alloc_percpu(void __iomem *);
++	gic->cpu_base.percpu_base = alloc_percpu(void __iomem *);
++	if (WARN_ON(!gic->dist_base.percpu_base ||
++			!gic->cpu_base.percpu_base)) {
++		free_percpu(gic->dist_base.percpu_base);
++		free_percpu(gic->cpu_base.percpu_base);
++
++		return -ENOMEM;
++	}
++
++	for_each_possible_cpu(cpu) {
++		if (use_cpu_nodes) {
++			struct device_node *cpu_node =
++						of_get_cpu_node(cpu, NULL);
++
++			of_property_read_u32(cpu_node, "gic-offset", &offset);
++		} else {
++			offset = percpu_offset * cpu_logical_map(cpu);
++		}
++
++		*per_cpu_ptr(gic->dist_base.percpu_base, cpu) =
++							dist_base + offset;
++		*per_cpu_ptr(gic->cpu_base.percpu_base, cpu) =
++							cpu_base + offset;
++	}
++
++	gic_set_base_accessor(gic, gic_get_percpu_base);
++
++	return 0;
++}
++
+ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 			   void __iomem *dist_base, void __iomem *cpu_base,
+ 			   u32 percpu_offset, struct device_node *node)
+@@ -936,36 +999,9 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	BUG_ON(gic_nr >= MAX_GIC_NR);
+ 
+ 	gic = &gic_data[gic_nr];
+-#ifdef CONFIG_GIC_NON_BANKED
+-	if (percpu_offset) { /* Frankein-GIC without banked registers... */
+-		unsigned int cpu;
+-
+-		gic->dist_base.percpu_base = alloc_percpu(void __iomem *);
+-		gic->cpu_base.percpu_base = alloc_percpu(void __iomem *);
+-		if (WARN_ON(!gic->dist_base.percpu_base ||
+-			    !gic->cpu_base.percpu_base)) {
+-			free_percpu(gic->dist_base.percpu_base);
+-			free_percpu(gic->cpu_base.percpu_base);
+-			return;
+-		}
+ 
+-		for_each_possible_cpu(cpu) {
+-			unsigned long offset = percpu_offset * cpu_logical_map(cpu);
+-			*per_cpu_ptr(gic->dist_base.percpu_base, cpu) = dist_base + offset;
+-			*per_cpu_ptr(gic->cpu_base.percpu_base, cpu) = cpu_base + offset;
+-		}
+-
+-		gic_set_base_accessor(gic, gic_get_percpu_base);
+-	} else
+-#endif
+-	{			/* Normal, sane GIC... */
+-		WARN(percpu_offset,
+-		     "GIC_NON_BANKED not enabled, ignoring %08x offset!",
+-		     percpu_offset);
+-		gic->dist_base.common_base = dist_base;
+-		gic->cpu_base.common_base = cpu_base;
+-		gic_set_base_accessor(gic, gic_get_common_base);
+-	}
++	if (gic_setup_bases(gic, dist_base, cpu_base, percpu_offset))
++		return;
+ 
+ 	/*
+ 	 * Initialize the CPU interface map to all CPUs.
 -- 
 1.9.2
