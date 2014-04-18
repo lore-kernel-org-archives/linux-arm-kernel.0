@@ -1,53 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Apr 2014 17:31:29 +0200
-Subject: [PATCH] ARM: at91: fix spi cs on sama5d3 Xplained board
-In-Reply-To: <1396336363-13709-1-git-send-email-voice.shen@atmel.com>
-References: <1396336363-13709-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <53514551.8030601@atmel.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 18 Apr 2014 17:45:04 +0200
+Subject: [PATCH RESEND] tty/serial: atmel_serial: Fix device tree documentation
+Message-ID: <1397835904-866-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2014 09:12, Bo Shen :
-> The PD16 is the CS3 for SPI0 while not SPI1.
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+RTS pin is an active low pin.
+For now, this doesn't change anything as the ACTIVE_LOW (1) flag is not
+handled in atmel_serial, but it will be in 3.16.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Okay, queued in at91-3.15-fixes. Thanks
-
-
-
-> ---
-> This patch is based on v3.14-rc8
-> 
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index ce13755..4537259 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -34,7 +34,7 @@
->  			};
->  
->  			spi0: spi at f0004000 {
-> -				cs-gpios = <&pioD 13 0>;
-> +				cs-gpios = <&pioD 13 0>, <0>, <0>, <&pioD 16 0>;
->  				status = "okay";
->  			};
->  
-> @@ -79,7 +79,7 @@
->  			};
->  
->  			spi1: spi at f8008000 {
-> -				cs-gpios = <&pioC 25 0>, <0>, <0>, <&pioD 16 0>;
-> +				cs-gpios = <&pioC 25 0>;
->  				status = "okay";
->  			};
->  
-> 
-
-
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index 17c1042b2df8..0dd0a5493a54 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -35,7 +35,7 @@ Example:
+ 		clock-names = "usart";
+ 		atmel,use-dma-rx;
+ 		atmel,use-dma-tx;
+-		rts-gpios = <&pioD 15 0>;
++		rts-gpios = <&pioD 15 1>;
+ 	};
+ 
+ - use DMA:
 -- 
-Nicolas Ferre
+1.8.5.5
