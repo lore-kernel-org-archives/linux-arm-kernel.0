@@ -1,65 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Apr 2014 13:42:02 +0100
-Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
- components tracking
-In-Reply-To: <53510C39.1020205@samsung.com>
-References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
- <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
- <20140417214709.GY24070@n2100.arm.linux.org.uk>
- <53510C39.1020205@samsung.com>
-Message-ID: <20140418124202.GD24070@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 18 Apr 2014 09:46:59 -0300
+Subject: [PATCH v2] ARM: dts: imx6qdl-sabresd: Add HDMI support
+Message-ID: <1397825219-7872-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 01:27:53PM +0200, Andrzej Hajda wrote:
-> Hi Russel,
-> 
-> Thanks for comments.
-> 
-> On 04/17/2014 11:47 PM, Russell King - ARM Linux wrote:
-> > On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
-> >> +out:
-> >> +	if (ret != -EPROBE_DEFER)
-> >> +		exynos_drm_dev_ready(&pdev->dev);
-> > So we end up with everyone needing a "ready" call in each sub-driver
-> > back into the main driver... this makes it impossible to write a
-> > generic subcomponent driver which is not tied in any way to the
-> > main driver.
-> >
-> > That is quite some restriction, and would prevent, for example, the
-> > TDA998x driver being used both with Armada DRM, tilcdc and any other
-> > driver.
-> 
-> As I see in armada driver drm is deferred in case tda998x is not yet
-> available. The same solution can be still used with pending_devices
-> approach - the main driver will not report its readiness until tda998x
-> is present.
-> 
-> Anyway it still seems to be better than componentize every driver which can
-> probably become a part of some superdevice.
-> 
-> If you want to get rid of deferred probe one can make global list of
-> 'ready' devices with notifications systems for master devices.
-> 
-> Maybe it would be good to consider notification system for devices probe
-> result,
-> it will require that driver register all its interfaces in probe, ie its
-> readiness cannot
-> be reported later but will not require to add new framework. I hope just
-> extending current
-> notification system should be enough.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-You aren't addressing my point.  If I were to convert tda998x to use
-your infrastructure, then I would have to add in ifdefs to tie it into
-armada DRM _and_ a different set of ifdefs to tie it into tilcdc.  Then
-when someone else wanted to use it in their driver, they'd have to add
-yet more ifdefs into it to tie it into their driver.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Shawn,
 
-This does not scale.
+I currently do not have hardware access, so I did not test this one.
 
-So, please address my point: in your system, how can a single component
-be shared between multiple different master drivers?
+It is based on the previous version that I submitted and tested.
 
+Changes since v1:
+- Rebased against 3.15-rc1
+
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 7a88d9a..3d88712 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -148,6 +148,14 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hdmi>;
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++	crtcs = <&ipu1 1>;
++};
++
+ &i2c1 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -390,6 +398,13 @@
+ 			>;
+ 		};
+ 
++
++		pinctrl_hdmi: hdmigrp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3.2
