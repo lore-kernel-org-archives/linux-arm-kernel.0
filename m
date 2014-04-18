@@ -1,7 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Apr 2014 20:52:28 +0200
-Subject: [PATCH 1/2] ARM: sun7i: Add ARM PMU in A20 DTSI
-Message-ID: <1397847149-26501-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 18 Apr 2014 20:52:29 +0200
+Subject: [PATCH 2/2] ARM: sun6i: Add ARM PMU in A31 DTSI
+In-Reply-To: <1397847149-26501-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1397847149-26501-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1397847149-26501-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,21 +11,23 @@ Enable the performance monitoring unit found in the A20 SoCs.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 899fd0e2b749..cc0d37fe5ae1 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -57,6 +57,12 @@
- 			     <1 10 0xf08>;
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index bc46814d2ff0..4b0f1231efc4 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -59,6 +59,14 @@
+ 		reg = <0x40000000 0x80000000>;
  	};
  
 +	pmu {
 +		compatible = "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
 +		interrupts = <0 120 4>,
-+			     <0 121 4>;
++			     <0 121 4>,
++			     <0 122 4>,
++			     <0 123 4>;
 +	};
 +
  	clocks {
