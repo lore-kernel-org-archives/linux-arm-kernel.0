@@ -1,61 +1,70 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 Apr 2014 16:48:12 +0200
-Subject: [PATCH v2 12/14] ARM: shmobile: r8a7791: Add CMT devices to DT
+Date: Fri, 18 Apr 2014 16:48:06 +0200
+Subject: [PATCH v2 06/14] clocksource: sh_mtu2: Replace global spinlock with a
+ per-device spinlock
 In-Reply-To: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1397832494-20607-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1397832494-20607-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- arch/arm/boot/dts/r8a7791.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+The global spinlock is used to protect the shared start/stop register.
+Now that all MTU2 channels are handled by a single device instance, use
+a per-device spinlock.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 44f0344..6eff2dc 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -170,6 +170,40 @@
- 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Tested-by: Wolfram Sang <wsa@sang-engineering.com>
+---
+ drivers/clocksource/sh_mtu2.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+index 2931fea..ebdf9d1 100644
+--- a/drivers/clocksource/sh_mtu2.c
++++ b/drivers/clocksource/sh_mtu2.c
+@@ -47,14 +47,14 @@ struct sh_mtu2_device {
+ 	void __iomem *mapbase;
+ 	struct clk *clk;
  
-+	cmt0: timer at ffca0000 {
-+		compatible = "renesas,cmt-48-gen2";
-+		reg = <0 0xffca0000 0 0x1004>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7791_CLK_CMT0>;
-+		clock-names = "fck";
++	raw_spinlock_t lock; /* Protect the shared registers */
 +
-+		renesas,channels-mask = <0x60>;
+ 	struct sh_mtu2_channel *channels;
+ 	unsigned int num_channels;
+ 
+ 	bool has_clockevent;
+ };
+ 
+-static DEFINE_RAW_SPINLOCK(sh_mtu2_lock);
+-
+ #define TSTR -1 /* shared register */
+ #define TCR  0 /* channel register */
+ #define TMDR 1 /* channel register */
+@@ -192,7 +192,7 @@ static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
+ 	unsigned long flags, value;
+ 
+ 	/* start stop register shared by multiple timer channels */
+-	raw_spin_lock_irqsave(&sh_mtu2_lock, flags);
++	raw_spin_lock_irqsave(&ch->mtu->lock, flags);
+ 	value = sh_mtu2_read(ch, TSTR);
+ 
+ 	if (start)
+@@ -201,7 +201,7 @@ static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
+ 		value &= ~(1 << ch->index);
+ 
+ 	sh_mtu2_write(ch, TSTR, value);
+-	raw_spin_unlock_irqrestore(&sh_mtu2_lock, flags);
++	raw_spin_unlock_irqrestore(&ch->mtu->lock, flags);
+ }
+ 
+ static int sh_mtu2_enable(struct sh_mtu2_channel *ch)
+@@ -402,6 +402,8 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
+ 
+ 	mtu->pdev = pdev;
+ 
++	raw_spin_lock_init(&mtu->lock);
 +
-+		status = "disabled";
-+	};
-+
-+	cmt1: timer at e6130000 {
-+		compatible = "renesas,cmt-48-gen2";
-+		reg = <0 0xe6130000 0 0x1004>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 121 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 122 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 123 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 124 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 125 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 126 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7791_CLK_CMT1>;
-+		clock-names = "fck";
-+
-+		renesas,channels-mask = <0xff>;
-+
-+		status = "disabled";
-+	};
-+
- 	irqc0: interrupt-controller at e61c0000 {
- 		compatible = "renesas,irqc-r8a7791", "renesas,irqc";
- 		#interrupt-cells = <2>;
+ 	/* Get hold of clock. */
+ 	mtu->clk = clk_get(&mtu->pdev->dev, "fck");
+ 	if (IS_ERR(mtu->clk)) {
 -- 
 1.8.3.2
