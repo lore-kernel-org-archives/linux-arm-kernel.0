@@ -1,66 +1,117 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 18 Apr 2014 14:58:47 +0200
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
-References: <20140410181953.50ccfcc3@skate>
- <20140410165733.GB23104@obsidianresearch.com>
- <20140410200153.46669e0c@skate>
- <20140410201201.GA12661@obsidianresearch.com>
- <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
-Message-ID: <20140418145847.709b29ce@skate>
+From: b.brezillon.dev@gmail.com (Boris BREZILLON)
+Date: Fri, 18 Apr 2014 15:00:37 +0200
+Subject: [PATCH v2 02/11] clk: at91: update main clk documentation
+In-Reply-To: <53511F60.3040301@atmel.com>
+References: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1395649643-9146-3-git-send-email-b.brezillon.dev@gmail.com>
+ <53511F60.3040301@atmel.com>
+Message-ID: <535121F5.10307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil, Jason,
 
-On Thu, 10 Apr 2014 22:56:00 +0100 (BST), Neil Greatorex wrote:
+On 18/04/2014 14:49, Nicolas Ferre wrote:
+> On 24/03/2014 09:27, Boris BREZILLON :
+>> Update main clk documentation to match main clk implementation rework.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+>> ---
+>>  .../devicetree/bindings/clock/at91-clock.txt       |   56 ++++++++++++++++----
+>>  1 file changed, 47 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> index cd5e239..9a7025b 100644
+>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> @@ -15,8 +15,13 @@ Required properties:
+>>  		All at91 specific clocks (clocks defined below) must be child
+>>  		node of the PMC node.
+>>  
+>> +	"atmel,at91rm9200-clk-main-osc"
+>> +	"atmel,at91sam9x5-clk-main-rc-osc"
+>> +		at91 main clk sources
+>> +
+>> +	"atmel,at91sam9x5-clk-main"
+>>  	"atmel,at91rm9200-clk-main":
+>> -		at91 main oscillator
+>> +		at91 main clock
+>>  
+>>  	"atmel,at91rm9200-clk-master" or
+>>  	"atmel,at91sam9x5-clk-master":
+>> @@ -85,24 +90,57 @@ For example:
+>>  		/* put at91 clocks here */
+>>  	};
+>>  
+>> +Required properties for main clock oscillator:
+>> +- interrupt-parent : must reference the PMC node.
+>> +- interrupts : shall be set to "<0>".
+>> +- clock-frequency : define the internal RC oscillator frequency.
+>> +
+>> +Optional properties:
+>> +- clock-accuracy : define the internal RC oscillator accuracy.
+>> +
+>> +For example:
+>> +	main_rc_osc: main_rc_osc {
+>> +		compatible = "atmel,at91sam9x5-clk-main-rc-osc";
+>> +		interrupt-parent = <&pmc>;
+>> +		interrupts = <0>;
+>> +		clock-frequency = <12000000>;
+>> +		clock-accuracy = <50000000>;
+>> +	};
+> Don't you swapped this example above with the description below?
 
-> I took your attached patch and extended it a bit to print out how long it 
-> took. The delays also need to be much longer for me. I also fixed a small 
-> typo you made where the bit wasn't being set again to bring the link back 
-> up. I've attached the diff to your patch, as well as the combined patch 
-> (hope that makes sense).
+Actually I only swapped the "Required properties" lines, I'll fix it.
 
-Unfortunately here your patch doesn't work (and neither does the patch
-from Jason Gunthorpe). On Armada 370 DB, without the patch, the e1000e
-NIC is detected when earlyprintk is enabled, and not detected when
-earlyprintk is disabled. With the patch applied, the e1000e is no
-longer detected *at all*, even if earlyprintk is enabled.
+Thanks,
 
-Extract from a boot log:
+Boris
 
-Linux version 3.15.0-rc1-00007-gedf643a-dirty (thomas at skate) (gcc version 4.8.1 (Ubuntu/Linaro 4.8.1-10ubuntu7) ) #317 SMP Fri Apr 18 14:54:13 CEST 2014
-[...]
-Kernel command line: console=ttyS0,115200 earlyprintk loglevel=8 root=/dev/nfs nfsroot=192.168.1.22:/home/thomas/nfsroot ip=192.168.1.142:192.168.1.22:192.168.1.1:255.255.255.0:devboard:eth0:on
-[...]
-mvebu-pcie pcie-controller.2: PCIe0.0: performing link reset
-mvebu-pcie pcie-controller.2: PCIe0.0: link went down after 20 tries
-mvebu-pcie pcie-controller.2: PCIe0.0: link came back up after 100 tries
-mvebu-pcie pcie-controller.2: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-pci_bus 0000:00: root bus resource [mem 0xf8000000-0xffdfffff]
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci 0000:00:01.0: [11ab:6710] type 01 class 0x060400
-pci 0000:00:02.0: [11ab:6710] type 01 class 0x060400
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-pci 0000:00:02.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-PCI: bus1: Fast back to back transfers enabled
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-PCI: bus2: Fast back to back transfers enabled
-pci_bus 0000:02: busn_res: [bus 02-ff] end is updated to 02
-pci 0000:00:01.0: PCI bridge to [bus 01]
-pci 0000:00:02.0: PCI bridge to [bus 02]
-[...]
-# /usr/sbin/lspci 
-00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710
-00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710
-#
-
-Any idea?
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+>
+>> +Required properties for main clock internal RC oscillator:
+>> +- interrupt-parent : must reference the PMC node.
+>> +- interrupts : shall be set to "<0>".
+>> +- #clock-cells : from common clock binding; shall be set to 0.
+>> +- clocks : shall encode the main osc source clk sources (see atmel datasheet).
+>> +
+>> +Optional properties:
+>> +- atmel,osc-bypass : boolean property. Specified if a clock signal is provided
+>> +  on XIN.
+>> +
+>> +  clock signal is directly provided on XIN pin.
+>> +
+>> +For example:
+>> +	main_osc: main_osc {
+>> +		compatible = "atmel,at91rm9200-clk-main-osc";
+>> +		interrupt-parent = <&pmc>;
+>> +		interrupts = <0>;
+>> +		#clock-cells = <0>;
+>> +		clocks = <&main_xtal>;
+>> +	};
+>> +
+>>  Required properties for main clock:
+>>  - interrupt-parent : must reference the PMC node.
+>>  - interrupts : shall be set to "<0>".
+>>  - #clock-cells : from common clock binding; shall be set to 0.
+>> -- clocks (optional if clock-frequency is provided) : shall be the slow clock
+>> -	phandle. This clock is used to calculate the main clock rate if
+>> -	"clock-frequency" is not provided.
+>> -- clock-frequency : the main oscillator frequency.Prefer the use of
+>> -	"clock-frequency" over automatic clock rate calculation.
+>> +- clocks : shall encode the main clk sources (see atmel datasheet).
+>>  
+>>  For example:
+>>  	main: mainck {
+>> -		compatible = "atmel,at91rm9200-clk-main";
+>> +		compatible = "atmel,at91sam9x5-clk-main";
+>>  		interrupt-parent = <&pmc>;
+>>  		interrupts = <0>;
+>>  		#clock-cells = <0>;
+>> -		clocks = <&ck32k>;
+>> -		clock-frequency = <18432000>;
+>> +		clocks = <&main_rc_osc &main_osc>;
+>>  	};
+>>  
+>>  Required properties for master clock:
+>>
+>
