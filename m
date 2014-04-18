@@ -1,64 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Apr 2014 15:41:15 -0700
-Subject: [PATCH] ARM: dts: OMAP2+: remove uses of obsolete gpmc,device-nand
-In-Reply-To: <1396948817-29362-1-git-send-email-jhovold@gmail.com>
-References: <1396948817-29362-1-git-send-email-jhovold@gmail.com>
-Message-ID: <20140418224115.GL21823@atomide.com>
+Date: Fri, 18 Apr 2014 15:44:23 -0700
+Subject: [PATCH 1/4] ARM: dts: Add support for OMAP4 Variscite OM44 family
+In-Reply-To: <CAGhQ9VyFU0ee3nXmD3Ckpaj1wYfgWXWG1k=L16MYCX05sCtjOA@mail.gmail.com>
+References: <1397833849-22396-1-git-send-email-manabian@gmail.com>
+ <1397833849-22396-2-git-send-email-manabian@gmail.com>
+ <20140418155721.GC5354@atomide.com>
+ <CAGhQ9VysdxGMd99CiVVh8YJt7KDAyy3Pe9YA2VM-G4mzn_6+0g@mail.gmail.com>
+ <20140418172907.GK5354@atomide.com>
+ <CAGhQ9VyFU0ee3nXmD3Ckpaj1wYfgWXWG1k=L16MYCX05sCtjOA@mail.gmail.com>
+Message-ID: <20140418224423.GN21823@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Johan Hovold <jhovold@gmail.com> [140408 02:25]:
-> Remove all remaining uses of gpmc,device-nand that have been added since
-> the property was removed by commit f40739faba8e ("ARM: dts: OMAP2+:
-> Simplify NAND support").
+* Joachim Eastwood <manabian@gmail.com> [140418 11:04]:
+> 
+> > I did a check script when we split omap3 pinctrl core instance into
+> > two separate instance to deal with the large hole in the register
+> > space. Some parts of that might be usable for a generic conversion
+> > script too. The script I used is below for reference.
+> 
+> I hacked up a short awk-script for the job. So I'll change to IOPAD
+> macro's in the next version.
+> 
+> My script for reference :)
+> #!/bin/gawk -f
+> /omap4_pmx_core/ { pmx = "CORE" }
+> /omap4_pmx_wkup/ { pmx = "WKUP" }
+> /0x[0-9a-f]{1,3} \(PIN/ {
+> offset = sprintf("OMAP4_%s_IOPAD(0x%03x, ", pmx, strtonum($1) + 64)
+> sub(/0x[0-9a-f]{1,3} \(/, offset, $0)
+> print $0
+> next
+> }
+> { print $0 }
 
-Thanks applying into omap-for-v3.15/fixes.
+Cool script :)
 
 Tony
- 
-> Signed-off-by: Johan Hovold <jhovold@gmail.com>
-> ---
->  arch/arm/boot/dts/am335x-igep0033.dtsi  | 1 -
->  arch/arm/boot/dts/omap3-devkit8000.dts  | 1 -
->  arch/arm/boot/dts/omap3-lilly-a83x.dtsi | 1 -
->  3 files changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-> index 7063311a58d9..06c822a48b71 100644
-> --- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-> +++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-> @@ -118,7 +118,6 @@
->  		reg = <0 0 0>; /* CS0, offset 0 */
->  		nand-bus-width = <8>;
->  		ti,nand-ecc-opt = "bch8";
-> -		gpmc,device-nand = "true";
->  		gpmc,device-width = <1>;
->  		gpmc,sync-clk-ps = <0>;
->  		gpmc,cs-on-ns = <0>;
-> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-> index bf5a515a3247..da402f0fdab4 100644
-> --- a/arch/arm/boot/dts/omap3-devkit8000.dts
-> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-> @@ -112,7 +112,6 @@
->  		reg = <0 0 0>; /* CS0, offset 0 */
->  		nand-bus-width = <16>;
->  
-> -		gpmc,device-nand;
->  		gpmc,sync-clk-ps = <0>;
->  		gpmc,cs-on-ns = <0>;
->  		gpmc,cs-rd-off-ns = <44>;
-> diff --git a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-> index 6369d9f43ca2..cc1dce6978f5 100644
-> --- a/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-> +++ b/arch/arm/boot/dts/omap3-lilly-a83x.dtsi
-> @@ -368,7 +368,6 @@
->  		/* no elm on omap3 */
->  
->  		gpmc,mux-add-data = <0>;
-> -		gpmc,device-nand;
->  		gpmc,device-width = <2>;
->  		gpmc,wait-pin = <0>;
->  		gpmc,wait-monitoring-ns = <0>;
-> -- 
-> 1.8.3.2
-> 
