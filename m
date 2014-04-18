@@ -1,121 +1,42 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 18 Apr 2014 17:10:47 +0200
-Subject: [PATCH 2/4] ARM: dts: Add support for OMAP4 VAR-DVK-OM44
+Date: Fri, 18 Apr 2014 17:10:49 +0200
+Subject: [PATCH 4/4] ARM: OMAP2+: Use pdata quirks for wl12xx on
+ VAR-STK/DVK-OM44
 In-Reply-To: <1397833849-22396-1-git-send-email-manabian@gmail.com>
 References: <1397833849-22396-1-git-send-email-manabian@gmail.com>
-Message-ID: <1397833849-22396-3-git-send-email-manabian@gmail.com>
+Message-ID: <1397833849-22396-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../devicetree/bindings/arm/omap/omap.txt          |  3 +
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/omap4-var-dvk-om44.dts           | 70 ++++++++++++++++++++++
- 3 files changed, 74 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap4-var-dvk-om44.dts
+ arch/arm/mach-omap2/pdata-quirks.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index 7db69ac46188..62df0244114e 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -105,6 +105,9 @@ Boards:
- - OMAP4 VAR-STK-OM44 : Commercial dev kit with VAR-OM44CustomBoard and VAR-SOM-OM44 w/WLAN
-   compatible = "variscite,var-stk-om44", "variscite,var-som-om44", "ti,omap4430", "ti,omap4";
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index c3b73351cb7a..ab94f3a87c32 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -254,6 +254,11 @@ static void __init omap4_panda_legacy_init(void)
+ {
+ 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
+ }
++
++static void __init var_som_om44_legacy_init(void)
++{
++	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 41);
++}
+ #endif
  
-+- OMAP4 VAR-DVK-OM44 : Commercial dev kit with VAR-OM44CustomBoard, VAR-SOM-OM44 w/WLAN and LCD touchscreen
-+  compatible = "variscite,var-dvk-om44", "variscite,var-som-om44", "ti,omap4430", "ti,omap4";
-+
- - OMAP3 EVM : Software Development Board for OMAP35x, AM/DM37x
-   compatible = "ti,omap3-evm", "ti,omap3"
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f443ade8ae3c..2cc120cf6bbf 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -273,6 +273,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap4-panda.dtb \
- 	omap4-panda-a4.dtb \
- 	omap4-panda-es.dtb \
-+	omap4-var-dvk-om44.dtb \
- 	omap4-var-stk-om44.dtb \
- 	omap4-sdp.dtb \
- 	omap4-sdp-es23plus.dtb \
-diff --git a/arch/arm/boot/dts/omap4-var-dvk-om44.dts b/arch/arm/boot/dts/omap4-var-dvk-om44.dts
-new file mode 100644
-index 000000000000..9471bbd8cb33
---- /dev/null
-+++ b/arch/arm/boot/dts/omap4-var-dvk-om44.dts
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright (C) 2014 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+#include "omap4-var-som-om44.dtsi"
-+#include "omap4-var-om44customboard.dtsi"
-+
-+/ {
-+	model = "Variscite VAR-DVK-OM44";
-+	compatible = "variscite,var-dvk-om44", "variscite,var-som-om44", "ti,omap4430", "ti,omap4";
-+
-+	aliases {
-+		display0 = &lcd0;
-+		display1 = &hdmi0;
-+	};
-+
-+	lcd0: display {
-+		compatible = "innolux,at070tn83", "panel-dpi";
-+		label = "lcd";
-+		panel-timing {
-+			clock-frequency = <33333333>;
-+
-+			hback-porch = <40>;
-+			hactive = <800>;
-+			hfront-porch = <40>;
-+			hsync-len = <48>;
-+
-+			vback-porch = <29>;
-+			vactive = <480>;
-+			vfront-porch = <13>;
-+			vsync-len = <3>;
-+		};
-+
-+		port {
-+			lcd_in: endpoint {
-+				remote-endpoint = <&dpi_out>;
-+			};
-+		};
-+	};
-+
-+	backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&backlight_pins>;
-+
-+		gpios = <&gpio4 26 GPIO_ACTIVE_HIGH>; /* gpio 122 */
-+	};
-+};
-+
-+&dss {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_dpi_pins>;
-+
-+	port {
-+		dpi_out: endpoint {
-+			remote-endpoint = <&lcd_in>;
-+			data-lines = <24>;
-+		};
-+	};
-+};
-+
-+&dsi2 {
-+	status = "okay";
-+	vdd-supply = <&vcxio>;
-+};
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+@@ -364,6 +369,8 @@ static struct pdata_init pdata_quirks[] __initdata = {
+ #ifdef CONFIG_ARCH_OMAP4
+ 	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
+ 	{ "ti,omap4-panda", omap4_panda_legacy_init, },
++	{ "variscite,var-dvk-om44", var_som_om44_legacy_init, },
++	{ "variscite,var-stk-om44", var_som_om44_legacy_init, },
+ #endif
+ #ifdef CONFIG_SOC_AM33XX
+ 	{ "ti,am335x-evmsk", am335x_evmsk_legacy_init, },
 -- 
 1.8.0
