@@ -1,47 +1,52 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 18 Apr 2014 17:02:41 +0530
-Subject: [PATCH v2] phy: core: make NULL a valid phy reference if
- !CONFIG_GENERIC_PHY
-In-Reply-To: <20140416151947.GF28035@saruman.home>
-References: <1397648901-4450-1-git-send-email-grygorii.strashko@ti.com>
- <20140416151947.GF28035@saruman.home>
-Message-ID: <53510D59.3000509@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 18 Apr 2014 13:34:30 +0200
+Subject: [PATCH v4 1/5] sched: rework of sched_domain topology definition
+In-Reply-To: <20140418105601.GU11182@twins.programming.kicks-ass.net>
+References: <1397209481-28542-1-git-send-email-vincent.guittot@linaro.org>
+ <1397209481-28542-2-git-send-email-vincent.guittot@linaro.org>
+ <20140418105601.GU11182@twins.programming.kicks-ass.net>
+Message-ID: <CAKfTPtCQpesxEMOcaOPemv+QydhrnN9H=NPHdczsY991Vhtdkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 16 April 2014 08:49 PM, Felipe Balbi wrote:
-> On Wed, Apr 16, 2014 at 02:48:21PM +0300, Grygorii Strashko wrote:
->> This fixes a regression on Keystone 2 platforms caused by patch
->> 57303488cd37da58263e842de134dc65f7c626d5
->> "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
->> optional support of generic phy in DWC3 core.
+On 18 April 2014 12:56, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Fri, Apr 11, 2014 at 11:44:37AM +0200, Vincent Guittot wrote:
+>> We replace the old way to configure the scheduler topology with a new method
+>> which enables a platform to declare additionnal level (if needed).
 >>
->> On Keystone 2 platforms the USB is not working now because
->> CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
->> return -ENOSYS always. The log shows:
->>  dwc3 2690000.dwc3: failed to initialize core
->>  dwc3: probe of 2690000.dwc3 failed with error -38
+>> We still have a default topology table definition that can be used by platform
+>> that don't want more level than the SMT, MC, CPU and NUMA ones. This table can
+>> be overwritten by an arch which either wants to add new level where a load
+>> balance make sense like BOOK or powergating level or wants to change the flags
+>> configuration of some levels.
 >>
->> Hence, fix it by making NULL a valid phy reference in Generic PHY
->> APIs stubs in the same way as it was done by the patch
->> 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
->> a valid phy reference".
+>> For each level, we need a function pointer that returns cpumask for each cpu,
+>> a function pointer that returns the flags for the level and a name. Only flags
+>> that describe topology, can be set by an architecture. The current topology
+>> flags are:
+>>  SD_SHARE_CPUPOWER
+>>  SD_SHARE_PKG_RESOURCES
+>>  SD_NUMA
+>>  SD_ASYM_PACKING
 >>
->> CC: Kishon Vijay Abraham I <kishon@ti.com>
->> CC: Felipe Balbi <balbi@ti.com>
->> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> 
-> I thought I'd already acked this one... oh well, need more coffee:
+>> Then, each level must be a subset on the next one. The build sequence of the
+>> sched_domain will take care of removing useless levels like those with 1 CPU
+>> and those with the same CPU span and no more relevant information for
+>> load balancing than its childs.
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> Reviewed-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
+>
+> On x86_64 defconfig this gets me:
+>
+> kernel/sched/core.c: In function 'sched_init_numa':
+> kernel/sched/core.c:6197:4: warning: initialization makes pointer from integer without a cast [enabled by default]
+> kernel/sched/core.c:6197:4: warning: (near initialization for '(anonymous).sd_flags') [enabled by default]
 
-Indeed.. you acked the v1 of this patch series and already queued the v2 with
-your acked by ;-)
+Sorry, while moving from int to function pointer, i forgot to change
+the numa part
 
-Cheers
-Kishon
+I'm going to send a fix right now
 
-> 
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> 
+
+>
