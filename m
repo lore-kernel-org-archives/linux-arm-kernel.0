@@ -1,58 +1,59 @@
 From: elder@linaro.org (Alex Elder)
-Date: Thu, 17 Apr 2014 21:30:07 -0500
-Subject: [PATCH 02/10] ARM: bcm: err, don't BUG() on SMC init failures
-In-Reply-To: <1397788215-20279-1-git-send-email-elder@linaro.org>
-References: <1397788215-20279-1-git-send-email-elder@linaro.org>
-Message-ID: <1397788215-20279-3-git-send-email-elder@linaro.org>
+Date: Thu, 17 Apr 2014 21:30:05 -0500
+Subject: [PATCH 00/10] ARM: bcm: SCM and L2 cache code cleanup
+Message-ID: <1397788215-20279-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several conditions in bcm_kona_smc_init() are handled with BUG_ON().
-That function is capable of returning an error, so do that instead.
+This series cleans up a number of things in the code that issues
+secure monitor ("smc") requests for the bcm281xx and bcm21664 SoC
+families.  This code is currently used only for enabling the level-2
+cache.
 
-Also, don't assume of_get_address() returns a valid pointer.
+There are some bug fixes and other improvements.  An assembly
+language file containing a single function has been eliminated by
+re-implementing the code using inline assembly.  Some comments have
+been expanded and clarified.  Kernel configuration options allow
+finer-grained control over how this code gets built.  Finally, the
+"kona.c" and "kona.h" files are renamed to reflect the fact that
+only contain code related to level-2 cache support.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <mporter@linaro.org>
----
- arch/arm/mach-bcm/bcm_kona_smc.c |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+This series is based on v3.15-rc1, and depends on one patch posted
+previously:
+    [PATCH v4] mach-bcm: clean up config and build targets
+    https://lkml.org/lkml/2014/4/15/303
 
-diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-index d881c72..ddc2f17 100644
---- a/arch/arm/mach-bcm/bcm_kona_smc.c
-+++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-@@ -45,6 +45,7 @@ static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
- int __init bcm_kona_smc_init(void)
- {
- 	struct device_node *node;
-+	const __be32 *prop_val;
- 
- 	/* Read buffer addr and size from the device tree node */
- 	node = of_find_matching_node(NULL, bcm_kona_smc_ids);
-@@ -52,12 +53,17 @@ int __init bcm_kona_smc_init(void)
- 		return -ENODEV;
- 
- 	/* Don't care about size or flags of the DT node */
--	bridge_data.buffer_addr =
--		be32_to_cpu(*of_get_address(node, 0, NULL, NULL));
--	BUG_ON(!bridge_data.buffer_addr);
-+	prop_val = of_get_address(node, 0, NULL, NULL);
-+	if (!prop_val)
-+		return -EINVAL;
-+
-+	bridge_data.buffer_addr = be32_to_cpu(*prop_val);
-+	if (!bridge_data.buffer_addr)
-+		return -EINVAL;
- 
- 	bridge_data.bounce = of_iomap(node, 0);
--	BUG_ON(!bridge_data.bounce);
-+	if (!bridge_data.bounce)
-+		return -ENOMEM;
- 
- 	bridge_data.initialized = 1;
- 
+It is available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-smc-cleanup
+
+					-Alex
+
+Alex Elder (10):
+  ARM: bcm: use memory accessors for ioremapped area
+  ARM: bcm: err, don't BUG() on SMC init failures
+  ARM: bcm: clean up SMC code
+  ARM: bcm: have bcm_kona_smc() return request result
+  ARM: bcm: don't special-case CPU 0 in bcm_kona_smc()
+  ARM: bcm: config option for l2 cache support
+  ARM: bcm: tidy up a few includes
+  ARM: bcm: use inline assembly for "smc" request
+  ARM: bcm: rewrite commentary for bcm_kona_do_smc()
+  ARM: bcm: rename "kona.h" and "kona.c"
+
+ arch/arm/mach-bcm/Kconfig                     |   12 ++-
+ arch/arm/mach-bcm/Makefile                    |   10 +-
+ arch/arm/mach-bcm/bcm_kona_smc.c              |  136 ++++++++++++++++++-------
+ arch/arm/mach-bcm/bcm_kona_smc.h              |   52 +---------
+ arch/arm/mach-bcm/bcm_kona_smc_asm.S          |   41 --------
+ arch/arm/mach-bcm/board_bcm21664.c            |    5 +-
+ arch/arm/mach-bcm/board_bcm281xx.c            |    2 +-
+ arch/arm/mach-bcm/{kona.c => kona_l2_cache.c} |   16 +--
+ arch/arm/mach-bcm/{kona.h => kona_l2_cache.h} |    6 ++
+ 9 files changed, 137 insertions(+), 143 deletions(-)
+ delete mode 100644 arch/arm/mach-bcm/bcm_kona_smc_asm.S
+ rename arch/arm/mach-bcm/{kona.c => kona_l2_cache.c} (80%)
+ rename arch/arm/mach-bcm/{kona.h => kona_l2_cache.h} (82%)
+
 -- 
 1.7.9.5
