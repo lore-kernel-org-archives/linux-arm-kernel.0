@@ -1,57 +1,121 @@
-From: triplesquarednine@gmail.com (jordan)
-Date: Fri, 18 Apr 2014 11:09:16 -0400
-Subject: BUG: spinlock trylock failure on UP - reverting timer patches
- helps
-In-Reply-To: <53513A7E.5050907@meduna.org>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org> <53500184.4050309@meduna.org>
- <53505BD7.9050004@meduna.org>
- <CAOcfFMyTmQH-FwGE2YWoA76ypzBtWPYVTyi+4QpEMnrRtw8QVg@mail.gmail.com>
- <53513A7E.5050907@meduna.org>
-Message-ID: <CAOcfFMwybECrCM6ovQs4HdOHDWPAMtyi3hzAYdsKZZBERQAzTQ@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 18 Apr 2014 17:10:47 +0200
+Subject: [PATCH 2/4] ARM: dts: Add support for OMAP4 VAR-DVK-OM44
+In-Reply-To: <1397833849-22396-1-git-send-email-manabian@gmail.com>
+References: <1397833849-22396-1-git-send-email-manabian@gmail.com>
+Message-ID: <1397833849-22396-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey slavo
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../devicetree/bindings/arm/omap/omap.txt          |  3 +
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/omap4-var-dvk-om44.dts           | 70 ++++++++++++++++++++++
+ 3 files changed, 74 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap4-var-dvk-om44.dts
 
-> many thanks for the tests. I probably botched something during
-> the reverting - I now tried some more experiments and the system
-> now runs without BUGs and without kernel leak - of course
-> it needs some more uptime to be really sure.
-
-No problem. It's good to hear that is working. My AMD Phenom II 965
-has 1day, 10hours uptime. Hopefully that foreshadows your system
-running well.
-
-> My combined revert patch from 3.12.15-rt25 is at
->   http://pastebin.com/MYLqbmZw
-> That was all that was needed.
-
-Yup. I suggest anyone from the list who can't get their machines to
-boot with those commits applied, test that patch.
-
->> Yeah, i know a handful of people [amd users] that have now reported
->> success booting into 3.14-rt1 reverting those patches.  Personally, I
->> have disabled NO_HZ_FULL and have switched back to 'old tick' method
->> in kconfig. I don't think the latest no_hz stuff is stable enough...
->
-> My problems were with periodic timers (I am on an embedded system
-> that runs things periodically anyway and I have also my doubts
-> regarding the stability), so the latest code did not break
-> only NO_HZ_FULL.
-
-ah, thanks for the clarification [ i must have missed that bit - i was
-just glad someone else had verified on the list that those commits
-were problematic, as i hadn't gotten any response]. NO_HZ_FULL had
-been alright for me, for a while - so i didn't really notice the
-breakage with periodic timers, but that is good to know.
-
-I think periodic timers + reverting those patches + resurrecting sirq
-threads on seems to be the best on 3.14-rt, afaict.
-
-Jordan
-
-> Thanks
-> --
->                                        Stano
->
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index 7db69ac46188..62df0244114e 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -105,6 +105,9 @@ Boards:
+ - OMAP4 VAR-STK-OM44 : Commercial dev kit with VAR-OM44CustomBoard and VAR-SOM-OM44 w/WLAN
+   compatible = "variscite,var-stk-om44", "variscite,var-som-om44", "ti,omap4430", "ti,omap4";
+ 
++- OMAP4 VAR-DVK-OM44 : Commercial dev kit with VAR-OM44CustomBoard, VAR-SOM-OM44 w/WLAN and LCD touchscreen
++  compatible = "variscite,var-dvk-om44", "variscite,var-som-om44", "ti,omap4430", "ti,omap4";
++
+ - OMAP3 EVM : Software Development Board for OMAP35x, AM/DM37x
+   compatible = "ti,omap3-evm", "ti,omap3"
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f443ade8ae3c..2cc120cf6bbf 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -273,6 +273,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap4-panda.dtb \
+ 	omap4-panda-a4.dtb \
+ 	omap4-panda-es.dtb \
++	omap4-var-dvk-om44.dtb \
+ 	omap4-var-stk-om44.dtb \
+ 	omap4-sdp.dtb \
+ 	omap4-sdp-es23plus.dtb \
+diff --git a/arch/arm/boot/dts/omap4-var-dvk-om44.dts b/arch/arm/boot/dts/omap4-var-dvk-om44.dts
+new file mode 100644
+index 000000000000..9471bbd8cb33
+--- /dev/null
++++ b/arch/arm/boot/dts/omap4-var-dvk-om44.dts
+@@ -0,0 +1,70 @@
++/*
++ * Copyright (C) 2014 Joachim Eastwood <manabian@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++#include "omap4-var-som-om44.dtsi"
++#include "omap4-var-om44customboard.dtsi"
++
++/ {
++	model = "Variscite VAR-DVK-OM44";
++	compatible = "variscite,var-dvk-om44", "variscite,var-som-om44", "ti,omap4430", "ti,omap4";
++
++	aliases {
++		display0 = &lcd0;
++		display1 = &hdmi0;
++	};
++
++	lcd0: display {
++		compatible = "innolux,at070tn83", "panel-dpi";
++		label = "lcd";
++		panel-timing {
++			clock-frequency = <33333333>;
++
++			hback-porch = <40>;
++			hactive = <800>;
++			hfront-porch = <40>;
++			hsync-len = <48>;
++
++			vback-porch = <29>;
++			vactive = <480>;
++			vfront-porch = <13>;
++			vsync-len = <3>;
++		};
++
++		port {
++			lcd_in: endpoint {
++				remote-endpoint = <&dpi_out>;
++			};
++		};
++	};
++
++	backlight {
++		compatible = "gpio-backlight";
++		pinctrl-names = "default";
++		pinctrl-0 = <&backlight_pins>;
++
++		gpios = <&gpio4 26 GPIO_ACTIVE_HIGH>; /* gpio 122 */
++	};
++};
++
++&dss {
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_dpi_pins>;
++
++	port {
++		dpi_out: endpoint {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
++		};
++	};
++};
++
++&dsi2 {
++	status = "okay";
++	vdd-supply = <&vcxio>;
++};
+-- 
+1.8.0
