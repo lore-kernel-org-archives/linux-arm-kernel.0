@@ -1,117 +1,295 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 17 Apr 2014 21:53:23 -0500
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <20140417213502.GX24070@n2100.arm.linux.org.uk>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
- <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
- <20140417201645.GU24070@n2100.arm.linux.org.uk>
- <CAL_JsqL65bXBh1_dcud6XaDqFBnY1L69dMXWeNHvFAvcDizzhQ@mail.gmail.com>
- <20140417213502.GX24070@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqKCGg25wrTq8SyXK3zebo+uJG61083K6--mJ9Fxek03XQ@mail.gmail.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Fri, 18 Apr 2014 12:42:42 +0900
+Subject: [PATCH v2 7/7] arm64: KVM: Implement 4 levels of translation
+ tables for HYP and stage2
+In-Reply-To: <878ur4w3vu.fsf@approximate.cambridge.arm.com>
+References: <004701cf592d$053b3380$0fb19a80$@samsung.com>
+ <878ur4w3vu.fsf@approximate.cambridge.arm.com>
+Message-ID: <000b01cf5ab8$412a0970$c37e1c50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 4:35 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 17, 2014 at 04:18:45PM -0500, Rob Herring wrote:
->> The problem here is more than just the TEXT_OFFSET changed. From what
->> I've heard, there are some QC chips which need much more reserved RAM
->> than the 2MB discussed here. Changing the TEXT_OFFSET is a hack that
->> doesn't scale.
->
-> You may think it's a hack, but we really can't get around this.  There
-> really are platforms out there where we must do this kind of stuff.  I
-> invite you next time you meet up to talk to Michal Simek.  There's no
-> way they can load the kernel at 32K into RAM.
+On Thursday, April 17, 2014 9:13 PM, Marc Zyngier wrote:
+> On Wed, Apr 16 2014 at  5:33:31 am BST, Jungseok Lee <jays.lee@samsung.com> wrote:
+> > This patch adds 4 levels of translation tables implementation for both
+> > HYP and stage2. A combination of 4KB + 4 levels host and 4KB + 4
+> > levels guest can run on ARMv8 architecture as introducing this feature.
+> 
+> Just to be sure: have you tested it with asymetric configurations (4kB host, 64kB guest, and the
+> oposite configuration)?
 
-In fact, I have discussed this with him. If we're having discussions
-about it, then obviously some problems remain.
+Dear Marc
 
->> A simple issue is you are now wasting 2MB of low memory on every
->> platform. Not such a big deal I guess. But what if more is needed?
->
-> Why do you think it's wasted in the general case?  Do you think the
-> first 16K is ignored by Linux?  All memory will be freed to the Linux
-> page allocator unless it has an explicit reservation in memblock.  So
-> the 2MB won't be wasted - it will be freed as before to the page
-> allocator.
+Yes, I've tested all asymmetric configurations using 4K+3Level, 4K+4Level
+and 64K+2Level. I will add all test configurations in the commit message
+from the next version.
 
-Okay, my mistake.
+> > Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+> > Reviewed-by: Sungjinn Chung <sungjinn.chung@samsung.com>
+> > ---
+> >  arch/arm/include/asm/kvm_mmu.h   |   10 +++++
+> >  arch/arm/kvm/mmu.c               |   88 +++++++++++++++++++++++++++++++++-----
+> >  arch/arm64/include/asm/kvm_arm.h |   20 +++++++++
+> >  arch/arm64/include/asm/kvm_mmu.h |   10 +++++
+> >  4 files changed, 117 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/arch/arm/include/asm/kvm_mmu.h
+> > b/arch/arm/include/asm/kvm_mmu.h index 5c7aa3c..6f7906e 100644
+> > --- a/arch/arm/include/asm/kvm_mmu.h
+> > +++ b/arch/arm/include/asm/kvm_mmu.h
+> > @@ -37,6 +37,11 @@
+> >   */
+> >  #define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
+> >
+> > +/*
+> > + * NUM_OBJS depends on the number of page table translation levels
+> > +*/
+> > +#define NUM_OBJS		2
+> 
+> I'm afraid this is way too generic. Use something along the lines of MMU_CACHE_MIN_PAGES, that makes
+> it obvious what we're talking about.
 
->> The zImage requires that the kernel be placed at a 128M aligned
->> address plus TEXT_OFFSET. The v2p patching then requires the kernel to
->> be located within the first 16MB of RAM. So the Image can only ever be
->> placed at 0x8000 - 15.?MB from a 128MB aligned address. You can never
->> have the first 16-127MB of RAM reserved.
->
-> Wrong.  You can have as much RAM as you want reserved, you just can't
-> manage it with Linux memory allocators if you go over 16MB.
->
-> Remember that the virtual address space PAGE_OFFSET...kernel corresponds
-> with PHYS_OFFSET...kernel.  So, if you have 16MB between PHYS_OFFSET and
-> the kernel, then you have 16MB between PAGE_OFFSET and the kernel.  Your
-> modules are looking very distant, and PCREL24 relocations become
-> troublesome.
+Okay, I will change it.
 
-For the reasons you give here, doesn't that mean you want to have
-TEXT_OFFSET be as small as possible? And (ab)using TEXT_OFFSET to
-reserve 16, 32, 64MB, etc, would be a bad idea. Also, that only gives
-us a compile time memory reservation.
+> > +
+> >  #ifndef __ASSEMBLY__
+> >
+> >  #include <asm/cacheflush.h>
+> > @@ -94,6 +99,11 @@ static inline void kvm_clean_pgd(pgd_t *pgd)
+> >  	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));  }
+> >
+> > +static inline void kvm_clean_pmd(pmd_t *pmd) {
+> > +	clean_dcache_area(pmd, PTRS_PER_PMD * sizeof(pmd_t)); }
+> > +
+> >  static inline void kvm_clean_pmd_entry(pmd_t *pmd)  {
+> >  	clean_pmd_entry(pmd);
+> > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c index
+> > 80bb1e6..7fc9e55 100644
+> > --- a/arch/arm/kvm/mmu.c
+> > +++ b/arch/arm/kvm/mmu.c
+> > @@ -388,13 +388,44 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+> >  	return 0;
+> >  }
+> >
+> > +static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
+> > +				   unsigned long end, unsigned long pfn,
+> > +				   pgprot_t prot)
+> > +{
+> > +	pud_t *pud;
+> > +	pmd_t *pmd;
+> > +	unsigned long addr, next;
+> > +
+> > +	addr = start;
+> > +	do {
+> > +		pud = pud_offset(pgd, addr);
+> > +
+> > +		if (pud_none_or_clear_bad(pud)) {
+> > +			pmd = pmd_alloc_one(NULL, addr);
+> > +			if (!pmd) {
+> > +				kvm_err("Cannot allocate Hyp pmd\n");
+> > +				return -ENOMEM;
+> > +			}
+> > +			pud_populate(NULL, pud, pmd);
+> > +			get_page(virt_to_page(pud));
+> > +			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+> > +		}
+> > +
+> > +		next = pud_addr_end(addr, end);
+> > +
+> > +		create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
+> > +		pfn += (next - addr) >> PAGE_SHIFT;
+> > +	} while (addr = next, addr != end);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  static int __create_hyp_mappings(pgd_t *pgdp,
+> >  				 unsigned long start, unsigned long end,
+> >  				 unsigned long pfn, pgprot_t prot)  {
+> >  	pgd_t *pgd;
+> >  	pud_t *pud;
+> > -	pmd_t *pmd;
+> >  	unsigned long addr, next;
+> >  	int err = 0;
+> >
+> > @@ -403,22 +434,23 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+> >  	end = PAGE_ALIGN(end);
+> >  	do {
+> >  		pgd = pgdp + pgd_index(addr);
+> > -		pud = pud_offset(pgd, addr);
+> >
+> > -		if (pud_none_or_clear_bad(pud)) {
+> > -			pmd = pmd_alloc_one(NULL, addr);
+> > -			if (!pmd) {
+> > -				kvm_err("Cannot allocate Hyp pmd\n");
+> > +		if (pgd_none(*pgd)) {
+> > +			pud = pud_alloc_one(NULL, addr);
+> > +			if (!pud) {
+> > +				kvm_err("Cannot allocate Hyp pud\n");
+> >  				err = -ENOMEM;
+> >  				goto out;
+> >  			}
+> > -			pud_populate(NULL, pud, pmd);
+> > -			get_page(virt_to_page(pud));
+> > -			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+> > +			pgd_populate(NULL, pgd, pud);
+> > +			get_page(virt_to_page(pgd));
+> > +			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
+> >  		}
+> >
+> >  		next = pgd_addr_end(addr, end);
+> > -		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
+> > +
+> > +		err = create_hyp_pud_mappings(pgd, addr, next, pfn, prot);
+> > +
+> >  		if (err)
+> >  			goto out;
+> >  		pfn += (next - addr) >> PAGE_SHIFT; @@ -563,6 +595,24 @@ void
+> > kvm_free_stage2_pgd(struct kvm *kvm)
+> >  	kvm->arch.pgd = NULL;
+> >  }
+> >
+> > +static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> > +			     phys_addr_t addr)
+> > +{
+> > +	pgd_t *pgd;
+> > +	pud_t *pud;
+> > +
+> > +	pgd = kvm->arch.pgd + pgd_index(addr);
+> > +	if (pgd_none(*pgd)) {
+> > +		if (!cache)
+> > +			return NULL;
+> > +		pud = mmu_memory_cache_alloc(cache);
+> > +		pgd_populate(NULL, pgd, pud);
+> > +		get_page(virt_to_page(pgd));
+> > +	}
+> > +
+> > +	return pud_offset(pgd, addr);
+> > +}
+> > +
+> >  static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> >  			     phys_addr_t addr)
+> >  {
+> > @@ -617,6 +667,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> >  	pmd_t *pmd;
+> >  	pte_t *pte, old_pte;
+> >
+> > +	pud_t *pud;
+> > +
+> > +	/* Create stage-2 page table mapping - Level 0 */
+> > +	pud = stage2_get_pud(kvm, cache, addr);
+> > +	if (!pud)
+> > +		return 0;
+> > +
+> > +	if (pud_none(*pud)) {
+> > +		if (!cache)
+> > +			return 0;
+> > +		pmd = mmu_memory_cache_alloc(cache);
+> > +		kvm_clean_pmd(pmd);
+> > +		pud_populate(NULL, pud, pmd);
+> > +		get_page(virt_to_page(pud));
+> > +	}
+> > +
+> >  	/* Create stage-2 page table mapping - Level 1 */
+> >  	pmd = stage2_get_pmd(kvm, cache, addr);
+> >  	if (!pmd) {
+> > @@ -675,7 +741,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+> >  	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+> >  		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+> >
+> > -		ret = mmu_topup_memory_cache(&cache, 2, 2);
+> > +		ret = mmu_topup_memory_cache(&cache, NUM_OBJS, NUM_OBJS);
+> >  		if (ret)
+> >  			goto out;
+> >  		spin_lock(&kvm->mmu_lock);
+> > diff --git a/arch/arm64/include/asm/kvm_arm.h
+> > b/arch/arm64/include/asm/kvm_arm.h
+> > index 3d69030..295eda6 100644
+> > --- a/arch/arm64/include/asm/kvm_arm.h
+> > +++ b/arch/arm64/include/asm/kvm_arm.h
+> > @@ -117,9 +117,11 @@
+> >  #define VTCR_EL2_IRGN0_MASK	(3 << 8)
+> >  #define VTCR_EL2_IRGN0_WBWA	(1 << 8)
+> >  #define VTCR_EL2_SL0_MASK	(3 << 6)
+> > +#define VTCR_EL2_SL0_LVL0	(2 << 6)
+> >  #define VTCR_EL2_SL0_LVL1	(1 << 6)
+> >  #define VTCR_EL2_T0SZ_MASK	0x3f
+> >  #define VTCR_EL2_T0SZ_40B	24
+> > +#define VTCR_EL2_T0SZ_48B	16
+> 
+> How about having
+> #define	VTCR_EL2_TOSZ(bits)	(64 - (bits))
+> and using that everywhere?
 
-Here's a simple test of what I was trying to point out. I took a
-working kernel with TEXT_OFFSET of 0x8000 and booted it on QEMU using
-the "virt" machine which RAM normally starts at 0x40000000. Then
-varying the RAM base, I get these results:
+It sounds good. I will fix it.
 
-0x40000000 - boots
-0x41000000 - no output because the decompressor will still put the
-Image at 0x40008000.
-0x48000000 - boots
+> >
+> >  #ifdef CONFIG_ARM64_64K_PAGES
+> >  /*
+> > @@ -134,6 +136,7 @@
+> >  				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> >  #define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
+> >  #else
+> > +#ifndef CONFIG_ARM64_4_LEVELS
+> >  /*
+> >   * Stage2 translation configuration:
+> >   * 40bits output (PS = 2)
+> > @@ -145,10 +148,27 @@
+> >  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> >  				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+> >  #define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
+> > +#else
+> > +/*
+> > + * Stage2 translation configuration:
+> > + * 40bits output (PS = 2)
+> > + * 48bits input  (T0SZ = 16)
+> > + * 4kB pages (TG0 = 0)
+> > + * 4 level page tables (SL = 2)
+> > + */
+> > +#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+> > +				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+> > +				 VTCR_EL2_SL0_LVL0 | VTCR_EL2_T0SZ_48B)
+> > +#define VTTBR_X		(29 - VTCR_EL2_T0SZ_48B)
+> > +#endif
+> >  #endif
+> >
+> >  #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+> > +#ifndef CONFIG_ARM64_4_LEVELS
+> >  #define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) <<
+> > VTTBR_BADDR_SHIFT)
+> > +#else
+> > +#define VTTBR_BADDR_MASK  (((1LLU << (48 - VTTBR_X)) - 1) <<
+> > +VTTBR_BADDR_SHIFT) #endif
+> 
+> Have a global #define for the number of output bits, and unify these two definitions.
 
-So without changing TEXT_OFFSET, you can only vary the PHYS_OFFSET in
-128MB steps. For anything in between you have to use TEXT_OFFSET. Is
-that really the right solution?
+Okay, I will introduce a new macro for output bits.
 
-BTW, a TEXT_OFFSET of 0x408000 or more doesn't work either due to the
-limits in immediate values, but that problem could be easily fixed.
+> >  #define VTTBR_VMID_SHIFT  (48LLU)
+> >  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+> >
+> > diff --git a/arch/arm64/include/asm/kvm_mmu.h
+> > b/arch/arm64/include/asm/kvm_mmu.h
+> > index 7d29847..f7fb2d0 100644
+> > --- a/arch/arm64/include/asm/kvm_mmu.h
+> > +++ b/arch/arm64/include/asm/kvm_mmu.h
+> > @@ -41,6 +41,15 @@
+> >   */
+> >  #define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+> >
+> > +/*
+> > + * NUM_OBJS depends on the number of page table translation levels
+> > +*/ #ifndef CONFIG_ARM64_4_LEVELS
+> > +#define NUM_OBJS		2
+> > +#else
+> > +#define NUM_OBJS		3
+> > +#endif
+> 
+> What about 64kB pages with two levels? Only one page should be necessary.
 
->> The only way to have reserved
->> memory (in chucks of 16MB) is by loading an Image file directly
->> instead. The bootloaders will know the start of RAM and any reserved
->> memory size because they can simply parse DT.
->>
->> Bootloaders are going to have to change for arm64 Image support
->> anyway, so we should have an aligned solution here.
->
-> No.  You simply can't eliminate any of the above - each one has been
-> negotiated through quite an amount of discussion with relevant parties
-> and/or due to technical requirements and they just can't be magic'd
-> away.
->
-> Plus the ARM64 image format is different from our zImage format.  It
-> would make far *more* sense to align our Image format with our zImage
-> format so existing boot loaders which look for the zImage magic numbers
-> can boot plain Image files too.
->
-> Moreover, since we could *never* align zImage with the ARM64 format,
-> why on earth would we want to start using the ARM64 format for the
-> Image format?
+Okay, I will add it.
 
-I'm not talking about zImage. I'm talking about Image files only. The
-arm64 Image header could be added to ARM Image files and that would
-not hurt or change a thing for existing users. The cost is 64 bytes.
+I really thank you for the comments.
 
-> If you say, we should just break the existing zImage format, my response
-> will be: who the hell are you to decide to break 20 odd years of boot
-> ABI in a way which *stops* platforms from booting on such a pathetic
-> whim.
-
-I'm not suggesting to break anything or changing existing platforms,
-but how do we improve the Image format in a compatible way. If
-bootloaders want to support booting Image files or vmlinux directly,
-then we should support that including any compatible changes to make
-things work better.
-
-Rob
+Best Regards
+Jungseok Lee
