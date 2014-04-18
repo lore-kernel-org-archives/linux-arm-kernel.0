@@ -1,42 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Apr 2014 22:50:17 +0200
-Subject: [PATCH 5/8] ARM: at91: sama5d3: clock for ssc from rk pin
-In-Reply-To: <1395049541-28128-6-git-send-email-voice.shen@atmel.com>
-References: <1395049541-28128-1-git-send-email-voice.shen@atmel.com>
- <1395049541-28128-6-git-send-email-voice.shen@atmel.com>
-Message-ID: <53519009.8040405@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Apr 2014 13:52:14 -0700
+Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
+ probe and defer if needed
+In-Reply-To: <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
+References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
+ <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
+ <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
+ <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
+Message-ID: <20140418205213.GA21823@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/2014 10:45, Bo Shen :
-> According to hardware design the clock for SSC device is from rk pin.
+* Rob Herring <robherring2@gmail.com> [140411 10:33]:
+> On Fri, Mar 21, 2014 at 9:46 AM, Jean-Jacques Hiblot
+> <jjhiblot@traphandler.com> wrote:
+> > The goal of this patch is to allow drivers to be probed even if at the time of
+> > the DT parsing some of their IRQ ressources are not available yet.
+> >
+> > In the current situation, the IRQ resources of a platform device are filled from
+> > the DT at the time the device is created (of_device_alloc()). The drawback of
+> > this is that a device sitting close to the top of the DT (ahb for example) but
+> > depending on ressources that are initialized later (IRQ domain dynamically
+> > created for example) will fail to probe because the ressources don't exist
+> > at this time.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> s/ressources/resources/
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+While I've tested these two patches and they fix the issue for me. I have
+some serious doubts again about this whole ------ up string parsing
+pile of ---- called device tree.
 
-> ---
-> 
->  arch/arm/boot/dts/sama5d3xmb.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
-> index 0600153..306eef0 100644
-> --- a/arch/arm/boot/dts/sama5d3xmb.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
-> @@ -32,6 +32,10 @@
->  				};
->  			};
->  
-> +			ssc0: ssc at f0008000 {
-> +				atmel,clk-from-rk-pin;
-> +			};
-> +
->  			/*
->  			 * i2c0 conflicts with ISI:
->  			 * disable it to allow the use of ISI
-> 
+Do we really need to sprinkle more of_* hacks to the irq subsystem?
 
+There's nothing wrong with with the irq subsystem. Platform bus is just
+calling the irq subsystem at the wrong time with uninitialized data.
 
--- 
-Nicolas Ferre
+It seems that we're again papering over the fact that there's nothing
+coordinating the setting up of various resources with device tree.
+That seems to be the repeating never ending pattern as we've already
+seen with GPIOs, pinctrl, and IRQchips. We end up adding all kinds of
+cross subsystem calls that were never needed earlier.
+
+Regards,
+
+Tony
