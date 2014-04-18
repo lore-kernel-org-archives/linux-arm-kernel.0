@@ -1,31 +1,39 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 18 Apr 2014 19:08:10 +0200
-Subject: [PATCH v2 2/2] regmap: i2c: fallback to SMBus if the adapter
- does not support standard I2C
-In-Reply-To: <1397727612-32103-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397727612-32103-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <53515BFA.3060601@metafoo.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Apr 2014 10:08:18 -0700
+Subject: [PATCH 1/2] ARM: dts: sbc-t54: add support for sbc-t54 with cm-t54
+In-Reply-To: <1396962531-27729-2-git-send-email-lifshitz@compulab.co.il>
+References: <1396962531-27729-1-git-send-email-lifshitz@compulab.co.il>
+ <1396962531-27729-2-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <20140418170818.GI5354@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
-> +					    const struct regmap_config *config)
-> +{
-> +	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
-> +		return &regmap_i2c;
-> +	else if (config->val_bits == 16 &&
-> +		 i2c_check_functionality(i2c->adapter,
-> +					 I2C_FUNC_SMBUS_WORD_DATA))
-> +		return &regmap_smbus_word;
-> +	else if (config->val_bits == 8 &&
-> +		 i2c_check_functionality(i2c->adapter,
-> +					 I2C_FUNC_SMBUS_BYTE_DATA))
-> +		return &regmap_smbus_byte;
+* Dmitry Lifshitz <lifshitz@compulab.co.il> [140408 06:14]:
+> Add support for CM-T54 CoM and SBC-T54 board:
+> 
+> http://compulab.co.il/products/computer-on-modules/cm-t54/
+> http://compulab.co.il/products/sbcs/sbc-t54/
+> 
+> SBC-T54 is a single board computer based on OMAP5432 CPU.
+> It is implemented with a CM-T54 CoM providing most of the functions,
+> and SB-T54 carrier board providing connectors and several additional
+> functions.
+> 
+> Added basic support for:
+> 
+> * PMIC
+> * LED
+> * MMC/SD
+> * eMMC
+> * USB
+> * I2C1/4
+> * SB-T54 and CM-T54 EEPROMs
+> * RTC
 
-The fallback code should also check that reg_bits is 8.
+You probably want to use the OMAP5_CORE_IOPAD and OMAP5_WKUP_IOPAD
+macros for new boards as then you can easily check them against
+the TRM based on the physical offset of the register.
 
-> +
-> +	return ERR_PTR(-ENOTSUPP);
-> +}
-> +
+Regards,
+
+Tony
