@@ -1,32 +1,91 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Apr 2014 09:31:53 -0400
-Subject: [PATCH 0/4] Add a DT description of LaCie 2Big and 5Big Network v2
-In-Reply-To: <20140417175629.GW27979@kw.sim.vm.gnt>
-References: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
- <20140417175629.GW27979@kw.sim.vm.gnt>
-Message-ID: <20140418133153.GZ28159@titan.lakedaemon.net>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 18 Apr 2014 15:37:31 +0200
+Subject: [RFC 0/3] DRM driver for the ATMEL High end LCD controller
+In-Reply-To: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
+References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <53512A9B.8000404@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 07:56:29PM +0200, Simon Guinot wrote:
-> On Thu, Apr 17, 2014 at 06:08:54PM +0200, Andrew Lunn wrote:
-> > This patchset adds a DT description for LaCie 2Big and 5Big, one of
-> > the last remaining boards in mach-kirkwood. The LEDs cannot be
-> > described in DT, since there is no binding yet for the device which
-> > controls them. So a board file is added for that part.
-> > 
-> > These patches are build tested only. It would be good if somebody
-> > could boot them.
-> 
-> Hi Andrew,
-> 
-> Unfortunately, I won't be able to test this patches before two weeks.
+Hi JJ,
 
-Once we address your other comments and figure out the led driver, I'll
-get these up in mvebu's for next.  That way, anyone with the board can
-test easily and report back.  There's plenty of time before the merge
-window to add your Tested-by.
+On 18/04/2014 11:45, Jean-Jacques Hiblot wrote:
+> Hi,
+>
+> this patch serie implements a simple DRM driver for the ATMEL High end LCD
+> controller found in the SAMA5 familly. It's based on the tilcdc driver.
+> It uses the cma_helper for memory and fbdev stuff.
+> Your comments are welcome !
 
-thx,
+Thanks for you work.
 
-Jason.
+As I already told you, I started to work on a DRM/KMS driver for the
+hlcdc too, and I'd be pleased to help you on this driver (either by
+adding the missing stuff, debugging or reworking some parts).
+
+Regarding the code itself, I only had a quick look, but I'll try to
+review it next week. Anyway, I might not be the best person to give
+advice on a DRM/KMS driver :-).
+
+BTW, I tried to boot a kernel with your driver (statically compiled),
+and it hangs (see http://pastebin.com/H24KpVHb). But I didn't have time
+for further debugging.
+
+Best Regards,
+
+Boris
+>
+>
+> Supported features:
+> * the base layer (the main framebuffer)
+> * a simple panel
+> * a backlight driver
+> * structure to 'easily' add other connectors (it comes from the tilcdc)
+>
+> On the todo list:
+> * support overlays as drm_planes
+> * support for the hardware cursor
+> * support for the SiI9022 HDMI connector (present on sama5d36ek)
+>
+>
+> Jean-Jacques Hiblot (3):
+>   atmel: drm: added drm driver for the atmel hlcd controller
+>   atmel: drm: dt: Added DT entry for the atmel hlcdc found in the sama5
+>   atmel: dt: Add supports for the lcdc support on the sama5d36ek
+>
+>  arch/arm/boot/dts/sama5d36ek.dts                   |  27 +-
+>  arch/arm/boot/dts/sama5d3_lcd.dtsi                 |  11 +
+>  drivers/gpu/drm/Kconfig                            |   2 +
+>  drivers/gpu/drm/Makefile                           |   1 +
+>  drivers/gpu/drm/atmel_hlcdc/Kconfig                |  13 +
+>  drivers/gpu/drm/atmel_hlcdc/Makefile               |  12 +
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h          | 771 +++++++++++++++++++++
+>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c    |  92 +++
+>  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h    |  25 +
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c     | 702 +++++++++++++++++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c      | 586 ++++++++++++++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h      | 124 ++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h      | 190 +++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c    | 459 ++++++++++++
+>  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h    |  28 +
+>  15 files changed, 3042 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Kconfig
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Makefile
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c
+>  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h
+>
+> --
+> 1.9.1
+>
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
