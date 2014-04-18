@@ -1,31 +1,49 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 18 Apr 2014 11:40:12 -0500
-Subject: [patch 5/6] edma: Make reading the position of active channels
- work
-In-Reply-To: <alpine.DEB.2.02.1404181123150.22697@ionos.tec.linutronix.de>
-References: <20140417133737.892475126@linutronix.de>
- <20140417143249.889774979@linutronix.de> <5350761C.6010109@ti.com>
- <alpine.DEB.2.02.1404180834520.22697@ionos.tec.linutronix.de>
- <alpine.DEB.2.02.1404181123150.22697@ionos.tec.linutronix.de>
-Message-ID: <5351556C.7000807@ti.com>
+From: tim.kryger@linaro.org (Tim Kryger)
+Date: Fri, 18 Apr 2014 09:44:50 -0700
+Subject: [PATCH v6 1/5] Documentation: dt: Add Kona PWM binding
+In-Reply-To: <1397839494-21049-1-git-send-email-tim.kryger@linaro.org>
+References: <1397839494-21049-1-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1397839494-21049-2-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2014 04:24 AM, Thomas Gleixner wrote:
-> On Fri, 18 Apr 2014, Thomas Gleixner wrote:
->> On Thu, 17 Apr 2014, Joel Fernandes wrote:
->>> Here's a thread that discusses it and the end conclusion is that it
->>> should be fine (Kyle Kastile is one of the EDMA hardware designers).
->>> http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
->>
->> Gah, right I saw the issues with the original code, which does a
->> memcpy_fromio which copies byte by byte. Did not think about retrying
->> with the edma_read() based one.
-> 
-> Actually I did expect memcpy_fromio to be more clever. But you are
-> right, using the 32bit wide read works like a charm.
+Add the binding description for the Kona PWM controller found on Broadcom's
+mobile SoCs.
 
-Cool, glad it does :)
+Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
+Reviewed-by: Alex Elder <elder@linaro.org>
+Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
+---
+ .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |   21 ++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
 
-regards,
-  -Joel
+diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+new file mode 100644
+index 0000000..8eae9fe
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+@@ -0,0 +1,21 @@
++Broadcom Kona PWM controller device tree bindings
++
++This controller has 6 channels.
++
++Required Properties :
++- compatible: should contain "brcm,kona-pwm"
++- reg: physical base address and length of the controller's registers
++- clocks: phandle + clock specifier pair for the external clock
++- #pwm-cells: Should be 3. See pwm.txt in this directory for a
++  description of the cells format.
++
++Refer to clocks/clock-bindings.txt for generic clock consumer properties.
++
++Example:
++
++pwm: pwm at 3e01a000 {
++	compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
++	reg = <0x3e01a000 0xc4>;
++	clocks = <&pwm_clk>;
++	#pwm-cells = <3>;
++};
+-- 
+1.7.9.5
