@@ -1,44 +1,41 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 18 Apr 2014 14:19:47 +0200
-Subject: [PATCH 1/7] irqchip: armada-370-xp: fix invalid cast of signed value
- into unsigned variable
+Date: Fri, 18 Apr 2014 14:19:49 +0200
+Subject: [PATCH 3/7] irqchip: armada-370-xp: Fix releasing of MSIs
 In-Reply-To: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1397823593-1932-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1397823593-1932-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The armada_370_xp_alloc_msi() function returns a signed int, which is
-negative on error. However, we store the return value into an
-irq_hw_number_t, which is unsigned. Therefore, we actually never test
-if armada_370_xp_alloc_msi() returns an error or not, which may lead
-us to use hwirq numbers of as 0xffffffe4 (when
-armada_370_xp_alloc_msi() returns -ENOSPC).
+From: Neil Greatorex <neil@fatboyfat.co.uk>
 
-This commit fixes that by storing the return value of
-armada_370_xp_alloc_msi() in a signed variable.
+Store the value of d->hwirq in a local variable as the real value is wiped out
+by calling irq_dispose_mapping. Without this patch, the armada_370_xp_free_msi
+function would always free MSI#0, no matter what was passed to it.
 
 Fixes: 31f614edb726fcc4d5aa0f2895fbdec9b04a3ca4 ('irqchip: armada-370-xp: implement MSI support')
 Cc: <stable@vger.kernel.org> # v3.13+
+Signed-off-by: Neil Greatorex <neil@fatboyfat.co.uk>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Neil Greatorex <neil@fatboyfat.co.uk>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 41be897..3c8d89b 100644
+index 78b0ac9..868d11b 100644
 --- a/drivers/irqchip/irq-armada-370-xp.c
 +++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -132,8 +132,7 @@ static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
- 				       struct msi_desc *desc)
+@@ -158,8 +158,10 @@ static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
+ 					   unsigned int irq)
  {
- 	struct msi_msg msg;
--	irq_hw_number_t hwirq;
--	int virq;
-+	int virq, hwirq;
+ 	struct irq_data *d = irq_get_irq_data(irq);
++	unsigned long hwirq = d->hwirq;
++
+ 	irq_dispose_mapping(irq);
+-	armada_370_xp_free_msi(d->hwirq);
++	armada_370_xp_free_msi(hwirq);
+ }
  
- 	hwirq = armada_370_xp_alloc_msi();
- 	if (hwirq < 0)
+ static int armada_370_xp_check_msi_device(struct msi_chip *chip, struct pci_dev *dev,
 -- 
 1.9.2
