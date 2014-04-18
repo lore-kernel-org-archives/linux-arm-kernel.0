@@ -1,70 +1,67 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 Apr 2014 16:48:06 +0200
-Subject: [PATCH v2 06/14] clocksource: sh_mtu2: Replace global spinlock with a
- per-device spinlock
+Date: Fri, 18 Apr 2014 16:48:13 +0200
+Subject: [PATCH v2 13/14] ARM: shmobile: lager-reference: Enable CMT0 in
+ device tree
 In-Reply-To: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1397832494-20607-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1397832494-20607-14-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The global spinlock is used to protect the shared start/stop register.
-Now that all MTU2 channels are handled by a single device instance, use
-a per-device spinlock.
+Enable the CMT0 device and configure channel 0 as a clock event
+provider.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- drivers/clocksource/sh_mtu2.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts            | 4 ++++
+ arch/arm/mach-shmobile/board-lager-reference.c | 1 -
+ arch/arm/mach-shmobile/setup-r8a7790.c         | 2 +-
+ 3 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
-index 2931fea..ebdf9d1 100644
---- a/drivers/clocksource/sh_mtu2.c
-+++ b/drivers/clocksource/sh_mtu2.c
-@@ -47,14 +47,14 @@ struct sh_mtu2_device {
- 	void __iomem *mapbase;
- 	struct clk *clk;
- 
-+	raw_spinlock_t lock; /* Protect the shared registers */
-+
- 	struct sh_mtu2_channel *channels;
- 	unsigned int num_channels;
- 
- 	bool has_clockevent;
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 86d676f..68dc594 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -201,6 +201,10 @@
+ 	};
  };
  
--static DEFINE_RAW_SPINLOCK(sh_mtu2_lock);
--
- #define TSTR -1 /* shared register */
- #define TCR  0 /* channel register */
- #define TMDR 1 /* channel register */
-@@ -192,7 +192,7 @@ static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
- 	unsigned long flags, value;
- 
- 	/* start stop register shared by multiple timer channels */
--	raw_spin_lock_irqsave(&sh_mtu2_lock, flags);
-+	raw_spin_lock_irqsave(&ch->mtu->lock, flags);
- 	value = sh_mtu2_read(ch, TSTR);
- 
- 	if (start)
-@@ -201,7 +201,7 @@ static void sh_mtu2_start_stop_ch(struct sh_mtu2_channel *ch, int start)
- 		value &= ~(1 << ch->index);
- 
- 	sh_mtu2_write(ch, TSTR, value);
--	raw_spin_unlock_irqrestore(&sh_mtu2_lock, flags);
-+	raw_spin_unlock_irqrestore(&ch->mtu->lock, flags);
++&cmt0 {
++	status = "ok";
++};
++
+ &ether {
+ 	pinctrl-0 = <&ether_pins &phy1_pins>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 1bca2748..8873c69 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -90,7 +90,6 @@ static void __init lager_add_du_device(void)
+  * devices until they get moved to DT.
+  */
+ static const struct clk_name clk_names[] __initconst = {
+-	{ "cmt0", "fck", "sh-cmt-48-gen2.0" },
+ 	{ "scifa0", NULL, "sh-sci.0" },
+ 	{ "scifa1", NULL, "sh-sci.1" },
+ 	{ "scifb0", NULL, "sh-sci.2" },
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 2a67083..ac00e4b 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -291,12 +291,12 @@ void __init r8a7790_add_dt_devices(void)
+ 	r8a7790_register_scif(7);
+ 	r8a7790_register_scif(8);
+ 	r8a7790_register_scif(9);
+-	r8a7790_register_cmt(0);
  }
  
- static int sh_mtu2_enable(struct sh_mtu2_channel *ch)
-@@ -402,6 +402,8 @@ static int sh_mtu2_setup(struct sh_mtu2_device *mtu,
- 
- 	mtu->pdev = pdev;
- 
-+	raw_spin_lock_init(&mtu->lock);
-+
- 	/* Get hold of clock. */
- 	mtu->clk = clk_get(&mtu->pdev->dev, "fck");
- 	if (IS_ERR(mtu->clk)) {
+ void __init r8a7790_add_standard_devices(void)
+ {
+ 	r8a7790_add_dt_devices();
++	r8a7790_register_cmt(0);
+ 	r8a7790_register_irqc(0);
+ 	r8a7790_register_thermal();
+ 	r8a7790_register_i2c(0);
 -- 
 1.8.3.2
