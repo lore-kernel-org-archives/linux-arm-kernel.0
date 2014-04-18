@@ -1,34 +1,57 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 18 Apr 2014 03:55:46 +0000
-Subject: [RFC][PATCH 3/3] clocksource: Add Freescale FlexTimer Module
- (FTM) timer support
-In-Reply-To: <534FE3C1.4060509@linaro.org>
-References: <1397614787-8300-1-git-send-email-Li.Xiubo@freescale.com>
- <1397614787-8300-4-git-send-email-Li.Xiubo@freescale.com>
- <534FE3C1.4060509@linaro.org>
-Message-ID: <aa8f83c882144105b4c2c230dc6f517b@BY2PR03MB505.namprd03.prod.outlook.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 18 Apr 2014 00:34:56 -0400 (EDT)
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <CAL_JsqKCGg25wrTq8SyXK3zebo+uJG61083K6--mJ9Fxek03XQ@mail.gmail.com>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
+ <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
+ <20140417201645.GU24070@n2100.arm.linux.org.uk>
+ <CAL_JsqL65bXBh1_dcud6XaDqFBnY1L69dMXWeNHvFAvcDizzhQ@mail.gmail.com>
+ <20140417213502.GX24070@n2100.arm.linux.org.uk>
+ <CAL_JsqKCGg25wrTq8SyXK3zebo+uJG61083K6--mJ9Fxek03XQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1404180019410.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +	freq = clk_get_rate(ftm_clk);
-> > +
-> > +	calc_closest_cound_cyc(freq);
-> > +
-> > +	BUG_ON(ftm_clocksource_init(freq));
-> > +
-> > +	BUG_ON(ftm_clockevent_init(freq, irq));
-> > +}
-> > +CLOCKSOURCE_OF_DECLARE(vf610, "fsl,vf610-ftm-timer", ftm_timer_init);
-> 
-> 
-> I am not a big fan of those BUG_ON every line. Could you please replace
-> it by dev_err().
-> 
+On Thu, 17 Apr 2014, Rob Herring wrote:
 
-While, for the FlexTimer driver, there hasn't any device creation and
-registering, so I'll use pr_err() instead of dev_err()...
+> Here's a simple test of what I was trying to point out. I took a
+> working kernel with TEXT_OFFSET of 0x8000 and booted it on QEMU using
+> the "virt" machine which RAM normally starts at 0x40000000. Then
+> varying the RAM base, I get these results:
+> 
+> 0x40000000 - boots
+> 0x41000000 - no output because the decompressor will still put the
+> Image at 0x40008000.
 
-Thanks
+If you want this to work, you have to disable CONFIG_AUTO_ZRELADDR.
 
-BRs
-Xiubo
+In practice there is no actual hardware with physical RAM not aligned to 
+a 128MB boundary.  That's why this particular alignment was selected.
+
+> 0x48000000 - boots
+> 
+> So without changing TEXT_OFFSET, you can only vary the PHYS_OFFSET in
+> 128MB steps. For anything in between you have to use TEXT_OFFSET. Is
+> that really the right solution?
+
+What "solution" are you looking for?  I'm under the impression you're 
+getting confused about what TEXT_OFFSET is for.
+
+> I'm not suggesting to break anything or changing existing platforms,
+> but how do we improve the Image format in a compatible way. If
+> bootloaders want to support booting Image files or vmlinux directly,
+> then we should support that including any compatible changes to make
+> things work better.
+
+And why would bootloaders want that?  Just to create confusion with 
+the established boot protocol?
+
+There is really not much to share between ARM32 and ARM64 bootloader 
+implementation wise given the major platform initialization differences, 
+so trying to consolidate the very little code to actually boot the image 
+is rather futile.
+
+
+Nicolas
