@@ -1,124 +1,44 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 18 Apr 2014 11:01:27 +0100
-Subject: [PATCH] ARM: imx: add HDMI support for SolidRun HummingBoard and
- Cubox-i
-Message-ID: <E1Wb5br-0002ZE-T3@rmk-PC.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 18 Apr 2014 12:03:21 +0200
+Subject: Rockchip RK3188 I2C driver
+In-Reply-To: <2664026.dY5rX8rfNU@typ>
+References: <3748421.ND1tAjvgKS@typ> <1437066.E9nAxXbK6K@phil>
+ <2664026.dY5rX8rfNU@typ>
+Message-ID: <3654530.JEvxoLYNLf@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the HDMI DT configuration for the SolidRun HummingBoard and Cubox-i.
+Am Freitag, 18. April 2014, 11:30:21 schrieb Max Schwarz:
+> On Friday 18 April 2014 at 11:06:56, Heiko St?bner wrote:
+> > > I think Heiko and I have been operating under the misconception that
+> > > caching is somehow enabled by default - which is not the case. Thanks
+> > > for
+> > > clearing that up ;-)
+> > 
+> > Actually I think it's the other way around :-).
+> > 
+> > See regmap_read() calling _reagmap_read(), which in turn calls
+> > regcache_read(), except when map->cache_bypass is enabled, which then
+> > checks the volatile setting for the individual register.
+> 
+> But map->cache_bypass *is* enabled by regcache_init() in regcache.c when
+> cache_type is REGCACHE_NONE, which is the default value:
+> 
+> if (map->cache_type == REGCACHE_NONE) {
+> 	map->cache_bypass = true;
+> 	return 0;
+> }
+> 
+> You can see the behaviour in detail if you compile with event tracing and
+> boot with trace_event=regmap:* .
+> 
+> If you think about it, it would be quite insane to enable caching in syscon
+> without knowing anything about the registers.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/imx6dl-hummingboard.dts | 28 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 28 ++++++++++++++++++++++++++++
- 2 files changed, 56 insertions(+)
+yep, you're right of course ... now I see it too :-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-index 5bfae54fb780..d3095f58bf7b 100644
---- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-@@ -67,6 +67,14 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hummingboard_hdmi>;
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+	crtcs = <&ipu1 0>;
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hummingboard_i2c1>;
-@@ -82,6 +90,13 @@
- 	 */
- };
- 
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hummingboard_i2c2>;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	hummingboard {
- 		pinctrl_hummingboard_flexcan1: hummingboard-flexcan1 {
-@@ -97,6 +112,12 @@
- 			>;
- 		};
- 
-+		pinctrl_hummingboard_hdmi: hummingboard-hdmi {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
-+			>;
-+		};
-+
- 		pinctrl_hummingboard_i2c1: hummingboard-i2c1 {
- 			fsl,pins = <
- 				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
-@@ -104,6 +125,13 @@
- 			>;
- 		};
- 
-+		pinctrl_hummingboard_i2c2: hummingboard-i2c2 {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_hummingboard_spdif: hummingboard-spdif {
- 			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
- 		};
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index c2a24888a276..5b9e7bceedaa 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -55,6 +55,21 @@
- 	};
- };
- 
-+&hdmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_cubox_i_hdmi>;
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+	crtcs = <&ipu1 0>;
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_cubox_i_i2c2>;
-+	status = "okay";
-+};
-+
- &i2c3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_cubox_i_i2c3>;
-@@ -69,6 +84,19 @@
- 
- &iomuxc {
- 	cubox_i {
-+		pinctrl_cubox_i_hdmi: cubox-i-hdmi {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
-+			>;
-+		};
-+
-+		pinctrl_cubox_i_i2c2: cubox-i-i2c2 {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
-+			>;
-+		};
-+
- 		pinctrl_cubox_i_i2c3: cubox-i-i2c3 {
- 			fsl,pins = <
- 				MX6QDL_PAD_EIM_D17__I2C3_SCL 0x4001b8b1
--- 
-1.8.3.1
+So we really can leave everything as it is now - and I can stop worrying about 
+creating future issues with the soc_con registers :-)
+
+
+Heiko
