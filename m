@@ -1,81 +1,113 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Apr 2014 13:45:08 +0200
-Subject: [PATCH 5/8] ARM: mvebu: Add Device Tree description of xHCI hosts
- on Armada 38x
-In-Reply-To: <53510B28.1070709@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 18 Apr 2014 13:47:38 +0200
+Subject: [PATCH 2/8] usb: host: xhci-plat: Add support for the Armada
+ 38x glue code
+In-Reply-To: <53510FEC.7030803@free-electrons.com>
 References: <1397816563-9000-1-git-send-email-gregory.clement@free-electrons.com>
- <1397816563-9000-6-git-send-email-gregory.clement@free-electrons.com>
- <53510B28.1070709@gmail.com>
-Message-ID: <53511044.9070601@free-electrons.com>
+ <1397816563-9000-3-git-send-email-gregory.clement@free-electrons.com>
+ <535108E3.2010208@gmail.com> <53510FEC.7030803@free-electrons.com>
+Message-ID: <535110DA.2010005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-On 18/04/2014 13:23, Sebastian Hesselbarth wrote:
-> On 04/18/2014 12:22 PM, Gregory CLEMENT wrote:
->> The Marvell Armada 38x SoCs contain two xHCI host. This commit adds
->> the Device Tree description of those interfaces at the SoC level, and
->> also enables the two USB3 ports on the Armada 385 DB platform and one
->> USB3 port on the Armada 385 RD platforms.
+On 04/18/2014 01:43 PM, Gregory CLEMENT wrote:
+>>> @@ -0,0 +1,21 @@
+>>> +/*
+>>> + * Copyright (C) 2014 Marvell
+>>> + *
+>>> + * Gregory Clement <gregory.clement@free-electrons.com>
+>>> + *
+>>> + * This file is licensed under the terms of the GNU General Public
+>>> + * License version 2.  This program is licensed "as is" without any
+>>> + * warranty of any kind, whether express or implied.
+>>> + */
+>>> +
+>>> +#ifndef __LINUX_XHCI_MVEBU_H
+>>> +#define __LINUX_XHCI_MVEBU_H
+>>> +
+>>> +#ifdef CONFIG_USB_XHCI_MVEBU
+>>> +int xhci_mvebu_probe(struct platform_device *pdev);
+>>> +int xhci_mvebu_remove(struct platform_device *pdev);
+>>> +#else
+>>> +#define xhci_mvebu_probe NULL
+>>> +#define xhci_mvebu_remove NULL
+>>> +#endif
+>>> +#endif /* __LINUX_XHCI_MVEBU_H */
+>>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>>> index 8029cc82edc4..f1261d3848a9 100644
+>>> --- a/drivers/usb/host/xhci-plat.c
+>>> +++ b/drivers/usb/host/xhci-plat.c
+>>> @@ -19,6 +19,7 @@
+>>>  #include <linux/of_device.h>
+>>>  
+>>>  #include "xhci.h"
+>>> +#include "xhci-mvebu.h"
+>>>  
+>>>  static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
+>>>  {
+>>> @@ -250,6 +251,11 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
+>>>  #endif /* CONFIG_PM */
+>>>  
+>>>  #ifdef CONFIG_OF
 >>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm/boot/dts/armada-385-db.dts |  8 ++++++++
->>  arch/arm/boot/dts/armada-385-rd.dts |  4 ++++
->>  arch/arm/boot/dts/armada-38x.dtsi   | 17 +++++++++++++++++
->>  3 files changed, 29 insertions(+)
-> [...]
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index a064f59da02d..4f117e66aa1a 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -355,6 +355,23 @@
->>  				clocks = <&coredivclk 0>;
->>  				status = "disabled";
->>  			};
->> +
->> +			usb3 at f0000 {
->> +				compatible = "marvell,xhci-armada-380";
->> +				reg = <0xf0000 0x3fff>,<0xf4000 0x3fff>;
->> +				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
->> +				clocks = <&gateclk 9>;
+>> Gregory,
+>>
+>> either you should #ifndef CONFIG_USB_XHCI_MVEBU this and the one below -
+>> or even better:
 > 
-> Using generic PHY framework will allow you to reference the PHY nodes
-> with "usb-phy" here.
+> With the current code we don't need to add this, see xhci-mvebu.h: xhci_mvebu_*
+> are set to NULL if CONFIG_USB_XHCI_MVEBU is not define. Then the driver
+> is more multiplatform friendly.
+
+Ok, but strictly speaking, the compatible should be #ifndef'd at least.
+
+>>
+>> Can you put driver stub with its of_match_table right into xhci-mvebu?
+>> That way platform specific probe wouldn't pollute the generic driver.
 > 
-> BTW, you added a "marvell,armada-380-usb-utmi" in the patch for PHY init
-> but I can see no corresponding node added.
+> This sound more interesting. However the only "pollution" is to extend
+> the compatible list, the platform specific code is in is own file. Moreover
+> it could make sens to have all the compatible strings at the same place.
 
-Yes a commit was lost during one of my rebase!
-Thanks to git reflog, I found it.
-Thanks,
+"pollute" wasn't meant for just your patch, but you can expect others
+the hop in as soon as one adds platform specific code ;)
 
-Gregory
+> I wait for the opinion of the USB maintainers for this point.
 
+Agreed.
 
-> 
-> Sebastian
-> 
->> +				status = "disabled";
->> +			};
->> +
->> +			usb3 at f8000 {
->> +				compatible = "marvell,xhci-armada-380";
->> +				reg = <0xf8000 0x3fff>,<0xfc000 0x3fff>;
->> +				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
->> +				clocks = <&gateclk 10>;
->> +				status = "disabled";
->> +			};
->> +
->>  		};
->>  	};
->>  
+Sebastian
+
+>> Greg will have a better opinion about it, but I remember some cleanup
+>> in ehci, that basically removed platform specific references from the
+>> generic code.
+>>
+>>> +struct xhci_plat_ops xhci_plat_mvebu = {
+>>> +	.probe =  xhci_mvebu_probe,
+>>> +	.remove =  xhci_mvebu_remove,
+>>> +};
+>>> +
+>>>  static const struct of_device_id usb_xhci_of_match[] = {
+>>>  	{
+>>>  		.compatible = "generic-xhci",
+>>> @@ -259,6 +265,10 @@ static const struct of_device_id usb_xhci_of_match[] = {
+>>>  		.compatible = "xhci-platform",
+>>>  		.data = (void *) &xhci_plat_default,
+>>>  	},
+>>> +	{
+>>> +		.compatible = "marvell,xhci-armada-380",
+>>
+>> nit: the ususal order we use on mvebu is "marvell,<soc>-<ip>", so this
+>> should be "marvell,armada-380-xhci".
+>>
+>> Sebastian
+>>
+>>> +		.data = (void *) &xhci_plat_mvebu,
+>>> +	},
+>>>  	{ },
+>>>  };
+>>>  MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+>>>
 >>
 > 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
