@@ -1,275 +1,127 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 18 Apr 2014 14:44:26 +0800
-Subject: [PATCH v2 2/2] ahci: imx: software workaround for phy reset issue in
- resume
-In-Reply-To: <1397803466-28411-1-git-send-email-shawn.guo@freescale.com>
-References: <1397803466-28411-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1397803466-28411-3-git-send-email-shawn.guo@freescale.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 18 Apr 2014 08:56:27 +0200
+Subject: [PATCH v3 02/13] ARM: append ARCH_MULTI_V7_LPAE
+In-Reply-To: <1397801156-25682-3-git-send-email-haojian.zhuang@linaro.org>
+References: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
+ <1397801156-25682-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <5350CC9B.2090102@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When suspending imx6q systems which have rootfs on SATA, the following
-error will likely be seen in resume.  The SATA link will fail to come
-up, and it results in an unusable system across the suspend/resume
-cycle.
+Hi Haojian,
 
-$ echo mem > /sys/power/state
-PM: Syncing filesystems ... done.
-PM: Preparing system for mem sleep
-Freezing user space processes ... (elapsed 0.002 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-PM: Entering mem sleep
-sd 0:0:0:0: [sda] Synchronizing SCSI cache
-sd 0:0:0:0: [sda] Stopping disk
-PM: suspend of devices complete after 61.914 msecs
-PM: suspend devices took 0.070 seconds
-PM: late suspend of devices complete after 4.906 msecs
-PM: noirq suspend of devices complete after 4.521 msecs
-Disabling non-boot CPUs ...
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-Enabling non-boot CPUs ...
-CPU1: Booted secondary processor
-CPU1 is up
-CPU2: Booted secondary processor
-CPU2 is up
-CPU3: Booted secondary processor
-CPU3 is up
-PM: noirq resume of devices complete after 10.486 msecs
-PM: early resume of devices complete after 4.679 msecs
-sd 0:0:0:0: [sda] Starting disk
-PM: resume of devices complete after 22.674 msecs
-PM: resume devices took 0.030 seconds
-PM: Finishing wakeup.
-Restarting tasks ... done.
-$ ata1: SATA link down (SStatus 1 SControl 300)
-ata1: SATA link down (SStatus 1 SControl 300)
-ata1: limiting SATA link speed to 1.5 Gbps
-ata1: SATA link down (SStatus 1 SControl 310)
-ata1.00: disabled
-ata1: exception Emask 0x10 SAct 0x0 SErr 0x4040000 action 0xe frozen t4
-ata1: irq_stat 0x00000040, connection status changed
-ata1: SError: { CommWake DevExch }
-ata1: hard resetting link
-sd 0:0:0:0: rejecting I/O to offline device
-sd 0:0:0:0: killing request
-sd 0:0:0:0: rejecting I/O to offline device
-Aborting journal on device sda2-8.
-sd 0:0:0:0: rejecting I/O to offline device
-EXT4-fs warning (device sda2): ext4_end_bio:317: I/O error writing to inode 132577 (offset 0 size 0 starting block 26235)
-Buffer I/O error on device sda2, logical block 10169
-...
+On 18/04/2014 08:05, Haojian Zhuang wrote:
+> Add new ARCH_MULTI_V7_LPAE config. It will select ARM_LPAE only both
+> ARCH_MULTI_V6 & ARCH_MULTI_V7 is disabled.
+> 
+> ARCH_MULTI_V7 means non-LPAE platform.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/Kconfig               | 9 ++++++++-
+>  arch/arm/mach-berlin/Kconfig   | 2 +-
+>  arch/arm/mach-highbank/Kconfig | 2 +-
+>  arch/arm/mach-mvebu/Kconfig    | 6 +++---
+>  arch/arm/mach-omap2/Kconfig    | 4 ++--
+>  arch/arm/mach-qcom/Kconfig     | 2 +-
+>  arch/arm/mach-shmobile/Kconfig | 2 +-
+>  arch/arm/mach-tegra/Kconfig    | 2 +-
+>  arch/arm/mach-vexpress/Kconfig | 2 +-
+>  9 files changed, 19 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index ab438cb..9a2214e 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -918,12 +918,19 @@ config ARCH_MULTI_V6
+>  	select CPU_V6K
+>  
+>  config ARCH_MULTI_V7
+> -	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+> +	bool "ARMv7 non-LPAE based platforms (Cortex-A5/A8/A9, PJ4, Scorpion)"
+Actually some PJ4B are also non LPAE capable
 
-It's caused by a silicon issue that SATA phy does not get reset by
-controller when coming back from LPM.  The patch adds a software
-workaround for this issue.  It enforces a software reset on SATA phy
-in imx_sata_enable() function, so that we can ensure SATA link will
-come up properly in both power-on and resume.
 
-The software reset is implemented by writing phy reset register through
-the phy control register bus interface.  Functions
-imx_phy_reg_[addressing|write|read]() implement this bus interface, while
-imx_sata_phy_reset() performs the actually reset operation.
+>  	default y
+>  	select ARCH_MULTI_V6_V7
+>  	select CPU_V7
+>  	select HAVE_SMP
+>  
+> +config ARCH_MULTI_V7_LPAE
+> +	bool "ARMv7 LPAE based platforms (Cortex-A7/A12/A15/A17, Brahma-B15, PJ4B, Krait)"
+Only Armada XP is LPAE capable, and and the CPU is not a "simple" PJ4B
+but a PJ4B-MP
 
-Signed-off-by: Richard Zhu <r65037@freescale.com>
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- drivers/ata/ahci_imx.c | 158 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 158 insertions(+)
+> +	select ARCH_MULTI_V6_V7
+> +	select CPU_V7
+> +	select HAVE_SMP
+> +	select ARM_LPAE if !(ARCH_MULTI_V6 || ARCH_MULTI_V7)
+> +
+>  config ARCH_MULTI_V6_V7
+>  	bool
+>  	select MIGHT_HAVE_CACHE_L2X0
+> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+> index b0cb072..be0512d 100644
+> --- a/arch/arm/mach-berlin/Kconfig
+> +++ b/arch/arm/mach-berlin/Kconfig
+> @@ -1,5 +1,5 @@
+>  config ARCH_BERLIN
+> -	bool "Marvell Berlin SoCs" if ARCH_MULTI_V7
+> +	bool "Marvell Berlin SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE)
+>  	select ARM_GIC
+>  	select GENERIC_IRQ_CHIP
+>  	select DW_APB_ICTL
+> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+> index 830b76e..9b6b3f8 100644
+> --- a/arch/arm/mach-highbank/Kconfig
+> +++ b/arch/arm/mach-highbank/Kconfig
+> @@ -1,5 +1,5 @@
+>  config ARCH_HIGHBANK
+> -	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
+> +	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7_LPAE
+>  	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+>  	select ARCH_HAS_CPUFREQ
+>  	select ARCH_HAS_HOLES_MEMORYMODEL
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 3f73eec..16f69ae 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -1,5 +1,5 @@
+>  config ARCH_MVEBU
+> -	bool "Marvell Engineering Business Unit (MVEBU) SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V5)
+> +	bool "Marvell Engineering Business Unit (MVEBU) SoCs" if (ARCH_MULTI_V7 || ARCH_MULTI_V7_LPAE || ARCH_MULTI_V5)
+>  	select ARCH_SUPPORTS_BIG_ENDIAN
+>  	select CLKSRC_MMIO
+>  	select GENERIC_IRQ_CHIP
+> @@ -23,7 +23,7 @@ config MACH_MVEBU_V7
+>  	select CACHE_L2X0
+>  
+>  config MACH_ARMADA_370
+> -	bool "Marvell Armada 370 boards" if ARCH_MULTI_V7
+> +	bool "Marvell Armada 370 boards" if ARCH_MULTI_V7_LPAE
+Armada 370 is not LPAE capable
 
-diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
-index 009a074..1c3d4c8 100644
---- a/drivers/ata/ahci_imx.c
-+++ b/drivers/ata/ahci_imx.c
-@@ -32,6 +32,17 @@ enum {
- 	IMX_SATA_TIMER1MS			= 0x00e0,
- 	IMX_SATA_P0PHYCR			= 0x0178,
- 	IMX_SATA_P0PHYCR_TEST_PDDQ		= 1 << 20,
-+	IMX_SATA_P0PHYCR_CR_READ		= 1 << 19,
-+	IMX_SATA_P0PHYCR_CR_WRITE		= 1 << 18,
-+	IMX_SATA_P0PHYCR_CR_CAP_DATA		= 1 << 17,
-+	IMX_SATA_P0PHYCR_CR_CAP_ADDR		= 1 << 16,
-+	IMX_SATA_P0PHYSR			= 0x017c,
-+	IMX_SATA_P0PHYSR_CR_ACK			= 1 << 18,
-+	IMX_SATA_P0PHYSR_CR_DATA_OUT		= 0xffff << 0,
-+	IMX_PHY_LANE0_OUT_STAT			= 0x2003,
-+	IMX_PHY_LANE0_OUT_STAT_RX_PLL_STATE	= 1 << 1,
-+	IMX_PHY_CLOCK_RESET			= 0x7f3f,
-+	IMX_PHY_CLOCK_RESET_RESET		= 1 << 0,
- };
- 
- enum ahci_imx_type {
-@@ -54,9 +65,149 @@ MODULE_PARM_DESC(hotplug, "AHCI IMX hot-plug support (0=Don't support, 1=support
- 
- static void ahci_imx_host_stop(struct ata_host *host);
- 
-+static int imx_phy_crbit_assert(void __iomem *mmio, u32 bit, bool assert)
-+{
-+	int timeout = 10;
-+	u32 crval;
-+	u32 srval;
-+
-+	/* Assert or deassert the bit */
-+	crval = readl(mmio + IMX_SATA_P0PHYCR);
-+	if (assert)
-+		crval |= bit;
-+	else
-+		crval &= ~bit;
-+	writel(crval, mmio + IMX_SATA_P0PHYCR);
-+
-+	/* Wait for the cr_ack signal */
-+	do {
-+		srval = readl(mmio + IMX_SATA_P0PHYSR);
-+		if ((assert ? srval : ~srval) & IMX_SATA_P0PHYSR_CR_ACK)
-+			break;
-+		usleep_range(100, 200);
-+	} while (--timeout);
-+
-+	return timeout ? 0 : -ETIMEDOUT;
-+}
-+
-+static int imx_phy_reg_addressing(u16 addr, void __iomem *mmio)
-+{
-+	u32 crval = addr;
-+	int ret;
-+
-+	/* Supply the address on cr_data_in */
-+	writel(crval, mmio + IMX_SATA_P0PHYCR);
-+
-+	/* Assert the cr_cap_addr signal */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_CAP_ADDR, true);
-+	if (ret)
-+		return ret;
-+
-+	/* Deassert cr_cap_addr */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_CAP_ADDR, false);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static int imx_phy_reg_write(u16 val, void __iomem *mmio)
-+{
-+	u32 crval = val;
-+	int ret;
-+
-+	/* Supply the data on cr_data_in */
-+	writel(crval, mmio + IMX_SATA_P0PHYCR);
-+
-+	/* Assert the cr_cap_data signal */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_CAP_DATA, true);
-+	if (ret)
-+		return ret;
-+
-+	/* Deassert cr_cap_data */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_CAP_DATA, false);
-+	if (ret)
-+		return ret;
-+
-+	if (val & IMX_PHY_CLOCK_RESET_RESET) {
-+		/*
-+		 * In case we're resetting the phy, it's unable to acknowledge,
-+		 * so we return immediately here.
-+		 */
-+		crval |= IMX_SATA_P0PHYCR_CR_WRITE;
-+		writel(crval, mmio + IMX_SATA_P0PHYCR);
-+		goto out;
-+	}
-+
-+	/* Assert the cr_write signal */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_WRITE, true);
-+	if (ret)
-+		return ret;
-+
-+	/* Deassert cr_write */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_WRITE, false);
-+	if (ret)
-+		return ret;
-+
-+out:
-+	return 0;
-+}
-+
-+static int imx_phy_reg_read(u16 *val, void __iomem *mmio)
-+{
-+	int ret;
-+
-+	/* Assert the cr_read signal */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_READ, true);
-+	if (ret)
-+		return ret;
-+
-+	/* Capture the data from cr_data_out[] */
-+	*val = readl(mmio + IMX_SATA_P0PHYSR) & IMX_SATA_P0PHYSR_CR_DATA_OUT;
-+
-+	/* Deassert cr_read */
-+	ret = imx_phy_crbit_assert(mmio, IMX_SATA_P0PHYCR_CR_READ, false);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static int imx_sata_phy_reset(struct ahci_host_priv *hpriv)
-+{
-+	void __iomem *mmio = hpriv->mmio;
-+	int timeout = 10;
-+	u16 val;
-+	int ret;
-+
-+	/* Reset SATA PHY by setting RESET bit of PHY register CLOCK_RESET */
-+	ret = imx_phy_reg_addressing(IMX_PHY_CLOCK_RESET, mmio);
-+	if (ret)
-+		return ret;
-+	ret = imx_phy_reg_write(IMX_PHY_CLOCK_RESET_RESET, mmio);
-+	if (ret)
-+		return ret;
-+
-+	/* Wait for PHY RX_PLL to be stable */
-+	do {
-+		usleep_range(100, 200);
-+		ret = imx_phy_reg_addressing(IMX_PHY_LANE0_OUT_STAT, mmio);
-+		if (ret)
-+			return ret;
-+		ret = imx_phy_reg_read(&val, mmio);
-+		if (ret)
-+			return ret;
-+		if (val & IMX_PHY_LANE0_OUT_STAT_RX_PLL_STATE)
-+			break;
-+	} while (--timeout);
-+
-+	return timeout ? 0 : -ETIMEDOUT;
-+}
-+
- static int imx_sata_enable(struct ahci_host_priv *hpriv)
- {
- 	struct imx_ahci_priv *imxpriv = hpriv->plat_data;
-+	struct device *dev = &imxpriv->ahci_pdev->dev;
- 	int ret;
- 
- 	if (imxpriv->no_device)
-@@ -101,6 +252,12 @@ static int imx_sata_enable(struct ahci_host_priv *hpriv)
- 		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
- 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN,
- 				   IMX6Q_GPR13_SATA_MPLL_CLK_EN);
-+
-+		ret = imx_sata_phy_reset(hpriv);
-+		if (ret) {
-+			dev_err(dev, "failed to reset phy: %d\n", ret);
-+			goto disable_regulator;
-+		}
- 	}
- 
- 	usleep_range(1000, 2000);
-@@ -217,6 +374,7 @@ static int imx_ahci_probe(struct platform_device *pdev)
- 	if (!imxpriv)
- 		return -ENOMEM;
- 
-+	imxpriv->ahci_pdev = pdev;
- 	imxpriv->no_device = false;
- 	imxpriv->first_time = true;
- 	imxpriv->type = (enum ahci_imx_type)of_id->data;
+>  	select ARMADA_370_CLK
+>  	select CPU_PJ4B
+>  	select MACH_MVEBU_V7
+> @@ -59,7 +59,7 @@ config MACH_ARMADA_38X
+>  	  on the Marvell Armada 380/385 SoC with device tree.
+>  
+>  config MACH_ARMADA_XP
+> -	bool "Marvell Armada XP boards" if ARCH_MULTI_V7
+> +	bool "Marvell Armada XP boards" if ARCH_MULTI_V7_LPAE
+>  	select ARMADA_XP_CLK
+>  	select CPU_PJ4B
+>  	select MACH_MVEBU_V7
+
+
+Thanks,
+
+Gregory
+
+
 -- 
-1.8.3.2
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
