@@ -1,58 +1,166 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 18 Apr 2014 23:51:07 +0400
-Subject: [PATCH v2 2/4] Documentation: dts: Add bindings for APM X-Gene
- SoC ethernet driver
-In-Reply-To: <1397271984-23405-3-git-send-email-isubramanian@apm.com>
-References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
- <1397271984-23405-3-git-send-email-isubramanian@apm.com>
-Message-ID: <5351822B.7010402@cogentembedded.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 18 Apr 2014 22:11:41 +0200
+Subject: [PATCH v3] regmap: i2c: fallback to SMBus if the adapter does not
+ support standard I2C
+In-Reply-To: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1397851901-16390-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Some I2C adapters are only compatible with the SMBus protocol and do not
+support standard I2C transfers.
 
-On 04/12/2014 07:06 AM, Iyappan Subramanian wrote:
+Fallback to SMBus transfers if we encounter such kind of adapters.
+The transfer type is chosen according to the val_bits field in the regmap
+config.
 
-> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+Changes since v2:
+- fix regmap_get_i2c_bus scope (declare as static)
+- fix reg width check in reg_read/write functions
+- add reg_bits check in regmap_get_i2c_bus function
+- 
 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Ravi Patel <rapatel@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> ---
->   .../devicetree/bindings/net/apm-xgene-enet.txt     |   46 ++++++++++++++++++++
->   1 file changed, 46 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+ drivers/base/regmap/regmap-i2c.c | 104 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 102 insertions(+), 2 deletions(-)
 
-> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> new file mode 100644
-> index 0000000..0c983e8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
-> @@ -0,0 +1,46 @@
-> +APM X-Gene SoC Ethernet nodes
-> +
-> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
-> +APM X-Gene SoC.
-> +
-> +Required properties:
-> +- compatible		: Should be "apm,xgene-enet"
-> +- reg			: First resource is the ethernet base register set
-> +			  Second resource is the ring base register set
-> +			  Third resource is the ring command register set
-> +- interrupts		: Ethernet main interrupt
-> +- clocks		: Reference to the clock entry.
-> +- local-mac-address	: Ethernet MAC address.
-
-    This property is described in 
-Documentation/devicetree/bindings/net/ethernet.txt, please refer to it.
-
-> +- phy-addr		: Ethernet MII phy address.
-
-    No, thus won't do. Please use "phy-handle" property to refer to a PHY subnode.
-
-> +- phy-mode		: Ethernet MII mode.
-
-    This one is described in 
-Documentation/devicetree/bindings/net/ethernet.txt as well.
-
-WBR, Sergei
+diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
+index ebd1895..0a43211 100644
+--- a/drivers/base/regmap/regmap-i2c.c
++++ b/drivers/base/regmap/regmap-i2c.c
+@@ -14,6 +14,79 @@
+ #include <linux/i2c.h>
+ #include <linux/module.h>
+ 
++
++static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg > 0xff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_byte_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
++}
++
++static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (val > 0xff || reg > 0xff)
++		return -EINVAL;
++
++	return i2c_smbus_write_byte_data(i2c, reg, val);
++}
++
++static struct regmap_bus regmap_smbus_byte = {
++	.reg_write = regmap_smbus_byte_reg_write,
++	.reg_read = regmap_smbus_byte_reg_read,
++};
++
++static int regmap_smbus_word_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg > 0xff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_word_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
++}
++
++static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (val > 0xffff || reg > 0xff)
++		return -EINVAL;
++
++	return i2c_smbus_write_word_data(i2c, reg, val);
++}
++
++static struct regmap_bus regmap_smbus_word = {
++	.reg_write = regmap_smbus_word_reg_write,
++	.reg_read = regmap_smbus_word_reg_read,
++};
++
+ static int regmap_i2c_write(void *context, const void *data, size_t count)
+ {
+ 	struct device *dev = context;
+@@ -97,6 +170,23 @@ static struct regmap_bus regmap_i2c = {
+ 	.read = regmap_i2c_read,
+ };
+ 
++static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
++					const struct regmap_config *config)
++{
++	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
++		return &regmap_i2c;
++	else if (config->val_bits == 16 && config->reg_bits == 8 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_WORD_DATA))
++		return &regmap_smbus_word;
++	else if (config->val_bits == 8 && config->reg_bits == 8 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_BYTE_DATA))
++		return &regmap_smbus_byte;
++
++	return ERR_PTR(-ENOTSUPP);
++}
++
+ /**
+  * regmap_init_i2c(): Initialise register map
+  *
+@@ -109,7 +199,12 @@ static struct regmap_bus regmap_i2c = {
+ struct regmap *regmap_init_i2c(struct i2c_client *i2c,
+ 			       const struct regmap_config *config)
+ {
+-	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
++
++	if (IS_ERR(bus))
++		return ERR_PTR(PTR_ERR(bus));
++
++	return regmap_init(&i2c->dev, bus, &i2c->dev, config);
+ }
+ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ 
+@@ -126,7 +221,12 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
+ 				    const struct regmap_config *config)
+ {
+-	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
++
++	if (IS_ERR(bus))
++		return ERR_PTR(PTR_ERR(bus));
++
++	return devm_regmap_init(&i2c->dev, bus, &i2c->dev, config);
+ }
+ EXPORT_SYMBOL_GPL(devm_regmap_init_i2c);
+ 
+-- 
+1.8.3.2
