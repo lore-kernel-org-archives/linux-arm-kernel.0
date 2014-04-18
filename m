@@ -1,292 +1,362 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 18 Apr 2014 09:21:48 -0400
-Subject: [PATCH 1/4] ARM: Kirkwood: Add board file for netxbig LEDs
-In-Reply-To: <1397750938-25381-2-git-send-email-andrew@lunn.ch>
-References: <1397750938-25381-1-git-send-email-andrew@lunn.ch>
- <1397750938-25381-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20140418132148.GX28159@titan.lakedaemon.net>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 18 Apr 2014 15:21:22 +0200
+Subject: [RFC 1/3] atmel: drm: added drm driver for the atmel hlcd
+ controller
+In-Reply-To: <1397814309-32160-2-git-send-email-jjhiblot@traphandler.com>
+References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
+ <1397814309-32160-2-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <535126D2.4080406@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 06:08:55PM +0200, Andrew Lunn wrote:
-> There is currently no DT binding for the CPLD which controls the LEDs
-> on the Net 2Big and Net 5Big. So use a platform device.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/mach-mvebu/Kconfig         |   7 ++
->  arch/arm/mach-mvebu/Makefile        |   1 +
->  arch/arm/mach-mvebu/board-netxbig.c | 191 ++++++++++++++++++++++++++++++++++++
+Hi JJ,
 
-This seems pretty simple.  What's preventing this from becoming a
-full-fledged driver under drivers/leds?
-
-If this were a driver that's critical for boot, I could see moving it
-in soc code, but it's not.  What's you're plan here?
-
-thx,
-
-Jason.
-
->  arch/arm/mach-mvebu/board.h         |   6 ++
->  arch/arm/mach-mvebu/kirkwood.c      |   3 +
->  5 files changed, 208 insertions(+)
->  create mode 100644 arch/arm/mach-mvebu/board-netxbig.c
-> 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 3f73eecbcfb0..711ffd4fef85 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -97,6 +97,13 @@ config MACH_KIRKWOOD
->  	  Say 'Y' here if you want your kernel to support boards based
->  	  on the Marvell Kirkwood device tree.
->  
-> +config MACH_NETXBIG
-> +	bool "LaCie 2Big and 5Big Network v2"
-> +	depends on MACH_KIRKWOOD
-> +	help
-> +	  Say 'Y' here if you want your kernel to support the
-> +	  LaCie 2Big and 5Big Network v2
+On 18/04/2014 11:45, Jean-Jacques Hiblot wrote:
 > +
->  config MACH_T5325
->  	bool "HP T5325 thin client"
->  	depends on MACH_KIRKWOOD
-> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-> index a63e43b6b451..014f32d87ebd 100644
-> --- a/arch/arm/mach-mvebu/Makefile
-> +++ b/arch/arm/mach-mvebu/Makefile
-> @@ -10,4 +10,5 @@ obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
->  obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
->  obj-$(CONFIG_MACH_KIRKWOOD)	 += kirkwood.o kirkwood-pm.o
-> +obj-$(CONFIG_MACH_NETXBIG)	 += board-netxbig.o
->  obj-$(CONFIG_MACH_T5325)	 += board-t5325.o
-> diff --git a/arch/arm/mach-mvebu/board-netxbig.c b/arch/arm/mach-mvebu/board-netxbig.c
-> new file mode 100644
-> index 000000000000..e6f2f547b1c7
-> --- /dev/null
-> +++ b/arch/arm/mach-mvebu/board-netxbig.c
-> @@ -0,0 +1,191 @@
-> +/*
-> + * arch/arm/mach-mvbu/board-netxbig.c
-> + *
-> + * LaCie 2Big and 5Big Network v2 board setup
-> + *
-> + * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/platform_data/leds-kirkwood-netxbig.h>
-> +#include "common.h"
-> +
-> +/*****************************************************************************
-> + * GPIO extension LEDs
-> + ****************************************************************************/
-> +
-> +/*
-> + * The LEDs are controlled by a CPLD and can be configured through a GPIO
-> + * extension bus:
-> + *
-> + * - address register : bit [0-2] -> GPIO [47-49]
-> + * - data register    : bit [0-2] -> GPIO [44-46]
-> + * - enable register  : GPIO 29
-> + */
-> +
-> +static int netxbig_v2_gpio_ext_addr[] = { 47, 48, 49 };
-> +static int netxbig_v2_gpio_ext_data[] = { 44, 45, 46 };
-> +
-> +static struct netxbig_gpio_ext netxbig_v2_gpio_ext = {
-> +	.addr		= netxbig_v2_gpio_ext_addr,
-> +	.num_addr	= ARRAY_SIZE(netxbig_v2_gpio_ext_addr),
-> +	.data		= netxbig_v2_gpio_ext_data,
-> +	.num_data	= ARRAY_SIZE(netxbig_v2_gpio_ext_data),
-> +	.enable		= 29,
-> +};
-> +
-> +/*
-> + * Address register selection:
-> + *
-> + * addr | register
-> + * ----------------------------
-> + *   0  | front LED
-> + *   1  | front LED brightness
-> + *   2  | SATA LED brightness
-> + *   3  | SATA0 LED
-> + *   4  | SATA1 LED
-> + *   5  | SATA2 LED
-> + *   6  | SATA3 LED
-> + *   7  | SATA4 LED
-> + *
-> + * Data register configuration:
-> + *
-> + * data | LED brightness
-> + * -------------------------------------------------
-> + *   0  | min (off)
-> + *   -  | -
-> + *   7  | max
-> + *
-> + * data | front LED mode
-> + * -------------------------------------------------
-> + *   0  | fix off
-> + *   1  | fix blue on
-> + *   2  | fix red on
-> + *   3  | blink blue on=1 sec and blue off=1 sec
-> + *   4  | blink red on=1 sec and red off=1 sec
-> + *   5  | blink blue on=2.5 sec and red on=0.5 sec
-> + *   6  | blink blue on=1 sec and red on=1 sec
-> + *   7  | blink blue on=0.5 sec and blue off=2.5 sec
-> + *
-> + * data | SATA LED mode
-> + * -------------------------------------------------
-> + *   0  | fix off
-> + *   1  | SATA activity blink
-> + *   2  | fix red on
-> + *   3  | blink blue on=1 sec and blue off=1 sec
-> + *   4  | blink red on=1 sec and red off=1 sec
-> + *   5  | blink blue on=2.5 sec and red on=0.5 sec
-> + *   6  | blink blue on=1 sec and red on=1 sec
-> + *   7  | fix blue on
-> + */
-> +
-> +static int netxbig_v2_red_mled[NETXBIG_LED_MODE_NUM] = {
-> +	[NETXBIG_LED_OFF]	= 0,
-> +	[NETXBIG_LED_ON]	= 2,
-> +	[NETXBIG_LED_SATA]	= NETXBIG_LED_INVALID_MODE,
-> +	[NETXBIG_LED_TIMER1]	= 4,
-> +	[NETXBIG_LED_TIMER2]	= NETXBIG_LED_INVALID_MODE,
-> +};
-> +
-> +static int netxbig_v2_blue_pwr_mled[NETXBIG_LED_MODE_NUM] = {
-> +	[NETXBIG_LED_OFF]	= 0,
-> +	[NETXBIG_LED_ON]	= 1,
-> +	[NETXBIG_LED_SATA]	= NETXBIG_LED_INVALID_MODE,
-> +	[NETXBIG_LED_TIMER1]	= 3,
-> +	[NETXBIG_LED_TIMER2]	= 7,
-> +};
-> +
-> +static int netxbig_v2_blue_sata_mled[NETXBIG_LED_MODE_NUM] = {
-> +	[NETXBIG_LED_OFF]	= 0,
-> +	[NETXBIG_LED_ON]	= 7,
-> +	[NETXBIG_LED_SATA]	= 1,
-> +	[NETXBIG_LED_TIMER1]	= 3,
-> +	[NETXBIG_LED_TIMER2]	= NETXBIG_LED_INVALID_MODE,
-> +};
-> +
-> +static struct netxbig_led_timer netxbig_v2_led_timer[] = {
-> +	[0] = {
-> +		.delay_on	= 500,
-> +		.delay_off	= 500,
-> +		.mode		= NETXBIG_LED_TIMER1,
-> +	},
-> +	[1] = {
-> +		.delay_on	= 500,
-> +		.delay_off	= 1000,
-> +		.mode		= NETXBIG_LED_TIMER2,
-> +	},
-> +};
-> +
-> +#define NETXBIG_LED(_name, maddr, mval, baddr)			\
-> +	{ .name		= _name,				\
-> +	  .mode_addr	= maddr,				\
-> +	  .mode_val	= mval,					\
-> +	  .bright_addr	= baddr }
-> +
-> +static struct netxbig_led net2big_v2_leds_ctrl[] = {
-> +	NETXBIG_LED("net2big-v2:blue:power", 0, netxbig_v2_blue_pwr_mled,  1),
-> +	NETXBIG_LED("net2big-v2:red:power",  0, netxbig_v2_red_mled,       1),
-> +	NETXBIG_LED("net2big-v2:blue:sata0", 3, netxbig_v2_blue_sata_mled, 2),
-> +	NETXBIG_LED("net2big-v2:red:sata0",  3, netxbig_v2_red_mled,       2),
-> +	NETXBIG_LED("net2big-v2:blue:sata1", 4, netxbig_v2_blue_sata_mled, 2),
-> +	NETXBIG_LED("net2big-v2:red:sata1",  4, netxbig_v2_red_mled,       2),
-> +};
-> +
-> +static struct netxbig_led_platform_data net2big_v2_leds_data = {
-> +	.gpio_ext	= &netxbig_v2_gpio_ext,
-> +	.timer		= netxbig_v2_led_timer,
-> +	.num_timer	= ARRAY_SIZE(netxbig_v2_led_timer),
-> +	.leds		= net2big_v2_leds_ctrl,
-> +	.num_leds	= ARRAY_SIZE(net2big_v2_leds_ctrl),
-> +};
-> +
-> +static struct netxbig_led net5big_v2_leds_ctrl[] = {
-> +	NETXBIG_LED("net5big-v2:blue:power", 0, netxbig_v2_blue_pwr_mled,  1),
-> +	NETXBIG_LED("net5big-v2:red:power",  0, netxbig_v2_red_mled,       1),
-> +	NETXBIG_LED("net5big-v2:blue:sata0", 3, netxbig_v2_blue_sata_mled, 2),
-> +	NETXBIG_LED("net5big-v2:red:sata0",  3, netxbig_v2_red_mled,       2),
-> +	NETXBIG_LED("net5big-v2:blue:sata1", 4, netxbig_v2_blue_sata_mled, 2),
-> +	NETXBIG_LED("net5big-v2:red:sata1",  4, netxbig_v2_red_mled,       2),
-> +	NETXBIG_LED("net5big-v2:blue:sata2", 5, netxbig_v2_blue_sata_mled, 2),
-> +	NETXBIG_LED("net5big-v2:red:sata2",  5, netxbig_v2_red_mled,       2),
-> +	NETXBIG_LED("net5big-v2:blue:sata3", 6, netxbig_v2_blue_sata_mled, 2),
-> +	NETXBIG_LED("net5big-v2:red:sata3",  6, netxbig_v2_red_mled,       2),
-> +	NETXBIG_LED("net5big-v2:blue:sata4", 7, netxbig_v2_blue_sata_mled, 2),
-> +	NETXBIG_LED("net5big-v2:red:sata5",  7, netxbig_v2_red_mled,       2),
-> +};
-> +
-> +static struct netxbig_led_platform_data net5big_v2_leds_data = {
-> +	.gpio_ext	= &netxbig_v2_gpio_ext,
-> +	.timer		= netxbig_v2_led_timer,
-> +	.num_timer	= ARRAY_SIZE(netxbig_v2_led_timer),
-> +	.leds		= net5big_v2_leds_ctrl,
-> +	.num_leds	= ARRAY_SIZE(net5big_v2_leds_ctrl),
-> +};
-> +
-> +static struct platform_device netxbig_v2_leds = {
-> +	.name		= "leds-netxbig",
-> +	.id		= -1,
-> +	.dev		= {
-> +		.platform_data	= &net2big_v2_leds_data,
-> +	},
-> +};
-> +
-> +void __init netxbig_init(void)
+> +static void update_scanout(struct drm_crtc *crtc)
 > +{
+> +	struct atmel_hlcdc_crtc *hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
+> +	struct drm_device *dev = crtc->dev;
+> +	struct atmel_hlcdc_drm_private *priv = dev->dev_private;
+> +	struct drm_framebuffer *fb = crtc->fb;
 > +
-> +	if (of_machine_is_compatible("lacie,net5big"))
-> +		netxbig_v2_leds.dev.platform_data = &net5big_v2_leds_data;
-> +	platform_device_register(&netxbig_v2_leds);
+
+I guess you meant
+
+struct drm_framebuffer *fb = hclcd_crtc->fb;
+
+
+because otherwise you get an error when compiling (there are similar
+issues below).
+
+> +	struct drm_gem_cma_object *gem;
+> +	struct atmel_hlcd_dma_desc *desc = hlcdc_crtc->dma_descs[DMA_BASE];
+> +	unsigned int depth, bpp;
+> +	dma_addr_t start;
+> +	dma_addr_t desc_phys = hlcdc_crtc->dma_descs_phys[DMA_BASE];
+> +
+> +	drm_fb_get_bpp_depth(fb->pixel_format, &depth, &bpp);
+> +	gem = drm_fb_cma_get_gem_obj(fb, 0);
+> +
+> +	start = gem->paddr + fb->offsets[0] +
+> +			(crtc->y * fb->pitches[0]) + (crtc->x * bpp/8);
+> +
+> +	if (hlcdc_crtc->fb != fb) {
+> +		struct drm_framebuffer *oldfb = hlcdc_crtc->fb;
+> +		drm_framebuffer_reference(fb);
+> +		hlcdc_crtc->fb = fb;
+> +		if (oldfb) {
+> +			drm_flip_work_queue(&hlcdc_crtc->unref_work, oldfb);
+> +			drm_flip_work_commit(&hlcdc_crtc->unref_work, priv->wq);
+> +		}
+> +	}
+> +
+> +	if (desc->address != start) {
+> +		desc->address = start;
+> +		desc->next = desc_phys;
+> +		desc->control = LCDC_OVRCTRL_DFETCH;
+> +	}
+> +
+> +	if (hlcdc_read(dev, ATMEL_LCDC_BASENEXT) != desc_phys) {
+> +		hlcdc_write(dev, ATMEL_LCDC_BASENEXT, desc_phys);
+> +		hlcdc_write(dev, ATMEL_LCDC_BASECHER, LCDC_BASECHER_UPDATEEN);
+> +	}
 > +}
-> diff --git a/arch/arm/mach-mvebu/board.h b/arch/arm/mach-mvebu/board.h
-> index de7f0a191394..f130d8079b68 100644
-> --- a/arch/arm/mach-mvebu/board.h
-> +++ b/arch/arm/mach-mvebu/board.h
-> @@ -19,4 +19,10 @@ void t5325_init(void);
->  static inline void t5325_init(void) {};
->  #endif
->  
-> +#ifdef CONFIG_MACH_NETXBIG
-> +void netxbig_init(void);
-> +#else
-> +static inline void netxbig_init(void) {};
-> +#endif
 > +
->  #endif
-> diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
-> index 120207fc36f1..c0b4828970fc 100644
-> --- a/arch/arm/mach-mvebu/kirkwood.c
-> +++ b/arch/arm/mach-mvebu/kirkwood.c
-> @@ -183,6 +183,9 @@ static void __init kirkwood_dt_init(void)
->  	if (of_machine_is_compatible("hp,t5325"))
->  		t5325_init();
->  
-> +	if (of_machine_is_compatible("lacie,netxbig"))
-> +		netxbig_init();
+> +static void start(struct drm_crtc *crtc)
+> +{
+> +	struct drm_device *dev = crtc->dev;
 > +
->  	of_platform_populate(NULL, of_default_bus_match_table, auxdata, NULL);
->  }
->  
-> -- 
-> 1.9.2
-> 
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDEN, LCDC_LCDEN_CLKEN);
+> +	while (!(hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_CLKSTS))
+> +		cpu_relax();
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDEN, LCDC_LCDEN_SYNCEN);
+> +	while (!(hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_LCDSTS))
+> +		cpu_relax();
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDEN, LCDC_LCDEN_DISPEN);
+> +	while (!(hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_DISPSTS))
+> +		cpu_relax();
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDEN, LCDC_LCDEN_PWMEN);
+> +	while (!(hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_PWMSTS))
+> +		cpu_relax();
+> +}
+> +
+> +static void stop(struct drm_crtc *crtc)
+> +{
+> +	struct drm_device *dev = crtc->dev;
+> +
+> +	/* Disable DISP signal */
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDDIS, LCDC_LCDDIS_DISPDIS);
+> +	while ((hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_DISPSTS))
+> +		cpu_relax();
+> +	/* Disable synchronization */
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDDIS, LCDC_LCDDIS_SYNCDIS);
+> +	while ((hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_LCDSTS))
+> +		cpu_relax();
+> +	/* Disable pixel clock */
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDDIS, LCDC_LCDDIS_CLKDIS);
+> +	while ((hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_CLKSTS))
+> +		cpu_relax();
+> +	/* Disable PWM */
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDDIS, LCDC_LCDDIS_PWMDIS);
+> +	while ((hlcdc_read(dev, ATMEL_LCDC_LCDSR) & LCDC_LCDSR_PWMSTS))
+> +		cpu_relax();
+> +}
+> +
+> +static void atmel_hlcdc_crtc_destroy(struct drm_crtc *crtc)
+> +{
+> +	struct atmel_hlcdc_crtc *atmel_hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
+> +	struct drm_device *dev = crtc->dev;
+> +
+> +	WARN_ON(atmel_hlcdc_crtc->dpms == DRM_MODE_DPMS_ON);
+> +
+> +	drm_crtc_cleanup(crtc);
+> +	drm_flip_work_cleanup(&atmel_hlcdc_crtc->unref_work);
+> +
+> +	if (atmel_hlcdc_crtc->dma_descs[0])
+> +		dma_free_writecombine(dev->dev,
+> +			      sizeof(struct atmel_hlcd_dma_desc) * DMA_MAX,
+> +			      atmel_hlcdc_crtc->dma_descs[0],
+> +			      atmel_hlcdc_crtc->dma_descs_phys[0]);
+> +	kfree(atmel_hlcdc_crtc);
+> +}
+> +
+> +static int atmel_hlcdc_crtc_page_flip(struct drm_crtc *crtc,
+> +		struct drm_framebuffer *fb,
+> +		struct drm_pending_vblank_event *event,
+> +		uint32_t page_flip_flags)
+> +{
+> +	struct atmel_hlcdc_crtc *atmel_hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
+> +	struct drm_device *dev = crtc->dev;
+> +
+> +	if (atmel_hlcdc_crtc->event) {
+> +		dev_err(dev->dev, "already pending page flip!\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	crtc->fb = fb;
+
+ditto
+
+> +	atmel_hlcdc_crtc->event = event;
+> +	update_scanout(crtc);
+> +	return 0;
+> +}
+> +
+> +static void atmel_hlcdc_crtc_dpms(struct drm_crtc *crtc, int mode)
+> +{
+> +	struct atmel_hlcdc_crtc *atmel_hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
+> +	struct drm_device *dev = crtc->dev;
+> +
+> +	/* we really only care about on or off: */
+> +	if (mode != DRM_MODE_DPMS_ON)
+> +		mode = DRM_MODE_DPMS_OFF;
+> +
+> +	if (atmel_hlcdc_crtc->dpms == mode)
+> +		return;
+> +
+> +	atmel_hlcdc_crtc->dpms = mode;
+> +
+> +	pm_runtime_get_sync(dev->dev);
+> +
+> +	if (mode == DRM_MODE_DPMS_ON) {
+> +		pm_runtime_forbid(dev->dev);
+> +		start(crtc);
+> +	} else {
+> +		stop(crtc);
+> +		pm_runtime_allow(dev->dev);
+> +	}
+> +
+> +	pm_runtime_put_sync(dev->dev);
+> +}
+> +
+> +static bool atmel_hlcdc_crtc_mode_fixup(struct drm_crtc *crtc,
+> +		const struct drm_display_mode *mode,
+> +		struct drm_display_mode *adjusted_mode)
+> +{
+> +	return true;
+> +}
+> +
+> +static void atmel_hlcdc_crtc_prepare(struct drm_crtc *crtc)
+> +{
+> +	atmel_hlcdc_crtc_dpms(crtc, DRM_MODE_DPMS_OFF);
+> +}
+> +
+> +static void atmel_hlcdc_crtc_commit(struct drm_crtc *crtc)
+> +{
+> +	atmel_hlcdc_crtc_dpms(crtc, DRM_MODE_DPMS_ON);
+> +}
+> +
+> +static u32 atmel_hlcdfb_get_rgbmode(struct device *dev, int depth, int bpp)
+> +{
+> +	u32 value = 0;
+> +
+> +	switch (depth) {
+> +	case 1:
+> +		value = LCDC_BASECFG1_CLUTMODE_1BPP | LCDC_BASECFG1_CLUTEN;
+> +		break;
+> +	case 2:
+> +		value = LCDC_BASECFG1_CLUTMODE_2BPP | LCDC_BASECFG1_CLUTEN;
+> +		break;
+> +	case 4:
+> +		value = LCDC_BASECFG1_CLUTMODE_4BPP | LCDC_BASECFG1_CLUTEN;
+> +		break;
+> +	case 8:
+> +		value = LCDC_BASECFG1_CLUTMODE_8BPP | LCDC_BASECFG1_CLUTEN;
+> +		break;
+> +	case 12:
+> +		value = LCDC_BASECFG1_RGBMODE_12BPP_RGB_444;
+> +		break;
+> +	case 16:
+> +		value = LCDC_BASECFG1_RGBMODE_16BPP_RGB_565;
+> +		break;
+> +	case 18:
+> +		value = LCDC_BASECFG1_RGBMODE_18BPP_RGB_666_PACKED;
+> +		break;
+> +	case 24:
+> +		value = LCDC_BASECFG1_RGBMODE_24BPP_RGB_888_PACKED;
+> +		break;
+> +	case 32:
+> +		value = LCDC_BASECFG1_RGBMODE_32BPP_ARGB_8888;
+> +		break;
+> +	default:
+> +		dev_err(dev, "Cannot set video mode for depth %d, bpp %d\n",
+> +			depth, bpp);
+> +		break;
+> +	}
+> +
+> +	return value;
+> +}
+> +
+> +
+> +void atmel_hlcdc_crtc_update_clk(struct drm_crtc *crtc, int clock)
+> +{
+> +	struct drm_device *dev = crtc->dev;
+> +	struct atmel_hlcdc_drm_private *priv = dev->dev_private;
+> +	unsigned long value;
+> +	unsigned long clk_value_khz;
+> +
+> +	if (clock == 0)
+> +		clock = crtc->mode.clock;
+> +
+> +	pm_runtime_get_sync(dev->dev);
+> +
+> +	clk_value_khz = clk_get_rate(priv->clk) / 1000;
+> +
+> +	value = DIV_ROUND_CLOSEST(clk_value_khz, clock);
+> +
+> +	if (value < 1) {
+> +		dev_notice(dev->dev, "using system clock as pixel clock\n");
+> +		value = LCDC_LCDCFG0_CLKPWMSEL | LCDC_LCDCFG0_CGDISBASE;
+> +		hlcdc_write(dev, ATMEL_LCDC_LCDCFG0, value);
+> +	} else {
+> +		dev_dbg(dev->dev, "  updated pixclk:     %lu KHz\n",
+> +				clk_value_khz / value);
+> +		value = value - 2;
+> +		dev_dbg(dev->dev, "  * programming CLKDIV = 0x%08lx\n",
+> +					value);
+> +		value = LCDC_LCDCFG0_CLKPWMSEL |
+> +			(value << LCDC_LCDCFG0_CLKDIV_OFFSET)
+> +			| LCDC_LCDCFG0_CGDISBASE;
+> +		hlcdc_write(dev, ATMEL_LCDC_LCDCFG0, value);
+> +	}
+> +
+> +	pm_runtime_put_sync(dev->dev);
+> +}
+> +
+> +static int atmel_hlcdc_crtc_mode_set(struct drm_crtc *crtc,
+> +		struct drm_display_mode *mode,
+> +		struct drm_display_mode *adjusted_mode,
+> +		int x, int y,
+> +		struct drm_framebuffer *old_fb)
+> +{
+> +	struct atmel_hlcdc_crtc *atmel_hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
+> +	struct drm_device *dev = crtc->dev;
+> +	struct atmel_hlcdc_drm_private *priv = dev->dev_private;
+> +	int dpms = atmel_hlcdc_crtc->dpms;
+> +	int hbp, hfp, hsw, vbp, vfp, vsw;
+> +	unsigned int depth, bpp;
+> +	unsigned long value;
+> +	int ret;
+> +
+> +	ret = atmel_hlcdc_crtc_mode_valid(crtc, mode);
+> +	if (WARN_ON(ret))
+> +		return ret;
+> +
+> +	pm_runtime_get_sync(dev->dev);
+> +
+> +	if (dpms == DRM_MODE_DPMS_ON)
+> +		atmel_hlcdc_crtc_dpms(crtc, DRM_MODE_DPMS_OFF);
+> +
+> +	dev_dbg(dev->dev, "%s:\n", __func__);
+> +
+> +
+> +	/* Set pixel clock */
+> +	atmel_hlcdc_crtc_update_clk(crtc, mode->clock);
+> +
+> +	/* Initialize control register 5 */
+> +	value = priv->default_lcdcfg5;
+> +	value |= (priv->guard_time << LCDC_LCDCFG5_GUARDTIME_OFFSET)
+> +		| LCDC_LCDCFG5_DISPDLY
+> +		| LCDC_LCDCFG5_VSPDLYS;
+> +
+> +	if (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC)
+> +		value |= LCDC_LCDCFG5_HSPOL;
+> +
+> +	if (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC)
+> +		value |= LCDC_LCDCFG5_VSPOL;
+> +
+> +	dev_dbg(dev->dev, "  * LCDC_LCDCFG5 = %08lx\n", value);
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDCFG5, value);
+> +
+> +
+> +	/* Configure timings: */
+> +	hbp = MAX(mode->htotal - mode->hsync_end, 1);
+> +	hfp = MAX(mode->hsync_start - mode->hdisplay, 1);
+> +	hsw = MAX(mode->hsync_end - mode->hsync_start, 1);
+> +	vbp = MAX(mode->vtotal - mode->vsync_end, 0);
+> +	vfp = MAX(mode->vsync_start - mode->vdisplay, 1);
+> +	vsw = MAX(mode->vsync_end - mode->vsync_start, 1);
+> +
+> +	DBG("%dx%d, hbp=%u, hfp=%u, hsw=%u, vbp=%u, vfp=%u, vsw=%u",
+> +		mode->hdisplay, mode->vdisplay, hbp, hfp, hsw, vbp, vfp, vsw);
+> +
+> +	/* Vertical & Horizontal Timing */
+> +	value = (vsw - 1) << LCDC_LCDCFG1_VSPW_OFFSET;
+> +	value |= (hsw - 1) << LCDC_LCDCFG1_HSPW_OFFSET;
+> +	dev_dbg(dev->dev, "  * LCDC_LCDCFG1 = %08lx\n", value);
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDCFG1, value);
+> +
+> +	value = (vbp) << LCDC_LCDCFG2_VBPW_OFFSET;
+> +	value |= (vfp - 1) << LCDC_LCDCFG2_VFPW_OFFSET;
+> +	dev_dbg(dev->dev, "  * LCDC_LCDCFG2 = %08lx\n", value);
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDCFG2, value);
+> +
+> +	value = (hbp - 1) << LCDC_LCDCFG3_HBPW_OFFSET;
+> +	value |= (hfp - 1) << LCDC_LCDCFG3_HFPW_OFFSET;
+> +	dev_dbg(dev->dev, "  * LCDC_LCDCFG3 = %08lx\n", value);
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDCFG3, value);
+> +
+> +	/* Display size */
+> +	value = (mode->vdisplay - 1) << LCDC_LCDCFG4_RPF_OFFSET;
+> +	value |= (mode->hdisplay - 1) << LCDC_LCDCFG4_PPL_OFFSET;
+> +	dev_dbg(dev->dev, "  * LCDC_LCDCFG4 = %08lx\n", value);
+> +	hlcdc_write(dev, ATMEL_LCDC_LCDCFG4, value);
+> +
+> +	hlcdc_write(dev, ATMEL_LCDC_BASECFG0,
+> +		    LCDC_BASECFG0_BLEN_AHB_INCR16 | LCDC_BASECFG0_DLBO);
+> +
+> +	drm_fb_get_bpp_depth(crtc->fb->pixel_format, &depth, &bpp);
+ditto
+> +	hlcdc_write(dev, ATMEL_LCDC_BASECFG1,
+> +		    atmel_hlcdfb_get_rgbmode(dev->dev, depth, bpp));
+> +	hlcdc_write(dev, ATMEL_LCDC_BASECFG2, 0);
+> +	hlcdc_write(dev, ATMEL_LCDC_BASECFG3, 0);	/* Default color */
+> +	hlcdc_write(dev, ATMEL_LCDC_BASECFG4, LCDC_BASECFG4_DMA);
+> +
+>
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
