@@ -1,44 +1,69 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 18 Apr 2014 12:03:21 +0200
-Subject: Rockchip RK3188 I2C driver
-In-Reply-To: <2664026.dY5rX8rfNU@typ>
-References: <3748421.ND1tAjvgKS@typ> <1437066.E9nAxXbK6K@phil>
- <2664026.dY5rX8rfNU@typ>
-Message-ID: <3654530.JEvxoLYNLf@phil>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 18 Apr 2014 12:22:35 +0200
+Subject: [PATCH 0/8] USB3 support for Armada 38x
+Message-ID: <1397816563-9000-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 18. April 2014, 11:30:21 schrieb Max Schwarz:
-> On Friday 18 April 2014 at 11:06:56, Heiko St?bner wrote:
-> > > I think Heiko and I have been operating under the misconception that
-> > > caching is somehow enabled by default - which is not the case. Thanks
-> > > for
-> > > clearing that up ;-)
-> > 
-> > Actually I think it's the other way around :-).
-> > 
-> > See regmap_read() calling _reagmap_read(), which in turn calls
-> > regcache_read(), except when map->cache_bypass is enabled, which then
-> > checks the volatile setting for the individual register.
-> 
-> But map->cache_bypass *is* enabled by regcache_init() in regcache.c when
-> cache_type is REGCACHE_NONE, which is the default value:
-> 
-> if (map->cache_type == REGCACHE_NONE) {
-> 	map->cache_bypass = true;
-> 	return 0;
-> }
-> 
-> You can see the behaviour in detail if you compile with event tracing and
-> boot with trace_event=regmap:* .
-> 
-> If you think about it, it would be quite insane to enable caching in syscon
-> without knowing anything about the registers.
+Hello,
 
-yep, you're right of course ... now I see it too :-)
+This patch set adds the USB3 support for the Armada 38x and also
+prepares the support for Armada 375. These SoCs use an xHCI but still
+need specific initialization, mainly to setup the windows memory on
+the mbus.
 
-So we really can leave everything as it is now - and I can stop worrying about 
-creating future issues with the soc_con registers :-)
+The first patch extend the the xhci-plat driver to allow to register
+platform specific functions.
 
+The second patch use it to setup the windows memory on the mbus for
+Armada 38x.
 
-Heiko
+Then the 3rd patch update he binding documentation.
+
+This first 3 patches should go through the xhci subsystem, I really
+would like to have a feedback on the 1st patch from the USB
+maintainers.
+
+The rest of the series is more platform specific and should go through
+the mvebu tree, except the last patch that should be taken directly by
+the arm-soc maintainer.
+
+The support for Armada 375 is coming soon.
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (8):
+  usb: host: xhci-plat: Allow to register glue code using the device
+    tree
+  usb: host: xhci-plat: Add support for the Armada 38x glue code
+  xhci-platform: Add a new controller using xhci: Armada 38x
+  ARM: mvebu: Add USB3 UTMI support
+  ARM: mvebu: Add Device Tree description of xHCI hosts on Armada 38x
+  ARM: mvebu: Add USB3 support for Armada 38x
+  ARM: configs: Add usb_xhci_mvebu to mvebu_v7_defconfig
+  ARM: configs: Add usb_xhci_mvebu to multi_v7_defconfig
+
+ Documentation/devicetree/bindings/usb/usb-xhci.txt |   3 +-
+ arch/arm/boot/dts/armada-385-db.dts                |   8 ++
+ arch/arm/boot/dts/armada-385-rd.dts                |   4 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |  17 ++++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/mvebu_v7_defconfig                |   1 +
+ arch/arm/mach-mvebu/Kconfig                        |   1 +
+ arch/arm/mach-mvebu/Makefile                       |   2 +-
+ arch/arm/mach-mvebu/usb-utmi.c                     |  64 +++++++++++++
+ drivers/usb/host/Kconfig                           |   7 ++
+ drivers/usb/host/Makefile                          |   1 +
+ drivers/usb/host/xhci-mvebu.c                      | 105 +++++++++++++++++++++
+ drivers/usb/host/xhci-mvebu.h                      |  21 +++++
+ drivers/usb/host/xhci-plat.c                       |  82 +++++++++++++++-
+ drivers/usb/host/xhci.h                            |   4 +
+ 15 files changed, 315 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-mvebu/usb-utmi.c
+ create mode 100644 drivers/usb/host/xhci-mvebu.c
+ create mode 100644 drivers/usb/host/xhci-mvebu.h
+
+-- 
+1.8.1.2
