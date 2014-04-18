@@ -1,35 +1,53 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 18 Apr 2014 14:06:39 +0800
-Subject: [PATCH 1/4] mmc: sdhci: add a driver for Berlin SoCs
-In-Reply-To: <20140417133359.GB31034@kwain>
-References: <1397652011-21284-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397652011-21284-2-git-send-email-antoine.tenart@free-electrons.com>
- <534E92FE.8010400@gmail.com> <20140417133359.GB31034@kwain>
-Message-ID: <20140418140639.03c450f3@xhacker>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 18 Apr 2014 14:05:44 +0800
+Subject: [PATCH v3 01/13] ARM: debug: add HiP04 debug uart
+In-Reply-To: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1397801156-25682-2-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add the support of Hisilicon HiP04 debug uart.
 
-On Thu, 17 Apr 2014 06:33:59 -0700
-Antoine T?nart <antoine.tenart@free-electrons.com> wrote:
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> Sebastian,
-> 
-> On Wed, Apr 16, 2014 at 04:26:06PM +0200, Sebastian Hesselbarth wrote:
-> > On 04/16/2014 02:40 PM, Antoine T?nart wrote:
-> > >Add a Driver to support the SDHCI controller of the Marvell Berlin SoCs.
-> > >This controller supports 3 sockets.
-> > 
-> > nit: Isn't it three controller with one socket each?
-> 
-> It's a little bit confusing, there are 3 different register regions and
-> I can see 3 separate data lines but, I quote: "The SD host controller
-> supports three sockets".
-> 
-> Maybe Jisheng can advise on that matter ?
-
-
-It's three controller with one socket each ;)
-
-Thanks
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 4a2fc0b..5a311af 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -223,6 +223,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on HI3716 UART.
+ 
++	config DEBUG_HIP04_UART
++		bool "Hisilicon HiP04 Debug UART"
++		depends on ARCH_HIP04
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on HIP04 UART.
++
+ 	config DEBUG_HIGHBANK_UART
+ 		bool "Kernel low-level debugging messages via Highbank UART"
+ 		depends on ARCH_HIGHBANK
+@@ -1044,6 +1052,7 @@ config DEBUG_UART_PHYS
+ 	default 0xd4017000 if DEBUG_MMP_UART2
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
++	default 0xe4007000 if DEBUG_HIP04_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+@@ -1076,6 +1085,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
+ 	default 0xf7fc9000 if DEBUG_BERLIN_UART
++	default 0xf8007000 if DEBUG_HIP04_UART
+ 	default 0xf8009000 if DEBUG_VEXPRESS_UART0_CA9
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+ 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
+-- 
+1.8.3.2
