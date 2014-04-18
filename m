@@ -1,46 +1,58 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 18 Apr 2014 14:41:01 -0500
-Subject: [PATCH 1/2] dmaengine: qcom_bam_dma: Add v1.3.0 driver support
-In-Reply-To: <53505D3F.9000108@mm-sol.com>
-References: <1397684719-30065-1-git-send-email-agross@codeaurora.org>
- <1397684719-30065-2-git-send-email-agross@codeaurora.org>
- <53505D3F.9000108@mm-sol.com>
-Message-ID: <20140418194101.GA12607@qualcomm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 18 Apr 2014 23:51:07 +0400
+Subject: [PATCH v2 2/4] Documentation: dts: Add bindings for APM X-Gene
+ SoC ethernet driver
+In-Reply-To: <1397271984-23405-3-git-send-email-isubramanian@apm.com>
+References: <1397271984-23405-1-git-send-email-isubramanian@apm.com>
+ <1397271984-23405-3-git-send-email-isubramanian@apm.com>
+Message-ID: <5351822B.7010402@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 02:01:19AM +0300, Stanimir Vabanov wrote:
+Hello.
 
-<snip>
+On 04/12/2014 07:06 AM, Iyappan Subramanian wrote:
 
-> >  
-> >  static const struct of_device_id bam_of_match[] = {
-> > +	{ .compatible = "qcom,bam-v1.3.0", },
-> >  	{ .compatible = "qcom,bam-v1.4.0", },
-> 
-> you could use the of_device_id::data field to switch between different
-> versions.
-> 
-> I mean this:
-> 
-> static const struct of_device_id bam_of_match[] = {
-> 	{ .compatible = "qcom,bam-v1.3.0", .data = &reg_offs_v1_3 },
->   	{ .compatible = "qcom,bam-v1.4.0", .data = &reg_offs_v1_4 },
-> }
-> 
-> and during .probe you will get the correct offsets per version. It then
-> could be assigned to a variable in bdev.
-> 
-> Then the defines could be:
-> 
-> #define BAM_CTRL(bdev)	(bdev->reg_offs->ctrl_offs + 0x00)
-> 
-> I'm not sure how many additional code this will be but it looks clearer.
+> This patch adds documentation for APM X-Gene SoC ethernet DTS binding.
 
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Ravi Patel <rapatel@apm.com>
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> ---
+>   .../devicetree/bindings/net/apm-xgene-enet.txt     |   46 ++++++++++++++++++++
+>   1 file changed, 46 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-enet.txt
 
-That's not a bad idea.  I'll try this out and see how it looks.
+> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+> new file mode 100644
+> index 0000000..0c983e8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+> @@ -0,0 +1,46 @@
+> +APM X-Gene SoC Ethernet nodes
+> +
+> +Ethernet nodes are defined to describe on-chip ethernet interfaces in
+> +APM X-Gene SoC.
+> +
+> +Required properties:
+> +- compatible		: Should be "apm,xgene-enet"
+> +- reg			: First resource is the ethernet base register set
+> +			  Second resource is the ring base register set
+> +			  Third resource is the ring command register set
+> +- interrupts		: Ethernet main interrupt
+> +- clocks		: Reference to the clock entry.
+> +- local-mac-address	: Ethernet MAC address.
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+    This property is described in 
+Documentation/devicetree/bindings/net/ethernet.txt, please refer to it.
+
+> +- phy-addr		: Ethernet MII phy address.
+
+    No, thus won't do. Please use "phy-handle" property to refer to a PHY subnode.
+
+> +- phy-mode		: Ethernet MII mode.
+
+    This one is described in 
+Documentation/devicetree/bindings/net/ethernet.txt as well.
+
+WBR, Sergei
