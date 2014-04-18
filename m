@@ -1,96 +1,54 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 18 Apr 2014 23:25:48 +0200
-Subject: [PATCH v5 3/3] ARM: dts: sama5d3xcm: add the regulator device node
-In-Reply-To: <1387852570-18159-1-git-send-email-wenyou.yang@atmel.com>
-References: <1387852421-18033-1-git-send-email-wenyou.yang@atmel.com>
- <1387852570-18159-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <5351985C.4090308@atmel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 18 Apr 2014 16:39:33 -0500
+Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
+ probe and defer if needed
+In-Reply-To: <20140418205213.GA21823@atomide.com>
+References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
+ <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
+ <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
+ <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
+ <20140418205213.GA21823@atomide.com>
+Message-ID: <CAL_JsqJvVvo6R-qNXxur7wiZERKbi52xyKoWnmzJTfKS2iKK7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/12/2013 03:36, Wenyou Yang :
-> Reviwed-by: Mark Brown <broonie@linaro.org>
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+On Fri, Apr 18, 2014 at 3:52 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Rob Herring <robherring2@gmail.com> [140411 10:33]:
+>> On Fri, Mar 21, 2014 at 9:46 AM, Jean-Jacques Hiblot
+>> <jjhiblot@traphandler.com> wrote:
+>> > The goal of this patch is to allow drivers to be probed even if at the time of
+>> > the DT parsing some of their IRQ ressources are not available yet.
+>> >
+>> > In the current situation, the IRQ resources of a platform device are filled from
+>> > the DT at the time the device is created (of_device_alloc()). The drawback of
+>> > this is that a device sitting close to the top of the DT (ahb for example) but
+>> > depending on ressources that are initialized later (IRQ domain dynamically
+>> > created for example) will fail to probe because the ressources don't exist
+>> > at this time.
+>>
+>> s/ressources/resources/
+>
+> While I've tested these two patches and they fix the issue for me. I have
+> some serious doubts again about this whole ------ up string parsing
+> pile of ---- called device tree.
+>
+> Do we really need to sprinkle more of_* hacks to the irq subsystem?
+>
+> There's nothing wrong with with the irq subsystem. Platform bus is just
+> calling the irq subsystem at the wrong time with uninitialized data.
 
-Wenyou,
+This patch doesn't even touch the irq subsystem.
 
-While collecting patches for our next at91-3.16-dt branch I noticed this
-patch that should go on top of the SAMA5D3 CMP board.
+> It seems that we're again papering over the fact that there's nothing
+> coordinating the setting up of various resources with device tree.
+> That seems to be the repeating never ending pattern as we've already
+> seen with GPIOs, pinctrl, and IRQchips. We end up adding all kinds of
+> cross subsystem calls that were never needed earlier.
 
-I would prefer to create another .dtsi file for CMP board and not mix
-with the current cpu module usual board that does not contain this
-regulator. But well we can do something even more simpler and move this
-PMIC example to the newer SAMA5D3 Xplained board.
+This problem may be made worse with DT, but this problem has existed
+for as long as I have worked on the kernel. It is worse with DT since
+platforms have less control over the init ordering and loose some
+ability to do tricks like changing the initcall levels. We didn't even
+try to do pinctrl in any generic way before DT.
 
-So, will it be possible for you to re-send a new patch targeted to
-SAMA5D3 Xplained?
-
-Thanks, bye.
-
-
-> ---
->  arch/arm/boot/dts/sama5d3xcm.dtsi |   46 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index 726a0f3..3d4e5c2 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -38,6 +38,52 @@
->  			macb0: ethernet at f0028000 {
->  				phy-mode = "rgmii";
->  			};
-> +
-> +			i2c1: i2c at f0018000 {
-> +				pmic: act8865 at 5b {
-> +					compatible = "active-semi,act8865";
-> +					reg = <0x5b>;
-> +					status = "disabled";
-> +
-> +					regulators {
-> +						vcc_1v8_reg: DCDC_REG1 {
-> +							regulator-name = "VCC_1V8";
-> +							regulator-min-microvolt = <1800000>;
-> +							regulator-max-microvolt = <1800000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vcc_1v2_reg: DCDC_REG2 {
-> +							regulator-name = "VCC_1V2";
-> +							regulator-min-microvolt = <1100000>;
-> +							regulator-max-microvolt = <1300000>;
-> +							regulator-suspend-mem-microvolt = <1150000>;
-> +							regulator-suspend-standby-microvolt = <1150000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vcc_3v3_reg: DCDC_REG3 {
-> +							regulator-name = "VCC_3V3";
-> +							regulator-min-microvolt = <3300000>;
-> +							regulator-max-microvolt = <3300000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vddana_reg: LDO_REG1 {
-> +							regulator-name = "VDDANA";
-> +							regulator-min-microvolt = <3300000>;
-> +							regulator-max-microvolt = <3300000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vddfuse_reg: LDO_REG2 {
-> +							regulator-name = "FUSE_2V5";
-> +							regulator-min-microvolt = <2500000>;
-> +							regulator-max-microvolt = <2500000>;
-> +						};
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		nand0: nand at 60000000 {
-> 
-
-
--- 
-Nicolas Ferre
+Rob
