@@ -1,115 +1,60 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 18 Apr 2014 11:22:28 -0500
-Subject: [patch 6/6] dma: edma: Provide granular accounting
-In-Reply-To: <alpine.DEB.2.02.1404180844330.22697@ionos.tec.linutronix.de>
-References: <20140417133737.892475126@linutronix.de>
- <20140417143250.066998289@linutronix.de> <535075A9.9040904@ti.com>
- <alpine.DEB.2.02.1404180844330.22697@ionos.tec.linutronix.de>
-Message-ID: <53515144.3070905@ti.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 18 Apr 2014 18:17:57 +0200
+Subject: [PATCH 1/4] ARM: dts: Add support for OMAP4 Variscite OM44 family
+In-Reply-To: <20140418155721.GC5354@atomide.com>
+References: <1397833849-22396-1-git-send-email-manabian@gmail.com>
+ <1397833849-22396-2-git-send-email-manabian@gmail.com>
+ <20140418155721.GC5354@atomide.com>
+Message-ID: <CAGhQ9VysdxGMd99CiVVh8YJt7KDAyy3Pe9YA2VM-G4mzn_6+0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 04/18/2014 02:03 AM, Thomas Gleixner wrote:
-[..]
->>> @@ -645,7 +652,17 @@ static void edma_callback(unsigned ch_nu
->>>  				vchan_cookie_complete(&edesc->vdesc);
->>>  				edma_execute(echan);
->>>  			} else {
->>> +				int i, n;
->>> +
->>>  				dev_dbg(dev, "Intermediate transfer complete on channel %d\n", ch_num);
->>> +
->>> +				/* Update statistics for tx_status */
->>> +				n = edesc->processed;
->>> +				for (i = edesc->processed_stat; i < n; i++)
->>> +					edesc->residue -= edesc->pset[i].len;
->>> +				edesc->processed_stat = n;
->>> +				edesc->residue_stat = edesc->residue;
->>> +
+On 18 April 2014 17:57, Tony Lindgren <tony@atomide.com> wrote:
+> * Joachim Eastwood <manabian@gmail.com> [140418 08:11]:
+>> Add support for VAR-SOM-OM44[1] SODIMM system on module from Variscite. SoM
+>> features a OMAP4460, 1GB RAM, Gigabit Ethernet (LAN7500) and optional WLAN/BT.
 >>
->> This is a bit of a NAK since it is O(n) on every intermediate transfer
->> completion. I'm not sure of a better way to do it but I certainly don't
->> want the IRQ slowed down anymore... Is there a way to pre-calculate the
->> size of the intermediate transfer and store it somewhere for accounting?
-> 
-> Yeah, I can do that. Adds an extra field to edma_pset, but that
-> shouldnt hurt.
-
-Sure, I guess without adding any more space than you initially did
-(added a note on len element in the structure below)
-
-then do something like:
- edma_pset[edesc->processed_stat].sum - edema_pset[edesc->proccessed].sum
-
-and subtract that from the residue in O(1).
-
-len element in pset can be got rid off as the same sum can be used to
-find it in tx_status by len = pset[i].sum - pset[i-1].sum.
-
->> Also another thing is I don't think processed_stat is required at all,
->> because I think you introduced it for the possibility that there might
->> be delays in processing interrupts for intermediate transfers. That is
-> 
-> No, I introduced it to not walk the full list of psets in every
-> tx_status() call. It's keeping track of the already finished slots.
-
-Ah, ok. cool.
-
->> actually an impossibility because such a scenario would result in
->> catastrophic failure anyway. Because for intermediate transfer
->> interrupts shouldn't be missed, so in this case you can just do:
+>> Also add support for VAR-STK-OM44 development board from Variscite. This kit
+>> features a VAR-SOM-OM44 and the carrier board VAR-OM44CustomBoard[2]. The
+>> VAR-STK-OM44 is the same as VAR-DVK-OM44 but without the LCD display.
 >>
->> for (i = 1; i <= MAX_NR_SG; i++) {
->> 	edesc->residue -= edesc->pset[edesc->processed - i].len;
->> }
+>> omap4-var-stk-om44.dts replace the old and very limited omap4-var-som.dts.
 >>
->> I think that'll work.
-> 
-> No. The point is:
-> 
-> submit()
-> 
-> tx_status()
-> 	
->   We dont want to iterate through all psets when we are polling in a
->   loop. So we progress processed_stat when we see a finished slot.
->   And thereby we adjust edesc->residue.
-
-Ah ok, that's certainly fast to skip all progressive updates and jump to
-the current.
-
-
->>> +
->>> +		/* Otherwise mark it done and update residue[_stat]. */
->>> +		edesc->processed_stat++;
->>> +		edesc->residue -= pset->len;
->>> +		edesc->residue_stat = edesc->residue;
->>> +	}
+>> [1] http://www.variscite.com/products/system-on-module-som/cortex-a9/var-som-om44-cpu-ti-omap-4-omap4460
+>> [2] http://www.variscite.com/products/single-board-computers/var-om44customboard
 >>
->>
->> Also, just curious - doesn't calling status too aggressively result in
->> any slowness for you? Since vchan lock spinlock will be held during the
->> duration of this processing, and interrupts would be disabled causing
->> edma_callback interrupt delays possibly. I'm not saying you introduced
->> the lock or anything because status would previously also hold the lock.
->> I just haven't played status enough to know how it will behave when
->> happening concurrently with DMA transfers.
-> 
-> Well, in the case I'm looking at (cyclic transfer) I do not care about
-> the interrupt at all. I get a notification for the first incoming
-> packet via the peripheral and go from there.
-> 
-> But yes, it might cause slight delays for the interrupt in the SG
-> case. Though the irq disabled region is small if you actively poll as
-> we keep track of the processed slots and therefor only have one or two
-> readouts to process.
-> 
-> But as Russell pointed out, this should be rewritten by updating the
-> chain on the fly and not waiting until MAX_SG has been processed.
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+>>  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>>  arch/arm/boot/dts/Makefile                         |   2 +-
+>>  arch/arm/boot/dts/omap4-var-om44customboard.dtsi   | 235 ++++++++++++++
+>>  arch/arm/boot/dts/omap4-var-som-om44.dtsi          | 343 +++++++++++++++++++++
+>>  arch/arm/boot/dts/omap4-var-som.dts                |  96 ------
+>>  arch/arm/boot/dts/omap4-var-stk-om44.dts           |  16 +
+>>  7 files changed, 599 insertions(+), 97 deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/omap4-var-om44customboard.dtsi
+>>  create mode 100644 arch/arm/boot/dts/omap4-var-som-om44.dtsi
+>>  delete mode 100644 arch/arm/boot/dts/omap4-var-som.dts
+>>  create mode 100644 arch/arm/boot/dts/omap4-var-stk-om44.dts
+>
+> Hmm don't you still need to keep omap4-var-som.dts to build just the
+> core SoC module without any add-on boards?
 
-Ok, sounds good. Thanks.
+Since VAR-SOM-OM44 is a SODIMM module it is not possible to use
+without a carrier board. Variscite's carrier board is called
+OM44CustomBoard and I am in process of creating my own application
+specific one so the omap4-var-som-om44 should be a dtsi-file.
 
-regards,
-  -Joel
+> Also, you might want to use the OMAP4_CORE_IOPAD and OMAP4_WKUP_IOPAD
+> macros in include/dt-bindings/pinctrl/omap.h to be able to check the
+> registers against the TRM easier as you can use the physical register
+> offset listed in the TRM.
+
+I don't see any other OMAP4 using these macros. Is there a plan for a
+mass conversion?
+It's really a job for an automated script. But the macro are indeed
+nice. That offset has bothered me more than once.
+
+regards
+Joachim Eastwood
