@@ -1,118 +1,89 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 18 Apr 2014 09:03:13 +0200 (CEST)
-Subject: [patch 6/6] dma: edma: Provide granular accounting
-In-Reply-To: <535075A9.9040904@ti.com>
-References: <20140417133737.892475126@linutronix.de>
- <20140417143250.066998289@linutronix.de> <535075A9.9040904@ti.com>
-Message-ID: <alpine.DEB.2.02.1404180844330.22697@ionos.tec.linutronix.de>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 18 Apr 2014 15:08:26 +0800
+Subject: [PATCH v3 02/13] ARM: append ARCH_MULTI_V7_LPAE
+In-Reply-To: <5350CC9B.2090102@free-electrons.com>
+References: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
+ <1397801156-25682-3-git-send-email-haojian.zhuang@linaro.org>
+ <5350CC9B.2090102@free-electrons.com>
+Message-ID: <CAD6h2NR=4-hs7mURUPojLFY+r1t5HyysRG_oRsWhz8HVr_vYog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Apr 2014, Joel Fernandes wrote:
-> On 04/17/2014 09:40 AM, Thomas Gleixner wrote:
-> > +	u32				residue_stat;
-> > +	int				slot0;
-> 
-> Instead of slot0, perhaps storing a pointer to the echan would be great
-> incase in the future we need to access something else in the channel.
-> Then you can just do edesc->echan->slot[0].
+On 18 April 2014 14:56, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Haojian,
+>
+> On 18/04/2014 08:05, Haojian Zhuang wrote:
+>> Add new ARCH_MULTI_V7_LPAE config. It will select ARM_LPAE only both
+>> ARCH_MULTI_V6 & ARCH_MULTI_V7 is disabled.
+>>
+>> ARCH_MULTI_V7 means non-LPAE platform.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>  arch/arm/Kconfig               | 9 ++++++++-
+>>  arch/arm/mach-berlin/Kconfig   | 2 +-
+>>  arch/arm/mach-highbank/Kconfig | 2 +-
+>>  arch/arm/mach-mvebu/Kconfig    | 6 +++---
+>>  arch/arm/mach-omap2/Kconfig    | 4 ++--
+>>  arch/arm/mach-qcom/Kconfig     | 2 +-
+>>  arch/arm/mach-shmobile/Kconfig | 2 +-
+>>  arch/arm/mach-tegra/Kconfig    | 2 +-
+>>  arch/arm/mach-vexpress/Kconfig | 2 +-
+>>  9 files changed, 19 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index ab438cb..9a2214e 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -918,12 +918,19 @@ config ARCH_MULTI_V6
+>>       select CPU_V6K
+>>
+>>  config ARCH_MULTI_V7
+>> -     bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
+>> +     bool "ARMv7 non-LPAE based platforms (Cortex-A5/A8/A9, PJ4, Scorpion)"
+> Actually some PJ4B are also non LPAE capable
+>
+>
+>>       default y
+>>       select ARCH_MULTI_V6_V7
+>>       select CPU_V7
+>>       select HAVE_SMP
+>>
+>> +config ARCH_MULTI_V7_LPAE
+>> +     bool "ARMv7 LPAE based platforms (Cortex-A7/A12/A15/A17, Brahma-B15, PJ4B, Krait)"
+> Only Armada XP is LPAE capable, and and the CPU is not a "simple" PJ4B
+> but a PJ4B-MP
 
-Sure.
- 
-> > @@ -645,7 +652,17 @@ static void edma_callback(unsigned ch_nu
-> >  				vchan_cookie_complete(&edesc->vdesc);
-> >  				edma_execute(echan);
-> >  			} else {
-> > +				int i, n;
-> > +
-> >  				dev_dbg(dev, "Intermediate transfer complete on channel %d\n", ch_num);
-> > +
-> > +				/* Update statistics for tx_status */
-> > +				n = edesc->processed;
-> > +				for (i = edesc->processed_stat; i < n; i++)
-> > +					edesc->residue -= edesc->pset[i].len;
-> > +				edesc->processed_stat = n;
-> > +				edesc->residue_stat = edesc->residue;
-> > +
-> 
-> This is a bit of a NAK since it is O(n) on every intermediate transfer
-> completion. I'm not sure of a better way to do it but I certainly don't
-> want the IRQ slowed down anymore... Is there a way to pre-calculate the
-> size of the intermediate transfer and store it somewhere for accounting?
+Do you mind that I append CPU_PJ4B_MP?
 
-Yeah, I can do that. Adds an extra field to edma_pset, but that
-shouldnt hurt.
-
-> Also another thing is I don't think processed_stat is required at all,
-> because I think you introduced it for the possibility that there might
-> be delays in processing interrupts for intermediate transfers. That is
-
-No, I introduced it to not walk the full list of psets in every
-tx_status() call. It's keeping track of the already finished slots.
-
-> actually an impossibility because such a scenario would result in
-> catastrophic failure anyway. Because for intermediate transfer
-> interrupts shouldn't be missed, so in this case you can just do:
-> 
-> for (i = 1; i <= MAX_NR_SG; i++) {
-> 	edesc->residue -= edesc->pset[edesc->processed - i].len;
-> }
-> 
-> I think that'll work.
-
-No. The point is:
-
-submit()
-
-tx_status()
-	
-  We dont want to iterate through all psets when we are polling in a
-  loop. So we progress processed_stat when we see a finished slot.
-  And thereby we adjust edesc->residue.
-
-Now in the intermediate interrupt we need to take processed_stat into
-account when we update residue.
-
-But when we store the sums in the psets then this should become O(1)
-and avoid the loop business.
-
-> > +	if (ret)
-> > +		return edesc->residue_stat;
-> > +
-> 
-> This check could be dropped following the discussion in earlier patch
-> and also residue_stat could be dropped if there's no other use for it.
-
-Right.
- 
-> > +
-> > +		/* Otherwise mark it done and update residue[_stat]. */
-> > +		edesc->processed_stat++;
-> > +		edesc->residue -= pset->len;
-> > +		edesc->residue_stat = edesc->residue;
-> > +	}
-> 
-> 
-> Also, just curious - doesn't calling status too aggressively result in
-> any slowness for you? Since vchan lock spinlock will be held during the
-> duration of this processing, and interrupts would be disabled causing
-> edma_callback interrupt delays possibly. I'm not saying you introduced
-> the lock or anything because status would previously also hold the lock.
-> I just haven't played status enough to know how it will behave when
-> happening concurrently with DMA transfers.
-
-Well, in the case I'm looking at (cyclic transfer) I do not care about
-the interrupt at all. I get a notification for the first incoming
-packet via the peripheral and go from there.
-
-But yes, it might cause slight delays for the interrupt in the SG
-case. Though the irq disabled region is small if you actively poll as
-we keep track of the processed slots and therefor only have one or two
-readouts to process.
-
-But as Russell pointed out, this should be rewritten by updating the
-chain on the fly and not waiting until MAX_SG has been processed.
-
-Thanks,
-
-	tglx
+>>
+>>  config MACH_ARMADA_370
+>> -     bool "Marvell Armada 370 boards" if ARCH_MULTI_V7
+>> +     bool "Marvell Armada 370 boards" if ARCH_MULTI_V7_LPAE
+> Armada 370 is not LPAE capable
+>
+>>       select ARMADA_370_CLK
+>>       select CPU_PJ4B
+>>       select MACH_MVEBU_V7
+>> @@ -59,7 +59,7 @@ config MACH_ARMADA_38X
+>>         on the Marvell Armada 380/385 SoC with device tree.
+>>
+>>  config MACH_ARMADA_XP
+>> -     bool "Marvell Armada XP boards" if ARCH_MULTI_V7
+>> +     bool "Marvell Armada XP boards" if ARCH_MULTI_V7_LPAE
+>>       select ARMADA_XP_CLK
+>>       select CPU_PJ4B
+>>       select MACH_MVEBU_V7
+>
+>
+> Thanks,
+>
+> Gregory
+>
+>
+> --
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
