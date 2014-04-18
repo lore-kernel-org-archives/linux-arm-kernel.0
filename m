@@ -1,74 +1,37 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 18 Apr 2014 16:42:58 +0200
-Subject: [PATCH 1/4] ARM: EXYNOS: Fix definitions of S5P_ARM_CORE_* registers
-In-Reply-To: <1397832181-5153-1-git-send-email-t.figa@samsung.com>
-References: <1397832181-5153-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1397832181-5153-2-git-send-email-t.figa@samsung.com>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Fri, 18 Apr 2014 16:45:18 +0200
+Subject: BUG: spinlock trylock failure on UP - reverting timer patches
+ helps
+In-Reply-To: <CAOcfFMyTmQH-FwGE2YWoA76ypzBtWPYVTyi+4QpEMnrRtw8QVg@mail.gmail.com>
+References: <534C3606.7010206@meduna.org>	<534C731F.1050406@meduna.org>	<534DADF1.6060608@meduna.org>	<53500184.4050309@meduna.org>	<53505BD7.9050004@meduna.org>
+ <CAOcfFMyTmQH-FwGE2YWoA76ypzBtWPYVTyi+4QpEMnrRtw8QVg@mail.gmail.com>
+Message-ID: <53513A7E.5050907@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SoCs with more than 2 cores there are more than 2 S5P_ARM_CORE_*
-registers that can be addressed with fixed stride of 0x80. This patch
-renames the definitions of S5P_ARM_CORE1_* registers to be S5P_ARM_CORE_*
-and make them take physical core ID as argument to calculate register
-address.
+On 18.04.2014 01:10, jordan wrote:
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/hotplug.c  | 2 +-
- arch/arm/mach-exynos/platsmp.c  | 6 +++---
- arch/arm/mach-exynos/regs-pmu.h | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+Hi Jordan,
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index 5eead53..7e0f31a 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -96,7 +96,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 
- 		/* make cpu1 to be turned off at next WFI command */
- 		if (cpu == 1)
--			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
-+			__raw_writel(0, S5P_ARM_CORE_CONFIGURATION(1));
- 
- 		/*
- 		 * here's the WFI
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 03e5e9f..7b7de4b 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -107,14 +107,14 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	 */
- 	write_pen_release(phys_cpu);
- 
--	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-+	if (!(__raw_readl(S5P_ARM_CORE_STATUS(1)) & S5P_CORE_LOCAL_PWR_EN)) {
- 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
--			     S5P_ARM_CORE1_CONFIGURATION);
-+			     S5P_ARM_CORE_CONFIGURATION(1));
- 
- 		timeout = 10;
- 
- 		/* wait max 10 ms until cpu1 is on */
--		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
-+		while ((__raw_readl(S5P_ARM_CORE_STATUS(1))
- 			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
- 			if (timeout-- == 0)
- 				break;
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 4f6a256..d94bbc8 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -105,8 +105,8 @@
- #define S5P_GPS_LOWPWR				S5P_PMUREG(0x139C)
- #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
- 
--#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
--#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
-+#define S5P_ARM_CORE_CONFIGURATION(n)		S5P_PMUREG(0x2000 + (n) * 0x80)
-+#define S5P_ARM_CORE_STATUS(n)			S5P_PMUREG(0x2004 + (n) * 0x80)
- 
- #define S5P_PAD_RET_MAUDIO_OPTION		S5P_PMUREG(0x3028)
- #define S5P_PAD_RET_GPIO_OPTION			S5P_PMUREG(0x3108)
+many thanks for the tests. I probably botched something during
+the reverting - I now tried some more experiments and the system
+now runs without BUGs and without kernel leak - of course
+it needs some more uptime to be really sure.
+
+My combined revert patch from 3.12.15-rt25 is at
+  http://pastebin.com/MYLqbmZw
+That was all that was needed.
+
+> Yeah, i know a handful of people [amd users] that have now reported
+> success booting into 3.14-rt1 reverting those patches.  Personally, I
+> have disabled NO_HZ_FULL and have switched back to 'old tick' method
+> in kconfig. I don't think the latest no_hz stuff is stable enough...
+
+My problems were with periodic timers (I am on an embedded system
+that runs things periodically anyway and I have also my doubts
+regarding the stability), so the latest code did not break
+only NO_HZ_FULL.
+
+Thanks
 -- 
-1.9.2
+                                       Stano
