@@ -1,36 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Apr 2014 21:07:08 +0200
-Subject: [PATCH v4 0/2] i2c: sunxi: Change compatibles pattern
-In-Reply-To: <1396270498-30703-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1396270498-30703-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140418190708.GA24905@lukather>
+Date: Fri, 18 Apr 2014 21:15:11 +0200
+Subject: [PATCH] ARM: sun7i: Fix i2c4 base address
+Message-ID: <1397848511-30160-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+For some reason, the base address of the fifth I2C adapter in the A20 was
+incorrect. Change this to the actual base address.
 
-On Mon, Mar 31, 2014 at 02:54:56PM +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> This is the fourth version of the i2c compatible changes.
-> 
-> Changes from v4:
->   - Added extra per-SoC compatibles to the DT for all SoC but the A10
+Reported-by: Marcus Cooper <codekipper@gmail.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I think I've addressed your comments in this version, are you ok with
-these changes?
-
-Thanks,
-Maxime
-
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 899fd0e2b749..9dd904d53bd3 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -821,9 +821,9 @@
+ 			#size-cells = <0>;
+ 		};
+ 
+-		i2c4: i2c at 01c2bc00 {
++		i2c4: i2c at 01c2c000 {
+ 			compatible = "allwinner,sun4i-i2c";
+-			reg = <0x01c2bc00 0x400>;
++			reg = <0x01c2c000 0x400>;
+ 			interrupts = <0 89 4>;
+ 			clocks = <&apb1_gates 15>;
+ 			clock-frequency = <100000>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140418/39e6810f/attachment-0001.sig>
+1.9.1
