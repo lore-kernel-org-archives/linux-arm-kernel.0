@@ -1,31 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 18 Apr 2014 11:06:56 +0200
-Subject: Rockchip RK3188 I2C driver
-In-Reply-To: <15224827.56gI5cqpbK@typ>
-References: <3748421.ND1tAjvgKS@typ> <20140417183835.GG12304@sirena.org.uk>
- <15224827.56gI5cqpbK@typ>
-Message-ID: <1437066.E9nAxXbK6K@phil>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 18 Apr 2014 11:24:10 +0200 (CEST)
+Subject: [patch 5/6] edma: Make reading the position of active channels
+ work
+In-Reply-To: <alpine.DEB.2.02.1404180834520.22697@ionos.tec.linutronix.de>
+References: <20140417133737.892475126@linutronix.de>
+ <20140417143249.889774979@linutronix.de> <5350761C.6010109@ti.com>
+ <alpine.DEB.2.02.1404180834520.22697@ionos.tec.linutronix.de>
+Message-ID: <alpine.DEB.2.02.1404181123150.22697@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 18. April 2014, 01:06:27 schrieb Max Schwarz:
-> On Thursday 17 April 2014 at 19:38:35, Mark Brown wrote:
-> > If you're only doing a few accesses then surely there's no meaningful
-> > overhead from just writing what you want?  So long as you don't cache
-> > these registers regmap won't really get in the way.
+On Fri, 18 Apr 2014, Thomas Gleixner wrote:
+> On Thu, 17 Apr 2014, Joel Fernandes wrote:
+> > Here's a thread that discusses it and the end conclusion is that it
+> > should be fine (Kyle Kastile is one of the EDMA hardware designers).
+> > http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
 > 
-> I think Heiko and I have been operating under the misconception that caching
-> is somehow enabled by default - which is not the case. Thanks for clearing
-> that up ;-)
+> Gah, right I saw the issues with the original code, which does a
+> memcpy_fromio which copies byte by byte. Did not think about retrying
+> with the edma_read() based one.
 
-Actually I think it's the other way around :-).
+Actually I did expect memcpy_fromio to be more clever. But you are
+right, using the 32bit wide read works like a charm.
 
-See regmap_read() calling _reagmap_read(), which in turn calls 
-regcache_read(), except when map->cache_bypass is enabled, which then checks 
-the volatile setting for the individual register.
+Thanks,
 
-So I guess we'd need to teach syscon to handle volatile registers (mark our 
-grf ones as such) and then could leave the rest alone.
-
-
-Heiko
+	tglx
