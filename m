@@ -1,40 +1,70 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Fri, 18 Apr 2014 10:13:20 -0700
-Subject: [PATCH V2] ARM: mach-bcm: add ARM_ERRATA_775420
-Message-ID: <1397841200-14061-1-git-send-email-sbranden@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Apr 2014 10:18:54 -0700
+Subject: [RFC 2/4] ARM: dts: Add ctrl-core DT node for DRA7
+In-Reply-To: <1397654063-8055-2-git-send-email-archit@ti.com>
+References: <1397654063-8055-1-git-send-email-archit@ti.com>
+ <1397654063-8055-2-git-send-email-archit@ti.com>
+Message-ID: <20140418171854.GJ5354@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_ERRATA_775420 needs to be enabled.
+* Archit Taneja <archit@ti.com> [140416 06:20]:
+> Add DT node for the ctrl-core sub module of the DRA7 control module. We map the
+> CTRL_MODULE_CORE address region up to 0x4a002d60, this region contains register
+> fields which configure clocks. The remainder of the registers are related to
+> pad configurations or cross-bar configurations, and therefore aren't mapped.
 
-A data cache maintenance operation which aborts, followed by an ISB,
-without any DSB in-between, might lead to deadlock.
+Can you please check if this can just use the existing
+regmap syscon mapping:
 
-Affects: bug present in Cortex-A9 r3p0 and earlier. Fixed in r4p0.
+syscon = <&dra7_ctrl_general>;
 
-Cortex-A9 r3p0 is used in a multitude of Broadcom parts including
-the bcm21664, bcm281xx, 5301x families of devices.
+See how the drivers/regulator/pbias-regulator.c is using the
+syscon to initialize a regulator and then omap_hsmmc.c just does
+the standard regulator calls.
 
-Signed-off-by: Scott Branden <sbranden@broadcom.com>
-Tested-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Alex Elder <elder@linaro.org>
-Acked-by: Matt Porter <mporter@linaro.org>
----
- arch/arm/mach-bcm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+Depending what the range 0x4a002000 0x6d0 contains, you may
+want to set it up as another syscon area.
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 49c914c..9ef7f65 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -15,6 +15,7 @@ config ARCH_BCM_MOBILE
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_764369 if SMP
-+	select ARM_ERRATA_775420
- 	select ARM_GIC
- 	select GPIO_BCM_KONA
- 	select TICK_ONESHOT
--- 
-1.7.9.5
+Regards,
+
+Tony
+
+ 
+> Signed-off-by: Archit Taneja <archit@ti.com>
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 1c0f8e1..58bbdf3 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -148,6 +148,19 @@
+>  			};
+>  		};
+>  
+> +		ctrl_core: ctrl_core at 4a002000 {
+> +			compatible = "ti,dra7-ctrl-core";
+> +			reg = <0x4a002000 0x6d0>;
+> +
+> +			ctrl_core_clocks: clocks {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +			};
+> +
+> +			ctrl_core_clockdomains: clockdomains {
+> +			};
+> +		};
+> +
+>  		counter32k: counter at 4ae04000 {
+>  			compatible = "ti,omap-counter32k";
+>  			reg = <0x4ae04000 0x40>;
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
