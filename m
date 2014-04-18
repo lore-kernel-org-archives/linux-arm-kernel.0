@@ -1,182 +1,83 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 Apr 2014 16:48:03 +0200
-Subject: [PATCH v2 03/14] clocksource: sh_tmu: Drop support for legacy
- platform data
-In-Reply-To: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1397832494-20607-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Fri, 18 Apr 2014 16:48:00 +0200
+Subject: [PATCH v2 00/14] Renesas CMT, MTU2 and TMU timers DT support
+Message-ID: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all platforms have switched to the new-style platform data,
-drop support for the legacy version.
+Hello,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/clocksource/sh_tmu.c | 82 ++++++++------------------------------------
- 1 file changed, 15 insertions(+), 67 deletions(-)
+This patch set adds DT bindings to the Renesas CMT, MTU2 and TMU timers. The
+CMT patches have been previously posted as part of the "[PATCH 00/27] Renesas
+CMT (Compare Match Timer) DT bindings" series. The MTU2 patches have been
+previously posted as part of the "[PATCH 00/22] SH MTU2 DT support" series.
+The TMU patches are new.
 
-diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
-index 4ba2c0f..47f5b48 100644
---- a/drivers/clocksource/sh_tmu.c
-+++ b/drivers/clocksource/sh_tmu.c
-@@ -32,7 +32,6 @@
- #include <linux/spinlock.h>
- 
- enum sh_tmu_model {
--	SH_TMU_LEGACY,
- 	SH_TMU,
- 	SH_TMU_SH3,
- };
-@@ -91,8 +90,6 @@ static inline unsigned long sh_tmu_read(struct sh_tmu_channel *ch, int reg_nr)
- 
- 	if (reg_nr == TSTR) {
- 		switch (ch->tmu->model) {
--		case SH_TMU_LEGACY:
--			return ioread8(ch->tmu->mapbase);
- 		case SH_TMU_SH3:
- 			return ioread8(ch->tmu->mapbase + 2);
- 		case SH_TMU:
-@@ -115,8 +112,6 @@ static inline void sh_tmu_write(struct sh_tmu_channel *ch, int reg_nr,
- 
- 	if (reg_nr == TSTR) {
- 		switch (ch->tmu->model) {
--		case SH_TMU_LEGACY:
--			return iowrite8(value, ch->tmu->mapbase);
- 		case SH_TMU_SH3:
- 			return iowrite8(value, ch->tmu->mapbase + 2);
- 		case SH_TMU:
-@@ -476,27 +471,12 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch, unsigned int index,
- 		return 0;
- 
- 	ch->tmu = tmu;
-+	ch->index = index;
- 
--	if (tmu->model == SH_TMU_LEGACY) {
--		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
--
--		/*
--		 * The SH3 variant (SH770x, SH7705, SH7710 and SH7720) maps
--		 * channel registers blocks at base + 2 + 12 * index, while all
--		 * other variants map them at base + 4 + 12 * index. We can
--		 * compute the index by just dividing by 12, the 2 bytes or 4
--		 * bytes offset being hidden by the integer division.
--		 */
--		ch->index = cfg->channel_offset / 12;
--		ch->base = tmu->mapbase + cfg->channel_offset;
--	} else {
--		ch->index = index;
--
--		if (tmu->model == SH_TMU_SH3)
--			ch->base = tmu->mapbase + 4 + ch->index * 12;
--		else
--			ch->base = tmu->mapbase + 8 + ch->index * 12;
--	}
-+	if (tmu->model == SH_TMU_SH3)
-+		ch->base = tmu->mapbase + 4 + ch->index * 12;
-+	else
-+		ch->base = tmu->mapbase + 8 + ch->index * 12;
- 
- 	ch->irq = platform_get_irq(tmu->pdev, ch->index);
- 	if (ch->irq < 0) {
-@@ -526,28 +506,9 @@ static int sh_tmu_map_memory(struct sh_tmu_device *tmu)
- 	if (tmu->mapbase == NULL)
- 		return -ENXIO;
- 
--	/*
--	 * In legacy platform device configuration (with one device per channel)
--	 * the resource points to the channel base address.
--	 */
--	if (tmu->model == SH_TMU_LEGACY) {
--		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
--		tmu->mapbase -= cfg->channel_offset;
--	}
--
- 	return 0;
- }
- 
--static void sh_tmu_unmap_memory(struct sh_tmu_device *tmu)
--{
--	if (tmu->model == SH_TMU_LEGACY) {
--		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
--		tmu->mapbase += cfg->channel_offset;
--	}
--
--	iounmap(tmu->mapbase);
--}
--
- static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- {
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
-@@ -564,8 +525,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 	tmu->model = id->driver_data;
- 
- 	/* Get hold of clock. */
--	tmu->clk = clk_get(&tmu->pdev->dev,
--			   tmu->model == SH_TMU_LEGACY ? "tmu_fck" : "fck");
-+	tmu->clk = clk_get(&tmu->pdev->dev, "fck");
- 	if (IS_ERR(tmu->clk)) {
- 		dev_err(&tmu->pdev->dev, "cannot get clock\n");
- 		return PTR_ERR(tmu->clk);
-@@ -583,10 +543,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 	}
- 
- 	/* Allocate and setup the channels. */
--	if (tmu->model == SH_TMU_LEGACY)
--		tmu->num_channels = 1;
--	else
--		tmu->num_channels = hweight8(cfg->channels_mask);
-+	tmu->num_channels = hweight8(cfg->channels_mask);
- 
- 	tmu->channels = kzalloc(sizeof(*tmu->channels) * tmu->num_channels,
- 				GFP_KERNEL);
-@@ -595,23 +552,15 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 		goto err_unmap;
- 	}
- 
--	if (tmu->model == SH_TMU_LEGACY) {
--		ret = sh_tmu_channel_setup(&tmu->channels[0], 0,
--					   cfg->clockevent_rating != 0,
--					   cfg->clocksource_rating != 0, tmu);
-+	/*
-+	 * Use the first channel as a clock event device and the second channel
-+	 * as a clock source.
-+	 */
-+	for (i = 0; i < tmu->num_channels; ++i) {
-+		ret = sh_tmu_channel_setup(&tmu->channels[i], i,
-+					   i == 0, i == 1, tmu);
- 		if (ret < 0)
- 			goto err_unmap;
--	} else {
--		/*
--		 * Use the first channel as a clock event device and the second
--		 * channel as a clock source.
--		 */
--		for (i = 0; i < tmu->num_channels; ++i) {
--			ret = sh_tmu_channel_setup(&tmu->channels[i], i,
--						   i == 0, i == 1, tmu);
--			if (ret < 0)
--				goto err_unmap;
--		}
- 	}
- 
- 	platform_set_drvdata(pdev, tmu);
-@@ -620,7 +569,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
- 
- err_unmap:
- 	kfree(tmu->channels);
--	sh_tmu_unmap_memory(tmu);
-+	iounmap(tmu->mapbase);
- err_clk_unprepare:
- 	clk_unprepare(tmu->clk);
- err_clk_put:
-@@ -673,7 +622,6 @@ static int sh_tmu_remove(struct platform_device *pdev)
- }
- 
- static const struct platform_device_id sh_tmu_id_table[] = {
--	{ "sh_tmu", SH_TMU_LEGACY },
- 	{ "sh-tmu", SH_TMU },
- 	{ "sh-tmu-sh3", SH_TMU_SH3 },
- 	{ }
+The set builds on top of the "[PATCH v3 00/52] Renesas CMT and TMU cleanups"
+series and the cleanup patches of the "[PATCH 00/22] SH MTU2 DT support"
+series. I will thus rebase and resend it when the dependencies will be merged.
+I would however like to get the patches reviewed and acked already.
+
+Compared to v1 I've dropped the channel subnodes from the CMT DT bindings and
+just use a channels mask, as I don't need to specify per-channel properties.
+I'm slightly uncertain about this change though, as I can't easily predict
+whether per-channel properties would be needed later for new hardware. It
+won't be difficult to reintroduce channel subnodes then, so I'd rather not
+clutter the DT bindings with channel subnodes now. Please feel free to
+disagree.
+
+The first 10 patches should go through the timers tree while the last 4
+patches should go through the Renesas SoC tree. Patches 11/14 and 12/14 have
+no build time or run time dependency on the drivers changes, so I plan to ask
+Simon to pick them up when the DT bindings will be approved. Patches 13/14 and
+14/14 have a run time dependency on the drivers changes, but only when
+architected timer support isn't enabled in the kernel. It should thus be
+relatively safe to merge them independently of the drivers changes. Simon,
+Magnus, what's your opinion ?
+
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <damm@opensource.se>
+
+Laurent Pinchart (14):
+  clocksource: sh_cmt: Drop support for legacy platform data
+  clocksource: sh_cmt: Replace global spinlock with a per-device
+    spinlock
+  clocksource: sh_tmu: Drop support for legacy platform data
+  clocksource: sh_tmu: Replace global spinlock with a per-device
+    spinlock
+  clocksource: sh_mtu2: Drop support for legacy platform data
+  clocksource: sh_mtu2: Replace global spinlock with a per-device
+    spinlock
+  clocksource: shmobile: Remove unused sh_timer_config members
+  clocksource: sh_cmt: Add DT support
+  clocksource: sh_tmu: Add DT support
+  clocksource: sh_mtu2: Add DT support
+  ARM: shmobile: r8a7790: Add CMT devices to DT
+  ARM: shmobile: r8a7791: Add CMT devices to DT
+  ARM: shmobile: lager-reference: Enable CMT0 in device tree
+  ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
+
+ .../devicetree/bindings/timer/renesas,cmt.txt      |  49 +++++
+ .../devicetree/bindings/timer/renesas,mtu2.txt     |  40 ++++
+ .../devicetree/bindings/timer/renesas,tmu.txt      |  40 ++++
+ arch/arm/boot/dts/r8a7790-lager.dts                |   4 +
+ arch/arm/boot/dts/r8a7790.dtsi                     |  34 +++
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |   4 +
+ arch/arm/boot/dts/r8a7791.dtsi                     |  34 +++
+ arch/arm/mach-shmobile/board-koelsch-reference.c   |   1 -
+ arch/arm/mach-shmobile/board-lager-reference.c     |   1 -
+ arch/arm/mach-shmobile/setup-r8a7790.c             |   2 +-
+ arch/arm/mach-shmobile/setup-r8a7791.c             |   2 +-
+ drivers/clocksource/sh_cmt.c                       | 233 ++++++++-------------
+ drivers/clocksource/sh_mtu2.c                      | 146 ++++---------
+ drivers/clocksource/sh_tmu.c                       | 123 +++++------
+ include/linux/sh_timer.h                           |   5 -
+ 15 files changed, 388 insertions(+), 330 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,tmu.txt
+
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
