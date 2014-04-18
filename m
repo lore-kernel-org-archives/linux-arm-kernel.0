@@ -1,58 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 18 Apr 2014 09:46:59 -0300
-Subject: [PATCH v2] ARM: dts: imx6qdl-sabresd: Add HDMI support
-Message-ID: <1397825219-7872-1-git-send-email-festevam@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Apr 2014 13:46:52 +0100
+Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
+ components tracking
+In-Reply-To: <5351145D.8070207@samsung.com>
+References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
+ <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+ <20140417220412.GZ24070@n2100.arm.linux.org.uk>
+ <5351145D.8070207@samsung.com>
+Message-ID: <20140418124652.GE24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Apr 18, 2014 at 02:02:37PM +0200, Andrzej Hajda wrote:
+> Separation of the interfaces exposed by the device from the device itself
+> seems to me a good thing. I would even consider it as a biggest
+> advantage of this solution :)
+> 
+> The problem of re-initialization does not seems to be relevant here, it
+> is classic
+> problem of coding correctness nothing more, it can appear here and in
+> many different
+> places.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Shawn,
+It may be a problem of coding correctless, but it's also a maintainability
+problem too - it makes it _much_ more difficult to ensure that everything
+is correct.
 
-I currently do not have hardware access, so I did not test this one.
+> Anyway it seems we have different point of view on the problem, your say
+> about devices with two stage initialization. I see it more as devices
+> registering interfaces and superdevice using it.
 
-It is based on the previous version that I submitted and tested.
+Right, so please make this exynos-specific, because from what I can see it
+has no reason to pretend to be generic.  As I've already pointed out, it
+can't be used in the general case because it ties sub-components directly
+to their main driver, which is absolutely absurd.  Please keep this
+absurdness in exynos and don't spread it around.  Thanks.
 
-Changes since v1:
-- Rebased against 3.15-rc1
-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 7a88d9a..3d88712 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -148,6 +148,14 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hdmi>;
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+	crtcs = <&ipu1 1>;
-+};
-+
- &i2c1 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
-@@ -390,6 +398,13 @@
- 			>;
- 		};
- 
-+
-+		pinctrl_hdmi: hdmigrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
 -- 
-1.8.3.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
