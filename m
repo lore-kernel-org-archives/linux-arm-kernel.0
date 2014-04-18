@@ -1,117 +1,87 @@
-From: b.brezillon.dev@gmail.com (Boris BREZILLON)
-Date: Fri, 18 Apr 2014 15:00:37 +0200
-Subject: [PATCH v2 02/11] clk: at91: update main clk documentation
-In-Reply-To: <53511F60.3040301@atmel.com>
-References: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
- <1395649643-9146-3-git-send-email-b.brezillon.dev@gmail.com>
- <53511F60.3040301@atmel.com>
-Message-ID: <535121F5.10307@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 18 Apr 2014 15:02:44 +0200
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <20140411163129.GA20565@obsidianresearch.com>
+References: <20140410181953.50ccfcc3@skate>
+ <20140410165733.GB23104@obsidianresearch.com>
+ <20140410200153.46669e0c@skate>
+ <20140410201201.GA12661@obsidianresearch.com>
+ <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
+ <20140411122314.220614bf@skate>
+ <20140411163129.GA20565@obsidianresearch.com>
+Message-ID: <20140418150244.4b3d5229@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Jason Gunthorpe,
 
-On 18/04/2014 14:49, Nicolas Ferre wrote:
-> On 24/03/2014 09:27, Boris BREZILLON :
->> Update main clk documentation to match main clk implementation rework.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
->> ---
->>  .../devicetree/bindings/clock/at91-clock.txt       |   56 ++++++++++++++++----
->>  1 file changed, 47 insertions(+), 9 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
->> index cd5e239..9a7025b 100644
->> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
->> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
->> @@ -15,8 +15,13 @@ Required properties:
->>  		All at91 specific clocks (clocks defined below) must be child
->>  		node of the PMC node.
->>  
->> +	"atmel,at91rm9200-clk-main-osc"
->> +	"atmel,at91sam9x5-clk-main-rc-osc"
->> +		at91 main clk sources
->> +
->> +	"atmel,at91sam9x5-clk-main"
->>  	"atmel,at91rm9200-clk-main":
->> -		at91 main oscillator
->> +		at91 main clock
->>  
->>  	"atmel,at91rm9200-clk-master" or
->>  	"atmel,at91sam9x5-clk-master":
->> @@ -85,24 +90,57 @@ For example:
->>  		/* put at91 clocks here */
->>  	};
->>  
->> +Required properties for main clock oscillator:
->> +- interrupt-parent : must reference the PMC node.
->> +- interrupts : shall be set to "<0>".
->> +- clock-frequency : define the internal RC oscillator frequency.
->> +
->> +Optional properties:
->> +- clock-accuracy : define the internal RC oscillator accuracy.
->> +
->> +For example:
->> +	main_rc_osc: main_rc_osc {
->> +		compatible = "atmel,at91sam9x5-clk-main-rc-osc";
->> +		interrupt-parent = <&pmc>;
->> +		interrupts = <0>;
->> +		clock-frequency = <12000000>;
->> +		clock-accuracy = <50000000>;
->> +	};
-> Don't you swapped this example above with the description below?
+On Fri, 11 Apr 2014 10:31:29 -0600, Jason Gunthorpe wrote:
 
-Actually I only swapped the "Required properties" lines, I'll fix it.
+> > Moreover, I am not entirely convinced that a PHY reset is needed here.
+> > In my tests, doing just a wait after setting the local dev number was
+> > sufficient. The fact is works with earlyprintk also indicates that we
+> > don't need to do any specific action with the PHY, just to wait a bit
+> > of time. I am worried that resetting the PHY might actually take more
+> > time than what is needed, and may have other consequences that we don't
+> > necessarily understand at this point.
+> 
+> I really disagree - clearly the fundamental problem is suspending one
+> side of the PEX link while the other remains operating. That isn't
+> specified to work and really shouldn't work.
+> 
+> If you suspend one side of the PEX you *MUST* reset the
+> link. Absolutely. No Doubt In My Mind.
+> 
+> Remember, PCI-E is a serial shared state protocol. The two sides must
+> remain in sync or a link reset is required to recover the shared
+> state. Halting one side obviously destroys this invariant.
+> 
+> I think in many cases the reset happens autonomously. The remote side
+> will force it to happen. This is what the debugging from Neil shows -
+> the link just resets at some inconvenient point. Now we know why.
+> 
+> The timing sensitivity also makes sense, if you suspend for a very
+> short time window the other side might not notice. If you suspend for
+> longer the other side will reset the link autonomously and your local
+> side will quickly notice the reset once it comes back.
+> 
+> If you suspend for a little bit the link might not retrain immediately
+> but the shared state can become corrupted (eg sequence number
+> mismatch) this will eventually trigger a reset, after the local PEX
+> has been operating again.
+> 
+> The LinkUp bit after resume is also clearly a lie - most likely the
+> PEX takes some time to detect the change in remote state to trigger a
+> link down. After all, it was suspended while the remote was busy
+> trying to recover.
 
-Thanks,
+Ok, fair enough. However, Neil's patch (which is basically your patch
+with longer delays) isn't working here, as I just reported in a
+separate e-mail.
 
-Boris
+So we don't have a solution right now. Do you have another proposal to
+try ?
 
->
->
->> +Required properties for main clock internal RC oscillator:
->> +- interrupt-parent : must reference the PMC node.
->> +- interrupts : shall be set to "<0>".
->> +- #clock-cells : from common clock binding; shall be set to 0.
->> +- clocks : shall encode the main osc source clk sources (see atmel datasheet).
->> +
->> +Optional properties:
->> +- atmel,osc-bypass : boolean property. Specified if a clock signal is provided
->> +  on XIN.
->> +
->> +  clock signal is directly provided on XIN pin.
->> +
->> +For example:
->> +	main_osc: main_osc {
->> +		compatible = "atmel,at91rm9200-clk-main-osc";
->> +		interrupt-parent = <&pmc>;
->> +		interrupts = <0>;
->> +		#clock-cells = <0>;
->> +		clocks = <&main_xtal>;
->> +	};
->> +
->>  Required properties for main clock:
->>  - interrupt-parent : must reference the PMC node.
->>  - interrupts : shall be set to "<0>".
->>  - #clock-cells : from common clock binding; shall be set to 0.
->> -- clocks (optional if clock-frequency is provided) : shall be the slow clock
->> -	phandle. This clock is used to calculate the main clock rate if
->> -	"clock-frequency" is not provided.
->> -- clock-frequency : the main oscillator frequency.Prefer the use of
->> -	"clock-frequency" over automatic clock rate calculation.
->> +- clocks : shall encode the main clk sources (see atmel datasheet).
->>  
->>  For example:
->>  	main: mainck {
->> -		compatible = "atmel,at91rm9200-clk-main";
->> +		compatible = "atmel,at91sam9x5-clk-main";
->>  		interrupt-parent = <&pmc>;
->>  		interrupts = <0>;
->>  		#clock-cells = <0>;
->> -		clocks = <&ck32k>;
->> -		clock-frequency = <18432000>;
->> +		clocks = <&main_rc_osc &main_osc>;
->>  	};
->>  
->>  Required properties for master clock:
->>
->
+> The fundamental problem here is the clock driver. It should not be
+> gating PEX clocks so naively. A PEX suspend needs to be sequenced to
+> ensure the link is cleanly brought down before the PEX is put to
+> sleep. That way it can cleanly and unambiguously be started up when it
+> resumes. No risk of glitching/corrupting the far side with some kind
+> of crap on the serial bus.
+> 
+> In any event, the most important required patch here is one that fixes
+> socid. It must not turn off the PEX clock. Then we can talk about how
+> to fix pci-mvebu to work as a module...
+
+I don't really understand this: all clocks are gated at boot time, so
+regardless of mvebu-soc-id behavior, the PCIe driver should take care
+of doing all the necessary initialization without making the
+assumptions that the clocks were left turned on from the bootloader
+time. This is needed if we want to support pci-mvebu as a module, so I
+don't see why hacking mvebu-soc-id is going to solve this.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
