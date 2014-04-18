@@ -1,79 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Apr 2014 15:51:12 -0700
-Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
-In-Reply-To: <CAOCHtYhygGFbUunY9abEkjKfpQ1hh-DfRfhm160NehSYhWJSRw@mail.gmail.com>
-References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
- <CAOCHtYg5_Lvi3SWuWaRTDDNhLJ32jiXsKYQmrsKaShVWpM+xWQ@mail.gmail.com>
- <534D51C1.3010007@ti.com>
- <CAOCHtYhygGFbUunY9abEkjKfpQ1hh-DfRfhm160NehSYhWJSRw@mail.gmail.com>
-Message-ID: <20140418225111.GP21823@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 19 Apr 2014 00:03:35 +0100
+Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
+ probe and defer if needed
+In-Reply-To: <20140418215848.GD21823@atomide.com>
+References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
+ <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
+ <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
+ <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
+ <20140418205213.GA21823@atomide.com>
+ <CAL_JsqJvVvo6R-qNXxur7wiZERKbi52xyKoWnmzJTfKS2iKK7A@mail.gmail.com>
+ <20140418215848.GD21823@atomide.com>
+Message-ID: <20140418230335.GI24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [140415 08:46]:
-> On Tue, Apr 15, 2014 at 10:35 AM, Nishanth Menon <nm@ti.com> wrote:
-> > On 04/15/2014 10:12 AM, Robert Nelson wrote:
-> >> On Tue, Apr 15, 2014 at 10:09 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> >>> BeagleBoard xM A/B has an inverted usb hub enable line vs the xM C
-> >>>
-> >>> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> >>> ---
-> >>>  arch/arm/boot/dts/Makefile               |  1 +
-> >>>  arch/arm/boot/dts/omap3-beagle-xm-ab.dts | 15 +++++++++++++++
-> >>>  2 files changed, 16 insertions(+)
-> >>>  create mode 100644 arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >>> index 35c146f..0bdeba3 100644
-> >>> --- a/arch/arm/boot/dts/Makefile
-> >>> +++ b/arch/arm/boot/dts/Makefile
-> >>> @@ -246,6 +246,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
-> >>>         omap3-sbc-t3730.dtb \
-> >>>         omap3-devkit8000.dtb \
-> >>>         omap3-beagle-xm.dtb \
-> >>> +       omap3-beagle-xm-ab.dtb \
-> >>>         omap3-evm.dtb \
-> >>>         omap3-evm-37xx.dtb \
-> >>>         omap3-ldp.dtb \
-> >>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm-ab.dts b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-> >>> new file mode 100644
-> >>> index 0000000..9d81123
-> >>> --- /dev/null
-> >>> +++ b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
-> >>> @@ -0,0 +1,15 @@
-> >>> +/*
-> >>> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> >>> + *
-> >>> + * This program is free software; you can redistribute it and/or modify
-> >>> + * it under the terms of the GNU General Public License version 2 as
-> >>> + * published by the Free Software Foundation.
-> >>> + */
-> >>> +
-> >>> +#include "omap3-beagle-xm.dts"
-> >>> +
-> >>> +/ {
-> >>> +       /* HS USB Port 2 Power enable was inverted with the xM C */
-> >>> +       hsusb2_power: hsusb2_power_reg {
-> >>> +               enable-active-high;
-> >>        };
-> >>> +};
-> >>
-> >> Crap, copy paste bug, there.  I can send a v2, if you guys are happy
-> >> with the "omap3-beagle-xm-ab.dtb" naming..
-> >>
-> >> Regards,
-> >>
-> > Will u-boot adequately handle this as part of find_fdt?
-> 
-> It will after i submit something like: (this uses a new feature in v2014.04)
-> 
-> https://github.com/eewiki/u-boot-patches/blob/master/v2014.04/0001-am335x_evm-uEnv.txt-bootz-n-fixes.patch#L76
-> 
-> Essentially, test for presence of omap3-beagle-xm-ab.dtb, if not found
-> drop to old omap3-beagle-xm.dtb
-> 
-> Background: i also tried getting this having this fixed in u-boot:
+On Fri, Apr 18, 2014 at 02:58:48PM -0700, Tony Lindgren wrote:
+> Oh come on, let's stop pretending it's not broken. And it's way worse with
+> device tree as there's nothing making sure the resources for a driver
+> are set up before the driver probes. And we've been unable to fix just
+> this issue alone for about six months now. It's also broken beyond that.
+> It's called of_platform_bus yet it won't even pass the platform_data
+> as auxdata to the devices on a sub-bus instantatiated like I2C.
 
-Do we still need to apply this patch then?
+Isn't there a much simpler solution to the platform device IRQ problem?
 
-Tony
+Rather than trying to fix it at the point where the resources are
+created, why not just *not* have DT create the IRQ resources in the
+first place, and instead have platform_get_irq() (which is the function
+which should be used to get an IRQ) be the actor to do whatever is
+necessary to return the IRQ(s) ?
+
+Yes, I know we have some drivers which use platform_get_resources() with
+IORESOURCE_IRQ, but they should really use the right accessor.  And those
+who just dereference the resource array directly... get what's coming
+(though of course they have to be fixed.)
+
+It has the benefit that you're in a path where you /can/ return
+-EPROBE_DEFER too and not have to mess around with notifiers or other
+silly stuff like that.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
