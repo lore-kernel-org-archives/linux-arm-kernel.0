@@ -1,351 +1,119 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 17 Apr 2014 17:47:03 -0700
-Subject: [PATCH 3/3] arm64: WIP: add better page protections to arm64
-In-Reply-To: <1397782023-28114-1-git-send-email-lauraa@codeaurora.org>
-References: <1397782023-28114-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1397782023-28114-4-git-send-email-lauraa@codeaurora.org>
+From: joelf@ti.com (Joel Fernandes)
+Date: Thu, 17 Apr 2014 19:47:24 -0500
+Subject: [patch 5/6] edma: Make reading the position of active channels
+ work
+In-Reply-To: <20140417143249.889774979@linutronix.de>
+References: <20140417133737.892475126@linutronix.de>
+ <20140417143249.889774979@linutronix.de>
+Message-ID: <5350761C.6010109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add page protections for arm64 similar to those in arm or in
-progress for arm. This is for security reasons. The flow is
-currently:
+On 04/17/2014 09:40 AM, Thomas Gleixner wrote:
+> Reading destination and source is pointless. In DEV_TO_MEM transfers
+> we are only interested in the destination, in MEM_TO_DEV we care about
+> the source. In MEM_TO_MEM it really does not matter which one you
+> read.
+> 
+> Remove the extra pointer and select dest/source via a bool.
+> 
+> Reading the src/dst data from an active parameter set in the EDMA
+> parameter RAM is not reliable, as there might be a concurrent update
+> from the controller.
+> 
+> But experimentation showed, that a double readout with comparing the
+> results and a limited loop works nicely. I've actually never found a
+> case where the loop limit triggered, but we have it there for sanity
+> reasons. In case it triggers we return -EBUSY and let the caller deal
+> with it.
+> 
+> Remove the export of this function while at it. The only potential
+> user is the dmaengine and that's always builtin.
+> 
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  arch/arm/common/edma.c             |   48 ++++++++++++++++++++++++++-----------
+>  include/linux/platform_data/edma.h |    2 -
+>  2 files changed, 35 insertions(+), 15 deletions(-)
+> 
+> Index: linux/arch/arm/common/edma.c
+> ===================================================================
+> --- linux.orig/arch/arm/common/edma.c
+> +++ linux/arch/arm/common/edma.c
+> @@ -994,29 +994,49 @@ void edma_set_dest(unsigned slot, dma_ad
+>  EXPORT_SYMBOL(edma_set_dest);
+>  
+>  /**
+> - * edma_get_position - returns the current transfer points
+> + * edma_get_position - returns the current transfer point
+>   * @slot: parameter RAM slot being examined
+> - * @src: pointer to source port position
+> - * @dst: pointer to destination port position
+> + * @pos:  where to store the data
+> + * @dst:  true selects the dest position, false the source
+>   *
+> - * Returns current source and destination addresses for a particular
+> - * parameter RAM slot.  Its channel should not be active when this is called.
+> + * Return 0 indicates a stable readout. -EBUSY indicates that the
+> + * readout failed due to concurrent updates.
+> + *
+> + * Call this on active channels with care. For inactive channels this
+> + * never fails.
+>   */
+> -void edma_get_position(unsigned slot, dma_addr_t *src, dma_addr_t *dst)
+> +int edma_get_position(unsigned slot, dma_addr_t *pos, bool dst)
+>  {
+> -	struct edmacc_param temp;
+> -	unsigned ctlr;
+> +	u32 dat, ctlr, offs;
+> +	int i;
+>  
+>  	ctlr = EDMA_CTLR(slot);
+>  	slot = EDMA_CHAN_SLOT(slot);
+>  
+> -	edma_read_slot(EDMA_CTLR_CHAN(ctlr, slot), &temp);
+> -	if (src != NULL)
+> -		*src = temp.src;
+> -	if (dst != NULL)
+> -		*dst = temp.dst;
+> +	if (slot >= edma_cc[ctlr]->num_slots)
+> +		return -EINVAL;
+> +
+> +	offs = PARM_OFFSET(slot);
+> +	offs += dst ? PARM_DST : PARM_SRC;
+> +
+> +	/*
+> +	 * If the channel is active, we need to double read as we
+> +	 * might see half updated data. We limit this to 5
+> +	 * attempts. If that fails we return -EBUSY and let the caller
+> +	 * deal with it.
+> +	 */
+> +	dat = edma_read(ctlr, offs);
+> +	for (i = 0; i < 5; i++) {
+> +		u32 tmp = edma_read(ctlr, offs);
+> +
+> +		if (tmp == dat) {
+> +			*pos = dat;
+> +			return 0;
+> +		}
+> +		dat = tmp;
+> +	}
+> +	return -EBUSY;
+>  }
+> -EXPORT_SYMBOL(edma_get_position);
+>  
+>  /**
 
-- Map all memory as either RWX or RW. We round to the nearest
-  section to avoid creating page tables before everything is mapped
-- Once everything is mapped, if either end of the RWX section should
-  not be X, we split the PMD and remap as necessary
-- When initmem is to be freed, we change the permissions back to
-  RW (using stop machine if necessary to flush the TLB)
-- If CONFIG_DEBUG_RODATA is set, the read only sections are set
-  read only.
+The access is synchronized though and you shouldn't see unreliable
+results, unless you _are_ seeing unreliable results in which case it
+could be a silicon issue.
 
-TODO:
-- actually make init rodata ro?
-- Kconfig option to align up to section boundary (ran into relocation
-  truncation errors, need to debug more)
-- Anything to do with ftrace/kprobes
+The original code also doesn't have the double read so I would just drop
+that, unless you are seeing reliability issues.
 
-Change-Id: I219b57fd628edc283da1a3e238fc4cc8185a686e
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm64/Kconfig.debug |  10 +++
- arch/arm64/mm/init.c     |   1 +
- arch/arm64/mm/mm.h       |   2 +
- arch/arm64/mm/mmu.c      | 173 ++++++++++++++++++++++++++++++++++++++++++-----
- 4 files changed, 170 insertions(+), 16 deletions(-)
+Here's a thread that discusses it and the end conclusion is that it
+should be fine (Kyle Kastile is one of the EDMA hardware designers).
+http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 53979ac..bfb1aec 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -48,4 +48,14 @@ config DEBUG_SET_MODULE_RONX
-           against certain classes of kernel exploits.
-           If in doubt, say "N".
- 
-+config DEBUG_RODATA
-+	bool "Make kernel text and rodata read-only"
-+	help
-+	  If this is set, kernel text and rodata will be made read-only. This
-+	  is to help catch accidental or malicious attempts to change the
-+	  kernel's executable code. Additionally splits rodata from kernel
-+	  text so it can be made explicitly non-executable.
-+
-+          If in doubt, say Y
-+
- endmenu
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 51d5352..bc74a3a 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -325,6 +325,7 @@ void __init mem_init(void)
- 
- void free_initmem(void)
- {
-+	fixup_init();
- 	free_initmem_default(0);
- }
- 
-diff --git a/arch/arm64/mm/mm.h b/arch/arm64/mm/mm.h
-index d519f4f..82347d8 100644
---- a/arch/arm64/mm/mm.h
-+++ b/arch/arm64/mm/mm.h
-@@ -1,2 +1,4 @@
- extern void __init bootmem_init(void);
- extern void __init arm64_swiotlb_init(void);
-+
-+void fixup_init(void);
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 6b7e895..e94789c 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -26,6 +26,7 @@
- #include <linux/memblock.h>
- #include <linux/fs.h>
- #include <linux/io.h>
-+#include <linux/stop_machine.h>
- 
- #include <asm/cputype.h>
- #include <asm/sections.h>
-@@ -167,26 +168,67 @@ static void __init *early_alloc(unsigned long sz)
- 	return ptr;
- }
- 
--static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
--				  unsigned long end, unsigned long pfn)
-+/*
-+ * remap a PMD into pages
-+ */
-+static noinline void __ref split_pmd(pmd_t *pmd, pgprot_t prot, bool early)
-+{
-+	pte_t *pte, *start_pte;
-+	u64 val;
-+	unsigned long pfn;
-+	int i = 0;
-+
-+	val = pmd_val(*pmd);
-+
-+	if (early)
-+		start_pte = pte = early_alloc(PTRS_PER_PTE*sizeof(pte_t));
-+	else
-+		start_pte = pte = (pte_t *)__get_free_page(PGALLOC_GFP);
-+
-+	BUG_ON(!pte);
-+
-+
-+	pfn = __phys_to_pfn(val & PHYS_MASK);
-+
-+	do {
-+		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
-+		pfn++;
-+	} while (pte++, i++, i < PTRS_PER_PTE);
-+
-+
-+	__pmd_populate(pmd, __pa(start_pte), PMD_TYPE_TABLE);
-+	flush_tlb_all();
-+}
-+
-+static void __ref alloc_init_pte(pmd_t *pmd, unsigned long addr,
-+				  unsigned long end, unsigned long pfn,
-+				  pgprot_t prot, bool early)
- {
- 	pte_t *pte;
- 
- 	if (pmd_none(*pmd)) {
--		pte = early_alloc(PTRS_PER_PTE * sizeof(pte_t));
-+		if (early)
-+			pte = early_alloc(PTRS_PER_PTE * sizeof(pte_t));
-+		else
-+			pte = (pte_t *)__get_free_page(PGALLOC_GFP);
-+		BUG_ON(!pte);
- 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
- 	}
--	BUG_ON(pmd_bad(*pmd));
-+
-+	if (pmd_bad(*pmd))
-+		split_pmd(pmd, prot, early);
- 
- 	pte = pte_offset_kernel(pmd, addr);
- 	do {
--		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
-+		set_pte(pte, pfn_pte(pfn, prot));
- 		pfn++;
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
- 
--static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
--				  unsigned long end, phys_addr_t phys)
-+static void __ref alloc_init_pmd(pud_t *pud, unsigned long addr,
-+				  unsigned long end, phys_addr_t phys,
-+				  pgprot_t sect_prot, pgprot_t pte_prot,
-+				  bool early)
- {
- 	pmd_t *pmd;
- 	unsigned long next;
-@@ -195,7 +237,11 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
- 	if (pud_none(*pud) || pud_bad(*pud)) {
--		pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
-+		if (early)
-+			pmd = early_alloc(PTRS_PER_PMD * sizeof(pmd_t));
-+		else
-+			pmd = pmd_alloc_one(&init_mm, addr);
-+		BUG_ON(!pmd);
- 		pud_populate(&init_mm, pud, pmd);
- 	}
- 
-@@ -213,21 +259,25 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 			if (!pmd_none(old_pmd))
- 				flush_tlb_all();
- 		} else {
--			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys));
-+			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-+					pte_prot, early);
- 		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
- }
- 
--static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
--				  unsigned long end, unsigned long phys)
-+static void __ref alloc_init_pud(pgd_t *pgd, unsigned long addr,
-+				  unsigned long end, unsigned long phys,
-+				  pgprot_t sect_prot, pgprot_t pte_prot,
-+				  bool early)
- {
- 	pud_t *pud = pud_offset(pgd, addr);
- 	unsigned long next;
- 
- 	do {
- 		next = pud_addr_end(addr, end);
--		alloc_init_pmd(pud, addr, next, phys);
-+		alloc_init_pmd(pud, addr, next, phys, sect_prot, pte_prot,
-+				early);
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -236,8 +286,10 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
-  * Create the page directory entries and any necessary page tables for the
-  * mapping specified by 'md'.
-  */
--static void __init create_mapping(phys_addr_t phys, unsigned long virt,
--				  phys_addr_t size)
-+static void __ref __create_mapping(phys_addr_t phys, unsigned long virt,
-+				  phys_addr_t size,
-+				  pgprot_t sect_prot, pgprot_t pte_prot,
-+				  bool early)
- {
- 	unsigned long addr, length, end, next;
- 	pgd_t *pgd;
-@@ -255,15 +307,37 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 	end = addr + length;
- 	do {
- 		next = pgd_addr_end(addr, end);
--		alloc_init_pud(pgd, addr, next, phys);
-+		alloc_init_pud(pgd, addr, next, phys, sect_prot, pte_prot,
-+				early);
- 		phys += next - addr;
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-+static void __ref create_mapping(phys_addr_t phys, unsigned long virt,
-+				  phys_addr_t size,
-+				  pgprot_t sect_prot, pgprot_t pte_prot)
-+{
-+	return __create_mapping(phys, virt, size, sect_prot, pte_prot, true);
-+}
-+
-+static void __ref create_mapping_late(phys_addr_t phys, unsigned long virt,
-+				  phys_addr_t size,
-+				  pgprot_t sect_prot, pgprot_t pte_prot)
-+{
-+	return __create_mapping(phys, virt, size, sect_prot, pte_prot, false);
-+}
-+
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
- 	phys_addr_t limit;
-+	/*
-+	 * Set up the executable regions using the exising section mappings
-+	 * foir now. This will get more fine grained later once all memory
-+	 * is mapped
-+	 */
-+	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-+	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
- 
- 	/*
- 	 * Temporarily limit the memblock range. We need to do this as
-@@ -301,13 +375,79 @@ static void __init map_mem(void)
- 		}
- #endif
- 
--		create_mapping(start, __phys_to_virt(start), end - start);
-+		if (end < kernel_x_start) {
-+			create_mapping(start, __phys_to_virt(start), end - start,
-+				prot_sect_kernel, pgprot_default);
-+		} else if (start >= kernel_x_end) {
-+			create_mapping(start, __phys_to_virt(start), end - start,
-+				prot_sect_kernel | PMD_SECT_PXN, pgprot_default | PTE_PXN);
-+		} else {
-+			if (start < kernel_x_start)
-+				create_mapping(start, __phys_to_virt(start), kernel_x_start - start,
-+					prot_sect_kernel | PMD_SECT_PXN, pgprot_default | PTE_PXN);
-+			create_mapping(kernel_x_start, __phys_to_virt(kernel_x_start), kernel_x_end - kernel_x_start,
-+				prot_sect_kernel, pgprot_default);
-+			if (kernel_x_end < end)
-+				create_mapping(kernel_x_end, __phys_to_virt(kernel_x_end), end - kernel_x_end,
-+					prot_sect_kernel | PMD_SECT_PXN, pgprot_default | PTE_PXN);
-+
-+
-+		}
-+
- 	}
- 
- 	/* Limit no longer required. */
- 	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
- }
- 
-+void __init fixup_executable(void)
-+{
-+	/* now that we are actually fully mapped, make the start/end more fine grained */
-+	if (!IS_ALIGNED((unsigned long)_stext, SECTION_SIZE)) {
-+		unsigned long aligned_start = round_down(__pa(_stext), SECTION_SIZE);
-+
-+		create_mapping(aligned_start, __phys_to_virt(aligned_start),
-+				__pa(_stext) - aligned_start,
-+				prot_sect_kernel | PMD_SECT_PXN,
-+				pgprot_default | PTE_PXN);
-+	}
-+
-+	if (!IS_ALIGNED((unsigned long)__init_end, SECTION_SIZE)) {
-+		unsigned long aligned_end = round_up(__pa(__init_end), SECTION_SIZE);
-+		create_mapping(__pa(__init_end), (unsigned long)__init_end,
-+				aligned_end - __pa(__init_end),
-+				prot_sect_kernel | PMD_SECT_PXN, pgprot_default | PTE_PXN);
-+	}
-+}
-+
-+#ifdef CONFIG_DEBUG_RODATA
-+void mark_rodata_ro(void)
-+{
-+	create_mapping_late(__pa(_stext), (unsigned long)_stext, (unsigned long)_etext - (unsigned long)_stext,
-+				prot_sect_kernel | PMD_SECT_RDONLY,
-+				pgprot_default | PTE_RDONLY);
-+
-+}
-+#endif
-+
-+static int __flush_mappings(void *unused)
-+{
-+	flush_tlb_kernel_range((unsigned long)__init_begin, (unsigned long)__init_end);
-+	return 0;
-+}
-+
-+void __ref fixup_init(void)
-+{
-+	phys_addr_t start = __pa(__init_begin);
-+	phys_addr_t end = __pa(__init_end);
-+
-+	create_mapping_late(start, (unsigned long)__init_begin,
-+			end - start,
-+			prot_sect_kernel | PMD_SECT_PXN, pgprot_default | PTE_PXN);
-+	if (!IS_ALIGNED(start, SECTION_SIZE) || !IS_ALIGNED(end, SECTION_SIZE))
-+		stop_machine(__flush_mappings, NULL, NULL);
-+}
-+
- /*
-  * paging_init() sets up the page tables, initialises the zone memory
-  * maps and sets up the zero page.
-@@ -317,6 +457,7 @@ void __init paging_init(void)
- 	void *zero_page;
- 
- 	map_mem();
-+	fixup_executable();
- 
- 	/*
- 	 * Finally flush the caches and tlb to ensure that we're in a
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+thanks,
+  -Joel
