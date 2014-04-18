@@ -1,41 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Apr 2014 13:46:52 +0100
-Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
- components tracking
-In-Reply-To: <5351145D.8070207@samsung.com>
-References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
- <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
- <20140417220412.GZ24070@n2100.arm.linux.org.uk>
- <5351145D.8070207@samsung.com>
-Message-ID: <20140418124652.GE24070@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Apr 2014 14:49:36 +0200
+Subject: [PATCH v2 02/11] clk: at91: update main clk documentation
+In-Reply-To: <1395649643-9146-3-git-send-email-b.brezillon.dev@gmail.com>
+References: <1395649643-9146-1-git-send-email-b.brezillon.dev@gmail.com>
+ <1395649643-9146-3-git-send-email-b.brezillon.dev@gmail.com>
+Message-ID: <53511F60.3040301@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 02:02:37PM +0200, Andrzej Hajda wrote:
-> Separation of the interfaces exposed by the device from the device itself
-> seems to me a good thing. I would even consider it as a biggest
-> advantage of this solution :)
+On 24/03/2014 09:27, Boris BREZILLON :
+> Update main clk documentation to match main clk implementation rework.
 > 
-> The problem of re-initialization does not seems to be relevant here, it
-> is classic
-> problem of coding correctness nothing more, it can appear here and in
-> many different
-> places.
+> Signed-off-by: Boris BREZILLON <b.brezillon.dev@gmail.com>
+> ---
+>  .../devicetree/bindings/clock/at91-clock.txt       |   56 ++++++++++++++++----
+>  1 file changed, 47 insertions(+), 9 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> index cd5e239..9a7025b 100644
+> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+> @@ -15,8 +15,13 @@ Required properties:
+>  		All at91 specific clocks (clocks defined below) must be child
+>  		node of the PMC node.
+>  
+> +	"atmel,at91rm9200-clk-main-osc"
+> +	"atmel,at91sam9x5-clk-main-rc-osc"
+> +		at91 main clk sources
+> +
+> +	"atmel,at91sam9x5-clk-main"
+>  	"atmel,at91rm9200-clk-main":
+> -		at91 main oscillator
+> +		at91 main clock
+>  
+>  	"atmel,at91rm9200-clk-master" or
+>  	"atmel,at91sam9x5-clk-master":
+> @@ -85,24 +90,57 @@ For example:
+>  		/* put at91 clocks here */
+>  	};
+>  
+> +Required properties for main clock oscillator:
+> +- interrupt-parent : must reference the PMC node.
+> +- interrupts : shall be set to "<0>".
+> +- clock-frequency : define the internal RC oscillator frequency.
+> +
+> +Optional properties:
+> +- clock-accuracy : define the internal RC oscillator accuracy.
+> +
+> +For example:
+> +	main_rc_osc: main_rc_osc {
+> +		compatible = "atmel,at91sam9x5-clk-main-rc-osc";
+> +		interrupt-parent = <&pmc>;
+> +		interrupts = <0>;
+> +		clock-frequency = <12000000>;
+> +		clock-accuracy = <50000000>;
+> +	};
 
-It may be a problem of coding correctless, but it's also a maintainability
-problem too - it makes it _much_ more difficult to ensure that everything
-is correct.
+Don't you swapped this example above with the description below?
 
-> Anyway it seems we have different point of view on the problem, your say
-> about devices with two stage initialization. I see it more as devices
-> registering interfaces and superdevice using it.
 
-Right, so please make this exynos-specific, because from what I can see it
-has no reason to pretend to be generic.  As I've already pointed out, it
-can't be used in the general case because it ties sub-components directly
-to their main driver, which is absolutely absurd.  Please keep this
-absurdness in exynos and don't spread it around.  Thanks.
+> +Required properties for main clock internal RC oscillator:
+> +- interrupt-parent : must reference the PMC node.
+> +- interrupts : shall be set to "<0>".
+> +- #clock-cells : from common clock binding; shall be set to 0.
+> +- clocks : shall encode the main osc source clk sources (see atmel datasheet).
+> +
+> +Optional properties:
+> +- atmel,osc-bypass : boolean property. Specified if a clock signal is provided
+> +  on XIN.
+> +
+> +  clock signal is directly provided on XIN pin.
+> +
+> +For example:
+> +	main_osc: main_osc {
+> +		compatible = "atmel,at91rm9200-clk-main-osc";
+> +		interrupt-parent = <&pmc>;
+> +		interrupts = <0>;
+> +		#clock-cells = <0>;
+> +		clocks = <&main_xtal>;
+> +	};
+> +
+>  Required properties for main clock:
+>  - interrupt-parent : must reference the PMC node.
+>  - interrupts : shall be set to "<0>".
+>  - #clock-cells : from common clock binding; shall be set to 0.
+> -- clocks (optional if clock-frequency is provided) : shall be the slow clock
+> -	phandle. This clock is used to calculate the main clock rate if
+> -	"clock-frequency" is not provided.
+> -- clock-frequency : the main oscillator frequency.Prefer the use of
+> -	"clock-frequency" over automatic clock rate calculation.
+> +- clocks : shall encode the main clk sources (see atmel datasheet).
+>  
+>  For example:
+>  	main: mainck {
+> -		compatible = "atmel,at91rm9200-clk-main";
+> +		compatible = "atmel,at91sam9x5-clk-main";
+>  		interrupt-parent = <&pmc>;
+>  		interrupts = <0>;
+>  		#clock-cells = <0>;
+> -		clocks = <&ck32k>;
+> -		clock-frequency = <18432000>;
+> +		clocks = <&main_rc_osc &main_osc>;
+>  	};
+>  
+>  Required properties for master clock:
+> 
+
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Nicolas Ferre
