@@ -1,53 +1,21 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 18 Apr 2014 08:40:54 +0200 (CEST)
-Subject: [patch 5/6] edma: Make reading the position of active channels
- work
-In-Reply-To: <5350761C.6010109@ti.com>
-References: <20140417133737.892475126@linutronix.de>
- <20140417143249.889774979@linutronix.de> <5350761C.6010109@ti.com>
-Message-ID: <alpine.DEB.2.02.1404180834520.22697@ionos.tec.linutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 18 Apr 2014 14:44:24 +0800
+Subject: [PATCH v2 0/2] ahci: imx: software workaround for phy reset issue
+Message-ID: <1397803466-28411-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Apr 2014, Joel Fernandes wrote:
-> On 04/17/2014 09:40 AM, Thomas Gleixner wrote:
-> > +	/*
-> > +	 * If the channel is active, we need to double read as we
-> > +	 * might see half updated data. We limit this to 5
-> > +	 * attempts. If that fails we return -EBUSY and let the caller
-> > +	 * deal with it.
-> > +	 */
-> > +	dat = edma_read(ctlr, offs);
-> > +	for (i = 0; i < 5; i++) {
-> > +		u32 tmp = edma_read(ctlr, offs);
-> > +
-> > +		if (tmp == dat) {
-> > +			*pos = dat;
-> > +			return 0;
-> > +		}
-> > +		dat = tmp;
-> > +	}
-> > +	return -EBUSY;
-> >  }
-> > -EXPORT_SYMBOL(edma_get_position);
-> >  
-> >  /**
-> 
-> The access is synchronized though and you shouldn't see unreliable
-> results, unless you _are_ seeing unreliable results in which case it
-> could be a silicon issue.
->
-> The original code also doesn't have the double read so I would just drop
-> that, unless you are seeing reliability issues.
->
-> Here's a thread that discusses it and the end conclusion is that it
-> should be fine (Kyle Kastile is one of the EDMA hardware designers).
-> http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
+Changes since v1:
+ - Do not switch to defines and stay with enums
+ - Create a wrapper function imx_phy_crbit_assert() to make the code
+   a little shorter and easier for eyes
 
-Gah, right I saw the issues with the original code, which does a
-memcpy_fromio which copies byte by byte. Did not think about retrying
-with the edma_read() based one.
+Shawn Guo (2):
+  ahci: imx: add namespace for register enums
+  ahci: imx: software workaround for phy reset issue in resume
 
-Thanks,
+ drivers/ata/ahci_imx.c | 172 +++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 165 insertions(+), 7 deletions(-)
 
-	tglx
+-- 
+1.8.3.2
