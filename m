@@ -1,91 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 18 Apr 2014 15:37:31 +0200
-Subject: [RFC 0/3] DRM driver for the ATMEL High end LCD controller
-In-Reply-To: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
-References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <53512A9B.8000404@free-electrons.com>
+From: tgih.jun@samsung.com (Seungwon Jeon)
+Date: Fri, 18 Apr 2014 22:44:48 +0900
+Subject: [PATCH] ARM: dts: disable MDMA1 node for smdk5420 board
+Message-ID: <001a01cf5b0c$5ddc7d60$19957820$%jun@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi JJ,
+This change is similar to commit 3da355c(ARM: dts: Disable MDMA1 node
+for arndale-octa board). If MDMA1 region is configured with secure mode,
+it makes the boot failure with the following.
 
-On 18/04/2014 11:45, Jean-Jacques Hiblot wrote:
-> Hi,
->
-> this patch serie implements a simple DRM driver for the ATMEL High end LCD
-> controller found in the SAMA5 familly. It's based on the tilcdc driver.
-> It uses the cma_helper for memory and fbdev stuff.
-> Your comments are welcome !
+Unhandled fault: imprecise external abort (0x1406) at 0x00000000
 
-Thanks for you work.
+Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420-smdk5420.dts |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-As I already told you, I started to work on a DRM/KMS driver for the
-hlcdc too, and I'd be pleased to help you on this driver (either by
-adding the missing stuff, debugging or reworking some parts).
-
-Regarding the code itself, I only had a quick look, but I'll try to
-review it next week. Anyway, I might not be the best person to give
-advice on a DRM/KMS driver :-).
-
-BTW, I tried to boot a kernel with your driver (statically compiled),
-and it hangs (see http://pastebin.com/H24KpVHb). But I didn't have time
-for further debugging.
-
-Best Regards,
-
-Boris
->
->
-> Supported features:
-> * the base layer (the main framebuffer)
-> * a simple panel
-> * a backlight driver
-> * structure to 'easily' add other connectors (it comes from the tilcdc)
->
-> On the todo list:
-> * support overlays as drm_planes
-> * support for the hardware cursor
-> * support for the SiI9022 HDMI connector (present on sama5d36ek)
->
->
-> Jean-Jacques Hiblot (3):
->   atmel: drm: added drm driver for the atmel hlcd controller
->   atmel: drm: dt: Added DT entry for the atmel hlcdc found in the sama5
->   atmel: dt: Add supports for the lcdc support on the sama5d36ek
->
->  arch/arm/boot/dts/sama5d36ek.dts                   |  27 +-
->  arch/arm/boot/dts/sama5d3_lcd.dtsi                 |  11 +
->  drivers/gpu/drm/Kconfig                            |   2 +
->  drivers/gpu/drm/Makefile                           |   1 +
->  drivers/gpu/drm/atmel_hlcdc/Kconfig                |  13 +
->  drivers/gpu/drm/atmel_hlcdc/Makefile               |  12 +
->  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h          | 771 +++++++++++++++++++++
->  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c    |  92 +++
->  .../gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h    |  25 +
->  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c     | 702 +++++++++++++++++++
->  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c      | 586 ++++++++++++++++
->  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h      | 124 ++++
->  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h      | 190 +++++
->  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c    | 459 ++++++++++++
->  drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h    |  28 +
->  15 files changed, 3042 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Kconfig
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/Makefile
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc.h
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.c
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_backlight.h
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.c
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_drv.h
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_ovl.h
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.c
->  create mode 100644 drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_panel.h
->
-> --
-> 1.9.1
->
-
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index 6910485..9a48e3f 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -373,4 +373,10 @@
+ 			};
+ 		};
+ 	};
++
++	amba {
++		mdma1: mdma at 11C10000 {
++			status = "disabled";
++		};
++	};
+ };
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.0.4
