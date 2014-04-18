@@ -1,39 +1,35 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 18 Apr 2014 09:44:52 -0700
-Subject: [PATCH v6 3/5] ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
+Date: Fri, 18 Apr 2014 09:44:53 -0700
+Subject: [PATCH v6 4/5] ARM: dts: Enable the PWM for bcm28155 AP board
 In-Reply-To: <1397839494-21049-1-git-send-email-tim.kryger@linaro.org>
 References: <1397839494-21049-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1397839494-21049-4-git-send-email-tim.kryger@linaro.org>
+Message-ID: <1397839494-21049-5-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree node for the PWM on bcm11351 SoCs.
+Mark the PWM as enabled on the bcm28155 AP board.
 
 Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
 Reviewed-by: Alex Elder <elder@linaro.org>
 Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 ---
- arch/arm/boot/dts/bcm11351.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/bcm28155-ap.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 64d069b..6b05ae6 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -193,6 +193,14 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
+index af3da55..9ce91dd 100644
+--- a/arch/arm/boot/dts/bcm28155-ap.dts
++++ b/arch/arm/boot/dts/bcm28155-ap.dts
+@@ -69,6 +69,10 @@
+ 		status = "okay";
  	};
  
 +	pwm: pwm at 3e01a000 {
-+		compatible = "brcm,bcm11351-pwm", "brcm,kona-pwm";
-+		reg = <0x3e01a000 0xcc>;
-+		clocks = <&slave_ccu BCM281XX_SLAVE_CCU_PWM>;
-+		#pwm-cells = <3>;
-+		status = "disabled";
++		status = "okay";
 +	};
 +
- 	clocks {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ 	usbotg: usb at 3f120000 {
+ 		vusb_d-supply = <&usbldo_reg>;
+ 		vusb_a-supply = <&iosr1_reg>;
 -- 
 1.7.9.5
