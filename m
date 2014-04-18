@@ -1,88 +1,67 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Fri, 18 Apr 2014 09:48:51 -0500
-Subject: [RFC 3/3] atmel: dt: Add supports for the lcdc support on the
- sama5d36ek
-In-Reply-To: <1397814309-32160-4-git-send-email-jjhiblot@traphandler.com>
-References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
- <1397814309-32160-4-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <CAOCHtYjkUnWiGHG6v5Op-=3AxEW9sJ9xaSWkmu6Bg-6q23L2=g@mail.gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 18 Apr 2014 16:48:02 +0200
+Subject: [PATCH v2 02/14] clocksource: sh_cmt: Replace global spinlock with a
+ per-device spinlock
+In-Reply-To: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1397832494-20607-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 4:45 AM, Jean-Jacques Hiblot
-<jjhiblot@traphandler.com> wrote:
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
->  arch/arm/boot/dts/sama5d36ek.dts | 27 ++++++++++++++++++++++++++-
->  1 file changed, 26 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/sama5d36ek.dts b/arch/arm/boot/dts/sama5d36ek.dts
-> index 59576c6..df01037 100644
-> --- a/arch/arm/boot/dts/sama5d36ek.dts
-> +++ b/arch/arm/boot/dts/sama5d36ek.dts
-> @@ -11,12 +11,17 @@
->  #include "sama5d3xmb.dtsi"
->  #include "sama5d3xdm.dtsi"
->
-> +
+The global spinlock is used to protect the shared start/stop register.
+Now that all CMT channels are handled by a single device instance, use a
+per-device spinlock.
 
-extra space
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/clocksource/sh_cmt.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
->  / {
->         model = "Atmel SAMA5D36-EK";
->         compatible = "atmel,sama5d36ek", "atmel,sama5d3xmb", "atmel,sama5d3xcm", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
->
->         ahb {
->                 apb {
-> +                       hlcdc: hlcdc at f0030000 {
-> +                               status = "okay";
-> +                       };
-> +
->                         spi0: spi at f0004000 {
->                                 status = "okay";
->                         };
-> @@ -46,7 +51,27 @@
->                         };
->                 };
->         };
-> -
-> +       panel {
-> +               compatible = "atmel,hlcdc,panel";
-> +               invert-hsync;
-> +               invert-vsync;
-> +               status = "okay";
-> +               display-timings {
-> +                       800x480p60 {
-> +                               clock-frequency = <33260000>;
-> +                               hactive = <800>;
-> +                               vactive = <480>;
-> +                               hfront-porch = <168>;
-> +                               hback-porch = <88>;
-> +                               hsync-len = <64>;
-> +                               vback-porch = <8>;
-> +                               vfront-porch = <37>;
-> +                               vsync-len = <2>;
-> +                               hsync-active = <1>;
-> +                               vsync-active = <1>;
-> +                       };
-> +               };
-> +       };
->         sound {
->                 status = "okay";
->         };
-> --
-> 1.9.1
-
-Feel free to merge in this patch:
-
-https://github.com/RobertCNelson/armv7_devel/blob/v3.15.x-sama5-armv7/patches/drm/0005-atmel-dt-Add-supports-for-the-lcdc-support-on-the-sa.patch
-
-With this commit..
-
-All tested with sama5d31/33/34/36ek board's..
-
-Regards,
-
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index ff1a059..4d00e4b 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -118,6 +118,8 @@ struct sh_cmt_device {
+ 	void __iomem *mapbase;
+ 	struct clk *clk;
+ 
++	raw_spinlock_t lock; /* Protect the shared start/stop register */
++
+ 	struct sh_cmt_channel *channels;
+ 	unsigned int num_channels;
+ 
+@@ -299,14 +301,12 @@ static unsigned long sh_cmt_get_counter(struct sh_cmt_channel *ch,
+ 	return v2;
+ }
+ 
+-static DEFINE_RAW_SPINLOCK(sh_cmt_lock);
+-
+ static void sh_cmt_start_stop_ch(struct sh_cmt_channel *ch, int start)
+ {
+ 	unsigned long flags, value;
+ 
+ 	/* start stop register shared by multiple timer channels */
+-	raw_spin_lock_irqsave(&sh_cmt_lock, flags);
++	raw_spin_lock_irqsave(&ch->cmt->lock, flags);
+ 	value = sh_cmt_read_cmstr(ch);
+ 
+ 	if (start)
+@@ -315,7 +315,7 @@ static void sh_cmt_start_stop_ch(struct sh_cmt_channel *ch, int start)
+ 		value &= ~(1 << ch->timer_bit);
+ 
+ 	sh_cmt_write_cmstr(ch, value);
+-	raw_spin_unlock_irqrestore(&sh_cmt_lock, flags);
++	raw_spin_unlock_irqrestore(&ch->cmt->lock, flags);
+ }
+ 
+ static int sh_cmt_enable(struct sh_cmt_channel *ch, unsigned long *rate)
+@@ -934,6 +934,7 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ 
+ 	memset(cmt, 0, sizeof(*cmt));
+ 	cmt->pdev = pdev;
++	raw_spin_lock_init(&cmt->lock);
+ 
+ 	if (!cfg) {
+ 		dev_err(&cmt->pdev->dev, "missing platform data\n");
 -- 
-Robert Nelson
-http://www.rcn-ee.com/
+1.8.3.2
