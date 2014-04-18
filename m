@@ -1,35 +1,62 @@
 From: tim.kryger@linaro.org (Tim Kryger)
-Date: Fri, 18 Apr 2014 09:44:53 -0700
-Subject: [PATCH v6 4/5] ARM: dts: Enable the PWM for bcm28155 AP board
-In-Reply-To: <1397839494-21049-1-git-send-email-tim.kryger@linaro.org>
-References: <1397839494-21049-1-git-send-email-tim.kryger@linaro.org>
-Message-ID: <1397839494-21049-5-git-send-email-tim.kryger@linaro.org>
+Date: Fri, 18 Apr 2014 09:44:49 -0700
+Subject: [PATCH v6 0/5] Add Broadcom Kona PWM Support
+Message-ID: <1397839494-21049-1-git-send-email-tim.kryger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark the PWM as enabled on the bcm28155 AP board.
+This series introduces the driver for the Kona PWM controller found in
+Broadcom mobile SoCs like bcm281xx and updates the device tree and the
+defconfig to enable use of this hardware on the bcm28155 AP board.
 
-Signed-off-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
----
- arch/arm/boot/dts/bcm28155-ap.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+Changes since v5:
+  - Rebased on v3.15-rc1
 
-diff --git a/arch/arm/boot/dts/bcm28155-ap.dts b/arch/arm/boot/dts/bcm28155-ap.dts
-index af3da55..9ce91dd 100644
---- a/arch/arm/boot/dts/bcm28155-ap.dts
-+++ b/arch/arm/boot/dts/bcm28155-ap.dts
-@@ -69,6 +69,10 @@
- 		status = "okay";
- 	};
- 
-+	pwm: pwm at 3e01a000 {
-+		status = "okay";
-+	};
-+
- 	usbotg: usb at 3f120000 {
- 		vusb_d-supply = <&usbldo_reg>;
- 		vusb_a-supply = <&iosr1_reg>;
+Changes since v4:
+  - Added in real polarity support
+  - Labeled trigger bits as such rather than use the name from hw docs
+  - Listed unsual hardware characteristics at the top of the file
+  - Removed default from Kconfig and update defconfig accordingly
+  - Always use unsigned int for temporary register values
+
+Changes since v3:
+  - Removed polarity support for now
+  - Cleaned up whitespace issues, shortened some variable names
+  - Use container_of instead of dev_get_drvdata to get private data
+  - Removed workaround for PWM framework bug
+  - Reworded some binding documentation
+
+Changes since v2:
+  - SoC DTS file updated to use real clock's phandle + specifier
+  - Toggle smooth mode off during apply so new settings take immediately
+
+Changes since v1:
+  - Fixed up macros to be clearer and more complete
+  - Corrected spelling and punctuation mistakes
+  - Added support for polarity
+  - Made peripheral clock use more efficient
+  - Made prescale and duty computation clearer
+  - Moved Makefile addition to keep alphabetical
+  - Split complex lines into multiple steps
+
+
+Tim Kryger (5):
+  Documentation: dt: Add Kona PWM binding
+  pwm: kona: Introduce Kona PWM controller support
+  ARM: dts: Declare the PWM for bcm11351 (bcm281xx)
+  ARM: dts: Enable the PWM for bcm28155 AP board
+  ARM: bcm_defconfig: Enable PWM and Backlight
+
+ .../devicetree/bindings/pwm/bcm-kona-pwm.txt       |   21 ++
+ arch/arm/boot/dts/bcm11351.dtsi                    |    8 +
+ arch/arm/boot/dts/bcm28155-ap.dts                  |    4 +
+ arch/arm/configs/bcm_defconfig                     |    3 +
+ drivers/pwm/Kconfig                                |    9 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-bcm-kona.c                         |  319 ++++++++++++++++++++
+ 7 files changed, 365 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+ create mode 100644 drivers/pwm/pwm-bcm-kona.c
+
 -- 
 1.7.9.5
