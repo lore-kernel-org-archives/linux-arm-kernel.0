@@ -1,166 +1,57 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 18 Apr 2014 22:11:41 +0200
-Subject: [PATCH v3] regmap: i2c: fallback to SMBus if the adapter does not
- support standard I2C
-In-Reply-To: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1397851901-16390-1-git-send-email-boris.brezillon@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 18 Apr 2014 22:35:02 +0200
+Subject: [PATCH 0/8] ARM: at91: sama5d3: enable sound support
+In-Reply-To: <1395049541-28128-1-git-send-email-voice.shen@atmel.com>
+References: <1395049541-28128-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <53518C76.2020005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some I2C adapters are only compatible with the SMBus protocol and do not
-support standard I2C transfers.
+On 17/03/2014 10:45, Bo Shen :
+> This patch add sound support on sama5d3xek board.
+> 
+> This patch series based on the following patch set:
+>   clk: at91: better support for the PCKs
+>   http://comments.gmane.org/gmane.linux.kernel/1664477
+> 
+> 
+> Bo Shen (5):
+>   ARM: at91: sama5d3: add DMA property for SSC devices
+>   ARM: at91: sama5d3: disable sound by default
+>   ARM: at91: sama5d3: correct the sound compatible string
+>   ARM: at91: sama5d3: add the missing property
+>   ARM: at91: sama5d3: clock for ssc from rk pin
+> 
+> Boris BREZILLON (3):
+>   ASoC: atmel: support CCF based clks
+>   ASoC: atmel: document clock properties of the wm8904 driver
+>   ARM: at91/dt: add clock properties to the wm8904 codec node
 
-Fallback to SMBus transfers if we encounter such kind of adapters.
-The transfer type is chosen according to the val_bits field in the regmap
-config.
+Hi Voice and Boris,
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
-Changes since v2:
-- fix regmap_get_i2c_bus scope (declare as static)
-- fix reg width check in reg_read/write functions
-- add reg_bits check in regmap_get_i2c_bus function
-- 
+For this series I am a little bit puzzled: should I take the ASoC part
+of it? I see no acknowledgement from Mark and I also read some messages
+still discussing about CCF and wm8904 afterwards.
 
- drivers/base/regmap/regmap-i2c.c | 104 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 102 insertions(+), 2 deletions(-)
+So, I take the 5 patches by Voice Shen and tell me what is the proper
+sequence with this wm8904 work.
 
-diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
-index ebd1895..0a43211 100644
---- a/drivers/base/regmap/regmap-i2c.c
-+++ b/drivers/base/regmap/regmap-i2c.c
-@@ -14,6 +14,79 @@
- #include <linux/i2c.h>
- #include <linux/module.h>
- 
-+
-+static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
-+				      unsigned int *val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+	int ret;
-+
-+	if (reg > 0xff)
-+		return -EINVAL;
-+
-+	ret = i2c_smbus_read_byte_data(i2c, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	*val = ret;
-+
-+	return 0;
-+}
-+
-+static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
-+				       unsigned int val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+
-+	if (val > 0xff || reg > 0xff)
-+		return -EINVAL;
-+
-+	return i2c_smbus_write_byte_data(i2c, reg, val);
-+}
-+
-+static struct regmap_bus regmap_smbus_byte = {
-+	.reg_write = regmap_smbus_byte_reg_write,
-+	.reg_read = regmap_smbus_byte_reg_read,
-+};
-+
-+static int regmap_smbus_word_reg_read(void *context, unsigned int reg,
-+				      unsigned int *val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+	int ret;
-+
-+	if (reg > 0xff)
-+		return -EINVAL;
-+
-+	ret = i2c_smbus_read_word_data(i2c, reg);
-+	if (ret < 0)
-+		return ret;
-+
-+	*val = ret;
-+
-+	return 0;
-+}
-+
-+static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
-+				       unsigned int val)
-+{
-+	struct device *dev = context;
-+	struct i2c_client *i2c = to_i2c_client(dev);
-+
-+	if (val > 0xffff || reg > 0xff)
-+		return -EINVAL;
-+
-+	return i2c_smbus_write_word_data(i2c, reg, val);
-+}
-+
-+static struct regmap_bus regmap_smbus_word = {
-+	.reg_write = regmap_smbus_word_reg_write,
-+	.reg_read = regmap_smbus_word_reg_read,
-+};
-+
- static int regmap_i2c_write(void *context, const void *data, size_t count)
- {
- 	struct device *dev = context;
-@@ -97,6 +170,23 @@ static struct regmap_bus regmap_i2c = {
- 	.read = regmap_i2c_read,
- };
- 
-+static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
-+					const struct regmap_config *config)
-+{
-+	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
-+		return &regmap_i2c;
-+	else if (config->val_bits == 16 && config->reg_bits == 8 &&
-+		 i2c_check_functionality(i2c->adapter,
-+					 I2C_FUNC_SMBUS_WORD_DATA))
-+		return &regmap_smbus_word;
-+	else if (config->val_bits == 8 && config->reg_bits == 8 &&
-+		 i2c_check_functionality(i2c->adapter,
-+					 I2C_FUNC_SMBUS_BYTE_DATA))
-+		return &regmap_smbus_byte;
-+
-+	return ERR_PTR(-ENOTSUPP);
-+}
-+
- /**
-  * regmap_init_i2c(): Initialise register map
-  *
-@@ -109,7 +199,12 @@ static struct regmap_bus regmap_i2c = {
- struct regmap *regmap_init_i2c(struct i2c_client *i2c,
- 			       const struct regmap_config *config)
- {
--	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-+	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
-+
-+	if (IS_ERR(bus))
-+		return ERR_PTR(PTR_ERR(bus));
-+
-+	return regmap_init(&i2c->dev, bus, &i2c->dev, config);
- }
- EXPORT_SYMBOL_GPL(regmap_init_i2c);
- 
-@@ -126,7 +221,12 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
- struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
- 				    const struct regmap_config *config)
- {
--	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-+	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
-+
-+	if (IS_ERR(bus))
-+		return ERR_PTR(PTR_ERR(bus));
-+
-+	return devm_regmap_init(&i2c->dev, bus, &i2c->dev, config);
- }
- EXPORT_SYMBOL_GPL(devm_regmap_init_i2c);
- 
+I will be happy to stack more patches about this topic during the 3.16
+development phase.
+
+
+Otherwise, the 5 patches by Voice go into at91-3.16-dt branch.
+
+Thanks, bye.
+
+
+>  .../devicetree/bindings/sound/atmel-wm8904.txt     |  2 ++
+>  arch/arm/boot/dts/sama5d3.dtsi                     |  6 ++++++
+>  arch/arm/boot/dts/sama5d3xmb.dtsi                  | 11 +++++++++-
+>  sound/soc/atmel/atmel_wm8904.c                     | 25 +++++++++++-----------
+>  4 files changed, 31 insertions(+), 13 deletions(-)
+> 
+
+
 -- 
-1.8.3.2
+Nicolas Ferre
