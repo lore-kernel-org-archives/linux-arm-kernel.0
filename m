@@ -1,67 +1,182 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 Apr 2014 16:48:14 +0200
-Subject: [PATCH v2 14/14] ARM: shmobile: koelsch-reference: Enable CMT0 in
- device tree
+Date: Fri, 18 Apr 2014 16:48:03 +0200
+Subject: [PATCH v2 03/14] clocksource: sh_tmu: Drop support for legacy
+ platform data
 In-Reply-To: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1397832494-20607-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1397832494-20607-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1397832494-20607-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the CMT0 device and configure channel 0 as a clock event
-provider.
+Now that all platforms have switched to the new-style platform data,
+drop support for the legacy version.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts            | 4 ++++
- arch/arm/mach-shmobile/board-koelsch-reference.c | 1 -
- arch/arm/mach-shmobile/setup-r8a7791.c           | 2 +-
- 3 files changed, 5 insertions(+), 2 deletions(-)
+ drivers/clocksource/sh_tmu.c | 82 ++++++++------------------------------------
+ 1 file changed, 15 insertions(+), 67 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 0d69813..45334c3 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -290,6 +290,10 @@
- 	};
+diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+index 4ba2c0f..47f5b48 100644
+--- a/drivers/clocksource/sh_tmu.c
++++ b/drivers/clocksource/sh_tmu.c
+@@ -32,7 +32,6 @@
+ #include <linux/spinlock.h>
+ 
+ enum sh_tmu_model {
+-	SH_TMU_LEGACY,
+ 	SH_TMU,
+ 	SH_TMU_SH3,
  };
+@@ -91,8 +90,6 @@ static inline unsigned long sh_tmu_read(struct sh_tmu_channel *ch, int reg_nr)
  
-+&cmt0 {
-+	status = "ok";
-+};
-+
- &ether {
- 	pinctrl-0 = <&ether_pins &phy1_pins>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index bd90932..6b3b354 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -86,7 +86,6 @@ static void __init koelsch_add_du_device(void)
-  * devices until they get moved to DT.
-  */
- static const struct clk_name clk_names[] __initconst = {
--	{ "cmt0", "fck", "sh-cmt-48-gen2.0" },
- 	{ "scifa0", NULL, "sh-sci.0" },
- 	{ "scifa1", NULL, "sh-sci.1" },
- 	{ "scifb0", NULL, "sh-sci.2" },
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index 9839dac..e66f777 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -197,12 +197,12 @@ void __init r8a7791_add_dt_devices(void)
- 	r8a7791_register_scif(12);
- 	r8a7791_register_scif(13);
- 	r8a7791_register_scif(14);
--	r8a7791_register_cmt(0);
+ 	if (reg_nr == TSTR) {
+ 		switch (ch->tmu->model) {
+-		case SH_TMU_LEGACY:
+-			return ioread8(ch->tmu->mapbase);
+ 		case SH_TMU_SH3:
+ 			return ioread8(ch->tmu->mapbase + 2);
+ 		case SH_TMU:
+@@ -115,8 +112,6 @@ static inline void sh_tmu_write(struct sh_tmu_channel *ch, int reg_nr,
+ 
+ 	if (reg_nr == TSTR) {
+ 		switch (ch->tmu->model) {
+-		case SH_TMU_LEGACY:
+-			return iowrite8(value, ch->tmu->mapbase);
+ 		case SH_TMU_SH3:
+ 			return iowrite8(value, ch->tmu->mapbase + 2);
+ 		case SH_TMU:
+@@ -476,27 +471,12 @@ static int sh_tmu_channel_setup(struct sh_tmu_channel *ch, unsigned int index,
+ 		return 0;
+ 
+ 	ch->tmu = tmu;
++	ch->index = index;
+ 
+-	if (tmu->model == SH_TMU_LEGACY) {
+-		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
+-
+-		/*
+-		 * The SH3 variant (SH770x, SH7705, SH7710 and SH7720) maps
+-		 * channel registers blocks at base + 2 + 12 * index, while all
+-		 * other variants map them at base + 4 + 12 * index. We can
+-		 * compute the index by just dividing by 12, the 2 bytes or 4
+-		 * bytes offset being hidden by the integer division.
+-		 */
+-		ch->index = cfg->channel_offset / 12;
+-		ch->base = tmu->mapbase + cfg->channel_offset;
+-	} else {
+-		ch->index = index;
+-
+-		if (tmu->model == SH_TMU_SH3)
+-			ch->base = tmu->mapbase + 4 + ch->index * 12;
+-		else
+-			ch->base = tmu->mapbase + 8 + ch->index * 12;
+-	}
++	if (tmu->model == SH_TMU_SH3)
++		ch->base = tmu->mapbase + 4 + ch->index * 12;
++	else
++		ch->base = tmu->mapbase + 8 + ch->index * 12;
+ 
+ 	ch->irq = platform_get_irq(tmu->pdev, ch->index);
+ 	if (ch->irq < 0) {
+@@ -526,28 +506,9 @@ static int sh_tmu_map_memory(struct sh_tmu_device *tmu)
+ 	if (tmu->mapbase == NULL)
+ 		return -ENXIO;
+ 
+-	/*
+-	 * In legacy platform device configuration (with one device per channel)
+-	 * the resource points to the channel base address.
+-	 */
+-	if (tmu->model == SH_TMU_LEGACY) {
+-		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
+-		tmu->mapbase -= cfg->channel_offset;
+-	}
+-
+ 	return 0;
  }
  
- void __init r8a7791_add_standard_devices(void)
+-static void sh_tmu_unmap_memory(struct sh_tmu_device *tmu)
+-{
+-	if (tmu->model == SH_TMU_LEGACY) {
+-		struct sh_timer_config *cfg = tmu->pdev->dev.platform_data;
+-		tmu->mapbase += cfg->channel_offset;
+-	}
+-
+-	iounmap(tmu->mapbase);
+-}
+-
+ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
  {
- 	r8a7791_add_dt_devices();
-+	r8a7791_register_cmt(0);
- 	r8a7791_register_irqc(0);
- 	r8a7791_register_thermal();
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+@@ -564,8 +525,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 	tmu->model = id->driver_data;
+ 
+ 	/* Get hold of clock. */
+-	tmu->clk = clk_get(&tmu->pdev->dev,
+-			   tmu->model == SH_TMU_LEGACY ? "tmu_fck" : "fck");
++	tmu->clk = clk_get(&tmu->pdev->dev, "fck");
+ 	if (IS_ERR(tmu->clk)) {
+ 		dev_err(&tmu->pdev->dev, "cannot get clock\n");
+ 		return PTR_ERR(tmu->clk);
+@@ -583,10 +543,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 	}
+ 
+ 	/* Allocate and setup the channels. */
+-	if (tmu->model == SH_TMU_LEGACY)
+-		tmu->num_channels = 1;
+-	else
+-		tmu->num_channels = hweight8(cfg->channels_mask);
++	tmu->num_channels = hweight8(cfg->channels_mask);
+ 
+ 	tmu->channels = kzalloc(sizeof(*tmu->channels) * tmu->num_channels,
+ 				GFP_KERNEL);
+@@ -595,23 +552,15 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 		goto err_unmap;
+ 	}
+ 
+-	if (tmu->model == SH_TMU_LEGACY) {
+-		ret = sh_tmu_channel_setup(&tmu->channels[0], 0,
+-					   cfg->clockevent_rating != 0,
+-					   cfg->clocksource_rating != 0, tmu);
++	/*
++	 * Use the first channel as a clock event device and the second channel
++	 * as a clock source.
++	 */
++	for (i = 0; i < tmu->num_channels; ++i) {
++		ret = sh_tmu_channel_setup(&tmu->channels[i], i,
++					   i == 0, i == 1, tmu);
+ 		if (ret < 0)
+ 			goto err_unmap;
+-	} else {
+-		/*
+-		 * Use the first channel as a clock event device and the second
+-		 * channel as a clock source.
+-		 */
+-		for (i = 0; i < tmu->num_channels; ++i) {
+-			ret = sh_tmu_channel_setup(&tmu->channels[i], i,
+-						   i == 0, i == 1, tmu);
+-			if (ret < 0)
+-				goto err_unmap;
+-		}
+ 	}
+ 
+ 	platform_set_drvdata(pdev, tmu);
+@@ -620,7 +569,7 @@ static int sh_tmu_setup(struct sh_tmu_device *tmu, struct platform_device *pdev)
+ 
+ err_unmap:
+ 	kfree(tmu->channels);
+-	sh_tmu_unmap_memory(tmu);
++	iounmap(tmu->mapbase);
+ err_clk_unprepare:
+ 	clk_unprepare(tmu->clk);
+ err_clk_put:
+@@ -673,7 +622,6 @@ static int sh_tmu_remove(struct platform_device *pdev)
  }
+ 
+ static const struct platform_device_id sh_tmu_id_table[] = {
+-	{ "sh_tmu", SH_TMU_LEGACY },
+ 	{ "sh-tmu", SH_TMU },
+ 	{ "sh-tmu-sh3", SH_TMU_SH3 },
+ 	{ }
 -- 
 1.8.3.2
