@@ -1,165 +1,96 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 18 Apr 2014 16:29:42 -0700
-Subject: [PATCH 1/2] clk: Fix double free due to devm_clk_register()
-In-Reply-To: <1397863783-10728-1-git-send-email-sboyd@codeaurora.org>
-References: <1397863783-10728-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1397863783-10728-2-git-send-email-sboyd@codeaurora.org>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Fri, 18 Apr 2014 18:42:44 -0500
+Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
+In-Reply-To: <20140418225111.GP21823@atomide.com>
+References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
+ <CAOCHtYg5_Lvi3SWuWaRTDDNhLJ32jiXsKYQmrsKaShVWpM+xWQ@mail.gmail.com>
+ <534D51C1.3010007@ti.com>
+ <CAOCHtYhygGFbUunY9abEkjKfpQ1hh-DfRfhm160NehSYhWJSRw@mail.gmail.com>
+ <20140418225111.GP21823@atomide.com>
+Message-ID: <CAOCHtYjdC-OGkdaBt74xMqi5eDc1eVbU6O7VyWMEYN-U50-Abw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that clk_unregister() frees the struct clk we're
-unregistering we'll free memory twice: first we'll call kfree()
-in __clk_release() with an address kmalloc doesn't know about and
-second we'll call kfree() in the devres layer. Remove the
-allocation of struct clk in devm_clk_register() and let
-clk_release() handle it. This fixes slab errors like:
+On Fri, Apr 18, 2014 at 5:51 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Robert Nelson <robertcnelson@gmail.com> [140415 08:46]:
+>> On Tue, Apr 15, 2014 at 10:35 AM, Nishanth Menon <nm@ti.com> wrote:
+>> > On 04/15/2014 10:12 AM, Robert Nelson wrote:
+>> >> On Tue, Apr 15, 2014 at 10:09 AM, Robert Nelson <robertcnelson@gmail.com> wrote:
+>> >>> BeagleBoard xM A/B has an inverted usb hub enable line vs the xM C
+>> >>>
+>> >>> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+>> >>> ---
+>> >>>  arch/arm/boot/dts/Makefile               |  1 +
+>> >>>  arch/arm/boot/dts/omap3-beagle-xm-ab.dts | 15 +++++++++++++++
+>> >>>  2 files changed, 16 insertions(+)
+>> >>>  create mode 100644 arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+>> >>>
+>> >>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> >>> index 35c146f..0bdeba3 100644
+>> >>> --- a/arch/arm/boot/dts/Makefile
+>> >>> +++ b/arch/arm/boot/dts/Makefile
+>> >>> @@ -246,6 +246,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>> >>>         omap3-sbc-t3730.dtb \
+>> >>>         omap3-devkit8000.dtb \
+>> >>>         omap3-beagle-xm.dtb \
+>> >>> +       omap3-beagle-xm-ab.dtb \
+>> >>>         omap3-evm.dtb \
+>> >>>         omap3-evm-37xx.dtb \
+>> >>>         omap3-ldp.dtb \
+>> >>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm-ab.dts b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+>> >>> new file mode 100644
+>> >>> index 0000000..9d81123
+>> >>> --- /dev/null
+>> >>> +++ b/arch/arm/boot/dts/omap3-beagle-xm-ab.dts
+>> >>> @@ -0,0 +1,15 @@
+>> >>> +/*
+>> >>> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+>> >>> + *
+>> >>> + * This program is free software; you can redistribute it and/or modify
+>> >>> + * it under the terms of the GNU General Public License version 2 as
+>> >>> + * published by the Free Software Foundation.
+>> >>> + */
+>> >>> +
+>> >>> +#include "omap3-beagle-xm.dts"
+>> >>> +
+>> >>> +/ {
+>> >>> +       /* HS USB Port 2 Power enable was inverted with the xM C */
+>> >>> +       hsusb2_power: hsusb2_power_reg {
+>> >>> +               enable-active-high;
+>> >>        };
+>> >>> +};
+>> >>
+>> >> Crap, copy paste bug, there.  I can send a v2, if you guys are happy
+>> >> with the "omap3-beagle-xm-ab.dtb" naming..
+>> >>
+>> >> Regards,
+>> >>
+>> > Will u-boot adequately handle this as part of find_fdt?
+>>
+>> It will after i submit something like: (this uses a new feature in v2014.04)
+>>
+>> https://github.com/eewiki/u-boot-patches/blob/master/v2014.04/0001-am335x_evm-uEnv.txt-bootz-n-fixes.patch#L76
+>>
+>> Essentially, test for presence of omap3-beagle-xm-ab.dtb, if not found
+>> drop to old omap3-beagle-xm.dtb
+>>
+>> Background: i also tried getting this having this fixed in u-boot:
+>
+> Do we still need to apply this patch then?
 
-=============================================================================
-BUG kmalloc-128 (Not tainted): Invalid object pointer 0xed08e8d0
------------------------------------------------------------------------------
+Yeah, Tom want's it done in the kernel:
 
-Disabling lock debugging due to kernel taint
-INFO: Slab 0xeec503f8 objects=25 used=15 fp=0xed08ea00 flags=0x4081
-CPU: 2 PID: 73 Comm: rmmod Tainted: G    B         3.14.0-11032-g526e9c764381 #34
-[<c0014be0>] (unwind_backtrace) from [<c0012240>] (show_stack+0x10/0x14)
-[<c0012240>] (show_stack) from [<c04b74dc>] (dump_stack+0x70/0xbc)
-[<c04b74dc>] (dump_stack) from [<c00f6778>] (slab_err+0x74/0x84)
-[<c00f6778>] (slab_err) from [<c04b6278>] (free_debug_processing+0x2cc/0x31c)
-[<c04b6278>] (free_debug_processing) from [<c04b6300>] (__slab_free+0x38/0x41c)
-[<c04b6300>] (__slab_free) from [<c03931bc>] (clk_unregister+0xd4/0x140)
-[<c03931bc>] (clk_unregister) from [<c02fb774>] (release_nodes+0x164/0x1d8)
-[<c02fb774>] (release_nodes) from [<c02f8698>] (__device_release_driver+0x60/0xb0)
-[<c02f8698>] (__device_release_driver) from [<c02f9080>] (driver_detach+0xb4/0xb8)
-[<c02f9080>] (driver_detach) from [<c02f8480>] (bus_remove_driver+0x5c/0xc4)
-[<c02f8480>] (bus_remove_driver) from [<c008c9b8>] (SyS_delete_module+0x148/0x1d8)
-[<c008c9b8>] (SyS_delete_module) from [<c000ef80>] (ret_fast_syscall+0x0/0x48)
-FIX kmalloc-128: Object at 0xed08e8d0 not freed
+Here's my proposed u-boot patch:
+http://lists.denx.de/pipermail/u-boot/2014-January/172154.html
 
-Fixes: fcb0ee6a3d33 (clk: Implement clk_unregister)
-Cc: Jiada Wang <jiada_wang@mentor.com>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c | 71 +++++++++++++++++++++++--------------------------------
- 1 file changed, 30 insertions(+), 41 deletions(-)
+and Tom's recommendation:
+http://lists.denx.de/pipermail/u-boot/2014-January/172274.html
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index dff0373f53c1..f71093bf83ab 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1984,9 +1984,28 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
- }
- EXPORT_SYMBOL_GPL(__clk_register);
- 
--static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
-+/**
-+ * clk_register - allocate a new clock, register it and return an opaque cookie
-+ * @dev: device that is registering this clock
-+ * @hw: link to hardware-specific clock data
-+ *
-+ * clk_register is the primary interface for populating the clock tree with new
-+ * clock nodes.  It returns a pointer to the newly allocated struct clk which
-+ * cannot be dereferenced by driver code but may be used in conjuction with the
-+ * rest of the clock API.  In the event of an error clk_register will return an
-+ * error code; drivers must test for an error code after calling clk_register.
-+ */
-+struct clk *clk_register(struct device *dev, struct clk_hw *hw)
- {
- 	int i, ret;
-+	struct clk *clk;
-+
-+	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-+	if (!clk) {
-+		pr_err("%s: could not allocate clk\n", __func__);
-+		ret = -ENOMEM;
-+		goto fail_out;
-+	}
- 
- 	clk->name = kstrdup(hw->init->name, GFP_KERNEL);
- 	if (!clk->name) {
-@@ -2026,7 +2045,7 @@ static int _clk_register(struct device *dev, struct clk_hw *hw, struct clk *clk)
- 
- 	ret = __clk_init(dev, clk);
- 	if (!ret)
--		return 0;
-+		return clk;
- 
- fail_parent_names_copy:
- 	while (--i >= 0)
-@@ -2035,36 +2054,6 @@ fail_parent_names_copy:
- fail_parent_names:
- 	kfree(clk->name);
- fail_name:
--	return ret;
--}
--
--/**
-- * clk_register - allocate a new clock, register it and return an opaque cookie
-- * @dev: device that is registering this clock
-- * @hw: link to hardware-specific clock data
-- *
-- * clk_register is the primary interface for populating the clock tree with new
-- * clock nodes.  It returns a pointer to the newly allocated struct clk which
-- * cannot be dereferenced by driver code but may be used in conjuction with the
-- * rest of the clock API.  In the event of an error clk_register will return an
-- * error code; drivers must test for an error code after calling clk_register.
-- */
--struct clk *clk_register(struct device *dev, struct clk_hw *hw)
--{
--	int ret;
--	struct clk *clk;
--
--	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
--	if (!clk) {
--		pr_err("%s: could not allocate clk\n", __func__);
--		ret = -ENOMEM;
--		goto fail_out;
--	}
--
--	ret = _clk_register(dev, hw, clk);
--	if (!ret)
--		return clk;
--
- 	kfree(clk);
- fail_out:
- 	return ERR_PTR(ret);
-@@ -2173,7 +2162,7 @@ EXPORT_SYMBOL_GPL(clk_unregister);
- 
- static void devm_clk_release(struct device *dev, void *res)
- {
--	clk_unregister(res);
-+	clk_unregister(*(struct clk **)res);
- }
- 
- /**
-@@ -2188,18 +2177,18 @@ static void devm_clk_release(struct device *dev, void *res)
- struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw)
- {
- 	struct clk *clk;
--	int ret;
-+	struct clk **clkp;
- 
--	clk = devres_alloc(devm_clk_release, sizeof(*clk), GFP_KERNEL);
--	if (!clk)
-+	clkp = devres_alloc(devm_clk_release, sizeof(*clkp), GFP_KERNEL);
-+	if (!clkp)
- 		return ERR_PTR(-ENOMEM);
- 
--	ret = _clk_register(dev, hw, clk);
--	if (!ret) {
--		devres_add(dev, clk);
-+	clk = clk_register(dev, hw);
-+	if (!IS_ERR(clk)) {
-+		*clkp = clk;
-+		devres_add(dev, clkp);
- 	} else {
--		devres_free(clk);
--		clk = ERR_PTR(ret);
-+		devres_free(clkp);
- 	}
- 
- 	return clk;
+Once this hits mainline, i'll submit a patch to u-boot to check for
+the presence of this version and drop to the old dtb if not found.
+
+Regards,
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Robert Nelson
+http://www.rcn-ee.com/
