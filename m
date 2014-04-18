@@ -1,71 +1,72 @@
 From: elder@linaro.org (Alex Elder)
-Date: Thu, 17 Apr 2014 21:30:14 -0500
-Subject: [PATCH 09/10] ARM: bcm: rewrite commentary for bcm_kona_do_smc()
+Date: Thu, 17 Apr 2014 21:30:12 -0500
+Subject: [PATCH 07/10] ARM: bcm: tidy up a few includes
 In-Reply-To: <1397788215-20279-1-git-send-email-elder@linaro.org>
 References: <1397788215-20279-1-git-send-email-elder@linaro.org>
-Message-ID: <1397788215-20279-10-git-send-email-elder@linaro.org>
+Message-ID: <1397788215-20279-8-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The block of comments in bcm_kona_do_smc() are somewhat confusing.
-This patch attempts to clarify what's going on.
+Clean up a few header file includes, eliminating a few that are not
+really needed and putting in their place some that are.
 
 Signed-off-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 Reviewed-by: Matt Porter <mporter@linaro.org>
 ---
- arch/arm/mach-bcm/bcm_kona_smc.c |   38 ++++++++++++++++++++++++++++----------
- 1 file changed, 28 insertions(+), 10 deletions(-)
+ arch/arm/mach-bcm/board_bcm21664.c |    3 +--
+ arch/arm/mach-bcm/kona.c           |    5 +++--
+ arch/arm/mach-bcm/kona.h           |    1 +
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-index cc81c86..a55a7ec 100644
---- a/arch/arm/mach-bcm/bcm_kona_smc.c
-+++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-@@ -77,16 +77,34 @@ int __init bcm_kona_smc_init(void)
- }
- 
- /*
-- * Since interrupts are disabled in the open mode, we must keep
-- * interrupts disabled in secure mode by setting R5=0x3. If interrupts
-- * are enabled in open mode, we can set R5=0x0 to allow interrupts in
-- * secure mode.  If we did this, the secure monitor would return back
-- * control to the open mode to handle the interrupt prior to completing
-- * the secure service. If this happened, R12 would not be
-- * SEC_EXIT_NORMAL and we would need to call SMC again after resetting
-- * R5 (it gets clobbered by the secure monitor) and setting R4 to
-- * SSAPI_RET_FROM_INT_SERV to indicate that we want the secure monitor
-- * to finish up the previous uncompleted secure service.
-+ * int bcm_kona_do_smc(u32 service_id, u32 buffer_addr)
-+ *
-+ * Only core 0 can run the secure monitor code.  If an "smc" request
-+ * is initiated on a different core it must be redirected to core 0
-+ * for execution.  We rely on the caller to handle this.
-+ *
-+ * Each "smc" request supplies a service id and the address of a
-+ * buffer containing parameters related to the service to be
-+ * performed.  A flags value defines the behavior of the level 2
-+ * cache and interrupt handling while the secure monitor executes.
-+ *
-+ * Parameters to the "smc" request are passed in r4-r6 as follows:
-+ *     r4	service id
-+ *     r5	flags (SEC_ROM_*)
-+ *     r6	physical address of buffer with other parameters
-+ *
-+ * Execution of an "smc" request produces two distinct results.
-+ *
-+ * First, the secure monitor call itself (regardless of the specific
-+ * service request) can succeed, or can produce an error.  When an
-+ * "smc" request completes this value is found in r12; it should
-+ * always be SEC_EXIT_NORMAL.
-+ *
-+ * In addition, the particular service performed produces a result.
-+ * The values that should be expected depend on the service.  We
-+ * therefore return this value to the caller, so it can handle the
-+ * request result appropriately.  This result value is found in r0
-+ * when the "smc" request completes.
+diff --git a/arch/arm/mach-bcm/board_bcm21664.c b/arch/arm/mach-bcm/board_bcm21664.c
+index acc1573..ab96c3f 100644
+--- a/arch/arm/mach-bcm/board_bcm21664.c
++++ b/arch/arm/mach-bcm/board_bcm21664.c
+@@ -11,13 +11,12 @@
+  * GNU General Public License for more details.
   */
- static int bcm_kona_do_smc(u32 service_id, u32 buffer_phys)
+ 
+-#include <linux/clocksource.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ 
+ #include <asm/mach/arch.h>
++#include <asm/io.h>
+ 
+-#include "bcm_kona_smc.h"
+ #include "kona.h"
+ 
+ #define RSTMGR_DT_STRING		"brcm,bcm21664-resetmgr"
+diff --git a/arch/arm/mach-bcm/kona.c b/arch/arm/mach-bcm/kona.c
+index 60b5dd5..b319703 100644
+--- a/arch/arm/mach-bcm/kona.c
++++ b/arch/arm/mach-bcm/kona.c
+@@ -11,11 +11,12 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/of_platform.h>
++
++#include <linux/init.h>
++#include <linux/printk.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
+ #include "bcm_kona_smc.h"
+-#include "kona.h"
+ 
+ void __init kona_l2_cache_init(void)
  {
+diff --git a/arch/arm/mach-bcm/kona.h b/arch/arm/mach-bcm/kona.h
+index 110185f..bcdcf06 100644
+--- a/arch/arm/mach-bcm/kona.h
++++ b/arch/arm/mach-bcm/kona.h
+@@ -12,6 +12,7 @@
+  */
+ 
+ #ifdef CONFIG_ARCH_BCM_MOBILE_L2_CACHE
++#include <linux/init.h>
+ 
+ void __init kona_l2_cache_init(void);
+ #else
 -- 
 1.7.9.5
