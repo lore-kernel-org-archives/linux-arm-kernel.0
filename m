@@ -1,51 +1,47 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 18 Apr 2014 13:27:53 +0200
-Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for	components
- tracking
-In-Reply-To: <20140417214709.GY24070@n2100.arm.linux.org.uk>
-References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
- <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
- <20140417214709.GY24070@n2100.arm.linux.org.uk>
-Message-ID: <53510C39.1020205@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 18 Apr 2014 17:02:41 +0530
+Subject: [PATCH v2] phy: core: make NULL a valid phy reference if
+ !CONFIG_GENERIC_PHY
+In-Reply-To: <20140416151947.GF28035@saruman.home>
+References: <1397648901-4450-1-git-send-email-grygorii.strashko@ti.com>
+ <20140416151947.GF28035@saruman.home>
+Message-ID: <53510D59.3000509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
 
-Thanks for comments.
 
-On 04/17/2014 11:47 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
->> +out:
->> +	if (ret != -EPROBE_DEFER)
->> +		exynos_drm_dev_ready(&pdev->dev);
-> So we end up with everyone needing a "ready" call in each sub-driver
-> back into the main driver... this makes it impossible to write a
-> generic subcomponent driver which is not tied in any way to the
-> main driver.
->
-> That is quite some restriction, and would prevent, for example, the
-> TDA998x driver being used both with Armada DRM, tilcdc and any other
-> driver.
+On Wednesday 16 April 2014 08:49 PM, Felipe Balbi wrote:
+> On Wed, Apr 16, 2014 at 02:48:21PM +0300, Grygorii Strashko wrote:
+>> This fixes a regression on Keystone 2 platforms caused by patch
+>> 57303488cd37da58263e842de134dc65f7c626d5
+>> "usb: dwc3: adapt dwc3 core to use Generic PHY Framework" which adds
+>> optional support of generic phy in DWC3 core.
+>>
+>> On Keystone 2 platforms the USB is not working now because
+>> CONFIG_GENERIC_PHY isn't set and, as result, Generic PHY APIs stubs
+>> return -ENOSYS always. The log shows:
+>>  dwc3 2690000.dwc3: failed to initialize core
+>>  dwc3: probe of 2690000.dwc3 failed with error -38
+>>
+>> Hence, fix it by making NULL a valid phy reference in Generic PHY
+>> APIs stubs in the same way as it was done by the patch
+>> 04c2facad8fee66c981a51852806d8923336f362 "drivers: phy: Make NULL
+>> a valid phy reference".
+>>
+>> CC: Kishon Vijay Abraham I <kishon@ti.com>
+>> CC: Felipe Balbi <balbi@ti.com>
+>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> 
+> I thought I'd already acked this one... oh well, need more coffee:
 
-As I see in armada driver drm is deferred in case tda998x is not yet
-available. The same solution can be still used with pending_devices
-approach - the main driver will not report its readiness until tda998x
-is present.
+Indeed.. you acked the v1 of this patch series and already queued the v2 with
+your acked by ;-)
 
-Anyway it still seems to be better than componentize every driver which can
-probably become a part of some superdevice.
+Cheers
+Kishon
 
-If you want to get rid of deferred probe one can make global list of
-'ready' devices with notifications systems for master devices.
-
-Maybe it would be good to consider notification system for devices probe
-result,
-it will require that driver register all its interfaces in probe, ie its
-readiness cannot
-be reported later but will not require to add new framework. I hope just
-extending current
-notification system should be enough.
-
-Regards
-Andrzej
+> 
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> 
