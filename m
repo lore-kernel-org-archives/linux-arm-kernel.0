@@ -1,68 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Apr 2014 14:58:48 -0700
-Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
- probe and defer if needed
-In-Reply-To: <CAL_JsqJvVvo6R-qNXxur7wiZERKbi52xyKoWnmzJTfKS2iKK7A@mail.gmail.com>
-References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
- <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
- <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
- <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
- <20140418205213.GA21823@atomide.com>
- <CAL_JsqJvVvo6R-qNXxur7wiZERKbi52xyKoWnmzJTfKS2iKK7A@mail.gmail.com>
-Message-ID: <20140418215848.GD21823@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Sat, 19 Apr 2014 00:02:59 +0200
+Subject: [GIT PULL] at91: DT for 3.16 #1
+Message-ID: <1397858579-11619-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [140418 14:39]:
-> On Fri, Apr 18, 2014 at 3:52 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Rob Herring <robherring2@gmail.com> [140411 10:33]:
-> >> On Fri, Mar 21, 2014 at 9:46 AM, Jean-Jacques Hiblot
-> >> <jjhiblot@traphandler.com> wrote:
-> >> > The goal of this patch is to allow drivers to be probed even if at the time of
-> >> > the DT parsing some of their IRQ ressources are not available yet.
-> >> >
-> >> > In the current situation, the IRQ resources of a platform device are filled from
-> >> > the DT at the time the device is created (of_device_alloc()). The drawback of
-> >> > this is that a device sitting close to the top of the DT (ahb for example) but
-> >> > depending on ressources that are initialized later (IRQ domain dynamically
-> >> > created for example) will fail to probe because the ressources don't exist
-> >> > at this time.
-> >>
-> >> s/ressources/resources/
-> >
-> > While I've tested these two patches and they fix the issue for me. I have
-> > some serious doubts again about this whole ------ up string parsing
-> > pile of ---- called device tree.
-> >
-> > Do we really need to sprinkle more of_* hacks to the irq subsystem?
-> >
-> > There's nothing wrong with with the irq subsystem. Platform bus is just
-> > calling the irq subsystem at the wrong time with uninitialized data.
-> 
-> This patch doesn't even touch the irq subsystem.
+Arnd, Olof, Kevin,
 
-Heh, it depends on the previous patch in this series adding another
-of_blah_blah function to drivers/of/irq.c.
- 
-> > It seems that we're again papering over the fact that there's nothing
-> > coordinating the setting up of various resources with device tree.
-> > That seems to be the repeating never ending pattern as we've already
-> > seen with GPIOs, pinctrl, and IRQchips. We end up adding all kinds of
-> > cross subsystem calls that were never needed earlier.
-> 
-> This problem may be made worse with DT, but this problem has existed
-> for as long as I have worked on the kernel. It is worse with DT since
-> platforms have less control over the init ordering and loose some
-> ability to do tricks like changing the initcall levels. We didn't even
-> try to do pinctrl in any generic way before DT.
+Here is the first AT91 DT pull-request for 3.16. Nice enhancements for
+three different products.
 
-Oh come on, let's stop pretending it's not broken. And it's way worse with
-device tree as there's nothing making sure the resources for a driver
-are set up before the driver probes. And we've been unable to fix just
-this issue alone for about six months now. It's also broken beyond that.
-It's called of_platform_bus yet it won't even pass the platform_data
-as auxdata to the devices on a sub-bus instantatiated like I2C.
+Thanks, best regards,
 
-Regards,
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
 
-Tony
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to 27a96a0364787d2b41d2a72d08143d95263e1b07:
+
+  ARM: at91: sama5d3: clock for ssc from rk pin (2014-04-18 22:43:44 +0200)
+
+----------------------------------------------------------------
+3.16: first DT series:
+- more support for at91sam9rl and its associated EK board
+- some improvements to at91sam9g45 (ADC, TS, PWM leds)
+- addition of some missing pieces for describing audio
+  of SAMA5D3-EK in DT
+
+----------------------------------------------------------------
+Alexandre Belloni (5):
+      ARM: at91/dt: sam9rl: add lcd, adc, usb gadget and pwm support
+      ARM: at91/dt: add peripherals to the at91sam9rlek board
+      ARM: at91/dt: sam9g45: improve ADC/touchscreen support
+      ARM: at91/dt: at91sam9m10g45ek: add ADC and touchscreen support
+      ARM: at91/dt: at91sam9m10g45ek PWM leds polarity is inversed
+
+Bo Shen (5):
+      ARM: at91: sama5d3: add DMA property for SSC devices
+      ARM: at91: sama5d3: disable sound by default
+      ARM: at91: sama5d3: correct the sound compatible string
+      ARM: at91: sama5d3: add the missing property
+      ARM: at91: sama5d3: clock for ssc from rk pin
+
+ arch/arm/boot/dts/at91sam9g45.dtsi     |  33 +++-
+ arch/arm/boot/dts/at91sam9m10g45ek.dts |  20 ++-
+ arch/arm/boot/dts/at91sam9rl.dtsi      | 265 +++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/at91sam9rlek.dts     |  90 ++++++++++-
+ arch/arm/boot/dts/sama5d3.dtsi         |   6 +
+ arch/arm/boot/dts/sama5d3xmb.dtsi      |   9 +-
+ 6 files changed, 405 insertions(+), 18 deletions(-)
+
+-- 
+Nicolas Ferre
