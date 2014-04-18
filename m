@@ -1,29 +1,31 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 18 Apr 2014 21:01:50 +0200
-Subject: [PATCH 2/5] ARM: sun6i: Use CPU_METHOD_OF_DECLARE
+Date: Fri, 18 Apr 2014 21:01:51 +0200
+Subject: [PATCH 3/5] Documentation: dt: bindings: Document Allwinner A31
+ enable method
 In-Reply-To: <1397847713-28418-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1397847713-28418-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1397847713-28418-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1397847713-28418-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU_METHOD_OF_DECLARE allows to bind the smp_ops to a set of cpus through the
-enable-method property, instead of relying on the machine to define it. Switch
-to it to get closer to an empty machine.
+Document the necently introduced A31 enable-method as a valid option.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-sunxi/platsmp.c | 1 +
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
-index 0c7dbce033cc..828f21126973 100644
---- a/arch/arm/mach-sunxi/platsmp.c
-+++ b/arch/arm/mach-sunxi/platsmp.c
-@@ -122,3 +122,4 @@ struct smp_operations sun6i_smp_ops __initdata = {
- 	.smp_prepare_cpus	= sun6i_smp_prepare_cpus,
- 	.smp_boot_secondary	= sun6i_smp_boot_secondary,
- };
-+CPU_METHOD_OF_DECLARE(sun6i_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index ad6f7758d6ba..14611d22b95a 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -183,6 +183,7 @@ nodes to be present and contain the properties described below.
+ 			# On ARM 32-bit systems this property is optional and
+ 			  can be one of:
+ 			    "arm,psci"
++			    "allwinner,sun6i-a31"
+ 			    "qcom,gcc-msm8660"
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
 -- 
 1.9.1
