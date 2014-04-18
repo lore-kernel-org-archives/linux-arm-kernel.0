@@ -1,32 +1,31 @@
-From: lznuaa@gmail.com (Frank Li)
-Date: Fri, 18 Apr 2014 12:00:54 -0500
-Subject: Perf top always show 0.00
-Message-ID: <CAHrpEqQZ_0G-rmwfaeEzHOFVckyRRSUpYrPdMUgPjRZ1JYyy6g@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 18 Apr 2014 19:08:10 +0200
+Subject: [PATCH v2 2/2] regmap: i2c: fallback to SMBus if the adapter
+ does not support standard I2C
+In-Reply-To: <1397727612-32103-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397727612-32103-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <53515BFA.3060601@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I use mx6dq platform. Found below problem.
+> +const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
+> +					    const struct regmap_config *config)
+> +{
+> +	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
+> +		return &regmap_i2c;
+> +	else if (config->val_bits == 16 &&
+> +		 i2c_check_functionality(i2c->adapter,
+> +					 I2C_FUNC_SMBUS_WORD_DATA))
+> +		return &regmap_smbus_word;
+> +	else if (config->val_bits == 8 &&
+> +		 i2c_check_functionality(i2c->adapter,
+> +					 I2C_FUNC_SMBUS_BYTE_DATA))
+> +		return &regmap_smbus_byte;
 
-Run Perf top. First column always 0, but order look like correct.
+The fallback code should also check that reg_bits is 8.
 
-   0.00%  perf          [.] 0x00049420
-     0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.5
-     0.00%  [kernel]      [k] vsnprintf
-     0.00%  [kernel]      [k] arch_cpu_idle
-     0.00%  [kernel]      [k] format_decode
-     0.00%  [kernel]      [k] number.isra.2
-     0.00%  libc-2.19.so  [.] strstr
-     0.00%  libc-2.19.so  [.] 0x00072498
-     0.00%  libc-2.19.so  [.] memchr
-     0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
-     0.00%  [kernel]      [k] string.isra.4
-     0.00%  [kernel]      [k] strnlen
-     0.00%  libc-2.19.so  [.] getdelim
-     0.00%  libc-2.19.so  [.] memcpy
-     0.00%  [kernel]      [k] lock_acquire
-     0.00%  libc-2.19.so  [.] strchr
-     0.00%  libc-2.19.so  [.] strcmp
-     0.00%  [kernel]      [k] _raw_spin_unlock_irq
-     0.00%  libc-2.19.so  [.] __libc_calloc
-     0.00%  libc-2.19.so  [.] _IO_feof
-     0.00%  [kernel]      [k] pointer.isra.15
+> +
+> +	return ERR_PTR(-ENOTSUPP);
+> +}
+> +
