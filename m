@@ -1,25 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 Apr 2014 16:08:04 +0100
-Subject: [PATCH v2 1/2] regmap: add reg_read/reg_write callbacks to
- regmap_bus struct
-In-Reply-To: <1397727612-32103-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397727612-32103-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140418150804.GX12304@sirena.org.uk>
+From: triplesquarednine@gmail.com (jordan)
+Date: Fri, 18 Apr 2014 11:09:16 -0400
+Subject: BUG: spinlock trylock failure on UP - reverting timer patches
+ helps
+In-Reply-To: <53513A7E.5050907@meduna.org>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org> <53500184.4050309@meduna.org>
+ <53505BD7.9050004@meduna.org>
+ <CAOcfFMyTmQH-FwGE2YWoA76ypzBtWPYVTyi+4QpEMnrRtw8QVg@mail.gmail.com>
+ <53513A7E.5050907@meduna.org>
+Message-ID: <CAOcfFMwybECrCM6ovQs4HdOHDWPAMtyi3hzAYdsKZZBERQAzTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 11:40:11AM +0200, Boris BREZILLON wrote:
-> Some busses do not support sending/receiving multiple registers in one go.
-> Such kind of busses just unpack the registers that have been previously
-> packed by the regmap core or pack registers that will be later unpacked by
-> the core code.
+Hey slavo
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140418/86311eb4/attachment.sig>
+> many thanks for the tests. I probably botched something during
+> the reverting - I now tried some more experiments and the system
+> now runs without BUGs and without kernel leak - of course
+> it needs some more uptime to be really sure.
+
+No problem. It's good to hear that is working. My AMD Phenom II 965
+has 1day, 10hours uptime. Hopefully that foreshadows your system
+running well.
+
+> My combined revert patch from 3.12.15-rt25 is at
+>   http://pastebin.com/MYLqbmZw
+> That was all that was needed.
+
+Yup. I suggest anyone from the list who can't get their machines to
+boot with those commits applied, test that patch.
+
+>> Yeah, i know a handful of people [amd users] that have now reported
+>> success booting into 3.14-rt1 reverting those patches.  Personally, I
+>> have disabled NO_HZ_FULL and have switched back to 'old tick' method
+>> in kconfig. I don't think the latest no_hz stuff is stable enough...
+>
+> My problems were with periodic timers (I am on an embedded system
+> that runs things periodically anyway and I have also my doubts
+> regarding the stability), so the latest code did not break
+> only NO_HZ_FULL.
+
+ah, thanks for the clarification [ i must have missed that bit - i was
+just glad someone else had verified on the list that those commits
+were problematic, as i hadn't gotten any response]. NO_HZ_FULL had
+been alright for me, for a while - so i didn't really notice the
+breakage with periodic timers, but that is good to know.
+
+I think periodic timers + reverting those patches + resurrecting sirq
+threads on seems to be the best on 3.14-rt, afaict.
+
+Jordan
+
+> Thanks
+> --
+>                                        Stano
+>
