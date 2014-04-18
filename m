@@ -1,58 +1,37 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 18 Apr 2014 17:19:54 -0500
-Subject: [PATCH v2 1/7] x86: move FIX_EARLYCON_MEM kconfig into x86
+Date: Fri, 18 Apr 2014 17:19:59 -0500
+Subject: [PATCH v2 6/7] arm64: enable FIX_EARLYCON_MEM kconfig
 In-Reply-To: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
 References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1397859600-11507-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1397859600-11507-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-In preparation to support FIX_EARLYCON_MEM on other arches, make the
-option per arch.
+In order to support earlycon on arm64, we need to enable earlycon fixmap
+support.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/x86/Kconfig                | 3 +++
- drivers/tty/serial/8250/Kconfig | 5 -----
- 2 files changed, 3 insertions(+), 5 deletions(-)
+ arch/arm64/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 25d2c6f..0fb6cfd 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -261,6 +261,9 @@ config ARCH_HWEIGHT_CFLAGS
- config ARCH_SUPPORTS_UPROBES
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e6e4d37..22d1397 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -112,6 +112,9 @@ config IOMMU_HELPER
+ config KERNEL_MODE_NEON
  	def_bool y
  
 +config FIX_EARLYCON_MEM
 +	def_bool y
 +
  source "init/Kconfig"
+ 
  source "kernel/Kconfig.freezer"
- 
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index 2332991..91f1d83 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -90,11 +90,6 @@ config SERIAL_8250_CONSOLE
- 
- 	  If unsure, say N.
- 
--config FIX_EARLYCON_MEM
--	bool
--	depends on X86
--	default y
--
- config SERIAL_8250_GSC
- 	tristate
- 	depends on SERIAL_8250 && GSC
 -- 
 1.9.1
