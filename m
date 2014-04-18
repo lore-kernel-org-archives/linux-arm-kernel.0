@@ -1,75 +1,253 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sat, 19 Apr 2014 00:11:42 +0200
-Subject: [PATCH 0/8] ARM: at91: sama5d3: enable sound support
-In-Reply-To: <5351A1DE.9070801@gmail.com>
-References: <1395049541-28128-1-git-send-email-voice.shen@atmel.com>
- <53518C76.2020005@atmel.com> <5351A1DE.9070801@gmail.com>
-Message-ID: <5351A31E.7080109@atmel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 18 Apr 2014 17:19:55 -0500
+Subject: [PATCH v2 2/7] tty/serial: add generic serial earlycon
+In-Reply-To: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1397859600-11507-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/2014 00:06, Boris BREZILLON :
-> 
-> On 18/04/2014 22:35, Nicolas Ferre wrote:
->> On 17/03/2014 10:45, Bo Shen :
->>> This patch add sound support on sama5d3xek board.
->>>
->>> This patch series based on the following patch set:
->>>   clk: at91: better support for the PCKs
->>>   http://comments.gmane.org/gmane.linux.kernel/1664477
->>>
->>>
->>> Bo Shen (5):
->>>   ARM: at91: sama5d3: add DMA property for SSC devices
->>>   ARM: at91: sama5d3: disable sound by default
->>>   ARM: at91: sama5d3: correct the sound compatible string
->>>   ARM: at91: sama5d3: add the missing property
->>>   ARM: at91: sama5d3: clock for ssc from rk pin
->>>
->>> Boris BREZILLON (3):
->>>   ASoC: atmel: support CCF based clks
->>>   ASoC: atmel: document clock properties of the wm8904 driver
->>>   ARM: at91/dt: add clock properties to the wm8904 codec node
->> Hi Voice and Boris,
->>
->> For this series I am a little bit puzzled: should I take the ASoC part
->> of it? I see no acknowledgement from Mark and I also read some messages
->> still discussing about CCF and wm8904 afterwards.
->>
->> So, I take the 5 patches by Voice Shen and tell me what is the proper
->> sequence with this wm8904 work.
-> 
-> Bo was waiting for the "move sam9n12 SoC to the CCF" (which has been
-> submitted earlier this week) series before sending a new version of his
-> "wm8904: add CCF support" series.
+From: Rob Herring <robh@kernel.org>
 
-Ok, that makes perfect sense.
-So I have the whole dependency graph in mind now: we will have fun
-stacking everything in the proper order ;-)
+This introduces generic earlycon infrastructure for serial devices
+based on the 8250 earlycon. This allows for supporting earlycon option
+with other serial devices. The earlycon output is enabled at the time
+early_params are processed.
 
-Thanks for the clarification, Bye.
+Only architectures that have fixmap support or have functional ioremap
+when early_params are processed are supported. This is the same
+restriction that the 8250 driver had.
 
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+---
+v2:
+- Use set_fixmap_io/ioremap instead of set_fixmap_nocache/ioremap_nocache.
+- Do the mapping outside of option parsing function.
+  
+ drivers/tty/serial/Kconfig    |   7 ++
+ drivers/tty/serial/Makefile   |   2 +
+ drivers/tty/serial/earlycon.c | 152 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/serial_core.h   |  16 +++++
+ 4 files changed, 177 insertions(+)
+ create mode 100644 drivers/tty/serial/earlycon.c
 
->> I will be happy to stack more patches about this topic during the 3.16
->> development phase.
->>
->>
->> Otherwise, the 5 patches by Voice go into at91-3.16-dt branch.
->>
->> Thanks, bye.
->>
->>
->>>  .../devicetree/bindings/sound/atmel-wm8904.txt     |  2 ++
->>>  arch/arm/boot/dts/sama5d3.dtsi                     |  6 ++++++
->>>  arch/arm/boot/dts/sama5d3xmb.dtsi                  | 11 +++++++++-
->>>  sound/soc/atmel/atmel_wm8904.c                     | 25 +++++++++++-----------
->>>  4 files changed, 31 insertions(+), 13 deletions(-)
->>>
->>
-> 
-> 
-> 
-
-
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 2e6d8dd..3b7c19b 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -7,6 +7,13 @@ if TTY
+ menu "Serial drivers"
+ 	depends on HAS_IOMEM
+ 
++config SERIAL_EARLYCON
++	bool
++	help
++	  Support for early consoles with the earlycon parameter. This enables
++	  the console before standard serial driver is probed. The console is
++	  enabled when early_param is processed.
++
+ source "drivers/tty/serial/8250/Kconfig"
+ 
+ comment "Non-8250 serial port support"
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index 3680854..8af1415 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -5,6 +5,8 @@
+ obj-$(CONFIG_SERIAL_CORE) += serial_core.o
+ obj-$(CONFIG_SERIAL_21285) += 21285.o
+ 
++obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
++
+ # These Sparc drivers have to appear before others such as 8250
+ # which share ttySx minor node space.  Otherwise console device
+ # names change and other unplesantries.
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+new file mode 100644
+index 0000000..73bf1e2
+--- /dev/null
++++ b/drivers/tty/serial/earlycon.c
+@@ -0,0 +1,152 @@
++/*
++ * Copyright (C) 2014 Linaro Ltd.
++ * Author: Rob Herring <robh@kernel.org>
++ *
++ * Based on 8250 earlycon:
++ * (c) Copyright 2004 Hewlett-Packard Development Company, L.P.
++ *	Bjorn Helgaas <bjorn.helgaas@hp.com>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/console.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/serial_core.h>
++
++#ifdef CONFIG_FIX_EARLYCON_MEM
++#include <asm/fixmap.h>
++#endif
++
++#include <asm/serial.h>
++
++static struct console early_con = {
++	.name =		"earlycon",
++	.flags =	CON_PRINTBUFFER | CON_BOOT,
++	.index =	-1,
++};
++
++static struct earlycon_device early_console_dev = {
++	.con = &early_con,
++};
++
++static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
++{
++	void __iomem *base;
++#ifdef CONFIG_FIX_EARLYCON_MEM
++	set_fixmap_io(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
++	base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
++	base += paddr & ~PAGE_MASK;
++#else
++	base = ioremap(paddr, size);
++#endif
++	if (!base)
++		pr_err("%s: Couldn't map 0x%llx\n", __func__,
++		       (unsigned long long)paddr);
++
++	return base;
++}
++
++static int __init parse_options(struct earlycon_device *device,
++				char *options)
++{
++	struct uart_port *port = &device->port;
++	int mmio, mmio32, length, ret;
++	unsigned long addr;
++
++	if (!options)
++		return -ENODEV;
++
++	mmio = !strncmp(options, "mmio,", 5);
++	mmio32 = !strncmp(options, "mmio32,", 7);
++	if (mmio || mmio32) {
++		port->iotype = (mmio ? UPIO_MEM : UPIO_MEM32);
++		options += mmio ? 5 : 7;
++		ret = kstrtoul(options, 0, &addr);
++		if (ret)
++			return ret;
++		port->mapbase = addr;
++		if (mmio32)
++			port->regshift = 2;
++	} else if (!strncmp(options, "io,", 3)) {
++		port->iotype = UPIO_PORT;
++		options += 3;
++		ret = kstrtoul(options, 0, &addr);
++		if (ret)
++			return ret;
++		port->iobase = addr;
++		mmio = 0;
++	} else if (!strncmp(options, "0x", 2)) {
++		port->iotype = UPIO_MEM;
++		ret = kstrtoul(options, 0, &addr);
++		if (ret)
++			return ret;
++		port->mapbase = addr;
++	} else {
++		return -EINVAL;
++	}
++
++	port->uartclk = BASE_BAUD * 16;
++
++	options = strchr(options, ',');
++	if (options) {
++		options++;
++		ret = kstrtouint(options, 0, &device->baud);
++		if (ret)
++			return ret;
++		length = min(strcspn(options, " ") + 1,
++			     (size_t)(sizeof(device->options)));
++		strlcpy(device->options, options, length);
++	}
++
++	if (mmio || mmio32)
++		pr_info("Early serial console at MMIO%s 0x%llx (options '%s')\n",
++			mmio32 ? "32" : "",
++			(unsigned long long)port->mapbase,
++			device->options);
++	else
++		pr_info("Early serial console at I/O port 0x%lx (options '%s')\n",
++			port->iobase,
++			device->options);
++
++	return 0;
++}
++
++int __init setup_earlycon(char *buf, const char *match,
++			  int (*setup)(struct earlycon_device *, const char *))
++{
++	int err;
++	size_t len;
++	struct uart_port *port = &early_console_dev.port;
++
++	if (!buf || !match || !setup)
++		return 0;
++
++	len = strlen(match);
++	if (strncmp(buf, match, len))
++		return 0;
++	if (buf[len] && (buf[len] != ','))
++		return 0;
++
++	buf += len + 1;
++
++	err = parse_options(&early_console_dev, buf);
++	/* On parsing error, pass the options buf to the setup function */
++	if (!err)
++		buf = NULL;
++
++	if (port->mapbase)
++		port->membase = earlycon_map(port->mapbase, 64);
++
++	early_console_dev.con->data = &early_console_dev;
++	err = setup(&early_console_dev, buf);
++	if (err < 0)
++		return err;
++	if (!early_console_dev.con->write)
++		return -ENODEV;
++
++	register_console(early_console_dev.con);
++	return 0;
++}
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index f729be9..7a15b5b 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -285,6 +285,22 @@ static inline int uart_poll_timeout(struct uart_port *port)
+ /*
+  * Console helpers.
+  */
++struct earlycon_device {
++	struct console *con;
++	struct uart_port port;
++	char options[16];		/* e.g., 115200n8 */
++	unsigned int baud;
++};
++int setup_earlycon(char *buf, const char *match,
++		   int (*setup)(struct earlycon_device *, const char *));
++
++#define EARLYCON_DECLARE(name, func) \
++static int __init name ## _setup_earlycon(char *buf) \
++{ \
++	return setup_earlycon(buf, __stringify(name), func); \
++} \
++early_param("earlycon", name ## _setup_earlycon);
++
+ struct uart_port *uart_get_console(struct uart_port *ports, int nr,
+ 				   struct console *c);
+ void uart_parse_options(char *options, int *baud, int *parity, int *bits,
 -- 
-Nicolas Ferre
+1.9.1
