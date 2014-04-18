@@ -1,35 +1,55 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 18 Apr 2014 14:05:54 +0800
-Subject: [PATCH v3 11/13] ARM: hisi: enable erratum 798181 of A15 on HiP04
+Date: Fri, 18 Apr 2014 14:05:55 +0800
+Subject: [PATCH v3 12/13] ARM: dts: Add PMU support in HiP04
 In-Reply-To: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1397801156-25682-12-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1397801156-25682-13-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kefeng Wang <kefeng.wang@linaro.org>
 
-The commit 93dc688 (ARM: 7684/1: errata: Workaround for Cortex-A15
-erratum 798181 (TLBI/DSB operations)) introduced a workaround for
-Cortex-A15 erratum 798181. Enable it for HIP04(Cortex-a15 r3p2).
+ARM Performance Monitor Units are available on the HiP04.
+So add the support in the dtsi.
+
+Simply tested with perf.
 
 Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
-Singed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- arch/arm/mach-hisi/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/hip04.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index 0bfd739..82e85717 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -21,6 +21,7 @@ config ARCH_HI3xxx
+diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+index 7e909ee..98aa9fd 100644
+--- a/arch/arm/boot/dts/hip04.dtsi
++++ b/arch/arm/boot/dts/hip04.dtsi
+@@ -218,6 +218,26 @@
+ 			status = "ok";
+ 		};
  
- config ARCH_HIP04
- 	bool "Hisilicon HiP04 Cortex A15 family" if ARCH_MULTI_V7_LPAE
-+	select ARM_ERRATA_798181 if SMP
- 	select HAVE_ARM_ARCH_TIMER
- 	select MCPM if SMP
- 	help
++		arm-pmu {
++			compatible = "arm,cortex-a15-pmu";
++			interrupts = <0 64 4>,
++				     <0 65 4>,
++				     <0 66 4>,
++				     <0 67 4>,
++				     <0 68 4>,
++				     <0 69 4>,
++				     <0 70 4>,
++				     <0 71 4>,
++				     <0 72 4>,
++				     <0 73 4>,
++				     <0 74 4>,
++				     <0 75 4>,
++				     <0 76 4>,
++				     <0 77 4>,
++				     <0 78 4>,
++				     <0 79 4>;
++		};
++
+ 		timer {
+ 			compatible = "arm,armv7-timer";
+ 			interrupts = <1 13 0xf08>,
 -- 
 1.8.3.2
