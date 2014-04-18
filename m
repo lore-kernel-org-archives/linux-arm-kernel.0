@@ -1,34 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 18 Apr 2014 17:38:49 +0100
-Subject: [PATCH 4/5] ASoC: simple-card: Support setting mclk via a fixed
- factor
-In-Reply-To: <1397749994-24983-5-git-send-email-andrew@lunn.ch>
-References: <1397749994-24983-1-git-send-email-andrew@lunn.ch>
- <1397749994-24983-5-git-send-email-andrew@lunn.ch>
-Message-ID: <20140418163849.GJ12304@sirena.org.uk>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 18 Apr 2014 11:40:12 -0500
+Subject: [patch 5/6] edma: Make reading the position of active channels
+ work
+In-Reply-To: <alpine.DEB.2.02.1404181123150.22697@ionos.tec.linutronix.de>
+References: <20140417133737.892475126@linutronix.de>
+ <20140417143249.889774979@linutronix.de> <5350761C.6010109@ti.com>
+ <alpine.DEB.2.02.1404180834520.22697@ionos.tec.linutronix.de>
+ <alpine.DEB.2.02.1404181123150.22697@ionos.tec.linutronix.de>
+Message-ID: <5351556C.7000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 05:53:13PM +0200, Andrew Lunn wrote:
+On 04/18/2014 04:24 AM, Thomas Gleixner wrote:
+> On Fri, 18 Apr 2014, Thomas Gleixner wrote:
+>> On Thu, 17 Apr 2014, Joel Fernandes wrote:
+>>> Here's a thread that discusses it and the end conclusion is that it
+>>> should be fine (Kyle Kastile is one of the EDMA hardware designers).
+>>> http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/99/t/66011.aspx
+>>
+>> Gah, right I saw the issues with the original code, which does a
+>> memcpy_fromio which copies byte by byte. Did not think about retrying
+>> with the edma_read() based one.
+> 
+> Actually I did expect memcpy_fromio to be more clever. But you are
+> right, using the 32bit wide read works like a charm.
 
-> +- simple-audio-card,mclk-factor		: Multiplication factor between stream rate and codec
-> +					  mclk.
+Cool, glad it does :)
 
-The normal name for this is fs rather than factor.
-
-> +	if (priv->mclk_factor) {
-> +		mclk = params_rate(params) * priv->mclk_factor;
-> +		ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
-> +					     SND_SOC_CLOCK_IN);
-> +	}
-
-We also need to consider what happens in cases where a clock is
-specified via the clocks property.  I would expect this to be used to
-set the rate for that clock as well.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140418/968e5651/attachment.sig>
+regards,
+  -Joel
