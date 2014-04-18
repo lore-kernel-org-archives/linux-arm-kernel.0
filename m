@@ -1,104 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Apr 2014 15:26:13 -0700
-Subject: [PATCH trivial 3/3] ARM: dts: Grammar /that will/it will/
-In-Reply-To: <1396001499-17638-3-git-send-email-geert@linux-m68k.org>
-References: <1396001499-17638-1-git-send-email-geert@linux-m68k.org>
- <1396001499-17638-3-git-send-email-geert@linux-m68k.org>
-Message-ID: <20140418222612.GF21823@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 18 Apr 2014 17:19:54 -0500
+Subject: [PATCH v2 1/7] x86: move FIX_EARLYCON_MEM kconfig into x86
+In-Reply-To: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+References: <1397859600-11507-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1397859600-11507-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Geert Uytterhoeven <geert@linux-m68k.org> [140328 03:16]:
-> From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Rob Herring <robh@kernel.org>
 
-Applying this too into omap-for-v3.15/fixes thanks.
+In preparation to support FIX_EARLYCON_MEM on other arches, make the
+option per arch.
 
-Tony
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+---
+ arch/x86/Kconfig                | 3 +++
+ drivers/tty/serial/8250/Kconfig | 5 -----
+ 2 files changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 25d2c6f..0fb6cfd 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -261,6 +261,9 @@ config ARCH_HWEIGHT_CFLAGS
+ config ARCH_SUPPORTS_UPROBES
+ 	def_bool y
  
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/boot/dts/am33xx.dtsi |    4 ++--
->  arch/arm/boot/dts/dra7.dtsi   |    2 +-
->  arch/arm/boot/dts/omap3.dtsi  |    2 +-
->  arch/arm/boot/dts/omap4.dtsi  |    2 +-
->  arch/arm/boot/dts/omap5.dtsi  |    2 +-
->  5 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 70f7f3eb5fb4..2a66fd484284 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -90,8 +90,8 @@
->  
->  	/*
->  	 * XXX: Use a flat representation of the AM33XX interconnect.
-> -	 * The real AM33XX interconnect network is quite complex.Since
-> -	 * that will not bring real advantage to represent that in DT
-> +	 * The real AM33XX interconnect network is quite complex. Since
-> +	 * it will not bring real advantage to represent that in DT
->  	 * for the moment, just use a fake OCP bus entry to represent
->  	 * the whole bus hierarchy.
->  	 */
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index c19e90ecf95e..9daab63fe457 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -89,7 +89,7 @@
->  	/*
->  	 * XXX: Use a flat representation of the SOC interconnect.
->  	 * The real OMAP interconnect network is quite complex.
-> -	 * Since that will not bring real advantage to represent that in DT for
-> +	 * Since it will not bring real advantage to represent that in DT for
->  	 * the moment, just use a fake OCP bus entry to represent the whole bus
->  	 * hierarchy.
->  	 */
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index a5fc83b9c835..5ae8141d3713 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -69,7 +69,7 @@
->  	/*
->  	 * XXX: Use a flat representation of the OMAP3 interconnect.
->  	 * The real OMAP interconnect network is quite complex.
-> -	 * Since that will not bring real advantage to represent that in DT for
-> +	 * Since it will not bring real advantage to represent that in DT for
->  	 * the moment, just use a fake OCP bus entry to represent the whole bus
->  	 * hierarchy.
->  	 */
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index a07ea359ae20..c95adadb0bbf 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -91,7 +91,7 @@
->  	/*
->  	 * XXX: Use a flat representation of the OMAP4 interconnect.
->  	 * The real OMAP interconnect network is quite complex.
-> -	 * Since that will not bring real advantage to represent that in DT for
-> +	 * Since it will not bring real advantage to represent that in DT for
->  	 * the moment, just use a fake OCP bus entry to represent the whole bus
->  	 * hierarchy.
->  	 */
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index aa9878c0aaad..0d875ba32fa9 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -101,7 +101,7 @@
->  	/*
->  	 * XXX: Use a flat representation of the OMAP3 interconnect.
->  	 * The real OMAP interconnect network is quite complex.
-> -	 * Since that will not bring real advantage to represent that in DT for
-> +	 * Since it will not bring real advantage to represent that in DT for
->  	 * the moment, just use a fake OCP bus entry to represent the whole bus
->  	 * hierarchy.
->  	 */
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
++config FIX_EARLYCON_MEM
++	def_bool y
++
+ source "init/Kconfig"
+ source "kernel/Kconfig.freezer"
+ 
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index 2332991..91f1d83 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -90,11 +90,6 @@ config SERIAL_8250_CONSOLE
+ 
+ 	  If unsure, say N.
+ 
+-config FIX_EARLYCON_MEM
+-	bool
+-	depends on X86
+-	default y
+-
+ config SERIAL_8250_GSC
+ 	tristate
+ 	depends on SERIAL_8250 && GSC
+-- 
+1.9.1
