@@ -1,129 +1,115 @@
-From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Sat, 19 Apr 2014 19:09:14 +0800
-Subject: [PATCH 3/4] ARM: imx: add shared gate clock support
-In-Reply-To: <1397883693-26101-4-git-send-email-shawn.guo@freescale.com>
-References: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
- <1397883693-26101-4-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140419110912.GA25767@MrMyself>
+From: ritesh.harjani@gmail.com (Ritesh Harjani)
+Date: Sat, 19 Apr 2014 16:49:17 +0530
+Subject: [PATCH] arm: dma-mapping: Fix mapping size value
+Message-ID: <CAD15aga8DTuzYrPfHF3X=ZvCuCQxfx1nOTk90DdwdxeZvV5tdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 19, 2014 at 01:01:32PM +0800, Shawn Guo wrote:
-> It's quite common on i.MX that one gate bit controls the gating of
-> multiple clocks, i.e. this is a shared gate.  The patch adds the
-> function imx_clk_gate2_shared() for such case.  The clocks controlled
-> by the same gate bits should call this function with a pointer to a
-> single share count variable, so that the gate bits will only be
-> operated on the first enabling and the last disabling of these shared
-> gate clocks.
-> 
-> Thanks to Gerhard Sittig <gsi@denx.de> for this idea.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+I am finding an oops after following commit. I am on 3.10.30 kernel but applied
+all the latest patches from arch/arm/mm/dma-mapping.c
 
-Marvelous! It's seemly also applicable to our 3.10.y branch.
-It'll be superbly helpful to both upstream and internal release.
+I added some debug logs to see what is the error, on which I found that we are
+incorrectly setting mapping->size value.
+Please take a look at this and correct me if I am wrong here.
 
-Thank you Shawn!
-Nicolin
+FAULTY COMMIT:
+commit 68efd7d2fb32c2606f1da318b6a851
+d933813f27
+Author: Marek Szyprowski <m.szyprowski@samsung.com>
+Date:   Tue Feb 25 13:01:09 2014 +0100
 
-> ---
->  arch/arm/mach-imx/clk-gate2.c | 13 ++++++++++++-
->  arch/arm/mach-imx/clk.h       | 13 +++++++++++--
->  2 files changed, 23 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-> index 0803df9..4ba587d 100644
-> --- a/arch/arm/mach-imx/clk-gate2.c
-> +++ b/arch/arm/mach-imx/clk-gate2.c
-> @@ -33,6 +33,7 @@ struct clk_gate2 {
->  	u8		bit_idx;
->  	u8		flags;
->  	spinlock_t	*lock;
-> +	unsigned int	*share_count;
->  };
->  
->  #define to_clk_gate2(_hw) container_of(_hw, struct clk_gate2, hw)
-> @@ -45,10 +46,14 @@ static int clk_gate2_enable(struct clk_hw *hw)
->  
->  	spin_lock_irqsave(gate->lock, flags);
->  
-> +	if (gate->share_count && (*gate->share_count)++ > 0)
-> +		goto out;
-> +
->  	reg = readl(gate->reg);
->  	reg |= 3 << gate->bit_idx;
->  	writel(reg, gate->reg);
->  
-> +out:
->  	spin_unlock_irqrestore(gate->lock, flags);
->  
->  	return 0;
-> @@ -62,10 +67,14 @@ static void clk_gate2_disable(struct clk_hw *hw)
->  
->  	spin_lock_irqsave(gate->lock, flags);
->  
-> +	if (gate->share_count && --(*gate->share_count) > 0)
-> +		goto out;
-> +
->  	reg = readl(gate->reg);
->  	reg &= ~(3 << gate->bit_idx);
->  	writel(reg, gate->reg);
->  
-> +out:
->  	spin_unlock_irqrestore(gate->lock, flags);
->  }
->  
-> @@ -91,7 +100,8 @@ static struct clk_ops clk_gate2_ops = {
->  struct clk *clk_register_gate2(struct device *dev, const char *name,
->  		const char *parent_name, unsigned long flags,
->  		void __iomem *reg, u8 bit_idx,
-> -		u8 clk_gate2_flags, spinlock_t *lock)
-> +		u8 clk_gate2_flags, spinlock_t *lock,
-> +		unsigned int *share_count)
->  {
->  	struct clk_gate2 *gate;
->  	struct clk *clk;
-> @@ -106,6 +116,7 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
->  	gate->bit_idx = bit_idx;
->  	gate->flags = clk_gate2_flags;
->  	gate->lock = lock;
-> +	gate->share_count = share_count;
->  
->  	init.name = name;
->  	init.ops = &clk_gate2_ops;
-> diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-> index 048c5ad8..e29f6eb 100644
-> --- a/arch/arm/mach-imx/clk.h
-> +++ b/arch/arm/mach-imx/clk.h
-> @@ -28,7 +28,8 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
->  struct clk *clk_register_gate2(struct device *dev, const char *name,
->  		const char *parent_name, unsigned long flags,
->  		void __iomem *reg, u8 bit_idx,
-> -		u8 clk_gate_flags, spinlock_t *lock);
-> +		u8 clk_gate_flags, spinlock_t *lock,
-> +		unsigned int *share_count);
->  
->  struct clk * imx_obtain_fixed_clock(
->  			const char *name, unsigned long rate);
-> @@ -37,7 +38,15 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
->  		void __iomem *reg, u8 shift)
->  {
->  	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-> -			shift, 0, &imx_ccm_lock);
-> +			shift, 0, &imx_ccm_lock, NULL);
-> +}
-> +
-> +static inline struct clk *imx_clk_gate2_shared(const char *name,
-> +		const char *parent, void __iomem *reg, u8 shift,
-> +		unsigned int *share_count)
-> +{
-> +	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-> +			shift, 0, &imx_ccm_lock, share_count);
->  }
->  
->  struct clk *imx_clk_pfd(const char *name, const char *parent_name,
-> -- 
-> 1.8.3.2
-> 
-> 
+    arm: dma-mapping: remove order parameter from arm_iommu_create_mapping()
+
+
+OOPS LOGS:
+[26.898145] __alloc_iova#LINE: 1097 start = 0x3500
+[26.898159] __alloc_iova#LINE:1136 iova = 0x53500000
+[26.898170] __alloc_iova#LINE:1138 mapping->base= 0x50000000
+[26.898181] __alloc_iova#LINE:1140 mapping->size = 0x1000000, i = 0
+[26.924442] __free_iova, bitmap_index = 3
+
+[Ritesh]: bitmap_index should be 0 for address 0x53500000. see in alloc_iova
+above.
+
+[26.924454] __free_iova,addr = 0x53500000
+[26.924463] __free_iova,mapping->base = 0x50000000
+[26.924472] __free_iova,mapping->size = 0x1000000
+[26.924482] __free_iova,bitmap_base = 0x53000000
+[26.924490] __free_iova, start = 0x500
+
+[Ritesh]: start should be 0x3500 for address 0x53500000. see in alloc_iova
+above.
+
+[26.924533] Unable to handle kernel NULL pointer dereference at virtual
+address 000000a0
+[26.924543] pgd = e7a84000
+[26.924558] [000000a0] *pgd=00000000
+[26.924572] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+[26.924598] Modules linked in:
+[26.924613] CPU: 1 PID: 2263 Comm: BufferLiberator Not tainted 3.10.30+
+#144
+[26.924624] task: e7370a40 ti: e6e06000 task.ti: e6e06000
+[26.924644] PC is at bitmap_clear+0x48/0xd0
+[26.924659] LR is at __iommu_remove_mapping+0x130/0x164
+[26.924673] pc : [<c02d0814>]    lr : [<c001bd30>]    psr: 20000093
+[26.924673] sp : e6e07e20  ip : ffffffff  fp : e6e07e3c
+[26.924682] r10: 00000500  r9 : c1333ea8  r8 : 80000013
+[26.924692] r7 : ffffffff  r6 : 00000321  r5 : 000000a0  r4 : 00000028
+[26.924707] r3 : 00000000  r2 : 00000341  r1 : 00000500  r0 : 00000000
+[26.924730] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment
+user
+[26.924742] Control: 10c5387d  Table: 77a8406a  DAC: 00000015
+
+
+See below on how this is wrong:
+
+here iova_base = 0x50000000
+iova_size = 0x20000000
+=> bits needed to map = 131072.
+        => bitmap_size = 0x4000
+        since bitmap_size > PAGE_SIZE
+        => bitmap_size = PAGE_SIZE,  extensions = 4;
+
+Now, mapping->size is currently set as bitmap_size << PAGE_SHIFT.
+        =>mapping->size = 0x1000000.
+mapping->size is the IOVA size, which one bitmap can address.
+
+Now mapping->size * extensions should be size (0x20000000).
+which is not true, => our bitmap_size is set wrong.
+
+it should be (mapping->bits << PAGE_SIZE) or say
+(BITS_PER_BYTE * bitmap_size << PAGE_SIZE)
+        => (8 * 0x1000) << 12) = 0x8000000
+With this IOVA_SIZE = extensions * mapping->size = 0x20000000
+
+
+
+PATCH:
+
+Currently mapping->size is wrongly set resulting
+in OOPS (atleast we see OOPS with extension 4).
+
+Fix this.
+
+Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+---
+ arch/arm/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index f62aa06..d1701a2 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
+dma_addr_t base, size_t size)
+        mapping->nr_bitmaps = 1;
+        mapping->extensions = extensions;
+        mapping->base = base;
+-       mapping->size = bitmap_size << PAGE_SHIFT;
+        mapping->bits = BITS_PER_BYTE * bitmap_size;
++       mapping->size = mapping->bits << PAGE_SHIFT;
+
+        spin_lock_init(&mapping->lock);
+
+--
+1.8.1.3
