@@ -1,42 +1,34 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 19 Apr 2014 14:04:47 +0200
-Subject: [PATCH 14/29] ARM: orion: switch to a per-platform handle_irq()
- function
-In-Reply-To: <53523D40.4080703@gmail.com>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-15-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BBB30.5090602@gmail.com> <20140419092708.78eb9274@skate>
- <53523D40.4080703@gmail.com>
-Message-ID: <20140419140447.4f443551@skate>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 19 Apr 2014 22:43:20 +0900
+Subject: [PATCH 0/2] Support cpufreq driver for Exynos3250
+In-Reply-To: <CAK9yfHygoHZ7hnAcLuuaMEsPb8Tqw-QbcTrQ+b=2CD6kK3odmw@mail.gmail.com>
+References: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>
+ <CAK9yfHygoHZ7hnAcLuuaMEsPb8Tqw-QbcTrQ+b=2CD6kK3odmw@mail.gmail.com>
+Message-ID: <CAGTfZH1M9h3Sx73wJsD=_vnSyV-+fyOY041PN_7ea718B0mFoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+Hi Sachin,
 
-On Sat, 19 Apr 2014 11:09:20 +0200, Sebastian Hesselbarth wrote:
+On Fri, Apr 18, 2014 at 5:14 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+> Hi Chanwoo,
+>
+> On 18 April 2014 07:50, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>> This patchset support cpufreq driver for Exynos3250 which uses the Cortex-A7
+>> dual cores and has a target speed of 1.0 GHz and code clean using dev_err/info
+>> instead of pr_err/info function.
+>
+> Per SoC cpufreq driver which does not use CCF is no more encouraged for new
+> Exynos platforms. Thomas has already posted patches to make use of
+> generic cpu freq driver
+> on Exynos platforms. Please refer to [1] and try to utilize it for
+> this platform as well.
+>
+> [1] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/26886
 
-> > Also, this approach goes towards the goal of reducing plat-orion/ code.
-> > Having the code closer to each SoC is going to make it easier to
-> > progressively get rid of it I believe.
-> 
-> Ok, I agree. But IIRC the multi-irq handler is only needed, if you
-> compile both DT and non-DT in one kernel, right?
+OK, I'll refer to this new patch for cpufreq and rebase it.
 
-Correct.
+Thanks for your reply.
 
-> Dove DT just left mach-dove, so there is no way you can compile both.
-> For the sake of simplicity, I'd even agree on adding it now and
-> remove it later again. But at least for Dove, the move is bogus.
-
-I think there's a lot of possible following clean up to be made. But we
-have to define some limits to the current patch series, otherwise it's
-going to grow to a 50+ patches monster that will be very hard to merge.
-I clearly agree some of things are not in their final ideal state, but
-I believe, overall, this patch series for Orion5x is pushing things in
-the right direction, no?
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best Regards,
+Chanwoo Choi
