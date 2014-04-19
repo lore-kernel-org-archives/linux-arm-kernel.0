@@ -1,54 +1,129 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 19 Apr 2014 19:00:49 +0800
-Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
- device is disabled
-In-Reply-To: <20140419084229.GK24070@n2100.arm.linux.org.uk>
-References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
- <20140418204249.GG24070@n2100.arm.linux.org.uk>
- <20140419055205.GX2523@dragon>
- <20140419084229.GK24070@n2100.arm.linux.org.uk>
-Message-ID: <20140419110048.GY2523@dragon>
+From: Guangyu.Chen@freescale.com (Nicolin Chen)
+Date: Sat, 19 Apr 2014 19:09:14 +0800
+Subject: [PATCH 3/4] ARM: imx: add shared gate clock support
+In-Reply-To: <1397883693-26101-4-git-send-email-shawn.guo@freescale.com>
+References: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
+ <1397883693-26101-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20140419110912.GA25767@MrMyself>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 19, 2014 at 09:42:29AM +0100, Russell King - ARM Linux wrote:
-> On Sat, Apr 19, 2014 at 01:53:08PM +0800, Shawn Guo wrote:
-> > BTW, can you take a look at the following two patches, or are they
-> > already in your queue?
-> > 
-> > imx-drm: imx-drm-core: Fix imx_drm_encoder_get_mux_id
-> > https://lkml.org/lkml/2014/4/7/58
+On Sat, Apr 19, 2014 at 01:01:32PM +0800, Shawn Guo wrote:
+> It's quite common on i.MX that one gate bit controls the gating of
+> multiple clocks, i.e. this is a shared gate.  The patch adds the
+> function imx_clk_gate2_shared() for such case.  The clocks controlled
+> by the same gate bits should call this function with a pointer to a
+> single share count variable, so that the gate bits will only be
+> operated on the first enabling and the last disabling of these shared
+> gate clocks.
 > 
-> This one now is.
+> Thanks to Gerhard Sittig <gsi@denx.de> for this idea.
 > 
-> > mx-drm: imx-tve: correct DDC property name to 'ddc-i2c-bus'
-> > ('i' is missing from the prefix word, and it should be 'imx-drm')
-> > http://www.spinics.net/lists/arm-kernel/msg321057.html
-> 
-> This one touches arch/arm/boot/dts, which Arnd moaned at me for touching
-> via the staging tree during the merge window.  So, while I can take the
-> imx-tve part, I can't take the arch/arm/boot/dts part.  This patch needs
-> to be split.
-> 
-> It also means that the MBA platform will have its TVE output broken while
-> the two commits take their different paths, but I guess that's what you
-> get for this kind of sillyness about git trees having exclusive ownership
-> of various files in the kernel tree - more breakage not less.
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-I think Arnd's main concern is about merge conflict, which shouldn't be
-a problem for this particular case.  The change on dts file is pretty
-trivial.  And I assume this is a fix to be landed on mainline before
--rc5 or so.  Then I can rebase my DT branch on top of it.  That said,
-merge conflict is not really a problem for this patch.  Arnd?
+Marvelous! It's seemly also applicable to our 3.10.y branch.
+It'll be superbly helpful to both upstream and internal release.
 
-Shawn
+Thank you Shawn!
+Nicolin
 
+> ---
+>  arch/arm/mach-imx/clk-gate2.c | 13 ++++++++++++-
+>  arch/arm/mach-imx/clk.h       | 13 +++++++++++--
+>  2 files changed, 23 insertions(+), 3 deletions(-)
 > 
-> There's one which I posted yesterday which I think should be merged along
-> with these - imx-drm: fix hdmi hotplug detection initial state
-> 
+> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+> index 0803df9..4ba587d 100644
+> --- a/arch/arm/mach-imx/clk-gate2.c
+> +++ b/arch/arm/mach-imx/clk-gate2.c
+> @@ -33,6 +33,7 @@ struct clk_gate2 {
+>  	u8		bit_idx;
+>  	u8		flags;
+>  	spinlock_t	*lock;
+> +	unsigned int	*share_count;
+>  };
+>  
+>  #define to_clk_gate2(_hw) container_of(_hw, struct clk_gate2, hw)
+> @@ -45,10 +46,14 @@ static int clk_gate2_enable(struct clk_hw *hw)
+>  
+>  	spin_lock_irqsave(gate->lock, flags);
+>  
+> +	if (gate->share_count && (*gate->share_count)++ > 0)
+> +		goto out;
+> +
+>  	reg = readl(gate->reg);
+>  	reg |= 3 << gate->bit_idx;
+>  	writel(reg, gate->reg);
+>  
+> +out:
+>  	spin_unlock_irqrestore(gate->lock, flags);
+>  
+>  	return 0;
+> @@ -62,10 +67,14 @@ static void clk_gate2_disable(struct clk_hw *hw)
+>  
+>  	spin_lock_irqsave(gate->lock, flags);
+>  
+> +	if (gate->share_count && --(*gate->share_count) > 0)
+> +		goto out;
+> +
+>  	reg = readl(gate->reg);
+>  	reg &= ~(3 << gate->bit_idx);
+>  	writel(reg, gate->reg);
+>  
+> +out:
+>  	spin_unlock_irqrestore(gate->lock, flags);
+>  }
+>  
+> @@ -91,7 +100,8 @@ static struct clk_ops clk_gate2_ops = {
+>  struct clk *clk_register_gate2(struct device *dev, const char *name,
+>  		const char *parent_name, unsigned long flags,
+>  		void __iomem *reg, u8 bit_idx,
+> -		u8 clk_gate2_flags, spinlock_t *lock)
+> +		u8 clk_gate2_flags, spinlock_t *lock,
+> +		unsigned int *share_count)
+>  {
+>  	struct clk_gate2 *gate;
+>  	struct clk *clk;
+> @@ -106,6 +116,7 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+>  	gate->bit_idx = bit_idx;
+>  	gate->flags = clk_gate2_flags;
+>  	gate->lock = lock;
+> +	gate->share_count = share_count;
+>  
+>  	init.name = name;
+>  	init.ops = &clk_gate2_ops;
+> diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+> index 048c5ad8..e29f6eb 100644
+> --- a/arch/arm/mach-imx/clk.h
+> +++ b/arch/arm/mach-imx/clk.h
+> @@ -28,7 +28,8 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+>  struct clk *clk_register_gate2(struct device *dev, const char *name,
+>  		const char *parent_name, unsigned long flags,
+>  		void __iomem *reg, u8 bit_idx,
+> -		u8 clk_gate_flags, spinlock_t *lock);
+> +		u8 clk_gate_flags, spinlock_t *lock,
+> +		unsigned int *share_count);
+>  
+>  struct clk * imx_obtain_fixed_clock(
+>  			const char *name, unsigned long rate);
+> @@ -37,7 +38,15 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+>  		void __iomem *reg, u8 shift)
+>  {
+>  	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
+> -			shift, 0, &imx_ccm_lock);
+> +			shift, 0, &imx_ccm_lock, NULL);
+> +}
+> +
+> +static inline struct clk *imx_clk_gate2_shared(const char *name,
+> +		const char *parent, void __iomem *reg, u8 shift,
+> +		unsigned int *share_count)
+> +{
+> +	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
+> +			shift, 0, &imx_ccm_lock, share_count);
+>  }
+>  
+>  struct clk *imx_clk_pfd(const char *name, const char *parent_name,
 > -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+> 1.8.3.2
 > 
 > 
