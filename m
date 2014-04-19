@@ -1,118 +1,51 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 19 Apr 2014 13:01:32 +0800
-Subject: [PATCH 3/4] ARM: imx: add shared gate clock support
-In-Reply-To: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
-References: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1397883693-26101-4-git-send-email-shawn.guo@freescale.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 19 Apr 2014 09:04:03 +0400
+Subject: [PATCH] ARM: i.MX: Remove #ifdef CONFIG_OF
+Message-ID: <1397883843-6620-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's quite common on i.MX that one gate bit controls the gating of
-multiple clocks, i.e. this is a shared gate.  The patch adds the
-function imx_clk_gate2_shared() for such case.  The clocks controlled
-by the same gate bits should call this function with a pointer to a
-single share count variable, so that the gate bits will only be
-operated on the first enabling and the last disabling of these shared
-gate clocks.
+CONFIG_OF is always selected for i.MX.
 
-Thanks to Gerhard Sittig <gsi@denx.de> for this idea.
-
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/clk-gate2.c | 13 ++++++++++++-
- arch/arm/mach-imx/clk.h       | 13 +++++++++++--
- 2 files changed, 23 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/clk-imx27.c | 2 --
+ arch/arm/mach-imx/clk-imx31.c | 2 --
+ 2 files changed, 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-index 0803df9..4ba587d 100644
---- a/arch/arm/mach-imx/clk-gate2.c
-+++ b/arch/arm/mach-imx/clk-gate2.c
-@@ -33,6 +33,7 @@ struct clk_gate2 {
- 	u8		bit_idx;
- 	u8		flags;
- 	spinlock_t	*lock;
-+	unsigned int	*share_count;
- };
- 
- #define to_clk_gate2(_hw) container_of(_hw, struct clk_gate2, hw)
-@@ -45,10 +46,14 @@ static int clk_gate2_enable(struct clk_hw *hw)
- 
- 	spin_lock_irqsave(gate->lock, flags);
- 
-+	if (gate->share_count && (*gate->share_count)++ > 0)
-+		goto out;
-+
- 	reg = readl(gate->reg);
- 	reg |= 3 << gate->bit_idx;
- 	writel(reg, gate->reg);
- 
-+out:
- 	spin_unlock_irqrestore(gate->lock, flags);
- 
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index d2da890..0db0b4f 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -296,7 +296,6 @@ int __init mx27_clocks_init(unsigned long fref)
  	return 0;
-@@ -62,10 +67,14 @@ static void clk_gate2_disable(struct clk_hw *hw)
- 
- 	spin_lock_irqsave(gate->lock, flags);
- 
-+	if (gate->share_count && --(*gate->share_count) > 0)
-+		goto out;
-+
- 	reg = readl(gate->reg);
- 	reg &= ~(3 << gate->bit_idx);
- 	writel(reg, gate->reg);
- 
-+out:
- 	spin_unlock_irqrestore(gate->lock, flags);
  }
  
-@@ -91,7 +100,8 @@ static struct clk_ops clk_gate2_ops = {
- struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 bit_idx,
--		u8 clk_gate2_flags, spinlock_t *lock)
-+		u8 clk_gate2_flags, spinlock_t *lock,
-+		unsigned int *share_count)
+-#ifdef CONFIG_OF
+ int __init mx27_clocks_init_dt(void)
  {
- 	struct clk_gate2 *gate;
- 	struct clk *clk;
-@@ -106,6 +116,7 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- 	gate->bit_idx = bit_idx;
- 	gate->flags = clk_gate2_flags;
- 	gate->lock = lock;
-+	gate->share_count = share_count;
+ 	struct device_node *np;
+@@ -312,4 +311,3 @@ int __init mx27_clocks_init_dt(void)
  
- 	init.name = name;
- 	init.ops = &clk_gate2_ops;
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 048c5ad8..e29f6eb 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -28,7 +28,8 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
- 		void __iomem *reg, u8 bit_idx,
--		u8 clk_gate_flags, spinlock_t *lock);
-+		u8 clk_gate_flags, spinlock_t *lock,
-+		unsigned int *share_count);
- 
- struct clk * imx_obtain_fixed_clock(
- 			const char *name, unsigned long rate);
-@@ -37,7 +38,15 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
- 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
--			shift, 0, &imx_ccm_lock);
-+			shift, 0, &imx_ccm_lock, NULL);
-+}
-+
-+static inline struct clk *imx_clk_gate2_shared(const char *name,
-+		const char *parent, void __iomem *reg, u8 shift,
-+		unsigned int *share_count)
-+{
-+	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+			shift, 0, &imx_ccm_lock, share_count);
+ 	return mx27_clocks_init(fref);
+ }
+-#endif
+diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
+index b5b65f3..4a9de08 100644
+--- a/arch/arm/mach-imx/clk-imx31.c
++++ b/arch/arm/mach-imx/clk-imx31.c
+@@ -191,7 +191,6 @@ int __init mx31_clocks_init(unsigned long fref)
+ 	return 0;
  }
  
- struct clk *imx_clk_pfd(const char *name, const char *parent_name,
+-#ifdef CONFIG_OF
+ int __init mx31_clocks_init_dt(void)
+ {
+ 	struct device_node *np;
+@@ -207,4 +206,3 @@ int __init mx31_clocks_init_dt(void)
+ 
+ 	return mx31_clocks_init(fref);
+ }
+-#endif
 -- 
 1.8.3.2
