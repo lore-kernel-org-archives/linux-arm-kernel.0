@@ -1,56 +1,69 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 19 Apr 2014 13:32:24 +0200
-Subject: [PATCH 4/8] tty/serial: add generic serial earlycon
-In-Reply-To: <CAL_JsqJwKQ_KuWWQNZHrMh8NwwiubB2jR+g-Y2n_dH4kJ5zVow@mail.gmail.com>
-References: <1395436128-11244-1-git-send-email-robherring2@gmail.com>
- <21117957.8m9iUdR1VN@wuerfel>
- <CAL_JsqJwKQ_KuWWQNZHrMh8NwwiubB2jR+g-Y2n_dH4kJ5zVow@mail.gmail.com>
-Message-ID: <201404191332.24392.arnd@arndb.de>
+Date: Sat, 19 Apr 2014 13:59:35 +0200
+Subject: [PATCH v4 00/21] ARM: support for ICP DAS LP-8x4x (with dts)
+In-Reply-To: <534FCA5D.1020606@zonque.org>
+References: <1387309071-22382-1-git-send-email-ynvich@gmail.com>
+ <1397736755.16539.15.camel@host5.omatika.ru> <534FCA5D.1020606@zonque.org>
+Message-ID: <201404191359.36203.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 April 2014, Rob Herring wrote:
-> On Mon, Mar 24, 2014 at 10:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 24 March 2014 08:36:46 Rob Herring wrote:
-> >> On Mon, Mar 24, 2014 at 6:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Monday 24 March 2014 11:22:03 Catalin Marinas wrote:
-> >> >> On Fri, Mar 21, 2014 at 09:08:44PM +0000, Rob Herring wrote:
-> >> >> > diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-> >> >> > new file mode 100644
-> >> >> > index 0000000..241757a
-> >> >> > --- /dev/null
-> >> >> > +++ b/drivers/tty/serial/earlycon.c
-> >> >> [...]
-> >> >> > +static void __iomem * __init earlycon_map(unsigned long paddr, size_t size)
-> >> >> > +{
-> >> >> > +   void __iomem *base;
-> >> >> > +#ifdef CONFIG_FIX_EARLYCON_MEM
-> >> >> > +   set_fixmap_nocache(FIX_EARLYCON_MEM_BASE, paddr & PAGE_MASK);
-> >> >> > +   base = (void __iomem *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
-> >> >> > +   base += paddr & ~PAGE_MASK;
-> >> >> > +#else
-> >> >> > +   base = ioremap_nocache(paddr, size);
-> >> >> > +#endif
-> >> >>
-> >> >> Just curious why not set_fixmap_io (and plain ioremap)?
-> >> >
-> >> > Good point. Note that ioremap_nocache() is the same as ioremap()
-> >> > on *all* architectures.
+On Thursday 17 April 2014, Daniel Mack wrote:
+> On 04/17/2014 02:12 PM, Sergei Ianovich wrote:
+> > On Thu, 2014-04-17 at 12:38 +0200, Daniel Mack wrote
+> > I have all the
+> > reasons to believe, that LP-8x4x support would already have be merged,
+> > if I didn't try to use DT.
 > 
-> Did you mean "not the same"?
+> That might be, but that's not the point. We want progress here, and that
+> means we occasionally have to get rid of legacy.
 
-No
+In most cases, I would strongly support that statement. However, for PXA
+in particular, my opinion is that progress is not the highest priority
+as I see no realistic hope of converting all the existing machines over
+to use DT and change the platform to "multiplatform" support. Anything
+more modern than PXA I hope we can eventually get at least done for
+multiplatform, same for a few of the older and simpler platforms.
 
-> Why are there 2 flavors if they are
-> always the same.
+Then again, I'm certainly not stopping you from trying to use add
+modern platforms to PXA.
 
-I assume it's just a mistake someone made a long time ago and nobody
-ever changed it because they didn't want to break obscure code.
+One of the ideas I had earlier was to extend mach-mmp enough to
+run any fully DT-enabled PXA machines and leave mach-pxa for the
+old ATAGS support and stuff like the legacy DMA support.
+However, I don't think we should try that as long as mach-mmp is
+lacking some essential DT support, e.g. for the clocks that were
+only partially converted to use the common clock framework.
 
-x86 seems to be a bit odd here, because is has both page-table
-and MTRR method of setting up whether an access can be cached or not.
-This may have led to the introduction of the _nocache variant, when
-the regular ioremap was already uncached on all other architectures
-but cached on x86.
+> > if so
+> > B. We need to thinks whether it's acceptable to kill support for video
+> > capture.
+> 
+> We can't. As I said, for this particular driver, we can keep the old API
+> around. We can even make it depend on !CONFIG_DMA_ENGINE, so if anyone
+> actually wants to use it with DT-enabled boards, we finally have a user
+> and things can be fixed up. Similar for other drivers we can't test
+> ourselves.
+
+Sounds good to me.
+
+> > In short:
+> > 
+> > if (A && B)
+> >   we drop old DMA
+> > else
+> >   we take my patch #7
+> 
+> If A works, there's no need to for patch #7, right? If A doesn't work,
+> we have to check why and fix it.
+> 
+> Arnd, any oppinion on this?
+
+No strong opinion, I wouldn't object patch #7 if there is a strong reason
+to not use the dmaengine driver for PXA like I would object doing it for
+MMP. Then again, I see that you and recently also Laurent are driving a
+lot of good work on PXA, and if neither the arm-soc maintainers nor the
+three maintainers listed for mach-pxa have a strong opinion, I'd rather
+leave it up to your judgement.
 
 	Arnd
