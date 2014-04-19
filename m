@@ -1,26 +1,59 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 19 Apr 2014 13:01:29 +0800
-Subject: [PATCH 0/4] ARM: imx: shared gate support for i.MX clk_gate2 clock
-Message-ID: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
+Date: Sat, 19 Apr 2014 13:01:31 +0800
+Subject: [PATCH 2/4] ARM: imx: lock is always valid for clk_gate2
+In-Reply-To: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
+References: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1397883693-26101-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're constantly running into the situation on i.MX that multiple clocks
-share the single gate.  Since we already have i.MX specific gate clock
-implementation due to 2-bits gate, the series takes Gerhard's approach
-to add shared gate support for i.MX clk_gate2 clock.
+The imx specific clk_gate2 always has a valid lock with the clock.  So
+the validation on gate->lock is not really needed.  Remove it.
 
-Shawn Guo (4):
-  ARM: imx: define struct clk_gate2 on our own
-  ARM: imx: lock is always valid for clk_gate2
-  ARM: imx: add shared gate clock support
-  ARM: imx6q: add the missing esai_ahb clock
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/clk-gate2.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
- .../devicetree/bindings/clock/imx6q-clock.txt      |  1 +
- arch/arm/mach-imx/clk-gate2.c                      | 47 ++++++++++++++--------
- arch/arm/mach-imx/clk-imx6q.c                      |  7 +++-
- arch/arm/mach-imx/clk.h                            | 13 +++++-
- 4 files changed, 48 insertions(+), 20 deletions(-)
-
+diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+index 7e98ccb..0803df9 100644
+--- a/arch/arm/mach-imx/clk-gate2.c
++++ b/arch/arm/mach-imx/clk-gate2.c
+@@ -43,15 +43,13 @@ static int clk_gate2_enable(struct clk_hw *hw)
+ 	u32 reg;
+ 	unsigned long flags = 0;
+ 
+-	if (gate->lock)
+-		spin_lock_irqsave(gate->lock, flags);
++	spin_lock_irqsave(gate->lock, flags);
+ 
+ 	reg = readl(gate->reg);
+ 	reg |= 3 << gate->bit_idx;
+ 	writel(reg, gate->reg);
+ 
+-	if (gate->lock)
+-		spin_unlock_irqrestore(gate->lock, flags);
++	spin_unlock_irqrestore(gate->lock, flags);
+ 
+ 	return 0;
+ }
+@@ -62,15 +60,13 @@ static void clk_gate2_disable(struct clk_hw *hw)
+ 	u32 reg;
+ 	unsigned long flags = 0;
+ 
+-	if (gate->lock)
+-		spin_lock_irqsave(gate->lock, flags);
++	spin_lock_irqsave(gate->lock, flags);
+ 
+ 	reg = readl(gate->reg);
+ 	reg &= ~(3 << gate->bit_idx);
+ 	writel(reg, gate->reg);
+ 
+-	if (gate->lock)
+-		spin_unlock_irqrestore(gate->lock, flags);
++	spin_unlock_irqrestore(gate->lock, flags);
+ }
+ 
+ static int clk_gate2_is_enabled(struct clk_hw *hw)
 -- 
 1.8.3.2
