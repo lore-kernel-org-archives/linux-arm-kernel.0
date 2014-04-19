@@ -1,77 +1,63 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 19 Apr 2014 10:32:50 -0400
-Subject: [PATCH v2 5/7] ARM: dma: Use dma_pfn_offset for dma address
- translation
-In-Reply-To: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1397917972-6293-6-git-send-email-santosh.shilimkar@ti.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Sat, 19 Apr 2014 20:05:32 +0530
+Subject: [PATCH 0/2] Support cpufreq driver for Exynos3250
+In-Reply-To: <53527F54.5020601@gmail.com>
+References: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>
+ <CAK9yfHygoHZ7hnAcLuuaMEsPb8Tqw-QbcTrQ+b=2CD6kK3odmw@mail.gmail.com>
+ <CAGTfZH1M9h3Sx73wJsD=_vnSyV-+fyOY041PN_7ea718B0mFoQ@mail.gmail.com>
+ <53527F54.5020601@gmail.com>
+Message-ID: <CAK9yfHxdC7JAJ6CiBsoHWcdbnv53qzs0XNtfjsabGmA6Sgv=ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+Hi Tomasz,
 
-In most of cases DMA addresses can be performed using offset value of
- Bus address space relatively to physical address space as following:
 
-PFN->DMA:
- __pfn_to_phys(pfn + [-]dma_pfn_offset)
+On 19 April 2014 19:21, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Chanwoo, Sachin,
+>
+>
+> On 19.04.2014 15:43, Chanwoo Choi wrote:
+>>
+>> Hi Sachin,
+>>
+>> On Fri, Apr 18, 2014 at 5:14 PM, Sachin Kamat <sachin.kamat@linaro.org>
+>> wrote:
+>>>
+>>> Hi Chanwoo,
+>>>
+>>> On 18 April 2014 07:50, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>>>
+>>>> This patchset support cpufreq driver for Exynos3250 which uses the
+>>>> Cortex-A7
+>>>> dual cores and has a target speed of 1.0 GHz and code clean using
+>>>> dev_err/info
+>>>> instead of pr_err/info function.
+>>>
+>>>
+>>> Per SoC cpufreq driver which does not use CCF is no more encouraged for
+>>> new
+>>> Exynos platforms. Thomas has already posted patches to make use of
+>>> generic cpu freq driver
+>>> on Exynos platforms. Please refer to [1] and try to utilize it for
+>>> this platform as well.
+>>>
+>>> [1] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/26886
+>>
+>>
+>> OK, I'll refer to this new patch for cpufreq and rebase it.
+>>
+>> Thanks for your reply.
+>
+>
+> The last version posted by Thomas still had several comments to be addressed
+> that could lead to quite big changes in the whole design in next version.
+> According to the information from Thomas, the work on it is in progress and
+> we should see updated patchset soon.
 
-DMA->PFN:
- __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
+Yes, that is right. I wanted Chanwoo to be aware of this new design
+and track the same.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/dma-mapping.h |   17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index e701a4d..8c12149 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -58,22 +58,31 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
- #ifndef __arch_pfn_to_dma
- static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
- {
--	return (dma_addr_t)__pfn_to_bus(pfn);
-+	if (!dev)
-+		return DMA_ERROR_CODE;
-+	return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
- }
- 
- static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- {
--	return __bus_to_pfn(addr);
-+	if (!dev)
-+		return 0;
-+	return __bus_to_pfn(addr) + dev->dma_pfn_offset;
- }
- 
- static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
- {
--	return (void *)__bus_to_virt((unsigned long)addr);
-+	if (!dev)
-+		return NULL;
-+	return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
- }
- 
- static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- {
--	return (dma_addr_t)__virt_to_bus((unsigned long)(addr));
-+	if (!dev)
-+		return DMA_ERROR_CODE;
-+	return pfn_to_dma(dev,
-+			   __bus_to_pfn(__virt_to_bus((unsigned long)(addr))));
- }
- 
- #else
 -- 
-1.7.9.5
+With warm regards,
+Sachin
