@@ -1,108 +1,87 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 18 Apr 2014 21:50:33 -0500
-Subject: [PATCH] dmaengine: edma: Add DMA memcpy support
-Message-ID: <1397875833-31345-1-git-send-email-joelf@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 19 Apr 2014 13:01:30 +0800
+Subject: [PATCH 1/4] ARM: imx: define struct clk_gate2 on our own
+In-Reply-To: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
+References: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1397883693-26101-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We add DMA memcpy support to EDMA driver. Successful tests performed using
-dmatest kernel module. Copy alignment is set to DMA_SLAVE_BUSWIDTH_4_BYTES and
-users must ensure length is aligned so that copy is performed fully.
+The imx clk-gate2 driver implements an i.MX specific gate clock, which
+has two bits controlling the gate states.  While this is a completely
+separate gate driver from the common clk-gate one, it reuses the common
+clk_gate structure.  Such reusing makes the extending of clk_gate2
+clumsy.  Let's define struct clk_gate2 on our own to make the driver
+independent of the common clk-gate one, and ease the clk_gate2 extending
+at a later time.
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- drivers/dma/edma.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ arch/arm/mach-imx/clk-gate2.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 25a75e2..072f642 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -378,6 +378,11 @@ static int edma_config_pset(struct dma_chan *chan, struct edmacc_param *pset,
- 		src_cidx = 0;
- 		dst_bidx = acnt;
- 		dst_cidx = cidx;
-+	} else if (direction == DMA_MEM_TO_MEM)  {
-+		src_bidx = acnt;
-+		src_cidx = cidx;
-+		dst_bidx = acnt;
-+		dst_cidx = cidx;
- 	} else {
- 		dev_err(dev, "%s: direction not implemented yet\n", __func__);
- 		return -EINVAL;
-@@ -498,6 +503,44 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
- 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
- }
+diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+index a2ecc00..7e98ccb 100644
+--- a/arch/arm/mach-imx/clk-gate2.c
++++ b/arch/arm/mach-imx/clk-gate2.c
+@@ -27,11 +27,19 @@
+  * parent - fixed parent.  No clk_set_parent support
+  */
  
-+struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
-+	struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
-+	size_t len, unsigned long tx_flags)
-+{
-+	int ret;
-+	struct edma_desc *edesc;
-+	struct device *dev = chan->device->dev;
-+	struct edma_chan *echan = to_edma_chan(chan);
+-#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
++struct clk_gate2 {
++	struct clk_hw hw;
++	void __iomem	*reg;
++	u8		bit_idx;
++	u8		flags;
++	spinlock_t	*lock;
++};
 +
-+	if (unlikely(!echan || !len))
-+		return NULL;
-+
-+	edesc = kzalloc(sizeof(*edesc) + sizeof(edesc->pset[0]), GFP_ATOMIC);
-+	if (!edesc) {
-+		dev_dbg(dev, "Failed to allocate a descriptor\n");
-+		return NULL;
-+	}
-+
-+	edesc->pset_nr = 1;
-+
-+	ret = edma_config_pset(chan, &edesc->pset[0], src, dest, 1,
-+			       DMA_SLAVE_BUSWIDTH_4_BYTES, len, DMA_MEM_TO_MEM);
-+	if (ret < 0)
-+		return NULL;
-+
-+	edesc->absync = ret;
-+
-+	/*
-+	 * Enable intermediate transfer chaining to re-trigger channel
-+	 * on completion of every TR, and enable transfer-completion
-+	 * interrupt on completion of the whole transfer.
-+	 */
-+	edesc->pset[0].opt |= ITCCHEN;
-+	edesc->pset[0].opt |= TCINTEN;
-+
-+	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
-+}
-+
- static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
- 	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
- 	size_t period_len, enum dma_transfer_direction direction,
-@@ -875,6 +918,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
++#define to_clk_gate2(_hw) container_of(_hw, struct clk_gate2, hw)
+ 
+ static int clk_gate2_enable(struct clk_hw *hw)
  {
- 	dma->device_prep_slave_sg = edma_prep_slave_sg;
- 	dma->device_prep_dma_cyclic = edma_prep_dma_cyclic;
-+	dma->device_prep_dma_memcpy = edma_prep_dma_memcpy;
- 	dma->device_alloc_chan_resources = edma_alloc_chan_resources;
- 	dma->device_free_chan_resources = edma_free_chan_resources;
- 	dma->device_issue_pending = edma_issue_pending;
-@@ -883,6 +927,12 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
- 	dma->device_slave_caps = edma_dma_device_slave_caps;
- 	dma->dev = dev;
+-	struct clk_gate *gate = to_clk_gate(hw);
++	struct clk_gate2 *gate = to_clk_gate2(hw);
+ 	u32 reg;
+ 	unsigned long flags = 0;
  
-+	/*
-+	 * code using dma memcpy must make sure alignment of
-+	 * length is at dma->copy_align boundary.
-+	 */
-+	dma->copy_align = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+
- 	INIT_LIST_HEAD(&dma->channels);
- }
+@@ -50,7 +58,7 @@ static int clk_gate2_enable(struct clk_hw *hw)
  
-@@ -911,6 +961,7 @@ static int edma_probe(struct platform_device *pdev)
- 	dma_cap_zero(ecc->dma_slave.cap_mask);
- 	dma_cap_set(DMA_SLAVE, ecc->dma_slave.cap_mask);
- 	dma_cap_set(DMA_CYCLIC, ecc->dma_slave.cap_mask);
-+	dma_cap_set(DMA_MEMCPY, ecc->dma_slave.cap_mask);
+ static void clk_gate2_disable(struct clk_hw *hw)
+ {
+-	struct clk_gate *gate = to_clk_gate(hw);
++	struct clk_gate2 *gate = to_clk_gate2(hw);
+ 	u32 reg;
+ 	unsigned long flags = 0;
  
- 	edma_dma_init(ecc, &ecc->dma_slave, &pdev->dev);
+@@ -68,7 +76,7 @@ static void clk_gate2_disable(struct clk_hw *hw)
+ static int clk_gate2_is_enabled(struct clk_hw *hw)
+ {
+ 	u32 reg;
+-	struct clk_gate *gate = to_clk_gate(hw);
++	struct clk_gate2 *gate = to_clk_gate2(hw);
  
+ 	reg = readl(gate->reg);
+ 
+@@ -89,15 +97,15 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ 		void __iomem *reg, u8 bit_idx,
+ 		u8 clk_gate2_flags, spinlock_t *lock)
+ {
+-	struct clk_gate *gate;
++	struct clk_gate2 *gate;
+ 	struct clk *clk;
+ 	struct clk_init_data init;
+ 
+-	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
++	gate = kzalloc(sizeof(struct clk_gate2), GFP_KERNEL);
+ 	if (!gate)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	/* struct clk_gate assignments */
++	/* struct clk_gate2 assignments */
+ 	gate->reg = reg;
+ 	gate->bit_idx = bit_idx;
+ 	gate->flags = clk_gate2_flags;
 -- 
-1.7.9.5
+1.8.3.2
