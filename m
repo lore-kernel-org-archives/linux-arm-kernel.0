@@ -1,69 +1,87 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 19 Apr 2014 09:27:08 +0200
-Subject: [PATCH 14/29] ARM: orion: switch to a per-platform handle_irq()
- function
-In-Reply-To: <534BBB30.5090602@gmail.com>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-15-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BBB30.5090602@gmail.com>
-Message-ID: <20140419092708.78eb9274@skate>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Sat, 19 Apr 2014 07:32:01 +0000
+Subject: USB OTG support on mx27pdk
+In-Reply-To: <20140416150316.GR13429@pengutronix.de>
+References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
+ <1397627716.685483508@f399.i.mail.ru>
+ <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
+ <1397649526.601497269@f431.i.mail.ru>
+ <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
+ <20140416150316.GR13429@pengutronix.de>
+Message-ID: <77d21aa2203646bf867cfac4b78fef43@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
-
-On Mon, 14 Apr 2014 12:40:48 +0200, Sebastian Hesselbarth wrote:
-
-> > +static asmlinkage void
-> > +__exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
-> > +{
-> > +	u32 stat;
-> > +
-> > +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
-> > +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
-> > +	if (stat) {
-> > +		unsigned int hwirq = __fls(stat);
-> > +		handle_IRQ(hwirq, regs);
-> > +		return;
-> > +	}
+ 
 > 
-> I remember we talked about it already, but IMHO copying the multi-irq
-> handler to mach-{kirkwood,dove} isn't necessary. The only situation we
-> need this is when you compile _one_ mach-{kirkwood,dove,orion5x} with
-> both DT and non-DT.
+> On Wed, Apr 16, 2014 at 09:53:34AM -0300, Fabio Estevam wrote:
+> > On Wed, Apr 16, 2014 at 8:58 AM, Alexander Shiyan <shc_work@mail.ru>
+> wrote:
+> >
+> > > I can tell immediately without further testing,
+> > > this will not work without the USB support in the bootoader because
+> > > we do not have DT support for ULPI.
+> >
+> > The generic nop usb phy should work just fine.
+> >
+> > I have tried Uwe's suggestion from a previous post and reverted:
+> >
+> > commit cd0b42c2a6d2a74244f0053f8960f5dad5842278
+> > Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+> > Date:   Fri Jan 10 13:51:30 2014 +0800
+> >
+> >     usb: chipidea: put hw_phymode_configure before ci_usb_phy_init
+> >
+> >     hw_phymode_configure configures the PORTSC registers and allow the
+> >     following phy_inits to operate on the right parameters. This fix a
+> problem
+> >     where the UPLI (ISP1504) could not be detected, because the
+> Viewport was not
+> >     available and read the viewport return 0's only.
+> >
+> >     Signed-off-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+> >     Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> >     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >
+> >
+> > Then USB OTG port detected the USB pen driver fine:
+> >
+> > usbcore: registered new interface driver usb-storage
+> > 10024000.usb supply vbus not found, using dummy regulator
+> > ci_hdrc ci_hdrc.0: EHCI Host Controller
+> > ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
+> > ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
+> > hub 1-0:1.0: USB hub found
+> > hub 1-0:1.0: 1 port detected
+> > ...
+> > scsi 0:0:0:0: Direct-Access     ChipsBnk Flash Disk       2.00 PQ: 0
+> ANSI: 2
+> > sd 0:0:0:0: [sda] 1035200 512-byte logical blocks: (530 MB/505 MiB)
+> > sd 0:0:0:0: [sda] Write Protect is off
+> > sd 0:0:0:0: [sda] No Caching mode page found
+> > sd 0:0:0:0: [sda] Assuming drive cache: write through
+> >  sda: sda1
+> > sd 0:0:0:0: [sda] Attached SCSI removable disk
+> >
+> > If I understand correctly commit cd0b42c2a was only needed because
+> > Chris was trying to add DT support for ULPI, which never got merged
+> > into mainline.
+> >
+> > If we use the generic nop usb phy instead, we should just revert this
+> commit.
+> >
+> > Any objections?
 > 
-> So, I think it is fine to just add
+> Yes, when this patch got reverted it will probably break usb support
+> on mx6 machines. We have seen different behaviour on several mxc/mxs
+> machines regarding the order of PORTSC and phy configuration.
 > 
-> #if !defined(CONFIG_MACH_ORION5X)
-> > +	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
-> > +	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
-> > +	if (stat) {
-> > +		unsigned int hwirq = 32 + __fls(stat);
-> > +		handle_IRQ(hwirq, regs);
-> > +		return;
-> > +	}
-> #endif
+> We will probably need to test all platforms before reordering this
+> function call again and again for every machine using this driver.
 > 
-> in the original handler?
 
-Nope, it doesn't work, because mach-orion5x doesn't define
-IRQ_VIRT_BASE, IRQ_CAUSE_LOW_OFF and IRQ_MASK_LOW_OFF, so the common
-handler does not build, even after compiling-out the part you mention
-here.
+The below patch is intended to fix above issues for all platforms,
+I have tested it at imx6 platform, if possible, have a test at imx25/imx27
+please.
 
-Of course, Orion5x code can be changed to define those values, but I
-found it was not worth the effort, and Arnd Bergmann during an IRC
-discussion, also suggested to move the handle_irq() function to each
-individual mach-<foo> directory. And it actually makes sense, because
-it's only the same between Kirkwood and Dove: Orion5x and mv78xx0 need
-different implementations.
-
-Also, this approach goes towards the goal of reducing plat-orion/ code.
-Having the code closer to each SoC is going to make it easier to
-progressively get rid of it I believe.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Peter
