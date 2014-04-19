@@ -1,66 +1,31 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 19 Apr 2014 16:36:48 +0200
-Subject: [PATCH 0/2] Support cpufreq driver for Exynos3250
-In-Reply-To: <CAK9yfHxdC7JAJ6CiBsoHWcdbnv53qzs0XNtfjsabGmA6Sgv=ww@mail.gmail.com>
-References: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>	<CAK9yfHygoHZ7hnAcLuuaMEsPb8Tqw-QbcTrQ+b=2CD6kK3odmw@mail.gmail.com>	<CAGTfZH1M9h3Sx73wJsD=_vnSyV-+fyOY041PN_7ea718B0mFoQ@mail.gmail.com>	<53527F54.5020601@gmail.com>
- <CAK9yfHxdC7JAJ6CiBsoHWcdbnv53qzs0XNtfjsabGmA6Sgv=ww@mail.gmail.com>
-Message-ID: <53528A00.6090906@gmail.com>
+From: marek@goldelico.com (Marek Belisko)
+Date: Sat, 19 Apr 2014 17:12:53 +0200
+Subject: [PATCH] ARM: dts: twl4030: Add twl4030-madc node
+Message-ID: <1397920373-12073-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add madc node to twl4030 so DT boards can use it.
 
+Signed-off-by: Marek Belisko <marek@goldelico.com>
+---
+ arch/arm/boot/dts/twl4030.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-On 19.04.2014 16:35, Sachin Kamat wrote:
-> Hi Tomasz,
->
->
-> On 19 April 2014 19:21, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Chanwoo, Sachin,
->>
->>
->> On 19.04.2014 15:43, Chanwoo Choi wrote:
->>>
->>> Hi Sachin,
->>>
->>> On Fri, Apr 18, 2014 at 5:14 PM, Sachin Kamat <sachin.kamat@linaro.org>
->>> wrote:
->>>>
->>>> Hi Chanwoo,
->>>>
->>>> On 18 April 2014 07:50, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->>>>>
->>>>> This patchset support cpufreq driver for Exynos3250 which uses the
->>>>> Cortex-A7
->>>>> dual cores and has a target speed of 1.0 GHz and code clean using
->>>>> dev_err/info
->>>>> instead of pr_err/info function.
->>>>
->>>>
->>>> Per SoC cpufreq driver which does not use CCF is no more encouraged for
->>>> new
->>>> Exynos platforms. Thomas has already posted patches to make use of
->>>> generic cpu freq driver
->>>> on Exynos platforms. Please refer to [1] and try to utilize it for
->>>> this platform as well.
->>>>
->>>> [1] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/26886
->>>
->>>
->>> OK, I'll refer to this new patch for cpufreq and rebase it.
->>>
->>> Thanks for your reply.
->>
->>
->> The last version posted by Thomas still had several comments to be addressed
->> that could lead to quite big changes in the whole design in next version.
->> According to the information from Thomas, the work on it is in progress and
->> we should see updated patchset soon.
->
-> Yes, that is right. I wanted Chanwoo to be aware of this new design
-> and track the same.
->
-
-Sure. Just wanted to make sure this is clear.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+index 86cfc7d..36ae916 100644
+--- a/arch/arm/boot/dts/twl4030.dtsi
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -152,4 +152,10 @@
+ 		keypad,num-rows = <8>;
+ 		keypad,num-columns = <8>;
+ 	};
++
++	twl_madc: madc {
++		compatible = "ti,twl4030-madc";
++		interrupts = <3>;
++		#io-channel-cells = <1>;
++	};
+ };
+-- 
+1.8.3.2
