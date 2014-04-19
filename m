@@ -1,110 +1,87 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 19 Apr 2014 19:28:46 +0200
-Subject: [PATCH 02/29] pinctrl: mvebu: new driver for Orion platforms
-In-Reply-To: <534BA725.9010609@gmail.com>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BA725.9010609@gmail.com>
-Message-ID: <20140419192846.78ff71ab@skate>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Sat, 19 Apr 2014 21:03:10 +0200
+Subject: [RFC 1/3] atmel: drm: added drm driver for the atmel hlcd
+ controller
+In-Reply-To: <CAOCHtYiCq6SBadzashe+mwKmx8_23=-++zyhRM=dtjEbgrQ98w@mail.gmail.com>
+References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
+ <1397814309-32160-2-git-send-email-jjhiblot@traphandler.com>
+ <535126D2.4080406@free-electrons.com>
+ <CAOCHtYiCq6SBadzashe+mwKmx8_23=-++zyhRM=dtjEbgrQ98w@mail.gmail.com>
+Message-ID: <CACh+v5OoGqsF8bU=y-ToX8q+vv=6t0soLtMM3ZvC4DsE=0MbZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+Thanks for the patch Robert.
+I've just noticed that I actually worked with an old version of the
+kernel (v3.14-rc3) when I thought it based on 3.15.
 
-Thanks for your review!
+JJ
 
-On Mon, 14 Apr 2014 11:15:17 +0200, Sebastian Hesselbarth wrote:
-
-> > +* Marvell Orion 88f5182
-> > +
-> > +name          pins     functions
-> > +================================================================================
-> > +mpp0          0        pci(rstout), pci(req2), gpio
-> 
-> Shouldn't the above pcie(rstout)?
-> 
-> The one available datasheet I have for 5182 names the function
-> PEX_RST_OUTn, which is PCIexpress then.
-
-Indeed, fixed.
-
-> > +mpp1          1        gpio, pci(gnt2)
-> > +mpp2          2        gpio, pci(req3), pci(pme)
-> 
-> pinctrl-mvebu isn't that good with identically named functions.
-> You need to rename one of the "pci" functions to e.g. "pci-1".
-
-Done.
-
-> > +mpp3          3        gpio, pci(gnt3)
-> > +mpp4          4        gpio, pci(req4), bootnand(re), sata0(prsnt)
-> > +mpp5          5        gpio, pci(gnt4), bootnand(we), sata1(prsnt)
-> > +mpp6          6        gpio, pci(req5), nand(re0), sata0(act)
-> > +mpp7          7        gpio, pci(gnt5), nand(we0), sata1(act)
-> > +mpp8          8        gpio, ge(col)
-> > +mpp9          9        gpio, ge(rxerr)
-> > +mpp10         10       gpio, ge(crs)
-> > +mpp11         11       gpio, ge(txerr)
-> > +mpp12         12       gpio, ge(txd4), nand(re1), sata0(ledprsnt)
-> > +mpp13         13       gpio, ge(txd5), nand(we1), sata1(ledprsnt)
-> > +mpp14         14       gpio, ge(txd6), nand(re2), sata0(ledact)
-> > +mpp15         15       gpio, ge(txd7), nand(we2), sata1(ledact)
-> 
-> Four "led" prefixes above should be removed.
-
-I don't agree, because there would then be no difference between
-sata0(act) and sata0(ledact), even if in the datasheet, their
-description is different:
-
- * SATA 0 active indication (for which I've used "sata0(act)")
- * SATA 0 presence LED indication (Active Low) (for which I've used
-   "sata0(ledact)")
-
-Do you have another suggestion?
-
-
-> > +static struct mvebu_mpp_ctrl orion_mpp_controls[] = {
-> > +	MPP_FUNC_CTRL(0, 19, NULL, orion_mpp_ctrl),
-> > +};
-> > +
-> > +static struct pinctrl_gpio_range mv88f5181l_gpio_ranges[] = {
-> > +	MPP_GPIO_RANGE(0, 0, 0, 16),
-> > +};
-> > +
-> > +static struct pinctrl_gpio_range mv88f5182_gpio_ranges[] = {
-> > +	MPP_GPIO_RANGE(0, 0, 0, 19),
-> > +};
-> > +
-> > +static struct pinctrl_gpio_range mv88f5281_gpio_ranges[] = {
-> > +	MPP_GPIO_RANGE(0, 0, 0, 16),
-> > +};
-> 
-> mv88f5181l_gpio_ranges == mv88f5281_gpio_ranges.
-> 
-> You can possibly join them to mv88f5x81_gpio ranges, but I have
-> no strong opinion about it.
-
-I prefer to have them all for each SoC, for consistency.
-
-
-> > +static int orion_pinctrl_probe(struct platform_device *pdev)
-> > +{
-> > +	const struct of_device_id *match =
-> > +		of_match_device(orion_pinctrl_of_match, &pdev->dev);
-> > +	struct resource *res;
-> > +
-> > +	pdev->dev.platform_data = (void*) match->data;
-> 
-> Useless (void *) cast?
-
-No: there is the same cast in pinctrl-dove.c and pinctrl-kirkwood.c.
-The reason is a bit ugly: match->data is "const" but
-pdev->dev.platform_data is not. Certainly something to fix at some
-point, but probably not as part of this patch series, since Dove and
-Kirkwood are already doing the bad thing :)
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2014-04-18 16:31 GMT+02:00 Robert Nelson <robertcnelson@gmail.com>:
+>
+> On Fri, Apr 18, 2014 at 8:21 AM, Boris BREZILLON
+> <boris.brezillon@free-electrons.com> wrote:
+>> Hi JJ,
+>>
+>> On 18/04/2014 11:45, Jean-Jacques Hiblot wrote:
+>>> +
+>>> +static void update_scanout(struct drm_crtc *crtc)
+>>> +{
+>>> +     struct atmel_hlcdc_crtc *hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
+>>> +     struct drm_device *dev = crtc->dev;
+>>> +     struct atmel_hlcdc_drm_private *priv = dev->dev_private;
+>>> +     struct drm_framebuffer *fb = crtc->fb;
+>>> +
+>>
+>> I guess you meant
+>>
+>> struct drm_framebuffer *fb = hclcd_crtc->fb;
+>>
+>>
+>> because otherwise you get an error when compiling (there are similar
+>> issues below).
+>
+> This fixes this with v3.15-rc1
+>
+> diff --git a/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
+> b/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
+> index 649fa19..a111d69 100644
+> --- a/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
+> +++ b/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
+> @@ -81,7 +81,7 @@ static void update_scanout(struct drm_crtc *crtc)
+>   struct atmel_hlcdc_crtc *hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
+>   struct drm_device *dev = crtc->dev;
+>   struct atmel_hlcdc_drm_private *priv = dev->dev_private;
+> - struct drm_framebuffer *fb = crtc->fb;
+> + struct drm_framebuffer *fb = crtc->primary->fb;
+>
+>   struct drm_gem_cma_object *gem;
+>   struct atmel_hlcd_dma_desc *desc = hlcdc_crtc->dma_descs[DMA_BASE];
+> @@ -188,7 +188,7 @@ static int atmel_hlcdc_crtc_page_flip(struct drm_crtc *crtc,
+>   return -EBUSY;
+>   }
+>
+> - crtc->fb = fb;
+> + crtc->primary->fb = fb;
+>   atmel_hlcdc_crtc->event = event;
+>   update_scanout(crtc);
+>   return 0;
+> @@ -397,7 +397,7 @@ static int atmel_hlcdc_crtc_mode_set(struct drm_crtc *crtc,
+>   hlcdc_write(dev, ATMEL_LCDC_BASECFG0,
+>      LCDC_BASECFG0_BLEN_AHB_INCR16 | LCDC_BASECFG0_DLBO);
+>
+> - drm_fb_get_bpp_depth(crtc->fb->pixel_format, &depth, &bpp);
+> + drm_fb_get_bpp_depth(crtc->primary->fb->pixel_format, &depth, &bpp);
+>   hlcdc_write(dev, ATMEL_LCDC_BASECFG1,
+>      atmel_hlcdfb_get_rgbmode(dev->dev, depth, bpp));
+>   hlcdc_write(dev, ATMEL_LCDC_BASECFG2, 0);
+>
+> Tested-by: Robert Nelson <robertcnelson@gmail.com>
+>
+> digs out my 31/33/34, should have a patch for them in a bit...
+>
+> Regards,
+>
+> --
+> Robert Nelson
+> http://www.rcn-ee.com/
