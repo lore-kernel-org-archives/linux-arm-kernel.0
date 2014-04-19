@@ -1,39 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 19 Apr 2014 18:16:32 +0200
-Subject: [PATCH 14/29] ARM: orion: switch to a per-platform handle_irq()
- function
-In-Reply-To: <20140419140447.4f443551@skate>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-15-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BBB30.5090602@gmail.com> <20140419092708.78eb9274@skate>
- <53523D40.4080703@gmail.com> <20140419140447.4f443551@skate>
-Message-ID: <5352A160.7090905@gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sat, 19 Apr 2014 12:21:28 -0400
+Subject: current->sched_class->yield_task is NULL, any hint?
+In-Reply-To: <CAF1ivSa6_ir0LwiydugzSdEqNoVy7evbb7N6QX_02H32A1dwmw@mail.gmail.com>
+References: <CAF1ivSbZKbDc+rzd+CUqCzNmSgZmZTE-QeSU-2WmSiuEs-Kw_w@mail.gmail.com>
+ <20140409194742.GC26782@laptop.programming.kicks-ass.net>
+ <20140409200836.GE26782@laptop.programming.kicks-ass.net>
+ <CAF1ivSa6_ir0LwiydugzSdEqNoVy7evbb7N6QX_02H32A1dwmw@mail.gmail.com>
+Message-ID: <CAP=VYLp61h_i+RyuUfowO9CqjV6ohMZ=FSgqQbxv6WQjXR1_6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2014 02:04 PM, Thomas Petazzoni wrote:
-> Dear Sebastian Hesselbarth,
->>> Also, this approach goes towards the goal of reducing plat-orion/ code.
->>> Having the code closer to each SoC is going to make it easier to
->>> progressively get rid of it I believe.
+On Wed, Apr 9, 2014 at 5:39 PM, Lin Ming <minggr@gmail.com> wrote:
+> On Wed, Apr 9, 2014 at 1:08 PM, Peter Zijlstra <peterz@infradead.org> wrote:
+
+[...]
+
+>>>
+>>> Look at that, its calling yield() from a non-preemptible context as
+>>> well.
+>>>
+>>> That code is full of fail.
 >>
->> Ok, I agree. But IIRC the multi-irq handler is only needed, if you
->> compile both DT and non-DT in one kernel, right?
-> 
-> Correct.
-> 
->> Dove DT just left mach-dove, so there is no way you can compile both.
->> For the sake of simplicity, I'd even agree on adding it now and
->> remove it later again. But at least for Dove, the move is bogus.
-> 
-> I think there's a lot of possible following clean up to be made. But we
-> have to define some limits to the current patch series, otherwise it's
-> going to grow to a 50+ patches monster that will be very hard to merge.
-> I clearly agree some of things are not in their final ideal state, but
-> I believe, overall, this patch series for Orion5x is pushing things in
-> the right direction, no?
+>> *phew* none of that br_igmp_* muck lives in any kernel tree near me so I
+>> can stop worrying :-)
+>
+> It's our internal code.
 
-Agreed, the patch set is a great step for Orion5x. Let's do proper
-cleanup afterwards. Thanks for working on it!
+In the future, please don't simply call it 3.4-rt when there are a bunch of
+vendor/project/SDK patches also applied, as that can be very misleading
+to the people you are asking for help from.  If it is a hybrid franken-kernel
+then please at least indicate that right at the very beginning.
 
-Sebastian
+Paul.
+--
+
+>
+>>
+>> In any case, it wrongly passes a GFP_WAIT along to netlink_broadcast.
+>
+> I'll fix it.
+> Thanks very much.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
