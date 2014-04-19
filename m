@@ -1,22 +1,110 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 19 Apr 2014 14:09:51 -0300
-Subject: USB OTG support on mx27pdk
-In-Reply-To: <77d21aa2203646bf867cfac4b78fef43@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
- <1397627716.685483508@f399.i.mail.ru>
- <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
- <1397649526.601497269@f431.i.mail.ru>
- <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
- <20140416150316.GR13429@pengutronix.de>
- <77d21aa2203646bf867cfac4b78fef43@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <CAOMZO5A1CQP3jLJKs1HJupc8GxXzKMf7czTx21=PxomyENhhTw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 19 Apr 2014 19:28:46 +0200
+Subject: [PATCH 02/29] pinctrl: mvebu: new driver for Orion platforms
+In-Reply-To: <534BA725.9010609@gmail.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <534BA725.9010609@gmail.com>
+Message-ID: <20140419192846.78ff71ab@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 19, 2014 at 4:32 AM, Peter Chen <Peter.Chen@freescale.com> wrote:
-> The below patch is intended to fix above issues for all platforms,
-> I have tested it at imx6 platform, if possible, have a test at imx25/imx27
-> please.
+Sebastian,
 
-I don't see any patch below, but anyway I have managed to fix the
-issue on mx27 at dts level.
+Thanks for your review!
+
+On Mon, 14 Apr 2014 11:15:17 +0200, Sebastian Hesselbarth wrote:
+
+> > +* Marvell Orion 88f5182
+> > +
+> > +name          pins     functions
+> > +================================================================================
+> > +mpp0          0        pci(rstout), pci(req2), gpio
+> 
+> Shouldn't the above pcie(rstout)?
+> 
+> The one available datasheet I have for 5182 names the function
+> PEX_RST_OUTn, which is PCIexpress then.
+
+Indeed, fixed.
+
+> > +mpp1          1        gpio, pci(gnt2)
+> > +mpp2          2        gpio, pci(req3), pci(pme)
+> 
+> pinctrl-mvebu isn't that good with identically named functions.
+> You need to rename one of the "pci" functions to e.g. "pci-1".
+
+Done.
+
+> > +mpp3          3        gpio, pci(gnt3)
+> > +mpp4          4        gpio, pci(req4), bootnand(re), sata0(prsnt)
+> > +mpp5          5        gpio, pci(gnt4), bootnand(we), sata1(prsnt)
+> > +mpp6          6        gpio, pci(req5), nand(re0), sata0(act)
+> > +mpp7          7        gpio, pci(gnt5), nand(we0), sata1(act)
+> > +mpp8          8        gpio, ge(col)
+> > +mpp9          9        gpio, ge(rxerr)
+> > +mpp10         10       gpio, ge(crs)
+> > +mpp11         11       gpio, ge(txerr)
+> > +mpp12         12       gpio, ge(txd4), nand(re1), sata0(ledprsnt)
+> > +mpp13         13       gpio, ge(txd5), nand(we1), sata1(ledprsnt)
+> > +mpp14         14       gpio, ge(txd6), nand(re2), sata0(ledact)
+> > +mpp15         15       gpio, ge(txd7), nand(we2), sata1(ledact)
+> 
+> Four "led" prefixes above should be removed.
+
+I don't agree, because there would then be no difference between
+sata0(act) and sata0(ledact), even if in the datasheet, their
+description is different:
+
+ * SATA 0 active indication (for which I've used "sata0(act)")
+ * SATA 0 presence LED indication (Active Low) (for which I've used
+   "sata0(ledact)")
+
+Do you have another suggestion?
+
+
+> > +static struct mvebu_mpp_ctrl orion_mpp_controls[] = {
+> > +	MPP_FUNC_CTRL(0, 19, NULL, orion_mpp_ctrl),
+> > +};
+> > +
+> > +static struct pinctrl_gpio_range mv88f5181l_gpio_ranges[] = {
+> > +	MPP_GPIO_RANGE(0, 0, 0, 16),
+> > +};
+> > +
+> > +static struct pinctrl_gpio_range mv88f5182_gpio_ranges[] = {
+> > +	MPP_GPIO_RANGE(0, 0, 0, 19),
+> > +};
+> > +
+> > +static struct pinctrl_gpio_range mv88f5281_gpio_ranges[] = {
+> > +	MPP_GPIO_RANGE(0, 0, 0, 16),
+> > +};
+> 
+> mv88f5181l_gpio_ranges == mv88f5281_gpio_ranges.
+> 
+> You can possibly join them to mv88f5x81_gpio ranges, but I have
+> no strong opinion about it.
+
+I prefer to have them all for each SoC, for consistency.
+
+
+> > +static int orion_pinctrl_probe(struct platform_device *pdev)
+> > +{
+> > +	const struct of_device_id *match =
+> > +		of_match_device(orion_pinctrl_of_match, &pdev->dev);
+> > +	struct resource *res;
+> > +
+> > +	pdev->dev.platform_data = (void*) match->data;
+> 
+> Useless (void *) cast?
+
+No: there is the same cast in pinctrl-dove.c and pinctrl-kirkwood.c.
+The reason is a bit ugly: match->data is "const" but
+pdev->dev.platform_data is not. Certainly something to fix at some
+point, but probably not as part of this patch series, since Dove and
+Kirkwood are already doing the bad thing :)
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
