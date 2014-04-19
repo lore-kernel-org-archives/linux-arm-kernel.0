@@ -1,57 +1,108 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 18 Apr 2014 18:57:00 -0700
-Subject: [PATCH v3] regmap: i2c: fallback to SMBus if the adapter does
- not support standard I2C
-In-Reply-To: <1397851901-16390-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397851901-16390-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5351D7EC.80902@roeck-us.net>
+From: joelf@ti.com (Joel Fernandes)
+Date: Fri, 18 Apr 2014 21:50:33 -0500
+Subject: [PATCH] dmaengine: edma: Add DMA memcpy support
+Message-ID: <1397875833-31345-1-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2014 01:11 PM, Boris BREZILLON wrote:
-> Some I2C adapters are only compatible with the SMBus protocol and do not
-> support standard I2C transfers.
->
-> Fallback to SMBus transfers if we encounter such kind of adapters.
-> The transfer type is chosen according to the val_bits field in the regmap
-> config.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
+We add DMA memcpy support to EDMA driver. Successful tests performed using
+dmatest kernel module. Copy alignment is set to DMA_SLAVE_BUSWIDTH_4_BYTES and
+users must ensure length is aligned so that copy is performed fully.
 
-[ ... ]
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ drivers/dma/edma.c |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
->   /**
->    * regmap_init_i2c(): Initialise register map
->    *
-> @@ -109,7 +199,12 @@ static struct regmap_bus regmap_i2c = {
->   struct regmap *regmap_init_i2c(struct i2c_client *i2c,
->   			       const struct regmap_config *config)
->   {
-> -	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-> +	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
-> +
-> +	if (IS_ERR(bus))
-> +		return ERR_PTR(PTR_ERR(bus));
-> +
-This seems clumsy. You should be able to use ERR_CAST() instead.
-Also see Documentation/coccinelle.txt and scripts/coccinelle/api/err_cast.cocci.
-
-> +	return regmap_init(&i2c->dev, bus, &i2c->dev, config);
->   }
->   EXPORT_SYMBOL_GPL(regmap_init_i2c);
->
-> @@ -126,7 +221,12 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
->   struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
->   				    const struct regmap_config *config)
->   {
-> -	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
-> +	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
-> +
-> +	if (IS_ERR(bus))
-> +		return ERR_PTR(PTR_ERR(bus));
-> +
-Same here.
-
-Guenter
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 25a75e2..072f642 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -378,6 +378,11 @@ static int edma_config_pset(struct dma_chan *chan, struct edmacc_param *pset,
+ 		src_cidx = 0;
+ 		dst_bidx = acnt;
+ 		dst_cidx = cidx;
++	} else if (direction == DMA_MEM_TO_MEM)  {
++		src_bidx = acnt;
++		src_cidx = cidx;
++		dst_bidx = acnt;
++		dst_cidx = cidx;
+ 	} else {
+ 		dev_err(dev, "%s: direction not implemented yet\n", __func__);
+ 		return -EINVAL;
+@@ -498,6 +503,44 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
+ 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+ }
+ 
++struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
++	struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
++	size_t len, unsigned long tx_flags)
++{
++	int ret;
++	struct edma_desc *edesc;
++	struct device *dev = chan->device->dev;
++	struct edma_chan *echan = to_edma_chan(chan);
++
++	if (unlikely(!echan || !len))
++		return NULL;
++
++	edesc = kzalloc(sizeof(*edesc) + sizeof(edesc->pset[0]), GFP_ATOMIC);
++	if (!edesc) {
++		dev_dbg(dev, "Failed to allocate a descriptor\n");
++		return NULL;
++	}
++
++	edesc->pset_nr = 1;
++
++	ret = edma_config_pset(chan, &edesc->pset[0], src, dest, 1,
++			       DMA_SLAVE_BUSWIDTH_4_BYTES, len, DMA_MEM_TO_MEM);
++	if (ret < 0)
++		return NULL;
++
++	edesc->absync = ret;
++
++	/*
++	 * Enable intermediate transfer chaining to re-trigger channel
++	 * on completion of every TR, and enable transfer-completion
++	 * interrupt on completion of the whole transfer.
++	 */
++	edesc->pset[0].opt |= ITCCHEN;
++	edesc->pset[0].opt |= TCINTEN;
++
++	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
++}
++
+ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
+ 	struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+ 	size_t period_len, enum dma_transfer_direction direction,
+@@ -875,6 +918,7 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+ {
+ 	dma->device_prep_slave_sg = edma_prep_slave_sg;
+ 	dma->device_prep_dma_cyclic = edma_prep_dma_cyclic;
++	dma->device_prep_dma_memcpy = edma_prep_dma_memcpy;
+ 	dma->device_alloc_chan_resources = edma_alloc_chan_resources;
+ 	dma->device_free_chan_resources = edma_free_chan_resources;
+ 	dma->device_issue_pending = edma_issue_pending;
+@@ -883,6 +927,12 @@ static void edma_dma_init(struct edma_cc *ecc, struct dma_device *dma,
+ 	dma->device_slave_caps = edma_dma_device_slave_caps;
+ 	dma->dev = dev;
+ 
++	/*
++	 * code using dma memcpy must make sure alignment of
++	 * length is at dma->copy_align boundary.
++	 */
++	dma->copy_align = DMA_SLAVE_BUSWIDTH_4_BYTES;
++
+ 	INIT_LIST_HEAD(&dma->channels);
+ }
+ 
+@@ -911,6 +961,7 @@ static int edma_probe(struct platform_device *pdev)
+ 	dma_cap_zero(ecc->dma_slave.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, ecc->dma_slave.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, ecc->dma_slave.cap_mask);
++	dma_cap_set(DMA_MEMCPY, ecc->dma_slave.cap_mask);
+ 
+ 	edma_dma_init(ecc, &ecc->dma_slave, &pdev->dev);
+ 
+-- 
+1.7.9.5
