@@ -1,84 +1,92 @@
 From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Sat, 19 Apr 2014 21:03:10 +0200
-Subject: [RFC 1/3] atmel: drm: added drm driver for the atmel hlcd
- controller
-In-Reply-To: <CAOCHtYiCq6SBadzashe+mwKmx8_23=-++zyhRM=dtjEbgrQ98w@mail.gmail.com>
+Date: Sat, 19 Apr 2014 21:07:41 +0200
+Subject: [RFC 3/3] atmel: dt: Add supports for the lcdc support on the
+ sama5d36ek
+In-Reply-To: <CAOCHtYjkUnWiGHG6v5Op-=3AxEW9sJ9xaSWkmu6Bg-6q23L2=g@mail.gmail.com>
 References: <1397814309-32160-1-git-send-email-jjhiblot@traphandler.com>
- <1397814309-32160-2-git-send-email-jjhiblot@traphandler.com>
- <535126D2.4080406@free-electrons.com>
- <CAOCHtYiCq6SBadzashe+mwKmx8_23=-++zyhRM=dtjEbgrQ98w@mail.gmail.com>
-Message-ID: <CACh+v5OoGqsF8bU=y-ToX8q+vv=6t0soLtMM3ZvC4DsE=0MbZg@mail.gmail.com>
+ <1397814309-32160-4-git-send-email-jjhiblot@traphandler.com>
+ <CAOCHtYjkUnWiGHG6v5Op-=3AxEW9sJ9xaSWkmu6Bg-6q23L2=g@mail.gmail.com>
+Message-ID: <CACh+v5MyeCkCz=8w-5iNRrgxRiOdPsQV5zExMiZmdFTYX9dJ3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the patch Robert.
-I've just noticed that I actually worked with an old version of the
-kernel (v3.14-rc3) when I thought it based on 3.15.
+2014-04-18 16:48 GMT+02:00 Robert Nelson <robertcnelson@gmail.com>:
+>
+> On Fri, Apr 18, 2014 at 4:45 AM, Jean-Jacques Hiblot
+> <jjhiblot@traphandler.com> wrote:
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>> ---
+>>  arch/arm/boot/dts/sama5d36ek.dts | 27 ++++++++++++++++++++++++++-
+>>  1 file changed, 26 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d36ek.dts b/arch/arm/boot/dts/sama5d36ek.dts
+>> index 59576c6..df01037 100644
+>> --- a/arch/arm/boot/dts/sama5d36ek.dts
+>> +++ b/arch/arm/boot/dts/sama5d36ek.dts
+>> @@ -11,12 +11,17 @@
+>>  #include "sama5d3xmb.dtsi"
+>>  #include "sama5d3xdm.dtsi"
+>>
+>> +
+>
+> extra space
+>
+>>  / {
+>>         model = "Atmel SAMA5D36-EK";
+>>         compatible = "atmel,sama5d36ek", "atmel,sama5d3xmb", "atmel,sama5d3xcm", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
+>>
+>>         ahb {
+>>                 apb {
+>> +                       hlcdc: hlcdc at f0030000 {
+>> +                               status = "okay";
+>> +                       };
+>> +
+>>                         spi0: spi at f0004000 {
+>>                                 status = "okay";
+>>                         };
+>> @@ -46,7 +51,27 @@
+>>                         };
+>>                 };
+>>         };
+>> -
+>> +       panel {
+>> +               compatible = "atmel,hlcdc,panel";
+>> +               invert-hsync;
+>> +               invert-vsync;
+>> +               status = "okay";
+>> +               display-timings {
+>> +                       800x480p60 {
+>> +                               clock-frequency = <33260000>;
+>> +                               hactive = <800>;
+>> +                               vactive = <480>;
+>> +                               hfront-porch = <168>;
+>> +                               hback-porch = <88>;
+>> +                               hsync-len = <64>;
+>> +                               vback-porch = <8>;
+>> +                               vfront-porch = <37>;
+>> +                               vsync-len = <2>;
+>> +                               hsync-active = <1>;
+>> +                               vsync-active = <1>;
+>> +                       };
+>> +               };
+>> +       };
+>>         sound {
+>>                 status = "okay";
+>>         };
+>> --
+>> 1.9.1
+>
+> Feel free to merge in this patch:
+>
+> https://github.com/RobertCNelson/armv7_devel/blob/v3.15.x-sama5-armv7/patches/drm/0005-atmel-dt-Add-supports-for-the-lcdc-support-on-the-sa.patch
+>
+Thanks for the patch.
+> With this commit..
+>
+> All tested with sama5d31/33/34/36ek board's..
 
-JJ
+and many thanks for the testing.
 
-2014-04-18 16:31 GMT+02:00 Robert Nelson <robertcnelson@gmail.com>:
->
-> On Fri, Apr 18, 2014 at 8:21 AM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
->> Hi JJ,
->>
->> On 18/04/2014 11:45, Jean-Jacques Hiblot wrote:
->>> +
->>> +static void update_scanout(struct drm_crtc *crtc)
->>> +{
->>> +     struct atmel_hlcdc_crtc *hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
->>> +     struct drm_device *dev = crtc->dev;
->>> +     struct atmel_hlcdc_drm_private *priv = dev->dev_private;
->>> +     struct drm_framebuffer *fb = crtc->fb;
->>> +
->>
->> I guess you meant
->>
->> struct drm_framebuffer *fb = hclcd_crtc->fb;
->>
->>
->> because otherwise you get an error when compiling (there are similar
->> issues below).
->
-> This fixes this with v3.15-rc1
->
-> diff --git a/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
-> b/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
-> index 649fa19..a111d69 100644
-> --- a/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
-> +++ b/drivers/gpu/drm/atmel_hlcdc/atmel_hlcdc_crtc.c
-> @@ -81,7 +81,7 @@ static void update_scanout(struct drm_crtc *crtc)
->   struct atmel_hlcdc_crtc *hlcdc_crtc = to_atmel_hlcdc_crtc(crtc);
->   struct drm_device *dev = crtc->dev;
->   struct atmel_hlcdc_drm_private *priv = dev->dev_private;
-> - struct drm_framebuffer *fb = crtc->fb;
-> + struct drm_framebuffer *fb = crtc->primary->fb;
->
->   struct drm_gem_cma_object *gem;
->   struct atmel_hlcd_dma_desc *desc = hlcdc_crtc->dma_descs[DMA_BASE];
-> @@ -188,7 +188,7 @@ static int atmel_hlcdc_crtc_page_flip(struct drm_crtc *crtc,
->   return -EBUSY;
->   }
->
-> - crtc->fb = fb;
-> + crtc->primary->fb = fb;
->   atmel_hlcdc_crtc->event = event;
->   update_scanout(crtc);
->   return 0;
-> @@ -397,7 +397,7 @@ static int atmel_hlcdc_crtc_mode_set(struct drm_crtc *crtc,
->   hlcdc_write(dev, ATMEL_LCDC_BASECFG0,
->      LCDC_BASECFG0_BLEN_AHB_INCR16 | LCDC_BASECFG0_DLBO);
->
-> - drm_fb_get_bpp_depth(crtc->fb->pixel_format, &depth, &bpp);
-> + drm_fb_get_bpp_depth(crtc->primary->fb->pixel_format, &depth, &bpp);
->   hlcdc_write(dev, ATMEL_LCDC_BASECFG1,
->      atmel_hlcdfb_get_rgbmode(dev->dev, depth, bpp));
->   hlcdc_write(dev, ATMEL_LCDC_BASECFG2, 0);
->
-> Tested-by: Robert Nelson <robertcnelson@gmail.com>
->
-> digs out my 31/33/34, should have a patch for them in a bit...
 >
 > Regards,
 >
