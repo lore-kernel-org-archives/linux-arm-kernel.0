@@ -1,87 +1,68 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 19 Apr 2014 13:01:30 +0800
-Subject: [PATCH 1/4] ARM: imx: define struct clk_gate2 on our own
+Date: Sat, 19 Apr 2014 13:01:33 +0800
+Subject: [PATCH 4/4] ARM: imx6q: add the missing esai_ahb clock
 In-Reply-To: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
 References: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1397883693-26101-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1397883693-26101-5-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx clk-gate2 driver implements an i.MX specific gate clock, which
-has two bits controlling the gate states.  While this is a completely
-separate gate driver from the common clk-gate one, it reuses the common
-clk_gate structure.  Such reusing makes the extending of clk_gate2
-clumsy.  Let's define struct clk_gate2 on our own to make the driver
-independent of the common clk-gate one, and ease the clk_gate2 extending
-at a later time.
+The esai_ahb clock is derived from ahb and used to provide ESAI the
+capability of register accessing and FSYS clock source for I2S clocks
+dividing.  The gate bits of this esai_ahb clock are shared with the
+esai clock -- the baud clock, so we need to call imx_clk_gate2_shared()
+for these two clocks.
 
+Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/clk-gate2.c | 22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+ Documentation/devicetree/bindings/clock/imx6q-clock.txt | 1 +
+ arch/arm/mach-imx/clk-imx6q.c                           | 7 +++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-index a2ecc00..7e98ccb 100644
---- a/arch/arm/mach-imx/clk-gate2.c
-+++ b/arch/arm/mach-imx/clk-gate2.c
-@@ -27,11 +27,19 @@
-  * parent - fixed parent.  No clk_set_parent support
-  */
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index 6aab72b..90ec91f 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -220,6 +220,7 @@ clocks and IDs.
+ 	lvds2_sel		205
+ 	lvds1_gate		206
+ 	lvds2_gate		207
++	esai_ahb		208
  
--#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
-+struct clk_gate2 {
-+	struct clk_hw hw;
-+	void __iomem	*reg;
-+	u8		bit_idx;
-+	u8		flags;
-+	spinlock_t	*lock;
-+};
+ Examples:
+ 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 8440878..8e795de 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -107,7 +107,7 @@ enum mx6q_clks {
+ 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+ 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+ 	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, pll4_audio_div,
+-	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, clk_max
++	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, esai_ahb, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -140,6 +140,8 @@ static struct clk_div_table video_div_table[] = {
+ 	{ /* sentinel */ }
+ };
+ 
++static unsigned int share_count_esai;
 +
-+#define to_clk_gate2(_hw) container_of(_hw, struct clk_gate2, hw)
- 
- static int clk_gate2_enable(struct clk_hw *hw)
+ static void __init imx6q_clocks_init(struct device_node *ccm_node)
  {
--	struct clk_gate *gate = to_clk_gate(hw);
-+	struct clk_gate2 *gate = to_clk_gate2(hw);
- 	u32 reg;
- 	unsigned long flags = 0;
- 
-@@ -50,7 +58,7 @@ static int clk_gate2_enable(struct clk_hw *hw)
- 
- static void clk_gate2_disable(struct clk_hw *hw)
- {
--	struct clk_gate *gate = to_clk_gate(hw);
-+	struct clk_gate2 *gate = to_clk_gate2(hw);
- 	u32 reg;
- 	unsigned long flags = 0;
- 
-@@ -68,7 +76,7 @@ static void clk_gate2_disable(struct clk_hw *hw)
- static int clk_gate2_is_enabled(struct clk_hw *hw)
- {
- 	u32 reg;
--	struct clk_gate *gate = to_clk_gate(hw);
-+	struct clk_gate2 *gate = to_clk_gate2(hw);
- 
- 	reg = readl(gate->reg);
- 
-@@ -89,15 +97,15 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		void __iomem *reg, u8 bit_idx,
- 		u8 clk_gate2_flags, spinlock_t *lock)
- {
--	struct clk_gate *gate;
-+	struct clk_gate2 *gate;
- 	struct clk *clk;
- 	struct clk_init_data init;
- 
--	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	gate = kzalloc(sizeof(struct clk_gate2), GFP_KERNEL);
- 	if (!gate)
- 		return ERR_PTR(-ENOMEM);
- 
--	/* struct clk_gate assignments */
-+	/* struct clk_gate2 assignments */
- 	gate->reg = reg;
- 	gate->bit_idx = bit_idx;
- 	gate->flags = clk_gate2_flags;
+ 	struct device_node *np;
+@@ -358,7 +360,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	else
+ 		clk[ecspi5] = imx_clk_gate2("ecspi5",      "ecspi_root",        base + 0x6c, 8);
+ 	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
+-	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
++	clk[esai]         = imx_clk_gate2_shared("esai",   "esai_podf",         base + 0x6c, 16, &share_count_esai);
++	clk[esai_ahb]     = imx_clk_gate2_shared("esai_ahb", "ahb",             base + 0x6c, 16, &share_count_esai);
+ 	clk[gpt_ipg]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
+ 	clk[gpt_ipg_per]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
+ 	if (cpu_is_imx6dl())
 -- 
 1.8.3.2
