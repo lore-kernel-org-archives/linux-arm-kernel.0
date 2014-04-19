@@ -1,21 +1,22 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 19 Apr 2014 18:45:56 +0200
-Subject: [PATCH 1/2] ARM: mvebu: remove unnecessary ifdef around
- l2x0_of_init
-In-Reply-To: <1397925170-8202-2-git-send-email-gregory.clement@free-electrons.com>
+Date: Sat, 19 Apr 2014 18:46:41 +0200
+Subject: [PATCH 2/2] ARM: mvebu: fix the name of the parameter used in
+ mvebu_get_soc_id
+In-Reply-To: <1397925170-8202-3-git-send-email-gregory.clement@free-electrons.com>
 References: <1397925170-8202-1-git-send-email-gregory.clement@free-electrons.com>
- <1397925170-8202-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140419184556.0924f14d@skate>
+ <1397925170-8202-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140419184641.03c933c8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Gregory CLEMENT,
 
-On Sat, 19 Apr 2014 18:32:49 +0200, Gregory CLEMENT wrote:
-> l2x0_of_init function is always defined
-> arch/arm/include/asm/hardware/cache-l2x0.h: in case of
-> CONFIG_CACHE_L2X0 is not selected then a placeholder is defined.
-> Then there is no need to have ifdef around  l2x0_of_init.
+On Sat, 19 Apr 2014 18:32:50 +0200, Gregory CLEMENT wrote:
+> The name of the two parameters of mvebu_get_soc_id were inverted. This
+> patch fix it in order to have a more readable code.
+> 
+> Reported-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 -- 
