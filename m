@@ -1,87 +1,51 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Sat, 19 Apr 2014 07:32:01 +0000
-Subject: USB OTG support on mx27pdk
-In-Reply-To: <20140416150316.GR13429@pengutronix.de>
-References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
- <1397627716.685483508@f399.i.mail.ru>
- <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
- <1397649526.601497269@f431.i.mail.ru>
- <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
- <20140416150316.GR13429@pengutronix.de>
-Message-ID: <77d21aa2203646bf867cfac4b78fef43@BL2PR03MB226.namprd03.prod.outlook.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 19 Apr 2014 09:38:22 +0200
+Subject: [PATCH 17/29] ARM: orion5x: update I2C description at SoC level
+In-Reply-To: <534BBC52.7060304@gmail.com>
+References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1397400006-4315-18-git-send-email-thomas.petazzoni@free-electrons.com>
+ <534BBC52.7060304@gmail.com>
+Message-ID: <20140419093822.4abda156@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> On Wed, Apr 16, 2014 at 09:53:34AM -0300, Fabio Estevam wrote:
-> > On Wed, Apr 16, 2014 at 8:58 AM, Alexander Shiyan <shc_work@mail.ru>
-> wrote:
-> >
-> > > I can tell immediately without further testing,
-> > > this will not work without the USB support in the bootoader because
-> > > we do not have DT support for ULPI.
-> >
-> > The generic nop usb phy should work just fine.
-> >
-> > I have tried Uwe's suggestion from a previous post and reverted:
-> >
-> > commit cd0b42c2a6d2a74244f0053f8960f5dad5842278
-> > Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
-> > Date:   Fri Jan 10 13:51:30 2014 +0800
-> >
-> >     usb: chipidea: put hw_phymode_configure before ci_usb_phy_init
-> >
-> >     hw_phymode_configure configures the PORTSC registers and allow the
-> >     following phy_inits to operate on the right parameters. This fix a
-> problem
-> >     where the UPLI (ISP1504) could not be detected, because the
-> Viewport was not
-> >     available and read the viewport return 0's only.
-> >
-> >     Signed-off-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
-> >     Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> >     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >
-> >
-> > Then USB OTG port detected the USB pen driver fine:
-> >
-> > usbcore: registered new interface driver usb-storage
-> > 10024000.usb supply vbus not found, using dummy regulator
-> > ci_hdrc ci_hdrc.0: EHCI Host Controller
-> > ci_hdrc ci_hdrc.0: new USB bus registered, assigned bus number 1
-> > ci_hdrc ci_hdrc.0: USB 2.0 started, EHCI 1.00
-> > hub 1-0:1.0: USB hub found
-> > hub 1-0:1.0: 1 port detected
-> > ...
-> > scsi 0:0:0:0: Direct-Access     ChipsBnk Flash Disk       2.00 PQ: 0
-> ANSI: 2
-> > sd 0:0:0:0: [sda] 1035200 512-byte logical blocks: (530 MB/505 MiB)
-> > sd 0:0:0:0: [sda] Write Protect is off
-> > sd 0:0:0:0: [sda] No Caching mode page found
-> > sd 0:0:0:0: [sda] Assuming drive cache: write through
-> >  sda: sda1
-> > sd 0:0:0:0: [sda] Attached SCSI removable disk
-> >
-> > If I understand correctly commit cd0b42c2a was only needed because
-> > Chris was trying to add DT support for ULPI, which never got merged
-> > into mainline.
-> >
-> > If we use the generic nop usb phy instead, we should just revert this
-> commit.
-> >
-> > Any objections?
-> 
-> Yes, when this patch got reverted it will probably break usb support
-> on mx6 machines. We have seen different behaviour on several mxc/mxs
-> machines regarding the order of PORTSC and phy configuration.
-> 
-> We will probably need to test all platforms before reordering this
-> function call again and again for every machine using this driver.
-> 
+Dear Sebastian Hesselbarth,
 
-The below patch is intended to fix above issues for all platforms,
-I have tested it at imx6 platform, if possible, have a test at imx25/imx27
-please.
+On Mon, 14 Apr 2014 12:45:38 +0200, Sebastian Hesselbarth wrote:
+> On 04/13/2014 04:39 PM, Thomas Petazzoni wrote:
+> > This commit fixes the Orion5x SoC definition to:
+> >
+> >   * Not define a clock-frequency, as it should be described on a
+> >     per-board basis.
+> >
+> >   * Declare the appropriate clock reference, so that the driver can do
+> >     correct divisors calculations for the I2C bus.
+> >
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
+> >   arch/arm/boot/dts/orion5x.dtsi | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> > index f25ed91..ea6ec83 100644
+> > --- a/arch/arm/boot/dts/orion5x.dtsi
+> > +++ b/arch/arm/boot/dts/orion5x.dtsi
+> > @@ -56,7 +56,7 @@
+> >   				#address-cells = <1>;
+> >   				#size-cells = <0>;
+> >   				interrupts = <5>;
+> > -				clock-frequency = <100000>;
+> > +				clocks = <&core_clk 0>;
+> 
+> I guess the 100kHz (<100000>) has been a bug? Please mention that in
+> the commit log, too.
 
-Peter
+Hum, the commit log already mentions that this property is typically
+place at the board level. What other information do you think should be
+present in the commit log?
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
