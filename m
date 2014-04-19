@@ -1,51 +1,22 @@
-From: minggr@gmail.com (Lin Ming)
-Date: Sat, 19 Apr 2014 09:58:41 -0700
-Subject: current->sched_class->yield_task is NULL, any hint?
-In-Reply-To: <CAP=VYLp61h_i+RyuUfowO9CqjV6ohMZ=FSgqQbxv6WQjXR1_6g@mail.gmail.com>
-References: <CAF1ivSbZKbDc+rzd+CUqCzNmSgZmZTE-QeSU-2WmSiuEs-Kw_w@mail.gmail.com>
- <20140409194742.GC26782@laptop.programming.kicks-ass.net>
- <20140409200836.GE26782@laptop.programming.kicks-ass.net>
- <CAF1ivSa6_ir0LwiydugzSdEqNoVy7evbb7N6QX_02H32A1dwmw@mail.gmail.com>
- <CAP=VYLp61h_i+RyuUfowO9CqjV6ohMZ=FSgqQbxv6WQjXR1_6g@mail.gmail.com>
-Message-ID: <CAF1ivSbqxNAiZw3RNS+BgeQJMVJeUJoCNYCbeeLAYYqG7KNxkw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 19 Apr 2014 14:09:51 -0300
+Subject: USB OTG support on mx27pdk
+In-Reply-To: <77d21aa2203646bf867cfac4b78fef43@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
+ <1397627716.685483508@f399.i.mail.ru>
+ <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
+ <1397649526.601497269@f431.i.mail.ru>
+ <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
+ <20140416150316.GR13429@pengutronix.de>
+ <77d21aa2203646bf867cfac4b78fef43@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <CAOMZO5A1CQP3jLJKs1HJupc8GxXzKMf7czTx21=PxomyENhhTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 19, 2014 at 9:21 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> On Wed, Apr 9, 2014 at 5:39 PM, Lin Ming <minggr@gmail.com> wrote:
->> On Wed, Apr 9, 2014 at 1:08 PM, Peter Zijlstra <peterz@infradead.org> wrote:
->
-> [...]
->
->>>>
->>>> Look at that, its calling yield() from a non-preemptible context as
->>>> well.
->>>>
->>>> That code is full of fail.
->>>
->>> *phew* none of that br_igmp_* muck lives in any kernel tree near me so I
->>> can stop worrying :-)
->>
->> It's our internal code.
->
-> In the future, please don't simply call it 3.4-rt when there are a bunch of
-> vendor/project/SDK patches also applied, as that can be very misleading
-> to the people you are asking for help from.  If it is a hybrid franken-kernel
-> then please at least indicate that right at the very beginning.
+On Sat, Apr 19, 2014 at 4:32 AM, Peter Chen <Peter.Chen@freescale.com> wrote:
+> The below patch is intended to fix above issues for all platforms,
+> I have tested it at imx6 platform, if possible, have a test at imx25/imx27
+> please.
 
-Sorry for the misleading.
-I'll make it clear next time.
-
-Thanks.
-
->
-> Paul.
-> --
->
->>
->>>
->>> In any case, it wrongly passes a GFP_WAIT along to netlink_broadcast.
->>
->> I'll fix it.
->> Thanks very much.
+I don't see any patch below, but anyway I have managed to fix the
+issue on mx27 at dts level.
