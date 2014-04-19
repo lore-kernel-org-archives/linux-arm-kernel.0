@@ -1,68 +1,26 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 19 Apr 2014 13:01:33 +0800
-Subject: [PATCH 4/4] ARM: imx6q: add the missing esai_ahb clock
-In-Reply-To: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
-References: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1397883693-26101-5-git-send-email-shawn.guo@freescale.com>
+Date: Sat, 19 Apr 2014 13:01:29 +0800
+Subject: [PATCH 0/4] ARM: imx: shared gate support for i.MX clk_gate2 clock
+Message-ID: <1397883693-26101-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The esai_ahb clock is derived from ahb and used to provide ESAI the
-capability of register accessing and FSYS clock source for I2S clocks
-dividing.  The gate bits of this esai_ahb clock are shared with the
-esai clock -- the baud clock, so we need to call imx_clk_gate2_shared()
-for these two clocks.
+We're constantly running into the situation on i.MX that multiple clocks
+share the single gate.  Since we already have i.MX specific gate clock
+implementation due to 2-bits gate, the series takes Gerhard's approach
+to add shared gate support for i.MX clk_gate2 clock.
 
-Signed-off-by: Nicolin Chen <Guangyu.Chen@freescale.com>
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- Documentation/devicetree/bindings/clock/imx6q-clock.txt | 1 +
- arch/arm/mach-imx/clk-imx6q.c                           | 7 +++++--
- 2 files changed, 6 insertions(+), 2 deletions(-)
+Shawn Guo (4):
+  ARM: imx: define struct clk_gate2 on our own
+  ARM: imx: lock is always valid for clk_gate2
+  ARM: imx: add shared gate clock support
+  ARM: imx6q: add the missing esai_ahb clock
 
-diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-index 6aab72b..90ec91f 100644
---- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-@@ -220,6 +220,7 @@ clocks and IDs.
- 	lvds2_sel		205
- 	lvds1_gate		206
- 	lvds2_gate		207
-+	esai_ahb		208
- 
- Examples:
- 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 8440878..8e795de 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -107,7 +107,7 @@ enum mx6q_clks {
- 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
- 	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
- 	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, pll4_audio_div,
--	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, clk_max
-+	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, esai_ahb, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -140,6 +140,8 @@ static struct clk_div_table video_div_table[] = {
- 	{ /* sentinel */ }
- };
- 
-+static unsigned int share_count_esai;
-+
- static void __init imx6q_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
-@@ -358,7 +360,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	else
- 		clk[ecspi5] = imx_clk_gate2("ecspi5",      "ecspi_root",        base + 0x6c, 8);
- 	clk[enet]         = imx_clk_gate2("enet",          "ipg",               base + 0x6c, 10);
--	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
-+	clk[esai]         = imx_clk_gate2_shared("esai",   "esai_podf",         base + 0x6c, 16, &share_count_esai);
-+	clk[esai_ahb]     = imx_clk_gate2_shared("esai_ahb", "ahb",             base + 0x6c, 16, &share_count_esai);
- 	clk[gpt_ipg]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
- 	clk[gpt_ipg_per]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
- 	if (cpu_is_imx6dl())
+ .../devicetree/bindings/clock/imx6q-clock.txt      |  1 +
+ arch/arm/mach-imx/clk-gate2.c                      | 47 ++++++++++++++--------
+ arch/arm/mach-imx/clk-imx6q.c                      |  7 +++-
+ arch/arm/mach-imx/clk.h                            | 13 +++++-
+ 4 files changed, 48 insertions(+), 20 deletions(-)
+
 -- 
 1.8.3.2
