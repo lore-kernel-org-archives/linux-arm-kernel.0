@@ -1,87 +1,54 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 19 Apr 2014 11:18:17 +0200
-Subject: [PATCH 26/29] ARM: orion5x: convert RD-88F5182 to Device Tree
-In-Reply-To: <20140419094633.2fa0b190@skate>
-References: <1397400006-4315-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1397400006-4315-27-git-send-email-thomas.petazzoni@free-electrons.com>
- <534BC5DA.7030106@gmail.com> <20140419094633.2fa0b190@skate>
-Message-ID: <53523F59.60209@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 19 Apr 2014 19:00:49 +0800
+Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
+ device is disabled
+In-Reply-To: <20140419084229.GK24070@n2100.arm.linux.org.uk>
+References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
+ <20140418204249.GG24070@n2100.arm.linux.org.uk>
+ <20140419055205.GX2523@dragon>
+ <20140419084229.GK24070@n2100.arm.linux.org.uk>
+Message-ID: <20140419110048.GY2523@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added devtree ML and Sascha Hauer]
-
-On 04/19/2014 09:46 AM, Thomas Petazzoni wrote:
-> Dear Sebastian Hesselbarth,
+On Sat, Apr 19, 2014 at 09:42:29AM +0100, Russell King - ARM Linux wrote:
+> On Sat, Apr 19, 2014 at 01:53:08PM +0800, Shawn Guo wrote:
+> > BTW, can you take a look at the following two patches, or are they
+> > already in your queue?
+> > 
+> > imx-drm: imx-drm-core: Fix imx_drm_encoder_get_mux_id
+> > https://lkml.org/lkml/2014/4/7/58
 > 
-> On Mon, 14 Apr 2014 13:26:18 +0200, Sebastian Hesselbarth wrote:
+> This one now is.
 > 
->>> +	chosen {
->>> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
->>
->> + [linux,]stdout-path = &uart0;
+> > mx-drm: imx-tve: correct DDC property name to 'ddc-i2c-bus'
+> > ('i' is missing from the prefix word, and it should be 'imx-drm')
+> > http://www.spinics.net/lists/arm-kernel/msg321057.html
 > 
-> Done. Should it be linux,stdout-path, or stdout-path? As of 3.15-rc1,
-> it seems that only linux,stdout-path is being used.
-
-I remember some discussion on devtree ML that mentioned stdout-path as
-possibly generic enough to loose its "linux," prefix.
-
-Maybe Sascha can give a comment on this.
-
->>> +		devbus-bootcs {
->>
->> Use node label references where applicable.
+> This one touches arch/arm/boot/dts, which Arnd moaned at me for touching
+> via the staging tree during the merge window.  So, while I can take the
+> imx-tve part, I can't take the arch/arm/boot/dts part.  This patch needs
+> to be split.
 > 
-> Ok. Which node labels do you suggest for the devbus-* nodes?
+> It also means that the MBA platform will have its TVE output broken while
+> the two commits take their different paths, but I guess that's what you
+> get for this kind of sillyness about git trees having exclusive ownership
+> of various files in the kernel tree - more breakage not less.
 
-I'd say, just pick the foo in devbus-foo, e.g. "bootcs" for the
-one above. Or "devbus_bootcs" if you like.
+I think Arnd's main concern is about merge conflict, which shouldn't be
+a problem for this particular case.  The change on dts file is pretty
+trivial.  And I assume this is a fix to be landed on mainline before
+-rc5 or so.  Then I can rebase my DT branch on top of it.  That said,
+merge conflict is not really a problem for this patch.  Arnd?
 
-[...]
->>> +&mdio {
->>> +	status = "okay";
->>> +
->>> +	ethphy: ethernet-phy {
->>> +		reg = <8>;
->>
->> Can you evaluate if it is GMII or RGMII[-id] and add a
->> phy-connection-type property now? This is something that
->> bothers me already on kirkwood.
+Shawn
+
 > 
-> I'll try to do this for this board for which I believe I have the
-> schematics, but for edmini_v2 or d2net, I don't have the schematics.
-> I'll see if I can infer the information from some U-Boot output, or by
-> dumping some register.
-
-If you find it out now, great. If not just leave it that way.
-
->>> + * Maintainer: Ronen Shitrit <rshitrit@marvell.com>
->>
->> Maybe add Ronen to the Signed-off tag, too? Or at least put him
->> on Cc?
+> There's one which I posted yesterday which I think should be merged along
+> with these - imx-drm: fix hdmi hotplug detection initial state
 > 
-> Signed-off-by looks a bit strong, because Ronen has never seen this
-> patch nor been involved in writing it. I'll Cc him.
-
-Well, you make him the number one person to ask if there is something
-wrong with the DT ;) Cc is ok.
-
->>> +	pin = RD88F5182_PCI_SLOT0_IRQ_A_PIN;
->>> +	if (gpio_request(pin, "PCI IntA") == 0) {
->>> +		if (gpio_direction_input(pin) == 0) {
->>> +			irq_set_irq_type(gpio_to_irq(pin), IRQ_TYPE_LEVEL_LOW);
->>> +		} else {
->>> +			printk(KERN_ERR "rd88f5182_pci_preinit failed to "
->>
->> I am not sure, what is the correct way of using it, but maybe it is
->> pr_err()? I'd also be interested in the latest policy of using it.
+> -- 
+> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+> improving, and getting towards what was expected from it.
 > 
-> Indeed pr_err() is the right thing to use now. However here I'm just
-> replicating existing code, so I'd prefer to keep it as is in this
-> commit, if possible. I'm anyway planning on removing this PCI platform
-> code soon, but this is going to be for after this series is merged.
-
-Ok, makes sense to me, feel free to leave it that way it is.
-
-Sebastian
+> 
