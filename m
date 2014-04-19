@@ -1,76 +1,138 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 19 Apr 2014 13:34:15 +0800
-Subject: [PATCH v2] ARM: dts: imx6qdl-sabresd: Add HDMI support
-In-Reply-To: <1397825219-7872-1-git-send-email-festevam@gmail.com>
-References: <1397825219-7872-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140419053413.GU2523@dragon>
+Date: Sat, 19 Apr 2014 13:41:35 +0800
+Subject: [PATCH] ARM: imx: add HDMI support for SolidRun HummingBoard and
+ Cubox-i
+In-Reply-To: <E1Wb5br-0002ZE-T3@rmk-PC.arm.linux.org.uk>
+References: <E1Wb5br-0002ZE-T3@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140419054134.GV2523@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 09:46:59AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Apr 18, 2014 at 11:01:27AM +0100, Russell King wrote:
+> Add the HDMI DT configuration for the SolidRun HummingBoard and Cubox-i.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
-> Shawn,
+>  arch/arm/boot/dts/imx6dl-hummingboard.dts | 28 ++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi    | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 56 insertions(+)
 > 
-> I currently do not have hardware access, so I did not test this one.
-> 
-> It is based on the previous version that I submitted and tested.
-
-Please retest it against my for-next branch.
-
-> 
-> Changes since v1:
-> - Rebased against 3.15-rc1
-> 
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index 7a88d9a..3d88712 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -148,6 +148,14 @@
+> diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> index 5bfae54fb780..d3095f58bf7b 100644
+> --- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> @@ -67,6 +67,14 @@
 >  	status = "okay";
 >  };
 >  
 > +&hdmi {
 > +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hdmi>;
+> +	pinctrl-0 = <&pinctrl_hummingboard_hdmi>;
 > +	ddc-i2c-bus = <&i2c2>;
 > +	status = "okay";
-> +	crtcs = <&ipu1 1>;
+> +	crtcs = <&ipu1 0>;
 
-The 'crtcs' property should be dropped now.
+The 'crtcs' should be dropped now, right?
 
 > +};
 > +
 >  &i2c1 {
->  	clock-frequency = <100000>;
 >  	pinctrl-names = "default";
-> @@ -390,6 +398,13 @@
+>  	pinctrl-0 = <&pinctrl_hummingboard_i2c1>;
+> @@ -82,6 +90,13 @@
+>  	 */
+>  };
+>  
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hummingboard_i2c2>;
+> +	status = "okay";
+> +};
+> +
+>  &iomuxc {
+>  	hummingboard {
+>  		pinctrl_hummingboard_flexcan1: hummingboard-flexcan1 {
+> @@ -97,6 +112,12 @@
 >  			>;
 >  		};
 >  
-> +
-> +		pinctrl_hdmi: hdmigrp {
+> +		pinctrl_hummingboard_hdmi: hummingboard-hdmi {
 > +			fsl,pins = <
 > +				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
-
-Is this only needed by CEC support?  And is the imx-hdmi driver already
-support CEC?
-
-Shawn
-
 > +			>;
 > +		};
 > +
->  		pinctrl_uart1: uart1grp {
+
+Is CEC already supported by imx-hdmi driver?  Just a question.
+
+Shawn
+
+>  		pinctrl_hummingboard_i2c1: hummingboard-i2c1 {
 >  			fsl,pins = <
->  				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
+>  				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
+> @@ -104,6 +125,13 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_hummingboard_i2c2: hummingboard-i2c2 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+>  		pinctrl_hummingboard_spdif: hummingboard-spdif {
+>  			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
+>  		};
+> diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> index c2a24888a276..5b9e7bceedaa 100644
+> --- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> @@ -55,6 +55,21 @@
+>  	};
+>  };
+>  
+> +&hdmi {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_cubox_i_hdmi>;
+> +	ddc-i2c-bus = <&i2c2>;
+> +	status = "okay";
+> +	crtcs = <&ipu1 0>;
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_cubox_i_i2c2>;
+> +	status = "okay";
+> +};
+> +
+>  &i2c3 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_cubox_i_i2c3>;
+> @@ -69,6 +84,19 @@
+>  
+>  &iomuxc {
+>  	cubox_i {
+> +		pinctrl_cubox_i_hdmi: cubox-i-hdmi {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_cubox_i_i2c2: cubox-i-i2c2 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+>  		pinctrl_cubox_i_i2c3: cubox-i-i2c3 {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_EIM_D17__I2C3_SCL 0x4001b8b1
 > -- 
-> 1.8.3.2
+> 1.8.3.1
 > 
 > 
 > 
