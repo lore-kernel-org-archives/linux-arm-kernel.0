@@ -1,34 +1,42 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 19 Apr 2014 22:43:20 +0900
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 19 Apr 2014 15:51:16 +0200
 Subject: [PATCH 0/2] Support cpufreq driver for Exynos3250
-In-Reply-To: <CAK9yfHygoHZ7hnAcLuuaMEsPb8Tqw-QbcTrQ+b=2CD6kK3odmw@mail.gmail.com>
-References: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>
- <CAK9yfHygoHZ7hnAcLuuaMEsPb8Tqw-QbcTrQ+b=2CD6kK3odmw@mail.gmail.com>
-Message-ID: <CAGTfZH1M9h3Sx73wJsD=_vnSyV-+fyOY041PN_7ea718B0mFoQ@mail.gmail.com>
+In-Reply-To: <CAGTfZH1M9h3Sx73wJsD=_vnSyV-+fyOY041PN_7ea718B0mFoQ@mail.gmail.com>
+References: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>	<CAK9yfHygoHZ7hnAcLuuaMEsPb8Tqw-QbcTrQ+b=2CD6kK3odmw@mail.gmail.com>
+ <CAGTfZH1M9h3Sx73wJsD=_vnSyV-+fyOY041PN_7ea718B0mFoQ@mail.gmail.com>
+Message-ID: <53527F54.5020601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+Hi Chanwoo, Sachin,
 
-On Fri, Apr 18, 2014 at 5:14 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> Hi Chanwoo,
+On 19.04.2014 15:43, Chanwoo Choi wrote:
+> Hi Sachin,
 >
-> On 18 April 2014 07:50, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patchset support cpufreq driver for Exynos3250 which uses the Cortex-A7
->> dual cores and has a target speed of 1.0 GHz and code clean using dev_err/info
->> instead of pr_err/info function.
+> On Fri, Apr 18, 2014 at 5:14 PM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
+>> Hi Chanwoo,
+>>
+>> On 18 April 2014 07:50, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>> This patchset support cpufreq driver for Exynos3250 which uses the Cortex-A7
+>>> dual cores and has a target speed of 1.0 GHz and code clean using dev_err/info
+>>> instead of pr_err/info function.
+>>
+>> Per SoC cpufreq driver which does not use CCF is no more encouraged for new
+>> Exynos platforms. Thomas has already posted patches to make use of
+>> generic cpu freq driver
+>> on Exynos platforms. Please refer to [1] and try to utilize it for
+>> this platform as well.
+>>
+>> [1] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/26886
 >
-> Per SoC cpufreq driver which does not use CCF is no more encouraged for new
-> Exynos platforms. Thomas has already posted patches to make use of
-> generic cpu freq driver
-> on Exynos platforms. Please refer to [1] and try to utilize it for
-> this platform as well.
+> OK, I'll refer to this new patch for cpufreq and rebase it.
 >
-> [1] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/26886
+> Thanks for your reply.
 
-OK, I'll refer to this new patch for cpufreq and rebase it.
+The last version posted by Thomas still had several comments to be 
+addressed that could lead to quite big changes in the whole design in 
+next version. According to the information from Thomas, the work on it 
+is in progress and we should see updated patchset soon.
 
-Thanks for your reply.
-
-Best Regards,
-Chanwoo Choi
+Best regards,
+Tomasz
