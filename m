@@ -1,37 +1,33 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sun, 20 Apr 2014 13:56:15 -0400 (EDT)
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Sun, 20 Apr 2014 20:52:11 +0200
 Subject: [RFC PATCH 0/2] usb: Reuse fsl driver code for synopsys usb
  controller
 In-Reply-To: <7aed4ee6-69e7-4f9f-9f45-675bc695089c@CO9EHSMHS031.ehs.local>
-Message-ID: <Pine.LNX.4.44L0.1404201354410.7666-100000@netrider.rowland.org>
+References: <7aed4ee6-69e7-4f9f-9f45-675bc695089c@CO9EHSMHS031.ehs.local>
+Message-ID: <5354175B.3070109@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 20 Apr 2014, Punnaiah Choudary Kalluri wrote:
-
+On 04/20/2014 06:27 PM, Punnaiah Choudary Kalluri wrote:
 > Zynq soc contains a dual role usb controller and this IP is from synopsys. We
 > observed that there is driver available for this controller from freescale and
 > decided to reuse this driver for zynq use.
-> 
-> Here is the link for zynq soc TRM. Please refer chapter 15 for usb controller
-> related information.
-> http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
-> 
-> The following series of patches add initial support for zynq soc in fsl gadget controller
-> driver and fsl host controller driver.
-> 
-> Based on these patches, I have the following concerns and sugesstions
-> 
-> Since the freescale usb driver is for synopsys IP, Please consider rebranding
-> this driver name and config options to reflect that it is a sysnopsys IP. So
-> that other vendors who using this IP can reuse thie driver.
-> 
-> Also the ehci-fsl.c is for powerpc based soc's, and zynq is ARM based, i have
-> protected the code which is specifc to freescale with CONFIG_FSL_SOC. Please
-> suggest if there is a better way of doing this?
 
-Filling the code with #ifdef lines is definitely not a good way to go.  
-Ordinary "if" statements would be a lot better, if you can't figure out 
-a reasonable way to encapsulate the differences.
+Have a look drivers/usb/chipidea. It's maintained by Peter Chen (Cc'ed)
+and is in better shape than the freescale driver.
 
-Alan Stern
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140420/d9c20ad5/attachment.sig>
