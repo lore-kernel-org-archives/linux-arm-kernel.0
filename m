@@ -1,54 +1,189 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Sun, 20 Apr 2014 12:05:05 +0000
-Subject: USB OTG support on mx27pdk
-In-Reply-To: <1397966301.558037781@f362.i.mail.ru>
-References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
- <CAOMZO5A1CQP3jLJKs1HJupc8GxXzKMf7czTx21=PxomyENhhTw@mail.gmail.com>
- <ddc3005702174f55b564328820078fb8@BL2PR03MB226.namprd03.prod.outlook.com>
- <1397966301.558037781@f362.i.mail.ru>
-Message-ID: <31dc153ebf444971ade463a07bdf7926@BL2PR03MB226.namprd03.prod.outlook.com>
+From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
+Date: Sun, 20 Apr 2014 21:53:28 +0530
+Subject: [RFC PATCH 1/2] usb: gadget: fsl_udc: Add support for zynq usb device
+ controller
+In-Reply-To: <1398011009-10978-1-git-send-email-punnaia@xilinx.com>
+References: <1398011009-10978-1-git-send-email-punnaia@xilinx.com>
+Message-ID: <b67542c4-b314-4d8d-ad0c-fcc08da6d65b@CH1EHSMHS041.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since zynq soc usb controller is a synopsys IP and there is a driver
+available for this controller from freescale in opensource, reusing this
+driver for zynq use.
+
+Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+---
+ drivers/usb/gadget/Kconfig        |    2 +-
+ drivers/usb/gadget/Makefile       |    1 +
+ drivers/usb/gadget/fsl_mxc_udc.c  |   21 +++++++++++++++++++++
+ drivers/usb/gadget/fsl_udc_core.c |    5 +++++
+ drivers/usb/gadget/fsl_usb2_udc.h |    2 +-
+ drivers/usb/host/fsl-mph-dr-of.c  |    9 +++++++++
+ 6 files changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 3557c7e..7f18ab47 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -186,7 +186,7 @@ config USB_BCM63XX_UDC
  
-> 
-> Sun, 20 Apr 2014 00:48:28 +0000 ?? Peter Chen <Peter.Chen@freescale.com>:
-> > > -----Original Message-----
-> > > From: Fabio Estevam [mailto:festevam at gmail.com]
-> > > Sent: Sunday, April 20, 2014 1:10 AM
-> > > To: Chen Peter-B29397
-> > > Cc: Michael Grzeschik; Alexander Shiyan; linux-arm-
-> > > kernel at lists.infradead.org; linux-usb at vger.kernel.org; Sascha Hauer;
-> > > chris.ruehl at gtsys.com.hk; Guo Shawn-R65073
-> > > Subject: Re: USB OTG support on mx27pdk
-> > >
-> > > On Sat, Apr 19, 2014 at 4:32 AM, Peter Chen <Peter.Chen@freescale.com>
-> > > wrote:
-> > > > The below patch is intended to fix above issues for all platforms,
-> > > > I have tested it at imx6 platform, if possible, have a test at
-> > > imx25/imx27
-> > > > please.
-> > >
-> > > I don't see any patch below, but anyway I have managed to fix the
-> > > issue on mx27 at dts level.
-> > >
-> >
-> > https://github.com/hzpeterchen/linux-
-> usb/commit/c1f42ea27ed3f5d988c63da7849d2e6b445b4fbc
-> >
-> > Your problem is different with sasche's, which hang the system due to
-> > no phy clk. The chris's patch should not cause the oops.
-> 
-> For me, nothing has changed.
-> The driver works on i.MX27 PCM970 RDK with the patch as well as without
-> it.
-> 
-
-Thanks for testing. This patch does not change the flow for ulpi, it changes
-pts at portsc first, and call ulpi_init if it exists, your results prove that
-the patch works ok if the kernel does not touch ulpi.
-
-Peter
-
-
+ config USB_FSL_USB2
+ 	tristate "Freescale Highspeed USB DR Peripheral Controller"
+-	depends on FSL_SOC || ARCH_MXC
++	depends on FSL_SOC || ARCH_MXC || ARCH_ZYNQ
+ 	select USB_FSL_MPH_DR_OF if OF
+ 	help
+ 	   Some of Freescale PowerPC and i.MX processors have a High Speed
+diff --git a/drivers/usb/gadget/Makefile b/drivers/usb/gadget/Makefile
+index 5f150bc..38b009f 100644
+--- a/drivers/usb/gadget/Makefile
++++ b/drivers/usb/gadget/Makefile
+@@ -23,6 +23,7 @@ obj-$(CONFIG_USB_BCM63XX_UDC)	+= bcm63xx_udc.o
+ obj-$(CONFIG_USB_FSL_USB2)	+= fsl_usb2_udc.o
+ fsl_usb2_udc-y			:= fsl_udc_core.o
+ fsl_usb2_udc-$(CONFIG_ARCH_MXC)	+= fsl_mxc_udc.o
++fsl_usb2_udc-$(CONFIG_ARCH_ZYNQ) += fsl_mxc_udc.o
+ obj-$(CONFIG_USB_M66592)	+= m66592-udc.o
+ obj-$(CONFIG_USB_R8A66597)	+= r8a66597-udc.o
+ obj-$(CONFIG_USB_FSL_QE)	+= fsl_qe_udc.o
+diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+index 9b140fc..181245c 100644
+--- a/drivers/usb/gadget/fsl_mxc_udc.c
++++ b/drivers/usb/gadget/fsl_mxc_udc.c
+@@ -19,8 +19,10 @@
+ #include <linux/io.h>
  
+ static struct clk *mxc_ahb_clk;
++#ifndef CONFIG_ARCH_ZYNQ
+ static struct clk *mxc_per_clk;
+ static struct clk *mxc_ipg_clk;
++#endif
+ 
+ /* workaround ENGcm09152 for i.MX35 */
+ #define MX35_USBPHYCTRL_OFFSET		0x600
+@@ -30,6 +32,7 @@ static struct clk *mxc_ipg_clk;
+ int fsl_udc_clk_init(struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata;
++#ifndef CONFIG_ARCH_ZYNQ
+ 	unsigned long freq;
+ 	int ret;
+ 
+@@ -76,10 +79,21 @@ eclkrate:
+ 	clk_disable_unprepare(mxc_per_clk);
+ 	mxc_per_clk = NULL;
+ 	return ret;
++#else
++	pdata = dev_get_platdata(&pdev->dev);
++	mxc_ahb_clk = devm_clk_get(pdev->dev.parent, NULL);
++	if (IS_ERR(mxc_ahb_clk))
++		return PTR_ERR(mxc_ahb_clk);
++
++	clk_prepare_enable(mxc_ahb_clk);
++
++	return 0;
++#endif
+ }
+ 
+ int fsl_udc_clk_finalize(struct platform_device *pdev)
+ {
++#ifndef CONFIG_ARCH_ZYNQ
+ 	struct fsl_usb2_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 	int ret = 0;
+ 
+@@ -112,12 +126,19 @@ ioremap_err:
+ 	}
+ 
+ 	return ret;
++#else
++	return 0;
++#endif
+ }
+ 
+ void fsl_udc_clk_release(void)
+ {
++#ifndef CONFIG_ARCH_ZYNQ
+ 	if (mxc_per_clk)
+ 		clk_disable_unprepare(mxc_per_clk);
+ 	clk_disable_unprepare(mxc_ahb_clk);
+ 	clk_disable_unprepare(mxc_ipg_clk);
++#else
++	clk_disable_unprepare(mxc_ahb_clk);
++#endif
+ }
+diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
+index 15960af..c3ff3fb 100644
+--- a/drivers/usb/gadget/fsl_udc_core.c
++++ b/drivers/usb/gadget/fsl_udc_core.c
+@@ -2492,6 +2492,9 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
+ 		goto err_free_irq;
+ 	}
+ 
++#ifdef CONFIG_ARCH_ZYNQ
++	udc_controller->vbus_active = 1;
++#endif
+ 	ret = usb_add_gadget_udc_release(&pdev->dev, &udc_controller->gadget,
+ 			fsl_udc_release);
+ 	if (ret)
+@@ -2661,8 +2664,10 @@ static const struct platform_device_id fsl_udc_devtype[] = {
+ MODULE_DEVICE_TABLE(platform, fsl_udc_devtype);
+ static struct platform_driver udc_driver = {
+ 	.remove		= __exit_p(fsl_udc_remove),
++#ifndef CONFIG_ARCH_ZYNQ
+ 	/* Just for FSL i.mx SoC currently */
+ 	.id_table	= fsl_udc_devtype,
++#endif
+ 	/* these suspend and resume are not usb suspend and resume */
+ 	.suspend	= fsl_udc_suspend,
+ 	.resume		= fsl_udc_resume,
+diff --git a/drivers/usb/gadget/fsl_usb2_udc.h b/drivers/usb/gadget/fsl_usb2_udc.h
+index c6703bb..6394138 100644
+--- a/drivers/usb/gadget/fsl_usb2_udc.h
++++ b/drivers/usb/gadget/fsl_usb2_udc.h
+@@ -590,7 +590,7 @@ static inline struct ep_queue_head *get_qh_by_ep(struct fsl_ep *ep)
+ }
+ 
+ struct platform_device;
+-#ifdef CONFIG_ARCH_MXC
++#if defined CONFIG_ARCH_MXC || defined CONFIG_ARCH_ZYNQ
+ int fsl_udc_clk_init(struct platform_device *pdev);
+ int fsl_udc_clk_finalize(struct platform_device *pdev);
+ void fsl_udc_clk_release(void);
+diff --git a/drivers/usb/host/fsl-mph-dr-of.c b/drivers/usb/host/fsl-mph-dr-of.c
+index 9162d1b..7d89415 100644
+--- a/drivers/usb/host/fsl-mph-dr-of.c
++++ b/drivers/usb/host/fsl-mph-dr-of.c
+@@ -42,6 +42,10 @@ static struct fsl_usb2_dev_data dr_mode_data[] = {
+ 	},
+ };
+ 
++#ifdef CONFIG_ARCH_ZYNQ
++static u64 dma_mask = 0xFFFFFFF0;
++#endif
++
+ static struct fsl_usb2_dev_data *get_dr_mode_data(struct device_node *np)
+ {
+ 	const unsigned char *prop;
+@@ -94,7 +98,11 @@ static struct platform_device *fsl_usb2_device_register(
+ 	pdev->dev.parent = &ofdev->dev;
+ 
+ 	pdev->dev.coherent_dma_mask = ofdev->dev.coherent_dma_mask;
++#ifndef CONFIG_ARCH_ZYNQ
+ 	*pdev->dev.dma_mask = *ofdev->dev.dma_mask;
++#else
++	pdev->dev.dma_mask = &dma_mask;
++#endif
+ 
+ 	retval = platform_device_add_data(pdev, pdata, sizeof(*pdata));
+ 	if (retval)
+@@ -320,6 +328,7 @@ static const struct of_device_id fsl_usb2_mph_dr_of_match[] = {
+ #ifdef CONFIG_PPC_MPC512x
+ 	{ .compatible = "fsl,mpc5121-usb2-dr", .data = &fsl_usb2_mpc5121_pd, },
+ #endif
++	{ .compatible = "synopsys,usb2-dr-2.20a", },
+ 	{},
+ };
+ 
+-- 
+1.7.4
