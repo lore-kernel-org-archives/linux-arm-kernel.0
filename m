@@ -1,55 +1,185 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sat, 19 Apr 2014 22:38:56 -0700
-Subject: [PATCH] Input: w90p910_ts - depend on ARCH_W90X900
-In-Reply-To: <CAKT61h__8fuJDs94akU73grWns82+mk1vmSdQw5fwd1Cx-455g@mail.gmail.com>
-References: <20140401142046.14d4bb8c@endymion.delvare>
- <CAKT61h__8fuJDs94akU73grWns82+mk1vmSdQw5fwd1Cx-455g@mail.gmail.com>
-Message-ID: <20140420053856.GF12454@core.coreip.homeip.net>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Sun, 20 Apr 2014 12:09:19 +0530
+Subject: [PATCH] arm: exynos: generalize power register address calculation
+In-Reply-To: <535132CC.8000206@samsung.com>
+References: <CANuQgHEbepUZO279+Bsx7Ynep6ZPQQJj+zCW3S2k50Cw5SLOdA@mail.gmail.com>
+ <1397547498-21729-1-git-send-email-chander.kashyap@linaro.org>
+ <535132CC.8000206@samsung.com>
+Message-ID: <CANuQgHGh_LZ5m-4PFrun5NpLPTO5oXJjQCpx3ix6KWkAoO=PNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 01, 2014 at 09:17:03PM +0800, Wan ZongShun wrote:
-> ---------- Forwarded message ----------
-> From: Jean Delvare <jdelvare@suse.de>
-> Date: 2014-04-01 20:20 GMT+08:00
-> Subject: [PATCH] Input: w90p910_ts - depend on ARCH_W90X900
-> To: linux-input at vger.kernel.org, linux-arm-kernel at lists.infradead.org
-> ??? Wan ZongShun <mcuos.com@gmail.com>, Dmitry Torokhov
-> <dmitry.torokhov@gmail.com>
-> 
-> 
-> The w90p910_ts touchscreen driver is heavily architecture dependent,
-> so there is no point in letting it be built on other architectures
-> than it was written for.
-> 
-> All other W90P910/W90X900 drivers already have that dependency, so it
-> makes things more consistent and configuration easier.
-> 
-> Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> ---
->  drivers/input/touchscreen/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --- linux-3.14-rc8.orig/drivers/input/touchscreen/Kconfig
-> 2014-02-09 16:53:02.945634113 +0100
-> +++ linux-3.14-rc8/drivers/input/touchscreen/Kconfig    2014-04-01
-> 14:10:08.936933702 +0200
-> @@ -867,7 +867,7 @@ config TOUCHSCREEN_TSC2007
-> 
->  config TOUCHSCREEN_W90X900
->         tristate "W90P910 touchscreen driver"
-> -       depends on HAVE_CLK
-> +       depends on ARCH_W90X900
->         help
->           Say Y here if you have a W90P910 based touchscreen.
-> 
-> Sure, your idea is reasonable.
-> 
-> Acked-by Wan Zongshun <mcuos.com@gmail.com>
+Hi Tomasz,
 
-Applied, thank you.
+On 18 April 2014 19:42, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Chander,
+>
+>
+> On 15.04.2014 09:38, Chander Kashyap wrote:
+>>
+>> Currently status/configuration power register values are hard-coded for
+>> cpu1.
+>>
+>> Make it generic so that it is useful for SoC's with more than two cpus.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> ---
+>> changes in v3:
+>>         1. Move cpunr calculation to a macro
+>>         2. Changed printk format specifier from unsigned hex to unsigned
+>> decimal
+>> Changes in v2:
+>>         1. Used existing macros for clusterid and cpuid calculation
+>>
+>>   arch/arm/mach-exynos/hotplug.c  |    7 ++++---
+>>   arch/arm/mach-exynos/platsmp.c  |   13 +++++++------
+>>   arch/arm/mach-exynos/regs-pmu.h |   15 +++++++++++++--
+>>   3 files changed, 24 insertions(+), 11 deletions(-)
+>>
+>
+> Now as I think of it, the code that is touched by this patch is not supposed
+> to be used on multi-cluster systems. Instead a separate MCPM driver should.
+> As far as I know, somebody is said to be already working on this.
+>
+> This means that we don't need to consider multi-cluster support in this
+> patch and simplify any calculations to just account for core ID. This would
+> also eliminate any need to handle non-zero cluster ID on single-cluster
+> SoCs.
+>
+> Please correct me if I'm wrong.
+
+Yes thats true.
+As mcpm code is in review process, so i will remove platsmp.c and
+hotplug.c changes and respin the patch.
+The  patch will add support for cpunr calculation and offset calculation.
+
+>
+>
+>> diff --git a/arch/arm/mach-exynos/hotplug.c
+>> b/arch/arm/mach-exynos/hotplug.c
+>> index 5eead53..9f74be2 100644
+>> --- a/arch/arm/mach-exynos/hotplug.c
+>> +++ b/arch/arm/mach-exynos/hotplug.c
+>> @@ -92,11 +92,12 @@ static inline void cpu_leave_lowpower(void)
+>>
+>>   static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>>   {
+>> +       unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
+>>         for (;;) {
+>>
+>> -               /* make cpu1 to be turned off at next WFI command */
+>> -               if (cpu == 1)
+>> -                       __raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
+>> +               /* make cpu to be turned off at next WFI command */
+>> +               if (cpu)
+>
+>
+> As I mentioned in my previous reply, I don't see what could go wrong if this
+> check is omitted. What happens if CPU0 is being hot-unplugged?
+>
+> If hardware doesn't support this (but I don't see any mention about this in
+> the documentation), such hotplug attempt should either simply fail on
+> .cpu_kill() operation for CPU0 or even have CPU0 marked as non-hotpluggable.
+
+That makes more sense, but i need to cross verify.
+
+>
+>
+>> +                       __raw_writel(0,
+>> S5P_ARM_CORE_CONFIGURATION(cpunr));
+>>
+>>                 /*
+>>                  * here's the WFI
+>> diff --git a/arch/arm/mach-exynos/platsmp.c
+>> b/arch/arm/mach-exynos/platsmp.c
+>> index 03e5e9f..d9c182f 100644
+>> --- a/arch/arm/mach-exynos/platsmp.c
+>> +++ b/arch/arm/mach-exynos/platsmp.c
+>> @@ -90,7 +90,7 @@ static int exynos_boot_secondary(unsigned int cpu,
+>> struct task_struct *idle)
+>>   {
+>>         unsigned long timeout;
+>>         unsigned long phys_cpu = cpu_logical_map(cpu);
+>> -
+>> +       unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
+>>         /*
+>>          * Set synchronisation state between this boot processor
+>>          * and the secondary one
+>> @@ -107,14 +107,15 @@ static int exynos_boot_secondary(unsigned int cpu,
+>> struct task_struct *idle)
+>>          */
+>>         write_pen_release(phys_cpu);
+>>
+>> -       if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN))
+>> {
+>> +       if (!(__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
+>> +               & S5P_CORE_LOCAL_PWR_EN)) {
+>>                 __raw_writel(S5P_CORE_LOCAL_PWR_EN,
+>> -                            S5P_ARM_CORE1_CONFIGURATION);
+>> +                            S5P_ARM_CORE_CONFIGURATION(cpunr));
+>>
+>>                 timeout = 10;
+>>
+>> -               /* wait max 10 ms until cpu1 is on */
+>> -               while ((__raw_readl(S5P_ARM_CORE1_STATUS)
+>> +               /* wait max 10 ms until secondary cpu is on */
+>> +               while ((__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
+>>                         & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN)
+>> {
+>>                         if (timeout-- == 0)
+>>                                 break;
+>> @@ -123,7 +124,7 @@ static int exynos_boot_secondary(unsigned int cpu,
+>> struct task_struct *idle)
+>>                 }
+>>
+>>                 if (timeout == 0) {
+>> -                       printk(KERN_ERR "cpu1 power enable failed");
+>> +                       pr_err("cpu%u power enable failed", cpu);
+>>                         spin_unlock(&boot_lock);
+>>                         return -ETIMEDOUT;
+>>                 }
+>> diff --git a/arch/arm/mach-exynos/regs-pmu.h
+>> b/arch/arm/mach-exynos/regs-pmu.h
+>> index 4f6a256..0de6df4 100644
+>> --- a/arch/arm/mach-exynos/regs-pmu.h
+>> +++ b/arch/arm/mach-exynos/regs-pmu.h
+>> @@ -105,8 +105,13 @@
+>>   #define S5P_GPS_LOWPWR                                S5P_PMUREG(0x139C)
+>>   #define S5P_GPS_ALIVE_LOWPWR                  S5P_PMUREG(0x13A0)
+>>
+>> -#define S5P_ARM_CORE1_CONFIGURATION            S5P_PMUREG(0x2080)
+>> -#define S5P_ARM_CORE1_STATUS                   S5P_PMUREG(0x2084)
+>> +#define S5P_ARM_CORE0_CONFIGURATION            S5P_PMUREG(0x2000)
+>> +#define S5P_ARM_CORE0_STATUS                   S5P_PMUREG(0x2004)
+>> +
+>> +#define S5P_ARM_CORE_CONFIGURATION(_cpunr)     \
+>> +               (S5P_ARM_CORE0_CONFIGURATION + 0x80 * (_cpunr))
+>> +#define S5P_ARM_CORE_STATUS(_cpunr)            \
+>> +               (S5P_ARM_CORE0_STATUS + 0x80 * (_cpunr))
+>>
+>>   #define S5P_PAD_RET_MAUDIO_OPTION             S5P_PMUREG(0x3028)
+>>   #define S5P_PAD_RET_GPIO_OPTION                       S5P_PMUREG(0x3108)
+>> @@ -313,4 +318,10 @@
+>>
+>>   #define EXYNOS5_OPTION_USE_RETENTION                          (1 << 4)
+>>
+>> +#include <asm/cputype.h>
+>> +#define MAX_CPUS_IN_CLUSTER    4
+>> +#define ENYNOS_PMU_CPUNR(mpidr) \
+>> +               ((MPIDR_AFFINITY_LEVEL(mpidr, 1) * MAX_CPUS_IN_CLUSTER) \
+>> +                 + MPIDR_AFFINITY_LEVEL(mpidr, 0));
+>
+>
+> Static inline would be preferred and then name in lowercase.
+
+ok
+
+>
+> Best regards,
+> Tomasz
+
+ Thanks again
 
 -- 
-Dmitry
+with warm regards,
+Chander Kashyap
