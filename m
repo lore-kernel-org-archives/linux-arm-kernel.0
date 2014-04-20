@@ -1,184 +1,150 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Sun, 20 Apr 2014 12:09:19 +0530
-Subject: [PATCH] arm: exynos: generalize power register address calculation
-In-Reply-To: <535132CC.8000206@samsung.com>
-References: <CANuQgHEbepUZO279+Bsx7Ynep6ZPQQJj+zCW3S2k50Cw5SLOdA@mail.gmail.com>
- <1397547498-21729-1-git-send-email-chander.kashyap@linaro.org>
- <535132CC.8000206@samsung.com>
-Message-ID: <CANuQgHGh_LZ5m-4PFrun5NpLPTO5oXJjQCpx3ix6KWkAoO=PNg@mail.gmail.com>
+Date: Sun, 20 Apr 2014 12:53:03 +0530
+Subject: [PATCH 2/4] ARM: EXYNOS: Fix core ID used by platsmp and hotplug
+ code
+In-Reply-To: <1397832181-5153-3-git-send-email-t.figa@samsung.com>
+References: <1397832181-5153-1-git-send-email-t.figa@samsung.com>
+ <1397832181-5153-3-git-send-email-t.figa@samsung.com>
+Message-ID: <CANuQgHF9up5=8+cWgC+9cm-8Bf7sGcRBcg1DyXm-pbmK=EMgmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Tomasz,
 
-On 18 April 2014 19:42, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Chander,
->
->
-> On 15.04.2014 09:38, Chander Kashyap wrote:
->>
->> Currently status/configuration power register values are hard-coded for
->> cpu1.
->>
->> Make it generic so that it is useful for SoC's with more than two cpus.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->> changes in v3:
->>         1. Move cpunr calculation to a macro
->>         2. Changed printk format specifier from unsigned hex to unsigned
->> decimal
->> Changes in v2:
->>         1. Used existing macros for clusterid and cpuid calculation
->>
->>   arch/arm/mach-exynos/hotplug.c  |    7 ++++---
->>   arch/arm/mach-exynos/platsmp.c  |   13 +++++++------
->>   arch/arm/mach-exynos/regs-pmu.h |   15 +++++++++++++--
->>   3 files changed, 24 insertions(+), 11 deletions(-)
->>
->
-> Now as I think of it, the code that is touched by this patch is not supposed
-> to be used on multi-cluster systems. Instead a separate MCPM driver should.
-> As far as I know, somebody is said to be already working on this.
->
-> This means that we don't need to consider multi-cluster support in this
-> patch and simplify any calculations to just account for core ID. This would
-> also eliminate any need to handle non-zero cluster ID on single-cluster
-> SoCs.
->
-> Please correct me if I'm wrong.
 
-Yes thats true.
-As mcpm code is in review process, so i will remove platsmp.c and
-hotplug.c changes and respin the patch.
-The  patch will add support for cpunr calculation and offset calculation.
+On 18 April 2014 20:12, Tomasz Figa <t.figa@samsung.com> wrote:
+> When CPU topology is specified in device tree, cpu_logical_map() does
+> not return core ID anymore, but rather full MPIDR value. This breaks
+> existing calculation of PMU register offsets on Exynos SoCs.
+>
+> This patch fixes the problem by adjusting the code to use only core ID
+> bits of the value returned by cpu_logical_map() to allow CPU topology to
+> be specified in device tree on Exynos SoCs.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  arch/arm/mach-exynos/hotplug.c | 10 ++++++----
+>  arch/arm/mach-exynos/platsmp.c | 31 ++++++++++++++++++-------------
+>  2 files changed, 24 insertions(+), 17 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> index 7e0f31a..8a5f07d 100644
+> --- a/arch/arm/mach-exynos/hotplug.c
+> +++ b/arch/arm/mach-exynos/hotplug.c
+> @@ -92,11 +92,13 @@ static inline void cpu_leave_lowpower(void)
+>
+>  static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>  {
+> +       u32 mpidr = cpu_logical_map(cpu);
+> +       u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +
+>         for (;;) {
+>
+> -               /* make cpu1 to be turned off at next WFI command */
+> -               if (cpu == 1)
+> -                       __raw_writel(0, S5P_ARM_CORE_CONFIGURATION(1));
 
->
->
->> diff --git a/arch/arm/mach-exynos/hotplug.c
->> b/arch/arm/mach-exynos/hotplug.c
->> index 5eead53..9f74be2 100644
->> --- a/arch/arm/mach-exynos/hotplug.c
->> +++ b/arch/arm/mach-exynos/hotplug.c
->> @@ -92,11 +92,12 @@ static inline void cpu_leave_lowpower(void)
->>
->>   static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->>   {
->> +       unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
->>         for (;;) {
->>
->> -               /* make cpu1 to be turned off at next WFI command */
->> -               if (cpu == 1)
->> -                       __raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
->> +               /* make cpu to be turned off at next WFI command */
->> +               if (cpu)
->
->
-> As I mentioned in my previous reply, I don't see what could go wrong if this
-> check is omitted. What happens if CPU0 is being hot-unplugged?
->
-> If hardware doesn't support this (but I don't see any mention about this in
-> the documentation), such hotplug attempt should either simply fail on
-> .cpu_kill() operation for CPU0 or even have CPU0 marked as non-hotpluggable.
+I think this macro is not yet in ML code.
 
-That makes more sense, but i need to cross verify.
+> +               /* Turn the CPU off on next WFI instruction. */
+> +               __raw_writel(0, S5P_ARM_CORE_CONFIGURATION(core_id));
+>
+>                 /*
+>                  * here's the WFI
+> @@ -106,7 +108,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>                     :
+>                     : "memory", "cc");
+>
+> -               if (pen_release == cpu_logical_map(cpu)) {
+> +               if (pen_release == core_id) {
+>                         /*
+>                          * OK, proper wakeup, we're done
+>                          */
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index 7b7de4b..e08b2c5 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -89,7 +89,9 @@ static void exynos_secondary_init(unsigned int cpu)
+>  static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+>         unsigned long timeout;
+> -       unsigned long phys_cpu = cpu_logical_map(cpu);
+> +       u32 mpidr = cpu_logical_map(cpu);
+> +       u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +       u32 reg;
+>
+>         /*
+>          * Set synchronisation state between this boot processor
+> @@ -102,19 +104,20 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>          * the holding pen - release it, then wait for it to flag
+>          * that it has been released by resetting pen_release.
+>          *
+> -        * Note that "pen_release" is the hardware CPU ID, whereas
+> +        * Note that "pen_release" is the hardware CPU core ID, whereas
+>          * "cpu" is Linux's internal ID.
+>          */
+> -       write_pen_release(phys_cpu);
+> +       write_pen_release(core_id);
+>
+> -       if (!(__raw_readl(S5P_ARM_CORE_STATUS(1)) & S5P_CORE_LOCAL_PWR_EN)) {
+> +       reg = __raw_readl(S5P_ARM_CORE_STATUS(core_id));
+> +       if (!(reg & S5P_CORE_LOCAL_PWR_EN)) {
+>                 __raw_writel(S5P_CORE_LOCAL_PWR_EN,
+> -                            S5P_ARM_CORE_CONFIGURATION(1));
+> +                            S5P_ARM_CORE_CONFIGURATION(core_id));
+>
+>                 timeout = 10;
+>
+>                 /* wait max 10 ms until cpu1 is on */
+> -               while ((__raw_readl(S5P_ARM_CORE_STATUS(1))
+> +               while ((__raw_readl(S5P_ARM_CORE_STATUS(core_id))
+>                         & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
+>                         if (timeout-- == 0)
+>                                 break;
+> @@ -146,10 +149,10 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>                  * Try to set boot address using firmware first
+>                  * and fall back to boot register if it fails.
+>                  */
+> -               if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
+> -                       __raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+> +               if (call_firmware_op(set_cpu_boot_addr, core_id, boot_addr))
+> +                       __raw_writel(boot_addr, cpu_boot_reg(core_id));
+>
+> -               call_firmware_op(cpu_boot, phys_cpu);
+> +               call_firmware_op(cpu_boot, core_id);
+>
+>                 arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+>
+> @@ -215,14 +218,16 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+>          * boot register if it fails.
+>          */
+>         for (i = 1; i < max_cpus; ++i) {
+> -               unsigned long phys_cpu;
+>                 unsigned long boot_addr;
+> +               u32 mpidr;
+> +               u32 core_id;
+>
+> -               phys_cpu = cpu_logical_map(i);
+> +               mpidr = cpu_logical_map(i);
+> +               core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>                 boot_addr = virt_to_phys(exynos4_secondary_startup);
+>
+> -               if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
+> -                       __raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+> +               if (call_firmware_op(set_cpu_boot_addr, core_id, boot_addr))
+> +                       __raw_writel(boot_addr, cpu_boot_reg(core_id));
+>         }
+>  }
+>
+> --
+> 1.9.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
->
->
->> +                       __raw_writel(0,
->> S5P_ARM_CORE_CONFIGURATION(cpunr));
->>
->>                 /*
->>                  * here's the WFI
->> diff --git a/arch/arm/mach-exynos/platsmp.c
->> b/arch/arm/mach-exynos/platsmp.c
->> index 03e5e9f..d9c182f 100644
->> --- a/arch/arm/mach-exynos/platsmp.c
->> +++ b/arch/arm/mach-exynos/platsmp.c
->> @@ -90,7 +90,7 @@ static int exynos_boot_secondary(unsigned int cpu,
->> struct task_struct *idle)
->>   {
->>         unsigned long timeout;
->>         unsigned long phys_cpu = cpu_logical_map(cpu);
->> -
->> +       unsigned int cpunr = ENYNOS_PMU_CPUNR(cpu_logical_map(cpu));
->>         /*
->>          * Set synchronisation state between this boot processor
->>          * and the secondary one
->> @@ -107,14 +107,15 @@ static int exynos_boot_secondary(unsigned int cpu,
->> struct task_struct *idle)
->>          */
->>         write_pen_release(phys_cpu);
->>
->> -       if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN))
->> {
->> +       if (!(__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
->> +               & S5P_CORE_LOCAL_PWR_EN)) {
->>                 __raw_writel(S5P_CORE_LOCAL_PWR_EN,
->> -                            S5P_ARM_CORE1_CONFIGURATION);
->> +                            S5P_ARM_CORE_CONFIGURATION(cpunr));
->>
->>                 timeout = 10;
->>
->> -               /* wait max 10 ms until cpu1 is on */
->> -               while ((__raw_readl(S5P_ARM_CORE1_STATUS)
->> +               /* wait max 10 ms until secondary cpu is on */
->> +               while ((__raw_readl(S5P_ARM_CORE_STATUS(cpunr))
->>                         & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN)
->> {
->>                         if (timeout-- == 0)
->>                                 break;
->> @@ -123,7 +124,7 @@ static int exynos_boot_secondary(unsigned int cpu,
->> struct task_struct *idle)
->>                 }
->>
->>                 if (timeout == 0) {
->> -                       printk(KERN_ERR "cpu1 power enable failed");
->> +                       pr_err("cpu%u power enable failed", cpu);
->>                         spin_unlock(&boot_lock);
->>                         return -ETIMEDOUT;
->>                 }
->> diff --git a/arch/arm/mach-exynos/regs-pmu.h
->> b/arch/arm/mach-exynos/regs-pmu.h
->> index 4f6a256..0de6df4 100644
->> --- a/arch/arm/mach-exynos/regs-pmu.h
->> +++ b/arch/arm/mach-exynos/regs-pmu.h
->> @@ -105,8 +105,13 @@
->>   #define S5P_GPS_LOWPWR                                S5P_PMUREG(0x139C)
->>   #define S5P_GPS_ALIVE_LOWPWR                  S5P_PMUREG(0x13A0)
->>
->> -#define S5P_ARM_CORE1_CONFIGURATION            S5P_PMUREG(0x2080)
->> -#define S5P_ARM_CORE1_STATUS                   S5P_PMUREG(0x2084)
->> +#define S5P_ARM_CORE0_CONFIGURATION            S5P_PMUREG(0x2000)
->> +#define S5P_ARM_CORE0_STATUS                   S5P_PMUREG(0x2004)
->> +
->> +#define S5P_ARM_CORE_CONFIGURATION(_cpunr)     \
->> +               (S5P_ARM_CORE0_CONFIGURATION + 0x80 * (_cpunr))
->> +#define S5P_ARM_CORE_STATUS(_cpunr)            \
->> +               (S5P_ARM_CORE0_STATUS + 0x80 * (_cpunr))
->>
->>   #define S5P_PAD_RET_MAUDIO_OPTION             S5P_PMUREG(0x3028)
->>   #define S5P_PAD_RET_GPIO_OPTION                       S5P_PMUREG(0x3108)
->> @@ -313,4 +318,10 @@
->>
->>   #define EXYNOS5_OPTION_USE_RETENTION                          (1 << 4)
->>
->> +#include <asm/cputype.h>
->> +#define MAX_CPUS_IN_CLUSTER    4
->> +#define ENYNOS_PMU_CPUNR(mpidr) \
->> +               ((MPIDR_AFFINITY_LEVEL(mpidr, 1) * MAX_CPUS_IN_CLUSTER) \
->> +                 + MPIDR_AFFINITY_LEVEL(mpidr, 0));
->
->
-> Static inline would be preferred and then name in lowercase.
 
-ok
-
->
-> Best regards,
-> Tomasz
-
- Thanks again
 
 -- 
 with warm regards,
