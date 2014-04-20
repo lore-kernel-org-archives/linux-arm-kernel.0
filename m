@@ -1,38 +1,37 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Sun, 20 Apr 2014 16:54:01 +0530
-Subject: [PATCH 4/7] ARM: dtsi: add access to simple hdmiphy to exynos5420 hdmi
- node
+Date: Sun, 20 Apr 2014 16:54:03 +0530
+Subject: [PATCH 6/7] ARM: dts: change to correct compatible string for
+ exynos5420 hdmi
 In-Reply-To: <1397993044-14564-1-git-send-email-rahul.sharma@samsung.com>
 References: <1397993044-14564-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1397993044-14564-5-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1397993044-14564-7-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-add reference for hdmiphy phy to the client node, which is
-hdmi for exynos5420.
+Replace compatible string for HDMI node in Exynos5420. Since
+latest restructring in Drm hdmi driver, it is agreed to use
+a seperate compatible string for Exynos5420 HDMI IP siince it
+uses APB mapped Phy.
 
 Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
- mode change 100755 => 100644 arch/arm/boot/dts/exynos5420.dtsi
+ arch/arm/boot/dts/exynos5420.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-old mode 100755
-new mode 100644
-index 07a6cdc..398cb20
+index 398cb20..663fca9 100644
 --- a/arch/arm/boot/dts/exynos5420.dtsi
 +++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -642,6 +642,8 @@
- 		clock-names = "hdmi", "sclk_hdmi", "sclk_pixel",
- 			"sclk_hdmiphy", "mout_hdmi";
- 		status = "disabled";
-+		phys = <&simple_phys 0>;
-+		phy-names = "hdmiphy";
+@@ -633,7 +633,7 @@
  	};
  
- 	mixer at 14450000 {
+ 	hdmi at 14530000 {
+-		compatible = "samsung,exynos4212-hdmi";
++		compatible = "samsung,exynos5420-hdmi";
+ 		reg = <0x14530000 0x70000>;
+ 		interrupts = <0 95 0>;
+ 		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
 -- 
 1.7.9.5
