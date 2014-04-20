@@ -1,28 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 20 Apr 2014 12:36:36 -0700
-Subject: [RESEND: PATCH 2/2] input: tc3589x-keypad: support probing from
- device tree
-In-Reply-To: <1397028491-15462-1-git-send-email-linus.walleij@linaro.org>
-References: <1397028491-15462-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140420193636.GG12454@core.coreip.homeip.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 20 Apr 2014 16:04:09 -0400
+Subject: [PATCH 0/7] Fixes for Armada 370/XP PCIe
+In-Reply-To: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397823593-1932-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140420200409.GI28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 09, 2014 at 09:28:11AM +0200, Linus Walleij wrote:
-> Implement device tree probing for the tc3589x keypad driver.
-> This is modeled on the STMPE keypad driver and tested on the
-> Ux500 TVK1281618 UIB.
+Thomas,
+
+On Fri, Apr 18, 2014 at 02:19:46PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v3:
-> - Use two local u32 variables to avoid weirdness in u8 casting
->   of the resulting values to the pointers.
-> ChangeLog v1->v2:
-> - Fix rows/columns binding to read two u32's insead of two
->   u8 /bits/ as noted by Mark Rutland.
+> This set of commits fixes a number of problems in the PCIe support of
+> the Armada 370 and Armada XP SoCs, allowing to use PCIe devices that
+> were not properly supported until now.
+> 
+> Due to the interaction of PCIe with other subsystems, the fixes are
+> not limited to drivers/pci, but also touch drivers/bus and
+> drivers/irqchip.
 
-Applied, thank you.
+I've tentatively pulled this series as follows:
 
--- 
-Dmitry
+  patches 1-3 into mvebu/drivers-irqchip-fixes
+
+  patches 4-7 into mvebu/drivers-mbus_pci-fixes
+
+with the latter depending on the former.  I'm going to hold them in
+-next for a bit.  At least until we get an Ack from Bjorn.  Then I'll
+send them their appropriate ways.
+
+thx,
+
+Jason.
