@@ -1,19 +1,18 @@
 From: shaik.samsung@gmail.com (Shaik Ameer Basha)
-Date: Sun, 20 Apr 2014 12:57:27 +0530
-Subject: [PATCH v2 1/7] clk: exynos5420: Add more clock register offsets
-In-Reply-To: <534D6242.9000605@gmail.com>
+Date: Sun, 20 Apr 2014 13:00:57 +0530
+Subject: [PATCH v2 2/7] clk: exynos5420: Add more clock IDs
+In-Reply-To: <534D6357.5000801@gmail.com>
 References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
- <1395918470-16374-2-git-send-email-shaik.ameer@samsung.com>
- <534D6242.9000605@gmail.com>
-Message-ID: <CAOD6ATosa=8CP=Ot4vZW7Tdr-mSvyuiF_KGVuL79HnVQ38n5zQ@mail.gmail.com>
+ <1395918470-16374-3-git-send-email-shaik.ameer@samsung.com>
+ <534D6357.5000801@gmail.com>
+Message-ID: <CAOD6ATq9NxMpPWrfWviCJy3Ea66JNJv-dntXuNPM7AYwbEYynA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Tomasz,
 
-Thanks for the review comments.
 
-On Tue, Apr 15, 2014 at 10:15 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+On Tue, Apr 15, 2014 at 10:20 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 > Hi Shaik,
 >
 >
@@ -21,110 +20,138 @@ On Tue, Apr 15, 2014 at 10:15 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 >>
 >> From: Rahul Sharma <rahul.sharma@samsung.com>
 >>
->> This patch adds the missing clock register offsets for Exynos5420.
+>> Add more clock IDs to be used in DT bindings for Exynos5420.
 >>
 >> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
 >> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
 >> ---
->>   drivers/clk/samsung/clk-exynos5420.c |   29
->> ++++++++++++++++++++++++++++-
->>   1 file changed, 28 insertions(+), 1 deletion(-)
+>>   include/dt-bindings/clock/exynos5420.h |   62
+>> ++++++++++++++++++++++++++++++--
+>>   1 file changed, 60 insertions(+), 2 deletions(-)
 >>
->> diff --git a/drivers/clk/samsung/clk-exynos5420.c
->> b/drivers/clk/samsung/clk-exynos5420.c
->> index 13f624d..3d0fb77 100644
->> --- a/drivers/clk/samsung/clk-exynos5420.c
->> +++ b/drivers/clk/samsung/clk-exynos5420.c
->> @@ -27,6 +27,9 @@
->>   #define DIV_CPU1              0x504
->>   #define GATE_BUS_CPU          0x700
->>   #define GATE_SCLK_CPU         0x800
->> +#define CLKOUT_CMU_CPU         0xa00
->> +#define DIV_G2D                        0x8500
->> +#define GATE_BUS_G2D           0x8700
->>   #define GATE_IP_G2D           0x8800
->>   #define CPLL_LOCK             0x10020
->>   #define DPLL_LOCK             0x10030
->> @@ -39,7 +42,11 @@
->>   #define CPLL_CON0             0x10120
->>   #define DPLL_CON0             0x10128
->>   #define EPLL_CON0             0x10130
->> +#define EPLL_CON1              0x10134
->> +#define EPLL_CON2              0x10138
->>   #define RPLL_CON0             0x10140
->> +#define RPLL_CON1              0x10144
->> +#define RPLL_CON2              0x10148
->>   #define IPLL_CON0             0x10150
->>   #define SPLL_CON0             0x10160
->>   #define VPLL_CON0             0x10170
->> @@ -57,10 +64,13 @@
->>   #define SRC_FSYS              0x10244
->>   #define SRC_PERIC0            0x10250
->>   #define SRC_PERIC1            0x10254
->> +#define SRC_ISP                        0x10270
->>   #define SRC_TOP10             0x10280
->>   #define SRC_TOP11             0x10284
->>   #define SRC_TOP12             0x10288
->> -#define        SRC_MASK_DISP10         0x1032c
->> +#define SRC_MASK_TOP2          0x10308
->> +#define SRC_MASK_DISP10                0x1032c
->> +#define SRC_MASK_MAU           0x10334
->>   #define SRC_MASK_FSYS         0x10340
->>   #define SRC_MASK_PERIC0               0x10350
->>   #define SRC_MASK_PERIC1               0x10354
->> @@ -77,24 +87,41 @@
->>   #define DIV_PERIC2            0x10560
->>   #define DIV_PERIC3            0x10564
->>   #define DIV_PERIC4            0x10568
->> +#define SCLK_DIV_ISP0          0x10580
->> +#define SCLK_DIV_ISP1          0x10584
->> +#define DIV2_RATIO0            0x10590
->> +#define DIV4_RATIO             0x105a0
->>   #define GATE_BUS_TOP          0x10700
->> +#define GATE_BUS_GSCL0         0x10710
->> +#define GATE_BUS_GSCL1         0x10720
->> +#define GATE_BUS_DISP1         0x10728
->> +#define GATE_BUS_MFC           0x10734
->> +#define GATE_BUS_GEN           0x1073c
->>   #define GATE_BUS_FSYS0                0x10740
->> +#define GATE_BUS_FSYS2         0x10748
->> +#define GATE_BUS_MSCL          0x1074C
->>   #define GATE_BUS_PERIC                0x10750
->>   #define GATE_BUS_PERIC1               0x10754
->>   #define GATE_BUS_PERIS0               0x10760
->>   #define GATE_BUS_PERIS1               0x10764
->> +#define GATE_BUS_NOC           0x10770
->> +#define GATE_TOP_SCLK_ISP      0x10870
->>   #define GATE_IP_GSCL0         0x10910
->>   #define GATE_IP_GSCL1         0x10920
->>   #define GATE_IP_MFC           0x1092c
->>   #define GATE_IP_DISP1         0x10928
->>   #define GATE_IP_G3D           0x10930
->>   #define GATE_IP_GEN           0x10934
->> +#define GATE_IP_FSYS           0x10944
->> +#define GATE_IP_PERIC          0x10950
->> +#define GATE_IP_PERIS          0x10960
->>   #define GATE_IP_MSCL          0x10970
->>   #define GATE_TOP_SCLK_GSCL    0x10820
->>   #define GATE_TOP_SCLK_DISP1   0x10828
->>   #define GATE_TOP_SCLK_MAU     0x1083c
->>   #define GATE_TOP_SCLK_FSYS    0x10840
->>   #define GATE_TOP_SCLK_PERIC   0x10850
->> +#define TOP_SPARE2             0x10b08
->>   #define BPLL_LOCK             0x20010
->>   #define BPLL_CON0             0x20110
->>   #define SRC_CDREX             0x20200
+>> diff --git a/include/dt-bindings/clock/exynos5420.h
+>> b/include/dt-bindings/clock/exynos5420.h
+>> index 5eefd88..e921913 100644
+>> --- a/include/dt-bindings/clock/exynos5420.h
+>> +++ b/include/dt-bindings/clock/exynos5420.h
+>> @@ -58,6 +58,16 @@
+>>   #define CLK_SCLK_GSCL_WA      156
+>>   #define CLK_SCLK_GSCL_WB      157
+>>   #define CLK_SCLK_HDMIPHY      158
+>> +#define CLK_SCLK_MPHY_REFCLK   159
+>> +#define CLK_SCLK_SPI0_ISP      160
+>> +#define CLK_SCLK_SPI1_ISP      161
+>> +#define CLK_SCLK_UART_ISP      162
+>> +#define CLK_SCLK_ISP_SENSOR0   163
+>> +#define CLK_SCLK_ISP_SENSOR1   164
+>> +#define CLK_SCLK_ISP_SENSOR2   165
+>> +#define CLK_SCLK_PWM_ISP       166
+>> +#define CLK_SCLK_HSIC_12M      167
+>> +#define CLK_SCLK_MPHY_IXTAL24  168
 >>
+>>   /* gate clocks */
+>>   #define CLK_ACLK66_PERIC      256
+>> @@ -123,6 +133,7 @@
+>>   #define CLK_USBH20            365
+>>   #define CLK_USBD300           366
+>>   #define CLK_USBD301           367
+>> +#define CLK_PCLK200_FSYS       370
+>>   #define CLK_ACLK400_MSCL      380
+>>   #define CLK_MSCL0             381
+>>   #define CLK_MSCL1             382
+>> @@ -141,6 +152,8 @@
+>>   #define CLK_ACLK300_DISP1     420
+>>   #define CLK_FIMD1             421
+>>   #define CLK_SMMU_FIMD1                422
+>> +#define CLK_SMMU_FIMD1M1       423
+>> +#define CLK_ACLK400_DISP1      424
+>>   #define CLK_ACLK166           430
+>>   #define CLK_MIXER             431
+>>   #define CLK_ACLK266           440
+>> @@ -172,12 +185,57 @@
+>>   #define CLK_SMMU_FIMCL1               493
+>>   #define CLK_SMMU_FIMCL3               494
+>>   #define CLK_FIMC_LITE3                495
+>> -#define CLK_ACLK_G3D           500
+>> -#define CLK_G3D                        501
+>> +#define CLK_G3D                        500
 >
-> From this patch, it's hard to tell what is the use for those registers. I
-> think they should be added along with definitions that need them.
 >
+> What is the reason for this ID change? Even if CLK_ACLK_G3D is removed, as
+> it wasn't even referenced by the driver, original clock IDs should remain
+> fixed.
 
-Ok. will add this macros along with the corresponding clock definitions.
+My Bad.
+Anyways, I am planning to post one more patch at the end of the series
+to remove the gaps b/w the numbers.
+I hope there is no significance of the numbers once we move completely
+to macros.
+
+>
+>
+>>   #define CLK_SMMU_MIXER                502
+>> +#define CLK_PCLK_TZPC10                503
+>> +#define CLK_PCLK_TZPC11                504
+>> +#define CLK_PCLK_MC            505
+>> +#define CLK_PCLK_TOP_RTC       506
+>> +#define CLK_SMMU_JPEG2         507
+>> +#define CLK_PCLK_ROTATOR       508
+>> +#define CLK_SMMU_RTIC          509
+>> +#define CLK_PCLK_G2D           510
+>> +#define CLK_ACLK_SMMU_G2D      511
+>> +#define CLK_SMMU_G2D           512
+>> +#define CLK_ACLK_SMMU_MDMA0    513
+>> +#define CLK_SMMU_MDMA0         514
+>> +#define CLK_ACLK_SMMU_SSS      515
+>> +#define CLK_SMMU_SSS           516
+>> +#define CLK_SMMU_SLIM_SSS      517
+>> +#define CLK_ACLK_SMMU_SLIM_SSS 518
+>> +#define CLK_ACLK266_ISP                519
+>> +#define CLK_ACLK400_ISP                520
+>> +#define CLK_ACLK333_432_ISP0   521
+>> +#define CLK_ACLK333_432_ISP    522
+>> +#define CLK_ACLK_SMMU_MIXER    523
+>> +#define CLK_PCLK_HDMIPHY       524
+>> +#define CLK_PCLK_GSCL0         525
+>> +#define CLK_PCLK_GSCL1         526
+>> +#define CLK_PCLK_FIMC_3AA      527
+>> +#define CLK_ACLK_FIMC_LITE0    528
+>> +#define CLK_ACLK_FIMC_LITE1    529
+>> +#define CLK_PCLK_FIMC_LITE0    530
+>> +#define CLK_PCLK_FIMC_LITE1    531
+>> +#define CLK_PCLK_FIMC_LITE3    532
+>> +#define CLK_PCLK_MSCL0         533
+>> +#define CLK_PCLK_MSCL1         534
+>> +#define CLK_PCLK_MSCL2         535
+>> +#define CLK_PCLK_MFC           536
+>>
+>>   /* mux clocks */
+>>   #define CLK_MOUT_HDMI         640
+>> +#define CLK_MOUT_FIMD1                 641
+>> +#define CLK_MOUT_MAUDIO0               642
+>> +#define CLK_MOUT_SPI0                  643
+>> +#define CLK_MOUT_SPI1                  644
+>> +#define CLK_MOUT_SPI2                  645
+>> +#define CLK_MOUT_SW_ACLK333            646
+>> +#define CLK_MOUT_USER_ACLK333          647
+>> +#define CLK_MOUT_SW_ACLK300_GSCL       648
+>> +#define CLK_MOUT_USER_ACLK300_GSCL     649
+>> +#define CLK_MOUT_SW_ACLK333_432_GSCL   650
+>> +#define CLK_MOUT_USER_ACLK333_432_GSCL 651
+>> +#define CLK_MOUT_G3D                   652
+>>
+>>   /* divider clocks */
+>>   #define CLK_DOUT_PIXEL                768
+>>
+>
+> Also similar comment as for patch 1/7, it's hard to tell why this change is
+> needed at all.
+
+Ok. Will take care for the next series.
 
 Regards,
 Shaik Ameer Basha
 
-
+>
 > Best regards,
 > Tomasz
