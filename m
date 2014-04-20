@@ -1,33 +1,41 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Sun, 20 Apr 2014 20:52:11 +0200
-Subject: [RFC PATCH 0/2] usb: Reuse fsl driver code for synopsys usb
- controller
-In-Reply-To: <7aed4ee6-69e7-4f9f-9f45-675bc695089c@CO9EHSMHS031.ehs.local>
-References: <7aed4ee6-69e7-4f9f-9f45-675bc695089c@CO9EHSMHS031.ehs.local>
-Message-ID: <5354175B.3070109@pengutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 20 Apr 2014 15:00:08 -0400
+Subject: [PATCH 0/5] ARM: mvebu: misc Device Tree fixes and updates
+In-Reply-To: <1397806908-7550-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397806908-7550-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140420190008.GG28159@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2014 06:27 PM, Punnaiah Choudary Kalluri wrote:
-> Zynq soc contains a dual role usb controller and this IP is from synopsys. We
-> observed that there is driver available for this controller from freescale and
-> decided to reuse this driver for zynq use.
+On Fri, Apr 18, 2014 at 09:41:43AM +0200, Thomas Petazzoni wrote:
+> Jason, Gregory, Andrew, Sebastian,
+> 
+> Here are five patches making misc Device Tree fixes and updates for
+> mvebu platforms:
+> 
+>  * The first patch is really a fix, that makes audio actually work on
+>    Armada 370 DB. It should be merged as part of 3.15-rc.
+> 
+>  * The second patch enables the SATA interface on Armada 375 DB,
+>    apparently something we forgot to do when submitting the initial
+>    Armada 375 DB Device Tree. Not sure whether it's 3.15 or 3.16
+>    material.
+> 
+>  * The last three patches are improvements to the Device Tree to use
+>    the 'clocks' property for UART controllers instead of an hard-coded
+>    'clock-frequency' property. This is clearly cleanup stuff, so 3.16
+>    is in order.
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (5):
+>   ARM: mvebu: specify I2C bus frequency on Armada 370 DB
+>   ARM: mvebu: enable the SATA interface on Armada 375 DB
 
-Have a look drivers/usb/chipidea. It's maintained by Peter Chen (Cc'ed)
-and is in better shape than the freescale driver.
+Patches 1 and 2 applied to mvebu/dt-fixes with Gregory's Ack.
 
-Marc
+thx,
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140420/d9c20ad5/attachment.sig>
+Jason.
