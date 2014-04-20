@@ -1,44 +1,58 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Sun, 20 Apr 2014 00:48:28 +0000
-Subject: USB OTG support on mx27pdk
-In-Reply-To: <CAOMZO5A1CQP3jLJKs1HJupc8GxXzKMf7czTx21=PxomyENhhTw@mail.gmail.com>
-References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
- <1397627716.685483508@f399.i.mail.ru>
- <CAOMZO5Bgo8L1G2hpZpg=0uVdxkcDDnkOPkNGX9dHYk3Wq9J+=w@mail.gmail.com>
- <1397649526.601497269@f431.i.mail.ru>
- <CAOMZO5DXStD5wsFhm3A9izyrxLfC8rmY2YnGBVGD=fqsJdaRFw@mail.gmail.com>
- <20140416150316.GR13429@pengutronix.de>
- <77d21aa2203646bf867cfac4b78fef43@BL2PR03MB226.namprd03.prod.outlook.com>
- <CAOMZO5A1CQP3jLJKs1HJupc8GxXzKMf7czTx21=PxomyENhhTw@mail.gmail.com>
-Message-ID: <ddc3005702174f55b564328820078fb8@BL2PR03MB226.namprd03.prod.outlook.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Sun, 20 Apr 2014 13:15:34 +1000
+Subject: [linux-sunxi] [PATCH 2/2] ARM: sun6i: Add ARM PMU in A31 DTSI
+In-Reply-To: <1397847149-26501-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1397847149-26501-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1397847149-26501-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGRGNgU1hyj0qJMEkQWk7diTfJXKrUHZW_LFoaDZQymbN=569Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+Hi Maxime
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Sunday, April 20, 2014 1:10 AM
-> To: Chen Peter-B29397
-> Cc: Michael Grzeschik; Alexander Shiyan; linux-arm-
-> kernel at lists.infradead.org; linux-usb at vger.kernel.org; Sascha Hauer;
-> chris.ruehl at gtsys.com.hk; Guo Shawn-R65073
-> Subject: Re: USB OTG support on mx27pdk
-> 
-> On Sat, Apr 19, 2014 at 4:32 AM, Peter Chen <Peter.Chen@freescale.com>
-> wrote:
-> > The below patch is intended to fix above issues for all platforms,
-> > I have tested it at imx6 platform, if possible, have a test at
-> imx25/imx27
-> > please.
-> 
-> I don't see any patch below, but anyway I have managed to fix the
-> issue on mx27 at dts level.
-> 
+On Sat, Apr 19, 2014 at 4:52 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Enable the performance monitoring unit found in the A20 SoCs.
 
-https://github.com/hzpeterchen/linux-usb/commit/c1f42ea27ed3f5d988c63da7849d2e6b445b4fbc
+Don't you mean A_31_?
 
-Your problem is different with sasche's, which hang the system due to
-no phy clk. The chris's patch should not cause the oops.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index bc46814d2ff0..4b0f1231efc4 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -59,6 +59,14 @@
+>                 reg = <0x40000000 0x80000000>;
+>         };
+>
+> +       pmu {
+> +               compatible = "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
+> +               interrupts = <0 120 4>,
+> +                            <0 121 4>,
+> +                            <0 122 4>,
+> +                            <0 123 4>;
+> +       };
+> +
+>         clocks {
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+> --
+> 1.9.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
-Peter
+
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
+.Plan: http://sites.google.com/site/juliancalaby/
