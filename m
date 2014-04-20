@@ -1,151 +1,130 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Sun, 20 Apr 2014 12:53:03 +0530
-Subject: [PATCH 2/4] ARM: EXYNOS: Fix core ID used by platsmp and hotplug
- code
-In-Reply-To: <1397832181-5153-3-git-send-email-t.figa@samsung.com>
-References: <1397832181-5153-1-git-send-email-t.figa@samsung.com>
- <1397832181-5153-3-git-send-email-t.figa@samsung.com>
-Message-ID: <CANuQgHF9up5=8+cWgC+9cm-8Bf7sGcRBcg1DyXm-pbmK=EMgmg@mail.gmail.com>
+From: shaik.samsung@gmail.com (Shaik Ameer Basha)
+Date: Sun, 20 Apr 2014 12:57:27 +0530
+Subject: [PATCH v2 1/7] clk: exynos5420: Add more clock register offsets
+In-Reply-To: <534D6242.9000605@gmail.com>
+References: <1395918470-16374-1-git-send-email-shaik.ameer@samsung.com>
+ <1395918470-16374-2-git-send-email-shaik.ameer@samsung.com>
+ <534D6242.9000605@gmail.com>
+Message-ID: <CAOD6ATosa=8CP=Ot4vZW7Tdr-mSvyuiF_KGVuL79HnVQ38n5zQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Tomasz,
 
+Thanks for the review comments.
 
-On 18 April 2014 20:12, Tomasz Figa <t.figa@samsung.com> wrote:
-> When CPU topology is specified in device tree, cpu_logical_map() does
-> not return core ID anymore, but rather full MPIDR value. This breaks
-> existing calculation of PMU register offsets on Exynos SoCs.
+On Tue, Apr 15, 2014 at 10:15 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Shaik,
 >
-> This patch fixes the problem by adjusting the code to use only core ID
-> bits of the value returned by cpu_logical_map() to allow CPU topology to
-> be specified in device tree on Exynos SoCs.
 >
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/hotplug.c | 10 ++++++----
->  arch/arm/mach-exynos/platsmp.c | 31 ++++++++++++++++++-------------
->  2 files changed, 24 insertions(+), 17 deletions(-)
+> On 27.03.2014 12:07, Shaik Ameer Basha wrote:
+>>
+>> From: Rahul Sharma <rahul.sharma@samsung.com>
+>>
+>> This patch adds the missing clock register offsets for Exynos5420.
+>>
+>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>> ---
+>>   drivers/clk/samsung/clk-exynos5420.c |   29
+>> ++++++++++++++++++++++++++++-
+>>   1 file changed, 28 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5420.c
+>> b/drivers/clk/samsung/clk-exynos5420.c
+>> index 13f624d..3d0fb77 100644
+>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>> @@ -27,6 +27,9 @@
+>>   #define DIV_CPU1              0x504
+>>   #define GATE_BUS_CPU          0x700
+>>   #define GATE_SCLK_CPU         0x800
+>> +#define CLKOUT_CMU_CPU         0xa00
+>> +#define DIV_G2D                        0x8500
+>> +#define GATE_BUS_G2D           0x8700
+>>   #define GATE_IP_G2D           0x8800
+>>   #define CPLL_LOCK             0x10020
+>>   #define DPLL_LOCK             0x10030
+>> @@ -39,7 +42,11 @@
+>>   #define CPLL_CON0             0x10120
+>>   #define DPLL_CON0             0x10128
+>>   #define EPLL_CON0             0x10130
+>> +#define EPLL_CON1              0x10134
+>> +#define EPLL_CON2              0x10138
+>>   #define RPLL_CON0             0x10140
+>> +#define RPLL_CON1              0x10144
+>> +#define RPLL_CON2              0x10148
+>>   #define IPLL_CON0             0x10150
+>>   #define SPLL_CON0             0x10160
+>>   #define VPLL_CON0             0x10170
+>> @@ -57,10 +64,13 @@
+>>   #define SRC_FSYS              0x10244
+>>   #define SRC_PERIC0            0x10250
+>>   #define SRC_PERIC1            0x10254
+>> +#define SRC_ISP                        0x10270
+>>   #define SRC_TOP10             0x10280
+>>   #define SRC_TOP11             0x10284
+>>   #define SRC_TOP12             0x10288
+>> -#define        SRC_MASK_DISP10         0x1032c
+>> +#define SRC_MASK_TOP2          0x10308
+>> +#define SRC_MASK_DISP10                0x1032c
+>> +#define SRC_MASK_MAU           0x10334
+>>   #define SRC_MASK_FSYS         0x10340
+>>   #define SRC_MASK_PERIC0               0x10350
+>>   #define SRC_MASK_PERIC1               0x10354
+>> @@ -77,24 +87,41 @@
+>>   #define DIV_PERIC2            0x10560
+>>   #define DIV_PERIC3            0x10564
+>>   #define DIV_PERIC4            0x10568
+>> +#define SCLK_DIV_ISP0          0x10580
+>> +#define SCLK_DIV_ISP1          0x10584
+>> +#define DIV2_RATIO0            0x10590
+>> +#define DIV4_RATIO             0x105a0
+>>   #define GATE_BUS_TOP          0x10700
+>> +#define GATE_BUS_GSCL0         0x10710
+>> +#define GATE_BUS_GSCL1         0x10720
+>> +#define GATE_BUS_DISP1         0x10728
+>> +#define GATE_BUS_MFC           0x10734
+>> +#define GATE_BUS_GEN           0x1073c
+>>   #define GATE_BUS_FSYS0                0x10740
+>> +#define GATE_BUS_FSYS2         0x10748
+>> +#define GATE_BUS_MSCL          0x1074C
+>>   #define GATE_BUS_PERIC                0x10750
+>>   #define GATE_BUS_PERIC1               0x10754
+>>   #define GATE_BUS_PERIS0               0x10760
+>>   #define GATE_BUS_PERIS1               0x10764
+>> +#define GATE_BUS_NOC           0x10770
+>> +#define GATE_TOP_SCLK_ISP      0x10870
+>>   #define GATE_IP_GSCL0         0x10910
+>>   #define GATE_IP_GSCL1         0x10920
+>>   #define GATE_IP_MFC           0x1092c
+>>   #define GATE_IP_DISP1         0x10928
+>>   #define GATE_IP_G3D           0x10930
+>>   #define GATE_IP_GEN           0x10934
+>> +#define GATE_IP_FSYS           0x10944
+>> +#define GATE_IP_PERIC          0x10950
+>> +#define GATE_IP_PERIS          0x10960
+>>   #define GATE_IP_MSCL          0x10970
+>>   #define GATE_TOP_SCLK_GSCL    0x10820
+>>   #define GATE_TOP_SCLK_DISP1   0x10828
+>>   #define GATE_TOP_SCLK_MAU     0x1083c
+>>   #define GATE_TOP_SCLK_FSYS    0x10840
+>>   #define GATE_TOP_SCLK_PERIC   0x10850
+>> +#define TOP_SPARE2             0x10b08
+>>   #define BPLL_LOCK             0x20010
+>>   #define BPLL_CON0             0x20110
+>>   #define SRC_CDREX             0x20200
+>>
 >
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 7e0f31a..8a5f07d 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -92,11 +92,13 @@ static inline void cpu_leave_lowpower(void)
+> From this patch, it's hard to tell what is the use for those registers. I
+> think they should be added along with definitions that need them.
 >
->  static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->  {
-> +       u32 mpidr = cpu_logical_map(cpu);
-> +       u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +
->         for (;;) {
->
-> -               /* make cpu1 to be turned off at next WFI command */
-> -               if (cpu == 1)
-> -                       __raw_writel(0, S5P_ARM_CORE_CONFIGURATION(1));
 
-I think this macro is not yet in ML code.
+Ok. will add this macros along with the corresponding clock definitions.
 
-> +               /* Turn the CPU off on next WFI instruction. */
-> +               __raw_writel(0, S5P_ARM_CORE_CONFIGURATION(core_id));
->
->                 /*
->                  * here's the WFI
-> @@ -106,7 +108,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->                     :
->                     : "memory", "cc");
->
-> -               if (pen_release == cpu_logical_map(cpu)) {
-> +               if (pen_release == core_id) {
->                         /*
->                          * OK, proper wakeup, we're done
->                          */
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 7b7de4b..e08b2c5 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -89,7 +89,9 @@ static void exynos_secondary_init(unsigned int cpu)
->  static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
->         unsigned long timeout;
-> -       unsigned long phys_cpu = cpu_logical_map(cpu);
-> +       u32 mpidr = cpu_logical_map(cpu);
-> +       u32 core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +       u32 reg;
->
->         /*
->          * Set synchronisation state between this boot processor
-> @@ -102,19 +104,20 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->          * the holding pen - release it, then wait for it to flag
->          * that it has been released by resetting pen_release.
->          *
-> -        * Note that "pen_release" is the hardware CPU ID, whereas
-> +        * Note that "pen_release" is the hardware CPU core ID, whereas
->          * "cpu" is Linux's internal ID.
->          */
-> -       write_pen_release(phys_cpu);
-> +       write_pen_release(core_id);
->
-> -       if (!(__raw_readl(S5P_ARM_CORE_STATUS(1)) & S5P_CORE_LOCAL_PWR_EN)) {
-> +       reg = __raw_readl(S5P_ARM_CORE_STATUS(core_id));
-> +       if (!(reg & S5P_CORE_LOCAL_PWR_EN)) {
->                 __raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> -                            S5P_ARM_CORE_CONFIGURATION(1));
-> +                            S5P_ARM_CORE_CONFIGURATION(core_id));
->
->                 timeout = 10;
->
->                 /* wait max 10 ms until cpu1 is on */
-> -               while ((__raw_readl(S5P_ARM_CORE_STATUS(1))
-> +               while ((__raw_readl(S5P_ARM_CORE_STATUS(core_id))
->                         & S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
->                         if (timeout-- == 0)
->                                 break;
-> @@ -146,10 +149,10 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->                  * Try to set boot address using firmware first
->                  * and fall back to boot register if it fails.
->                  */
-> -               if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
-> -                       __raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
-> +               if (call_firmware_op(set_cpu_boot_addr, core_id, boot_addr))
-> +                       __raw_writel(boot_addr, cpu_boot_reg(core_id));
->
-> -               call_firmware_op(cpu_boot, phys_cpu);
-> +               call_firmware_op(cpu_boot, core_id);
->
->                 arch_send_wakeup_ipi_mask(cpumask_of(cpu));
->
-> @@ -215,14 +218,16 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->          * boot register if it fails.
->          */
->         for (i = 1; i < max_cpus; ++i) {
-> -               unsigned long phys_cpu;
->                 unsigned long boot_addr;
-> +               u32 mpidr;
-> +               u32 core_id;
->
-> -               phys_cpu = cpu_logical_map(i);
-> +               mpidr = cpu_logical_map(i);
-> +               core_id = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->                 boot_addr = virt_to_phys(exynos4_secondary_startup);
->
-> -               if (call_firmware_op(set_cpu_boot_addr, phys_cpu, boot_addr))
-> -                       __raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
-> +               if (call_firmware_op(set_cpu_boot_addr, core_id, boot_addr))
-> +                       __raw_writel(boot_addr, cpu_boot_reg(core_id));
->         }
->  }
->
-> --
-> 1.9.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Shaik Ameer Basha
 
 
-
--- 
-with warm regards,
-Chander Kashyap
+> Best regards,
+> Tomasz
