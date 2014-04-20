@@ -1,41 +1,56 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 20 Apr 2014 07:58:21 +0400
-Subject: =?UTF-8?B?UmU6IFVTQiBPVEcgc3VwcG9ydCBvbiBteDI3cGRr?=
-In-Reply-To: <ddc3005702174f55b564328820078fb8@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <CAOMZO5BcTP=fvYDE8EU2Y2Syn=QqbPd4zaQ96mSfy-mgLEjOmA@mail.gmail.com>
- <CAOMZO5A1CQP3jLJKs1HJupc8GxXzKMf7czTx21=PxomyENhhTw@mail.gmail.com>
- <ddc3005702174f55b564328820078fb8@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <1397966301.558037781@f362.i.mail.ru>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun, 20 Apr 2014 09:18:52 +0400
+Subject: [PATCH 2/2] ARM: i.MX27 clk: Remove clk_register_clkdev() for unused
+ clocks
+In-Reply-To: <1397971132-13663-1-git-send-email-shc_work@mail.ru>
+References: <1397971132-13663-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1397971132-13663-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sun, 20 Apr 2014 00:48:28 +0000 ?? Peter Chen <Peter.Chen@freescale.com>:
-> > -----Original Message-----
-> > From: Fabio Estevam [mailto:festevam at gmail.com]
-> > Sent: Sunday, April 20, 2014 1:10 AM
-> > To: Chen Peter-B29397
-> > Cc: Michael Grzeschik; Alexander Shiyan; linux-arm-
-> > kernel at lists.infradead.org; linux-usb at vger.kernel.org; Sascha Hauer;
-> > chris.ruehl at gtsys.com.hk; Guo Shawn-R65073
-> > Subject: Re: USB OTG support on mx27pdk
-> > 
-> > On Sat, Apr 19, 2014 at 4:32 AM, Peter Chen <Peter.Chen@freescale.com>
-> > wrote:
-> > > The below patch is intended to fix above issues for all platforms,
-> > > I have tested it at imx6 platform, if possible, have a test at
-> > imx25/imx27
-> > > please.
-> > 
-> > I don't see any patch below, but anyway I have managed to fix the
-> > issue on mx27 at dts level.
-> > 
-> 
-> https://github.com/hzpeterchen/linux-usb/commit/c1f42ea27ed3f5d988c63da7849d2e6b445b4fbc
-> 
-> Your problem is different with sasche's, which hang the system due to
-> no phy clk. The chris's patch should not cause the oops.
+This patch removes clk_register_clkdev() for the clocks that do not
+have any users for non-DT boards and drivers.
 
-For me, nothing has changed.
-The driver works on i.MX27 PCM970 RDK with the patch as well as without it.
-
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
+ arch/arm/mach-imx/clk-imx27.c | 17 -----------------
+ 1 file changed, 17 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 5176dc5..629e27c 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -227,16 +227,6 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[per1_gate], "per", "imx21-uart.5");
+ 	clk_register_clkdev(clk[gpt1_ipg_gate], "ipg", "imx-gpt.0");
+ 	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.0");
+-	clk_register_clkdev(clk[gpt2_ipg_gate], "ipg", "imx-gpt.1");
+-	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.1");
+-	clk_register_clkdev(clk[gpt3_ipg_gate], "ipg", "imx-gpt.2");
+-	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.2");
+-	clk_register_clkdev(clk[gpt4_ipg_gate], "ipg", "imx-gpt.3");
+-	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.3");
+-	clk_register_clkdev(clk[gpt5_ipg_gate], "ipg", "imx-gpt.4");
+-	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.4");
+-	clk_register_clkdev(clk[gpt6_ipg_gate], "ipg", "imx-gpt.5");
+-	clk_register_clkdev(clk[per1_gate], "per", "imx-gpt.5");
+ 	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.0");
+ 	clk_register_clkdev(clk[sdhc1_ipg_gate], "ipg", "imx21-mmc.0");
+ 	clk_register_clkdev(clk[per2_gate], "per", "imx21-mmc.1");
+@@ -284,14 +274,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[emma_ipg_gate], "emma-ipg", "imx27-camera.0");
+ 	clk_register_clkdev(clk[emma_ahb_gate], "ahb", "m2m-emmaprp.0");
+ 	clk_register_clkdev(clk[emma_ipg_gate], "ipg", "m2m-emmaprp.0");
+-	clk_register_clkdev(clk[iim_ipg_gate], "iim", NULL);
+-	clk_register_clkdev(clk[gpio_ipg_gate], "gpio", NULL);
+-	clk_register_clkdev(clk[brom_ahb_gate], "brom", NULL);
+-	clk_register_clkdev(clk[ata_ahb_gate], "ata", NULL);
+-	clk_register_clkdev(clk[rtc_ipg_gate], NULL, "imx21-rtc");
+-	clk_register_clkdev(clk[scc_ipg_gate], "scc", NULL);
+ 	clk_register_clkdev(clk[cpu_div], NULL, "cpu0");
+-	clk_register_clkdev(clk[emi_ahb_gate], "emi_ahb" , NULL);
+ 
+ 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
+ 
+-- 
+1.8.3.2
