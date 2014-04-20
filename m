@@ -1,60 +1,36 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Sun, 20 Apr 2014 17:18:41 +0530
-Subject: [PATCH 1/5] ARM: dts: move dp hpd line to the board file for
- exynos5420
+Date: Sun, 20 Apr 2014 17:18:42 +0530
+Subject: [PATCH 2/5] ARM: dts: enable fimd for exynos5250 based snow board
 In-Reply-To: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
 References: <1397994525-18537-1-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <1397994525-18537-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1397994525-18537-3-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-Display controller HPD Gpio line is board specific. This patch
-is moving the pinctrl for hpd gpio line to the respective board
-file.
+Enable fimd node for snow board.
 
 Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi |    7 -------
- arch/arm/boot/dts/exynos5420-smdk5420.dts |    7 +++++++
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/exynos5250-snow.dts |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index e62c8eb..5848c42 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -59,13 +59,6 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 586cd38..09f363d 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -344,6 +344,11 @@
  		};
--
--		dp_hpd: dp_hpd {
--			samsung,pins = "gpx0-7";
--			samsung,pin-function = <3>;
--			samsung,pin-pud = <0>;
--			samsung,pin-drv = <0>;
--		};
  	};
  
- 	pinctrl at 13410000 {
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 6910485..62d38c8 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -138,6 +138,13 @@
- 			samsung,pin-pud = <1>;
- 			samsung,pin-drv = <0>;
- 		};
++	fimd at 14400000 {
++		status = "okay";
++		samsung,invert-vclk;
++	};
 +
-+		dp_hpd: dp_hpd {
-+			samsung,pins = "gpx0-7";
-+			samsung,pin-function = <3>;
-+			samsung,pin-pud = <0>;
-+			samsung,pin-drv = <0>;
-+		};
- 	};
- 
- 	hdmi at 14530000 {
+ 	hdmi {
+ 		hdmi-en-supply = <&tps65090_fet7>;
+ 		vdd-supply = <&ldo8_reg>;
 -- 
 1.7.9.5
