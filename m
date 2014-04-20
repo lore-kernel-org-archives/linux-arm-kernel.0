@@ -1,42 +1,40 @@
-From: daniel@totalueberwachung.de (Daniel Willmann)
-Date: Sun, 20 Apr 2014 12:56:03 +0200
-Subject: [PATCH v2 1/9] ARM: centralize common multi-platform kconfig
- options
-In-Reply-To: <201402282133.57910.arnd@arndb.de>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <201402282115.55948.arnd@arndb.de> <7h38j3t2ba.fsf@paris.lan>
- <201402282133.57910.arnd@arndb.de>
-Message-ID: <20140420105603.GA7644@adrastea.totalueberwachung.de>
+From: rahul.sharma@samsung.com (Rahul Sharma)
+Date: Sun, 20 Apr 2014 16:53:57 +0530
+Subject: [PATCH 0/7] ARM: dts: enable hdmi for exynos5 based peach and snow
+ boards
+Message-ID: <1397993044-14564-1-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-28 at 21:33, Arnd Bergmann wrote:
-> On Friday 28 February 2014, Kevin Hilman wrote:
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index 7d1588e..cf35d18 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -304,6 +304,7 @@ config ARCH_MULTIPLATFORM
-> > >       bool "Allow multiple platforms to be selected"
-> > >       select ARCH_WANT_OPTIONAL_GPIOLIB
-> > >       select AUTO_ZRELADDR
-> > > +     select CLKSRC_OF
-> > >       select COMMON_CLK
-> > >       select GENERIC_CLOCKEVENTS
-> > >       select MULTI_IRQ_HANDLER
-> > 
-> > Yup, that's it.  With that, sunxi_defconfig is booting again.
-> > 
-> > Tested-by: Kevin Hilman <khilman@linaro.org>
-> 
-> I've added this patch on the *for-next* branch for now, while we
-> still decide whether it is the correct solution. The alternative
-> would be to only select it from the clocksource drivers that want
+From: Rahul Sharma <Rahul.Sharma@samsung.com>
 
-I see the same lockup with v3.15-rc1 on an imx233 board (olinuxino nano)
-and this patch also fixes the issues I see.
+Enable hdmi for exynos5250 based snow board and exynos5420
+based peach pit board. It also adds properties to hdmi nodes
+for accessing hdmiphy as simple phys.
 
-Tested-by: Daniel Willmann <daniel@totalueberwachung.de>
+This series is based on Kukjin Kims, for-next branch.
 
-Regards,
-Daniel Willmann
+It is dependent on
+1) Tomasz Stanislawski's Simple phy driver patches at
+https://lkml.org/lkml/2014/4/8/226.
+2) Arun's patch for adding peach-pit board dts file at
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg28846.html.
+
+Rahul Sharma (7):
+  ARM: dtsi: add node for simple phy provider for exynos5250
+  ARM: dtsi: add node for simple phy provider for exynos5420
+  ARM: dtsi: add access to simple hdmiphy to exynos5250 hdmi node
+  ARM: dtsi: add access to simple hdmiphy to exynos5420 hdmi node
+  ARM: dts: enable hdmi for exynos5250 based snow board
+  ARM: dts: change to correct compatible string for exynos5420 hdmi
+  ARM: dts: enable hdmi for exynos5420 based peach-pit board
+
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi |   13 ++++++++++++-
+ arch/arm/boot/dts/exynos5250-snow.dts         |    7 +++++++
+ arch/arm/boot/dts/exynos5250.dtsi             |    8 ++++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    |   26 +++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi             |   15 +++++++++++++-
+ 5 files changed, 67 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
