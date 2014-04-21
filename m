@@ -1,67 +1,33 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 21 Apr 2014 12:29:07 +0800
-Subject: [PATCH] ARM: dts: at91-sama5d3_xplained: add the regulator device node
-Message-ID: <1398054547-5834-1-git-send-email-wenyou.yang@atmel.com>
+From: punnaia@xilinx.com (punnaiah choudary kalluri)
+Date: Mon, 21 Apr 2014 10:23:30 +0530
+Subject: [RFC PATCH 0/2] usb: Reuse fsl driver code for synopsys usb
+ controller
+In-Reply-To: <5354175B.3070109@pengutronix.de>
+References: <7aed4ee6-69e7-4f9f-9f45-675bc695089c@CO9EHSMHS031.ehs.local>
+ <5354175B.3070109@pengutronix.de>
+Message-ID: <CAGnW=Bav_Q_ZpkFq0gG7m9+OBnPWyPhOoBTNnP=VdErzcwe2dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d3_xplained.dts |   42 +++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+On Mon, Apr 21, 2014 at 12:22 AM, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
+> On 04/20/2014 06:27 PM, Punnaiah Choudary Kalluri wrote:
+>> Zynq soc contains a dual role usb controller and this IP is from synopsys. We
+>> observed that there is driver available for this controller from freescale and
+>> decided to reuse this driver for zynq use.
+>
+> Have a look drivers/usb/chipidea. It's maintained by Peter Chen (Cc'ed)
+> and is in better shape than the freescale driver.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index ce13755..57cdd83 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -48,6 +48,48 @@
- 
- 			i2c1: i2c at f0018000 {
- 				status = "okay";
-+
-+				pmic: act8865 at 5b {
-+					compatible = "active-semi,act8865";
-+					reg = <0x5b>;
-+					status = "okay";
-+
-+					regulators {
-+						vcc_1v8_reg: DCDC_REG1 {
-+							regulator-name = "VCC_1V8";
-+							regulator-min-microvolt = <1800000>;
-+							regulator-max-microvolt = <1800000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_1v2_reg: DCDC_REG2 {
-+							regulator-name = "VCC_1V2";
-+							regulator-min-microvolt = <1200000>;
-+							regulator-max-microvolt = <1200000>;
-+							regulator-always-on;
-+						};
-+
-+						vcc_3v3_reg: DCDC_REG3 {
-+							regulator-name = "VCC_3V3";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+
-+						vddfuse_reg: LDO_REG1 {
-+							regulator-name = "FUSE_2V5";
-+							regulator-min-microvolt = <2500000>;
-+							regulator-max-microvolt = <2500000>;
-+						};
-+
-+						vddana_reg: LDO_REG2 {
-+							regulator-name = "VDDANA";
-+							regulator-min-microvolt = <3300000>;
-+							regulator-max-microvolt = <3300000>;
-+							regulator-always-on;
-+						};
-+					};
-+				};
- 			};
- 
- 			macb0: ethernet at f0028000 {
--- 
-1.7.9.5
+Thanks. I will check this implementation and also check with Peter Chen if
+i have any concerns about this implementation.
+
+Punnaiah.
+>
+> Marc
+>
+> --
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+>
