@@ -1,76 +1,31 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 21 Apr 2014 18:58:52 +0900
-Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
-In-Reply-To: <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
- <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
- <16730530.rJ9T0MsYmt@wuerfel>
- <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
-Message-ID: <000501cf5d48$4cf707c0$e6e51740$%han@samsung.com>
+From: kefeng.wang@linaro.org (Kefeng Wang)
+Date: Mon, 21 Apr 2014 18:11:04 +0800
+Subject: [PATCH] arm: oprofile: add ARMv7 cortex-a15 support
+Message-ID: <1398075064-4906-1-git-send-email-kefeng.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 21, 2014 10:54 AM, Jingoo Han wrote:
-> On Thursday, April 17, 2014 3:26 AM, Arnd Bergmann wrote:
-> > On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
-> > > Jingoo,
-> > >
-> > > Thanks for taking a stab at trying to convert a host bridge
-> > > driver to use the new generic host bridge code.
-> > >
-> > > I do however have concerns on the direction you took. You have split
-> > > your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
-> > > even if (with my series) it should be no reason why the host bridge
-> > > driver should not work on other architectures as well once they are
-> > > converted.
-> >
-> > Right.
-> >
-> > > Also, some of the functions that you use have identical names but different
-> > > signatures depending on what arch you have selected. This is really bad
-> > > in my books!
+ARMv7 cortex-a15 supports Performance Monitor Units, and
+it could be used by oprofile, add perf_pmu_name pair.
 
-[.....]
+Simply tested on hisilicon hip04 soc.
 
-> > > What about creating functions that use my series directly if CONFIG_ARM64 is
-> > > defined (or any CONFIG_ you want to create for your driver that you select
-> > > from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
-> > > way your driver will call only one API without any #ifdef and when arm code
-> > > gets converted you drop your adaptation functions. Or (better yet), have a
-> > > stab at converting bios32 (Rob Herring has already provided some hints on
-> > > how to do it for arch/arm).
-> 
-> To: Liviu Dudau
-> 
-> Sorry, but I will not implement this.
-> At first, you had to think the compatibility with ARM32 PCIe.
-> Why do you want other engineers to take this load?
+Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
+---
+ arch/arm/oprofile/common.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-(+cc Rob Herring)
-
-Um, I am looking at Rob Herring's patchset for Versatile PCI. [1]
-Then, do you mean the following?
-
-1. Add Rob Herring's patch converting bios32. [2]
-2. Reference Rob Herring's patch in order to know how to
-    handle "of_create_pci_host_bridge()" directly in ARM32. [3]
-3. Use of_create_pci_host_bridge() for the designware PCIe
-    driver in ARM32.
-4. Also, use of_create_pci_host_bridge() for the designware PCIe
-    driver in "ARM64".
-
-
-[1] http://www.spinics.net/lists/linux-pci/msg30084.html
-[2] http://www.spinics.net/lists/linux-pci/msg30083.html
-[3] http://www.spinics.net/lists/linux-pci/msg30086.html
-
-Best regards,
-Jingoo Han
-
-> 
-> >
-> > That would of course be best.
-> >
-
-[.....]
+diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+index 99c63d4b..9ede34b 100644
+--- a/arch/arm/oprofile/common.c
++++ b/arch/arm/oprofile/common.c
+@@ -39,6 +39,7 @@ static struct op_perf_name {
+ 	{ "v6mpcore",		"arm/mpcore"	},
+ 	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
+ 	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
++	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15"},
+ };
+ 
+ char *op_name_from_perf_id(void)
+-- 
+1.7.9.5
