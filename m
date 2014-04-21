@@ -1,53 +1,39 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 21 Apr 2014 23:05:00 +0400
-Subject: [PATCH 3/9] iommu/ipmmu-vmsa: Define driver-specific page
- directory sizes
-In-Reply-To: <1398089589-9181-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1398089589-9181-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <53556BDC.6040705@cogentembedded.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 Apr 2014 15:17:06 -0400
+Subject: [PATCH v2 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <20140421201911.10783191@skate>
+References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>	<20140419182528.414b9b2e@skate>	<53551E9D.9080107@ti.com>
+ <20140421201911.10783191@skate>
+Message-ID: <53556EB2.80503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Monday 21 April 2014 02:19 PM, Thomas Petazzoni wrote:
+> Dear Santosh Shilimkar,
+> 
+> On Mon, 21 Apr 2014 09:35:25 -0400, Santosh Shilimkar wrote:
+> 
+>>> In mach-mvebu, what we do is that we register a bus notifier on the
+>>> platform bus, so that we can set our custom DMA operations for all
+>>> platform devices in the system. Should this be done in a different way
+>>> after your series?
+>>>
+>> Nope. Since you have a very custom SOC specific case, you can continue
+>> what you are doing.
+> 
+> True, but as you said, the goal is to remove machine code. So instead
+> of having just a 'dma-coherent' property, shouldn't we have a
+> dma-method property, which could be dma-method = "coherent" or
+> dma-method = "marvell,io-coherent" and therefore allow the DT binding
+> to cover more use cases than just the default non-coherent and coherent
+> DMA operations?
+> 
+Please remember the infrastructure we are adding is not really for machines
+(sub arch's) but for architectures. I don't think its worth adding methods
+The whole reason of dma_ops being exported is take care of cases like yours
+so we are just fine with that. If we see more cases likes your, we can
+think about that.
 
-On 04/21/2014 06:13 PM, Laurent Pinchart wrote:
-
-> The PTRS_PER_(PGD|PMD|PTE) macros evaluate to different values depending
-> on whether LPAE is enabled. The IPMMU driver uses a long descriptor
-> format regardless of LPAE, making those macros mismatch the IPMMU
-> configuration on non-LPAE systems.
-
-> Replace the macros by driver-specific versions that always evaluate to
-> the right value.
-
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->   drivers/iommu/ipmmu-vmsa.c | 14 +++++++++-----
->   1 file changed, 9 insertions(+), 5 deletions(-)
-
-> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-> index 1ae97d8..7c8c21e 100644
-> --- a/drivers/iommu/ipmmu-vmsa.c
-> +++ b/drivers/iommu/ipmmu-vmsa.c
-> @@ -210,6 +210,10 @@ static LIST_HEAD(ipmmu_devices);
->   #define ARM_VMSA_PTE_MEMATTR_NC		(((pteval_t)0x5) << 2)
->   #define ARM_VMSA_PTE_MEMATTR_DEV	(((pteval_t)0x1) << 2)
->
-> +#define IPMMU_PTRS_PER_PTE		512
-> +#define IPMMU_PTRS_PER_PMD		512
-> +#define IPMMU_PTRS_PER_PGD		4
-> +
-[...]
-> @@ -487,7 +491,7 @@ static void ipmmu_free_puds(pgd_t *pgd)
->   	unsigned int i;
->
->   	pud = pud_base;
-> -	for (i = 0; i < PTRS_PER_PUD; ++i) {
-> +	for (i = 0; i < IPMMU_PTRS_PER_PUD; ++i) {
-
-    I don't see where you #define IPMMU_PTRS_PER_PUD...
-
-[...]
-
-WBR, Sergei
+regards,
+Santosh
