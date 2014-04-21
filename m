@@ -1,33 +1,35 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Apr 2014 12:41:47 +0200
-Subject: [PATCH 2/2] ARM: dts: set 'ti,set-rate-parent' for dpll4_m5 path
-In-Reply-To: <1398076907-2901-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1398076907-2901-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <1398076907-2901-3-git-send-email-laurent.pinchart@ideasonboard.com>
+From: kefeng.wang@linaro.org (kefeng.wang)
+Date: Mon, 21 Apr 2014 19:02:48 +0800
+Subject: [PATCH] arm: oprofile: add ARMv7 cortex-a15 support
+In-Reply-To: <1398075064-4906-1-git-send-email-kefeng.wang@linaro.org>
+References: <1398075064-4906-1-git-send-email-kefeng.wang@linaro.org>
+Message-ID: <5354FAD8.6090402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set 'ti,set-rate-parent' property for the dpll4_m5x2_mul_ck clock, which
-is used for the ISP functional clock. This fixes the OMAP3 ISP driver's
-clock rate configuration, which needs the rate to be propagated properly
-to the divider node (dpll4_m5_ck).
+Sorry, please ignore, we have operf tool, this is unnecessary.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- arch/arm/boot/dts/omap3xxx-clocks.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/omap3xxx-clocks.dtsi b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-index 351f58b..e47ff69 100644
---- a/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-@@ -457,6 +457,7 @@
- 		clocks = <&dpll4_m5_ck>;
- 		ti,clock-mult = <2>;
- 		ti,clock-div = <1>;
-+		ti,set-rate-parent;
- 	};
- 
- 	dpll4_m5x2_ck: dpll4_m5x2_ck {
--- 
-1.8.3.2
+On 2014-4-21 18:11, Kefeng Wang wrote:
+> ARMv7 cortex-a15 supports Performance Monitor Units, and
+> it could be used by oprofile, add perf_pmu_name pair.
+> 
+> Simply tested on hisilicon hip04 soc.
+> 
+> Signed-off-by: Kefeng Wang <kefeng.wang@linaro.org>
+> ---
+>  arch/arm/oprofile/common.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> index 99c63d4b..9ede34b 100644
+> --- a/arch/arm/oprofile/common.c
+> +++ b/arch/arm/oprofile/common.c
+> @@ -39,6 +39,7 @@ static struct op_perf_name {
+>  	{ "v6mpcore",		"arm/mpcore"	},
+>  	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
+>  	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
+> +	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15"},
+>  };
+>  
+>  char *op_name_from_perf_id(void)
+> 
