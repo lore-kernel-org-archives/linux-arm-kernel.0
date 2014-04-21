@@ -1,50 +1,58 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Apr 2014 11:13:37 -0400
-Subject: [PATCH v2 0/7] of: setup dma parameters using dma-ranges and
- dma-coherent
-In-Reply-To: <CAL_JsqLogKfqHyw4zYBkPrYh=f6tVibtmX25oYB1Q2hO11Whcw@mail.gmail.com>
-References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
- <CAL_JsqLogKfqHyw4zYBkPrYh=f6tVibtmX25oYB1Q2hO11Whcw@mail.gmail.com>
-Message-ID: <535535A1.4020501@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 21 Apr 2014 10:18:57 -0500
+Subject: [RFC PATCH 0/2] usb: Reuse fsl driver code for synopsys usb
+ controller
+In-Reply-To: <7aed4ee6-69e7-4f9f-9f45-675bc695089c@CO9EHSMHS031.ehs.local>
+References: <7aed4ee6-69e7-4f9f-9f45-675bc695089c@CO9EHSMHS031.ehs.local>
+Message-ID: <20140421151857.GH27341@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Monday 21 April 2014 10:37 AM, Rob Herring wrote:
-> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> Here is an updated version of [2] based on discussion. Series introduces
->> support for setting up dma parameters based on device tree properties
->> like 'dma-ranges' and 'dma-coherent' and also update to ARM 32 bit port.
->> Earlier version of the same series is here [1].
->>
->> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
->> by use of dma_pfn_offset which we maintain now per device. Arch code then
->> uses it for dma address translations for such cases. We update the
->> dma_pfn_offset accordingly during DT the device creation process.The
->> 'dma-coherent' property is used to setup arch's coherent dma_ops.
->>
->> After some off-list discussion with RMK and Arnd, I have now dropped the
->> controversial dma_mask setup code from the series which actually isn't blocking
->> me as such. Considering rest of the parts of the series are already aligned,
->> am hoping to get this version merged for 3.16 merge window.
+On Sun, Apr 20, 2014 at 09:57:03PM +0530, Punnaiah Choudary Kalluri wrote:
+> Zynq soc contains a dual role usb controller and this IP is from synopsys. We
+> observed that there is driver available for this controller from freescale and
+> decided to reuse this driver for zynq use.
 > 
-> Can you briefly describe what the h/w looks like in terms of addresses
-> for the problem you are trying to solve? Something like: Cpu view of
-> RAM is X to Y address, X corresponds to DMA address Z. Max DMA address
-> is ?
+> Here is the link for zynq soc TRM. Please refer chapter 15 for usb controller
+> related information.
+> http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
 > 
-Let me try with say 8 GB RAM example
+> The following series of patches add initial support for zynq soc in fsl gadget controller
+> driver and fsl host controller driver.
+> 
+> Based on these patches, I have the following concerns and sugesstions
+> 
+> Since the freescale usb driver is for synopsys IP, Please consider rebranding
+> this driver name and config options to reflect that it is a sysnopsys IP. So
+> that other vendors who using this IP can reuse thie driver.
+> 
+> Also the ehci-fsl.c is for powerpc based soc's, and zynq is ARM based, i have
+> protected the code which is specifc to freescale with CONFIG_FSL_SOC. Please
+> suggest if there is a better way of doing this?
+> 
+> Punnaiah Choudary Kalluri (2):
+>   usb: gadget: fsl_udc: Add support for zynq usb device controller
+>   usb: ehci-fsl: Add support for zynq usb host controller
+> 
+>  drivers/usb/gadget/Kconfig        |    2 +-
+>  drivers/usb/gadget/Makefile       |    1 +
+>  drivers/usb/gadget/fsl_mxc_udc.c  |   21 ++++++++++++
+>  drivers/usb/gadget/fsl_udc_core.c |    5 +++
+>  drivers/usb/gadget/fsl_usb2_udc.h |    2 +-
+>  drivers/usb/host/Kconfig          |    2 +-
+>  drivers/usb/host/ehci-fsl.c       |   63 ++++++++++++++++++++++++++++++++++++-
+>  drivers/usb/host/fsl-mph-dr-of.c  |    9 +++++
+>  8 files changed, 101 insertions(+), 4 deletions(-)
 
-CPU view of memory : 0x0000 0008 0000 0000 to 0x0000 000a 0000 0000
+as somebody else already mentioned, chipidea is the way to go.
 
->From above memory range, first 2 GB of memory has an alias 32 bit
-view in the hardware. Hardware internally map the address issued within
-that first 2 GB to same memory. 
 
-DMA view of first 2 GB [ 0x0000 0008 0000 0000 to 0x0000 0008 7fff ffff]
-is : 0x8000 0000 to 0xffff fffff.
-
-Regards,
-Santosh 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140421/3b19b7d4/attachment.sig>
