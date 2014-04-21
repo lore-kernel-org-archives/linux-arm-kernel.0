@@ -1,36 +1,50 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 21 Apr 2014 13:05:27 +0800
-Subject: [PATCH] defconfig: sama5_defconfig: updated
-Message-ID: <1398056727-21339-1-git-send-email-wenyou.yang@atmel.com>
+From: archit@ti.com (Archit Taneja)
+Date: Mon, 21 Apr 2014 10:45:28 +0530
+Subject: [RFC 2/4] ARM: dts: Add ctrl-core DT node for DRA7
+In-Reply-To: <20140418171854.GJ5354@atomide.com>
+References: <1397654063-8055-1-git-send-email-archit@ti.com>
+ <1397654063-8055-2-git-send-email-archit@ti.com>
+ <20140418171854.GJ5354@atomide.com>
+Message-ID: <5354A970.8040605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-due to enabling
-	-- CONFIG_REGULATOR
-	-- CONFIG_REGULATOR_ACT8865
+Hi,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
-Hi Nicolas,
+On Friday 18 April 2014 10:48 PM, Tony Lindgren wrote:
+> * Archit Taneja <archit@ti.com> [140416 06:20]:
+>> Add DT node for the ctrl-core sub module of the DRA7 control module. We map the
+>> CTRL_MODULE_CORE address region up to 0x4a002d60, this region contains register
+>> fields which configure clocks. The remainder of the registers are related to
+>> pad configurations or cross-bar configurations, and therefore aren't mapped.
+>
+> Can you please check if this can just use the existing
+> regmap syscon mapping:
+>
+> syscon = <&dra7_ctrl_general>;
+>
+> See how the drivers/regulator/pbias-regulator.c is using the
+> syscon to initialize a regulator and then omap_hsmmc.c just does
+> the standard regulator calls.
 
-The patch is based on the branch: at91-3.10-dt
-	git://github.com/at91linux/linux-at91.git
+The thing is that this bit needs to be set before the the DSS hwmods are 
+reset, and that happens very early. If we don't do this, DSS won't reset 
+properly, and not get back to an idle state.
 
-Best Regards,
-Wenyou Yang
+I am not sure where I can configure the syscon register early enough 
+that it happens before the hwmods are reset. With a syscon mapping, I 
+guess we would access the register when the DSS driver is probed. But 
+that's too late for us.
 
- arch/arm/configs/sama5_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+Ideally, it would be much better to have a syscon mapping. Do you have 
+any suggestions how this can be achieved very early in boot?
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index dc3881e..2b9891e 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -201,3 +201,5 @@ CONFIG_CRYPTO_DEV_ATMEL_TDES=y
- CONFIG_CRYPTO_DEV_ATMEL_SHA=y
- CONFIG_CRC_CCITT=m
- CONFIG_CRC_ITU_T=m
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_ACT8865=y
--- 
-1.7.9.5
+Archit
+
+>
+> Depending what the range 0x4a002000 0x6d0 contains, you may
+> want to set it up as another syscon area.
+>
+> Regards,
+>
+> Tony
