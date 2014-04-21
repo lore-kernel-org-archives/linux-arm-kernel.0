@@ -1,32 +1,35 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 21 Apr 2014 16:03:43 +0900
-Subject: [PATCH 1/2] cpufreq: exynos: Use dev_err/info function instead of
- pr_err/info
-In-Reply-To: <CAKohpo=-Oxu6ZoB4B2H4552meq46iXrVzKbP5ZwnG==sCc2_MA@mail.gmail.com>
-References: <1397787634-9334-1-git-send-email-cw00.choi@samsung.com>
- <1397787634-9334-2-git-send-email-cw00.choi@samsung.com>
- <CAKohpo=-Oxu6ZoB4B2H4552meq46iXrVzKbP5ZwnG==sCc2_MA@mail.gmail.com>
-Message-ID: <5354C2CF.5020206@samsung.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Mon, 21 Apr 2014 15:19:57 +0800
+Subject: [PATCH 0/3] clocksource: Add Freescale FlexTimer Module (FTM) timer
+ support
+Message-ID: <1398064800-27250-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2014 03:05 PM, Viresh Kumar wrote:
-> On 18 April 2014 07:50, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> This patch uses dev_err/info function to show accurate log message with device name
->> instead of pr_err/info function.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  drivers/cpufreq/exynos-cpufreq.c | 21 ++++++++++++---------
->>  drivers/cpufreq/exynos-cpufreq.h |  1 +
->>  2 files changed, 13 insertions(+), 9 deletions(-)
-> 
-> This still looks fine even if we don't take the new driver ?
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Thanks for your review.
+Changes in V2:
+- Add big-endian support.
+- Add using pr_err instead of BUG_ON.
+- Add more detail comment message of FTM.
+- Add DT binding documentation.
+- Remove some header files and macros not useful.
 
-Best regards,
-Chanwoo Choi
+
+
+Xiubo Li (3):
+  clocksource: ftm: Add FlexTimer Module (FTM) Timer devicetree
+    Documentation
+  ARM: dts: vf610: Add Freescale FlexTimer Module timer node.
+  clocksource: Add Freescale FlexTimer Module (FTM) timer support
+
+ .../devicetree/bindings/timer/fsl,ftm-timer.txt    |  31 ++
+ arch/arm/boot/dts/vf610.dtsi                       |  12 +
+ drivers/clocksource/Kconfig                        |   5 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/fsl_ftm_timer.c                | 344 +++++++++++++++++++++
+ 5 files changed, 393 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+ create mode 100644 drivers/clocksource/fsl_ftm_timer.c
+
+-- 
+1.8.4
