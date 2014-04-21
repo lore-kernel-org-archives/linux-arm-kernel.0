@@ -1,32 +1,54 @@
 From: elder@linaro.org (Alex Elder)
-Date: Mon, 21 Apr 2014 16:11:37 -0500
-Subject: [PATCH v4 RESEND 1/7] clk: bcm281xx: warn if ccu_wait_bit() fails
-In-Reply-To: <1398114703-32410-1-git-send-email-elder@linaro.org>
-References: <1398114703-32410-1-git-send-email-elder@linaro.org>
-Message-ID: <1398114703-32410-2-git-send-email-elder@linaro.org>
+Date: Mon, 21 Apr 2014 16:11:36 -0500
+Subject: [PATCH v4 RESEND 0/7] clk: bcm281xx: updates
+Message-ID: <1398114703-32410-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't let a failure of ccu_wait_bit() go unnoticed.
+This series includes updates for the bcm281xx clock code.  It is
+dependent on the following patch, which has been taken into the
+clk-fixes tree:
+    clk: bcm281xx: don't use unnamed structs or unions
+    https://lkml.org/lkml/2014/4/7/322
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- drivers/clk/bcm/clk-kona.c | 3 +++
- 1 file changed, 3 insertions(+)
+There are three groups of patches:
+    - Some straightforward code cleanups
+    - Changing CCU and clock definitions so they're almost
+      completely initialized statically (i.e., not at run-time)
+    - Add two small features
 
-diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-index db11a87..4b4e35a 100644
---- a/drivers/clk/bcm/clk-kona.c
-+++ b/drivers/clk/bcm/clk-kona.c
-@@ -207,6 +207,9 @@ __ccu_wait_bit(struct ccu_data *ccu, u32 reg_offset, u32 bit, bool want)
- 			return true;
- 		udelay(1);
- 	}
-+	pr_warn("%s: %s/0x%04x bit %u was never %s\n", __func__,
-+		ccu->name, reg_offset, bit, want ? "set" : "clear");
-+
- 	return false;
- }
- 
+Initially this series included support for "prerequisite clocks"
+but that has been removed so it can be discussed independently.
+
+The patches in this series--based on the current linus/master branch
+plus the patch mentioned above--are available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-clk-next-v4
+
+    					-Alex
+
+History:
+  - v4: Rebased on current linus/master and reworked to account
+  	for the no-longer-unnamed union and struct members.
+  - v3: Dropped prerequisite clock support so resolving how
+	best to handle that can be resolved separately.  As
+	a result, bus clock support is no longer included.
+  - v2: Removed one unrelated patch from the series.
+
+Alex Elder (7):
+  clk: bcm281xx: warn if ccu_wait_bit() fails
+  clk: bcm281xx: use init_data.name for clock name
+  clk: bcm281xx: change some symbol names
+  clk: bcm281xx: initialize CCU structures statically
+  clk: bcm281xx: define CCU clock data statically
+  clk: bcm281xx: add clock policy support
+  clk: bcm281xx: add clock hysteresis support
+
+ drivers/clk/bcm/clk-bcm281xx.c   | 243 +++++++++++++++++----------------------
+ drivers/clk/bcm/clk-kona-setup.c | 229 ++++++++++++++++++++++++++----------
+ drivers/clk/bcm/clk-kona.c       | 212 ++++++++++++++++++++++++++++++++--
+ drivers/clk/bcm/clk-kona.h       | 160 +++++++++++++++++++++-----
+ 4 files changed, 611 insertions(+), 233 deletions(-)
+
 -- 
 1.9.1
