@@ -1,32 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 21 Apr 2014 12:18:17 -0600
-Subject: [PATCH 7/7] ARM: tegra: Add the EC i2c tunnel to tegra124-venice2
-In-Reply-To: <1397757570-19750-8-git-send-email-dianders@chromium.org>
-References: <1397757570-19750-1-git-send-email-dianders@chromium.org>
- <1397757570-19750-8-git-send-email-dianders@chromium.org>
-Message-ID: <535560E9.5040108@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 21 Apr 2014 20:19:11 +0200
+Subject: [PATCH v2 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <53551E9D.9080107@ti.com>
+References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140419182528.414b9b2e@skate> <53551E9D.9080107@ti.com>
+Message-ID: <20140421201911.10783191@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2014 11:59 AM, Doug Anderson wrote:
-> This adds the EC i2c tunnel (and devices under it) to the
-> tegra124-venice2 device tree.
+Dear Santosh Shilimkar,
 
-The series,
-Tested-by: Stephen Warren <swarren@nvidia.com>
+On Mon, 21 Apr 2014 09:35:25 -0400, Santosh Shilimkar wrote:
 
-I can apply this one patch once the other patches in the series are
-acked or applied (in order to make sure the DT binding is acceptable to
-others).
+> > In mach-mvebu, what we do is that we register a bus notifier on the
+> > platform bus, so that we can set our custom DMA operations for all
+> > platform devices in the system. Should this be done in a different way
+> > after your series?
+> > 
+> Nope. Since you have a very custom SOC specific case, you can continue
+> what you are doing.
 
-I guess I'll send separate patches for tegra_defconfig and
-multi_v7_defconfig to add the required options once I've applied this,
-unless you beat me to it.
+True, but as you said, the goal is to remove machine code. So instead
+of having just a 'dma-coherent' property, shouldn't we have a
+dma-method property, which could be dma-method = "coherent" or
+dma-method = "marvell,io-coherent" and therefore allow the DT binding
+to cover more use cases than just the default non-coherent and coherent
+DMA operations?
 
-> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+Best regards,
 
->  	aliases {
-> +		i2c20 = "/spi at 0,7000d400/cros-ec at 0/i2c-tunnel";
-
-Is that needed? I'd prefer not to add it unless there's a specific
-reason. I don't think I2C buses need specific names, do they?
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
