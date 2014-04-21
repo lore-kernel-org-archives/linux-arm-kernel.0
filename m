@@ -1,98 +1,201 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 21 Apr 2014 10:10:30 +0900
-Subject: [PATCHv3 0/7] Support new Exynos3250 SoC based on Cortex-A7 dual
- core
-In-Reply-To: <1397783728-6193-1-git-send-email-cw00.choi@samsung.com>
-References: <1397783728-6193-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <53547006.8030307@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 21 Apr 2014 10:54:12 +0900
+Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
+In-Reply-To: <16730530.rJ9T0MsYmt@wuerfel>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+ <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
+ <16730530.rJ9T0MsYmt@wuerfel>
+Message-ID: <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+On Thursday, April 17, 2014 3:26 AM, Arnd Bergmann wrote:
 
-Please review this patchset for Exynos3250 SoC.
+(+cc Mohit KUMAR, Pratyush Anand, Marek Vasut, Richard Zhu,
+      Kishon Vijay Abraham I, Byungho An)
+> 
+> On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
+> > Jingoo,
+> >
+> > Thanks for taking a stab at trying to convert a host bridge
+> > driver to use the new generic host bridge code.
+> >
+> > I do however have concerns on the direction you took. You have split
+> > your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
+> > even if (with my series) it should be no reason why the host bridge
+> > driver should not work on other architectures as well once they are
+> > converted.
+> 
+> Right.
+> 
+> > Also, some of the functions that you use have identical names but different
+> > signatures depending on what arch you have selected. This is really bad
+> > in my books!
+> 
+> It's only the sys_to_pcie() function, right?
+> 
+> You can probably simplify that to take a void pointer and have only one line
+> difference.
 
-Best Regards,
-Chanwoo Choi
+Do you mean the following?
+Would you give me more detailed advice?
 
-On 04/18/2014 10:15 AM, Chanwoo Choi wrote:
-> This patchset support new Exynos3250 Samsung SoC based on Cortex-A7 dual core.
-> Exynos3250 is a System-On-Chip (SoC) that is based on 32-bit RISC processor
-> for Smartphone. It is desigend with the 28nm low-power high-K metal gate process
-> and provides the best performance features.
+static inline struct pcie_port *sys_to_pcie(void *sys)
+{
+	struct pcie_port *pp
+
+#ifdef CONFIG_ARM
+	pp = ((struct pci_sys_data *)sys)->private_data;
+#else
+	pp = (struct pcie_port *)sys;
+#endif
+	return pp;
+}
+
 > 
-> This patchset include some patches such as:
-> - Support secondary CPU of Exynos3250 (cpu up/down)
-> - Supoort uart/mct/adc/gic/i2c/spi/power-domain/pmu/mshc/pwm/amba
-> - Support the clock control for Exynos3250 using common clk framework
+> > What about creating functions that use my series directly if CONFIG_ARM64 is
+> > defined (or any CONFIG_ you want to create for your driver that you select
+> > from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
+> > way your driver will call only one API without any #ifdef and when arm code
+> > gets converted you drop your adaptation functions. Or (better yet), have a
+> > stab at converting bios32 (Rob Herring has already provided some hints on
+> > how to do it for arch/arm).
+
+To: Liviu Dudau
+
+Sorry, but I will not implement this.
+At first, you had to think the compatibility with ARM32 PCIe.
+Why do you want other engineers to take this load?
+
 > 
-> This patchset is based on following git repo/branch.
-> - git repo : git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> - branch   : for-next (Linux 3.15-rc1)
+> That would of course be best.
 > 
-> Additional patch description about static memory mapping:
-> This patchset must need to map memory mapping about SYSRAM/PMU for CPU UP/DOWN.
-> So, this patchset need to merge following patchset to remove static memory
-> mapping for SYSRAM[1] / PMU ([2] or [3]).
+> > To give an example on how things are not going well in your version (not obvious
+> > from your patch, but you can see it once you apply it): dw_pcie_host_init()
+> > will still carry the handcoded version of DT parsing and that is not guarded
+> > against CONFIG_ARM64 being defined, where the parsing will happen again
+> > when you call of_create_pci_host_bridge().
 > 
-> [1] http://www.spinics.net/lists/arm-kernel/msg323011.html
-> [2] https://lkml.org/lkml/2014/4/2/48
-> [3] http://www.spinics.net/lists/arm-kernel/msg316013.html
+> How about making the generic DT parsing code from of_create_pci_host_bridge()
+> an exported function that can be called by drivers that don't use
+> of_create_pci_host_bridge?
+
+Do you mean that of_create_pci_host_bridge() should be used for both ARM32
+and ARM64 cases?
+
 > 
-> And,
-> The pinctrl patch for Exynos3250 was posted as separated patch[4].
-> [4] https://lkml.org/lkml/2014/4/13/156
+> > Speaking of the handcoded DT parsing of resources: you are using restype == 0
+> > as a way of selecting config space, *and then split the range size into two
+> > halves*. From what Jason Gunthorpe and Arnd were saying, config ranges in the DT
+> > tree should only be used for ECAM space, so no split is allowed.
+> >
+> > Arnd, are you allowing this non-standard use to creep in the bindings?
 > 
-> Changes from v2:
-> - Remove static memory mapping about SYSRAM/PMU such as following patches:
->   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM of Exynos3250
->   ARM: EXYNOS: Add IO mapping for PMU of Exynos3250
-> - Add description for secondary CPU boot of Exynos4212/Exynos3250
-> - Fix description in exynos_cpu_die() to remove particular SoC series
-> - Fix minor coding style
-> - Add documentation for Exynos3250 clock controller
+> I fear it's too late to change that now. In retrospect we probably shoulnd't
+> have defined the binding like that.
 > 
-> Changes from v1:
-> - Add new "samsung,exynos3" compatible name
-> - Add comment about exynos_cpu_boot in Exynos4212
-> - Remove unnecessary 'goto' statement in firmware.c
-> - Use read_cpuid_part_number() function instead of assembler directly
-> - Post separated pinctrl patch from this patchset
->   : https://lkml.org/lkml/2014/4/13/156
-> - Remove unused pmu interrupts due to Exynos3250 dual-core
-> - Cosolidate all the patches related to exynos3250.dtsi into one patch
-> - Fix gic compatible name to "cortex-a15-gic" because Cortex-A7 GIC is same
-> - Add sign-off of sender to all this patches
-> - Fix minor typo
+> Overall, my impression of the patch is that it should be possible to do
+> the same with much fewer #ifdefs by first rearranging the code in one patch
+> and then doing another patch on top to add the generic arm64 support.
+
+I will try to reduce #ifdefs as possible.
+
+Best regards,
+Jingoo Han
+
 > 
-> Chanwoo Choi (4):
->   ARM: EXYNOS: Add Exynos3250 SoC ID
->   ARM: EXYNOS: Support secondary CPU boot of Exynos3250
->   ARM: EXYNOS: Enter a15 lowpower mode for Exynos3250 based on Cortex-a7
->   dt-bindings: add documentation for Exynos3250 clock controller
-> 
-> Kyungmin Park (1):
->   ARM: EXYNOS: Support secondary CPU boot of Exynos4212
-> 
-> Tomasz Figa (2):
->   clk: samsung: exynos3250: Add clocks using common clock framework
->   ARM: dts: Add device tree sources for Exynos3250
-> 
->  .../devicetree/bindings/clock/exynos3250-clock.txt |  41 ++
->  arch/arm/boot/dts/exynos3250-pinctrl.dtsi          | 477 +++++++++++++
->  arch/arm/boot/dts/exynos3250.dtsi                  | 427 +++++++++++
->  arch/arm/mach-exynos/Kconfig                       |  22 +
->  arch/arm/mach-exynos/exynos.c                      |   2 +
->  arch/arm/mach-exynos/firmware.c                    |  21 +-
->  arch/arm/mach-exynos/hotplug.c                     |  19 +-
->  arch/arm/plat-samsung/include/plat/cpu.h           |  10 +
->  drivers/clk/samsung/Makefile                       |   1 +
->  drivers/clk/samsung/clk-exynos3250.c               | 785 +++++++++++++++++++++
->  include/dt-bindings/clock/exynos3250.h             | 256 +++++++
->  11 files changed, 2053 insertions(+), 8 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/exynos3250-clock.txt
->  create mode 100644 arch/arm/boot/dts/exynos3250-pinctrl.dtsi
->  create mode 100644 arch/arm/boot/dts/exynos3250.dtsi
->  create mode 100644 drivers/clk/samsung/clk-exynos3250.c
->  create mode 100644 include/dt-bindings/clock/exynos3250.h
+> > > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> > > index 6d23d8c..fac0440 100644
+> > > --- a/drivers/pci/host/pcie-designware.c
+> > > +++ b/drivers/pci/host/pcie-designware.c
+> > > @@ -65,14 +65,27 @@
+> > >  #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+> > >  #define PCIE_ATU_UPPER_TARGET		0x91C
+> > >
+> > > +#ifdef CONFIG_ARM
+> > >  static struct hw_pci dw_pci;
+> > > +#endif
+> > >
+> > >  static unsigned long global_io_offset;
+> > >
+> > > +#ifdef CONFIG_ARM
+> > >  static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+> > >  {
+> > >  	return sys->private_data;
+> > >  }
+> > > +#endif
+> > > +
+> > > +#ifdef CONFIG_ARM64
+> > > +static inline struct pcie_port *sys_to_pcie(struct pcie_port *pp)
+> > > +{
+> > > +	return pp;
+> > > +}
+> > > +
+> > > +static struct pci_ops dw_pcie_ops;
+> > > +#endif
+> > >
+> > >  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+> > >  {
+> > > @@ -381,7 +394,9 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> > >  {
+> > >  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+> > >  	irq_set_chip_data(irq, domain->host_data);
+> > > +#ifdef CONFIG_ARM
+> > >  	set_irq_flags(irq, IRQF_VALID);
+> > > +#endif
+> > >
+> > >  	return 0;
+> > >  }
+> > > @@ -397,6 +412,10 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> > >  	struct of_pci_range_parser parser;
+> > >  	u32 val;
+> > >  	int i;
+> > > +#ifdef CONFIG_ARM64
+> > > +	struct pci_host_bridge *bridge;
+> > > +	resource_size_t lastbus;
+> > > +#endif
+> > >
+> > >  	if (of_pci_range_parser_init(&parser, np)) {
+> > >  		dev_err(pp->dev, "missing ranges property\n");
+> > > @@ -489,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> > >  	val |= PORT_LOGIC_SPEED_CHANGE;
+> > >  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> > >
+> > > +#ifdef CONFIG_ARM
+> > >  	dw_pci.nr_controllers = 1;
+> > >  	dw_pci.private_data = (void **)&pp;
+> > >
+> > > @@ -497,6 +517,16 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> > >  #ifdef CONFIG_PCI_DOMAINS
+> > >  	dw_pci.domain++;
+> > >  #endif
+> > > +#endif
+> > > +
+> > > +#ifdef CONFIG_ARM64
+> > > +	bridge = of_create_pci_host_bridge(pp->dev, &dw_pcie_ops, pp);
+> > > +	if (IS_ERR_OR_NULL(bridge))
+> > > +		return PTR_ERR(bridge);
+> > > +
+> > > +	lastbus = pci_rescan_bus(bridge->bus);
+> > > +	pci_bus_update_busn_res_end(bridge->bus, lastbus);
+> > > +#endif
+> > >
+> > >  	return 0;
+> > >  }
+> > > @@ -695,6 +725,7 @@ static struct pci_ops dw_pcie_ops = {
+> > >  	.write = dw_pcie_wr_conf,
+> > >  };
+> > >
+> > > +#ifdef CONFIG_ARM
+> > >  static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+> > >  {
+> > >  	struct pcie_port *pp;
+> > > @@ -758,6 +789,7 @@ static struct hw_pci dw_pci = {
+> > >  	.map_irq	= dw_pcie_map_irq,
+> > >  	.add_bus	= dw_pcie_add_bus,
+> > >  };
+> > > +#endif /* CONFIG_ARM */
+> > >
+> > >  void dw_pcie_setup_rc(struct pcie_port *pp)
 > 
