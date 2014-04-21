@@ -1,54 +1,32 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 21 Apr 2014 20:10:08 +0200
-Subject: [PATCH] ARM: fix string functions on !MMU
-Message-ID: <1398103808-24380-1-git-send-email-rabin@rab.in>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 21 Apr 2014 12:18:17 -0600
+Subject: [PATCH 7/7] ARM: tegra: Add the EC i2c tunnel to tegra124-venice2
+In-Reply-To: <1397757570-19750-8-git-send-email-dianders@chromium.org>
+References: <1397757570-19750-1-git-send-email-dianders@chromium.org>
+ <1397757570-19750-8-git-send-email-dianders@chromium.org>
+Message-ID: <535560E9.5040108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
-strncpy_from_user functions") apparently broken those string operations
-for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
-restricts the addresses to TASK_SIZE.
+On 04/17/2014 11:59 AM, Doug Anderson wrote:
+> This adds the EC i2c tunnel (and devices under it) to the
+> tegra124-venice2 device tree.
 
-TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
-restrict anything.
+The series,
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/include/asm/uaccess.h | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+I can apply this one patch once the other patches in the series are
+acked or applied (in order to make sure the DT binding is acceptable to
+others).
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 12c3a5d..c3a65f1 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -199,6 +199,9 @@ extern int __put_user_8(void *, unsigned long long);
- 		__put_user_check(x,p);					\
- 	 })
- 
-+#define user_addr_max() \
-+	(segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
-+
- #else /* CONFIG_MMU */
- 
- /*
-@@ -210,6 +213,7 @@ extern int __put_user_8(void *, unsigned long long);
- #define __addr_ok(addr)		((void)(addr),1)
- #define __range_ok(addr,size)	((void)(addr),0)
- #define get_fs()		(KERNEL_DS)
-+#define user_addr_max()		(~0UL)
- 
- static inline void set_fs(mm_segment_t fs)
- {
-@@ -222,9 +226,6 @@ static inline void set_fs(mm_segment_t fs)
- 
- #define access_ok(type,addr,size)	(__range_ok(addr,size) == 0)
- 
--#define user_addr_max() \
--	(segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
--
- /*
-  * The "__xxx" versions of the user access functions do not verify the
-  * address space - it must have been done previously with a separate
--- 
-1.9.1
+I guess I'll send separate patches for tegra_defconfig and
+multi_v7_defconfig to add the required options once I've applied this,
+unless you beat me to it.
+
+> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+
+>  	aliases {
+> +		i2c20 = "/spi at 0,7000d400/cros-ec at 0/i2c-tunnel";
+
+Is that needed? I'd prefer not to add it unless there's a specific
+reason. I don't think I2C buses need specific names, do they?
