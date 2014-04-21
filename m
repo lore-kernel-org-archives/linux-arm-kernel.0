@@ -1,43 +1,30 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 21 Apr 2014 11:21:52 -0500
-Subject: [PATCH 0/4] Introduce drivers/soc and add QCOM GSBI driver
-In-Reply-To: <535521A0.5050706@codeaurora.org>
-References: <1398058244-14099-1-git-send-email-agross@codeaurora.org>
- <535521A0.5050706@codeaurora.org>
-Message-ID: <20140421162152.GA32485@qualcomm.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 21 Apr 2014 09:41:42 -0700
+Subject: [RFC PATCH v4] ARM: uprobes xol write directly to userspace
+In-Reply-To: <5355446A.9080302@linaro.org>
+References: <20140416191825.GA22246@redhat.com>
+ <20140416.153734.675854782374654510.davem@davemloft.net>
+ <534EE6F2.3050005@linaro.org>
+ <20140416.172153.646525167994615191.davem@davemloft.net>
+ <20140416222548.GL24070@n2100.arm.linux.org.uk>
+ <5355446A.9080302@linaro.org>
+Message-ID: <CA+55aFzCwtEbHjFf9E4yqqx8zZDYft5kacDZpg7KWyFWgVH5_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 09:48:16AM -0400, Christopher Covington wrote:
+On Mon, Apr 21, 2014 at 9:16 AM, David Long <dave.long@linaro.org> wrote:
+>
+> void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
+>                         const void *src, int len)
+> {
+>         void *kaddr = kmap_atomic(page);
+>
+> #ifdef CONFIG_SMP
+>         preempt_disable();
+> #endif
 
-<snip>
+That #ifdef seems totally pointless. Make it unconditional, or remove
+it entirely (the kmap_atomic() already causes us to be non-preemptible
+in practice).
 
-> In that thread, Olof wrote, "The code [going into drivers/soc] isn't the pure
-> drivers. Those we find homes for."
-
-Right.  I see this as glue for the most part.  You could argue it's a small
-pinctrl, but this doesn't route external pins, it's more to connect pins
-internally to the IP block and it's sub-device parts (qup, uart, etc).
-
-> 
-> https://lkml.org/lkml/2014/3/2/123
-> 
-> > The remaining patches add the QCOM GSBI (General Serial Bus Interface) driver,
-> > device tree binding information for both the GSBI and child node interaction,
-> > and lastly a patch to fix the current MSM serial driver to work correctly with
-> > the GSBI changes.
-> 
-> It's not obvious to me what makes the GSBI driver "impure" and unfit for say
-> drivers/bus. Could you perhaps include a brief explanation?
-
-The intent of the gsbi driver is merely to provide/configure the single mux
-setting for the devices that share those 4 IO lines.  I don't see this as a full
-blown bus.
-
-Regards,
-
-Andy
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+           Linus
