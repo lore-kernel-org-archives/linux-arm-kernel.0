@@ -1,87 +1,146 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Apr 2014 08:54:24 -0700
-Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
- probe and defer if needed
-In-Reply-To: <CAL_JsqLvLTJwgsB-m0W72WxSUoTV4ubMdvM_a784J4k2eiK9AQ@mail.gmail.com>
-References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
- <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
- <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
- <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
- <20140418205213.GA21823@atomide.com>
- <CAL_JsqJvVvo6R-qNXxur7wiZERKbi52xyKoWnmzJTfKS2iKK7A@mail.gmail.com>
- <20140418215848.GD21823@atomide.com>
- <20140418230335.GI24070@n2100.arm.linux.org.uk>
- <20140418232407.GQ21823@atomide.com>
- <CAL_JsqLvLTJwgsB-m0W72WxSUoTV4ubMdvM_a784J4k2eiK9AQ@mail.gmail.com>
-Message-ID: <20140421155424.GD23945@atomide.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Mon, 21 Apr 2014 21:27:13 +0530
+Subject: [PATCH 1/5] ARM: bL_switcher: Don't enable bL switcher on systems
+ without CCI
+In-Reply-To: <alpine.LFD.2.11.1404161524050.980@knanqh.ubzr>
+References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+ <1397239311-27717-2-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1404111406210.980@knanqh.ubzr>
+ <CAM4voanduaJ32ztj6ZDMOPXNd9W6Ttwae_PQ68VGxPKZEsj3kA@mail.gmail.com>
+ <alpine.LFD.2.11.1404161524050.980@knanqh.ubzr>
+Message-ID: <CAM4voamv7CrGpnM_HgTsSU6jvb3TffC0BKKrvNh-VHj+u9EKOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [140421 06:47]:
-> On Fri, Apr 18, 2014 at 6:24 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [140418 16:04]:
-> >> On Fri, Apr 18, 2014 at 02:58:48PM -0700, Tony Lindgren wrote:
-> >> > Oh come on, let's stop pretending it's not broken. And it's way worse with
-> >> > device tree as there's nothing making sure the resources for a driver
-> >> > are set up before the driver probes. And we've been unable to fix just
-> >> > this issue alone for about six months now. It's also broken beyond that.
-> >> > It's called of_platform_bus yet it won't even pass the platform_data
-> >> > as auxdata to the devices on a sub-bus instantatiated like I2C.
-> >>
-> >> Isn't there a much simpler solution to the platform device IRQ problem?
-> >>
-> >> Rather than trying to fix it at the point where the resources are
-> >> created, why not just *not* have DT create the IRQ resources in the
-> >> first place, and instead have platform_get_irq() (which is the function
-> >> which should be used to get an IRQ) be the actor to do whatever is
-> >> necessary to return the IRQ(s) ?
-> >
-> > Yeah why not. I don't see why we would need to do all this of_* special
-> > trickery for much anything beyond parsing the binding.
-> 
-> That can work, but it will still need something like
-> of_find_irq_domain() to determine whether to return -EPROBE_DEFER or
-> not.
+Hi Nicolas,
 
-Right. Naturally let's do whatever it takes to first fix this issue
-in a minimal way first for the -rc cycle so we can do the longer term
-changes needed.
- 
-> You could also go in the other direction and don't create the device
-> until the resources can be resolved. Unlike any of the other
-> solutions, that would work for amba bus as well although we may never
-> have a case where we need this with the amba bus. This would require
-> making of_platform_populate be callable multiple times, but there are
-> already some other reasons for wanting to do that. Specifically, I
-> would like the core code to call of_platform_populate with default
-> options and then only platforms with non-default options need a call
-> to of_platform_populate.
+On Thu, Apr 17, 2014 at 1:48 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 17 Apr 2014, Abhilash Kesavan wrote:
+>
+>> Hi Nicolas,
+>>
+>> On Fri, Apr 11, 2014 at 11:44 PM, Nicolas Pitre
+>> <nicolas.pitre@linaro.org> wrote:
+>> > On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
+>> >
+>> >> From: Andrew Bresticker <abrestic@chromium.org>
+>> >>
+>> >> Do not enable the big.LITTLE switcher on systems that do not have an
+>> >> ARM CCI (cache-coherent interconnect) present.  Since the CCI is used
+>> >> to maintain cache coherency between multiple clusters and peripherals,
+>> >> it is unlikely that a system without CCI would support big.LITTLE.
+>> >>
+>> >> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> >
+>> > The b.L switcher depends on MCPM, and it also expects only 2 clusters
+>> > which is evaluated at run time or it bails out.
+>> >
+>> > There might be in theory other ways than the CCI to enforce coherency
+>> > between clusters.  And that should all be encapsulated by the MCPM
+>> > layer.  The switcher module should not be concerned at all by the
+>> > underlying hardware mechanism.
+>> >
+>> > So if the goal is to determine at run time whether or not the switcher
+>> > should be activated in a multi-config kernel, then the criteria should
+>> > be whether or not MCPM is initialized, and not if there is a CCI.
+>>
+>> Yes, we have a multi-SoC enabled kernel (with MCPM and BL_SWITCHER
+>> configs enabled); one SoC has a single cluster while the other is a
+>> dual cluster. We wanted a run-time check to prevent bL_switcher from
+>> running on the single cluster one and zeroed in on CCI. But, I get
+>> your point as to why CCI should not be used as a distinguishing factor
+>> for switcher initialization.
+>>
+>> For now, I can use the no_bL_switcher parameter to disable it on
+>> certain platforms. However, can you elaborate on the MCPM
+>> initialization check you suggested ?
+>
+> Here's what I mean:
+>
+> ----- >8
+>
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date: Wed, 16 Apr 2014 15:43:59 -0400
+> Subject: [PATCH] ARM: bL_switcher: fix validation check before its activation
+>
+> The switcher should not depend on MAX_CLUSTER which is a build time
+> limit to  determine ifit should be activated or not. In a multiplatform
+> kernel binary it is possible to have dual-cluster and quad-cluster
+> platforms configured in. In that case MAX_CLUSTER should be 4 and that
+> shouldn't prevent the switcher from working if the kernel is booted on a
+> b.L dual-cluster system.
+>
+> In bL_switcher_halve_cpus() we already have a runtime validation check
+> to make sure we're dealing with only two clusters, so booting on a quad
+> cluster system will be caught and switcher activation aborted.
+>
+> However, the b.L switcher must ensure the MCPM layer is initialized on
+> the booted hardware before doing anything.  The mcpm_is_available()
+> function is added to that effect.
+>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-I like this idea as this would also probably remove the the numerous
-dmesg errors we are currently getting for drivers reprobing with
--EPROBE_DEFER.
+Thank you for the explanation and patch. I have tested this on our
+multi-platform configuration and it works fine - activating the
+switcher on one SoC and not on the other.
 
-In the long term we should have platform bus just call a set of
-standardized functions implemented by whatever the data source might
-be. That way we can limit the use of of_* functions in device drivers
-to just parsing of custom bindings in the drivers and use bus specific
-functions for everything else.
-
-> >> Yes, I know we have some drivers which use platform_get_resources() with
-> >> IORESOURCE_IRQ, but they should really use the right accessor.  And those
-> >> who just dereference the resource array directly... get what's coming
-> >> (though of course they have to be fixed.)
-> >
-> > $ git grep IORESOURCE_IRQ drivers/ | grep platform_get_resource | wc -l
-> > 179
-> 
-> Certainly, this is worthwhile clean-up no matter what the solution.
-
-Yeah agreed. But let's also consider the IORESOURCE_IRQ as just another
-source for for the bus or driver data in addition to the DT parsed data.
-Both sources of data should work just fine with platform_bus even
-without cleaning up the drivers.
+Even though it is not the case now, could we have a scenario where we
+may use mcpm for only secondary core boot-up on one SoC and for
+switching on another ? I would then have mcpm ops populated for both
+but still want bL switcher activated for only one of them.
 
 Regards,
-
-Tony
+Abhilash
+>
+> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+> index 5774b6ea7a..f01c0ee0c8 100644
+> --- a/arch/arm/common/bL_switcher.c
+> +++ b/arch/arm/common/bL_switcher.c
+> @@ -797,10 +797,8 @@ static int __init bL_switcher_init(void)
+>  {
+>         int ret;
+>
+> -       if (MAX_NR_CLUSTERS != 2) {
+> -               pr_err("%s: only dual cluster systems are supported\n", __func__);
+> -               return -EINVAL;
+> -       }
+> +       if (!mcpm_is_available())
+> +               return -ENODEV;
+>
+>         cpu_notifier(bL_switcher_hotplug_callback, 0);
+>
+> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+> index 1e361abc29..86fd60fefb 100644
+> --- a/arch/arm/common/mcpm_entry.c
+> +++ b/arch/arm/common/mcpm_entry.c
+> @@ -48,6 +48,11 @@ int __init mcpm_platform_register(const struct mcpm_platform_ops *ops)
+>         return 0;
+>  }
+>
+> +bool mcpm_is_available(void)
+> +{
+> +       return (platform_ops) ? true : false;
+> +}
+> +
+>  int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
+>  {
+>         if (!platform_ops)
+> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> index 608516ebab..a5ff410dcd 100644
+> --- a/arch/arm/include/asm/mcpm.h
+> +++ b/arch/arm/include/asm/mcpm.h
+> @@ -54,6 +54,13 @@ void mcpm_set_early_poke(unsigned cpu, unsigned cluster,
+>   */
+>
+>  /**
+> + * mcpm_is_available - returns whether MCPM is initialized and available
+> + *
+> + * This returns true or false accordingly.
+> + */
+> +bool mcpm_is_available(void);
+> +
+> +/**
+>   * mcpm_cpu_power_up - make given CPU in given cluster runable
+>   *
+>   * @cpu: CPU number within given cluster
