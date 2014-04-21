@@ -1,64 +1,53 @@
-From: murzin.v@gmail.com (Vladimir Murzin)
-Date: Mon, 21 Apr 2014 17:18:48 +0100
-Subject: [Xen-devel] [PATCH RFC] arm64: 32-bit tolerant sync bitops
-In-Reply-To: <534FB009.5030904@citrix.com>
-References: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>
- <534FB009.5030904@citrix.com>
-Message-ID: <CABV+yWsFY4AnNa+Bs54ZNswCUga1OtFh3+5PPWHSEA4zRXJD3g@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 21 Apr 2014 11:19:42 -0500
+Subject: [PATCH v2] arm64: enable EDAC on arm64
+In-Reply-To: <534C5F69.8030208@codeaurora.org>
+References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
+ <loom.20140410T150903-818@post.gmane.org>
+ <534C5F69.8030208@codeaurora.org>
+Message-ID: <CAL_Jsq+N4WgCN3DAigaPW_D=hujL+JQMxaM5rXz0TcQ1VWX8AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 17, 2014 at 11:42 AM, David Vrabel <david.vrabel@citrix.com> wrote:
-> On 17/04/14 09:38, Vladimir Murzin wrote:
->> Xen assumes that bit operations are able to operate on 32-bit size and
->> alignment [1]. For arm64 bitops are based on atomic exclusive load/store
->> instructions to guarantee that changes are made atomically. However, these
->> instructions require that address to be aligned to the data size. Because, by
->> default, bitops operates on 64-bit size it implies that address should be
->> aligned appropriately. All these lead to breakage of Xen assumption for bitops
->> properties.
+On Mon, Apr 14, 2014 at 5:21 PM, Rohit Vaswani <rvaswani@codeaurora.org> wrote:
+> On 4/10/2014 6:10 AM, Tomasz Nowicki wrote:
 >>
->> With this patch 32-bit sized/aligned bitops is implemented.
+>> Rob Herring <robherring2 <at> gmail.com> writes:
 >>
->> [1] http://www.gossamer-threads.com/lists/xen/devel/325613
+>>> From: Rob Herring <rob.herring <at> calxeda.com>
+>>>
+>>> Implement atomic_scrub and enable EDAC for arm64.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring <at> calxeda.com>
+>>> Cc: Catalin Marinas <catalin.marinas <at> arm.com>
+>>> Cc: Will Deacon <will.deacon <at> arm.com>
+>>> ---
+>>> v2:
+>>> - Add loop for exclusive store success
+>>> - Fix size to be 32-bits at a time. The framework gives no alignment
+>>>    guarantees.
+>>>
+>> Hi Rob,
 >>
->> Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
->> ---
->>  Apart this patch other approaches were implemented:
->>  1. turn bitops to be 32-bit size/align tolerant.
->>     the changes are minimal, but I'm not sure how broad side effect might be
->>  2. separate 32-bit size/aligned operations.
->>     it exports new API, which might not be good
+>> I am working on memory error for ARM64 and wondering what is your plans
+>> regarding this patch. It looks essential for my further work.
+>>
+>> Regards,
+>> Tomasz
+>>
+> Hi Tomasz, Rob,
 >
-> I've never been particularly happy with the way the events_fifo.c uses
-> casts for the sync_*_bit() calls and I think we should do option 2.
->
-> A generic implementation could be something like:
->
-> bool sync_test_bit32(uint32_t *v, unsigned bit)
-> {
->      if (sizeof(unsigned long) == 8 && (unsigned long)v & 0x4)
->          return sync_test_bit((unsigned long *)(v - 1), bit + 32);
->      else
->          return sync_test_bit((unsigned long *)v, bit);
-> }
->
-> David
+> I am looking at similar information for A53 and A57 for the L1/L2 single and
+> double bit ecc errors.
+> Is there an upstream/linaro effort for EDAC driver in progress ?
 
-Talking about separate 32-bit ops I mean arch specific bitops which
-are targeting for 32-bit size/alignment.
-With separate API for Xen it looks awkward for me, because currently
-there are only a few users for sync_*_bit ops - Xen and HV.
-Xen assumes that these ops are 32 bit and looks like never try to deal
-with 64-bit (am I overlooking something?). So, sync ops are 32-bit
-de-facto, having separate version means there is support for both
-32-bit and 64-bit ops, but (by now) there is no user for 64-bit ops.
-All this lead to obvious question why we need API conversion now? Is
-not it easier to turn assumptions to requirements?
-x86 world defines it's own sync ops, arm32 world alias them to
-non-sync, so, probably arm64 could do something (may be different to
-my patch) to make sure that sync bitops are 32-bit sized/aligned...
+I just sent out v3.
 
-Hope to hear other opinions here ;)
+There is work to develop a generic RAS framework based on perf which
+would hopefully replace EDAC and mcelog(x86 only). Jean Pihet has
+picked up this work recently. There probably needs to be some
+infrastructure work to handle SError events as I believe that is how
+cache ECC errors are reported. Although those may get handled by
+firmware and then passed to the OS via some other mechanism like ACPI.
 
-Vladimir
+Rob
