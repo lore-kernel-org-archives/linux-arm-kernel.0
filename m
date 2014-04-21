@@ -1,53 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 21 Apr 2014 11:19:42 -0500
-Subject: [PATCH v2] arm64: enable EDAC on arm64
-In-Reply-To: <534C5F69.8030208@codeaurora.org>
-References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>
- <loom.20140410T150903-818@post.gmane.org>
- <534C5F69.8030208@codeaurora.org>
-Message-ID: <CAL_Jsq+N4WgCN3DAigaPW_D=hujL+JQMxaM5rXz0TcQ1VWX8AA@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Mon, 21 Apr 2014 11:21:52 -0500
+Subject: [PATCH 0/4] Introduce drivers/soc and add QCOM GSBI driver
+In-Reply-To: <535521A0.5050706@codeaurora.org>
+References: <1398058244-14099-1-git-send-email-agross@codeaurora.org>
+ <535521A0.5050706@codeaurora.org>
+Message-ID: <20140421162152.GA32485@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 5:21 PM, Rohit Vaswani <rvaswani@codeaurora.org> wrote:
-> On 4/10/2014 6:10 AM, Tomasz Nowicki wrote:
->>
->> Rob Herring <robherring2 <at> gmail.com> writes:
->>
->>> From: Rob Herring <rob.herring <at> calxeda.com>
->>>
->>> Implement atomic_scrub and enable EDAC for arm64.
->>>
->>> Signed-off-by: Rob Herring <rob.herring <at> calxeda.com>
->>> Cc: Catalin Marinas <catalin.marinas <at> arm.com>
->>> Cc: Will Deacon <will.deacon <at> arm.com>
->>> ---
->>> v2:
->>> - Add loop for exclusive store success
->>> - Fix size to be 32-bits at a time. The framework gives no alignment
->>>    guarantees.
->>>
->> Hi Rob,
->>
->> I am working on memory error for ARM64 and wondering what is your plans
->> regarding this patch. It looks essential for my further work.
->>
->> Regards,
->> Tomasz
->>
-> Hi Tomasz, Rob,
->
-> I am looking at similar information for A53 and A57 for the L1/L2 single and
-> double bit ecc errors.
-> Is there an upstream/linaro effort for EDAC driver in progress ?
+On Mon, Apr 21, 2014 at 09:48:16AM -0400, Christopher Covington wrote:
 
-I just sent out v3.
+<snip>
 
-There is work to develop a generic RAS framework based on perf which
-would hopefully replace EDAC and mcelog(x86 only). Jean Pihet has
-picked up this work recently. There probably needs to be some
-infrastructure work to handle SError events as I believe that is how
-cache ECC errors are reported. Although those may get handled by
-firmware and then passed to the OS via some other mechanism like ACPI.
+> In that thread, Olof wrote, "The code [going into drivers/soc] isn't the pure
+> drivers. Those we find homes for."
 
-Rob
+Right.  I see this as glue for the most part.  You could argue it's a small
+pinctrl, but this doesn't route external pins, it's more to connect pins
+internally to the IP block and it's sub-device parts (qup, uart, etc).
+
+> 
+> https://lkml.org/lkml/2014/3/2/123
+> 
+> > The remaining patches add the QCOM GSBI (General Serial Bus Interface) driver,
+> > device tree binding information for both the GSBI and child node interaction,
+> > and lastly a patch to fix the current MSM serial driver to work correctly with
+> > the GSBI changes.
+> 
+> It's not obvious to me what makes the GSBI driver "impure" and unfit for say
+> drivers/bus. Could you perhaps include a brief explanation?
+
+The intent of the gsbi driver is merely to provide/configure the single mux
+setting for the devices that share those 4 IO lines.  I don't see this as a full
+blown bus.
+
+Regards,
+
+Andy
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
