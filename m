@@ -1,104 +1,63 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 21 Apr 2014 00:30:43 -0500
-Subject: [PATCH 3/4] soc: qcom: Add device tree binding for GSBI
+Date: Mon, 21 Apr 2014 00:30:41 -0500
+Subject: [PATCH 1/4] soc: Placeholder files for drivers/soc
 In-Reply-To: <1398058244-14099-1-git-send-email-agross@codeaurora.org>
 References: <1398058244-14099-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1398058244-14099-4-git-send-email-agross@codeaurora.org>
+Message-ID: <1398058244-14099-2-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding support for the QCOM GSBI driver.
+Add placeholder Kconfig and linkage for driver/soc.
+
+The first patch set that implemented this was authored by Santosh Shilimkar:
+https://lkml.org/lkml/2014/2/28/567
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |   78 ++++++++++++++++++++
- 1 file changed, 78 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+ drivers/Kconfig     |    2 ++
+ drivers/Makefile    |    4 ++++
+ drivers/soc/Kconfig |    4 ++++
+ 3 files changed, 10 insertions(+)
+ create mode 100644 drivers/soc/Kconfig
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index b3138fb..37f955f 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -130,6 +130,8 @@ source "drivers/staging/Kconfig"
+ 
+ source "drivers/platform/Kconfig"
+ 
++source "drivers/soc/Kconfig"
++
+ source "drivers/clk/Kconfig"
+ 
+ source "drivers/hwspinlock/Kconfig"
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 8e3b8b0..ba77e7b 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -132,6 +132,10 @@ obj-$(CONFIG_VHOST_RING)	+= vhost/
+ obj-$(CONFIG_VLYNQ)		+= vlynq/
+ obj-$(CONFIG_STAGING)		+= staging/
+ obj-y				+= platform/
++
++# soc specific drivers
++obj-y				+= soc/
++
+ #common clk code
+ obj-y				+= clk/
+ 
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
 new file mode 100644
-index 0000000..6462e61
+index 0000000..58bd962
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,gsbi.txt
-@@ -0,0 +1,78 @@
-+QCOM GSBI (General Serial Bus Interface) Driver
++++ b/drivers/soc/Kconfig
+@@ -0,0 +1,4 @@
++menu "SOC specific Drivers"
 +
-+The GSBI controller is modeled as a node with zero or more child nodes, each
-+representing a serial sub-node device that is mux'd as part of the GSBI
-+configuration settings.  The mode setting will govern the input/output mode of
-+the 4 GSBI IOs.
-+
-+Required properties:
-+- compatible: must contain "qcom,gsbi-v1.0.0" for APQ8064/IPQ8064
-+- reg: Address range for GSBI registers
-+- clocks: required clock
-+- clock-names: must contain "iface" entry
-+- qcom,mode : indicates MUX value for configuration of the serial interface.
-+	mode 0: idle, null values applied to all four GSBI IOs
-+	mode 1: I2C on 2 ports, SIM/R-UIM on other 2.
-+	mode 2: I2C
-+	mode 3: SPI
-+	mode 4: UART w/ flow control
-+	mode 5: SIM/R-UIM
-+	mode 6: I2C on 2 ports, UART (without flow control) on other 2
-+	mode 7: undefined
-+
-+Required properties if child node exists:
-+- #address-cells: Must be 1
-+- #size-cells: Must be 1
-+- ranges: Must be present
-+
-+Properties for children:
-+
-+A GSBI controller node can contain 0 or more child nodes representing serial
-+devices.  These serial devices can be a QCOM UART, I2C controller, spi
-+controller, or some combination of aforementioned devices.
-+
-+See the following for child node definitions:
-+Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
-+Documentation/devicetree/bindings/spi/qcom,spi-qup.txt
-+Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt
-+
-+Example for APQ8064:
-+
-+	gsbi4 at 16300000 {
-+		compatible = "qcom,gsbi-v1.0.0";
-+		reg = <0x16300000 0x100>;
-+		clocks = <&gcc GSBI4_H_CLK>;
-+		clock-names = "iface";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		qcom,mode = <6>;
-+
-+		/* child nodes go under here */
-+
-+		i2c_qup4: i2c at 16380000 {
-+		        compatible = "qcom,i2c-qup-v1.1.1";
-+		        reg = <0x16380000 0x1000>;
-+		        interrupts = <0 153 0>;
-+
-+		        clocks = <&gcc GSBI4_QUP_CLK>, <&gcc GSBI4_H_CLK>;
-+		        clock-names = "core", "iface";
-+
-+		        clock-frequency = <200000>;
-+
-+		        #address-cells = <1>;
-+		        #size-cells = <0>;
-+
-+		 };
-+
-+		uart4:	serial at 16340000 {
-+			compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
-+			reg = <0x16340000 0x1000>,
-+				<0x16300000 0x1000>;
-+			interrupts = <0 152 0x0>;
-+			clocks = <&gcc GSBI4_UART_CLK>, <&gcc GSBI4_H_CLK>;
-+			clock-names = "core", "iface";
-+			status = "ok";
-+		};
-+	};
-+
++endmenu
++`
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
