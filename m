@@ -1,77 +1,52 @@
-From: stratosk@semaphore.gr (Stratos Karafotis)
-Date: Tue, 22 Apr 2014 02:01:29 +0300
-Subject: [PATCH v4 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry macro
- for iteration
-In-Reply-To: <534DB213.7080802@semaphore.gr>
-References: <534DB213.7080802@semaphore.gr>
-Message-ID: <5355A349.50908@semaphore.gr>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Apr 2014 07:31:49 +0800
+Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
+ device is disabled
+In-Reply-To: <CAOesGMiDqd+JSd_fzzeWohSGixuR1ciOz_FO5CGnSm7F3ioxDw@mail.gmail.com>
+References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
+ <20140418204249.GG24070@n2100.arm.linux.org.uk>
+ <20140419055205.GX2523@dragon>
+ <20140419084229.GK24070@n2100.arm.linux.org.uk>
+ <20140419110048.GY2523@dragon>
+ <CAOesGMiDqd+JSd_fzzeWohSGixuR1ciOz_FO5CGnSm7F3ioxDw@mail.gmail.com>
+Message-ID: <20140421233148.GZ2523@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq core now supports the cpufreq_for_each_entry macro helper
-for iteration over the cpufreq_frequency_table, so use it.
+On Mon, Apr 21, 2014 at 07:22:52AM -0700, Olof Johansson wrote:
+> On Sat, Apr 19, 2014 at 4:00 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > On Sat, Apr 19, 2014 at 09:42:29AM +0100, Russell King - ARM Linux wrote:
+> >> On Sat, Apr 19, 2014 at 01:53:08PM +0800, Shawn Guo wrote:
+> >> > BTW, can you take a look at the following two patches, or are they
+> >> > already in your queue?
+> >> >
+> >> > imx-drm: imx-drm-core: Fix imx_drm_encoder_get_mux_id
+> >> > https://lkml.org/lkml/2014/4/7/58
+> >>
+> >> This one now is.
+> >>
+> >> > mx-drm: imx-tve: correct DDC property name to 'ddc-i2c-bus'
+> >> > ('i' is missing from the prefix word, and it should be 'imx-drm')
+> >> > http://www.spinics.net/lists/arm-kernel/msg321057.html
+> >>
+> >> This one touches arch/arm/boot/dts, which Arnd moaned at me for touching
+> >> via the staging tree during the merge window.  So, while I can take the
+> >> imx-tve part, I can't take the arch/arm/boot/dts part.  This patch needs
+> >> to be split.
+> >>
+> >> It also means that the MBA platform will have its TVE output broken while
+> >> the two commits take their different paths, but I guess that's what you
+> >> get for this kind of sillyness about git trees having exclusive ownership
+> >> of various files in the kernel tree - more breakage not less.
+> >
+> > I think Arnd's main concern is about merge conflict, which shouldn't be
+> > a problem for this particular case.  The change on dts file is pretty
+> > trivial.  And I assume this is a fix to be landed on mainline before
+> > -rc5 or so.  Then I can rebase my DT branch on top of it.  That said,
+> > merge conflict is not really a problem for this patch.  Arnd?
+> 
+> I'm not Arnd, but that should work well.
 
-It should have no functional changes.
+Thanks, Olof.
 
-Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
----
- drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 7694e07..b11fdd6 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -1734,18 +1734,17 @@ static struct cpufreq_frequency_table db8500_cpufreq_table[] = {
- 
- static long round_armss_rate(unsigned long rate)
- {
-+	struct cpufreq_frequency_table *pos;
- 	long freq = 0;
--	int i = 0;
- 
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		freq = db8500_cpufreq_table[i].frequency;
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table) {
-+		freq = pos->frequency;
- 		if (freq == rate)
- 			break;
--		i++;
- 	}
- 
- 	/* Return the last valid value, even if a match was not found. */
-@@ -1886,23 +1885,21 @@ static void set_clock_rate(u8 clock, unsigned long rate)
- 
- static int set_armss_rate(unsigned long rate)
- {
--	int i = 0;
-+	struct cpufreq_frequency_table *pos;
- 
- 	/* cpufreq table frequencies is in KHz. */
- 	rate = rate / 1000;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	while (db8500_cpufreq_table[i].frequency != CPUFREQ_TABLE_END) {
--		if (db8500_cpufreq_table[i].frequency == rate)
-+	cpufreq_for_each_entry(pos, db8500_cpufreq_table)
-+		if (pos->frequency == rate)
- 			break;
--		i++;
--	}
- 
--	if (db8500_cpufreq_table[i].frequency != rate)
-+	if (pos->frequency != rate)
- 		return -EINVAL;
- 
- 	/* Set the new arm opp. */
--	return db8500_prcmu_set_arm_opp(db8500_cpufreq_table[i].driver_data);
-+	return db8500_prcmu_set_arm_opp(pos->driver_data);
- }
- 
- static int set_plldsi_rate(unsigned long rate)
--- 
-1.9.0
+Shawn
