@@ -1,89 +1,129 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 21 Apr 2014 17:19:18 +0530
-Subject: [PATCH 4/4] mcpm: exynos: populate suspend and powered_up callbacks
-In-Reply-To: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
-References: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Mon, 21 Apr 2014 17:46:42 +0530
+Subject: [PATCH 1/3] usb: ohci-exynos: Make provision for vdd regulators
+Message-ID: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support cpuidle through mcpm, suspend and powered-up
-callbacks are required in mcpm platform code.
-Hence populate the same callbacks.
+Facilitate getting required 3.3V and 1.0V VDD supply for
+OHCI controller on Exynos.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+With patches for regulators' nodes merged in 3.15:
+c8c253f ARM: dts: Add regulator entries to smdk5420
+275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+
+certain perripherals will now need to ensure that,
+they request VDD regulators in their drivers, and enable
+them so as to make them working.
+
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
 ---
- arch/arm/mach-exynos/mcpm-exynos.c |   53 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-index 46d4968..16af0bd 100644
---- a/arch/arm/mach-exynos/mcpm-exynos.c
-+++ b/arch/arm/mach-exynos/mcpm-exynos.c
-@@ -318,10 +318,63 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
- 	return 0; /* success: the CPU is halted */
- }
- 
-+static void enable_coherency(void)
-+{
-+	unsigned long v, u;
-+
-+	asm volatile(
-+		"mrc	p15, 0, %0, c1, c0, 1\n"
-+		"orr	%0, %0, %2\n"
-+		"ldr	%1, [%3]\n"
-+		"and	%1, %1, #0\n"
-+		"orr	%0, %0, %1\n"
-+		"mcr	p15, 0, %0, c1, c0, 1\n"
-+		: "=&r" (v), "=&r" (u)
-+		: "Ir" (0x40), "Ir" (S5P_INFORM0)
-+		: "cc");
-+}
-+
-+void exynos_powered_up(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	arch_spin_lock(&bl_lock);
-+	if (cpu_use_count[cpu][cluster] == 0)
-+		cpu_use_count[cpu][cluster] = 1;
-+	arch_spin_unlock(&bl_lock);
-+}
-+
-+static void exynos_suspend(u64 residency)
-+{
-+	unsigned int mpidr, cpunr;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpunr = enynos_pmu_cpunr(mpidr);
-+
-+	__raw_writel(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
-+
-+	exynos_power_down();
-+
-+	/*
-+	 * Execution reaches here only if cpu did not power down.
-+	 * Hence roll back the changes done in exynos_power_down function.
-+	*/
-+	__raw_writel(EXYNOS_CORE_LOCAL_PWR_EN,
-+			EXYNOS_ARM_CORE_CONFIGURATION(cpunr));
-+	set_cr(get_cr() | CR_C);
-+	enable_coherency();
-+}
-+
- static const struct mcpm_platform_ops exynos_power_ops = {
- 	.power_up		= exynos_power_up,
- 	.power_down		= exynos_power_down,
- 	.power_down_finish	= exynos_power_down_finish,
-+	.suspend		= exynos_suspend,
-+	.powered_up		= exynos_powered_up,
+Based on 'usb-next' branch of Greg's usb tree.
+
+ drivers/usb/host/ohci-exynos.c |   47 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+
+diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+index 68588d8..e2e72a8 100644
+--- a/drivers/usb/host/ohci-exynos.c
++++ b/drivers/usb/host/ohci-exynos.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/usb/phy.h>
+ #include <linux/usb/samsung_usb_phy.h>
+ #include <linux/usb.h>
+@@ -37,6 +38,8 @@ struct exynos_ohci_hcd {
+ 	struct clk *clk;
+ 	struct usb_phy *phy;
+ 	struct usb_otg *otg;
++	struct regulator *vdd33;
++	struct regulator *vdd10;
  };
  
- static void __init exynos_mcpm_usage_count_init(void)
+ static void exynos_ohci_phy_enable(struct platform_device *pdev)
+@@ -98,6 +101,28 @@ static int exynos_ohci_probe(struct platform_device *pdev)
+ 		exynos_ohci->otg = phy->otg;
+ 	}
+ 
++	exynos_ohci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
++	if (IS_ERR(exynos_ohci->vdd33)) {
++		err = PTR_ERR(exynos_ohci->vdd33);
++		goto fail_regulator1;
++	}
++	err = regulator_enable(exynos_ohci->vdd33);
++	if (err) {
++		dev_err(&pdev->dev, "Failed to enable VDD33 supply\n");
++		goto fail_regulator1;
++	}
++
++	exynos_ohci->vdd10 = devm_regulator_get(&pdev->dev, "vdd10");
++	if (IS_ERR(exynos_ohci->vdd10)) {
++		err = PTR_ERR(exynos_ohci->vdd10);
++		goto fail_regulator2;
++	}
++	err = regulator_enable(exynos_ohci->vdd10);
++	if (err) {
++		dev_err(&pdev->dev, "Failed to enable VDD10 supply\n");
++		goto fail_regulator2;
++	}
++
+ skip_phy:
+ 	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
+ 
+@@ -154,6 +179,10 @@ fail_add_hcd:
+ fail_io:
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ fail_clk:
++	regulator_disable(exynos_ohci->vdd10);
++fail_regulator2:
++	regulator_disable(exynos_ohci->vdd33);
++fail_regulator1:
+ 	usb_put_hcd(hcd);
+ 	return err;
+ }
+@@ -172,6 +201,9 @@ static int exynos_ohci_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
++	regulator_disable(exynos_ohci->vdd10);
++	regulator_disable(exynos_ohci->vdd33);
++
+ 	usb_put_hcd(hcd);
+ 
+ 	return 0;
+@@ -208,6 +240,9 @@ static int exynos_ohci_suspend(struct device *dev)
+ 
+ 	clk_disable_unprepare(exynos_ohci->clk);
+ 
++	regulator_disable(exynos_ohci->vdd10);
++	regulator_disable(exynos_ohci->vdd33);
++
+ 	spin_unlock_irqrestore(&ohci->lock, flags);
+ 
+ 	return 0;
+@@ -218,6 +253,18 @@ static int exynos_ohci_resume(struct device *dev)
+ 	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+ 	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+ 	struct platform_device *pdev		= to_platform_device(dev);
++	int ret;
++
++	ret = regulator_enable(exynos_ohci->vdd33);
++	if (ret) {
++		dev_err(dev, "Failed to enable VDD33 supply\n");
++		return ret;
++	}
++	ret = regulator_enable(exynos_ohci->vdd10);
++	if (ret) {
++		dev_err(dev, "Failed to enable VDD10 supply\n");
++		return ret;
++	}
+ 
+ 	clk_prepare_enable(exynos_ohci->clk);
+ 
 -- 
-1.7.9.5
+1.7.10.4
