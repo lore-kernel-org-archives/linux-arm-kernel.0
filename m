@@ -1,146 +1,74 @@
 From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 21 Apr 2014 21:27:13 +0530
-Subject: [PATCH 1/5] ARM: bL_switcher: Don't enable bL switcher on systems
- without CCI
-In-Reply-To: <alpine.LFD.2.11.1404161524050.980@knanqh.ubzr>
+Date: Mon, 21 Apr 2014 21:27:44 +0530
+Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <20140417153812.GD18864@e103592.cambridge.arm.com>
 References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
- <1397239311-27717-2-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1404111406210.980@knanqh.ubzr>
- <CAM4voanduaJ32ztj6ZDMOPXNd9W6Ttwae_PQ68VGxPKZEsj3kA@mail.gmail.com>
- <alpine.LFD.2.11.1404161524050.980@knanqh.ubzr>
-Message-ID: <CAM4voamv7CrGpnM_HgTsSU6jvb3TffC0BKKrvNh-VHj+u9EKOQ@mail.gmail.com>
+ <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
+ <20140414104116.GA3844@e103592.cambridge.arm.com>
+ <CAM4voa=-29EsNRCebri1C9D5cWopTT4Ux_0UPGAvdjP60ADZZQ@mail.gmail.com>
+ <20140417095925.GA18864@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404171114370.980@knanqh.ubzr>
+ <20140417153812.GD18864@e103592.cambridge.arm.com>
+Message-ID: <CAM4voak2wGVfimjYR14nXuqwK+QDqBQiQ2CGKoV-fggVN75nkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Dave,
 
-On Thu, Apr 17, 2014 at 1:48 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 17 Apr 2014, Abhilash Kesavan wrote:
->
->> Hi Nicolas,
+On Thu, Apr 17, 2014 at 9:08 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Apr 17, 2014 at 04:20:26PM +0100, Nicolas Pitre wrote:
+>> On Thu, 17 Apr 2014, Dave Martin wrote:
 >>
->> On Fri, Apr 11, 2014 at 11:44 PM, Nicolas Pitre
->> <nicolas.pitre@linaro.org> wrote:
->> > On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
+>> > On Thu, Apr 17, 2014 at 12:41:22AM +0530, Abhilash Kesavan wrote:
 >> >
->> >> From: Andrew Bresticker <abrestic@chromium.org>
->> >>
->> >> Do not enable the big.LITTLE switcher on systems that do not have an
->> >> ARM CCI (cache-coherent interconnect) present.  Since the CCI is used
->> >> to maintain cache coherency between multiple clusters and peripherals,
->> >> it is unlikely that a system without CCI would support big.LITTLE.
->> >>
->> >> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> >> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> > [...]
 >> >
->> > The b.L switcher depends on MCPM, and it also expects only 2 clusters
->> > which is evaluated at run time or it bails out.
+>> > > > The fact that there is no C interface for enabling ACE ports is
+>> > > > deliberate.  For CPUs connected to ACE and managed via MCPM,
+>> > > > it is incorrect to enable CCI via C code, since the safe window
+>> > > > is the window during which all outbound CPUs have reached CLUSTER_DOWN
+>> > > > and all inbound CPUs have not turned their MMU on yet (and thus cannot
+>> > > > execute any general Linux C code).
+>> > > >
+>> > > > There might be scenarios involving GPUs and other non-CPU devices
+>> > > > connected to ACE ports where the device cannot enable CCI snoops
+>> > > > for itself -- but this would require a holding-pen protocol to enable
+>> > > > the device to wait and signal a CPU to enable CCI snoops on the device's
+>> > > > behalf before the device proceeds.  It is not the correct solution for
+>> > > > CPU clusters attached to ACE, precisely because we can be more efficient
+>> > > > in that case.
+>> > > >
+>> > > > In fact, because you implement a power_up_setup method that calls
+>> > > > cci_enable_port_for_self, CCI snoops are actually enabled twice, making
+>> > > > the above code appear redundant.   Have I missed something?
+>> > > When a cluster is being turned off the snoops for both the clusters
+>> > > are being turned off. When the other cluster comes back the snoops are
+>> > > being turned on for the incoming cluster via power_up_setup and here
+>> > > for the other cluster. As previously mentioned, I will be dropping
+>> > > this change.
 >> >
->> > There might be in theory other ways than the CCI to enforce coherency
->> > between clusters.  And that should all be encapsulated by the MCPM
->> > layer.  The switcher module should not be concerned at all by the
->> > underlying hardware mechanism.
->> >
->> > So if the goal is to determine at run time whether or not the switcher
->> > should be activated in a multi-config kernel, then the criteria should
->> > be whether or not MCPM is initialized, and not if there is a CCI.
+>> > That's a fair point.  If there is only one cluster alive, turning off
+>> > snoops for it should be safe, because there is no second cluster for
+>> > it to maintain coherency with.
 >>
->> Yes, we have a multi-SoC enabled kernel (with MCPM and BL_SWITCHER
->> configs enabled); one SoC has a single cluster while the other is a
->> dual cluster. We wanted a run-time check to prevent bL_switcher from
->> running on the single cluster one and zeroed in on CCI. But, I get
->> your point as to why CCI should not be used as a distinguishing factor
->> for switcher initialization.
->>
->> For now, I can use the no_bL_switcher parameter to disable it on
->> certain platforms. However, can you elaborate on the MCPM
->> initialization check you suggested ?
+>> But that's not that simple as I explained in a previous email.  If the
+>> other cluster has gone down via cpuidle, it may come back up at any
+>> moment without warning.  We do have the infrastructure in place to cope
+>> with possible races handling the CCI within a cluster.  We do not have
+>> anything for cross cluster races.  And before we do, it is necessary to
+>> know if it is worth it.
 >
-> Here's what I mean:
->
-> ----- >8
->
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date: Wed, 16 Apr 2014 15:43:59 -0400
-> Subject: [PATCH] ARM: bL_switcher: fix validation check before its activation
->
-> The switcher should not depend on MAX_CLUSTER which is a build time
-> limit to  determine ifit should be activated or not. In a multiplatform
-> kernel binary it is possible to have dual-cluster and quad-cluster
-> platforms configured in. In that case MAX_CLUSTER should be 4 and that
-> shouldn't prevent the switcher from working if the kernel is booted on a
-> b.L dual-cluster system.
->
-> In bL_switcher_halve_cpus() we already have a runtime validation check
-> to make sure we're dealing with only two clusters, so booting on a quad
-> cluster system will be caught and switcher activation aborted.
->
-> However, the b.L switcher must ensure the MCPM layer is initialized on
-> the booted hardware before doing anything.  The mcpm_is_available()
-> function is added to that effect.
->
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> Agreed.  It could be done, perhaps by the approach I already considered
+> for handling multilevel clusters, but it is far from trivial, and I
+> would like to see some measurement of the potential benefit before
+> getting into it.
+I am afraid I do not have any power numbers for this change.
 
-Thank you for the explanation and patch. I have tested this on our
-multi-platform configuration and it works fine - activating the
-switcher on one SoC and not on the other.
-
-Even though it is not the case now, could we have a scenario where we
-may use mcpm for only secondary core boot-up on one SoC and for
-switching on another ? I would then have mcpm ops populated for both
-but still want bL switcher activated for only one of them.
+Next version of the patches will be posted soon.
 
 Regards,
 Abhilash
 >
-> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-> index 5774b6ea7a..f01c0ee0c8 100644
-> --- a/arch/arm/common/bL_switcher.c
-> +++ b/arch/arm/common/bL_switcher.c
-> @@ -797,10 +797,8 @@ static int __init bL_switcher_init(void)
->  {
->         int ret;
->
-> -       if (MAX_NR_CLUSTERS != 2) {
-> -               pr_err("%s: only dual cluster systems are supported\n", __func__);
-> -               return -EINVAL;
-> -       }
-> +       if (!mcpm_is_available())
-> +               return -ENODEV;
->
->         cpu_notifier(bL_switcher_hotplug_callback, 0);
->
-> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-> index 1e361abc29..86fd60fefb 100644
-> --- a/arch/arm/common/mcpm_entry.c
-> +++ b/arch/arm/common/mcpm_entry.c
-> @@ -48,6 +48,11 @@ int __init mcpm_platform_register(const struct mcpm_platform_ops *ops)
->         return 0;
->  }
->
-> +bool mcpm_is_available(void)
-> +{
-> +       return (platform_ops) ? true : false;
-> +}
-> +
->  int mcpm_cpu_power_up(unsigned int cpu, unsigned int cluster)
->  {
->         if (!platform_ops)
-> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
-> index 608516ebab..a5ff410dcd 100644
-> --- a/arch/arm/include/asm/mcpm.h
-> +++ b/arch/arm/include/asm/mcpm.h
-> @@ -54,6 +54,13 @@ void mcpm_set_early_poke(unsigned cpu, unsigned cluster,
->   */
->
->  /**
-> + * mcpm_is_available - returns whether MCPM is initialized and available
-> + *
-> + * This returns true or false accordingly.
-> + */
-> +bool mcpm_is_available(void);
-> +
-> +/**
->   * mcpm_cpu_power_up - make given CPU in given cluster runable
->   *
->   * @cpu: CPU number within given cluster
+> Cheers
+> ---Dave
