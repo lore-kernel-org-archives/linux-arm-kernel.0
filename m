@@ -1,58 +1,211 @@
-From: elder@linaro.org (Alex Elder)
-Date: Mon, 21 Apr 2014 16:53:03 -0500
-Subject: [PATCH v2 02/10] ARM: bcm: err, don't BUG() on SMC init failures
-In-Reply-To: <1398117191-2433-1-git-send-email-elder@linaro.org>
-References: <1398117191-2433-1-git-send-email-elder@linaro.org>
-Message-ID: <1398117191-2433-3-git-send-email-elder@linaro.org>
+From: pinskia@gmail.com (Andrew Pinski)
+Date: Mon, 21 Apr 2014 15:06:18 -0700
+Subject: [PATCH 5/5] ARM64: Add support for ILP32 ABI.
+In-Reply-To: <20130913121244.GC10385@arm.com>
+References: <1378762380-13152-1-git-send-email-apinski@cavium.com>
+ <1378762380-13152-5-git-send-email-apinski@cavium.com>
+ <20130911143102.GA8825@darko.cambridge.arm.com>
+ <CA+=Sn1nd3Ym8so_=SP4NC1fjKWn4dNPYvz4OZMo0tLZptF8KVw@mail.gmail.com>
+ <20130913121244.GC10385@arm.com>
+Message-ID: <CA+=Sn1nfKzjt53HW7n8nGU+Z7BHC25msf5GWs-QtKfvfe4Zkzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several conditions in bcm_kona_smc_init() are handled with BUG_ON().
-That function is capable of returning an error, so do that instead.
+On Fri, Sep 13, 2013 at 5:12 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Sep 13, 2013 at 07:18:48AM +0100, Andrew Pinski wrote:
+>> On Wed, Sep 11, 2013 at 7:32 AM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Mon, Sep 09, 2013 at 10:32:59PM +0100, Andrew Pinski wrote:
+>> >
+>> > On top of these, I would really like to see
+>> > Documentation/arm64/ilp32.txt describing the ABI.
+>>
+>> No other target does not, not even x86_64 for x32.
+>
+> That's not really a good argument.
+>
+>> > The other approach I've been looking at is just using the native siginfo
+>> > instead of the compat one for ILP32. But this requires wider debate
+>> > (cc'ed Arnd if he has time).
+>>
+>> This is not useful and as you shown can be very messy and even worse
+>> when it comes taking into account big and little-endian.  Even x32
+>> does not do that.
+>
+> Well, please don't bring the "x32 does not do that" argument. It doesn't
+> mean we shouldn't investigate better ways. Initially x32 got the siginfo
+> members alignment wrong and they ended up __ARCH_SI_CLOCK_T and
+> __ARCH_SI_ATTRIBUTES, changing the generic uapi files.
+>
+>> > Basically if you use the current siginfo in the ILP32 context with
+>> > __kernel_clock_t being 64-bit you end up with a structure that doesn't
+>> > match any of the native or compat siginfo. This is because we have some
+>> > pointers which will turn into 32-bit values in ILP32:
+>> >
+>> >         void __user *sival_ptr;         /* accessed via si_ptr */
+>> >         void __user *_addr;             /* accessed via si_addr */
+>> >         void __user *_call_addr;        /* accessed via si_call_addr */
+>> >
+>> > We also have __ARCH_SI_BAND_T defined as long.
+>>
+>> I had first thought about this and even started to implement it but I
+>> found the glibc and the kernel messier than it was already.
+>
+> The kernel part wasn't bad IMO (of course, needs ack from generic
+> headers maintainer). I can't talk about glibc but wouldn't it just
+> access these members explicitly?
 
-Also, don't assume of_get_address() returns a valid pointer.
 
-Signed-off-by: Alex Elder <elder@linaro.org>
-Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
-Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
-Reviewed-by: Matt Porter <mporter@linaro.org>
----
- arch/arm/mach-bcm/bcm_kona_smc.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+>
+>> > AFAICT, Linux only does a put_user() on these and never reads them from
+>> > user space. This means that we can add the right padding on either side
+>> > of these pointers (for endianness reasons) and Linux would write 0 as
+>> > the top part of a 64-bit pointer (since the user address is restricted
+>> > to 32-bit anyway). User ILP32 would only access the corresponding
+>> > pointer as a 32-bit value and ignore the padding.
 
-diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-index d881c72..ddc2f17 100644
---- a/arch/arm/mach-bcm/bcm_kona_smc.c
-+++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-@@ -45,6 +45,7 @@ static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
- int __init bcm_kona_smc_init(void)
- {
- 	struct device_node *node;
-+	const __be32 *prop_val;
- 
- 	/* Read buffer addr and size from the device tree node */
- 	node = of_find_matching_node(NULL, bcm_kona_smc_ids);
-@@ -52,12 +53,17 @@ int __init bcm_kona_smc_init(void)
- 		return -ENODEV;
- 
- 	/* Don't care about size or flags of the DT node */
--	bridge_data.buffer_addr =
--		be32_to_cpu(*of_get_address(node, 0, NULL, NULL));
--	BUG_ON(!bridge_data.buffer_addr);
-+	prop_val = of_get_address(node, 0, NULL, NULL);
-+	if (!prop_val)
-+		return -EINVAL;
-+
-+	bridge_data.buffer_addr = be32_to_cpu(*prop_val);
-+	if (!bridge_data.buffer_addr)
-+		return -EINVAL;
- 
- 	bridge_data.bounce = of_iomap(node, 0);
--	BUG_ON(!bridge_data.bounce);
-+	if (!bridge_data.bounce)
-+		return -ENOMEM;
- 
- 	bridge_data.initialized = 1;
- 
--- 
-1.9.1
+This is not true for sigevent which is defined to include "union
+sigval" by the POSIX standard.  sigval is also included in siginfo so
+it needs to be using 64bit pointers here.  The padding issue does come
+into play for some syscalls (mq_notify and timer_create).  They both
+would need a special wrapper syscall to correctly zero fill the upper
+bits of that union.  Would it be ok for those two system calls to have
+a wapper?
+
+The rest is correct we only write to those fields and never read from them.
+
+Thanks,
+Andrew Pinski
+
+>>
+>> And I am not a fan of changing the generic UAPI files just so it is no
+>> longer generic like you are doing.
+>
+> As I said above, x32 did that already and your are doing similar things
+> for __ARCH_SI_CLOCK_T.
+>
+>> > So, I'm looking for feedback on this proposal.
+>>
+>> As I mentioned before even x32 does not do that and it is very messy
+>> to make sure things get zero'd on the glibc and kernel sides.
+>
+> (not the x32 argument again)
+>
+> On the kernel side, they get zeroed automatically because the kernel
+> assumes it is a 64-bit address for user space, which is restricted to
+> 32-bit only. Are these members ever read back by the kernel? That's
+> where glibc zeroing would be needed (and I wouldn't like it either).
+>
+>> >> diff --git a/arch/arm64/include/uapi/asm/siginfo.h b/arch/arm64/include/uapi/asm/siginfo.h
+>> >> index 5a74a08..297fb4f 100644
+>> >> --- a/arch/arm64/include/uapi/asm/siginfo.h
+>> >> +++ b/arch/arm64/include/uapi/asm/siginfo.h
+>> >> @@ -16,7 +16,13 @@
+>> >>  #ifndef __ASM_SIGINFO_H
+>> >>  #define __ASM_SIGINFO_H
+>> >>
+>> >> +#ifdef __LP64__
+>> >>  #define __ARCH_SI_PREAMBLE_SIZE        (4 * sizeof(int))
+>> >> +#else /* ILP32 */
+>> >> +typedef long long __kernel_si_clock_t __attribute__((aligned(4)));
+>> >> +#define __ARCH_SI_CLOCK_T      __kernel_si_clock_t
+>> >> +#define __ARCH_SI_ATTRIBUTES   __attribute__((aligned(8)))
+>> >> +#endif
+>> >
+>> > This could go away if we manage to use the native siginfo.
+>>
+>> See above why I think this is a bad thing and even worse since even
+>> x32 did not do that already; it was the last added ABI like ILP32 to
+>> the kernel.
+>
+> The x32 thing is becoming the central theme.
+>
+>> >> --- /dev/null
+>> >> +++ b/arch/arm64/kernel/sys_ilp32.c
+>> >> @@ -0,0 +1,274 @@
+>> >> +/*
+>> >> + * AArch64- ILP32 specific system calls implementation
+>> >> + *
+>> >> + * Copyright (C) 2013 Cavium Inc.
+>> >> + * Author: Andrew Pinski <apinski@cavium.com>
+>> >> + *
+>> >> + * This program is free software; you can redistribute it and/or modify
+>> >> + * it under the terms of the GNU General Public License version 2 as
+>> >> + * published by the Free Software Foundation.
+>> >> + *
+>> >> + * This program is distributed in the hope that it will be useful,
+>> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> >> + * GNU General Public License for more details.
+>> >> + *
+>> >> + * You should have received a copy of the GNU General Public License
+>> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> >> + */
+>> >> +
+>> >> +/* Adjust unistd.h to provide 32-bit numbers and functions. */
+>> >> +#define __SYSCALL_COMPAT
+>> >
+>> > No. We need to use as many native syscalls as possible and only define
+>> > those absolutely necessary. In my investigation, I only ended up needing
+>> > these:
+>>
+>> No using __SYSCALL_COMPAT is the correct thing to do and then only
+>> reverting back what is needed.
+>
+> I _disagree_. "Even x32 does not to that". Some past discussions:
+>
+> http://thread.gmane.org/gmane.linux.kernel/1184913
+>
+>> > #define sys_ioctl               compat_sys_ioctl
+>> > #define sys_readv               compat_sys_readv
+>> > #define sys_writev              compat_sys_writev
+>> > #define sys_preadv              compat_sys_preadv64
+>> > #define sys_pwritev             compat_sys_pwritev64
+>> > #define sys_vmsplice            compat_sys_vmsplice
+>> > #define sys_waitid              compat_sys_waitid
+>> > #define sys_set_robust_list     compat_sys_set_robust_list
+>> > #define sys_get_robust_list     compat_sys_get_robust_list
+>> > #define sys_kexec_load          compat_sys_kexec_load
+>> > #define sys_timer_create        compat_sys_timer_create
+>> > #define sys_ptrace              compat_sys_ptrace
+>> > #define sys_sigaltstack         compat_sys_sigaltstack
+>> > #define sys_rt_sigaction        compat_sys_rt_sigaction
+>> > #define sys_rt_sigpending       compat_sys_rt_sigpending
+>> > #define sys_rt_sigtimedwait     compat_sys_rt_sigtimedwait
+>> > #define sys_rt_sigqueueinfo     compat_sys_rt_sigqueueinfo
+>> > #define sys_rt_sigreturn        compat_sys_rt_sigreturn_wrapper
+>> > #define sys_mq_notify           compat_sys_mq_notify
+>> > #define sys_recvfrom            compat_sys_recvfrom
+>> > #define sys_setsockopt          compat_sys_setsockopt
+>> > #define sys_getsockopt          compat_sys_getsockopt
+>> > #define sys_sendmsg             compat_sys_sendmsg
+>> > #define sys_recvmsg             compat_sys_recvmsg
+>> > #define sys_execve              compat_sys_execve
+>> > #define sys_move_pages          compat_sys_move_pages
+>> > #define sys_rt_tgsigqueueinfo   compat_sys_rt_tgsigqueueinfo
+>> > #define sys_recvmmsg            compat_sys_recvmmsg
+>> > #define sys_sendmmsg            compat_sys_sendmmsg
+>> > #define sys_process_vm_readv    compat_sys_process_vm_readv
+>> > #define sys_process_vm_writev   compat_sys_process_vm_writev
+>>
+>> You even forgot compat_sys_openat (where O_LARGEFILE differences does
+>> make a difference).
+>
+> Just read the above thread. "Even x32 does not do that".
+>
+>> >> diff --git a/arch/arm64/kernel/vdsoilp32/Makefile b/arch/arm64/kernel/vdsoilp32/Makefile
+>> >> new file mode 100644
+>> >> index 0000000..ec93f3f
+>> >> --- /dev/null
+>> >> +++ b/arch/arm64/kernel/vdsoilp32/Makefile
+>> >
+>> > Could we not keep vdso in the same directory?
+>>
+>> I started out that way but "make clean ARCH=arm64" did not clean the
+>> vdso files all the time.
+>
+> I'll leave vdso comments to Will.
+>
+> --
+> Catalin
