@@ -1,107 +1,93 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 21 Apr 2014 22:21:50 +0400
-Subject: [PATCH v8 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <CAGVrzcb8Ykxi72x3iBStjTL+OO1BhDc_yZnnPq8ZHra+mtrBEA@mail.gmail.com>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <1397869980-21187-3-git-send-email-zhangfei.gao@linaro.org>
- <53555C28.4050303@cogentembedded.com>
- <CAGVrzcb8Ykxi72x3iBStjTL+OO1BhDc_yZnnPq8ZHra+mtrBEA@mail.gmail.com>
-Message-ID: <535561BE.9070303@cogentembedded.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 21 Apr 2014 20:28:40 +0200
+Subject: [PATCH 0/3] net: mvneta: fix usage as a module, and support
+ QSGMII properly
+In-Reply-To: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1397569821-5530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140421202840.789d0e24@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2014 10:03 PM, Florian Fainelli wrote:
+Jason,
 
->>> Hisilicon hip04 platform mdio driver
->>> Reuse Marvell phy drivers/net/phy/marvell.c
+Would it be possible to get PATCH 3/3 merged into 3.15-rc in the not
+too distant future? David Miller has already sent PATCH 1/3 and PATCH
+2/3, and they are part of the just released -rc2. However, the Device
+Tree fix for Armada XP GP QSGMII usage is missing.
 
->>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> [...]
+Thanks!
 
->>> diff --git a/drivers/net/ethernet/hisilicon/hip04_mdio.c
->>> b/drivers/net/ethernet/hisilicon/hip04_mdio.c
->>> new file mode 100644
->>> index 0000000..19826a3
->>> --- /dev/null
->>> +++ b/drivers/net/ethernet/hisilicon/hip04_mdio.c
->>> @@ -0,0 +1,185 @@
+Thomas
 
-[...]
+On Tue, 15 Apr 2014 15:50:18 +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This set of patches is a new attempt at fixing the operation of the
+> mvneta driver when built as a module. For the record, the previous
+> attempt, merged in commit e3a8786c10e75903f1269474e21fe8cb49c3a670
+> ('net: mvneta: fix usage as a module on RGMII configurations') caused
+> problems for all RGMII configurations.
+> 
+> In fact, it turned out that the MAC to PHY connection on the Armada XP
+> GP, which was described as using RGMII-ID according to its Device
+> Tree, is in fact a QSGMII connection. And the RGMII and QSGMII
+> configurations have to be handled in a different way in the driver,
+> because the SERDES configuration is different in those two cases.
+> 
+> So, this patch series fixes that by:
+> 
+>  * Adding minimal handling of a "qsgmii" connection type in the PHY
+>    layer. Mainly to make sure that a "qsgmii" phy-mode in the Device
+>    Tree is recognized, and handed over to the driver as
+>    PHY_INTERFACE_QSGMII.
+> 
+>  * Changing the mvneta driver to properly configure the RGMIIEn and
+>    PCSEn bits in the GMAC_CTRL_2 register, and configure the SERDES
+>    register, in the three possible cases: RGMII, SGMII and QSGMII.
+> 
+>  * Updating the Device Tree of the Armada XP GP board to reflect the
+>    fact that it uses a QSGMII MAC/PHY connection.
+> 
+> PATCH 1 and 2 would be merged by David Miller, through the net tree,
+> while PATCH 3 would be merged by the mach-mvebu maintainers, through
+> their tree and arm-soc.
+> 
+> This set of patches has been tested on:
+> 
+>  * Armada XP GP (four QSGMII interfaces)
+>  * Armada XP DB (two RGMII interfaces and two SGMII interfaces)
+>  * Armada 370 Mirabox (two RGMII interfaces)
+> 
+> I've tested both the driver built-in, and compiled as a module.
+> 
+> Since the last attempt at fixing this was quite a fiasco, I'd like
+> this new attempt to be tested more widely before being applied. I'll
+> try to do some testing on other Armada boards I have, but independent
+> testing from other persons would also be appreciated.
+> 
+> Note that these patches apply after reverting the previous attempt,
+> obviously.
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (3):
+>   net: phy: add minimal support for QSGMII PHY
+>   net: mvneta: properly configure the MAC <-> PHY connection in all
+>     situations
+>   ARM: mvebu: use qsgmii phy-mode for Armada XP GP interfaces
+> 
+>  Documentation/devicetree/bindings/net/ethernet.txt |  2 +-
+>  arch/arm/boot/dts/armada-xp-gp.dts                 |  8 +--
+>  drivers/net/ethernet/marvell/mvneta.c              | 73 ++++++++++------------
+>  include/linux/phy.h                                |  3 +
+>  4 files changed, 42 insertions(+), 44 deletions(-)
+> 
 
->>> +static int hip04_mdio_reset(struct mii_bus *bus)
->>> +{
->>> +       int temp, err, i;
->>> +
->>> +       for (i = 0; i < PHY_MAX_ADDR; i++) {
->>> +               hip04_mdio_write(bus, i, 22, 0);
 
->>     Why? What kind of a register this is? <uapi/linux/mii.h> tells me it's
->> MII_SREVISION...
 
-> I think this rather means clause 22 as opposed to clause 45.
-
-    No, the corresponding hip04_mdio_write()'s parameter is a register #, so 
-this is a write of 0 to register #22. A comment certainly wouldn't hurt here...
-
->>> +               temp = hip04_mdio_read(bus, i, MII_BMCR);
-
->>     You're not checking for error...
-
->>> +               temp |= BMCR_RESET;
->>> +               err = hip04_mdio_write(bus, i, MII_BMCR, temp);
-
->>     Hmm, why you're open coding BMCR reset? There's phy_init_hw() doing this
->> correctly...
-
-> Except that this runs way before we have created the PHY driver, so we
-> can't use that function just yet.
-
-    Ah, you're right.
-
-> I already asked about this, and he
-> explained that this was because the PHY devices he uses are not
-> responding correcty to MII_PHYSID1/2 reads.
-
-    So, this manual reset loop helps with reading the ID registers? A comment 
-wouldn't hurt either...
-
->>> +               if (err < 0)
->>> +                       return err;
-
-    I'm not at all sure we want to leave the reset loop on a first write error.
-
->>> +       }
->>> +
->>> +       mdelay(500);
-
-    I'm not sure this is enough, given that in phy_init_hw() we poll for 600 
-ms + 1 ms.
-
->>> +       return 0;
->>> +}
->>> +
->>> +static int hip04_mdio_probe(struct platform_device *pdev)
->>> +{
->>> +       struct resource *r;
->>> +       struct mii_bus *bus;
->>> +       struct hip04_mdio_priv *priv;
->>> +       int ret;
->>> +
->>> +       bus = mdiobus_alloc_size(sizeof(struct hip04_mdio_priv));
->>> +       if (!bus) {
->>> +               dev_err(&pdev->dev, "Cannot allocate MDIO bus\n");
->>> +               return -ENOMEM;
->>> +       }
->>> +
->>> +       bus->name = "hip04_mdio_bus";
->>> +       bus->read = hip04_mdio_read;
->>> +       bus->write = hip04_mdio_write;
->>> +       bus->reset = hip04_mdio_reset;
-
->>     Ah... However I don't think it a good implementation of that bus
->> method...
-
-    I assumed this method exists to do a hardware reset of the whole bus, not 
-to do a loop of soft-resetting all PHYs...
-
-WBR, Sergei
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
