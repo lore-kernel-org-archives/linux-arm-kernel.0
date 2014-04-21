@@ -1,50 +1,169 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 Apr 2014 22:56:49 +0200
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Add PCIe support
-Message-ID: <1398113809-7580-1-git-send-email-marex@denx.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 21 Apr 2014 22:56:59 +0200
+Subject: [PATCH v4] regmap: i2c: fallback to SMBus if the adapter does not
+ support standard I2C
+In-Reply-To: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397727612-32103-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1398113819-22289-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the PCI express bus available on MX6 SabreSDP.
+Some I2C adapters are only compatible with the SMBus protocol and do not
+support standard I2C transfers.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Fallback to SMBus transfers if we encounter such kind of adapters.
+The transfer type is chosen according to the val_bits field in the regmap
+config.
+
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Changes since v3:
+- make use of ERR_CAST instead of ERR_PTR + PTR_ERR
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 7a88d9a..0d43e37 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -384,6 +384,13 @@
- 			>;
- 		};
+Changes since v2:
+- fix regmap_get_i2c_bus scope (declare as static)
+- fix reg width check in reg_read/write functions
+- add reg_bits check in regmap_get_i2c_bus function
+
+
+ drivers/base/regmap/regmap-i2c.c | 104 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 102 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
+index ebd1895..ca193d1 100644
+--- a/drivers/base/regmap/regmap-i2c.c
++++ b/drivers/base/regmap/regmap-i2c.c
+@@ -14,6 +14,79 @@
+ #include <linux/i2c.h>
+ #include <linux/module.h>
  
-+		pinctrl_pcie: pciegrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x80000000
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x80000000
-+			>;
-+		};
 +
- 		pinctrl_pwm1: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT		0x1b0b1
-@@ -468,6 +475,14 @@
- 	};
- };
- 
-+&pcie {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pcie>;
-+	power-on-gpio = <&gpio3 19 0>;
-+	reset-gpio = <&gpio7 12 0>;
-+	status = "okay";
++static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg > 0xff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_byte_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
++}
++
++static int regmap_smbus_byte_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (val > 0xff || reg > 0xff)
++		return -EINVAL;
++
++	return i2c_smbus_write_byte_data(i2c, reg, val);
++}
++
++static struct regmap_bus regmap_smbus_byte = {
++	.reg_write = regmap_smbus_byte_reg_write,
++	.reg_read = regmap_smbus_byte_reg_read,
 +};
 +
- &pwm1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm1>;
++static int regmap_smbus_word_reg_read(void *context, unsigned int reg,
++				      unsigned int *val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++	int ret;
++
++	if (reg > 0xff)
++		return -EINVAL;
++
++	ret = i2c_smbus_read_word_data(i2c, reg);
++	if (ret < 0)
++		return ret;
++
++	*val = ret;
++
++	return 0;
++}
++
++static int regmap_smbus_word_reg_write(void *context, unsigned int reg,
++				       unsigned int val)
++{
++	struct device *dev = context;
++	struct i2c_client *i2c = to_i2c_client(dev);
++
++	if (val > 0xffff || reg > 0xff)
++		return -EINVAL;
++
++	return i2c_smbus_write_word_data(i2c, reg, val);
++}
++
++static struct regmap_bus regmap_smbus_word = {
++	.reg_write = regmap_smbus_word_reg_write,
++	.reg_read = regmap_smbus_word_reg_read,
++};
++
+ static int regmap_i2c_write(void *context, const void *data, size_t count)
+ {
+ 	struct device *dev = context;
+@@ -97,6 +170,23 @@ static struct regmap_bus regmap_i2c = {
+ 	.read = regmap_i2c_read,
+ };
+ 
++static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
++					const struct regmap_config *config)
++{
++	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
++		return &regmap_i2c;
++	else if (config->val_bits == 16 && config->reg_bits == 8 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_WORD_DATA))
++		return &regmap_smbus_word;
++	else if (config->val_bits == 8 && config->reg_bits == 8 &&
++		 i2c_check_functionality(i2c->adapter,
++					 I2C_FUNC_SMBUS_BYTE_DATA))
++		return &regmap_smbus_byte;
++
++	return ERR_PTR(-ENOTSUPP);
++}
++
+ /**
+  * regmap_init_i2c(): Initialise register map
+  *
+@@ -109,7 +199,12 @@ static struct regmap_bus regmap_i2c = {
+ struct regmap *regmap_init_i2c(struct i2c_client *i2c,
+ 			       const struct regmap_config *config)
+ {
+-	return regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
++
++	if (IS_ERR(bus))
++		return ERR_CAST(bus);
++
++	return regmap_init(&i2c->dev, bus, &i2c->dev, config);
+ }
+ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ 
+@@ -126,7 +221,12 @@ EXPORT_SYMBOL_GPL(regmap_init_i2c);
+ struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
+ 				    const struct regmap_config *config)
+ {
+-	return devm_regmap_init(&i2c->dev, &regmap_i2c, &i2c->dev, config);
++	const struct regmap_bus *bus = regmap_get_i2c_bus(i2c, config);
++
++	if (IS_ERR(bus))
++		return ERR_CAST(bus);
++
++	return devm_regmap_init(&i2c->dev, bus, &i2c->dev, config);
+ }
+ EXPORT_SYMBOL_GPL(devm_regmap_init_i2c);
+ 
 -- 
-1.9.1
+1.8.3.2
