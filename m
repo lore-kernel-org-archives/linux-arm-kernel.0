@@ -1,50 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 Apr 2014 16:52:39 +0200
-Subject: [PATCH 0/5] defconfigs: add MTD_SPI_NOR (dependency for M25P80)
-In-Reply-To: <20140418063054.GK5512@norris-Latitude-E6410>
-References: <1397719309-2022-1-git-send-email-computersforpeace@gmail.com>
- <20140417105302.GA32603@ulmo> <20140418063054.GK5512@norris-Latitude-E6410>
-Message-ID: <201404211652.39704.marex@denx.de>
+From: elder@linaro.org (Alex Elder)
+Date: Mon, 21 Apr 2014 16:26:22 -0500
+Subject: [PATCH v2 RESEND 0/5] clk: bcm21664: add common clock support
+Message-ID: <1398115587-32529-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 18, 2014 at 08:30:54 AM, Brian Norris wrote:
-> Hi,
-> 
-> On Thu, Apr 17, 2014 at 12:53:03PM +0200, Thierry Reding wrote:
-> > On Thu, Apr 17, 2014 at 12:21:44AM -0700, Brian Norris wrote:
-> > > We are introducing a new SPI-NOR library/framework for MTD, to support
-> > > various types of SPI-NOR flash controllers which require (or benefit
-> > > from) intimate knowledge of the flash interface, rather than just the
-> > > relatively dumb SPI interface. This library borrows much of the m25p80
-> > > driver for its abstraction and moves this code into a spi-nor module.
-> > 
-> > If this is a common library, then the more common approach to solve this
-> > would be to have each driver that uses it to select MTD_SPI_NOR rather
-> > than depend on it. That way you can drop this whole series to update the
-> > default configurations.
-> 
-> But does MTD_SPI_NOR (and drivers/mtd/spi-nor/) qualify as a "library"
-> or as a "subsystem"? I thought the latter were typically expected to be
-> user-selectable options, not automatically-"select"ed.
+This is series has two parts.  The first two patches are changes
+to the existing Broadcom Kona family clock code to prepare for the
+addition of support for another SoC, bcm21664.
 
-I agree the "subsystem" is user-selectable while the "library" is to be 
-'select'ed .
+The remaining three define the binding and code for bcm21664, and
+replace the use of "fake" clocks in the device tree with the real
+ones.  This ends up being a fairly straightforward definition of
+the clocks on this SoC; the rest of the clock code is shared with
+other SoCs that use the Kona style clock system.
 
-> I would say that, except for its age, MTD_SPI_NOR is very similar in to
-> MTD_NAND (driver/mtd/nand/), which I'd consider a kind of subsystem, and
-> which users must select before they are asked about drivers which fall
-> under its category.
-> 
-> Perhaps my usage of the word "library" in the description was a mistake,
-> as I don't exactly consider it like a library in the sense of many other
-> "select"ed libraries.
+This series depends on the following patch, which has been taken
+into the clk-fixes tree:
+    clk: bcm281xx: don't use unnamed structs or unions
+    https://lkml.org/lkml/2014/4/7/322
 
-It did look like a library to me at first, but it's rather a subsystem that 
-contains a small library in it. Thus, I retract my previous comment about using 
-'select' and add :
+In addition, it depends on the version 4 of the following series,
+just (re)posted for review:
+    clk: bcm281xx: updates
+    https://lkml.org/lkml/2014/4/8/485
 
-Acked-by: Marek Vasut <marex@denx.de>
+The patches in this series--based on the current linus/master branch
+plus the patches mentioned above--are available here:
+    http://git.linaro.org/git/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm21664-clock-v2
 
-Best regards,
-Marek Vasut
+Alex Elder (5):
+  clk: bcm281xx: move compatible string definitions
+  ARM: dts: revise kona clock binding document
+  ARM: dts: define clock binding for bcm21664
+  clk: bcm21664: use common clock framework
+  ARM: dts: use real clocks for bcm21664
+
+ .../devicetree/bindings/clock/bcm-kona-clock.txt   | 116 ++++++---
+ arch/arm/boot/dts/bcm21664.dtsi                    | 190 +++++++++-----
+ drivers/clk/bcm/Kconfig                            |   2 +-
+ drivers/clk/bcm/Makefile                           |   1 +
+ drivers/clk/bcm/clk-bcm21664.c                     | 290 +++++++++++++++++++++
+ drivers/clk/bcm/clk-bcm281xx.c                     |  12 -
+ include/dt-bindings/clock/bcm21664.h               |  62 +++++
+ include/dt-bindings/clock/bcm281xx.h               |  12 +
+ 8 files changed, 565 insertions(+), 120 deletions(-)
+ create mode 100644 drivers/clk/bcm/clk-bcm21664.c
+ create mode 100644 include/dt-bindings/clock/bcm21664.h
+
+-- 
+1.9.1
