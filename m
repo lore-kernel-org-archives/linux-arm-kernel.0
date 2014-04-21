@@ -1,55 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 21 Apr 2014 10:35:17 -0500
-Subject: [PATCH v2 0/7] of: setup dma parameters using dma-ranges and
- dma-coherent
-In-Reply-To: <535535A1.4020501@ti.com>
-References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
- <CAL_JsqLogKfqHyw4zYBkPrYh=f6tVibtmX25oYB1Q2hO11Whcw@mail.gmail.com>
- <535535A1.4020501@ti.com>
-Message-ID: <CAL_JsqJws80+o6E13rQQjEwxOaTvACpmYoa5fvnRwJ7Yry3q0A@mail.gmail.com>
+From: stratosk@semaphore.gr (Stratos Karafotis)
+Date: Mon, 21 Apr 2014 18:35:52 +0300
+Subject: [PATCH v3 3/8] ARM: davinci: da850: Use cpufreq_for_each_entry macro
+ for iteration
+Message-ID: <53553AD8.5080901@semaphore.gr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 10:13 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Hi Rob,
->
-> On Monday 21 April 2014 10:37 AM, Rob Herring wrote:
->> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
->>> Here is an updated version of [2] based on discussion. Series introduces
->>> support for setting up dma parameters based on device tree properties
->>> like 'dma-ranges' and 'dma-coherent' and also update to ARM 32 bit port.
->>> Earlier version of the same series is here [1].
->>>
->>> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
->>> by use of dma_pfn_offset which we maintain now per device. Arch code then
->>> uses it for dma address translations for such cases. We update the
->>> dma_pfn_offset accordingly during DT the device creation process.The
->>> 'dma-coherent' property is used to setup arch's coherent dma_ops.
->>>
->>> After some off-list discussion with RMK and Arnd, I have now dropped the
->>> controversial dma_mask setup code from the series which actually isn't blocking
->>> me as such. Considering rest of the parts of the series are already aligned,
->>> am hoping to get this version merged for 3.16 merge window.
->>
->> Can you briefly describe what the h/w looks like in terms of addresses
->> for the problem you are trying to solve? Something like: Cpu view of
->> RAM is X to Y address, X corresponds to DMA address Z. Max DMA address
->> is ?
->>
-> Let me try with say 8 GB RAM example
->
-> CPU view of memory : 0x0000 0008 0000 0000 to 0x0000 000a 0000 0000
->
-> From above memory range, first 2 GB of memory has an alias 32 bit
-> view in the hardware. Hardware internally map the address issued within
-> that first 2 GB to same memory.
->
-> DMA view of first 2 GB [ 0x0000 0008 0000 0000 to 0x0000 0008 7fff ffff]
-> is : 0x8000 0000 to 0xffff fffff.
+The cpufreq core now supports the cpufreq_for_each_entry macro helper
+for iteration over the cpufreq_frequency_table, so use it.
 
-Are you setting ZONE_DMA to be 2GB so allocations stay within DMAable
-memory and that is enough that you don't need to set DMA masks?
+It should have no functional changes.
 
-Rob
+Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+---
+
+Changes v2 -> v3
+	- Added 'ARM' prefix in the subject as Sekhar Nori suggested.
+
+ arch/arm/mach-davinci/da850.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 85399c9..45ce065 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -1092,20 +1092,21 @@ int da850_register_cpufreq(char *async_clk)
+ 
+ static int da850_round_armrate(struct clk *clk, unsigned long rate)
+ {
+-	int i, ret = 0, diff;
++	int ret = 0, diff;
+ 	unsigned int best = (unsigned int) -1;
+ 	struct cpufreq_frequency_table *table = cpufreq_info.freq_table;
++	struct cpufreq_frequency_table *pos;
+ 
+ 	rate /= 1000; /* convert to kHz */
+ 
+-	for (i = 0; table[i].frequency != CPUFREQ_TABLE_END; i++) {
+-		diff = table[i].frequency - rate;
++	cpufreq_for_each_entry(pos, table) {
++		diff = pos->frequency - rate;
+ 		if (diff < 0)
+ 			diff = -diff;
+ 
+ 		if (diff < best) {
+ 			best = diff;
+-			ret = table[i].frequency;
++			ret = pos->frequency;
+ 		}
+ 	}
+ 
+-- 
+1.9.0
