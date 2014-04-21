@@ -1,138 +1,85 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 21 Apr 2014 21:27:52 +0530
-Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <20140417100302.GB18864@e103592.cambridge.arm.com>
-References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
- <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
- <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
- <20140414104116.GA3844@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1404140956060.980@knanqh.ubzr>
- <20140415083615.GC3596@e103592.cambridge.arm.com>
- <CAM4voamo5iiOQ5P1JyO8kekU6cuxoj4oAT+VpS14LNvWqw_T4g@mail.gmail.com>
- <20140417100302.GB18864@e103592.cambridge.arm.com>
-Message-ID: <CAM4voamiJ-HZqz8Rgc-RTCjNRDaw5VQbs6GVfxPDxqCKKhm6XA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 21 Apr 2014 11:09:16 -0500
+Subject: [PATCH v3] arm64: enable EDAC on arm64
+Message-ID: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+From: Rob Herring <robh@kernel.org>
 
-On Thu, Apr 17, 2014 at 3:33 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Thu, Apr 17, 2014 at 12:41:31AM +0530, Abhilash Kesavan wrote:
->> Hi Dave,
->>
->> On Tue, Apr 15, 2014 at 2:06 PM, Dave Martin <Dave.Martin@arm.com> wrote:
->> > On Mon, Apr 14, 2014 at 10:01:27AM -0400, Nicolas Pitre wrote:
->> >> On Mon, 14 Apr 2014, Dave Martin wrote:
->> >>
->> >> > On Fri, Apr 11, 2014 at 04:23:04PM -0400, Nicolas Pitre wrote:
->> >> > > On Fri, 11 Apr 2014, Abhilash Kesavan wrote:
->> >> > >
->> >> > > > Add machine-dependent MCPM call-backs for Exynos5420. These are used
->> >> > > > to power up/down the secondary CPUs during boot, shutdown, s2r and
->> >> > > > switching.
->> >> > > >
->> >> > > > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> >> > > > Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
->> >> > > > Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> >> > > > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> >> > >
->> >> > > See comments inline.
->> >> >
->> >> > I won't duplicate Nico's review, but I have a couple of extra comments/
->> >> > questions, below.
->> >> >
->> >> > [...]
->> >> >
->> >> > > > diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
->> >> > > > new file mode 100644
->> >> > > > index 0000000..46d4968
->> >> > > > --- /dev/null
->> >> > > > +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->> >> > > > @@ -0,0 +1,444 @@
->> >> >
->> >> > [...]
->> >> >
->> >> > > > +static void exynos_cluster_power_control(unsigned int cluster, int enable)
->> >> > > > +{
->> >> > > > +       unsigned long timeout = jiffies + msecs_to_jiffies(20);
->> >> > > > +       unsigned int status, val = EXYNOS_CORE_LOCAL_PWR_DIS;
->> >> > > > +
->> >> > > > +       if (enable)
->> >> > > > +               val = EXYNOS_CORE_LOCAL_PWR_EN;
->> >> > > > +
->> >> > > > +       status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
->> >> > > > +       if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
->> >> > > > +               return;
->> >> > > > +
->> >> > > > +       __raw_writel(val, EXYNOS_COMMON_CONFIGURATION(cluster));
->> >> > > > +       /* Wait until cluster power control is applied */
->> >> > > > +       while (time_before(jiffies, timeout)) {
->> >> > > > +               status = __raw_readl(EXYNOS_COMMON_STATUS(cluster));
->> >> > > > +
->> >> > > > +               if ((status & EXYNOS_CORE_LOCAL_PWR_EN) == val)
->> >> > > > +                       return;
->> >> > > > +
->> >> > > > +               cpu_relax();
->> >> > > > +       }
->> >> > > > +       pr_warn("timed out waiting for cluster %u to power %s\n", cluster,
->> >> > > > +               enable ? "on" : "off");
->> >> > >
->> >> > > You should not have to wait for the power status to change here.
->> >> > > Simply signaling the desired state and returning is all that is
->> >> > > expected.  And because IRQs are turned off, it is likely that
->> >> > > time_before(jiffies, timeout) will always be true anyway because jiffies
->> >> > > are not updated if there is no other CPU to service the timer interrupt.
->> >> > >
->> >> > > The actual power status should be polled for in the mcpm_finish()
->> >> > > method only.
->> >> >
->>
->> >> > Depending on the power controller, it might be possible for writes to
->> >> > the controller to be lost or not acted upon, if a previous change is
->> >> > still pending.
->> >> >
->> >> > Does this issue apply to the exynos power controller?
->> >>
->> >> Given the way the code is structured now, I suppose that has not been
->> >> the case so far.
->> >
->> > It depends on the purpose of the polling loop.  If it was added to resolve
->> > a race between a power-up and a power-down that is complete in MCPM but
->> > still pending in the hardware, than that would suggest the power controller
->> > does have this behaviour.
->> >
->> > But I'm just guessing.
->> >
->> > Abhilash, can you comment?
->> The polling loop in the above function was added to ensure that the
->> cluster is switched on before we power on the individual cores in
->> exynos_power_up. This is only required when the first man comes up.
->
-> Is this only required on power-up, not power-down?  I don't see a call
-> to exynos_cluster_power_control(..., 0), but maybe I'm looking in the
-> wrong place.
-No, you have not missed it. As of now, we are turning on both the L2s
-for 8 core bring-up and then not turning it off (if all 4 cores in the
-clusters are down). Turning the L2 off (A15 L2 mainly) brings in
-significant power savings and I will be looking at adding support for
-this next.
->
-> I wonder whether this is needed, though.  It imposes a requirement on
-> the OS to waste time polling for the cluster to come online.  Can the
-> hardware not cope with a CPU poweron request being pending already before
-> the cluster is powered on?  If that were possible, there would be no need
-> for an extra poll.
-No, we need to ensure that the cluster L2 is turned On before we can
-turn the core on, the hardware does not handle it.
->
-> How long do you expect to need to poll for?
-In internal testing when we are turning the cluster on from an off
-state, I have seen the loop being executed 3-4 times occasionally
-during ageing tests. Generally, the status returns as being powered ON
-immediately.
+Implement atomic_scrub and enable EDAC for arm64.
 
-Regards,
-Abhilash
->
-> Cheers
-> ---Dave
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+v3:
+- Drop "cc" clobber annotation.
+v2:
+- Add loop for exclusive store success
+- Fix size to be 32-bits at a time. The framework gives no alignment
+  guarantees.
+
+ arch/arm64/Kconfig            |  1 +
+ arch/arm64/include/asm/edac.h | 38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
+ create mode 100644 arch/arm64/include/asm/edac.h
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e6e4d37..4c1f857 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -14,6 +14,7 @@ config ARM64
+ 	select COMMON_CLK
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select DCACHE_WORD_ACCESS
++	select EDAC_SUPPORT
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+ 	select GENERIC_CPU_AUTOPROBE
+diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
+new file mode 100644
+index 0000000..8a3d176
+--- /dev/null
++++ b/arch/arm64/include/asm/edac.h
+@@ -0,0 +1,38 @@
++/*
++ * Copyright 2013 Calxeda, Inc.
++ * Based on PPC version Copyright 2007 MontaVista Software, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++#ifndef ASM_EDAC_H
++#define ASM_EDAC_H
++/*
++ * ECC atomic, DMA, SMP and interrupt safe scrub function.
++ * Implements the per arch atomic_scrub() that EDAC use for software
++ * ECC scrubbing.  It reads memory and then writes back the original
++ * value, allowing the hardware to detect and correct memory errors.
++ */
++static inline void atomic_scrub(void *va, u32 size)
++{
++	unsigned int *virt_addr = va;
++	unsigned int i;
++
++	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
++		long result;
++		unsigned long tmp;
++
++		asm volatile("/* atomic_scrub */\n"
++		"1:     ldxr    %w0, %2\n"
++		"       stxr    %w1, %w0, %2\n"
++		"       cbnz    %w1, 1b"
++			: "=&r" (result), "=&r" (tmp), "+Q" (*virt_addr) : : );
++	}
++}
++#endif
+-- 
+1.9.1
