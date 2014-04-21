@@ -1,62 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 Apr 2014 10:11:17 -0500
-Subject: [PATCH V2 06/19] bus: omap_l3_noc: un-obfuscate l3_targ address
- computation
-In-Reply-To: <5355185B.70003@ti.com>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1397767775-10965-1-git-send-email-nm@ti.com>
- <1397767775-10965-7-git-send-email-nm@ti.com>
- <20140417220036.GE8504@saruman.home> <5355185B.70003@ti.com>
-Message-ID: <20140421151117.GF27341@saruman.home>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 Apr 2014 11:13:37 -0400
+Subject: [PATCH v2 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <CAL_JsqLogKfqHyw4zYBkPrYh=f6tVibtmX25oYB1Q2hO11Whcw@mail.gmail.com>
+References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_JsqLogKfqHyw4zYBkPrYh=f6tVibtmX25oYB1Q2hO11Whcw@mail.gmail.com>
+Message-ID: <535535A1.4020501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 08:08:43AM -0500, Nishanth Menon wrote:
-> On 04/17/2014 05:00 PM, Felipe Balbi wrote:
-> > On Thu, Apr 17, 2014 at 03:49:22PM -0500, Nishanth Menon wrote:
-> >> just simplify derefencing that is equivalent.
-> >>
-> >> Signed-off-by: Nishanth Menon <nm@ti.com>
-> >> ---
-> >> V2: just ordering change
-> >> V1: https://patchwork.kernel.org/patch/3984201/
-> >>  drivers/bus/omap_l3_noc.c |    2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
-> >> index c8facb0..f7d3bf4 100644
-> >> --- a/drivers/bus/omap_l3_noc.c
-> >> +++ b/drivers/bus/omap_l3_noc.c
-> >> @@ -76,7 +76,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
-> >>  			err_src = __ffs(err_reg);
-> >>  
-> >>  			/* Read the stderrlog_main_source from clk domain */
-> >> -			l3_targ_base = base + *(l3_targ[i] + err_src);
-> >> +			l3_targ_base = base + l3_targ[i][err_src];
-> > 
-> > hmmm, wasn't it so that pointer arithmetic was slightly faster than
-> > array indexing ? In that case would it be best to:
-> > 
-> > l3_targ_base = base + *(l3_targ + i + err_src);
-> > 
-> Yes, if this was a hot path (example: interrupt handler that gets
-> invoked very often), I would probably have preferred optimization at
-> this point.
-> 
-> However, the patch is just a step away from patches that converts the
-> target information into a structure under flagmux structure allowing
-> us to get rid of multiple array operations.
-> 
-> This patch just makes the further changes a bit readable.
+Hi Rob,
 
-alright, the error IRQ doesn't fire very often indeed.
+On Monday 21 April 2014 10:37 AM, Rob Herring wrote:
+> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> Here is an updated version of [2] based on discussion. Series introduces
+>> support for setting up dma parameters based on device tree properties
+>> like 'dma-ranges' and 'dma-coherent' and also update to ARM 32 bit port.
+>> Earlier version of the same series is here [1].
+>>
+>> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
+>> by use of dma_pfn_offset which we maintain now per device. Arch code then
+>> uses it for dma address translations for such cases. We update the
+>> dma_pfn_offset accordingly during DT the device creation process.The
+>> 'dma-coherent' property is used to setup arch's coherent dma_ops.
+>>
+>> After some off-list discussion with RMK and Arnd, I have now dropped the
+>> controversial dma_mask setup code from the series which actually isn't blocking
+>> me as such. Considering rest of the parts of the series are already aligned,
+>> am hoping to get this version merged for 3.16 merge window.
+> 
+> Can you briefly describe what the h/w looks like in terms of addresses
+> for the problem you are trying to solve? Something like: Cpu view of
+> RAM is X to Y address, X corresponds to DMA address Z. Max DMA address
+> is ?
+> 
+Let me try with say 8 GB RAM example
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140421/fe8fb9ab/attachment.sig>
+CPU view of memory : 0x0000 0008 0000 0000 to 0x0000 000a 0000 0000
+
+>From above memory range, first 2 GB of memory has an alias 32 bit
+view in the hardware. Hardware internally map the address issued within
+that first 2 GB to same memory. 
+
+DMA view of first 2 GB [ 0x0000 0008 0000 0000 to 0x0000 0008 7fff ffff]
+is : 0x8000 0000 to 0xffff fffff.
+
+Regards,
+Santosh 
