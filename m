@@ -1,39 +1,42 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 21 Apr 2014 09:48:16 -0400
-Subject: [PATCH 0/4] Introduce drivers/soc and add QCOM GSBI driver
-In-Reply-To: <1398058244-14099-1-git-send-email-agross@codeaurora.org>
-References: <1398058244-14099-1-git-send-email-agross@codeaurora.org>
-Message-ID: <535521A0.5050706@codeaurora.org>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Apr 2014 16:13:00 +0200
+Subject: [PATCH 0/9] Renesas ipmmu-vmsa: Miscellaneous cleanups and fixes
+Message-ID: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Hello,
 
-On 04/21/2014 01:30 AM, Andy Gross wrote:
-> The first patch in this set adds the drivers/soc directory and all the necessary
-> plumbing.  These changes were discussed at the kernel summit and also were
-> introduced in an earlier patch set from Santosh Shilimkar.
-> 
-> Reference the following set of patches:
-> https://lkml.org/lkml/2014/2/28/567
+This patch set cleans up and fixes small issues in the ipmmu-vmsa driver. The
+patches are based on top of "[PATCH v3] iommu: Add driver for Renesas
+VMSA-compatible IPMMU" that adds the ipmmu-vmsa driver.
 
-In that thread, Olof wrote, "The code [going into drivers/soc] isn't the pure
-drivers. Those we find homes for."
+The most interesting part of this series is the rewrite of the page table
+management code. The IOMMU core guarantees that the map and unmap operations
+will always be called only with page sizes advertised by the driver. We can
+use that assumption to remove loops of PGD and PMD entries, simplifying the
+code.
 
-https://lkml.org/lkml/2014/3/2/123
+Will, would it make sense to perform the same cleanup for the arm-smmu driver,
+or is there a reason to keep loops over PGD and PMD entries ? Removing them
+makes the implementation of 68kB and 2MB pages easier.
 
-> The remaining patches add the QCOM GSBI (General Serial Bus Interface) driver,
-> device tree binding information for both the GSBI and child node interaction,
-> and lastly a patch to fix the current MSM serial driver to work correctly with
-> the GSBI changes.
+Laurent Pinchart (9):
+  iommu/ipmmu-vmsa: Cleanup failures of ARM mapping creation or
+    attachment
+  iommu/ipmmu-vmsa: Fix the supported page sizes
+  iommu/ipmmu-vmsa: Define driver-specific page directory sizes
+  iommu/ipmmu-vmsa: Set the PTE contiguous hint bit when possible
+  iommu/ipmmu-vmsa: PMD is never folded, PUD always is
+  iommu/ipmmu-vmsa: Rewrite page table management
+  iommu/ipmmu-vmsa: Support 2MB mappings
+  iommu/ipmmu-vmsa: Remove stage 2 PTE bits definitions
+  iommu/ipmmu-vmsa: Support clearing mappings
 
-It's not obvious to me what makes the GSBI driver "impure" and unfit for say
-drivers/bus. Could you perhaps include a brief explanation?
-
-Thanks,
-Christopher
+ drivers/iommu/ipmmu-vmsa.c | 443 +++++++++++++++++++++++++++++++--------------
+ 1 file changed, 309 insertions(+), 134 deletions(-)
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Regards,
+
+Laurent Pinchart
