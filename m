@@ -1,74 +1,47 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Apr 2014 09:38:01 -0400
-Subject: [PATCH v2 5/7] ARM: dma: Use dma_pfn_offset for dma address
- translation
-In-Reply-To: <20140419194334.GL24070@n2100.arm.linux.org.uk>
+Date: Mon, 21 Apr 2014 09:39:13 -0400
+Subject: [PATCH v2 7/7] ARM: mm: use phys_addr_t in
+ __dma_page_[cpu_to_dev/dev_to_cpu]
+In-Reply-To: <1397917972-6293-8-git-send-email-santosh.shilimkar@ti.com>
 References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
- <1397917972-6293-6-git-send-email-santosh.shilimkar@ti.com>
- <20140419194334.GL24070@n2100.arm.linux.org.uk>
-Message-ID: <53551F39.90908@ti.com>
+ <1397917972-6293-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <53551F81.9040209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 19 April 2014 03:43 PM, Russell King - ARM Linux wrote:
-> On Sat, Apr 19, 2014 at 10:32:50AM -0400, Santosh Shilimkar wrote:
->> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> In most of cases DMA addresses can be performed using offset value of
->>  Bus address space relatively to physical address space as following:
->>
->> PFN->DMA:
->>  __pfn_to_phys(pfn + [-]dma_pfn_offset)
->>
->> DMA->PFN:
->>  __phys_to_pfn(dma_addr) + [-]dma_pfn_offset
->>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/include/asm/dma-mapping.h |   17 +++++++++++++----
->>  1 file changed, 13 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
->> index e701a4d..8c12149 100644
->> --- a/arch/arm/include/asm/dma-mapping.h
->> +++ b/arch/arm/include/asm/dma-mapping.h
->> @@ -58,22 +58,31 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
->>  #ifndef __arch_pfn_to_dma
->>  static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
->>  {
->> -	return (dma_addr_t)__pfn_to_bus(pfn);
->> +	if (!dev)
->> +		return DMA_ERROR_CODE;
->> +	return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
+(Adding few CC's)
+
+On Saturday 19 April 2014 10:32 AM, Santosh Shilimkar wrote:
+> On a 32 bit ARM architecture with LPAE extension physical addresses
+> cannot fit into unsigned long variable.
 > 
-> How do ISA devices (iow, those which pass a NULL device) work with this?
-> This looks to me like it ends up breaking some drivers.
+> So fix it by using phys_addr_t instead of unsigned long.
 > 
-> I've also seen some drivers (such as the Freescale FEC driver) which
-> perform DMA coherent allocations with a NULL device - technically, that's
-> a bug in the driver, but the above change will cause them to regress.
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mm/dma-mapping.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-Good point. We can keep the NULL case working as well...
-
-static inline dma_addr_t pfn_to_dma(struct device *dev, unsigned long pfn)
-{
-
-	if (!dev)
-		return (dma_addr_t)__pfn_to_bus(pfn);
-	else
-		return (dma_addr_t)__pfn_to_bus(pfn - dev->dma_pfn_offset);
-}
-
-I will update the patch accordingly.
-
-Regards,
-Santosh
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index f62aa06..5260f43 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -885,7 +885,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+>  static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+>  	size_t size, enum dma_data_direction dir)
+>  {
+> -	unsigned long paddr;
+> +	phys_addr_t paddr;
+>  
+>  	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
+>  
+> @@ -901,7 +901,7 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+>  static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+>  	size_t size, enum dma_data_direction dir)
+>  {
+> -	unsigned long paddr = page_to_phys(page) + off;
+> +	phys_addr_t paddr = page_to_phys(page) + off;
+>  
+>  	/* FIXME: non-speculating: not required */
+>  	/* don't bother invalidating if DMA to device */
+> 
