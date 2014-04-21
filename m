@@ -1,219 +1,111 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Apr 2014 14:25:59 +0200
-Subject: [PATCH] arm: dma-mapping: Fix mapping size value
-In-Reply-To: <10358035.cGxAQP71WM@avalon>
-References: <CAD15agZwxTQOBZtJCmAkbBW6hXGfRgedSc_Fi_-nHOE5MeAjTw@mail.gmail.com>
- <10358035.cGxAQP71WM@avalon>
-Message-ID: <1930688.4qk0cWdMAN@avalon>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Mon, 21 Apr 2014 18:29:54 +0530
+Subject: [PATCH v10 00/12] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
+Message-ID: <1398085206-30555-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 April 2014 11:53:12 Laurent Pinchart wrote:
-> Hi Ritesh,
-> 
-> On Monday 21 April 2014 09:31:38 Ritesh Harjani wrote:
-> > Fixed the commit message. Please find the new patch below:
-> Thank you. Your mail has wrapped lines and converted tabs to whitespaces.
-> Could you please fix that and resubmit the patch on a mail of its own (use
-> git send-email to avoid white space issues), with the subject set to
-> "[PATCH v2] arm: dma-mapping: Fix mapping size value" ?
+Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
+and Coordination Interface (PSCI) v0.1.
 
-Please ignore this, I had missed that you have already resent the patch.
-> 
-> > 68efd7d2fb("arm: dma-mapping: remove order parameter from
-> > arm_iommu_create_mapping()") is causing kernel panic
-> > because it wrongly sets the mapping->size value.
-> > 
-> > Unable to handle kernel NULL pointer dereference at virtual
-> > address 000000a0
-> > pgd = e7a84000
-> > [000000a0] *pgd=00000000
-> > ...
-> > PC is at bitmap_clear+0x48/0xd0
-> > LR is at __iommu_remove_mapping+0x130/
-> > 0x164
-> > 
-> > 
-> > Fix it by correcting the mapping->size value.
-> > 
-> > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > ---
-> > 
-> >  arch/arm/mm/dma-mapping.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index f62aa06..6b00be1 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
-> > dma_addr_t base, size_t size)
-> > 
-> >         mapping->nr_bitmaps = 1;
-> >         mapping->extensions = extensions;
-> >         mapping->base = base;
-> > 
-> > -       mapping->size = bitmap_size << PAGE_SHIFT;
-> > 
-> >         mapping->bits = BITS_PER_BYTE * bitmap_size;
-> > 
-> > +       mapping->size = mapping->bits << PAGE_SHIFT;
-> > 
-> >         spin_lock_init(&mapping->lock);
-> > 
-> > --
-> > 1.8.1.3
-> > 
-> > On Mon, Apr 21, 2014 at 4:06 AM, Laurent Pinchart
-> > 
-> > <laurent.pinchart@ideasonboard.com> wrote:
-> > > Hi Ritesh,
-> > > 
-> > > On Saturday 19 April 2014 16:55:30 Ritesh Harjani wrote:
-> > >> In explaining the issue below, made a mistake of taking PAGE_SIZE
-> > >> instead of PAGE_SHIFT (mistake mentioned inline).
-> > >> Although numerical values and patch is correct.
-> > > 
-> > > I was about to send the same patch, so, provided you fix the commit
-> > > message,
-> > > 
-> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > > 
-> > >> On Sat, Apr 19, 2014 at 4:49 PM, Ritesh Harjani
-> > >> 
-> > >> <ritesh.harjani@gmail.com> wrote:
-> > >> > I am finding an oops after following commit. I am on 3.10.30 kernel
-> > >> > but
-> > >> > applied all the latest patches from arch/arm/mm/dma-mapping.c
-> > >> > 
-> > >> > I added some debug logs to see what is the error, on which I found
-> > >> > that
-> > >> > we
-> > >> > are incorrectly setting mapping->size value.
-> > >> > Please take a look at this and correct me if I am wrong here.
-> > >> > 
-> > >> > FAULTY COMMIT:
-> > >> > commit 68efd7d2fb32c2606f1da318b6a851
-> > >> > d933813f27
-> > >> > Author: Marek Szyprowski <m.szyprowski@samsung.com>
-> > >> > Date:   Tue Feb 25 13:01:09 2014 +0100
-> > >> > 
-> > >> >     arm: dma-mapping: remove order parameter from
-> > >> >     arm_iommu_create_mapping()
-> > >> > 
-> > >> > OOPS LOGS:
-> > >> > [26.898145] __alloc_iova#LINE: 1097 start = 0x3500
-> > >> > [26.898159] __alloc_iova#LINE:1136 iova = 0x53500000
-> > >> > [26.898170] __alloc_iova#LINE:1138 mapping->base= 0x50000000
-> > >> > [26.898181] __alloc_iova#LINE:1140 mapping->size = 0x1000000, i = 0
-> > >> > [26.924442] __free_iova, bitmap_index = 3
-> > >> > 
-> > >> > [Ritesh]: bitmap_index should be 0 for address 0x53500000. see in
-> > >> > alloc_iova above.
-> > >> > 
-> > >> > [26.924454] __free_iova,addr = 0x53500000
-> > >> > [26.924463] __free_iova,mapping->base = 0x50000000
-> > >> > [26.924472] __free_iova,mapping->size = 0x1000000
-> > >> > [26.924482] __free_iova,bitmap_base = 0x53000000
-> > >> > [26.924490] __free_iova, start = 0x500
-> > >> > 
-> > >> > [Ritesh]: start should be 0x3500 for address 0x53500000. see in
-> > >> > alloc_iova
-> > >> > above.
-> > >> > 
-> > >> > [26.924533] Unable to handle kernel NULL pointer dereference at
-> > >> > virtual
-> > >> > address 000000a0
-> > >> > [26.924543] pgd = e7a84000
-> > >> > [26.924558] [000000a0] *pgd=00000000
-> > >> > [26.924572] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
-> > >> > [26.924598] Modules linked in:
-> > >> > [26.924613] CPU: 1 PID: 2263 Comm: BufferLiberator Not tainted
-> > >> > 3.10.30+
-> > >> > #144
-> > >> > [26.924624] task: e7370a40 ti: e6e06000 task.ti: e6e06000
-> > >> > [26.924644] PC is at bitmap_clear+0x48/0xd0
-> > >> > [26.924659] LR is at __iommu_remove_mapping+0x130/0x164
-> > >> > [26.924673] pc : [<c02d0814>]    lr : [<c001bd30>]    psr: 20000093
-> > >> > [26.924673] sp : e6e07e20  ip : ffffffff  fp : e6e07e3c
-> > >> > [26.924682] r10: 00000500  r9 : c1333ea8  r8 : 80000013
-> > >> > [26.924692] r7 : ffffffff  r6 : 00000321  r5 : 000000a0  r4 :
-> > >> > 00000028
-> > >> > [26.924707] r3 : 00000000  r2 : 00000341  r1 : 00000500  r0 :
-> > >> > 00000000
-> > >> > [26.924730] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM
-> > >> > Segment
-> > >> > user
-> > >> > [26.924742] Control: 10c5387d  Table: 77a8406a  DAC: 00000015
-> > >> > 
-> > >> > 
-> > >> > See below on how this is wrong:
-> > >> > 
-> > >> > here iova_base = 0x50000000
-> > >> > iova_size = 0x20000000
-> > >> > => bits needed to map = 131072.
-> > >> > 
-> > >> >         => bitmap_size = 0x4000
-> > >> >         since bitmap_size > PAGE_SIZE
-> > >> >         => bitmap_size = PAGE_SIZE,  extensions = 4;
-> > >> > 
-> > >> > Now, mapping->size is currently set as bitmap_size << PAGE_SHIFT.
-> > >> > 
-> > >> >         =>mapping->size = 0x1000000.
-> > >> > 
-> > >> > mapping->size is the IOVA size, which one bitmap can address.
-> > >> > 
-> > >> > Now mapping->size * extensions should be size (0x20000000).
-> > >> > which is not true, => our bitmap_size is set wrong.
-> > >> > 
-> > >> > it should be (mapping->bits << PAGE_SIZE) or say
-> > >> 
-> > >> It should be PAGE_SHIFT here.
-> > >> 
-> > >> > (BITS_PER_BYTE * bitmap_size << PAGE_SIZE)
-> > >> 
-> > >> It should be PAGE_SHIFT here.
-> > >> 
-> > >> >         => (8 * 0x1000) << 12) = 0x8000000
-> > >> > 
-> > >> > With this IOVA_SIZE = extensions * mapping->size = 0x20000000
-> > >> > 
-> > >> > 
-> > >> > 
-> > >> > PATCH:
-> > >> > 
-> > >> > Currently mapping->size is wrongly set resulting
-> > >> > in OOPS (atleast we see OOPS with extension 4).
-> > >> > 
-> > >> > Fix this.
-> > >> > 
-> > >> > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-> > >> > ---
-> > >> > 
-> > >> >  arch/arm/mm/dma-mapping.c | 2 +-
-> > >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >> > 
-> > >> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > >> > index f62aa06..d1701a2 100644
-> > >> > --- a/arch/arm/mm/dma-mapping.c
-> > >> > +++ b/arch/arm/mm/dma-mapping.c
-> > >> > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
-> > >> > dma_addr_t base, size_t size)
-> > >> > 
-> > >> >         mapping->nr_bitmaps = 1;
-> > >> >         mapping->extensions = extensions;
-> > >> >         mapping->base = base;
-> > >> > 
-> > >> > -       mapping->size = bitmap_size << PAGE_SHIFT;
-> > >> > 
-> > >> >         mapping->bits = BITS_PER_BYTE * bitmap_size;
-> > >> > 
-> > >> > +       mapping->size = mapping->bits << PAGE_SHIFT;
-> > >> > 
-> > >> >         spin_lock_init(&mapping->lock);
+This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
+such that it does not break current KVM ARM/ARM64 ABI.
+
+The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
+KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
+PSCI v0.2 to VCPUs.
+
+Changlog:
+
+V10:
+ - Updated PSCI_VERSION_xxx defines in uapi/linux/psci.h
+ - Added PSCI_0_2_AFFINITY_LEVEL_xxxx defines in uapi/linux/psci.h
+ - Removed PSCI v0.1 related defines from uapi/linux/psci.h
+ - Inject undefined exception for all types of errors in PSCI
+   emulation (i.e kvm_psci_call(vcpu) < 0)
+ - Removed "inline" attribute of kvm_prepare_system_event()
+ - Store INTERNAL_FAILURE in r0 (or x0) before exiting to userspace
+ - Use MPIDR_LEVEL_BITS in AFFINITY_MASK define
+ - Updated comment in kvm_psci_vcpu_suspend() as-per Marc's suggestion
+
+V9:
+ - Rename undefined PSCI_VER_xxx defines to PSCI_VERSION_xxx defines
+
+V8:
+ - Add #define for possible values of migrate type in uapi/linux/psci.h
+ - Simplified psci_affinity_mask() in psci.c
+ - Update comments in kvm_psci_vcpu_suspend() to indicate that for KVM
+   wakeup events are interrupts.
+ - Unconditionally update r0 (or x0) in kvm_psci_vcpu_on()
+
+V7:
+ - Make uapi/linux/psci.h inline with Ashwin's patch
+   http://www.spinics.net/lists/arm-kernel/msg319090.html
+ - Incorporate Rob's suggestions for uapi/linux/psci.h
+ - Treat CPU_SUSPEND power-down request to be same as standby
+   request. This further simplifies CPU_SUSPEND emulation.
+
+V6:
+ - Introduce uapi/linux/psci.h for sharing PSCI defines between
+   ARM kernel, ARM64 kernel, KVM ARM/ARM64 and user space
+ - Make CPU_SUSPEND emulation similar to WFI emulation
+
+V5:
+ - Have separate last patch to advertise KVM_CAP_ARM_PSCI_0_2
+ - Use kvm_psci_version() in kvm_psci_vcpu_on()
+ - Return ALREADY_ON for PSCI v0.2 CPU_ON if VCPU is not paused
+ - Remove per-VCPU suspend context
+ - As-per PSCI v0.2 spec, only current CPU can suspend itself
+
+V4:
+ - Implement all mandatory functions required by PSCI v0.2
+
+V3:
+ - Make KVM_ARM_VCPU_PSCI_0_2 feature experiementatl for now so that
+   it fails for user space till all mandatory PSCI v0.2 functions are
+   emulated by KVM ARM/ARM64
+ - Have separate patch for making KVM_ARM_VCPU_PSCI_0_2 feature available
+   to user space. This patch can be defferred for now
+
+V2:
+ - Don't rename PSCI return values KVM_PSCI_RET_NI and KVM_PSCI_RET_INVAL
+ - Added kvm_psci_version() to get PSCI version available to VCPU
+ - Fixed grammer in Documentation/virtual/kvm/api.txt
+
+V1:
+ - Initial RFC PATCH
+
+Anup Patel (12):
+  KVM: Add capability to advertise PSCI v0.2 support
+  ARM/ARM64: KVM: Add common header for PSCI related defines
+  ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+  KVM: Documentation: Add info regarding KVM_ARM_VCPU_PSCI_0_2 feature
+  ARM/ARM64: KVM: Make kvm_psci_call() return convention more flexible
+  KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API header
+  ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET
+  ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
+  ARM/ARM64: KVM: Emulate PSCI v0.2 MIGRATE_INFO_TYPE and related
+    functions
+  ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI v0.2
+  ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
+  ARM/ARM64: KVM: Advertise KVM_CAP_ARM_PSCI_0_2 to user space
+
+ Documentation/virtual/kvm/api.txt |   17 +++
+ arch/arm/include/asm/kvm_host.h   |    2 +-
+ arch/arm/include/asm/kvm_psci.h   |    6 +-
+ arch/arm/include/uapi/asm/kvm.h   |   10 +-
+ arch/arm/kvm/arm.c                |    1 +
+ arch/arm/kvm/handle_exit.c        |   10 +-
+ arch/arm/kvm/psci.c               |  221 +++++++++++++++++++++++++++++++++----
+ arch/arm64/include/asm/kvm_host.h |    2 +-
+ arch/arm64/include/asm/kvm_psci.h |    6 +-
+ arch/arm64/include/uapi/asm/kvm.h |   10 +-
+ arch/arm64/kvm/handle_exit.c      |   10 +-
+ include/uapi/linux/Kbuild         |    1 +
+ include/uapi/linux/kvm.h          |    9 ++
+ include/uapi/linux/psci.h         |   85 ++++++++++++++
+ 14 files changed, 353 insertions(+), 37 deletions(-)
+ create mode 100644 include/uapi/linux/psci.h
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
