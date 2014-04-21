@@ -1,89 +1,76 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 21 Apr 2014 11:54:43 +0200
-Subject: [PATCH] ARM: dts: at91-sama5d3_xplained: add the regulator
- device node
-In-Reply-To: <1398054547-5834-1-git-send-email-wenyou.yang@atmel.com>
-References: <1398054547-5834-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20140421095443.GA3461@piout.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 21 Apr 2014 18:58:52 +0900
+Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
+In-Reply-To: <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+ <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
+ <16730530.rJ9T0MsYmt@wuerfel>
+ <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
+Message-ID: <000501cf5d48$4cf707c0$e6e51740$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday, April 21, 2014 10:54 AM, Jingoo Han wrote:
+> On Thursday, April 17, 2014 3:26 AM, Arnd Bergmann wrote:
+> > On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
+> > > Jingoo,
+> > >
+> > > Thanks for taking a stab at trying to convert a host bridge
+> > > driver to use the new generic host bridge code.
+> > >
+> > > I do however have concerns on the direction you took. You have split
+> > > your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
+> > > even if (with my series) it should be no reason why the host bridge
+> > > driver should not work on other architectures as well once they are
+> > > converted.
+> >
+> > Right.
+> >
+> > > Also, some of the functions that you use have identical names but different
+> > > signatures depending on what arch you have selected. This is really bad
+> > > in my books!
 
-On 21/04/2014 at 12:29:07 +0800, Wenyou Yang wrote :
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts |   42 +++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
+[.....]
+
+> > > What about creating functions that use my series directly if CONFIG_ARM64 is
+> > > defined (or any CONFIG_ you want to create for your driver that you select
+> > > from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
+> > > way your driver will call only one API without any #ifdef and when arm code
+> > > gets converted you drop your adaptation functions. Or (better yet), have a
+> > > stab at converting bios32 (Rob Herring has already provided some hints on
+> > > how to do it for arch/arm).
 > 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index ce13755..57cdd83 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -48,6 +48,48 @@
->  
->  			i2c1: i2c at f0018000 {
->  				status = "okay";
-> +
-> +				pmic: act8865 at 5b {
-> +					compatible = "active-semi,act8865";
-> +					reg = <0x5b>;
-> +					status = "okay";
-> +
-> +					regulators {
-> +						vcc_1v8_reg: DCDC_REG1 {
-> +							regulator-name = "VCC_1V8";
-> +							regulator-min-microvolt = <1800000>;
-> +							regulator-max-microvolt = <1800000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vcc_1v2_reg: DCDC_REG2 {
-> +							regulator-name = "VCC_1V2";
-> +							regulator-min-microvolt = <1200000>;
-> +							regulator-max-microvolt = <1200000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vcc_3v3_reg: DCDC_REG3 {
-> +							regulator-name = "VCC_3V3";
-> +							regulator-min-microvolt = <3300000>;
-> +							regulator-max-microvolt = <3300000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vddfuse_reg: LDO_REG1 {
-> +							regulator-name = "FUSE_2V5";
-> +							regulator-min-microvolt = <2500000>;
-> +							regulator-max-microvolt = <2500000>;
-> +						};
-> +
-> +						vddana_reg: LDO_REG2 {
-> +							regulator-name = "VDDANA";
-> +							regulator-min-microvolt = <3300000>;
-> +							regulator-max-microvolt = <3300000>;
-> +							regulator-always-on;
-
-I'm pretty sure that one is not always on as you actually have to
-configure it to get any voltage. Are you sure you want to set the
-regulator-always-on property here ?
-
-> +						};
-> +					};
-> +				};
->  			};
->  
->  			macb0: ethernet at f0028000 {
-> -- 
-> 1.7.9.5
+> To: Liviu Dudau
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Sorry, but I will not implement this.
+> At first, you had to think the compatibility with ARM32 PCIe.
+> Why do you want other engineers to take this load?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+(+cc Rob Herring)
+
+Um, I am looking at Rob Herring's patchset for Versatile PCI. [1]
+Then, do you mean the following?
+
+1. Add Rob Herring's patch converting bios32. [2]
+2. Reference Rob Herring's patch in order to know how to
+    handle "of_create_pci_host_bridge()" directly in ARM32. [3]
+3. Use of_create_pci_host_bridge() for the designware PCIe
+    driver in ARM32.
+4. Also, use of_create_pci_host_bridge() for the designware PCIe
+    driver in "ARM64".
+
+
+[1] http://www.spinics.net/lists/linux-pci/msg30084.html
+[2] http://www.spinics.net/lists/linux-pci/msg30083.html
+[3] http://www.spinics.net/lists/linux-pci/msg30086.html
+
+Best regards,
+Jingoo Han
+
+> 
+> >
+> > That would of course be best.
+> >
+
+[.....]
