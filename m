@@ -1,45 +1,67 @@
-From: sandeepa.prabhu@linaro.org (Sandeepa Prabhu)
-Date: Mon, 21 Apr 2014 08:33:27 +0530
-Subject: [PATCH] arm64: debug: remove noisy, pointless warning
-In-Reply-To: <1397734634-14464-1-git-send-email-will.deacon@arm.com>
-References: <1397734634-14464-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CA+b37P1UtLM_Ah3bw6LPz=ShGYvOhfyM6TpgtH+4zidNS6JeDQ@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 21 Apr 2014 12:29:07 +0800
+Subject: [PATCH] ARM: dts: at91-sama5d3_xplained: add the regulator device node
+Message-ID: <1398054547-5834-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am okay with this change, ACK.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts |   42 +++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-Thanks,
-~Sandeepa
-
-On 17 April 2014 17:07, Will Deacon <will.deacon@arm.com> wrote:
-> Sending a SIGTRAP to a user task after execution of a BRK instruction at
-> EL0 is fundamental to the way in which software breakpoints work and
-> doesn't deserve a warning to be logged in dmesg. Whilst the warning can
-> be justified from EL1, do_debug_exception will already do the right thing,
-> so simply remove the code altogether.
->
-> Cc: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> Reported-by: Kyrylo Tkachov <kyrylo.tkachov@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/debug-monitors.c | 3 ---
->  1 file changed, 3 deletions(-)
->
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index ed3955a95747..a7fb874b595e 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -318,9 +318,6 @@ static int brk_handler(unsigned long addr, unsigned int esr,
->         if (call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
->                 return 0;
->
-> -       pr_warn("unexpected brk exception at %lx, esr=0x%x\n",
-> -                       (long)instruction_pointer(regs), esr);
-> -
->         if (!user_mode(regs))
->                 return -EFAULT;
->
-> --
-> 1.9.1
->
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index ce13755..57cdd83 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -48,6 +48,48 @@
+ 
+ 			i2c1: i2c at f0018000 {
+ 				status = "okay";
++
++				pmic: act8865 at 5b {
++					compatible = "active-semi,act8865";
++					reg = <0x5b>;
++					status = "okay";
++
++					regulators {
++						vcc_1v8_reg: DCDC_REG1 {
++							regulator-name = "VCC_1V8";
++							regulator-min-microvolt = <1800000>;
++							regulator-max-microvolt = <1800000>;
++							regulator-always-on;
++						};
++
++						vcc_1v2_reg: DCDC_REG2 {
++							regulator-name = "VCC_1V2";
++							regulator-min-microvolt = <1200000>;
++							regulator-max-microvolt = <1200000>;
++							regulator-always-on;
++						};
++
++						vcc_3v3_reg: DCDC_REG3 {
++							regulator-name = "VCC_3V3";
++							regulator-min-microvolt = <3300000>;
++							regulator-max-microvolt = <3300000>;
++							regulator-always-on;
++						};
++
++						vddfuse_reg: LDO_REG1 {
++							regulator-name = "FUSE_2V5";
++							regulator-min-microvolt = <2500000>;
++							regulator-max-microvolt = <2500000>;
++						};
++
++						vddana_reg: LDO_REG2 {
++							regulator-name = "VDDANA";
++							regulator-min-microvolt = <3300000>;
++							regulator-max-microvolt = <3300000>;
++							regulator-always-on;
++						};
++					};
++				};
+ 			};
+ 
+ 			macb0: ethernet at f0028000 {
+-- 
+1.7.9.5
