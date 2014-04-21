@@ -1,52 +1,75 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 21 Apr 2014 08:16:28 -0500
-Subject: [PATCH V2 05/19] bus: omap_l3_noc: switch over to relaxed variants
- of readl/writel
-In-Reply-To: <20140417220329.GF8504@saruman.home>
-References: <1397492726-17203-1-git-send-email-nm@ti.com>
- <1397767775-10965-1-git-send-email-nm@ti.com>
- <1397767775-10965-6-git-send-email-nm@ti.com>
- <20140417215228.GD8504@saruman.home> <53504DFF.7090907@ti.com>
- <20140417220329.GF8504@saruman.home>
-Message-ID: <53551A2C.8060404@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 Apr 2014 09:35:25 -0400
+Subject: [PATCH v2 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <20140419182528.414b9b2e@skate>
+References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140419182528.414b9b2e@skate>
+Message-ID: <53551E9D.9080107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2014 05:03 PM, Felipe Balbi wrote:
-> On Thu, Apr 17, 2014 at 05:56:15PM -0400, Santosh Shilimkar wrote:
->> On Thursday 17 April 2014 05:52 PM, Felipe Balbi wrote:
->>> Hi,
->>>
->>> On Thu, Apr 17, 2014 at 03:49:21PM -0500, Nishanth Menon wrote:
->>>> Currently we use __raw_readl and writel in this driver, however, there
->>>
->>> __raw_* and *_relaxed variants are the same, just have a look <asm/io.h>
->>>
->> Except the relaxed version can take care of endian conversion if
->> needed. :-)
+On Saturday 19 April 2014 12:25 PM, Thomas Petazzoni wrote:
+> Dear Santosh Shilimkar,
 > 
-> right, but according to commit log, this commit is more concerned about
-> the memory barriers which writel()/readl() add, not endianness. Just a
-> matter of fixing up commit log.
+> On Sat, 19 Apr 2014 10:32:45 -0400, Santosh Shilimkar wrote:
+>> Here is an updated version of [2] based on discussion. Series introduces
+>> support for setting up dma parameters based on device tree properties
+>> like 'dma-ranges' and 'dma-coherent' and also update to ARM 32 bit port.
+>> Earlier version of the same series is here [1].
+>>
+>> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
+>> by use of dma_pfn_offset which we maintain now per device. Arch code then
+>> uses it for dma address translations for such cases. We update the
+>> dma_pfn_offset accordingly during DT the device creation process.The
+>> 'dma-coherent' property is used to setup arch's coherent dma_ops.
+>>
+>> After some off-list discussion with RMK and Arnd, I have now dropped the
+>> controversial dma_mask setup code from the series which actually isn't blocking
+>> me as such. Considering rest of the parts of the series are already aligned,
+>> am hoping to get this version merged for 3.16 merge window.
+>>
+>> We agreed in last discussion that drivers have the ultimate
+>> responsibility to setup the correct dma mask but then we need to have some
+>> means to see if bus can support what driver has requested for a case where
+>> driver request for bigger mask than what bus supports. I can follow up on
+>> the mask topic if we have broken drivers.
 > 
+> I am not sure whether there is an intersection or not, but I wanted to
+> mention that the mvebu platform (in mach-mvebu) supports hardware I/O
+> coherency, which makes it a coherent DMA platform. However, we are not
+> able to use arm_coherent_dma_ops for this platform, because when a
+> transfer is being made DMA_FROM_DEVICE, at the end of the transfer, we
+> need to perform an I/O barrier to wait for the snooping unit to
+> complete its coherency work. So we're coherent, but not with
+> arm_coherent_dma_ops: we have our own dma operation implementation (see
+> arch/arm/mach-mvebu/coherency.c).
+> 
+I have seen that.
 
-yep, this patch does replace writel with writel_relaxed there is no
-strong need for barriers in the operations that we perform here.
+> However, it seems that your patch series, at least in PATCH 6/7 makes
+> the assumption that for all DMA coherent platforms,
+> arm_coherent_dma_ops is going to be OK.
+> 
+No it doesn't. The infrastructure is for all the common cases which can
+just use arm generic dma_ops.
 
-I agree that the commit message should probably be a little more
-detailed at this point.
+> Also, I haven't followed all the discussions, but what is the intended
+> usage of of_dma_is_coherent() and set_arch_dma_coherent_ops() (device
+> drivers? platform code?).
+>
+The intention is for sub arch's like ARM, ARM64, powerPC etc can set
+the dma_ops based on the device tree property. Today the ARM coherent
+machines are doing that in machine code and we want to move that
+to more generic code.
+ 
+> In mach-mvebu, what we do is that we register a bus notifier on the
+> platform bus, so that we can set our custom DMA operations for all
+> platform devices in the system. Should this be done in a different way
+> after your series?
+> 
+Nope. Since you have a very custom SOC specific case, you can continue
+what you are doing.
 
-
-How about:
-Currently we use __raw_readl and writel in this driver. Considering
-there is no specific need for a memory barrier, replacing writel with
-endian-neutral writel_relaxed and replacing __raw_readls with the
-corresponding endian-neutral readl_relaxed allows us to have a
-standard set of register operations for the driver.
-
-While at it, simplify address computation using variables for register.
-
-
--- 
 Regards,
-Nishanth Menon
+Santosh
