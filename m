@@ -1,20 +1,26 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 21 Apr 2014 15:56:35 +0530
-Subject: [PATCH v2 3/8] davinci: da850: Use cpufreq_for_each_entry macro
- for iteration
-In-Reply-To: <5354F1A1.7010200@ti.com>
-References: <534DB1F9.8020105@semaphore.gr>
-	<5354F1A1.7010200@ti.com>
-Message-ID: <CAKohpokgq=mHi5768=AVqTiRJ5UUBxgMWtpRuzQa2AntzGZZ7w@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 21 Apr 2014 12:41:45 +0200
+Subject: [PATCH 0/2] ARM: dts: Fix OMAP3 ISP functional clock configuration
+Message-ID: <1398076907-2901-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 April 2014 15:53, Sekhar Nori <nsekhar@ti.com> wrote:
-> I cannot test this (or even build this) since I do not have the patch
-> which adds cpufreq_for_each_entry(). The change as such looks fine to
-> me. Please prefix the subject line with "ARM: " as is the convention in
-> ARM world.
+Hello,
 
-In case you wanna have a look:
+This patch set enables rate propagation from the OMAP3 ISP functional clock to
+the DPLL4 M5 clock. It copies Tomi Valkeinen's similar patch set for the OMAP
+DSS functional clock from the "OMAP: OMAP3 DSS related clock patches" patch
+series.
 
-https://lkml.org/lkml/2014/4/15/695
+Laurent Pinchart (2):
+  ARM: dts: use ti,fixed-factor-clock for dpll4_m5x2_mul_ck
+  ARM: dts: set 'ti,set-rate-parent' for dpll4_m5 path
+
+ arch/arm/boot/dts/omap36xx-clocks.dtsi | 2 +-
+ arch/arm/boot/dts/omap3xxx-clocks.dtsi | 7 ++++---
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
