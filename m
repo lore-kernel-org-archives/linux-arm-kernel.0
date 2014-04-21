@@ -1,85 +1,46 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 21 Apr 2014 09:52:29 +0900
-Subject: [PATCH 2/2] phy: samsung: add simple phys for exynos5420 SoC
-In-Reply-To: <1397988495-29376-3-git-send-email-rahul.sharma@samsung.com>
-References: <1397988495-29376-1-git-send-email-rahul.sharma@samsung.com>
- <1397988495-29376-3-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <53546BCD.7000906@samsung.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 21 Apr 2014 02:56:41 +0200
+Subject: [PATCH v3 1/4] MAINTAINERS: Add entry for APM X-Gene SoC ethernet
+ driver
+In-Reply-To: <1397704685.14062.14.camel@joe-AO725>
+References: <1397702368-4846-1-git-send-email-isubramanian@apm.com>
+ <1397702368-4846-2-git-send-email-isubramanian@apm.com>
+ <1397704685.14062.14.camel@joe-AO725>
+Message-ID: <CABxcv=mj+phHmyg2U2jW51mLTwBN9Au791m-GtqU5BXDPy7Gtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
+Hello Lyappan,
 
-On 04/20/2014 07:08 PM, Rahul Sharma wrote:
-> From: Rahul Sharma <Rahul.Sharma@samsung.com>
+On Thu, Apr 17, 2014 at 5:18 AM, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2014-04-16 at 19:39 -0700, Iyappan Subramanian wrote:
+>> This patch adds a MAINTAINERS entry for APM X-Gene SoC
+>> ethernet driver.
+> []
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+> []
+>> @@ -686,6 +686,14 @@ S:       Maintained
+>>  F:   drivers/net/appletalk/
+>>  F:   net/appletalk/
+>>
+>> +APPLIED MICRO (APM) X-GENE SOC ETHERNET DRIVER
+>> +M:   Iyappan Subramanian <isubramanian@apm.com>
+>> +M:   Keyur Chudgar <kchudgar@apm.com>
+>> +M:   Ravi Patel <rapatel@apm.com>
+>> +S:   Maintained
+>> +F:   drivers/net/ethernet/apm/xgene
 >
-> Extend the support for simple phys for exynos5420
-> SoC in simple phy driver.
+> Please add a terminating slash to show this is a directory.
 >
-> Change-Id: I0ab7b59b1f013db9e924fc868bd8b1b6ed8acbb3
-Change-Id should be removed.
-> Signed-off-by: Rahul Sharma <Rahul.Sharma@samsung.com>
-> ---
->   .../devicetree/bindings/phy/samsung-phy.txt        |    6 ++++++
->   drivers/phy/exynos-simple-phy.c                    |    8 ++++++++
->   2 files changed, 14 insertions(+)
->   mode change 100644 => 100755 drivers/phy/exynos-simple-phy.c
-File permission should not be changed.
+> F:      drivers/net/ethernet/apm/xgene/
 >
-> diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> index f469099..f0ae619 100644
-> --- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-> @@ -123,6 +123,7 @@ Required properties:
->   	- "samsung,exynos4210-simple-phy"
->   	- "samsung,exynos4412-simple-phy"
->   	- "samsung,exynos5250-simple-phy"
-> +	- "samsung,exynos5420-simple-phy"
->   - reg : offset and length of the register set;
->   - #phy-cells : from the generic phy bindings, must be 1;
->   
-> @@ -145,6 +146,11 @@ the PHY specifier identifies the PHY and its meaning is as follows:
->     1 - ADC PHY,
->     2 - ADC PHY,
->   
-> +For "samsung,exynos5420-simple-phy" compatible PHYs the second cell in
-> +the PHY specifier identifies the PHY and its meaning is as follows:
-> +  0 - HDMI PHY,
-> +  1 - ADC PHY,
-> +
->   Example:
->   Simple PHY provider node:
->   
-> diff --git a/drivers/phy/exynos-simple-phy.c b/drivers/phy/exynos-simple-phy.c
-> old mode 100644
-> new mode 100755
-> index 187f6b1..9681a43
-> --- a/drivers/phy/exynos-simple-phy.c
-> +++ b/drivers/phy/exynos-simple-phy.c
-> @@ -71,6 +71,12 @@ static const u32 exynos5250_offsets[] = {
->   	~0, /* end mark */
->   };
->   
-> +static const u32 exynos5420_offsets[] = {
-> +	0x0700, /* HDMI_PHY */
-> +	0x0720, /* ADC_PHY */
-> +	~0, /* end mark */
-> +};
-> +
->   static const struct of_device_id exynos_phy_of_match[] = {
->   	{ .compatible = "samsung,exynos4210-simple-phy",
->   	  .data = exynos4210_offsets},
-> @@ -78,6 +84,8 @@ static const struct of_device_id exynos_phy_of_match[] = {
->   	  .data = exynos4412_offsets},
->   	{ .compatible = "samsung,exynos5250-simple-phy",
->   	  .data = exynos5250_offsets},
-> +	{ .compatible = "samsung,exynos5420-simple-phy",
-> +	  .data = exynos5420_offsets},
->   	{ },
->   };
->   MODULE_DEVICE_TABLE(of, exynos_phy_of_match);
 
+Also if you are maintaining this driver as a part of your daily work
+(i.e: actually being paid for it by your company) the status should be
+"Supported" instead.
 
--- 
-Best Regards,
-Pankaj Dubey
+If you are doing it on your own time but still using your company
+email address then "Maintained" is correct.
+
+Best regards,
+Javier
