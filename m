@@ -1,34 +1,54 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 21 Apr 2014 20:07:44 +0200
-Subject: [PATCH] ARM: fix v7-M signal return
-Message-ID: <1398103664-23078-1-git-send-email-rabin@rab.in>
+Date: Mon, 21 Apr 2014 20:10:08 +0200
+Subject: [PATCH] ARM: fix string functions on !MMU
+Message-ID: <1398103808-24380-1-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the ARM ARM, the behaviour is UNDPREDICTABLE if the PC read
-from the exception return stack is not half word aligned.  See the
-pseudo code for ExceptionReturn() and PopStack().
+8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
+strncpy_from_user functions") apparently broken those string operations
+for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
+restricts the addresses to TASK_SIZE.
 
-The signal handler's address has the bit 0 set, and setup_return()
-directly writes this to regs->ARM_pc.  Mask out bit 0 before the
-exception return to get predictable behaviour.
+TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
+restrict anything.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- arch/arm/kernel/entry-header.S | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/asm/uaccess.h | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-index 1420725..ef72f4b 100644
---- a/arch/arm/kernel/entry-header.S
-+++ b/arch/arm/kernel/entry-header.S
-@@ -133,6 +133,7 @@
- 	biceq	r5, V7M_xPSR_FRAMEPTRALIGN
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 12c3a5d..c3a65f1 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -199,6 +199,9 @@ extern int __put_user_8(void *, unsigned long long);
+ 		__put_user_check(x,p);					\
+ 	 })
  
- 	@ write basic exception frame
-+	bic	r4, r4, #1
- 	stmdb	r2!, {r1, r3-r5}
- 	ldmia	sp, {r1, r3-r5}
- 	.if	\ret_r0
++#define user_addr_max() \
++	(segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
++
+ #else /* CONFIG_MMU */
+ 
+ /*
+@@ -210,6 +213,7 @@ extern int __put_user_8(void *, unsigned long long);
+ #define __addr_ok(addr)		((void)(addr),1)
+ #define __range_ok(addr,size)	((void)(addr),0)
+ #define get_fs()		(KERNEL_DS)
++#define user_addr_max()		(~0UL)
+ 
+ static inline void set_fs(mm_segment_t fs)
+ {
+@@ -222,9 +226,6 @@ static inline void set_fs(mm_segment_t fs)
+ 
+ #define access_ok(type,addr,size)	(__range_ok(addr,size) == 0)
+ 
+-#define user_addr_max() \
+-	(segment_eq(get_fs(), USER_DS) ? TASK_SIZE : ~0UL)
+-
+ /*
+  * The "__xxx" versions of the user access functions do not verify the
+  * address space - it must have been done previously with a separate
 -- 
 1.9.1
