@@ -1,201 +1,129 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 21 Apr 2014 10:54:12 +0900
-Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
-In-Reply-To: <16730530.rJ9T0MsYmt@wuerfel>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
- <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
- <16730530.rJ9T0MsYmt@wuerfel>
-Message-ID: <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Mon, 21 Apr 2014 03:08:34 +0000
+Subject: [PATCH v5 3/3] ARM: dts: sama5d3xcm: add the regulator device node
+In-Reply-To: <5351985C.4090308@atmel.com>
+References: <1387852421-18033-1-git-send-email-wenyou.yang@atmel.com>
+ <1387852570-18159-1-git-send-email-wenyou.yang@atmel.com>
+ <5351985C.4090308@atmel.com>
+Message-ID: <B256D81BAE5131468A838E5D7A24364180A855DE@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 17, 2014 3:26 AM, Arnd Bergmann wrote:
+Hi Nicolas,
 
-(+cc Mohit KUMAR, Pratyush Anand, Marek Vasut, Richard Zhu,
-      Kishon Vijay Abraham I, Byungho An)
+> -----Original Message-----
+> From: Ferre, Nicolas
+> Sent: Saturday, April 19, 2014 5:26 AM
+> To: Yang, Wenyou
+> Cc: broonie at kernel.org; lgirdwood at gmail.com; grant.likely at linaro.org;
+> rob.herring at calxeda.com; plagnioj at jcrosoft.com; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-
+> doc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v5 3/3] ARM: dts: sama5d3xcm: add the regulator
+> device node
 > 
-> On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
-> > Jingoo,
+> On 24/12/2013 03:36, Wenyou Yang :
+> > Reviwed-by: Mark Brown <broonie@linaro.org>
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> 
+> Wenyou,
+> 
+> While collecting patches for our next at91-3.16-dt branch I noticed
+> this patch that should go on top of the SAMA5D3 CMP board.
+> 
+> I would prefer to create another .dtsi file for CMP board and not mix
+> with the current cpu module usual board that does not contain this
+> regulator. But well we can do something even more simpler and move this
+> PMIC example to the newer SAMA5D3 Xplained board.
+> 
+> So, will it be possible for you to re-send a new patch targeted to
+> SAMA5D3 Xplained?
+OK, I will re-send a new patch.
+
+> 
+> Thanks, bye.
+> 
+> 
+> > ---
+> >  arch/arm/boot/dts/sama5d3xcm.dtsi |   46
+> +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 46 insertions(+)
 > >
-> > Thanks for taking a stab at trying to convert a host bridge
-> > driver to use the new generic host bridge code.
+> > diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi
+> > b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> > index 726a0f3..3d4e5c2 100644
+> > --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
+> > +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+> > @@ -38,6 +38,52 @@
+> >  			macb0: ethernet at f0028000 {
+> >  				phy-mode = "rgmii";
+> >  			};
+> > +
+> > +			i2c1: i2c at f0018000 {
+> > +				pmic: act8865 at 5b {
+> > +					compatible = "active-semi,act8865";
+> > +					reg = <0x5b>;
+> > +					status = "disabled";
+> > +
+> > +					regulators {
+> > +						vcc_1v8_reg: DCDC_REG1 {
+> > +							regulator-name = "VCC_1V8";
+> > +							regulator-min-microvolt =
+> <1800000>;
+> > +							regulator-max-microvolt =
+> <1800000>;
+> > +							regulator-always-on;
+> > +						};
+> > +
+> > +						vcc_1v2_reg: DCDC_REG2 {
+> > +							regulator-name = "VCC_1V2";
+> > +							regulator-min-microvolt =
+> <1100000>;
+> > +							regulator-max-microvolt =
+> <1300000>;
+> > +							regulator-suspend-mem-
+> microvolt = <1150000>;
+> > +							regulator-suspend-standby-
+> microvolt = <1150000>;
+> > +							regulator-always-on;
+> > +						};
+> > +
+> > +						vcc_3v3_reg: DCDC_REG3 {
+> > +							regulator-name = "VCC_3V3";
+> > +							regulator-min-microvolt =
+> <3300000>;
+> > +							regulator-max-microvolt =
+> <3300000>;
+> > +							regulator-always-on;
+> > +						};
+> > +
+> > +						vddana_reg: LDO_REG1 {
+> > +							regulator-name = "VDDANA";
+> > +							regulator-min-microvolt =
+> <3300000>;
+> > +							regulator-max-microvolt =
+> <3300000>;
+> > +							regulator-always-on;
+> > +						};
+> > +
+> > +						vddfuse_reg: LDO_REG2 {
+> > +							regulator-name = "FUSE_2V5";
+> > +							regulator-min-microvolt =
+> <2500000>;
+> > +							regulator-max-microvolt =
+> <2500000>;
+> > +						};
+> > +					};
+> > +				};
+> > +			};
+> >  		};
 > >
-> > I do however have concerns on the direction you took. You have split
-> > your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
-> > even if (with my series) it should be no reason why the host bridge
-> > driver should not work on other architectures as well once they are
-> > converted.
-> 
-> Right.
-> 
-> > Also, some of the functions that you use have identical names but different
-> > signatures depending on what arch you have selected. This is really bad
-> > in my books!
-> 
-> It's only the sys_to_pcie() function, right?
-> 
-> You can probably simplify that to take a void pointer and have only one line
-> difference.
-
-Do you mean the following?
-Would you give me more detailed advice?
-
-static inline struct pcie_port *sys_to_pcie(void *sys)
-{
-	struct pcie_port *pp
-
-#ifdef CONFIG_ARM
-	pp = ((struct pci_sys_data *)sys)->private_data;
-#else
-	pp = (struct pcie_port *)sys;
-#endif
-	return pp;
-}
-
-> 
-> > What about creating functions that use my series directly if CONFIG_ARM64 is
-> > defined (or any CONFIG_ you want to create for your driver that you select
-> > from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
-> > way your driver will call only one API without any #ifdef and when arm code
-> > gets converted you drop your adaptation functions. Or (better yet), have a
-> > stab at converting bios32 (Rob Herring has already provided some hints on
-> > how to do it for arch/arm).
-
-To: Liviu Dudau
-
-Sorry, but I will not implement this.
-At first, you had to think the compatibility with ARM32 PCIe.
-Why do you want other engineers to take this load?
-
-> 
-> That would of course be best.
-> 
-> > To give an example on how things are not going well in your version (not obvious
-> > from your patch, but you can see it once you apply it): dw_pcie_host_init()
-> > will still carry the handcoded version of DT parsing and that is not guarded
-> > against CONFIG_ARM64 being defined, where the parsing will happen again
-> > when you call of_create_pci_host_bridge().
-> 
-> How about making the generic DT parsing code from of_create_pci_host_bridge()
-> an exported function that can be called by drivers that don't use
-> of_create_pci_host_bridge?
-
-Do you mean that of_create_pci_host_bridge() should be used for both ARM32
-and ARM64 cases?
-
-> 
-> > Speaking of the handcoded DT parsing of resources: you are using restype == 0
-> > as a way of selecting config space, *and then split the range size into two
-> > halves*. From what Jason Gunthorpe and Arnd were saying, config ranges in the DT
-> > tree should only be used for ECAM space, so no split is allowed.
+> >  		nand0: nand at 60000000 {
 > >
-> > Arnd, are you allowing this non-standard use to creep in the bindings?
 > 
-> I fear it's too late to change that now. In retrospect we probably shoulnd't
-> have defined the binding like that.
 > 
-> Overall, my impression of the patch is that it should be possible to do
-> the same with much fewer #ifdefs by first rearranging the code in one patch
-> and then doing another patch on top to add the generic arm64 support.
+> --
+> Nicolas Ferre
 
-I will try to reduce #ifdefs as possible.
-
-Best regards,
-Jingoo Han
-
-> 
-> > > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> > > index 6d23d8c..fac0440 100644
-> > > --- a/drivers/pci/host/pcie-designware.c
-> > > +++ b/drivers/pci/host/pcie-designware.c
-> > > @@ -65,14 +65,27 @@
-> > >  #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
-> > >  #define PCIE_ATU_UPPER_TARGET		0x91C
-> > >
-> > > +#ifdef CONFIG_ARM
-> > >  static struct hw_pci dw_pci;
-> > > +#endif
-> > >
-> > >  static unsigned long global_io_offset;
-> > >
-> > > +#ifdef CONFIG_ARM
-> > >  static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
-> > >  {
-> > >  	return sys->private_data;
-> > >  }
-> > > +#endif
-> > > +
-> > > +#ifdef CONFIG_ARM64
-> > > +static inline struct pcie_port *sys_to_pcie(struct pcie_port *pp)
-> > > +{
-> > > +	return pp;
-> > > +}
-> > > +
-> > > +static struct pci_ops dw_pcie_ops;
-> > > +#endif
-> > >
-> > >  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
-> > >  {
-> > > @@ -381,7 +394,9 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
-> > >  {
-> > >  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
-> > >  	irq_set_chip_data(irq, domain->host_data);
-> > > +#ifdef CONFIG_ARM
-> > >  	set_irq_flags(irq, IRQF_VALID);
-> > > +#endif
-> > >
-> > >  	return 0;
-> > >  }
-> > > @@ -397,6 +412,10 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> > >  	struct of_pci_range_parser parser;
-> > >  	u32 val;
-> > >  	int i;
-> > > +#ifdef CONFIG_ARM64
-> > > +	struct pci_host_bridge *bridge;
-> > > +	resource_size_t lastbus;
-> > > +#endif
-> > >
-> > >  	if (of_pci_range_parser_init(&parser, np)) {
-> > >  		dev_err(pp->dev, "missing ranges property\n");
-> > > @@ -489,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> > >  	val |= PORT_LOGIC_SPEED_CHANGE;
-> > >  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-> > >
-> > > +#ifdef CONFIG_ARM
-> > >  	dw_pci.nr_controllers = 1;
-> > >  	dw_pci.private_data = (void **)&pp;
-> > >
-> > > @@ -497,6 +517,16 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> > >  #ifdef CONFIG_PCI_DOMAINS
-> > >  	dw_pci.domain++;
-> > >  #endif
-> > > +#endif
-> > > +
-> > > +#ifdef CONFIG_ARM64
-> > > +	bridge = of_create_pci_host_bridge(pp->dev, &dw_pcie_ops, pp);
-> > > +	if (IS_ERR_OR_NULL(bridge))
-> > > +		return PTR_ERR(bridge);
-> > > +
-> > > +	lastbus = pci_rescan_bus(bridge->bus);
-> > > +	pci_bus_update_busn_res_end(bridge->bus, lastbus);
-> > > +#endif
-> > >
-> > >  	return 0;
-> > >  }
-> > > @@ -695,6 +725,7 @@ static struct pci_ops dw_pcie_ops = {
-> > >  	.write = dw_pcie_wr_conf,
-> > >  };
-> > >
-> > > +#ifdef CONFIG_ARM
-> > >  static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
-> > >  {
-> > >  	struct pcie_port *pp;
-> > > @@ -758,6 +789,7 @@ static struct hw_pci dw_pci = {
-> > >  	.map_irq	= dw_pcie_map_irq,
-> > >  	.add_bus	= dw_pcie_add_bus,
-> > >  };
-> > > +#endif /* CONFIG_ARM */
-> > >
-> > >  void dw_pcie_setup_rc(struct pcie_port *pp)
-> 
+Best Regards,
+Wenyou Yang
