@@ -1,70 +1,50 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Apr 2014 22:52:14 +0200
-Subject: [PATCH 3/9] iommu/ipmmu-vmsa: Define driver-specific page
- directory sizes
-In-Reply-To: <53556BDC.6040705@cogentembedded.com>
-References: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1398089589-9181-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <53556BDC.6040705@cogentembedded.com>
-Message-ID: <11850321.Q0Kc9vhtF9@avalon>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 21 Apr 2014 22:56:49 +0200
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Add PCIe support
+Message-ID: <1398113809-7580-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Add support for the PCI express bus available on MX6 SabreSDP.
 
-Thank you for the review.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-On Monday 21 April 2014 23:05:00 Sergei Shtylyov wrote:
-> On 04/21/2014 06:13 PM, Laurent Pinchart wrote:
-> > The PTRS_PER_(PGD|PMD|PTE) macros evaluate to different values depending
-> > on whether LPAE is enabled. The IPMMU driver uses a long descriptor
-> > format regardless of LPAE, making those macros mismatch the IPMMU
-> > configuration on non-LPAE systems.
-> > 
-> > Replace the macros by driver-specific versions that always evaluate to
-> > the right value.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >   drivers/iommu/ipmmu-vmsa.c | 14 +++++++++-----
-> >   1 file changed, 9 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-> > index 1ae97d8..7c8c21e 100644
-> > --- a/drivers/iommu/ipmmu-vmsa.c
-> > +++ b/drivers/iommu/ipmmu-vmsa.c
-> > @@ -210,6 +210,10 @@ static LIST_HEAD(ipmmu_devices);
-> > 
-> >   #define ARM_VMSA_PTE_MEMATTR_NC		(((pteval_t)0x5) << 2)
-> >   #define ARM_VMSA_PTE_MEMATTR_DEV	(((pteval_t)0x1) << 2)
-> > 
-> > +#define IPMMU_PTRS_PER_PTE		512
-> > +#define IPMMU_PTRS_PER_PMD		512
-> > +#define IPMMU_PTRS_PER_PGD		4
-> > +
-> 
-> [...]
-> 
-> > @@ -487,7 +491,7 @@ static void ipmmu_free_puds(pgd_t *pgd)
-> > 
-> >   	unsigned int i;
-> >   	
-> >   	pud = pud_base;
-> > 
-> > -	for (i = 0; i < PTRS_PER_PUD; ++i) {
-> > +	for (i = 0; i < IPMMU_PTRS_PER_PUD; ++i) {
-> 
-> I don't see where you #define IPMMU_PTRS_PER_PUD...
-
-Come on, it's easy. I don't define it anywhere :-)
-
-The line is changed in a further patch, it seems I've forgotten to compile-
-test all intermediate versions. Thank you for catching the problem, I'll fix 
-that in v2 and will make sure to properly test all patches individually.
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 7a88d9a..0d43e37 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -384,6 +384,13 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pcie: pciegrp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x80000000
++				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x80000000
++			>;
++		};
++
+ 		pinctrl_pwm1: pwm1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT		0x1b0b1
+@@ -468,6 +475,14 @@
+ 	};
+ };
+ 
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	power-on-gpio = <&gpio3 19 0>;
++	reset-gpio = <&gpio7 12 0>;
++	status = "okay";
++};
++
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
 -- 
-Regards,
-
-Laurent Pinchart
+1.9.1
