@@ -1,44 +1,49 @@
 From: elder@linaro.org (Alex Elder)
-Date: Mon, 21 Apr 2014 16:53:02 -0500
-Subject: [PATCH v2 01/10] ARM: bcm: use memory accessors for ioremapped area
+Date: Mon, 21 Apr 2014 16:53:06 -0500
+Subject: [PATCH v2 05/10] ARM: bcm: don't special-case CPU 0 in bcm_kona_smc()
 In-Reply-To: <1398117191-2433-1-git-send-email-elder@linaro.org>
 References: <1398117191-2433-1-git-send-email-elder@linaro.org>
-Message-ID: <1398117191-2433-2-git-send-email-elder@linaro.org>
+Message-ID: <1398117191-2433-6-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pointer used to pass parameters to an "smc" call is produced
-through a call to ioremap().  As such, we should be using functions
-like writel() to access it.
+There's logic in bcm_kona_smc() to ensure __bcm_kona_smc() gets
+called on CPU 0; if already executing on CPU 0, that function is
+called directly.  The direct call is not protected from interrupts,
+however, which is not safe.
+
+Note that smp_call_function_single() is designed to handle the case
+where the target cpu is the current one.  It also gets a reference
+to the CPU and disables IRQs across the call.
+
+So we can simplify things and at the same time be protected against
+interrupts by calling smp_call_function_single() unconditionally.
 
 Signed-off-by: Alex Elder <elder@linaro.org>
 Reviewed-by: Tim Kryger <tim.kryger@linaro.org>
 Reviewed-by: Markus Mayer <markus.mayer@linaro.org>
 Reviewed-by: Matt Porter <mporter@linaro.org>
 ---
- arch/arm/mach-bcm/bcm_kona_smc.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-bcm/bcm_kona_smc.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-index 5e31e91..d881c72 100644
+index 47cf360..6fdcf96 100644
 --- a/arch/arm/mach-bcm/bcm_kona_smc.c
 +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-@@ -79,11 +79,11 @@ static void __bcm_kona_smc(void *info)
- 	/* Check map in the bounce area */
- 	BUG_ON(!bridge_data.initialized);
+@@ -114,12 +114,7 @@ unsigned bcm_kona_smc(unsigned service_id, unsigned arg0, unsigned arg1,
+ 	 * Due to a limitation of the secure monitor, we must use the SMP
+ 	 * infrastructure to forward all secure monitor calls to Core 0.
+ 	 */
+-	if (get_cpu() != 0)
+-		smp_call_function_single(0, __bcm_kona_smc, (void *)&data, 1);
+-	else
+-		__bcm_kona_smc(&data);
+-
+-	put_cpu();
++	smp_call_function_single(0, __bcm_kona_smc, &data, 1);
  
--	/* Copy one 32 bit word into the bounce area */
--	args[0] = data->arg0;
--	args[1] = data->arg1;
--	args[2] = data->arg2;
--	args[3] = data->arg3;
-+	/* Copy the four 32 bit argument values into the bounce area */
-+	writel_relaxed(data->arg0, args++);
-+	writel_relaxed(data->arg1, args++);
-+	writel_relaxed(data->arg2, args++);
-+	writel(data->arg3, args);
- 
- 	/* Flush caches for input data passed to Secure Monitor */
- 	if (data->service_id != SSAPI_BRCM_START_VC_CORE)
+ 	return data.result;
+ }
 -- 
 1.9.1
