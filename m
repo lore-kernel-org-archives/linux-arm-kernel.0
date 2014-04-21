@@ -1,85 +1,84 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Apr 2014 16:13:03 +0200
-Subject: [PATCH 3/9] iommu/ipmmu-vmsa: Define driver-specific page directory
- sizes
+Date: Mon, 21 Apr 2014 16:13:04 +0200
+Subject: [PATCH 4/9] iommu/ipmmu-vmsa: Set the PTE contiguous hint bit when
+ possible
 In-Reply-To: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1398089589-9181-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1398089589-9181-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PTRS_PER_(PGD|PMD|PTE) macros evaluate to different values depending
-on whether LPAE is enabled. The IPMMU driver uses a long descriptor
-format regardless of LPAE, making those macros mismatch the IPMMU
-configuration on non-LPAE systems.
-
-Replace the macros by driver-specific versions that always evaluate to
-the right value.
+The contiguous hint bit signals to the IOMMU that a range of 16 PTEs
+refer to physically contiguous memory. It improves performances by
+dividing the number of TLB lookups by 16, effectively implementing 64kB
+page sizes.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/iommu/ipmmu-vmsa.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ drivers/iommu/ipmmu-vmsa.c | 43 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 40 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 1ae97d8..7c8c21e 100644
+index 7c8c21e..1ce2115 100644
 --- a/drivers/iommu/ipmmu-vmsa.c
 +++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -210,6 +210,10 @@ static LIST_HEAD(ipmmu_devices);
+@@ -210,6 +210,9 @@ static LIST_HEAD(ipmmu_devices);
  #define ARM_VMSA_PTE_MEMATTR_NC		(((pteval_t)0x5) << 2)
  #define ARM_VMSA_PTE_MEMATTR_DEV	(((pteval_t)0x1) << 2)
  
-+#define IPMMU_PTRS_PER_PTE		512
-+#define IPMMU_PTRS_PER_PMD		512
-+#define IPMMU_PTRS_PER_PGD		4
++#define ARM_VMSA_PTE_CONT_ENTRIES	16
++#define ARM_VMSA_PTE_CONT_SIZE		(PAGE_SIZE * ARM_VMSA_PTE_CONT_ENTRIES)
 +
- /* -----------------------------------------------------------------------------
-  * Read/Write Access
-  */
-@@ -328,7 +332,7 @@ static int ipmmu_domain_init_context(struct ipmmu_vmsa_domain *domain)
+ #define IPMMU_PTRS_PER_PTE		512
+ #define IPMMU_PTRS_PER_PMD		512
+ #define IPMMU_PTRS_PER_PGD		4
+@@ -569,10 +572,44 @@ static int ipmmu_alloc_init_pte(struct ipmmu_vmsa_device *mmu, pmd_t *pmd,
+ 	pteval |= ARM_VMSA_PTE_SH_IS;
+ 	start = pte;
  
- 	/* TTBR0 */
- 	ipmmu_flush_pgtable(domain->mmu, domain->pgd,
--			    PTRS_PER_PGD * sizeof(*domain->pgd));
-+			    IPMMU_PTRS_PER_PGD * sizeof(*domain->pgd));
- 	ttbr = __pa(domain->pgd);
- 	ipmmu_ctx_write(domain, IMTTLBR0, ttbr);
- 	ipmmu_ctx_write(domain, IMTTUBR0, ttbr >> 32);
-@@ -470,7 +474,7 @@ static void ipmmu_free_pmds(pud_t *pud)
- 	unsigned int i;
+-	/* Install the page table entries. */
++	/*
++	 * Install the page table entries.
++	 *
++	 * Set the contiguous hint in the PTEs where possible. The hint
++	 * indicates a series of ARM_VMSA_PTE_CONT_ENTRIES PTEs mapping a
++	 * physically contiguous region with the following constraints:
++	 *
++	 * - The region start is aligned to ARM_VMSA_PTE_CONT_SIZE
++	 * - Each PTE in the region has the contiguous hint bit set
++	 *
++	 * We don't support partial unmapping so there's no need to care about
++	 * clearing the contiguous hint from neighbour PTEs.
++	 */
+ 	do {
+-		*pte++ = pfn_pte(pfn++, __pgprot(pteval));
+-		addr += PAGE_SIZE;
++		unsigned long chunk_end;
++
++		/*
++		 * If the address is aligned to a contiguous region size and the
++		 * mapping size is large enough, process the largest possible
++		 * number of PTEs multiple of ARM_VMSA_PTE_CONT_ENTRIES.
++		 * Otherwise process the smallest number of PTEs to align the
++		 * address to a contiguous region size or to complete the
++		 * mapping.
++		 */
++		if (IS_ALIGNED(addr, ARM_VMSA_PTE_CONT_SIZE) &&
++		    end - addr >= ARM_VMSA_PTE_CONT_SIZE) {
++			chunk_end = round_down(end, ARM_VMSA_PTE_CONT_SIZE);
++			pteval |= ARM_VMSA_PTE_CONT;
++		} else {
++			chunk_end = min(ALIGN(addr, ARM_VMSA_PTE_CONT_SIZE),
++					end);
++			pteval &= ~ARM_VMSA_PTE_CONT;
++		}
++
++		do {
++			*pte++ = pfn_pte(pfn++, __pgprot(pteval));
++			addr += PAGE_SIZE;
++		} while (addr != chunk_end);
+ 	} while (addr != end);
  
- 	pmd = pmd_base;
--	for (i = 0; i < PTRS_PER_PMD; ++i) {
-+	for (i = 0; i < IPMMU_PTRS_PER_PMD; ++i) {
- 		if (pmd_none(*pmd))
- 			continue;
- 
-@@ -487,7 +491,7 @@ static void ipmmu_free_puds(pgd_t *pgd)
- 	unsigned int i;
- 
- 	pud = pud_base;
--	for (i = 0; i < PTRS_PER_PUD; ++i) {
-+	for (i = 0; i < IPMMU_PTRS_PER_PUD; ++i) {
- 		if (pud_none(*pud))
- 			continue;
- 
-@@ -510,7 +514,7 @@ static void ipmmu_free_pgtables(struct ipmmu_vmsa_domain *domain)
- 	 * tables.
- 	 */
- 	pgd = pgd_base;
--	for (i = 0; i < PTRS_PER_PGD; ++i) {
-+	for (i = 0; i < IPMMU_PTRS_PER_PGD; ++i) {
- 		if (pgd_none(*pgd))
- 			continue;
- 		ipmmu_free_puds(pgd);
-@@ -695,7 +699,7 @@ static int ipmmu_domain_init(struct iommu_domain *io_domain)
- 
- 	spin_lock_init(&domain->lock);
- 
--	domain->pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
-+	domain->pgd = kzalloc(IPMMU_PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
- 	if (!domain->pgd) {
- 		kfree(domain);
- 		return -ENOMEM;
+ 	ipmmu_flush_pgtable(mmu, start, sizeof(*pte) * (pte - start));
 -- 
 1.8.3.2
