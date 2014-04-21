@@ -1,49 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Apr 2014 07:22:52 -0700
-Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
- device is disabled
-In-Reply-To: <20140419110048.GY2523@dragon>
-References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
- <20140418204249.GG24070@n2100.arm.linux.org.uk>
- <20140419055205.GX2523@dragon>
- <20140419084229.GK24070@n2100.arm.linux.org.uk>
- <20140419110048.GY2523@dragon>
-Message-ID: <CAOesGMiDqd+JSd_fzzeWohSGixuR1ciOz_FO5CGnSm7F3ioxDw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 21 Apr 2014 09:37:08 -0500
+Subject: [PATCH v2 0/7] of: setup dma parameters using dma-ranges and
+ dma-coherent
+In-Reply-To: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAL_JsqLogKfqHyw4zYBkPrYh=f6tVibtmX25oYB1Q2hO11Whcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 19, 2014 at 4:00 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Sat, Apr 19, 2014 at 09:42:29AM +0100, Russell King - ARM Linux wrote:
->> On Sat, Apr 19, 2014 at 01:53:08PM +0800, Shawn Guo wrote:
->> > BTW, can you take a look at the following two patches, or are they
->> > already in your queue?
->> >
->> > imx-drm: imx-drm-core: Fix imx_drm_encoder_get_mux_id
->> > https://lkml.org/lkml/2014/4/7/58
->>
->> This one now is.
->>
->> > mx-drm: imx-tve: correct DDC property name to 'ddc-i2c-bus'
->> > ('i' is missing from the prefix word, and it should be 'imx-drm')
->> > http://www.spinics.net/lists/arm-kernel/msg321057.html
->>
->> This one touches arch/arm/boot/dts, which Arnd moaned at me for touching
->> via the staging tree during the merge window.  So, while I can take the
->> imx-tve part, I can't take the arch/arm/boot/dts part.  This patch needs
->> to be split.
->>
->> It also means that the MBA platform will have its TVE output broken while
->> the two commits take their different paths, but I guess that's what you
->> get for this kind of sillyness about git trees having exclusive ownership
->> of various files in the kernel tree - more breakage not less.
+On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Here is an updated version of [2] based on discussion. Series introduces
+> support for setting up dma parameters based on device tree properties
+> like 'dma-ranges' and 'dma-coherent' and also update to ARM 32 bit port.
+> Earlier version of the same series is here [1].
 >
-> I think Arnd's main concern is about merge conflict, which shouldn't be
-> a problem for this particular case.  The change on dts file is pretty
-> trivial.  And I assume this is a fix to be landed on mainline before
-> -rc5 or so.  Then I can rebase my DT branch on top of it.  That said,
-> merge conflict is not really a problem for this patch.  Arnd?
+> The 'dma-ranges' helps to take care of few DMAable system memory restrictions
+> by use of dma_pfn_offset which we maintain now per device. Arch code then
+> uses it for dma address translations for such cases. We update the
+> dma_pfn_offset accordingly during DT the device creation process.The
+> 'dma-coherent' property is used to setup arch's coherent dma_ops.
+>
+> After some off-list discussion with RMK and Arnd, I have now dropped the
+> controversial dma_mask setup code from the series which actually isn't blocking
+> me as such. Considering rest of the parts of the series are already aligned,
+> am hoping to get this version merged for 3.16 merge window.
 
-I'm not Arnd, but that should work well.
+Can you briefly describe what the h/w looks like in terms of addresses
+for the problem you are trying to solve? Something like: Cpu view of
+RAM is X to Y address, X corresponds to DMA address Z. Max DMA address
+is ?
 
-
--Olof
+Rob
