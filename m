@@ -1,74 +1,85 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Apr 2014 20:06:06 -0700
-Subject: [PATCH 5/6] ARM: EXYNOS: Enable multi-platform build support
-In-Reply-To: <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
-References: <1397554134-11827-1-git-send-email-sachin.kamat@linaro.org>
- <1397554134-11827-6-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <CAOesGMh0VdSbQ1fSjGkJOG+BDeNfo4NNQjtiznh18DxSROaT1A@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 21 Apr 2014 23:09:00 -0400 (EDT)
+Subject: [PATCH v3 06/13] ARM: mcpm: support 4 clusters in HiP04
+In-Reply-To: <1397801156-25682-7-git-send-email-haojian.zhuang@linaro.org>
+References: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
+ <1397801156-25682-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <alpine.LFD.2.11.1404212255520.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 2:28 AM, Sachin Kamat <sachin.kamat@linaro.org> wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> This makes it possible to enable the exynos platform as part of a
-> multiplatform kernel, in addition to keeping the single-platform
-> Exynos support.
-> sparsemem is currently not supported in multiplatform.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+On Fri, 18 Apr 2014, Haojian Zhuang wrote:
+
+> Since 16 Cortex-A15 cores are used in HiP04 SoC, enlarge the maximum
+> clusters from 2 to 4 if HiP04 SoC is built without CONFIG_BIG_LITTLE.
+
+Why "... if HiP04 SoC is built without CONFIG_BIG_LITTLE" ?
+That statement makes no sense.  As mentioned before, if you have a 
+multi-platform kernel config with CONFIG_BIG_LITTLE included, there is 
+no reason for not supporting quad cluster platforms at the same time.
+
+FYI you might want to have a look at patch #8032 in RMK's patch system 
+that removes a build-time MCPM dependency from the b.L switcher.
+
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+
+More comments below.
+
 > ---
->  arch/arm/Kconfig                  |   27 +++------------------------
->  arch/arm/configs/exynos_defconfig |    2 +-
->  arch/arm/mach-exynos/Kconfig      |   27 +++++++++++++++++++++++++++
->  arch/arm/mach-exynos/Makefile     |    2 ++
->  arch/arm/plat-samsung/Makefile    |    3 +++
->  5 files changed, 36 insertions(+), 25 deletions(-)
->
+>  arch/arm/Kconfig            | 8 ++++++++
+>  arch/arm/include/asm/mcpm.h | 5 +++++
+>  2 files changed, 13 insertions(+)
+> 
 > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 4422601059e8..9d459e9c396b 100644
+> index 9a2214e..f2a25be 100644
 > --- a/arch/arm/Kconfig
 > +++ b/arch/arm/Kconfig
-> @@ -828,34 +828,13 @@ config ARCH_S5PV210
->         help
->           Samsung S5PV210/S5PC110 series based systems
->
-> -config ARCH_EXYNOS
-> +config ARCH_EXYNOS_SINGLE
->         bool "Samsung EXYNOS"
-> -       select ARCH_HAS_BANDGAP
-> -       select ARCH_HAS_CPUFREQ
-> -       select ARCH_HAS_HOLES_MEMORYMODEL
-> -       select ARCH_REQUIRE_GPIOLIB
-> +       select ARCH_EXYNOS
->         select ARCH_SPARSEMEM_ENABLE
-> -       select ARM_AMBA
-> -       select ARM_GIC
-> -       select CLKSRC_OF
-> -       select COMMON_CLK
-> -       select CPU_V7
-> -       select GENERIC_CLOCKEVENTS
-> -       select HAVE_ARM_SCU if SMP
-> -       select HAVE_S3C2410_I2C if I2C
-> -       select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> -       select HAVE_S3C_RTC if RTC_CLASS
-> -       select HAVE_SMP
->         select NEED_MACH_MEMORY_H
-> -       select PINCTRL
-> -       select PINCTRL_EXYNOS
-> -       select PM_GENERIC_DOMAINS if PM_RUNTIME
-> -       select S5P_DEV_MFC
-> -       select SAMSUNG_DMADEV
-> -       select SPARSE_IRQ
-> -       select USE_OF
->         help
-> -         Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
-> +         Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
+> @@ -1571,6 +1571,14 @@ config MCPM
+>  	  for (multi-)cluster based systems, such as big.LITTLE based
+>  	  systems.
+>  
+> +config MCPM_QUAD_CLUSTER
+> +	bool "Enable Quad clusters in MPCM"
 
-I don't think there's a point in keeping this around. A
-"single-platform" config is just enabling a single platform in the
-config, it's not a specific option. I don't think any of the other
-platforms use anything like this today.
+s/MPCM/MCPM/
 
--Olof
+Yet you should not provide any prompt text here.  This is way too 
+technical to leave to the user configuring the kernel to decide.  
+Instead, the actual platform needing this feature should select this 
+config symbol directly.
+
+> +	depends on MCPM
+> +	default n
+
+The default is already n, so no need to explicitly default to the 
+default's default.
+
+> +	help
+> +	  This option enables quad clusters in MCPM. Quad clusters exist
+> +	  in HiP04 SoC.
+
+Please refrain from listing SoCs here.
+
+>  config BIG_LITTLE
+>  	bool "big.LITTLE support (Experimental)"
+>  	depends on CPU_V7 && SMP
+> diff --git a/arch/arm/include/asm/mcpm.h b/arch/arm/include/asm/mcpm.h
+> index 608516e..fc8d70d 100644
+> --- a/arch/arm/include/asm/mcpm.h
+> +++ b/arch/arm/include/asm/mcpm.h
+> @@ -20,7 +20,12 @@
+>   * to consider dynamic allocation.
+>   */
+>  #define MAX_CPUS_PER_CLUSTER	4
+> +
+> +#ifdef CONFIG_MCPM_QUAD_CLUSTER
+> +#define MAX_NR_CLUSTERS		4
+> +#else
+>  #define MAX_NR_CLUSTERS		2
+> +#endif
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> -- 
+> 1.8.3.2
+> 
