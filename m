@@ -1,98 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Apr 2014 11:29:52 -0500
-Subject: [PATCH v3] arm64: enable EDAC on arm64
-In-Reply-To: <20140422160100.GH9820@arm.com>
-References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
- <20140422102455.GD7484@arm.com>
- <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
- <20140422132624.GC9820@arm.com>
- <CAL_JsqJEwUu0ooEcL+hniD8vxjBW5571ea3u3JmPN3x1MfXW3w@mail.gmail.com>
- <20140422160100.GH9820@arm.com>
-Message-ID: <CAL_Jsq+pcK4XvSyahaK8zoxNMWrebqsU+funBqzR9MBfK2ABYA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 22 Apr 2014 09:45:47 -0700
+Subject: [PATCH v2 0/7] Add cros_ec changes for newer boards
+Message-ID: <1398185154-19404-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 11:01 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Apr 22, 2014 at 04:23:20PM +0100, Rob Herring wrote:
->> On Tue, Apr 22, 2014 at 8:26 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Apr 22, 2014 at 01:54:12PM +0100, Rob Herring wrote:
->> >> On Tue, Apr 22, 2014 at 5:24 AM, Will Deacon <will.deacon@arm.com> wrote:
->> >> > On Mon, Apr 21, 2014 at 05:09:16PM +0100, Rob Herring wrote:
->> >> >> +#ifndef ASM_EDAC_H
->> >> >> +#define ASM_EDAC_H
->> >> >> +/*
->> >> >> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
->> >> >
->> >> > What do you mean by `DMA safe'? For coherent (cacheable) DMA buffers, this
->> >> > should work fine, but for non-coherent (and potentially non-cacheable)
->> >> > buffers, I think we'll have problems both due to the lack of guaranteed
->> >> > exclusive monitor support and also eviction of dirty lines.
->> >>
->> >> That's just copied from other implementations. I agree you could have
->> >> a problem here although I don't see why dirty line eviction would be.
->> >
->> > I was thinking of the case where you have an ongoing, non-coherent DMA
->> > transfer from a device and then the atomic_scrub routine runs in parallel
->> > on the CPU, targetting the same buffer. In this case, the stxr could store
->> > stale data back to the buffer, leading to corruption (since the monitor
->> > won't help). This differs from the case where the monitor could always
->> > report failure for non-cacheable regions, causing atomic_scrub to livelock.
->>
->> It is only reads that will trigger an error and scrubbing. If the DMA
->> is continuously reading (such as a framebuffer), then there would not
->> be an issue. What would be the usecase where a DMA continously writes
->> to the same location without any synchronization with the cpu? I
->> suppose one core could re-trigger a DMA while another core is doing
->> the scrubbing. You would have to read the DMA data and be finished
->> with it quicker than the scrubbing could get handled. I just wonder
->> whether this is really only a theoretical problem, but not one in
->> practice.
->
-> I don't think it's all that complicated if you consider speculative reads
-> from the CPU triggering the error. However, discussion with Catalin raised
-> another question (see below).
->
->> >> There's not really a solution other than not doing s/w scrubbing or
->> >> doing it in h/w. So it is up to individual drivers to decide what to
->> >> do, but we have to provide this function just to enable EDAC.
->> >
->> > I think we need to avoid s/w scrubbing of non-cacheable memory altogether.
->>
->> There's not really a way to determine the memory attributes easily
->> though. Whether it works depends on the h/w. Calxeda's memory
->> controller did have an exclusive monitor so I think this would have
->> worked even in the non-coherent case.
->>
->> What exactly is your proposal to do here? I think we should assume the
->> h/w is designed correctly until we have a case that it is not.
->
-> Looking at the edac_mc_scrub_block code, atomic_scrub is always called with
-> a normal, cacheable mapping (kmap_atomic) so that doesn't help us (although
-> it means the exclusives will at least succeed).
->
-> The problem of speculative reads by the CPU could be solved by unmapped the
-> DMA buffer when we transfer the ownership over to the device (instead of
-> invalidating it after the transfer). However, I'm now slightly confused as
-> to how atomic_scrub fixes errors reported at any cache level higher than
-> L1. Do we need cache-flushing to ensure that the exclusive-store propagates
-> to the point of failure?
+This series adds the most critical cros_ec changes for newer boards
+using cros_ec.  Specifically:
+* Fixes timing/locking issues with the previously upstreamed (but
+  never used upstream) cros_ec_spi driver.
+* Updates the cros_ec header file to the latest version which allows
+  us to use newer EC features like i2c tunneling.
+* Adds an i2c tunnel driver to allow communication to the EC's i2c
+  devices.
 
-The whole point of scrubbing is to stop repeated error reporting of
-correctable errors. For example, you do a write to memory and the ECC
-code is added to it. Suppose the data stored in the memory gets
-corrupted either on the write or some time later you get a bit flip in
-the memory cell. Then when the data is read from memory, the memory
-controller will detect the error, correct it, and trigger and ECC
-correctable error interrupt. It will do this every time you read that
-memory location because the error occurred on the write. The only way
-to clear the error is re-writing memory. As long as that cache line is
-dirty, no reads from that memory location will occur as other readers
-will get the line from other cores, the L2, or the line will get
-pushed out to memory first. I guess you could see an invalidate on DMA
-memory causing the scrub to get lost, but that doesn't really matter.
-It would be harmless to get the error again other than making your
-error rate seem higher (which is something OEMs are very sensitive
-to). You are doing the invalidate so that DMA can write new data
-anyway.
+This _doesn't_ get the EC driver fully up to speed with what's in the
+current Chromium OS trees.  There are a whole slew of cleanup patches
+there, an addition of an LPC transport mode, and exports of functions
+to userspace.  Once these patches land and we have functionality we
+can continue to pick more cleanup patches.
 
-Rob
+Changes in v2:
+- Update tunnel binding as per swarren
+- Removed i2c20 alias for i2c tunnel
+
+Bill Richardson (1):
+  mfd: cros_ec: Sync to the latest cros_ec_commands.h from EC sources
+
+David Hendricks (1):
+  mfd: cros_ec: spi: calculate delay between transfers correctly
+
+Doug Anderson (5):
+  mfd: cros_ec: spi: Add mutex to cros_ec_spi
+  mfd: cros_ec: spi: Make the cros_ec_spi timeout more reliable
+  mfd: cros_ec: spi: Increase cros_ec_spi deadline from 5ms to 100ms
+  i2c: ChromeOS EC tunnel driver
+  ARM: tegra: Add the EC i2c tunnel to tegra124-venice2
+
+ .../devicetree/bindings/i2c/i2c-cros-ec-tunnel.txt |   39 +
+ arch/arm/boot/dts/tegra124-venice2.dts             |   26 +
+ drivers/i2c/busses/Kconfig                         |    9 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-cros-ec-tunnel.c            |  304 ++++++
+ drivers/mfd/cros_ec.c                              |    7 +-
+ drivers/mfd/cros_ec_spi.c                          |   67 +-
+ include/linux/mfd/cros_ec.h                        |    4 +-
+ include/linux/mfd/cros_ec_commands.h               | 1128 ++++++++++++++++++--
+ 9 files changed, 1493 insertions(+), 92 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-cros-ec-tunnel.txt
+ create mode 100644 drivers/i2c/busses/i2c-cros-ec-tunnel.c
+
+-- 
+1.9.1.423.g4596e3a
