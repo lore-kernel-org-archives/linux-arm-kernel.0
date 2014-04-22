@@ -1,85 +1,78 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 22 Apr 2014 12:24:02 +0200
-Subject: [PATCH] gpio: omap: implement get_direction
-In-Reply-To: <1398158635-18415-1-git-send-email-yegorslists@googlemail.com>
-References: <1398158635-18415-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <CABxcv=nieJq1NS1s=jtHOH_hK-C=O0Rh2OiZ36+2RK=8uLWh-A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Apr 2014 11:24:55 +0100
+Subject: [PATCH v3] arm64: enable EDAC on arm64
+In-Reply-To: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
+References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20140422102455.GD7484@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Yegor,
+Hi Rob,
 
-On Tue, Apr 22, 2014 at 11:23 AM,  <yegorslists@googlemail.com> wrote:
-> From: Yegor Yefremov <yegorslists@googlemail.com>
->
-> This patch implements gpio_chip's get_direction() routine, that
-> lets other drivers get particular GPIOs direction using
-> struct gpio_desc.
->
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-> ---
->  drivers/gpio/gpio-omap.c |   28 ++++++++++++++++++++++++++++
->  1 files changed, 28 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 19b886c..b55bf7b 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -102,6 +102,20 @@ static int omap_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->         return irq_find_mapping(bank->domain, offset);
->  }
->
-> +static int _get_gpio_direction(struct gpio_bank *bank, int gpio)
+On Mon, Apr 21, 2014 at 05:09:16PM +0100, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> Implement atomic_scrub and enable EDAC for arm64.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+
+[...]
+
+> diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
+> new file mode 100644
+> index 0000000..8a3d176
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/edac.h
+> @@ -0,0 +1,38 @@
+> +/*
+> + * Copyright 2013 Calxeda, Inc.
+> + * Based on PPC version Copyright 2007 MontaVista Software, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + */
+> +#ifndef ASM_EDAC_H
+> +#define ASM_EDAC_H
+> +/*
+> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
+
+What do you mean by `DMA safe'? For coherent (cacheable) DMA buffers, this
+should work fine, but for non-coherent (and potentially non-cacheable)
+buffers, I think we'll have problems both due to the lack of guaranteed
+exclusive monitor support and also eviction of dirty lines.
+
+Will
+
+> + * Implements the per arch atomic_scrub() that EDAC use for software
+> + * ECC scrubbing.  It reads memory and then writes back the original
+> + * value, allowing the hardware to detect and correct memory errors.
+> + */
+> +static inline void atomic_scrub(void *va, u32 size)
 > +{
-> +       void __iomem *reg = bank->base;
-> +       u32 l;
-> +       u32 mask = 1 << gpio;
+> +	unsigned int *virt_addr = va;
+> +	unsigned int i;
 > +
-> +       reg += bank->regs->direction;
-> +       l = readl_relaxed(reg);
-> +       if (l & mask)
-> +               return 1;
+> +	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+> +		long result;
+> +		unsigned long tmp;
 > +
-> +       return 0;
+> +		asm volatile("/* atomic_scrub */\n"
+> +		"1:     ldxr    %w0, %2\n"
+> +		"       stxr    %w1, %w0, %2\n"
+> +		"       cbnz    %w1, 1b"
+> +			: "=&r" (result), "=&r" (tmp), "+Q" (*virt_addr) : : );
+> +	}
 > +}
-> +
-
-You can avoid the if condition here by using return !!(l & mask) but
-the above code is more clear indeed so is up to you.
-
-Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
-
->  static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
->  {
->         void __iomem *reg = bank->base;
-> @@ -936,6 +950,19 @@ static inline void mpuio_init(struct gpio_bank *bank)
->
->  /*---------------------------------------------------------------------*/
->
-> +static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
-> +{
-> +       struct gpio_bank *bank;
-> +       unsigned long flags;
-> +       int dir;
-> +
-> +       bank = container_of(chip, struct gpio_bank, chip);
-> +       spin_lock_irqsave(&bank->lock, flags);
-> +       dir = _get_gpio_direction(bank, offset);
-> +       spin_unlock_irqrestore(&bank->lock, flags);
-> +       return dir;
-> +}
-> +
->  static int gpio_input(struct gpio_chip *chip, unsigned offset)
->  {
->         struct gpio_bank *bank;
-> @@ -1092,6 +1119,7 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
->          */
->         bank->chip.request = omap_gpio_request;
->         bank->chip.free = omap_gpio_free;
-> +       bank->chip.get_direction = gpio_get_direction;
->         bank->chip.direction_input = gpio_input;
->         bank->chip.get = gpio_get;
->         bank->chip.direction_output = gpio_output;
-> --
-> 1.7.7
->
+> +#endif
+> -- 
+> 1.9.1
+> 
+> 
