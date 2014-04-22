@@ -1,29 +1,28 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 22 Apr 2014 15:12:40 +0200
-Subject: [PATCH v3 11/11] ARM: at91/dt: define sam9rlek crystal frequencies
+Date: Tue, 22 Apr 2014 15:12:36 +0200
+Subject: [PATCH v3 07/11] ARM: at91/dt: add xtal frequencies to sama5d3
+ xplained board
 In-Reply-To: <1398172360-7837-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1398172360-7837-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1398172360-7837-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1398172360-7837-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define at91sam9rlek crystal frequencies.
+Define crystal properties of sama5d3 xplained board.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9rlek.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
-index cddb378..b3b89ba 100644
---- a/arch/arm/boot/dts/at91sam9rlek.dts
-+++ b/arch/arm/boot/dts/at91sam9rlek.dts
-@@ -20,6 +20,15 @@
- 		reg = <0x20000000 0x4000000>;
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index ce13755..f1a1119 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -21,6 +21,14 @@
+ 		reg = <0x20000000 0x10000000>;
  	};
  
-+
 +	slow_xtal {
 +		clock-frequency = <32768>;
 +	};
@@ -32,8 +31,8 @@ index cddb378..b3b89ba 100644
 +		clock-frequency = <12000000>;
 +	};
 +
- 	clocks {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ 	ahb {
+ 		apb {
+ 			mmc0: mmc at f0000000 {
 -- 
 1.8.3.2
