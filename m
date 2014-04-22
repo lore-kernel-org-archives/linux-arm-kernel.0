@@ -1,147 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Apr 2014 21:57:31 -0700
-Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
- probe and defer if needed
-In-Reply-To: <20140422030528.GB26554@atomide.com>
-References: <20140418205213.GA21823@atomide.com>
- <CAL_JsqJvVvo6R-qNXxur7wiZERKbi52xyKoWnmzJTfKS2iKK7A@mail.gmail.com>
- <20140418215848.GD21823@atomide.com>
- <20140418230335.GI24070@n2100.arm.linux.org.uk>
- <20140418232407.GQ21823@atomide.com>
- <CAL_JsqLvLTJwgsB-m0W72WxSUoTV4ubMdvM_a784J4k2eiK9AQ@mail.gmail.com>
- <20140421155424.GD23945@atomide.com> <53556AF1.2030608@gmail.com>
- <20140421202546.GA26554@atomide.com>
- <20140422030528.GB26554@atomide.com>
-Message-ID: <20140422045730.GC26554@atomide.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 Apr 2014 11:18:02 +0530
+Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
+In-Reply-To: <20140411112500.GM27282@n2100.arm.linux.org.uk>
+References: <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
+ <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
+ <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
+ <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
+ <53469C29.8050906@ti.com> <20140410134028.GL27282@n2100.arm.linux.org.uk>
+ <53477EC5.5080400@ti.com> <20140411112500.GM27282@n2100.arm.linux.org.uk>
+Message-ID: <53560292.2080609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140421 20:06]:
-> * Tony Lindgren <tony@atomide.com> [140421 13:26]:
-> > * Rob Herring <robherring2@gmail.com> [140421 12:01]:
-> > > Something like this is what you had in mind?
-... 
-> > > --- a/drivers/of/irq.c
-> > > +++ b/drivers/of/irq.c
-> > > @@ -400,6 +400,26 @@ int of_irq_to_resource(struct device_node *dev, int
-> > > index, struct resource *r)
-> > >  EXPORT_SYMBOL_GPL(of_irq_to_resource);
-> > > 
-> > >  /**
-> > > + * of_irq_get - Decode a node's IRQ and return it as a Linux irq number
-> > > + * @dev: pointer to device tree node
-> > > + * @index: zero-based index of the irq
-> > > + *
-> > > + * Returns Linux irq number on success, or -EPROBE_DEFER if the irq domain
-> > > + * is not yet created.
-> > > + *
-> > > + */
-> > > +int of_irq_get(struct device_node *dev, int index)
-> > > +{
-> > > +	int irq = irq_of_parse_and_map(dev, index);
-> > > +
-> > > +	if (!irq && of_find_irq_domain(dev, index) == NULL)
-> > > +		return -EPROBE_DEFER;
-> > > +
-> > > +	return irq;
-> > > +}
-> > 
-> > Yeah something like that. That might also work as a pretty
-> > minimal fix as long as we fix the known broken drivers to use
-> > platform_get_irq().
+On Friday 11 April 2014 04:55 PM, Russell King - ARM Linux wrote:
+> On Fri, Apr 11, 2014 at 11:03:57AM +0530, Sekhar Nori wrote:
+>> Here is a revised patch which is just an extension of your patch 
+>> with L2C-220 case handled. I dont really have L2C-220 hardware so even 
+>> if you want to handle that at a later time, it would be perfectly okay 
+>> with me.
 > 
-> Actually, the above code for of_irq_get() won't help as we're still
-> calling irq_of_parse_and_map() before we should. So the nasty warnings
-> are still there if the irqdomain is not yet found.
+> This is what I came up with, which of course is very similar to yours.
+> I think the only difference is that I'm allowing the state of the NS
+> access bits to be preserved by the OMAP code, getting OMAP closer to
+> the target of a ~0 mask.  The only bits which are clear in the mask
+> passed into the L2 code by OMAP now are:
+> 
+> - L310_AUX_CTRL_INSTR_PREFETCH
+> - L310_AUX_CTRL_DATA_PREFETCH
+> - L310_AUX_CTRL_CACHE_REPLACE_RR
+> - L2C_AUX_CTRL_SHARED_OVERRIDE
+> - L2C_AUX_CTRL_PARITY_ENABLE
+> 
+> It sounds like we can kill L310_AUX_CTRL_CACHE_REPLACE_RR as well since
+> that's already set for us (and fwir is the power-on-reset default too.)
+> 
+>  arch/arm/mach-omap2/omap4-common.c |  4 +---
+>  arch/arm/mm/cache-l2x0.c           | 23 +++++++++++++++++++++--
+>  2 files changed, 22 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> index c0f9a81a2d32..3b01c5223b11 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -213,8 +213,6 @@ static int __init omap_l2_cache_init(void)
+>  
+>  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
+>  	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
+> -		   L310_AUX_CTRL_NS_LOCKDOWN |
+> -		   L310_AUX_CTRL_NS_INT_CTRL |
+>  		   L2C_AUX_CTRL_SHARED_OVERRIDE |
+>  		   L310_AUX_CTRL_DATA_PREFETCH |
+>  		   L310_AUX_CTRL_INSTR_PREFETCH;
+> @@ -223,7 +221,7 @@ static int __init omap_l2_cache_init(void)
+>  	if (of_have_populated_dt())
+>  		l2x0_of_init(aux_ctrl, 0xc19fffff);
 
-OK so to fix the warning part of the problem we first need to not
-try to map uninitialized irqdomains and then downgrade the current
-warning to a dev_dbg.
+Just noticed that the mask here too should have been changed to
+0xcd9fffff. I will be making this change to the local version I am
+committing to base my AM43x support series on.
 
-So looks like the current minimal fix to my original problem the
-first patch from Jean-Jacques in this series, and the following patch.
+>  	else
+> -		l2x0_init(l2cache_base, aux_ctrl, 0xc19fffff);
+> +		l2x0_init(l2cache_base, aux_ctrl, 0xcd9fffff);
 
-This works for drivers that currently do of_irq_parse_and_map(),
-then your patch is also needed to make things work properly with
-platform_get_irq().
-
-8< ------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 21 Apr 2014 19:33:43 -0700
-Subject: [PATCH] of/platform: Fix no irq domain found errors when populating interrupts
-
-Currently we get the following kind of errors if we try to use interrupt
-phandles to irqchips that have not yet initialized:
-
-irq: no irq domain found for /ocp/pinmux at 48002030 !
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
-(show_stack+0x14/0x1c)
-(dump_stack+0x6c/0xa0)
-(warn_slowpath_common+0x64/0x84)
-(warn_slowpath_null+0x1c/0x24)
-(of_device_alloc+0x144/0x184)
-(of_platform_device_create_pdata+0x44/0x9c)
-(of_platform_bus_create+0xd0/0x170)
-(of_platform_bus_create+0x12c/0x170)
-(of_platform_populate+0x60/0x98)
-
-This is because we're wrongly trying to populate resources that are not
-yet available. It's perfectly valid to create irqchips dynamically, so
-let's fix up the issue by populating the interrupt resources at the
-driver probe time instead.
-
-Let's fix the problem by using of_find_irq_domain() recently introduced
-by Jean-Jacques Hiblot <jjhiblot@traphandler.com>. This way we can
-avoid calling irq_of_parse_and_map() unnecesssarily with incomplete
-data.
-
-And then we also need to accept the fact that some irqdomains do not
-exist that early on, and only get initialized later on. So we can
-make the current WARN_ON into just into a pr_debug().
-
-Note that this patch only solves the problem for drivers that are
-currently doing of_irq_parse_and_map(). A follow-up patch is needed
-to make platform_get_irq() to work without relying on the populated
-resources.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -425,13 +425,17 @@ int of_irq_count(struct device_node *dev)
- int of_irq_to_resource_table(struct device_node *dev, struct resource *res,
- 		int nr_irqs)
- {
--	int i;
-+	int i, found = 0;
- 
--	for (i = 0; i < nr_irqs; i++, res++)
-+	for (i = 0; i < nr_irqs; i++, res++) {
-+		if (!of_find_irq_domain(dev, i))
-+			continue;
- 		if (!of_irq_to_resource(dev, i, res))
- 			break;
-+		found++;
-+	}
- 
--	return i;
-+	return found;
- }
- EXPORT_SYMBOL_GPL(of_irq_to_resource_table);
- 
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -168,7 +168,9 @@ struct platform_device *of_device_alloc(struct device_node *np,
- 			rc = of_address_to_resource(np, i, res);
- 			WARN_ON(rc);
- 		}
--		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
-+		if (of_irq_to_resource_table(np, res, num_irq) != num_irq)
-+			pr_debug("not all legacy IRQ resources mapped for %s\n",
-+				 np->name);
- 	}
- 
- 	dev->dev.of_node = of_node_get(np);
+Thanks,
+Sekhar
