@@ -1,51 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Apr 2014 22:23:45 +0200
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <5356C9D1.2060001@ti.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
-Message-ID: <5895821.PvurJ8TWz2@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 23 Apr 2014 00:27:36 +0400
+Subject: [PATCH 05/14] ARM: shmobile: koelsch-reference: Work around core
+ clock issues
+In-Reply-To: <53cf0cf7ba2ef785b339826a0765bb6b1756adeb.1397774191.git.horms+renesas@verge.net.au>
+References: <cover.1397774190.git.horms+renesas@verge.net.au>
+ <53cf0cf7ba2ef785b339826a0765bb6b1756adeb.1397774191.git.horms+renesas@verge.net.au>
+Message-ID: <5356D0B8.5010406@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014 15:58:09 Santosh Shilimkar wrote:
-> On Tuesday 22 April 2014 03:53 PM, Arnd Bergmann wrote:
-> > On Tuesday 22 April 2014, Santosh Shilimkar wrote:
-> >> On Tuesday 22 April 2014 10:08 AM, Arnd Bergmann wrote:
-> >>> It's not the nicest API ever, but that's what it is and has been, mostly
-> >>> for compatibility with x86, where the 'mov' instruction performing the
-> >>> store to MMIO registers implies that all writes to DMA memory are
-> >>> visible to the device.
-> >>>
-> >> This is not about writel() and  writel_relaxed(). The driver don't
-> >> need that barrier. For example if the actual start of the DMA
-> >> happens bit later, that doesn't matter for the driver.
-> >>
-> >> DMA APIs already do barriers today for non-coherent case. We
-> >> are not talking anything new here. Sorry but I don't see the
-> >> connection here.
-> > 
-> > I don't think they do, nor should they. Can you tell me where
-> > you see a barrier in dma_sync_single_for_cpu() or 
-> > arm_dma_sync_single_for_device()? For all I can tell, they
-> > only deal with L1 and L2 cache maintainance in arm_dma_ops.
-> > 
-> The cache APIs used by dma_ops do have the necessary barriers
-> at end of the of the cache operations. Thats what I meant. So for
-> end user(Device driver), its transparent.
+Hello.
 
-Ok, I see it now for the noncoherent operations, and I see
-the same thing on PowerPC and MIPS, which also have both coherent
-and noncoherent versions of their dma_map_ops.
+On 04/18/2014 02:44 AM, Simon Horman wrote:
 
-However, I also see that neither of those does a wmb() for the
-coherent version. I don't see why ARM should be different from
-the others here, so if there is a reason to do a barrier there,
-we should change all architectures. I still don't see a reason
-why the barrier is needed though.
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Can you be more specific in your driver example why you think
-the barrier in the writel() is not sufficient?
+> Due to issues with runtime PM clock management, clocks not explicitly
+> managed by their drivers may not be enabled at all, or be inadvertently
+> disabled by the clk_disable_unused() late initcall.
 
-	Arnd
+> Until this is fixed, add a temporary workaround, calling
+> shmobile_clk_workaround() with enable == true.
+
+> For now this enables the clocks for: ether, i2c2, msiof0, qspi_mod, and
+> thermal. More clocks can be added if needed.
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+    It is strange but this workaround doesn't seem to help me booting Koelsch
+reference kernel with NFS root: it still crashes due to imprecise external 
+abort once the userland starts. Only the actual drivers/sh/ fixing series by 
+Ben/Geert helps with booting further. I therefore would like to have it merged 
+by Simon the sooner the better...
+
+WBR, Sergei
