@@ -1,31 +1,27 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Apr 2014 08:15:41 +0100
-Subject: [PATCH v4 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry
- macro for iteration
-In-Reply-To: <5355A349.50908@semaphore.gr>
-References: <534DB213.7080802@semaphore.gr>
- <5355A349.50908@semaphore.gr>
-Message-ID: <20140422071541.GA17657@lee--X1>
+Date: Tue, 22 Apr 2014 08:39:26 +0100
+Subject: [PATCH 1/3] arm: dts: add device_type="memory" for ste-ccu8540
+In-Reply-To: <1397756521-29387-2-git-send-email-leif.lindholm@linaro.org>
+References: <1397756521-29387-1-git-send-email-leif.lindholm@linaro.org>
+ <1397756521-29387-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <20140422073926.GC17657@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The cpufreq core now supports the cpufreq_for_each_entry macro helper
-> for iteration over the cpufreq_frequency_table, so use it.
+> The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
+> its memory node, relying on an old ppc quirk in order to discover its
+> memory. Add this, to permit that quirk to be made ppc only.
 > 
-> It should have no functional changes.
-
-> Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
 > ---
+>  arch/arm/boot/dts/ste-ccu8540.dts |    1 +
+>  1 file changed, 1 insertion(+)
 
-It would be good to have a changelog which describes the differences
-between the versions, so we can keep track.
-
->  drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
->  1 file changed, 8 insertions(+), 11 deletions(-)
-
-So it looks like I already applied v2 of this patch to my tree. What
-changed in v3 and v4? Should I remove that patch from MFD and apply
-this one instead?
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
 Lee Jones
