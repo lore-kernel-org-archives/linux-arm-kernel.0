@@ -1,97 +1,62 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 22 Apr 2014 14:01:22 +0100
-Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
-In-Reply-To: <000501cf5d48$4cf707c0$e6e51740$%han@samsung.com>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
- <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
- <16730530.rJ9T0MsYmt@wuerfel>
- <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
- <000501cf5d48$4cf707c0$e6e51740$%han@samsung.com>
-Message-ID: <20140422130122.GH865@e106497-lin.cambridge.arm.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Tue, 22 Apr 2014 15:01:48 +0200
+Subject: [PATCH v2] arm64: enable EDAC on arm64
+In-Reply-To: <CAL_Jsq+N4WgCN3DAigaPW_D=hujL+JQMxaM5rXz0TcQ1VWX8AA@mail.gmail.com>
+References: <1385154308-31335-1-git-send-email-robherring2@gmail.com>	<loom.20140410T150903-818@post.gmane.org>	<534C5F69.8030208@codeaurora.org>
+ <CAL_Jsq+N4WgCN3DAigaPW_D=hujL+JQMxaM5rXz0TcQ1VWX8AA@mail.gmail.com>
+Message-ID: <5356683C.7090909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 10:58:52AM +0100, Jingoo Han wrote:
-> On Monday, April 21, 2014 10:54 AM, Jingoo Han wrote:
-> > On Thursday, April 17, 2014 3:26 AM, Arnd Bergmann wrote:
-> > > On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
-> > > > Jingoo,
-> > > >
-> > > > Thanks for taking a stab at trying to convert a host bridge
-> > > > driver to use the new generic host bridge code.
-> > > >
-> > > > I do however have concerns on the direction you took. You have split
-> > > > your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
-> > > > even if (with my series) it should be no reason why the host bridge
-> > > > driver should not work on other architectures as well once they are
-> > > > converted.
-> > >
-> > > Right.
-> > >
-> > > > Also, some of the functions that you use have identical names but different
-> > > > signatures depending on what arch you have selected. This is really bad
-> > > > in my books!
-> 
-> [.....]
-> 
-> > > > What about creating functions that use my series directly if CONFIG_ARM64 is
-> > > > defined (or any CONFIG_ you want to create for your driver that you select
-> > > > from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
-> > > > way your driver will call only one API without any #ifdef and when arm code
-> > > > gets converted you drop your adaptation functions. Or (better yet), have a
-> > > > stab at converting bios32 (Rob Herring has already provided some hints on
-> > > > how to do it for arch/arm).
-> > 
-> > To: Liviu Dudau
-> > 
-> > Sorry, but I will not implement this.
-> > At first, you had to think the compatibility with ARM32 PCIe.
-> > Why do you want other engineers to take this load?
-> 
-> (+cc Rob Herring)
-> 
-> Um, I am looking at Rob Herring's patchset for Versatile PCI. [1]
-> Then, do you mean the following?
-> 
-> 1. Add Rob Herring's patch converting bios32. [2]
-> 2. Reference Rob Herring's patch in order to know how to
->     handle "of_create_pci_host_bridge()" directly in ARM32. [3]
-> 3. Use of_create_pci_host_bridge() for the designware PCIe
->     driver in ARM32.
-> 4. Also, use of_create_pci_host_bridge() for the designware PCIe
->     driver in "ARM64".
-> 
+Hi Rob,
 
-Sounds like a good plan. 3 and 4 should be one and the same in my opinion, but
-there might be more things in designware driver that I am missing right now.
+Thanks for taking care of that. Please see question below.
 
-Best regards,
-Liviu
+On 21.04.2014 18:19, Rob Herring wrote:
+> On Mon, Apr 14, 2014 at 5:21 PM, Rohit Vaswani <rvaswani@codeaurora.org> wrote:
+>> On 4/10/2014 6:10 AM, Tomasz Nowicki wrote:
+>>>
+>>> Rob Herring <robherring2 <at> gmail.com> writes:
+>>>
+>>>> From: Rob Herring <rob.herring <at> calxeda.com>
+>>>>
+>>>> Implement atomic_scrub and enable EDAC for arm64.
+>>>>
+>>>> Signed-off-by: Rob Herring <rob.herring <at> calxeda.com>
+>>>> Cc: Catalin Marinas <catalin.marinas <at> arm.com>
+>>>> Cc: Will Deacon <will.deacon <at> arm.com>
+>>>> ---
+>>>> v2:
+>>>> - Add loop for exclusive store success
+>>>> - Fix size to be 32-bits at a time. The framework gives no alignment
+>>>>     guarantees.
+>>>>
+>>> Hi Rob,
+>>>
+>>> I am working on memory error for ARM64 and wondering what is your plans
+>>> regarding this patch. It looks essential for my further work.
+>>>
+>>> Regards,
+>>> Tomasz
+>>>
+>> Hi Tomasz, Rob,
+>>
+>> I am looking at similar information for A53 and A57 for the L1/L2 single and
+>> double bit ecc errors.
+>> Is there an upstream/linaro effort for EDAC driver in progress ?
+>
+> I just sent out v3.
+>
+> There is work to develop a generic RAS framework based on perf which
+> would hopefully replace EDAC and mcelog(x86 only).
 
-> 
-> [1] http://www.spinics.net/lists/linux-pci/msg30084.html
-> [2] http://www.spinics.net/lists/linux-pci/msg30083.html
-> [3] http://www.spinics.net/lists/linux-pci/msg30086.html
-> 
-> Best regards,
-> Jingoo Han
-> 
-> > 
-> > >
-> > > That would of course be best.
-> > >
-> 
-> [.....]
-> 
-> 
+What do you mean by EDAC and mcelog replacement with RAS framework?
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> Jean Pihet has
+> picked up this work recently. There probably needs to be some
+> infrastructure work to handle SError events as I believe that is how
+> cache ECC errors are reported. Although those may get handled by
+> firmware and then passed to the OS via some other mechanism like ACPI.
+
+
+Tomasz
