@@ -1,56 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Apr 2014 16:30:07 +0200
-Subject: [PATCH v8 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <535679A6.4020103@linaro.org>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <10652983.rXrAGMo8Yn@wuerfel> <535679A6.4020103@linaro.org>
-Message-ID: <201404221630.07865.arnd@arndb.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 22 Apr 2014 16:36:34 +0200
+Subject: [PATCH] ARM: EXYNOS: cpu hotplug: use v7_exit_coherency_flush
+ macro for cache disabling
+In-Reply-To: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
+References: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
+Message-ID: <53567E72.1030201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014, zhangfei wrote:
-> On 04/22/2014 04:22 PM, Arnd Bergmann wrote:
-> 
-> >> It's private register of the phy marvell 88e1512.
-> >> To make it clearer using define instead.
-> >> #define MII_MARVELL_PHY_PAGE    22
-> >>
-> >> The registers has been grouped into several pages, access register need
-> >> choose which page first.
-> >
-> > You shouldn't touch the PHY private registers in the main driver though,
-> > this should be purely handled by drivers/net/phy/marvell.c.
-> >
-> > I don't see support for 88e1512 there, only 88e1510 and lots of older
-> > ones, but I assume it isn't hard to add.
-> >
-> 
-> 88e1512 driver is already supported, same as 88e1510.
-> #define MARVELL_PHY_ID_MASK             0xfffffff0
-> So it should support 88e151x.
-> 
-> Reset is required here for get_phy_id, otherwise only 0 can be get.
-> phy_device_create will not be called, and can not match any driver.
-> 
-> However in the experiment, it is found BMCR_RESET is not required in fact.
-> Only hip04_mdio_write(bus, i, MII_MARVELL_PHY_PAGE, 0) has to be set.
-> 88e151x registers are divided into pages.
-> Generic MII registers is in page 0, including MII_PHYSID1 and MII_PHYSID2.
-> Unfortunately the default page is not 0, so get_phy_id will fail.
-> 
-> So bus->reset still required to set the page to 0, prepared for get_phy_id.
+On 04/22/2014 04:18 PM, Leela Krishna Amudala wrote:
+> Remove the duplicated code for cache disabling and use "v7_exit_coherency_flush"
+> macro to do the same job.
 
-But it means that the hip04_mdio driver potentially won't work if connected
-to something other than a Marvell PHY.
+Hi Leela,
 
-I noticed that the marvell_of_reg_init() does this at init time:
+thanks for this patch! It would be nice if you can describe why those 
+macros can be replaced by the generic v7_exit_coherency_flush macro.
 
-saved_page = phy_read(phydev, MII_MARVELL_PHY_PAGE);
-... /* perform init */
-if (page_changed)
-	phy_write(phydev, MII_MARVELL_PHY_PAGE, saved_page);
+>
+> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+>
+> ---
+> cpu hotplug is tested with 3.15-rc1 on Origen(which has cortex A9) and
+> Arndale octa(which has cortex A7 and A15) boards.
+>
+>   arch/arm/mach-exynos/hotplug.c |   56 ++--------------------------------------
+>   1 file changed, 2 insertions(+), 54 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> index 5eead53..9eb8d1b 100644
+> --- a/arch/arm/mach-exynos/hotplug.c
+> +++ b/arch/arm/mach-exynos/hotplug.c
+> @@ -24,56 +24,6 @@
+>   #include "common.h"
+>   #include "regs-pmu.h"
+>
+> -static inline void cpu_enter_lowpower_a9(void)
+> -{
+> -	unsigned int v;
+> -
+> -	asm volatile(
+> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
+> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
+> -	/*
+> -	 * Turn off coherency
+> -	 */
+> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, %3\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, %2\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> -	  : "=&r" (v)
+> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+> -	  : "cc");
+> -}
+> -
+> -static inline void cpu_enter_lowpower_a15(void)
+> -{
+> -	unsigned int v;
+> -
+> -	asm volatile(
+> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, %1\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> -	  : "=&r" (v)
+> -	  : "Ir" (CR_C)
+> -	  : "cc");
+> -
+> -	flush_cache_louis();
+> -
+> -	asm volatile(
+> -	/*
+> -	* Turn off coherency
+> -	*/
+> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, %1\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> -	: "=&r" (v)
+> -	: "Ir" (0x40)
+> -	: "cc");
+> -
+> -	isb();
+> -	dsb();
+> -}
+> -
+>   static inline void cpu_leave_lowpower(void)
+>   {
+>   	unsigned int v;
+> @@ -141,10 +91,8 @@ void __ref exynos_cpu_die(unsigned int cpu)
+>   	 * appropriate sequence for entering low power.
+>   	 */
+>   	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
 
-Is this a bug? Maybe it should always set page 0 when leaving
-this function.
+Can't you remove this asm line above as well as the primary_part variable ?
 
-	Arnd
+> -	if ((primary_part & 0xfff0) == 0xc0f0)
+> -		cpu_enter_lowpower_a15();
+> -	else
+> -		cpu_enter_lowpower_a9();
+> +
+> +	v7_exit_coherency_flush(louis);
+>
+>   	platform_do_lowpower(cpu, &spurious);
+>
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
