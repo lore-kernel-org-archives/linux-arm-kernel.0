@@ -1,89 +1,208 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 22 Apr 2014 11:18:41 +0900
-Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
-In-Reply-To: <CAFp+6iGYfz+ZT9zxgeVefLhtb0mb-=K4faUZC+1FtQoO0hMoqw@mail.gmail.com>
-References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
- <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
- <534529B2.2020107@samsung.com>
- <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
- <53454C11.7060607@samsung.com>
- <CAFp+6iHU0YXj18ajDwOqPh_SJWr6GkMPRr6qaGdmPoCc0+tz5g@mail.gmail.com>
- <CAFp+6iH7-O8pNNMrk7Yhg1u+DXcXD1Tp9RYdiFg+-Om5Toojfw@mail.gmail.com>
- <534E892B.6090409@samsung.com>
- <CAFp+6iGYfz+ZT9zxgeVefLhtb0mb-=K4faUZC+1FtQoO0hMoqw@mail.gmail.com>
-Message-ID: <001101cf5dd1$2e04d390$8a0e7ab0$%han@samsung.com>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Tue, 22 Apr 2014 10:26:36 +0800
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+Message-ID: <1398133596-29170-1-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 16, 2014 11:49 PM, Vivek Gautam wrote:
-> On Wed, Apr 16, 2014 at 7:14 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > On 15.04.2014 08:09, Vivek Gautam wrote:
-> >> On Thu, Apr 10, 2014 at 5:09 PM, Vivek Gautam wrote:
-> >>> On Wed, Apr 9, 2014 at 7:03 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> >>>> On 09.04.2014 13:49, Vivek Gautam wrote:
-> >>>
-> >>> So, USB30_SCLK_100M is the SCLK that we are talking in the driver. I
-> >>> don't see any reference to XXTI in the USB 3.0 DRD controller chapter
-> >>> (in both Exynos5250 and 5420)
-> >>> In addition to this there's one more point to be noticed here.
-> >>> On Exynos5420 system, the sclk_usbphy300 (which is the sclk_usbphy30
-> >>> for USB DRD channel 0), is also the PICO phy clock, i.e. USB 2.0 phy
-> >>> clock.
-> >>> So we should add a similar clk_get() for this clock in the
-> >>> phy-exynos5250-usb2 driver too, to support Exynos5420.
-> >>
-> >>
-> >> Is something clear from the above block diagram ? (although the
-> >> diagram looks weird - space and tabs problem :-(  )
-> >> Basically there's the clock USB30_SCLK_100M which is going into the
-> >> USB 3.0 DRD PHY controller.
-> >> And this is the only sclk mentioned in the block diagram for USB 3.0
-> >> DRD controller in Exynos5420.
-> >> Same is not there in the block diagram in Exynos5250 UM.
-> >
-> >
-> > From what I can see in the documentation, there are 4 USB 3.0 related clocks
-> > generated in CMU:
-> >
-> >  - sclk_usbphy300,
-> >  - sclk_usbphy301,
-> >  - sclk_usbdrd300,
-> >  - sclk_usbdrd301,
-> >
-> > They are all rated to max. 24 MHz and the recommended operating frequency is
-> > 24 MHz, so it looks exactly like USB PHY reference, which is usually a 24
-> > MHz clock.
-> >
-> > To me, this looks like on Exynos5420 a separate special clock path is used
-> > instead of xusbxti as reference of USB 3.0 PHY and so the sclk should be
-> > simply passed as the "ref" clock.
-> 
-> Ok, i will clear on this with the hardware engineer also once.
-> May be Jingoo can help me with this.
-> 
-> Jingoo,
-> Can you please enquire about the clock path of usbphy30 reference
-> clocks on Exynos5420.
-> As mentioned by Tomasz above, we have sclk_usbphy300 and
-> sclk_usbphy301 as the reference clocks for USB3.0 DRD phy. *Also*
-> sclk_usbphy300 is used for Pico phy (which is the USb 2.0 phy used by
-> ehci/ohci controller on Exynos5420).
-> It will be of great help.
+This adds core support for saving and restoring CPU PMU registers
+for suspend/resume support i.e. deeper C-states in cpuidle terms.
+This patch adds support only to ARMv7 PMU registers save/restore.
+It needs to be extended to xscale and ARMv6 if needed.
 
-Hi Vevek, Tomasz
+I made this patch because DS-5 is not working on Marvell's CA7 based SoCs.
+And it has consulted Sudeep KarkadaNagesha's patch set for multiple PMUs.
 
-Long time no see.
+Thanks Will and Sudeep's suggestion to only save / restore used events.
 
-I asked USB S/W engineer and USB H/W engineer.
+Cc: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+---
+ arch/arm/include/asm/pmu.h       |    4 +++
+ arch/arm/kernel/perf_event.c     |    2 ++
+ arch/arm/kernel/perf_event_cpu.c |   28 +++++++++++++++
+ arch/arm/kernel/perf_event_v7.c  |   74 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 108 insertions(+)
 
-There are two USB3.0 on Exynos5420; thus there are two sclks
-such as 'sclk_usbphy300 and sclk_usbphy301'.
-
-As Tomasz mentioned, 'sclk_usbphy300 and sclk_usbphy301' can
-be used instead of 'xusbxti' as reference of USB 3.0 PHY.
-
-However, on Exynos5420, "ONLY" 'sclk_usbphy300' can be used
-for USB2.0 pico phy. (so, '301' CANNOT support USB2.0 pico phy.)
-
-Best regards,
-Jingoo Han
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index ae1919b..3de3db7 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -83,6 +83,10 @@ struct arm_pmu {
+ 	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
+ 	void		(*free_irq)(struct arm_pmu *);
+ 	int		(*map_event)(struct perf_event *event);
++	int		(*register_pm_notifier)(struct arm_pmu *);
++	void		(*unregister_pm_notifier)(struct arm_pmu *);
++	void		(*save_regs)(struct arm_pmu *);
++	void		(*restore_regs)(struct arm_pmu *);
+ 	int		num_events;
+ 	atomic_t	active_events;
+ 	struct mutex	reserve_mutex;
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index a6bc431..08822de 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -326,6 +326,7 @@ static void
+ armpmu_release_hardware(struct arm_pmu *armpmu)
+ {
+ 	armpmu->free_irq(armpmu);
++	armpmu->unregister_pm_notifier(armpmu);
+ 	pm_runtime_put_sync(&armpmu->plat_device->dev);
+ }
+ 
+@@ -339,6 +340,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+ 		return -ENODEV;
+ 
+ 	pm_runtime_get_sync(&pmu_device->dev);
++	armpmu->register_pm_notifier(armpmu);
+ 	err = armpmu->request_irq(armpmu, armpmu_dispatch_irq);
+ 	if (err) {
+ 		armpmu_release_hardware(armpmu);
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 51798d7..79e1c06 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -19,6 +19,7 @@
+ #define pr_fmt(fmt) "CPU PMU: " fmt
+ 
+ #include <linux/bitmap.h>
++#include <linux/cpu_pm.h>
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+@@ -173,6 +174,31 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 	return 0;
+ }
+ 
++static int cpu_pmu_pm_notify(struct notifier_block *b,
++					unsigned long action, void *v)
++{
++	if (action == CPU_PM_ENTER && cpu_pmu->save_regs)
++		cpu_pmu->save_regs(cpu_pmu);
++	else if (action == CPU_PM_EXIT && cpu_pmu->restore_regs)
++		cpu_pmu->restore_regs(cpu_pmu);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block cpu_pmu_pm_notifier = {
++	.notifier_call = cpu_pmu_pm_notify,
++};
++
++static int cpu_pmu_register_pm_notifier(struct arm_pmu *cpu_pmu)
++{
++	return cpu_pm_register_notifier(&cpu_pmu_pm_notifier);
++}
++
++static void cpu_pmu_unregister_pm_notifier(struct arm_pmu *cpu_pmu)
++{
++	cpu_pm_unregister_notifier(&cpu_pmu_pm_notifier);
++}
++
+ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int cpu;
+@@ -187,6 +213,8 @@ static void cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->get_hw_events	= cpu_pmu_get_cpu_events;
+ 	cpu_pmu->request_irq	= cpu_pmu_request_irq;
+ 	cpu_pmu->free_irq	= cpu_pmu_free_irq;
++	cpu_pmu->register_pm_notifier	= cpu_pmu_register_pm_notifier;
++	cpu_pmu->unregister_pm_notifier	= cpu_pmu_unregister_pm_notifier;
+ 
+ 	/* Ensure the PMU has sane values out of reset. */
+ 	if (cpu_pmu->reset)
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index f4ef398..9069310 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -1237,6 +1237,78 @@ static void armv7_pmnc_dump_regs(struct arm_pmu *cpu_pmu)
+ }
+ #endif
+ 
++struct armv7_pmuregs {
++	u32 pmc;
++	u32 pmcntenset;
++	u32 pmintenset;
++	u32 pmxevttype[8];
++	u32 pmxevtcnt[8];
++};
++
++static DEFINE_PER_CPU(struct armv7_pmuregs, pmu_regs);
++
++static void armv7pmu_reset(void *info);
++
++static void armv7pmu_save_regs(struct arm_pmu *cpu_pmu)
++{
++	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	struct armv7_pmuregs *regs;
++	int bit;
++
++	/* Check whether there are events used */
++	bit = find_first_bit(events->used_mask, cpu_pmu->num_events);
++	if (bit >= cpu_pmu->num_events)
++		return;
++
++	regs = this_cpu_ptr(&pmu_regs);
++	for_each_set_bit(bit, events->used_mask, cpu_pmu->num_events) {
++		if (bit) {
++			armv7_pmnc_select_counter(bit);
++			asm volatile("mrc p15, 0, %0, c9, c13, 1"
++					: "=r"(regs->pmxevttype[bit]));
++			asm volatile("mrc p15, 0, %0, c9, c13, 2"
++					: "=r"(regs->pmxevtcnt[bit]));
++		} else
++			asm volatile("mrc p15, 0, %0, c9, c13, 0"
++					: "=r" (regs->pmxevtcnt[0]));
++	}
++
++	asm volatile("mrc p15, 0, %0, c9, c12, 1" : "=r" (regs->pmcntenset));
++	asm volatile("mrc p15, 0, %0, c9, c14, 1" : "=r" (regs->pmintenset));
++	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (regs->pmc));
++}
++
++static void armv7pmu_restore_regs(struct arm_pmu *cpu_pmu)
++{
++	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	struct armv7_pmuregs *regs;
++	int bit;
++
++	/* Check whether there are events used */
++	bit = find_first_bit(events->used_mask, cpu_pmu->num_events);
++	if (bit >= cpu_pmu->num_events)
++		return;
++
++	armv7pmu_reset(cpu_pmu);
++
++	regs = this_cpu_ptr(&pmu_regs);
++	for_each_set_bit(bit, events->used_mask, cpu_pmu->num_events) {
++		if (bit) {
++			armv7_pmnc_select_counter(bit);
++			asm volatile("mcr p15, 0, %0, c9, c13, 1"
++					: : "r"(regs->pmxevttype[bit]));
++			asm volatile("mcr p15, 0, %0, c9, c13, 2"
++					: : "r"(regs->pmxevtcnt[bit]));
++		} else
++			asm volatile("mcr p15, 0, %0, c9, c13, 0"
++					: : "r" (regs->pmxevtcnt[0]));
++	}
++
++	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (regs->pmcntenset));
++	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (regs->pmintenset));
++	asm volatile("mcr p15, 0, %0, c9, c12, 0" : : "r" (regs->pmc));
++}
++
+ static void armv7pmu_enable_event(struct perf_event *event)
+ {
+ 	unsigned long flags;
+@@ -1528,6 +1600,8 @@ static void armv7pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->start		= armv7pmu_start;
+ 	cpu_pmu->stop		= armv7pmu_stop;
+ 	cpu_pmu->reset		= armv7pmu_reset;
++	cpu_pmu->save_regs	= armv7pmu_save_regs;
++	cpu_pmu->restore_regs	= armv7pmu_restore_regs;
+ 	cpu_pmu->max_period	= (1LLU << 32) - 1;
+ };
+ 
+-- 
+1.7.9.5
