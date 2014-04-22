@@ -1,61 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Apr 2014 09:44:08 -0500
-Subject: [PATCH v2 4/7] of: configure the platform device dma parameters
-In-Reply-To: <53568641.2020300@ti.com>
-References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
- <1397917972-6293-5-git-send-email-santosh.shilimkar@ti.com>
- <CAL_JsqJJ4Cbh5poMa-KRwy+bp_t3VtRd7bCpcWey+DZ74eYHJQ@mail.gmail.com>
- <53568641.2020300@ti.com>
-Message-ID: <CAL_JsqKe_L00P36UT7hizB=zAxCB0S_1kV3XEVGGbJOi27S84A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Apr 2014 16:49:35 +0200
+Subject: [PATCH V2 1/4] pinctrl: tegra: remove redundant data table fields
+In-Reply-To: <1397581250-1506-1-git-send-email-swarren@wwwdotorg.org>
+References: <1397581250-1506-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CACRpkdYx6aBNTSHAjJVpJ=H=2Bkf5QrzZEUcBhqY9T9u2eHvjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 10:09 AM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> Hi Rob,
+On Tue, Apr 15, 2014 at 7:00 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+
+> From: Stephen Warren <swarren@nvidia.com>
 >
-> On 04/21/2014 05:58 PM, Rob Herring wrote:
->> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
->>> Retrieve DMA configuration from DT and setup platform device's DMA
->>> parameters. The DMA configuration in DT has to be specified using
->>> "dma-ranges" and "dma-coherent" properties if supported.
->>>
->>> We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
->>> using "dma-coherent" device tree properties.
->>>
->>> The set_arch_dma_coherent_ops macro has to be defined by arch if
->>> it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
->>> declared as nop.
-
-[...]
-
->>>
->>> +       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
->>> +       if (ret < 0) {
->>
->> Perhaps an error is not the right return for the default case. The
->> default should probably be dma_addr and paddr equal to 0 and size 4GB.
+> Any SoC which supports the einput, odrain, lock, ioreset, or rcv_sel
+> options has the relevant HW register fields in the same register as the
+> mux function selection. Similarly, the drvtype option is always in the
+> drive register, if it is supported at all. Hence, we don't need to have
+> struct *_reg fields in the pin group table to define which register and
+> bank to use for those options. Delete this to save space in the driver's
+> data tables.
 >
-> The error code is needed here to properly distinguish the case when
-> there are no "dma-ranges" defined in DT. Also, I think, that
-> of_dma_get_range() shouldn't return any default values - It just
-> has to get data from DT. And the caller should decide what to do
-> with this data and how to handle error cases.
+> However, many of those options are not supported on all SoCs, or not
+> supported on some pingroups. We need a way to detect when they are
+> supported. Previously, this was indicated by setting the struct *_reg
+> field to -1. With the struct *_reg fields removed, we use the struct
+> *_bit fields for this purpose instead. The struct *_bit fields need to
+> be expanded from 5 to 6 bits in order to store a value outside the valid
+> HW bit range of 0..31.
 >
-> So, I prefer to keep behavior as is:
-> - in case of failure of_dma_get_range() will not touch values of
->   &dma_addr, &paddr, &size.
+> Even without removing the struct *_reg fields, we still need to add code
+> to validate the struct *_bit fields, since some struct *_bit fields were
+> already being set to -1, without an option-specific struct *_reg field to
+> "guard" them. In other words, before this change, the pinmux driver might
+> allow some unsupported options to be written to HW.
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> (Note: For V2, I'm only reposting patch 1/4, since patch 2/4 is large, and
+> I don't want to spam the list again with the whole series)
+>
+> v2:
+> * Modify width of struct tegra_pingroup's drvtype_bit in the same way as
+>   other *_bit fields.
+> * Fix struct tegra_pingroup's documentation to match the changes made
+>   to the struct.
+> * Fix pinctrl-tegra20.c's DRV_PG_EXT() macro to initialize the drvtype_bit
+>   field.
 
-Fine, but that is not how of_dma_get_range currently behaves:
+This v2 version applied.
 
-+       *dma_addr = of_read_number(ranges, naddr);
-+       *paddr = of_translate_dma_address(np, ranges);
-+       if (*paddr == OF_BAD_ADDR) {
-+               pr_err("%s: translation of DMA address(%pad) to CPU
-address failed node(%s)\n",
-+                      __func__, dma_addr, np->full_name);
-+               ret = -EINVAL;
-+       }
-
-Rob
+Yours,
+Linus Walleij
