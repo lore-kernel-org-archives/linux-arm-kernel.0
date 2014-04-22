@@ -1,158 +1,64 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 22 Apr 2014 17:56:31 +0300
-Subject: [PATCH v2 2/7] of: introduce of_dma_get_range() helper
-In-Reply-To: <CAL_Jsq+9dZiAndnbC3fZDjZWU90K4BBR=ckuDxfy5_mBcRL=nA@mail.gmail.com>
-References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>	<1397917972-6293-3-git-send-email-santosh.shilimkar@ti.com>
- <CAL_Jsq+9dZiAndnbC3fZDjZWU90K4BBR=ckuDxfy5_mBcRL=nA@mail.gmail.com>
-Message-ID: <5356831F.40006@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Apr 2014 16:08:36 +0200
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
+ memory barrier
+In-Reply-To: <53567352.1080306@ti.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140422102834.GE7484@arm.com> <53567352.1080306@ti.com>
+Message-ID: <201404221608.36628.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tuesday 22 April 2014, Santosh Shilimkar wrote:
+> On Tuesday 22 April 2014 06:28 AM, Will Deacon wrote:
 
-On 04/21/2014 06:29 PM, Rob Herring wrote:
-> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> The of_dma_get_range() allows to find "dma-range" property for
->> the specified device and parse it.
->>   dma-ranges format:
->>     DMA addr (dma_addr)          : naddr cells
->>     CPU addr (phys_addr_t)       : pna cells
->>     size                         : nsize cells
->>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>   drivers/of/platform.c       |   85 +++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/of_platform.h |    8 ++++
->
-> This belongs in drivers/of/address.c and of_address.h.
->
->>   2 files changed, 93 insertions(+)
->>
->> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->> index 404d1da..2265a55 100644
->> --- a/drivers/of/platform.c
->> +++ b/drivers/of/platform.c
->> @@ -485,4 +485,89 @@ int of_platform_populate(struct device_node *root,
->>          return rc;
->>   }
->>   EXPORT_SYMBOL_GPL(of_platform_populate);
->> +
->> +/**
->> + * of_dma_get_range - Get DMA range info
->> + * @np:                device node to get DMA range info
->> + * @dma_addr:  pointer to store initial DMA address of DMA range
->> + * @paddr:     pointer to store initial CPU address of DMA range
->> + * @size:      pointer to store size of DMA range
->> + *
->> + * Look in bottom up direction for the first "dma-range" property
->
-> dma-ranges
->
->> + * and parse it.
->> + *  dma-ranges format:
->> + *     DMA addr (dma_addr)     : naddr cells
->> + *     CPU addr (phys_addr_t)  : pna cells
->> + *     size                    : nsize cells
->> + *
->> + * It returns -ENODEV if "dma-ranges" property was not found
->> + * for this device in DT.
->> + */
->> +extern int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
->
-> drop extern.
->
->> +               phys_addr_t *paddr, phys_addr_t *size)
->> +{
->> +       struct device_node *node = np;
->> +       const u32 *ranges = NULL;
->
-> __be32
->
->> +       int len, naddr, nsize, pna;
->> +       int ret = 0;
->> +
->> +       if (!node)
->> +               return -EINVAL;
->> +
->> +       while (1) {
->> +               naddr = of_n_addr_cells(node);
->> +               nsize = of_n_size_cells(node);
->> +               node = of_get_next_parent(node);
->> +               if (!node)
->> +                       break;
->> +
->> +               ranges = of_get_property(node, "dma-ranges", &len);
->> +
->> +               /* Ignore empty ranges, they imply no translation required */
->> +               if (ranges && len > 0)
->> +                       break;
->> +
->> +               /*
->> +                * At least empty ranges has to be defined for parent node if
->> +                * DMA is supported
->> +                */
->> +               if (!ranges)
->> +                       break;
->
-> You need an of_node_put here if you are getting the next parent.
+> > Don't you only need these barriers if you're passing ownership of a CPU
+> > buffer to a device? In that case, I would expect a subsequent writel to tell
+> > the device about the new buffer, which includes the required __iowmb().
+> > That's the reason for the relaxed accessors: to avoid this barrier when it's
+> > not needed. Perhaps you're using the relaxed accessors where you actually
+> > need the stronger ordering guarantees?
+> > 
+> I kind of guessed some one will bring up above point. Infact this is how
+> mostly people have been living with the issue on coherent machines. On
+> Keystone too, we did explicit barriers in respective drivers.
 
-Seems, It's not needed, because of_get_next_parent() does following:
-	parent = of_node_get(node->parent);
-	of_node_put(node);
+You should not actually need explicit barriers in the drivers. As Will
+said, you already do a writel() operation, which is contains the
+implicit wmb.
 
->
->> +       }
->> +
->> +       if (!ranges) {
->> +               pr_debug("%s: no dma-ranges found for node(%s)\n",
->> +                        __func__, np->full_name);
->> +               ret = -ENODEV;
->> +               goto out;
->> +       }
->> +
->> +       len /= sizeof(u32);
->> +
->> +       pna = of_n_addr_cells(node);
->> +
->> +       /* dma-ranges format:
->> +        * DMA addr     : naddr cells
->> +        * CPU addr     : pna cells
->> +        * size         : nsize cells
->> +        */
->> +       *dma_addr = of_read_number(ranges, naddr);
->
-> You should set this after the following call succeeds.
->
->> +       *paddr = of_translate_dma_address(np, ranges);
->
-> This is going to search for dma-ranges again, but you have already
-> done that. Is there a case that just reading the CPU addr will not
-> work? I suppose we could have more than one level of translation. It
-> also seems a bit abusive that the DMA address is the ranges property.
-> I don't really have a better suggestion though.
+> I have added these barriers only on CPU to device streaming APIs because on
+> other direction, the memory is already upto date from CPU's perspective.
+> 
+> But if you look at the actual problem, its really responsibility of
+> DMA streaming APIs which we are trying to push on to drivers. A device
+> driver should be independent of whether it is running on a coherent or
+> a non-coherent CPU.
+> 
+> Lets take a example....
+> MMC controller driver running on a non-coherent and coherent machine.
+> Driver has below code sequence which is generic.
+> 1. Prepare SG list
+> 2. Perform CMO using DMA streaming API
+> 3. Start DMA transfer...
+> 	
+> Step 3 expects that step 2 has done its job and buffer is
+> completely in the main memory. And thats what also happens
+> on non-coherent machines.
+> 
+> Now, on coherent machines, as you mentioned, we are saying drivers
+> should add a barrier because Step2 is just NOP which is not correct.
+> The Step3 itself which is just suppose to start DMA doesn't need
+> any barrier as such. This is the whole rationale behind the patch.
 
-I think, We need to keep using of_translate_dma_address(), because
-this code intended to be generic and, as result, there is no
-guarantee that we will always have one level of translations.
+That's not what the API is. The entire reason for having both writel()
+and writel_relaxed() is that drivers rely on writel() to do the barrier.
+Doing another barrier in the DMA operations would add unnecessary
+overhead for every single driver.
 
->
->> +       if (*paddr == OF_BAD_ADDR) {
->
-> As I mentioned, this is potentially a size mismatch.
+It's not the nicest API ever, but that's what it is and has been, mostly
+for compatibility with x86, where the 'mov' instruction performing the
+store to MMIO registers implies that all writes to DMA memory are
+visible to the device.
 
-Thanks for your review.
-
-Regards,
-Grygorii
+	Arnd
