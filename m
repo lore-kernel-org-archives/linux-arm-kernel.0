@@ -1,47 +1,89 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 22 Apr 2014 11:18:13 +0900
-Subject: [PATCH] ARM: dts: disable MDMA1 node for smdk5420 board
-In-Reply-To: <001a01cf5b0c$5ddc7d60$19957820$%jun@samsung.com>
-References: <001a01cf5b0c$5ddc7d60$19957820$%jun@samsung.com>
-Message-ID: <021301cf5dd1$1d0ec910$572c5b30$@samsung.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 22 Apr 2014 11:18:41 +0900
+Subject: [PATCH V4 1/5] phy: Add new Exynos5 USB 3.0 PHY driver
+In-Reply-To: <CAFp+6iGYfz+ZT9zxgeVefLhtb0mb-=K4faUZC+1FtQoO0hMoqw@mail.gmail.com>
+References: <1396967803-28868-1-git-send-email-gautam.vivek@samsung.com>
+ <1396967803-28868-2-git-send-email-gautam.vivek@samsung.com>
+ <534529B2.2020107@samsung.com>
+ <CAFp+6iEzaxCQNkGZWuBnAaAHk0uXrX4KhjVbaJfZFChB6uzk4A@mail.gmail.com>
+ <53454C11.7060607@samsung.com>
+ <CAFp+6iHU0YXj18ajDwOqPh_SJWr6GkMPRr6qaGdmPoCc0+tz5g@mail.gmail.com>
+ <CAFp+6iH7-O8pNNMrk7Yhg1u+DXcXD1Tp9RYdiFg+-Om5Toojfw@mail.gmail.com>
+ <534E892B.6090409@samsung.com>
+ <CAFp+6iGYfz+ZT9zxgeVefLhtb0mb-=K4faUZC+1FtQoO0hMoqw@mail.gmail.com>
+Message-ID: <001101cf5dd1$2e04d390$8a0e7ab0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seungwon Jeon wrote:
+On Wednesday, April 16, 2014 11:49 PM, Vivek Gautam wrote:
+> On Wed, Apr 16, 2014 at 7:14 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > On 15.04.2014 08:09, Vivek Gautam wrote:
+> >> On Thu, Apr 10, 2014 at 5:09 PM, Vivek Gautam wrote:
+> >>> On Wed, Apr 9, 2014 at 7:03 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> >>>> On 09.04.2014 13:49, Vivek Gautam wrote:
+> >>>
+> >>> So, USB30_SCLK_100M is the SCLK that we are talking in the driver. I
+> >>> don't see any reference to XXTI in the USB 3.0 DRD controller chapter
+> >>> (in both Exynos5250 and 5420)
+> >>> In addition to this there's one more point to be noticed here.
+> >>> On Exynos5420 system, the sclk_usbphy300 (which is the sclk_usbphy30
+> >>> for USB DRD channel 0), is also the PICO phy clock, i.e. USB 2.0 phy
+> >>> clock.
+> >>> So we should add a similar clk_get() for this clock in the
+> >>> phy-exynos5250-usb2 driver too, to support Exynos5420.
+> >>
+> >>
+> >> Is something clear from the above block diagram ? (although the
+> >> diagram looks weird - space and tabs problem :-(  )
+> >> Basically there's the clock USB30_SCLK_100M which is going into the
+> >> USB 3.0 DRD PHY controller.
+> >> And this is the only sclk mentioned in the block diagram for USB 3.0
+> >> DRD controller in Exynos5420.
+> >> Same is not there in the block diagram in Exynos5250 UM.
+> >
+> >
+> > From what I can see in the documentation, there are 4 USB 3.0 related clocks
+> > generated in CMU:
+> >
+> >  - sclk_usbphy300,
+> >  - sclk_usbphy301,
+> >  - sclk_usbdrd300,
+> >  - sclk_usbdrd301,
+> >
+> > They are all rated to max. 24 MHz and the recommended operating frequency is
+> > 24 MHz, so it looks exactly like USB PHY reference, which is usually a 24
+> > MHz clock.
+> >
+> > To me, this looks like on Exynos5420 a separate special clock path is used
+> > instead of xusbxti as reference of USB 3.0 PHY and so the sclk should be
+> > simply passed as the "ref" clock.
 > 
-
-+ Javi Merino and Tushar Behera
-
-> This change is similar to commit 3da355c(ARM: dts: Disable MDMA1 node
-> for arndale-octa board). If MDMA1 region is configured with secure mode,
-> it makes the boot failure with the following.
+> Ok, i will clear on this with the hardware engineer also once.
+> May be Jingoo can help me with this.
 > 
-> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-> 
-If so, how about adding the 'disabled' status in 5420 dtsi file? Then if 'enabling' is required, we can enable in each board dt file...
+> Jingoo,
+> Can you please enquire about the clock path of usbphy30 reference
+> clocks on Exynos5420.
+> As mentioned by Tomasz above, we have sclk_usbphy300 and
+> sclk_usbphy301 as the reference clocks for USB3.0 DRD phy. *Also*
+> sclk_usbphy300 is used for Pico phy (which is the USb 2.0 phy used by
+> ehci/ohci controller on Exynos5420).
+> It will be of great help.
 
-- Kukjin
+Hi Vevek, Tomasz
 
-> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-smdk5420.dts |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> index 6910485..9a48e3f 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -373,4 +373,10 @@
->  			};
->  		};
->  	};
-> +
-> +	amba {
-> +		mdma1: mdma at 11C10000 {
-> +			status = "disabled";
-> +		};
-> +	};
->  };
-> --
-> 1.7.0.4
+Long time no see.
+
+I asked USB S/W engineer and USB H/W engineer.
+
+There are two USB3.0 on Exynos5420; thus there are two sclks
+such as 'sclk_usbphy300 and sclk_usbphy301'.
+
+As Tomasz mentioned, 'sclk_usbphy300 and sclk_usbphy301' can
+be used instead of 'xusbxti' as reference of USB 3.0 PHY.
+
+However, on Exynos5420, "ONLY" 'sclk_usbphy300' can be used
+for USB2.0 pico phy. (so, '301' CANNOT support USB2.0 pico phy.)
+
+Best regards,
+Jingoo Han
