@@ -1,123 +1,84 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Tue, 22 Apr 2014 13:32:45 -0400
-Subject: [PATCH v6 1/3] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
-References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
- <1397762146-8337-2-git-send-email-ashwin.chaugule@linaro.org>
- <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
-Message-ID: <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 22 Apr 2014 11:34:06 -0600
+Subject: Fixing PCIe issues on Armada XP
+In-Reply-To: <20140418150244.4b3d5229@skate>
+References: <20140410181953.50ccfcc3@skate>
+ <20140410165733.GB23104@obsidianresearch.com>
+ <20140410200153.46669e0c@skate>
+ <20140410201201.GA12661@obsidianresearch.com>
+ <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
+ <20140411122314.220614bf@skate>
+ <20140411163129.GA20565@obsidianresearch.com>
+ <20140418150244.4b3d5229@skate>
+Message-ID: <20140422173406.GC23955@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 April 2014 02:23, Anup Patel <anup.patel@linaro.org> wrote:
-> Hi Ashwin,
->
-> Please include system reboot & shutdown implementation
-> in this patch using PSCI v0.2 SYSTEM_OFF and
-> SYSTEM_RESET functions.
+On Fri, Apr 18, 2014 at 03:02:44PM +0200, Thomas Petazzoni wrote:
 
-hm, I had thought these relied on having the (optional) MIGRATE
-function. But thats not the case.
+> > The LinkUp bit after resume is also clearly a lie - most likely the
+> > PEX takes some time to detect the change in remote state to trigger a
+> > link down. After all, it was suspended while the remote was busy
+> > trying to recover.
+> 
+> Ok, fair enough. However, Neil's patch (which is basically your patch
+> with longer delays) isn't working here, as I just reported in a
+> separate e-mail.
+> 
+> So we don't have a solution right now. Do you have another proposal to
+> try ?
 
-So, how about this..
+Do you have time to see if we can isolate the difference on your
+system?
 
----------------------8<---------------------
+> > The fundamental problem here is the clock driver. It should not be
+> > gating PEX clocks so naively. A PEX suspend needs to be sequenced to
+> > ensure the link is cleanly brought down before the PEX is put to
+> > sleep. That way it can cleanly and unambiguously be started up when it
+> > resumes. No risk of glitching/corrupting the far side with some kind
+> > of crap on the serial bus.
+> > 
+> > In any event, the most important required patch here is one that fixes
+> > socid. It must not turn off the PEX clock. Then we can talk about how
+> > to fix pci-mvebu to work as a module...
+ 
+> I don't really understand this: all clocks are gated at boot time, so
+> regardless of mvebu-soc-id behavior, the PCIe driver should take care
+> of doing all the necessary initialization without making the
+> assumptions that the clocks were left turned on from the bootloader
 
-diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-index ead8cdb..5a54f2f 100644
---- a/arch/arm/kernel/psci.c
-+++ b/arch/arm/kernel/psci.c
-@@ -17,6 +17,8 @@
+The current mvebu-soc-id makes it impossible to do a clean hand off of
+the boot loader PEX setup to the PEX driver. I think that is a
+problem. Certainly if we fix it non-modular PEX will start working
+reliably.
 
- #include <linux/init.h>
- #include <linux/of.h>
-+#include <linux/reboot.h>
-+#include <linux/pm.h>
- #include <uapi/linux/psci.h>
+Keep in mind the current driver cannot startup a PEX without
+bootloader support. It does not clear the set-at-reset
+Conf_TrainingDisable bit, and it doesn't wait for a link to come up
+after doing so.
 
- #include <asm/compiler.h>
-@@ -24,6 +26,7 @@
- #include <asm/opcodes-sec.h>
- #include <asm/opcodes-virt.h>
- #include <asm/psci.h>
-+#include <asm/system_misc.h>
+> time. This is needed if we want to support pci-mvebu as a module, so I
+> don't see why hacking mvebu-soc-id is going to solve this.
 
- struct psci_operations psci_ops;
+I agree we should try to figure the modular case out, but it looks to
+me that suspending the PEX is a bigger job that just gating the
+clock..
 
-@@ -196,6 +199,16 @@ static int get_set_conduit_method(struct device_node *np)
-  return 0;
- }
+The automatic gating of the PEX clocks should be more clever. If there
+are no DT elements that reference the clock it can be disabled,
+otherwise we should probably leave it enabled and rely on the PEX
+driver to do power management once it gets loaded.
 
-+static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-+}
-+
-+static void psci_sys_off(void)
-+{
-+ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-+}
-+
- /*
-  * PSCI Function IDs for v0.2+ are well defined so use
-  * standard values.
-@@ -249,6 +262,10 @@ static int psci_0_2_init(struct device_node *np)
-  PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-  psci_ops.migrate_info_type = psci_migrate_info_type;
+So broadly, my thinking is the following largely orthogonal items:
+ 1) PEX's that are setup by the bootloader must be cleanly handed off
+    to the driver. The clocks must never gate.
+ 2) The driver should learn to turn on a PEX from either the
+    Conf_TrainingDisable=1 state or the clock gated state
+ 3) PEX clocks that are never used in DT can be safely shutoff,
+    otherwise they must remain on
+ 4) The PEX driver can learn to properly suspend the PEX for power
+    savings, via the normal Linux power management stuff.
 
-+ arm_pm_restart = psci_sys_reset;
-+
-+ pm_power_off = psci_sys_off;
-+
- out_put_node:
-  of_node_put(np);
-  return err;
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 63a7685..583b7c3 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -18,6 +18,8 @@
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/smp.h>
-+#include <linux/reboot.h>
-+#include <linux/pm.h>
- #include <uapi/linux/psci.h>
+What do you think?
 
- #include <asm/compiler.h>
-@@ -25,6 +27,7 @@
- #include <asm/errno.h>
- #include <asm/psci.h>
- #include <asm/smp_plat.h>
-+#include <asm/system_misc.h>
-
- #define PSCI_POWER_STATE_TYPE_STANDBY 0
- #define PSCI_POWER_STATE_TYPE_POWER_DOWN 1
-@@ -217,6 +220,16 @@ static int get_set_conduit_method(struct device_node *np)
-  return 0;
- }
-
-+static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-+}
-+
-+static void psci_sys_off(void)
-+{
-+ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-+}
-+
- /*
-  * PSCI Function IDs for v0.2+ are well defined so use
-  * standard values.
-@@ -270,6 +283,10 @@ static int psci_0_2_init(struct device_node *np)
-  PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-  psci_ops.migrate_info_type = psci_migrate_info_type;
-
-+ arm_pm_restart = psci_sys_reset;
-+
-+ pm_power_off = psci_sys_off;
-+
- out_put_node:
-  of_node_put(np);
-  return err;
+Jason
