@@ -1,36 +1,73 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Apr 2014 07:41:34 +0900
-Subject: [PATCH v2] ARM: dts: disable MDMA1 node for Exynos5420
-In-Reply-To: <20140422134554.GA6991@e102654-lin.cambridge.arm.com>
-References: <000a01cf5e2b$87601760$96204620$%jun@samsung.com>
- <20140422134554.GA6991@e102654-lin.cambridge.arm.com>
-Message-ID: <00ff01cf5e7c$0395ac50$0ac104f0$@samsung.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 22 Apr 2014 15:50:07 -0700
+Subject: [RFC][PATCH] arm64: Add atomic pool for dma mapping
+In-Reply-To: <20140422100201.GB7484@arm.com>
+References: <1397764941-1351-1-git-send-email-lauraa@codeaurora.org>
+ <20140422100201.GB7484@arm.com>
+Message-ID: <5356F21F.1060001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javi Merino wrote:
+On 4/22/2014 3:02 AM, Will Deacon wrote:
+> Hi Laura,
 > 
-> On Tue, Apr 22, 2014 at 02:05:26PM +0100, Seungwon Jeon wrote:
-> > This change places MDMA1 in disabled node for Exynos5420.
-> > If MDMA1 region is configured with secure mode, it makes
-> > the boot failure with the following on smdk5420 board.
-> > ("Unhandled fault: imprecise external abort (0x1406) at 0x00000000")
-> > Thus, arndale-octa board don't need to do the same thing anymore.
-> >
-> > Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+> On Thu, Apr 17, 2014 at 09:02:21PM +0100, Laura Abbott wrote:
+>> Neither CMA nor noncoherent allocations support atomic allocations.
+>> Add a dedicated atomic pool to support this.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> ---
+>>  arch/arm64/mm/dma-mapping.c | 186 +++++++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 184 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>> index 0ba347e..c67a3ff 100644
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -38,6 +38,110 @@ static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
+>>  	return prot;
+>>  }
+>>  
+>> +#define DEFAULT_DMA_COHERENT_POOL_SIZE  SZ_256K
+>> +
+>> +struct dma_pool {
+>> +	size_t size;
+>> +	spinlock_t lock;
+>> +	void *coherent_vaddr;
+>> +	void *noncoherent_vaddr;
+>> +	unsigned long *bitmap;
+>> +	unsigned long nr_pages;
+>> +	struct page **pages;
+>> +};
+>> +
+>> +static struct dma_pool atomic_pool = {
+>> +	.size = DEFAULT_DMA_COHERENT_POOL_SIZE,
+>> +};
+>> +
+>> +static int __init early_coherent_pool(char *p)
+>> +{
+>> +	atomic_pool.size = memparse(p, &p);
+>> +	return 0;
+>> +}
+>> +early_param("coherent_pool", early_coherent_pool);
 > 
-> I've had some problem applying it (wrong EOL?).  Not sure if it's my
-
-Probably, it is due to Seungwon's e-mail client ;-)
-
-> email client.  In any case, I've manually fixed the rejects and tested
-> it in my Arndale Octa.  It works for me so
+> What happened to the device-tree bindings we discussed in Edinburgh with
+> Grant and Ben? This looks like a good opportunity to make use of those,
+> rather than use the command-line as we do for arch/arm.
 > 
-> Tested-by: Javi Merino <javi.merino@arm.com>
 
-Anyway, thanks for your test.
+The current point of the coherent command line option is to override the
+default size. Going with DT would mean that if the node is specified in
+DT, the memory is allocated via that framework. If there is no node, then
+fallback to allocating the memory as normal. This asymmetry seems a bit
+odd to me.
 
-I will apply but I'm not sure this is critical bug or not for smdk5420...
+> Will
+> 
 
 Thanks,
-Kukjin
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
