@@ -1,39 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Apr 2014 12:34:23 +0100
-Subject: [PATCH 0/9] Renesas ipmmu-vmsa: Miscellaneous cleanups and fixes
-In-Reply-To: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140422113423.GB8389@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Apr 2014 13:40:47 +0200
+Subject: [PATCH v3 2/7] pinctrl: sunxi: disable clk when failing to probe
+ pin controller
+In-Reply-To: <1397137966-30818-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1397137966-30818-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CACRpkdYQ-rTTNukXA+6vN=Qce1hxYSBc5MNM84dYweBu52jfag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 03:13:00PM +0100, Laurent Pinchart wrote:
-> Hello,
+On Thu, Apr 10, 2014 at 3:52 PM, Boris BREZILLON
+<boris.brezillon@free-electrons.com> wrote:
 
-Hi Laurent,
+> Disable the clk when failing to probe the pin controller device.
+>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-> This patch set cleans up and fixes small issues in the ipmmu-vmsa driver. The
-> patches are based on top of "[PATCH v3] iommu: Add driver for Renesas
-> VMSA-compatible IPMMU" that adds the ipmmu-vmsa driver.
-> 
-> The most interesting part of this series is the rewrite of the page table
-> management code. The IOMMU core guarantees that the map and unmap operations
-> will always be called only with page sizes advertised by the driver. We can
-> use that assumption to remove loops of PGD and PMD entries, simplifying the
-> code.
+Patch applied with Maxime's ACK.
 
-Hmm, interesting. We still have to handle the case where a mapping created
-with one page-size could be unmapped with another though (in particular,
-unmapping part of the range).
-
-> Will, would it make sense to perform the same cleanup for the arm-smmu driver,
-> or is there a reason to keep loops over PGD and PMD entries ? Removing them
-> makes the implementation of 68kB and 2MB pages easier.
-
-Is this an assumption that's relied on by other IOMMU drivers? It
-certainly makes mapping of large ranges less efficient than it could be, so
-I'm more inclined to set all the bits > PAGE_SIZE in pgsize_bitmap if it's
-only used to determine the granularity at which map/unmap are called (which
-is unrelated to what the hardware can actually do).
-
-Will
+Yours,
+Linus Walleij
