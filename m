@@ -1,30 +1,29 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 22 Apr 2014 13:59:43 -0400 (EDT)
-Subject: [PATCH] usb: ohci-exynos: Add facility to use phy provided by
- the generic phy framework
-In-Reply-To: <CAFp+6iGrgMTE27FxpFTQfALJO_XypxGSZ1-wny8KAoY1sLBbWw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1404221358530.1326-100000@iolanthe.rowland.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 22 Apr 2014 20:08:15 +0200
+Subject: [PATCH 0/2] Add GPIO nodes for Berlin BG2 and BG2CD
+In-Reply-To: <1397724329-14154-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1397724329-14154-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <5356B00F.8040109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Apr 2014, Vivek Gautam wrote:
-
-> On Thu, Apr 10, 2014 at 6:54 PM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> > Add support to consume phy provided by Generic phy framework.
-> > Keeping the support for older usb-phy intact right now, in order
-> > to prevent any functionality break in absence of relevant
-> > device tree side change for ohci-exynos.
-> > Once we move to new phy in the device nodes for ohci, we can
-> > remove the support for older phys.
+On 04/17/2014 10:45 AM, Antoine T?nart wrote:
+> After adding support for the Berlin BG2Q GPIOs, this series uses the
+> same GPIO dwapb driver to support the Berlin BG2 and BG2CD GPIOs.
 > 
-> Any comments on this please.
-> I think whatever the approach we follow, that can be common to both
-> ehci-exynos[1], and ohci-exynos, since
-> both are needed to move to the new generic phy framework, keeping
-> support for older usb-phy
-> so as to have smooth transition, in order to avoid any regression.
+> Applies on top of Sebastian's for-next branch[1].
+> 
+> [1] https://github.com/shesselba/linux-berlin/commits/berlin/for-next
+> 
+> Antoine T?nart (2):
+>   ARM: dts: berlin: add the BG2 GPIO nodes
+>   ARM: dts: berlin: add the BG2CD GPIO nodes
+> 
+>  arch/arm/boot/dts/berlin2.dtsi   | 105 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/berlin2cd.dtsi | 102 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 207 insertions(+)
+> 
 
-I lost my copies of the ehci-exynos patch, but probably the same 
-comments apply as for the ohci-exynos patch.
+Both applied to berlin/dt.
 
-Alan Stern
+Thanks!
