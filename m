@@ -1,62 +1,97 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Tue, 22 Apr 2014 22:05:26 +0900
-Subject: [PATCH v2] ARM: dts: disable MDMA1 node for Exynos5420
-Message-ID: <000a01cf5e2b$87601760$96204620$%jun@samsung.com>
+From: yegor_sub1@visionsystems.de (Yegor Yefremov)
+Date: Tue, 22 Apr 2014 15:08:43 +0200
+Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
+ modem lines
+In-Reply-To: <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
+References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
+ <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <535669DB.8010109@visionsystems.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change places MDMA1 in disabled node for Exynos5420.
-If MDMA1 region is configured with secure mode, it makes
-the boot failure with the following on smdk5420 board.
-("Unhandled fault: imprecise external abort (0x1406) at 0x00000000")
-Thus, arndale-octa board don't need to do the same thing anymore.
+On 10.03.2014 17:45, Richard Genoud wrote:
+> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+> GPIO.
+> This will be useful for many boards which have a serial controller that
+> only handle CTS/RTS pins (or even just RX/TX).
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
----
-Note: This patch comes from "[PATCH] ARM: dts: disable MDMA1 node for smdk5420 board"
+....
 
- arch/arm/boot/dts/exynos5420-arndale-octa.dts |   12 ------------
- arch/arm/boot/dts/exynos5420.dtsi             |    7 +++++++
- 2 files changed, 7 insertions(+), 12 deletions(-)
+> +
+> +struct mctrl_gpios {
+> +	struct gpio_desc *gpio[UART_GPIO_MAX];
+> +};
+> +
+> +static const struct {
+> +	const char *name;
+> +	unsigned int mctrl;
+> +	bool dir_out;
+> +} mctrl_gpios_desc[UART_GPIO_MAX] = {
+> +	{ "cts", TIOCM_CTS, false, },
+> +	{ "dsr", TIOCM_DSR, false, },
+> +	{ "dcd", TIOCM_CD, false, },
+> +	{ "rng", TIOCM_RNG, false, },
+> +	{ "rts", TIOCM_RTS, true, },
+> +	{ "dtr", TIOCM_DTR, true, },
+> +	{ "out1", TIOCM_OUT1, true, },
+> +	{ "out2", TIOCM_OUT2, true, },
+> +};
+> +
+> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	if (IS_ERR_OR_NULL(gpios))
+> +		return;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++)
+> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+> +		    mctrl_gpios_desc[i].dir_out)
+> +			gpiod_set_value(gpios->gpio[i],
+> +					!!(mctrl & mctrl_gpios_desc[i].mctrl));
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_set);
+> +
+> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+> +				      enum mctrl_gpio_idx gidx)
+> +{
+> +	if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
+> +		return gpios->gpio[gidx];
+> +	else
+> +		return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+> +
+> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+> +{
+> +	enum mctrl_gpio_idx i;
+> +
+> +	/*
+> +	 * return it unchanged if the structure is not allocated
+> +	 */
+> +	if (IS_ERR_OR_NULL(gpios))
+> +		return *mctrl;
+> +
+> +	for (i = 0; i < UART_GPIO_MAX; i++) {
+> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
+> +		    !mctrl_gpios_desc[i].dir_out) {
+> +			if (gpiod_get_value(gpios->gpio[i]))
+> +				*mctrl |= mctrl_gpios_desc[i].mctrl;
+> +			else
+> +				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
+> +		}
+> +	}
+> +
+> +	return *mctrl;
+> +}
+> +EXPORT_SYMBOL_GPL(mctrl_gpio_get);
 
-diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-index 80a3bf4..896a2a6 100644
---- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-+++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-@@ -364,16 +364,4 @@
- 			gpio-key,wakeup;
- 		};
- 	};
--
--	amba {
--		mdma1: mdma at 11C10000 {
--			/*
--			 * MDMA1 can support both secure and non-secure
--			 * AXI transactions. When this is enabled in the kernel
--			 * for boards that run in secure mode, we are getting
--			 * imprecise external aborts causing the kernel to oops.
--			 */
--			status = "disabled";
--		};
--	};
- };
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c3a9a66..97cbcdd 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -336,6 +336,13 @@
- 			#dma-cells = <1>;
- 			#dma-channels = <8>;
- 			#dma-requests = <1>;
-+			/*
-+			 * MDMA1 can support both secure and non-secure
-+			 * AXI transactions. When this is enabled in the kernel
-+			 * for boards that run in secure mode, we are getting
-+			 * imprecise external aborts causing the kernel to oops.
-+			 */
-+			status = "disabled";
- 		};
- 	};
- 
--- 
-1.7.0.4
+Should this routine be renamed to msr_gpio_get() or perhaps better to give all values (inputs and outputs)?
+
+I'm trying to port this approach to omap-serial to implement RS485 switching. I need to know if RTS is already on or not and set it accordingly.
+
+What would be the best solution for this task using this new API?
+
+Yegor
