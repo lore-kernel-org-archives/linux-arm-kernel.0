@@ -1,115 +1,75 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 22 Apr 2014 16:36:34 +0200
-Subject: [PATCH] ARM: EXYNOS: cpu hotplug: use v7_exit_coherency_flush
- macro for cache disabling
-In-Reply-To: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
-References: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
-Message-ID: <53567E72.1030201@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 22 Apr 2014 10:36:44 -0400
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
+ memory barrier
+In-Reply-To: <201404221608.36628.arnd@arndb.de>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140422102834.GE7484@arm.com> <53567352.1080306@ti.com>
+ <201404221608.36628.arnd@arndb.de>
+Message-ID: <53567E7C.7020409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2014 04:18 PM, Leela Krishna Amudala wrote:
-> Remove the duplicated code for cache disabling and use "v7_exit_coherency_flush"
-> macro to do the same job.
+On Tuesday 22 April 2014 10:08 AM, Arnd Bergmann wrote:
+> On Tuesday 22 April 2014, Santosh Shilimkar wrote:
+>> On Tuesday 22 April 2014 06:28 AM, Will Deacon wrote:
+> 
+>>> Don't you only need these barriers if you're passing ownership of a CPU
+>>> buffer to a device? In that case, I would expect a subsequent writel to tell
+>>> the device about the new buffer, which includes the required __iowmb().
+>>> That's the reason for the relaxed accessors: to avoid this barrier when it's
+>>> not needed. Perhaps you're using the relaxed accessors where you actually
+>>> need the stronger ordering guarantees?
+>>>
+>> I kind of guessed some one will bring up above point. Infact this is how
+>> mostly people have been living with the issue on coherent machines. On
+>> Keystone too, we did explicit barriers in respective drivers.
+> 
+> You should not actually need explicit barriers in the drivers. As Will
+> said, you already do a writel() operation, which is contains the
+> implicit wmb.
+> 
+>> I have added these barriers only on CPU to device streaming APIs because on
+>> other direction, the memory is already upto date from CPU's perspective.
+>>
+>> But if you look at the actual problem, its really responsibility of
+>> DMA streaming APIs which we are trying to push on to drivers. A device
+>> driver should be independent of whether it is running on a coherent or
+>> a non-coherent CPU.
+>>
+>> Lets take a example....
+>> MMC controller driver running on a non-coherent and coherent machine.
+>> Driver has below code sequence which is generic.
+>> 1. Prepare SG list
+>> 2. Perform CMO using DMA streaming API
+>> 3. Start DMA transfer...
+>> 	
+>> Step 3 expects that step 2 has done its job and buffer is
+>> completely in the main memory. And thats what also happens
+>> on non-coherent machines.
+>>
+>> Now, on coherent machines, as you mentioned, we are saying drivers
+>> should add a barrier because Step2 is just NOP which is not correct.
+>> The Step3 itself which is just suppose to start DMA doesn't need
+>> any barrier as such. This is the whole rationale behind the patch.
+> 
+> That's not what the API is. The entire reason for having both writel()
+> and writel_relaxed() is that drivers rely on writel() to do the barrier.
+> Doing another barrier in the DMA operations would add unnecessary
+> overhead for every single driver.
+> 
+> It's not the nicest API ever, but that's what it is and has been, mostly
+> for compatibility with x86, where the 'mov' instruction performing the
+> store to MMIO registers implies that all writes to DMA memory are
+> visible to the device.
+> 
+This is not about writel() and  writel_relaxed(). The driver don't
+need that barrier. For example if the actual start of the DMA
+happens bit later, that doesn't matter for the driver.
 
-Hi Leela,
+DMA APIs already do barriers today for non-coherent case. We
+are not talking anything new here. Sorry but I don't see the
+connection here.
 
-thanks for this patch! It would be nice if you can describe why those 
-macros can be replaced by the generic v7_exit_coherency_flush macro.
-
->
-> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
->
-> ---
-> cpu hotplug is tested with 3.15-rc1 on Origen(which has cortex A9) and
-> Arndale octa(which has cortex A7 and A15) boards.
->
->   arch/arm/mach-exynos/hotplug.c |   56 ++--------------------------------------
->   1 file changed, 2 insertions(+), 54 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..9eb8d1b 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -24,56 +24,6 @@
->   #include "common.h"
->   #include "regs-pmu.h"
->
-> -static inline void cpu_enter_lowpower_a9(void)
-> -{
-> -	unsigned int v;
-> -
-> -	asm volatile(
-> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
-> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
-> -	/*
-> -	 * Turn off coherency
-> -	 */
-> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %3\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, %2\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> -	  : "=&r" (v)
-> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-> -	  : "cc");
-> -}
-> -
-> -static inline void cpu_enter_lowpower_a15(void)
-> -{
-> -	unsigned int v;
-> -
-> -	asm volatile(
-> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, %1\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> -	  : "=&r" (v)
-> -	  : "Ir" (CR_C)
-> -	  : "cc");
-> -
-> -	flush_cache_louis();
-> -
-> -	asm volatile(
-> -	/*
-> -	* Turn off coherency
-> -	*/
-> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %1\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> -	: "=&r" (v)
-> -	: "Ir" (0x40)
-> -	: "cc");
-> -
-> -	isb();
-> -	dsb();
-> -}
-> -
->   static inline void cpu_leave_lowpower(void)
->   {
->   	unsigned int v;
-> @@ -141,10 +91,8 @@ void __ref exynos_cpu_die(unsigned int cpu)
->   	 * appropriate sequence for entering low power.
->   	 */
->   	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
-
-Can't you remove this asm line above as well as the primary_part variable ?
-
-> -	if ((primary_part & 0xfff0) == 0xc0f0)
-> -		cpu_enter_lowpower_a15();
-> -	else
-> -		cpu_enter_lowpower_a9();
-> +
-> +	v7_exit_coherency_flush(louis);
->
->   	platform_do_lowpower(cpu, &spurious);
->
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Regards,
+Santosh
