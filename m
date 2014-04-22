@@ -1,89 +1,196 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Apr 2014 07:54:12 -0500
-Subject: [PATCH v3] arm64: enable EDAC on arm64
-In-Reply-To: <20140422102455.GD7484@arm.com>
-References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
- <20140422102455.GD7484@arm.com>
-Message-ID: <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 22 Apr 2014 13:54:12 +0100
+Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
+In-Reply-To: <16730530.rJ9T0MsYmt@wuerfel>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+ <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
+ <16730530.rJ9T0MsYmt@wuerfel>
+Message-ID: <20140422125412.GF865@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 5:24 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Rob,
->
-> On Mon, Apr 21, 2014 at 05:09:16PM +0100, Rob Herring wrote:
->> From: Rob Herring <robh@kernel.org>
->>
->> Implement atomic_scrub and enable EDAC for arm64.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->
-> [...]
->
->> diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
->> new file mode 100644
->> index 0000000..8a3d176
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/edac.h
->> @@ -0,0 +1,38 @@
->> +/*
->> + * Copyright 2013 Calxeda, Inc.
->> + * Based on PPC version Copyright 2007 MontaVista Software, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + */
->> +#ifndef ASM_EDAC_H
->> +#define ASM_EDAC_H
->> +/*
->> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
->
-> What do you mean by `DMA safe'? For coherent (cacheable) DMA buffers, this
-> should work fine, but for non-coherent (and potentially non-cacheable)
-> buffers, I think we'll have problems both due to the lack of guaranteed
-> exclusive monitor support and also eviction of dirty lines.
+On Wed, Apr 16, 2014 at 07:26:15PM +0100, Arnd Bergmann wrote:
+> On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
+> > Jingoo,
+> > 
+> > Thanks for taking a stab at trying to convert a host bridge
+> > driver to use the new generic host bridge code.
+> > 
+> > I do however have concerns on the direction you took. You have split
+> > your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
+> > even if (with my series) it should be no reason why the host bridge
+> > driver should not work on other architectures as well once they are
+> > converted.
+> 
+> Right.
+> 
+> > Also, some of the functions that you use have identical names but different
+> > signatures depending on what arch you have selected. This is really bad
+> > in my books!
+> 
+> It's only the sys_to_pcie() function, right?
 
-That's just copied from other implementations. I agree you could have
-a problem here although I don't see why dirty line eviction would be.
-There's not really a solution other than not doing s/w scrubbing or
-doing it in h/w. So it is up to individual drivers to decide what to
-do, but we have to provide this function just to enable EDAC.
+Right.
 
-Rob
+> 
+> You can probably simplify that to take a void pointer and have only one line
+> difference.
+> 
+> > What about creating functions that use my series directly if CONFIG_ARM64 is
+> > defined (or any CONFIG_ you want to create for your driver that you select
+> > from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
+> > way your driver will call only one API without any #ifdef and when arm code
+> > gets converted you drop your adaptation functions. Or (better yet), have a
+> > stab at converting bios32 (Rob Herring has already provided some hints on
+> > how to do it for arch/arm).
+> 
+> That would of course be best.
+> 
+> > To give an example on how things are not going well in your version (not obvious
+> > from your patch, but you can see it once you apply it): dw_pcie_host_init()
+> > will still carry the handcoded version of DT parsing and that is not guarded
+> > against CONFIG_ARM64 being defined, where the parsing will happen again
+> > when you call of_create_pci_host_bridge().
+> 
+> How about making the generic DT parsing code from of_create_pci_host_bridge()
+> an exported function that can be called by drivers that don't use
+> of_create_pci_host_bridge?
 
->
-> Will
->
->> + * Implements the per arch atomic_scrub() that EDAC use for software
->> + * ECC scrubbing.  It reads memory and then writes back the original
->> + * value, allowing the hardware to detect and correct memory errors.
->> + */
->> +static inline void atomic_scrub(void *va, u32 size)
->> +{
->> +     unsigned int *virt_addr = va;
->> +     unsigned int i;
->> +
->> +     for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
->> +             long result;
->> +             unsigned long tmp;
->> +
->> +             asm volatile("/* atomic_scrub */\n"
->> +             "1:     ldxr    %w0, %2\n"
->> +             "       stxr    %w1, %w0, %2\n"
->> +             "       cbnz    %w1, 1b"
->> +                     : "=&r" (result), "=&r" (tmp), "+Q" (*virt_addr) : : );
->> +     }
->> +}
->> +#endif
->> --
->> 1.9.1
->>
->>
+Yes, I guess that should ease the transition to the new code even if the function
+should not be needed for the users of the framework.
+
+> 
+> > Speaking of the handcoded DT parsing of resources: you are using restype == 0
+> > as a way of selecting config space, *and then split the range size into two
+> > halves*. From what Jason Gunthorpe and Arnd were saying, config ranges in the DT
+> > tree should only be used for ECAM space, so no split is allowed.
+> > 
+> > Arnd, are you allowing this non-standard use to creep in the bindings?
+> 
+> I fear it's too late to change that now. In retrospect we probably shoulnd't
+> have defined the binding like that.
+
+OK, but I'm going to NAK the driver using the same tricks for arm64. Jingoo will
+need to come up with an upgrade path where he has the config space described in
+the reg property and parses that if CONFIG_ARM64 is enabled.
+
+> 
+> Overall, my impression of the patch is that it should be possible to do
+> the same with much fewer #ifdefs by first rearranging the code in one patch
+> and then doing another patch on top to add the generic arm64 support.
+
+Agree.
+
+Best regards,
+Liviu
+
+> 
+> > > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> > > index 6d23d8c..fac0440 100644
+> > > --- a/drivers/pci/host/pcie-designware.c
+> > > +++ b/drivers/pci/host/pcie-designware.c
+> > > @@ -65,14 +65,27 @@
+> > >  #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+> > >  #define PCIE_ATU_UPPER_TARGET		0x91C
+> > >  
+> > > +#ifdef CONFIG_ARM
+> > >  static struct hw_pci dw_pci;
+> > > +#endif
+> > >  
+> > >  static unsigned long global_io_offset;
+> > >  
+> > > +#ifdef CONFIG_ARM
+> > >  static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+> > >  {
+> > >  	return sys->private_data;
+> > >  }
+> > > +#endif
+> > > +
+> > > +#ifdef CONFIG_ARM64
+> > > +static inline struct pcie_port *sys_to_pcie(struct pcie_port *pp)
+> > > +{
+> > > +	return pp;
+> > > +}
+> > > +
+> > > +static struct pci_ops dw_pcie_ops;
+> > > +#endif
+> > >  
+> > >  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+> > >  {
+> > > @@ -381,7 +394,9 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> > >  {
+> > >  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+> > >  	irq_set_chip_data(irq, domain->host_data);
+> > > +#ifdef CONFIG_ARM
+> > >  	set_irq_flags(irq, IRQF_VALID);
+> > > +#endif
+> > >  
+> > >  	return 0;
+> > >  }
+> > > @@ -397,6 +412,10 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> > >  	struct of_pci_range_parser parser;
+> > >  	u32 val;
+> > >  	int i;
+> > > +#ifdef CONFIG_ARM64
+> > > +	struct pci_host_bridge *bridge;
+> > > +	resource_size_t lastbus;
+> > > +#endif
+> > >  
+> > >  	if (of_pci_range_parser_init(&parser, np)) {
+> > >  		dev_err(pp->dev, "missing ranges property\n");
+> > > @@ -489,6 +508,7 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> > >  	val |= PORT_LOGIC_SPEED_CHANGE;
+> > >  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> > >  
+> > > +#ifdef CONFIG_ARM
+> > >  	dw_pci.nr_controllers = 1;
+> > >  	dw_pci.private_data = (void **)&pp;
+> > >  
+> > > @@ -497,6 +517,16 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> > >  #ifdef CONFIG_PCI_DOMAINS
+> > >  	dw_pci.domain++;
+> > >  #endif
+> > > +#endif
+> > > +
+> > > +#ifdef CONFIG_ARM64
+> > > +	bridge = of_create_pci_host_bridge(pp->dev, &dw_pcie_ops, pp);
+> > > +	if (IS_ERR_OR_NULL(bridge))
+> > > +		return PTR_ERR(bridge);
+> > > +
+> > > +	lastbus = pci_rescan_bus(bridge->bus);
+> > > +	pci_bus_update_busn_res_end(bridge->bus, lastbus);
+> > > +#endif
+> > >  
+> > >  	return 0;
+> > >  }
+> > > @@ -695,6 +725,7 @@ static struct pci_ops dw_pcie_ops = {
+> > >  	.write = dw_pcie_wr_conf,
+> > >  };
+> > >  
+> > > +#ifdef CONFIG_ARM
+> > >  static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+> > >  {
+> > >  	struct pcie_port *pp;
+> > > @@ -758,6 +789,7 @@ static struct hw_pci dw_pci = {
+> > >  	.map_irq	= dw_pcie_map_irq,
+> > >  	.add_bus	= dw_pcie_add_bus,
+> > >  };
+> > > +#endif /* CONFIG_ARM */
+> > >  
+> > >  void dw_pcie_setup_rc(struct pcie_port *pp)
+> 
+> 
+> 
+> 
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
