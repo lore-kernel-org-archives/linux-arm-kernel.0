@@ -1,84 +1,90 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 22 Apr 2014 11:34:06 -0600
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <20140418150244.4b3d5229@skate>
-References: <20140410181953.50ccfcc3@skate>
- <20140410165733.GB23104@obsidianresearch.com>
- <20140410200153.46669e0c@skate>
- <20140410201201.GA12661@obsidianresearch.com>
- <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
- <20140411122314.220614bf@skate>
- <20140411163129.GA20565@obsidianresearch.com>
- <20140418150244.4b3d5229@skate>
-Message-ID: <20140422173406.GC23955@obsidianresearch.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 22 Apr 2014 19:35:27 +0200
+Subject: [PATCH v2 1/2] ARM: dts: berlin: add the SDHCI nodes for the BG2Q
+In-Reply-To: <1398155248-1659-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1398155248-1659-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398155248-1659-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <5356A85F.6030708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 03:02:44PM +0200, Thomas Petazzoni wrote:
+[Added MMC maintainers Chris and Ulf for one question below]
 
-> > The LinkUp bit after resume is also clearly a lie - most likely the
-> > PEX takes some time to detect the change in remote state to trigger a
-> > link down. After all, it was suspended while the remote was busy
-> > trying to recover.
+On 04/22/2014 10:27 AM, Antoine T?nart wrote:
+> Add the SDHCI nodes for the Marvell Berlin BG2Q, using the mrvl,pxav3-mmc
+> driver.
 > 
-> Ok, fair enough. However, Neil's patch (which is basically your patch
-> with longer delays) isn't working here, as I just reported in a
-> separate e-mail.
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/berlin2q.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> So we don't have a solution right now. Do you have another proposal to
-> try ?
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 5925e6a16749..85d0ca5cc47a 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -67,6 +67,14 @@
+>  		clock-div = <3>;
+>  	};
+>  
+> +	sdio1clk: sdio1clk {
+> +		compatible = "fixed-factor-clock";
+> +		#clock-cells = <0>;
+> +		clocks = <&syspll>;
+> +		clock-mult = <1>;
+> +		clock-div = <4>;
+> +	};
+> +
+>  	soc {
+>  		compatible = "simple-bus";
+>  		#address-cells = <1>;
+> @@ -75,6 +83,30 @@
+>  		ranges = <0 0xf7000000 0x1000000>;
+>  		interrupt-parent = <&gic>;
+>  
+> +		sdhci0: sdhci at ab0000 {
+> +			compatible = "mrvl,pxav3-mmc";
+> +			reg = <0xab0000 0x200>;
+> +			clocks = <&sdio1clk>;
+> +			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+> +		sdhci1: sdhci at ab0800 {
+> +			compatible = "mrvl,pxav3-mmc";
+> +			reg = <0xab0800 0x200>;
+> +			clocks = <&sdio1clk>;
+> +			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+> +		sdhci2: sdhci at ab1000 {
 
-Do you have time to see if we can isolate the difference on your
-system?
+Didn't Jisheng ask for sdhci2 being registered at mmc0?
+Renaming the node labels will not help, but have you tried using an:
 
-> > The fundamental problem here is the clock driver. It should not be
-> > gating PEX clocks so naively. A PEX suspend needs to be sequenced to
-> > ensure the link is cleanly brought down before the PEX is put to
-> > sleep. That way it can cleanly and unambiguously be started up when it
-> > resumes. No risk of glitching/corrupting the far side with some kind
-> > of crap on the serial bus.
-> > 
-> > In any event, the most important required patch here is one that fixes
-> > socid. It must not turn off the PEX clock. Then we can talk about how
-> > to fix pci-mvebu to work as a module...
- 
-> I don't really understand this: all clocks are gated at boot time, so
-> regardless of mvebu-soc-id behavior, the PCIe driver should take care
-> of doing all the necessary initialization without making the
-> assumptions that the clocks were left turned on from the bootloader
+aliases {
+	mmc0 = &sdhci2;
+	mmc1 = &sdhci0;
+	mmc2 = &sdhci1;
+};
 
-The current mvebu-soc-id makes it impossible to do a clean hand off of
-the boot loader PEX setup to the PEX driver. I think that is a
-problem. Certainly if we fix it non-modular PEX will start working
-reliably.
+node and set the platform_device's .id field with what you get
+from of_alias_get_id(np, "mmc")?
 
-Keep in mind the current driver cannot startup a PEX without
-bootloader support. It does not clear the set-at-reset
-Conf_TrainingDisable bit, and it doesn't wait for a link to come up
-after doing so.
+@Chris, Ulf: Is there any generic alias, e.g. "sdhci", you prefer for
+drivers/mmc so we can put it into sdhci_get_of_property()?
 
-> time. This is needed if we want to support pci-mvebu as a module, so I
-> don't see why hacking mvebu-soc-id is going to solve this.
+Sebastian
 
-I agree we should try to figure the modular case out, but it looks to
-me that suspending the PEX is a bigger job that just gating the
-clock..
-
-The automatic gating of the PEX clocks should be more clever. If there
-are no DT elements that reference the clock it can be disabled,
-otherwise we should probably leave it enabled and rely on the PEX
-driver to do power management once it gets loaded.
-
-So broadly, my thinking is the following largely orthogonal items:
- 1) PEX's that are setup by the bootloader must be cleanly handed off
-    to the driver. The clocks must never gate.
- 2) The driver should learn to turn on a PEX from either the
-    Conf_TrainingDisable=1 state or the clock gated state
- 3) PEX clocks that are never used in DT can be safely shutoff,
-    otherwise they must remain on
- 4) The PEX driver can learn to properly suspend the PEX for power
-    savings, via the normal Linux power management stuff.
-
-What do you think?
-
-Jason
+> +			compatible = "mrvl,pxav3-mmc";
+> +			reg = <0xab1000 0x200>;
+> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&sdio1clk>;
+> +			status = "disabled";
+> +		};
+> +
+>  		l2: l2-cache-controller at ac0000 {
+>  			compatible = "arm,pl310-cache";
+>  			reg = <0xac0000 0x1000>;
+> 
