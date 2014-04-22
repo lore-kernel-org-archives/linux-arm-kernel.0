@@ -1,90 +1,61 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Apr 2014 13:01:27 +0200
-Subject: [PATCH v8 07/17] ARM: dts: sun5i: Add mmc controller nodes
+Date: Tue, 22 Apr 2014 13:01:30 +0200
+Subject: [PATCH v8 10/17] ARM: dts: sun6i: Add mmc clocks
 In-Reply-To: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
 References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1398164497-14212-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <1398164497-14212-11-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+Add clk-nodes for the mmc clocks.
 
-Add nodes for the 3 mmc controllers found on A10s SoCs and for the 2 mmc
-controllers found on A13 SoCs.
-
-Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a10s.dtsi | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi  | 18 ++++++++++++++++++
- 2 files changed, 45 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 79989ed..12113f9 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -338,6 +338,33 @@
- 			#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index d45efa7..12bcc17 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -198,6 +198,38 @@
+ 					"apb2_uart4", "apb2_uart5";
  		};
  
-+		mmc0: mmc at 01c0f000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ahb_gates 8>, <&mmc0_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <32>;
-+			status = "disabled";
++		mmc0_clk: clk at 01c20088 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20088 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc0";
 +		};
 +
-+		mmc1: mmc at 01c10000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&ahb_gates 9>, <&mmc1_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <33>;
-+			status = "disabled";
++		mmc1_clk: clk at 01c2008c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c2008c 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc1";
 +		};
 +
-+		mmc2: mmc at 01c11000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ahb_gates 10>, <&mmc2_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <34>;
-+			status = "disabled";
++		mmc2_clk: clk at 01c20090 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20090 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc2";
 +		};
 +
- 		usbphy: phy at 01c13400 {
- 			#phy-cells = <1>;
- 			compatible = "allwinner,sun5i-a13-usb-phy";
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index f01c315..a0e55e8 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -320,6 +320,24 @@
- 			#size-cells = <0>;
- 		};
- 
-+		mmc0: mmc at 01c0f000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ahb_gates 8>, <&mmc0_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <32>;
-+			status = "disabled";
++		mmc3_clk: clk at 01c20094 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-mod0-clk";
++			reg = <0x01c20094 0x4>;
++			clocks = <&osc24M>, <&pll6>;
++			clock-output-names = "mmc3";
 +		};
 +
-+		mmc2: mmc at 01c11000 {
-+			compatible = "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ahb_gates 10>, <&mmc2_clk>;
-+			clock-names = "ahb", "mod";
-+			interrupts = <34>;
-+			status = "disabled";
-+		};
-+
- 		usbphy: phy at 01c13400 {
- 			#phy-cells = <1>;
- 			compatible = "allwinner,sun5i-a13-usb-phy";
+ 		spi0_clk: clk at 01c200a0 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-mod0-clk";
 -- 
 1.9.0
