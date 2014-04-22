@@ -1,90 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 22 Apr 2014 22:58:22 +0200
-Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
-In-Reply-To: <1398195678-28787-2-git-send-email-robherring2@gmail.com>
-References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
- <1398195678-28787-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20140422205822.GC25453@lunn.ch>
+From: marek@goldelico.com (Marek Belisko)
+Date: Tue, 22 Apr 2014 23:12:46 +0200
+Subject: [PATCH 0/2] Add display support for gta04 device
+Message-ID: <1398201168-25275-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 02:41:16PM -0500, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
-> 
-> Multi-platform support implies all these options are already selected and
-> individual platforms don't need to select them.
+This 2 patches adding display support for openmoko gta04 device.
+First patch add DT bindings for topolly td028 panel and second add description for
+dss + panel.
 
-Hi Rob
+Marek Belisko (2):
+  omapdss: panel-tpo-td028ec1: Add DT support.
+  ARM: dts: oma3-gta04: Add display support
 
-Does this break mvebu_v7_defconfig?
+ .../bindings/video/toppoly,td028ttec1.txt          | 30 ++++++++
+ arch/arm/boot/dts/omap3-gta04.dts                  | 86 ++++++++++++++++++++++
+ .../omap2/displays-new/panel-tpo-td028ttec1.c      | 32 +++++++-
+ 3 files changed, 147 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/video/toppoly,td028ttec1.txt
 
-     Andrew
-
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
->  arch/arm/mach-mvebu/Kconfig | 6 ------
->  1 file changed, 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 3f73eec..bfc5af1 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -3,7 +3,6 @@ config ARCH_MVEBU
->  	select ARCH_SUPPORTS_BIG_ENDIAN
->  	select CLKSRC_MMIO
->  	select GENERIC_IRQ_CHIP
-> -	select IRQ_DOMAIN
->  	select PINCTRL
->  	select PLAT_ORION
->  	select MVEBU_MBUS
-> @@ -11,7 +10,6 @@ config ARCH_MVEBU
->  	select ARCH_REQUIRE_GPIOLIB
->  	select MIGHT_HAVE_PCI
->  	select PCI_QUIRKS if PCI
-> -	select OF_ADDRESS_PCI
->  
->  if ARCH_MVEBU
->  
-> @@ -38,7 +36,6 @@ config MACH_ARMADA_375
->  	select ARM_ERRATA_753970
->  	select ARM_GIC
->  	select ARMADA_375_CLK
-> -	select CPU_V7
->  	select MACH_MVEBU_V7
->  	select PINCTRL_ARMADA_375
->  	help
-> @@ -51,7 +48,6 @@ config MACH_ARMADA_38X
->  	select ARM_ERRATA_753970
->  	select ARM_GIC
->  	select ARMADA_38X_CLK
-> -	select CPU_V7
->  	select MACH_MVEBU_V7
->  	select PINCTRL_ARMADA_38X
->  	help
-> @@ -86,13 +82,11 @@ config MACH_KIRKWOOD
->  	select ARCH_REQUIRE_GPIOLIB
->  	select CPU_FEROCEON
->  	select KIRKWOOD_CLK
-> -	select OF_IRQ
->  	select ORION_IRQCHIP
->  	select ORION_TIMER
->  	select PCI
->  	select PCI_QUIRKS
->  	select PINCTRL_KIRKWOOD
-> -	select USE_OF
->  	help
->  	  Say 'Y' here if you want your kernel to support boards based
->  	  on the Marvell Kirkwood device tree.
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+1.8.3.2
