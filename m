@@ -1,28 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Apr 2014 12:01:32 -0700
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Boot fixes
-In-Reply-To: <1398192739-8901-1-git-send-email-d-gerlach@ti.com>
-References: <1398192739-8901-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20140422190132.GA12204@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 13:54:33 -0500
+Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
+In-Reply-To: <CAL_JsqKE_Z3kBhS1VaQADV5ob8x6AKHhbHaQEGoVSwkwdd50zA@mail.gmail.com>
+References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
+ <CAL_JsqKE_Z3kBhS1VaQADV5ob8x6AKHhbHaQEGoVSwkwdd50zA@mail.gmail.com>
+Message-ID: <CAL_JsqJwC2xcZakXiJXJscK7tN7xt2OotBKyr9u+aK3bOP+7GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [140422 11:52]:
-> This patch, along with patch here [1], fixes boot for am437x-gp-evm. The
-> bootloader configures gpio5_7 to control the DDR3 termination regulator,
-> the linked patch prevents that gpio bank from being reset and losing
-> the previously configured state, and this patch binds the gpio to a
-> regulator so the kernel is aware of the state of the gpio.
-> 
-> [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg102941.html
+On Tue, Apr 22, 2014 at 1:47 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, Apr 22, 2014 at 10:38 AM, Antoine T?nart
+> <antoine.tenart@free-electrons.com> wrote:
+>> Add support for the Berlin SoCs AHCI SATA controller allowing to
+>> interface with devices like external hard drives.
 
-Setting up the GPIO regulator makes sense to me. But the hack in the
-link above is potentially a nasty time bomb for anybody trying to
-use GPIO bank 5 on that board.
+One more thing.
 
-What tests have been done that the GPIO bank behaves properly when
-it's not reset?
+>> +       nports = readl(hpriv->mmio + HOST_PORTS_IMPL);
+>> +
+>> +       /* force_map is modified only if the property is found */
+>> +       of_property_read_u32(np, "marvell,force-port-map", &force_map);
 
-Regards,
+This property does not appear to be documented.
 
-Tony
+>> +       if (force_map)
+>> +               nports = force_map;
+
+You don't need this as your comment says, you can just do:
+
+of_property_read_u32(np, "marvell,force-port-map", &nports);
+
+nports will only be changed if property is present.
+
+Rob
