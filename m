@@ -1,66 +1,62 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 22 Apr 2014 16:30:27 -0400
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <5895821.PvurJ8TWz2@wuerfel>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
- <5895821.PvurJ8TWz2@wuerfel>
-Message-ID: <5356D163.1070304@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Apr 2014 22:49:07 +0200
+Subject: [PATCH v2] staging: imx-drm-core: skip components whose parent
+ device is disabled
+In-Reply-To: <20140421233148.GZ2523@dragon>
+References: <1397440946-2303-1-git-send-email-shawn.guo@freescale.com>
+ <CAOesGMiDqd+JSd_fzzeWohSGixuR1ciOz_FO5CGnSm7F3ioxDw@mail.gmail.com>
+ <20140421233148.GZ2523@dragon>
+Message-ID: <201404222249.07486.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014 04:23 PM, Arnd Bergmann wrote:
-> On Tuesday 22 April 2014 15:58:09 Santosh Shilimkar wrote:
->> On Tuesday 22 April 2014 03:53 PM, Arnd Bergmann wrote:
->>> On Tuesday 22 April 2014, Santosh Shilimkar wrote:
->>>> On Tuesday 22 April 2014 10:08 AM, Arnd Bergmann wrote:
->>>>> It's not the nicest API ever, but that's what it is and has been, mostly
->>>>> for compatibility with x86, where the 'mov' instruction performing the
->>>>> store to MMIO registers implies that all writes to DMA memory are
->>>>> visible to the device.
->>>>>
->>>> This is not about writel() and  writel_relaxed(). The driver don't
->>>> need that barrier. For example if the actual start of the DMA
->>>> happens bit later, that doesn't matter for the driver.
->>>>
->>>> DMA APIs already do barriers today for non-coherent case. We
->>>> are not talking anything new here. Sorry but I don't see the
->>>> connection here.
->>>
->>> I don't think they do, nor should they. Can you tell me where
->>> you see a barrier in dma_sync_single_for_cpu() or 
->>> arm_dma_sync_single_for_device()? For all I can tell, they
->>> only deal with L1 and L2 cache maintainance in arm_dma_ops.
->>>
->> The cache APIs used by dma_ops do have the necessary barriers
->> at end of the of the cache operations. Thats what I meant. So for
->> end user(Device driver), its transparent.
+On Tuesday 22 April 2014, Shawn Guo wrote:
+> On Mon, Apr 21, 2014 at 07:22:52AM -0700, Olof Johansson wrote:
+> > On Sat, Apr 19, 2014 at 4:00 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > > On Sat, Apr 19, 2014 at 09:42:29AM +0100, Russell King - ARM Linux wrote:
+> > >> On Sat, Apr 19, 2014 at 01:53:08PM +0800, Shawn Guo wrote:
+> > >> > BTW, can you take a look at the following two patches, or are they
+> > >> > already in your queue?
+> > >> >
+> > >> > imx-drm: imx-drm-core: Fix imx_drm_encoder_get_mux_id
+> > >> > https://lkml.org/lkml/2014/4/7/58
+> > >>
+> > >> This one now is.
+> > >>
+> > >> > mx-drm: imx-tve: correct DDC property name to 'ddc-i2c-bus'
+> > >> > ('i' is missing from the prefix word, and it should be 'imx-drm')
+> > >> > http://www.spinics.net/lists/arm-kernel/msg321057.html
+> > >>
+> > >> This one touches arch/arm/boot/dts, which Arnd moaned at me for touching
+> > >> via the staging tree during the merge window.  So, while I can take the
+> > >> imx-tve part, I can't take the arch/arm/boot/dts part.  This patch needs
+> > >> to be split.
+> > >>
+> > >> It also means that the MBA platform will have its TVE output broken while
+> > >> the two commits take their different paths, but I guess that's what you
+> > >> get for this kind of sillyness about git trees having exclusive ownership
+> > >> of various files in the kernel tree - more breakage not less.
+> > >
+> > > I think Arnd's main concern is about merge conflict, which shouldn't be
+> > > a problem for this particular case.  The change on dts file is pretty
+> > > trivial.  And I assume this is a fix to be landed on mainline before
+> > > -rc5 or so.  Then I can rebase my DT branch on top of it.  That said,
+> > > merge conflict is not really a problem for this patch.  Arnd?
+> > 
+> > I'm not Arnd, but that should work well.
 > 
-> Ok, I see it now for the noncoherent operations, and I see
-> the same thing on PowerPC and MIPS, which also have both coherent
-> and noncoherent versions of their dma_map_ops.
-> 
-> However, I also see that neither of those does a wmb() for the
-> coherent version. I don't see why ARM should be different from
-> the others here, so if there is a reason to do a barrier there,
-> we should change all architectures. I still don't see a reason
-> why the barrier is needed though.
-> 
-Thats fair.
+> Thanks, Olof.
 
-> Can you be more specific in your driver example why you think
-> the barrier in the writel() is not sufficient?
-> 
-writel() or an explcit barrier in the driver will do the job. I was
-just thinking that we are trying to work around the short comings
-of streaming API by adding barriers in the driver. For example
-on a non-coherent system, i don't need that barrier because
-dma_ops does take care of that.
+Just to clarify, we generally want to avoid three things that happened
+with this driver during the merge window:
 
-Anyway, I think you and Catalin convinced me enough to handle the
-case at driver level so I step back on the patch. It make sense
-to keep ARM consistent with other architectures.
+- incompatible DT binding changes
+- known merge conflicts
+- dts changes going through another tree (because they tend to cause
+  merge conflicts)
 
-Regards,
-Santosh
+However, none of these are hard rules, we can bend them for good reasons
+if it's clearly spelled out in the patch description and we are aware
+of the change (ideally with an explicit Ack).
+
+	Arnd
