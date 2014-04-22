@@ -1,32 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Apr 2014 21:53:41 +0200
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <53567E7C.7020409@ti.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404221608.36628.arnd@arndb.de> <53567E7C.7020409@ti.com>
-Message-ID: <201404222153.41786.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 22 Apr 2014 16:55:14 -0300
+Subject: [PATCH] ARM: Better virt_to_page() handling
+In-Reply-To: <E1WTYiT-0007Jl-Fe@rmk-PC.arm.linux.org.uk>
+References: <20140328152831.GK7528@n2100.arm.linux.org.uk>
+ <E1WTYiT-0007Jl-Fe@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140422195514.GA13106@arch.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014, Santosh Shilimkar wrote:
-> On Tuesday 22 April 2014 10:08 AM, Arnd Bergmann wrote:
-> > It's not the nicest API ever, but that's what it is and has been, mostly
-> > for compatibility with x86, where the 'mov' instruction performing the
-> > store to MMIO registers implies that all writes to DMA memory are
-> > visible to the device.
-> > 
-> This is not about writel() and  writel_relaxed(). The driver don't
-> need that barrier. For example if the actual start of the DMA
-> happens bit later, that doesn't matter for the driver.
-> 
-> DMA APIs already do barriers today for non-coherent case. We
-> are not talking anything new here. Sorry but I don't see the
-> connection here.
+Russell,
 
-I don't think they do, nor should they. Can you tell me where
-you see a barrier in dma_sync_single_for_cpu() or 
-arm_dma_sync_single_for_device()? For all I can tell, they
-only deal with L1 and L2 cache maintainance in arm_dma_ops.
+On Mar 28, Russell King wrote:
+> -#ifndef __virt_to_phys
+> -#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+> +#if defined(__virt_to_phys)
+> +#define PHYS_OFFSET	PLAT_PHYS_OFFSET
+> +#define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+> +
+> +#define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
+> +
 
-	Arnd
+Building 20140422 -next produces a myriad of these warnings:
+
+  [..]
+  CC      fs/mpage.o
+In file included from /home/zeta/linux/next/arch/arm/include/asm/page.h:163:0,
+                 from include/linux/mmzone.h:20,
+                 from include/linux/gfp.h:5,
+                 from include/linux/mm.h:9,
+                 from fs/mpage.c:17:
+/home/zeta/linux/next/arch/arm/include/asm/memory.h:297:0: warning: "virt_to_pfn" redefined [enabled by default]
+ #define virt_to_pfn(kaddr)      (__pa(kaddr) >> PAGE_SHIFT)
+ ^
+/home/zeta/linux/next/arch/arm/include/asm/memory.h:194:0: note: this is the location of the previous definition
+ #define virt_to_pfn(kaddr) \
+ ^
+
+I saw you already answered Nicolas about the double-definition, so I'm merely
+reporting the build gets really spammy now. (Although I guess you already
+noticed this)
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
