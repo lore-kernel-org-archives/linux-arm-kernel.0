@@ -1,18 +1,26 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 22 Apr 2014 21:39:30 +0530
-Subject: [PATCH] dmaengine: edma: Add DMA memcpy support
-In-Reply-To: <1397875833-31345-1-git-send-email-joelf@ti.com>
-References: <1397875833-31345-1-git-send-email-joelf@ti.com>
-Message-ID: <20140422160930.GY32284@intel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 22 Apr 2014 18:27:13 +0200
+Subject: [PATCH 2/6] Documentation: bindings: add the berlin-achi
+ compatible to the ahci platform
+In-Reply-To: <1398181105-19714-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398181105-19714-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140422182713.0084fd2f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 09:50:33PM -0500, Joel Fernandes wrote:
-> We add DMA memcpy support to EDMA driver. Successful tests performed using
-> dmatest kernel module. Copy alignment is set to DMA_SLAVE_BUSWIDTH_4_BYTES and
-> users must ensure length is aligned so that copy is performed fully.
+Dear Antoine T?nart,
 
-Applied, thanks
+On Tue, 22 Apr 2014 17:38:21 +0200, Antoine T?nart wrote:
+> The berlin-achi driver allows Berlin SoCs to support their AHCI SATA controller.
+> Add the compatible to the device tree bindings documentation.
+> 
+> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
 
+Typo in the commit title: s/achi/ahci.
+
+Thomas
 -- 
-~Vinod
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
