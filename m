@@ -1,51 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Apr 2014 17:18:40 +0200
-Subject: [PATCH 2/7] gpiolib: Support purely name based gpiod lookup in
- device trees
-In-Reply-To: <CACRpkdZ+3dnhoj1TS4KSVUP8iFHsjjwop-FG2Nf07YtH6aSO_Q@mail.gmail.com>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
- <1397544101-18135-3-git-send-email-wens@csie.org>
- <CACRpkdZ+3dnhoj1TS4KSVUP8iFHsjjwop-FG2Nf07YtH6aSO_Q@mail.gmail.com>
-Message-ID: <20140422151840.GH24905@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Apr 2014 16:21:52 +0100
+Subject: arm64: default dma_ops is set to coherent_dma_ops results into
+ DMA FAILURE
+In-Reply-To: <20140422140413.GB10224@arm.com>
+References: <CALk7dXpKGdYd7K4M68KbBgv9a7oHWhPPLER297xFgkYnEiv8Ug@mail.gmail.com>
+ <20140422132045.GB9820@arm.com> <20140422140413.GB10224@arm.com>
+Message-ID: <20140422152152.GG9820@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Tue, Apr 22, 2014 at 05:00:17PM +0200, Linus Walleij wrote:
-> On Tue, Apr 15, 2014 at 8:41 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+On Tue, Apr 22, 2014 at 03:04:13PM +0100, Catalin Marinas wrote:
+> On Tue, Apr 22, 2014 at 02:20:45PM +0100, Will Deacon wrote:
+> > On Tue, Apr 22, 2014 at 01:48:12PM +0100, Ritesh Harjani wrote:
+> > > This is regarding the default dma_ops that we populate for arm64.
+> > > 
+> > > PROBLEM:
+> > > Currently in arch/arm64/mm/dma-mapping.c we set dma_ops =
+> > > &coherent_swiotlb_dma_ops.
+> > > 
+> > > The problem with this is, lets say that there is a dma device which
+> > > has not populated its dev->archdata.dma_ops, then this dma device will
+> > > get the coherent dma_ops in which we dont do any cache maintainance.
+> > > 
+> > > So, if the dma driver do kmalloc, make some changes to the buffer and
+> > > after dma_map_single gives it to the dma for the transfer, due to no
+> > > cache maintenance performed, result will be DMA transfer failed.
+> > > 
+> > > Earlier noncoherent ops code was not present at all for arm64, so may
+> > > be we were setting default ops to coherent ops. But now that we have
+> > > noncoherent ops in place shall we make the default dma_ops to
+> > > noncoherent (as what arm also does) ?
+> > 
+> > The problem with changing the default assumption to non-coherent is that
+> > existing coherent platforms that rely on the coherent DMA ops being selected
+> > without any additional DT properties (e.g. dma-coherent) will break with
+> > this change.
+> > 
+> > This puts us into a nasty situation where we have the opposite policy from
+> > arch/arm/ regarding default DMA ops, rendering device-trees potentially
+> > incompatible between the two architectures.
+> > 
+> > I'd be inclined to align the two, but it will break any users relying on the
+> > current behaviour (I believe this includes Applied with their X-gene SoC).
 > 
-> > This patch enables gpio-names based gpiod lookup in device tree usage,
-> > which ignores the index passed to gpiod_get_index. If this fails, fall
-> > back to the original function-index ("con_id"-gpios) based lookup scheme,
-> > for backward compatibility and any drivers needing more than one GPIO
-> > for any function.
-> >
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> If there aren't any DMA-capable X-gene drivers in mainline yet, we could
+> make this change (probably even if they are, though we need input from
+> the Applied guys on how disruptive this is).
+
+I'd certainly be supportive of such a change.
+
+> But do we have a documented way on describing which SoC is coherent? The
+> longer term plan is for a full description of the system topology but we
+> are not there yet. IIRC Santosh has been looking at this as well but I
+> haven't followed the recent developments.
 > 
-> This looks a bit scary and I cannot claim to realize the entire semantic
-> effect of this patch, but if it's the way to go then OK.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Shall I just apply this to the GPIO tree or are you carrying it along with
-> the other stuff?
+> There are some instances of "dma-coherent" properties described in
+> Documentation/devicetree/, we could use them and just need to find a way
+> in the arm64 to handle this automatically without SoC-specific
+> initialisation (and independent of the driver code).
 
-This patch has a dependency on the first patch of this serie, since it
-uses a binding that was documented there.
+I think we can default to non-coherent ops without merging support for the
+"dma-coherent" properties initially. Then we can ask the Applied folks to
+get involved with Santosh's thread, which will hopefully result in something
+usable for both arm and arm64.
 
-Maybe you'll want to wait for the ACK from the DT maintainers to merge
-this one.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140422/3fbc1df2/attachment.sig>
+Will
