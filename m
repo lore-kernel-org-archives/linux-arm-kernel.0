@@ -1,39 +1,109 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 22 Apr 2014 12:18:51 +0200
-Subject: [PATCH v4 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry
- macro for iteration
-In-Reply-To: <20140422071541.GA17657@lee--X1>
-References: <534DB213.7080802@semaphore.gr> <5355A349.50908@semaphore.gr>
- <20140422071541.GA17657@lee--X1>
-Message-ID: <6612075.PRZcWcuj98@vostro.rjw.lan>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 22 Apr 2014 10:06:14 +0000
+Subject: [PATCH v7 1/2] can: xilinx CAN controller support
+In-Reply-To: <53562F36.6020005@pengutronix.de>
+References: <3e750ec3-9d47-4b4e-8173-56698ab19786@CH1EHSMHS029.ehs.local>
+ <53424C32.7090000@monstr.eu>
+ <707ea084-ed82-407b-8967-1e82a994b784@AM1EHSMHS003.ehs.local>
+ <53562F36.6020005@pengutronix.de>
+Message-ID: <bbe8aafc-8fce-4065-91b3-c051ad5c150f@CH1EHSMHS043.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 22, 2014 08:15:41 AM Lee Jones wrote:
-> > The cpufreq core now supports the cpufreq_for_each_entry macro helper
-> > for iteration over the cpufreq_frequency_table, so use it.
-> > 
-> > It should have no functional changes.
-> 
-> > Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
-> > ---
-> 
-> It would be good to have a changelog which describes the differences
-> between the versions, so we can keep track.
-> 
-> >  drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
-> >  1 file changed, 8 insertions(+), 11 deletions(-)
-> 
-> So it looks like I already applied v2 of this patch to my tree. What
-> changed in v3 and v4? Should I remove that patch from MFD and apply
-> this one instead?
+Hi Marc,
 
-The reason why v4 was sent is because I asked for it.
 
-And if you applied [5/8] without [1/8], it won't work, because the macro is
-introduced by that patch.
+> -----Original Message-----
+> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> Sent: Tuesday, April 22, 2014 2:29 PM
+> To: Appana Durga Kedareswara Rao; monstr at monstr.eu
+> Cc: wg at grandegger.com; Michal Simek; grant.likely at linaro.org;
+> robh+dt at kernel.org; linux-can at vger.kernel.org; netdev at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH v7 1/2] can: xilinx CAN controller support
+>
+> On 04/22/2014 09:56 AM, Appana Durga Kedareswara Rao wrote:
+> > Hi Marc,
+> >
+> >> -----Original Message-----
+> >> From: Michal Simek [mailto:monstr at monstr.eu]
+> >> Sent: Monday, April 07, 2014 12:27 PM
+> >> To: Appana Durga Kedareswara Rao
+> >> Cc: wg at grandegger.com; mkl at pengutronix.de; Michal Simek;
+> >> grant.likely at linaro.org; robh+dt at kernel.org;
+> >> linux-can at vger.kernel.org; netdev at vger.kernel.org;
+> >> linux-arm-kernel at lists.infradead.org; linux- kernel at vger.kernel.org;
+> >> devicetree at vger.kernel.org; Appana Durga Kedareswara Rao
+> >> Subject: Re: [PATCH v7 1/2] can: xilinx CAN controller support
+> >>
+> >> On 04/02/2014 03:13 PM, Kedareswara rao Appana wrote:
+> >>> This patch adds xilinx CAN controller support.
+> >>> This driver supports both ZYNQ CANPS and Soft IP AXI CAN controller.
+> >>>
+> >>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> >>> ---
+> >>> Changes for v7:
+> >>> - Updated the driver with review comments.
+> >>> - Moved the driver bindings doc as a separte patch.
+> >>> Changes for v6:
+> >>> - Updated the driver with review comments.
+> >>> - Used the clock names specified in the data sheet.
+> >>> - Updated the devicetree bindings doc as per Rob suggestion.
+> >>> Changes for v5:
+> >>> - Updated the driver with the review comments.
+> >>> - Remove the check for the tx fifo full interrupt condition
+> >>>   form Tx interrupt routine as we are checking it in the _xmit
+> >>>   routine.
+> >>> - Clearing the txok interrupt in the tx interrupt routine for
+> >>>   every Tx can frame.
+> >>> Changes for v4:
+> >>> - Added check for the tx fifo full interrupt condition in Tx
+> >>> interrupt routine.
+> >>> - Added be iohelper functions.
+> >>> - Moved the clock enable/disable to probe/remove because of
+> >>>   Added big endian support for AXI CAN controller case(reading
+> >>>   a register during probe for that we need to enable clock).
+> >>> Changes for v3:
+> >>> - Updated the driver with the review comments.
+> >>> - Modified the tranmit logic as per Marc suggestion.
+> >>> - Enabling the clock when the interface is up to reduce the
+> >>>   Power consumption.
+> >>> Changes for v2:
+> >>> - Updated with the review comments.
+> >>> - Removed the unnecessary debug prints.
+> >>> - include tx,rx fifo depths in ZYNQ CANPS case also
+> >>> ---
+> >>>  drivers/net/can/Kconfig      |    7 +
+> >>>  drivers/net/can/Makefile     |    1 +
+> >>>  drivers/net/can/xilinx_can.c | 1176
+> >>> ++++++++++++++++++++++++++++++++++++++++++
+> >>>  3 files changed, 1184 insertions(+), 0 deletions(-)  create mode
+> >>> 100644 drivers/net/can/xilinx_can.c
+> >>
+> >> Mark: Any update on this one?
+> >> BTW: When you apply these patches you should apply 2/2 before 1/2.
+> >> There is new checking for binding.
+> >>
+> >
+> > Ping?
+>
+> Done, when you repost, can you change the order of the patches, so that the
+> binding comes first.
+>
+Ok Sure.
 
-If that's the case, please drop [5/8] and let me handle the entire series.
+Regards,
+Kedar.
 
-Kind regards,
-Rafael
+> Marc
+>
+> --
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
