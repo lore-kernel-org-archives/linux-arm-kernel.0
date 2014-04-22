@@ -1,25 +1,40 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 22 Apr 2014 13:54:39 +0200
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <534DADF1.6060608@meduna.org>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org>
-Message-ID: <20140422115439.GA20669@linutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Apr 2014 13:54:52 +0200
+Subject: [PATCH 11/11] pinctrl: single: Clear pin interrupts enabled by
+ bootloader
+In-Reply-To: <1397173639-29587-12-git-send-email-tony@atomide.com>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-12-git-send-email-tony@atomide.com>
+Message-ID: <CACRpkdYu2Obo8kuA2D9a33K_KCF-LPza=+reEpFnq8JFK6jOCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stanislav Meduna | 2014-04-16 00:08:49 [+0200]:
+On Fri, Apr 11, 2014 at 1:47 AM, Tony Lindgren <tony@atomide.com> wrote:
 
->Hmm... how is it in the rt-case guaranteed that the timer interrupt
->does not preempt someone trying to modify the timer? The run_local_timers
->looks to have arrived via hardirq context. The spinlock in the tvec_base
->is a normal one and spin_lock_irqsave does not disable interrupts
->on rt, right?
+> Since we set up device wake-up interrupts as pinctrl-single
+> interrupts, we now must use the standard request_irq and
+> related functions to manage them.
+>
+> If the pin interrupts are enabled for some pins at boot,
+> the wake-up events can show up as constantly pending
+> at least on omaps and will hang the system unless the related
+> device driver clears the event at the device.
+>
+> To fix this, let's clear the interrupt flags during init,
+> and print out a warning so the board maintainers can update
+> their drivers to do proper request_irq for the driver specific
+> wake-up events.
+>
+> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-this is, erm, harmless. We grab the timer lock via trylock in hardirq
-context. If the lock is already taken then we fail to get it we go for
-plan B. According to lockdep a trylock should not fail on UP. This is
-true in general except for this timer case. I was thinking abour
-disabling this lockdep check?
+Looks clean.
 
-Sebastian
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Shall I apply this patch or will you funnel it through ARM SoC
+due to deps?
+
+Yours,
+Linus Walleij
