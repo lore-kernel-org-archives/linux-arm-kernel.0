@@ -1,83 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Apr 2014 23:49:58 +0200
-Subject: [PATCH 2/3] ARM: at91: at91sam9g45: change at91_adc name
-In-Reply-To: <532472B8.4090802@kernel.org>
-References: <1394038675-15809-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1394038675-15809-3-git-send-email-alexandre.belloni@free-electrons.com>
- <5318C98C.1070702@kernel.org> <531DBD71.8040905@atmel.com>
- <532472B8.4090802@kernel.org>
-Message-ID: <5356E406.40507@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 22 Apr 2014 23:53:23 +0200
+Subject: [PATCH v2 22/38] ARM: orion: switch to a per-platform
+ handle_irq() function
+In-Reply-To: <4298778.6g1TfFX2gY@wuerfel>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1398202002-28530-23-git-send-email-thomas.petazzoni@free-electrons.com>
+ <4298778.6g1TfFX2gY@wuerfel>
+Message-ID: <20140422235323.1119b1eb@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/2014 16:33, Jonathan Cameron :
-> On 10/03/14 13:26, Nicolas Ferre wrote:
->> On 06/03/2014 20:16, Jonathan Cameron :
->>> On 05/03/14 16:57, Alexandre Belloni wrote:
->>>> We can't use "at91_adc" to refer to the at91_adc driver anymore as the name is
->>>> used to match an id_table.
->>>>
->>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> As stated in previous email, I'll take this along with the fix that 'broke'
->>> this, if I get an Ack from one of the at91 maintainers.
->>
->> Jonathan,
->>
->> It is maybe more clear if I answer here:
->> - so, yes, you can take the 3 patches yourself (if you do not mind)
->> - you have, for the whole series::
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Applied to the fixes-togreg branch of iio.git
+Dear Arnd Bergmann,
+
+On Tue, 22 Apr 2014 23:45:55 +0200, Arnd Bergmann wrote:
+> On Tuesday 22 April 2014 23:26:26 Thomas Petazzoni wrote:
+> > However, the common CONFIG_MULTI_IRQ_HANDLER handler for non-DT
+> > platforms in plat-orion/irq.c doesn't match the needs of
+> > Orion5x. Also, it doesn't make much sense for orion_irq_init() to
+> > register the multi-IRQ handler: orion_irq_init() is called once for
+> > each IRQ cause/mask tuple, while the multi-IRQ handler only needs to
+> > be registered once.
 > 
-> Timing wise, these will now hit immediately after the merge window closes.
+> Since you now have the code for doing MULTI_IRQ_HANDLER on Orion5x,
+> why not always enable it for both Orion and Kirkwood, and remove
+> the #ifdef?
 
-Greg, Jonathan,
+You mean the #ifdef CONFIG_MULTI_IRQ_HANDLER ? This is because this
+piece of code is only needed if you build into the same image the DT
+and non-DT code. For pure DT, this is not needed, as the handler is in
+drivers/irqchip/irq-orion.c. For pure non-DT, this is not needed,
+because we don't use MULTI_IRQ_HANDLER. However, for mixed DT and
+non-DT, since the DT stuff selects MULTI_IRQ_HANDLER, the non-DT stuff
+must have its own.
 
-I saw the IIO pull request a week ago ([PULL] IIO fixes for 3.15 round
-1) but I do not see it in Linus' tree for the moment:
-http://article.gmane.org/gmane.linux.kernel.iio/11764
+Also, this patch step is only *one* step in the (hopefully) right
+direction. It's already a 38 patches series, so it would be good to
+understand that no all cleanups can be done in this particular patch
+series. What you're suggesting is not a problem introduced by this
+patch series: the original code already had the #ifdef
+CONFIG_MULTI_IRQ_HANDLER, so I would like to take the task of removing
+it as a follow-up task, if you agree.
 
-(sorry, I can't reply to the pull-request itself as I am not subscriber
-to iio mailing-list)
+Thanks!
 
-As the series contains a fix for a kernel Oops and that is was already
-delayed at the end of 3.14 cycle, will it be possible to include it
-pretty soon in 3.15 cycle?
-
-Thanks for your help, bye.
-
-> Jonathan
->>
->> Thanks for your help with this issue.
->>
->> Bye,
->>
->>>> ---
->>>>    arch/arm/mach-at91/at91sam9g45_devices.c | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
->>>> index cb36fa872d30..88554024eb2d 100644
->>>> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
->>>> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
->>>> @@ -1203,7 +1203,7 @@ static struct resource adc_resources[] = {
->>>>    };
->>>>
->>>>    static struct platform_device at91_adc_device = {
->>>> -	.name		= "at91_adc",
->>>> +	.name		= "at91sam9g45-adc",
->>>>    	.id		= -1,
->>>>    	.dev		= {
->>>>    				.platform_data	= &adc_data,
->>>>
->>>
->>>
->>
->>
-> 
-> 
-
-
+Thomas
 -- 
-Nicolas Ferre
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
