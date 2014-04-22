@@ -1,68 +1,76 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 22 Apr 2014 11:55:19 +0100
-Subject: [Xen-devel] [PATCH RFC] arm64: 32-bit tolerant sync bitops
-In-Reply-To: <5356418F.5090408@citrix.com>
-References: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>
- <534FB009.5030904@citrix.com>
- <CABV+yWsFY4AnNa+Bs54ZNswCUga1OtFh3+5PPWHSEA4zRXJD3g@mail.gmail.com>
- <5356418F.5090408@citrix.com>
-Message-ID: <1398164119.5111.42.camel@kazak.uk.xensource.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 22 Apr 2014 13:01:21 +0200
+Subject: [PATCH v8 01/17] clk: sunxi: factors: automatic reparenting support
+In-Reply-To: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1398164497-14212-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-22 at 11:16 +0100, David Vrabel wrote:
-> On 21/04/14 17:18, Vladimir Murzin wrote:
-> > On Thu, Apr 17, 2014 at 11:42 AM, David Vrabel <david.vrabel@citrix.com> wrote:
-> >> On 17/04/14 09:38, Vladimir Murzin wrote:
-> >>> Xen assumes that bit operations are able to operate on 32-bit size and
-> >>> alignment [1]. For arm64 bitops are based on atomic exclusive load/store
-> >>> instructions to guarantee that changes are made atomically. However, these
-> >>> instructions require that address to be aligned to the data size. Because, by
-> >>> default, bitops operates on 64-bit size it implies that address should be
-> >>> aligned appropriately. All these lead to breakage of Xen assumption for bitops
-> >>> properties.
-> >>>
-> >>> With this patch 32-bit sized/aligned bitops is implemented.
-> >>>
-> >>> [1] http://www.gossamer-threads.com/lists/xen/devel/325613
-> >>>
-> >>> Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
-> >>> ---
-> >>>  Apart this patch other approaches were implemented:
-> >>>  1. turn bitops to be 32-bit size/align tolerant.
-> >>>     the changes are minimal, but I'm not sure how broad side effect might be
-> >>>  2. separate 32-bit size/aligned operations.
-> >>>     it exports new API, which might not be good
-> >>
-> >> I've never been particularly happy with the way the events_fifo.c uses
-> >> casts for the sync_*_bit() calls and I think we should do option 2.
-> >>
-> >> A generic implementation could be something like:
-> >>
-> >> bool sync_test_bit32(uint32_t *v, unsigned bit)
-> >> {
-> >>      if (sizeof(unsigned long) == 8 && (unsigned long)v & 0x4)
-> >>          return sync_test_bit((unsigned long *)(v - 1), bit + 32);
-> >>      else
-> >>          return sync_test_bit((unsigned long *)v, bit);
-> >> }
-> >>
-> >> David
-> > 
-> > Talking about separate 32-bit ops I mean arch specific bitops which
-> > are targeting for 32-bit size/alignment.
-> > With separate API for Xen it looks awkward for me, because currently
-> > there are only a few users for sync_*_bit ops - Xen and HV.
-> > Xen assumes that these ops are 32 bit and looks like never try to deal
-> > with 64-bit (am I overlooking something?). So, sync ops are 32-bit
-> > de-facto, having separate version means there is support for both
-> > 32-bit and 64-bit ops, but (by now) there is no user for 64-bit ops.
-> > All this lead to obvious question why we need API conversion now? Is
-> > not it easier to turn assumptions to requirements?
-> 
-> Xen does use the sync bit ops on 64-bit values (for 2-level event channels).
+From: Emilio L?pez <emilio@elopez.com.ar>
 
-It is valid to use a 32-bit bitop on a 64-bit aligned bitmask though
-(whereas the converse is not always true).
+This commit implements .determine_rate, so that our factor clocks can be
+reparented when needed.
 
-Ian.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/clk/sunxi/clk-factors.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 9e23264..3806d97 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -77,6 +77,41 @@ static long clk_factors_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	return rate;
+ }
+ 
++static long clk_factors_determine_rate(struct clk_hw *hw, unsigned long rate,
++				       unsigned long *best_parent_rate,
++				       struct clk **best_parent_p)
++{
++	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
++	int i, num_parents;
++	unsigned long parent_rate, best = 0, child_rate, best_child_rate = 0;
++
++	/* find the parent that can help provide the fastest rate <= rate */
++	num_parents = __clk_get_num_parents(clk);
++	for (i = 0; i < num_parents; i++) {
++		parent = clk_get_parent_by_index(clk, i);
++		if (!parent)
++			continue;
++		if (__clk_get_flags(clk) & CLK_SET_RATE_PARENT)
++			parent_rate = __clk_round_rate(parent, rate);
++		else
++			parent_rate = __clk_get_rate(parent);
++
++		child_rate = clk_factors_round_rate(hw, rate, &parent_rate);
++
++		if (child_rate <= rate && child_rate > best_child_rate) {
++			best_parent = parent;
++			best = parent_rate;
++			best_child_rate = child_rate;
++		}
++	}
++
++	if (best_parent)
++		*best_parent_p = best_parent;
++	*best_parent_rate = best;
++
++	return best_child_rate;
++}
++
+ static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long parent_rate)
+ {
+@@ -113,6 +148,7 @@ static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
+ }
+ 
+ const struct clk_ops clk_factors_ops = {
++	.determine_rate = clk_factors_determine_rate,
+ 	.recalc_rate = clk_factors_recalc_rate,
+ 	.round_rate = clk_factors_round_rate,
+ 	.set_rate = clk_factors_set_rate,
+-- 
+1.9.0
