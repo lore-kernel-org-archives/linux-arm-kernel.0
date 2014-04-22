@@ -1,80 +1,131 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 23 Apr 2014 22:56:57 +0200
-Subject: [PATCH v2 2/3] arm: exynos: Add MCPM call-back functions
-In-Reply-To: <CAM4voa=WJiF-9wZB29JOFhz2kEE-TC0y6h-8GVwk3_JoXxpK+A@mail.gmail.com>
-References: <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>	<1398147435-3122-1-git-send-email-a.kesavan@samsung.com>	<535650AE.90501@linaro.org>
- <CAM4voa=WJiF-9wZB29JOFhz2kEE-TC0y6h-8GVwk3_JoXxpK+A@mail.gmail.com>
-Message-ID: <53582919.1040905@linaro.org>
+From: murzin.v@gmail.com (Vladimir Murzin)
+Date: Tue, 22 Apr 2014 21:56:57 +0100
+Subject: [Xen-devel] [PATCH RFC] arm64: 32-bit tolerant sync bitops
+In-Reply-To: <1398241889.4880.96.camel@kazak.uk.xensource.com>
+References: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>
+ <534FB009.5030904@citrix.com>
+ <1398241889.4880.96.camel@kazak.uk.xensource.com>
+Message-ID: <20140422205656.GA4467@hp530>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 05:31 PM, Abhilash Kesavan wrote:
-> Hi Daniel,
-> On Tue, Apr 22, 2014 at 4:51 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> On 04/22/2014 08:17 AM, Abhilash Kesavan wrote:
->>>
->>> Add machine-dependent MCPM call-backs for Exynos5420. These are used
->>> to power up/down the secondary CPUs during boot, shutdown, s2r and
->>> switching.
->>>
->>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>> Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
->>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->>> ---
+On Wed, Apr 23, 2014 at 09:31:29AM +0100, Ian Campbell wrote:
+> On Thu, 2014-04-17 at 11:42 +0100, David Vrabel wrote:
+> > On 17/04/14 09:38, Vladimir Murzin wrote:
+> > > Xen assumes that bit operations are able to operate on 32-bit size and
+> > > alignment [1]. For arm64 bitops are based on atomic exclusive load/store
+> > > instructions to guarantee that changes are made atomically. However, these
+> > > instructions require that address to be aligned to the data size. Because, by
+> > > default, bitops operates on 64-bit size it implies that address should be
+> > > aligned appropriately. All these lead to breakage of Xen assumption for bitops
+> > > properties.
+> > > 
+> > > With this patch 32-bit sized/aligned bitops is implemented. 
+> > > 
+> > > [1] http://www.gossamer-threads.com/lists/xen/devel/325613
+> > > 
+> > > Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+> > > ---
+> > >  Apart this patch other approaches were implemented:
+> > >  1. turn bitops to be 32-bit size/align tolerant.
+> > >     the changes are minimal, but I'm not sure how broad side effect might be
+> > >  2. separate 32-bit size/aligned operations.
+> > >     it exports new API, which might not be good
+> > 
+> > I've never been particularly happy with the way the events_fifo.c uses
+> > casts for the sync_*_bit() calls and I think we should do option 2.
+> > 
+> > A generic implementation could be something like:
+> 
+> It seems like there isn't currently much call for/interest in a generic
+> 32-bit set of bitops. Since this is a regression on arm64 right now how
+> about we simply fix it up in the Xen layer now and if in the future a
+> common need is found we can rework to use it.
+> 
+> We already have evtchn_fifo_{clear,set,is}_pending (although
+> evtchn_fifo_unmask and consume_one_event need fixing to use is_pending)
+> and evtchn_fifo_{test_and_set_,}mask, plus we would need
+> evtchn_fifo_set_mask for consume_one_event to use instead of open
+> coding.
+> 
+> With that then those helpers can become something like:
+>         #define BM(w) (unsigned long *)(w & ~0x7)
+>         #define EVTCHN_FIFO_BIT(b, w) (BUG_ON(w&0x3), w & 0x4 ? EVTCHN_FIFO_#b + 32 : EVTCHN_FIFO_#b)
+>         static void evtchn_fifo_clear_pending(unsigned port)
+>         {
+>         	event_word_t *word = event_word_from_port(port);
+>         	sync_clear_bit(EVTCHN_FIFO_BIT(PENDING, word), BM(word));
+>         }
+> similarly for the others.
+> 
+> If that is undesirable in the common code then wrap each existing helper
+> in #ifndef evtchn_fifo_clean_pending and put something like the above in
+> arch/arm64/include/asm/xen/events.h with a #define (and/or make the
+> helpers themselves macros, or #define HAVE_XEN_FIFO_EVTCHN_ACCESSORS etc
+> etc)
+> 
+> We still need your patch from
+> http://article.gmane.org/gmane.comp.emulators.xen.devel/196067 for the
+> other unaligned bitmap case. Note that this also removes the use of BM
+> for non-PENDING/MASKED bits, which is why it was safe for me to change
+> it above (also it would be safe to & ~0x7 after that change anyway).
+> 
+> Ian.
+> 
 
-[ ... ]
 
->>> +#include <plat/cpu.h>
->>> +#include "regs-pmu.h"
->>> +
->>> +#define EXYNOS5420_CPUS_PER_CLUSTER    4
->>> +#define EXYNOS5420_NR_CLUSTERS         2
->>> +
->>> +/* Secondary CPU entry point */
->>> +#define REG_ENTRY_ADDR         (S5P_VA_SYSRAM_NS + 0x1C)
->>> +
->>> +#define EXYNOS_CORE_LOCAL_PWR_EN               0x3
->>> +#define EXYNOS_CORE_LOCAL_PWR_DIS              0x0
->>>
->>> +#define EXYNOS_ARM_COMMON_CONFIGURATION                S5P_PMUREG(0x2500)
->>> +#define EXYNOS_ARM_L2_CONFIGURATION            S5P_PMUREG(0x2600)
->>> +
->>> +#define EXYNOS_ARM_CORE_CONFIGURATION(_nr)     \
->>> +                       (S5P_ARM_CORE0_CONFIGURATION + ((_nr) * 0x80))
->>> +#define EXYNOS_ARM_CORE_STATUS(_nr)            \
->>> +                       (S5P_ARM_CORE0_STATUS + ((_nr) * 0x80))
->>> +
->>> +#define EXYNOS_COMMON_CONFIGURATION(_nr)       \
->>> +                       (EXYNOS_ARM_COMMON_CONFIGURATION + ((_nr) * 0x80))
->>> +#define EXYNOS_COMMON_STATUS(_nr)              \
->>> +                       (EXYNOS_COMMON_CONFIGURATION(_nr) + 0x4)
->>> +
->>> +#define EXYNOS_L2_CONFIGURATION(_nr)           \
->>> +                       (EXYNOS_ARM_L2_CONFIGURATION + ((_nr) * 0x80))
->>> +#define EXYNOS_L2_STATUS(_nr)                  \
->>> +                       (EXYNOS_L2_CONFIGURATION(_nr) + 0x4)
->>> +
->>
->>
->> Is it possible to share the definition of those macros with the rest of the
->> code via functions, so they can be re-used for the other sub-systems ? eg:
->> https://patches.linaro.org/27798/
-> OK..I will work on making wrapper functions for these. Would these new
-> functions be better placed in the mcpm code or the pm code ?
+Might be dealing with it on Xen side is only way unless arm64 folks say what
+they think... because reports related to unaligned access still appear I'll
+put the minimally tested patch for making arm64 bitops 32-bits friendly ;)
 
-Hi Abhilash,
+---
+ arch/arm64/lib/bitops.S | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-yes, in the pm code. That would make more sense.
-
-Thanks
-   -- Daniel
-
-
+diff --git a/arch/arm64/lib/bitops.S b/arch/arm64/lib/bitops.S
+index 7dac371..7c3b058 100644
+--- a/arch/arm64/lib/bitops.S
++++ b/arch/arm64/lib/bitops.S
+@@ -26,14 +26,14 @@
+  */
+ 	.macro	bitop, name, instr
+ ENTRY(	\name	)
+-	and	w3, w0, #63		// Get bit offset
++	and	w3, w0, #31		// Get bit offset
+ 	eor	w0, w0, w3		// Clear low bits
+ 	mov	x2, #1
+-	add	x1, x1, x0, lsr #3	// Get word offset
++	add	x1, x1, x0, lsr #2	// Get word offset
+ 	lsl	x3, x2, x3		// Create mask
+-1:	ldxr	x2, [x1]
+-	\instr	x2, x2, x3
+-	stxr	w0, x2, [x1]
++1:	ldxr	w2, [x1]
++	\instr	w2, w2, w3
++	stxr	w0, w2, [x1]
+ 	cbnz	w0, 1b
+ 	ret
+ ENDPROC(\name	)
+@@ -41,15 +41,15 @@ ENDPROC(\name	)
+ 
+ 	.macro	testop, name, instr
+ ENTRY(	\name	)
+-	and	w3, w0, #63		// Get bit offset
++	and	w3, w0, #31		// Get bit offset
+ 	eor	w0, w0, w3		// Clear low bits
+ 	mov	x2, #1
+-	add	x1, x1, x0, lsr #3	// Get word offset
++	add	x1, x1, x0, lsr #2	// Get word offset
+ 	lsl	x4, x2, x3		// Create mask
+-1:	ldxr	x2, [x1]
++1:	ldxr	w2, [x1]
+ 	lsr	x0, x2, x3		// Save old value of bit
+-	\instr	x2, x2, x4		// toggle bit
+-	stlxr	w5, x2, [x1]
++	\instr	w2, w2, w4		// toggle bit
++	stlxr	w5, w2, [x1]
+ 	cbnz	w5, 1b
+ 	dmb	ish
+ 	and	x0, x0, #1
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.3
