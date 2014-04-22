@@ -1,50 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:28 +0200
-Subject: [PATCH v2 24/38] ARM: orion5x: enable pinctrl driver at SoC level
-In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-25-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Apr 2014 22:31:14 +0100
+Subject: [PATCH v3 0/2] change ARM linux memory layout to support 32 CPUs
+In-Reply-To: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+Message-ID: <20140422213114.GA24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit declares the pinctrl device in the Orion5x 5182 Device
-Tree files, and ensures that the Orion pinctrl driver is compiled.
+On Tue, Apr 15, 2014 at 07:06:05PM +0800, Liu Hua wrote:
+> This patch series change fixmap mapping region to suppport 32 CPUs.
+> Because the "top_pmd" covers 0xfffe0000 - 0xffffffff(2M). And part 
+> is used by vector table. So I move this region down to 0xffc00000
+>  - 0xffdffff. 
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
- arch/arm/boot/dts/orion5x-mv88f5182.dtsi | 5 +++++
- arch/arm/mach-orion5x/Kconfig            | 2 ++
- 2 files changed, 7 insertions(+)
+Can you explain why you have submitted these patches to my patch tracker
+with a copy to stable at vger.kernel.org ?
 
-diff --git a/arch/arm/boot/dts/orion5x-mv88f5182.dtsi b/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
-index a56f9c8..8c71b6b 100644
---- a/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
-+++ b/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
-@@ -15,6 +15,11 @@
- 		compatible = "marvell,orion5x-88f5182-mbus", "simple-bus";
- 
- 		internal-regs {
-+			pinctrl: pinctrl at 10000 {
-+				compatible = "marvell,88f5182-pinctrl";
-+				reg = <0x10000 0x8>, <0x10050 0x4>;
-+			};
-+
- 			core_clk: core-clocks at 10030 {
- 				compatible = "marvell,mv88f5182-core-clock";
- 				reg = <0x10010 0x4>;
-diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-index bd65872..3c69a3c 100644
---- a/arch/arm/mach-orion5x/Kconfig
-+++ b/arch/arm/mach-orion5x/Kconfig
-@@ -8,6 +8,8 @@ config ARCH_ORION5X_DT
- 	select ORION_CLK
- 	select ORION_IRQCHIP
- 	select ORION_TIMER
-+	select PINCTRL
-+	select PINCTRL_ORION
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell Orion5x using flattened device tree.
+What makes these qualify for stable tree inclusion?  What regression are
+they fixing?
+
+We don't put patches into the stable tree for things that /never/ worked
+in the past.  We've never supported 32 CPUs so I don't think these
+qualify.
+
 -- 
-1.9.2
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
