@@ -1,49 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:15 +0200
-Subject: [PATCH v2 11/38] ARM: orion5x: switch to preprocessor includes in DT
+Date: Tue, 22 Apr 2014 23:26:23 +0200
+Subject: [PATCH v2 19/38] ARM: orion5x: add interrupt for Ethernet in Device
+ Tree
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-12-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-20-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit switches the Orion5x Device Tree files to use C
-preprocessor based includes, as it will allow us to use definitions
-from header files in future commits.
+For some reason, the Ethernet interrupt was missing in the Orion5x
+Device Tree definition.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 3 ++-
- arch/arm/boot/dts/orion5x.dtsi                            | 2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/orion5x.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-index 5ed6c13..0245bb3 100644
---- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-+++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-@@ -7,7 +7,8 @@
-  */
- 
- /dts-v1/;
--/include/ "orion5x.dtsi"
-+
-+#include "orion5x.dtsi"
- 
- / {
- 	model = "LaCie Ethernet Disk mini V2";
 diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index da57fb9..2364e3d 100644
+index 3802d4f..ad23ff4 100644
 --- a/arch/arm/boot/dts/orion5x.dtsi
 +++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -6,7 +6,7 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
--/include/ "skeleton.dtsi"
-+#include "skeleton.dtsi"
- 
- / {
- 	model = "Marvell Orion5x SoC";
+@@ -128,6 +128,7 @@
+ 				ethport: ethernet-port at 0 {
+ 					compatible = "marvell,orion-eth-port";
+ 					reg = <0>;
++					interrupts = <21>;
+ 					/* overwrite MAC address in bootloader */
+ 					local-mac-address = [00 00 00 00 00 00];
+ 					/* set phy-handle property in board file */
 -- 
 1.9.2
