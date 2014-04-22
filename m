@@ -1,31 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:20 +0200
-Subject: [PATCH v2 16/38] ARM: orion5x: add linux,stdout-path to edmini_v2
+Date: Tue, 22 Apr 2014 23:26:29 +0200
+Subject: [PATCH v2 25/38] ARM: orion5x: update I2C description at SoC level
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-26-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the new linux,stdout-path to the edmini_v2 platform,
-pointing to the serial device use for the console.
+This commit fixes the Orion5x SoC definition to:
+
+ * Not define a clock-frequency, as it should be described on a
+   per-board basis.
+
+ * Declare the appropriate clock reference, so that the driver can do
+   correct divisors calculations for the I2C bus.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/orion5x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-index d85a206..df53d256 100644
---- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-+++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-@@ -22,6 +22,7 @@
+diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+index b4c2234..203edde 100644
+--- a/arch/arm/boot/dts/orion5x.dtsi
++++ b/arch/arm/boot/dts/orion5x.dtsi
+@@ -56,7 +56,7 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				interrupts = <5>;
+-				clock-frequency = <100000>;
++				clocks = <&core_clk 0>;
+ 				status = "disabled";
+ 			};
  
- 	chosen {
- 		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+		linux,stdout-path = &uart0;
- 	};
- 
- 	soc {
 -- 
 1.9.2
