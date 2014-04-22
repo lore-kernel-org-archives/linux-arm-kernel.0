@@ -1,83 +1,72 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 22 Apr 2014 17:23:36 -0500
-Subject: [PATCH 2/3] ARM: dts: OMAP2: Fix interrupts for OMAP2420 mailbox
-In-Reply-To: <1398205417-1575-1-git-send-email-s-anna@ti.com>
-References: <1398205417-1575-1-git-send-email-s-anna@ti.com>
-Message-ID: <1398205417-1575-3-git-send-email-s-anna@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 23 Apr 2014 07:36:28 +0900
+Subject: [PATCH v8 1/3] ARM: EXYNOS: initial board support for exynos5260
+ SoC
+In-Reply-To: <534E3AE7.10907@gmail.com>
+References: <1397620738-14431-1-git-send-email-rahul.sharma@samsung.com>
+ <1397620738-14431-2-git-send-email-rahul.sharma@samsung.com>
+ <534E3803.5010404@gmail.com>
+ <CAK9yfHztqGWhUJ=PNc7L-epu48PkEM6=v6JFDZ1n52NBeOUB8w@mail.gmail.com>
+ <534E3AE7.10907@gmail.com>
+Message-ID: <00eb01cf5e7b$4eb9edf0$ec2dc9d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mailbox module is capable of generating two interrupts
-to MPU in OMAP2420, compared to one in OMAP2430. The second
-interrupt is to handle interrupts from the additional IVA
-processor present only on OMAP2420.
+Tomasz Figa wrote:
+> 
+> On 16.04.2014 10:08, Sachin Kamat wrote:
+> > Hi Tomasz,
+> >
+> > On 16 April 2014 13:27, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> >> Hi Rahul,
+> >>
+> >>
+> >> On 16.04.2014 05:58, Rahul Sharma wrote:
+> >>>
+> >>> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >>>
+> >>> This patch add basic arch side support for exynos5260 SoC.
+> >>>
+> >>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >>> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> >>> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> >>> ---
+> >>>    arch/arm/mach-exynos/Kconfig |    5 +++++
+> >>>    1 file changed, 5 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-
+> exynos/Kconfig
+> >>> index fc8bf18..bf4ed87 100644
+> >>> --- a/arch/arm/mach-exynos/Kconfig
+> >>> +++ b/arch/arm/mach-exynos/Kconfig
+> >>> @@ -84,6 +84,11 @@ config SOC_EXYNOS5250
+> >>>          help
+> >>>            Enable EXYNOS5250 SoC support
+> >>>
+> >>> +config SOC_EXYNOS5260
+> >>> +       bool "SAMSUNG EXYNOS5260"
+> >>> +       default y
+> >>> +       depends on ARCH_EXYNOS5
+> >>> +
+> >>>    config SOC_EXYNOS5420
+> >>>          bool "SAMSUNG EXYNOS5420"
+> >>>          default y
+> >>>
+> >>
+> >> Is this patch necessary now? After Sachin's consolidation series there
+> are
+> >> no per SoC entries anymore.
+> >
+> > Kukjin still wanted individual SoCs to be selectable. Please refer [1].
+> >
+> > [1] http://www.spinics.net/lists/devicetree/msg27040.html
+> 
+> I don't think any valid reason was presented there. Features in code
+> should not be selected using #ifdef CONFIG_ anymore, so I don't really
+> see any reason to not proceed with this consolidation. Olof, Arnd?
+> 
+Hi,
 
-Move the current common mailbox DT node into the SoC
-specific files to allow the above differentiation. Also,
-added back the interrupt-names on OMAP2420, that were
-previously defined in hwmod data.
+Yeah, in this case, nothing happened with adding SOC_EXYNOS5260. So I don't have any idea why this is required.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/omap2.dtsi    | 7 -------
- arch/arm/boot/dts/omap2420.dtsi | 8 ++++++++
- arch/arm/boot/dts/omap2430.dtsi | 7 +++++++
- 3 files changed, 15 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index 22f35ea..8f8c07d 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -71,13 +71,6 @@
- 			interrupts = <58>;
- 		};
- 
--		mailbox: mailbox at 48094000 {
--			compatible = "ti,omap2-mailbox";
--			ti,hwmods = "mailbox";
--			reg = <0x48094000 0x200>;
--			interrupts = <26>;
--		};
--
- 		intc: interrupt-controller at 1 {
- 			compatible = "ti,omap2-intc";
- 			interrupt-controller;
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index 85b1fb0..2d99798 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -125,6 +125,14 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		mailbox: mailbox at 48094000 {
-+			compatible = "ti,omap2-mailbox";
-+			reg = <0x48094000 0x200>;
-+			interrupts = <26>, <34>;
-+			interrupt-names = "dsp", "iva";
-+			ti,hwmods = "mailbox";
-+		};
-+
- 		timer1: timer at 48028000 {
- 			compatible = "ti,omap2420-timer";
- 			reg = <0x48028000 0x400>;
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index d09697d..42d2c61 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -216,6 +216,13 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		mailbox: mailbox at 48094000 {
-+			compatible = "ti,omap2-mailbox";
-+			reg = <0x48094000 0x200>;
-+			interrupts = <26>;
-+			ti,hwmods = "mailbox";
-+		};
-+
- 		timer1: timer at 49018000 {
- 			compatible = "ti,omap2420-timer";
- 			reg = <0x49018000 0x400>;
--- 
-1.9.2
+- Kukjin
