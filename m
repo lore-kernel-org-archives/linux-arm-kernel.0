@@ -1,89 +1,87 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:24 +0200
-Subject: [PATCH v2 20/38] ARM: orion5x: switch to use the clock driver for DT
- platforms
+Date: Tue, 22 Apr 2014 23:26:42 +0200
+Subject: [PATCH v2 38/38] ARM: orion: remove no longer needed gpio DT code
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-21-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-39-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit moves the Orion5x platforms using the Device Tree to use
-the recently introduced clock driver for Orion5x. To achieve that, it:
-
- * Adds the necessary DT description of the clock.
-
- * Selects ORION_CLK to enable the compilation of the clock driver.
-
- * Call of_clk_init() instead of the Orion5x-specific clock
-   initialization function.
+Following the move to pure DT-based probing of the GPIO controllers on
+Orion5x, some code in plat-orion/orion-gpio.c can be removed as it is
+no longer used.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/orion5x-mv88f5182.dtsi | 6 ++++++
- arch/arm/mach-orion5x/Kconfig            | 1 +
- arch/arm/mach-orion5x/board-dt.c         | 5 ++---
- 3 files changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/plat-orion/gpio.c                    | 48 ---------------------------
+ arch/arm/plat-orion/include/plat/orion-gpio.h |  1 -
+ 2 files changed, 49 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-mv88f5182.dtsi b/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
-index ddfb4d1..a56f9c8 100644
---- a/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
-+++ b/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
-@@ -15,6 +15,12 @@
- 		compatible = "marvell,orion5x-88f5182-mbus", "simple-bus";
+diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+index 6816192..b61a3bc 100644
+--- a/arch/arm/plat-orion/gpio.c
++++ b/arch/arm/plat-orion/gpio.c
+@@ -597,51 +597,3 @@ void __init orion_gpio_init(struct device_node *np,
  
- 		internal-regs {
-+			core_clk: core-clocks at 10030 {
-+				compatible = "marvell,mv88f5182-core-clock";
-+				reg = <0x10010 0x4>;
-+				#clock-cells = <1>;
-+			};
-+
- 			mbusc: mbus-controller at 20000 {
- 				compatible = "marvell,mbus-controller";
- 				reg = <0x20000 0x100>, <0x1500 0x20>;
-diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-index 14f2cae..4f51132 100644
---- a/arch/arm/mach-orion5x/Kconfig
-+++ b/arch/arm/mach-orion5x/Kconfig
-@@ -5,6 +5,7 @@ menu "Orion Implementations"
- config ARCH_ORION5X_DT
- 	bool "Marvell Orion5x Flattened Device Tree"
- 	select USE_OF
-+	select ORION_CLK
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell Orion5x using flattened device tree.
-diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
-index 7f00897..34286ef 100644
---- a/arch/arm/mach-orion5x/board-dt.c
-+++ b/arch/arm/mach-orion5x/board-dt.c
-@@ -16,6 +16,7 @@
- #include <linux/of_platform.h>
- #include <linux/cpu.h>
- #include <linux/mbus.h>
-+#include <linux/clk-provider.h>
- #include <asm/system_misc.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -43,6 +44,7 @@ static void orion5x_dt_init_early(void)
- static void orion5x_dt_init_time(void)
- {
- 	orion5x_timer_init();
-+	of_clk_init(NULL);
+ 	orion_gpio_chip_count++;
  }
- 
- static void __init orion5x_dt_init(void)
-@@ -60,9 +62,6 @@ static void __init orion5x_dt_init(void)
- 	 */
- 	orion5x_setup_wins();
- 
--	/* Setup root of clk tree */
--	clk_init();
 -
- 	/*
- 	 * Don't issue "Wait for Interrupt" instruction if we are
- 	 * running on D0 5281 silicon.
+-#ifdef CONFIG_OF
+-static void __init orion_gpio_of_init_one(struct device_node *np,
+-					  int irq_gpio_base)
+-{
+-	int ngpio, gpio_base, mask_offset;
+-	void __iomem *base;
+-	int ret, i;
+-	int irqs[4];
+-	int secondary_irq_base;
+-
+-	ret = of_property_read_u32(np, "ngpio", &ngpio);
+-	if (ret)
+-		goto out;
+-	ret = of_property_read_u32(np, "mask-offset", &mask_offset);
+-	if (ret == -EINVAL)
+-		mask_offset = 0;
+-	else
+-		goto out;
+-	base = of_iomap(np, 0);
+-	if (!base)
+-		goto out;
+-
+-	secondary_irq_base = irq_gpio_base + (32 * orion_gpio_chip_count);
+-	gpio_base = 32 * orion_gpio_chip_count;
+-
+-	/* Get the interrupt numbers. Each chip can have up to 4
+-	 * interrupt handlers, with each handler dealing with 8 GPIO
+-	 * pins. */
+-
+-	for (i = 0; i < 4; i++)
+-		irqs[i] = irq_of_parse_and_map(np, i);
+-
+-	orion_gpio_init(np, gpio_base, ngpio, base, mask_offset,
+-			secondary_irq_base, irqs);
+-	return;
+-out:
+-	pr_err("%s: %s: missing mandatory property\n", __func__, np->name);
+-}
+-
+-void __init orion_gpio_of_init(int irq_gpio_base)
+-{
+-	struct device_node *np;
+-
+-	for_each_compatible_node(np, NULL, "marvell,orion-gpio")
+-		orion_gpio_of_init_one(np, irq_gpio_base);
+-}
+-#endif
+diff --git a/arch/arm/plat-orion/include/plat/orion-gpio.h b/arch/arm/plat-orion/include/plat/orion-gpio.h
+index 614dcac..e763988 100644
+--- a/arch/arm/plat-orion/include/plat/orion-gpio.h
++++ b/arch/arm/plat-orion/include/plat/orion-gpio.h
+@@ -33,5 +33,4 @@ void __init orion_gpio_init(struct device_node *np,
+ 			    int secondary_irq_base,
+ 			    int irq[4]);
+ 
+-void __init orion_gpio_of_init(int irq_gpio_base);
+ #endif
 -- 
 1.9.2
