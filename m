@@ -1,70 +1,58 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 22 Apr 2014 14:24:24 +0300
-Subject: [PATCH v1] dma: imx-sdma: add support for sdma memory copy
-In-Reply-To: <20140422105142.GA9693@Robin-OptiPlex-780>
-References: <1397728870-22086-1-git-send-email-b38343@freescale.com>
- <1397730289.11914.225.camel@smile.fi.intel.com>
- <20140418094057.GA11496@Robin-OptiPlex-780>
- <1398162484.11914.234.camel@smile.fi.intel.com>
- <20140422105142.GA9693@Robin-OptiPlex-780>
-Message-ID: <1398165864.11914.241.camel@smile.fi.intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Apr 2014 12:27:17 +0100
+Subject: [PATCH v4 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry
+ macro for iteration
+In-Reply-To: <6612075.PRZcWcuj98@vostro.rjw.lan>
+References: <534DB213.7080802@semaphore.gr> <5355A349.50908@semaphore.gr>
+ <20140422071541.GA17657@lee--X1>
+ <6612075.PRZcWcuj98@vostro.rjw.lan>
+Message-ID: <20140422112717.GA21613@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-22 at 18:51 +0800, Robin Gong wrote:
-> On Tue, Apr 22, 2014 at 10:28:05AM +0000, Shevchenko, Andriy wrote:
-> > On Fri, 2014-04-18 at 17:41 +0800, Robin Gong wrote:
-> > > On Thu, Apr 17, 2014 at 10:24:50AM +0000, Shevchenko, Andriy wrote:
-> > > > On Thu, 2014-04-17 at 18:01 +0800, Robin Gong wrote:
-> > 
-> > []
-> > 
-> > > > > +	dev_dbg(sdma->dev, "memcpy: %x->%x, len=%d, channel=%d.\n",
-> > > > 
-> > > > %pad for dma_addr_t variables.
-> > > >
-> > > Yes, %x here is not proper, will be %#llx here to align with others similar
-> > > code in this file.
-> > 
-> > Why %#llx? You don't need the specific casting since kernel has special
-> > specifiers for phys_addr_t and dma_addr_t and their derivatives (see
-> > Documentation/printk-formats.txt)
-> >
-> I think both are ok, why I choose %llx is only for align the code style,
+On Tue, 22 Apr 2014, Rafael J. Wysocki wrote:
 
-Yes, but it was started being developed earlier than kernel gains the
-feature.
-
->  you
-> can find the same code in sdma_prep_dma_cyclic function. below description also
-> copy from Documentation/printk-formats.txt:
+> On Tuesday, April 22, 2014 08:15:41 AM Lee Jones wrote:
+> > > The cpufreq core now supports the cpufreq_for_each_entry macro helper
+> > > for iteration over the cpufreq_frequency_table, so use it.
+> > > 
+> > > It should have no functional changes.
+> > 
+> > > Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+> > > ---
+> > 
+> > It would be good to have a changelog which describes the differences
+> > between the versions, so we can keep track.
+> > 
+> > >  drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
+> > >  1 file changed, 8 insertions(+), 11 deletions(-)
+> > 
+> > So it looks like I already applied v2 of this patch to my tree. What
+> > changed in v3 and v4? Should I remove that patch from MFD and apply
+> > this one instead?
 > 
+> The reason why v4 was sent is because I asked for it.
 > 
-> If <type> is dependent on a config option for its size (e.g., sector_t,
-> blkcnt_t, phys_addr_t, resource_size_t) or is architecture-dependent
-> for its size (e.g., tcflag_t), use a format specifier of its largest
-> possible type and explicitly cast to it.  Example:
-> 
-> 	printk("test: sector number/total blocks: %llu/%llu\n",
-> 		(unsigned long long)sector, (unsigned long long)blockcount);
+> And if you applied [5/8] without [1/8], it won't work, because the macro is
+> introduced by that patch.
 
-Yeah, I think it requires to be updated accordingly to last changes
-regarding to new specifiers.
+That's right, which is why I mailed you about it:
 
-+Cc Randy. Randy, do you think is a matter of fact that we have to
-update that paragraph somehow and recommend to prefer special specifiers
-over explicit casting to longest possible type?
+  > > > Applied untested by me.
+  > >
+  > > Wouldn't build. Let it go via Rafael.
+  >
+  > Rafael, would you mind creating a branch from this patch set that we
+  > can both pull from please?
 
-> > > > > +		dev_dbg(sdma->dev, "entry %d: count: %d dma: 0x%08x %s%s\n",
-> > > > > +				i, count, sg_src->dma_address,
-> > > > 
-> > > > %pad for dma_addr_t.
-> > > > 
-> > > Accept the idea, same as the above.
-> > 
-> > Same as above.
+> If that's the case, please drop [5/8] and let me handle the entire series.
 
+I'm happy for you to apply the series and send me a pull-request for
+either a) the entire series or b) just the patches which touch MFD and
+any subsequent decencies. Or I can apply them and send you one.
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
