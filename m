@@ -1,55 +1,73 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 22 Apr 2014 11:09:29 +0200
-Subject: [PATCH] arm: dma-mapping: Fix mapping size value
-In-Reply-To: <1398062847-5770-2-git-send-email-ritesh.harjani@gmail.com>
-References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
- <1398062847-5770-2-git-send-email-ritesh.harjani@gmail.com>
-Message-ID: <535631C9.9060100@samsung.com>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Tue, 22 Apr 2014 11:23:55 +0200
+Subject: [PATCH] gpio: omap: implement get_direction
+Message-ID: <1398158635-18415-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-On 2014-04-21 08:47, Ritesh Harjani wrote:
-> 68efd7d2fb("arm: dma-mapping: remove order parameter from
-> arm_iommu_create_mapping()") is causing kernel panic
-> because it wrongly sets the value of mapping->size:
->
-> Unable to handle kernel NULL pointer dereference at virtual
-> address 000000a0
-> pgd = e7a84000
-> [000000a0] *pgd=00000000
-> ...
-> PC is at bitmap_clear+0x48/0xd0
-> LR is at __iommu_remove_mapping+0x130/0x164
->
-> Fix it by correcting mapping->size value.
->
-> Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+This patch implements gpio_chip's get_direction() routine, that
+lets other drivers get particular GPIOs direction using
+struct gpio_desc.
 
-Thanks for spotting this issue! I'm really sorry for introducing it. I 
-will push it to the fixes branch asap.
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+---
+ drivers/gpio/gpio-omap.c |   28 ++++++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
 
-> ---
->   arch/arm/mm/dma-mapping.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index f62aa06..6b00be1 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
->   	mapping->nr_bitmaps = 1;
->   	mapping->extensions = extensions;
->   	mapping->base = base;
-> -	mapping->size = bitmap_size << PAGE_SHIFT;
->   	mapping->bits = BITS_PER_BYTE * bitmap_size;
-> +	mapping->size = mapping->bits << PAGE_SHIFT;
->   
->   	spin_lock_init(&mapping->lock);
-
-Best regards
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 19b886c..b55bf7b 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -102,6 +102,20 @@ static int omap_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ 	return irq_find_mapping(bank->domain, offset);
+ }
+ 
++static int _get_gpio_direction(struct gpio_bank *bank, int gpio)
++{
++	void __iomem *reg = bank->base;
++	u32 l;
++	u32 mask = 1 << gpio;
++
++	reg += bank->regs->direction;
++	l = readl_relaxed(reg);
++	if (l & mask)
++		return 1;
++
++	return 0;
++}
++
+ static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+ {
+ 	void __iomem *reg = bank->base;
+@@ -936,6 +950,19 @@ static inline void mpuio_init(struct gpio_bank *bank)
+ 
+ /*---------------------------------------------------------------------*/
+ 
++static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++	int dir;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	dir = _get_gpio_direction(bank, offset);
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return dir;
++}
++
+ static int gpio_input(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct gpio_bank *bank;
+@@ -1092,6 +1119,7 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+ 	 */
+ 	bank->chip.request = omap_gpio_request;
+ 	bank->chip.free = omap_gpio_free;
++	bank->chip.get_direction = gpio_get_direction;
+ 	bank->chip.direction_input = gpio_input;
+ 	bank->chip.get = gpio_get;
+ 	bank->chip.direction_output = gpio_output;
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.7.7
