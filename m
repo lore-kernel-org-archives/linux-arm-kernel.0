@@ -1,62 +1,85 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Tue, 22 Apr 2014 11:16:47 +0100
-Subject: [Xen-devel] [PATCH RFC] arm64: 32-bit tolerant sync bitops
-In-Reply-To: <CABV+yWsFY4AnNa+Bs54ZNswCUga1OtFh3+5PPWHSEA4zRXJD3g@mail.gmail.com>
-References: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>	<534FB009.5030904@citrix.com>
- <CABV+yWsFY4AnNa+Bs54ZNswCUga1OtFh3+5PPWHSEA4zRXJD3g@mail.gmail.com>
-Message-ID: <5356418F.5090408@citrix.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 22 Apr 2014 12:24:02 +0200
+Subject: [PATCH] gpio: omap: implement get_direction
+In-Reply-To: <1398158635-18415-1-git-send-email-yegorslists@googlemail.com>
+References: <1398158635-18415-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <CABxcv=nieJq1NS1s=jtHOH_hK-C=O0Rh2OiZ36+2RK=8uLWh-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/14 17:18, Vladimir Murzin wrote:
-> On Thu, Apr 17, 2014 at 11:42 AM, David Vrabel <david.vrabel@citrix.com> wrote:
->> On 17/04/14 09:38, Vladimir Murzin wrote:
->>> Xen assumes that bit operations are able to operate on 32-bit size and
->>> alignment [1]. For arm64 bitops are based on atomic exclusive load/store
->>> instructions to guarantee that changes are made atomically. However, these
->>> instructions require that address to be aligned to the data size. Because, by
->>> default, bitops operates on 64-bit size it implies that address should be
->>> aligned appropriately. All these lead to breakage of Xen assumption for bitops
->>> properties.
->>>
->>> With this patch 32-bit sized/aligned bitops is implemented.
->>>
->>> [1] http://www.gossamer-threads.com/lists/xen/devel/325613
->>>
->>> Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
->>> ---
->>>  Apart this patch other approaches were implemented:
->>>  1. turn bitops to be 32-bit size/align tolerant.
->>>     the changes are minimal, but I'm not sure how broad side effect might be
->>>  2. separate 32-bit size/aligned operations.
->>>     it exports new API, which might not be good
->>
->> I've never been particularly happy with the way the events_fifo.c uses
->> casts for the sync_*_bit() calls and I think we should do option 2.
->>
->> A generic implementation could be something like:
->>
->> bool sync_test_bit32(uint32_t *v, unsigned bit)
->> {
->>      if (sizeof(unsigned long) == 8 && (unsigned long)v & 0x4)
->>          return sync_test_bit((unsigned long *)(v - 1), bit + 32);
->>      else
->>          return sync_test_bit((unsigned long *)v, bit);
->> }
->>
->> David
-> 
-> Talking about separate 32-bit ops I mean arch specific bitops which
-> are targeting for 32-bit size/alignment.
-> With separate API for Xen it looks awkward for me, because currently
-> there are only a few users for sync_*_bit ops - Xen and HV.
-> Xen assumes that these ops are 32 bit and looks like never try to deal
-> with 64-bit (am I overlooking something?). So, sync ops are 32-bit
-> de-facto, having separate version means there is support for both
-> 32-bit and 64-bit ops, but (by now) there is no user for 64-bit ops.
-> All this lead to obvious question why we need API conversion now? Is
-> not it easier to turn assumptions to requirements?
+Hello Yegor,
 
-Xen does use the sync bit ops on 64-bit values (for 2-level event channels).
+On Tue, Apr 22, 2014 at 11:23 AM,  <yegorslists@googlemail.com> wrote:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
+>
+> This patch implements gpio_chip's get_direction() routine, that
+> lets other drivers get particular GPIOs direction using
+> struct gpio_desc.
+>
+> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> ---
+>  drivers/gpio/gpio-omap.c |   28 ++++++++++++++++++++++++++++
+>  1 files changed, 28 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 19b886c..b55bf7b 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -102,6 +102,20 @@ static int omap_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+>         return irq_find_mapping(bank->domain, offset);
+>  }
+>
+> +static int _get_gpio_direction(struct gpio_bank *bank, int gpio)
+> +{
+> +       void __iomem *reg = bank->base;
+> +       u32 l;
+> +       u32 mask = 1 << gpio;
+> +
+> +       reg += bank->regs->direction;
+> +       l = readl_relaxed(reg);
+> +       if (l & mask)
+> +               return 1;
+> +
+> +       return 0;
+> +}
+> +
 
-David
+You can avoid the if condition here by using return !!(l & mask) but
+the above code is more clear indeed so is up to you.
+
+Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+
+>  static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+>  {
+>         void __iomem *reg = bank->base;
+> @@ -936,6 +950,19 @@ static inline void mpuio_init(struct gpio_bank *bank)
+>
+>  /*---------------------------------------------------------------------*/
+>
+> +static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
+> +{
+> +       struct gpio_bank *bank;
+> +       unsigned long flags;
+> +       int dir;
+> +
+> +       bank = container_of(chip, struct gpio_bank, chip);
+> +       spin_lock_irqsave(&bank->lock, flags);
+> +       dir = _get_gpio_direction(bank, offset);
+> +       spin_unlock_irqrestore(&bank->lock, flags);
+> +       return dir;
+> +}
+> +
+>  static int gpio_input(struct gpio_chip *chip, unsigned offset)
+>  {
+>         struct gpio_bank *bank;
+> @@ -1092,6 +1119,7 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+>          */
+>         bank->chip.request = omap_gpio_request;
+>         bank->chip.free = omap_gpio_free;
+> +       bank->chip.get_direction = gpio_get_direction;
+>         bank->chip.direction_input = gpio_input;
+>         bank->chip.get = gpio_get;
+>         bank->chip.direction_output = gpio_output;
+> --
+> 1.7.7
+>
