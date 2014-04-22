@@ -1,112 +1,94 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 22 Apr 2014 12:51:06 +0200
-Subject: [PATCH 4/4] mcpm: exynos: populate suspend and powered_up
- callbacks
-In-Reply-To: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
-References: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
- <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <5356499A.20609@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Apr 2014 12:52:16 +0200
+Subject: [PATCH RESEND 3/5] ARM: BCM63XX: add BCM63138 minimal Device Tree
+In-Reply-To: <1398130758-19456-4-git-send-email-f.fainelli@gmail.com>
+References: <1398130758-19456-1-git-send-email-f.fainelli@gmail.com>
+ <1398130758-19456-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <4701106.5EnjdVQgVO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2014 01:49 PM, Chander Kashyap wrote:
-> In order to support cpuidle through mcpm, suspend and powered-up
-> callbacks are required in mcpm platform code.
-> Hence populate the same callbacks.
->
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-> ---
->   arch/arm/mach-exynos/mcpm-exynos.c |   53 ++++++++++++++++++++++++++++++++++++
->   1 file changed, 53 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 46d4968..16af0bd 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -318,10 +318,63 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
->   	return 0; /* success: the CPU is halted */
->   }
->
-> +static void enable_coherency(void)
-> +{
-> +	unsigned long v, u;
+On Monday 21 April 2014 18:39:16 Florian Fainelli wrote:
+> 
+> +#include "skeleton.dtsi"
 > +
-> +	asm volatile(
-> +		"mrc	p15, 0, %0, c1, c0, 1\n"
-> +		"orr	%0, %0, %2\n"
-> +		"ldr	%1, [%3]\n"
-> +		"and	%1, %1, #0\n"
-> +		"orr	%0, %0, %1\n"
-> +		"mcr	p15, 0, %0, c1, c0, 1\n"
-> +		: "=&r" (v), "=&r" (u)
-> +		: "Ir" (0x40), "Ir" (S5P_INFORM0)
-> +		: "cc");
-> +}
+> +/ {
+> +       compatible = "brcm,bcm63138";
+> +       model = "Broadcom BCM63138 DSL SoC";
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a9";
+> +                       next-level-cache = <&L2>;
+> +                       reg = <0>;
+> +               };
+> +       };
 
-Shouldn't this function to be used from hotplug.c also ?
+Even if you don't support SMP yet, I can see no reason not
+to list both CPUs here. The binding is known and the code
+should ignore the extra cores if it doesn't know how to
+turn them on.
 
 > +
-> +void exynos_powered_up(void)
-> +{
-> +	unsigned int mpidr, cpu, cluster;
+> +       /* ARM bus */
+> +       axi at 80000000 {
+> +               compatible = "simple-bus";
+> +               ranges = <0 0x80000000 0x783003>;
+> +               reg = <0x80000000 0x783003>;
+
+The length seems odd, I would expect that the bus actually
+translates all addresses in the 0x80000000 range to downstream
+devices even if there is nothing connected. Just round it up
+to your best knowledge.
+
+I would also drop the 'reg' property. Since you don't have a
+specific "compatible" value, there is no way to use the registers
+in this node.
+
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
 > +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +               L2: cache-controller at 1d000 {
+> +                       compatible = "arm,pl310-cache";
+> +                       reg = <0x1d000 0x1000>;
+> +                       cache-unified;
+> +                       cache-level = <2>;
+> +                       interrupts = <GIC_PPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> +               };
 > +
-> +	arch_spin_lock(&bl_lock);
-> +	if (cpu_use_count[cpu][cluster] == 0)
-> +		cpu_use_count[cpu][cluster] = 1;
-> +	arch_spin_unlock(&bl_lock);
-> +}
+> +               mpcore at 1e000 {
+> +                       compatible = "simple-bus";
+> +                       reg = <0x1e000 0x20000>;
+> +                       ranges = <0 0x1e000 0x20000>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+
+
+Same thing here.
+
+Also, can you explain why there is a separate 'mpcore' bus, and why the
+cache controller is not part of that?
+
+Do you have reason to believe that this is how the hardware actually
+looks?
+
 > +
-> +static void exynos_suspend(u64 residency)
-> +{
-> +	unsigned int mpidr, cpunr;
-> +
-> +	mpidr = read_cpuid_mpidr();
-> +	cpunr = enynos_pmu_cpunr(mpidr);
-
-*enynos*_pmu_cpunr ?
-
-> +
-> +	__raw_writel(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
-> +
-> +	exynos_power_down();
-> +
-> +	/*
-> +	 * Execution reaches here only if cpu did not power down.
-> +	 * Hence roll back the changes done in exynos_power_down function.
-> +	*/
-> +	__raw_writel(EXYNOS_CORE_LOCAL_PWR_EN,
-> +			EXYNOS_ARM_CORE_CONFIGURATION(cpunr));
-
-Why don't you use the functions defined in the
-
-patch 5/5 arm: exynos: Add MCPM call-back functions
-
-exynos_core_power_control() ?
-
-> +	set_cr(get_cr() | CR_C);
-> +	enable_coherency();
-> +}
-> +
->   static const struct mcpm_platform_ops exynos_power_ops = {
->   	.power_up		= exynos_power_up,
->   	.power_down		= exynos_power_down,
->   	.power_down_finish	= exynos_power_down_finish,
-> +	.suspend		= exynos_suspend,
-> +	.powered_up		= exynos_powered_up,
->   };
->
->   static void __init exynos_mcpm_usage_count_init(void)
->
+> +       /* Legacy UBUS base */
+> +       ubus at fffe8000 {
+> +               compatible = "simple-bus";
+> +               reg = <0xfffe8000 0x8053>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges = <0 0xfffe8000 0x8053>;
+> +       };
+> +};
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Again, use a proper 'length' here and remove the 'reg' property.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
