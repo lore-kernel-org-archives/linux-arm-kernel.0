@@ -1,53 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Apr 2014 21:21:15 +0100
-Subject: [PATCH 1/4] arm64: topology: Initialise default topology state
- immediately
-Message-ID: <1398198078-7473-1-git-send-email-broonie@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Apr 2014 22:23:45 +0200
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
+ memory barrier
+In-Reply-To: <5356C9D1.2060001@ti.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+Message-ID: <5895821.PvurJ8TWz2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Tuesday 22 April 2014 15:58:09 Santosh Shilimkar wrote:
+> On Tuesday 22 April 2014 03:53 PM, Arnd Bergmann wrote:
+> > On Tuesday 22 April 2014, Santosh Shilimkar wrote:
+> >> On Tuesday 22 April 2014 10:08 AM, Arnd Bergmann wrote:
+> >>> It's not the nicest API ever, but that's what it is and has been, mostly
+> >>> for compatibility with x86, where the 'mov' instruction performing the
+> >>> store to MMIO registers implies that all writes to DMA memory are
+> >>> visible to the device.
+> >>>
+> >> This is not about writel() and  writel_relaxed(). The driver don't
+> >> need that barrier. For example if the actual start of the DMA
+> >> happens bit later, that doesn't matter for the driver.
+> >>
+> >> DMA APIs already do barriers today for non-coherent case. We
+> >> are not talking anything new here. Sorry but I don't see the
+> >> connection here.
+> > 
+> > I don't think they do, nor should they. Can you tell me where
+> > you see a barrier in dma_sync_single_for_cpu() or 
+> > arm_dma_sync_single_for_device()? For all I can tell, they
+> > only deal with L1 and L2 cache maintainance in arm_dma_ops.
+> > 
+> The cache APIs used by dma_ops do have the necessary barriers
+> at end of the of the cache operations. Thats what I meant. So for
+> end user(Device driver), its transparent.
 
-As a legacy of the way 32 bit ARM did things the topology code uses a null
-topology map by default and then overwrites it by mapping cores with no
-information to a cluster by themselves later. In order to make it simpler
-to reset things as part of recovering from parse failures in firmware
-information directly set this configuration on init. A core will always be
-its own sibling so there should be no risk of confusion with firmware
-provided information.
+Ok, I see it now for the noncoherent operations, and I see
+the same thing on PowerPC and MIPS, which also have both coherent
+and noncoherent versions of their dma_map_ops.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/kernel/topology.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+However, I also see that neither of those does a wmb() for the
+coherent version. I don't see why ARM should be different from
+the others here, so if there is a reason to do a barrier there,
+we should change all architectures. I still don't see a reason
+why the barrier is needed though.
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 3e06b0be4ec8..ff662b23af5f 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -43,9 +43,6 @@ static void update_siblings_masks(unsigned int cpuid)
- 		 * reset it to default behaviour
- 		 */
- 		pr_debug("CPU%u: No topology information configured\n", cpuid);
--		cpuid_topo->core_id = 0;
--		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
--		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
- 		return;
- 	}
- 
-@@ -87,9 +84,12 @@ void __init init_cpu_topology(void)
- 		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
- 
- 		cpu_topo->thread_id = -1;
--		cpu_topo->core_id =  -1;
-+		cpu_topo->core_id = 0;
- 		cpu_topo->cluster_id = -1;
-+
- 		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
- 		cpumask_clear(&cpu_topo->thread_sibling);
-+		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
- 	}
- }
--- 
-1.9.2
+Can you be more specific in your driver example why you think
+the barrier in the writel() is not sufficient?
+
+	Arnd
