@@ -1,55 +1,125 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Tue, 22 Apr 2014 15:33:42 +0200
-Subject: [PATCH] gpio: omap: implement get_direction
-In-Reply-To: <CABxcv=nieJq1NS1s=jtHOH_hK-C=O0Rh2OiZ36+2RK=8uLWh-A@mail.gmail.com>
-References: <1398158635-18415-1-git-send-email-yegorslists@googlemail.com>
- <CABxcv=nieJq1NS1s=jtHOH_hK-C=O0Rh2OiZ36+2RK=8uLWh-A@mail.gmail.com>
-Message-ID: <CAGm1_ksUZ4G-3VNgW=tktEs1t9Gu=exvqVybSvYXhFVp4EU2BQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 08:34:25 -0500
+Subject: [PATCH v3 2/3] dma: Add Xilinx Video DMA DT Binding Documentation
+In-Reply-To: <1392465619-27614-3-git-send-email-sthokal@xilinx.com>
+References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+ <1392465619-27614-3-git-send-email-sthokal@xilinx.com>
+Message-ID: <CAL_Jsq+FZt5yLwePEwiAHoACM1S2rE3Yi0302LwRHWdn-pcnFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 12:24 PM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> Hello Yegor,
+On Sat, Feb 15, 2014 at 6:00 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+> Device-tree binding documentation of Xilinx Video DMA Engine
 >
-> On Tue, Apr 22, 2014 at 11:23 AM,  <yegorslists@googlemail.com> wrote:
->> From: Yegor Yefremov <yegorslists@googlemail.com>
->>
->> This patch implements gpio_chip's get_direction() routine, that
->> lets other drivers get particular GPIOs direction using
->> struct gpio_desc.
->>
->> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
->> ---
->>  drivers/gpio/gpio-omap.c |   28 ++++++++++++++++++++++++++++
->>  1 files changed, 28 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index 19b886c..b55bf7b 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -102,6 +102,20 @@ static int omap_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->>         return irq_find_mapping(bank->domain, offset);
->>  }
->>
->> +static int _get_gpio_direction(struct gpio_bank *bank, int gpio)
->> +{
->> +       void __iomem *reg = bank->base;
->> +       u32 l;
->> +       u32 mask = 1 << gpio;
->> +
->> +       reg += bank->regs->direction;
->> +       l = readl_relaxed(reg);
->> +       if (l & mask)
->> +               return 1;
->> +
->> +       return 0;
->> +}
->> +
+> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+
+A few typos below, but otherwise:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+> Changes in v3:
+> None
 >
-> You can avoid the if condition here by using return !!(l & mask) but
-> the above code is more clear indeed so is up to you.
+> Changes in v2:
+> - Removed device-id DT property, as suggested by Arnd Bergmann
+> - Properly documented DT bindings as suggested by Arnd Bergmann
+> ---
+>  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++++++++++++++++++++
+>  1 file changed, 75 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> new file mode 100644
+> index 0000000..ab8be1a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> @@ -0,0 +1,75 @@
+> +Xilinx AXI VDMA engine, it does transfers between memory and video devices.
+> +It can be configured to have one channel or two channels. If configured
+> +as two channels, one is to transmit to the video device and another is
+> +to receive from the video device.
+> +
+> +Required properties:
+> +- compatible: Should be "xlnx,axi-vdma-1.00.a"
+> +- #dma-cells: Should be <1>, see "dmas" property below
+> +- reg: Should contain VDMA registers location and length.
+> +- xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
+> +- dma-channel child node: Should have atleast one channel and can have upto
 
-Hm, nice trick. I've reworked the calculation in v2.
+s/atleast/at least/
+s/upto/up to/
 
-Yegor
+> +       two channels per device. This node specifies the properties of each
+> +       DMA channel (see child node properties below).
+> +
+> +Optional properties:
+> +- xlnx,include-sg: Tells whether configured for Scatter-mode in
+> +       the hardware.
+> +- xlnx,flush-fsync: Tells whether which channel to Flush on Frame sync.
+
+s/whether//
+
+> +       It takes following values:
+> +       {1}, flush both channels
+> +       {2}, flush mm2s channel
+> +       {3}, flush s2mm channel
+> +
+> +Required child node properties:
+> +- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
+> +       "xlnx,axi-vdma-s2mm-channel".
+> +- interrupts: Should contain per channel VDMA interrupts.
+> +- xlnx,data-width: Should contain the stream data width, take values
+> +       {32,64...1024}.
+> +
+> +Option child node properties:
+
+s/Option/Optional/
+
+> +- xlnx,include-dre: Tells whether hardware is configured for Data
+> +       Realignment Engine.
+> +- xlnx,genlock-mode: Tells whether Genlock synchronization is
+> +       enabled/disabled in hardware.
+> +
+> +Example:
+> +++++++++
+> +
+> +axi_vdma_0: axivdma at 40030000 {
+> +       compatible = "xlnx,axi-vdma-1.00.a";
+> +       #dma_cells = <1>;
+> +       reg = < 0x40030000 0x10000 >;
+> +       xlnx,num-fstores = <0x8>;
+> +       xlnx,flush-fsync = <0x1>;
+> +       dma-channel at 40030000 {
+> +               compatible = "xlnx,axi-vdma-mm2s-channel";
+> +               interrupts = < 0 54 4 >;
+> +               xlnx,datawidth = <0x40>;
+> +       } ;
+> +       dma-channel at 40030030 {
+> +               compatible = "xlnx,axi-vdma-s2mm-channel";
+> +               interrupts = < 0 53 4 >;
+> +               xlnx,datawidth = <0x40>;
+> +       } ;
+> +} ;
+> +
+> +
+> +* DMA client
+> +
+> +Required properties:
+> +- dmas: a list of <[Video DMA device phandle] [Channel ID]> pairs,
+> +       where Channel ID is '0' for write/tx and '1' for read/rx
+> +       channel.
+> +- dma-names: a list of DMA channel names, one per "dmas" entry
+> +
+> +Example:
+> +++++++++
+> +
+> +vdmatest_0: vdmatest at 0 {
+> +       compatible ="xlnx,axi-vdma-test-1.00.a";
+> +       dmas = <&axi_vdma_0 0
+> +               &axi_vdma_0 1>;
+> +       dma-names = "vdma0", "vdma1";
+> +} ;
+> --
+> 1.7.9.5
+>
