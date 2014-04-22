@@ -1,61 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 22 Apr 2014 11:18:08 -0400
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
- memory barrier
-In-Reply-To: <20140422150725.GD10224@arm.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <20140422102834.GE7484@arm.com> <53567352.1080306@ti.com>
- <20140422150725.GD10224@arm.com>
-Message-ID: <53568830.50801@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Apr 2014 17:18:40 +0200
+Subject: [PATCH 2/7] gpiolib: Support purely name based gpiod lookup in
+ device trees
+In-Reply-To: <CACRpkdZ+3dnhoj1TS4KSVUP8iFHsjjwop-FG2Nf07YtH6aSO_Q@mail.gmail.com>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-3-git-send-email-wens@csie.org>
+ <CACRpkdZ+3dnhoj1TS4KSVUP8iFHsjjwop-FG2Nf07YtH6aSO_Q@mail.gmail.com>
+Message-ID: <20140422151840.GH24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014 11:07 AM, Catalin Marinas wrote:
-> On Tue, Apr 22, 2014 at 02:49:06PM +0100, Santosh Shilimkar wrote:
->> On Tuesday 22 April 2014 06:28 AM, Will Deacon wrote:
->>> On Mon, Apr 21, 2014 at 07:03:10PM +0100, Santosh Shilimkar wrote:
->>>> ARM coherent CPU dma map APIS are assumed to be nops on cache coherent
->>>> machines. While this is true, one still needs to ensure that no
->>>> outstanding writes are pending in CPU write buffers. To take care
->>>> of that, we at least need a memory barrier to commit those changes
->>>> to main memory.
->>>>
->>>> Patch is trying to fix those cases. Without such a patch, you will
->>>> end up patching device drivers to avoid the synchronisation issues.
->>>
->>> Don't you only need these barriers if you're passing ownership of a CPU
->>> buffer to a device? In that case, I would expect a subsequent writel to tell
->>> the device about the new buffer, which includes the required __iowmb().
->>> That's the reason for the relaxed accessors: to avoid this barrier when it's
->>> not needed. Perhaps you're using the relaxed accessors where you actually
->>> need the stronger ordering guarantees?
->>
->> I kind of guessed some one will bring up above point. Infact this is how
->> mostly people have been living with the issue on coherent machines. On
->> Keystone too, we did explicit barriers in respective drivers.
->>
->> I have added these barriers only on CPU to device streaming APIs because on
->> other direction, the memory is already upto date from CPU's perspective.
->>
->> But if you look at the actual problem, its really responsibility of
->> DMA streaming APIs which we are trying to push on to drivers. A device
->> driver should be independent of whether it is running on a coherent or
->> a non-coherent CPU.
->>
->> Lets take a example....
->> MMC controller driver running on a non-coherent and coherent machine.
->> Driver has below code sequence which is generic.
->> 1. Prepare SG list
->> 2. Perform CMO using DMA streaming API
->> 3. Start DMA transfer...
-> 
-> The key here is how you start the DMA transfer. So far we assumed it's
-> done via an I/O operation like writel() and it has the right barriers.
-> If we have other ways for starting this (like writing the dma_addr in
-> some other memory descriptor), should we use explicit memory barriers?
-> 
-My point is why we want to rely on the DMA kick mechanism barrier
-for the operation which is suppose to be completed in step 2.
+Hi Linus,
 
-Regards,
-Santosh
+On Tue, Apr 22, 2014 at 05:00:17PM +0200, Linus Walleij wrote:
+> On Tue, Apr 15, 2014 at 8:41 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> 
+> > This patch enables gpio-names based gpiod lookup in device tree usage,
+> > which ignores the index passed to gpiod_get_index. If this fails, fall
+> > back to the original function-index ("con_id"-gpios) based lookup scheme,
+> > for backward compatibility and any drivers needing more than one GPIO
+> > for any function.
+> >
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> This looks a bit scary and I cannot claim to realize the entire semantic
+> effect of this patch, but if it's the way to go then OK.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Shall I just apply this to the GPIO tree or are you carrying it along with
+> the other stuff?
+
+This patch has a dependency on the first patch of this serie, since it
+uses a binding that was documented there.
+
+Maybe you'll want to wait for the ACK from the DT maintainers to merge
+this one.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140422/3fbc1df2/attachment.sig>
