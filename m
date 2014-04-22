@@ -1,73 +1,32 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 22 Apr 2014 15:50:07 -0700
-Subject: [RFC][PATCH] arm64: Add atomic pool for dma mapping
-In-Reply-To: <20140422100201.GB7484@arm.com>
-References: <1397764941-1351-1-git-send-email-lauraa@codeaurora.org>
- <20140422100201.GB7484@arm.com>
-Message-ID: <5356F21F.1060001@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 22 Apr 2014 19:50:48 -0400 (EDT)
+Subject: [PATCH v3 0/2] change ARM linux memory layout to support 32 CPUs
+In-Reply-To: <20140422213114.GA24070@n2100.arm.linux.org.uk>
+References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
+ <20140422213114.GA24070@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1404221949510.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/22/2014 3:02 AM, Will Deacon wrote:
-> Hi Laura,
-> 
-> On Thu, Apr 17, 2014 at 09:02:21PM +0100, Laura Abbott wrote:
->> Neither CMA nor noncoherent allocations support atomic allocations.
->> Add a dedicated atomic pool to support this.
->>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> ---
->>  arch/arm64/mm/dma-mapping.c | 186 +++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 184 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index 0ba347e..c67a3ff 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -38,6 +38,110 @@ static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
->>  	return prot;
->>  }
->>  
->> +#define DEFAULT_DMA_COHERENT_POOL_SIZE  SZ_256K
->> +
->> +struct dma_pool {
->> +	size_t size;
->> +	spinlock_t lock;
->> +	void *coherent_vaddr;
->> +	void *noncoherent_vaddr;
->> +	unsigned long *bitmap;
->> +	unsigned long nr_pages;
->> +	struct page **pages;
->> +};
->> +
->> +static struct dma_pool atomic_pool = {
->> +	.size = DEFAULT_DMA_COHERENT_POOL_SIZE,
->> +};
->> +
->> +static int __init early_coherent_pool(char *p)
->> +{
->> +	atomic_pool.size = memparse(p, &p);
->> +	return 0;
->> +}
->> +early_param("coherent_pool", early_coherent_pool);
-> 
-> What happened to the device-tree bindings we discussed in Edinburgh with
-> Grant and Ben? This looks like a good opportunity to make use of those,
-> rather than use the command-line as we do for arch/arm.
-> 
+On Tue, 22 Apr 2014, Russell King - ARM Linux wrote:
 
-The current point of the coherent command line option is to override the
-default size. Going with DT would mean that if the node is specified in
-DT, the memory is allocated via that framework. If there is no node, then
-fallback to allocating the memory as normal. This asymmetry seems a bit
-odd to me.
-
-> Will
+> On Tue, Apr 15, 2014 at 07:06:05PM +0800, Liu Hua wrote:
+> > This patch series change fixmap mapping region to suppport 32 CPUs.
+> > Because the "top_pmd" covers 0xfffe0000 - 0xffffffff(2M). And part 
+> > is used by vector table. So I move this region down to 0xffc00000
+> >  - 0xffdffff. 
 > 
+> Can you explain why you have submitted these patches to my patch tracker
+> with a copy to stable at vger.kernel.org ?
+> 
+> What makes these qualify for stable tree inclusion?  What regression are
+> they fixing?
+> 
+> We don't put patches into the stable tree for things that /never/ worked
+> in the past.  We've never supported 32 CPUs so I don't think these
+> qualify.
 
-Thanks,
-Laura
+Indeed.  The stable qualifier should be dropped.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+
+Nicolas
