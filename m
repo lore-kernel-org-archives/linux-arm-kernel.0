@@ -1,120 +1,57 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 22 Apr 2014 13:33:15 +0530
-Subject: [PATCH v5 2/2] phy: exynos5-usbdrd: Add facility for VBUS supply
-In-Reply-To: <1398153795-28475-1-git-send-email-gautam.vivek@samsung.com>
-References: <1398153795-28475-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1398153795-28475-3-git-send-email-gautam.vivek@samsung.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 22 Apr 2014 09:42:26 +0200
+Subject: [PATCH 3/6] ARM: dts: zynq: drop address cells from GIC node
+In-Reply-To: <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
+References: <1397228380-7352-1-git-send-email-l.stach@pengutronix.de>
+ <1397228380-7352-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <53561D62.3050600@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding support to enable/disable VBUS controlled by a
-regulator, to enable vbus supply on the port.
+On 04/11/2014 04:59 PM, Lucas Stach wrote:
+> This is likely a copy-and-paste error from the
+> ARM GIC documentation, that has already been fixed.
+> 
+> address-cells should have been set to 0, as with the size
+> cells. As having those properties set to 0 is the
+> same thing as not specifying them, drop them completely.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 511180769af5..3f277c2bc19c 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -57,7 +57,6 @@
+>  		intc: interrupt-controller at f8f01000 {
+>  			compatible = "arm,cortex-a9-gic";
+>  			#interrupt-cells = <3>;
+> -			#address-cells = <1>;
+>  			interrupt-controller;
+>  			reg = <0xF8F01000 0x1000>,
+>  			      <0xF8F00100 0x100>;
+> 
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
----
+Applied.
 
-This is v2 version of patch:
-[PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio on/off
-https://lkml.org/lkml/2014/4/9/186
+Thanks,
+Michal
 
-Changes from v1:
- - Using regulator APIs instead of gpio to control VBUS.
-
- drivers/phy/phy-exynos5-usbdrd.c |   36 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 35 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index 89d7ae8..d7e3745 100644
---- a/drivers/phy/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -23,6 +23,7 @@
- #include <linux/mutex.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
- 
- /* Exynos USB PHY registers */
- #define EXYNOS5_FSEL_9MHZ6		0x0
-@@ -172,6 +173,7 @@ struct exynos5_usbdrd_phy {
- 	unsigned int extrefclk;
- 	struct clk *ref_clk;
- 	unsigned long ref_rate;
-+	struct regulator *vbus;
- };
- 
- #define to_usbdrd_phy(inst) \
-@@ -442,6 +444,7 @@ static int exynos5_usbdrd_phy_exit(struct phy *phy)
- 
- static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- {
-+	int ret;
- 	struct phy_usb_instance *inst = phy_get_drvdata(phy);
- 	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
- 
-@@ -449,10 +452,26 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- 
- 	clk_prepare_enable(phy_drd->ref_clk);
- 
-+	/* Enable VBUS supply */
-+	if (phy_drd->vbus) {
-+		ret = regulator_enable(phy_drd->vbus);
-+		if (ret) {
-+			dev_err(phy_drd->dev, "Failed to enable VBUS supply\n");
-+			goto fail_vbus;
-+		}
-+	}
-+
- 	/* Power-on PHY*/
- 	inst->phy_cfg->phy_isol(inst, 0);
- 
- 	return 0;
-+
-+fail_vbus:
-+	clk_disable_unprepare(phy_drd->ref_clk);
-+	if (!IS_ERR(phy_drd->usb30_sclk))
-+		clk_disable_unprepare(phy_drd->usb30_sclk);
-+
-+	return ret;
- }
- 
- static int exynos5_usbdrd_phy_power_off(struct phy *phy)
-@@ -465,6 +484,10 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
- 	/* Power-off the PHY */
- 	inst->phy_cfg->phy_isol(inst, 1);
- 
-+	/* Disable VBUS supply */
-+	if (phy_drd->vbus)
-+		regulator_disable(phy_drd->vbus);
-+
- 	clk_disable_unprepare(phy_drd->ref_clk);
- 
- 	return 0;
-@@ -537,7 +560,7 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 	const struct exynos5_usbdrd_phy_drvdata *drv_data;
- 	struct regmap *reg_pmu;
- 	u32 pmu_offset;
--	int i;
-+	int i, ret;
- 
- 	phy_drd = devm_kzalloc(dev, sizeof(*phy_drd), GFP_KERNEL);
- 	if (!phy_drd)
-@@ -580,6 +603,17 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(reg_pmu);
- 	}
- 
-+	/* Get required GPIO for vbus */
-+	phy_drd->vbus = devm_regulator_get(dev, "vbus");
-+	if (IS_ERR(phy_drd->vbus)) {
-+		ret = PTR_ERR(phy_drd->vbus);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+
-+		dev_warn(dev, "Failed to get VBUS supply regulator\n");
-+		phy_drd->vbus = NULL;
-+	}
-+
- 	if (of_property_read_u32(node, "samsung,pmu-offset", &pmu_offset)) {
- 		dev_err(dev, "Missing pmu-offset for phy isolation\n");
- 		return -EINVAL;
 -- 
-1.7.10.4
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140422/f86b2ed7/attachment-0001.sig>
