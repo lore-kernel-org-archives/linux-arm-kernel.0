@@ -1,188 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Apr 2014 16:42:21 +0200
-Subject: [PATCH 4/4] drm/tegra: Implement race-free hotplug detection
-In-Reply-To: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
-References: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1398177741-28482-4-git-send-email-thierry.reding@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 09:44:08 -0500
+Subject: [PATCH v2 4/7] of: configure the platform device dma parameters
+In-Reply-To: <53568641.2020300@ti.com>
+References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
+ <1397917972-6293-5-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_JsqJJ4Cbh5poMa-KRwy+bp_t3VtRd7bCpcWey+DZ74eYHJQ@mail.gmail.com>
+ <53568641.2020300@ti.com>
+Message-ID: <CAL_JsqKe_L00P36UT7hizB=zAxCB0S_1kV3XEVGGbJOi27S84A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Tue, Apr 22, 2014 at 10:09 AM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> Hi Rob,
+>
+> On 04/21/2014 05:58 PM, Rob Herring wrote:
+>> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>>> Retrieve DMA configuration from DT and setup platform device's DMA
+>>> parameters. The DMA configuration in DT has to be specified using
+>>> "dma-ranges" and "dma-coherent" properties if supported.
+>>>
+>>> We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
+>>> using "dma-coherent" device tree properties.
+>>>
+>>> The set_arch_dma_coherent_ops macro has to be defined by arch if
+>>> it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
+>>> declared as nop.
 
-A race condition currently exists on Tegra, where it can happen that a
-monitor attached via HDMI isn't detected during the initial FB helper
-setup, but the hotplug event happens too early to be processed by the
-poll helpers because they haven't been initialized yet. This happens
-because on some boards the HDMI driver can control the regulator that
-supplies the +5V pin on the HDMI connector. Therefore depending on the
-timing between the initialization of the HDMI driver and the rest of
-DRM, it's possible that the monitor returns the hotplug signal right
-within the window where we would miss it.
+[...]
 
-Unfortunately, drm_kms_helper_poll_init() will wreak havoc when called
-before at least some parts of the FB helpers have been set up.
+>>>
+>>> +       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+>>> +       if (ret < 0) {
+>>
+>> Perhaps an error is not the right return for the default case. The
+>> default should probably be dma_addr and paddr equal to 0 and size 4GB.
+>
+> The error code is needed here to properly distinguish the case when
+> there are no "dma-ranges" defined in DT. Also, I think, that
+> of_dma_get_range() shouldn't return any default values - It just
+> has to get data from DT. And the caller should decide what to do
+> with this data and how to handle error cases.
+>
+> So, I prefer to keep behavior as is:
+> - in case of failure of_dma_get_range() will not touch values of
+>   &dma_addr, &paddr, &size.
 
-This commit fixes this by splitting out the minimum of initialization
-required to make drm_kms_helper_poll_init() work into a separate
-function that can be called early. It is then safe to move all of the
-poll helper initialization to an earlier point in time (before the
-HDMI output driver has a chance to enable the +5V supply). That way if
-the hotplug signal is returned before the initial FB helper setup, the
-monitor will be forcefully detected at that point, and if the hotplug
-signal is returned after that it will be properly handled by the poll
-helpers.
+Fine, but that is not how of_dma_get_range currently behaves:
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/gpu/drm/tegra/drm.c |  8 ++++++--
- drivers/gpu/drm/tegra/drm.h |  1 +
- drivers/gpu/drm/tegra/fb.c  | 47 ++++++++++++++++++++++++++++++---------------
- 3 files changed, 39 insertions(+), 17 deletions(-)
++       *dma_addr = of_read_number(ranges, naddr);
++       *paddr = of_translate_dma_address(np, ranges);
++       if (*paddr == OF_BAD_ADDR) {
++               pr_err("%s: translation of DMA address(%pad) to CPU
+address failed node(%s)\n",
++                      __func__, dma_addr, np->full_name);
++               ret = -EINVAL;
++       }
 
-diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
-index 6f5b6e2f552e..4d36debe3de6 100644
---- a/drivers/gpu/drm/tegra/drm.c
-+++ b/drivers/gpu/drm/tegra/drm.c
-@@ -41,6 +41,12 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
- 
- 	drm_mode_config_init(drm);
- 
-+	err = tegra_drm_fb_prepare(drm);
-+	if (err < 0)
-+		return err;
-+
-+	drm_kms_helper_poll_init(drm);
-+
- 	err = host1x_device_init(device);
- 	if (err < 0)
- 		return err;
-@@ -60,8 +66,6 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
- 	if (err < 0)
- 		return err;
- 
--	drm_kms_helper_poll_init(drm);
--
- 	return 0;
- }
- 
-diff --git a/drivers/gpu/drm/tegra/drm.h b/drivers/gpu/drm/tegra/drm.h
-index 126332c3ecbb..c2d9705de1f9 100644
---- a/drivers/gpu/drm/tegra/drm.h
-+++ b/drivers/gpu/drm/tegra/drm.h
-@@ -288,6 +288,7 @@ struct tegra_bo *tegra_fb_get_plane(struct drm_framebuffer *framebuffer,
- 				    unsigned int index);
- bool tegra_fb_is_bottom_up(struct drm_framebuffer *framebuffer);
- bool tegra_fb_is_tiled(struct drm_framebuffer *framebuffer);
-+int tegra_drm_fb_prepare(struct drm_device *drm);
- extern int tegra_drm_fb_init(struct drm_device *drm);
- extern void tegra_drm_fb_exit(struct drm_device *drm);
- #ifdef CONFIG_DRM_TEGRA_FBDEV
-diff --git a/drivers/gpu/drm/tegra/fb.c b/drivers/gpu/drm/tegra/fb.c
-index 2e3758542c89..70d0e07d353c 100644
---- a/drivers/gpu/drm/tegra/fb.c
-+++ b/drivers/gpu/drm/tegra/fb.c
-@@ -271,13 +271,9 @@ static const struct drm_fb_helper_funcs tegra_fb_helper_funcs = {
- 	.fb_probe = tegra_fbdev_probe,
- };
- 
--static struct tegra_fbdev *tegra_fbdev_create(struct drm_device *drm,
--					      unsigned int preferred_bpp,
--					      unsigned int num_crtc,
--					      unsigned int max_connectors)
-+static struct tegra_fbdev *tegra_fbdev_create(struct drm_device *drm)
- {
- 	struct tegra_fbdev *fbdev;
--	int err;
- 
- 	fbdev = kzalloc(sizeof(*fbdev), GFP_KERNEL);
- 	if (!fbdev) {
-@@ -287,10 +283,21 @@ static struct tegra_fbdev *tegra_fbdev_create(struct drm_device *drm,
- 
- 	drm_fb_helper_prepare(drm, &fbdev->base, &tegra_fb_helper_funcs);
- 
-+	return fbdev;
-+}
-+
-+static int tegra_fbdev_init(struct tegra_fbdev *fbdev,
-+			    unsigned int preferred_bpp,
-+			    unsigned int num_crtc,
-+			    unsigned int max_connectors)
-+{
-+	struct drm_device *drm = fbdev->base.dev;
-+	int err;
-+
- 	err = drm_fb_helper_init(drm, &fbdev->base, num_crtc, max_connectors);
- 	if (err < 0) {
- 		dev_err(drm->dev, "failed to initialize DRM FB helper\n");
--		goto free;
-+		return err;
- 	}
- 
- 	err = drm_fb_helper_single_add_all_connectors(&fbdev->base);
-@@ -299,21 +306,17 @@ static struct tegra_fbdev *tegra_fbdev_create(struct drm_device *drm,
- 		goto fini;
- 	}
- 
--	drm_helper_disable_unused_functions(drm);
--
- 	err = drm_fb_helper_initial_config(&fbdev->base, preferred_bpp);
- 	if (err < 0) {
- 		dev_err(drm->dev, "failed to set initial configuration\n");
- 		goto fini;
- 	}
- 
--	return fbdev;
-+	return 0;
- 
- fini:
- 	drm_fb_helper_fini(&fbdev->base);
--free:
--	kfree(fbdev);
--	return ERR_PTR(err);
-+	return err;
- }
- 
- static void tegra_fbdev_free(struct tegra_fbdev *fbdev)
-@@ -367,7 +370,7 @@ static const struct drm_mode_config_funcs tegra_drm_mode_funcs = {
- #endif
- };
- 
--int tegra_drm_fb_init(struct drm_device *drm)
-+int tegra_drm_fb_prepare(struct drm_device *drm)
- {
- #ifdef CONFIG_DRM_TEGRA_FBDEV
- 	struct tegra_drm *tegra = drm->dev_private;
-@@ -382,8 +385,7 @@ int tegra_drm_fb_init(struct drm_device *drm)
- 	drm->mode_config.funcs = &tegra_drm_mode_funcs;
- 
- #ifdef CONFIG_DRM_TEGRA_FBDEV
--	tegra->fbdev = tegra_fbdev_create(drm, 32, drm->mode_config.num_crtc,
--					  drm->mode_config.num_connector);
-+	tegra->fbdev = tegra_fbdev_create(drm);
- 	if (IS_ERR(tegra->fbdev))
- 		return PTR_ERR(tegra->fbdev);
- #endif
-@@ -391,6 +393,21 @@ int tegra_drm_fb_init(struct drm_device *drm)
- 	return 0;
- }
- 
-+int tegra_drm_fb_init(struct drm_device *drm)
-+{
-+#ifdef CONFIG_DRM_TEGRA_FBDEV
-+	struct tegra_drm *tegra = drm->dev_private;
-+	int err;
-+
-+	err = tegra_fbdev_init(tegra->fbdev, 32, drm->mode_config.num_crtc,
-+			       drm->mode_config.num_connector);
-+	if (err < 0)
-+		return err;
-+#endif
-+
-+	return 0;
-+}
-+
- void tegra_drm_fb_exit(struct drm_device *drm)
- {
- #ifdef CONFIG_DRM_TEGRA_FBDEV
--- 
-1.9.2
+Rob
