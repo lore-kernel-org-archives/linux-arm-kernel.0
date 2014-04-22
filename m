@@ -1,142 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 22 Apr 2014 13:15:51 +0100
-Subject: [PATCH v3 13/13] virt: arm: support hip04 gic
-In-Reply-To: <1397801156-25682-14-git-send-email-haojian.zhuang@linaro.org>
- (Haojian Zhuang's message of "Fri, 18 Apr 2014 07:05:56 +0100")
-References: <1397801156-25682-1-git-send-email-haojian.zhuang@linaro.org>
- <1397801156-25682-14-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <87ppk9v9u0.fsf@approximate.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 22 Apr 2014 14:17:30 +0200
+Subject: [PATCH v8 00/17] ARM: sunxi: Add driver for SD/MMC hosts found
+ on Allwinner sunxi SoCs
+In-Reply-To: <53565B74.4000703@elopez.com.ar>
+References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+ <53565B74.4000703@elopez.com.ar>
+Message-ID: <53565DDA.9020202@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18 2014 at  7:05:56 am BST, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
-> In HiP04 SoC, the address of GICH_APR & GICH_LR0 registers are different
-> from ARM standard SoC. So add the support of HiP04 SoC in VGIC.
+Hi,
 
-Please explain the differences in the commit message.
+On 04/22/2014 02:07 PM, Emilio L?pez wrote:
+> Hi Hans,
+> 
+> El 22/04/14 08:01, Hans de Goede escribi?:
+>> Hi All,
+>>
+>> Here is v8 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
+>> working on.
+>>
+>> The first 2 patches are depenencies which should go in through the clk tree,
+>> Mike can you pick these 2 up please ?  :
+>>
+>> "clk: sunxi: factors: automatic reparenting support"
+>> Is uncontroversial and has been favorably reviewed by various people.
+> 
+> I'll pick this one up for 3.16 if you're ok with that. Mike, let me know if you have any objection to the patch, but I'm pretty sure you (informally?) acked it in the past.
+> 
+>> "clk: sunxi: Implement MMC phase control"
+>> Is somewhat more controversial as there has been lots of discussion about
+>> adding a generic phase control method to the clk framework. The problem is
+>> that there has been a lot of talk about such a generic phase control method
+>> but not a single patch. Therefor I would like to move forwards with using
+>> a platform specific method for now. I hereby promise that once we've a generic
+>> method I'll write patches to convert the sunxi code to that method.
+> 
+> Mike proposed a RFC for handling this better, and there were talks with Allwinner people to see what did these phase controls actually mean. We should be able to get a proper solution for it during this cycle. I'd prefer to work towards that instead of merging this, as we have more than a month to get it ready still.
 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/kvm/interrupts_head.S  | 23 +++++++++++++++++++----
->  include/linux/irqchip/arm-gic.h |  3 +++
->  virt/kvm/arm/vgic.c             | 10 ++++++++--
->  3 files changed, 30 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-> index 76af9302..13e4144 100644
-> --- a/arch/arm/kvm/interrupts_head.S
-> +++ b/arch/arm/kvm/interrupts_head.S
-> @@ -419,7 +419,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	ldr	r7, [r2, #GICH_EISR1]
->  	ldr	r8, [r2, #GICH_ELRSR0]
->  	ldr	r9, [r2, #GICH_ELRSR1]
-> -	ldr	r10, [r2, #GICH_APR]
-> +	ldr	r10, =gich_apr
-> +	ldr	r10, [r10]
-> +	ldr	r10, [r2, r10]
->  
->  	str	r3, [r11, #VGIC_CPU_HCR]
->  	str	r4, [r11, #VGIC_CPU_VMCR]
-> @@ -435,7 +437,9 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  	str	r5, [r2, #GICH_HCR]
->  
->  	/* Save list registers */
-> -	add	r2, r2, #GICH_LR0
-> +	ldr	r10, =gich_lr0
-> +	ldr	r10, [r10]
-> +	add	r2, r2, r10
->  	add	r3, r11, #VGIC_CPU_LR
->  	ldr	r4, [r11, #VGIC_CPU_NR_LR]
->  1:	ldr	r6, [r2], #4
-> @@ -469,10 +473,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  
->  	str	r3, [r2, #GICH_HCR]
->  	str	r4, [r2, #GICH_VMCR]
-> -	str	r8, [r2, #GICH_APR]
-> +	ldr	r6, =gich_apr
-> +	ldr	r6, [r6]
-> +	str	r8, [r2, r6]
->  
->  	/* Restore list registers */
-> -	add	r2, r2, #GICH_LR0
-> +	ldr	r6, =gich_lr0
-> +	ldr	r6, [r6]
-> +	add	r2, r2, r6
->  	add	r3, r11, #VGIC_CPU_LR
->  	ldr	r4, [r11, #VGIC_CPU_NR_LR]
->  1:	ldr	r6, [r3], #4
+A month will be gone before you know it, and merging sunxi mmc support really
+is long overdue, and is the last thing keeping distros from shipping with sunxi
+support ootb. So I would really prefer to just get this merged as is for now,
+changing it later should be easy, and merging an interim solution will make
+some more time for doing the generic clk phase control method properly.
 
-So we get four extra memory accesses per world switch, just to find out
-about the new fancy memory map. Let's just say that I'm not exactly
-pleased.
+Regards,
 
-How about encoding that in the field containing the number of LRs? the
-distance between GICH_APR and GICH_LR0 is constant (0x10), so we only
-need to encode the offset of GICH_APR. This way, we only have to read
-one single word from memory. Not pretty, but I'm not really willing to
-impact 
-
-
-> @@ -618,3 +626,10 @@ vcpu	.req	r0		@ vcpu pointer always in r0
->  .macro load_vcpu
->  	mrc	p15, 4, vcpu, c13, c0, 2	@ HTPIDR
->  .endm
-> +
-> +	.global gich_apr
-> +gich_apr:
-> +	.long	GICH_APR
-> +	.global gich_lr0
-> +gich_lr0:
-> +	.long	GICH_LR0
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index 55933aa..653525b 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -49,6 +49,8 @@
->  #define GICH_ELRSR1 			0x34
->  #define GICH_APR			0xf0
->  #define GICH_LR0			0x100
-> +#define HIP04_GICH_APR			0x70
-> +#define HIP04_GICH_LR0			0x80
->  
->  #define GICH_HCR_EN			(1 << 0)
->  #define GICH_HCR_UIE			(1 << 1)
-> @@ -78,6 +80,7 @@
->  struct device_node;
->  
->  extern struct irq_chip gic_arch_extn;
-> +extern unsigned int gich_apr, gich_lr0;
->  
->  void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
->  		    u32 offset, struct device_node *);
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 47b2983..010e491 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1478,8 +1478,14 @@ int kvm_vgic_hyp_init(void)
->  
->  	vgic_node = of_find_compatible_node(NULL, NULL, "arm,cortex-a15-gic");
->  	if (!vgic_node) {
-> -		kvm_err("error: no compatible vgic node in DT\n");
-> -		return -ENODEV;
-> +		vgic_node = of_find_compatible_node(NULL, NULL,
-> +						    "hisilicon,hip04-gic");
-> +		if (!vgic_node) {
-> +			kvm_err("error: no compatible vgic node in DT\n");
-> +			return -ENODEV;
-> +		}
-> +		gich_apr = HIP04_GICH_APR;
-> +		gich_lr0 = HIP04_GICH_LR0;
-
-Consider using of_find_matching_node_and_match instead, with a set of
-flags for this particular case.
-
->  	}
->  
->  	vgic_maint_irq = irq_of_parse_and_map(vgic_node, 0);
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Hans
