@@ -1,51 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Apr 2014 19:12:52 +0100
-Subject: [Qemu-devel] Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <20140422175325.GD23955@obsidianresearch.com>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <534EF153.5050603@codeaurora.org>
- <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
- <53501E87.6070307@codeaurora.org>
- <20140417203521.GB22411@obsidianresearch.com> <535681A4.1080402@monstr.eu>
- <20140422171141.GW24070@n2100.arm.linux.org.uk>
- <20140422175325.GD23955@obsidianresearch.com>
-Message-ID: <20140422181252.GX24070@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 22 Apr 2014 14:14:32 -0400 (EDT)
+Subject: [PATCH] ARM: EXYNOS: cpu hotplug: use v7_exit_coherency_flush
+ macro for cache disabling
+In-Reply-To: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
+References: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
+Message-ID: <alpine.LFD.2.11.1404221414060.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 11:53:25AM -0600, Jason Gunthorpe wrote:
-> On Tue, Apr 22, 2014 at 06:11:42PM +0100, Russell King - ARM Linux wrote:
+On Tue, 22 Apr 2014, Leela Krishna Amudala wrote:
+
+> Remove the duplicated code for cache disabling and use "v7_exit_coherency_flush"
+> macro to do the same job.
 > 
-> > Put another way, if your platform is part of the multi-platform kernel
-> > then you are *excluded* from being able to use this... unless you hack
-> > the Kconfig, and then also provide a constant value for PHYS_OFFSET,
-> > thereby _tying_ the kernel you built to a _single_ platform.
+> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
 > 
-> That is exactly right. To get a fixed LMA you must commit to a
-> non-relocatable kernel image.
+> ---
+> cpu hotplug is tested with 3.15-rc1 on Origen(which has cortex A9) and
+> Arndale octa(which has cortex A7 and A15) boards.
 > 
-> Realistically this patch would need to be accompanied by something
-> that makes ARM_PATCH_PHYS_VIRT optional for multiplatform based on
-> EXPERT or similar.
+>  arch/arm/mach-exynos/hotplug.c |   56 ++--------------------------------------
+>  1 file changed, 2 insertions(+), 54 deletions(-)
 > 
-> The best usecase seems to be to support ELF tooling for low level
-> debugging activities, a non-relocatable image isn't a blocker for that
-> case.
-
-Let's not forget that if you want to debug, it's because you've hit a
-problem in the kernel you're running.  To get an ELF image you can debug,
-you have to turn ARM_PATCH_PHYS_VIRT off, which changes the generated
-code - which can in itself cause bugs to hide themselves.
-
-Unfortunately, those kinds of bugs are not as rare as you might think.
-
-> Since the patch is a no-op if LOAD_OFFSET isn't set, is there a
-> downside I don't see?
-
-It leads people into thinking that we support booting an ELF file.
-We don't.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> index 5eead53..9eb8d1b 100644
+> --- a/arch/arm/mach-exynos/hotplug.c
+> +++ b/arch/arm/mach-exynos/hotplug.c
+> @@ -24,56 +24,6 @@
+>  #include "common.h"
+>  #include "regs-pmu.h"
+>  
+> -static inline void cpu_enter_lowpower_a9(void)
+> -{
+> -	unsigned int v;
+> -
+> -	asm volatile(
+> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
+> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
+> -	/*
+> -	 * Turn off coherency
+> -	 */
+> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, %3\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, %2\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> -	  : "=&r" (v)
+> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+> -	  : "cc");
+> -}
+> -
+> -static inline void cpu_enter_lowpower_a15(void)
+> -{
+> -	unsigned int v;
+> -
+> -	asm volatile(
+> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, %1\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> -	  : "=&r" (v)
+> -	  : "Ir" (CR_C)
+> -	  : "cc");
+> -
+> -	flush_cache_louis();
+> -
+> -	asm volatile(
+> -	/*
+> -	* Turn off coherency
+> -	*/
+> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, %1\n"
+> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> -	: "=&r" (v)
+> -	: "Ir" (0x40)
+> -	: "cc");
+> -
+> -	isb();
+> -	dsb();
+> -}
+> -
+>  static inline void cpu_leave_lowpower(void)
+>  {
+>  	unsigned int v;
+> @@ -141,10 +91,8 @@ void __ref exynos_cpu_die(unsigned int cpu)
+>  	 * appropriate sequence for entering low power.
+>  	 */
+>  	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
+> -	if ((primary_part & 0xfff0) == 0xc0f0)
+> -		cpu_enter_lowpower_a15();
+> -	else
+> -		cpu_enter_lowpower_a9();
+> +
+> +	v7_exit_coherency_flush(louis);
+>  
+>  	platform_do_lowpower(cpu, &spurious);
+>  
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
