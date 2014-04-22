@@ -1,57 +1,75 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 22 Apr 2014 14:40:39 -0500
-Subject: [PATCH v2] ARM: OMAP5: Switch to THUMB mode if needed on secondary CPU
-Message-ID: <1398195639-29273-1-git-send-email-joelf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 14:41:16 -0500
+Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
+In-Reply-To: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
+References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1398195678-28787-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On my DRA7 system, when the kernel is built in Thumb-2 mode, the secondary CPU
-(Cortex A15) fails to come up causing SMP boot on second CPU to timeout. This
-seems to be because the CPU is in ARM mode once the ROM hands over control to
-the kernel.  Switch to Thumb-2 mode if required once the kernel is control of
-secondary CPU. On OMAP4 on the other hand, it appears to be in Thumb-2 mode on
-entry so this is not required and SMP boot works as is.
+From: Rob Herring <robh@kernel.org>
 
-Also corrected a spurious '+' and updated copyright information.
+Multi-platform support implies all these options are already selected and
+individual platforms don't need to select them.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Tested-by: Nishanth Menon <nm@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Joel Fernandes <joelf@ti.com>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/mach-omap2/omap-headsmp.S |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/Kconfig | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
-index 75e9295..40c5d5f 100644
---- a/arch/arm/mach-omap2/omap-headsmp.S
-+++ b/arch/arm/mach-omap2/omap-headsmp.S
-@@ -1,7 +1,7 @@
- /*
-  * Secondary CPU startup routine source file.
-  *
-- * Copyright (C) 2009 Texas Instruments, Inc.
-+ * Copyright (C) 2009-2014 Texas Instruments, Inc.
-  *
-  * Author:
-  *      Santosh Shilimkar <santosh.shilimkar@ti.com>
-@@ -28,9 +28,13 @@
-  * code.  This routine also provides a holding flag into which
-  * secondary core is held until we're ready for it to initialise.
-  * The primary core will update this flag using a hardware
--+ * register AuxCoreBoot0.
-+ * register AuxCoreBoot0.
-  */
- ENTRY(omap5_secondary_startup)
-+.arm
-+THUMB( adr     r9, BSYM(wait)  )       @ CPU may be entered in ARM mode.
-+THUMB( bx      r9              )       @ If this is a Thumb-2 kernel,
-+THUMB( .thumb                  )       @ switch to Thumb now.
- wait:	ldr	r2, =AUX_CORE_BOOT0_PA	@ read from AuxCoreBoot0
- 	ldr	r0, [r2]
- 	mov	r0, r0, lsr #5
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 3f73eec..bfc5af1 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -3,7 +3,6 @@ config ARCH_MVEBU
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+-	select IRQ_DOMAIN
+ 	select PINCTRL
+ 	select PLAT_ORION
+ 	select MVEBU_MBUS
+@@ -11,7 +10,6 @@ config ARCH_MVEBU
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select MIGHT_HAVE_PCI
+ 	select PCI_QUIRKS if PCI
+-	select OF_ADDRESS_PCI
+ 
+ if ARCH_MVEBU
+ 
+@@ -38,7 +36,6 @@ config MACH_ARMADA_375
+ 	select ARM_ERRATA_753970
+ 	select ARM_GIC
+ 	select ARMADA_375_CLK
+-	select CPU_V7
+ 	select MACH_MVEBU_V7
+ 	select PINCTRL_ARMADA_375
+ 	help
+@@ -51,7 +48,6 @@ config MACH_ARMADA_38X
+ 	select ARM_ERRATA_753970
+ 	select ARM_GIC
+ 	select ARMADA_38X_CLK
+-	select CPU_V7
+ 	select MACH_MVEBU_V7
+ 	select PINCTRL_ARMADA_38X
+ 	help
+@@ -86,13 +82,11 @@ config MACH_KIRKWOOD
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CPU_FEROCEON
+ 	select KIRKWOOD_CLK
+-	select OF_IRQ
+ 	select ORION_IRQCHIP
+ 	select ORION_TIMER
+ 	select PCI
+ 	select PCI_QUIRKS
+ 	select PINCTRL_KIRKWOOD
+-	select USE_OF
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Kirkwood device tree.
 -- 
-1.7.9.5
+1.9.1
