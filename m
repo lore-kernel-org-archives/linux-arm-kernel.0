@@ -1,134 +1,88 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Tue, 22 Apr 2014 14:03:40 +0800
-Subject: [PATCH v8 2/3] net: hisilicon: new hip04 MDIO driver
-In-Reply-To: <535561BE.9070303@cogentembedded.com>
-References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
- <1397869980-21187-3-git-send-email-zhangfei.gao@linaro.org>
- <53555C28.4050303@cogentembedded.com>
- <CAGVrzcb8Ykxi72x3iBStjTL+OO1BhDc_yZnnPq8ZHra+mtrBEA@mail.gmail.com>
- <535561BE.9070303@cogentembedded.com>
-Message-ID: <5356063C.6070100@linaro.org>
+From: behanw@converseincode.com (behanw at converseincode.com)
+Date: Mon, 21 Apr 2014 23:08:18 -0700
+Subject: [PATCH] Kbuild arm: LLVMLinux: Add Kbuild support for building arch
+ arm with Clang
+Message-ID: <1398146898-15009-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Behan Webster <behanw@converseincode.com>
 
+Protect more options for arm with cc-option so that we don't get errors when
+using clang instead of gcc.  Add more or different options when using clang as
+well.
 
-On 04/22/2014 02:21 AM, Sergei Shtylyov wrote:
-> On 04/21/2014 10:03 PM, Florian Fainelli wrote:
->
->>>> Hisilicon hip04 platform mdio driver
->>>> Reuse Marvell phy drivers/net/phy/marvell.c
->
->>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->>> [...]
->
->>>> diff --git a/drivers/net/ethernet/hisilicon/hip04_mdio.c
->>>> b/drivers/net/ethernet/hisilicon/hip04_mdio.c
->>>> new file mode 100644
->>>> index 0000000..19826a3
->>>> --- /dev/null
->>>> +++ b/drivers/net/ethernet/hisilicon/hip04_mdio.c
->>>> @@ -0,0 +1,185 @@
->
-> [...]
->
->>>> +static int hip04_mdio_reset(struct mii_bus *bus)
->>>> +{
->>>> +       int temp, err, i;
->>>> +
->>>> +       for (i = 0; i < PHY_MAX_ADDR; i++) {
->>>> +               hip04_mdio_write(bus, i, 22, 0);
->
->>>     Why? What kind of a register this is? <uapi/linux/mii.h> tells me
->>> it's
->>> MII_SREVISION...
->
->> I think this rather means clause 22 as opposed to clause 45.
->
->     No, the corresponding hip04_mdio_write()'s parameter is a register
-> #, so this is a write of 0 to register #22. A comment certainly wouldn't
-> hurt here...
+Author: Behan Webster <behanw@converseincode.com>
+Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+Signed-off-by: Behan Webster <behanw@converseincode.com>
+---
+ arch/arm/Makefile                 | 16 ++++++++++++----
+ arch/arm/boot/compressed/Makefile |  2 +-
+ 2 files changed, 13 insertions(+), 5 deletions(-)
 
-It's private register of the phy marvell 88e1512.
-To make it clearer using define instead.
-#define MII_MARVELL_PHY_PAGE    22
-
-The registers has been grouped into several pages, access register need 
-choose which page first.
->
->>>> +               temp = hip04_mdio_read(bus, i, MII_BMCR);
->
->>>     You're not checking for error...
->
->>>> +               temp |= BMCR_RESET;
->>>> +               err = hip04_mdio_write(bus, i, MII_BMCR, temp);
->
->>>     Hmm, why you're open coding BMCR reset? There's phy_init_hw()
->>> doing this
->>> correctly...
->
->> Except that this runs way before we have created the PHY driver, so we
->> can't use that function just yet.
->
->     Ah, you're right.
->
->> I already asked about this, and he
->> explained that this was because the PHY devices he uses are not
->> responding correcty to MII_PHYSID1/2 reads.
->
->     So, this manual reset loop helps with reading the ID registers? A
-> comment wouldn't hurt either...
-Yes, it required for get_phy_id, will add comments.
-
->
->>>> +               if (err < 0)
->>>> +                       return err;
->
->     I'm not at all sure we want to leave the reset loop on a first write
-> error.
-Yes, continue can be used instead.
-
->
->>>> +       }
->>>> +
->>>> +       mdelay(500);
->
->     I'm not sure this is enough, given that in phy_init_hw() we poll for
-> 600 ms + 1 ms.
-Though not find clear delay time required from the phy spec, the 
-experiment shows OK.
-Also here can not verify the BMCR_RESET bit, 0xffff will returned if the 
-phy is not exists.
->
->>>> +       return 0;
->>>> +}
->>>> +
->>>> +static int hip04_mdio_probe(struct platform_device *pdev)
->>>> +{
->>>> +       struct resource *r;
->>>> +       struct mii_bus *bus;
->>>> +       struct hip04_mdio_priv *priv;
->>>> +       int ret;
->>>> +
->>>> +       bus = mdiobus_alloc_size(sizeof(struct hip04_mdio_priv));
->>>> +       if (!bus) {
->>>> +               dev_err(&pdev->dev, "Cannot allocate MDIO bus\n");
->>>> +               return -ENOMEM;
->>>> +       }
->>>> +
->>>> +       bus->name = "hip04_mdio_bus";
->>>> +       bus->read = hip04_mdio_read;
->>>> +       bus->write = hip04_mdio_write;
->>>> +       bus->reset = hip04_mdio_reset;
->
->>>     Ah... However I don't think it a good implementation of that bus
->>> method...
->
->     I assumed this method exists to do a hardware reset of the whole
-> bus, not to do a loop of soft-resetting all PHYs...
->
-
-It is required for each phy, if no such reset, the specific phy can NOT be
-detected and get_phy_id returns 0.
-
-Thanks
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 41c1931..60412ce 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -23,6 +23,14 @@ OBJCOPYFLAGS	:=-O binary -R .comment -S
+ GZFLAGS		:=-9
+ #KBUILD_CFLAGS	+=-pipe
+ 
++ifeq ($(COMPILER),clang)
++# Clang options
++ifneq ($(CROSS_COMPILE),)
++KBUILD_CPPFLAGS	+= -target $(CROSS_COMPILE:-=)
++endif
++KBUILD_CFLAGS   += -fno-builtin -Wno-asm-operand-widths -Xassembler -mno-warn-deprecated
++endif
++
+ # Never generate .eh_frame
+ KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
+ 
+@@ -41,11 +49,11 @@ KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
+ endif
+ 
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+-KBUILD_CPPFLAGS	+= -mbig-endian
++KBUILD_CPPFLAGS	+= $(call cc-option,-mbig-endian,)
+ AS		+= -EB
+ LD		+= -EB
+ else
+-KBUILD_CPPFLAGS	+= -mlittle-endian
++KBUILD_CPPFLAGS	+= $(call cc-option,-mlittle-endian,)
+ AS		+= -EL
+ LD		+= -EL
+ endif
+@@ -96,7 +104,7 @@ tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+ tune-y := $(tune-y)
+ 
+ ifeq ($(CONFIG_AEABI),y)
+-CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
++CFLAGS_ABI	:=-mabi=aapcs-linux $(call cc-option,-mno-thumb-interwork,) -mfpu=vfp
+ else
+ CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
+ endif
+@@ -120,7 +128,7 @@ AFLAGS_ISA	:=$(CFLAGS_ISA)
+ endif
+ 
+ # Need -Uarm for gcc < 3.x
+-KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
++KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float $(call cc-option, -Uarm,)
+ KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+ 
+ CHECKFLAGS	+= -D__arm__
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 68c9183..9aee36e 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -121,7 +121,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ 
+-ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
++ccflags-y := -fpic $(call cc-option,-mno-single-pic-base,) -fno-builtin -I$(obj)
+ asflags-y := -DZIMAGE
+ 
+ # Supply kernel BSS size to the decompressor via a linker symbol.
+-- 
+1.8.3.2
