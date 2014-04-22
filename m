@@ -1,97 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 22 Apr 2014 16:23:41 -0500
-Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
-In-Reply-To: <20140422205822.GC25453@lunn.ch>
-References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
- <1398195678-28787-2-git-send-email-robherring2@gmail.com>
- <20140422205822.GC25453@lunn.ch>
-Message-ID: <CAL_JsqJnp26n-0xbkNkGY8UR8mXRuiwcout1YtnDkk_Y9WRKxA@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 22 Apr 2014 23:24:06 +0200
+Subject: [PATCH 1/2] ARM: berlin: add MACH_BERLIN_BG2Q symbol
+In-Reply-To: <532CB252.6010702@gmail.com>
+References: <1395430757-8677-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <532CB252.6010702@gmail.com>
+Message-ID: <5356DDF6.4010308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 3:58 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Tue, Apr 22, 2014 at 02:41:16PM -0500, Rob Herring wrote:
->> From: Rob Herring <robh@kernel.org>
+On 03/21/2014 10:42 PM, Sebastian Hesselbarth wrote:
+> On 03/21/2014 08:39 PM, Alexandre Belloni wrote:
+>> Now that we start supporting the Marvell Berlin BG2Q, add a symbol
+>> allowing to
+>> differentiate that SoC from the other SoCs of the Berlin family.
 >>
->> Multi-platform support implies all these options are already selected and
->> individual platforms don't need to select them.
->
-> Hi Rob
->
-> Does this break mvebu_v7_defconfig?
-
-No, it should all be redundant selects.
-
-Rob
-
->
->      Andrew
->
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Gregory Clement <gregory.clement@free-electrons.com>
->> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Applied to berlin/defconfig, Thanks!
+> 
 >> ---
->>  arch/arm/mach-mvebu/Kconfig | 6 ------
->>  1 file changed, 6 deletions(-)
+>>   arch/arm/mach-berlin/Kconfig | 7 +++++++
+>>   1 file changed, 7 insertions(+)
 >>
->> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
->> index 3f73eec..bfc5af1 100644
->> --- a/arch/arm/mach-mvebu/Kconfig
->> +++ b/arch/arm/mach-mvebu/Kconfig
->> @@ -3,7 +3,6 @@ config ARCH_MVEBU
->>       select ARCH_SUPPORTS_BIG_ENDIAN
->>       select CLKSRC_MMIO
->>       select GENERIC_IRQ_CHIP
->> -     select IRQ_DOMAIN
->>       select PINCTRL
->>       select PLAT_ORION
->>       select MVEBU_MBUS
->> @@ -11,7 +10,6 @@ config ARCH_MVEBU
->>       select ARCH_REQUIRE_GPIOLIB
->>       select MIGHT_HAVE_PCI
->>       select PCI_QUIRKS if PCI
->> -     select OF_ADDRESS_PCI
+>> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+>> index 7a02d222c378..0ff6f5877076 100644
+>> --- a/arch/arm/mach-berlin/Kconfig
+>> +++ b/arch/arm/mach-berlin/Kconfig
+>> @@ -24,6 +24,13 @@ config MACH_BERLIN_BG2CD
+>>       select CPU_V7
+>>       select HAVE_ARM_TWD if SMP
 >>
->>  if ARCH_MVEBU
+>> +config MACH_BERLIN_BG2Q
+>> +    bool "Marvell Armada 1500 Pro (BG2-Q)"
+>> +    select CACHE_L2X0
+>> +    select CPU_V7
+>> +    select HAVE_ARM_TWD if SMP
+>> +    select HAVE_SMP
+
+As Rob Herring pointed out, CPU_V7 is already selected by MULTI_V7.
+Also, with no agreement on how to proceed with SMP, I also dropped
+HAVE_SMP for now.
+
+Sebastian
+
+
+>>   endmenu
 >>
->> @@ -38,7 +36,6 @@ config MACH_ARMADA_375
->>       select ARM_ERRATA_753970
->>       select ARM_GIC
->>       select ARMADA_375_CLK
->> -     select CPU_V7
->>       select MACH_MVEBU_V7
->>       select PINCTRL_ARMADA_375
->>       help
->> @@ -51,7 +48,6 @@ config MACH_ARMADA_38X
->>       select ARM_ERRATA_753970
->>       select ARM_GIC
->>       select ARMADA_38X_CLK
->> -     select CPU_V7
->>       select MACH_MVEBU_V7
->>       select PINCTRL_ARMADA_38X
->>       help
->> @@ -86,13 +82,11 @@ config MACH_KIRKWOOD
->>       select ARCH_REQUIRE_GPIOLIB
->>       select CPU_FEROCEON
->>       select KIRKWOOD_CLK
->> -     select OF_IRQ
->>       select ORION_IRQCHIP
->>       select ORION_TIMER
->>       select PCI
->>       select PCI_QUIRKS
->>       select PINCTRL_KIRKWOOD
->> -     select USE_OF
->>       help
->>         Say 'Y' here if you want your kernel to support boards based
->>         on the Marvell Kirkwood device tree.
->> --
->> 1.9.1
+>>   endif
 >>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
