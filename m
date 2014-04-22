@@ -1,258 +1,381 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Apr 2014 16:42:19 +0200
-Subject: [PATCH 2/4] drm: Constify struct drm_fb_helper_funcs
+Date: Tue, 22 Apr 2014 16:42:20 +0200
+Subject: [PATCH 3/4] drm: Introduce drm_fb_helper_prepare()
 In-Reply-To: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
 References: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1398177741-28482-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1398177741-28482-3-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-There's no need for this to be modifiable. Make it const so that it can
-be put into the .rodata section.
+To implement hotplug detection in a race-free manner, drivers must call
+drm_kms_helper_poll_init() before hotplug events can be triggered. Such
+events can be triggered right after any of the encoders or connectors
+are initialized. At the same time, if the drm_fb_helper_hotplug_event()
+helper is used by a driver, then the poll helper requires some parts of
+the FB helper to be initialized to prevent a crash.
+
+At the same time, drm_fb_helper_init() requires information that is not
+necessarily available at such an early stage (number of CRTCs and
+connectors), so it cannot be used yet.
+
+Add a new helper, drm_fb_helper_prepare(), that initializes the bare
+minimum needed to allow drm_kms_helper_poll_init() to execute and any
+subsequent hotplug events to be processed properly.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/gpu/drm/armada/armada_fbdev.c     | 2 +-
- drivers/gpu/drm/ast/ast_fb.c              | 2 +-
- drivers/gpu/drm/bochs/bochs_fbdev.c       | 2 +-
- drivers/gpu/drm/cirrus/cirrus_fbdev.c     | 2 +-
- drivers/gpu/drm/drm_fb_cma_helper.c       | 2 +-
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 2 +-
- drivers/gpu/drm/gma500/framebuffer.c      | 2 +-
- drivers/gpu/drm/i915/intel_fbdev.c        | 2 +-
- drivers/gpu/drm/mgag200/mgag200_fb.c      | 2 +-
- drivers/gpu/drm/msm/msm_fbdev.c           | 2 +-
- drivers/gpu/drm/nouveau/nouveau_fbcon.c   | 2 +-
- drivers/gpu/drm/omapdrm/omap_fbdev.c      | 2 +-
- drivers/gpu/drm/qxl/qxl_fb.c              | 2 +-
- drivers/gpu/drm/radeon/radeon_fb.c        | 2 +-
- drivers/gpu/drm/tegra/fb.c                | 2 +-
- drivers/gpu/drm/udl/udl_fb.c              | 2 +-
- include/drm/drm_fb_helper.h               | 2 +-
- 17 files changed, 17 insertions(+), 17 deletions(-)
+ drivers/gpu/drm/armada/armada_fbdev.c     |  2 +-
+ drivers/gpu/drm/ast/ast_fb.c              |  4 ++-
+ drivers/gpu/drm/bochs/bochs_fbdev.c       |  3 ++-
+ drivers/gpu/drm/cirrus/cirrus_fbdev.c     |  4 ++-
+ drivers/gpu/drm/drm_fb_cma_helper.c       |  3 ++-
+ drivers/gpu/drm/drm_fb_helper.c           | 43 ++++++++++++++++++++++++-------
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c |  3 ++-
+ drivers/gpu/drm/gma500/framebuffer.c      |  3 ++-
+ drivers/gpu/drm/i915/intel_fbdev.c        |  3 ++-
+ drivers/gpu/drm/mgag200/mgag200_fb.c      |  3 ++-
+ drivers/gpu/drm/msm/msm_fbdev.c           |  2 +-
+ drivers/gpu/drm/nouveau/nouveau_fbcon.c   |  3 ++-
+ drivers/gpu/drm/omapdrm/omap_fbdev.c      |  2 +-
+ drivers/gpu/drm/qxl/qxl_fb.c              |  5 +++-
+ drivers/gpu/drm/radeon/radeon_fb.c        |  4 ++-
+ drivers/gpu/drm/tegra/fb.c                |  4 +--
+ drivers/gpu/drm/udl/udl_fb.c              |  3 ++-
+ include/drm/drm_fb_helper.h               |  2 ++
+ 18 files changed, 68 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/gpu/drm/armada/armada_fbdev.c b/drivers/gpu/drm/armada/armada_fbdev.c
-index 948cb14c561e..21aa1261dba2 100644
+index 21aa1261dba2..9437e11d5df1 100644
 --- a/drivers/gpu/drm/armada/armada_fbdev.c
 +++ b/drivers/gpu/drm/armada/armada_fbdev.c
-@@ -131,7 +131,7 @@ static int armada_fb_probe(struct drm_fb_helper *fbh,
- 	return ret;
- }
+@@ -149,7 +149,7 @@ int armada_fbdev_init(struct drm_device *dev)
  
--static struct drm_fb_helper_funcs armada_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs armada_fb_helper_funcs = {
- 	.gamma_set	= armada_drm_crtc_gamma_set,
- 	.gamma_get	= armada_drm_crtc_gamma_get,
- 	.fb_probe	= armada_fb_probe,
+ 	priv->fbdev = fbh;
+ 
+-	fbh->funcs = &armada_fb_helper_funcs;
++	drm_fb_helper_prepare(dev, fbh, &armada_fb_helper_funcs);
+ 
+ 	ret = drm_fb_helper_init(dev, fbh, 1, 1);
+ 	if (ret) {
 diff --git a/drivers/gpu/drm/ast/ast_fb.c b/drivers/gpu/drm/ast/ast_fb.c
-index a28640f47c27..2113894e4ff8 100644
+index 2113894e4ff8..cba45c774552 100644
 --- a/drivers/gpu/drm/ast/ast_fb.c
 +++ b/drivers/gpu/drm/ast/ast_fb.c
-@@ -287,7 +287,7 @@ static void ast_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
- 	*blue = ast_crtc->lut_b[regno] << 8;
- }
+@@ -328,8 +328,10 @@ int ast_fbdev_init(struct drm_device *dev)
+ 		return -ENOMEM;
  
--static struct drm_fb_helper_funcs ast_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs ast_fb_helper_funcs = {
- 	.gamma_set = ast_fb_gamma_set,
- 	.gamma_get = ast_fb_gamma_get,
- 	.fb_probe = astfb_create,
+ 	ast->fbdev = afbdev;
+-	afbdev->helper.funcs = &ast_fb_helper_funcs;
+ 	spin_lock_init(&afbdev->dirty_lock);
++
++	drm_fb_helper_prepare(dev, &afbdev->helper, &ast_fb_helper_funcs);
++
+ 	ret = drm_fb_helper_init(dev, &afbdev->helper,
+ 				 1, 1);
+ 	if (ret) {
 diff --git a/drivers/gpu/drm/bochs/bochs_fbdev.c b/drivers/gpu/drm/bochs/bochs_fbdev.c
-index 561b84474122..17e5c17f2730 100644
+index 17e5c17f2730..19cf3e9413b6 100644
 --- a/drivers/gpu/drm/bochs/bochs_fbdev.c
 +++ b/drivers/gpu/drm/bochs/bochs_fbdev.c
-@@ -179,7 +179,7 @@ void bochs_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
- 	*blue  = regno;
- }
+@@ -189,7 +189,8 @@ int bochs_fbdev_init(struct bochs_device *bochs)
+ {
+ 	int ret;
  
--static struct drm_fb_helper_funcs bochs_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs bochs_fb_helper_funcs = {
- 	.gamma_set = bochs_fb_gamma_set,
- 	.gamma_get = bochs_fb_gamma_get,
- 	.fb_probe = bochsfb_create,
+-	bochs->fb.helper.funcs = &bochs_fb_helper_funcs;
++	drm_fb_helper_prepare(bochs->dev, &bochs->fb.helper,
++			      &bochs_fb_helper_funcs);
+ 
+ 	ret = drm_fb_helper_init(bochs->dev, &bochs->fb.helper,
+ 				 1, 1);
 diff --git a/drivers/gpu/drm/cirrus/cirrus_fbdev.c b/drivers/gpu/drm/cirrus/cirrus_fbdev.c
-index 32bbba0a787b..2bd0291168e4 100644
+index 2bd0291168e4..2a135f253e29 100644
 --- a/drivers/gpu/drm/cirrus/cirrus_fbdev.c
 +++ b/drivers/gpu/drm/cirrus/cirrus_fbdev.c
-@@ -288,7 +288,7 @@ static int cirrus_fbdev_destroy(struct drm_device *dev,
- 	return 0;
- }
+@@ -306,9 +306,11 @@ int cirrus_fbdev_init(struct cirrus_device *cdev)
+ 		return -ENOMEM;
  
--static struct drm_fb_helper_funcs cirrus_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs cirrus_fb_helper_funcs = {
- 	.gamma_set = cirrus_crtc_fb_gamma_set,
- 	.gamma_get = cirrus_crtc_fb_gamma_get,
- 	.fb_probe = cirrusfb_create,
+ 	cdev->mode_info.gfbdev = gfbdev;
+-	gfbdev->helper.funcs = &cirrus_fb_helper_funcs;
+ 	spin_lock_init(&gfbdev->dirty_lock);
+ 
++	drm_fb_helper_prepare(cdev->dev, &gfbdev->helper,
++			      &cirrus_fb_helper_funcs);
++
+ 	ret = drm_fb_helper_init(cdev->dev, &gfbdev->helper,
+ 				 cdev->num_crtc, CIRRUSFB_CONN_LIMIT);
+ 	if (ret) {
 diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c b/drivers/gpu/drm/drm_fb_cma_helper.c
-index 61b5a47ad239..b74f9e58b69d 100644
+index b74f9e58b69d..acbbd230e081 100644
 --- a/drivers/gpu/drm/drm_fb_cma_helper.c
 +++ b/drivers/gpu/drm/drm_fb_cma_helper.c
-@@ -327,7 +327,7 @@ err_drm_gem_cma_free_object:
- 	return ret;
+@@ -354,9 +354,10 @@ struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+-	fbdev_cma->fb_helper.funcs = &drm_fb_cma_helper_funcs;
+ 	helper = &fbdev_cma->fb_helper;
+ 
++	drm_fb_helper_prepare(dev, helper, &drm_fb_cma_helper_funcs);
++
+ 	ret = drm_fb_helper_init(dev, helper, num_crtc, max_conn_count);
+ 	if (ret < 0) {
+ 		dev_err(dev->dev, "Failed to initialize drm fb helper.\n");
+diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+index 80ce92ab91f9..7788f110fcbf 100644
+--- a/drivers/gpu/drm/drm_fb_helper.c
++++ b/drivers/gpu/drm/drm_fb_helper.c
+@@ -49,10 +49,11 @@ static LIST_HEAD(kernel_fb_helper_list);
+  * helper functions used by many drivers to implement the kernel mode setting
+  * interfaces.
+  *
+- * Initialization is done as a three-step process with drm_fb_helper_init(),
+- * drm_fb_helper_single_add_all_connectors() and drm_fb_helper_initial_config().
+- * Drivers with fancier requirements than the default behaviour can override the
+- * second step with their own code.  Teardown is done with drm_fb_helper_fini().
++ * Initialization is done as a four-step process with drm_fb_helper_prepare(),
++ * drm_fb_helper_init(), drm_fb_helper_single_add_all_connectors() and
++ * drm_fb_helper_initial_config(). Drivers with fancier requirements than the
++ * default behaviour can override the second step with their own code.
++ * Teardown is done with drm_fb_helper_fini().
+  *
+  * At runtime drivers should restore the fbdev console by calling
+  * drm_fb_helper_restore_fbdev_mode() from their ->lastclose callback. They
+@@ -502,6 +503,33 @@ static void drm_fb_helper_crtc_free(struct drm_fb_helper *helper)
  }
  
--static struct drm_fb_helper_funcs drm_fb_cma_helper_funcs = {
-+static const struct drm_fb_helper_funcs drm_fb_cma_helper_funcs = {
- 	.fb_probe = drm_fbdev_cma_create,
- };
+ /**
++ * drm_fb_helper_prepare - setup a drm_fb_helper structure
++ * @dev: DRM device
++ * @helper: driver-allocated fbdev helper structure to set up
++ * @funcs: pointer to structure of functions associate with this helper
++ *
++ * Sets up the bare minimum to make the framebuffer helper usable. This is
++ * useful to implement race-free initialization of the polling helpers. In
++ * that case a typical sequence would be:
++ *
++ *   - call drm_fb_helper_prepare()
++ *   - set dev->mode_config.funcs
++ *   - perform driver-specific setup
++ *   - call drm_kms_helper_poll_init()
++ *   - call drm_fb_helper_init()
++ *   - call drm_fb_helper_single_add_all_connectors()
++ *   - call drm_fb_helper_initial_config()
++ */
++void drm_fb_helper_prepare(struct drm_device *dev, struct drm_fb_helper *helper,
++			   const struct drm_fb_helper_funcs *funcs)
++{
++	INIT_LIST_HEAD(&helper->kernel_fb_list);
++	helper->funcs = funcs;
++	helper->dev = dev;
++}
++EXPORT_SYMBOL(drm_fb_helper_prepare);
++
++/**
+  * drm_fb_helper_init - initialize a drm_fb_helper structure
+  * @dev: drm device
+  * @fb_helper: driver-allocated fbdev helper structure to initialize
+@@ -513,8 +541,7 @@ static void drm_fb_helper_crtc_free(struct drm_fb_helper *helper)
+  * nor register the fbdev. This is only done in drm_fb_helper_initial_config()
+  * to allow driver writes more control over the exact init sequence.
+  *
+- * Drivers must set fb_helper->funcs before calling
+- * drm_fb_helper_initial_config().
++ * Drivers must call drm_fb_helper_prepare() before calling this function.
+  *
+  * RETURNS:
+  * Zero if everything went ok, nonzero otherwise.
+@@ -529,10 +556,6 @@ int drm_fb_helper_init(struct drm_device *dev,
+ 	if (!max_conn_count)
+ 		return -EINVAL;
  
+-	fb_helper->dev = dev;
+-
+-	INIT_LIST_HEAD(&fb_helper->kernel_fb_list);
+-
+ 	fb_helper->crtc_info = kcalloc(crtc_count, sizeof(struct drm_fb_helper_crtc), GFP_KERNEL);
+ 	if (!fb_helper->crtc_info)
+ 		return -ENOMEM;
 diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-index addbf7536da4..7ccf04917f47 100644
+index 7ccf04917f47..46443971d517 100644
 --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
 +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-@@ -233,7 +233,7 @@ out:
- 	return ret;
- }
+@@ -274,7 +274,8 @@ int exynos_drm_fbdev_init(struct drm_device *dev)
+ 		return -ENOMEM;
  
--static struct drm_fb_helper_funcs exynos_drm_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs exynos_drm_fb_helper_funcs = {
- 	.fb_probe =	exynos_drm_fbdev_create,
- };
+ 	private->fb_helper = helper = &fbdev->drm_fb_helper;
+-	helper->funcs = &exynos_drm_fb_helper_funcs;
++
++	drm_fb_helper_prepare(dev, helper, &exynos_drm_fb_helper_funcs);
+ 
+ 	num_crtc = dev->mode_config.num_crtc;
  
 diff --git a/drivers/gpu/drm/gma500/framebuffer.c b/drivers/gpu/drm/gma500/framebuffer.c
-index e7fcc148f333..76e4d777d01d 100644
+index 76e4d777d01d..d0dd3bea8aa5 100644
 --- a/drivers/gpu/drm/gma500/framebuffer.c
 +++ b/drivers/gpu/drm/gma500/framebuffer.c
-@@ -561,7 +561,7 @@ static int psbfb_probe(struct drm_fb_helper *helper,
- 	return psbfb_create(psb_fbdev, sizes);
- }
+@@ -600,7 +600,8 @@ int psb_fbdev_init(struct drm_device *dev)
+ 	}
  
--static struct drm_fb_helper_funcs psb_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs psb_fb_helper_funcs = {
- 	.gamma_set = psbfb_gamma_set,
- 	.gamma_get = psbfb_gamma_get,
- 	.fb_probe = psbfb_probe,
+ 	dev_priv->fbdev = fbdev;
+-	fbdev->psb_fb_helper.funcs = &psb_fb_helper_funcs;
++
++	drm_fb_helper_prepare(dev, &fbdev->psb_fb_helper, &psb_fb_helper_funcs);
+ 
+ 	drm_fb_helper_init(dev, &fbdev->psb_fb_helper, dev_priv->ops->crtcs,
+ 							INTELFB_CONN_LIMIT);
 diff --git a/drivers/gpu/drm/i915/intel_fbdev.c b/drivers/gpu/drm/i915/intel_fbdev.c
-index b4d44e62f0c7..336a89f2549e 100644
+index 336a89f2549e..e7dd21029060 100644
 --- a/drivers/gpu/drm/i915/intel_fbdev.c
 +++ b/drivers/gpu/drm/i915/intel_fbdev.c
-@@ -429,7 +429,7 @@ out:
- 	return true;
- }
+@@ -600,7 +600,8 @@ int intel_fbdev_init(struct drm_device *dev)
+ 	if (ifbdev == NULL)
+ 		return -ENOMEM;
  
--static struct drm_fb_helper_funcs intel_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs intel_fb_helper_funcs = {
- 	.initial_config = intel_fb_initial_config,
- 	.gamma_set = intel_crtc_fb_gamma_set,
- 	.gamma_get = intel_crtc_fb_gamma_get,
+-	ifbdev->helper.funcs = &intel_fb_helper_funcs;
++	drm_fb_helper_probe(dev, &ifbdev->helper, &intel_fb_helper_funcs);
++
+ 	if (!intel_fbdev_init_bios(dev, ifbdev))
+ 		ifbdev->preferred_bpp = 32;
+ 
 diff --git a/drivers/gpu/drm/mgag200/mgag200_fb.c b/drivers/gpu/drm/mgag200/mgag200_fb.c
-index 13b7dd83faa9..a4319aba9180 100644
+index a4319aba9180..5451dc58eff1 100644
 --- a/drivers/gpu/drm/mgag200/mgag200_fb.c
 +++ b/drivers/gpu/drm/mgag200/mgag200_fb.c
-@@ -272,7 +272,7 @@ static int mga_fbdev_destroy(struct drm_device *dev,
- 	return 0;
- }
+@@ -293,9 +293,10 @@ int mgag200_fbdev_init(struct mga_device *mdev)
+ 		return -ENOMEM;
  
--static struct drm_fb_helper_funcs mga_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs mga_fb_helper_funcs = {
- 	.gamma_set = mga_crtc_fb_gamma_set,
- 	.gamma_get = mga_crtc_fb_gamma_get,
- 	.fb_probe = mgag200fb_create,
+ 	mdev->mfbdev = mfbdev;
+-	mfbdev->helper.funcs = &mga_fb_helper_funcs;
+ 	spin_lock_init(&mfbdev->dirty_lock);
+ 
++	drm_fb_helper_prepare(mdev->dev, &mfbdev->helper, &mga_fb_helper_funcs);
++
+ 	ret = drm_fb_helper_init(mdev->dev, &mfbdev->helper,
+ 				 mdev->num_crtc, MGAG200FB_CONN_LIMIT);
+ 	if (ret)
 diff --git a/drivers/gpu/drm/msm/msm_fbdev.c b/drivers/gpu/drm/msm/msm_fbdev.c
-index 6c6d7d4c9b4e..841665862f2f 100644
+index 841665862f2f..745b1be4acf0 100644
 --- a/drivers/gpu/drm/msm/msm_fbdev.c
 +++ b/drivers/gpu/drm/msm/msm_fbdev.c
-@@ -180,7 +180,7 @@ static void msm_crtc_fb_gamma_get(struct drm_crtc *crtc,
- 	DBG("fbdev: get gamma");
- }
+@@ -200,7 +200,7 @@ struct drm_fb_helper *msm_fbdev_init(struct drm_device *dev)
  
--static struct drm_fb_helper_funcs msm_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs msm_fb_helper_funcs = {
- 	.gamma_set = msm_crtc_fb_gamma_set,
- 	.gamma_get = msm_crtc_fb_gamma_get,
- 	.fb_probe = msm_fbdev_create,
+ 	helper = &fbdev->base;
+ 
+-	helper->funcs = &msm_fb_helper_funcs;
++	drm_fb_helper_prepare(dev, helper, &msm_fb_helper_funcs);
+ 
+ 	ret = drm_fb_helper_init(dev, helper,
+ 			priv->num_crtcs, priv->num_connectors);
 diff --git a/drivers/gpu/drm/nouveau/nouveau_fbcon.c b/drivers/gpu/drm/nouveau/nouveau_fbcon.c
-index 64a42cfd3717..8e9c07b7fc89 100644
+index 8e9c07b7fc89..afe706a20f97 100644
 --- a/drivers/gpu/drm/nouveau/nouveau_fbcon.c
 +++ b/drivers/gpu/drm/nouveau/nouveau_fbcon.c
-@@ -438,7 +438,7 @@ void nouveau_fbcon_gpu_lockup(struct fb_info *info)
- 	info->flags |= FBINFO_HWACCEL_DISABLED;
- }
+@@ -464,7 +464,8 @@ nouveau_fbcon_init(struct drm_device *dev)
  
--static struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
-+static const struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
- 	.gamma_set = nouveau_fbcon_gamma_set,
- 	.gamma_get = nouveau_fbcon_gamma_get,
- 	.fb_probe = nouveau_fbcon_create,
+ 	fbcon->dev = dev;
+ 	drm->fbcon = fbcon;
+-	fbcon->helper.funcs = &nouveau_fbcon_helper_funcs;
++
++	drm_fb_helper_prepare(dev, &fbcon->helper, &nouveau_fbcon_helper_funcs);
+ 
+ 	ret = drm_fb_helper_init(dev, &fbcon->helper,
+ 				 dev->mode_config.num_crtc, 4);
 diff --git a/drivers/gpu/drm/omapdrm/omap_fbdev.c b/drivers/gpu/drm/omapdrm/omap_fbdev.c
-index 1388ca7f87e8..4cb12083eb12 100644
+index 4cb12083eb12..8436c6857cda 100644
 --- a/drivers/gpu/drm/omapdrm/omap_fbdev.c
 +++ b/drivers/gpu/drm/omapdrm/omap_fbdev.c
-@@ -281,7 +281,7 @@ fail:
- 	return ret;
- }
+@@ -325,7 +325,7 @@ struct drm_fb_helper *omap_fbdev_init(struct drm_device *dev)
  
--static struct drm_fb_helper_funcs omap_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs omap_fb_helper_funcs = {
- 	.fb_probe = omap_fbdev_create,
- };
+ 	helper = &fbdev->base;
  
+-	helper->funcs = &omap_fb_helper_funcs;
++	drm_fb_helper_prepare(dev, helper, &omap_fb_helper_funcs);
+ 
+ 	ret = drm_fb_helper_init(dev, helper,
+ 			priv->num_crtcs, priv->num_connectors);
 diff --git a/drivers/gpu/drm/qxl/qxl_fb.c b/drivers/gpu/drm/qxl/qxl_fb.c
-index f437b30ce689..cf89614c72be 100644
+index cf89614c72be..df567888bb1e 100644
 --- a/drivers/gpu/drm/qxl/qxl_fb.c
 +++ b/drivers/gpu/drm/qxl/qxl_fb.c
-@@ -660,7 +660,7 @@ static int qxl_fbdev_destroy(struct drm_device *dev, struct qxl_fbdev *qfbdev)
- 	return 0;
- }
+@@ -676,9 +676,12 @@ int qxl_fbdev_init(struct qxl_device *qdev)
  
--static struct drm_fb_helper_funcs qxl_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs qxl_fb_helper_funcs = {
- 	.fb_probe = qxl_fb_find_or_create_single,
- };
- 
+ 	qfbdev->qdev = qdev;
+ 	qdev->mode_info.qfbdev = qfbdev;
+-	qfbdev->helper.funcs = &qxl_fb_helper_funcs;
+ 	spin_lock_init(&qfbdev->delayed_ops_lock);
+ 	INIT_LIST_HEAD(&qfbdev->delayed_ops);
++
++	drm_fb_helper_prepare(qdev->ddev, &qfbdev->helper,
++			      &qxl_fb_helper_funcs);
++
+ 	ret = drm_fb_helper_init(qdev->ddev, &qfbdev->helper,
+ 				 qxl_num_crtc /* num_crtc - QXL supports just 1 */,
+ 				 QXLFB_CONN_LIMIT);
 diff --git a/drivers/gpu/drm/radeon/radeon_fb.c b/drivers/gpu/drm/radeon/radeon_fb.c
-index 665ced3b7313..ad97afdbc4c7 100644
+index ad97afdbc4c7..db598d712901 100644
 --- a/drivers/gpu/drm/radeon/radeon_fb.c
 +++ b/drivers/gpu/drm/radeon/radeon_fb.c
-@@ -331,7 +331,7 @@ static int radeon_fbdev_destroy(struct drm_device *dev, struct radeon_fbdev *rfb
- 	return 0;
- }
+@@ -353,7 +353,9 @@ int radeon_fbdev_init(struct radeon_device *rdev)
  
--static struct drm_fb_helper_funcs radeon_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs radeon_fb_helper_funcs = {
- 	.gamma_set = radeon_crtc_fb_gamma_set,
- 	.gamma_get = radeon_crtc_fb_gamma_get,
- 	.fb_probe = radeonfb_create,
+ 	rfbdev->rdev = rdev;
+ 	rdev->mode_info.rfbdev = rfbdev;
+-	rfbdev->helper.funcs = &radeon_fb_helper_funcs;
++
++	drm_fb_helper_prepare(rdev->ddev, &rfbdev->helper,
++			      &radeon_fb_helper_funcs);
+ 
+ 	ret = drm_fb_helper_init(rdev->ddev, &rfbdev->helper,
+ 				 rdev->num_crtc,
 diff --git a/drivers/gpu/drm/tegra/fb.c b/drivers/gpu/drm/tegra/fb.c
-index f7fca09d4921..75bed72a9755 100644
+index 75bed72a9755..2e3758542c89 100644
 --- a/drivers/gpu/drm/tegra/fb.c
 +++ b/drivers/gpu/drm/tegra/fb.c
-@@ -267,7 +267,7 @@ release:
- 	return err;
- }
+@@ -276,7 +276,6 @@ static struct tegra_fbdev *tegra_fbdev_create(struct drm_device *drm,
+ 					      unsigned int num_crtc,
+ 					      unsigned int max_connectors)
+ {
+-	struct drm_fb_helper *helper;
+ 	struct tegra_fbdev *fbdev;
+ 	int err;
  
--static struct drm_fb_helper_funcs tegra_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs tegra_fb_helper_funcs = {
- 	.fb_probe = tegra_fbdev_probe,
- };
+@@ -286,8 +285,7 @@ static struct tegra_fbdev *tegra_fbdev_create(struct drm_device *drm,
+ 		return ERR_PTR(-ENOMEM);
+ 	}
  
+-	fbdev->base.funcs = &tegra_fb_helper_funcs;
+-	helper = &fbdev->base;
++	drm_fb_helper_prepare(drm, &fbdev->base, &tegra_fb_helper_funcs);
+ 
+ 	err = drm_fb_helper_init(drm, &fbdev->base, num_crtc, max_connectors);
+ 	if (err < 0) {
 diff --git a/drivers/gpu/drm/udl/udl_fb.c b/drivers/gpu/drm/udl/udl_fb.c
-index 377176372da8..0647c8cc368b 100644
+index 0647c8cc368b..d1da339843ca 100644
 --- a/drivers/gpu/drm/udl/udl_fb.c
 +++ b/drivers/gpu/drm/udl/udl_fb.c
-@@ -550,7 +550,7 @@ out:
- 	return ret;
- }
+@@ -583,7 +583,8 @@ int udl_fbdev_init(struct drm_device *dev)
+ 		return -ENOMEM;
  
--static struct drm_fb_helper_funcs udl_fb_helper_funcs = {
-+static const struct drm_fb_helper_funcs udl_fb_helper_funcs = {
- 	.fb_probe = udlfb_create,
- };
+ 	udl->fbdev = ufbdev;
+-	ufbdev->helper.funcs = &udl_fb_helper_funcs;
++
++	drm_fb_helper_prepare(dev, &ufbdev->helper, &udl_fb_helper_funcs);
  
+ 	ret = drm_fb_helper_init(dev, &ufbdev->helper,
+ 				 1, 1);
 diff --git a/include/drm/drm_fb_helper.h b/include/drm/drm_fb_helper.h
-index 6e622f7d481d..e8c8eeb3a253 100644
+index e8c8eeb3a253..9b83c66a5f13 100644
 --- a/include/drm/drm_fb_helper.h
 +++ b/include/drm/drm_fb_helper.h
-@@ -87,7 +87,7 @@ struct drm_fb_helper {
- 	struct drm_fb_helper_crtc *crtc_info;
- 	int connector_count;
- 	struct drm_fb_helper_connector **connector_info;
--	struct drm_fb_helper_funcs *funcs;
-+	const struct drm_fb_helper_funcs *funcs;
- 	struct fb_info *fbdev;
- 	u32 pseudo_palette[17];
- 	struct list_head kernel_fb_list;
+@@ -97,6 +97,8 @@ struct drm_fb_helper {
+ 	bool delayed_hotplug;
+ };
+ 
++void drm_fb_helper_prepare(struct drm_device *dev, struct drm_fb_helper *helper,
++			   const struct drm_fb_helper_funcs *funcs);
+ int drm_fb_helper_init(struct drm_device *dev,
+ 		       struct drm_fb_helper *helper, int crtc_count,
+ 		       int max_conn);
 -- 
 1.9.2
