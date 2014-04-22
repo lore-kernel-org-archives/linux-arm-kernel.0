@@ -1,111 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 22 Apr 2014 14:14:32 -0400 (EDT)
-Subject: [PATCH] ARM: EXYNOS: cpu hotplug: use v7_exit_coherency_flush
- macro for cache disabling
-In-Reply-To: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
-References: <1398176280-7258-1-git-send-email-leela.krishna@linaro.org>
-Message-ID: <alpine.LFD.2.11.1404221414060.980@knanqh.ubzr>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 22 Apr 2014 14:16:50 -0400
+Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
+In-Reply-To: <20140422134802.73fc1fa4@gandalf.local.home>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org>
+ <20140422115439.GA20669@linutronix.de>
+ <20140422094657.5b6ca1e2@gandalf.local.home>
+ <53569E05.8010600@linutronix.de>
+ <20140422134802.73fc1fa4@gandalf.local.home>
+Message-ID: <20140422141650.7f43d5ba@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Apr 2014, Leela Krishna Amudala wrote:
+On Tue, 22 Apr 2014 13:48:02 -0400
+Steven Rostedt <rostedt@goodmis.org> wrote:
 
-> Remove the duplicated code for cache disabling and use "v7_exit_coherency_flush"
-> macro to do the same job.
-> 
-> Signed-off-by: Leela Krishna Amudala <leela.krishna@linaro.org>
+> I need to take a deeper look into the actual code. But as trylocks on
+> UP are nops (always succeed), and if it expects to be able to do
+> something in a critical section that is protected by spinlocks (again
+> nops on UP), this would be broken for UP.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Reading the code, I see it's broken. We should add something like this:
 
-
-> 
-> ---
-> cpu hotplug is tested with 3.15-rc1 on Origen(which has cortex A9) and
-> Arndale octa(which has cortex A7 and A15) boards.
-> 
->  arch/arm/mach-exynos/hotplug.c |   56 ++--------------------------------------
->  1 file changed, 2 insertions(+), 54 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index 5eead53..9eb8d1b 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -24,56 +24,6 @@
->  #include "common.h"
->  #include "regs-pmu.h"
->  
-> -static inline void cpu_enter_lowpower_a9(void)
-> -{
-> -	unsigned int v;
-> -
-> -	asm volatile(
-> -	"	mcr	p15, 0, %1, c7, c5, 0\n"
-> -	"	mcr	p15, 0, %1, c7, c10, 4\n"
-> -	/*
-> -	 * Turn off coherency
-> -	 */
-> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %3\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, %2\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> -	  : "=&r" (v)
-> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-> -	  : "cc");
-> -}
-> -
-> -static inline void cpu_enter_lowpower_a15(void)
-> -{
-> -	unsigned int v;
-> -
-> -	asm volatile(
-> -	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, %1\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> -	  : "=&r" (v)
-> -	  : "Ir" (CR_C)
-> -	  : "cc");
-> -
-> -	flush_cache_louis();
-> -
-> -	asm volatile(
-> -	/*
-> -	* Turn off coherency
-> -	*/
-> -	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %1\n"
-> -	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> -	: "=&r" (v)
-> -	: "Ir" (0x40)
-> -	: "cc");
-> -
-> -	isb();
-> -	dsb();
-> -}
-> -
->  static inline void cpu_leave_lowpower(void)
->  {
->  	unsigned int v;
-> @@ -141,10 +91,8 @@ void __ref exynos_cpu_die(unsigned int cpu)
->  	 * appropriate sequence for entering low power.
->  	 */
->  	asm("mrc p15, 0, %0, c0, c0, 0" : "=r"(primary_part) : : "cc");
-> -	if ((primary_part & 0xfff0) == 0xc0f0)
-> -		cpu_enter_lowpower_a15();
-> -	else
-> -		cpu_enter_lowpower_a9();
-> +
-> +	v7_exit_coherency_flush(louis);
->  
->  	platform_do_lowpower(cpu, &spurious);
->  
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+---
+diff --git a/kernel/timer.c b/kernel/timer.c
+index cc34e42..a03164a 100644
+--- a/kernel/timer.c
++++ b/kernel/timer.c
+@@ -1447,6 +1447,12 @@ static void run_timer_softirq(struct softirq_action *h)
+ 		__run_timers(base);
+ }
+ 
++#ifdef CONFIG_SMP
++#define timer_should_raise_softirq(lock)	!spin_do_trylock(lock)
++#else
++#define timer_should_raise_softirq(lock)	1
++#endif
++
+ /*
+  * Called by the local, per-CPU timer interrupt on SMP.
+  */
+@@ -1467,7 +1473,7 @@ void run_local_timers(void)
+ 		return;
+ 	}
+ 
+-	if (!spin_do_trylock(&base->lock)) {
++	if (timer_should_raise_softirq(&base->lock)) {
+ 		raise_softirq(TIMER_SOFTIRQ);
+ 		return;
+ 	}
