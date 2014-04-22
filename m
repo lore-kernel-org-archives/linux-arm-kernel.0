@@ -1,55 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 22 Apr 2014 15:27:16 +0200
-Subject: [PATCH v3 5/7] pinctrl: sunxi: define A31 R_PIO pin functions
-In-Reply-To: <CACRpkdam1a0TUPx4rMG6mzXwRdYZgfeZdBUhk0hnWAbKVQKr=A@mail.gmail.com>
-References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>	<1397137966-30818-6-git-send-email-boris.brezillon@free-electrons.com>
- <CACRpkdam1a0TUPx4rMG6mzXwRdYZgfeZdBUhk0hnWAbKVQKr=A@mail.gmail.com>
-Message-ID: <53566E34.2070709@free-electrons.com>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Tue, 22 Apr 2014 15:31:45 +0200
+Subject: [PATCH v2] gpio: omap: implement get_direction
+Message-ID: <1398173505-28193-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-On 22/04/2014 13:47, Linus Walleij wrote:
-> On Thu, Apr 10, 2014 at 3:52 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
->
->> The A31 SoC provides both PL and PM pio bank through the R_PIO block.
->>
->> These pins all support gpio function and can bbe assigned to system
->> peripherals (like TWI, P2WI, JTAG, ...)
->>
->> Add new compatible string to the DT bindings doc.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> PARTLY APPLIED.
->
-> The patch to the DT bindings apparently depend on some
-> patch that I do *NOT* have in my tree, please figure out what is
-> going on here and help me figure out what and how to apply the
-> changes to the bindings.
+This patch implements gpio_chip's get_direction() routine, that
+lets other drivers get particular GPIOs direction using
+struct gpio_desc.
 
-Oops: I dropped the patch documenting existing compatible strings in
-this version ([1]).
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+---
+Changes:
+	v2: rework return value calculation
 
->
-> The hunk adding the docs was dropped from the patch, please
-> develop new series on top of my pinctrl devel branch as I
-> push it out.
+ drivers/gpio/gpio-omap.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-Sure, I'll make a new patch listing all compatible strings (including
-this new one) in the sunxi pinctrl DT bindings doc.
-
-Thanks,
-
-Boris
-
-[1] https://lkml.org/lkml/2014/4/9/258
->
-> Yours,
-> Linus Walleij
-
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 19b886c..fadc45e 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -102,6 +102,17 @@ static int omap_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ 	return irq_find_mapping(bank->domain, offset);
+ }
+ 
++static int _get_gpio_direction(struct gpio_bank *bank, int gpio)
++{
++	void __iomem *reg = bank->base;
++	u32 l;
++
++	reg += bank->regs->direction;
++	l = (readl_relaxed(reg) >> gpio);
++
++	return (l & 0x00000001);
++}
++
+ static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+ {
+ 	void __iomem *reg = bank->base;
+@@ -936,6 +947,19 @@ static inline void mpuio_init(struct gpio_bank *bank)
+ 
+ /*---------------------------------------------------------------------*/
+ 
++static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
++{
++	struct gpio_bank *bank;
++	unsigned long flags;
++	int dir;
++
++	bank = container_of(chip, struct gpio_bank, chip);
++	spin_lock_irqsave(&bank->lock, flags);
++	dir = _get_gpio_direction(bank, offset);
++	spin_unlock_irqrestore(&bank->lock, flags);
++	return dir;
++}
++
+ static int gpio_input(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct gpio_bank *bank;
+@@ -1092,6 +1116,7 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
+ 	 */
+ 	bank->chip.request = omap_gpio_request;
+ 	bank->chip.free = omap_gpio_free;
++	bank->chip.get_direction = gpio_get_direction;
+ 	bank->chip.direction_input = gpio_input;
+ 	bank->chip.get = gpio_get;
+ 	bank->chip.direction_output = gpio_output;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.7
