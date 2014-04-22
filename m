@@ -1,143 +1,60 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 21 Apr 2014 23:09:27 -0500
-Subject: [PATCH v2 2/7] of: introduce of_dma_get_range() helper
-In-Reply-To: <1397917972-6293-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>
- <1397917972-6293-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <5355EB77.7000306@ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 22 Apr 2014 09:55:35 +0530
+Subject: [PATCH] ARM: dts: disable MDMA1 node for smdk5420 board
+In-Reply-To: <021301cf5dd1$1d0ec910$572c5b30$@samsung.com>
+References: <001a01cf5b0c$5ddc7d60$19957820$%jun@samsung.com>
+ <021301cf5dd1$1d0ec910$572c5b30$@samsung.com>
+Message-ID: <CAHbNUh3G1NUUfAwh=B+rDwVkfsAetUpDspiPS-JbK3oYuxSd_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2014 09:32 AM, Santosh Shilimkar wrote:
-> From: Grygorii Strashko <grygorii.strashko@ti.com>
-[..]
-> + * Look in bottom up direction for the first "dma-range" property
-> + * and parse it.
-> + *  dma-ranges format:
-> + *	DMA addr (dma_addr)	: naddr cells
-> + *	CPU addr (phys_addr_t)	: pna cells
-> + *	size			: nsize cells
-> + *
-> + * It returns -ENODEV if "dma-ranges" property was not found
-> + * for this device in DT.
-> + */
-> +extern int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
-> +		phys_addr_t *paddr, phys_addr_t *size)
-> +{
-> +	struct device_node *node = np;
-> +	const u32 *ranges = NULL;
-> +	int len, naddr, nsize, pna;
-> +	int ret = 0;
-> +
-> +	if (!node)
-> +		return -EINVAL;
-> +
-> +	while (1) {
-> +		naddr = of_n_addr_cells(node);
-> +		nsize = of_n_size_cells(node);
-> +		node = of_get_next_parent(node);
-> +		if (!node)
-> +			break;
-> +
-> +		ranges = of_get_property(node, "dma-ranges", &len);
-> +
-> +		/* Ignore empty ranges, they imply no translation required */
-> +		if (ranges && len > 0)
-> +			break;
-> +
-> +		/*
-> +		 * At least empty ranges has to be defined for parent node if
-> +		 * DMA is supported
-> +		 */
-> +		if (!ranges)
-> +			break;
-> +	}
-> +
-> +	if (!ranges) {
-> +		pr_debug("%s: no dma-ranges found for node(%s)\n",
-> +			 __func__, np->full_name);
-> +		ret = -ENODEV;
-> +		goto out;
-> +	}
-> +
-> +	len /= sizeof(u32);
-> +
-> +	pna = of_n_addr_cells(node);
-> +
-> +	/* dma-ranges format:
-> +	 * DMA addr	: naddr cells
-> +	 * CPU addr	: pna cells
-> +	 * size		: nsize cells
-> +	 */
-> +	*dma_addr = of_read_number(ranges, naddr);
-> +	*paddr = of_translate_dma_address(np, ranges);
+On 22 April 2014 07:48, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Seungwon Jeon wrote:
+>>
+>
+> + Javi Merino and Tushar Behera
+>
+>> This change is similar to commit 3da355c(ARM: dts: Disable MDMA1 node
+>> for arndale-octa board). If MDMA1 region is configured with secure mode,
+>> it makes the boot failure with the following.
+>>
+>> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+>>
+> If so, how about adding the 'disabled' status in 5420 dtsi file? Then if 'enabling' is required, we can enable in each board dt file...
+>
 
-I am probably missing something but I'm wondering the need for a
-translate step here instead of doing something like:
+That should be okay. While at it, we can remove the node disabling
+code from Arndale-Octa board DTS file.
 
-*paddr = of_read_number(ranges + naddr, pna);
 
-Perhaps there is a need to do a translate step of the DMA Address in
-dma-ranges all the way to the parent, which can be different from the
-CPU Address (second address in dma-ranges).
-
-in which case the format of dma-ranges after parsing looks like
-<DMA-Addr Translate(DMA-Addr) Size>
-to the caller, and not, <DMA-Addr CPU-Addr Size>
-
-But for keystone if something like the following is used,		
- dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
-
-Then, the above fragment I proposed would return 0x8 0x00000000 which is
-sufficient?
-
-thanks,
- -Joel
+> - Kukjin
+>
+>> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5420-smdk5420.dts |    6 ++++++
+>>  1 files changed, 6 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> index 6910485..9a48e3f 100644
+>> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> @@ -373,4 +373,10 @@
+>>                       };
+>>               };
+>>       };
+>> +
+>> +     amba {
+>> +             mdma1: mdma at 11C10000 {
+>> +                     status = "disabled";
+>> +             };
+>> +     };
+>>  };
+>> --
+>> 1.7.0.4
+>
 
 
 
-> +	if (*paddr == OF_BAD_ADDR) {
-> +		pr_err("%s: translation of DMA address(%pad) to CPU address failed node(%s)\n",
-> +		       __func__, dma_addr, np->full_name);
-> +		ret = -EINVAL;
-> +	}
-> +
-> +	*size = of_read_number(ranges + naddr + pna, nsize);
-> +
-> +	pr_debug("dma_addr(%pad) cpu_addr(%pa) size(%pa)\n",
-> +		 dma_addr, paddr, size);
-> +
-> +out:
-> +	of_node_put(node);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(of_dma_get_range);
->  #endif /* CONFIG_OF_ADDRESS */
-> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-> index 05cb4a9..ba7d3dc 100644
-> --- a/include/linux/of_platform.h
-> +++ b/include/linux/of_platform.h
-> @@ -72,6 +72,8 @@ extern int of_platform_populate(struct device_node *root,
->  				const struct of_device_id *matches,
->  				const struct of_dev_auxdata *lookup,
->  				struct device *parent);
-> +extern int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
-> +				phys_addr_t *paddr, phys_addr_t *size);
->  #else
->  static inline int of_platform_populate(struct device_node *root,
->  					const struct of_device_id *matches,
-> @@ -80,6 +82,12 @@ static inline int of_platform_populate(struct device_node *root,
->  {
->  	return -ENODEV;
->  }
-> +
-> +static inline int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
-> +					phys_addr_t *paddr, phys_addr_t *size)
-> +{
-> +	return -ENODEV;
-> +}
->  #endif
->  
->  #endif	/* _LINUX_OF_PLATFORM_H */
-> 
+-- 
+Tushar Behera
