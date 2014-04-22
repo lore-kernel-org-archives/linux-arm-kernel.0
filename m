@@ -1,59 +1,39 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 22 Apr 2014 13:48:02 -0400
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <53569E05.8010600@linutronix.de>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org>
- <20140422115439.GA20669@linutronix.de>
- <20140422094657.5b6ca1e2@gandalf.local.home>
- <53569E05.8010600@linutronix.de>
-Message-ID: <20140422134802.73fc1fa4@gandalf.local.home>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 22 Apr 2014 11:53:25 -0600
+Subject: [Qemu-devel] Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <20140422171141.GW24070@n2100.arm.linux.org.uk>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <534EF153.5050603@codeaurora.org>
+ <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
+ <53501E87.6070307@codeaurora.org>
+ <20140417203521.GB22411@obsidianresearch.com>
+ <535681A4.1080402@monstr.eu>
+ <20140422171141.GW24070@n2100.arm.linux.org.uk>
+Message-ID: <20140422175325.GD23955@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Apr 2014 18:51:17 +0200
-Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+On Tue, Apr 22, 2014 at 06:11:42PM +0100, Russell King - ARM Linux wrote:
 
-> On 04/22/2014 03:46 PM, Steven Rostedt wrote:
-> > [ added Peter ]
-> > 
-> > On Tue, 22 Apr 2014 13:54:39 +0200
-> > Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> >  
-> >> this is, erm, harmless. We grab the timer lock via trylock in hardirq
-> >> context. If the lock is already taken then we fail to get it we go for
-> >> plan B. According to lockdep a trylock should not fail on UP. This is
-> >> true in general except for this timer case. I was thinking abour
-> >> disabling this lockdep check?
-> > 
-> > trylock not failing on UP, can that be an issue? I mean, if a hardirq
-> > does a trylock to see if it can grab a lock that is not protected by
-> > disabling irqs, and will go to plan B if it fails, on UP, it will
-> > always get it.  But the issue is still there. That would mean that a
-> > hardirq could have preempted a critical section and doing a trylock
-> > here would succeed when it really should have failed.
-> 
-> If you take a lock with irqs enabled and disabled then lockdep should
-> complain about it.
+> Put another way, if your platform is part of the multi-platform kernel
+> then you are *excluded* from being able to use this... unless you hack
+> the Kconfig, and then also provide a constant value for PHYS_OFFSET,
+> thereby _tying_ the kernel you built to a _single_ platform.
 
-There's nothing wrong with taking locks with irqs enabled and disabled.
-It's only wrong if that lock (or a lock that is held when the lock is
-taken) is also taking in interrupt *context*.
+That is exactly right. To get a fixed LMA you must commit to a
+non-relocatable kernel image.
 
-> 
-> This is the ->wait_lock of the timer base lock. This (sleeping) lock is
-> usually taken with interrupts enabled. Except here, in the timer
-> callback, we check if the lock is available or not. And this lock may
-> be a) taken (and the ->wait_lock unlocked) or b) in process to be taken
-> but the caller only succeeded to acquire the ->wait_lock before the
-> interrupt occurred. This is the case here and we can't acquire the
-> ->wait_lock a second time the check if the lock is really taken. But
-> since the wait_lock is occupied it is likely that the lock itself is
-> occupied as well.
+Realistically this patch would need to be accompanied by something
+that makes ARM_PATCH_PHYS_VIRT optional for multiplatform based on
+EXPERT or similar.
 
-I need to take a deeper look into the actual code. But as trylocks on
-UP are nops (always succeed), and if it expects to be able to do
-something in a critical section that is protected by spinlocks (again
-nops on UP), this would be broken for UP.
+The best usecase seems to be to support ELF tooling for low level
+debugging activities, a non-relocatable image isn't a blocker for that
+case.
 
--- Steve
+Since the patch is a no-op if LOAD_OFFSET isn't set, is there a
+downside I don't see?
+
+Thanks,
+Jason
