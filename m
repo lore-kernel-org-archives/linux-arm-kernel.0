@@ -1,33 +1,136 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Apr 2014 16:20:19 +0200
-Subject: [PATCH v3 7/7] ARM: sunxi: update the default ARCH_NR_GPIO for
- sunxi arch
-In-Reply-To: <CACRpkdYT9HvG6dOVOEnBSNhRt847tdCsAU6E_dZLdFQEHntpKg@mail.gmail.com>
-References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397137966-30818-8-git-send-email-boris.brezillon@free-electrons.com>
- <CACRpkdYT9HvG6dOVOEnBSNhRt847tdCsAU6E_dZLdFQEHntpKg@mail.gmail.com>
-Message-ID: <201404221620.19519.arnd@arndb.de>
+From: bcousson@baylibre.com (Benoit Cousson)
+Date: Tue, 22 Apr 2014 16:14:36 +0200
+Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
+In-Reply-To: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
+References: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
+Message-ID: <5356794C.7070707@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014, Linus Walleij wrote:
-> On Thu, Apr 10, 2014 at 3:52 PM, Boris BREZILLON
-> <boris.brezillon@free-electrons.com> wrote:
-> 
-> > The A31 SoC has PL and PM banks and thus increase the default ARCH_NR_GPIO.
-> >
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Patch applied, and grrrr we need to get rid of these static #gpios defines
-> in the long run.
+Hi Leigh,
 
-Yes, that would be nice. I guess the gpio-descriptor framework should
-have solved this, but we can't move everything over to that soon, right?
+On 16/04/2014 13:26, Leigh Brown wrote:
+> In "ARM: dts: am33xx: correcting dt node unit address for usb", the
+> usb_ctrl_mod and cppi41dma nodes were updated with the correct register
+> addresses.  However, the dts files that reference these nodes were not
+> updated, and those devices are no longer being enabled.
+>
+> This patch corrects the references for the affected dts files.
 
-> ARM SoC folks: notice this hitting arch/arm/Kconfig, complain if it's
-> problematic.
+Thanks for the fix. BTW, why is it a RFC? Do you plan to send an updated 
+version?
 
-Thanks for letting us know about it.
+FYI, even with this fix, the BBB still does not have a working MUSB on 
+3.15-rc2. Have you observed that as well?
 
-	Arnd
+> Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+
+If this is a final version, I'll apply it for -rc3.
+
+Thanks,
+Benoit
+
+
+> ---
+>   arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
+>   arch/arm/boot/dts/am335x-evm.dts          | 4 ++--
+>   arch/arm/boot/dts/am335x-evmsk.dts        | 4 ++--
+>   arch/arm/boot/dts/am335x-igep0033.dtsi    | 4 ++--
+>   4 files changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index e3f27ec..2e7d932 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -183,7 +183,7 @@
+>   &usb {
+>   	status = "okay";
+>
+> -	control at 44e10000 {
+> +	control at 44e10620 {
+>   		status = "okay";
+>   	};
+>
+> @@ -204,7 +204,7 @@
+>   		dr_mode = "host";
+>   	};
+>
+> -	dma-controller at 07402000  {
+> +	dma-controller at 47402000  {
+>   		status = "okay";
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+> index 28ae040..77df10d 100644
+> --- a/arch/arm/boot/dts/am335x-evm.dts
+> +++ b/arch/arm/boot/dts/am335x-evm.dts
+> @@ -331,7 +331,7 @@
+>   &usb {
+>   	status = "okay";
+>
+> -	control at 44e10000 {
+> +	control at 44e10620 {
+>   		status = "okay";
+>   	};
+>
+> @@ -352,7 +352,7 @@
+>   		dr_mode = "host";
+>   	};
+>
+> -	dma-controller at 07402000  {
+> +	dma-controller at 47402000  {
+>   		status = "okay";
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+> index ec08f6f..ab23885 100644
+> --- a/arch/arm/boot/dts/am335x-evmsk.dts
+> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
+> @@ -364,7 +364,7 @@
+>   &usb {
+>   	status = "okay";
+>
+> -	control at 44e10000 {
+> +	control at 44e10620 {
+>   		status = "okay";
+>   	};
+>
+> @@ -385,7 +385,7 @@
+>   		dr_mode = "host";
+>   	};
+>
+> -	dma-controller at 07402000  {
+> +	dma-controller at 47402000  {
+>   		status = "okay";
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+> index 7063311..5942e7d 100644
+> --- a/arch/arm/boot/dts/am335x-igep0033.dtsi
+> +++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+> @@ -202,7 +202,7 @@
+>   &usb {
+>   	status = "okay";
+>
+> -	control at 44e10000 {
+> +	control at 44e10620 {
+>   		status = "okay";
+>   	};
+>
+> @@ -223,7 +223,7 @@
+>   		dr_mode = "host";
+>   	};
+>
+> -	dma-controller at 07402000  {
+> +	dma-controller at 47402000  {
+>   		status = "okay";
+>   	};
+>   };
+>
+
+
+-- 
+Beno?t Cousson
+BayLibre
+Embedded Linux Technology Lab
+www.baylibre.com
