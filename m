@@ -1,146 +1,258 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Apr 2014 16:42:18 +0200
-Subject: [PATCH 1/4] drm/fb-helper: Fix hpd vs. initial config races
-Message-ID: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
+Date: Tue, 22 Apr 2014 16:42:19 +0200
+Subject: [PATCH 2/4] drm: Constify struct drm_fb_helper_funcs
+In-Reply-To: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
+References: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1398177741-28482-2-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Vetter <daniel.vetter@ffwll.ch>
+From: Thierry Reding <treding@nvidia.com>
 
-Some drivers need to be able to have a perfect race-free fbcon setup.
-Current drivers only enable hotplug processing after the call to
-drm_fb_helper_initial_config which leaves a tiny but important race.
+There's no need for this to be modifiable. Make it const so that it can
+be put into the .rodata section.
 
-This race is especially noticable on embedded platforms where the
-driver itself enables the voltage for the hdmi output, since only then
-will monitors (after a bit of delay, as usual) respond by asserting
-the hpd pin.
-
-Most of the infrastructure is already there with the split-out
-drm_fb_helper_init. And drm_fb_helper_initial_config already has all
-the required locking to handle concurrent hpd events since
-
-commit 53f1904bced78d7c00f5d874c662ec3ac85d0f9f
-Author: Daniel Vetter <daniel.vetter@ffwll.ch>
-Date:   Thu Mar 20 14:26:35 2014 +0100
-
-    drm/fb-helper: improve drm_fb_helper_initial_config locking
-
-The only missing bit is making drm_fb_helper_hotplug_event save
-against concurrent calls of drm_fb_helper_initial_config. The only
-unprotected bit is the check for fb_helper->fb.
-
-With that drivers can first initialize the fb helper, then enabel
-hotplug processing and then set up the initial config all in a
-completely race-free manner. Update kerneldoc and convert i915 as a
-proof of concept.
-
-Feature requested by Thierry since his tegra driver atm reliably boots
-slowly enough to misses the hotplug event for an external hdmi screen,
-but also reliably boots to quickly for the hpd pin to be asserted when
-the fb helper calls into the hdmi ->detect function.
-
-Cc: Thierry Reding <treding@nvidia.com>
-Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/gpu/drm/drm_fb_helper.c | 11 +++++------
- drivers/gpu/drm/i915/i915_dma.c |  3 ---
- drivers/gpu/drm/i915/i915_drv.c |  2 --
- drivers/gpu/drm/i915/i915_drv.h |  1 -
- drivers/gpu/drm/i915/i915_irq.c |  4 ----
- 5 files changed, 5 insertions(+), 16 deletions(-)
+ drivers/gpu/drm/armada/armada_fbdev.c     | 2 +-
+ drivers/gpu/drm/ast/ast_fb.c              | 2 +-
+ drivers/gpu/drm/bochs/bochs_fbdev.c       | 2 +-
+ drivers/gpu/drm/cirrus/cirrus_fbdev.c     | 2 +-
+ drivers/gpu/drm/drm_fb_cma_helper.c       | 2 +-
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 2 +-
+ drivers/gpu/drm/gma500/framebuffer.c      | 2 +-
+ drivers/gpu/drm/i915/intel_fbdev.c        | 2 +-
+ drivers/gpu/drm/mgag200/mgag200_fb.c      | 2 +-
+ drivers/gpu/drm/msm/msm_fbdev.c           | 2 +-
+ drivers/gpu/drm/nouveau/nouveau_fbcon.c   | 2 +-
+ drivers/gpu/drm/omapdrm/omap_fbdev.c      | 2 +-
+ drivers/gpu/drm/qxl/qxl_fb.c              | 2 +-
+ drivers/gpu/drm/radeon/radeon_fb.c        | 2 +-
+ drivers/gpu/drm/tegra/fb.c                | 2 +-
+ drivers/gpu/drm/udl/udl_fb.c              | 2 +-
+ include/drm/drm_fb_helper.h               | 2 +-
+ 17 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
-index e95ed5805f07..80ce92ab91f9 100644
---- a/drivers/gpu/drm/drm_fb_helper.c
-+++ b/drivers/gpu/drm/drm_fb_helper.c
-@@ -1587,8 +1587,10 @@ EXPORT_SYMBOL(drm_fb_helper_initial_config);
-  * either the output polling work or a work item launched from the driver's
-  * hotplug interrupt).
-  *
-- * Note that the driver must ensure that this is only called _after_ the fb has
-- * been fully set up, i.e. after the call to drm_fb_helper_initial_config.
-+ * Note that drivers may call this even before calling
-+ * drm_fb_helper_initial_config but only aftert drm_fb_helper_init. This allows
-+ * for a race-free fbcon setup and will make sure that the fbdev emulation will
-+ * not miss any hotplug events.
-  *
-  * RETURNS:
-  * 0 on success and a non-zero error code otherwise.
-@@ -1598,11 +1600,8 @@ int drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper)
- 	struct drm_device *dev = fb_helper->dev;
- 	u32 max_width, max_height;
+diff --git a/drivers/gpu/drm/armada/armada_fbdev.c b/drivers/gpu/drm/armada/armada_fbdev.c
+index 948cb14c561e..21aa1261dba2 100644
+--- a/drivers/gpu/drm/armada/armada_fbdev.c
++++ b/drivers/gpu/drm/armada/armada_fbdev.c
+@@ -131,7 +131,7 @@ static int armada_fb_probe(struct drm_fb_helper *fbh,
+ 	return ret;
+ }
  
--	if (!fb_helper->fb)
--		return 0;
--
- 	mutex_lock(&fb_helper->dev->mode_config.mutex);
--	if (!drm_fb_helper_is_bound(fb_helper)) {
-+	if (!fb_helper->fb || !drm_fb_helper_is_bound(fb_helper)) {
- 		fb_helper->delayed_hotplug = true;
- 		mutex_unlock(&fb_helper->dev->mode_config.mutex);
- 		return 0;
-diff --git a/drivers/gpu/drm/i915/i915_dma.c b/drivers/gpu/drm/i915/i915_dma.c
-index cc0c6eded51c..89ba88d37ae1 100644
---- a/drivers/gpu/drm/i915/i915_dma.c
-+++ b/drivers/gpu/drm/i915/i915_dma.c
-@@ -1375,9 +1375,6 @@ static int i915_load_modeset_init(struct drm_device *dev)
- 	 */
- 	intel_fbdev_initial_config(dev);
+-static struct drm_fb_helper_funcs armada_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs armada_fb_helper_funcs = {
+ 	.gamma_set	= armada_drm_crtc_gamma_set,
+ 	.gamma_get	= armada_drm_crtc_gamma_get,
+ 	.fb_probe	= armada_fb_probe,
+diff --git a/drivers/gpu/drm/ast/ast_fb.c b/drivers/gpu/drm/ast/ast_fb.c
+index a28640f47c27..2113894e4ff8 100644
+--- a/drivers/gpu/drm/ast/ast_fb.c
++++ b/drivers/gpu/drm/ast/ast_fb.c
+@@ -287,7 +287,7 @@ static void ast_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
+ 	*blue = ast_crtc->lut_b[regno] << 8;
+ }
  
--	/* Only enable hotplug handling once the fbdev is fully set up. */
--	dev_priv->enable_hotplug_processing = true;
--
- 	drm_kms_helper_poll_init(dev);
+-static struct drm_fb_helper_funcs ast_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs ast_fb_helper_funcs = {
+ 	.gamma_set = ast_fb_gamma_set,
+ 	.gamma_get = ast_fb_gamma_get,
+ 	.fb_probe = astfb_create,
+diff --git a/drivers/gpu/drm/bochs/bochs_fbdev.c b/drivers/gpu/drm/bochs/bochs_fbdev.c
+index 561b84474122..17e5c17f2730 100644
+--- a/drivers/gpu/drm/bochs/bochs_fbdev.c
++++ b/drivers/gpu/drm/bochs/bochs_fbdev.c
+@@ -179,7 +179,7 @@ void bochs_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
+ 	*blue  = regno;
+ }
  
+-static struct drm_fb_helper_funcs bochs_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs bochs_fb_helper_funcs = {
+ 	.gamma_set = bochs_fb_gamma_set,
+ 	.gamma_get = bochs_fb_gamma_get,
+ 	.fb_probe = bochsfb_create,
+diff --git a/drivers/gpu/drm/cirrus/cirrus_fbdev.c b/drivers/gpu/drm/cirrus/cirrus_fbdev.c
+index 32bbba0a787b..2bd0291168e4 100644
+--- a/drivers/gpu/drm/cirrus/cirrus_fbdev.c
++++ b/drivers/gpu/drm/cirrus/cirrus_fbdev.c
+@@ -288,7 +288,7 @@ static int cirrus_fbdev_destroy(struct drm_device *dev,
  	return 0;
-diff --git a/drivers/gpu/drm/i915/i915_drv.c b/drivers/gpu/drm/i915/i915_drv.c
-index 254b3236200b..dee36a5b7fae 100644
---- a/drivers/gpu/drm/i915/i915_drv.c
-+++ b/drivers/gpu/drm/i915/i915_drv.c
-@@ -448,7 +448,6 @@ static int i915_drm_freeze(struct drm_device *dev)
- 		cancel_delayed_work_sync(&dev_priv->rps.delayed_resume_work);
+ }
  
- 		drm_irq_uninstall(dev);
--		dev_priv->enable_hotplug_processing = false;
- 		/*
- 		 * Disable CRTCs directly since we want to preserve sw state
- 		 * for _thaw.
-@@ -589,7 +588,6 @@ static int __i915_drm_thaw(struct drm_device *dev, bool restore_gtt_mappings)
- 		 * notifications.
- 		 * */
- 		intel_hpd_init(dev);
--		dev_priv->enable_hotplug_processing = true;
- 		/* Config may have changed between suspend and resume */
- 		intel_resume_hotplug(dev);
- 	}
-diff --git a/drivers/gpu/drm/i915/i915_drv.h b/drivers/gpu/drm/i915/i915_drv.h
-index 7d6acb401fd9..41094d6357b1 100644
---- a/drivers/gpu/drm/i915/i915_drv.h
-+++ b/drivers/gpu/drm/i915/i915_drv.h
-@@ -1321,7 +1321,6 @@ struct drm_i915_private {
- 	u32 pipestat_irq_mask[I915_MAX_PIPES];
+-static struct drm_fb_helper_funcs cirrus_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs cirrus_fb_helper_funcs = {
+ 	.gamma_set = cirrus_crtc_fb_gamma_set,
+ 	.gamma_get = cirrus_crtc_fb_gamma_get,
+ 	.fb_probe = cirrusfb_create,
+diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c b/drivers/gpu/drm/drm_fb_cma_helper.c
+index 61b5a47ad239..b74f9e58b69d 100644
+--- a/drivers/gpu/drm/drm_fb_cma_helper.c
++++ b/drivers/gpu/drm/drm_fb_cma_helper.c
+@@ -327,7 +327,7 @@ err_drm_gem_cma_free_object:
+ 	return ret;
+ }
  
- 	struct work_struct hotplug_work;
--	bool enable_hotplug_processing;
- 	struct {
- 		unsigned long hpd_last_jiffies;
- 		int hpd_cnt;
-diff --git a/drivers/gpu/drm/i915/i915_irq.c b/drivers/gpu/drm/i915/i915_irq.c
-index c828f5b78250..179588b2368f 100644
---- a/drivers/gpu/drm/i915/i915_irq.c
-+++ b/drivers/gpu/drm/i915/i915_irq.c
-@@ -1003,10 +1003,6 @@ static void i915_hotplug_work_func(struct work_struct *work)
- 	bool changed = false;
- 	u32 hpd_event_bits;
+-static struct drm_fb_helper_funcs drm_fb_cma_helper_funcs = {
++static const struct drm_fb_helper_funcs drm_fb_cma_helper_funcs = {
+ 	.fb_probe = drm_fbdev_cma_create,
+ };
  
--	/* HPD irq before everything is fully set up. */
--	if (!dev_priv->enable_hotplug_processing)
--		return;
--
- 	mutex_lock(&mode_config->mutex);
- 	DRM_DEBUG_KMS("running encoder hotplug functions\n");
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index addbf7536da4..7ccf04917f47 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -233,7 +233,7 @@ out:
+ 	return ret;
+ }
  
+-static struct drm_fb_helper_funcs exynos_drm_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs exynos_drm_fb_helper_funcs = {
+ 	.fb_probe =	exynos_drm_fbdev_create,
+ };
+ 
+diff --git a/drivers/gpu/drm/gma500/framebuffer.c b/drivers/gpu/drm/gma500/framebuffer.c
+index e7fcc148f333..76e4d777d01d 100644
+--- a/drivers/gpu/drm/gma500/framebuffer.c
++++ b/drivers/gpu/drm/gma500/framebuffer.c
+@@ -561,7 +561,7 @@ static int psbfb_probe(struct drm_fb_helper *helper,
+ 	return psbfb_create(psb_fbdev, sizes);
+ }
+ 
+-static struct drm_fb_helper_funcs psb_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs psb_fb_helper_funcs = {
+ 	.gamma_set = psbfb_gamma_set,
+ 	.gamma_get = psbfb_gamma_get,
+ 	.fb_probe = psbfb_probe,
+diff --git a/drivers/gpu/drm/i915/intel_fbdev.c b/drivers/gpu/drm/i915/intel_fbdev.c
+index b4d44e62f0c7..336a89f2549e 100644
+--- a/drivers/gpu/drm/i915/intel_fbdev.c
++++ b/drivers/gpu/drm/i915/intel_fbdev.c
+@@ -429,7 +429,7 @@ out:
+ 	return true;
+ }
+ 
+-static struct drm_fb_helper_funcs intel_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs intel_fb_helper_funcs = {
+ 	.initial_config = intel_fb_initial_config,
+ 	.gamma_set = intel_crtc_fb_gamma_set,
+ 	.gamma_get = intel_crtc_fb_gamma_get,
+diff --git a/drivers/gpu/drm/mgag200/mgag200_fb.c b/drivers/gpu/drm/mgag200/mgag200_fb.c
+index 13b7dd83faa9..a4319aba9180 100644
+--- a/drivers/gpu/drm/mgag200/mgag200_fb.c
++++ b/drivers/gpu/drm/mgag200/mgag200_fb.c
+@@ -272,7 +272,7 @@ static int mga_fbdev_destroy(struct drm_device *dev,
+ 	return 0;
+ }
+ 
+-static struct drm_fb_helper_funcs mga_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs mga_fb_helper_funcs = {
+ 	.gamma_set = mga_crtc_fb_gamma_set,
+ 	.gamma_get = mga_crtc_fb_gamma_get,
+ 	.fb_probe = mgag200fb_create,
+diff --git a/drivers/gpu/drm/msm/msm_fbdev.c b/drivers/gpu/drm/msm/msm_fbdev.c
+index 6c6d7d4c9b4e..841665862f2f 100644
+--- a/drivers/gpu/drm/msm/msm_fbdev.c
++++ b/drivers/gpu/drm/msm/msm_fbdev.c
+@@ -180,7 +180,7 @@ static void msm_crtc_fb_gamma_get(struct drm_crtc *crtc,
+ 	DBG("fbdev: get gamma");
+ }
+ 
+-static struct drm_fb_helper_funcs msm_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs msm_fb_helper_funcs = {
+ 	.gamma_set = msm_crtc_fb_gamma_set,
+ 	.gamma_get = msm_crtc_fb_gamma_get,
+ 	.fb_probe = msm_fbdev_create,
+diff --git a/drivers/gpu/drm/nouveau/nouveau_fbcon.c b/drivers/gpu/drm/nouveau/nouveau_fbcon.c
+index 64a42cfd3717..8e9c07b7fc89 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_fbcon.c
++++ b/drivers/gpu/drm/nouveau/nouveau_fbcon.c
+@@ -438,7 +438,7 @@ void nouveau_fbcon_gpu_lockup(struct fb_info *info)
+ 	info->flags |= FBINFO_HWACCEL_DISABLED;
+ }
+ 
+-static struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
++static const struct drm_fb_helper_funcs nouveau_fbcon_helper_funcs = {
+ 	.gamma_set = nouveau_fbcon_gamma_set,
+ 	.gamma_get = nouveau_fbcon_gamma_get,
+ 	.fb_probe = nouveau_fbcon_create,
+diff --git a/drivers/gpu/drm/omapdrm/omap_fbdev.c b/drivers/gpu/drm/omapdrm/omap_fbdev.c
+index 1388ca7f87e8..4cb12083eb12 100644
+--- a/drivers/gpu/drm/omapdrm/omap_fbdev.c
++++ b/drivers/gpu/drm/omapdrm/omap_fbdev.c
+@@ -281,7 +281,7 @@ fail:
+ 	return ret;
+ }
+ 
+-static struct drm_fb_helper_funcs omap_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs omap_fb_helper_funcs = {
+ 	.fb_probe = omap_fbdev_create,
+ };
+ 
+diff --git a/drivers/gpu/drm/qxl/qxl_fb.c b/drivers/gpu/drm/qxl/qxl_fb.c
+index f437b30ce689..cf89614c72be 100644
+--- a/drivers/gpu/drm/qxl/qxl_fb.c
++++ b/drivers/gpu/drm/qxl/qxl_fb.c
+@@ -660,7 +660,7 @@ static int qxl_fbdev_destroy(struct drm_device *dev, struct qxl_fbdev *qfbdev)
+ 	return 0;
+ }
+ 
+-static struct drm_fb_helper_funcs qxl_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs qxl_fb_helper_funcs = {
+ 	.fb_probe = qxl_fb_find_or_create_single,
+ };
+ 
+diff --git a/drivers/gpu/drm/radeon/radeon_fb.c b/drivers/gpu/drm/radeon/radeon_fb.c
+index 665ced3b7313..ad97afdbc4c7 100644
+--- a/drivers/gpu/drm/radeon/radeon_fb.c
++++ b/drivers/gpu/drm/radeon/radeon_fb.c
+@@ -331,7 +331,7 @@ static int radeon_fbdev_destroy(struct drm_device *dev, struct radeon_fbdev *rfb
+ 	return 0;
+ }
+ 
+-static struct drm_fb_helper_funcs radeon_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs radeon_fb_helper_funcs = {
+ 	.gamma_set = radeon_crtc_fb_gamma_set,
+ 	.gamma_get = radeon_crtc_fb_gamma_get,
+ 	.fb_probe = radeonfb_create,
+diff --git a/drivers/gpu/drm/tegra/fb.c b/drivers/gpu/drm/tegra/fb.c
+index f7fca09d4921..75bed72a9755 100644
+--- a/drivers/gpu/drm/tegra/fb.c
++++ b/drivers/gpu/drm/tegra/fb.c
+@@ -267,7 +267,7 @@ release:
+ 	return err;
+ }
+ 
+-static struct drm_fb_helper_funcs tegra_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs tegra_fb_helper_funcs = {
+ 	.fb_probe = tegra_fbdev_probe,
+ };
+ 
+diff --git a/drivers/gpu/drm/udl/udl_fb.c b/drivers/gpu/drm/udl/udl_fb.c
+index 377176372da8..0647c8cc368b 100644
+--- a/drivers/gpu/drm/udl/udl_fb.c
++++ b/drivers/gpu/drm/udl/udl_fb.c
+@@ -550,7 +550,7 @@ out:
+ 	return ret;
+ }
+ 
+-static struct drm_fb_helper_funcs udl_fb_helper_funcs = {
++static const struct drm_fb_helper_funcs udl_fb_helper_funcs = {
+ 	.fb_probe = udlfb_create,
+ };
+ 
+diff --git a/include/drm/drm_fb_helper.h b/include/drm/drm_fb_helper.h
+index 6e622f7d481d..e8c8eeb3a253 100644
+--- a/include/drm/drm_fb_helper.h
++++ b/include/drm/drm_fb_helper.h
+@@ -87,7 +87,7 @@ struct drm_fb_helper {
+ 	struct drm_fb_helper_crtc *crtc_info;
+ 	int connector_count;
+ 	struct drm_fb_helper_connector **connector_info;
+-	struct drm_fb_helper_funcs *funcs;
++	const struct drm_fb_helper_funcs *funcs;
+ 	struct fb_info *fbdev;
+ 	u32 pseudo_palette[17];
+ 	struct list_head kernel_fb_list;
 -- 
 1.9.2
