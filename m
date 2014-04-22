@@ -1,249 +1,87 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 22 Apr 2014 22:56:51 +0200
-Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
-In-Reply-To: <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140422205651.GB25453@lunn.ch>
+Date: Tue, 22 Apr 2014 22:58:22 +0200
+Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
+In-Reply-To: <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
+ <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20140422205822.GC25453@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 05:38:20PM +0200, Antoine T?nart wrote:
-> Add support for the Berlin SoCs AHCI SATA controller allowing to
-> interface with devices like external hard drives.
+On Tue, Apr 22, 2014 at 02:41:16PM -0500, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
 > 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+> Multi-platform support implies all these options are already selected and
+> individual platforms don't need to select them.
+
+Hi Rob
+
+Does this break mvebu_v7_defconfig?
+
+     Andrew
+
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 > ---
->  drivers/ata/Kconfig       |   9 +++
->  drivers/ata/Makefile      |   1 +
->  drivers/ata/ahci_berlin.c | 175 ++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 185 insertions(+)
->  create mode 100644 drivers/ata/ahci_berlin.c
+>  arch/arm/mach-mvebu/Kconfig | 6 ------
+>  1 file changed, 6 deletions(-)
 > 
-> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> index 20e03a7eb8b4..c985dfcd5a6c 100644
-> --- a/drivers/ata/Kconfig
-> +++ b/drivers/ata/Kconfig
-> @@ -97,6 +97,15 @@ config SATA_AHCI_PLATFORM
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 3f73eec..bfc5af1 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -3,7 +3,6 @@ config ARCH_MVEBU
+>  	select ARCH_SUPPORTS_BIG_ENDIAN
+>  	select CLKSRC_MMIO
+>  	select GENERIC_IRQ_CHIP
+> -	select IRQ_DOMAIN
+>  	select PINCTRL
+>  	select PLAT_ORION
+>  	select MVEBU_MBUS
+> @@ -11,7 +10,6 @@ config ARCH_MVEBU
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select MIGHT_HAVE_PCI
+>  	select PCI_QUIRKS if PCI
+> -	select OF_ADDRESS_PCI
 >  
->  	  If unsure, say N.
+>  if ARCH_MVEBU
 >  
-> +config AHCI_BERLIN
-> +	tristate "Marvell Berlin AHCI SATA support"
-> +	depends on ARCH_BERLIN
-> +	help
-> +	  This option enables support for the Marvell Berlin SoC's
-> +	  onboard AHCI SATA.
-> +
-> +	  If unsure, say N.
-> +
->  config AHCI_DA850
->  	tristate "DaVinci DA850 AHCI SATA support"
->  	depends on ARCH_DAVINCI_DA850
-> diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
-> index 44c8016e565c..7fb78d1e0a44 100644
-> --- a/drivers/ata/Makefile
-> +++ b/drivers/ata/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_SATA_INIC162X)	+= sata_inic162x.o
->  obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
->  obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
->  obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
-> +obj-$(CONFIG_AHCI_BERLIN)	+= ahci_berlin.o libahci.o libahci_platform.o
->  obj-$(CONFIG_AHCI_DA850)	+= ahci_da850.o libahci.o libahci_platform.o
->  obj-$(CONFIG_AHCI_IMX)		+= ahci_imx.o libahci.o libahci_platform.o
->  obj-$(CONFIG_AHCI_SUNXI)	+= ahci_sunxi.o libahci.o libahci_platform.o
-> diff --git a/drivers/ata/ahci_berlin.c b/drivers/ata/ahci_berlin.c
-> new file mode 100644
-> index 000000000000..cf1c9d3b9d18
-> --- /dev/null
-> +++ b/drivers/ata/ahci_berlin.c
-> @@ -0,0 +1,175 @@
-> +/*
-> + * Marvell Berlin AHCI SATA platform driver
-> + *
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine T?nart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/ahci_platform.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include "ahci.h"
-> +
-> +#define PORT_VSR_ADDR		0x78
-> +#define PORT_VSR_DATA		0x7C
-> +#define HOST_VSA_ADDR		0xA0
-> +#define HOST_VSA_DATA		0xA4
-> +
-> +static inline void ahci_berlin_reg_setbits(void __iomem *reg, u32 val)
-> +{
-> +	u32 regval;
-> +
-> +	regval = readl(reg);
-> +	regval |= val;
-> +	writel(regval, reg);
-> +}
-> +
-> +static inline void ahci_berlin_reg_set(void __iomem *reg, u32 val)
-> +{
-> +	writel(val, reg);
-> +}
-> +
-> +static inline void ahci_berlin_reg_clear_set(void __iomem *reg, u32 clear_val,
-> +					     u32 set_val)
-> +{
-> +	u32 regval;
-> +
-> +	regval = readl(reg);
-> +	regval &= ~(clear_val);
-> +	regval |= set_val;
-> +	writel(regval, reg);
-> +}
-> +
-> +static void ahci_berlin_init(void __iomem *mmio)
-> +{
-> +	/* interface select */
-> +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, BIT(2));
-> +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR,
-> +			    BIT(21) | BIT(18) | BIT(5) | BIT(4) | BIT(2));
-> +
-> +}
-> +
-> +static void ahci_berlin_port_init(void __iomem *mmio, unsigned int ports)
-> +{
-> +	int p;
-> +
-> +	/* power down pll */
-> +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, 0x0);
-> +	ahci_berlin_reg_setbits(mmio + HOST_VSA_DATA, BIT(6));
-> +
-> +	for (p = 0; p < ports; p++) {
-> +		/* port control register */
-> +		void __iomem *ctrl_reg = mmio + 0x100 + (p * 0x80);
-> +
-> +		/* set PHY mode to SATA, ref freq to 25 MHz */
-> +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, 0x201);
-> +		ahci_berlin_reg_clear_set(ctrl_reg + PORT_VSR_DATA,
-> +					  0xff, BIT(0));
-> +
-> +		/* set PHY up to 6 Gbps */
-> +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, 0x225);
-> +		ahci_berlin_reg_clear_set(ctrl_reg + PORT_VSR_DATA,
-> +					  BIT(11) | BIT(10), BIT(11));
-
-Why clear bit 11, if you are going to set it?
-
-Could you also document all these bits, rather than use black
-magic?
-
-	Thanks
-		Andrew
-
-> +
-> +		/* set SEL_BITS to 40 bit */
-> +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, 0x223);
-> +		ahci_berlin_reg_clear_set(ctrl_reg + PORT_VSR_DATA,
-> +					  BIT(11) | BIT(10), BIT(11));
-> +
-> +		/* use max pll rate */
-> +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, 0x202);
-> +		ahci_berlin_reg_setbits(ctrl_reg + PORT_VSR_DATA, BIT(12));
-> +
-> +		/* CT timing fix */
-> +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, BIT(6) | BIT(1));
-> +		ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR,
-> +				    BIT(15) | BIT(13) | BIT(12) | BIT(11) |
-> +				    BIT(10) | BIT(2) | BIT(1));
-> +
-> +		/* set the controller speed */
-> +		ahci_berlin_reg_set(ctrl_reg + PORT_SCR_CTL,
-> +				    BIT(6) | BIT(5) | BIT(0));
-> +	}
-> +
-> +	/* power up pll */
-> +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, 0x0);
-> +	ahci_berlin_reg_clear_set(mmio + HOST_VSA_DATA, BIT(6), 0x0);
-> +}
-> +
-> +static const struct ata_port_info ahci_berlin_port_info = {
-> +	.flags		= AHCI_FLAG_COMMON | ATA_FLAG_NCQ,
-> +	.pio_mask	= ATA_PIO4,
-> +	.udma_mask	= ATA_UDMA6,
-> +	.port_ops	= &ahci_platform_ops,
-> +};
-> +
-> +static int ahci_berlin_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	struct ahci_host_priv *hpriv;
-> +	int ret, nports, force_map = 0;
-> +
-> +	hpriv = ahci_platform_get_resources(pdev);
-> +	if (IS_ERR(hpriv)) {
-> +		dev_err(dev, "cannot get AHCI resources\n");
-> +		return PTR_ERR(hpriv);
-> +	}
-> +
-> +	ret = ahci_platform_enable_resources(hpriv);
-> +	if (ret) {
-> +		dev_err(dev, "cannot enable resources: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	nports = readl(hpriv->mmio + HOST_PORTS_IMPL);
-> +
-> +	/* force_map is modified only if the property is found */
-> +	of_property_read_u32(np, "marvell,force-port-map", &force_map);
-> +	if (force_map)
-> +		nports = force_map;
-> +
-> +	ahci_berlin_init(hpriv->mmio);
-> +	ahci_berlin_port_init(hpriv->mmio, nports);
-> +
-> +	ret = ahci_platform_init_host(pdev, hpriv, &ahci_berlin_port_info,
-> +				      force_map, 0);
-> +	if (ret) {
-> +		dev_err(dev, "host init failed: %d\n", ret);
-> +		goto disable_resources;
-> +	}
-> +
-> +	return 0;
-> +
-> +disable_resources:
-> +	ahci_platform_disable_resources(hpriv);
-> +	return ret;
-> +}
-> +
-> +static const struct of_device_id ahci_berlin_of_match[] = {
-> +	{ .compatible = "marvell,berlin-ahci" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, ahci_berlin_of_match);
-> +
-> +static struct platform_driver ahci_berlin_driver = {
-> +	.probe	= ahci_berlin_probe,
-> +	.remove	= ata_platform_remove_one,
-> +	.driver	= {
-> +		.name		= "ahci-berlin",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table = ahci_berlin_of_match,
-> +	},
-> +};
-> +module_platform_driver(ahci_berlin_driver);
-> +
-> +MODULE_DESCRIPTION("Marvell Berlin AHCI SATA driver");
-> +MODULE_AUTHOR("Antoine T?nart <antoine.tenart@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
+> @@ -38,7 +36,6 @@ config MACH_ARMADA_375
+>  	select ARM_ERRATA_753970
+>  	select ARM_GIC
+>  	select ARMADA_375_CLK
+> -	select CPU_V7
+>  	select MACH_MVEBU_V7
+>  	select PINCTRL_ARMADA_375
+>  	help
+> @@ -51,7 +48,6 @@ config MACH_ARMADA_38X
+>  	select ARM_ERRATA_753970
+>  	select ARM_GIC
+>  	select ARMADA_38X_CLK
+> -	select CPU_V7
+>  	select MACH_MVEBU_V7
+>  	select PINCTRL_ARMADA_38X
+>  	help
+> @@ -86,13 +82,11 @@ config MACH_KIRKWOOD
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CPU_FEROCEON
+>  	select KIRKWOOD_CLK
+> -	select OF_IRQ
+>  	select ORION_IRQCHIP
+>  	select ORION_TIMER
+>  	select PCI
+>  	select PCI_QUIRKS
+>  	select PINCTRL_KIRKWOOD
+> -	select USE_OF
+>  	help
+>  	  Say 'Y' here if you want your kernel to support boards based
+>  	  on the Marvell Kirkwood device tree.
 > -- 
-> 1.8.3.2
+> 1.9.1
 > 
 > 
 > _______________________________________________
