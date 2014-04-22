@@ -1,166 +1,57 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 22 Apr 2014 20:40:24 +0200
-Subject: [PATCH 3/4] ARM: dts: Typo s/interrupts-names/interrupt-names/g
-In-Reply-To: <1398192025-31523-1-git-send-email-geert+renesas@glider.be>
-References: <1398192025-31523-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1398192025-31523-3-git-send-email-geert+renesas@glider.be>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Apr 2014 20:42:29 +0200
+Subject: [PATCH] tty/serial: atmel_serial: Fix device tree documentation
+In-Reply-To: <20140415080006.GE2255@ldesroches-Latitude-E6320>
+References: <1397487482-3816-1-git-send-email-richard.genoud@gmail.com>
+ <20140414152212.GC2255@ldesroches-Latitude-E6320>
+ <534CE24F.9020703@gmail.com>
+ <20140415080006.GE2255@ldesroches-Latitude-E6320>
+Message-ID: <CACRpkdZdSCqgs7huAgp53V1T9+A_6ACgUXzCx4-nvgLP5VPxMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Benoit Cousson <bcousson@baylibre.com>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Cc: linux-omap at vger.kernel.org
-Cc: kernel at stlinux.com
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/boot/dts/am33xx.dtsi          |    4 ++--
- arch/arm/boot/dts/am4372.dtsi          |    4 ++--
- arch/arm/boot/dts/stih415-pinctrl.dtsi |   10 +++++-----
- arch/arm/boot/dts/stih416-pinctrl.dtsi |   10 +++++-----
- 4 files changed, 14 insertions(+), 14 deletions(-)
+On Tue, Apr 15, 2014 at 10:00 AM, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> On Tue, Apr 15, 2014 at 09:39:59AM +0200, Richard Genoud wrote:
+>> On 14/04/2014 17:22, Ludovic Desroches wrote:
+>> > Hi Richard,
+>> >
+>> > On Mon, Apr 14, 2014 at 04:58:02PM +0200, Richard Genoud wrote:
+>> >> RTS pin is an active low pin.
+>> >> For now, this doesn't change anything as the ACTIVE_LOW flag is not
+>> >> handled in atmel_serial, but it will be in 3.16.
+>> >>
+>> >> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>> >> ---
+>> >>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
+>> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>> >> index 17c1042b2df8..2f7aad71b3c9 100644
+>> >> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>> >> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+>> >> @@ -35,7 +35,7 @@ Example:
+>> >>            clock-names = "usart";
+>> >>            atmel,use-dma-rx;
+>> >>            atmel,use-dma-tx;
+>> >> -          rts-gpios = <&pioD 15 0>;
+>> >> +          rts-gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
+>> >
+>> > I was told we should not use macros here. If it is still the truth:
+>> >
+>> > rts-gpios = <&pioD 15 1>;
+>>
+>> But I'd really like to know if macros are forbidden in DT documentation and why...
+>> Because, IMHO, <&pioD 15 1> talks less that <&pioD 15 GPIO_ACTIVE_LOW>.
+>> Which is a shame in a documentation.
+>
+> I don't remember who told me that but the reason was that device tree
+> should not depend on Linux and macros are relative to Linux.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 07f283c20eb1..cb6811e5ae5a 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -802,7 +802,7 @@
- 			      <0x46000000 0x400000>;
- 			reg-names = "mpu", "dat";
- 			interrupts = <80>, <81>;
--			interrupts-names = "tx", "rx";
-+			interrupt-names = "tx", "rx";
- 			status = "disabled";
- 			dmas = <&edma 8>,
- 				<&edma 9>;
-@@ -816,7 +816,7 @@
- 			      <0x46400000 0x400000>;
- 			reg-names = "mpu", "dat";
- 			interrupts = <82>, <83>;
--			interrupts-names = "tx", "rx";
-+			interrupt-names = "tx", "rx";
- 			status = "disabled";
- 			dmas = <&edma 10>,
- 				<&edma 11>;
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 36d523a26831..d1f8707ff1df 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -691,7 +691,7 @@
- 			      <0x46000000 0x400000>;
- 			reg-names = "mpu", "dat";
- 			interrupts = <80>, <81>;
--			interrupts-names = "tx", "rx";
-+			interrupt-names = "tx", "rx";
- 			status = "disabled";
- 			dmas = <&edma 8>,
- 			       <&edma 9>;
-@@ -705,7 +705,7 @@
- 			      <0x46400000 0x400000>;
- 			reg-names = "mpu", "dat";
- 			interrupts = <82>, <83>;
--			interrupts-names = "tx", "rx";
-+			interrupt-names = "tx", "rx";
- 			status = "disabled";
- 			dmas = <&edma 10>,
- 			       <&edma 11>;
-diff --git a/arch/arm/boot/dts/stih415-pinctrl.dtsi b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-index f09fb10a3791..81df870e5ee6 100644
---- a/arch/arm/boot/dts/stih415-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih415-pinctrl.dtsi
-@@ -49,7 +49,7 @@
- 			reg 		= <0xfe61f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges 		= <0 0xfe610000 0x5000>;
- 
- 			PIO0: gpio at fe610000 {
-@@ -187,7 +187,7 @@
- 			reg 		= <0xfee0f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 181 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges		= <0 0xfee00000 0x8000>;
- 
- 			PIO5: gpio at fee00000 {
-@@ -282,7 +282,7 @@
- 			reg 		= <0xfe82f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges		= <0 0xfe820000 0x8000>;
- 
- 			PIO13: gpio at fe820000 {
-@@ -423,7 +423,7 @@
- 			reg 		= <0xfd6bf080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges		= <0 0xfd6b0000 0x3000>;
- 
- 			PIO100: gpio at fd6b0000 {
-@@ -460,7 +460,7 @@
- 			reg 		= <0xfd33f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges		= <0 0xfd330000 0x5000>;
- 
- 			PIO103: gpio at fd330000 {
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index aeea304086eb..250d5ecc951e 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -53,7 +53,7 @@
- 			reg 		= <0xfe61f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges		= <0 0xfe610000 0x6000>;
- 
- 			PIO0: gpio at fe610000 {
-@@ -201,7 +201,7 @@
- 			reg 		= <0xfee0f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges		= <0 0xfee00000 0x10000>;
- 
- 			PIO5: gpio at fee00000 {
-@@ -333,7 +333,7 @@
- 			reg 		= <0xfe82f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges 		= <0 0xfe820000 0x6000>;
- 
- 			PIO13: gpio at fe820000 {
-@@ -461,7 +461,7 @@
- 			reg 		= <0xfd6bf080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges		= <0 0xfd6b0000 0x3000>;
- 
- 			PIO100: gpio at fd6b0000 {
-@@ -498,7 +498,7 @@
- 			reg 		= <0xfd33f080 0x4>;
- 			reg-names	= "irqmux";
- 			interrupts 	= <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
--			interrupts-names = "irqmux";
-+			interrupt-names	= "irqmux";
- 			ranges			= <0 0xfd330000 0x5000>;
- 
- 			PIO103: gpio at fd330000 {
--- 
-1.7.9.5
+These macros are not Linux-specific.
+
+They come from include/dt-bindings/* which is part of the OS-neutral
+bindings, just in a machine-readable form.
+
+Yours,
+Linus Walleij
