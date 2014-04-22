@@ -1,25 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Apr 2014 15:40:34 +0200
-Subject: [PATCH v2 2/5] pinctrl: pfc: r8a7790: add mux data for IIC(B)
- cores
-In-Reply-To: <1395773789-17249-3-git-send-email-wsa@the-dreams.de>
-References: <1395773789-17249-1-git-send-email-wsa@the-dreams.de>
- <1395773789-17249-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <CACRpkdYO_okYZmnY2x0L1iLGnpPC6WdjzEFJzaVDG7K1_rwE-A@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 22 Apr 2014 15:41:11 +0200
+Subject: [PATCH v3 2/3] dma: Add Xilinx Video DMA DT Binding Documentation
+In-Reply-To: <CAL_Jsq+FZt5yLwePEwiAHoACM1S2rE3Yi0302LwRHWdn-pcnFQ@mail.gmail.com>
+References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+ <1392465619-27614-3-git-send-email-sthokal@xilinx.com>
+ <CAL_Jsq+FZt5yLwePEwiAHoACM1S2rE3Yi0302LwRHWdn-pcnFQ@mail.gmail.com>
+Message-ID: <53567177.6050705@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 25, 2014 at 7:56 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+On 04/22/2014 03:34 PM, Rob Herring wrote:
+> On Sat, Feb 15, 2014 at 6:00 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>> Device-tree binding documentation of Xilinx Video DMA Engine
+>>
+>> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> 
+> A few typos below, but otherwise:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-> From: Wolfram Sang <wsa@sang-engineering.com>
->
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> ---
-> Change since V1:
->
-> * renamed i2c4-7 to iic0-3
+Thanks Rob,
+Michal
 
-Patch applied with Laurent's ACK.
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Yours,
-Linus Walleij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140422/a37415b4/attachment.sig>
