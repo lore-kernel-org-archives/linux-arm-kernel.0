@@ -1,50 +1,53 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Apr 2014 21:21:18 +0100
-Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
-In-Reply-To: <1398198078-7473-1-git-send-email-broonie@kernel.org>
-References: <1398198078-7473-1-git-send-email-broonie@kernel.org>
-Message-ID: <1398198078-7473-4-git-send-email-broonie@kernel.org>
+Date: Tue, 22 Apr 2014 21:21:15 +0100
+Subject: [PATCH 1/4] arm64: topology: Initialise default topology state
+ immediately
+Message-ID: <1398198078-7473-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-Provide performance numbers to the scheduler to help it fill the cores in
-the system on big.LITTLE systems. With the current scheduler this may
-perform poorly for applications that try to do OpenMP style work over all
-cores but should help for more common workloads. The current 32 bit ARM
-implementation provides a similar estimate so this helps ensure that
-work to improve big.LITTLE systems on ARMv7 systems performs similarly
-on ARMv8 systems.
-
-The power numbers are the same as for ARMv7 since it seems that the
-expected differential between the big and little cores is very similar on
-both ARMv7 and ARMv8.  In both ARMv7 and ARMv8 cases the numbers were
-based on the published DMIPS numbers.
-
-These numbers are just an initial and basic approximation for use with
-the current scheduler, it is likely that both experience with silicon
-and ongoing work on improving the scheduler will lead to further tuning
-or will tune automatically at runtime and so make the specific choice of
-numbers here less critical.
+As a legacy of the way 32 bit ARM did things the topology code uses a null
+topology map by default and then overwrites it by mapping cores with no
+information to a cluster by themselves later. In order to make it simpler
+to reset things as part of recovering from parse failures in firmware
+information directly set this configuration on init. A core will always be
+its own sibling so there should be no risk of confusion with firmware
+provided information.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm64/kernel/topology.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/kernel/topology.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index a912f3a7c804..caf2a7cc7673 100644
+index 3e06b0be4ec8..ff662b23af5f 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -199,6 +199,8 @@ struct cpu_efficiency {
-  * use the default SCHED_POWER_SCALE value for cpu_scale.
-  */
- static const struct cpu_efficiency table_efficiency[] = {
-+	{ "arm,cortex-a57", 3891 },
-+	{ "arm,cortex-a53", 2048 },
- 	{ NULL, },
- };
+@@ -43,9 +43,6 @@ static void update_siblings_masks(unsigned int cpuid)
+ 		 * reset it to default behaviour
+ 		 */
+ 		pr_debug("CPU%u: No topology information configured\n", cpuid);
+-		cpuid_topo->core_id = 0;
+-		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
+-		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
+ 		return;
+ 	}
  
+@@ -87,9 +84,12 @@ void __init init_cpu_topology(void)
+ 		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
+ 
+ 		cpu_topo->thread_id = -1;
+-		cpu_topo->core_id =  -1;
++		cpu_topo->core_id = 0;
+ 		cpu_topo->cluster_id = -1;
++
+ 		cpumask_clear(&cpu_topo->core_sibling);
++		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
++		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
+ 	}
+ }
 -- 
 1.9.2
