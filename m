@@ -1,119 +1,184 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:32 +0200
-Subject: [PATCH v2 28/38] ARM: orion5x: convert edmini_v2 to DT pinctrl
+Date: Tue, 22 Apr 2014 23:26:27 +0200
+Subject: [PATCH v2 23/38] ARM: orion5x: switch to DT interrupts and timer
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-29-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-24-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit converts the already partially DT-converted edmini_v2
-platform to use the Device Tree for pinctrl.
+This commit switches the Orion5x platforms described through DT to use
+a DT-defined interrupt controller and timer.
+
+This involves:
+
+ * Describing in the DT the bridge interrupt controller, which is a
+   child interrupt controller to the main one, which is used for timer
+   and watchdog interrupts.
+
+ * Describing in the DT the timer.
+
+ * Adding in the DT the interrupt specifications for the watchdog.
+
+ * Selecting the ORION_IRQCHIP and ORION_TIMER drivers to be compiled.
+
+ * Change board-dt.c to no longer have an ->init_time() callback,
+   since the default callback will work fine: it calls
+   clocksource_of_init() and of_clk_init(), as needed.
+
+ * Implement a multi-IRQ handler for non-DT platforms in
+   mach-orion5x/irq.c.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 31 ++++++++++++++++++++++
- arch/arm/mach-orion5x/edmini_v2-setup.c            | 28 -------------------
- 2 files changed, 31 insertions(+), 28 deletions(-)
+ arch/arm/boot/dts/orion5x.dtsi   | 19 +++++++++++++++++++
+ arch/arm/mach-orion5x/Kconfig    |  2 ++
+ arch/arm/mach-orion5x/board-dt.c | 15 +--------------
+ arch/arm/mach-orion5x/irq.c      | 28 ++++++++++++++++++++++++++++
+ 4 files changed, 50 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-index ba43197..aa74b00 100644
---- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-+++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-@@ -32,6 +32,8 @@
+diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+index 88df8a8..b4c2234 100644
+--- a/arch/arm/boot/dts/orion5x.dtsi
++++ b/arch/arm/boot/dts/orion5x.dtsi
+@@ -78,6 +78,15 @@
+ 				status = "disabled";
+ 			};
  
- 	gpio-keys {
- 		compatible = "gpio-keys";
-+		pinctrl-0 = <&pmx_power_button>;
-+		pinctrl-names = "default";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		button at 1 {
-@@ -43,6 +45,8 @@
++			bridge_intc: bridge-interrupt-ctrl at 20110 {
++				compatible = "marvell,orion-bridge-intc";
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				reg = <0x20110 0x8>;
++				interrupts = <0>;
++				marvell,#interrupts = <4>;
++			};
++
+ 			intc: interrupt-controller at 20200 {
+ 				compatible = "marvell,orion-intc";
+ 				interrupt-controller;
+@@ -85,9 +94,19 @@
+ 				reg = <0x20200 0x08>;
+ 			};
  
- 	gpio-leds {
- 		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_power_led>;
-+		pinctrl-names = "default";
++			timer: timer at 20300 {
++				compatible = "marvell,orion-timer";
++				reg = <0x20300 0x20>;
++				interrupt-parent = <&bridge_intc>;
++				interrupts = <1>, <2>;
++				clocks = <&core_clk 0>;
++			};
++
+ 			wdt: wdt at 20300 {
+ 				compatible = "marvell,orion-wdt";
+ 				reg = <0x20300 0x28>;
++				interrupt-parent = <&bridge_intc>;
++				interrupts = <3>;
+ 				status = "okay";
+ 			};
  
- 		led at 1 {
- 			label = "power:blue";
-@@ -67,7 +71,34 @@
- 	};
+diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+index 4f51132..bd65872 100644
+--- a/arch/arm/mach-orion5x/Kconfig
++++ b/arch/arm/mach-orion5x/Kconfig
+@@ -6,6 +6,8 @@ config ARCH_ORION5X_DT
+ 	bool "Marvell Orion5x Flattened Device Tree"
+ 	select USE_OF
+ 	select ORION_CLK
++	select ORION_IRQCHIP
++	select ORION_TIMER
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell Orion5x using flattened device tree.
+diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
+index 34286ef..6dc48465 100644
+--- a/arch/arm/mach-orion5x/board-dt.c
++++ b/arch/arm/mach-orion5x/board-dt.c
+@@ -17,6 +17,7 @@
+ #include <linux/cpu.h>
+ #include <linux/mbus.h>
+ #include <linux/clk-provider.h>
++#include <linux/clocksource.h>
+ #include <asm/system_misc.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -36,17 +37,6 @@ static struct of_dev_auxdata orion5x_auxdata_lookup[] __initdata = {
+ 	{},
  };
  
-+&pinctrl {
-+	pinctrl-0 = <&pmx_rtc &pmx_power_led_ctrl>;
-+	pinctrl-names = "default";
-+
-+	pmx_power_button: pmx-power-button {
-+		marvell,pins = "mpp18";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_power_led: pmx-power-led {
-+		marvell,pins = "mpp16";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_power_led_ctrl: pmx-power-led-ctrl {
-+		marvell,pins = "mpp17";
-+		marvell,function = "gpio";
-+	};
-+
-+	pmx_rtc: pmx-rtc {
-+		marvell,pins = "mpp3";
-+		marvell,function = "gpio";
-+	};
-+};
-+
- &sata {
-+	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
-+	pinctrl-names = "default";
- 	status = "okay";
- 	nr-ports = <2>;
- };
-diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
-index f66c1b2..c50469e 100644
---- a/arch/arm/mach-orion5x/edmini_v2-setup.c
-+++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
-@@ -109,37 +109,9 @@ static struct i2c_board_info __initdata edmini_v2_i2c_rtc = {
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static unsigned int edminiv2_mpp_modes[] __initdata = {
--	MPP0_UNUSED,
--	MPP1_UNUSED,
--	MPP2_UNUSED,
--	MPP3_GPIO,	/* RTC interrupt */
--	MPP4_UNUSED,
--	MPP5_UNUSED,
--	MPP6_UNUSED,
--	MPP7_UNUSED,
--	MPP8_UNUSED,
--	MPP9_UNUSED,
--	MPP10_UNUSED,
--	MPP11_UNUSED,
--	MPP12_SATA_LED,	/* SATA 0 presence */
--	MPP13_SATA_LED,	/* SATA 1 presence */
--	MPP14_SATA_LED,	/* SATA 0 active */
--	MPP15_SATA_LED,	/* SATA 1 active */
--	/* 16: Power LED control (0 = On, 1 = Off) */
--	MPP16_GPIO,
--	/* 17: Power LED control select (0 = CPLD, 1 = GPIO16) */
--	MPP17_GPIO,
--	/* 18: Power button status (0 = Released, 1 = Pressed) */
--	MPP18_GPIO,
--	MPP19_UNUSED,
--	0,
--};
- 
- void __init edmini_v2_init(void)
- {
--	orion5x_mpp_conf(edminiv2_mpp_modes);
+-static void orion5x_dt_init_early(void)
+-{
+-	orion_time_set_base(TIMER_VIRT_BASE);
+-}
 -
+-static void orion5x_dt_init_time(void)
+-{
+-	orion5x_timer_init();
+-	of_clk_init(NULL);
+-}
+-
+ static void __init orion5x_dt_init(void)
+ {
+ 	char *dev_name;
+@@ -86,9 +76,6 @@ static const char *orion5x_dt_compat[] = {
+ DT_MACHINE_START(ORION5X_DT, "Marvell Orion5x (Flattened Device Tree)")
+ 	/* Maintainer: Thomas Petazzoni <thomas.petazzoni@free-electrons.com> */
+ 	.map_io		= orion5x_map_io,
+-	.init_early	= orion5x_dt_init_early,
+-	.init_irq	= orion_dt_init_irq,
+-	.init_time	= orion5x_dt_init_time,
+ 	.init_machine	= orion5x_dt_init,
+ 	.restart	= orion5x_restart,
+ 	.dt_compat	= orion5x_dt_compat,
+diff --git a/arch/arm/mach-orion5x/irq.c b/arch/arm/mach-orion5x/irq.c
+index 9654b0c..cd4bac4 100644
+--- a/arch/arm/mach-orion5x/irq.c
++++ b/arch/arm/mach-orion5x/irq.c
+@@ -16,6 +16,7 @@
+ #include <mach/bridge-regs.h>
+ #include <plat/orion-gpio.h>
+ #include <plat/irq.h>
++#include <asm/exception.h>
+ #include "common.h"
+ 
+ static int __initdata gpio0_irqs[4] = {
+@@ -25,10 +26,37 @@ static int __initdata gpio0_irqs[4] = {
+ 	IRQ_ORION5X_GPIO_24_31,
+ };
+ 
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++/*
++ * Compiling with both non-DT and DT support enabled, will
++ * break asm irq handler used by non-DT boards. Therefore,
++ * we provide a C-style irq handler even for non-DT boards,
++ * if MULTI_IRQ_HANDLER is set.
++ */
++
++asmlinkage void
++__exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
++{
++	u32 stat;
++
++	stat = readl_relaxed(MAIN_IRQ_CAUSE);
++	stat &= readl_relaxed(MAIN_IRQ_MASK);
++	if (stat) {
++		unsigned int hwirq = __fls(stat);
++		handle_IRQ(hwirq, regs);
++		return;
++	}
++}
++#endif
++
+ void __init orion5x_init_irq(void)
+ {
+ 	orion_irq_init(0, MAIN_IRQ_MASK);
+ 
++#ifdef CONFIG_MULTI_IRQ_HANDLER
++	set_handle_irq(orion5x_legacy_handle_irq);
++#endif
++
  	/*
- 	 * Configure peripherals.
+ 	 * Initialize gpiolib for GPIOs 0-31.
  	 */
 -- 
 1.9.2
