@@ -1,64 +1,129 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Tue, 22 Apr 2014 18:51:44 +0800
-Subject: [PATCH v1] dma: imx-sdma: add support for sdma memory copy
-In-Reply-To: <1398162484.11914.234.camel@smile.fi.intel.com>
-References: <1397728870-22086-1-git-send-email-b38343@freescale.com>
- <1397730289.11914.225.camel@smile.fi.intel.com>
- <20140418094057.GA11496@Robin-OptiPlex-780>
- <1398162484.11914.234.camel@smile.fi.intel.com>
-Message-ID: <20140422105142.GA9693@Robin-OptiPlex-780>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Apr 2014 12:45:52 +0200
+Subject: [PATCH RESEND 1/5] ARM: BCM63XX: add basic support for the
+ Broadcom BCM63138 DSL SoC
+In-Reply-To: <1398130758-19456-2-git-send-email-f.fainelli@gmail.com>
+References: <1398130758-19456-1-git-send-email-f.fainelli@gmail.com>
+ <1398130758-19456-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <7337945.Kibhmj51LR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 10:28:05AM +0000, Shevchenko, Andriy wrote:
-> On Fri, 2014-04-18 at 17:41 +0800, Robin Gong wrote:
-> > On Thu, Apr 17, 2014 at 10:24:50AM +0000, Shevchenko, Andriy wrote:
-> > > On Thu, 2014-04-17 at 18:01 +0800, Robin Gong wrote:
+On Monday 21 April 2014 18:39:14 Florian Fainelli wrote:
+> This patch adds basic support for the Broadcom BCM63138 DSL SoC which is
+> using a dual-core Cortex A9 system. Add the very minimum required code
+> boot Linux on this SoC.
 > 
-> []
-> 
-> > > > +	dev_dbg(sdma->dev, "memcpy: %x->%x, len=%d, channel=%d.\n",
-> > > 
-> > > %pad for dma_addr_t variables.
-> > >
-> > Yes, %x here is not proper, will be %#llx here to align with others similar
-> > code in this file.
-> 
-> Why %#llx? You don't need the specific casting since kernel has special
-> specifiers for phys_addr_t and dma_addr_t and their derivatives (see
-> Documentation/printk-formats.txt)
->
-I think both are ok, why I choose %llx is only for align the code style, you
-can find the same code in sdma_prep_dma_cyclic function. below description also
-copy from Documentation/printk-formats.txt:
+> Due to the two specific register address spaces located at 0x8000_0000
+> and 0xfffe_0000, we need to setup a specific iotable descriptor for
+> those to be remapped at the expected virtual addresses.
 
+What is the significance of the "expected virtual address"? All drivers
+nowadays should call ioremap() and use whatever virtual address comes
+out of that.
 
-If <type> is dependent on a config option for its size (e.g., sector_t,
-blkcnt_t, phys_addr_t, resource_size_t) or is architecture-dependent
-for its size (e.g., tcflag_t), use a format specifier of its largest
-possible type and explicitly cast to it.  Example:
+> Finally, the PL310 cache controller requires a bit of tweaking before
+> handing its initialization over l2x0_of_init(), this is also taken care
+> of to make sure that its size is properly configured.
 
-	printk("test: sector number/total blocks: %llu/%llu\n",
-		(unsigned long long)sector, (unsigned long long)blockcount);
-> > > > +		dev_dbg(sdma->dev, "entry %d: count: %d dma: 0x%08x %s%s\n",
-> > > > +				i, count, sg_src->dma_address,
-> > > 
-> > > %pad for dma_addr_t.
-> > > 
-> > Accept the idea, same as the above.
-> 
-> Same as above.
-> 
-> -- 
-> Andy Shevchenko <andriy.shevchenko@intel.com>
-> Intel Finland Oy
-> ---------------------------------------------------------------------
-> Intel Finland Oy
-> Registered Address: PL 281, 00181 Helsinki 
-> Business Identity Code: 0357606 - 4 
-> Domiciled in Helsinki 
-> 
-> This e-mail and any attachments may contain confidential material for
-> the sole use of the intended recipient(s). Any review or distribution
-> by others is strictly prohibited. If you are not the intended
-> recipient, please contact the sender and delete all copies.
+Russell has just spent a lot of work on cleaning up the l2x0 setup
+of various platforms. I really don't want to see new platform specific
+code for this.
+
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 49c914cd9c7a..26b51bcf878c 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -69,6 +69,26 @@ config ARCH_BCM_5301X
+>  	  different SoC or with the older BCM47XX and BCM53XX based
+>  	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+>  
+> +config ARCH_BCM_63XX
+> +	bool "Broadcom BCM63xx DSL SoC" if ARCH_MULTI_V7
+> +	depends on MMU
+> +	select ARM_ERRATA_754322
+> +	select ARM_ERRATA_764369 if SMP
+> +	select ARM_GIC
+> +	select ARM_GLOBAL_TIMER
+> +	select CACHE_L2X0
+> +	select COMMON_CLK
+> +	select CPU_V7
+> +	select GENERIC_CLOCKEVENTS
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select HAVE_ARM_TWD if SMP
+> +	select HAVE_ARM_SCU if SMP
+> +	select HAVE_SMP
+
+A lot of these are already selected by ARCH_MULTI_V7 and can be
+omitted here.
+
+> +#ifndef __ARM_BCM63XX_H
+> +#define __ARM_BCM63XX_H
+> +
+> +#define IO_ADDRESS(x)		(((x) & 0x00ffffff) + 0xfc000000)
+> +
+> +/* AHB register space */
+> +#define BCM63XX_AHB_PHYS	0x80001000
+> +#define BCM63XX_AHB_VIRT	IO_ADDRESS(BCM63XX_AHB_PHYS)
+> +#define BCM63XX_AHB_SIZE	0x800000
+> +
+> +/* PERIPH (legacy) register space */
+> +#define BCM63XX_PERIPH_PHYS	0xfffe8000
+> +#define BCM63XX_PERIPH_VIRT	IO_ADDRESS(BCM63XX_PERIPH_PHYS)
+> +#define BCM63XX_PERIPH_SIZE	0x10000
+
+You shouldn't need these any more. If you do, just move all of this
+into the main file, to ensure no other file accidentally relies
+on hardcoded values.
+
+Note that BCM63XX_AHB_PHYS is nor aligned, so AFAICT you don't
+actually get a huge page entry for it, and there is no point
+doing this at all, as it has neither functional nor performance
+relevance.
+
+You may have out-of-tree drivers that you haven't cleaned up
+or posted yet relying on specific static mappings, but that is
+no reason to have these mappings in the mainline kernel.
+
+> diff --git a/arch/arm/mach-bcm/board_bcm63xx.c b/arch/arm/mach-bcm/board_bcm63xx.c
+> new file mode 100644
+> index 000000000000..a779aca673c4
+> --- /dev/null
+> +++ b/arch/arm/mach-bcm/board_bcm63xx.c
+
+Maybe just "bcm63xx.c"? We don't really do "board" files any more.
+
+> +static void __init bcm63xx_l2cc_init(void)
+> +{
+> +	u32 auxctl_val = 0, auxctl_msk = ~0UL;
+> +
+> +	/* 16-way cache */
+> +	auxctl_val |= (1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT);
+> +	auxctl_msk &= ~(1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT);
+> +	/* 32 KB */
+> +	auxctl_val |= (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+> +	auxctl_msk &= ~(L2X0_AUX_CTRL_WAY_SIZE_MASK);
+> +
+> +	/*
+> +	 * Set bit 22 in the auxiliary control register. If this bit
+> +	 * is cleared, PL310 treats Normal Shared Non-cacheable
+> +	 * accesses as Cacheable no-allocate.
+> +	 */
+> +	auxctl_val |= (1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT);
+> +
+> +	/* Allow non-secure access */
+> +	auxctl_val |= (1 << L2X0_AUX_CTRL_NS_INT_CTRL_SHIFT);
+> +	/* Instruction prefetch */
+> +	auxctl_val |= (1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT);
+> +	/* Early BRESP */
+> +	auxctl_val |= (1 << L2X0_AUX_CTRL_EARLY_BRESP_SHIFT);
+> +
+> +	l2x0_of_init(auxctl_val, auxctl_msk);
+> +}
+
+What are the power-on values of bits you override here? Are you sure
+you have to force all of them?
+
+Don't we already have ways to specify the same things in DT properties?
+
+	Arnd
