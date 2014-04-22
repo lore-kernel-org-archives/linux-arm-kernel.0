@@ -1,205 +1,93 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:26 +0200
-Subject: [PATCH v2 22/38] ARM: orion: switch to a per-platform handle_irq()
- function
+Date: Tue, 22 Apr 2014 23:26:33 +0200
+Subject: [PATCH v2 29/38] ARM: orion5x: use DT to describe I2C devices on
+ edmini_v2
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-23-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-30-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving to the Device Tree implies having CONFIG_MULTI_IRQ_HANDLER
-enabled, even for non-DT platforms (if we want both DT and non-DT
-platforms to be supported in a single kernel).
-
-However, the common CONFIG_MULTI_IRQ_HANDLER handler for non-DT
-platforms in plat-orion/irq.c doesn't match the needs of
-Orion5x. Also, it doesn't make much sense for orion_irq_init() to
-register the multi-IRQ handler: orion_irq_init() is called once for
-each IRQ cause/mask tuple, while the multi-IRQ handler only needs to
-be registered once.
-
-To solve this problem, we move the multi-IRQ handle in per-platform
-code: mach-kirkwood/irq.c and mach-dove/irq.c. The Orion5x variant
-will be introduced in a followup commit. Of course, this code will
-ultimately be completely removed once all boards are converted to the
-Device Tree.
+This commit converts the already partially DT-converted edmini_v2
+platform to use the Device Tree for I2C bus and devices.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-dove/irq.c     | 36 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/irq.c | 36 +++++++++++++++++++++++++++++++++++
- arch/arm/plat-orion/irq.c    | 45 --------------------------------------------
- 3 files changed, 72 insertions(+), 45 deletions(-)
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 14 +++++++++++++
+ arch/arm/mach-orion5x/edmini_v2-setup.c            | 24 ----------------------
+ 2 files changed, 14 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-index bc4344a..4a5a7ae 100644
---- a/arch/arm/mach-dove/irq.c
-+++ b/arch/arm/mach-dove/irq.c
-@@ -108,6 +108,38 @@ static int __initdata gpio2_irqs[4] = {
- 	0,
+diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+index aa74b00..41b2ab5 100644
+--- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
++++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+@@ -10,6 +10,7 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include "orion5x-mv88f5182.dtsi"
+ 
+ / {
+@@ -63,6 +64,19 @@
+ 	};
  };
  
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+/*
-+ * Compiling with both non-DT and DT support enabled, will
-+ * break asm irq handler used by non-DT boards. Therefore,
-+ * we provide a C-style irq handler even for non-DT boards,
-+ * if MULTI_IRQ_HANDLER is set.
-+ */
++&i2c {
++	status = "okay";
++	clock-frequency = <100000>;
++	#address-cells = <1>;
 +
-+static void __iomem *dove_irq_base = IRQ_VIRT_BASE;
++	rtc at 32 {
++		compatible = "ricoh,rs5c372a";
++		reg = <0x32>;
++		interrupt-parent = <&gpio0>;
++		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
 +
-+static asmlinkage void
-+__exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
-+{
-+	u32 stat;
-+
-+	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
-+	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
-+	if (stat) {
-+		unsigned int hwirq = __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
-+	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
-+	if (stat) {
-+		unsigned int hwirq = 32 + __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+}
-+#endif
-+
- void __init dove_init_irq(void)
- {
- 	int i;
-@@ -115,6 +147,10 @@ void __init dove_init_irq(void)
- 	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
- 	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+ &mdio {
+ 	status = "okay";
  
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	set_handle_irq(dove_legacy_handle_irq);
-+#endif
-+
- 	/*
- 	 * Initialize gpiolib for GPIOs 0-71.
- 	 */
-diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
-index 2a97a2e..c9dd860 100644
---- a/arch/arm/mach-kirkwood/irq.c
-+++ b/arch/arm/mach-kirkwood/irq.c
-@@ -30,11 +30,47 @@ static int __initdata gpio1_irqs[4] = {
- 	0,
+diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
+index c50469e..75648ab 100644
+--- a/arch/arm/mach-orion5x/edmini_v2-setup.c
++++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
+@@ -96,17 +96,6 @@ static struct platform_device edmini_v2_nor_flash = {
  };
  
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+/*
-+ * Compiling with both non-DT and DT support enabled, will
-+ * break asm irq handler used by non-DT boards. Therefore,
-+ * we provide a C-style irq handler even for non-DT boards,
-+ * if MULTI_IRQ_HANDLER is set.
-+ */
-+
-+static void __iomem *kirkwood_irq_base = IRQ_VIRT_BASE;
-+
-+asmlinkage void
-+__exception_irq_entry kirkwood_legacy_handle_irq(struct pt_regs *regs)
-+{
-+	u32 stat;
-+
-+	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_LOW_OFF);
-+	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_LOW_OFF);
-+	if (stat) {
-+		unsigned int hwirq = __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+	stat = readl_relaxed(kirkwood_irq_base + IRQ_CAUSE_HIGH_OFF);
-+	stat &= readl_relaxed(kirkwood_irq_base + IRQ_MASK_HIGH_OFF);
-+	if (stat) {
-+		unsigned int hwirq = 32 + __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+}
-+#endif
-+
- void __init kirkwood_init_irq(void)
- {
- 	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
- 	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+ /*****************************************************************************
+- * RTC 5C372a on I2C bus
+- ****************************************************************************/
+-
+-#define EDMINIV2_RTC_GPIO	3
+-
+-static struct i2c_board_info __initdata edmini_v2_i2c_rtc = {
+-	I2C_BOARD_INFO("rs5c372a", 0x32),
+-	.irq = 0,
+-};
+-
+-/*****************************************************************************
+  * General Setup
+  ****************************************************************************/
  
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	set_handle_irq(kirkwood_legacy_handle_irq);
-+#endif
-+
- 	/*
- 	 * Initialize gpiolib for GPIOs 0-49.
- 	 */
-diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
-index 807df14..27ec18b 100644
---- a/arch/arm/plat-orion/irq.c
-+++ b/arch/arm/plat-orion/irq.c
-@@ -20,47 +20,6 @@
- #include <plat/orion-gpio.h>
- #include <mach/bridge-regs.h>
+@@ -125,17 +114,4 @@ void __init edmini_v2_init(void)
  
--#ifdef CONFIG_MULTI_IRQ_HANDLER
--/*
-- * Compiling with both non-DT and DT support enabled, will
-- * break asm irq handler used by non-DT boards. Therefore,
-- * we provide a C-style irq handler even for non-DT boards,
-- * if MULTI_IRQ_HANDLER is set.
-- *
-- * Notes:
-- * - this is prepared for Kirkwood and Dove only, update
-- *   accordingly if you add Orion5x or MV78x00.
-- * - Orion5x uses different macro names and has only one
-- *   set of CAUSE/MASK registers.
-- * - MV78x00 uses the same macro names but has a third
-- *   set of CAUSE/MASK registers.
-- *
-- */
+ 	pr_notice("edmini_v2: USB device port, flash write and power-off "
+ 		  "are not yet supported.\n");
 -
--static void __iomem *orion_irq_base = IRQ_VIRT_BASE;
--
--asmlinkage void
--__exception_irq_entry orion_legacy_handle_irq(struct pt_regs *regs)
--{
--	u32 stat;
--
--	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_LOW_OFF);
--	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_LOW_OFF);
--	if (stat) {
--		unsigned int hwirq = __fls(stat);
--		handle_IRQ(hwirq, regs);
--		return;
+-	/* Get RTC IRQ and register the chip */
+-	if (gpio_request(EDMINIV2_RTC_GPIO, "rtc") == 0) {
+-		if (gpio_direction_input(EDMINIV2_RTC_GPIO) == 0)
+-			edmini_v2_i2c_rtc.irq = gpio_to_irq(EDMINIV2_RTC_GPIO);
+-		else
+-			gpio_free(EDMINIV2_RTC_GPIO);
 -	}
--	stat = readl_relaxed(orion_irq_base + IRQ_CAUSE_HIGH_OFF);
--	stat &= readl_relaxed(orion_irq_base + IRQ_MASK_HIGH_OFF);
--	if (stat) {
--		unsigned int hwirq = 32 + __fls(stat);
--		handle_IRQ(hwirq, regs);
--		return;
--	}
--}
--#endif
 -
- void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
- {
- 	struct irq_chip_generic *gc;
-@@ -78,10 +37,6 @@ void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
- 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
- 	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_MASK_CACHE,
- 			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+-	if (edmini_v2_i2c_rtc.irq == 0)
+-		pr_warning("edmini_v2: failed to get RTC IRQ\n");
 -
--#ifdef CONFIG_MULTI_IRQ_HANDLER
--	set_handle_irq(orion_legacy_handle_irq);
--#endif
+-	i2c_register_board_info(0, &edmini_v2_i2c_rtc, 1);
  }
- 
- #ifdef CONFIG_OF
 -- 
 1.9.2
