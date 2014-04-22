@@ -1,89 +1,56 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 22 Apr 2014 10:43:16 +0200
-Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for	components
- tracking
-In-Reply-To: <20140418124202.GD24070@n2100.arm.linux.org.uk>
-References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
- <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
- <20140417214709.GY24070@n2100.arm.linux.org.uk> <53510C39.1020205@samsung.com>
- <20140418124202.GD24070@n2100.arm.linux.org.uk>
-Message-ID: <53562BA4.6020902@samsung.com>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Tue, 22 Apr 2014 16:48:44 +0800
+Subject: [PATCH v2] pwm: i.MX: Avoid sample fifo overflow for i.MX pwm
+ version2
+In-Reply-To: <20140413074643.GD24180@dragon>
+References: <1397121829-19331-1-git-send-email-Ying.Liu@freescale.com>
+ <20140413074643.GD24180@dragon>
+Message-ID: <53562CEC.6040902@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Hi Thierry,
 
-My answer little bit later due to Easter.
-
-On 04/18/2014 02:42 PM, Russell King - ARM Linux wrote:
-> On Fri, Apr 18, 2014 at 01:27:53PM +0200, Andrzej Hajda wrote:
->> Hi Russel,
+On 04/13/2014 03:46 PM, Shawn Guo wrote:
+> On Thu, Apr 10, 2014 at 05:23:49PM +0800, Liu Ying wrote:
+>> The i.MX pwm version2 is embedded in several i.MX SoCs, such
+>> as i.MX27, i.MX51 and i.MX6SL.  There are four 16bit sample
+>> fifos in this IP, each of which determines the duty period
+>> of a PWM waveform in one full cycle.  The IP spec mentions
+>> that we should not write a fourth sample because the fifo
+>> will become full and trigger a fifo write error(FWE) which
+>> will prevent the PWM from starting once it is enabled.  In
+>> order to avoid any sample fifo overflow issue, this patch
+>> does software reset to clear all the sample fifos in the
+>> very beginning of the pwm configuration function.
 >>
->> Thanks for comments.
+>> The fifo overflow issue can be reproduced by the following
+>> commands on the i.MX6SL evk platform, assuming we use pwm2
+>> for the debug LED which is driven by the pin HSIC_STROBE
+>> and the maximal brightness is 255.
+>> echo 0   > /sys/class/leds/user/brightness
+>> echo 0   > /sys/class/leds/user/brightness
+>> echo 0   > /sys/class/leds/user/brightness
+>> echo 0   > /sys/class/leds/user/brightness
+>> echo 255 > /sys/class/leds/user/brightness
+>> Here, FWE happens(PWMSR register reads 0x58) and the LED
+>> can not be lighten.
 >>
->> On 04/17/2014 11:47 PM, Russell King - ARM Linux wrote:
->>> On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
->>>> +out:
->>>> +	if (ret != -EPROBE_DEFER)
->>>> +		exynos_drm_dev_ready(&pdev->dev);
->>> So we end up with everyone needing a "ready" call in each sub-driver
->>> back into the main driver... this makes it impossible to write a
->>> generic subcomponent driver which is not tied in any way to the
->>> main driver.
->>>
->>> That is quite some restriction, and would prevent, for example, the
->>> TDA998x driver being used both with Armada DRM, tilcdc and any other
->>> driver.
->> As I see in armada driver drm is deferred in case tda998x is not yet
->> available. The same solution can be still used with pending_devices
->> approach - the main driver will not report its readiness until tda998x
->> is present.
->>
->> Anyway it still seems to be better than componentize every driver which can
->> probably become a part of some superdevice.
->>
->> If you want to get rid of deferred probe one can make global list of
->> 'ready' devices with notifications systems for master devices.
->>
->> Maybe it would be good to consider notification system for devices probe
->> result,
->> it will require that driver register all its interfaces in probe, ie its
->> readiness cannot
->> be reported later but will not require to add new framework. I hope just
->> extending current
->> notification system should be enough.
-> You aren't addressing my point.  If I were to convert tda998x to use
-> your infrastructure, then I would have to add in ifdefs to tie it into
-> armada DRM _and_ a different set of ifdefs to tie it into tilcdc.  Then
-> when someone else wanted to use it in their driver, they'd have to add
-> yet more ifdefs into it to tie it into their driver.
->
-> This does not scale.
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Cc: Shawn Guo <shawn.guo@freescale.com>
+> 
+> Acked-by: Shawn Guo <shawn.guo@freescale.com>
+> 
+>> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+>> Cc: linux-pwm at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> 
 
-As I already answered, you should not use 'my' framework for tda998x
-driver, you can still use current approach with deferred probe. I am not
-sure
-why have you used ifdefs in armada, tilcdc also uses tda998x and without
-ifdefs.
+I've got Shawn's ack on this patch.
+If no objections, could you take it into your PWM tree?
 
-'My' framework (I think helper library is a better name) was created to
-use with
-devices which are closely tied together by another framework - case
-of some SoC devices.
+Thanks.
 
-
->
-> So, please address my point: in your system, how can a single component
-> be shared between multiple different master drivers?
->
-
-I have answered this question above, again. But your question suggests
-you want to componentize
-also drivers which are shared by different DRMs. How do you want to do it?
-- componentize all DRM drivers sharing given driver?
-- componentize shared device in a way that it can used by
-non-componentized devices? how? I guess it
-will be possible but will have some price.
-
-Regards
-Andrzej
+-- 
+Liu Ying
