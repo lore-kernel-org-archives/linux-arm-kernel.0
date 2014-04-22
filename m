@@ -1,40 +1,30 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 22 Apr 2014 15:45:26 +0200
-Subject: [PATCH RESEND] tty/serial: atmel_serial: Fix device tree
- documentation
-In-Reply-To: <1397835904-866-1-git-send-email-richard.genoud@gmail.com>
-References: <1397835904-866-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <CACQ1gAhjrb+3Bka64QfbopvEeiU-ifm35eLYUrjwyR-3goW4QQ@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 22 Apr 2014 09:46:57 -0400
+Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
+In-Reply-To: <20140422115439.GA20669@linutronix.de>
+References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
+ <534DADF1.6060608@meduna.org>
+ <20140422115439.GA20669@linutronix.de>
+Message-ID: <20140422094657.5b6ca1e2@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-18 17:45 GMT+02:00 Richard Genoud <richard.genoud@gmail.com>:
-> RTS pin is an active low pin.
-> For now, this doesn't change anything as the ACTIVE_LOW (1) flag is not
-> handled in atmel_serial, but it will be in 3.16.
->
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> index 17c1042b2df8..0dd0a5493a54 100644
-> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-> @@ -35,7 +35,7 @@ Example:
->                 clock-names = "usart";
->                 atmel,use-dma-rx;
->                 atmel,use-dma-tx;
-> -               rts-gpios = <&pioD 15 0>;
-> +               rts-gpios = <&pioD 15 1>;
->         };
->
->  - use DMA:
+[ added Peter ]
 
-Rob,
-Does this has a chance to get to 3.15-rc3 or it's not worth it ?
-If it's not programmed for the 3.15-rc cycle, please drop it : I've
-got a patchset depending on it, and it will be in another tree.
+On Tue, 22 Apr 2014 13:54:39 +0200
+Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+ 
+> this is, erm, harmless. We grab the timer lock via trylock in hardirq
+> context. If the lock is already taken then we fail to get it we go for
+> plan B. According to lockdep a trylock should not fail on UP. This is
+> true in general except for this timer case. I was thinking abour
+> disabling this lockdep check?
 
-Richard.
+trylock not failing on UP, can that be an issue? I mean, if a hardirq
+does a trylock to see if it can grab a lock that is not protected by
+disabling irqs, and will go to plan B if it fails, on UP, it will
+always get it.  But the issue is still there. That would mean that a
+hardirq could have preempted a critical section and doing a trylock
+here would succeed when it really should have failed.
+
+-- Steve
