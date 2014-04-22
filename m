@@ -1,108 +1,120 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 22 Apr 2014 13:33:13 +0530
-Subject: [PATCH v5 0/2] Add Exynos5 USB 3.0 phy driver based on generic PHY
- framework
-Message-ID: <1398153795-28475-1-git-send-email-gautam.vivek@samsung.com>
+Date: Tue, 22 Apr 2014 13:33:15 +0530
+Subject: [PATCH v5 2/2] phy: exynos5-usbdrd: Add facility for VBUS supply
+In-Reply-To: <1398153795-28475-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398153795-28475-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1398153795-28475-3-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on 'next' branch of Kishon's phy tree (linux-phy).
-Tested on 'usb-next' of Greg's usb tree.
+Adding support to enable/disable VBUS controlled by a
+regulator, to enable vbus supply on the port.
 
-Changes from v4:
-1) Separated out the device tree related arch patches from this patch series.
-   Shall be posting these below mentioned patches (which were part of
-   V4 version of this series) in a separate patch series based on
-   Kgene's next branch.
-   [PATCH v4 2/5]dt: exynos5420: Enable support for USB 3.0 PHY controller
-   [PATCH v4 3/5]dt: exynos5420: Enable support for DWC3 controller
-   [PATCH v4 4/5]dt: exynos5250: Enable support for generic USB DRD phy
-   [PATCH v4 5/5]usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
 
-2) Also clubbed the reworked VBUS patch for usb3-drd phy, which was earlier
-   sent as a separate patch:
-   [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio on/off.
-   https://lkml.org/lkml/2014/4/9/186
+This is v2 version of patch:
+[PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio on/off
+https://lkml.org/lkml/2014/4/9/186
 
-1) Removed the mention of separate sclk_usbphy30*, instead this clock
-   will be used as 'ref' phy reference clock while adding the device
-   nodes.
-2) Reading the PHYCLKRST register to restore any previous settings,
-   instead of using a separate variable for saving/restoring purpose.
-3) Renamed 'samsung,syscon-phandle' property to 'samsung,pmu-syscon'.
-4) Removed unnecessary check for of_node property at the starting of
-   driver probe, since this is exclusively DT enabled driver.
+Changes from v1:
+ - Using regulator APIs instead of gpio to control VBUS.
 
-Changes from V3:
-1) Separated out the phy init sequences for utmi and pipe3 phys.
-2) Changed the nomenclature across the phy to 'usbdrd-phy' to
-   indicate USB 3.0 DRD PHY controller; and thereby changed the names                
-   of functions correspondingly, including specific functions for
-   utmi and pipe3 phys.                                                              
-3) Modified the DT nodes for the updated nomenclature.
-4) Using BIT macro for single bit definitions.                                       
-5) Keeping track of reference clock after getting till the removal of                
-   phy, and getting the ref clock using devm_clk_get() api.
-6) Removed aliases for mutiple channel PHYs, and instead using
-   'samsung,pmu-offset' property for PHY power control register offset.
-7) Keeping the phy_init() and phy_power_on() separately in order to
-   align with phy handling in the consumer (DWC3).
+ drivers/phy/phy-exynos5-usbdrd.c |   36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
 
-Changes from v2:
-1) Added support for multiple PHYs (UTMI+ and PIPE3) and                   
-   related changes in the driver structuring.
-2) Added a xlate function to get the required phy out of
-   number of PHYs in mutiple PHY scenerio.
-3) Changed the names of few structures and variables to                
-   have a clearer meaning. 
-4) Added 'usb3phy_config' structure to take care of mutiple
-   phys for a SoC having 'exynos5_usb3phy_drv_data' driver data.      
-5) Not deleting support for old driver 'phy-samsung-usb3' until
-   required support for generic phy is added to DWC3.  
+diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+index 89d7ae8..d7e3745 100644
+--- a/drivers/phy/phy-exynos5-usbdrd.c
++++ b/drivers/phy/phy-exynos5-usbdrd.c
+@@ -23,6 +23,7 @@
+ #include <linux/mutex.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
  
-Changes from RFC patch-set:
-1) fixes in documentation file
- - added provision for syscon interface for using PMU register.
- - added clock names and description
- - modified description style for 'compatible property'                    
- - made usb30_sclk as additional clock rather then making it optional, since
-   it is actually an additional clock for Exynos5420 Soc.
-2) fixes in phy-exynos5-usb3 driver file
- - removed unnecessary #ifndef around KHZ and MHZ definitions            
- - removed 'samsung_cpu_type', 'usb3phy_state' enums; and merged necessary
-   necessary from 'usb3phy_instance' structure to 'usb3phy_driver'.
- - changed name 'sclk_usbphy30' to 'usb30_sclk_100m' since this is the name
-   indicated as input to the PHY block; and also added (!IS_ERR()) check for
-   using usb30_sclk.
- - removed unnecessary 'state' check code.
- - moved 'of_device_id' structure definitions before 'probe()' to avoid
-   unnecessary declaration.
- - added (pdev->dev.of_node == NULL) check at the starting of probe()
- - moved 'devm_of_phy_provider_register()' call to end of the probe().
- - removed 'label' for usb3drd phy.
- - corrected macros definition 'PHYCLKRST_MPLL_MULTIPLIER_50M_REF' from
-   0x02 to 0x32 after confirming same from PHY's data sheet.
- - replaced pmu register handling, used for power-isolation, with syscon
-   interface api's.
- - added '.init' and '.exit' callbacks and using them for one time
-   PHY-initialization and deinitialization.
- - Filtering out the PHY 'power-on' and 'power-off' sequence to '.power_on"
-   and ".power_off" callbacks.
- - Removed drivers/usb/phy/phy-samsung-usb3.c driver and related code.
-3) fixes in dt files
- - added reference for 'samsung,syscon-phandle' to used for PMU register.
- - removed second register field which was earlier used for PMU.
-
-Vivek Gautam (2):
-  phy: Add new Exynos5 USB 3.0 PHY driver
-  phy: exynos5-usbdrd: Add facility for VBUS supply
-
- .../devicetree/bindings/phy/samsung-phy.txt        |   40 ++
- drivers/phy/Kconfig                                |   11 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-exynos5-usbdrd.c                   |  663 ++++++++++++++++++++
- 4 files changed, 715 insertions(+)
- create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
-
+ /* Exynos USB PHY registers */
+ #define EXYNOS5_FSEL_9MHZ6		0x0
+@@ -172,6 +173,7 @@ struct exynos5_usbdrd_phy {
+ 	unsigned int extrefclk;
+ 	struct clk *ref_clk;
+ 	unsigned long ref_rate;
++	struct regulator *vbus;
+ };
+ 
+ #define to_usbdrd_phy(inst) \
+@@ -442,6 +444,7 @@ static int exynos5_usbdrd_phy_exit(struct phy *phy)
+ 
+ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+ {
++	int ret;
+ 	struct phy_usb_instance *inst = phy_get_drvdata(phy);
+ 	struct exynos5_usbdrd_phy *phy_drd = to_usbdrd_phy(inst);
+ 
+@@ -449,10 +452,26 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+ 
+ 	clk_prepare_enable(phy_drd->ref_clk);
+ 
++	/* Enable VBUS supply */
++	if (phy_drd->vbus) {
++		ret = regulator_enable(phy_drd->vbus);
++		if (ret) {
++			dev_err(phy_drd->dev, "Failed to enable VBUS supply\n");
++			goto fail_vbus;
++		}
++	}
++
+ 	/* Power-on PHY*/
+ 	inst->phy_cfg->phy_isol(inst, 0);
+ 
+ 	return 0;
++
++fail_vbus:
++	clk_disable_unprepare(phy_drd->ref_clk);
++	if (!IS_ERR(phy_drd->usb30_sclk))
++		clk_disable_unprepare(phy_drd->usb30_sclk);
++
++	return ret;
+ }
+ 
+ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+@@ -465,6 +484,10 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+ 	/* Power-off the PHY */
+ 	inst->phy_cfg->phy_isol(inst, 1);
+ 
++	/* Disable VBUS supply */
++	if (phy_drd->vbus)
++		regulator_disable(phy_drd->vbus);
++
+ 	clk_disable_unprepare(phy_drd->ref_clk);
+ 
+ 	return 0;
+@@ -537,7 +560,7 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+ 	const struct exynos5_usbdrd_phy_drvdata *drv_data;
+ 	struct regmap *reg_pmu;
+ 	u32 pmu_offset;
+-	int i;
++	int i, ret;
+ 
+ 	phy_drd = devm_kzalloc(dev, sizeof(*phy_drd), GFP_KERNEL);
+ 	if (!phy_drd)
+@@ -580,6 +603,17 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(reg_pmu);
+ 	}
+ 
++	/* Get required GPIO for vbus */
++	phy_drd->vbus = devm_regulator_get(dev, "vbus");
++	if (IS_ERR(phy_drd->vbus)) {
++		ret = PTR_ERR(phy_drd->vbus);
++		if (ret == -EPROBE_DEFER)
++			return ret;
++
++		dev_warn(dev, "Failed to get VBUS supply regulator\n");
++		phy_drd->vbus = NULL;
++	}
++
+ 	if (of_property_read_u32(node, "samsung,pmu-offset", &pmu_offset)) {
+ 		dev_err(dev, "Missing pmu-offset for phy isolation\n");
+ 		return -EINVAL;
 -- 
 1.7.10.4
