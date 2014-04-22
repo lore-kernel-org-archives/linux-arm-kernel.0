@@ -1,29 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 22 Apr 2014 14:39:37 -0400
-Subject: [PATCH] ARM: OMAP5: Switch to THUMB mode if needed on secondary
- CPU
-In-Reply-To: <1398191506-3741-1-git-send-email-joelf@ti.com>
-References: <1398191506-3741-1-git-send-email-joelf@ti.com>
-Message-ID: <5356B769.1020306@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Apr 2014 19:38:55 +0100
+Subject: [Qemu-devel] Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <15350123.PBHzyiOlX4@wuerfel>
+References: <534D0D91.8020406@linaro.org>
+ <20140422171141.GW24070@n2100.arm.linux.org.uk>
+ <20140422175325.GD23955@obsidianresearch.com> <15350123.PBHzyiOlX4@wuerfel>
+Message-ID: <20140422183855.GZ24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014 02:31 PM, Joel Fernandes wrote:
-> On my DRA7 system, when the kernel is built in THUMB mode, the secondary CPU
-> (Cortex A15) fails to come up causing SMP boot on second CPU to timeout. This
-> seems to be because the CPU is in ARM mode once the ROM hands over control to
-> the kernel.  Switch to THUMB mode if required once the kernel is control of
-> secondary CPU. On OMAP4 on the other hand, it appears to be in THUMB mode on
-> entry so this is not required and SMP boot works as is.
-> 
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->  arch/arm/mach-omap2/omap-headsmp.S |    8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-Looks fine to me ..
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Tue, Apr 22, 2014 at 08:32:10PM +0200, Arnd Bergmann wrote:
+> @@ -1943,6 +1953,7 @@ config DEPRECATED_PARAM_STRUCT
+>  # TEXT and BSS so we preserve their values in the config files.
+>  config ZBOOT_ROM_TEXT
+>  	hex "Compressed ROM boot loader base address"
+> +	depends on BROKEN_MULTIPLATFORM
+>  	default "0"
+>  	help
+>  	  The physical address at which the ROM-able zImage is to be
+> @@ -1954,6 +1965,7 @@ config ZBOOT_ROM_TEXT
+>  
+>  config ZBOOT_ROM_BSS
+>  	hex "Compressed ROM boot loader BSS address"
+> +	depends on BROKEN_MULTIPLATFORM
+>  	default "0"
+>  	help
+>  	  The base address of an area of read/write memory in the target
+
+Please get rid of the above changes.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
