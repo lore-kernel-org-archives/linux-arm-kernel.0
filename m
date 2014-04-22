@@ -1,37 +1,73 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 22 Apr 2014 11:56:05 -0600
-Subject: Fixing PCIe issues on Armada XP
-In-Reply-To: <20140418145847.709b29ce@skate>
-References: <20140410181953.50ccfcc3@skate>
- <20140410165733.GB23104@obsidianresearch.com>
- <20140410200153.46669e0c@skate>
- <20140410201201.GA12661@obsidianresearch.com>
- <alpine.DEB.2.10.1404102206090.28003@vroombuntu>
- <20140418145847.709b29ce@skate>
-Message-ID: <20140422175605.GE23955@obsidianresearch.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 22 Apr 2014 13:58:33 -0400 (EDT)
+Subject: [PATCH] usb: ohci-exynos: Add facility to use phy provided by
+ the generic phy framework
+In-Reply-To: <1397136261-16408-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <Pine.LNX.4.44L0.1404221350300.1326-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> mvebu-pcie pcie-controller.2: PCIe0.0: performing link reset
-> mvebu-pcie pcie-controller.2: PCIe0.0: link went down after 20 tries
-> mvebu-pcie pcie-controller.2: PCIe0.0: link came back up after 100 tries
+On Thu, 10 Apr 2014, Vivek Gautam wrote:
 
-So the '100' here says the timeout expired. My first stab would be to
-set the timeout longer.. Maybe your chip takes longer to train the
-link.
+> Add support to consume phy provided by Generic phy framework.
+> Keeping the support for older usb-phy intact right now, in order
+> to prevent any functionality break in absence of relevant
+> device tree side change for ohci-exynos.
+> Once we move to new phy in the device nodes for ohci, we can
+> remove the support for older phys.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
 
-You also mentioned that setting Conf_TrainingDisable doesn't cause the
-link to go down? That would be useful to verify (in a clean
-environment without clock gating weirdness..)
+> +static int exynos_ohci_phyg_on(struct phy *phy, bool on)
+> +{
+> +	int ret = 0;
+> +
+> +	if (phy) {
+> +		if (on)
+> +			ret = phy_power_on(phy);
+> +		else
+> +			ret = phy_power_off(phy);
+> +	}
+> +
+> +	return ret;
+> +}
 
-> # /usr/sbin/lspci 
-> 00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 6710
-> 00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 6710
+This would be cleaner if you had separate routines for 
+exynos_ohci_phyg_of and exynos_ohci_phyg_off.  For example:
 
-I'm guessing:
+static int exynos_ohci_phyg_on(struct phy *phy)
+{
+	return phy ? phy_power_on(phy) : 0;
+}
 
-echo 1 > /sys/bus/pci/rescan
+> @@ -88,16 +104,49 @@ static int exynos_ohci_probe(struct platform_device *pdev)
+>  					"samsung,exynos5440-ohci"))
+>  		goto skip_phy;
+>  
+> -	phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+> -	if (IS_ERR(phy)) {
+> -		usb_put_hcd(hcd);
+> -		dev_warn(&pdev->dev, "no platform data or transceiver defined\n");
+> -		return -EPROBE_DEFER;
+> +	exynos_ohci->phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+> +	if (IS_ERR(exynos_ohci->phy)) {
+> +		err = PTR_ERR(exynos_ohci->phy);
+> +		if (err == -ENXIO || err == -ENODEV) {
+> +			exynos_ohci->phy = NULL;
+> +		} else if (err == -EPROBE_DEFER) {
+> +			usb_put_hcd(hcd);
+> +			return err;
+> +		} else {
+> +			dev_err(&pdev->dev, "no usb2 phy configured\n");
+> +			usb_put_hcd(hcd);
+> +			return err;
+> +		}
 
-Will make it appear?
+Instead of all the calls to usb_put_hcd() here and below, just goto 
+fail_clk.  Or add a new fail_phy label at the same spot and goto it.
 
-Jason
+Otherwise this looks basically okay.
+
+Alan Stern
