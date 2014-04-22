@@ -1,44 +1,97 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 22 Apr 2014 23:22:40 +0200
-Subject: [PATCH] ARM: berlin: add CPU_V7 to Marvell Armada 1500-mini
- (BG2CD)
-In-Reply-To: <CAL_JsqKvBWk3bD3=G=kY+8yitV6M7Gx=7JnwJeH=yns5dvXbnA@mail.gmail.com>
-References: <1397587699-11023-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <5356B0C2.6010708@gmail.com>
- <CAL_JsqKvBWk3bD3=G=kY+8yitV6M7Gx=7JnwJeH=yns5dvXbnA@mail.gmail.com>
-Message-ID: <5356DDA0.6060405@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 16:23:41 -0500
+Subject: [PATCH 1/3] ARM: mvebu: clean-up unneeded kconfig selects
+In-Reply-To: <20140422205822.GC25453@lunn.ch>
+References: <1398195678-28787-1-git-send-email-robherring2@gmail.com>
+ <1398195678-28787-2-git-send-email-robherring2@gmail.com>
+ <20140422205822.GC25453@lunn.ch>
+Message-ID: <CAL_JsqJnp26n-0xbkNkGY8UR8mXRuiwcout1YtnDkk_Y9WRKxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2014 08:29 PM, Rob Herring wrote:
-> On Tue, Apr 22, 2014 at 1:11 PM, Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com> wrote:
->> On 04/15/2014 08:48 PM, Sebastian Hesselbarth wrote:
->>> This selects missing CPU_V7 for ARM Cortex-A9 based Marvell Armada
->>> 1500-mini (BG2CD).
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> ---
+On Tue, Apr 22, 2014 at 3:58 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Tue, Apr 22, 2014 at 02:41:16PM -0500, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
 >>
->> Applied to berlin/soc.
+>> Multi-platform support implies all these options are already selected and
+>> individual platforms don't need to select them.
+>
+> Hi Rob
+>
+> Does this break mvebu_v7_defconfig?
+
+No, it should all be redundant selects.
+
+Rob
+
+>
+>      Andrew
+>
 >>
->>> ---
->>>  arch/arm/mach-berlin/Kconfig | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
->>> index d3c5f14dc142..0add8350faf4 100644
->>> --- a/arch/arm/mach-berlin/Kconfig
->>> +++ b/arch/arm/mach-berlin/Kconfig
->>> @@ -18,6 +18,7 @@ config MACH_BERLIN_BG2
->>>  config MACH_BERLIN_BG2CD
->>>       bool "Marvell Armada 1500-mini (BG2CD)"
->>>       select CACHE_L2X0
->>> +     select CPU_V7
-> 
-> This should not be needed. This gets selected by multi-platform with
-> ARCH_MULTI_V7.
-
-Dropped again, thanks for sending the cleanup :)
-
-Sebastian
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>>  arch/arm/mach-mvebu/Kconfig | 6 ------
+>>  1 file changed, 6 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+>> index 3f73eec..bfc5af1 100644
+>> --- a/arch/arm/mach-mvebu/Kconfig
+>> +++ b/arch/arm/mach-mvebu/Kconfig
+>> @@ -3,7 +3,6 @@ config ARCH_MVEBU
+>>       select ARCH_SUPPORTS_BIG_ENDIAN
+>>       select CLKSRC_MMIO
+>>       select GENERIC_IRQ_CHIP
+>> -     select IRQ_DOMAIN
+>>       select PINCTRL
+>>       select PLAT_ORION
+>>       select MVEBU_MBUS
+>> @@ -11,7 +10,6 @@ config ARCH_MVEBU
+>>       select ARCH_REQUIRE_GPIOLIB
+>>       select MIGHT_HAVE_PCI
+>>       select PCI_QUIRKS if PCI
+>> -     select OF_ADDRESS_PCI
+>>
+>>  if ARCH_MVEBU
+>>
+>> @@ -38,7 +36,6 @@ config MACH_ARMADA_375
+>>       select ARM_ERRATA_753970
+>>       select ARM_GIC
+>>       select ARMADA_375_CLK
+>> -     select CPU_V7
+>>       select MACH_MVEBU_V7
+>>       select PINCTRL_ARMADA_375
+>>       help
+>> @@ -51,7 +48,6 @@ config MACH_ARMADA_38X
+>>       select ARM_ERRATA_753970
+>>       select ARM_GIC
+>>       select ARMADA_38X_CLK
+>> -     select CPU_V7
+>>       select MACH_MVEBU_V7
+>>       select PINCTRL_ARMADA_38X
+>>       help
+>> @@ -86,13 +82,11 @@ config MACH_KIRKWOOD
+>>       select ARCH_REQUIRE_GPIOLIB
+>>       select CPU_FEROCEON
+>>       select KIRKWOOD_CLK
+>> -     select OF_IRQ
+>>       select ORION_IRQCHIP
+>>       select ORION_TIMER
+>>       select PCI
+>>       select PCI_QUIRKS
+>>       select PINCTRL_KIRKWOOD
+>> -     select USE_OF
+>>       help
+>>         Say 'Y' here if you want your kernel to support boards based
+>>         on the Marvell Kirkwood device tree.
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
