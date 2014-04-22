@@ -1,45 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Apr 2014 12:29:13 +0100
-Subject: [PATCH v4 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry
- macro for iteration
-In-Reply-To: <535635d0.8908b40a.6c36.ffffaaa9SMTPIN_ADDED_MISSING@mx.google.com>
-References: <535635d0.8908b40a.6c36.ffffaaa9SMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20140422112913.GB21613@lee--X1>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 22 Apr 2014 13:29:54 +0200
+Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for	components
+ tracking
+In-Reply-To: <20140418124652.GE24070@n2100.arm.linux.org.uk>
+References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
+ <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+ <20140417220412.GZ24070@n2100.arm.linux.org.uk> <5351145D.8070207@samsung.com>
+ <20140418124652.GE24070@n2100.arm.linux.org.uk>
+Message-ID: <535652B2.7000607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > The cpufreq core now supports the cpufreq_for_each_entry macro helper 
-> > > for iteration over the cpufreq_frequency_table, so use it. 
-> > > 
-> > > It should have no functional changes. 
-> >
-> > > Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr> 
-> > > --- 
-> >
-> > It would be good to have a changelog which describes the differences 
-> > between the versions, so we can keep track. 
-> >
-> > >? drivers/mfd/db8500-prcmu.c | 19 ++++++++----------- 
-> > >? 1 file changed, 8 insertions(+), 11 deletions(-) 
-> >
-> > So it looks like I already applied v2 of this patch to my tree. What 
-> > changed in v3 and v4? Should I remove that patch from MFD and apply 
-> > this one instead?
-> 
-> I'm sorry for the confusion.
-> I sent v3 only for patches 1/8 and 3/8.
-> So, I was asked by Rafael to resend the entire series as v4
-> in order to be clear which is the latest version in each patch.
-> Unfortunately, I omit the change log :(
-> 
-> The specific patch (5/8) is unchanged since v2.
-> 
-> I'm sorry for the inconvenience.
+On 04/18/2014 02:46 PM, Russell King - ARM Linux wrote:
+> On Fri, Apr 18, 2014 at 02:02:37PM +0200, Andrzej Hajda wrote:
+>> Separation of the interfaces exposed by the device from the device itself
+>> seems to me a good thing. I would even consider it as a biggest
+>> advantage of this solution :)
+>>
+>> The problem of re-initialization does not seems to be relevant here, it
+>> is classic
+>> problem of coding correctness nothing more, it can appear here and in
+>> many different
+>> places.
+> It may be a problem of coding correctless, but it's also a maintainability
+> problem too - it makes it _much_ more difficult to ensure that everything
+> is correct.
 
-That's okay, thanks for clarifying.
+But forcibly re-initializing all component devices instead of fixing bugs
+in specific drivers seems to be 'absolutely absurd' as classic says.
+>> Anyway it seems we have different point of view on the problem, your say
+>> about devices with two stage initialization. I see it more as devices
+>> registering interfaces and superdevice using it.
+> Right, so please make this exynos-specific, because from what I can see it
+> has no reason to pretend to be generic.  As I've already pointed out, it
+> can't be used in the general case because it ties sub-components directly
+> to their main driver, which is absolutely absurd.  Please keep this
+> absurdness in exynos and don't spread it around.  Thanks.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+As I wrote already, this framework was proposed for drivers which
+are tied together anyway, and this is case of many drivers, not only exynos.
+Standalone drivers were not at my sight but I have also described in
+other mail
+how the framework can be 'improved' to support standalone drivers also.
+
+Regards
+Andrzej
+
+>
