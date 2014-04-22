@@ -1,49 +1,39 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Apr 2014 14:17:30 +0200
-Subject: [PATCH v8 00/17] ARM: sunxi: Add driver for SD/MMC hosts found
- on Allwinner sunxi SoCs
-In-Reply-To: <53565B74.4000703@elopez.com.ar>
-References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
- <53565B74.4000703@elopez.com.ar>
-Message-ID: <53565DDA.9020202@redhat.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 22 Apr 2014 14:17:00 +0200
+Subject: [PATCH v4 0/6] Add STiH407 SoC and reference board support
+In-Reply-To: <CACRpkdZ7NpQBnpKLWSMST6fW9ST_tHi6L66jTQ4kh=+ONfjMgg@mail.gmail.com>
+References: <1394614210-15698-1-git-send-email-maxime.coquelin@st.com>	<CACRpkdboBkzcJC35-BNvVYmS_t9Cd204AVz4rZasKtNJp0yE4g@mail.gmail.com>	<53207CA2.4090309@st.com>
+ <CACRpkdZ7NpQBnpKLWSMST6fW9ST_tHi6L66jTQ4kh=+ONfjMgg@mail.gmail.com>
+Message-ID: <53565DBC.6040709@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd, Olof,
 
-On 04/22/2014 02:07 PM, Emilio L?pez wrote:
-> Hi Hans,
-> 
-> El 22/04/14 08:01, Hans de Goede escribi?:
->> Hi All,
+On 03/14/2014 11:14 AM, Linus Walleij wrote:
+> On Wed, Mar 12, 2014 at 4:26 PM, Maxime Coquelin <maxime.coquelin@st.com> wrote:
+>> On 03/12/2014 03:20 PM, Linus Walleij wrote:
+>
+>>> I've applied the pinctrl changes to the pinctrl tree, please push all the
+>>> DTS[i] changes through ARM SoC.
 >>
->> Here is v8 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
->> working on.
+>> As mentioned in the cover-letter, the DTS changes are based on arm_soc's
+>> for-next branch.
 >>
->> The first 2 patches are depenencies which should go in through the clk tree,
->> Mike can you pick these 2 up please ?  :
->>
->> "clk: sunxi: factors: automatic reparenting support"
->> Is uncontroversial and has been favorably reviewed by various people.
-> 
-> I'll pick this one up for 3.16 if you're ok with that. Mike, let me know if you have any objection to the patch, but I'm pretty sure you (informally?) acked it in the past.
-> 
->> "clk: sunxi: Implement MMC phase control"
->> Is somewhat more controversial as there has been lots of discussion about
->> adding a generic phase control method to the clk framework. The problem is
->> that there has been a lot of talk about such a generic phase control method
->> but not a single patch. Therefor I would like to move forwards with using
->> a platform specific method for now. I hereby promise that once we've a generic
->> method I'll write patches to convert the sunxi code to that method.
-> 
-> Mike proposed a RFC for handling this better, and there were talks with Allwinner people to see what did these phase controls actually mean. We should be able to get a proper solution for it during this cycle. I'd prefer to work towards that instead of merging this, as we have more than a month to get it ready still.
+>> Do you mean I should send a pull request for these three patches?
+>
+> You'd have to ask the ARM SoC maintainers, but if it's a few patches
+> they can also apply them directly on the target branch.
 
-A month will be gone before you know it, and merging sunxi mmc support really
-is long overdue, and is the last thing keeping distros from shipping with sunxi
-support ootb. So I would really prefer to just get this merged as is for now,
-changing it later should be easy, and merging an interim solution will make
-some more time for doing the generic clk phase control method properly.
+It looks like the get_maintainer.pl script does not give your names.
+Are DT and mach-sti patches good for you?
 
-Regards,
+If so, can I have you Ack?
 
-Hans
+Thanks,
+Maxime
+
+>
+> Yours,
+> Linus Walleij
+>
