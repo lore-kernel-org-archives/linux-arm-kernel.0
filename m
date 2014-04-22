@@ -1,115 +1,81 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 22 Apr 2014 18:09:53 +0300
-Subject: [PATCH v2 4/7] of: configure the platform device dma parameters
-In-Reply-To: <CAL_JsqJJ4Cbh5poMa-KRwy+bp_t3VtRd7bCpcWey+DZ74eYHJQ@mail.gmail.com>
-References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>	<1397917972-6293-5-git-send-email-santosh.shilimkar@ti.com>
- <CAL_JsqJJ4Cbh5poMa-KRwy+bp_t3VtRd7bCpcWey+DZ74eYHJQ@mail.gmail.com>
-Message-ID: <53568641.2020300@ti.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Tue, 22 Apr 2014 11:19:31 -0300
+Subject: [PATCH] ARM: dts: am33xx: Move the cppi41dma node so it's probed early
+Message-ID: <1398176371-26468-1-git-send-email-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+The DMA controller is needed for the USB controller to be correctly
+registered. Therefore, if the DMA node is located at the end an unecessary
+probe deferral is produced systematically.
 
-On 04/21/2014 05:58 PM, Rob Herring wrote:
-> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->> Retrieve DMA configuration from DT and setup platform device's DMA
->> parameters. The DMA configuration in DT has to be specified using
->> "dma-ranges" and "dma-coherent" properties if supported.
->>
->> We setup dma_pfn_offset using "dma-ranges" and dma_coherent_ops
->> using "dma-coherent" device tree properties.
->>
->> The set_arch_dma_coherent_ops macro has to be defined by arch if
->> it supports coherent dma_ops. Otherwise, set_arch_dma_coherent_ops() is
->> declared as nop.
->>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Grant Likely <grant.likely@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>   drivers/of/platform.c       |   43 +++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/dma-mapping.h |    7 +++++++
->>   2 files changed, 50 insertions(+)
->>
->> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->> index 573db15..7e4a43b 100644
->> --- a/drivers/of/platform.c
->> +++ b/drivers/of/platform.c
->> @@ -187,6 +187,47 @@ struct platform_device *of_device_alloc(struct device_node *np,
->>   EXPORT_SYMBOL(of_device_alloc);
->>
->>   /**
->> + * of_dma_configure - Setup DMA configuration
->> + * @dev:       Device to apply DMA configuration
->> + *
->> + * Try to get devices's DMA configuration from DT and update it
->> + * accordingly.
->> + *
->> + * In case if platform code need to use own special DMA configuration,it
->> + * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
->> + * to fix up DMA configuration.
->> + */
->> +static void of_dma_configure(struct device *dev)
->> +{
->> +       dma_addr_t dma_addr;
->> +       phys_addr_t paddr, size;
-> 
-> A problem with using dma_addr_t and phys_addr_t is that they normally
-> depend on CONFIG_LPAE, but the address cell sizes are independent of
-> that. That is why all the memory related functions stick with u64. I
-> think you would have issues here if you have a platform with sizes of
-> 4GB or more. You need to properly cap the sizes and addresses.
-> 
->> +       int ret;
->> +
->> +       /*
->> +        * if dma-coherent property exist, call arch hook to setup
->> +        * dma coherent operations.
->> +        */
->> +       if (of_dma_is_coherent(dev->of_node)) {
->> +               set_arch_dma_coherent_ops(dev);
->> +               dev_dbg(dev, "device is dma coherent\n");
->> +       }
->> +
->> +       /*
->> +        * if dma-ranges property doesn't exist - just return else
->> +        * setup the dma offset
->> +        */
->> +       ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
->> +       if (ret < 0) {
-> 
-> Perhaps an error is not the right return for the default case. The
-> default should probably be dma_addr and paddr equal to 0 and size 4GB.
+This is easily fixed by moving the node at the beggining of the child list,
+so it's probed first.
 
-The error code is needed here to properly distinguish the case when 
-there are no "dma-ranges" defined in DT. Also, I think, that 
-of_dma_get_range() shouldn't return any default values - It just
-has to get data from DT. And the caller should decide what to do
-with this data and how to handle error cases.
+Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+---
+Felipe, Sebastian:
 
-So, I prefer to keep behavior as is:
-- in case of failure of_dma_get_range() will not touch values of
-  &dma_addr, &paddr, &size.
+I cannot see why the cppi41dma node must be placed inside the
+"ti,am33xx-usb" compatible node. Tried to move it out
+so it's probed just like the edma engine, but the USB doesn't work
+properly in that case.
 
-> 
->> +               dev_dbg(dev, "no dma range information to setup\n");
->> +               return;
->> +       } else {
-> 
-> You don't need the else here.
-> 
+Can you enlighten me?
 
-[...]
+In any case, this change is good enough to remove the deferral probe.
 
-Thanks for your comments.
+Thanks!
 
-Regards,
--Grygorii
+ arch/arm/boot/dts/am33xx.dtsi | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 9770e35..c673be4 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -453,6 +453,21 @@
+ 			ti,hwmods = "usb_otg_hs";
+ 			status = "disabled";
+ 
++			cppi41dma: dma-controller at 47402000 {
++				compatible = "ti,am3359-cppi41";
++				reg =  <0x47400000 0x1000
++					0x47402000 0x1000
++					0x47403000 0x1000
++					0x47404000 0x4000>;
++				reg-names = "glue", "controller", "scheduler", "queuemgr";
++				interrupts = <17>;
++				interrupt-names = "glue";
++				#dma-cells = <2>;
++				#dma-channels = <30>;
++				#dma-requests = <256>;
++				status = "disabled";
++			};
++
+ 			usb_ctrl_mod: control at 44e10620 {
+ 				compatible = "ti,am335x-usb-ctrl-module";
+ 				reg = <0x44e10620 0x10
+@@ -556,20 +571,6 @@
+ 					"tx14", "tx15";
+ 			};
+ 
+-			cppi41dma: dma-controller@47402000 {
+-				compatible = "ti,am3359-cppi41";
+-				reg =  <0x47400000 0x1000
+-					0x47402000 0x1000
+-					0x47403000 0x1000
+-					0x47404000 0x4000>;
+-				reg-names = "glue", "controller", "scheduler", "queuemgr";
+-				interrupts = <17>;
+-				interrupt-names = "glue";
+-				#dma-cells = <2>;
+-				#dma-channels = <30>;
+-				#dma-requests = <256>;
+-				status = "disabled";
+-			};
+ 		};
+ 
+ 		epwmss0: epwmss at 48300000 {
+-- 
+1.9.1
