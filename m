@@ -1,30 +1,65 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 22 Apr 2014 09:46:57 -0400
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <20140422115439.GA20669@linutronix.de>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org>
- <20140422115439.GA20669@linutronix.de>
-Message-ID: <20140422094657.5b6ca1e2@gandalf.local.home>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 22 Apr 2014 09:49:06 -0400
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with missing
+ memory barrier
+In-Reply-To: <20140422102834.GE7484@arm.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140422102834.GE7484@arm.com>
+Message-ID: <53567352.1080306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ added Peter ]
+Hi Will,
 
-On Tue, 22 Apr 2014 13:54:39 +0200
-Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+On Tuesday 22 April 2014 06:28 AM, Will Deacon wrote:
+> Hi Santosh,
+> 
+> On Mon, Apr 21, 2014 at 07:03:10PM +0100, Santosh Shilimkar wrote:
+>> ARM coherent CPU dma map APIS are assumed to be nops on cache coherent
+>> machines. While this is true, one still needs to ensure that no
+>> outstanding writes are pending in CPU write buffers. To take care
+>> of that, we at least need a memory barrier to commit those changes
+>> to main memory.
+>>
+>> Patch is trying to fix those cases. Without such a patch, you will
+>> end up patching device drivers to avoid the synchronisation issues.
+> 
+> Don't you only need these barriers if you're passing ownership of a CPU
+> buffer to a device? In that case, I would expect a subsequent writel to tell
+> the device about the new buffer, which includes the required __iowmb().
+> That's the reason for the relaxed accessors: to avoid this barrier when it's
+> not needed. Perhaps you're using the relaxed accessors where you actually
+> need the stronger ordering guarantees?
+> 
+I kind of guessed some one will bring up above point. Infact this is how
+mostly people have been living with the issue on coherent machines. On
+Keystone too, we did explicit barriers in respective drivers.
+
+I have added these barriers only on CPU to device streaming APIs because on
+other direction, the memory is already upto date from CPU's perspective.
+
+But if you look at the actual problem, its really responsibility of
+DMA streaming APIs which we are trying to push on to drivers. A device
+driver should be independent of whether it is running on a coherent or
+a non-coherent CPU.
+
+Lets take a example....
+MMC controller driver running on a non-coherent and coherent machine.
+Driver has below code sequence which is generic.
+1. Prepare SG list
+2. Perform CMO using DMA streaming API
+3. Start DMA transfer...
+
+Step 3 expects that step 2 has done its job and buffer is
+completely in the main memory. And thats what also happens
+on non-coherent machines.
+
+Now, on coherent machines, as you mentioned, we are saying drivers
+should add a barrier because Step2 is just NOP which is not correct.
+The Step3 itself which is just suppose to start DMA doesn't need
+any barrier as such. This is the whole rationale behind the patch.
+
+Regards,
+Santosh
+
  
-> this is, erm, harmless. We grab the timer lock via trylock in hardirq
-> context. If the lock is already taken then we fail to get it we go for
-> plan B. According to lockdep a trylock should not fail on UP. This is
-> true in general except for this timer case. I was thinking abour
-> disabling this lockdep check?
-
-trylock not failing on UP, can that be an issue? I mean, if a hardirq
-does a trylock to see if it can grab a lock that is not protected by
-disabling irqs, and will go to plan B if it fails, on UP, it will
-always get it.  But the issue is still there. That would mean that a
-hardirq could have preempted a critical section and doing a trylock
-here would succeed when it really should have failed.
-
--- Steve
