@@ -1,67 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Apr 2014 16:21:52 +0100
-Subject: arm64: default dma_ops is set to coherent_dma_ops results into
- DMA FAILURE
-In-Reply-To: <20140422140413.GB10224@arm.com>
-References: <CALk7dXpKGdYd7K4M68KbBgv9a7oHWhPPLER297xFgkYnEiv8Ug@mail.gmail.com>
- <20140422132045.GB9820@arm.com> <20140422140413.GB10224@arm.com>
-Message-ID: <20140422152152.GG9820@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 10:23:20 -0500
+Subject: [PATCH v3] arm64: enable EDAC on arm64
+In-Reply-To: <20140422132624.GC9820@arm.com>
+References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
+ <20140422102455.GD7484@arm.com>
+ <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
+ <20140422132624.GC9820@arm.com>
+Message-ID: <CAL_JsqJEwUu0ooEcL+hniD8vxjBW5571ea3u3JmPN3x1MfXW3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 03:04:13PM +0100, Catalin Marinas wrote:
-> On Tue, Apr 22, 2014 at 02:20:45PM +0100, Will Deacon wrote:
-> > On Tue, Apr 22, 2014 at 01:48:12PM +0100, Ritesh Harjani wrote:
-> > > This is regarding the default dma_ops that we populate for arm64.
-> > > 
-> > > PROBLEM:
-> > > Currently in arch/arm64/mm/dma-mapping.c we set dma_ops =
-> > > &coherent_swiotlb_dma_ops.
-> > > 
-> > > The problem with this is, lets say that there is a dma device which
-> > > has not populated its dev->archdata.dma_ops, then this dma device will
-> > > get the coherent dma_ops in which we dont do any cache maintainance.
-> > > 
-> > > So, if the dma driver do kmalloc, make some changes to the buffer and
-> > > after dma_map_single gives it to the dma for the transfer, due to no
-> > > cache maintenance performed, result will be DMA transfer failed.
-> > > 
-> > > Earlier noncoherent ops code was not present at all for arm64, so may
-> > > be we were setting default ops to coherent ops. But now that we have
-> > > noncoherent ops in place shall we make the default dma_ops to
-> > > noncoherent (as what arm also does) ?
-> > 
-> > The problem with changing the default assumption to non-coherent is that
-> > existing coherent platforms that rely on the coherent DMA ops being selected
-> > without any additional DT properties (e.g. dma-coherent) will break with
-> > this change.
-> > 
-> > This puts us into a nasty situation where we have the opposite policy from
-> > arch/arm/ regarding default DMA ops, rendering device-trees potentially
-> > incompatible between the two architectures.
-> > 
-> > I'd be inclined to align the two, but it will break any users relying on the
-> > current behaviour (I believe this includes Applied with their X-gene SoC).
-> 
-> If there aren't any DMA-capable X-gene drivers in mainline yet, we could
-> make this change (probably even if they are, though we need input from
-> the Applied guys on how disruptive this is).
+On Tue, Apr 22, 2014 at 8:26 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Apr 22, 2014 at 01:54:12PM +0100, Rob Herring wrote:
+>> On Tue, Apr 22, 2014 at 5:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Apr 21, 2014 at 05:09:16PM +0100, Rob Herring wrote:
+>> >> +#ifndef ASM_EDAC_H
+>> >> +#define ASM_EDAC_H
+>> >> +/*
+>> >> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
+>> >
+>> > What do you mean by `DMA safe'? For coherent (cacheable) DMA buffers, this
+>> > should work fine, but for non-coherent (and potentially non-cacheable)
+>> > buffers, I think we'll have problems both due to the lack of guaranteed
+>> > exclusive monitor support and also eviction of dirty lines.
+>>
+>> That's just copied from other implementations. I agree you could have
+>> a problem here although I don't see why dirty line eviction would be.
+>
+> I was thinking of the case where you have an ongoing, non-coherent DMA
+> transfer from a device and then the atomic_scrub routine runs in parallel
+> on the CPU, targetting the same buffer. In this case, the stxr could store
+> stale data back to the buffer, leading to corruption (since the monitor
+> won't help). This differs from the case where the monitor could always
+> report failure for non-cacheable regions, causing atomic_scrub to livelock.
 
-I'd certainly be supportive of such a change.
+It is only reads that will trigger an error and scrubbing. If the DMA
+is continuously reading (such as a framebuffer), then there would not
+be an issue. What would be the usecase where a DMA continously writes
+to the same location without any synchronization with the cpu? I
+suppose one core could re-trigger a DMA while another core is doing
+the scrubbing. You would have to read the DMA data and be finished
+with it quicker than the scrubbing could get handled. I just wonder
+whether this is really only a theoretical problem, but not one in
+practice.
 
-> But do we have a documented way on describing which SoC is coherent? The
-> longer term plan is for a full description of the system topology but we
-> are not there yet. IIRC Santosh has been looking at this as well but I
-> haven't followed the recent developments.
-> 
-> There are some instances of "dma-coherent" properties described in
-> Documentation/devicetree/, we could use them and just need to find a way
-> in the arm64 to handle this automatically without SoC-specific
-> initialisation (and independent of the driver code).
+>> There's not really a solution other than not doing s/w scrubbing or
+>> doing it in h/w. So it is up to individual drivers to decide what to
+>> do, but we have to provide this function just to enable EDAC.
+>
+> I think we need to avoid s/w scrubbing of non-cacheable memory altogether.
 
-I think we can default to non-coherent ops without merging support for the
-"dma-coherent" properties initially. Then we can ask the Applied folks to
-get involved with Santosh's thread, which will hopefully result in something
-usable for both arm and arm64.
+There's not really a way to determine the memory attributes easily
+though. Whether it works depends on the h/w. Calxeda's memory
+controller did have an exclusive monitor so I think this would have
+worked even in the non-coherent case.
 
-Will
+What exactly is your proposal to do here? I think we should assume the
+h/w is designed correctly until we have a case that it is not.
+
+Rob
