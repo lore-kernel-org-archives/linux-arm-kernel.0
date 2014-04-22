@@ -1,51 +1,123 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 22 Apr 2014 19:22:42 +0200
-Subject: [PATCH 3/6] ARM: berlin: add the AHCI node for the BG2Q
-In-Reply-To: <20140422182802.447c2912@skate>
-References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398181105-19714-4-git-send-email-antoine.tenart@free-electrons.com>
- <20140422182802.447c2912@skate>
-Message-ID: <5356A562.2090403@gmail.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Tue, 22 Apr 2014 13:32:45 -0400
+Subject: [PATCH v6 1/3] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
+References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1397762146-8337-2-git-send-email-ashwin.chaugule@linaro.org>
+ <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
+Message-ID: <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2014 06:28 PM, Thomas Petazzoni wrote:
-> Dear Antoine T?nart,
-> 
-> On Tue, 22 Apr 2014 17:38:22 +0200, Antoine T?nart wrote:
->> The BG2Q has an AHCI SATA controller. Add the corresponding node
->> in its device tree.
-> 
-> I believe the commit log should explain why an apparently unrelated
-> generic-regs@ node gets added in this commit.
+On 21 April 2014 02:23, Anup Patel <anup.patel@linaro.org> wrote:
+> Hi Ashwin,
+>
+> Please include system reboot & shutdown implementation
+> in this patch using PSCI v0.2 SYSTEM_OFF and
+> SYSTEM_RESET functions.
 
-generic-regs@ is from another patch, please drop it entirely.
+hm, I had thought these relied on having the (optional) MIGRATE
+function. But thats not the case.
 
-Sebastian
+So, how about this..
 
->> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
->> index 07452a7483fa..8e58aae73365 100644
->> --- a/arch/arm/boot/dts/berlin2q.dtsi
->> +++ b/arch/arm/boot/dts/berlin2q.dtsi
->> @@ -183,6 +183,18 @@
->>  			};
->>  		};
->>  
->> +		ahci: sata at e90000 {
->> +			compatible = "marvell,berlin-ahci";
->> +			reg = <0xe90000 0x10000>;
->> +			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
->> +			status = "disable";
->> +		};
->> +
->> +		generic-regs at ea0110 {
->> +			compatible = "marvell,berlin-generic-regs", "syscon";
->> +			reg = <0xea0110 0x10>;
->> +		};
->> +
->>  		apb at fc0000 {
->>  			compatible = "simple-bus";
->>  			#address-cells = <1>;
-> 
-> 
-> 
+---------------------8<---------------------
+
+diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+index ead8cdb..5a54f2f 100644
+--- a/arch/arm/kernel/psci.c
++++ b/arch/arm/kernel/psci.c
+@@ -17,6 +17,8 @@
+
+ #include <linux/init.h>
+ #include <linux/of.h>
++#include <linux/reboot.h>
++#include <linux/pm.h>
+ #include <uapi/linux/psci.h>
+
+ #include <asm/compiler.h>
+@@ -24,6 +26,7 @@
+ #include <asm/opcodes-sec.h>
+ #include <asm/opcodes-virt.h>
+ #include <asm/psci.h>
++#include <asm/system_misc.h>
+
+ struct psci_operations psci_ops;
+
+@@ -196,6 +199,16 @@ static int get_set_conduit_method(struct device_node *np)
+  return 0;
+ }
+
++static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
++{
++ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
++}
++
++static void psci_sys_off(void)
++{
++ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
++}
++
+ /*
+  * PSCI Function IDs for v0.2+ are well defined so use
+  * standard values.
+@@ -249,6 +262,10 @@ static int psci_0_2_init(struct device_node *np)
+  PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+  psci_ops.migrate_info_type = psci_migrate_info_type;
+
++ arm_pm_restart = psci_sys_reset;
++
++ pm_power_off = psci_sys_off;
++
+ out_put_node:
+  of_node_put(np);
+  return err;
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index 63a7685..583b7c3 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -18,6 +18,8 @@
+ #include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/smp.h>
++#include <linux/reboot.h>
++#include <linux/pm.h>
+ #include <uapi/linux/psci.h>
+
+ #include <asm/compiler.h>
+@@ -25,6 +27,7 @@
+ #include <asm/errno.h>
+ #include <asm/psci.h>
+ #include <asm/smp_plat.h>
++#include <asm/system_misc.h>
+
+ #define PSCI_POWER_STATE_TYPE_STANDBY 0
+ #define PSCI_POWER_STATE_TYPE_POWER_DOWN 1
+@@ -217,6 +220,16 @@ static int get_set_conduit_method(struct device_node *np)
+  return 0;
+ }
+
++static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
++{
++ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
++}
++
++static void psci_sys_off(void)
++{
++ invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
++}
++
+ /*
+  * PSCI Function IDs for v0.2+ are well defined so use
+  * standard values.
+@@ -270,6 +283,10 @@ static int psci_0_2_init(struct device_node *np)
+  PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+  psci_ops.migrate_info_type = psci_migrate_info_type;
+
++ arm_pm_restart = psci_sys_reset;
++
++ pm_power_off = psci_sys_off;
++
+ out_put_node:
+  of_node_put(np);
+  return err;
