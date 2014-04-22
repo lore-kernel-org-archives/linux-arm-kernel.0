@@ -1,37 +1,25 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 22 Apr 2014 10:44:14 +0100
-Subject: Change of TEXT_OFFSET for multi_v7_defconfig
-In-Reply-To: <20140417203521.GB22411@obsidianresearch.com>
-References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
- <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
- <534EF153.5050603@codeaurora.org>
- <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
- <53501E87.6070307@codeaurora.org>
- <20140417203521.GB22411@obsidianresearch.com>
-Message-ID: <535639EE.7040102@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Apr 2014 10:44:24 +0100
+Subject: [PATCH] ARM: fix string functions on !MMU
+In-Reply-To: <1398103808-24380-1-git-send-email-rabin@rab.in>
+References: <1398103808-24380-1-git-send-email-rabin@rab.in>
+Message-ID: <20140422094424.GA6979@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/04/14 21:35, Jason Gunthorpe wrote:
->>> The above is useful for loading the raw uncompressed Image without 
->>> carrying the full ELF baggage.
->>
->> What exactly is the full ELF baggage? Aren't there existing mechanisms to omit
->> debugging symbols, for example, if size is of concern?
+On Mon, Apr 21, 2014 at 07:10:08PM +0100, Rabin Vincent wrote:
+> 8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
+> strncpy_from_user functions") apparently broken those string operations
+> for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
+> restricts the addresses to TASK_SIZE.
 > 
-> FWIW, it is a small non-intrusive change to produce ELFs with the
-> proper LMA, if it is useful for specialized tooling, here is the 3.14
-> version of the patch I created (I see it needs a bit of cleanup..)
-> You must also force PATCH_PHYS_VIRT off.
-> 
-> The ELF also has the correct entry point address, so ELF tooling can
-> just jump into it, after setting the proper register values according
-> to the boot protocol.
+> TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
+> restrict anything.
 
-That might be a useful approach for single platform kernels but I don't
-think such an approach can work for multi-arch kernels since, because
-the RAM can be located anywhere in the address map, the physical load
-address is platform dependant.
+Might be worth mentioning that this is an issue because KERNEL_DS is 0x0
+(since it's a 32-bit quantity), so checks like addr < user_addr_max() will
+fail. Anyway, the code looks fine to me:
 
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Daniel.
+Will
