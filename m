@@ -1,60 +1,58 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:25 +0200
-Subject: [PATCH v2 21/38] ARM: orion5x: convert to use 'clocks' property for
- UART controllers
+Date: Tue, 22 Apr 2014 23:26:14 +0200
+Subject: [PATCH v2 10/38] ARM: orion5x: move interrupt controller node into ocp
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-22-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until the previous commit, the Orion5x clocks were not described in
-the Device Tree. Now that they are described in the Device Tree, we
-can replace the manual 'clock-frequency' property in the UART nodes
-by a nicer 'clocks' reference in those UART nodes.
+The interrupt controller node was located outside of the ocp at f1000000
+node, which doesn't make much sense: like any other device, the
+interrupt controller has registers located in the "Internal Registers
+Window", so it is much more logical to have it under the ocp at f1000000
+node.
 
-This commit consequently removes the 'clock-frequency' property from
-the LaCie edmini_v2 board, which is at this point the only Orion5x
-board converted to the Device Tree.
+It is even more important as we are going to move Orion5x to use the
+Device Tree binding of the mvebu-mbus driver.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 1 -
- arch/arm/boot/dts/orion5x.dtsi                            | 4 ++--
- 2 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/orion5x.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-index 83f45a7..ba43197 100644
---- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-+++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-@@ -73,6 +73,5 @@
- };
- 
- &uart0 {
--	clock-frequency = <166666667>;
- 	status = "okay";
- };
 diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index ad23ff4..88df8a8 100644
+index 174d892..da57fb9 100644
 --- a/arch/arm/boot/dts/orion5x.dtsi
 +++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -65,7 +65,7 @@
- 				reg = <0x12000 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <3>;
--				/* set clock-frequency in board dts */
-+				clocks = <&core_clk 0>;
- 				status = "disabled";
- 			};
+@@ -17,13 +17,6 @@
+ 		gpio0 = &gpio0;
+ 	};
  
-@@ -74,7 +74,7 @@
- 				reg = <0x12100 0x100>;
- 				reg-shift = <2>;
- 				interrupts = <4>;
--				/* set clock-frequency in board dts */
-+				clocks = <&core_clk 0>;
- 				status = "disabled";
- 			};
+-	intc: interrupt-controller {
+-		compatible = "marvell,orion-intc";
+-		interrupt-controller;
+-		#interrupt-cells = <1>;
+-		reg = <0xf1020200 0x08>;
+-	};
+-
+ 	ocp at f1000000 {
+ 		compatible = "simple-bus";
+ 		ranges = <0x00000000 0xf1000000 0x4000000
+@@ -79,6 +72,13 @@
+ 			status = "disabled";
+ 		};
  
++		intc: interrupt-controller@20200 {
++			compatible = "marvell,orion-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			reg = <0x20200 0x08>;
++		};
++
+ 		wdt at 20300 {
+ 			compatible = "marvell,orion-wdt";
+ 			reg = <0x20300 0x28>;
 -- 
 1.9.2
