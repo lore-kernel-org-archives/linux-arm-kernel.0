@@ -1,27 +1,51 @@
-From: jogo@openwrt.org (Jonas Gorski)
-Date: Tue, 22 Apr 2014 15:49:52 +0200
-Subject: [PATCH RESEND 4/5] ARM: BCM63XX: add BCM963138DVT Reference
- platform DTS
-In-Reply-To: <1398130758-19456-5-git-send-email-f.fainelli@gmail.com>
-References: <1398130758-19456-1-git-send-email-f.fainelli@gmail.com>
- <1398130758-19456-5-git-send-email-f.fainelli@gmail.com>
-Message-ID: <CAOiHx=mxDeAE0OMOr4dWN1g3_PbwNoJ-7UJ4x6PjeOWdP_hFdA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Apr 2014 07:03:16 -0700
+Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAC458C@DBDE04.ent.ti.com>
+References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
+ <CAOCHtYg5_Lvi3SWuWaRTDDNhLJ32jiXsKYQmrsKaShVWpM+xWQ@mail.gmail.com>
+ <534D51C1.3010007@ti.com>
+ <CAOCHtYhygGFbUunY9abEkjKfpQ1hh-DfRfhm160NehSYhWJSRw@mail.gmail.com>
+ <20140418225111.GP21823@atomide.com>
+ <CAOCHtYjdC-OGkdaBt74xMqi5eDc1eVbU6O7VyWMEYN-U50-Abw@mail.gmail.com>
+ <20140418235119.GS21823@atomide.com>
+ <20980858CB6D3A4BAE95CA194937D5E73EAC458C@DBDE04.ent.ti.com>
+Message-ID: <20140422140316.GA19317@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 3:39 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Add a DTS file for the Broadcom BCM963138DVT reference platform board
-> which leverages the bcm63138.dtsi SoC DTSi file.
->
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile        |  3 +++
->  arch/arm/boot/dts/bcm63138dvt.dts | 18 ++++++++++++++++++
->  2 files changed, 21 insertions(+)
->  create mode 100644 arch/arm/boot/dts/bcm63138dvt.dts
+* Gupta, Pekon <pekon@ti.com> [140421 23:49]:
+> Tony,
+> 
+> >From: Tony Lindgren
+> >* Robert Nelson <robertcnelson@gmail.com> [140418 16:42]:
+> >> On Fri, Apr 18, 2014 at 5:51 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > * Robert Nelson <robertcnelson@gmail.com> [140415 08:46]:
+> >> >>
+> >> >> Background: i also tried getting this having this fixed in u-boot:
+> >> >
+> >> > Do we still need to apply this patch then?
+> >>
+> >> Yeah, Tom want's it done in the kernel:
+> >>
+> >> Here's my proposed u-boot patch:
+> >> http://lists.denx.de/pipermail/u-boot/2014-January/172154.html
+> >>
+> >> and Tom's recommendation:
+> >> http://lists.denx.de/pipermail/u-boot/2014-January/172274.html
+> >>
+> >> Once this hits mainline, i'll submit a patch to u-boot to check for
+> >> the presence of this version and drop to the old dtb if not found.
+> >
+> >OK applying into omap-for-v3.15/fixes thanks.
+> >
+> >Tony
+> 
+> You probably missed fixing below typo before applying this patch.
+> omap3-beagle-xm-ab.dts breaks without this.
 
-Shouldn't the file be called bcm*9*63138dvt.dts, same as the board name?
+Yeah pushed out omap-for-v3.15/fixes-v2 with the missing bracket.
 
+Regards,
 
-Regards
-Jonas
+Tony
