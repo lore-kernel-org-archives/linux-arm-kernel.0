@@ -1,60 +1,158 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 22 Apr 2014 15:04:13 +0100
-Subject: arm64: default dma_ops is set to coherent_dma_ops results into
- DMA FAILURE
-In-Reply-To: <20140422132045.GB9820@arm.com>
-References: <CALk7dXpKGdYd7K4M68KbBgv9a7oHWhPPLER297xFgkYnEiv8Ug@mail.gmail.com>
- <20140422132045.GB9820@arm.com>
-Message-ID: <20140422140413.GB10224@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 22 Apr 2014 17:56:31 +0300
+Subject: [PATCH v2 2/7] of: introduce of_dma_get_range() helper
+In-Reply-To: <CAL_Jsq+9dZiAndnbC3fZDjZWU90K4BBR=ckuDxfy5_mBcRL=nA@mail.gmail.com>
+References: <1397917972-6293-1-git-send-email-santosh.shilimkar@ti.com>	<1397917972-6293-3-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_Jsq+9dZiAndnbC3fZDjZWU90K4BBR=ckuDxfy5_mBcRL=nA@mail.gmail.com>
+Message-ID: <5356831F.40006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 02:20:45PM +0100, Will Deacon wrote:
-> On Tue, Apr 22, 2014 at 01:48:12PM +0100, Ritesh Harjani wrote:
-> > This is regarding the default dma_ops that we populate for arm64.
-> > 
-> > PROBLEM:
-> > Currently in arch/arm64/mm/dma-mapping.c we set dma_ops =
-> > &coherent_swiotlb_dma_ops.
-> > 
-> > The problem with this is, lets say that there is a dma device which
-> > has not populated its dev->archdata.dma_ops, then this dma device will
-> > get the coherent dma_ops in which we dont do any cache maintainance.
-> > 
-> > So, if the dma driver do kmalloc, make some changes to the buffer and
-> > after dma_map_single gives it to the dma for the transfer, due to no
-> > cache maintenance performed, result will be DMA transfer failed.
-> > 
-> > Earlier noncoherent ops code was not present at all for arm64, so may
-> > be we were setting default ops to coherent ops. But now that we have
-> > noncoherent ops in place shall we make the default dma_ops to
-> > noncoherent (as what arm also does) ?
-> 
-> The problem with changing the default assumption to non-coherent is that
-> existing coherent platforms that rely on the coherent DMA ops being selected
-> without any additional DT properties (e.g. dma-coherent) will break with
-> this change.
-> 
-> This puts us into a nasty situation where we have the opposite policy from
-> arch/arm/ regarding default DMA ops, rendering device-trees potentially
-> incompatible between the two architectures.
-> 
-> I'd be inclined to align the two, but it will break any users relying on the
-> current behaviour (I believe this includes Applied with their X-gene SoC).
+Hi Rob,
 
-If there aren't any DMA-capable X-gene drivers in mainline yet, we could
-make this change (probably even if they are, though we need input from
-the Applied guys on how disruptive this is).
+On 04/21/2014 06:29 PM, Rob Herring wrote:
+> On Sat, Apr 19, 2014 at 9:32 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>>
+>> The of_dma_get_range() allows to find "dma-range" property for
+>> the specified device and parse it.
+>>   dma-ranges format:
+>>     DMA addr (dma_addr)          : naddr cells
+>>     CPU addr (phys_addr_t)       : pna cells
+>>     size                         : nsize cells
+>>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>>   drivers/of/platform.c       |   85 +++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/of_platform.h |    8 ++++
+>
+> This belongs in drivers/of/address.c and of_address.h.
+>
+>>   2 files changed, 93 insertions(+)
+>>
+>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> index 404d1da..2265a55 100644
+>> --- a/drivers/of/platform.c
+>> +++ b/drivers/of/platform.c
+>> @@ -485,4 +485,89 @@ int of_platform_populate(struct device_node *root,
+>>          return rc;
+>>   }
+>>   EXPORT_SYMBOL_GPL(of_platform_populate);
+>> +
+>> +/**
+>> + * of_dma_get_range - Get DMA range info
+>> + * @np:                device node to get DMA range info
+>> + * @dma_addr:  pointer to store initial DMA address of DMA range
+>> + * @paddr:     pointer to store initial CPU address of DMA range
+>> + * @size:      pointer to store size of DMA range
+>> + *
+>> + * Look in bottom up direction for the first "dma-range" property
+>
+> dma-ranges
+>
+>> + * and parse it.
+>> + *  dma-ranges format:
+>> + *     DMA addr (dma_addr)     : naddr cells
+>> + *     CPU addr (phys_addr_t)  : pna cells
+>> + *     size                    : nsize cells
+>> + *
+>> + * It returns -ENODEV if "dma-ranges" property was not found
+>> + * for this device in DT.
+>> + */
+>> +extern int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
+>
+> drop extern.
+>
+>> +               phys_addr_t *paddr, phys_addr_t *size)
+>> +{
+>> +       struct device_node *node = np;
+>> +       const u32 *ranges = NULL;
+>
+> __be32
+>
+>> +       int len, naddr, nsize, pna;
+>> +       int ret = 0;
+>> +
+>> +       if (!node)
+>> +               return -EINVAL;
+>> +
+>> +       while (1) {
+>> +               naddr = of_n_addr_cells(node);
+>> +               nsize = of_n_size_cells(node);
+>> +               node = of_get_next_parent(node);
+>> +               if (!node)
+>> +                       break;
+>> +
+>> +               ranges = of_get_property(node, "dma-ranges", &len);
+>> +
+>> +               /* Ignore empty ranges, they imply no translation required */
+>> +               if (ranges && len > 0)
+>> +                       break;
+>> +
+>> +               /*
+>> +                * At least empty ranges has to be defined for parent node if
+>> +                * DMA is supported
+>> +                */
+>> +               if (!ranges)
+>> +                       break;
+>
+> You need an of_node_put here if you are getting the next parent.
 
-But do we have a documented way on describing which SoC is coherent? The
-longer term plan is for a full description of the system topology but we
-are not there yet. IIRC Santosh has been looking at this as well but I
-haven't followed the recent developments.
+Seems, It's not needed, because of_get_next_parent() does following:
+	parent = of_node_get(node->parent);
+	of_node_put(node);
 
-There are some instances of "dma-coherent" properties described in
-Documentation/devicetree/, we could use them and just need to find a way
-in the arm64 to handle this automatically without SoC-specific
-initialisation (and independent of the driver code).
+>
+>> +       }
+>> +
+>> +       if (!ranges) {
+>> +               pr_debug("%s: no dma-ranges found for node(%s)\n",
+>> +                        __func__, np->full_name);
+>> +               ret = -ENODEV;
+>> +               goto out;
+>> +       }
+>> +
+>> +       len /= sizeof(u32);
+>> +
+>> +       pna = of_n_addr_cells(node);
+>> +
+>> +       /* dma-ranges format:
+>> +        * DMA addr     : naddr cells
+>> +        * CPU addr     : pna cells
+>> +        * size         : nsize cells
+>> +        */
+>> +       *dma_addr = of_read_number(ranges, naddr);
+>
+> You should set this after the following call succeeds.
+>
+>> +       *paddr = of_translate_dma_address(np, ranges);
+>
+> This is going to search for dma-ranges again, but you have already
+> done that. Is there a case that just reading the CPU addr will not
+> work? I suppose we could have more than one level of translation. It
+> also seems a bit abusive that the DMA address is the ranges property.
+> I don't really have a better suggestion though.
 
--- 
-Catalin
+I think, We need to keep using of_translate_dma_address(), because
+this code intended to be generic and, as result, there is no
+guarantee that we will always have one level of translations.
+
+>
+>> +       if (*paddr == OF_BAD_ADDR) {
+>
+> As I mentioned, this is potentially a size mismatch.
+
+Thanks for your review.
+
+Regards,
+Grygorii
