@@ -1,37 +1,34 @@
 From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Tue, 22 Apr 2014 17:38:19 +0200
-Subject: [PATCH 0/6] ARM: berlin: add AHCI support
-Message-ID: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Tue, 22 Apr 2014 17:38:21 +0200
+Subject: [PATCH 2/6] Documentation: bindings: add the berlin-achi compatible
+ to the ahci platform
+In-Reply-To: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1398181105-19714-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the support for Berlin SoCs AHCI controllers. The
-controller allows to use the SATA host interface and, for example, the
-eSATA port on the BG2Q.
+The berlin-achi driver allows Berlin SoCs to support their AHCI SATA controller.
+Add the compatible to the device tree bindings documentation.
 
-Also enable the eSATA interface on the BG2Q DMP.
+Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+---
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Tested on the BG2Q DMP.
-
-Antoine T?nart (6):
-  ata: ahci: add AHCI support for Berlin SoCs
-  Documentation: bindings: add the berlin-achi compatible to the ahci
-    platform
-  ARM: berlin: add the AHCI node for the BG2Q
-  ARM: berlin: enable the eSATA interface on the BG2Q DMP
-  ARM: berlin: add the AHCI node for the BG2
-  ARM: berlin: add the AHCI node for the BG2CD
-
- .../devicetree/bindings/ata/ahci-platform.txt      |   3 +-
- arch/arm/boot/dts/berlin2.dtsi                     |   7 +
- arch/arm/boot/dts/berlin2cd.dtsi                   |   7 +
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   5 +
- arch/arm/boot/dts/berlin2q.dtsi                    |  12 ++
- drivers/ata/Kconfig                                |   9 ++
- drivers/ata/Makefile                               |   1 +
- drivers/ata/ahci_berlin.c                          | 175 +++++++++++++++++++++
- 8 files changed, 218 insertions(+), 1 deletion(-)
- create mode 100644 drivers/ata/ahci_berlin.c
-
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 48b285ffa3a6..9987b63aaa10 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -7,7 +7,8 @@ Required properties:
+ - compatible        : compatible list, one of "snps,spear-ahci",
+                       "snps,exynos5440-ahci", "ibm,476gtr-ahci",
+                       "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
+-                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
++                      "fsl,imx6q-ahci", "snps,dwc-ahci" or
++		      "marvell,berlin-ahci"
+ - interrupts        : <interrupt mapping for SATA IRQ>
+ - reg               : <registers mapping>
+ 
 -- 
 1.8.3.2
