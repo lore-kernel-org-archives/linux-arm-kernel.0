@@ -1,72 +1,160 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:30 +0200
-Subject: [PATCH v2 26/38] ARM: orion5x: add Device Bus description at SoC level
+Date: Tue, 22 Apr 2014 23:26:35 +0200
+Subject: [PATCH v2 31/38] ARM: orion5x: use DT to describe NOR on edmini_v2
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-27-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-32-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the necessary SoC-level Device Tree definitions to
-describe the Device Bus of Orion5x SOCs. The Device Bus is mainly used
-to connect NOR flashes to the system.
+This commit converts the already partially DT-converted edmini_v2
+platform to use the Device Tree for NOR flash, using the Device Bus.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/orion5x.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 43 ++++++++++++++-
+ arch/arm/mach-orion5x/edmini_v2-setup.c            | 62 ----------------------
+ 2 files changed, 42 insertions(+), 63 deletions(-)
 
-diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index 203edde..75cd01b 100644
---- a/arch/arm/boot/dts/orion5x.dtsi
-+++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -24,6 +24,46 @@
- 		#size-cells = <1>;
- 		controller = <&mbusc>;
+diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+index f0f2bcc..1ecddbe 100644
+--- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
++++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+@@ -28,7 +28,8 @@
  
-+		devbus_bootcs: devbus-bootcs {
-+			compatible = "marvell,orion-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x1046C 0x4>;
-+			ranges = <0 MBUS_ID(0x01, 0x0f) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&core_clk 0>;
-+			status = "disabled";
-+		};
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
+-			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>;
++			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
++			 <MBUS_ID(0x01, 0x0f) 0 0xfff80000 0x80000>;
+ 	};
+ 
+ 	gpio-keys {
+@@ -56,6 +57,46 @@
+ 	};
+ };
+ 
++&devbus_bootcs {
++	status = "okay";
 +
-+		devbus_cs0: devbus-cs0 {
-+			compatible = "marvell,orion-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x1045C 0x4>;
-+			ranges = <0 MBUS_ID(0x01, 0x1e) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&core_clk 0>;
-+			status = "disabled";
-+		};
++	/* Read parameters */
++	devbus,bus-width    = <8>;
++	devbus,turn-off-ps  = <90000>;
++	devbus,badr-skew-ps = <0>;
++	devbus,acc-first-ps = <186000>;
++	devbus,acc-next-ps  = <186000>;
 +
-+		devbus_cs1: devbus-cs1 {
-+			compatible = "marvell,orion-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10460 0x4>;
-+			ranges = <0 MBUS_ID(0x01, 0x1d) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&core_clk 0>;
-+			status = "disabled";
-+		};
++	/* Write parameters */
++	devbus,wr-high-ps  = <90000>;
++	devbus,wr-low-ps   = <90000>;
++	devbus,ale-wr-ps   = <90000>;
 +
-+		devbus_cs2: devbus-cs2 {
-+			compatible = "marvell,orion-devbus";
-+			reg = <MBUS_ID(0xf0, 0x01) 0x10464 0x4>;
-+			ranges = <0 MBUS_ID(0x01, 0x1b) 0 0xffffffff>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			clocks = <&core_clk 0>;
-+			status = "disabled";
-+		};
++	/*
++	 * Currently the MTD code does not recognize the MX29LV400CBCT
++	 * as a bottom-type device. This could cause risks of
++	 * accidentally erasing critical flash sectors. We thus define
++	 * a single, write-protected partition covering the whole
++	 * flash.  TODO: once the flash part TOP/BOTTOM detection
++	 * issue is sorted out in the MTD code, break this into at
++	 * least three partitions: 'u-boot code', 'u-boot environment'
++	 * and 'whatever is left'.
++	 */
++	flash at 0 {
++		compatible = "cfi-flash";
++		reg = <0 0x80000>;
++		bank-width = <1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
 +
- 		internal-regs {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++		partition at 0 {
++			label = "Full512Kb";
++			reg = <0 0x80000>;
++			read-only;
++		};
++	};
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
+index 2eebc0c..6bef2d5 100644
+--- a/arch/arm/mach-orion5x/edmini_v2-setup.c
++++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
+@@ -42,74 +42,12 @@
+  * EDMINI_V2 Info
+  ****************************************************************************/
+ 
+-/*
+- * 512KB NOR flash Device bus boot chip select
+- */
+-
+-#define EDMINI_V2_NOR_BOOT_BASE		0xfff80000
+-#define EDMINI_V2_NOR_BOOT_SIZE		SZ_512K
+-
+-/*****************************************************************************
+- * 512KB NOR Flash on BOOT Device
+- ****************************************************************************/
+-
+-/*
+- * Currently the MTD code does not recognize the MX29LV400CBCT as a bottom
+- * -type device. This could cause risks of accidentally erasing critical
+- * flash sectors. We thus define a single, write-protected partition covering
+- * the whole flash.
+- * TODO: once the flash part TOP/BOTTOM detection issue is sorted out in the MTD
+- * code, break this into at least three partitions: 'u-boot code', 'u-boot
+- * environment' and 'whatever is left'.
+- */
+-
+-static struct mtd_partition edmini_v2_partitions[] = {
+-	{
+-		.name		= "Full512kb",
+-		.size		= 0x00080000,
+-		.offset		= 0x00000000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	},
+-};
+-
+-static struct physmap_flash_data edmini_v2_nor_flash_data = {
+-	.width		= 1,
+-	.parts		= edmini_v2_partitions,
+-	.nr_parts	= ARRAY_SIZE(edmini_v2_partitions),
+-};
+-
+-static struct resource edmini_v2_nor_flash_resource = {
+-	.flags			= IORESOURCE_MEM,
+-	.start			= EDMINI_V2_NOR_BOOT_BASE,
+-	.end			= EDMINI_V2_NOR_BOOT_BASE
+-		+ EDMINI_V2_NOR_BOOT_SIZE - 1,
+-};
+-
+-static struct platform_device edmini_v2_nor_flash = {
+-	.name			= "physmap-flash",
+-	.id			= 0,
+-	.dev		= {
+-		.platform_data	= &edmini_v2_nor_flash_data,
+-	},
+-	.num_resources		= 1,
+-	.resource		= &edmini_v2_nor_flash_resource,
+-};
+-
+ /*****************************************************************************
+  * General Setup
+  ****************************************************************************/
+ 
+ void __init edmini_v2_init(void)
+ {
+-	/*
+-	 * Configure peripherals.
+-	 */
+-	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
+-				    ORION_MBUS_DEVBUS_BOOT_ATTR,
+-				    EDMINI_V2_NOR_BOOT_BASE,
+-				    EDMINI_V2_NOR_BOOT_SIZE);
+-	platform_device_register(&edmini_v2_nor_flash);
+-
+ 	pr_notice("edmini_v2: USB device port, flash write and power-off "
+ 		  "are not yet supported.\n");
+ }
 -- 
 1.9.2
