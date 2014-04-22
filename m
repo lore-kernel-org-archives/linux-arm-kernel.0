@@ -1,69 +1,50 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Tue, 22 Apr 2014 16:01:53 +0900
-Subject: [PATCH] ARM: dts: disable MDMA1 node for smdk5420 board
-In-Reply-To: <CAHbNUh3G1NUUfAwh=B+rDwVkfsAetUpDspiPS-JbK3oYuxSd_A@mail.gmail.com>
-References: <001a01cf5b0c$5ddc7d60$19957820$%jun@samsung.com>
- <021301cf5dd1$1d0ec910$572c5b30$@samsung.com>
- <CAHbNUh3G1NUUfAwh=B+rDwVkfsAetUpDspiPS-JbK3oYuxSd_A@mail.gmail.com>
-Message-ID: <000001cf5df8$bdc6f900$3954eb00$%jun@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 22 Apr 2014 10:05:38 +0300
+Subject: [PATCH] ARM: Wire up the renameat2() syscall
+Message-ID: <1398150338-23475-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, April 22, 2014, Tushar Behera wrote:
-> On 22 April 2014 07:48, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Seungwon Jeon wrote:
-> >>
-> >
-> > + Javi Merino and Tushar Behera
-> >
-> >> This change is similar to commit 3da355c(ARM: dts: Disable MDMA1 node
-> >> for arndale-octa board). If MDMA1 region is configured with secure mode,
-> >> it makes the boot failure with the following.
-> >>
-> >> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-> >>
-> > If so, how about adding the 'disabled' status in 5420 dtsi file? Then if 'enabling' is required, we
-> can enable in each board dt file...
-> >
-> 
-> That should be okay. While at it, we can remove the node disabling
-> code from Arndale-Octa board DTS file.
+The new renameat2() system call was only wired up for ARM causing:
+ CALL    /home/ujfalusi/work/kernel/kernel.org-next-linux-next/scripts/checksyscalls.sh
+<stdin>:1232:2: warning: #warning syscall renameat2 not implemented [-Wcpp]
 
-OK, I'll consider both.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+Hi,
 
-Thanks,
-Seungwon Jeon
+I have noticed this with linux-next.
 
-> 
-> 
-> > - Kukjin
-> >
-> >> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-> >> ---
-> >>  arch/arm/boot/dts/exynos5420-smdk5420.dts |    6 ++++++
-> >>  1 files changed, 6 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> index 6910485..9a48e3f 100644
-> >> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> @@ -373,4 +373,10 @@
-> >>                       };
-> >>               };
-> >>       };
-> >> +
-> >> +     amba {
-> >> +             mdma1: mdma at 11C10000 {
-> >> +                     status = "disabled";
-> >> +             };
-> >> +     };
-> >>  };
-> >> --
-> >> 1.7.0.4
-> >
-> 
-> 
-> 
-> --
-> Tushar Behera
+Regards,
+Peter
+
+ arch/arm/include/uapi/asm/unistd.h | 1 +
+ arch/arm/kernel/calls.S            | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index fb5584d0cc05..ba94446c72d9 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -408,6 +408,7 @@
+ #define __NR_finit_module		(__NR_SYSCALL_BASE+379)
+ #define __NR_sched_setattr		(__NR_SYSCALL_BASE+380)
+ #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
++#define __NR_renameat2			(__NR_SYSCALL_BASE+382)
+ 
+ /*
+  * This may need to be greater than __NR_last_syscall+1 in order to
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 166e945de832..8f51bdcdacbb 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -391,6 +391,7 @@
+ 		CALL(sys_finit_module)
+ /* 380 */	CALL(sys_sched_setattr)
+ 		CALL(sys_sched_getattr)
++		CALL(sys_renameat2)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+-- 
+1.9.2
