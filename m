@@ -1,44 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Apr 2014 14:48:04 +0200
-Subject: [PATCH RESEND 1/5] pinctrl: allows not to define the
- get_group_pins operation
-In-Reply-To: <1397135274-10764-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
- <1397135274-10764-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <CACRpkdZrLZZwpVCzo_Ms2=7SqUoryt-6OtF7ePhGp4kwJgDgXQ@mail.gmail.com>
+From: ritesh.harjani@gmail.com (Ritesh Harjani)
+Date: Tue, 22 Apr 2014 18:18:12 +0530
+Subject: arm64: default dma_ops is set to coherent_dma_ops results into DMA
+ FAILURE
+Message-ID: <CALk7dXpKGdYd7K4M68KbBgv9a7oHWhPPLER297xFgkYnEiv8Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 3:07 PM, Antoine T?nart
-<antoine.tenart@free-electrons.com> wrote:
+Hi Catalin/Will,
 
-> When using a group only pinctrl driver, which does not have any
-> information on the pins it is useless to define a get_group_pins
-> always returning an empty list of pins.
->
-> When not using get_group_pin[1], a driver must implement it so
-> pins = NULL and num_pins = 0. This patch makes it the default
-> behaviour if not defined in the pinctrl driver when used in
-> pinmux enable and disable funtions and in pinctrl_groups_show.
->
-> It also adds a check in pinctrl_get_group_pins and return -EINVAL if
-> not defined. This function is called in the gpiolib when adding when
-> pingroup range. It cannot be used if no group is defined, so this seams
-> reasonable.
->
-> [1] get_group_pin(struct pinctrl_dev *pctldev,
->                   unsigned selector,
->                   const unsigned **pins,
->                   unsigned *num_pins);
->
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+This is regarding the default dma_ops that we populate for arm64.
 
-OK makes perfect sense.
+PROBLEM:
+Currently in arch/arm64/mm/dma-mapping.c we set dma_ops =
+&coherent_swiotlb_dma_ops.
 
-Patch applied.
+The problem with this is, lets say that there is a dma device which
+has not populated its dev->archdata.dma_ops, then this dma device will
+get the coherent dma_ops in which we dont do any cache maintainance.
 
-Can you please check the Documentation/pinctrl.txt to see
-if anything needs to be updated due to this?
+So, if the dma driver do kmalloc, make some changes to the buffer and
+after dma_map_single gives it to the dma for the transfer, due to no
+cache maintenance performed, result will be DMA transfer failed.
 
-Yours,
-Linus Walleij
+
+
+Earlier noncoherent ops code was not present at all for arm64, so may
+be we were setting default ops to coherent ops. But now that we have
+noncoherent ops in place shall we make the default dma_ops to
+noncoherent (as what arm also does) ?
+
+
+Please let me know if I am missing something here.
+
+
+Thanks
+Ritesh
