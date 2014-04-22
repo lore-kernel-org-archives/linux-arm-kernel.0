@@ -1,67 +1,134 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Apr 2014 11:18:02 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP2+: AM43x: L2 cache support
-In-Reply-To: <20140411112500.GM27282@n2100.arm.linux.org.uk>
-References: <efa5fda5ae625a43fac14bf173cbd96ad7b44e7a.1396605300.git.nsekhar@ti.com>
- <20140404101808.GG27282@n2100.arm.linux.org.uk> <53440D73.6060504@ti.com>
- <20140409162327.GH27282@n2100.arm.linux.org.uk> <534686DF.7070207@ti.com>
- <20140410120348.GK27282@n2100.arm.linux.org.uk> <53468B8E.9040604@ti.com>
- <53469C29.8050906@ti.com> <20140410134028.GL27282@n2100.arm.linux.org.uk>
- <53477EC5.5080400@ti.com> <20140411112500.GM27282@n2100.arm.linux.org.uk>
-Message-ID: <53560292.2080609@ti.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 22 Apr 2014 14:03:40 +0800
+Subject: [PATCH v8 2/3] net: hisilicon: new hip04 MDIO driver
+In-Reply-To: <535561BE.9070303@cogentembedded.com>
+References: <1397869980-21187-1-git-send-email-zhangfei.gao@linaro.org>
+ <1397869980-21187-3-git-send-email-zhangfei.gao@linaro.org>
+ <53555C28.4050303@cogentembedded.com>
+ <CAGVrzcb8Ykxi72x3iBStjTL+OO1BhDc_yZnnPq8ZHra+mtrBEA@mail.gmail.com>
+ <535561BE.9070303@cogentembedded.com>
+Message-ID: <5356063C.6070100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 April 2014 04:55 PM, Russell King - ARM Linux wrote:
-> On Fri, Apr 11, 2014 at 11:03:57AM +0530, Sekhar Nori wrote:
->> Here is a revised patch which is just an extension of your patch 
->> with L2C-220 case handled. I dont really have L2C-220 hardware so even 
->> if you want to handle that at a later time, it would be perfectly okay 
->> with me.
-> 
-> This is what I came up with, which of course is very similar to yours.
-> I think the only difference is that I'm allowing the state of the NS
-> access bits to be preserved by the OMAP code, getting OMAP closer to
-> the target of a ~0 mask.  The only bits which are clear in the mask
-> passed into the L2 code by OMAP now are:
-> 
-> - L310_AUX_CTRL_INSTR_PREFETCH
-> - L310_AUX_CTRL_DATA_PREFETCH
-> - L310_AUX_CTRL_CACHE_REPLACE_RR
-> - L2C_AUX_CTRL_SHARED_OVERRIDE
-> - L2C_AUX_CTRL_PARITY_ENABLE
-> 
-> It sounds like we can kill L310_AUX_CTRL_CACHE_REPLACE_RR as well since
-> that's already set for us (and fwir is the power-on-reset default too.)
-> 
->  arch/arm/mach-omap2/omap4-common.c |  4 +---
->  arch/arm/mm/cache-l2x0.c           | 23 +++++++++++++++++++++--
->  2 files changed, 22 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index c0f9a81a2d32..3b01c5223b11 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -213,8 +213,6 @@ static int __init omap_l2_cache_init(void)
->  
->  	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
->  	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
-> -		   L310_AUX_CTRL_NS_LOCKDOWN |
-> -		   L310_AUX_CTRL_NS_INT_CTRL |
->  		   L2C_AUX_CTRL_SHARED_OVERRIDE |
->  		   L310_AUX_CTRL_DATA_PREFETCH |
->  		   L310_AUX_CTRL_INSTR_PREFETCH;
-> @@ -223,7 +221,7 @@ static int __init omap_l2_cache_init(void)
->  	if (of_have_populated_dt())
->  		l2x0_of_init(aux_ctrl, 0xc19fffff);
 
-Just noticed that the mask here too should have been changed to
-0xcd9fffff. I will be making this change to the local version I am
-committing to base my AM43x support series on.
 
->  	else
-> -		l2x0_init(l2cache_base, aux_ctrl, 0xc19fffff);
-> +		l2x0_init(l2cache_base, aux_ctrl, 0xcd9fffff);
+On 04/22/2014 02:21 AM, Sergei Shtylyov wrote:
+> On 04/21/2014 10:03 PM, Florian Fainelli wrote:
+>
+>>>> Hisilicon hip04 platform mdio driver
+>>>> Reuse Marvell phy drivers/net/phy/marvell.c
+>
+>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> [...]
+>
+>>>> diff --git a/drivers/net/ethernet/hisilicon/hip04_mdio.c
+>>>> b/drivers/net/ethernet/hisilicon/hip04_mdio.c
+>>>> new file mode 100644
+>>>> index 0000000..19826a3
+>>>> --- /dev/null
+>>>> +++ b/drivers/net/ethernet/hisilicon/hip04_mdio.c
+>>>> @@ -0,0 +1,185 @@
+>
+> [...]
+>
+>>>> +static int hip04_mdio_reset(struct mii_bus *bus)
+>>>> +{
+>>>> +       int temp, err, i;
+>>>> +
+>>>> +       for (i = 0; i < PHY_MAX_ADDR; i++) {
+>>>> +               hip04_mdio_write(bus, i, 22, 0);
+>
+>>>     Why? What kind of a register this is? <uapi/linux/mii.h> tells me
+>>> it's
+>>> MII_SREVISION...
+>
+>> I think this rather means clause 22 as opposed to clause 45.
+>
+>     No, the corresponding hip04_mdio_write()'s parameter is a register
+> #, so this is a write of 0 to register #22. A comment certainly wouldn't
+> hurt here...
 
-Thanks,
-Sekhar
+It's private register of the phy marvell 88e1512.
+To make it clearer using define instead.
+#define MII_MARVELL_PHY_PAGE    22
+
+The registers has been grouped into several pages, access register need 
+choose which page first.
+>
+>>>> +               temp = hip04_mdio_read(bus, i, MII_BMCR);
+>
+>>>     You're not checking for error...
+>
+>>>> +               temp |= BMCR_RESET;
+>>>> +               err = hip04_mdio_write(bus, i, MII_BMCR, temp);
+>
+>>>     Hmm, why you're open coding BMCR reset? There's phy_init_hw()
+>>> doing this
+>>> correctly...
+>
+>> Except that this runs way before we have created the PHY driver, so we
+>> can't use that function just yet.
+>
+>     Ah, you're right.
+>
+>> I already asked about this, and he
+>> explained that this was because the PHY devices he uses are not
+>> responding correcty to MII_PHYSID1/2 reads.
+>
+>     So, this manual reset loop helps with reading the ID registers? A
+> comment wouldn't hurt either...
+Yes, it required for get_phy_id, will add comments.
+
+>
+>>>> +               if (err < 0)
+>>>> +                       return err;
+>
+>     I'm not at all sure we want to leave the reset loop on a first write
+> error.
+Yes, continue can be used instead.
+
+>
+>>>> +       }
+>>>> +
+>>>> +       mdelay(500);
+>
+>     I'm not sure this is enough, given that in phy_init_hw() we poll for
+> 600 ms + 1 ms.
+Though not find clear delay time required from the phy spec, the 
+experiment shows OK.
+Also here can not verify the BMCR_RESET bit, 0xffff will returned if the 
+phy is not exists.
+>
+>>>> +       return 0;
+>>>> +}
+>>>> +
+>>>> +static int hip04_mdio_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +       struct resource *r;
+>>>> +       struct mii_bus *bus;
+>>>> +       struct hip04_mdio_priv *priv;
+>>>> +       int ret;
+>>>> +
+>>>> +       bus = mdiobus_alloc_size(sizeof(struct hip04_mdio_priv));
+>>>> +       if (!bus) {
+>>>> +               dev_err(&pdev->dev, "Cannot allocate MDIO bus\n");
+>>>> +               return -ENOMEM;
+>>>> +       }
+>>>> +
+>>>> +       bus->name = "hip04_mdio_bus";
+>>>> +       bus->read = hip04_mdio_read;
+>>>> +       bus->write = hip04_mdio_write;
+>>>> +       bus->reset = hip04_mdio_reset;
+>
+>>>     Ah... However I don't think it a good implementation of that bus
+>>> method...
+>
+>     I assumed this method exists to do a hardware reset of the whole
+> bus, not to do a loop of soft-resetting all PHYs...
+>
+
+It is required for each phy, if no such reset, the specific phy can NOT be
+detected and get_phy_id returns 0.
+
+Thanks
