@@ -1,23 +1,56 @@
-From: johannes@sipsolutions.net (Johannes Berg)
-Date: Tue, 22 Apr 2014 17:06:42 +0200
-Subject: [PATCH 0/7] net: rfkill: gpio: Add device tree support
-In-Reply-To: <1397544101-18135-1-git-send-email-wens@csie.org>
-References: <1397544101-18135-1-git-send-email-wens@csie.org>
-Message-ID: <1398179202.4211.15.camel@jlt4.sipsolutions.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Apr 2014 16:07:25 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <53567352.1080306@ti.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140422102834.GE7484@arm.com> <53567352.1080306@ti.com>
+Message-ID: <20140422150725.GD10224@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-04-15 at 14:41 +0800, Chen-Yu Tsai wrote:
+On Tue, Apr 22, 2014 at 02:49:06PM +0100, Santosh Shilimkar wrote:
+> On Tuesday 22 April 2014 06:28 AM, Will Deacon wrote:
+> > On Mon, Apr 21, 2014 at 07:03:10PM +0100, Santosh Shilimkar wrote:
+> >> ARM coherent CPU dma map APIS are assumed to be nops on cache coherent
+> >> machines. While this is true, one still needs to ensure that no
+> >> outstanding writes are pending in CPU write buffers. To take care
+> >> of that, we at least need a memory barrier to commit those changes
+> >> to main memory.
+> >>
+> >> Patch is trying to fix those cases. Without such a patch, you will
+> >> end up patching device drivers to avoid the synchronisation issues.
+> > 
+> > Don't you only need these barriers if you're passing ownership of a CPU
+> > buffer to a device? In that case, I would expect a subsequent writel to tell
+> > the device about the new buffer, which includes the required __iowmb().
+> > That's the reason for the relaxed accessors: to avoid this barrier when it's
+> > not needed. Perhaps you're using the relaxed accessors where you actually
+> > need the stronger ordering guarantees?
+> 
+> I kind of guessed some one will bring up above point. Infact this is how
+> mostly people have been living with the issue on coherent machines. On
+> Keystone too, we did explicit barriers in respective drivers.
+> 
+> I have added these barriers only on CPU to device streaming APIs because on
+> other direction, the memory is already upto date from CPU's perspective.
+> 
+> But if you look at the actual problem, its really responsibility of
+> DMA streaming APIs which we are trying to push on to drivers. A device
+> driver should be independent of whether it is running on a coherent or
+> a non-coherent CPU.
+> 
+> Lets take a example....
+> MMC controller driver running on a non-coherent and coherent machine.
+> Driver has below code sequence which is generic.
+> 1. Prepare SG list
+> 2. Perform CMO using DMA streaming API
+> 3. Start DMA transfer...
 
-> The first 2 patches should go through the gpio tree. The 4 rfkill-gpio
-> patches should go through the same tree that Heikki's patches are
-> in. Maxime, can you take the last one?
+The key here is how you start the DMA transfer. So far we assumed it's
+done via an I/O operation like writel() and it has the right barriers.
+If we have other ways for starting this (like writing the dma_addr in
+some other memory descriptor), should we use explicit memory barriers?
 
-Are there no dependencies? Maybe it'd be easier if you sent it as
-separate patch series then?
-
-I can take those four patches into my topic branch on top of Heikki's
-patches, but in any case, there seem to be a bunch of
-comments/discussions so for now I'm not going to do anything with them.
-
-johannes
+-- 
+Catalin
