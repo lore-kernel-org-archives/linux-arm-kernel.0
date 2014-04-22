@@ -1,102 +1,53 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 22 Apr 2014 11:47:37 +0530
-Subject: [PATCH v2 3/3] arm: exynos: Add /dev/bL_status user interface on
- Exynos5420
-Message-ID: <1398147457-3186-1-git-send-email-a.kesavan@samsung.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Tue, 22 Apr 2014 06:49:34 +0000
+Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
+In-Reply-To: <20140418235119.GS21823@atomide.com>
+References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
+ <CAOCHtYg5_Lvi3SWuWaRTDDNhLJ32jiXsKYQmrsKaShVWpM+xWQ@mail.gmail.com>
+ <534D51C1.3010007@ti.com>
+ <CAOCHtYhygGFbUunY9abEkjKfpQ1hh-DfRfhm160NehSYhWJSRw@mail.gmail.com>
+ <20140418225111.GP21823@atomide.com>
+ <CAOCHtYjdC-OGkdaBt74xMqi5eDc1eVbU6O7VyWMEYN-U50-Abw@mail.gmail.com>
+ <20140418235119.GS21823@atomide.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73EAC458C@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a user interface to check the core and cluster status on
-Exynos5420. This can be utilized while debugging mcpm issues.
-cat /dev/bL_status will show the current power status of all
-the 8 cores along with the cluster.
+Tony,
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
-Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- arch/arm/mach-exynos/mcpm-exynos.c |   64 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+>From: Tony Lindgren
+>* Robert Nelson <robertcnelson@gmail.com> [140418 16:42]:
+>> On Fri, Apr 18, 2014 at 5:51 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > * Robert Nelson <robertcnelson@gmail.com> [140415 08:46]:
+>> >>
+>> >> Background: i also tried getting this having this fixed in u-boot:
+>> >
+>> > Do we still need to apply this patch then?
+>>
+>> Yeah, Tom want's it done in the kernel:
+>>
+>> Here's my proposed u-boot patch:
+>> http://lists.denx.de/pipermail/u-boot/2014-January/172154.html
+>>
+>> and Tom's recommendation:
+>> http://lists.denx.de/pipermail/u-boot/2014-January/172274.html
+>>
+>> Once this hits mainline, i'll submit a patch to u-boot to check for
+>> the presence of this version and drop to the old dtb if not found.
+>
+>OK applying into omap-for-v3.15/fixes thanks.
+>
+>Tony
 
-diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-index 49b9031..6c74c82 100644
---- a/arch/arm/mach-exynos/mcpm-exynos.c
-+++ b/arch/arm/mach-exynos/mcpm-exynos.c
-@@ -293,6 +293,53 @@ static void __init exynos_mcpm_usage_count_init(void)
- 	cpu_use_count[cpu][cluster] = 1;
- }
- 
-+static size_t bL_check_status(char *info)
-+{
-+	size_t len = 0;
-+	int i;
-+
-+	len += sprintf(&info[len], "\t0 1 2 3 L2\n");
-+	len += sprintf(&info[len], "[A15]   ");
-+	for (i = 0; i < 4; i++) {
-+		len += sprintf(&info[len], "%d ",
-+			(readl(EXYNOS_ARM_CORE_STATUS(i)) & 0x3) == 3 ? 1 : 0);
-+	}
-+	len += sprintf(&info[len], "%d\n",
-+			(readl(EXYNOS_COMMON_STATUS(0)) & 0x3) == 3 ? 1 : 0);
-+
-+	len += sprintf(&info[len], "[A7]    ");
-+	for (i = 4; i < 8; i++)
-+		len += sprintf(&info[len], "%d ",
-+			(readl(EXYNOS_ARM_CORE_STATUS(i)) & 0x3) == 3 ? 1 : 0);
-+	len += sprintf(&info[len], "%d\n\n",
-+			(readl(EXYNOS_COMMON_STATUS(1)) & 0x3) == 3 ? 1 : 0);
-+
-+	return len;
-+}
-+
-+static ssize_t bL_status_read(struct file *file, char __user *buf,
-+			size_t len, loff_t *pos)
-+{
-+	size_t count = 0;
-+	char info[100];
-+
-+	count = bL_check_status(info);
-+	if (count < 0)
-+		return -EINVAL;
-+
-+	return simple_read_from_buffer(buf, len, pos, info, count);
-+}
-+
-+static const struct file_operations bL_status_fops = {
-+	.read		= bL_status_read,
-+};
-+
-+static struct miscdevice bL_status_device = {
-+	MISC_DYNAMIC_MINOR,
-+	"bL_status",
-+	&bL_status_fops
-+};
-+
- /*
-  * Enable cluster-level coherency, in preparation for turning on the MMU.
-  */
-@@ -343,3 +390,20 @@ static int __init exynos_mcpm_init(void)
- }
- 
- early_initcall(exynos_mcpm_init);
-+
-+static int __init exynos_bl_status_init(void)
-+{
-+	int ret;
-+
-+	if (!soc_is_exynos5420())
-+		return -ENODEV;
-+
-+	ret = misc_register(&bL_status_device);
-+	if (ret) {
-+		pr_info("bl_status not available\n");
-+		return ret;
-+	}
-+	return 0;
-+}
-+
-+late_initcall(exynos_bl_status_init);
--- 
-1.7.9.5
+You probably missed fixing below typo before applying this patch.
+omap3-beagle-xm-ab.dts breaks without this.
+
+> +/ {
+> +       /* HS USB Port 2 Power enable was inverted with the xM C */
+> +       hsusb2_power: hsusb2_power_reg {
+> +               enable-active-high;
+       };
+> +};
+
+
+with regards, pekon
