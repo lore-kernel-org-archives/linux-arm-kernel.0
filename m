@@ -1,33 +1,32 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Tue, 22 Apr 2014 10:27:26 +0200
-Subject: [PATCH v2 0/2] ARM: berlin: add SDHCI support
-Message-ID: <1398155248-1659-1-git-send-email-antoine.tenart@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 Apr 2014 13:58:00 +0530
+Subject: [PATCH v3 0/3] ARM: OMAP2+: AM437x: L2 cache support
+Message-ID: <cover.1398149526.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the Berlin BG2Q SDHCI nodes to support the 3 controllers
-available. The Berlin BG2Q SDHCI controllers are compatible with the pxav3
-driver. This patches also enable the SD Card reader and the eMMC of the
-BG2Q DMP.
+This patch series adds L2 cache support for AM437x
+and does some clean-ups for existing OMAP4 support
+along the way (no functional changes). On OMAP4 Panda,
+the Aux control value remains 0x7e470000 before and
+after the series.
 
-This series applies on top of Alexandre's patches for the Berlin's pll:
-https://patchwork.kernel.org/patch/3890341/
-https://patchwork.kernel.org/patch/3876271/
+Tested on OMAP4 Panda and AM437x EPOS EVMs.
 
-Changes since v1:
-	The v2 introduced a custom Berlin SDHCI driver. It turns out the
-	available pxav3 driver was compatible with the BG2Q SDHCI controllers.
-	- removed the unneeded custom driver
-	- switched to the pxav3 driver
-	- removed the board specific properties from the SoC device tree
+It is based on RMK's 75 patch series titled "l2c series" +
+the patch contained in https://www.mail-archive.com/linux-omap at vger.kernel.org/msg103439.html
 
-Antoine T?nart (2):
-  ARM: dts: berlin: add the SDHCI nodes for the BG2Q
-  ARM: dts: berlin: enable SD card reader and eMMC for the BG2Q DMP
+Sekhar Nori (3):
+  ARM: OMAP2+: L2 cache: get rid of init call
+  ARM: OMAP2+: L2 cache: git rid of redundant cache replacement policy
+    setting
+  ARM: OMAP2+: AM43x: L2 cache support
 
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 11 ++++++++++
- arch/arm/boot/dts/berlin2q.dtsi            | 32 ++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+)
+ arch/arm/mach-omap2/Kconfig        |    1 +
+ arch/arm/mach-omap2/common.h       |    1 +
+ arch/arm/mach-omap2/io.c           |    2 ++
+ arch/arm/mach-omap2/omap4-common.c |   17 ++++-------------
+ 4 files changed, 8 insertions(+), 13 deletions(-)
 
 -- 
-1.8.3.2
+1.7.10.1
