@@ -1,48 +1,77 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:34 +0200
-Subject: [PATCH v2 30/38] ARM: orion5x: use DT to describe EHCI on edmini_v2
+Date: Tue, 22 Apr 2014 23:26:21 +0200
+Subject: [PATCH v2 17/38] ARM: orion5x: use node labels for UART and SATA on
+ edmini_v2
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-31-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-18-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit converts the already partially DT-converted edmini_v2
-platform to use the Device Tree for USB.
+This commit converts the existing devices described in the edmini_v2
+Device Tree to use node labels: the UART and SATA device. Also, it
+reorders the eth and mdio node label references to be sorted
+alphabetically.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 4 ++++
- arch/arm/mach-orion5x/edmini_v2-setup.c                   | 2 --
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 30 ++++++++++------------
+ 1 file changed, 14 insertions(+), 16 deletions(-)
 
 diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-index 41b2ab5..f0f2bcc 100644
+index df53d256..83f45a7 100644
 --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
 +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-@@ -56,6 +56,10 @@
+@@ -28,18 +28,6 @@
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
+ 			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>;
+-
+-		internal-regs {
+-			serial at 12000 {
+-				clock-frequency = <166666667>;
+-				status = "okay";
+-			};
+-
+-			sata at 80000 {
+-				status = "okay";
+-				nr-ports = <2>;
+-			};
+-		};
+ 	};
+ 
+ 	gpio-keys {
+@@ -63,6 +51,14 @@
  	};
  };
  
-+&ehci0 {
++&eth {
 +	status = "okay";
++
++	ethernet-port at 0 {
++		phy-handle = <&ethphy>;
++	};
 +};
 +
- &eth {
+ &mdio {
  	status = "okay";
  
-diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
-index 75648ab..2eebc0c 100644
---- a/arch/arm/mach-orion5x/edmini_v2-setup.c
-+++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
-@@ -104,8 +104,6 @@ void __init edmini_v2_init(void)
- 	/*
- 	 * Configure peripherals.
- 	 */
--	orion5x_ehci0_init();
--
- 	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
- 				    ORION_MBUS_DEVBUS_BOOT_ATTR,
- 				    EDMINI_V2_NOR_BOOT_BASE,
+@@ -71,10 +67,12 @@
+ 	};
+ };
+ 
+-&eth {
++&sata {
+ 	status = "okay";
++	nr-ports = <2>;
++};
+ 
+-	ethernet-port at 0 {
+-		phy-handle = <&ethphy>;
+-	};
++&uart0 {
++	clock-frequency = <166666667>;
++	status = "okay";
+ };
 -- 
 1.9.2
