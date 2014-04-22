@@ -1,169 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 22 Apr 2014 11:09:36 +0900
-Subject: [PATCH Resend] ARM: EXYNOS: Map SYSRAM address through DT
-In-Reply-To: <CAL_JsqLjPZmPrd=qmcxUCosx=Xu87NSTvG0d-LrGR=uncBHE5g@mail.gmail.com>
-References: <1397649051-3288-1-git-send-email-sachin.kamat@linaro.org>
- <CAL_JsqLjPZmPrd=qmcxUCosx=Xu87NSTvG0d-LrGR=uncBHE5g@mail.gmail.com>
-Message-ID: <01ad01cf5dcf$eabfde50$c03f9af0$@samsung.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 21 Apr 2014 22:11:07 -0400 (EDT)
+Subject: [PATCH 5/5] arm: exynos: Add MCPM call-back functions
+In-Reply-To: <CAM4voamiJ-HZqz8Rgc-RTCjNRDaw5VQbs6GVfxPDxqCKKhm6XA@mail.gmail.com>
+References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+ <1397239311-27717-6-git-send-email-a.kesavan@samsung.com>
+ <alpine.LFD.2.11.1404111426510.980@knanqh.ubzr>
+ <20140414104116.GA3844@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1404140956060.980@knanqh.ubzr>
+ <20140415083615.GC3596@e103592.cambridge.arm.com>
+ <CAM4voamo5iiOQ5P1JyO8kekU6cuxoj4oAT+VpS14LNvWqw_T4g@mail.gmail.com>
+ <20140417100302.GB18864@e103592.cambridge.arm.com>
+ <CAM4voamiJ-HZqz8Rgc-RTCjNRDaw5VQbs6GVfxPDxqCKKhm6XA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1404212207210.980@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring wrote:
-> 
-> On Wed, Apr 16, 2014 at 6:50 AM, Sachin Kamat <sachin.kamat@linaro.org>
-> wrote:
-> > Instead of hardcoding the SYSRAM details for each SoC,
-> > pass this information through device tree (DT) and make
-> > the code SoC agnostic.
-> >
-> > Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> > ---
-> > Rebased on latest linux-next.
-> > ---
-> >  .../devicetree/bindings/arm/samsung-boards.txt     |   11 +++
-> >  arch/arm/boot/dts/exynos4210-universal_c210.dts    |    9 ++
-> >  arch/arm/boot/dts/exynos4210.dtsi                  |   10 ++
-> >  arch/arm/boot/dts/exynos4x12.dtsi                  |   10 ++
-> >  arch/arm/boot/dts/exynos5.dtsi                     |    5 +
-> >  arch/arm/boot/dts/exynos5250.dtsi                  |    5 +
-> >  arch/arm/boot/dts/exynos5420.dtsi                  |    5 +
-> >  arch/arm/mach-exynos/exynos.c                      |  104 ++++++++-----------
-> -
-> >  arch/arm/mach-exynos/include/mach/map.h            |    7 --
-> >  9 files changed, 95 insertions(+), 71 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt
-> b/Documentation/devicetree/bindings/arm/samsung-boards.txt
-> > index 2168ed31e1b0..f79710eb7e79 100644
-> > --- a/Documentation/devicetree/bindings/arm/samsung-boards.txt
-> > +++ b/Documentation/devicetree/bindings/arm/samsung-boards.txt
-> > @@ -7,6 +7,17 @@ Required root node properties:
-> >          (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
-> >          (b) "samsung,exynos4210"  - for boards based on Exynos4210 SoC.
-> >
-> > +    - sysram node, specifying the type (secure or non-secure) of SYSRAM
-> > +       - compatible: following types are supported
-> > +               "samsung,exynos4210-sysram" : Secure SYSRAM
-> > +               "samsung,exynos4210-sysram-ns" : Non-secure SYSRAM
-> 
-> Base this on mmio-sram binding please.
-> 
-> > +       - reg: address of SYSRAM bank
-> > +
-> > +       sysram at 02020000 {
-> > +               compatible = "samsung,exynos4210-sysram";
-> > +               reg = <0x02020000 0x1000>;
-> > +       };
-> > +
-> >  Optional:
-> >      - firmware node, specifying presence and type of secure firmware:
-> >          - compatible: only "samsung,secure-firmware" is currently
-> supported
-> > diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> > index 63e34b24b04f..cf4158728108 100644
-> > --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> > +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> > @@ -28,6 +28,15 @@
-> >                 bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw
-> rootwait earlyprintk panic=5 maxcpus=1";
-> >         };
-> >
-> > +       sysram at 02020000 {
-> > +               status = "disabled";
-> > +       };
-> > +
-> > +       sysram at 02025000 {
-> > +               compatible = "samsung,exynos4210-sysram";
-> > +               reg = <0x02025000 0x1000>;
-> > +       };
-> > +
-> >         mct at 10050000 {
-> >                 compatible = "none";
-> >         };
-> > diff --git a/arch/arm/boot/dts/exynos4210.dtsi
-> b/arch/arm/boot/dts/exynos4210.dtsi
-> > index cacf6140dd2f..a3f4bba099e6 100644
-> > --- a/arch/arm/boot/dts/exynos4210.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> > @@ -31,6 +31,16 @@
-> >                 pinctrl2 = &pinctrl_2;
-> >         };
-> >
-> > +       sysram at 02020000 {
-> > +               compatible = "samsung,exynos4210-sysram";
-> > +               reg = <0x02020000 0x1000>;
-> > +       };
-> > +
-> > +       sysram-ns at 0203F000 {
-> > +               compatible = "samsung,exynos4210-sysram-ns";
-> > +               reg = <0x0203F000 0x1000>;
-> 
-> hex should be lower case.
-> 
-> 
-> [...]
-> 
-> > @@ -268,6 +218,44 @@ static int __init exynos_fdt_map_chipid(unsigned
-> long node, const char *uname,
-> >         return 1;
-> >  }
-> >
-> > +struct __sysram_desc {
-> > +       char name[32];
-> > +       unsigned long addr;
-> > +};
-> > +
-> > +static struct __sysram_desc sysram_desc[] __initdata = {
-> > +       {
-> > +               .name = "samsung,exynos4210-sysram",
-> > +               .addr = (unsigned long)S5P_VA_SYSRAM,
-> > +       }, {
-> > +               .name = "samsung,exynos4210-sysram-ns",
-> > +               .addr = (unsigned long)S5P_VA_SYSRAM_NS,
-> > +       },
-> > +};
-> > +
-> > +static int __init exynos_fdt_map_sysram(unsigned long node, const char
-> *uname,
-> > +                                       int depth, void *data)
-> > +{
-> > +       struct map_desc iodesc;
-> > +       __be32 *reg;
-> > +       unsigned long len;
-> > +       int i;
-> > +
-> > +       for (i = 0; i < ARRAY_SIZE(sysram_desc); i++) {
-> > +               if (of_flat_dt_is_compatible(node, sysram_desc[i].name)) {
-> > +                       reg = of_get_flat_dt_prop(node, "reg", &len);
-> > +                       if (!reg || len != (sizeof(unsigned long) * 2))
-> > +                               return -ENODEV;
-> > +                       iodesc.virtual = sysram_desc[i].addr;
-> > +                       iodesc.pfn = __phys_to_pfn(be32_to_cpu(reg[0]));
-> > +                       iodesc.length = be32_to_cpu(reg[1]);
-> > +                       iodesc.type = MT_DEVICE;
-> > +                       iotable_init(&iodesc, 1);
-> 
-> I don't think this needs to be a static mapping at all. Fix your SMP
-> code. Move the code setting the boot address in prepare_cpus to
-> boot_secondary.
-> 
-> Also, the pen code is all unnecessary if you can properly reset a core
-> on hotplug. Given this code:
-> 
-> if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
-> __raw_writel(S5P_CORE_LOCAL_PWR_EN,
->     S5P_ARM_CORE1_CONFIGURATION);
-> 
-> and:
-> 
-> /* make cpu1 to be turned off at next WFI command */
-> if (cpu == 1)
-> __raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
-> 
-> It would appear you probably have this capability and the exynos smp
-> code is pure mindless cut n' paste.
-> 
-Basically, I have no strong objection on Rob's suggestion but I'd like to pick this one after small addressing because of other patches' dependency. Then how about addressing comments?
+On Mon, 21 Apr 2014, Abhilash Kesavan wrote:
 
-- Kukjin
+> Hi Dave,
+> 
+> On Thu, Apr 17, 2014 at 3:33 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Apr 17, 2014 at 12:41:31AM +0530, Abhilash Kesavan wrote:
+> >> The polling loop in the above function was added to ensure that the
+> >> cluster is switched on before we power on the individual cores in
+> >> exynos_power_up. This is only required when the first man comes up.
+> >
+> > Is this only required on power-up, not power-down?  I don't see a call
+> > to exynos_cluster_power_control(..., 0), but maybe I'm looking in the
+> > wrong place.
+> No, you have not missed it. As of now, we are turning on both the L2s
+> for 8 core bring-up and then not turning it off (if all 4 cores in the
+> clusters are down). Turning the L2 off (A15 L2 mainly) brings in
+> significant power savings and I will be looking at adding support for
+> this next.
+
+Good.  Please add a comment in the code to that effect in the mean time.
+
+> > I wonder whether this is needed, though.  It imposes a requirement on
+> > the OS to waste time polling for the cluster to come online.  Can the
+> > hardware not cope with a CPU poweron request being pending already before
+> > the cluster is powered on?  If that were possible, there would be no need
+> > for an extra poll.
+> No, we need to ensure that the cluster L2 is turned On before we can
+> turn the core on, the hardware does not handle it.
+> >
+> > How long do you expect to need to poll for?
+> In internal testing when we are turning the cluster on from an off
+> state, I have seen the loop being executed 3-4 times occasionally
+> during ageing tests. Generally, the status returns as being powered ON
+> immediately.
+
+Looping 3-4 times is pretty reasonable.  We certainly can live with 
+that.
+
+
+Nicolas
