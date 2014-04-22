@@ -1,36 +1,51 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 22 Apr 2014 20:11:14 +0200
-Subject: [PATCH] ARM: berlin: add CPU_V7 to Marvell Armada 1500-mini
- (BG2CD)
-In-Reply-To: <1397587699-11023-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1397587699-11023-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <5356B0C2.6010708@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Apr 2014 19:12:52 +0100
+Subject: [Qemu-devel] Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <20140422175325.GD23955@obsidianresearch.com>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <534EF153.5050603@codeaurora.org>
+ <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
+ <53501E87.6070307@codeaurora.org>
+ <20140417203521.GB22411@obsidianresearch.com> <535681A4.1080402@monstr.eu>
+ <20140422171141.GW24070@n2100.arm.linux.org.uk>
+ <20140422175325.GD23955@obsidianresearch.com>
+Message-ID: <20140422181252.GX24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2014 08:48 PM, Sebastian Hesselbarth wrote:
-> This selects missing CPU_V7 for ARM Cortex-A9 based Marvell Armada
-> 1500-mini (BG2CD).
+On Tue, Apr 22, 2014 at 11:53:25AM -0600, Jason Gunthorpe wrote:
+> On Tue, Apr 22, 2014 at 06:11:42PM +0100, Russell King - ARM Linux wrote:
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
+> > Put another way, if your platform is part of the multi-platform kernel
+> > then you are *excluded* from being able to use this... unless you hack
+> > the Kconfig, and then also provide a constant value for PHYS_OFFSET,
+> > thereby _tying_ the kernel you built to a _single_ platform.
+> 
+> That is exactly right. To get a fixed LMA you must commit to a
+> non-relocatable kernel image.
+> 
+> Realistically this patch would need to be accompanied by something
+> that makes ARM_PATCH_PHYS_VIRT optional for multiplatform based on
+> EXPERT or similar.
+> 
+> The best usecase seems to be to support ELF tooling for low level
+> debugging activities, a non-relocatable image isn't a blocker for that
+> case.
 
-Applied to berlin/soc.
+Let's not forget that if you want to debug, it's because you've hit a
+problem in the kernel you're running.  To get an ELF image you can debug,
+you have to turn ARM_PATCH_PHYS_VIRT off, which changes the generated
+code - which can in itself cause bugs to hide themselves.
 
-> ---
->  arch/arm/mach-berlin/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-> index d3c5f14dc142..0add8350faf4 100644
-> --- a/arch/arm/mach-berlin/Kconfig
-> +++ b/arch/arm/mach-berlin/Kconfig
-> @@ -18,6 +18,7 @@ config MACH_BERLIN_BG2
->  config MACH_BERLIN_BG2CD
->  	bool "Marvell Armada 1500-mini (BG2CD)"
->  	select CACHE_L2X0
-> +	select CPU_V7
->  	select HAVE_ARM_TWD if SMP
->  
->  config MACH_BERLIN_BG2Q
-> 
+Unfortunately, those kinds of bugs are not as rare as you might think.
+
+> Since the patch is a no-op if LOAD_OFFSET isn't set, is there a
+> downside I don't see?
+
+It leads people into thinking that we support booting an ELF file.
+We don't.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
