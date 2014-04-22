@@ -1,97 +1,30 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Tue, 22 Apr 2014 15:08:43 +0200
-Subject: [PATCH v6 1/3] tty/serial: Add GPIOLIB helpers for controlling
- modem lines
-In-Reply-To: <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
-References: <1394469951-21192-1-git-send-email-richard.genoud@gmail.com>
- <1394469951-21192-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <535669DB.8010109@visionsystems.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 22 Apr 2014 14:09:12 +0100
+Subject: [PATCH 1/3] arm: dts: add device_type="memory" for ste-ccu8540
+In-Reply-To: <20140422073926.GC17657@lee--X1>
+References: <1397756521-29387-1-git-send-email-leif.lindholm@linaro.org>
+ <1397756521-29387-2-git-send-email-leif.lindholm@linaro.org>
+ <20140422073926.GC17657@lee--X1>
+Message-ID: <20140422130912.A4F71C4042C@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.03.2014 17:45, Richard Genoud wrote:
-> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
-> GPIO.
-> This will be useful for many boards which have a serial controller that
-> only handle CTS/RTS pins (or even just RX/TX).
+On Tue, 22 Apr 2014 08:39:26 +0100, Lee Jones <lee.jones@linaro.org> wrote:
+> > The current .dts for ste-ccu8540 lacks a 'device_type = "memory"' for
+> > its memory node, relying on an old ppc quirk in order to discover its
+> > memory. Add this, to permit that quirk to be made ppc only.
+> > 
+> > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: devicetree at vger.kernel.org
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/ste-ccu8540.dts |    1 +
+> >  1 file changed, 1 insertion(+)
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-....
+Acked-by: Grant Likely <grant.likely@linaro.org>
 
-> +
-> +struct mctrl_gpios {
-> +	struct gpio_desc *gpio[UART_GPIO_MAX];
-> +};
-> +
-> +static const struct {
-> +	const char *name;
-> +	unsigned int mctrl;
-> +	bool dir_out;
-> +} mctrl_gpios_desc[UART_GPIO_MAX] = {
-> +	{ "cts", TIOCM_CTS, false, },
-> +	{ "dsr", TIOCM_DSR, false, },
-> +	{ "dcd", TIOCM_CD, false, },
-> +	{ "rng", TIOCM_RNG, false, },
-> +	{ "rts", TIOCM_RTS, true, },
-> +	{ "dtr", TIOCM_DTR, true, },
-> +	{ "out1", TIOCM_OUT1, true, },
-> +	{ "out2", TIOCM_OUT2, true, },
-> +};
-> +
-> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
-> +{
-> +	enum mctrl_gpio_idx i;
-> +
-> +	if (IS_ERR_OR_NULL(gpios))
-> +		return;
-> +
-> +	for (i = 0; i < UART_GPIO_MAX; i++)
-> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
-> +		    mctrl_gpios_desc[i].dir_out)
-> +			gpiod_set_value(gpios->gpio[i],
-> +					!!(mctrl & mctrl_gpios_desc[i].mctrl));
-> +}
-> +EXPORT_SYMBOL_GPL(mctrl_gpio_set);
-> +
-> +struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
-> +				      enum mctrl_gpio_idx gidx)
-> +{
-> +	if (!IS_ERR_OR_NULL(gpios) && !IS_ERR_OR_NULL(gpios->gpio[gidx]))
-> +		return gpios->gpio[gidx];
-> +	else
-> +		return NULL;
-> +}
-> +EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
-> +
-> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
-> +{
-> +	enum mctrl_gpio_idx i;
-> +
-> +	/*
-> +	 * return it unchanged if the structure is not allocated
-> +	 */
-> +	if (IS_ERR_OR_NULL(gpios))
-> +		return *mctrl;
-> +
-> +	for (i = 0; i < UART_GPIO_MAX; i++) {
-> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
-> +		    !mctrl_gpios_desc[i].dir_out) {
-> +			if (gpiod_get_value(gpios->gpio[i]))
-> +				*mctrl |= mctrl_gpios_desc[i].mctrl;
-> +			else
-> +				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
-> +		}
-> +	}
-> +
-> +	return *mctrl;
-> +}
-> +EXPORT_SYMBOL_GPL(mctrl_gpio_get);
-
-Should this routine be renamed to msr_gpio_get() or perhaps better to give all values (inputs and outputs)?
-
-I'm trying to port this approach to omap-serial to implement RS485 switching. I need to know if RTS is already on or not and set it accordingly.
-
-What would be the best solution for this task using this new API?
-
-Yegor
+g.
