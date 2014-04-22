@@ -1,28 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Apr 2014 22:31:14 +0100
-Subject: [PATCH v3 0/2] change ARM linux memory layout to support 32 CPUs
-In-Reply-To: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
-References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
-Message-ID: <20140422213114.GA24070@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Apr 2014 23:39:38 +0200
+Subject: [PATCH] pinctrl/at91: convert driver to use gpiolib irqchip
+In-Reply-To: <1397592581-20251-1-git-send-email-alexanders83@web.de>
+References: <1397592581-20251-1-git-send-email-alexanders83@web.de>
+Message-ID: <CACRpkdYsPPRkht9+nTLHHQdzmej9sMpdFLqyy37YjEtYePB+mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 07:06:05PM +0800, Liu Hua wrote:
-> This patch series change fixmap mapping region to suppport 32 CPUs.
-> Because the "top_pmd" covers 0xfffe0000 - 0xffffffff(2M). And part 
-> is used by vector table. So I move this region down to 0xffc00000
->  - 0xffdffff. 
+On Tue, Apr 15, 2014 at 10:09 PM, Alexander Stein <alexanders83@web.de> wrote:
 
-Can you explain why you have submitted these patches to my patch tracker
-with a copy to stable at vger.kernel.org ?
+> This converts the AT91 pin control driver to register its
+> chained irq handler and irqchip using the helpers in the
+> gpiolib core.
+>
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
 
-What makes these qualify for stable tree inclusion?  What regression are
-they fixing?
+Part of the large attempt to pull all these local hacks into the
+gpiolib irqchip helpers so patch applied. Any further quarrels
+can be solved on top of this in the *generic* code.
 
-We don't put patches into the stable tree for things that /never/ worked
-in the past.  We've never supported 32 CPUs so I don't think these
-qualify.
+I changed this:
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+> +static void gpio_orq_ack(struct irq_data *d)
+> +{
+> +       /* the interrupt is already cleared before by reading ISR */
+> +}
+> +
+>  static unsigned int gpio_irq_startup(struct irq_data *d)
+>  {
+>         struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
+> @@ -1434,6 +1420,7 @@ void at91_pinctrl_gpio_resume(void)
+>
+>  static struct irq_chip gpio_irqchip = {
+>         .name           = "GPIO",
+> +       .irq_ack        = gpio_orq_ack,
+
+orq? I didn't get it so changed to irq when applying.
+
+Yours,
+Linus Walleij
