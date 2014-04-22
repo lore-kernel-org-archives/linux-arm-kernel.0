@@ -1,51 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Apr 2014 07:03:16 -0700
-Subject: [PATCH] ARM: dts: Add support for the BeagleBoard xM A/B
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73EAC458C@DBDE04.ent.ti.com>
-References: <1397574599-29573-1-git-send-email-robertcnelson@gmail.com>
- <CAOCHtYg5_Lvi3SWuWaRTDDNhLJ32jiXsKYQmrsKaShVWpM+xWQ@mail.gmail.com>
- <534D51C1.3010007@ti.com>
- <CAOCHtYhygGFbUunY9abEkjKfpQ1hh-DfRfhm160NehSYhWJSRw@mail.gmail.com>
- <20140418225111.GP21823@atomide.com>
- <CAOCHtYjdC-OGkdaBt74xMqi5eDc1eVbU6O7VyWMEYN-U50-Abw@mail.gmail.com>
- <20140418235119.GS21823@atomide.com>
- <20980858CB6D3A4BAE95CA194937D5E73EAC458C@DBDE04.ent.ti.com>
-Message-ID: <20140422140316.GA19317@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 22 Apr 2014 15:04:13 +0100
+Subject: arm64: default dma_ops is set to coherent_dma_ops results into
+ DMA FAILURE
+In-Reply-To: <20140422132045.GB9820@arm.com>
+References: <CALk7dXpKGdYd7K4M68KbBgv9a7oHWhPPLER297xFgkYnEiv8Ug@mail.gmail.com>
+ <20140422132045.GB9820@arm.com>
+Message-ID: <20140422140413.GB10224@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Gupta, Pekon <pekon@ti.com> [140421 23:49]:
-> Tony,
+On Tue, Apr 22, 2014 at 02:20:45PM +0100, Will Deacon wrote:
+> On Tue, Apr 22, 2014 at 01:48:12PM +0100, Ritesh Harjani wrote:
+> > This is regarding the default dma_ops that we populate for arm64.
+> > 
+> > PROBLEM:
+> > Currently in arch/arm64/mm/dma-mapping.c we set dma_ops =
+> > &coherent_swiotlb_dma_ops.
+> > 
+> > The problem with this is, lets say that there is a dma device which
+> > has not populated its dev->archdata.dma_ops, then this dma device will
+> > get the coherent dma_ops in which we dont do any cache maintainance.
+> > 
+> > So, if the dma driver do kmalloc, make some changes to the buffer and
+> > after dma_map_single gives it to the dma for the transfer, due to no
+> > cache maintenance performed, result will be DMA transfer failed.
+> > 
+> > Earlier noncoherent ops code was not present at all for arm64, so may
+> > be we were setting default ops to coherent ops. But now that we have
+> > noncoherent ops in place shall we make the default dma_ops to
+> > noncoherent (as what arm also does) ?
 > 
-> >From: Tony Lindgren
-> >* Robert Nelson <robertcnelson@gmail.com> [140418 16:42]:
-> >> On Fri, Apr 18, 2014 at 5:51 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >> > * Robert Nelson <robertcnelson@gmail.com> [140415 08:46]:
-> >> >>
-> >> >> Background: i also tried getting this having this fixed in u-boot:
-> >> >
-> >> > Do we still need to apply this patch then?
-> >>
-> >> Yeah, Tom want's it done in the kernel:
-> >>
-> >> Here's my proposed u-boot patch:
-> >> http://lists.denx.de/pipermail/u-boot/2014-January/172154.html
-> >>
-> >> and Tom's recommendation:
-> >> http://lists.denx.de/pipermail/u-boot/2014-January/172274.html
-> >>
-> >> Once this hits mainline, i'll submit a patch to u-boot to check for
-> >> the presence of this version and drop to the old dtb if not found.
-> >
-> >OK applying into omap-for-v3.15/fixes thanks.
-> >
-> >Tony
+> The problem with changing the default assumption to non-coherent is that
+> existing coherent platforms that rely on the coherent DMA ops being selected
+> without any additional DT properties (e.g. dma-coherent) will break with
+> this change.
 > 
-> You probably missed fixing below typo before applying this patch.
-> omap3-beagle-xm-ab.dts breaks without this.
+> This puts us into a nasty situation where we have the opposite policy from
+> arch/arm/ regarding default DMA ops, rendering device-trees potentially
+> incompatible between the two architectures.
+> 
+> I'd be inclined to align the two, but it will break any users relying on the
+> current behaviour (I believe this includes Applied with their X-gene SoC).
 
-Yeah pushed out omap-for-v3.15/fixes-v2 with the missing bracket.
+If there aren't any DMA-capable X-gene drivers in mainline yet, we could
+make this change (probably even if they are, though we need input from
+the Applied guys on how disruptive this is).
 
-Regards,
+But do we have a documented way on describing which SoC is coherent? The
+longer term plan is for a full description of the system topology but we
+are not there yet. IIRC Santosh has been looking at this as well but I
+haven't followed the recent developments.
 
-Tony
+There are some instances of "dma-coherent" properties described in
+Documentation/devicetree/, we could use them and just need to find a way
+in the arm64 to handle this automatically without SoC-specific
+initialisation (and independent of the driver code).
+
+-- 
+Catalin
