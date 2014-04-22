@@ -1,58 +1,39 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 22 Apr 2014 13:49:31 +0200
-Subject: [PATCH v4 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry
- macro for iteration
-In-Reply-To: <20140422112717.GA21613@lee--X1>
-References: <534DB213.7080802@semaphore.gr>
- <6612075.PRZcWcuj98@vostro.rjw.lan> <20140422112717.GA21613@lee--X1>
-Message-ID: <4646665.ZmnOyyFeHY@vostro.rjw.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Apr 2014 12:34:23 +0100
+Subject: [PATCH 0/9] Renesas ipmmu-vmsa: Miscellaneous cleanups and fixes
+In-Reply-To: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140422113423.GB8389@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 22, 2014 12:27:17 PM Lee Jones wrote:
-> On Tue, 22 Apr 2014, Rafael J. Wysocki wrote:
-> 
-> > On Tuesday, April 22, 2014 08:15:41 AM Lee Jones wrote:
-> > > > The cpufreq core now supports the cpufreq_for_each_entry macro helper
-> > > > for iteration over the cpufreq_frequency_table, so use it.
-> > > > 
-> > > > It should have no functional changes.
-> > > 
-> > > > Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
-> > > > ---
-> > > 
-> > > It would be good to have a changelog which describes the differences
-> > > between the versions, so we can keep track.
-> > > 
-> > > >  drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
-> > > >  1 file changed, 8 insertions(+), 11 deletions(-)
-> > > 
-> > > So it looks like I already applied v2 of this patch to my tree. What
-> > > changed in v3 and v4? Should I remove that patch from MFD and apply
-> > > this one instead?
-> > 
-> > The reason why v4 was sent is because I asked for it.
-> > 
-> > And if you applied [5/8] without [1/8], it won't work, because the macro is
-> > introduced by that patch.
-> 
-> That's right, which is why I mailed you about it:
-> 
->   > > > Applied untested by me.
->   > >
->   > > Wouldn't build. Let it go via Rafael.
->   >
->   > Rafael, would you mind creating a branch from this patch set that we
->   > can both pull from please?
-> 
-> > If that's the case, please drop [5/8] and let me handle the entire series.
-> 
-> I'm happy for you to apply the series and send me a pull-request for
-> either a) the entire series or b) just the patches which touch MFD and
-> any subsequent decencies. Or I can apply them and send you one.
+On Mon, Apr 21, 2014 at 03:13:00PM +0100, Laurent Pinchart wrote:
+> Hello,
 
-OK, I'll create a separate branch with those patches and will let you know
-where it is.
+Hi Laurent,
 
-Kind regards,
-Rafael
+> This patch set cleans up and fixes small issues in the ipmmu-vmsa driver. The
+> patches are based on top of "[PATCH v3] iommu: Add driver for Renesas
+> VMSA-compatible IPMMU" that adds the ipmmu-vmsa driver.
+> 
+> The most interesting part of this series is the rewrite of the page table
+> management code. The IOMMU core guarantees that the map and unmap operations
+> will always be called only with page sizes advertised by the driver. We can
+> use that assumption to remove loops of PGD and PMD entries, simplifying the
+> code.
+
+Hmm, interesting. We still have to handle the case where a mapping created
+with one page-size could be unmapped with another though (in particular,
+unmapping part of the range).
+
+> Will, would it make sense to perform the same cleanup for the arm-smmu driver,
+> or is there a reason to keep loops over PGD and PMD entries ? Removing them
+> makes the implementation of 68kB and 2MB pages easier.
+
+Is this an assumption that's relied on by other IOMMU drivers? It
+certainly makes mapping of large ranges less efficient than it could be, so
+I'm more inclined to set all the bits > PAGE_SIZE in pgsize_bitmap if it's
+only used to determine the granularity at which map/unmap are called (which
+is unrelated to what the hardware can actually do).
+
+Will
