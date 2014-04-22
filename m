@@ -1,42 +1,68 @@
-From: antoine.tenart@free-electrons.com (=?UTF-8?q?Antoine=20T=C3=A9nart?=)
-Date: Tue, 22 Apr 2014 17:38:22 +0200
-Subject: [PATCH 3/6] ARM: berlin: add the AHCI node for the BG2Q
-In-Reply-To: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1398181105-19714-4-git-send-email-antoine.tenart@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 10:39:29 -0500
+Subject: [RFC PATCH 1/2] PCI: designware: Add ARM64 PCI support
+In-Reply-To: <000501cf5d48$4cf707c0$e6e51740$%han@samsung.com>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000901cf592e$563bc8c0$02b35a40$%han@samsung.com>
+ <20140416165724.GG7802@e106497-lin.cambridge.arm.com>
+ <16730530.rJ9T0MsYmt@wuerfel>
+ <000001cf5d04$982a6000$c87f2000$%han@samsung.com>
+ <000501cf5d48$4cf707c0$e6e51740$%han@samsung.com>
+Message-ID: <CAL_JsqJ5=7bvxQZhbn4unDH0wTB=qn4nEnqGCnskvOmRhJ8JQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q has an AHCI SATA controller. Add the corresponding node
-in its device tree.
+On Mon, Apr 21, 2014 at 4:58 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> On Monday, April 21, 2014 10:54 AM, Jingoo Han wrote:
+>> On Thursday, April 17, 2014 3:26 AM, Arnd Bergmann wrote:
+>> > On Wednesday 16 April 2014 17:57:24 Liviu Dudau wrote:
+>> > > Jingoo,
+>> > >
+>> > > Thanks for taking a stab at trying to convert a host bridge
+>> > > driver to use the new generic host bridge code.
+>> > >
+>> > > I do however have concerns on the direction you took. You have split
+>> > > your driver in two, depending on whether it was CONFIG_ARM or CONFIG_ARM64,
+>> > > even if (with my series) it should be no reason why the host bridge
+>> > > driver should not work on other architectures as well once they are
+>> > > converted.
+>> >
+>> > Right.
+>> >
+>> > > Also, some of the functions that you use have identical names but different
+>> > > signatures depending on what arch you have selected. This is really bad
+>> > > in my books!
+>
+> [.....]
+>
+>> > > What about creating functions that use my series directly if CONFIG_ARM64 is
+>> > > defined (or any CONFIG_ you want to create for your driver that you select
+>> > > from CONFIG_ARM64) and otherwise implement the CONFIG_ARM version? That
+>> > > way your driver will call only one API without any #ifdef and when arm code
+>> > > gets converted you drop your adaptation functions. Or (better yet), have a
+>> > > stab at converting bios32 (Rob Herring has already provided some hints on
+>> > > how to do it for arch/arm).
+>>
+>> To: Liviu Dudau
+>>
+>> Sorry, but I will not implement this.
 
-Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Then you will not get what you want upstream.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 07452a7483fa..8e58aae73365 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -183,6 +183,18 @@
- 			};
- 		};
- 
-+		ahci: sata at e90000 {
-+			compatible = "marvell,berlin-ahci";
-+			reg = <0xe90000 0x10000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disable";
-+		};
-+
-+		generic-regs at ea0110 {
-+			compatible = "marvell,berlin-generic-regs", "syscon";
-+			reg = <0xea0110 0x10>;
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
--- 
-1.8.3.2
+>> At first, you had to think the compatibility with ARM32 PCIe.
+>> Why do you want other engineers to take this load?
+
+That is how the process works.
+
+> (+cc Rob Herring)
+>
+> Um, I am looking at Rob Herring's patchset for Versatile PCI. [1]
+> Then, do you mean the following?
+>
+> 1. Add Rob Herring's patch converting bios32. [2]
+
+I would expect all or most of this patch to go away in Liviu's next
+version. It does at least show we don't have to fix all of ARM PCI
+support to use of_create_pci_host_bridge on ARM.
+
+Rob
