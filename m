@@ -1,38 +1,50 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:36 +0200
-Subject: [PATCH v2 32/38] ARM: orion5x: keep TODO list in edmini_v2 DT
+Date: Tue, 22 Apr 2014 23:26:28 +0200
+Subject: [PATCH v2 24/38] ARM: orion5x: enable pinctrl driver at SoC level
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-33-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-25-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to the complete removal of non-DT support for
-edmini_v2, this commit copies the TODO list of things to support from
-the old-style board file into the Device Tree of edmini_v2.
+This commit declares the pinctrl device in the Orion5x 5182 Device
+Tree files, and ensures that the Orion pinctrl driver is compiled.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/orion5x-mv88f5182.dtsi | 5 +++++
+ arch/arm/mach-orion5x/Kconfig            | 2 ++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-index 1ecddbe..89ff404 100644
---- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-+++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-@@ -6,6 +6,13 @@
-  * warranty of any kind, whether express or implied.
-  */
+diff --git a/arch/arm/boot/dts/orion5x-mv88f5182.dtsi b/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
+index a56f9c8..8c71b6b 100644
+--- a/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
++++ b/arch/arm/boot/dts/orion5x-mv88f5182.dtsi
+@@ -15,6 +15,11 @@
+ 		compatible = "marvell,orion5x-88f5182-mbus", "simple-bus";
  
-+/*
-+ * TODO: add Orion USB device port init when kernel.org support is added.
-+ * TODO: add flash write support: see below.
-+ * TODO: add power-off support.
-+ * TODO: add I2C EEPROM support.
-+ */
+ 		internal-regs {
++			pinctrl: pinctrl at 10000 {
++				compatible = "marvell,88f5182-pinctrl";
++				reg = <0x10000 0x8>, <0x10050 0x4>;
++			};
 +
- /dts-v1/;
- 
- #include <dt-bindings/gpio/gpio.h>
+ 			core_clk: core-clocks at 10030 {
+ 				compatible = "marvell,mv88f5182-core-clock";
+ 				reg = <0x10010 0x4>;
+diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+index bd65872..3c69a3c 100644
+--- a/arch/arm/mach-orion5x/Kconfig
++++ b/arch/arm/mach-orion5x/Kconfig
+@@ -8,6 +8,8 @@ config ARCH_ORION5X_DT
+ 	select ORION_CLK
+ 	select ORION_IRQCHIP
+ 	select ORION_TIMER
++	select PINCTRL
++	select PINCTRL_ORION
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell Orion5x using flattened device tree.
 -- 
 1.9.2
