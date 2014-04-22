@@ -1,78 +1,89 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Apr 2014 13:58:01 +0530
-Subject: [PATCH v3 1/3] ARM: OMAP2+: L2 cache: get rid of init call
-In-Reply-To: <cover.1398149526.git.nsekhar@ti.com>
-References: <cover.1398149526.git.nsekhar@ti.com>
-Message-ID: <9e9e4a3cae0b383f35a04aa1c060d4f678471f4d.1398149526.git.nsekhar@ti.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 22 Apr 2014 10:43:16 +0200
+Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for	components
+ tracking
+In-Reply-To: <20140418124202.GD24070@n2100.arm.linux.org.uk>
+References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
+ <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+ <20140417214709.GY24070@n2100.arm.linux.org.uk> <53510C39.1020205@samsung.com>
+ <20140418124202.GD24070@n2100.arm.linux.org.uk>
+Message-ID: <53562BA4.6020902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of init call to initialize L2 cache.
-Instead use the init_early machine hook. This
-helps in using the initialization routine across
-SoCs without the need of ugly cpu_is_*() checks.
+Hi Russel,
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-omap2/common.h       |    1 +
- arch/arm/mach-omap2/io.c           |    1 +
- arch/arm/mach-omap2/omap4-common.c |   10 +---------
- 3 files changed, 3 insertions(+), 9 deletions(-)
+My answer little bit later due to Easter.
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index d88aff7..ff02973 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -91,6 +91,7 @@ extern void omap3_sync32k_timer_init(void);
- extern void omap3_secure_sync32k_timer_init(void);
- extern void omap3_gptimer_timer_init(void);
- extern void omap4_local_timer_init(void);
-+int omap_l2_cache_init(void);
- extern void omap5_realtime_timer_init(void);
- 
- void omap2420_init_early(void);
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index f14f9ac..b28299b 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -640,6 +640,7 @@ void __init omap4430_init_early(void)
- 	omap44xx_clockdomains_init();
- 	omap44xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
-+	omap_l2_cache_init();
- 	omap_clk_soc_init = omap4xxx_dt_clk_init;
- }
- 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index df3f531..1230975 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -196,17 +196,10 @@ static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
- 	omap_smc1(smc_op, val);
- }
- 
--static int __init omap_l2_cache_init(void)
-+int __init omap_l2_cache_init(void)
- {
- 	u32 aux_ctrl;
- 
--	/*
--	 * To avoid code running on other OMAPs in
--	 * multi-omap builds
--	 */
--	if (!cpu_is_omap44xx())
--		return -ENODEV;
--
- 	/* Static mapping, never released */
- 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
- 	if (WARN_ON(!l2cache_base))
-@@ -226,7 +219,6 @@ static int __init omap_l2_cache_init(void)
- 
- 	return 0;
- }
--omap_early_initcall(omap_l2_cache_init);
- #endif
- 
- void __iomem *omap4_get_sar_ram_base(void)
--- 
-1.7.10.1
+On 04/18/2014 02:42 PM, Russell King - ARM Linux wrote:
+> On Fri, Apr 18, 2014 at 01:27:53PM +0200, Andrzej Hajda wrote:
+>> Hi Russel,
+>>
+>> Thanks for comments.
+>>
+>> On 04/17/2014 11:47 PM, Russell King - ARM Linux wrote:
+>>> On Thu, Apr 17, 2014 at 01:28:50PM +0200, Andrzej Hajda wrote:
+>>>> +out:
+>>>> +	if (ret != -EPROBE_DEFER)
+>>>> +		exynos_drm_dev_ready(&pdev->dev);
+>>> So we end up with everyone needing a "ready" call in each sub-driver
+>>> back into the main driver... this makes it impossible to write a
+>>> generic subcomponent driver which is not tied in any way to the
+>>> main driver.
+>>>
+>>> That is quite some restriction, and would prevent, for example, the
+>>> TDA998x driver being used both with Armada DRM, tilcdc and any other
+>>> driver.
+>> As I see in armada driver drm is deferred in case tda998x is not yet
+>> available. The same solution can be still used with pending_devices
+>> approach - the main driver will not report its readiness until tda998x
+>> is present.
+>>
+>> Anyway it still seems to be better than componentize every driver which can
+>> probably become a part of some superdevice.
+>>
+>> If you want to get rid of deferred probe one can make global list of
+>> 'ready' devices with notifications systems for master devices.
+>>
+>> Maybe it would be good to consider notification system for devices probe
+>> result,
+>> it will require that driver register all its interfaces in probe, ie its
+>> readiness cannot
+>> be reported later but will not require to add new framework. I hope just
+>> extending current
+>> notification system should be enough.
+> You aren't addressing my point.  If I were to convert tda998x to use
+> your infrastructure, then I would have to add in ifdefs to tie it into
+> armada DRM _and_ a different set of ifdefs to tie it into tilcdc.  Then
+> when someone else wanted to use it in their driver, they'd have to add
+> yet more ifdefs into it to tie it into their driver.
+>
+> This does not scale.
+
+As I already answered, you should not use 'my' framework for tda998x
+driver, you can still use current approach with deferred probe. I am not
+sure
+why have you used ifdefs in armada, tilcdc also uses tda998x and without
+ifdefs.
+
+'My' framework (I think helper library is a better name) was created to
+use with
+devices which are closely tied together by another framework - case
+of some SoC devices.
+
+
+>
+> So, please address my point: in your system, how can a single component
+> be shared between multiple different master drivers?
+>
+
+I have answered this question above, again. But your question suggests
+you want to componentize
+also drivers which are shared by different DRMs. How do you want to do it?
+- componentize all DRM drivers sharing given driver?
+- componentize shared device in a way that it can used by
+non-componentized devices? how? I guess it
+will be possible but will have some price.
+
+Regards
+Andrzej
