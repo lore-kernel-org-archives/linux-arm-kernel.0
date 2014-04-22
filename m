@@ -1,50 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 22 Apr 2014 10:05:38 +0300
-Subject: [PATCH] ARM: Wire up the renameat2() syscall
-Message-ID: <1398150338-23475-1-git-send-email-peter.ujfalusi@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Apr 2014 08:15:41 +0100
+Subject: [PATCH v4 5/8] mfd: db8500-prcmu: Use cpufreq_for_each_entry
+ macro for iteration
+In-Reply-To: <5355A349.50908@semaphore.gr>
+References: <534DB213.7080802@semaphore.gr>
+ <5355A349.50908@semaphore.gr>
+Message-ID: <20140422071541.GA17657@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new renameat2() system call was only wired up for ARM causing:
- CALL    /home/ujfalusi/work/kernel/kernel.org-next-linux-next/scripts/checksyscalls.sh
-<stdin>:1232:2: warning: #warning syscall renameat2 not implemented [-Wcpp]
+> The cpufreq core now supports the cpufreq_for_each_entry macro helper
+> for iteration over the cpufreq_frequency_table, so use it.
+> 
+> It should have no functional changes.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-Hi,
+> Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+> ---
 
-I have noticed this with linux-next.
+It would be good to have a changelog which describes the differences
+between the versions, so we can keep track.
 
-Regards,
-Peter
+>  drivers/mfd/db8500-prcmu.c | 19 ++++++++-----------
+>  1 file changed, 8 insertions(+), 11 deletions(-)
 
- arch/arm/include/uapi/asm/unistd.h | 1 +
- arch/arm/kernel/calls.S            | 1 +
- 2 files changed, 2 insertions(+)
+So it looks like I already applied v2 of this patch to my tree. What
+changed in v3 and v4? Should I remove that patch from MFD and apply
+this one instead?
 
-diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
-index fb5584d0cc05..ba94446c72d9 100644
---- a/arch/arm/include/uapi/asm/unistd.h
-+++ b/arch/arm/include/uapi/asm/unistd.h
-@@ -408,6 +408,7 @@
- #define __NR_finit_module		(__NR_SYSCALL_BASE+379)
- #define __NR_sched_setattr		(__NR_SYSCALL_BASE+380)
- #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
-+#define __NR_renameat2			(__NR_SYSCALL_BASE+382)
- 
- /*
-  * This may need to be greater than __NR_last_syscall+1 in order to
-diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
-index 166e945de832..8f51bdcdacbb 100644
---- a/arch/arm/kernel/calls.S
-+++ b/arch/arm/kernel/calls.S
-@@ -391,6 +391,7 @@
- 		CALL(sys_finit_module)
- /* 380 */	CALL(sys_sched_setattr)
- 		CALL(sys_sched_getattr)
-+		CALL(sys_renameat2)
- #ifndef syscalls_counted
- .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
- #define syscalls_counted
 -- 
-1.9.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
