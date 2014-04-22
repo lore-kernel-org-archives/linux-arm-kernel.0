@@ -1,91 +1,108 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 22 Apr 2014 07:56:46 +0000
-Subject: [PATCH v7 1/2] can: xilinx CAN controller support
-In-Reply-To: <53424C32.7090000@monstr.eu>
-References: <3e750ec3-9d47-4b4e-8173-56698ab19786@CH1EHSMHS029.ehs.local>
- <53424C32.7090000@monstr.eu>
-Message-ID: <707ea084-ed82-407b-8967-1e82a994b784@AM1EHSMHS003.ehs.local>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Tue, 22 Apr 2014 13:33:13 +0530
+Subject: [PATCH v5 0/2] Add Exynos5 USB 3.0 phy driver based on generic PHY
+ framework
+Message-ID: <1398153795-28475-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Based on 'next' branch of Kishon's phy tree (linux-phy).
+Tested on 'usb-next' of Greg's usb tree.
 
-> -----Original Message-----
-> From: Michal Simek [mailto:monstr at monstr.eu]
-> Sent: Monday, April 07, 2014 12:27 PM
-> To: Appana Durga Kedareswara Rao
-> Cc: wg at grandegger.com; mkl at pengutronix.de; Michal Simek;
-> grant.likely at linaro.org; robh+dt at kernel.org; linux-can at vger.kernel.org;
-> netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; Appana Durga
-> Kedareswara Rao
-> Subject: Re: [PATCH v7 1/2] can: xilinx CAN controller support
->
-> On 04/02/2014 03:13 PM, Kedareswara rao Appana wrote:
-> > This patch adds xilinx CAN controller support.
-> > This driver supports both ZYNQ CANPS and Soft IP AXI CAN controller.
-> >
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > ---
-> > Changes for v7:
-> > - Updated the driver with review comments.
-> > - Moved the driver bindings doc as a separte patch.
-> > Changes for v6:
-> > - Updated the driver with review comments.
-> > - Used the clock names specified in the data sheet.
-> > - Updated the devicetree bindings doc as per Rob suggestion.
-> > Changes for v5:
-> > - Updated the driver with the review comments.
-> > - Remove the check for the tx fifo full interrupt condition
-> >   form Tx interrupt routine as we are checking it in the _xmit
-> >   routine.
-> > - Clearing the txok interrupt in the tx interrupt routine for
-> >   every Tx can frame.
-> > Changes for v4:
-> > - Added check for the tx fifo full interrupt condition in Tx interrupt
-> > routine.
-> > - Added be iohelper functions.
-> > - Moved the clock enable/disable to probe/remove because of
-> >   Added big endian support for AXI CAN controller case(reading
-> >   a register during probe for that we need to enable clock).
-> > Changes for v3:
-> > - Updated the driver with the review comments.
-> > - Modified the tranmit logic as per Marc suggestion.
-> > - Enabling the clock when the interface is up to reduce the
-> >   Power consumption.
-> > Changes for v2:
-> > - Updated with the review comments.
-> > - Removed the unnecessary debug prints.
-> > - include tx,rx fifo depths in ZYNQ CANPS case also
-> > ---
-> >  drivers/net/can/Kconfig      |    7 +
-> >  drivers/net/can/Makefile     |    1 +
-> >  drivers/net/can/xilinx_can.c | 1176
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 1184 insertions(+), 0 deletions(-)  create mode
-> > 100644 drivers/net/can/xilinx_can.c
->
-> Mark: Any update on this one?
-> BTW: When you apply these patches you should apply 2/2 before 1/2. There
-> is new checking for binding.
->
+Changes from v4:
+1) Separated out the device tree related arch patches from this patch series.
+   Shall be posting these below mentioned patches (which were part of
+   V4 version of this series) in a separate patch series based on
+   Kgene's next branch.
+   [PATCH v4 2/5]dt: exynos5420: Enable support for USB 3.0 PHY controller
+   [PATCH v4 3/5]dt: exynos5420: Enable support for DWC3 controller
+   [PATCH v4 4/5]dt: exynos5250: Enable support for generic USB DRD phy
+   [PATCH v4 5/5]usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
 
-Ping?
+2) Also clubbed the reworked VBUS patch for usb3-drd phy, which was earlier
+   sent as a separate patch:
+   [PATCH] phy: exynos5-usbdrd: Add facility to toggle vbus gpio on/off.
+   https://lkml.org/lkml/2014/4/9/186
 
-Regards,
-Kedar.
+1) Removed the mention of separate sclk_usbphy30*, instead this clock
+   will be used as 'ref' phy reference clock while adding the device
+   nodes.
+2) Reading the PHYCLKRST register to restore any previous settings,
+   instead of using a separate variable for saving/restoring purpose.
+3) Renamed 'samsung,syscon-phandle' property to 'samsung,pmu-syscon'.
+4) Removed unnecessary check for of_node property at the starting of
+   driver probe, since this is exclusively DT enabled driver.
 
-> Thanks,
-> Michal
->
-> --
-> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-> w: www.monstr.eu p: +42-0-721842854
-> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-> Maintainer of Linux kernel - Xilinx Zynq ARM architecture Microblaze U-
-> BOOT custodian and responsible for u-boot arm zynq platform
->
+Changes from V3:
+1) Separated out the phy init sequences for utmi and pipe3 phys.
+2) Changed the nomenclature across the phy to 'usbdrd-phy' to
+   indicate USB 3.0 DRD PHY controller; and thereby changed the names                
+   of functions correspondingly, including specific functions for
+   utmi and pipe3 phys.                                                              
+3) Modified the DT nodes for the updated nomenclature.
+4) Using BIT macro for single bit definitions.                                       
+5) Keeping track of reference clock after getting till the removal of                
+   phy, and getting the ref clock using devm_clk_get() api.
+6) Removed aliases for mutiple channel PHYs, and instead using
+   'samsung,pmu-offset' property for PHY power control register offset.
+7) Keeping the phy_init() and phy_power_on() separately in order to
+   align with phy handling in the consumer (DWC3).
 
+Changes from v2:
+1) Added support for multiple PHYs (UTMI+ and PIPE3) and                   
+   related changes in the driver structuring.
+2) Added a xlate function to get the required phy out of
+   number of PHYs in mutiple PHY scenerio.
+3) Changed the names of few structures and variables to                
+   have a clearer meaning. 
+4) Added 'usb3phy_config' structure to take care of mutiple
+   phys for a SoC having 'exynos5_usb3phy_drv_data' driver data.      
+5) Not deleting support for old driver 'phy-samsung-usb3' until
+   required support for generic phy is added to DWC3.  
+ 
+Changes from RFC patch-set:
+1) fixes in documentation file
+ - added provision for syscon interface for using PMU register.
+ - added clock names and description
+ - modified description style for 'compatible property'                    
+ - made usb30_sclk as additional clock rather then making it optional, since
+   it is actually an additional clock for Exynos5420 Soc.
+2) fixes in phy-exynos5-usb3 driver file
+ - removed unnecessary #ifndef around KHZ and MHZ definitions            
+ - removed 'samsung_cpu_type', 'usb3phy_state' enums; and merged necessary
+   necessary from 'usb3phy_instance' structure to 'usb3phy_driver'.
+ - changed name 'sclk_usbphy30' to 'usb30_sclk_100m' since this is the name
+   indicated as input to the PHY block; and also added (!IS_ERR()) check for
+   using usb30_sclk.
+ - removed unnecessary 'state' check code.
+ - moved 'of_device_id' structure definitions before 'probe()' to avoid
+   unnecessary declaration.
+ - added (pdev->dev.of_node == NULL) check at the starting of probe()
+ - moved 'devm_of_phy_provider_register()' call to end of the probe().
+ - removed 'label' for usb3drd phy.
+ - corrected macros definition 'PHYCLKRST_MPLL_MULTIPLIER_50M_REF' from
+   0x02 to 0x32 after confirming same from PHY's data sheet.
+ - replaced pmu register handling, used for power-isolation, with syscon
+   interface api's.
+ - added '.init' and '.exit' callbacks and using them for one time
+   PHY-initialization and deinitialization.
+ - Filtering out the PHY 'power-on' and 'power-off' sequence to '.power_on"
+   and ".power_off" callbacks.
+ - Removed drivers/usb/phy/phy-samsung-usb3.c driver and related code.
+3) fixes in dt files
+ - added reference for 'samsung,syscon-phandle' to used for PMU register.
+ - removed second register field which was earlier used for PMU.
 
+Vivek Gautam (2):
+  phy: Add new Exynos5 USB 3.0 PHY driver
+  phy: exynos5-usbdrd: Add facility for VBUS supply
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+ .../devicetree/bindings/phy/samsung-phy.txt        |   40 ++
+ drivers/phy/Kconfig                                |   11 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-exynos5-usbdrd.c                   |  663 ++++++++++++++++++++
+ 4 files changed, 715 insertions(+)
+ create mode 100644 drivers/phy/phy-exynos5-usbdrd.c
+
+-- 
+1.7.10.4
