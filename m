@@ -1,41 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Apr 2014 14:26:24 +0100
-Subject: [PATCH v3] arm64: enable EDAC on arm64
-In-Reply-To: <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
-References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
- <20140422102455.GD7484@arm.com>
- <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
-Message-ID: <20140422132624.GC9820@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 22 Apr 2014 15:27:16 +0200
+Subject: [PATCH v3 5/7] pinctrl: sunxi: define A31 R_PIO pin functions
+In-Reply-To: <CACRpkdam1a0TUPx4rMG6mzXwRdYZgfeZdBUhk0hnWAbKVQKr=A@mail.gmail.com>
+References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>	<1397137966-30818-6-git-send-email-boris.brezillon@free-electrons.com>
+ <CACRpkdam1a0TUPx4rMG6mzXwRdYZgfeZdBUhk0hnWAbKVQKr=A@mail.gmail.com>
+Message-ID: <53566E34.2070709@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 01:54:12PM +0100, Rob Herring wrote:
-> On Tue, Apr 22, 2014 at 5:24 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Apr 21, 2014 at 05:09:16PM +0100, Rob Herring wrote:
-> >> +#ifndef ASM_EDAC_H
-> >> +#define ASM_EDAC_H
-> >> +/*
-> >> + * ECC atomic, DMA, SMP and interrupt safe scrub function.
-> >
-> > What do you mean by `DMA safe'? For coherent (cacheable) DMA buffers, this
-> > should work fine, but for non-coherent (and potentially non-cacheable)
-> > buffers, I think we'll have problems both due to the lack of guaranteed
-> > exclusive monitor support and also eviction of dirty lines.
-> 
-> That's just copied from other implementations. I agree you could have
-> a problem here although I don't see why dirty line eviction would be.
 
-I was thinking of the case where you have an ongoing, non-coherent DMA
-transfer from a device and then the atomic_scrub routine runs in parallel
-on the CPU, targetting the same buffer. In this case, the stxr could store
-stale data back to the buffer, leading to corruption (since the monitor
-won't help). This differs from the case where the monitor could always
-report failure for non-cacheable regions, causing atomic_scrub to livelock.
+On 22/04/2014 13:47, Linus Walleij wrote:
+> On Thu, Apr 10, 2014 at 3:52 PM, Boris BREZILLON
+> <boris.brezillon@free-electrons.com> wrote:
+>
+>> The A31 SoC provides both PL and PM pio bank through the R_PIO block.
+>>
+>> These pins all support gpio function and can bbe assigned to system
+>> peripherals (like TWI, P2WI, JTAG, ...)
+>>
+>> Add new compatible string to the DT bindings doc.
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> PARTLY APPLIED.
+>
+> The patch to the DT bindings apparently depend on some
+> patch that I do *NOT* have in my tree, please figure out what is
+> going on here and help me figure out what and how to apply the
+> changes to the bindings.
 
-> There's not really a solution other than not doing s/w scrubbing or
-> doing it in h/w. So it is up to individual drivers to decide what to
-> do, but we have to provide this function just to enable EDAC.
+Oops: I dropped the patch documenting existing compatible strings in
+this version ([1]).
 
-I think we need to avoid s/w scrubbing of non-cacheable memory altogether.
+>
+> The hunk adding the docs was dropped from the patch, please
+> develop new series on top of my pinctrl devel branch as I
+> push it out.
 
-Will
+Sure, I'll make a new patch listing all compatible strings (including
+this new one) in the sunxi pinctrl DT bindings doc.
+
+Thanks,
+
+Boris
+
+[1] https://lkml.org/lkml/2014/4/9/258
+>
+> Yours,
+> Linus Walleij
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
