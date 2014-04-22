@@ -1,88 +1,64 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Mon, 21 Apr 2014 23:08:18 -0700
-Subject: [PATCH] Kbuild arm: LLVMLinux: Add Kbuild support for building arch
- arm with Clang
-Message-ID: <1398146898-15009-1-git-send-email-behanw@converseincode.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 22 Apr 2014 11:46:29 +0530
+Subject: [PATCH v2 0/3] MCPM backend for Exynos5420
+In-Reply-To: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1398147389-2987-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+This is v2 of the series adding MCPM backend support for SMP secondary boot
+and core switching on Samsung's Exynos5420. The patches are based on the mcpm
+support added for Exynos5420 in the Chromium kernel repository here:
+https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.8
 
-Protect more options for arm with cc-option so that we don't get errors when
-using clang instead of gcc.  Add more or different options when using clang as
-well.
+This patchset depends on:
+- ARM: EXYNOS5: Add PMU settings for exynos5420
+(https://patchwork.kernel.org/patch/3896471/)
+- ARM: EXYNOS: Map SYSRAM address through DT
+(http://www.spinics.net/lists/arm-kernel/msg323011.html)
+- ARM: bL_switcher: fix validation check before its activation
+(http://www.spinics.net/lists/arm-kernel/msg323274.html)
 
-Author: Behan Webster <behanw@converseincode.com>
-Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-Signed-off-by: Behan Webster <behanw@converseincode.com>
----
- arch/arm/Makefile                 | 16 ++++++++++++----
- arch/arm/boot/compressed/Makefile |  2 +-
- 2 files changed, 13 insertions(+), 5 deletions(-)
+The patches have been prepared on Kgene's for-next branch and tested on SMDK5420
+EVT1 using the "/dev/b.L_switcher" user interface. Patches have also been tested
+on linux-next(20140417).
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 41c1931..60412ce 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -23,6 +23,14 @@ OBJCOPYFLAGS	:=-O binary -R .comment -S
- GZFLAGS		:=-9
- #KBUILD_CFLAGS	+=-pipe
- 
-+ifeq ($(COMPILER),clang)
-+# Clang options
-+ifneq ($(CROSS_COMPILE),)
-+KBUILD_CPPFLAGS	+= -target $(CROSS_COMPILE:-=)
-+endif
-+KBUILD_CFLAGS   += -fno-builtin -Wno-asm-operand-widths -Xassembler -mno-warn-deprecated
-+endif
-+
- # Never generate .eh_frame
- KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
- 
-@@ -41,11 +49,11 @@ KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
- endif
- 
- ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
--KBUILD_CPPFLAGS	+= -mbig-endian
-+KBUILD_CPPFLAGS	+= $(call cc-option,-mbig-endian,)
- AS		+= -EB
- LD		+= -EB
- else
--KBUILD_CPPFLAGS	+= -mlittle-endian
-+KBUILD_CPPFLAGS	+= $(call cc-option,-mlittle-endian,)
- AS		+= -EL
- LD		+= -EL
- endif
-@@ -96,7 +104,7 @@ tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
- tune-y := $(tune-y)
- 
- ifeq ($(CONFIG_AEABI),y)
--CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
-+CFLAGS_ABI	:=-mabi=aapcs-linux $(call cc-option,-mno-thumb-interwork,) -mfpu=vfp
- else
- CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
- endif
-@@ -120,7 +128,7 @@ AFLAGS_ISA	:=$(CFLAGS_ISA)
- endif
- 
- # Need -Uarm for gcc < 3.x
--KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
-+KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float $(call cc-option, -Uarm,)
- KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
- 
- CHECKFLAGS	+= -D__arm__
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 68c9183..9aee36e 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -121,7 +121,7 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
- KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
- endif
- 
--ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
-+ccflags-y := -fpic $(call cc-option,-mno-single-pic-base,) -fno-builtin -I$(obj)
- asflags-y := -DZIMAGE
- 
- # Supply kernel BSS size to the decompressor via a linker symbol.
+Changes since v1:
+Addressed the following comments from Dave Martin and Nicolas Pitre:
+	- Fixed help text for EXYNOS5420_MCPM symbol.
+	- Removed mcpm-exynos-setup.S file and added similar code from tc2_pm.c.
+	- Changed the spinlock name from "bl_lock" to "exynos_mcpm_lock".
+	- Removed snoop enable/disable calls due to possible cpuidle issue and
+	  not having numbers proving a significant power savings. Dropped the
+	  "drivers/bus: arm-cci: Add common control interface for ACE ports"
+	  patch from v1 as it was no longer needed.
+	- Created a macro for exynos-specific v7_exit_coherency_flush which
+	  handles an erratum. This was done to prevent duplication of code.
+	- Removed "outer_flush_all" call.
+	- Removed redundant dsb in power_down function.
+	- Removed unnecessary initialization of global variables to zero.
+	- Split the /dev/bL_status debug interface into another patch.
+	- Fixed error handling in exynos_mcpm_init().
+	- Called mcpm_smp_set_ops directly from exynos_mcpm_init().
+	- Added a TODO for supporting cluster down on exynos5420.
+
+There is no change in the patch " ARM: dts: exynos5420: add CCI node" from v1.
+
+Abhilash Kesavan (2):
+  arm: exynos: Add MCPM call-back functions
+  arm: exynos: Add /dev/bL_status user interface on Exynos5420
+
+Andrew Bresticker (1):
+  ARM: dts: exynos5420: add CCI node
+
+ arch/arm/boot/dts/exynos5420.dtsi  |   27 +++
+ arch/arm/mach-exynos/Kconfig       |    8 +
+ arch/arm/mach-exynos/Makefile      |    2 +
+ arch/arm/mach-exynos/mcpm-exynos.c |  409 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h    |    2 +
+ 5 files changed, 448 insertions(+)
+ create mode 100644 arch/arm/mach-exynos/mcpm-exynos.c
+
 -- 
-1.8.3.2
+1.7.9.5
