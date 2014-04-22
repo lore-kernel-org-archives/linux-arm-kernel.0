@@ -1,32 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 22 Apr 2014 19:50:48 -0400 (EDT)
-Subject: [PATCH v3 0/2] change ARM linux memory layout to support 32 CPUs
-In-Reply-To: <20140422213114.GA24070@n2100.arm.linux.org.uk>
-References: <1397559967-26050-1-git-send-email-sdu.liu@huawei.com>
- <20140422213114.GA24070@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1404221949510.980@knanqh.ubzr>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 22 Apr 2014 19:56:19 -0400
+Subject: [PATCH 0/2] net: Add Keystone NetCP ethernet driver support
+In-Reply-To: <20140422150231.2e87b7eb@nehalam.linuxnetplumber.net>
+References: <1398201675-17379-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140422150231.2e87b7eb@nehalam.linuxnetplumber.net>
+Message-ID: <535701A3.5050309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Apr 2014, Russell King - ARM Linux wrote:
-
-> On Tue, Apr 15, 2014 at 07:06:05PM +0800, Liu Hua wrote:
-> > This patch series change fixmap mapping region to suppport 32 CPUs.
-> > Because the "top_pmd" covers 0xfffe0000 - 0xffffffff(2M). And part 
-> > is used by vector table. So I move this region down to 0xffc00000
-> >  - 0xffdffff. 
+On Tuesday 22 April 2014 06:02 PM, Stephen Hemminger wrote:
+> On Tue, 22 Apr 2014 17:21:13 -0400
+> Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 > 
-> Can you explain why you have submitted these patches to my patch tracker
-> with a copy to stable at vger.kernel.org ?
+>> NetCP driver has a plug-in module architecture where each of the NetCP
+>> sub-modules exist as a loadable kernel module which plug in to the netcp
+>> core. These sub-modules are represented as "netcp-devices" in the dts
+>> bindings. It is mandatory to have the ethernet switch sub-module for
+>> the ethernet interface to be operational. Any other sub-module like the
+>> PA is optional.
 > 
-> What makes these qualify for stable tree inclusion?  What regression are
-> they fixing?
+> Where is the implementation of these modules. You need to include
+> this as separate patch set. Also the hooks for these modules should all
+> be EXPORT_SYMBOL_GPL() to disallow proprietary modules.
 > 
-> We don't put patches into the stable tree for things that /never/ worked
-> in the past.  We've never supported 32 CPUs so I don't think these
-> qualify.
+There is no proprietary issue and all the hooks will be GPL. The plan is
+to add them in another patch-set once the core driver gets merged. They need
+some work to make them upstream ready.
 
-Indeed.  The stable qualifier should be dropped.
-
-
-Nicolas
+Regards,
+Santosh
