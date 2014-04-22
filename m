@@ -1,47 +1,112 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Apr 2014 11:48:06 +0100
-Subject: [PATCH 2/3] arm64: Treat handle_arch_irq as a function pointer
-In-Reply-To: <1397782023-28114-3-git-send-email-lauraa@codeaurora.org>
-References: <1397782023-28114-1-git-send-email-lauraa@codeaurora.org>
- <1397782023-28114-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140422104806.GA8389@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 22 Apr 2014 12:51:06 +0200
+Subject: [PATCH 4/4] mcpm: exynos: populate suspend and powered_up
+ callbacks
+In-Reply-To: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+References: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
+ <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <5356499A.20609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 01:47:02AM +0100, Laura Abbott wrote:
-> handle_arch_irq isn't actually text, it's just a function
-> pointer. It doesn't need to be stored in the text section
-> and doing so causes problems if we ever want to make the
-> kernel text readonly. Move it to the data section.
-> 
-> Change-Id: I682ff82f5c8c429129dd81bbcc91571f278c62e2
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+On 04/21/2014 01:49 PM, Chander Kashyap wrote:
+> In order to support cpuidle through mcpm, suspend and powered-up
+> callbacks are required in mcpm platform code.
+> Hence populate the same callbacks.
+>
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 > ---
->  arch/arm64/kernel/entry.S | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 39ac630..5051f30 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -139,7 +139,8 @@ tsk	.req	x28		// current thread_info
->   * Interrupt handling.
->   */
->  	.macro	irq_handler
-> -	ldr	x1, handle_arch_irq
-> +	ldr	x1, =handle_arch_irq
-> +	ldr	x1, [x1]
->  	mov	x0, sp
->  	blr	x1
->  	.endm
-> @@ -678,5 +679,6 @@ ENTRY(sys_rt_sigreturn_wrapper)
->  	b	sys_rt_sigreturn
->  ENDPROC(sys_rt_sigreturn_wrapper)
->  
-> +.data
->  ENTRY(handle_arch_irq)
+>   arch/arm/mach-exynos/mcpm-exynos.c |   53 ++++++++++++++++++++++++++++++++++++
+>   1 file changed, 53 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 46d4968..16af0bd 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -318,10 +318,63 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
+>   	return 0; /* success: the CPU is halted */
+>   }
+>
+> +static void enable_coherency(void)
+> +{
+> +	unsigned long v, u;
+> +
+> +	asm volatile(
+> +		"mrc	p15, 0, %0, c1, c0, 1\n"
+> +		"orr	%0, %0, %2\n"
+> +		"ldr	%1, [%3]\n"
+> +		"and	%1, %1, #0\n"
+> +		"orr	%0, %0, %1\n"
+> +		"mcr	p15, 0, %0, c1, c0, 1\n"
+> +		: "=&r" (v), "=&r" (u)
+> +		: "Ir" (0x40), "Ir" (S5P_INFORM0)
+> +		: "cc");
+> +}
 
-Probably worth dropping the ENTRY directive if we're putting this in .data
-and using an explicit .align instead.
+Shouldn't this function to be used from hotplug.c also ?
 
-Will
+> +
+> +void exynos_powered_up(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	arch_spin_lock(&bl_lock);
+> +	if (cpu_use_count[cpu][cluster] == 0)
+> +		cpu_use_count[cpu][cluster] = 1;
+> +	arch_spin_unlock(&bl_lock);
+> +}
+> +
+> +static void exynos_suspend(u64 residency)
+> +{
+> +	unsigned int mpidr, cpunr;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpunr = enynos_pmu_cpunr(mpidr);
+
+*enynos*_pmu_cpunr ?
+
+> +
+> +	__raw_writel(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
+> +
+> +	exynos_power_down();
+> +
+> +	/*
+> +	 * Execution reaches here only if cpu did not power down.
+> +	 * Hence roll back the changes done in exynos_power_down function.
+> +	*/
+> +	__raw_writel(EXYNOS_CORE_LOCAL_PWR_EN,
+> +			EXYNOS_ARM_CORE_CONFIGURATION(cpunr));
+
+Why don't you use the functions defined in the
+
+patch 5/5 arm: exynos: Add MCPM call-back functions
+
+exynos_core_power_control() ?
+
+> +	set_cr(get_cr() | CR_C);
+> +	enable_coherency();
+> +}
+> +
+>   static const struct mcpm_platform_ops exynos_power_ops = {
+>   	.power_up		= exynos_power_up,
+>   	.power_down		= exynos_power_down,
+>   	.power_down_finish	= exynos_power_down_finish,
+> +	.suspend		= exynos_suspend,
+> +	.powered_up		= exynos_powered_up,
+>   };
+>
+>   static void __init exynos_mcpm_usage_count_init(void)
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
