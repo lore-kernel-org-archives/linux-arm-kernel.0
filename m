@@ -1,27 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Apr 2014 13:43:03 +0200
-Subject: [PATCH v3 4/7] pinctrl: sunxi: support multiple pin controller
-In-Reply-To: <1397137966-30818-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397137966-30818-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CACRpkdZLkDM68uRAKH1c2UeAL5isDEK8eFqpEw63K2TxNOPxeQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 22 Apr 2014 13:44:50 +0200
+Subject: [PATCH 0/9] Renesas ipmmu-vmsa: Miscellaneous cleanups and fixes
+In-Reply-To: <20140422113423.GB8389@arm.com>
+References: <1398089589-9181-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140422113423.GB8389@arm.com>
+Message-ID: <7322154.6fhsyAGbuH@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 10, 2014 at 3:52 PM, Boris BREZILLON
-<boris.brezillon@free-electrons.com> wrote:
+Hi Will,
 
-> Add support for multiple pin controller instances.
->
-> First remove the static definition of the sunxi gpio chip struct and fill
-> the dynamically struct instead.
-> Then define a new pin_base field in the sunxi_pinctrl_desc which will be
-> used to specify the gpiochip base pin.
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Tuesday 22 April 2014 12:34:23 Will Deacon wrote:
+> On Mon, Apr 21, 2014 at 03:13:00PM +0100, Laurent Pinchart wrote:
+> > Hello,
+> 
+> Hi Laurent,
+> 
+> > This patch set cleans up and fixes small issues in the ipmmu-vmsa driver.
+> > The patches are based on top of "[PATCH v3] iommu: Add driver for Renesas
+> > VMSA-compatible IPMMU" that adds the ipmmu-vmsa driver.
+> > 
+> > The most interesting part of this series is the rewrite of the page table
+> > management code. The IOMMU core guarantees that the map and unmap
+> > operations will always be called only with page sizes advertised by the
+> > driver. We can use that assumption to remove loops of PGD and PMD
+> > entries, simplifying the code.
+> 
+> Hmm, interesting. We still have to handle the case where a mapping created
+> with one page-size could be unmapped with another though (in particular,
+> unmapping part of the range).
 
-Patch applied.
+Correct. I've implemented that in patch 9/9. Note that the patch also frees 
+pages use for page directory entries when they're not needed anymore, instead 
+of just marking them as invalid. That's something you probably should do in 
+the arm-smmu driver as well.
 
-Yours,
-Linus Walleij
+> > Will, would it make sense to perform the same cleanup for the arm-smmu
+> > driver, or is there a reason to keep loops over PGD and PMD entries ?
+> > Removing them makes the implementation of 68kB and 2MB pages easier.
+> 
+> Is this an assumption that's relied on by other IOMMU drivers? It certainly
+> makes mapping of large ranges less efficient than it could be, so I'm more
+> inclined to set all the bits > PAGE_SIZE in pgsize_bitmap if it's only used
+> to determine the granularity at which map/unmap are called (which is
+> unrelated to what the hardware can actually do).
+
+I haven't checked all the other IOMMU drivers, but at least the OMAP IOMMU 
+driver relies on the same assumption. Splitting map/unmap operations in page 
+size chunks inside the IOMMU core might indeed have a negative performance 
+impact due to locking, but I'm not sure it would be noticeable.
+
+-- 
+Regards,
+
+Laurent Pinchart
