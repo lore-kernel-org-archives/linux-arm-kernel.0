@@ -1,142 +1,61 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 21 Apr 2014 18:39:16 -0700
-Subject: [PATCH RESEND 3/5] ARM: BCM63XX: add BCM63138 minimal Device Tree
+Date: Mon, 21 Apr 2014 18:39:17 -0700
+Subject: [PATCH RESEND 4/5] ARM: BCM63XX: add BCM963138DVT Reference platform
+ DTS
 In-Reply-To: <1398130758-19456-1-git-send-email-f.fainelli@gmail.com>
 References: <1398130758-19456-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1398130758-19456-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1398130758-19456-5-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a very minimalistic BCM63138 Device Tree include file which
-describes the BCM63138 SoC with only the basic set of required
-peripherals:
-
-- Cortex A9 CPU
-- ARM GIC
-- PL310 Level-2 cache controller
-- ARM TWD & Global timers
-- ARM TWD watchdog
-- legacy MIPS bus (UBUS)
+Add a DTS file for the Broadcom BCM963138DVT reference platform board
+which leverages the bcm63138.dtsi SoC DTSi file.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/bcm63138.dtsi | 109 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 109 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
+ arch/arm/boot/dts/Makefile        |  3 +++
+ arch/arm/boot/dts/bcm63138dvt.dts | 18 ++++++++++++++++++
+ 2 files changed, 21 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm63138dvt.dts
 
-diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 35c146f31e46..2738fa6e950d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -53,8 +53,11 @@ dtb-$(CONFIG_ARCH_ATLAS6) += atlas6-evb.dtb
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm28155-ap.dtb \
+ 	bcm21664-garnet.dtb
++dtb-$(CONFIG_ARCH_BCM_MOBILE) += bcm11351-brt.dtb \
++	bcm28155-ap.dtb
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2835-rpi-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += bcm4708-netgear-r6250.dtb
++dtb-$(CONFIG_ARCH_BCM_63XX) += bcm63138dvt.dtb
+ dtb-$(CONFIG_ARCH_BERLIN) += \
+ 	berlin2-sony-nsz-gs7.dtb	\
+ 	berlin2cd-google-chromecast.dtb
+diff --git a/arch/arm/boot/dts/bcm63138dvt.dts b/arch/arm/boot/dts/bcm63138dvt.dts
 new file mode 100644
-index 000000000000..190d6e53a85a
+index 000000000000..e212b4731978
 --- /dev/null
-+++ b/arch/arm/boot/dts/bcm63138.dtsi
-@@ -0,0 +1,109 @@
++++ b/arch/arm/boot/dts/bcm63138dvt.dts
+@@ -0,0 +1,18 @@
 +/*
-+ * Broadcom BCM63138 DSL SoCs Device Tree
++ * Broadcom BCM63138 Reference Board DTS
 + *
 + * Copyright (C) 2014 Broadcom Corporation
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details
 + */
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
++/dts-v1/;
 +
-+#include "skeleton.dtsi"
++#include "bcm63138.dtsi"
 +
 +/ {
-+	compatible = "brcm,bcm63138";
-+	model = "Broadcom BCM63138 DSL SoC";
-+	interrupt-parent = <&gic>;
++	compatible = "BCM963138DVT", "brcm,bcm63138";
++	model = "Broadcom BCM963138DVT";
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&L2>;
-+			reg = <0>;
-+		};
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		arm_timer_clk: arm_timer_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <500000000>;
-+		};
-+	};
-+
-+	/* ARM bus */
-+	axi at 80000000 {
-+		compatible = "simple-bus";
-+		ranges = <0 0x80000000 0x783003>;
-+		reg = <0x80000000 0x783003>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		L2: cache-controller at 1d000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x1d000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+			interrupts = <GIC_PPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		mpcore at 1e000 {
-+			compatible = "simple-bus";
-+			reg = <0x1e000 0x20000>;
-+			ranges = <0 0x1e000 0x20000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			scu: scu at 0 {
-+				compatible = "arm,cortex-a9-scu";
-+				reg = <0x0 0x100>;
-+			};
-+
-+			gic: interrupt-controller at 100 {
-+				compatible = "arm,cortex-a9-gic";
-+				reg = <0x1000 0x1000
-+					0x100 0x100>;
-+				#interrupt-cells = <3>;
-+				#address-cells = <0>;
-+				interrupt-controller;
-+			};
-+
-+			global_timer: timer at 200 {
-+				compatible = "arm,cortex-a9-global-timer";
-+				reg = <0x200 0x20>;
-+				interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&arm_timer_clk>;
-+			};
-+
-+			local_timer: local-timer at 600 {
-+				compatible = "arm,cortex-a9-twd-timer";
-+				reg = <0x600 0x20>;
-+				interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&arm_timer_clk>;
-+			};
-+
-+			twd_watchdog: watchdog at 620 {
-+				compatible = "arm,cortex-a9-twd-wdt";
-+				reg = <0x620 0x20>;
-+				interupts = <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+	};
-+
-+	/* Legacy UBUS base */
-+	ubus at fffe8000 {
-+		compatible = "simple-bus";
-+		reg = <0xfffe8000 0x8053>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xfffe8000 0x8053>;
++	memory {
++		reg = <0x0 0x08000000>;
 +	};
 +};
 -- 
