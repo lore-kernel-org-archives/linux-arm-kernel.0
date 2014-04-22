@@ -1,29 +1,25 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 22 Apr 2014 14:20:43 -0400
-Subject: [PATCH v3 0/3] ARM: OMAP2+: AM437x: L2 cache support
-In-Reply-To: <cover.1398149526.git.nsekhar@ti.com>
-References: <cover.1398149526.git.nsekhar@ti.com>
-Message-ID: <5356B2FB.5090205@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Apr 2014 20:27:55 +0200
+Subject: [PATCH 1/4] pinctrl: sirf: wrap all gpio banks into one gpio_chip
+In-Reply-To: <1397544229-20545-2-git-send-email-21cnbao@gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+ <1397544229-20545-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdZ5e=3SzQxvhzEJ=jyOPzqjZ1LfU0CtYscREsNXyFf+bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 April 2014 04:28 AM, Sekhar Nori wrote:
-> This patch series adds L2 cache support for AM437x
-> and does some clean-ups for existing OMAP4 support
-> along the way (no functional changes). On OMAP4 Panda,
-> the Aux control value remains 0x7e470000 before and
-> after the series.
-> 
-> Tested on OMAP4 Panda and AM437x EPOS EVMs.
-> 
-> It is based on RMK's 75 patch series titled "l2c series" +
-> the patch contained in https://www.mail-archive.com/linux-omap at vger.kernel.org/msg103439.html
-> 
-> Sekhar Nori (3):
->   ARM: OMAP2+: L2 cache: get rid of init call
->   ARM: OMAP2+: L2 cache: git rid of redundant cache replacement policy
->     setting
->   ARM: OMAP2+: AM43x: L2 cache support
-> 
-For the whole series,
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Tue, Apr 15, 2014 at 8:43 AM, Barry Song <21cnbao@gmail.com> wrote:
+
+> From: Barry Song <Baohua.Song@csr.com>
+>
+> all gpio banks are in one chip, that makes software clean in mapping
+> irq and gpio.
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+
+These all look good, but for some reason does not apply on top of
+the pinctrl "devel" branch based on v3.15-rc2. Can you please rebase
+this set onto my branch or atleast v3.15-rc2 and resend?
+
+Yours,
+Linus Walleij
