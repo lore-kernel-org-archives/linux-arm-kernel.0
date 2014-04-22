@@ -1,25 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Apr 2014 10:44:24 +0100
-Subject: [PATCH] ARM: fix string functions on !MMU
-In-Reply-To: <1398103808-24380-1-git-send-email-rabin@rab.in>
-References: <1398103808-24380-1-git-send-email-rabin@rab.in>
-Message-ID: <20140422094424.GA6979@arm.com>
+Date: Tue, 22 Apr 2014 10:46:59 +0100
+Subject: [PATCH] ARM64: disable DCACHE_WORD_ACCESS in big endian case
+In-Reply-To: <1398119770-27817-1-git-send-email-victor.kamensky@linaro.org>
+References: <1398119770-27817-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <20140422094659.GB6979@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 21, 2014 at 07:10:08PM +0100, Rabin Vincent wrote:
-> 8c56cc8be5b38e ("ARM: 7449/1: use generic strnlen_user and
-> strncpy_from_user functions") apparently broken those string operations
-> for !MMU.  USER_DS == KERNEL_DS on !MMU, so user_addr_max() always
-> restricts the addresses to TASK_SIZE.
+On Mon, Apr 21, 2014 at 11:36:10PM +0100, Victor Kamensky wrote:
+> If DCACHE_WORD_ACCESS is enabled big endian image failed to
+> boot. commit 7bc13fd33adb9536bd73965cd46bbf7377df097c
+> "arm64: dcache: select DCACHE_WORD_ACCESS for little-endian CPUs"
+> enabled this setting for both big endian and little endian
+> cpus. And code in commit itself seems to be endian agnostic,
+> however other, i.e C, code that sits under DCACHE_WORD_ACCESS
+> seems to be not endian agnostic, I could not figure out where
+> though.
 > 
-> TASK_SIZE has anyway no meaning on !MMU, so make user_addr_max() not
-> restrict anything.
+> Solution is to enable DCACHE_WORD_ACCESS only if little
+> endian mode is enabled (default).
+> 
+> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 
-Might be worth mentioning that this is an issue because KERNEL_DS is 0x0
-(since it's a 32-bit quantity), so checks like addr < user_addr_max() will
-fail. Anyway, the code looks fine to me:
+NAK, this really should work for big-endian machines. If it doesn't, we
+should figure out why and fix the problem.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+As a start, can you share further details of the failure please?
 
 Will
+
+> ---
+>  arch/arm64/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index e6e4d37..106ac4f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -13,7 +13,7 @@ config ARM64
+>  	select CLONE_BACKWARDS
+>  	select COMMON_CLK
+>  	select CPU_PM if (SUSPEND || CPU_IDLE)
+> -	select DCACHE_WORD_ACCESS
+> +	select DCACHE_WORD_ACCESS if !CPU_BIG_ENDIAN
+>  	select GENERIC_CLOCKEVENTS
+>  	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+>  	select GENERIC_CPU_AUTOPROBE
+> -- 
+> 1.8.1.4
+> 
+> 
