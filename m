@@ -1,24 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Apr 2014 15:44:02 +0200
-Subject: [PATCH 15/20] mfd: db8500-prcmu: Use cpufreq_for_each_entry macro
- for iteration
-In-Reply-To: <534C4EB8.9080704@semaphore.gr>
-References: <534C4EB8.9080704@semaphore.gr>
-Message-ID: <CACRpkdZjcgC-9mgS7ZQDKOxPhCf720d2usdB+KzxqEMPcjSfiA@mail.gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 22 Apr 2014 15:45:26 +0200
+Subject: [PATCH RESEND] tty/serial: atmel_serial: Fix device tree
+ documentation
+In-Reply-To: <1397835904-866-1-git-send-email-richard.genoud@gmail.com>
+References: <1397835904-866-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <CACQ1gAhjrb+3Bka64QfbopvEeiU-ifm35eLYUrjwyR-3goW4QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 14, 2014 at 11:10 PM, Stratos Karafotis
-<stratosk@semaphore.gr> wrote:
-
-> The cpufreq core supports the cpufreq_for_each_entry macro helper
-> for iteration over the cpufreq_frequency_table, so use it.
+2014-04-18 17:45 GMT+02:00 Richard Genoud <richard.genoud@gmail.com>:
+> RTS pin is an active low pin.
+> For now, this doesn't change anything as the ACTIVE_LOW (1) flag is not
+> handled in atmel_serial, but it will be in 3.16.
 >
-> It should have no functional changes.
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/serial/atmel-usart.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Signed-off-by: Stratos Karafotis <stratosk@semaphore.gr>
+> diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> index 17c1042b2df8..0dd0a5493a54 100644
+> --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+> @@ -35,7 +35,7 @@ Example:
+>                 clock-names = "usart";
+>                 atmel,use-dma-rx;
+>                 atmel,use-dma-tx;
+> -               rts-gpios = <&pioD 15 0>;
+> +               rts-gpios = <&pioD 15 1>;
+>         };
+>
+>  - use DMA:
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Rob,
+Does this has a chance to get to 3.15-rc3 or it's not worth it ?
+If it's not programmed for the 3.15-rc cycle, please drop it : I've
+got a patchset depending on it, and it will be in another tree.
 
-Yours,
-Linus Walleij
+Richard.
