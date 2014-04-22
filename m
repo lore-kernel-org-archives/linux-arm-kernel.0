@@ -1,40 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Apr 2014 13:54:52 +0200
-Subject: [PATCH 11/11] pinctrl: single: Clear pin interrupts enabled by
- bootloader
-In-Reply-To: <1397173639-29587-12-git-send-email-tony@atomide.com>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-12-git-send-email-tony@atomide.com>
-Message-ID: <CACRpkdYu2Obo8kuA2D9a33K_KCF-LPza=+reEpFnq8JFK6jOCg@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 22 Apr 2014 13:57:59 +0200
+Subject: [PATCH v3 0/2] ARM: sunxi: Add A31 High Speed Timer Support
+In-Reply-To: <1397725606-18000-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1397725606-18000-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <53565947.3020503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 11, 2014 at 1:47 AM, Tony Lindgren <tony@atomide.com> wrote:
-
-> Since we set up device wake-up interrupts as pinctrl-single
-> interrupts, we now must use the standard request_irq and
-> related functions to manage them.
+On 04/17/2014 11:06 AM, Maxime Ripard wrote:
+> Hi everyone,
 >
-> If the pin interrupts are enabled for some pins at boot,
-> the wake-up events can show up as constantly pending
-> at least on omaps and will hang the system unless the related
-> device driver clears the event at the device.
+> This patchset enables support for the High Speed Timer IP found in the
+> Allwinner A31 SoCs.
 >
-> To fix this, let's clear the interrupt flags during init,
-> and print out a warning so the board maintainers can update
-> their drivers to do proper request_irq for the driver specific
-> wake-up events.
+> These timers are asserted in reset, and are not associated with any
+> struct device, so we also add a small helper to the reset framework
+> along the way to be able to retrieve the reset controller from the
+> device tree directly.
 >
-> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Thanks,
+> Maxime
+>
+> Changes from v2:
+>    - Rebased on top of 3.15-rc1
+>
+> Changes from v1:
+>    - Rebased on top of 3.14-rc1 and reset/for_3.15
+>
+> Maxime Ripard (2):
+>    clocksource: sun5i: Add support for reset controller
+>    ARM: sun6i: a31: Add support for the High Speed Timers
+>
+>   .../devicetree/bindings/timer/allwinner,sun5i-a13-hstimer.txt |  4 ++++
+>   arch/arm/boot/dts/sun6i-a31.dtsi                              | 11 +++++++++++
+>   drivers/clocksource/timer-sun5i.c                             |  6 ++++++
+>   3 files changed, 21 insertions(+)
 
-Looks clean.
+Applied for 3.16
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks
 
-Shall I apply this patch or will you funnel it through ARM SoC
-due to deps?
+   -- Daniel
 
-Yours,
-Linus Walleij
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
