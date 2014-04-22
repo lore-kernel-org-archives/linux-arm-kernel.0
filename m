@@ -1,24 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Apr 2014 11:37:44 +0100
-Subject: [PATCH 1/3] perf tests: Introduce perf_regs_load function on ARM64
-In-Reply-To: <CAFrcx1m_iH1ivWdTi7tbMXxEq1KYqHOAQS3hh3hnJh2ZgEDP3Q@mail.gmail.com>
-References: <1395222155-22205-1-git-send-email-jean.pihet@linaro.org>
- <1395222155-22205-2-git-send-email-jean.pihet@linaro.org>
- <20140321151126.GR23372@e106331-lin.cambridge.arm.com>
- <CAFrcx1=TSsaDK0xgtJSQUtvUnwicrXNU-nYAcMOi4B=nTU_Qwg@mail.gmail.com>
- <CAFrcx1m_iH1ivWdTi7tbMXxEq1KYqHOAQS3hh3hnJh2ZgEDP3Q@mail.gmail.com>
-Message-ID: <20140422103744.GG7484@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 22 Apr 2014 12:38:25 +0200
+Subject: [PATCH 3/4] exynos: cpuidle: do not allow cpuidle registration
+ for Exynos5420
+In-Reply-To: <1398080958-21677-4-git-send-email-chander.kashyap@linaro.org>
+References: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
+ <1398080958-21677-4-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <535646A1.1020201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 09:13:33AM +0100, Jean Pihet wrote:
-> Hi Mark, Will,
+On 04/21/2014 01:49 PM, Chander Kashyap wrote:
+> Exynos5420 is big.Little Soc. It uses cpuidle-big-litle generic cpuidle driver.
+> Hence do not allow exynos cpuidle driver registration for Exynos5420.
+>
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> ---
 
-Hi Jean,
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-> Ping on this series. Can you please check? I
+but will conflict with:
 
-Do you have a pointer to the latest version of your code please? The email
-backlog I have seems to end with MarkR saying he would take a look.
+http://www.spinics.net/lists/arm-kernel/msg319862.html
 
-Will
+>   arch/arm/mach-exynos/cpuidle.c |    3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index c57cae0..242f75d 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -219,6 +219,9 @@ static int exynos_cpuidle_probe(struct platform_device *pdev)
+>   	int cpu_id, ret;
+>   	struct cpuidle_device *device;
+>
+> +	if (soc_is_exynos5420())
+> +		return -ENODEV;
+> +
+>   	if (soc_is_exynos5250())
+>   		exynos5_core_down_clk();
+>
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
