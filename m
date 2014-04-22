@@ -1,56 +1,34 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Tue, 22 Apr 2014 16:48:44 +0800
-Subject: [PATCH v2] pwm: i.MX: Avoid sample fifo overflow for i.MX pwm
- version2
-In-Reply-To: <20140413074643.GD24180@dragon>
-References: <1397121829-19331-1-git-send-email-Ying.Liu@freescale.com>
- <20140413074643.GD24180@dragon>
-Message-ID: <53562CEC.6040902@freescale.com>
+From: list-09_linux_arm@tqsc.de (Markus Niebel)
+Date: Tue, 22 Apr 2014 11:01:41 +0200
+Subject: [PATCH] DT: Vendor: add prefix for TQ Systems
+Message-ID: <1398157301-4179-1-git-send-email-list-09_linux_arm@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+From: Markus Niebel <Markus.Niebel@tq-group.com>
 
-On 04/13/2014 03:46 PM, Shawn Guo wrote:
-> On Thu, Apr 10, 2014 at 05:23:49PM +0800, Liu Ying wrote:
->> The i.MX pwm version2 is embedded in several i.MX SoCs, such
->> as i.MX27, i.MX51 and i.MX6SL.  There are four 16bit sample
->> fifos in this IP, each of which determines the duty period
->> of a PWM waveform in one full cycle.  The IP spec mentions
->> that we should not write a fourth sample because the fifo
->> will become full and trigger a fifo write error(FWE) which
->> will prevent the PWM from starting once it is enabled.  In
->> order to avoid any sample fifo overflow issue, this patch
->> does software reset to clear all the sample fifos in the
->> very beginning of the pwm configuration function.
->>
->> The fifo overflow issue can be reproduced by the following
->> commands on the i.MX6SL evk platform, assuming we use pwm2
->> for the debug LED which is driven by the pin HSIC_STROBE
->> and the maximal brightness is 255.
->> echo 0   > /sys/class/leds/user/brightness
->> echo 0   > /sys/class/leds/user/brightness
->> echo 0   > /sys/class/leds/user/brightness
->> echo 0   > /sys/class/leds/user/brightness
->> echo 255 > /sys/class/leds/user/brightness
->> Here, FWE happens(PWMSR register reads 0x58) and the LED
->> can not be lighten.
->>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Shawn Guo <shawn.guo@freescale.com>
-> 
-> Acked-by: Shawn Guo <shawn.guo@freescale.com>
-> 
->> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
->> Cc: linux-pwm at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> 
+Add prefix for TQ Systems GmbH and for TQ Components.
+Both are needed since the existing PPC device trees use
+tqc but the TQMa53 ARM module uses tq. The tq prefix is better
+since TQ Components was renamed some time ago.
 
-I've got Shawn's ack on this patch.
-If no objections, could you take it into your PWM tree?
+Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
+---
+ .../devicetree/bindings/vendor-prefixes.txt        |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks.
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2855004..eb8a863 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -126,6 +126,8 @@ tlm	Trusted Logic Mobility
+ toradex	Toradex AG
+ toshiba	Toshiba Corporation
+ toumaz	Toumaz
++tq	TQ Systems GmbH
++tqc	TQ Components (deprecated, use tq)
+ usi	Universal Scientifc Industrial Co., Ltd.
+ v3	V3 Semiconductor
+ via	VIA Technologies, Inc.
 -- 
-Liu Ying
+1.7.9.5
