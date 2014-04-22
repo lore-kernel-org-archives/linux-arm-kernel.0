@@ -1,73 +1,37 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Tue, 22 Apr 2014 11:23:55 +0200
-Subject: [PATCH] gpio: omap: implement get_direction
-Message-ID: <1398158635-18415-1-git-send-email-yegorslists@googlemail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 22 Apr 2014 10:44:14 +0100
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <20140417203521.GB22411@obsidianresearch.com>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <534EF153.5050603@codeaurora.org>
+ <alpine.LFD.2.11.1404161853530.980@knanqh.ubzr>
+ <53501E87.6070307@codeaurora.org>
+ <20140417203521.GB22411@obsidianresearch.com>
+Message-ID: <535639EE.7040102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+On 17/04/14 21:35, Jason Gunthorpe wrote:
+>>> The above is useful for loading the raw uncompressed Image without 
+>>> carrying the full ELF baggage.
+>>
+>> What exactly is the full ELF baggage? Aren't there existing mechanisms to omit
+>> debugging symbols, for example, if size is of concern?
+> 
+> FWIW, it is a small non-intrusive change to produce ELFs with the
+> proper LMA, if it is useful for specialized tooling, here is the 3.14
+> version of the patch I created (I see it needs a bit of cleanup..)
+> You must also force PATCH_PHYS_VIRT off.
+> 
+> The ELF also has the correct entry point address, so ELF tooling can
+> just jump into it, after setting the proper register values according
+> to the boot protocol.
 
-This patch implements gpio_chip's get_direction() routine, that
-lets other drivers get particular GPIOs direction using
-struct gpio_desc.
+That might be a useful approach for single platform kernels but I don't
+think such an approach can work for multi-arch kernels since, because
+the RAM can be located anywhere in the address map, the physical load
+address is platform dependant.
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
----
- drivers/gpio/gpio-omap.c |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 19b886c..b55bf7b 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -102,6 +102,20 @@ static int omap_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	return irq_find_mapping(bank->domain, offset);
- }
- 
-+static int _get_gpio_direction(struct gpio_bank *bank, int gpio)
-+{
-+	void __iomem *reg = bank->base;
-+	u32 l;
-+	u32 mask = 1 << gpio;
-+
-+	reg += bank->regs->direction;
-+	l = readl_relaxed(reg);
-+	if (l & mask)
-+		return 1;
-+
-+	return 0;
-+}
-+
- static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
- {
- 	void __iomem *reg = bank->base;
-@@ -936,6 +950,19 @@ static inline void mpuio_init(struct gpio_bank *bank)
- 
- /*---------------------------------------------------------------------*/
- 
-+static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct gpio_bank *bank;
-+	unsigned long flags;
-+	int dir;
-+
-+	bank = container_of(chip, struct gpio_bank, chip);
-+	spin_lock_irqsave(&bank->lock, flags);
-+	dir = _get_gpio_direction(bank, offset);
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+	return dir;
-+}
-+
- static int gpio_input(struct gpio_chip *chip, unsigned offset)
- {
- 	struct gpio_bank *bank;
-@@ -1092,6 +1119,7 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
- 	 */
- 	bank->chip.request = omap_gpio_request;
- 	bank->chip.free = omap_gpio_free;
-+	bank->chip.get_direction = gpio_get_direction;
- 	bank->chip.direction_input = gpio_input;
- 	bank->chip.get = gpio_get;
- 	bank->chip.direction_output = gpio_output;
--- 
-1.7.7
+Daniel.
