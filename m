@@ -1,41 +1,62 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Apr 2014 23:39:38 +0200
-Subject: [PATCH] pinctrl/at91: convert driver to use gpiolib irqchip
-In-Reply-To: <1397592581-20251-1-git-send-email-alexanders83@web.de>
-References: <1397592581-20251-1-git-send-email-alexanders83@web.de>
-Message-ID: <CACRpkdYsPPRkht9+nTLHHQdzmej9sMpdFLqyy37YjEtYePB+mw@mail.gmail.com>
+Date: Tue, 22 Apr 2014 23:31:41 +0200
+Subject: [PATCH 2/5] ARM: dts: Device tree for AXM55xx.
+In-Reply-To: <8344066.GP0Bf5lvlE@wuerfel>
+References: <cover.1397552154.git.anders.berg@lsi.com>
+ <02c006a6fc64131df82981abbc1c71c7af52254e.1397552154.git.anders.berg@lsi.com>
+ <8344066.GP0Bf5lvlE@wuerfel>
+Message-ID: <CACRpkdapwscc9tA830nJVHMsh4-sEVuv5GUvCEL5e1YH+b0Wvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 15, 2014 at 10:09 PM, Alexander Stein <alexanders83@web.de> wrote:
+On Tue, Apr 15, 2014 at 2:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 15 April 2014 14:06:11 Anders Berg wrote:
 
-> This converts the AT91 pin control driver to register its
-> chained irq handler and irqchip using the helpers in the
-> gpiolib core.
+>> +                     serial0: uart at 2010080000 {
+>> +                             compatible = "arm,pl011", "arm,primecell";
+>> +                             reg = <0x20 0x10080000 0 0x1000>;
+>> +                             interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+>> +                             clocks = <&clk_per>, <&clk_per>;
+>> +                             clock-names = "uartclk", "apb_pclk";
+>> +                             status = "disabled";
+>> +                     };
 >
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-
-Part of the large attempt to pull all these local hacks into the
-gpiolib irqchip helpers so patch applied. Any further quarrels
-can be solved on top of this in the *generic* code.
-
-I changed this:
-
-> +static void gpio_orq_ack(struct irq_data *d)
-> +{
-> +       /* the interrupt is already cleared before by reading ISR */
-> +}
-> +
->  static unsigned int gpio_irq_startup(struct irq_data *d)
->  {
->         struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(d);
-> @@ -1434,6 +1420,7 @@ void at91_pinctrl_gpio_resume(void)
+> "uartclk" is not a valid string for pl011, as per binding:
 >
->  static struct irq_chip gpio_irqchip = {
->         .name           = "GPIO",
-> +       .irq_ack        = gpio_orq_ack,
+> | - clocks:  When present, must refer to exactly one clock named
+> |           "apb_pclk"
+>
+> I do see that a lot of platforms do the same thing you have here, not
+> sure who is wrong.
 
-orq? I didn't get it so changed to irq when applying.
+OK the PL011 is tricksier. It has two clocks, the APB clock driving
+the logic and another clock input that is divided down to generate
+the external data clock (baud rate).
+
+The bus will do:
+pcdev->pclk = clk_get(&pcdev->dev, "apb_pclk");
+
+The driver will do:
+uap->clk = devm_clk_get(&dev->dev, NULL);
+
+So the driver relies on the anonymous clock being "first"
+in a clock retrieveal operation, and it's a bit fragile indeed.
+That leads to that either you give this clock a sensible
+name or you list the empty string, as you have to have
+clock-names there to name the last entry so the bus can
+retrieve it.
+
+This clock is *indeed* named "UARTCLK" (capital letters)
+in the TRM for PL011. So I think this is perfectly reasonable.
+
+The situation is the same as with the PL022 SPI driver we have
+discussed before, it also retrieves the anonymous clock but we
+consistently named it "SSPCLK" in commits:
+dfc9832ca3f7a10d573e29e46d6ba03a54fbe580
+80fbe30f63c9ba2ab62eb2c1f7ef607ce0721a95
+
+As everyone else was using that. And it was the name from
+the TRM.
 
 Yours,
 Linus Walleij
