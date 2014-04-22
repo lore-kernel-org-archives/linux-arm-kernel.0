@@ -1,64 +1,110 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 22 Apr 2014 11:46:29 +0530
-Subject: [PATCH v2 0/3] MCPM backend for Exynos5420
-In-Reply-To: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
-References: <1397239311-27717-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1398147389-2987-1-git-send-email-a.kesavan@samsung.com>
+Date: Tue, 22 Apr 2014 11:46:59 +0530
+Subject: [PATCH v2 1/3] ARM: dts: exynos5420: add CCI node
+In-Reply-To: <1397239311-27717-5-git-send-email-a.kesavan@samsung.com>
+References: <1397239311-27717-5-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1398147419-3073-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v2 of the series adding MCPM backend support for SMP secondary boot
-and core switching on Samsung's Exynos5420. The patches are based on the mcpm
-support added for Exynos5420 in the Chromium kernel repository here:
-https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.8
+From: Andrew Bresticker <abrestic@chromium.org>
 
-This patchset depends on:
-- ARM: EXYNOS5: Add PMU settings for exynos5420
-(https://patchwork.kernel.org/patch/3896471/)
-- ARM: EXYNOS: Map SYSRAM address through DT
-(http://www.spinics.net/lists/arm-kernel/msg323011.html)
-- ARM: bL_switcher: fix validation check before its activation
-(http://www.spinics.net/lists/arm-kernel/msg323274.html)
+Add device-tree bindings for the ARM CCI-400 on Exynos5420.  There
+are two slave interfaces: one for the A15 cluster and one for the
+A7 cluster.
 
-The patches have been prepared on Kgene's for-next branch and tested on SMDK5420
-EVT1 using the "/dev/b.L_switcher" user interface. Patches have also been tested
-on linux-next(20140417).
+Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420.dtsi |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-Changes since v1:
-Addressed the following comments from Dave Martin and Nicolas Pitre:
-	- Fixed help text for EXYNOS5420_MCPM symbol.
-	- Removed mcpm-exynos-setup.S file and added similar code from tc2_pm.c.
-	- Changed the spinlock name from "bl_lock" to "exynos_mcpm_lock".
-	- Removed snoop enable/disable calls due to possible cpuidle issue and
-	  not having numbers proving a significant power savings. Dropped the
-	  "drivers/bus: arm-cci: Add common control interface for ACE ports"
-	  patch from v1 as it was no longer needed.
-	- Created a macro for exynos-specific v7_exit_coherency_flush which
-	  handles an erratum. This was done to prevent duplication of code.
-	- Removed "outer_flush_all" call.
-	- Removed redundant dsb in power_down function.
-	- Removed unnecessary initialization of global variables to zero.
-	- Split the /dev/bL_status debug interface into another patch.
-	- Fixed error handling in exynos_mcpm_init().
-	- Called mcpm_smp_set_ops directly from exynos_mcpm_init().
-	- Added a TODO for supporting cluster down on exynos5420.
-
-There is no change in the patch " ARM: dts: exynos5420: add CCI node" from v1.
-
-Abhilash Kesavan (2):
-  arm: exynos: Add MCPM call-back functions
-  arm: exynos: Add /dev/bL_status user interface on Exynos5420
-
-Andrew Bresticker (1):
-  ARM: dts: exynos5420: add CCI node
-
- arch/arm/boot/dts/exynos5420.dtsi  |   27 +++
- arch/arm/mach-exynos/Kconfig       |    8 +
- arch/arm/mach-exynos/Makefile      |    2 +
- arch/arm/mach-exynos/mcpm-exynos.c |  409 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h    |    2 +
- 5 files changed, 448 insertions(+)
- create mode 100644 arch/arm/mach-exynos/mcpm-exynos.c
-
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 217376f..43e7b25 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -58,6 +58,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x0>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -65,6 +66,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x1>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -72,6 +74,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x2>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -79,6 +82,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x3>;
+ 			clock-frequency = <1800000000>;
++			cci-control-port = <&cci_control1>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+@@ -86,6 +90,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+@@ -93,6 +98,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x101>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -100,6 +106,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x102>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -107,6 +114,26 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x103>;
+ 			clock-frequency = <1000000000>;
++			cci-control-port = <&cci_control0>;
++		};
++	};
++
++	cci at 10d20000 {
++		compatible = "arm,cci-400";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x10d20000 0x1000>;
++		ranges = <0x0 0x10d20000 0x6000>;
++
++		cci_control0: slave-if at 4000 {
++			compatible = "arm,cci-400-ctrl-if";
++			interface-type = "ace";
++			reg = <0x4000 0x1000>;
++		};
++		cci_control1: slave-if at 5000 {
++			compatible = "arm,cci-400-ctrl-if";
++			interface-type = "ace";
++			reg = <0x5000 0x1000>;
+ 		};
+ 	};
+ 
 -- 
 1.7.9.5
