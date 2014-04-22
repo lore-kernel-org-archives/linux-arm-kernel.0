@@ -1,83 +1,97 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Apr 2014 13:01:20 +0200
-Subject: [PATCH v8 00/17] ARM: sunxi: Add driver for SD/MMC hosts found on
- Allwinner sunxi SoCs
-Message-ID: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+Date: Tue, 22 Apr 2014 13:01:22 +0200
+Subject: [PATCH v8 02/17] clk: sunxi: Implement MMC phase control
+In-Reply-To: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1398164497-14212-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+From: Emilio L?pez <emilio@elopez.com.ar>
 
-Here is v8 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
-working on.
+HdG: add header exporting clk_sunxi_mmc_phase_control
 
-The first 2 patches are depenencies which should go in through the clk tree,
-Mike can you pick these 2 up please ?  :
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 35 +++++++++++++++++++++++++++++++++++
+ include/linux/clk/sunxi.h     | 22 ++++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
+ create mode 100644 include/linux/clk/sunxi.h
 
-"clk: sunxi: factors: automatic reparenting support"
-Is uncontroversial and has been favorably reviewed by various people.
-
-"clk: sunxi: Implement MMC phase control"
-Is somewhat more controversial as there has been lots of discussion about
-adding a generic phase control method to the clk framework. The problem is
-that there has been a lot of talk about such a generic phase control method
-but not a single patch. Therefor I would like to move forwards with using
-a platform specific method for now. I hereby promise that once we've a generic
-method I'll write patches to convert the sunxi code to that method.
-
-The third patch is the patch adding the actual mmc driver and should go in
-through the mmc tree.
-
-All the other patches are devicetree patches hooking things up, and should
-go upstream through Maxime's sunxi-dt tree.
-
-Changes since v1:
--Using mmc_of_parse instead of diy dt parsing
--Adding nodes for all mmc controller to the dtsi files,
- including sofar unused controllers
--Using generic GPIO slot library for WP/CD
--Adding additional MMC device nodes into DTSI files
-
-Changes since v2:
--Add missing Signed-off-by tags
--Stop using __raw_readl / __raw_writel so that barriers are properly used
--Adding missing new lines
--Adding missing patch for automatic reparenting of clocks
-
-Changes since v3:
--Move clk_enable / disable into host_init / exit (Hans)
--Fix hang on boot caused by irq storm (Hans)
-
-Changes since v4:
--moving sunxi-mci.{c/h} to sunxi-mmc.{c/h}
--removing camel cases from the defines in  sunxi-mmc.h
--moving defines out of the struct definition
- since this is bad coding style
--adding documentation for the device tree binding
-Changes since v5:
--adding host initialization for when the sdio irq is enabled
- (just to make sure having a defined state at all time)
--add mmc support fixup: set pullup on cd pins
--fixup: Don't set MMC_CAP_NEEDS_POLL /  MMC_CAP_4_BIT_DATA
-
-Changes since v6:
--fixing copyright info in sunxi-mmc.*
--s/__SUNXI_MCI_H__/__SUNXI_MMC_H__/g
--s/SDXC_RESPONSE_/SDXC_RESP_/g
--s/define/definitions <- Comment from Priit Laes
-
-Changes since v7:
--Merge sunxi-mmc.h into sunxi-mmc.c
--Various style fixes / cleanups based on Maxime's review
--sun6i support
--Fix a race condition in interrupt / tasklet interaction
--Split the dts patches into 3 per platform:
- 1) Add mmc nodes to the dtsi
- 2) Add mmc pinmux to the dtsi
- 3) Add mmc nodes to the various board files
--Moved setting of bus-width and cd gpio polarity from .dtsi to the board-files
--Added sun6i dts patches
-
-Regards,
-
-Hans
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index bd7dc73..7ee5eff 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -507,6 +507,41 @@ CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk",
+ 
+ 
+ /**
++ * clk_sunxi_mmc_phase_control() - configures MMC clock phase control
++ */
++
++void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output)
++{
++	#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
++	#define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
++
++	struct clk_composite *composite = to_clk_composite(hw);
++	struct clk_hw *rate_hw = composite->rate_hw;
++	struct clk_factors *factors = to_clk_factors(rate_hw);
++	unsigned long flags = 0;
++	u32 reg;
++
++	if (factors->lock)
++		spin_lock_irqsave(factors->lock, flags);
++
++	reg = readl(factors->reg);
++
++	/* set sample clock phase control */
++	reg &= ~(0x7 << 20);
++	reg |= ((sample & 0x7) << 20);
++
++	/* set output clock phase control */
++	reg &= ~(0x7 << 8);
++	reg |= ((output & 0x7) << 8);
++
++	writel(reg, factors->reg);
++
++	if (factors->lock)
++		spin_unlock_irqrestore(factors->lock, flags);
++}
++
++
++/**
+  * sunxi_factors_clk_setup() - Setup function for factor clocks
+  */
+ 
+diff --git a/include/linux/clk/sunxi.h b/include/linux/clk/sunxi.h
+new file mode 100644
+index 0000000..1ef5c89
+--- /dev/null
++++ b/include/linux/clk/sunxi.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright 2013 - Hans de Goede <hdegoede@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_CLK_SUNXI_H_
++#define __LINUX_CLK_SUNXI_H_
++
++#include <linux/clk.h>
++
++void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output);
++
++#endif
+-- 
+1.9.0
