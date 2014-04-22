@@ -1,65 +1,49 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 22 Apr 2014 13:06:37 +0300
-Subject: [PATCH] ARM: AM43xx: clk: Change the wdt1 func clk src to per_32k
- clk
-In-Reply-To: <1397621648-15691-1-git-send-email-lokeshvutla@ti.com>
-References: <1397621648-15691-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <53563F2D.20906@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Apr 2014 11:07:02 +0100
+Subject: Change of TEXT_OFFSET for multi_v7_defconfig
+In-Reply-To: <53563C03.7090401@linaro.org>
+References: <534D0D91.8020406@linaro.org> <534EAD6C.3040502@codeaurora.org>
+ <alpine.LFD.2.11.1404161428280.980@knanqh.ubzr>
+ <CAL_Jsq+aYXTQCzCtxPnS=zhBCba6-mEz+kT-mHTDW602E0vbDw@mail.gmail.com>
+ <alpine.LFD.2.11.1404171549480.980@knanqh.ubzr>
+ <20140417201645.GU24070@n2100.arm.linux.org.uk>
+ <CAL_JsqL65bXBh1_dcud6XaDqFBnY1L69dMXWeNHvFAvcDizzhQ@mail.gmail.com>
+ <20140417213502.GX24070@n2100.arm.linux.org.uk> <53563C03.7090401@linaro.org>
+Message-ID: <20140422100702.GS24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2014 07:14 AM, Lokesh Vutla wrote:
-> WDT1 module can take one of the below clocks as input functional
-> clock -
-> 	- On-Chip 32K RC Osc [default/reset]
-> 	- 32K from PRCM
->
-> The On-Chip 32K RC Osc clock is not an accurate clock-source as per
-> the design/spec, so as a result, for example, timer which supposed
-> to get expired @60Sec, but will expire somewhere ~@40Sec, which is
-> not expected by any use-case.
->
-> The solution here is to switch the input clock-source to PRCM
-> generated 32K clock-source during boot-time itself.
-> This is derived from AM33xx clock file.
+On Tue, Apr 22, 2014 at 10:53:07AM +0100, Daniel Thompson wrote:
+> On 17/04/14 22:35, Russell King - ARM Linux wrote:
+> > On Thu, Apr 17, 2014 at 04:18:45PM -0500, Rob Herring wrote:
+> >> The problem here is more than just the TEXT_OFFSET changed. From what
+> >> I've heard, there are some QC chips which need much more reserved RAM
+> >> than the 2MB discussed here. Changing the TEXT_OFFSET is a hack that
+> >> doesn't scale.
+> > 
+> > You may think it's a hack, but we really can't get around this.  There
+> > really are platforms out there where we must do this kind of stuff.  I
+> > invite you next time you meet up to talk to Michal Simek.  There's no
+> > way they can load the kernel at 32K into RAM.
+> 
+> After reading this thread I have noticed that the sort order for the
+> textofs part of this makefile is numeric (based on textofs) rather than
+> alphabetic.
 
-I guess this patch should wait until we have a proper solution upstream 
-for selecting parents based on DT data, unless you have pressing need to 
-merge this as a temporary hack.
+Correct.
 
--Tero
+> Is this an intentional mechanism? Certainly the result of numeric
+> sorting is that the kernel will rise to the highest point in memory that
+> suits all enabled platforms (based on the assumption that platforms are
+> much more likely to reserve memory right at the start of RAM than
+> slightly offset into it).
 
->
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->   drivers/clk/ti/clk-43xx.c |   13 +++++++++++++
->   1 file changed, 13 insertions(+)
->
-> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-> index 67c8de5..ae2524e 100644
-> --- a/drivers/clk/ti/clk-43xx.c
-> +++ b/drivers/clk/ti/clk-43xx.c
-> @@ -110,9 +110,22 @@ static struct ti_dt_clk am43xx_clks[] = {
->
->   int __init am43xx_dt_clk_init(void)
->   {
-> +	struct clk *clk1, *clk2;
-> +
->   	ti_dt_clocks_register(am43xx_clks);
->
->   	omap2_clk_disable_autoidle_all();
->
-> +	/*
-> +	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
-> +	 * the design/spec, so as a result, for example, timer which supposed
-> +	 * to get expired @60Sec, but will expire somewhere ~@40Sec, which is
-> +	 * not expected by any use-case, so change WDT1 clock source to PRCM
-> +	 * 32KHz clock.
-> +	 */
-> +	clk1 = clk_get_sys(NULL, "wdt1_fck");
-> +	clk2 = clk_get_sys(NULL, "clkdiv32k_ick");
-> +	clk_set_parent(clk1, clk2);
-> +
->   	return 0;
->   }
->
+Also correct.
+
+> If so would you welcome a comment only patch explaining this?
+
+If you're willing to provide one.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
