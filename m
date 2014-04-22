@@ -1,51 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 22 Apr 2014 23:24:06 +0200
-Subject: [PATCH 1/2] ARM: berlin: add MACH_BERLIN_BG2Q symbol
-In-Reply-To: <532CB252.6010702@gmail.com>
-References: <1395430757-8677-1-git-send-email-alexandre.belloni@free-electrons.com>
- <532CB252.6010702@gmail.com>
-Message-ID: <5356DDF6.4010308@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 22 Apr 2014 23:26:05 +0200
+Subject: [PATCH v2 01/38] ARM: orion5x: fix target ID for crypto SRAM window
+In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2014 10:42 PM, Sebastian Hesselbarth wrote:
-> On 03/21/2014 08:39 PM, Alexandre Belloni wrote:
->> Now that we start supporting the Marvell Berlin BG2Q, add a symbol
->> allowing to
->> differentiate that SoC from the other SoCs of the Berlin family.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Applied to berlin/defconfig, Thanks!
-> 
->> ---
->>   arch/arm/mach-berlin/Kconfig | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
->> index 7a02d222c378..0ff6f5877076 100644
->> --- a/arch/arm/mach-berlin/Kconfig
->> +++ b/arch/arm/mach-berlin/Kconfig
->> @@ -24,6 +24,13 @@ config MACH_BERLIN_BG2CD
->>       select CPU_V7
->>       select HAVE_ARM_TWD if SMP
->>
->> +config MACH_BERLIN_BG2Q
->> +    bool "Marvell Armada 1500 Pro (BG2-Q)"
->> +    select CACHE_L2X0
->> +    select CPU_V7
->> +    select HAVE_ARM_TWD if SMP
->> +    select HAVE_SMP
+In commit 4ca2c04085a1caa903e92a5fc0da25362150aac2 ('ARM: orion5x:
+Move to ID based window creation'), the mach-orion5x code was changed
+to use the new mvebu-mbus API. However, in the process, a mistake was
+made on the crypto SRAM window target ID: it should have been 0x9
+(verified in the datasheet) and not 0x0.
 
-As Rob Herring pointed out, CPU_V7 is already selected by MULTI_V7.
-Also, with no agreement on how to proceed with SMP, I also dropped
-HAVE_SMP for now.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: stable at vger.kernel.org
+---
+This should be backported to stable all the way to v3.12.
 
-Sebastian
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-orion5x/common.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
->>   endmenu
->>
->>   endif
->>
-> 
+diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+index f565f99..7548db2 100644
+--- a/arch/arm/mach-orion5x/common.h
++++ b/arch/arm/mach-orion5x/common.h
+@@ -21,7 +21,7 @@ struct mv_sata_platform_data;
+ #define ORION_MBUS_DEVBUS_BOOT_ATTR   0x0f
+ #define ORION_MBUS_DEVBUS_TARGET(cs)  0x01
+ #define ORION_MBUS_DEVBUS_ATTR(cs)    (~(1 << cs))
+-#define ORION_MBUS_SRAM_TARGET        0x00
++#define ORION_MBUS_SRAM_TARGET        0x09
+ #define ORION_MBUS_SRAM_ATTR          0x00
+ 
+ /*
+-- 
+1.9.2
