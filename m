@@ -1,60 +1,44 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 22 Apr 2014 09:55:35 +0530
-Subject: [PATCH] ARM: dts: disable MDMA1 node for smdk5420 board
-In-Reply-To: <021301cf5dd1$1d0ec910$572c5b30$@samsung.com>
-References: <001a01cf5b0c$5ddc7d60$19957820$%jun@samsung.com>
- <021301cf5dd1$1d0ec910$572c5b30$@samsung.com>
-Message-ID: <CAHbNUh3G1NUUfAwh=B+rDwVkfsAetUpDspiPS-JbK3oYuxSd_A@mail.gmail.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 21 Apr 2014 21:53:04 -0700
+Subject: Tegra baseline test results for v3.15-rc1
+Message-ID: <5355F5B0.6060703@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2014 07:48, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Seungwon Jeon wrote:
->>
->
-> + Javi Merino and Tushar Behera
->
->> This change is similar to commit 3da355c(ARM: dts: Disable MDMA1 node
->> for arndale-octa board). If MDMA1 region is configured with secure mode,
->> it makes the boot failure with the following.
->>
->> Unhandled fault: imprecise external abort (0x1406) at 0x00000000
->>
-> If so, how about adding the 'disabled' status in 5420 dtsi file? Then if 'enabling' is required, we can enable in each board dt file...
->
+Here are some basic Tegra test results for Linux v3.15-rc1.
+Logs and other details at:
 
-That should be okay. While at it, we can remove the node disabling
-code from Arndale-Octa board DTS file.
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.15-rc1/20140413153108/
 
 
-> - Kukjin
->
->> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5420-smdk5420.dts |    6 ++++++
->>  1 files changed, 6 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> index 6910485..9a48e3f 100644
->> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -373,4 +373,10 @@
->>                       };
->>               };
->>       };
->> +
->> +     amba {
->> +             mdma1: mdma at 11C10000 {
->> +                     status = "disabled";
->> +             };
->> +     };
->>  };
->> --
->> 1.7.0.4
->
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
 
 
 
--- 
-Tushar Behera
+vmlinux object size
+(delta in bytes from test_v3.14 (455c6fdbd219161bd09b1165f11699d6d73de11c)):
+    text     data      bss    total  kernel
++330455  +103624    +6112  +440191  multi_v7_defconfig
++191148   +13528    +4472  +209148  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.14 (455c6fdbd219161bd09b1165f11699d6d73de11c))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+   -49720k   49720k        .      36k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+   -49500k   49500k        .      12k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+   -49700k   49700k        .      36k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+   -49480k   49480k        .      12k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+
+48 MiB of additional reserved memory?  Ouch.  I had to rub my eyes and doublecheck.  It's the CMA allocation.
