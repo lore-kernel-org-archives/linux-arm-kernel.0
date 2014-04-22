@@ -1,48 +1,78 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Apr 2014 13:58:02 +0530
-Subject: [PATCH v3 2/3] ARM: OMAP2+: L2 cache: git rid of redundant cache
- replacement policy setting
+Date: Tue, 22 Apr 2014 13:58:01 +0530
+Subject: [PATCH v3 1/3] ARM: OMAP2+: L2 cache: get rid of init call
 In-Reply-To: <cover.1398149526.git.nsekhar@ti.com>
 References: <cover.1398149526.git.nsekhar@ti.com>
-Message-ID: <8bcc6d587cd1f320b59806dbdee9018b76c04e4f.1398149526.git.nsekhar@ti.com>
+Message-ID: <9e9e4a3cae0b383f35a04aa1c060d4f678471f4d.1398149526.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-L2 cache initialization for OMAP4 redundantly sets the
-cache policy to Round-Robin. This is not needed since
-thats the PL310 default anyway.
-
-Removing this reduces the number of platform specific
-aux control settings.
+Get rid of init call to initialize L2 cache.
+Instead use the init_early machine hook. This
+helps in using the initialization routine across
+SoCs without the need of ugly cpu_is_*() checks.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/mach-omap2/omap4-common.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/common.h       |    1 +
+ arch/arm/mach-omap2/io.c           |    1 +
+ arch/arm/mach-omap2/omap4-common.c |   10 +---------
+ 3 files changed, 3 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index d88aff7..ff02973 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -91,6 +91,7 @@ extern void omap3_sync32k_timer_init(void);
+ extern void omap3_secure_sync32k_timer_init(void);
+ extern void omap3_gptimer_timer_init(void);
+ extern void omap4_local_timer_init(void);
++int omap_l2_cache_init(void);
+ extern void omap5_realtime_timer_init(void);
+ 
+ void omap2420_init_early(void);
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index f14f9ac..b28299b 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -640,6 +640,7 @@ void __init omap4430_init_early(void)
+ 	omap44xx_clockdomains_init();
+ 	omap44xx_hwmod_init();
+ 	omap_hwmod_init_postsetup();
++	omap_l2_cache_init();
+ 	omap_clk_soc_init = omap4xxx_dt_clk_init;
+ }
+ 
 diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 1230975..c41ff8b 100644
+index df3f531..1230975 100644
 --- a/arch/arm/mach-omap2/omap4-common.c
 +++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -206,16 +206,15 @@ int __init omap_l2_cache_init(void)
- 		return -ENOMEM;
+@@ -196,17 +196,10 @@ static void omap4_l2c310_write_sec(unsigned long val, unsigned reg)
+ 	omap_smc1(smc_op, val);
+ }
  
- 	/* 16-way associativity, parity disabled, way size - 64KB (es2.0 +) */
--	aux_ctrl = L310_AUX_CTRL_CACHE_REPLACE_RR |
--		   L2C_AUX_CTRL_SHARED_OVERRIDE |
-+	aux_ctrl = L2C_AUX_CTRL_SHARED_OVERRIDE |
- 		   L310_AUX_CTRL_DATA_PREFETCH |
- 		   L310_AUX_CTRL_INSTR_PREFETCH;
+-static int __init omap_l2_cache_init(void)
++int __init omap_l2_cache_init(void)
+ {
+ 	u32 aux_ctrl;
  
- 	outer_cache.write_sec = omap4_l2c310_write_sec;
- 	if (of_have_populated_dt())
--		l2x0_of_init(aux_ctrl, 0xcd9fffff);
-+		l2x0_of_init(aux_ctrl, 0xcf9fffff);
- 	else
--		l2x0_init(l2cache_base, aux_ctrl, 0xcd9fffff);
-+		l2x0_init(l2cache_base, aux_ctrl, 0xcf9fffff);
+-	/*
+-	 * To avoid code running on other OMAPs in
+-	 * multi-omap builds
+-	 */
+-	if (!cpu_is_omap44xx())
+-		return -ENODEV;
+-
+ 	/* Static mapping, never released */
+ 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
+ 	if (WARN_ON(!l2cache_base))
+@@ -226,7 +219,6 @@ static int __init omap_l2_cache_init(void)
  
  	return 0;
  }
+-omap_early_initcall(omap_l2_cache_init);
+ #endif
+ 
+ void __iomem *omap4_get_sar_ram_base(void)
 -- 
 1.7.10.1
