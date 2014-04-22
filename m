@@ -1,56 +1,62 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Apr 2014 00:05:41 +0200
-Subject: [PATCH] ARM: at91: add pull-up to i2c[02] on SAMA5D3 Xplained
-Message-ID: <1398204341-13653-1-git-send-email-nicolas.ferre@atmel.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 22 Apr 2014 17:23:34 -0500
+Subject: [PATCH 0/3] Minor OMAP DTS fixes
+Message-ID: <1398205417-1575-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As there are no pull-up resistors on the board itself it can be useful to
-use the SoC pad pull-up to be able to easily connect usual i2c devices.
+Hi Tony, Benoit,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+This series includes couple of minor fixes in the OMAP DTS files. The patches
+are based on 3.15-rc2.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index ce1375595e5f..ff8a159bb600 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -43,6 +43,7 @@
- 			};
- 
- 			i2c0: i2c at f0014000 {
-+				pinctrl-0 = <&pinctrl_i2c0_pu>;
- 				status = "okay";
- 			};
- 
-@@ -102,6 +103,7 @@
- 
- 			i2c2: i2c at f801c000 {
- 				dmas = <0>, <0>;	/* Do not use DMA for i2c2 */
-+				pinctrl-0 = <&pinctrl_i2c2_pu>;
- 				status = "okay";
- 			};
- 
-@@ -116,6 +118,18 @@
- 
- 			pinctrl at fffff200 {
- 				board {
-+					pinctrl_i2c0_pu: i2c0_pu {
-+						atmel,pins =
-+							<AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>,
-+							<AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
-+					};
-+
-+					pinctrl_i2c2_pu: i2c2_pu {
-+						atmel,pins =
-+							<AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>,
-+							<AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
-+					};
-+
- 					pinctrl_mmc0_cd: mmc0_cd {
- 						atmel,pins =
- 							<AT91_PIOE 0 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+The first patch fixes the only WARN_ON trace present during kernel boot on
+OMAP5 uEVM, and this has been present since some time now. 
+[    0.045578] ------------[ cut here ]------------
+[    0.045598] WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2538 _init+0x1c0/0x3dc()
+[    0.045605] omap_hwmod: mailbox: doesn't have mpu register target base
+[    0.045611] Modules linked in:
+[    0.045625] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.15.0-rc2-00001-gb5e85a0 #45
+[    0.045653] [<c0015724>] (unwind_backtrace) from [<c00120f4>] (show_stack+0x10/0x14)
+[    0.045672] [<c00120f4>] (show_stack) from [<c05a1ccc>] (dump_stack+0x78/0x94)
+[    0.045686] [<c05a1ccc>] (dump_stack) from [<c0042a74>] (warn_slowpath_common+0x6c/0x8c)
+[    0.045698] [<c0042a74>] (warn_slowpath_common) from [<c0042b28>] (warn_slowpath_fmt+0x30/0x40)
+[    0.045710] [<c0042b28>] (warn_slowpath_fmt) from [<c0803b40>] (_init+0x1c0/0x3dc)
+[    0.045724] [<c0803b40>] (_init) from [<c0029c8c>] (omap_hwmod_for_each+0x34/0x5c)
+[    0.045736] [<c0029c8c>] (omap_hwmod_for_each) from [<c08042b0>] (__omap_hwmod_setup_all+0x24/0x40)
+[    0.045748] [<c08042b0>] (__omap_hwmod_setup_all) from [<c00088b8>] (do_one_initcall+0x34/0x160)
+[    0.045761] [<c00088b8>] (do_one_initcall) from [<c07f7bf4>] (kernel_init_freeable+0xfc/0x1c8)
+[    0.045772] [<c07f7bf4>] (kernel_init_freeable) from [<c059c4f4>] (kernel_init+0x8/0xe4)
+[    0.045784] [<c059c4f4>] (kernel_init) from [<c000eaa8>] (ret_from_fork+0x14/0x2c)
+[    0.045826] ---[ end trace c25fc521f2569d3c ]---
+
+The last patch eliminates the following traces on AM3517 based boards.
+[    0.418496] platform iva.2: Cannot lookup hwmod 'iva'
+[    0.454352] platform 48094000.mailbox: Cannot lookup hwmod 'mailbox'
+[    0.460610] platform 480bd400.mmu: Cannot lookup hwmod 'mmu_isp'
+[    0.464065] platform 480c9000.smartreflex: Cannot lookup hwmod 'smartreflex_mpu_iva'
+
+There are a few other such traces remaining, but these are all on valid nodes.
+[    0.420275] platform 480c5000.aes: Cannot lookup hwmod 'aes'
+[    0.462403] platform 480c3000.sham: Cannot lookup hwmod 'sham'
+[    0.463246] platform 480cb000.smartreflex: Cannot lookup hwmod 'smartreflex_core'
+[    0.477243] platform 480ab000.usb_otg_hs: Cannot lookup hwmod 'usb_otg_hs'
+
+regards
+Suman
+
+Suman Anna (3):
+  ARM: dts: OMAP5: Add mailbox dt node to fix boot warning
+  ARM: dts: OMAP2: Fix interrupts for OMAP2420 mailbox
+  ARM: dts: AM3517: Disable absent IPs inherited from OMAP3
+
+ arch/arm/boot/dts/am3517.dtsi   | 16 ++++++++++++++++
+ arch/arm/boot/dts/omap2.dtsi    |  7 -------
+ arch/arm/boot/dts/omap2420.dtsi |  8 ++++++++
+ arch/arm/boot/dts/omap2430.dtsi |  7 +++++++
+ arch/arm/boot/dts/omap3.dtsi    |  2 +-
+ arch/arm/boot/dts/omap5.dtsi    |  7 +++++++
+ 6 files changed, 39 insertions(+), 8 deletions(-)
+
 -- 
-1.8.2.2
+1.9.2
