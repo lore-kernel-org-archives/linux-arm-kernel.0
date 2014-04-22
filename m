@@ -1,184 +1,72 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 22 Apr 2014 23:26:27 +0200
-Subject: [PATCH v2 23/38] ARM: orion5x: switch to DT interrupts and timer
+Date: Tue, 22 Apr 2014 23:26:30 +0200
+Subject: [PATCH v2 26/38] ARM: orion5x: add Device Bus description at SoC level
 In-Reply-To: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1398202002-28530-24-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1398202002-28530-27-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit switches the Orion5x platforms described through DT to use
-a DT-defined interrupt controller and timer.
-
-This involves:
-
- * Describing in the DT the bridge interrupt controller, which is a
-   child interrupt controller to the main one, which is used for timer
-   and watchdog interrupts.
-
- * Describing in the DT the timer.
-
- * Adding in the DT the interrupt specifications for the watchdog.
-
- * Selecting the ORION_IRQCHIP and ORION_TIMER drivers to be compiled.
-
- * Change board-dt.c to no longer have an ->init_time() callback,
-   since the default callback will work fine: it calls
-   clocksource_of_init() and of_clk_init(), as needed.
-
- * Implement a multi-IRQ handler for non-DT platforms in
-   mach-orion5x/irq.c.
+This commit adds the necessary SoC-level Device Tree definitions to
+describe the Device Bus of Orion5x SOCs. The Device Bus is mainly used
+to connect NOR flashes to the system.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm/boot/dts/orion5x.dtsi   | 19 +++++++++++++++++++
- arch/arm/mach-orion5x/Kconfig    |  2 ++
- arch/arm/mach-orion5x/board-dt.c | 15 +--------------
- arch/arm/mach-orion5x/irq.c      | 28 ++++++++++++++++++++++++++++
- 4 files changed, 50 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/orion5x.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
 diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
-index 88df8a8..b4c2234 100644
+index 203edde..75cd01b 100644
 --- a/arch/arm/boot/dts/orion5x.dtsi
 +++ b/arch/arm/boot/dts/orion5x.dtsi
-@@ -78,6 +78,15 @@
- 				status = "disabled";
- 			};
+@@ -24,6 +24,46 @@
+ 		#size-cells = <1>;
+ 		controller = <&mbusc>;
  
-+			bridge_intc: bridge-interrupt-ctrl at 20110 {
-+				compatible = "marvell,orion-bridge-intc";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				reg = <0x20110 0x8>;
-+				interrupts = <0>;
-+				marvell,#interrupts = <4>;
-+			};
++		devbus_bootcs: devbus-bootcs {
++			compatible = "marvell,orion-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x1046C 0x4>;
++			ranges = <0 MBUS_ID(0x01, 0x0f) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&core_clk 0>;
++			status = "disabled";
++		};
 +
- 			intc: interrupt-controller at 20200 {
- 				compatible = "marvell,orion-intc";
- 				interrupt-controller;
-@@ -85,9 +94,19 @@
- 				reg = <0x20200 0x08>;
- 			};
- 
-+			timer: timer at 20300 {
-+				compatible = "marvell,orion-timer";
-+				reg = <0x20300 0x20>;
-+				interrupt-parent = <&bridge_intc>;
-+				interrupts = <1>, <2>;
-+				clocks = <&core_clk 0>;
-+			};
++		devbus_cs0: devbus-cs0 {
++			compatible = "marvell,orion-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x1045C 0x4>;
++			ranges = <0 MBUS_ID(0x01, 0x1e) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&core_clk 0>;
++			status = "disabled";
++		};
 +
- 			wdt: wdt at 20300 {
- 				compatible = "marvell,orion-wdt";
- 				reg = <0x20300 0x28>;
-+				interrupt-parent = <&bridge_intc>;
-+				interrupts = <3>;
- 				status = "okay";
- 			};
- 
-diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-index 4f51132..bd65872 100644
---- a/arch/arm/mach-orion5x/Kconfig
-+++ b/arch/arm/mach-orion5x/Kconfig
-@@ -6,6 +6,8 @@ config ARCH_ORION5X_DT
- 	bool "Marvell Orion5x Flattened Device Tree"
- 	select USE_OF
- 	select ORION_CLK
-+	select ORION_IRQCHIP
-+	select ORION_TIMER
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell Orion5x using flattened device tree.
-diff --git a/arch/arm/mach-orion5x/board-dt.c b/arch/arm/mach-orion5x/board-dt.c
-index 34286ef..6dc48465 100644
---- a/arch/arm/mach-orion5x/board-dt.c
-+++ b/arch/arm/mach-orion5x/board-dt.c
-@@ -17,6 +17,7 @@
- #include <linux/cpu.h>
- #include <linux/mbus.h>
- #include <linux/clk-provider.h>
-+#include <linux/clocksource.h>
- #include <asm/system_misc.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -36,17 +37,6 @@ static struct of_dev_auxdata orion5x_auxdata_lookup[] __initdata = {
- 	{},
- };
- 
--static void orion5x_dt_init_early(void)
--{
--	orion_time_set_base(TIMER_VIRT_BASE);
--}
--
--static void orion5x_dt_init_time(void)
--{
--	orion5x_timer_init();
--	of_clk_init(NULL);
--}
--
- static void __init orion5x_dt_init(void)
- {
- 	char *dev_name;
-@@ -86,9 +76,6 @@ static const char *orion5x_dt_compat[] = {
- DT_MACHINE_START(ORION5X_DT, "Marvell Orion5x (Flattened Device Tree)")
- 	/* Maintainer: Thomas Petazzoni <thomas.petazzoni@free-electrons.com> */
- 	.map_io		= orion5x_map_io,
--	.init_early	= orion5x_dt_init_early,
--	.init_irq	= orion_dt_init_irq,
--	.init_time	= orion5x_dt_init_time,
- 	.init_machine	= orion5x_dt_init,
- 	.restart	= orion5x_restart,
- 	.dt_compat	= orion5x_dt_compat,
-diff --git a/arch/arm/mach-orion5x/irq.c b/arch/arm/mach-orion5x/irq.c
-index 9654b0c..cd4bac4 100644
---- a/arch/arm/mach-orion5x/irq.c
-+++ b/arch/arm/mach-orion5x/irq.c
-@@ -16,6 +16,7 @@
- #include <mach/bridge-regs.h>
- #include <plat/orion-gpio.h>
- #include <plat/irq.h>
-+#include <asm/exception.h>
- #include "common.h"
- 
- static int __initdata gpio0_irqs[4] = {
-@@ -25,10 +26,37 @@ static int __initdata gpio0_irqs[4] = {
- 	IRQ_ORION5X_GPIO_24_31,
- };
- 
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+/*
-+ * Compiling with both non-DT and DT support enabled, will
-+ * break asm irq handler used by non-DT boards. Therefore,
-+ * we provide a C-style irq handler even for non-DT boards,
-+ * if MULTI_IRQ_HANDLER is set.
-+ */
++		devbus_cs1: devbus-cs1 {
++			compatible = "marvell,orion-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10460 0x4>;
++			ranges = <0 MBUS_ID(0x01, 0x1d) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&core_clk 0>;
++			status = "disabled";
++		};
 +
-+asmlinkage void
-+__exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
-+{
-+	u32 stat;
++		devbus_cs2: devbus-cs2 {
++			compatible = "marvell,orion-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10464 0x4>;
++			ranges = <0 MBUS_ID(0x01, 0x1b) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&core_clk 0>;
++			status = "disabled";
++		};
 +
-+	stat = readl_relaxed(MAIN_IRQ_CAUSE);
-+	stat &= readl_relaxed(MAIN_IRQ_MASK);
-+	if (stat) {
-+		unsigned int hwirq = __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+}
-+#endif
-+
- void __init orion5x_init_irq(void)
- {
- 	orion_irq_init(0, MAIN_IRQ_MASK);
- 
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+	set_handle_irq(orion5x_legacy_handle_irq);
-+#endif
-+
- 	/*
- 	 * Initialize gpiolib for GPIOs 0-31.
- 	 */
+ 		internal-regs {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
 -- 
 1.9.2
