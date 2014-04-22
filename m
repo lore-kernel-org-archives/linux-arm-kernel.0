@@ -1,41 +1,51 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 22 Apr 2014 19:21:53 +0200
-Subject: [PATCH 2/6] Documentation: bindings: add the berlin-achi
- compatible to the ahci platform
-In-Reply-To: <1398181105-19714-3-git-send-email-antoine.tenart@free-electrons.com>
+Date: Tue, 22 Apr 2014 19:22:42 +0200
+Subject: [PATCH 3/6] ARM: berlin: add the AHCI node for the BG2Q
+In-Reply-To: <20140422182802.447c2912@skate>
 References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398181105-19714-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <5356A531.7030606@gmail.com>
+ <1398181105-19714-4-git-send-email-antoine.tenart@free-electrons.com>
+ <20140422182802.447c2912@skate>
+Message-ID: <5356A562.2090403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2014 05:38 PM, Antoine T?nart wrote:
-> The berlin-achi driver allows Berlin SoCs to support their AHCI SATA controller.
-> Add the compatible to the device tree bindings documentation.
+On 04/22/2014 06:28 PM, Thomas Petazzoni wrote:
+> Dear Antoine T?nart,
 > 
-> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/ata/ahci-platform.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> On Tue, 22 Apr 2014 17:38:22 +0200, Antoine T?nart wrote:
+>> The BG2Q has an AHCI SATA controller. Add the corresponding node
+>> in its device tree.
 > 
-> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> index 48b285ffa3a6..9987b63aaa10 100644
-> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> @@ -7,7 +7,8 @@ Required properties:
->  - compatible        : compatible list, one of "snps,spear-ahci",
->                        "snps,exynos5440-ahci", "ibm,476gtr-ahci",
->                        "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
-> -                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
-> +                      "fsl,imx6q-ahci", "snps,dwc-ahci" or
-> +		      "marvell,berlin-ahci"
+> I believe the commit log should explain why an apparently unrelated
+> generic-regs@ node gets added in this commit.
 
-Besides the typo Thomas already mentioned, it looks like the compatibles
-are indented by spaces while you have tabs.
+generic-regs@ is from another patch, please drop it entirely.
 
 Sebastian
 
->  - interrupts        : <interrupt mapping for SATA IRQ>
->  - reg               : <registers mapping>
->  
+>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+>> index 07452a7483fa..8e58aae73365 100644
+>> --- a/arch/arm/boot/dts/berlin2q.dtsi
+>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+>> @@ -183,6 +183,18 @@
+>>  			};
+>>  		};
+>>  
+>> +		ahci: sata at e90000 {
+>> +			compatible = "marvell,berlin-ahci";
+>> +			reg = <0xe90000 0x10000>;
+>> +			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+>> +			status = "disable";
+>> +		};
+>> +
+>> +		generic-regs at ea0110 {
+>> +			compatible = "marvell,berlin-generic-regs", "syscon";
+>> +			reg = <0xea0110 0x10>;
+>> +		};
+>> +
+>>  		apb at fc0000 {
+>>  			compatible = "simple-bus";
+>>  			#address-cells = <1>;
+> 
+> 
 > 
