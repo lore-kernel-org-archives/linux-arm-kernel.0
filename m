@@ -1,75 +1,172 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 24 Apr 2014 07:23:15 +0800
-Subject: [PATCH 3/4] gpio: make handler_data configurable while using
- gpiolib_irqchip
-In-Reply-To: <CACRpkdYcbngMDPRnuQjPHwo-USHdtK26T_6VM=PFnkT71Dg8Ng@mail.gmail.com>
-References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
- <1397544229-20545-4-git-send-email-21cnbao@gmail.com>
- <CACRpkdb8rmMDXS1kfcq7wgOnG2XsPm_bxb15z9_9d3E+trBfQA@mail.gmail.com>
- <CAGsJ_4wmd-ejfHF+MXbO3JSppUDYcEVKeO1WxRM16FtSFEBxpA@mail.gmail.com>
- <CACRpkdYcbngMDPRnuQjPHwo-USHdtK26T_6VM=PFnkT71Dg8Ng@mail.gmail.com>
-Message-ID: <CAGsJ_4y4H63KxJLF1hKaBwHVYb2b_2wTzjO_kGhKUOzScYpKqA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Apr 2014 16:42:13 -0700
+Subject: [PATCH 2/2] of/irq: do irq resolution in platform_get_irq
+In-Reply-To: <1398293861-7682-3-git-send-email-robherring2@gmail.com>
+References: <1398293861-7682-1-git-send-email-robherring2@gmail.com>
+ <1398293861-7682-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20140423234213.GE6053@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-04-24 7:09 GMT+08:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, Apr 24, 2014 at 12:55 AM, Barry Song <21cnbao@gmail.com> wrote:
->
->>> NAK, the whole idea with the function gpiochip_set_chained_irqchip()
->>> is that its sets things up so that the gpiochip is passed as handler
->>> data on the parent IRQ, akin to how the gpiochip is passed as
->>> chip data on the cascaded IRQs.
->>
->> i think it is a really bad idea as the parent handler might not want
->> the whole chip if the chip has several parents and each parent want a
->> separate handler_data.
->> this patch doesn't break your way as the parameter is void *, drivers
->> which use your way don't need any change. but for drivers which want
->> more special handler_data, it supports better.
->
-> This is perfectly possible, just don't use
-> gpiochip_set_chained_irqchip() which has this semantic
-> effect.
->
-> Use irq_set_chained_handler() and irq_set_handler_data()
-> directly instead.
->
-> I do see that this is maybe easier for the handler to get the bank
-> passed in.
->
-> However when I in the RFT patches change the driver to allocate
-> and pass a struct for the gpio chip, it all looks a bit different.
-> You would have to get the sgpio from the bank instead, which
-> may require to introduce a special pointer for that.
->
-> What we want to get rid of is this:
->
-> for (i = 0; i < SIRFSOC_GPIO_BANK_SIZE; i++) {
->                 bank = &sgpio->sgpio_bank[i];
->                 if (bank->parent_irq == irq)
->                         break;
-> }
-> BUG_ON (i == SIRFSOC_GPIO_BANK_SIZE);
->
-> So what about passing something like that to the handler:
->
-> struct sirf_irq_handler_data {
->     struct sirfsoc_gpio_chip *sgpio;
->     struct sirfsoc_gpio_bank *bank;
-> };
->
-> Then the irq handler instantly have pointers to all it needs.
-> But maybe it's better to just pass the bank, whatdoIknow.
+* Rob Herring <robherring2@gmail.com> [140423 15:58]:
+> From: Rob Herring <robh@kernel.org>
+> 
+> Currently we get the following kind of errors if we try to use interrupt
+> phandles to irqchips that have not yet initialized:
+> 
+> irq: no irq domain found for /ocp/pinmux at 48002030 !
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at drivers/of/platform.c:171 of_device_alloc+0x144/0x184()
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.12.0-00038-g42a9708 #1012
+> (show_stack+0x14/0x1c)
+> (dump_stack+0x6c/0xa0)
+> (warn_slowpath_common+0x64/0x84)
+> (warn_slowpath_null+0x1c/0x24)
+> (of_device_alloc+0x144/0x184)
+> (of_platform_device_create_pdata+0x44/0x9c)
+> (of_platform_bus_create+0xd0/0x170)
+> (of_platform_bus_create+0x12c/0x170)
+> (of_platform_populate+0x60/0x98)
+> 
+> This is because we're wrongly trying to populate resources that are not
+> yet available. It's perfectly valid to create irqchips dynamically, so
+> let's fix up the issue by resolving the interrupt resources when
+> platform_get_irq is called.
+> 
+> And then we also need to accept the fact that some irqdomains do not
+> exist that early on, and only get initialized later on. So we can
+> make the current WARN_ON into just into a pr_debug().
+> 
+> We still attempt to populate irq resources when we create the devices.
+> This allows current drivers which don't use platform_get_irq to continue
+> to function. Once all drivers are fixed, this code can be removed.
+> 
+> Suggested-by: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-only if we move to irq_set_chained_handler() and
-irq_set_handler_data() directly and set bank-specific handler_data
-manually, it works.
-my point is that will we make the gpiochip_set_chained_irqchip() more
-general for this kind of cases too since you have had a good API to
-wrap things?
+Great, works for me. Hopefully this patch is non-intrusive enough for
+people for the -rc cycle too?
 
->
-> Yours,
-> Linus Walleij
+Tested-by: Tony Lindgren <tony@atomide.com>
 
--barry
+> ---
+>  drivers/base/platform.c |  7 ++++++-
+>  drivers/of/irq.c        | 26 ++++++++++++++++++++++++++
+>  drivers/of/platform.c   |  4 +++-
+>  include/linux/of_irq.h  |  7 ++++++-
+>  4 files changed, 41 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index e714709..5b47210 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/string.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/module.h>
+>  #include <linux/init.h>
+>  #include <linux/dma-mapping.h>
+> @@ -87,7 +88,11 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+>  		return -ENXIO;
+>  	return dev->archdata.irqs[num];
+>  #else
+> -	struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> +	struct resource *r;
+> +	if (IS_ENABLED(CONFIG_OF_IRQ) && dev->dev.of_node)
+> +		return of_irq_get(dev->dev.of_node, num);
+> +
+> +	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+>  
+>  	return r ? r->start : -ENXIO;
+>  #endif
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 9bcf2cf..ca01893 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -380,6 +380,32 @@ int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
+>  EXPORT_SYMBOL_GPL(of_irq_to_resource);
+>  
+>  /**
+> + * of_irq_get - Decode a node's IRQ and return it as a Linux irq number
+> + * @dev: pointer to device tree node
+> + * @index: zero-based index of the irq
+> + *
+> + * Returns Linux irq number on success, or -EPROBE_DEFER if the irq domain
+> + * is not yet created.
+> + *
+> + */
+> +int of_irq_get(struct device_node *dev, int index)
+> +{
+> +	int rc;
+> +	struct of_phandle_args oirq;
+> +	struct irq_domain *domain;
+> +
+> +	rc = of_irq_parse_one(dev, index, &oirq);
+> +	if (rc)
+> +		return rc;
+> +
+> +	domain = irq_find_host(oirq.np);
+> +	if (!domain)
+> +		return -EPROBE_DEFER;
+> +
+> +	return irq_create_of_mapping(&oirq);
+> +}
+> +
+> +/**
+>   * of_irq_count - Count the number of IRQs a node uses
+>   * @dev: pointer to device tree node
+>   */
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 404d1da..bd47fbc 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -168,7 +168,9 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  			rc = of_address_to_resource(np, i, res);
+>  			WARN_ON(rc);
+>  		}
+> -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+> +		if (of_irq_to_resource_table(np, res, num_irq) != num_irq)
+> +			pr_debug("not all legacy IRQ resources mapped for %s\n",
+> +				 np->name);
+>  	}
+>  
+>  	dev->dev.of_node = of_node_get(np);
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index 3f23b44..bc9e51a 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -34,21 +34,26 @@ static inline int of_irq_parse_oldworld(struct device_node *device, int index,
+>  extern int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq);
+>  extern int of_irq_parse_one(struct device_node *device, int index,
+>  			  struct of_phandle_args *out_irq);
+> -extern unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data);
+>  extern int of_irq_to_resource(struct device_node *dev, int index,
+>  			      struct resource *r);
+>  extern int of_irq_to_resource_table(struct device_node *dev,
+>  		struct resource *res, int nr_irqs);
+> +extern unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data);
+>  
+>  extern void of_irq_init(const struct of_device_id *matches);
+>  
+>  #ifdef CONFIG_OF_IRQ
+>  extern int of_irq_count(struct device_node *dev);
+> +extern int of_irq_get(struct device_node *dev, int index);
+>  #else
+>  static inline int of_irq_count(struct device_node *dev)
+>  {
+>  	return 0;
+>  }
+> +static inline int of_irq_get(struct device_node *dev, int index)
+> +{
+> +	return 0;
+> +}
+>  #endif
+>  
+>  #if defined(CONFIG_OF)
+> -- 
+> 1.9.1
+> 
