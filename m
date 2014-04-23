@@ -1,142 +1,170 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 23 Apr 2014 20:09:14 +0100
-Subject: [PATCH 36/38] mmc: fix power-on sequencing for esdhc-imx driver
+Date: Wed, 23 Apr 2014 20:09:24 +0100
+Subject: [PATCH 38/38] ARM: cubox-i: add support for Wifi/BT
 In-Reply-To: <20140423185534.GA26756@n2100.arm.linux.org.uk>
 References: <20140423185534.GA26756@n2100.arm.linux.org.uk>
-Message-ID: <E1Wd2Xi-0003wi-Av@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Wd2Xs-0003wq-IR@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no reason that this can't be applied to all MMC interfaces as
-it's all core code, so tie this into the core rather than it being
-optional for each host.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/mmc/core/host.c | 90 +++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 65 insertions(+), 25 deletions(-)
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi  |  8 +++
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi | 98 +++++++++++++++++++++++++++++++++
+ 2 files changed, 106 insertions(+)
 
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index abc60f39aa7e..c523f55b317c 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -316,7 +316,7 @@ int mmc_of_parse(struct mmc_host *host)
- 	u32 bus_width;
- 	bool explicit_inv_wp, gpio_inv_wp = false;
- 	enum of_gpio_flags flags;
--	int i, len, ret, gpio;
-+	int len, ret, gpio;
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index c928c0a5e3cc..67fe5585f6dd 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -152,6 +152,14 @@
+ 	status = "okay";
+ };
  
- 	if (!host->parent || !host->parent->of_node)
- 		return 0;
-@@ -419,30 +419,6 @@ int mmc_of_parse(struct mmc_host *host)
- 	if (explicit_inv_wp ^ gpio_inv_wp)
- 		host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
++&uart4 {
++	status = "okay";
++};
++
++&usdhc1 {
++	status = "okay";
++};
++
+ &usdhc2 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2>;
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index d729d0b15f25..a5d72895d9ce 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -1,9 +1,69 @@
+ /*
+  * Copyright (C) 2013,2014 Russell King
+  */
++#include <dt-bindings/gpio/gpio.h>
++/ {
++	regulators {
++		compatible = "simple-bus";
++
++		reg_brcm_osc: brcm-osc-reg {
++			compatible = "regulator-fixed";
++			enable-active-high;
++			gpio = <&gpio5 5 0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_microsom_brcm_osc_reg>;
++			regulator-name = "brcm_osc_reg";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		reg_brcm: brcm-reg {
++			compatible = "regulator-fixed";
++			enable-active-high;
++			gpio = <&gpio3 19 0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
++			regulator-name = "brcm_reg";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			startup-delay-us = <200000>;
++		};
++	};
++};
  
--	/* Parse card power/reset/clock control */
--	if (of_find_property(np, "card-reset-gpios", NULL)) {
--		struct gpio_desc *gpd;
--		for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
--			gpd = devm_gpiod_get_index(host->parent, "card-reset", i);
--			if (IS_ERR(gpd))
--				break;
--			gpiod_direction_output(gpd, 0);
--			host->card_reset_gpios[i] = gpd;
--		}
--
--		gpd = devm_gpiod_get_index(host->parent, "card-reset", ARRAY_SIZE(host->card_reset_gpios));
--		if (!IS_ERR(gpd)) {
--			dev_warn(host->parent, "More reset gpios than we can handle");
--			gpiod_put(gpd);
--		}
--	}
--
--	host->card_clk = of_clk_get_by_name(np, "card_ext_clock");
--	if (IS_ERR(host->card_clk))
--		host->card_clk = NULL;
--
--	host->card_regulator = regulator_get(host->parent, "card-external-vcc");
--
- 	if (of_find_property(np, "cap-sd-highspeed", &len))
- 		host->caps |= MMC_CAP_SD_HIGHSPEED;
- 	if (of_find_property(np, "cap-mmc-highspeed", &len))
-@@ -485,6 +461,66 @@ int mmc_of_parse(struct mmc_host *host)
+ &iomuxc {
+ 	microsom {
++		pinctrl_microsom_brcm_osc_reg: microsom-brcm-osc-reg {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05 0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_reg: microsom-brcm-reg {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D19__GPIO3_IO19 0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_wifi: microsom-brcm-wifi {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
++				MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x40013070
++				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
++				MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_bt: microsom-brcm-bt {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
++				MX6QDL_PAD_CSI0_DAT15__GPIO6_IO01	0x40013070
++				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
++			>;
++		};
++
+ 		pinctrl_microsom_uart1: microsom-uart1 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
+@@ -11,6 +71,15 @@
+ 			>;
+ 		};
  
- EXPORT_SYMBOL(mmc_of_parse);
++		pinctrl_microsom_uart4_1: microsom-uart4 {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
++			>;
++		};
++
+ 		pinctrl_microsom_usbotg: microsom-usbotg {
+ 			/*
+ 			 * Similar to pinctrl_usbotg_2, but we want it
+@@ -18,6 +87,17 @@
+ 			 */
+ 			fsl,pins = <MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x13059>;
+ 		};
++
++		pinctrl_microsom_usdhc1: microsom-usdhc1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
++				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
++				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
++			>;
++		};
+ 	};
+ };
  
-+static int mmc_of_parse_child(struct mmc_host *host)
-+{
-+	struct device_node *np;
-+	struct clk *clk;
-+	int i;
-+
-+	if (!host->parent || !host->parent->of_node)
-+		return 0;
-+
-+	np = host->parent->of_node;
-+
-+	host->card_regulator = regulator_get(host->parent, "card-external-vcc");
-+	if (IS_ERR(host->card_regulator)) {
-+		if (PTR_ERR(host->card_regulator) == -EPROBE_DEFER)
-+			return PTR_ERR(host->card_regulator);
-+		host->card_regulator = NULL;
-+	}
-+
-+	/* Parse card power/reset/clock control */
-+	if (of_find_property(np, "card-reset-gpios", NULL)) {
-+		struct gpio_desc *gpd;
-+		int level = 0;
-+
-+		/*
-+		 * If the regulator is enabled, then we can hold the
-+		 * card in reset with an active high resets.  Otherwise,
-+		 * hold the resets low.
-+		 */
-+		if (host->card_regulator && regulator_is_enabled(host->card_regulator))
-+			level = 1;
-+
-+		for (i = 0; i < ARRAY_SIZE(host->card_reset_gpios); i++) {
-+			gpd = devm_gpiod_get_index(host->parent, "card-reset", i);
-+			if (IS_ERR(gpd)) {
-+				if (PTR_ERR(gpd) == -EPROBE_DEFER)
-+					return PTR_ERR(gpd);
-+				break;
-+			}
-+			gpiod_direction_output(gpd, gpiod_is_active_low(gpd) | level);
-+			host->card_reset_gpios[i] = gpd;
-+		}
-+
-+		gpd = devm_gpiod_get_index(host->parent, "card-reset", ARRAY_SIZE(host->card_reset_gpios));
-+		if (!IS_ERR(gpd)) {
-+			dev_warn(host->parent, "More reset gpios than we can handle");
-+			gpiod_put(gpd);
-+		}
-+	}
-+
-+	clk = of_clk_get_by_name(np, "card_ext_clock");
-+	if (IS_ERR(clk)) {
-+		if (PTR_ERR(clk) == -EPROBE_DEFER)
-+			return PTR_ERR(clk);
-+		clk = NULL;
-+	}
-+	host->card_clk = clk;
-+
-+	return 0;
-+}
-+
- /**
-  *	mmc_alloc_host - initialise the per-host structure.
-  *	@extra: sizeof private data structure
-@@ -564,6 +600,10 @@ int mmc_add_host(struct mmc_host *host)
- {
- 	int err;
+@@ -27,7 +107,25 @@
+ 	status = "okay";
+ };
  
-+	err = mmc_of_parse_child(host);
-+	if (err)
-+		return err;
++/* UART4 - Connected to optional BRCM Wifi/BT/FM */
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_brcm_bt &pinctrl_microsom_uart4_1>;
++	fsl,uart-has-rtscts;
++};
 +
- 	WARN_ON((host->caps & MMC_CAP_SDIO_IRQ) &&
- 		!host->ops->enable_sdio_irq);
- 
+ &usbotg {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_microsom_usbotg>;
+ };
++
++/* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
++&usdhc1 {
++	card-external-vcc-supply = <&reg_brcm>;
++	card-reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>, <&gpio6 0 GPIO_ACTIVE_LOW>;
++	keep-power-in-suspend;
++	non-removable;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_brcm_wifi &pinctrl_microsom_usdhc1>;
++	vmmc-supply = <&reg_brcm>;
++};
 -- 
 1.8.3.1
