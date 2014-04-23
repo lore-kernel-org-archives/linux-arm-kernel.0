@@ -1,127 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 12:03:23 -0700
-Subject: [PATCH 3/3] ARM: dts: Fix GPMC timings for LAN9220
-In-Reply-To: <1398279803-5655-1-git-send-email-tony@atomide.com>
-References: <1398279803-5655-1-git-send-email-tony@atomide.com>
-Message-ID: <1398279803-5655-4-git-send-email-tony@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Apr 2014 20:04:48 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <6414220.SShvCHLvZQ@wuerfel>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140423171727.GK5649@arm.com>
+ <20140423183742.GK24070@n2100.arm.linux.org.uk> <6414220.SShvCHLvZQ@wuerfel>
+Message-ID: <20140423190448.GB26756@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've noticed occasional random oopsing on my gateway
-machine since I upgraded it to use device tree based
-booting. As this machine has worked reliably before
-that for a few years, pretty much the only difference
-was narrowed down to the GPMC timings. Turns out that
-for legacy based booting we are using bootloader timings
-for GPMC for smsc911x. With device tree we are passing
-the timings in the .dts file, and the device tree
-timings are not quite suitable for LAN9920.
+On Wed, Apr 23, 2014 at 08:58:05PM +0200, Arnd Bergmann wrote:
+> On Wednesday 23 April 2014 19:37:42 Russell King - ARM Linux wrote:
+> > On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
+> > > On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
+> > > > In the I/O coherency case, I would say it is the responsibility of the
+> > > > device/hardware to ensure that the data is visible to all observers
+> > > > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
+> > > > code, I think it covers such scenario from-device or bidirectional
+> > > > scenarios.
+> > > > 
+> > > > Maybe Santosh still has a point  but I don't know what the right
+> > > > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
+> > > > (I still hope a dsb would do the trick on newer/ARMv8 systems).
+> > > 
+> > > If you have device interrupts which are asynchronous to memory coherency,
+> > > then you're in a world of pain. I can't think of a generic (architected)
+> > > solution to this problem, unfortunately -- it's going to be both device
+> > > and interconnect specific. Adding dsbs doesn't necessarily help at all.
+> > 
+> > Think, network devices with NAPI handling.  There, we explicitly turn
+> > off the device's interrupt, and switch to software polling for received
+> > packets.
+> >
+> > The memory for the packets has already been mapped, and we're unmapping
+> > the buffer, and then reading from it (to locate the ether type, and/or
+> > vlan headers) before passing it up the network stack.
+> > 
+> > So in this case, we need to ensure that the cache operations are ordered
+> > before the subsequent loads read from the DMA'd data.  It's purely an
+> > ordering thing, it's not a completion thing.
+> 
+> PCI guarantees this, but I have seen systems in the past (on PowerPC) that
+> would violate them on the internal interconnect: You could sometimes see the
+> completion DMA data in the descriptor ring before the actual user data
+> is there. We only ever observed it in combination with an IOMMU, when the
+> descriptor address had a valid IOTLB but the data address did not.
 
-Enabling DEBUG in gpmc.c I noticed that the device tree
-configured timings are different from the the known
-working bootloader timings. So let's fix the timings to
-match the bootloader timings when looked at the gpmc
-dmesg output with DEBUG enabled.
+What is done on down-stream buses is of no concern to the behaviour of
+the CPU, which is what's being discussed here (in terms of barriers.)
+and the correct CPU ordering of various read/writes to memory and
+devices vs the streaming cache operations.
 
-The changes were done by multiplying the bootloader
-tick values by six to get the nanosecond value for
-device tree. This is not generic from the device point
-of view as the calculations should be based on the device
-timings. Anyways, further improvments can be done based
-on the timings documentation for LAN9220. But let's first
-get things to a known good working state.
-
-Note that we still need to change the timings also for
-sb-t35 also as it has two LAN9220 instances on GPMC and
-we can currently include the generic timings only once.
-
-Also note that any boards that have LAN9221 instead of
-LAN9220 should be updated to use omap-gpmc-smsc9221.dtsi
-instead of omap-gpmc-smsc911x.dtsi. The LAN9221 timings
-are different from LAN9220 timings.
-
-Cc: Christoph Fritz <chf.fritz@googlemail.com>
-Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Cc: Javier Martinez Canillas <javier@dowhile0.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi | 19 ++++++++-----------
- arch/arm/boot/dts/omap3-sb-t35.dtsi       | 19 ++++++++-----------
- 2 files changed, 16 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi b/arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
-index f577b7d..521c587 100644
---- a/arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
-+++ b/arch/arm/boot/dts/omap-gpmc-smsc911x.dtsi
-@@ -24,11 +24,10 @@
- 		compatible = "smsc,lan9221", "smsc,lan9115";
- 		bank-width = <2>;
- 		gpmc,mux-add-data;
--		gpmc,cs-on-ns = <0>;
--		gpmc,cs-rd-off-ns = <186>;
--		gpmc,cs-wr-off-ns = <186>;
--		gpmc,adv-on-ns = <12>;
--		gpmc,adv-rd-off-ns = <48>;
-+		gpmc,cs-on-ns = <1>;
-+		gpmc,cs-rd-off-ns = <180>;
-+		gpmc,cs-wr-off-ns = <180>;
-+		gpmc,adv-rd-off-ns = <18>;
- 		gpmc,adv-wr-off-ns = <48>;
- 		gpmc,oe-on-ns = <54>;
- 		gpmc,oe-off-ns = <168>;
-@@ -36,12 +35,10 @@
- 		gpmc,we-off-ns = <168>;
- 		gpmc,rd-cycle-ns = <186>;
- 		gpmc,wr-cycle-ns = <186>;
--		gpmc,access-ns = <114>;
--		gpmc,page-burst-access-ns = <6>;
--		gpmc,bus-turnaround-ns = <12>;
--		gpmc,cycle2cycle-delay-ns = <18>;
--		gpmc,wr-data-mux-bus-ns = <90>;
--		gpmc,wr-access-ns = <186>;
-+		gpmc,access-ns = <144>;
-+		gpmc,page-burst-access-ns = <24>;
-+		gpmc,bus-turnaround-ns = <90>;
-+		gpmc,cycle2cycle-delay-ns = <90>;
- 		gpmc,cycle2cycle-samecsen;
- 		gpmc,cycle2cycle-diffcsen;
- 		vddvario-supply = <&vddvario>;
-diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-index b3b6e43..d59e3de 100644
---- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
-+++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-@@ -23,11 +23,10 @@
- 		reg = <4 0 0xff>;
- 		bank-width = <2>;
- 		gpmc,mux-add-data;
--		gpmc,cs-on-ns = <0>;
--		gpmc,cs-rd-off-ns = <186>;
--		gpmc,cs-wr-off-ns = <186>;
--		gpmc,adv-on-ns = <12>;
--		gpmc,adv-rd-off-ns = <48>;
-+		gpmc,cs-on-ns = <1>;
-+		gpmc,cs-rd-off-ns = <180>;
-+		gpmc,cs-wr-off-ns = <180>;
-+		gpmc,adv-rd-off-ns = <18>;
- 		gpmc,adv-wr-off-ns = <48>;
- 		gpmc,oe-on-ns = <54>;
- 		gpmc,oe-off-ns = <168>;
-@@ -35,12 +34,10 @@
- 		gpmc,we-off-ns = <168>;
- 		gpmc,rd-cycle-ns = <186>;
- 		gpmc,wr-cycle-ns = <186>;
--		gpmc,access-ns = <114>;
--		gpmc,page-burst-access-ns = <6>;
--		gpmc,bus-turnaround-ns = <12>;
--		gpmc,cycle2cycle-delay-ns = <18>;
--		gpmc,wr-data-mux-bus-ns = <90>;
--		gpmc,wr-access-ns = <186>;
-+		gpmc,access-ns = <144>;
-+		gpmc,page-burst-access-ns = <24>;
-+		gpmc,bus-turnaround-ns = <90>;
-+		gpmc,cycle2cycle-delay-ns = <90>;
- 		gpmc,cycle2cycle-samecsen;
- 		gpmc,cycle2cycle-diffcsen;
- 		vddvario-supply = <&vddvario>;
 -- 
-1.8.1.1
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
