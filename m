@@ -1,19 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Apr 2014 23:19:11 +0200
-Subject: [PATCH 1/2] pinctrl: rockchip: return a complete config in
- pinconf_get
-In-Reply-To: <7604038.VoEVFUfvet@phil>
+Date: Wed, 23 Apr 2014 23:20:01 +0200
+Subject: [PATCH 2/2] pinctrl: rockchip: implement PIN_CONFIG_OUTPUT
+ handling
+In-Reply-To: <1574132.ZxCpxPcbBr@phil>
 References: <7604038.VoEVFUfvet@phil>
-Message-ID: <CACRpkdZ8Wsvh+hi8NXNk=82XbbB3n3AsAQ7Nr1KOnWB9tUv8qw@mail.gmail.com>
+	<1574132.ZxCpxPcbBr@phil>
+Message-ID: <CACRpkdbR+EWASr2WmnOie5L+2z8TaJ0bEWLYf+wOs4cce6iCqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 2:27 PM, Heiko St?bner <heiko@sntech.de> wrote:
+On Wed, Apr 23, 2014 at 2:28 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-> Till now pinconf_get only set the argument value into the config parameter
-> effectively removing the actual config param value. As other pinctrl drivers
-> do, it might be nicer to keep the config param intact.
-> Therefore construct a real pinconfig value from param and arg in pinconf_get
+> In some cases it is nice to be able to simply control a gpio output
+> via the PIN_CONFIG_OUTPUT option without having a driver control it.
+> Thus add support for it to the rockchip pinctrl driver.
 >
 > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
