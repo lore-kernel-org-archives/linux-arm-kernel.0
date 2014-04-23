@@ -1,210 +1,171 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 23 Apr 2014 18:16:55 +0800
-Subject: [PATCH v1 7/7] mtd: fsl-quadspi: add the DDR quad read support
+Date: Wed, 23 Apr 2014 18:16:50 +0800
+Subject: [PATCH v1 2/7] mtd: spi-nor: add DDR quad read support
 In-Reply-To: <a>
 References: <a>
-Message-ID: <1398248215-26768-8-git-send-email-b32955@freescale.com>
+Message-ID: <1398248215-26768-3-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DDR quad read support for the fsl-quadspi driver.
+This patch adds the DDR quad read support by the following:
 
- (1) Test this patch with imx6sx-sdb board (Spansion s25fl128s)
-     The clock rate is 66MHz.
+  [1] add SPI_NOR_DDR_QUAD read mode.
 
- (2) The information of NOR flash:
-     -----------------------------------------------
-     root at imx6qdlsolo:~# mtdinfo /dev/mtd0
-     mtd0
-     Name:                           21e4000.qspi
-     Type:                           nor
-     Eraseblock size:                65536 bytes, 64.0 KiB
-     Amount of eraseblocks:          256 (16777216 bytes, 16.0 MiB)
-     Minimum input/output unit size: 1 byte
-     Sub-page size:                  1 byte
-     Character device major/minor:   90:0
-     Bad blocks are allowed:         false
-     Device is writable:             true
-     -----------------------------------------------
+  [2] add DDR Quad read opcodes:
+       SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
 
- (3) Test this patch set with UBIFS & bonnie++:
-     -----------------------------------------------
-	ubiattach /dev/ubi_ctrl -m 0
-	ubimkvol /dev/ubi0 -N test -m
-	mount -t ubifs ubi0:test tmp
-	bonnie++ -d tmp -u 0 -s 10 -r 5
-     -----------------------------------------------
+  [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
+      Currently it only works for Spansion NOR.
 
- (4) Test this patch with mtd_speedtest.ko
+  [3] set the dummy with 8 for DDR quad read.
+      The m25p80.c can not support the DDR quad read, the SPI NOR controller
+      can set the dummy value in its driver, such as fsl-quadspi.c.
 
-     root at imx6qdlsolo:~# insmod mtd_speedtest.ko dev=0
-     =================================================
-     mtd_speedtest: MTD device: 0
-     mtd_speedtest: not NAND flash, assume page size is 512 bytes.
-     mtd_speedtest: MTD device size 16777216, eraseblock size 65536, page size 512,
-                    count of eraseblocks 256, pages per eraseblock 128, OOB size 0
-     mtd_speedtest: testing eraseblock write speed
-     mtd_speedtest: eraseblock write speed is 665 KiB/s
-     mtd_speedtest: testing eraseblock read speed
-     mtd_speedtest: eraseblock read speed is 49799 KiB/s
-     mtd_speedtest: testing page write speed
-     mtd_speedtest: page write speed is 662 KiB/s
-     mtd_speedtest: testing page read speed
-     mtd_speedtest: page read speed is 24236 KiB/s
-     mtd_speedtest: testing 2 page write speed
-     mtd_speedtest: 2 page write speed is 657 KiB/s
-     mtd_speedtest: testing 2 page read speed
-     mtd_speedtest: 2 page read speed is 32637 KiB/s
-     mtd_speedtest: Testing erase speed
-     mtd_speedtest: erase speed is 518 KiB/s
-     mtd_speedtest: Testing 2x multi-block erase speed
-     mtd_speedtest: 2x multi-block erase speed is 506 KiB/s
-     mtd_speedtest: Testing 4x multi-block erase speed
-     mtd_speedtest: 4x multi-block erase speed is 503 KiB/s
-     mtd_speedtest: Testing 8x multi-block erase speed
-     mtd_speedtest: 8x multi-block erase speed is 501 KiB/s
-     mtd_speedtest: Testing 16x multi-block erase speed
-     mtd_speedtest: 16x multi-block erase speed is 498 KiB/s
-     mtd_speedtest: Testing 32x multi-block erase speed
-     mtd_speedtest: 32x multi-block erase speed is 496 KiB/s
-     mtd_speedtest: Testing 64x multi-block erase speed
-     mtd_speedtest: 64x multi-block erase speed is 495 KiB/s
-     mtd_speedtest: finished
-     =================================================
-
-  (5) Conclusion:
-     The DDR quad read could be 49799 KiB/s.
+Test this patch for Spansion s25fl128s NOR flash.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c |   59 ++++++++++++++++++++++++++++++++++--
- 1 files changed, 55 insertions(+), 4 deletions(-)
+ drivers/mtd/spi-nor/spi-nor.c |   50 +++++++++++++++++++++++++++++++++++++++-
+ include/linux/mtd/spi-nor.h   |    8 +++++-
+ 2 files changed, 54 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 0a2901e..fcb963f 100644
---- a/drivers/mtd/spi-nor/fsl-quadspi.c
-+++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -29,6 +29,9 @@
- 
- /* The registers */
- #define QUADSPI_MCR			0x00
-+#define MX6SX_QUADSPI_MCR_TX_DDR_DELAY_EN_SHIFT	29
-+#define MX6SX_QUADSPI_MCR_TX_DDR_DELAY_EN_MASK	\
-+				(1 << MX6SX_QUADSPI_MCR_TX_DDR_DELAY_EN_SHIFT)
- #define QUADSPI_MCR_RESERVED_SHIFT	16
- #define QUADSPI_MCR_RESERVED_MASK	(0xF << QUADSPI_MCR_RESERVED_SHIFT)
- #define QUADSPI_MCR_MDIS_SHIFT		14
-@@ -292,7 +295,7 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	for (i = 0; i < QUADSPI_LUT_NUM; i++)
- 		writel(0, base + QUADSPI_LUT_BASE + i * 4);
- 
--	/* Quad Read */
-+	/* Quad Read and DDR Quad Read*/
- 	lut_base = SEQID_QUAD_READ * 4;
- 	op = nor->read_opcode;
- 	dm = nor->read_dummy;
-@@ -308,6 +311,24 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 			dev_err(nor->dev,
- 				"Unsupported cmd:%.2x\n", nor->read_opcode);
- 		}
-+	} else if (nor->flash_read == SPI_NOR_DDR_QUAD) {
-+		if (op == SPINOR_OP_READ_1_4_4_D ||
-+			 op == SPINOR_OP_READ4_1_4_4_D) {
-+			/* read mode : 1-4-4, such as Spansion s25fl128s. */
-+			writel(LUT0(CMD, PAD1, op)
-+				| LUT1(ADDR_DDR, PAD4, addrlen),
-+				base + QUADSPI_LUT(lut_base));
-+
-+			writel(LUT0(MODE_DDR, PAD1, 4) | LUT1(DUMMY, PAD1, dm),
-+				base + QUADSPI_LUT(lut_base + 1));
-+
-+			writel(LUT0(READ_DDR, PAD4, rxfifo)
-+				| LUT1(JMP_ON_CS, PAD1, 0),
-+				base + QUADSPI_LUT(lut_base + 2));
-+		} else {
-+			dev_err(nor->dev,
-+				"Unsupported cmd:%.2x\n", nor->read_opcode);
-+		}
- 	}
- 
- 	/* Write enable */
-@@ -369,6 +390,9 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 1a12f81..e2f69db 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -74,6 +74,15 @@ static int read_cr(struct spi_nor *nor)
+ static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
  {
- 	switch (cmd) {
-+	case SPINOR_OP_READ_1_4_4_D:
-+	case SPINOR_OP_READ4_1_4_4_D:
-+	case SPINOR_OP_READ4_1_1_4:
- 	case SPINOR_OP_READ_1_1_4:
- 		return SEQID_QUAD_READ;
- 	case SPINOR_OP_WREN:
-@@ -558,6 +582,8 @@ static void fsl_qspi_set_map_addr(struct fsl_qspi *q)
- static void fsl_qspi_init_abh_read(struct fsl_qspi *q)
- {
- 	void __iomem *base = q->iobase;
-+	struct spi_nor *nor = &q->nor[0];
-+	u32 reg, reg2;
- 	int seqid;
+ 	switch (nor->flash_read) {
++	case SPI_NOR_DDR_QUAD:
++		/*
++		 * The m25p80.c can not support the DDR quad read.
++		 * We set the dummy cycles to 8 by default. If the SPI NOR
++		 * controller driver has already set it before call the
++		 * spi_nor_scan(), we just keep it as it is.
++		 */
++		if (nor->read_dummy)
++			return nor->read_dummy;
+ 	case SPI_NOR_FAST:
+ 	case SPI_NOR_DUAL:
+ 	case SPI_NOR_QUAD:
+@@ -402,6 +411,7 @@ struct flash_info {
+ #define	SECT_4K_PMC		0x10	/* SPINOR_OP_BE_4K_PMC works uniformly */
+ #define	SPI_NOR_DUAL_READ	0x20    /* Flash supports Dual Read */
+ #define	SPI_NOR_QUAD_READ	0x40    /* Flash supports Quad Read */
++#define	SPI_NOR_DDR_QUAD_READ	0x80    /* Flash supports DDR Quad Read */
+ };
  
- 	/* AHB configuration for access buffer 0/1/2 .*/
-@@ -572,9 +598,30 @@ static void fsl_qspi_init_abh_read(struct fsl_qspi *q)
- 	writel(0, base + QUADSPI_BUF2IND);
- 
- 	/* Set the default lut sequence for AHB Read. */
--	seqid = fsl_qspi_get_seqid(q, q->nor[0].read_opcode);
-+	seqid = fsl_qspi_get_seqid(q, nor->read_opcode);
- 	writel(seqid << QUADSPI_BFGENCR_SEQID_SHIFT,
- 		q->iobase + QUADSPI_BFGENCR);
-+
-+	/* enable the DDR quad read */
-+	if (nor->flash_read == SPI_NOR_DDR_QUAD) {
-+		reg = readl(q->iobase + QUADSPI_MCR);
-+
-+		/* Firstly, disable the module */
-+		writel(reg | QUADSPI_MCR_MDIS_MASK, q->iobase + QUADSPI_MCR);
-+
-+		/* Set the Sampling Register for DDR */
-+		reg2 = readl(q->iobase + QUADSPI_SMPR);
-+		reg2 &= ~QUADSPI_SMPR_DDRSMP_MASK;
-+		reg2 |= (2 << QUADSPI_SMPR_DDRSMP_SHIFT);
-+		writel(reg2, q->iobase + QUADSPI_SMPR);
-+
-+		/* Enable the module again (enable the DDR too) */
-+		reg |= QUADSPI_MCR_DDR_EN_MASK;
-+		if (is_imx6sx_qspi(q))
-+			reg |= MX6SX_QUADSPI_MCR_TX_DDR_DELAY_EN_MASK;
-+
-+		writel(reg, q->iobase + QUADSPI_MCR);
-+	}
+ #define INFO(_jedec_id, _ext_id, _sector_size, _n_sectors, _flags)	\
+@@ -846,6 +856,24 @@ static int spansion_quad_enable(struct spi_nor *nor)
+ 	return 0;
  }
  
- /* We use this function to do some basic init for spi_nor_scan(). */
-@@ -863,6 +910,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
- 	/* iterate the subnodes. */
- 	for_each_available_child_of_node(dev->of_node, np) {
- 		const struct spi_device_id *id;
-+		enum read_mode mode = SPI_NOR_QUAD;
- 		char modalias[40];
- 		u32 dummy = 0;
- 
-@@ -903,13 +951,16 @@ static int fsl_qspi_probe(struct platform_device *pdev)
- 		/* Set the dummy cycles for the DDR Quad Read */
- 		ret = of_property_read_u32(np, "spi-nor,ddr-quad-read-dummy",
- 				&dummy);
--		if (!ret && dummy > 0 && dummy < 8)
-+		if (!ret && dummy > 0 && dummy < 8) {
- 			nor->read_dummy = dummy;
-+			mode = SPI_NOR_DDR_QUAD;
-+			dev_dbg(dev, "The DDR quad read dummy is %d.\n", dummy);
++static int set_ddr_quad_mode(struct spi_nor *nor, u32 jedec_id)
++{
++	int status;
++
++	switch (JEDEC_MFR(jedec_id)) {
++	case CFI_MFR_AMD: /* Spansion, actually */
++		status = spansion_quad_enable(nor);
++		if (status) {
++			dev_err(nor->dev,
++				"Spansion DDR quad-read not enabled\n");
++			return -EINVAL;
 +		}
++		return status;
++	default:
++		return -EINVAL;
++	}
++}
++
+ static int set_quad_mode(struct spi_nor *nor, u32 jedec_id)
+ {
+ 	int status;
+@@ -1016,8 +1044,15 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+ 	if (info->flags & SPI_NOR_NO_FR)
+ 		nor->flash_read = SPI_NOR_NORMAL;
  
- 		/* set the chip address for READID */
- 		fsl_qspi_set_base_addr(q, nor);
+-	/* Quad/Dual-read mode takes precedence over fast/normal */
+-	if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
++	/* DDR Quad/Quad/Dual-read mode takes precedence over fast/normal */
++	if (mode == SPI_NOR_DDR_QUAD && info->flags & SPI_NOR_DDR_QUAD_READ) {
++		ret = set_ddr_quad_mode(nor, info->jedec_id);
++		if (ret) {
++			dev_err(dev, "DDR quad mode not supported\n");
++			return ret;
++		}
++		nor->flash_read = SPI_NOR_DDR_QUAD;
++	} else if (mode == SPI_NOR_QUAD && info->flags & SPI_NOR_QUAD_READ) {
+ 		ret = set_quad_mode(nor, info->jedec_id);
+ 		if (ret) {
+ 			dev_err(dev, "quad mode not supported\n");
+@@ -1030,6 +1065,14 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
  
--		ret = spi_nor_scan(nor, id, SPI_NOR_QUAD);
-+		ret = spi_nor_scan(nor, id, mode);
- 		if (ret)
- 			goto map_failed;
+ 	/* Default commands */
+ 	switch (nor->flash_read) {
++	case SPI_NOR_DDR_QUAD:
++		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD) { /* Spansion */
++			nor->read_opcode = SPINOR_OP_READ_1_4_4_D;
++		} else {
++			dev_err(dev, "DDR Quad Read is not supported.\n");
++			return -EINVAL;
++		}
++		break;
+ 	case SPI_NOR_QUAD:
+ 		nor->read_opcode = SPINOR_OP_READ_1_1_4;
+ 		break;
+@@ -1057,6 +1100,9 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+ 		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD) {
+ 			/* Dedicated 4-byte command set */
+ 			switch (nor->flash_read) {
++			case SPI_NOR_DDR_QUAD:
++				nor->read_opcode = SPINOR_OP_READ4_1_4_4_D;
++				break;
+ 			case SPI_NOR_QUAD:
+ 				nor->read_opcode = SPINOR_OP_READ4_1_1_4;
+ 				break;
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index 5324184..fea7769 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -12,10 +12,11 @@
  
+ /*
+  * Note on opcode nomenclature: some opcodes have a format like
+- * SPINOR_OP_FUNCTION{4,}_x_y_z. The numbers x, y, and z stand for the number
++ * SPINOR_OP_FUNCTION{4,}_x_y_z{_D}. The numbers x, y, and z stand for the number
+  * of I/O lines used for the opcode, address, and data (respectively). The
+  * FUNCTION has an optional suffix of '4', to represent an opcode which
+- * requires a 4-byte (32-bit) address.
++ * requires a 4-byte (32-bit) address. The suffix of 'D' stands for the
++ * DDR mode.
+  */
+ 
+ /* Flash opcodes. */
+@@ -26,6 +27,7 @@
+ #define SPINOR_OP_READ_FAST	0x0b	/* Read data bytes (high frequency) */
+ #define SPINOR_OP_READ_1_1_2	0x3b	/* Read data bytes (Dual SPI) */
+ #define SPINOR_OP_READ_1_1_4	0x6b	/* Read data bytes (Quad SPI) */
++#define SPINOR_OP_READ_1_4_4_D	0xed	/* Read data bytes (DDR Quad SPI) */
+ #define SPINOR_OP_PP		0x02	/* Page program (up to 256 bytes) */
+ #define SPINOR_OP_BE_4K		0x20	/* Erase 4KiB block */
+ #define SPINOR_OP_BE_4K_PMC	0xd7	/* Erase 4KiB block on PMC chips */
+@@ -40,6 +42,7 @@
+ #define SPINOR_OP_READ4_FAST	0x0c	/* Read data bytes (high frequency) */
+ #define SPINOR_OP_READ4_1_1_2	0x3c	/* Read data bytes (Dual SPI) */
+ #define SPINOR_OP_READ4_1_1_4	0x6c	/* Read data bytes (Quad SPI) */
++#define SPINOR_OP_READ4_1_4_4_D	0xee	/* Read data bytes (DDR Quad SPI) */
+ #define SPINOR_OP_PP_4B		0x12	/* Page program (up to 256 bytes) */
+ #define SPINOR_OP_SE_4B		0xdc	/* Sector erase (usually 64KiB) */
+ 
+@@ -74,6 +77,7 @@ enum read_mode {
+ 	SPI_NOR_FAST,
+ 	SPI_NOR_DUAL,
+ 	SPI_NOR_QUAD,
++	SPI_NOR_DDR_QUAD,
+ };
+ 
+ /**
 -- 
 1.7.2.rc3
