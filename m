@@ -1,123 +1,97 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 23 Apr 2014 13:27:20 +0200
-Subject: [PATCH v2 28/38] ARM: orion5x: convert edmini_v2 to DT pinctrl
-In-Reply-To: <1398202002-28530-29-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 23 Apr 2014 13:28:03 +0200
+Subject: [PATCH v2 29/38] ARM: orion5x: use DT to describe I2C devices
+ on edmini_v2
+In-Reply-To: <1398202002-28530-30-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1398202002-28530-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1398202002-28530-29-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5357A398.1080902@gmail.com>
+ <1398202002-28530-30-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5357A3C3.8030805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/22/2014 11:26 PM, Thomas Petazzoni wrote:
 > This commit converts the already partially DT-converted edmini_v2
-> platform to use the Device Tree for pinctrl.
+> platform to use the Device Tree for I2C bus and devices.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
 > ---
->   .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 31 ++++++++++++++++++++++
->   arch/arm/mach-orion5x/edmini_v2-setup.c            | 28 -------------------
->   2 files changed, 31 insertions(+), 28 deletions(-)
+>   .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    | 14 +++++++++++++
+>   arch/arm/mach-orion5x/edmini_v2-setup.c            | 24 ----------------------
+>   2 files changed, 14 insertions(+), 24 deletions(-)
 >
 > diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> index ba43197..aa74b00 100644
+> index aa74b00..41b2ab5 100644
 > --- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
 > +++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
-> @@ -32,6 +32,8 @@
+> @@ -10,6 +10,7 @@
 >
->   	gpio-keys {
->   		compatible = "gpio-keys";
-> +		pinctrl-0 = <&pmx_power_button>;
-> +		pinctrl-names = "default";
->   		#address-cells = <1>;
->   		#size-cells = <0>;
->   		button at 1 {
-> @@ -43,6 +45,8 @@
+>   #include <dt-bindings/gpio/gpio.h>
+>   #include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+>   #include "orion5x-mv88f5182.dtsi"
 >
->   	gpio-leds {
->   		compatible = "gpio-leds";
-> +		pinctrl-0 = <&pmx_power_led>;
-> +		pinctrl-names = "default";
->
->   		led at 1 {
->   			label = "power:blue";
-> @@ -67,7 +71,34 @@
+>   / {
+> @@ -63,6 +64,19 @@
 >   	};
 >   };
 >
-> +&pinctrl {
-> +	pinctrl-0 = <&pmx_rtc &pmx_power_led_ctrl>;
-> +	pinctrl-names = "default";
+> +&i2c {
+> +	status = "okay";
+> +	clock-frequency = <100000>;
+> +	#address-cells = <1>;
 > +
-> +	pmx_power_button: pmx-power-button {
-> +		marvell,pins = "mpp18";
-> +		marvell,function = "gpio";
-> +	};
-> +
-> +	pmx_power_led: pmx-power-led {
-> +		marvell,pins = "mpp16";
-> +		marvell,function = "gpio";
-> +	};
-> +
-> +	pmx_power_led_ctrl: pmx-power-led-ctrl {
-> +		marvell,pins = "mpp17";
-> +		marvell,function = "gpio";
-> +	};
-> +
-> +	pmx_rtc: pmx-rtc {
-> +		marvell,pins = "mpp3";
-> +		marvell,function = "gpio";
+> +	rtc at 32 {
+> +		compatible = "ricoh,rs5c372a";
+> +		reg = <0x32>;
+> +		interrupt-parent = <&gpio0>;
+> +		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
 > +	};
 > +};
 > +
->   &sata {
-> +	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
-> +	pinctrl-names = "default";
+>   &mdio {
 >   	status = "okay";
->   	nr-ports = <2>;
->   };
+>
 > diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
-> index f66c1b2..c50469e 100644
+> index c50469e..75648ab 100644
 > --- a/arch/arm/mach-orion5x/edmini_v2-setup.c
 > +++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
-> @@ -109,37 +109,9 @@ static struct i2c_board_info __initdata edmini_v2_i2c_rtc = {
+> @@ -96,17 +96,6 @@ static struct platform_device edmini_v2_nor_flash = {
+>   };
+>
 >   /*****************************************************************************
+> - * RTC 5C372a on I2C bus
+> - ****************************************************************************/
+> -
+> -#define EDMINIV2_RTC_GPIO	3
+> -
+> -static struct i2c_board_info __initdata edmini_v2_i2c_rtc = {
+> -	I2C_BOARD_INFO("rs5c372a", 0x32),
+> -	.irq = 0,
+> -};
+> -
+> -/*****************************************************************************
 >    * General Setup
 >    ****************************************************************************/
-> -static unsigned int edminiv2_mpp_modes[] __initdata = {
-> -	MPP0_UNUSED,
-> -	MPP1_UNUSED,
-> -	MPP2_UNUSED,
-> -	MPP3_GPIO,	/* RTC interrupt */
-> -	MPP4_UNUSED,
-> -	MPP5_UNUSED,
-> -	MPP6_UNUSED,
-> -	MPP7_UNUSED,
-> -	MPP8_UNUSED,
-> -	MPP9_UNUSED,
-> -	MPP10_UNUSED,
-> -	MPP11_UNUSED,
-> -	MPP12_SATA_LED,	/* SATA 0 presence */
-> -	MPP13_SATA_LED,	/* SATA 1 presence */
-> -	MPP14_SATA_LED,	/* SATA 0 active */
-> -	MPP15_SATA_LED,	/* SATA 1 active */
-> -	/* 16: Power LED control (0 = On, 1 = Off) */
-> -	MPP16_GPIO,
-> -	/* 17: Power LED control select (0 = CPLD, 1 = GPIO16) */
-> -	MPP17_GPIO,
-> -	/* 18: Power button status (0 = Released, 1 = Pressed) */
-> -	MPP18_GPIO,
-> -	MPP19_UNUSED,
-> -	0,
-> -};
 >
->   void __init edmini_v2_init(void)
->   {
-> -	orion5x_mpp_conf(edminiv2_mpp_modes);
+> @@ -125,17 +114,4 @@ void __init edmini_v2_init(void)
+>
+>   	pr_notice("edmini_v2: USB device port, flash write and power-off "
+>   		  "are not yet supported.\n");
 > -
->   	/*
->   	 * Configure peripherals.
->   	 */
+> -	/* Get RTC IRQ and register the chip */
+> -	if (gpio_request(EDMINIV2_RTC_GPIO, "rtc") == 0) {
+> -		if (gpio_direction_input(EDMINIV2_RTC_GPIO) == 0)
+> -			edmini_v2_i2c_rtc.irq = gpio_to_irq(EDMINIV2_RTC_GPIO);
+> -		else
+> -			gpio_free(EDMINIV2_RTC_GPIO);
+> -	}
+> -
+> -	if (edmini_v2_i2c_rtc.irq == 0)
+> -		pr_warning("edmini_v2: failed to get RTC IRQ\n");
+> -
+> -	i2c_register_board_info(0, &edmini_v2_i2c_rtc, 1);
+>   }
 >
