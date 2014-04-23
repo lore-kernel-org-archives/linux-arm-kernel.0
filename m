@@ -1,62 +1,82 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 23 Apr 2014 18:05:00 -0400
-Subject: [PATCH 2/4] mfd: bcm590xx: add support for second i2c slave
- address space
-In-Reply-To: <20140423220126.GC4164@beef>
-References: <1397501428-8857-1-git-send-email-mporter@linaro.org>
- <1397501428-8857-3-git-send-email-mporter@linaro.org>
- <20140416110603.GA19671@lee--X1>
- <20140416213141.GD12304@sirena.org.uk>
- <20140417065753.GC28725@lee--X1> <20140417222616.GK23695@beef>
- <20140422082139.GF17657@lee--X1> <20140423220126.GC4164@beef>
-Message-ID: <20140423220500.GA1127@beef>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 24 Apr 2014 00:08:23 +0200
+Subject: [PATCH v2.1 1/9] ARM: S3C24XX: cpufreq-utils: don't write raw values
+ to MPLLCON when using ccf
+In-Reply-To: <5855371.5GIoOu8EnE@phil>
+References: <2104342.rkElQpXtvM@phil> <5855371.5GIoOu8EnE@phil>
+Message-ID: <2638137.1oBdcbvcY8@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 06:01:26PM -0400, Matt Porter wrote:
-> On Tue, Apr 22, 2014 at 09:21:39AM +0100, Lee Jones wrote:
-> > > > > > s/regmap/Regmap
-> > > > > 
-> > > > > It's consistently written regmap in all the documentation and so on :)
-> > > > 
-> > > > Furry muff; but the comments still stand for the acronyms.
-> > > > 
-> > > > > > addmap{0,1} doesn't quite sit right with me.
-> > > > > 
-> > > > > > REVISIT: Ah, it's address-map, rather than add map. Okay, not as bad
-> > > > > > as I first thought, but still, is there a better naming convention you
-> > > > > > could use?
-> > > > > 
-> > > > > addrmap or something?
-> > > > 
-> > > > Right, that was what I was thinking. However, I prefer something along
-> > > > the lines of 'i2c' and 'i2c_sec' or 'client' and 'client_slv' etc.
-> > > 
-> > > FWIW, the reason it's addmap{0,1} is that the datasheet has documents
-> > > ADDMAP=0 and the first bank of registers and ADDMAP=1 as the second bank
-> > > of registers. I adopted that to match the docs for the part.
-> > > 
-> > > I guess we could do i2c and i2c_sec, I'll just have to put a comment
-> > > correlating it to the h/w. Calling it 'slv' implies something else
-> > > so we should avoid that here. The notion of a "secondary" i2c device
-> > > is completely a Linux I2C subsystem fabrication which wouldn't exist
-> > > if it allowed multiple slave addresses per device. From a h/w
-> > > perspective there is really no primary and secondary relationship.
-> > > 
-> > > I'm fine with i2c/i2c_sec or addrmap0/1 and I will just comment to
-> > > correlate with the datasheet..pick one.
-> > 
-> > Let's stick method fabricated by the I2C subsystem. It may seem strange
-> > from a h/w perspective, but it is the way we (you) have coded it, as
-> > the first parameter of i2c_new_dummy() is the 'managing' (primary,
-> > parent, master, whatever) device, so '_sec' would suit as an
-> > identifying appendage for the resultant device.
-> 
-> That works, I'll also switch to addrmap_[pri|sec] which touches the
-> regulator driver as well. That will keep the relationship  between device
-> and regmap clear.
+The s3c24xx cpufreq driver needs to change the mpll speed and was doing
+this by writing raw values from a translation table into the MPLLCON
+register.
 
-Misspoke...I'm switching regmap[0|1] to regmap_[pri|sec] to keep that
-synced with i2c_[pri|sec]
+Change this to use a regular clk_set_rate call when using the common
+clock framework and only write the raw value in the samsung_clock case.
 
--Matt
+The s3c cpufreq driver does already aquire the mpll, so simply add a reference
+to struct s3c_cpufreq_config to let set_fvco access it.
+
+While struct clk is opaque the differenciation between samsung clock and
+common clock is kept, as the samsung-clock mpll clk does not implement a
+real set_rate.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/cpufreq-utils.c              | 8 ++++++++
+ arch/arm/plat-samsung/include/plat/cpu-freq-core.h | 1 +
+ drivers/cpufreq/s3c24xx-cpufreq.c                  | 1 +
+ 3 files changed, 10 insertions(+)
+
+diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+index 2a0aa56..c1b7508 100644
+--- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
++++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+@@ -14,6 +14,7 @@
+ #include <linux/errno.h>
+ #include <linux/cpufreq.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
+ 
+ #include <mach/map.h>
+ #include <mach/regs-clock.h>
+@@ -60,5 +61,12 @@ void s3c2410_cpufreq_setrefresh(struct s3c_cpufreq_config *cfg)
+  */
+ void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
+ {
++#ifdef CONFIG_SAMSUNG_CLOCK
+ 	__raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
++#endif
++
++#ifdef CONFIG_COMMON_CLK
++	if (!IS_ERR(cfg->mpll))
++		clk_set_rate(cfg->mpll, cfg->pll.frequency);
++#endif
+ }
+diff --git a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+index 7231c8e..72d4178 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
++++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+@@ -119,6 +119,7 @@ struct s3c_plltab {
+ struct s3c_cpufreq_config {
+ 	struct s3c_freq		freq;
+ 	struct s3c_freq		max;
++	struct clk		*mpll;
+ 	struct cpufreq_frequency_table pll;
+ 	struct s3c_clkdivs	divs;
+ 	struct s3c_cpufreq_info *info;	/* for core, not drivers */
+diff --git a/drivers/cpufreq/s3c24xx-cpufreq.c b/drivers/cpufreq/s3c24xx-cpufreq.c
+index be1b2b5..227ebf7 100644
+--- a/drivers/cpufreq/s3c24xx-cpufreq.c
++++ b/drivers/cpufreq/s3c24xx-cpufreq.c
+@@ -141,6 +141,7 @@ static int s3c_cpufreq_calcdivs(struct s3c_cpufreq_config *cfg)
+ 
+ static void s3c_cpufreq_setfvco(struct s3c_cpufreq_config *cfg)
+ {
++	cfg->mpll = _clk_mpll;
+ 	(cfg->info->set_fvco)(cfg);
+ }
+ 
+-- 
+1.9.0
