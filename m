@@ -1,61 +1,62 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 23 Apr 2014 17:03:44 +0300
-Subject: [PATCH] ARM: Wire up the renameat2() syscall
-In-Reply-To: <1398150338-23475-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1398150338-23475-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <5357C840.1000701@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Apr 2014 16:05:03 +0200
+Subject: [PATCH RESEND 2/5] pinctrl: berlin: add a pinctrl driver for
+ Marvell Berlin SoCs
+In-Reply-To: <20140422155602.GA19762@kwain>
+References: <1397135274-10764-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1397135274-10764-3-git-send-email-antoine.tenart@free-electrons.com>
+ <5347AFF4.3050607@gmail.com> <20140411123737.GA5903@kwain>
+ <5347EF8A.8040600@gmail.com>
+ <CACRpkdb1eijF-4e=KyhS=9S868NALdyJJaNnzjUubXnapWEeMg@mail.gmail.com>
+ <20140422155602.GA19762@kwain>
+Message-ID: <CACRpkdZ2U6vSShF8QmxZsPsKcwg4TH89xKwQMrbin4zN0xAAXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/2014 10:05 AM, Peter Ujfalusi wrote:
-> The new renameat2() system call was only wired up for ARM causing:
+On Tue, Apr 22, 2014 at 5:56 PM, Antoine T?nart
+<antoine.tenart@free-electrons.com> wrote:
+> On Tue, Apr 22, 2014 at 02:52:10PM +0200, Linus Walleij wrote:
+>> On Fri, Apr 11, 2014 at 3:35 PM, Sebastian Hesselbarth
+>> <sebastian.hesselbarth@gmail.com> wrote:
+>> > On 04/11/2014 02:37 PM, Antoine T?nart wrote:
+>> >> On Fri, Apr 11, 2014 at 11:03:48AM +0200, Sebastian Hesselbarth wrote:
+>> >>> On 04/10/2014 03:07 PM, Antoine T?nart wrote:
+>>
+>> >>> Having said that, the above assumes that each function is unique
+>> >>> but IIRC the idea of the function table was to group pins/groups
+>> >>> with the same function, e.g. function "gpio", groups 1,7,25,...
+>> >>
+>> >> Most of the functions you can use on the Berlin they will be unique and
+>> >> would
+>> >> only be used in one group, except for the 'gpio' one.
+>> >
+>> > Yeah, I had a similar discussion about it back then for mvebu. IIRC, the
+>> > correct answer is: Have a list of functions with groups assigned to it
+>> > no matter if there is only one group per function (or 40 per function as
+>> > it will be for gpio).
+>> >
+>> > Maybe Linus can give an update on how to deal with it?
+>>
+>> Have you considered implementing pinmux_ops
+>> .gpio_request_enable(), .gpio_set_direction() and
+>> .gpio_disable_free() instead of defining groups for each
+>> and every GPIO?
+>
+> The function 'gpio' can be found on different groups. But the Berlin pin muxing
+> does not allow to configure a pin individually. It is then not possible to mux
+> GPIO pins individually. For example the 'gpio' function of group 'GSM2' on the
+> BG2Q will mux GPIOs 17 *and* 18.
+>
+> Groups does not have more than a single 'gpio' function.
+>
+> Since the gpio_request_enable() comment says 'Implement this only if you can mux
+> every pin individually as GPIO', I did not considered implementing these
+> functions.
 
-obviously I mean that "system call was _not_ wired up for ARM causing"
+OK makes perfect sense.
 
-I can send the patch again with a fixed up commit message...
+Then I guess the current implementation is the best alternative,
+but I may need to look closer.
 
->  CALL    /home/ujfalusi/work/kernel/kernel.org-next-linux-next/scripts/checksyscalls.sh
-> <stdin>:1232:2: warning: #warning syscall renameat2 not implemented [-Wcpp]
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> Hi,
-> 
-> I have noticed this with linux-next.
-> 
-> Regards,
-> Peter
-> 
->  arch/arm/include/uapi/asm/unistd.h | 1 +
->  arch/arm/kernel/calls.S            | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
-> index fb5584d0cc05..ba94446c72d9 100644
-> --- a/arch/arm/include/uapi/asm/unistd.h
-> +++ b/arch/arm/include/uapi/asm/unistd.h
-> @@ -408,6 +408,7 @@
->  #define __NR_finit_module		(__NR_SYSCALL_BASE+379)
->  #define __NR_sched_setattr		(__NR_SYSCALL_BASE+380)
->  #define __NR_sched_getattr		(__NR_SYSCALL_BASE+381)
-> +#define __NR_renameat2			(__NR_SYSCALL_BASE+382)
->  
->  /*
->   * This may need to be greater than __NR_last_syscall+1 in order to
-> diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
-> index 166e945de832..8f51bdcdacbb 100644
-> --- a/arch/arm/kernel/calls.S
-> +++ b/arch/arm/kernel/calls.S
-> @@ -391,6 +391,7 @@
->  		CALL(sys_finit_module)
->  /* 380 */	CALL(sys_sched_setattr)
->  		CALL(sys_sched_getattr)
-> +		CALL(sys_renameat2)
->  #ifndef syscalls_counted
->  .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
->  #define syscalls_counted
-> 
-
-
--- 
-P?ter
+Yours,
+Linus Walleij
