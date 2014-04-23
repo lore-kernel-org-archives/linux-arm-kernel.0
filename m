@@ -1,25 +1,73 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 23 Apr 2014 17:59:39 +0300
-Subject: pull request for Tegra PLLE fixes
-Message-ID: <20140423145939.GA11307@tbergstrom-lnx.Nvidia.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 23 Apr 2014 16:02:49 +0100
+Subject: [PATCH v3 2/2] dt: platform driver: Fill the resources before
+ probe and defer if needed
+In-Reply-To: <CAL_JsqLvLTJwgsB-m0W72WxSUoTV4ubMdvM_a784J4k2eiK9AQ@mail.gmail.com>
+References: <20140320161118.B7075C4067A@trevor.secretlab.ca>
+ <1395413185-29763-1-git-send-email-jjhiblot@traphandler.com>
+ <1395413185-29763-3-git-send-email-jjhiblot@traphandler.com>
+ <CAL_Jsq+aU+rs28gV=Gesb_-Dy6Ht7zuKrRA6_hmqp94Uun23Yg@mail.gmail.com>
+ <20140418205213.GA21823@atomide.com>
+ <CAL_JsqJvVvo6R-qNXxur7wiZERKbi52xyKoWnmzJTfKS2iKK7A@mail.gmail.com>
+ <20140418215848.GD21823@atomide.com>
+ <20140418230335.GI24070@n2100.arm.linux.org.uk>
+ <20140418232407.GQ21823@atomide.com>
+ <CAL_JsqLvLTJwgsB-m0W72WxSUoTV4ubMdvM_a784J4k2eiK9AQ@mail.gmail.com>
+Message-ID: <20140423150249.38110C408D2@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Mon, 21 Apr 2014 08:47:41 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On Fri, Apr 18, 2014 at 6:24 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [140418 16:04]:
+> >> On Fri, Apr 18, 2014 at 02:58:48PM -0700, Tony Lindgren wrote:
+> >> > Oh come on, let's stop pretending it's not broken. And it's way worse with
+> >> > device tree as there's nothing making sure the resources for a driver
+> >> > are set up before the driver probes. And we've been unable to fix just
+> >> > this issue alone for about six months now. It's also broken beyond that.
+> >> > It's called of_platform_bus yet it won't even pass the platform_data
+> >> > as auxdata to the devices on a sub-bus instantatiated like I2C.
+> >>
+> >> Isn't there a much simpler solution to the platform device IRQ problem?
+> >>
+> >> Rather than trying to fix it at the point where the resources are
+> >> created, why not just *not* have DT create the IRQ resources in the
+> >> first place, and instead have platform_get_irq() (which is the function
+> >> which should be used to get an IRQ) be the actor to do whatever is
+> >> necessary to return the IRQ(s) ?
+> >
+> > Yeah why not. I don't see why we would need to do all this of_* special
+> > trickery for much anything beyond parsing the binding.
+> 
+> That can work, but it will still need something like
+> of_find_irq_domain() to determine whether to return -EPROBE_DEFER or
+> not.
+> 
+> You could also go in the other direction and don't create the device
+> until the resources can be resolved. Unlike any of the other
+> solutions, that would work for amba bus as well although we may never
+> have a case where we need this with the amba bus. This would require
+> making of_platform_populate be callable multiple times, but there are
+> already some other reasons for wanting to do that. Specifically, I
+> would like the core code to call of_platform_populate with default
+> options and then only platforms with non-default options need a call
+> to of_platform_populate.
 
-This fixes a number of stability problems with PCIe on Tegra30.
+No it wouldn't. It would require of_platform_populate to do the right
+thing internally and know when to create devices from nodes that get
+flagged by calling of_platform_populate().
 
-The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+> >> Yes, I know we have some drivers which use platform_get_resources() with
+> >> IORESOURCE_IRQ, but they should really use the right accessor.  And those
+> >> who just dereference the resource array directly... get what's coming
+> >> (though of course they have to be fixed.)
+> >
+> > $ git grep IORESOURCE_IRQ drivers/ | grep platform_get_resource | wc -l
+> > 179
+> 
+> Certainly, this is worthwhile clean-up no matter what the solution.
 
-  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+Yes, and it works no matter what the data source is; platform_data, dt,
+acpi, and works on any platform.
 
-are available in the git repository at:
-  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git  clk-tegra-fixes-3.15
-
-Thierry Reding (3):
-      clk: tegra: Fix PLLE programming
-      clk: tegra: Introduce divider mask and shift helpers
-      clk: tegra: Fix enabling of PLLE
-
- drivers/clk/tegra/clk-pll.c |   64 +++++++++++++++++++++++++++++--------------
- 1 files changed, 43 insertions(+), 21 deletions(-)
+g.
