@@ -1,34 +1,74 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 22 Apr 2014 20:27:07 -0500
-Subject: [PATCH 6/8] ARM: OMAP2+: timer: Fix error message to not use hwmod
- structure
+Date: Tue, 22 Apr 2014 20:27:08 -0500
+Subject: [PATCH 7/8] ARM: OMAP2+: timer: Add fallback for of_clk_get
 In-Reply-To: <1398216429-4681-1-git-send-email-joelf@ti.com>
 References: <1398216429-4681-1-git-send-email-joelf@ti.com>
-Message-ID: <1398216429-4681-7-git-send-email-joelf@ti.com>
+Message-ID: <1398216429-4681-8-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-oh->name is no longer used, correct the error message.
+Not all platforms currently will support of_clk_get on timer
+because they may not have clock property in their DT nodes. Add
+code to handle this case so that things are kept working. Finally
+we can delete this code once all system timer nodes have a clock
+property.
 
 Signed-off-by: Joel Fernandes <joelf@ti.com>
 ---
- arch/arm/mach-omap2/timer.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/timer.c |   27 +++++++++++++++++++--------
+ 1 file changed, 19 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 4fcfd7a..519ccfd 100644
+index 519ccfd..b3db1da 100644
 --- a/arch/arm/mach-omap2/timer.c
 +++ b/arch/arm/mach-omap2/timer.c
-@@ -331,8 +331,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	if (clk_get_parent(timer->fclk) != src) {
- 		r = clk_set_parent(timer->fclk, src);
- 		if (r < 0) {
--			pr_warn("%s: %s cannot set source\n", __func__,
--				oh->name);
-+			pr_warn("%s: cannot set timer's source\n", __func__);
-+			WARN_ON(1);
- 			clk_put(src);
+@@ -277,13 +277,19 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 		if (!timer->io_base)
+ 			return -ENXIO;
+ 
+-		timer->fclk = of_clk_get(np, 0);
+-		if (IS_ERR(timer->fclk))
+-			return PTR_ERR(timer->fclk);
+-
+ 		r = omap_dmtimer_powerup(np);
+ 		if (r)
  			return r;
- 		}
++
++		timer->fclk = of_clk_get(np, 0);
++		if (IS_ERR(timer->fclk)) {
++			/*
++			 * Support DT platforms temporarily that don't have
++			 * clock property in their dts yet. Ultimately this
++			 * fall back code is to be deleted and we're to return
++			 * PTR_ERR(timer->fclk) here.
++			 */
++		}
+ 	} else {
+ 		if (omap_dm_timer_reserve_systimer(timer->id))
+ 			return -ENODEV;
+@@ -312,14 +318,19 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 		if (!timer->io_base)
+ 			return -ENXIO;
+ 
+-		timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
+-		if (IS_ERR(timer->fclk))
+-			return PTR_ERR(timer->fclk);
+-
+ 		omap_hwmod_setup_one(oh_name);
+ 		omap_hwmod_enable(oh);
+ 	}
+ 
++	if (!timer->fclk || IS_ERR(timer->fclk)) {
++		oh = omap_hwmod_lookup(oh_name);
++		if (!oh)
++			return -ENODEV;
++		timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
++		if (IS_ERR(timer->fclk))
++			return PTR_ERR(timer->fclk);
++	}
++
+ 	/*
+ 	 * Clock reparenting code, goes away for DT-boot atleast,
+ 	 * once clock layer can do it through DT.
 -- 
 1.7.9.5
