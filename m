@@ -1,71 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Apr 2014 10:02:51 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <5356D163.1070304@ti.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
- <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
-Message-ID: <20140423090251.GA5281@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 23 Apr 2014 14:32:51 +0530
+Subject: [PATCH v2 0/4] ARM: DRA7: Add support for DRA72x devices
+Message-ID: <1398243775-4145-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 09:30:27PM +0100, Santosh Shilimkar wrote:
-> On Tuesday 22 April 2014 04:23 PM, Arnd Bergmann wrote:
-> > On Tuesday 22 April 2014 15:58:09 Santosh Shilimkar wrote:
-> >> On Tuesday 22 April 2014 03:53 PM, Arnd Bergmann wrote:
-> >>> On Tuesday 22 April 2014, Santosh Shilimkar wrote:
-> >>>> On Tuesday 22 April 2014 10:08 AM, Arnd Bergmann wrote:
-> >>>>> It's not the nicest API ever, but that's what it is and has been, mostly
-> >>>>> for compatibility with x86, where the 'mov' instruction performing the
-> >>>>> store to MMIO registers implies that all writes to DMA memory are
-> >>>>> visible to the device.
-> >>>>>
-> >>>> This is not about writel() and  writel_relaxed(). The driver don't
-> >>>> need that barrier. For example if the actual start of the DMA
-> >>>> happens bit later, that doesn't matter for the driver.
-> >>>>
-> >>>> DMA APIs already do barriers today for non-coherent case. We
-> >>>> are not talking anything new here. Sorry but I don't see the
-> >>>> connection here.
-> >>>
-> >>> I don't think they do, nor should they. Can you tell me where
-> >>> you see a barrier in dma_sync_single_for_cpu() or 
-> >>> arm_dma_sync_single_for_device()? For all I can tell, they
-> >>> only deal with L1 and L2 cache maintainance in arm_dma_ops.
-> >>>
-> >> The cache APIs used by dma_ops do have the necessary barriers
-> >> at end of the of the cache operations. Thats what I meant. So for
-> >> end user(Device driver), its transparent.
-> > 
-> > Ok, I see it now for the noncoherent operations, and I see
-> > the same thing on PowerPC and MIPS, which also have both coherent
-> > and noncoherent versions of their dma_map_ops.
-> > 
-> > However, I also see that neither of those does a wmb() for the
-> > coherent version. I don't see why ARM should be different from
-> > the others here, so if there is a reason to do a barrier there,
-> > we should change all architectures. I still don't see a reason
-> > why the barrier is needed though.
-> > 
-> Thats fair.
-> 
-> > Can you be more specific in your driver example why you think
-> > the barrier in the writel() is not sufficient?
-> > 
-> writel() or an explcit barrier in the driver will do the job. I was
-> just thinking that we are trying to work around the short comings
-> of streaming API by adding barriers in the driver. For example
-> on a non-coherent system, i don't need that barrier because
-> dma_ops does take care of that.
+DRA72x devices are single core Cortex A15 devices belonging to the
+DRA7 family (Similar to the DRA74x devices which are dual core Cortex
+A15 based)
 
-I wonder whether we can remove those barriers altogether then (from the DMA
-cache operations). For the coherent case, the driver must provide the
-barrier (probably via writel) so the non-coherent case shouldn't be any
-different.
+The patches (based off 3.15-rc2) add minimal DT/kernel modifications to add
+boot support for DRA72x devices reusing all the kernel data for DRA74x devices.
 
-I need some more coffee and a serious look at the code, but we may be able
-to use dmb instructions to order the cache maintenance and avoid a final
-dsb for completion.
+Rajendra Nayak (4):
+  ARM: dts: dra7-evm: Remove the wrong and undocumented compatible
+  ARM: dts: Add support for DRA72x family of devices
+  ARM: OMAP2+: Add machine entry for dra72x devices
+  ARM: DRA7: Add support for soc_is_dra74x() and soc_is_dra72x()
+    varients
 
-Will
+ .../devicetree/bindings/arm/omap/omap.txt          |   12 +++--
+ arch/arm/boot/dts/Makefile                         |    3 +-
+ arch/arm/boot/dts/dra7-evm.dts                     |    6 +--
+ arch/arm/boot/dts/dra7.dtsi                        |   27 ------------
+ arch/arm/boot/dts/dra72-evm.dts                    |   24 ++++++++++
+ arch/arm/boot/dts/dra72x.dtsi                      |   25 +++++++++++
+ arch/arm/boot/dts/dra74x.dtsi                      |   41 +++++++++++++++++
+ arch/arm/mach-omap2/board-generic.c                |   46 ++++++++++++++------
+ arch/arm/mach-omap2/soc.h                          |    7 +++
+ 9 files changed, 144 insertions(+), 47 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dra72-evm.dts
+ create mode 100644 arch/arm/boot/dts/dra72x.dtsi
+ create mode 100644 arch/arm/boot/dts/dra74x.dtsi
+
+-- 
+1.7.9.5
