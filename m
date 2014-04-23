@@ -1,57 +1,99 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Apr 2014 17:02:16 +0100
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <20140423090251.GA5281@arm.com>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
- <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
- <20140423090251.GA5281@arm.com>
-Message-ID: <20140423160216.GC2208@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 23 Apr 2014 17:02:56 +0100
+Subject: [Patch v2 4/4] mcpm: exynos: populate suspend and powered_up
+ callbacks
+In-Reply-To: <1398245154-18771-5-git-send-email-chander.kashyap@linaro.org>
+References: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+ <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
+ <1398245154-18771-5-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <20140423160256.GA1243@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 10:02:51AM +0100, Will Deacon wrote:
-> On Tue, Apr 22, 2014 at 09:30:27PM +0100, Santosh Shilimkar wrote:
-> > writel() or an explcit barrier in the driver will do the job. I was
-> > just thinking that we are trying to work around the short comings
-> > of streaming API by adding barriers in the driver. For example
-> > on a non-coherent system, i don't need that barrier because
-> > dma_ops does take care of that.
+[added Nico in CC]
+
+On Wed, Apr 23, 2014 at 10:25:54AM +0100, Chander Kashyap wrote:
+> In order to support cpuidle through mcpm, suspend and powered-up
+> callbacks are required in mcpm platform code.
+> Hence populate the same callbacks.
 > 
-> I wonder whether we can remove those barriers altogether then (from the DMA
-> cache operations). For the coherent case, the driver must provide the
-> barrier (probably via writel) so the non-coherent case shouldn't be any
-> different.
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> ---
+> changes in v2:
+> 	1. Fixed typo: enynos_pmu_cpunr to exynos_pmu_cpunr
+> 
+>  arch/arm/mach-exynos/mcpm-exynos.c |   53 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 6c74c82..d53f597 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -272,10 +272,63 @@ static int exynos_power_down_finish(unsigned int cpu, unsigned int cluster)
+>  	return 0; /* success: the CPU is halted */
+>  }
+>  
+> +static void enable_coherency(void)
+> +{
+> +	unsigned long v, u;
+> +
+> +	asm volatile(
+> +		"mrc	p15, 0, %0, c1, c0, 1\n"
+> +		"orr	%0, %0, %2\n"
+> +		"ldr	%1, [%3]\n"
+> +		"and	%1, %1, #0\n"
+> +		"orr	%0, %0, %1\n"
+> +		"mcr	p15, 0, %0, c1, c0, 1\n"
+> +		: "=&r" (v), "=&r" (u)
+> +		: "Ir" (0x40), "Ir" (S5P_INFORM0)
+> +		: "cc");
+> +}
+> +
+> +void exynos_powered_up(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	arch_spin_lock(&exynos_mcpm_lock);
+> +	if (cpu_use_count[cpu][cluster] == 0)
+> +		cpu_use_count[cpu][cluster] = 1;
+> +	arch_spin_unlock(&exynos_mcpm_lock);
+> +}
+> +
+> +static void exynos_suspend(u64 residency)
+> +{
+> +	unsigned int mpidr, cpunr;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpunr = exynos_pmu_cpunr(mpidr);
+> +
+> +	__raw_writel(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
+> +
+> +	exynos_power_down();
+> +
+> +	/*
+> +	 * Execution reaches here only if cpu did not power down.
+> +	 * Hence roll back the changes done in exynos_power_down function.
+> +	*/
+> +	__raw_writel(EXYNOS_CORE_LOCAL_PWR_EN,
+> +			EXYNOS_ARM_CORE_CONFIGURATION(cpunr));
+> +	set_cr(get_cr() | CR_C);
+> +	enable_coherency();
 
-For the DMA_TO_DEVICE case the effect should be the same as wmb()
-implies dsb (and outer_sync() for write). But the reason we have
-barriers in the DMA ops is slightly different - the completion of the
-cache maintenance operation rather than ordering with any previous
-writes to the DMA buffer.
+This is wrong:
 
-In the DMA_FROM_DEVICE scenario for example, the CPU gets an interrupt
-for a finished DMA transfer and executes dma_unmap_single() prior to
-accessing the page. However the CPU access after unmapping is done using
-normal LDR/STR which do not imply any barrier. So we need to ensure the
-completion of the cache invalidation in the dma operation.
+1) MCPM would eventually reboot the CPU in question if the suspend call
+   returns (and restore SCTLR and ACTLR in cpu_resume), so there is 0 point
+   in doing that here.
+2) The core would have executed out of coherency for a "while" so the
+   tlbs could be stale and you do not invalidate them. But given (1), (2)
+   becomes just informational. The register write must be executed
+   though (I guess...). Now, on restoring the SMP bit in cpu_resume
+   (errata 799270) I need to verify this is safe and get back to you.
 
-In the I/O coherency case, I would say it is the responsibility of the
-device/hardware to ensure that the data is visible to all observers
-(CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
-code, I think it covers such scenario from-device or bidirectional
-scenarios.
-
-Maybe Santosh still has a point ;) but I don't know what the right
-barrier would be here. And I really *hate* per-SoC/snoop unit barriers
-(I still hope a dsb would do the trick on newer/ARMv8 systems).
-
-> I need some more coffee and a serious look at the code, but we may be able
-> to use dmb instructions to order the cache maintenance and avoid a final
-> dsb for completion.
-
-Is the dmb enough (assuming no outer cache)? We need to ensure the
-flushed cache lines reach the memory for device access.
-
--- 
-Catalin
+Cheers,
+Lorenzo
