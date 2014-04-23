@@ -1,46 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Apr 2014 11:50:29 +0200
-Subject: [PATCH v8 11/17] ARM: dts: sun6i: Add mmc controller nodes
-In-Reply-To: <1398164497-14212-12-git-send-email-hdegoede@redhat.com>
+Date: Wed, 23 Apr 2014 11:53:19 +0200
+Subject: [PATCH v8 00/17] ARM: sunxi: Add driver for SD/MMC hosts found
+ on Allwinner sunxi SoCs
+In-Reply-To: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
 References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
- <1398164497-14212-12-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140423095029.GM24905@lukather>
+Message-ID: <20140423095319.GO24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 01:01:31PM +0200, Hans de Goede wrote:
-> Add nodes for the 4 mmc controllers found on A31 SoCs to
-> arch/arm/boot/dts/sun6i-a31.dtsi.
+Hi Hans,
+
+On Tue, Apr 22, 2014 at 01:01:20PM +0200, Hans de Goede wrote:
+> Hi All,
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun6i-a31.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
+> Here is v8 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
+> working on.
 > 
-> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-> index 12bcc17..a27afc8 100644
-> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> @@ -269,6 +269,58 @@
->  		#size-cells = <1>;
->  		ranges;
->  
-> +		mmc0: mmc at 01c0f000 {
-> +			compatible = "allwinner,sun5i-a13-mmc";
-> +			reg = <0x01c0f000 0x1000>;
-> +			clocks = <&ahb1_gates 8>, <&mmc0_clk>;
-> +			clock-names = "ahb", "mod";
-> +			resets = <&ahb1_rst 8>;
-> +			reset-names = "ahb";
-> +			interrupts = <0 60 4>;
-> +			bus-width = <4>;
-> +			cd-inverted;
+> The first 2 patches are depenencies which should go in through the clk tree,
+> Mike can you pick these 2 up please ?  :
+> 
+> "clk: sunxi: factors: automatic reparenting support"
+> Is uncontroversial and has been favorably reviewed by various people.
+> 
+> "clk: sunxi: Implement MMC phase control"
+> Is somewhat more controversial as there has been lots of discussion about
+> adding a generic phase control method to the clk framework. The problem is
+> that there has been a lot of talk about such a generic phase control method
+> but not a single patch. Therefor I would like to move forwards with using
+> a platform specific method for now. I hereby promise that once we've a generic
+> method I'll write patches to convert the sunxi code to that method.
+> 
+> The third patch is the patch adding the actual mmc driver and should go in
+> through the mmc tree.
+> 
+> All the other patches are devicetree patches hooking things up, and should
+> go upstream through Maxime's sunxi-dt tree.
 
-The two last items should be in the DTS.
+Apart from the ever-controversial phase control thing, and the minor
+comments I had here and there, this looks good, thanks!
 
-Looks good otherwise.
-
-Thanks!
 Maxime
 
 -- 
@@ -53,4 +51,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/1e9fa971/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/ffae2471/attachment.sig>
