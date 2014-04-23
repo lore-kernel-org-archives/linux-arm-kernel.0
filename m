@@ -1,32 +1,55 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 23 Apr 2014 09:26:54 -0500
-Subject: [PATCH 3/3] ARM: qcom: Select PINCTRL by default for ARCH_QCOM
-In-Reply-To: <CACRpkdauApm8_3DGE3Q4k-xkEpcrb2nUn=UhS+xHnVn4t+g2CA@mail.gmail.com>
-References: <1397531437-9104-1-git-send-email-agross@codeaurora.org>
- <1397531437-9104-4-git-send-email-agross@codeaurora.org>
- <CACRpkdauApm8_3DGE3Q4k-xkEpcrb2nUn=UhS+xHnVn4t+g2CA@mail.gmail.com>
-Message-ID: <0B526586-54FE-45E7-BA23-C405AD39FABA@codeaurora.org>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 23 Apr 2014 20:00:42 +0530
+Subject: [PATCH 0/9] Enable USB 3.0 support on Exynos5 systems
+Message-ID: <1398263451-18023-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Based on 'for-next' branch of Kgene's linux-samsung tree.
+Tested with phy-driver[1] patches and peach-pit dts[2].
 
-On Apr 23, 2014, at 9:03 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+This is the DT split part of the patch-series[3].
 
-> On Tue, Apr 15, 2014 at 5:10 AM, Andy Gross <agross@codeaurora.org> wrote:
-> 
->> Add missing PINCTRL selection.  This enables selection of pinctrollers for
->> Qualcomm processors.
->> 
->> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> David are you picking this to the Qualcomm tree?
+Patches:  usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
+          ARM: exynos_defconfig: Remove SAMSUNG_USB3PHY config
+are removing the older phy-samsung-usb3 driver. Have included this driver patch
+in this series since we are moving the device tree of DWC3 controller to new
+phy driver, so we wouldn't be needing this older driver anymore.
 
-I?ll pick it up
+[1]: [PATCH v6 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
+     http://www.spinics.net/lists/linux-usb/msg106185.html
+     [PATCH v6 2/2] phy: exynos5-usbdrd: Add facility for VBUS supply
+     http://www.spinics.net/lists/linux-usb/msg106184.html
 
-- k
+[2]: [PATCH] ARM: dts: Add peach-pit board support
+     http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg28846.html
+
+[3]: [PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
+     https://lkml.org/lkml/2014/4/8/247
+
+Vivek Gautam (9):
+  dt: exynos5420: Enable support for USB 3.0 PHY controller
+  dt: exynos5420: Enable support for DWC3 controller
+  dt: exynos5250: Enable support for generic USB DRD phy
+  dts: exynos5250: Update DWC3 usb controller to use new phy driver
+  dts: exynos5250-snow: Add Vbus regulator for USB 3.0
+  dts: exynos5420-peach-pit: Add Vbus regulator for USB 3.0
+  dts: exynos5420-smdk5420: Add Vbus regulator for USB 3.0
+  usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
+  ARM: exynos_defconfig: Remove SAMSUNG_USB3PHY config
+
+ arch/arm/boot/dts/exynos5250-snow.dts      |   22 ++
+ arch/arm/boot/dts/exynos5250.dtsi          |   21 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts |   44 ++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts  |   46 ++++
+ arch/arm/boot/dts/exynos5420.dtsi          |   54 +++++
+ arch/arm/configs/exynos_defconfig          |    1 -
+ drivers/usb/phy/Kconfig                    |    8 -
+ drivers/usb/phy/Makefile                   |    1 -
+ drivers/usb/phy/phy-samsung-usb.h          |   80 -------
+ drivers/usb/phy/phy-samsung-usb3.c         |  350 ----------------------------
+ 10 files changed, 175 insertions(+), 452 deletions(-)
+ delete mode 100644 drivers/usb/phy/phy-samsung-usb3.c
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.7.10.4
