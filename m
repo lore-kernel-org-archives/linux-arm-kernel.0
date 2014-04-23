@@ -1,86 +1,40 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 23 Apr 2014 23:11:35 +0200
-Subject: [PATCH v2 1/9] ARM: S3C24XX: cpufreq-utils: don't write raw
- values to MPLLCON when using ccf
-In-Reply-To: <535828D7.3080301@gmail.com>
-References: <2104342.rkElQpXtvM@phil> <535825AB.8060802@cogentembedded.com>
- <535828D7.3080301@gmail.com>
-Message-ID: <1538030.0aVnFA3MgQ@phil>
+From: jcmvbkbc@gmail.com (Max Filippov)
+Date: Thu, 24 Apr 2014 01:04:47 +0400
+Subject: [PATCH v2 00/21] FDT clean-ups and libfdt support
+In-Reply-To: <1398215901-25609-1-git-send-email-robherring2@gmail.com>
+References: <1398215901-25609-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAMo8Bf+LO-15x8vhOukskyaNMMu97NzFjmkc-inO9xqG075dkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 23. April 2014, 22:55:51 schrieb Tomasz Figa:
-> Hi,
-> 
-> On 23.04.2014 22:42, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> > On 04/23/2014 11:34 PM, Heiko St?bner wrote:
-> >> The s3c24xx cpufreq driver needs to change the mpll speed and was doing
-> >> this by writing raw values from a translation table into the MPLLCON
-> >> register.
-> >> 
-> >> Change this to use a regular clk_set_rate call when using the common
-> >> clock framework and only write the raw value in the samsung_clock case.
-> >> 
-> >> To not needing to create additional infrastructure for this, the mpll
-> >> clock
-> >> is requested at the first call to s3c2410_set_fvco().
-> >> 
-> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> >> ---
-> >> 
-> >>   arch/arm/mach-s3c24xx/cpufreq-utils.c | 14 ++++++++++++++
-> >>   1 file changed, 14 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> >> b/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> >> index 2a0aa56..d5e797b 100644
-> >> --- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> >> +++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> > 
-> > [...]
-> > 
-> >> @@ -60,5 +61,18 @@ void s3c2410_cpufreq_setrefresh(struct
-> >> s3c_cpufreq_config *cfg)
-> >> 
-> >>    */
-> >>   
-> >>   void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
-> >>   {
-> >> 
-> >> +#ifdef CONFIG_SAMSUNG_CLOCK
-> >> 
-> >>       __raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
-> >> 
-> >> +#endif
-> >> +
-> >> +#ifdef CONFIG_COMMON_CLK
-> >> +    static struct clk *mpll;
-> >> +
-> >> +    if (!mpll)
-> >> 
-> >     You are testing uninitialized variable. This check wouldn't make
-> > 
-> > much sense even if the variable was initialized.
-> 
-> I should probably add that NULL is considered a valid clock handle by
-> Common Clock Framework.
-> 
-> If there is really no way to pass the clock to this function then
-> probably a global variable initialized by some code running earlier than
-> this function could be called would be a better choice.
+On Wed, Apr 23, 2014 at 5:18 AM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <robh@kernel.org>
+>
+> This is a series of clean-ups of architecture FDT code and converts the
+> core FDT code over to using libfdt functions. This is in preparation
+> to add FDT based address translation parsing functions for early
+> console support. This series removes direct access to FDT data from all
+> arches except powerpc.
+>
+> The current MIPS lantiq and xlp DT code is buggy as built-in DTBs need
+> to be copied out of init section. Patches 2 and 3 should be applied to
+> 3.15.
+>
+> Changes in v2 are relatively minor. There was a bug in the unflattening
+> code where walking up the tree was not being handled correctly (thanks
+> to Michal Simek). I re-worked things a bit to avoid globally adding
+> libfdt include paths.
+>
+> A branch is available here[1], and I plan to put into linux-next in a few
+> days. Please test! I've compiled on arm, arm64, mips, microblaze, xtensa,
+> and powerpc and booted on arm and arm64.
+>
+> Rob
+>
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git libfdt
 
-*grrr* :-) ... ok I'll try to find another way (again) to do this
+For xtensa: Tested-by: Max Filippov <jcmvbkbc@gmail.com>
 
-
-> Anyway, Heiko, thanks for working on this. I'll try to review rest of
-> the series soon. (I'm attending the ELC next week, though, so I'm not
-> sure if I find some time then, though.)
-
-Just as a reminder, there isn't this much to still review, as you 
-Acked/Reviewed most of the series in v1 and only this patch as well as 2 and 5 
-still need a review/ack - and the only changes are fixes for your comments ;-)
-
-
-Heiko
+-- 
+Thanks.
+-- Max
