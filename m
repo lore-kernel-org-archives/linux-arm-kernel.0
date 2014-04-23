@@ -1,68 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Apr 2014 11:40:18 +0200
-Subject: [PATCH v8 00/17] ARM: sunxi: Add driver for SD/MMC hosts found
- on Allwinner sunxi SoCs
-In-Reply-To: <53565DDA.9020202@redhat.com>
-References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
- <53565B74.4000703@elopez.com.ar> <53565DDA.9020202@redhat.com>
-Message-ID: <20140423094018.GJ24905@lukather>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 23 Apr 2014 11:45:45 +0200
+Subject: [PATCH 3/3] ARM: at91/dt: sam9rl: Fix PLL output range and mck
+ divisors
+In-Reply-To: <1398243220-20874-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1398243220-20874-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1398243220-20874-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <53578BC9.3070908@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 02:17:30PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 04/22/2014 02:07 PM, Emilio L?pez wrote:
-> > Hi Hans,
-> > 
-> > El 22/04/14 08:01, Hans de Goede escribi?:
-> >> Hi All,
-> >>
-> >> Here is v8 of the sunxi-mmc patch-set David Lanzend?rfer and I have been
-> >> working on.
-> >>
-> >> The first 2 patches are depenencies which should go in through the clk tree,
-> >> Mike can you pick these 2 up please ?  :
-> >>
-> >> "clk: sunxi: factors: automatic reparenting support"
-> >> Is uncontroversial and has been favorably reviewed by various people.
-> > 
-> > I'll pick this one up for 3.16 if you're ok with that. Mike, let
-> > me know if you have any objection to the patch, but I'm pretty
-> > sure you (informally?) acked it in the past.
-> > 
-> >> "clk: sunxi: Implement MMC phase control"
-> >> Is somewhat more controversial as there has been lots of discussion about
-> >> adding a generic phase control method to the clk framework. The problem is
-> >> that there has been a lot of talk about such a generic phase control method
-> >> but not a single patch. Therefor I would like to move forwards with using
-> >> a platform specific method for now. I hereby promise that once we've a generic
-> >> method I'll write patches to convert the sunxi code to that method.
-> > 
-> > Mike proposed a RFC for handling this better, and there were talks
-> > with Allwinner people to see what did these phase controls
-> > actually mean. We should be able to get a proper solution for it
-> > during this cycle. I'd prefer to work towards that instead of
-> > merging this, as we have more than a month to get it ready still.
-> 
-> A month will be gone before you know it, and merging sunxi mmc support really
-> is long overdue, and is the last thing keeping distros from shipping with sunxi
-> support ootb. So I would really prefer to just get this merged as is for now,
-> changing it later should be easy, and merging an interim solution will make
-> some more time for doing the generic clk phase control method properly.
 
-While I'd be inclined to agree, it will be up to Mike.
-
-Mike?
+On 23/04/2014 10:53, Alexandre Belloni wrote:
+> Argument 3 (OUT) and 4 (ICPLL) of the atmel,pll-clk-output-ranges were missing.
+> Also, the at91sam9rl doesn't really have a by 3 divisor.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/at91sam9rl.dtsi | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
+> index a19a7c26a7fc..1109e7fbf9bd 100644
+> --- a/arch/arm/boot/dts/at91sam9rl.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9rl.dtsi
+> @@ -574,8 +574,9 @@
+>  					clocks = <&main>;
+>  					reg = <0>;
+>  					atmel,clk-input-range = <1000000 32000000>;
+> -					#atmel,pll-clk-output-range-cells = <4>;
+> -					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
+> +					#atmel,pll-clk-output-range-cells = <3>;
+> +					atmel,pll-clk-output-ranges = <80000000 200000000 0>,
+> +								<190000000 240000000 2>;
+>  				};
+>  
+>  				utmi: utmick {
+> @@ -592,7 +593,7 @@
+>  					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
+>  					clocks = <&clk32k>, <&main>, <&plla>, <&utmi>;
+>  					atmel,clk-output-range = <0 94000000>;
+> -					atmel,clk-divisors = <1 2 4 3>;
+> +					atmel,clk-divisors = <1 2 4 0>;
+>  				};
+>  
+>  				prog: progck {
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/56d549db/attachment.sig>
