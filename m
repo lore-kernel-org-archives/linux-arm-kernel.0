@@ -1,83 +1,89 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Apr 2014 10:25:44 +0900
-Subject: [PATCH 16/33] ARM: shmobile: kzm9g-reference dts: Use KEY_* macros
- for gpio-keys
+Date: Wed, 23 Apr 2014 10:25:47 +0900
+Subject: [PATCH 19/33] ARM: shmobile: r8a7791: add IIC(B) cores to dtsi
 In-Reply-To: <cover.1398216022.git.horms+renesas@verge.net.au>
 References: <cover.1398216022.git.horms+renesas@verge.net.au>
-Message-ID: <39f0163098d136411538060fd53c8b8c255cda05.1398216022.git.horms+renesas@verge.net.au>
+Message-ID: <36408d9dd0c398fc3efe87231a4c847601878c97.1398216022.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+From: Wolfram Sang <wsa@sang-engineering.com>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index eb8886b..a99171c 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -14,6 +14,7 @@
- /dts-v1/;
- #include "sh73a0.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-@@ -112,43 +113,43 @@
- 
- 		back-key {
- 			gpios = <&pcf8575 8 GPIO_ACTIVE_LOW>;
--			linux,code = <158>;
-+			linux,code = <KEY_BACK>;
- 			label = "SW3";
- 		};
- 
- 		right-key {
- 			gpios = <&pcf8575 9 GPIO_ACTIVE_LOW>;
--			linux,code = <106>;
-+			linux,code = <KEY_RIGHT>;
- 			label = "SW2-R";
- 		};
- 
- 		left-key {
- 			gpios = <&pcf8575 10 GPIO_ACTIVE_LOW>;
--			linux,code = <105>;
-+			linux,code = <KEY_LEFT>;
- 			label = "SW2-L";
- 		};
- 
- 		enter-key {
- 			gpios = <&pcf8575 11 GPIO_ACTIVE_LOW>;
--			linux,code = <28>;
-+			linux,code = <KEY_ENTER>;
- 			label = "SW2-P";
- 		};
- 
- 		up-key {
- 			gpios = <&pcf8575 12 GPIO_ACTIVE_LOW>;
--			linux,code = <103>;
-+			linux,code = <KEY_UP>;
- 			label = "SW2-U";
- 		};
- 
- 		down-key {
- 			gpios = <&pcf8575 13 GPIO_ACTIVE_LOW>;
--			linux,code = <108>;
-+			linux,code = <KEY_DOWN>;
- 			label = "SW2-D";
- 		};
- 
- 		home-key {
- 			gpios = <&pcf8575 14 GPIO_ACTIVE_LOW>;
--			linux,code = <102>;
-+			linux,code = <KEY_HOME>;
- 			label = "SW1";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index dd45e01..1004355 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -27,6 +27,9 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++		i2c7 = &i2c7;
++		i2c8 = &i2c8;
+ 		spi0 = &qspi;
+ 		spi1 = &msiof0;
+ 		spi2 = &msiof1;
+@@ -184,6 +187,7 @@
+ 			     <0 17 IRQ_TYPE_LEVEL_HIGH>;
  	};
+ 
++	/* The memory map in the User's Manual maps the cores to bus numbers */
+ 	i2c0: i2c at e6508000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -235,6 +239,7 @@
+ 	};
+ 
+ 	i2c5: i2c at e6528000 {
++		/* doesn't need pinmux */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,i2c-r8a7791";
+@@ -244,6 +249,37 @@
+ 		status = "disabled";
+ 	};
+ 
++	i2c6: i2c at e60b0000 {
++		/* doesn't need pinmux */
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,iic-r8a7791", "renesas,rmobile-iic";
++		reg = <0 0xe60b0000 0 0x425>;
++		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7791_CLK_IICDVFS>;
++		status = "disabled";
++	};
++
++	i2c7: i2c at e6500000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,iic-r8a7791", "renesas,rmobile-iic";
++		reg = <0 0xe6500000 0 0x425>;
++		interrupts = <0 174 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7791_CLK_IIC0>;
++		status = "disabled";
++	};
++
++	i2c8: i2c at e6510000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,iic-r8a7791", "renesas,rmobile-iic";
++		reg = <0 0xe6510000 0 0x425>;
++		interrupts = <0 175 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7791_CLK_IIC1>;
++		status = "disabled";
++	};
++
+ 	pfc: pfc at e6060000 {
+ 		compatible = "renesas,pfc-r8a7791";
+ 		reg = <0 0xe6060000 0 0x250>;
 -- 
 1.8.5.2
