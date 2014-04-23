@@ -1,123 +1,67 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 23 Apr 2014 10:21:00 +0200
-Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
-In-Reply-To: <5356A4F4.6090107@gmail.com>
-References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
- <5356A4F4.6090107@gmail.com>
-Message-ID: <20140423082100.GB24355@kwain>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 23 Apr 2014 10:20:38 +0200
+Subject: [PATCH 1/2] ARM: imx6q: clk: Parent DI clocks to video PLL via
+ di_pre_sel
+In-Reply-To: <53577203.6070700@de.bosch.com>
+References: <1397485240-29163-1-git-send-email-p.zabel@pengutronix.de>
+ <53577203.6070700@de.bosch.com>
+Message-ID: <1398241238.10369.5.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
-
-On Tue, Apr 22, 2014 at 07:20:52PM +0200, Sebastian Hesselbarth wrote:
-> On 04/22/2014 05:38 PM, Antoine T?nart wrote:
-
-[?]
-
-> > +static inline void ahci_berlin_reg_set(void __iomem *reg, u32 val)
-> > +{
-> > +	writel(val, reg);
-> > +}
-> 
-> Antoine,
-> 
-> if you really need to rename writel, the above function name should
-> end with _write.
-
-I renamed writel for consistency with ahci_berlin_reg_clear_set() and
-ahci_berlin_reg_setbits() but I can definitively drop it.
-
-> 
-> > +static inline void ahci_berlin_reg_clear_set(void __iomem *reg, u32 clear_val,
-> > +					     u32 set_val)
-> > +{
-> > +	u32 regval;
+Am Mittwoch, den 23.04.2014, 09:55 +0200 schrieb Dirk Behme:
+> On 14.04.2014 16:20, Philipp Zabel wrote:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> >
+> > Route the video PLL to the display interface clocks via the di_pre_sel
+> > and di_sel muxes by default.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> >   arch/arm/mach-imx/clk-imx6q.c | 9 +++++++++
+> >   1 file changed, 9 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index a3a69ab..ba17299 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -445,6 +445,15 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+> >   		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
+> >   	}
+> >
+> > +	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
+> > +	clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
+> > +	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
+> > +	clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
+> > +	clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
+> > +	clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
+> > +	clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
+> > +	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
 > > +
-> > +	regval = readl(reg);
-> > +	regval &= ~(clear_val);
-> > +	regval |= set_val;
-> > +	writel(regval, reg);
-> > +}
+> >   	/*
+> >   	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
+> >   	 * We can not get the 100MHz from the pll2_pfd0_352m.
 > 
-> ahci_berlin_reg_setbits(reg, val) == ahci_berlin_reg_clear_set(reg, 0, val);
+> I'm no expert on this, so just a question from an internal review:
 > 
-> Maybe get rid of the latter?
+> With this, having both ldb_di0_sel and ipu1_di0_sel driven by 
+> pll5_video, what will happen if both lvds and hdmi are trying to set the 
+> rate of pll5_video_div?
+> 
+Last one that comes around wins. We could change this to use clock
+notifiers, but it doesn't make much sense right now, as this would just
+change the situation to first one wins.
 
-Sure.
+What we really need is some kind of clock negotiation, but there isn't
+anything in the clock framework yet to make this happen. We have some
+ideas about this, but it will take a little while.
 
-> 
-> > +static void ahci_berlin_init(void __iomem *mmio)
-> > +{
-> > +	/* interface select */
-> > +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, BIT(2));
-> > +	ahci_berlin_reg_set(mmio + HOST_VSA_ADDR,
-> > +			    BIT(21) | BIT(18) | BIT(5) | BIT(4) | BIT(2));
-> 
-> Any chance we get named #defines for the BIT()s above and below?
+In the meanwhile this patch improves the situation for people using the
+driver with one LVDS or HDMI display.
 
-I'm afraid I can't. I'd love to do so if someone has a clue on this matter.
-
-> > +	/* force_map is modified only if the property is found */
-> > +	of_property_read_u32(np, "marvell,force-port-map", &force_map);
-> > +	if (force_map)
-> > +		nports = force_map;
-> 
-> marvell,force-port-map is undocumented and its name does not reflect
-> what it is about. Before you just rename it to marvell,nr-ports or
-> something, how about having one sub-node per port:
-> 
-> sata_phy0: sata-phy at e90100 {
-> 	compatible = "marvell,berlin-sata-phy";
-> 	reg = <0xe90100 0x80>;
-> 	status = "disabled";
-> };
-> 
-> sata_phy1: sata-phy at e90180 {
-> 	compatible = "marvell,berlin-sata-phy";
-> 	reg = <0xe90180 0x80>;
-> 	status = "disabled";
-> };
-> 
-> ahci: sata at e90000 {
-> 	compatible = "marvell,berlin-ahci";
-> 	reg = <0xe90000 0x100>;
-> 	interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 	status = "disabled";
-> 
-> 	sata-port at 0 {
-> 		reg = <0>;
-> 		sata-phy = <&sata_phy0>;
-> 		status = "disabled";
-> 	};
-> 
-> 	sata-port at 1 {
-> 		reg = <1>;
-> 		sata-phy = <&sata_phy1>;
-> 		status = "okay";
-> 	};
-> };
-> 
-> That way you can
-> (a) separate a PHY driver that has little code but is able to power-down
->     the PHY even if there is no AHCI driver loaded.
-> (b) enable/disable each port individually.
-> (c) enable port1 while port0 is disabled.
-> (d) disable the PLL if there is no port enabled at all.
-
-That would be better, but as of now I'm not sure I have enough information on
-the PHY to do (a).
-
-I guess (b), (c) and (d) can still be done.
-
-Thanks for the review!
-
-Antoine
-
+Regards,
+Lucas
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
