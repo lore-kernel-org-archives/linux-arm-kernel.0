@@ -1,49 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Apr 2014 18:19:30 +0900
-Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
-In-Reply-To: <201404221611.40087.arnd@arndb.de>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <000a01cf592e$67e592e0$37b0b8a0$%han@samsung.com>
- <201404221611.40087.arnd@arndb.de>
-Message-ID: <031b01cf5ed5$21d536a0$657fa3e0$@samsung.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 23 Apr 2014 14:55:50 +0530
+Subject: [Patch v2 0/4] add cpuidle support for Exynos5420
+In-Reply-To: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+References: <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1398245154-18771-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Wednesday 16 April 2014, Jingoo Han wrote:
-> > Samsung GH7 has four PCIe controllers which can be used as root
-> > complex for PCIe interface.
-> >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> >  drivers/pci/host/Kconfig      |    2 +-
-> >  drivers/pci/host/pci-exynos.c |  135
-> ++++++++++++++++++++++++++++++++++++++---
-> >  2 files changed, 126 insertions(+), 11 deletions(-)
-> 
-+ Byungho An, Ilho Lee
+Exynos5420 is a big-little Soc from Samsung. It has 4 A15 and 4 A7 cores.
 
-Hi Arnd,
+This patchset adds cpuidle support for Exynos5420 SoC based on
+generic big.little cpuidle driver.
 
-> Can you explain how much the GH7 and Exynos front-ends actually have in
-> common? Would it make sense to have a separate driver for gh7?
-> 
-Basically, ARMv8 based GH7 has same PCIe hardware IP with previous ARMv7
-based exynos5440, several features in PCIe are different though. In other
-words, basic functionalities for PCIe are same. So I think, would be nice if
-we could use one PCIe device driver for both SoCs.
+Tested on SMDK5420.
 
-However, if we need to support the PCIe with each own device driver because
-of difference of 32bit and 64bit, please kindly let us know. Honestly, I'm
-not sure about that right now.
+This patch set depends on:
+	1. [PATCH 0/5] MCPM backend for Exynos5420
+	   http://www.spinics.net/lists/arm-kernel/msg321666.html
 
-> Also, if gh7 is expected to run a full firmware, I think you should
-> do all the setup in the firmware before booting Linux, and just
-> do the required run-time operations in the driver itself.
-> 
-Well, we're expecting that all the setup should be done by the device driver
-in kernel not firmware.
+	2. [PATCH v4] arm: exynos: generalize power register address calculation
+	   http://www.spinics.net/lists/arm-kernel/msg324024.html
+		
+Changelog is in respective patches.
+Chander Kashyap (4):
+  cpuidle: config: Add SOC_EXYNOS5420 entry to select
+    cpuidle-big-little driver
+  driver: cpuidle: cpuidle-big-little: init driver for Exynos5420
+  exynos: cpuidle: do not allow cpuidle registration for Exynos5420
+  mcpm: exynos: populate suspend and powered_up callbacks
 
-Thanks,
-Kukjin
+ arch/arm/mach-exynos/cpuidle.c       |    3 ++
+ arch/arm/mach-exynos/mcpm-exynos.c   |   53 ++++++++++++++++++++++++++++++++++
+ drivers/cpuidle/Kconfig.arm          |    2 +-
+ drivers/cpuidle/cpuidle-big_little.c |    3 +-
+ 4 files changed, 59 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
