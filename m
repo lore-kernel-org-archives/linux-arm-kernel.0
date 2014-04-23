@@ -1,67 +1,142 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 23 Apr 2014 10:20:38 +0200
-Subject: [PATCH 1/2] ARM: imx6q: clk: Parent DI clocks to video PLL via
- di_pre_sel
-In-Reply-To: <53577203.6070700@de.bosch.com>
-References: <1397485240-29163-1-git-send-email-p.zabel@pengutronix.de>
- <53577203.6070700@de.bosch.com>
-Message-ID: <1398241238.10369.5.camel@weser.hi.pengutronix.de>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 23 Apr 2014 13:52:40 +0530
+Subject: [PATCH 4/4] mcpm: exynos: populate suspend and powered_up
+ callbacks
+In-Reply-To: <5356499A.20609@linaro.org>
+References: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
+ <1398080958-21677-5-git-send-email-chander.kashyap@linaro.org>
+ <5356499A.20609@linaro.org>
+Message-ID: <CANuQgHEQ_G-fuT6_hyKQ+bT0dsnNW5QnTTLBvX+BZUr4w0Fg2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 23.04.2014, 09:55 +0200 schrieb Dirk Behme:
-> On 14.04.2014 16:20, Philipp Zabel wrote:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> >
-> > Route the video PLL to the display interface clocks via the di_pre_sel
-> > and di_sel muxes by default.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >   arch/arm/mach-imx/clk-imx6q.c | 9 +++++++++
-> >   1 file changed, 9 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> > index a3a69ab..ba17299 100644
-> > --- a/arch/arm/mach-imx/clk-imx6q.c
-> > +++ b/arch/arm/mach-imx/clk-imx6q.c
-> > @@ -445,6 +445,15 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
-> >   		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
-> >   	}
-> >
-> > +	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
-> > +	clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
-> > +	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
-> > +	clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
-> > +	clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
-> > +	clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
-> > +	clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
-> > +	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
-> > +
-> >   	/*
-> >   	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
-> >   	 * We can not get the 100MHz from the pll2_pfd0_352m.
-> 
-> I'm no expert on this, so just a question from an internal review:
-> 
-> With this, having both ldb_di0_sel and ipu1_di0_sel driven by 
-> pll5_video, what will happen if both lvds and hdmi are trying to set the 
-> rate of pll5_video_div?
-> 
-Last one that comes around wins. We could change this to use clock
-notifiers, but it doesn't make much sense right now, as this would just
-change the situation to first one wins.
+On 22 April 2014 16:21, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 04/21/2014 01:49 PM, Chander Kashyap wrote:
+>>
+>> In order to support cpuidle through mcpm, suspend and powered-up
+>> callbacks are required in mcpm platform code.
+>> Hence populate the same callbacks.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+>> ---
+>>   arch/arm/mach-exynos/mcpm-exynos.c |   53
+>> ++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 53 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c
+>> b/arch/arm/mach-exynos/mcpm-exynos.c
+>> index 46d4968..16af0bd 100644
+>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>> @@ -318,10 +318,63 @@ static int exynos_power_down_finish(unsigned int
+>> cpu, unsigned int cluster)
+>>         return 0; /* success: the CPU is halted */
+>>   }
+>>
+>> +static void enable_coherency(void)
+>> +{
+>> +       unsigned long v, u;
+>> +
+>> +       asm volatile(
+>> +               "mrc    p15, 0, %0, c1, c0, 1\n"
+>> +               "orr    %0, %0, %2\n"
+>> +               "ldr    %1, [%3]\n"
+>> +               "and    %1, %1, #0\n"
+>> +               "orr    %0, %0, %1\n"
+>> +               "mcr    p15, 0, %0, c1, c0, 1\n"
+>> +               : "=&r" (v), "=&r" (u)
+>> +               : "Ir" (0x40), "Ir" (S5P_INFORM0)
+>> +               : "cc");
+>> +}
+>
+>
+> Shouldn't this function to be used from hotplug.c also ?
 
-What we really need is some kind of clock negotiation, but there isn't
-anything in the clock framework yet to make this happen. We have some
-ideas about this, but it will take a little while.
+Hotplug.c already taking care for this. And anyhow that will go away
+for mcpm dependent SoCs
 
-In the meanwhile this patch improves the situation for people using the
-driver with one LVDS or HDMI display.
+>
+>
+>> +
+>> +void exynos_powered_up(void)
+>> +{
+>> +       unsigned int mpidr, cpu, cluster;
+>> +
+>> +       mpidr = read_cpuid_mpidr();
+>> +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>> +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>> +
+>> +       arch_spin_lock(&bl_lock);
+>> +       if (cpu_use_count[cpu][cluster] == 0)
+>> +               cpu_use_count[cpu][cluster] = 1;
+>> +       arch_spin_unlock(&bl_lock);
+>> +}
+>> +
+>> +static void exynos_suspend(u64 residency)
+>> +{
+>> +       unsigned int mpidr, cpunr;
+>> +
+>> +       mpidr = read_cpuid_mpidr();
+>> +       cpunr = enynos_pmu_cpunr(mpidr);
+>
+>
+> *enynos*_pmu_cpunr ?
 
-Regards,
-Lucas
+oops, I will fix typo
+
+>
+>
+>> +
+>> +       __raw_writel(virt_to_phys(mcpm_entry_point), REG_ENTRY_ADDR);
+>> +
+>> +       exynos_power_down();
+>> +
+>> +       /*
+>> +        * Execution reaches here only if cpu did not power down.
+>> +        * Hence roll back the changes done in exynos_power_down function.
+>> +       */
+>> +       __raw_writel(EXYNOS_CORE_LOCAL_PWR_EN,
+>> +                       EXYNOS_ARM_CORE_CONFIGURATION(cpunr));
+>
+>
+> Why don't you use the functions defined in the
+>
+> patch 5/5 arm: exynos: Add MCPM call-back functions
+
+In exynos_core_power_control it powerup the alreay powered down core.
+But here i need to simply set this value as core never powered down.
+
+>
+> exynos_core_power_control() ?
+>
+>
+>> +       set_cr(get_cr() | CR_C);
+>> +       enable_coherency();
+>> +}
+>> +
+>>   static const struct mcpm_platform_ops exynos_power_ops = {
+>>         .power_up               = exynos_power_up,
+>>         .power_down             = exynos_power_down,
+>>         .power_down_finish      = exynos_power_down_finish,
+>> +       .suspend                = exynos_suspend,
+>> +       .powered_up             = exynos_powered_up,
+>>   };
+>>
+>>   static void __init exynos_mcpm_usage_count_init(void)
+>>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+
+
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+with warm regards,
+Chander Kashyap
