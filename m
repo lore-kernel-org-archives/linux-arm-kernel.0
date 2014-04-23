@@ -1,46 +1,113 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Apr 2014 14:20:33 +0100
-Subject: [PATCH v3] ARM: mm: support big-endian page tables
-In-Reply-To: <87ob00wau2.fsf@approximate.cambridge.arm.com>
-References: <534F9F79.9050503@huawei.com>
- <87ob00wau2.fsf@approximate.cambridge.arm.com>
-Message-ID: <20140423132033.GE5649@arm.com>
+From: ritesh.harjani@gmail.com (Ritesh Harjani)
+Date: Wed, 23 Apr 2014 18:52:26 +0530
+Subject: [PATCH] arm: dma-mapping: Fix mapping size value
+In-Reply-To: <5357BD77.3060908@samsung.com>
+References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
+ <20140422085307.GB5747@arm.com> <53577F84.1080101@samsung.com>
+ <4662711.Ubz0jaKMvq@avalon>
+ <CAD15agYETzLJZ26wh8c=+PCSoQ9dR9vLgg7VmZTnQquXxoW+2Q@mail.gmail.com>
+ <5357BD77.3060908@samsung.com>
+Message-ID: <CAD15agb+82CdM2UGde5UZT7KWHc1oXjjmYktmHT49t03xHOa3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jianguo,
+Ok thanks Marek,
 
-On Thu, Apr 17, 2014 at 10:43:01AM +0100, Marc Zyngier wrote:
-> On Thu, Apr 17 2014 at 10:31:37 am BST, Jianguo Wu <wujianguo@huawei.com> wrote:
-> > When enable LPAE and big-endian in a hisilicon board, while specify
-> > mem=384M mem=512M at 7680M, will get bad page state:
-> >
-> > Freeing unused kernel memory: 180K (c0466000 - c0493000)
-> > BUG: Bad page state in process init  pfn:fa442
-> > page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
-> > page flags: 0x40000400(reserved)
-> > Modules linked in:
-> > CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
-> > [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
-> > [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
-> > [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
-> > [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
-> > [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
-> > [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
-> > [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
-> > [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
-> > [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
+I was about to send a new patch (as I had now got hold of my system).
+Anyways, I will add this discussion of cleaning up this variable in my
+to-do list.
 
 
-[...]
+Thanks
+Ritesh
 
-Please can you put this into Russell's patch system? You can also add my
-ack:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-You should also CC stable <stable@vger.kernel.org> in the commit log.
-
-Cheers,
-
-Will
+On Wed, Apr 23, 2014 at 6:47 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+>
+> On 2014-04-23 12:04, Ritesh Harjani wrote:
+>>
+>> Hi Marek/Will
+>>
+>> On Wed, Apr 23, 2014 at 3:00 PM, Laurent Pinchart
+>> <laurent.pinchart@ideasonboard.com> wrote:
+>> > Hi Marek,
+>> >
+>> > On Wednesday 23 April 2014 10:53:24 Marek Szyprowski wrote:
+>> >> On 2014-04-22 10:53, Will Deacon wrote:
+>> >> > On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
+>> >> > > 68efd7d2fb("arm: dma-mapping: remove order parameter from
+>> >> > > arm_iommu_create_mapping()") is causing kernel panic
+>> >> > > because it wrongly sets the value of mapping->size:
+>> >> > >
+>> >> > > Unable to handle kernel NULL pointer dereference at virtual
+>> >> > > address 000000a0
+>> >> > > pgd = e7a84000
+>> >> > > [000000a0] *pgd=00000000
+>> >> > > ...
+>> >> > > PC is at bitmap_clear+0x48/0xd0
+>> >> > > LR is at __iommu_remove_mapping+0x130/0x164
+>> >> > >
+>> >> > > Fix it by correcting mapping->size value.
+>> >> > >
+>> >> > > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+>> >> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>> >> > > ---
+>> >> > >
+>> >> > >  arch/arm/mm/dma-mapping.c | 2 +-
+>> >> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >> > >
+>> >> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> >> > > index f62aa06..6b00be1 100644
+>> >> > > --- a/arch/arm/mm/dma-mapping.c
+>> >> > > +++ b/arch/arm/mm/dma-mapping.c
+>> >> > > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type
+>> >> > > *bus,
+>> >> > > dma_addr_t base, size_t size)> >
+>> >> > >   mapping->nr_bitmaps = 1;
+>> >> > >   mapping->extensions = extensions;
+>> >> > >   mapping->base = base;
+>> >> > >
+>> >> > > - mapping->size = bitmap_size << PAGE_SHIFT;
+>> >> > >
+>> >> > >   mapping->bits = BITS_PER_BYTE * bitmap_size;
+>> >> > >
+>> >> > > + mapping->size = mapping->bits << PAGE_SHIFT;
+>> >> >
+>> >> > Ok, but given that mapping->size is derived from mapping->bits, do we
+>> >> > really need both of these fields in struct dma_iommu_mapping?
+>> >>
+>> >> You are right. I didn't notice this while I was refactoring the code.
+>> >> Ritesh, could you update your patch and simply replace all references
+>> >> of
+>> >> mapping->size with (mapping->bits << PAGE_SHIFT), probably with some
+>> >> temporary variable to make the code easier to understand? I've didn't
+>> >> apply
+>> >> your patch yet.
+>> >
+>> > As this patch fixes a v3.15 regression, shouldn't it be applied as-is
+>> > and
+>> > ASAP, with the cleanup that removes mapping->size coming in a later,
+>> > less
+>> > urgent patch ?
+>>
+>> I agree with Laurent. Anyway this cleanup can be taken care when we will
+>> be
+>> doing refactoring of common code to lib/iommu-helper.c.
+>>
+>> Anyways, if you still insist I can prepare and submit the patch. Let me
+>> know
+>> again on this.
+>
+>
+> Ok, I've merged the patch as is and I will send pull request soon.
+> Please include the above discussed cleanup while refactoring common code to
+> lib.
+>
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
