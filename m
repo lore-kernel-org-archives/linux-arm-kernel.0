@@ -1,58 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Apr 2014 10:25:52 +0900
-Subject: [PATCH 24/33] ARM: shmobile: armadillo-reference dts: enable RTC
+Date: Wed, 23 Apr 2014 10:25:53 +0900
+Subject: [PATCH 25/33] ARM: shmobile: lager: Correct setting of ethernet PHY
+ LED mode
 In-Reply-To: <cover.1398216022.git.horms+renesas@verge.net.au>
 References: <cover.1398216022.git.horms+renesas@verge.net.au>
-Message-ID: <584b23db5beb3bd3a3c0767248a4843cac848a58.1398216022.git.horms+renesas@verge.net.au>
+Message-ID: <1c47a6aae8bc6113463c47e9b8d35e35e97411b2.1398216022.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht@gmail.com>
+The correct binding is "micrel,led-mode", not "led-mode".
 
-This enables the Seiko real-time clock that is attached to a couple of
-GPIO pins.
+This corrects an error which was introduced when setting of ethernet PHY
+LED mode was added by 82e62182d59bd1d0 ("ARM: shmobile: lager: Set ethernet
+PHY LED mode").
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+This makes the lager code consistent with the koelsch code which was added
+by ae00d12a032490b3 ("ARM: shmobile: koelsch: Set ethernet PHY LED mode").
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 97342a4..0cb235a 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -118,6 +118,16 @@
- 		};
- 	};
- 
-+	i2c2: i2c at 2 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "i2c-gpio";
-+		gpios = <&pfc 208 GPIO_ACTIVE_HIGH /* sda */
-+			 &pfc 91 GPIO_ACTIVE_HIGH /* scl */
-+			>;
-+		i2c-gpio,delay-us = <5>;
-+	};
-+
- 	backlight {
- 		compatible = "pwm-backlight";
- 		pwms = <&tpu 2 33333 PWM_POLARITY_INVERTED>;
-@@ -167,6 +177,14 @@
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index a55c5f8..265cba1 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -213,7 +213,7 @@
+ 		reg = <1>;
+ 		interrupt-parent = <&irqc0>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-		led-mode = <1>;
++		micrel,led-mode = <1>;
  	};
  };
  
-+&i2c2 {
-+	status = "okay";
-+	rtc at 30 {
-+		compatible = "seiko,s35390a";
-+		reg = <0x30>;
-+	};
-+};
-+
- &pfc {
- 	pinctrl-0 = <&scifa1_pins>;
- 	pinctrl-names = "default";
 -- 
 1.8.5.2
