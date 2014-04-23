@@ -1,66 +1,197 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 23 Apr 2014 13:34:54 -0600
-Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
- missing memory barrier
-In-Reply-To: <6414220.SShvCHLvZQ@wuerfel>
-References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
- <20140423171727.GK5649@arm.com>
- <20140423183742.GK24070@n2100.arm.linux.org.uk>
- <6414220.SShvCHLvZQ@wuerfel>
-Message-ID: <20140423193454.GA10076@obsidianresearch.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 23 Apr 2014 21:37:26 +0200
+Subject: [PATCH v2 6/9] ARM: S3C24XX: add platform code for conversion to the
+ common clock framework
+In-Reply-To: <2104342.rkElQpXtvM@phil>
+References: <2104342.rkElQpXtvM@phil>
+Message-ID: <4619612.KDbNoBHm4F@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 08:58:05PM +0200, Arnd Bergmann wrote:
+This adds the necessary init functions to init the clocks from the common
+clock framework and necessary CONFIG_SAMSUNG_CLOCK ifdefs around the legacy
+clock code.
 
-> PCI guarantees this, but I have seen systems in the past (on
-> PowerPC) that would violate them on the internal interconnect: You
-> could sometimes see the completion DMA data in the descriptor ring
-> before the actual user data is there. We only ever observed it in
-> combination with an IOMMU, when the descriptor address had a valid
-> IOTLB but the data address did not.
+This also includes empty stubs for the *_setup_clocks functions that are
+called from the cpufreq driver on resume.
 
-Ordering in PCI-E gets a bit fuzzy when you talk about internal order
-within the host bridge, but AFAIK, re-ordering non-relaxed PCI-E
-writes is certainly a big no-no.. It breaks the entire
-producer/consumer driver model..
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/mach-s3c24xx/Kconfig   |  5 +++++
+ arch/arm/mach-s3c24xx/common.c  | 25 +++++++++++++++++++++++++
+ arch/arm/mach-s3c24xx/common.h  |  7 +++++++
+ arch/arm/mach-s3c24xx/s3c2410.c |  6 ++++++
+ arch/arm/mach-s3c24xx/s3c2442.c |  3 ++-
+ arch/arm/mach-s3c24xx/s3c244x.c |  6 ++++++
+ 6 files changed, 51 insertions(+), 1 deletion(-)
 
-> Another problem is MSI processing. MSI was specifically invented to avoid
-> having to check an MMIO register for a DMA completion that as a side-effect
-> flushes pending DMAs from the same device. This breaks down if the MSI
-> packet gets turned into a level interrupt before it reaches the CPU's
-> coherency domain, which is likely the case on the dw-pcie controller that
-> comes with its own MSI block.
-
-I recently implemented a PCI-E to AXI bridge HW that does MSI in an
-AXI environment and it requires waiting for all AXI operations
-associated with prior PCI-E packets to complete and be acked back to
-the bridge before sending an MSI edge over to the GIC.
-
-Unlike PCI, AXI provides a write completion ack back to the initiator,
-which can only be sent by the completor once the transaction is
-visible to all other initiators.
-
-A bridge must similarly serialize other TLPs: eg a series of posted
-writes with the relaxed ordering bit set can be pipelined into AXI,
-but once a non-relaxed TLP is hit, the bridge must wait for all the
-prior writes to be ack'd before forwarding the non-relaxed one.
-
-Not doing this serialization would be the root cause of problem like
-you described above in PPC - where the IOMMU path takes longer than
-the non-IOMMU path so the non-relaxed completion write arrives too
-soon.
-
-IMHO, if someone builds a PCI-E bridge that doesn't do this, then it's
-MSI support is completely broken and should not be used. Delivering a
-MSI interrupt before data visibility completely violates requirements
-in PCI-E for transaction ordering.
-
-It is also important to note that even level interrupts require bridge
-serialization. When a non-relaxed read-response TLP is returned the
-bridge must wait for all AXI writes to be ack'd before forwarding the
-read response. Otherwise writes could be buffered within the
-interconnect and still not be visible to the CPU while the read
-response 'passes' them.
-
-Jason
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 6036e77..daab788 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -18,6 +18,11 @@ config PLAT_S3C24XX
+ 	help
+ 	  Base platform code for any Samsung S3C24XX device
+ 
++config S3C2410_COMMON_CLK
++	bool
++	help
++	  Build the s3c2410 clock driver based on the common clock framework.
++
+ config S3C2410_COMMON_DCLK
+ 	bool
+ 	select REGMAP_MMIO
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index 8e930e0..5307bb7 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -53,6 +53,7 @@
+ #include <plat/cpu-freq.h>
+ #include <plat/pll.h>
+ #include <plat/pwm-core.h>
++#include <plat/watchdog-reset.h>
+ 
+ #include "common.h"
+ 
+@@ -534,6 +535,14 @@ struct platform_device s3c2443_device_dma = {
+ };
+ #endif
+ 
++#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_CPU_S3C2410)
++void __init s3c2410_init_clocks(int xtal)
++{
++	s3c2410_common_clk_init(NULL, xtal, 0, S3C24XX_VA_CLKPWR);
++	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
++}
++#endif
++
+ #ifdef CONFIG_CPU_S3C2412
+ void __init s3c2412_init_clocks(int xtal)
+ {
+@@ -548,6 +557,22 @@ void __init s3c2416_init_clocks(int xtal)
+ }
+ #endif
+ 
++#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_CPU_S3C2440)
++void __init s3c2440_init_clocks(int xtal)
++{
++	s3c2410_common_clk_init(NULL, xtal, 1, S3C24XX_VA_CLKPWR);
++	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
++}
++#endif
++
++#if defined(CONFIG_COMMON_CLK) && defined(CONFIG_CPU_S3C2442)
++void __init s3c2442_init_clocks(int xtal)
++{
++	s3c2410_common_clk_init(NULL, xtal, 2, S3C24XX_VA_CLKPWR);
++	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
++}
++#endif
++
+ #ifdef CONFIG_CPU_S3C2443
+ void __init s3c2443_init_clocks(int xtal)
+ {
+diff --git a/arch/arm/mach-s3c24xx/common.h b/arch/arm/mach-s3c24xx/common.h
+index 50504c7..2d65541 100644
+--- a/arch/arm/mach-s3c24xx/common.h
++++ b/arch/arm/mach-s3c24xx/common.h
+@@ -77,6 +77,7 @@ extern void s3c244x_restart(enum reboot_mode mode, const char *cmd);
+ #ifdef CONFIG_CPU_S3C2440
+ extern  int s3c2440_init(void);
+ extern void s3c2440_map_io(void);
++extern void s3c2440_init_clocks(int xtal);
+ extern void s3c2440_init_irq(void);
+ #else
+ #define s3c2440_init NULL
+@@ -86,6 +87,7 @@ extern void s3c2440_init_irq(void);
+ #ifdef CONFIG_CPU_S3C2442
+ extern  int s3c2442_init(void);
+ extern void s3c2442_map_io(void);
++extern void s3c2442_init_clocks(int xtal);
+ extern void s3c2442_init_irq(void);
+ #else
+ #define s3c2442_init NULL
+@@ -116,6 +118,11 @@ extern struct platform_device s3c2443_device_dma;
+ 
+ extern struct platform_device s3c2410_device_dclk;
+ 
++#ifdef CONFIG_S3C2410_COMMON_CLK
++void __init s3c2410_common_clk_init(struct device_node *np, unsigned long xti_f,
++				    int current_soc,
++				    void __iomem *reg_base);
++#endif
+ #ifdef CONFIG_S3C2412_COMMON_CLK
+ void __init s3c2412_common_clk_init(struct device_node *np, unsigned long xti_f,
+ 				unsigned long ext_f, void __iomem *reg_base);
+diff --git a/arch/arm/mach-s3c24xx/s3c2410.c b/arch/arm/mach-s3c24xx/s3c2410.c
+index ffb92cbc..a1ce4b0 100644
+--- a/arch/arm/mach-s3c24xx/s3c2410.c
++++ b/arch/arm/mach-s3c24xx/s3c2410.c
+@@ -83,6 +83,7 @@ void __init s3c2410_map_io(void)
+ 	iotable_init(s3c2410_iodesc, ARRAY_SIZE(s3c2410_iodesc));
+ }
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ void __init_or_cpufreq s3c2410_setup_clocks(void)
+ {
+ 	struct clk *xtal_clk;
+@@ -142,6 +143,11 @@ void __init s3c2410_init_clocks(int xtal)
+ 	clkdev_add_table(s3c2410_clk_lookup, ARRAY_SIZE(s3c2410_clk_lookup));
+ 	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
+ }
++#else
++void __init_or_cpufreq s3c2410_setup_clocks(void)
++{
++}
++#endif
+ 
+ struct bus_type s3c2410_subsys = {
+ 	.name = "s3c2410-core",
+diff --git a/arch/arm/mach-s3c24xx/s3c2442.c b/arch/arm/mach-s3c24xx/s3c2442.c
+index 2c8adc0..564c6503 100644
+--- a/arch/arm/mach-s3c24xx/s3c2442.c
++++ b/arch/arm/mach-s3c24xx/s3c2442.c
+@@ -53,6 +53,7 @@
+ 
+ #include "common.h"
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ /* S3C2442 extended clock support */
+ 
+ static unsigned long s3c2442_camif_upll_round(struct clk *clk,
+@@ -162,7 +163,7 @@ static __init int s3c2442_clk_init(void)
+ }
+ 
+ arch_initcall(s3c2442_clk_init);
+-
++#endif
+ 
+ static struct device s3c2442_dev = {
+ 	.bus		= &s3c2442_subsys,
+diff --git a/arch/arm/mach-s3c24xx/s3c244x.c b/arch/arm/mach-s3c24xx/s3c244x.c
+index 0ce2538..aaaf90d2 100644
+--- a/arch/arm/mach-s3c24xx/s3c244x.c
++++ b/arch/arm/mach-s3c24xx/s3c244x.c
+@@ -78,6 +78,7 @@ void __init s3c244x_map_io(void)
+ 	s3c2410_device_dclk.name = "s3c2440-dclk";
+ }
+ 
++#ifdef CONFIG_SAMSUNG_CLOCK
+ void __init_or_cpufreq s3c244x_setup_clocks(void)
+ {
+ 	struct clk *xtal_clk;
+@@ -138,6 +139,11 @@ void __init s3c244x_init_clocks(int xtal)
+ 	s3c2410_baseclk_add();
+ 	samsung_wdt_reset_init(S3C24XX_VA_WATCHDOG);
+ }
++#else
++void __init_or_cpufreq s3c244x_setup_clocks(void)
++{
++}
++#endif
+ 
+ /* Since the S3C2442 and S3C2440 share items, put both subsystems here */
+ 
+-- 
+1.9.0
