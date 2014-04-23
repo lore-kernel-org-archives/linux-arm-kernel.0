@@ -1,39 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 Apr 2014 10:20:02 -0600
-Subject: [PATCH v2 0/7] Add cros_ec changes for newer boards
-In-Reply-To: <20140423123240.GA640@lee--X1>
-References: <1398185154-19404-1-git-send-email-dianders@chromium.org>
- <20140423123240.GA640@lee--X1>
-Message-ID: <5357E832.1000806@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Apr 2014 18:20:44 +0200
+Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
+In-Reply-To: <20140423142315.GO865@e106497-lin.cambridge.arm.com>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <4565008.ZECF3eWqge@wuerfel>
+ <20140423142315.GO865@e106497-lin.cambridge.arm.com>
+Message-ID: <14215032.8jhN17iHj5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 06:32 AM, Lee Jones wrote:
-> On Tue, 22 Apr 2014, Doug Anderson wrote:
+On Wednesday 23 April 2014 15:23:16 Liviu Dudau wrote:
+> > Unfortunately we are in a tricky situation on arm64 because we have
+> > to support both server-type SoCs and embedded-type SoCs. In an
+> > embedded system, you can't trust the boot loader to do a proper
+> > setup of all the hardware, so the kernel needs full control over
+> > all the initialization. In a server, the initialization is the
+> > responsibility of the firmware, and we don't want the kernel to
+> > even know about those registers.
+> > 
+> > My hope is that all server chips use an SBSA compliant PCIe
+> > implementation, but we already have X-Gene, which is doing server
+> > workloads with a nonstandard PCIe, and it's possible that there
+> > will also be server-like systems with a DesignWare PCIe block
+> > instead of an SBSA compliant one. We can still support those, but
+> > I don't want to see more than one implementation of dw-pcie
+> > on servers. Just like we have the generic PCIe support that Will
+> > is doing for virtual machines and SBSA compliant systems, we
+> > would do one dw-pcie variant for all systems that come with a
+> > host firmware and rely on it being set up already.
 > 
->> This series adds the most critical cros_ec changes for newer boards
->> using cros_ec.  Specifically:
->> * Fixes timing/locking issues with the previously upstreamed (but
->>   never used upstream) cros_ec_spi driver.
->> * Updates the cros_ec header file to the latest version which allows
->>   us to use newer EC features like i2c tunneling.
->> * Adds an i2c tunnel driver to allow communication to the EC's i2c
->>   devices.
->>
->> This _doesn't_ get the EC driver fully up to speed with what's in the
->> current Chromium OS trees.  There are a whole slew of cleanup patches
->> there, an addition of an LPC transport mode, and exports of functions
->> to userspace.  Once these patches land and we have functionality we
->> can continue to pick more cleanup patches.
-...
-> Need to wait for the ARM, DT and I2C guys to review, at which point
-> I'll be happy to take in and supply a branch for them to pull from if
-> required. If there are no _true_ dependencies and the MFD changes can
-> be added independently without fear of build breakages, let me know
-> and I'll apply them separately.
+> There is nothing in the SBSA that mandates firmware setup. All it requires
+> is that hardware is setup in a way that is not specific to a board
+> or a particular OEM. Surely if the setup being done for GH7 is always
+> the same it should fit the bill?
 
-I believe there aren't direct dependencies between the patches. So, the
-MFD patches can be applied to the MFD tree and the DT patch applied to
-the Tegra tree. I'm simply waiting for the MFD patches to be applied
-before applying the DT patch so that I know the DT binding definition is
-fully accepted before applying a patch that uses it.
+GH7 is already not SBSA compliant because it uses a nonstandard config
+space access method, and it uses its own MSI controller rather than GIC.
+This means it violates at least two out of the four clauses in SBSA
+describing PCIe.
+
+Regardless of this, the level of detail describing config space and
+MSI handling in SBSA can only make sense if the purpose is to handle
+all compliant implementations without platform specific code. If you
+require platform specific setup code in the OS, this underlying assumption
+no longer holds true and there is no point in having a spec in the
+first place.
+
+I think we should treat DW-PCIe in the same way if anyone attempts
+to use that in a server, e.g. in SBSA level 0. As you can see here,
+even when reusing hardware between Exynos and GH7, you can't just
+use the same init code, so it has to be in firmware to be any good.
+On a real server platform, you can't require a kernel upgrade every
+time a new SoC comes out, any basic functionality like PCI just has to
+work with existing OS images.
+
+	Arnd
