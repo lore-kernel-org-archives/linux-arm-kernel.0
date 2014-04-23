@@ -1,35 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Apr 2014 10:25:42 +0900
-Subject: [PATCH 14/33] ARM: shmobile: koelsch: Set ethernet PHY LED mode
+Date: Wed, 23 Apr 2014 10:25:43 +0900
+Subject: [PATCH 15/33] ARM: shmobile: armadillo-reference dts: Use KEY_*
+ macros for gpio-keys
 In-Reply-To: <cover.1398216022.git.horms+renesas@verge.net.au>
 References: <cover.1398216022.git.horms+renesas@verge.net.au>
-Message-ID: <19f647cbd432eff181777bbe0f302c62af4a180d.1398216022.git.horms+renesas@verge.net.au>
+Message-ID: <c9b60e922c7551ff1c477a121ad09f3790c1a575.1398216022.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-The Koelsch board uses the ethernet PHY LED0 as a link signal connected
-to the ethernet controller. Specify the corresponding LED mode for the
-PHY.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index fd1d6ee..ee23b7b 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -297,6 +297,7 @@
- 		reg = <1>;
- 		interrupt-parent = <&irqc0>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
- 	};
- };
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 95a849b..97342a4 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -11,6 +11,7 @@
+ /dts-v1/;
+ #include "r8a7740.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pwm/pwm.h>
  
+@@ -77,26 +78,26 @@
+ 
+ 		power-key {
+ 			gpios = <&pfc 99 GPIO_ACTIVE_LOW>;
+-			linux,code = <116>;
++			linux,code = <KEY_POWER>;
+ 			label = "SW3";
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		back-key {
+ 			gpios = <&pfc 100 GPIO_ACTIVE_LOW>;
+-			linux,code = <158>;
++			linux,code = <KEY_BACK>;
+ 			label = "SW4";
+ 		};
+ 
+ 		menu-key {
+ 			gpios = <&pfc 97 GPIO_ACTIVE_LOW>;
+-			linux,code = <139>;
++			linux,code = <KEY_MENU>;
+ 			label = "SW5";
+ 		};
+ 
+ 		home-key {
+ 			gpios = <&pfc 98 GPIO_ACTIVE_LOW>;
+-			linux,code = <102>;
++			linux,code = <KEY_HOME>;
+ 			label = "SW6";
+ 		};
+ 	};
 -- 
 1.8.5.2
