@@ -1,60 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 23 Apr 2014 12:45:41 -0700
-Subject: [PATCH v6 0/6] ARM: vdso gettimeofday using generic timer
- architecture
-In-Reply-To: <cover.1398213562.git.nathan_lynch@mentor.com>
-References: <cover.1398213562.git.nathan_lynch@mentor.com>
-Message-ID: <53581865.2020601@codeaurora.org>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 23 Apr 2014 21:48:50 +0200
+Subject: [PATCH v1 5/7] mtd: fsl-quadspi: get the dummy cycles for DDR
+ Quad read from the DT property
+In-Reply-To: <1398248215-26768-6-git-send-email-b32955@freescale.com>
+References: <a> <1398248215-26768-6-git-send-email-b32955@freescale.com>
+Message-ID: <201404232148.51034.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/22/14 17:48, Nathan Lynch wrote:
-> Provide fast userspace implementations of gettimeofday and
-> clock_gettime on systems that implement the generic timers extension
-> defined in ARMv7.  This follows the example of arm64 in conception but
-> significantly differs in some aspects of the implementation (C vs
-> assembly, mainly).
->
-> Clocks supported:
-> - CLOCK_REALTIME
-> - CLOCK_MONOTONIC
-> - CLOCK_REALTIME_COARSE
-> - CLOCK_MONOTONIC_COARSE
->
-> This also provides clock_getres (as arm64 does).
->
-> Note that while the high-precision realtime and monotonic clock
-> support depends on the generic timers extension, support for
-> clock_getres and coarse clocks is independent of the timer
-> implementation and is provided unconditionally.
+On Wednesday, April 23, 2014 at 12:16:53 PM, Huang Shijie wrote:
+> Check the "spi-nor,ddr-quad-read-dummy" DT property to get the
+> dummy cycles for DDR quad read.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  drivers/mtd/spi-nor/fsl-quadspi.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c
+> b/drivers/mtd/spi-nor/fsl-quadspi.c index 8d659a2..15bdeb9 100644
+> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> @@ -883,6 +883,7 @@ static int fsl_qspi_probe(struct platform_device *pdev)
+>  	for_each_available_child_of_node(dev->of_node, np) {
+>  		const struct spi_device_id *id;
+>  		char modalias[40];
+> +		u32 dummy = 0;
+> 
+>  		/* skip the holes */
+>  		if (!has_second_chip)
+> @@ -918,6 +919,12 @@ static int fsl_qspi_probe(struct platform_device
+> *pdev) if (ret < 0)
+>  			goto map_failed;
+> 
+> +		/* Set the dummy cycles for the DDR Quad Read */
+> +		ret = of_property_read_u32(np, "spi-nor,ddr-quad-read-dummy",
+> +				&dummy);
+> +		if (!ret && dummy > 0 && dummy < 8)
+> +			nor->read_dummy = dummy;
 
-I think we'll need to rename the clocksource in arch_timer.c if we only
-have an mmio architected timer to something like arch_mem_counter. Or we
-would need to map the register space for the view into userspace? I'm
-guessing that is hard, but if that was done then I assume it would lay
-the foundation for any mmio clocksource being used for the vdso.
+Is there any reason for the upper limit on number of dummy cycles ?
 
-----8<-----
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index b009012429b5..3f3d8ed465f4 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -449,10 +449,12 @@ static void __init arch_counter_register(unsigned type)
-        u64 start_count;
- 
-        /* Register the CP15 based counter if we have one */
--       if (type & ARCH_CP15_TIMER)
-+       if (type & ARCH_CP15_TIMER) {
-                arch_timer_read_counter = arch_counter_get_cntvct_cp15;
--       else
-+       } else {
-                arch_timer_read_counter = arch_counter_get_cntvct_mem;
-+               clocksource_counter.name = "arch_mem_counter";
-+       }
- 
-        start_count = arch_timer_read_counter();
-        clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Marek Vasut
