@@ -1,91 +1,82 @@
-From: linyongting@gmail.com (Lin Yongting)
-Date: Wed, 23 Apr 2014 20:52:21 +0800
-Subject: [PATCH] ftrace/arm: add save_stack_trace_regs() implementation
-Message-ID: <1398257541-18201-1-git-send-email-linyongting@gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 23 Apr 2014 14:00:12 +0100
+Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
+In-Reply-To: <031b01cf5ed5$21d536a0$657fa3e0$@samsung.com>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000a01cf592e$67e592e0$37b0b8a0$%han@samsung.com>
+ <201404221611.40087.arnd@arndb.de>
+ <031b01cf5ed5$21d536a0$657fa3e0$@samsung.com>
+Message-ID: <20140423130012.GL865@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When configure kprobe events of ftrace with "stacktrace" option enabled
-in arm, there is no stacktrace was recorded after the kprobe event was
-triggered. The root cause is no save_stack_trace_regs() function implemented.
+On Wed, Apr 23, 2014 at 10:19:30AM +0100, Kukjin Kim wrote:
+> Arnd Bergmann wrote:
+> > 
+> > On Wednesday 16 April 2014, Jingoo Han wrote:
+> > > Samsung GH7 has four PCIe controllers which can be used as root
+> > > complex for PCIe interface.
+> > >
+> > > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > > ---
+> > >  drivers/pci/host/Kconfig      |    2 +-
+> > >  drivers/pci/host/pci-exynos.c |  135
+> > ++++++++++++++++++++++++++++++++++++++---
+> > >  2 files changed, 126 insertions(+), 11 deletions(-)
+> > 
+> + Byungho An, Ilho Lee
+> 
+> Hi Arnd,
+> 
+> > Can you explain how much the GH7 and Exynos front-ends actually have in
+> > common? Would it make sense to have a separate driver for gh7?
+> > 
+> Basically, ARMv8 based GH7 has same PCIe hardware IP with previous ARMv7
+> based exynos5440, several features in PCIe are different though. In other
+> words, basic functionalities for PCIe are same. So I think, would be nice if
+> we could use one PCIe device driver for both SoCs.
+> 
+> However, if we need to support the PCIe with each own device driver because
+> of difference of 32bit and 64bit, please kindly let us know. Honestly, I'm
+> not sure about that right now.
 
-Implement the save_stack_trace_regs() function in arm, then ftrace will
-call this architecture-related function to record the stacktrace into
-ring buffer.
+Hi Kukjin,
 
-After this fix, stacktrace can be recorded, for example:
+I will let Arnd offer his view as a maintainer of DT enabled platforms for 
+arch/arm, but in my understanding the goal is to convert individual host
+bridge drivers to use my patch series directly, as they intentionally don't
+depend on any arch specific code and then leave the existing bios32 code
+for the non-DT platforms and the ones that do not see the need to convert
+to the framework.
 
-# mount -t debugfs nodev /sys/kernel/debug
-# echo "p:netrx net_rx_action" >> /sys/kernel/debug/tracing/kprobe_events
-# echo 1 > /sys/kernel/debug/tracing/events/kprobes/netrx/enable
-# echo 1 > /sys/kernel/debug/tracing/options/stacktrace
-# echo 1 > /sys/kernel/debug/tracing/tracing_on
-# ping 127.0.0.1 -c 1
-# echo 0 > /sys/kernel/debug/tracing/tracing_on
+Rob Herring has posted an example on how he can add support for a host
+bridge running under arm32 that uses my framework, so it is not an impossible
+task and can be used as an example for future conversions.
 
-# cat /sys/kernel/debug/tracing/trace
-# tracer: nop
-#
-# entries-in-buffer/entries-written: 12/12   #P:1
-#
-#                              _-----=> irqs-off
-#                             / _----=> need-resched
-#                            | / _---=> hardirq/softirq
-#                            || / _--=> preempt-depth
-#                            ||| /     delay
-#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
-#              | |       |   ||||       |         |
-            <------ missing some entries ---------------->
-            ping-1200  [000] dNs1   667.603250: netrx: (net_rx_action+0x0/0x1f8)
-            ping-1200  [000] dNs1   667.604738: <stack trace>
- => net_rx_action
- => do_softirq
- => local_bh_enable
- => ip_finish_output
- => ip_output
- => ip_local_out
- => ip_send_skb
- => ip_push_pending_frames
- => raw_sendmsg
- => inet_sendmsg
- => sock_sendmsg
- => SyS_sendto
- => ret_fast_syscall
+Does that make sense?
 
-Signed-off-by: Lin Yongting <linyongting@gmail.com>
----
- arch/arm/kernel/stacktrace.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Best regards,
+Liviu
 
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index af4e8c8..c558db6 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -123,6 +123,25 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 		trace->entries[trace->nr_entries++] = ULONG_MAX;
- }
- 
-+void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
-+{
-+	struct stack_trace_data data;
-+	struct stackframe frame;
-+
-+	data.trace = trace;
-+	data.skip = trace->skip;
-+	data.no_sched_functions = 0;
-+
-+	frame.fp = regs->ARM_fp;
-+	frame.sp = regs->ARM_sp;
-+	frame.lr = regs->ARM_lr;
-+	frame.pc = regs->ARM_pc;
-+
-+	walk_stackframe(&frame, save_trace, &data);
-+	if (trace->nr_entries < trace->max_entries)
-+		trace->entries[trace->nr_entries++] = ULONG_MAX;
-+}
-+
- void save_stack_trace(struct stack_trace *trace)
- {
- 	save_stack_trace_tsk(current, trace);
+> 
+> > Also, if gh7 is expected to run a full firmware, I think you should
+> > do all the setup in the firmware before booting Linux, and just
+> > do the required run-time operations in the driver itself.
+> > 
+> Well, we're expecting that all the setup should be done by the device driver
+> in kernel not firmware.
+> 
+> Thanks,
+> Kukjin
+> 
+> 
+
 -- 
-1.7.9.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
