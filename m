@@ -1,53 +1,59 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Wed, 23 Apr 2014 23:40:03 +0200
-Subject: [PATCH] pinctrl/at91: Fix lockup when IRQ on PIOC and PIOD occurs
-Message-ID: <1398289203-2407-1-git-send-email-alexanders83@web.de>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 23 Apr 2014 23:48:44 +0200
+Subject: [PATCH 0/5] GPIO OMAP driver changes for v3.16
+In-Reply-To: <20140410212202.GF15736@drone.musicnaut.iki.fi>
+References: <1396796297-13002-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CACRpkdarYt4tAD9WMDu6Me+dhipVyDHMpgF-AQ8SDNKMmhSjsA@mail.gmail.com>
+ <20140410193048.GE15736@drone.musicnaut.iki.fi>
+ <CABxcv=miFY3gE6HOU5ovWwCzgC6Un3ANh_Weh_bPCb7OoYQ+pA@mail.gmail.com>
+ <20140410212202.GF15736@drone.musicnaut.iki.fi>
+Message-ID: <CABxcv=nVpkt8HC0b6qnw=p6bdqKCPBKMk-QGRaHZnM+BJ1R3hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 8d56dfcc (pinctrl/at91: convert driver to use gpiolib irqchip)
-gpiochip_set_chained_irqchip is called for PIOC, PIOD and PIOE. The
-associated GPIO chip for the IRQ chip is overwritten each time, because
-they share the same hard IRQ line.
-Thus if an IRQ occurs on PIOC or PIOD, gpio_irq_handler will only check on
-PIOE (the assigned GPIO chip) where no event occured. Thus the IRQ will
-not be cleared, retriggering the ISR.
-Fix that (like done before) by only set the PIOC GPIO chip to the IRQ chip.
+Hello Aaro,
 
-Signed-off-by: Alexander Stein <alexanders83@web.de>
----
- drivers/pinctrl/pinctrl-at91.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On Thu, Apr 10, 2014 at 11:22 PM, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> Hi,
+>
+> On Thu, Apr 10, 2014 at 10:17:44PM +0200, Javier Martinez Canillas wrote:
+>> > The same happens also on Nokia 770:
+>> >
+>> > [    0.118896] genirq: Setting trigger mode 0 for irq 128 failed (gpio_irq_type+0x0/0x220)
+>>
+>> I don't have those errors when booting on my DM3730 IGEPv2 board but
+>> it seems that for some reason on omap1  __irq_set_trigger() complains
+>> when IRQ_TYPE_NONE is used as a default flag when calling
+>> gpiochip_irqchip_add()
+>>
+>> Could you please test the following patch and tell me if your board
+>> still works and makes the errors go away?
+>
+> Now it complains about mode 8...
+>
+> [    0.118835] genirq: Setting trigger mode 8 for irq 128 failed (gpio_irq_type
+> +0x0/0x220)
+>
+> A.
+>
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 64a8f8f..dd7d3e4 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1468,6 +1468,7 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- static int at91_gpio_of_irq_setup(struct device_node *node,
- 				  struct at91_gpio_chip *at91_gpio)
- {
-+	struct at91_gpio_chip   *prev = NULL;
- 	struct irq_data		*d = irq_get_irq_data(at91_gpio->pioc_virq);
- 	int ret;
- 
-@@ -1493,6 +1494,17 @@ static int at91_gpio_of_irq_setup(struct device_node *node,
- 		panic("at91_gpio.%d: couldn't allocate irq domain (DT).\n",
- 			at91_gpio->pioc_idx);
- 
-+	/* Setup chained handler */
-+	if (at91_gpio->pioc_idx)
-+		prev = gpio_chips[at91_gpio->pioc_idx - 1];
-+
-+	/* The top level handler handles one bank of GPIOs, except
-+	 * on some SoC it can handle up to three...
-+	 * We only set up the handler for the first of the list.
-+	 */
-+	if (prev && prev->next == at91_gpio)
-+		return 0;
-+
- 	/* Then register the chain on the parent IRQ */
- 	gpiochip_set_chained_irqchip(&at91_gpio->chip,
- 				     &gpio_irqchip,
--- 
-1.9.2
+On thread [1] was reported a regression on a Sitara AM335x board
+because the irq .map function handler used on the gpiolib called
+irq_set_type() for each pin on the bank.
+
+In the case of that board, a GPIO pin is used to control the SDRAM
+termination regulator and calling irq_set_type() sets the GPIO as
+input thus making the board to fail on boot. But this may also explain
+why you had those error logs on your OMAP1 board when applying these
+patches since that changes GPIO OMAP semantics when the driver
+expected irq_set_type() to only be called when a IRQ is requested.
+
+After some discussion Linus proposed a patch [2] which I think should
+also fix your issue. Can you please give it a try and provide your
+Tested-by for that patch?
+
+Thanks a lot and best regards,
+Javier
+
+[1]: http://marc.info/?t=139817273800014&r=1&w=2
+[2] https://patchwork.kernel.org/patch/4041881/
