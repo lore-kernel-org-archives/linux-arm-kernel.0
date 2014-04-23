@@ -1,82 +1,90 @@
-From: ssl@chromium.org (Sheng-Liang Song)
-Date: Tue, 22 Apr 2014 18:51:22 -0700
-Subject: [PATCH] Input: atkbd - fix keyboard LG Electronics
-Message-ID: <1398217882-29778-1-git-send-email-ssl@chromium.org>
+From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
+Date: Wed, 23 Apr 2014 12:07:43 +1000
+Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
+ friendly address
+In-Reply-To: <CAFEAcA8Ahe7A8Usy5x-DVvb6xxr3x6ELJS+NyzjDQKPv6FFLoQ@mail.gmail.com>
+References: <1395718484-20424-1-git-send-email-joelf@ti.com>
+ <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
+ <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
+ <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
+ <CAFEAcA96XGvwPM=OpqW8EU5nFksiEruGgncwqUPEWeU2ryCoJg@mail.gmail.com>
+ <CAL_JsqKxsR6-pKv9sP4z1nnp+sy7GncGDyL+kMkF60efn2=DsA@mail.gmail.com>
+ <CAFEAcA8Ahe7A8Usy5x-DVvb6xxr3x6ELJS+NyzjDQKPv6FFLoQ@mail.gmail.com>
+Message-ID: <CAEgOgz5Hw3-m0_w8bZs2OfMXit+ipPYzeXcu3iwmPq4cShx91A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After issuing ATKBD_CMD_RESET_DIS, LG Keyboard stop working.
-The workaround is to remove ATKBD_CMD_RESET_DIS for LG Keyboards.
+On Fri, Apr 18, 2014 at 5:26 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 17 April 2014 17:58, Rob Herring <robherring2@gmail.com> wrote:
+>> On Thu, Apr 17, 2014 at 5:02 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
+>>> On 2 April 2014 13:47, Peter Maydell <peter.maydell@linaro.org> wrote:
+>>>> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
+>>>>> Like others, I have been carrying this change locally. Good to see it up!
+>>>>
+>>>> Why are you all booting raw Images anyway (just out of curiosity)?
+>>>
+>>> Given the recent feedback from the kernel mailing list (viz "don't boot
+>>> Image unless you really know what you're doing, the correct load
+>>> image may change randomly depending what other board support
+>>> is in a multikernel image, etc") maybe we should just remove the
+>>> Image booting support instead? Clearly nobody who hasn't locally
+>>> patched QEMU is using it at the moment...
+>>
+>> Including AArch64, too? :) It happens to be correct ATM, but really we
+>> should be looking the Image header to determine the offset. I heard
+>> Mark Rutland has some patches to do TEXT_OFFSET randomization in fact.
+>
+> AArch64 is different -- the Image format is sanely specified and
+> includes enough information to get it right. (The fact that we don't
+> currently do so is a clear QEMU bug.)
+>
+>> The choice of 0x10000 is not really a good one either as this forces
+>> the decompressor to move itself out of the way first. I guess it is a
+>> good choice if your goal is to test the worst possible code path for
+>> the decompressor.
+>
+> The major awkwardness with AArch32 zImage is that it doesn't
+> give you enough information to know how big the zImage will
+> be uncompressed, so it's not possible for the bootloader to
+> sanity check that all the various bits and pieces aren't going
+> to overlap (and the kernel doesn't check either IIRC, so if things go
+> wrong they go wrong in various obscure ways).
+>
+> We could certainly rearrange where QEMU puts things; the current
+> setup results from a mixture of:
+>  * legacy "this is how we've always done it" (and the fact that if we
+>    get things wrong and the uncompressed kernel overlaps with the
+>    DTB or initrd then the failure is unhelpfully cryptic has generally
+>    been a pressure towards "don't tweak things too much")
+>  * handling both Image and zImage (and now AArch64 Image)
+>    in broadly similar codepaths
+>  * wanting to handle both boards with what by modern standards are
+>     tiny amounts of memory and also boards with gigabytes of RAM,
+>     even though optimal choices for location are going to differ
+>
+> I don't insist that we drop AArch32 Image support (or necessarily
+> even think we should gratuitously do so), but if it
+> makes it simpler to refactor the code to better handle the
+> other options then I don't particularly object to that happening.
+> I do think that it seems like an AArch32 Image loader that would
+> be useful to end-users ought to provide them with some way to
+> specify the load address or offset.
+>
 
-In order to keep the minimum changes to the current atkbd driver,
-I add logic to apply the patch if and only if the device is LG LW25-B7HV or P1-J273B.
----
- drivers/input/keyboard/atkbd.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+Regarding implementation of new bootloader specific user properties -
+the issue was discussed in my attempt to QOMify the ARM bootloader:
 
-diff --git a/drivers/input/keyboard/atkbd.c b/drivers/input/keyboard/atkbd.c
-index 2626773..9f82533 100644
---- a/drivers/input/keyboard/atkbd.c
-+++ b/drivers/input/keyboard/atkbd.c
-@@ -243,6 +243,8 @@ static void (*atkbd_platform_fixup)(struct atkbd *, const void *data);
- static void *atkbd_platform_fixup_data;
- static unsigned int (*atkbd_platform_scancode_fixup)(struct atkbd *, unsigned int);
- 
-+static void *atkbd_deactivate_fixup;
-+
- static ssize_t atkbd_attr_show_helper(struct device *dev, char *buf,
- 				ssize_t (*handler)(struct atkbd *, char *));
- static ssize_t atkbd_attr_set_helper(struct device *dev, const char *buf, size_t count,
-@@ -698,11 +700,13 @@ static int atkbd_activate(struct atkbd *atkbd)
-  * atkbd_deactivate() resets and disables the keyboard from sending
-  * keystrokes.
-  */
--
- static void atkbd_deactivate(struct atkbd *atkbd)
- {
- 	struct ps2dev *ps2dev = &atkbd->ps2dev;
- 
-+	if (atkbd_deactivate_fixup)
-+		return;
-+
- 	if (ps2_command(ps2dev, NULL, ATKBD_CMD_RESET_DIS))
- 		dev_err(&ps2dev->serio->dev,
- 			"Failed to deactivate keyboard on %s\n",
-@@ -1638,6 +1642,12 @@ static int __init atkbd_setup_scancode_fixup(const struct dmi_system_id *id)
- 	return 1;
- }
- 
-+static int __init atkbd_setup_deactivate(const struct dmi_system_id *id)
-+{
-+	atkbd_deactivate_fixup = id->driver_data;
-+	return 1;
-+}
-+
- static const struct dmi_system_id atkbd_dmi_quirk_table[] __initconst = {
- 	{
- 		.matches = {
-@@ -1775,6 +1785,22 @@ static const struct dmi_system_id atkbd_dmi_quirk_table[] __initconst = {
- 		.callback = atkbd_setup_scancode_fixup,
- 		.driver_data = atkbd_oqo_01plus_scancode_fixup,
- 	},
-+	{
-+		.matches = {
-+			DMI_MATCH(DMI_SYS_VENDOR, "LG Electronics"),
-+			DMI_MATCH(DMI_PRODUCT_NAME, "LW25-B7HV"),
-+		},
-+		.callback = atkbd_setup_deactivate,
-+		.driver_data = (void*) 1,
-+	},
-+	{
-+		.matches = {
-+			DMI_MATCH(DMI_SYS_VENDOR, "LG Electronics"),
-+			DMI_MATCH(DMI_PRODUCT_NAME, "P1-J273B"),
-+		},
-+		.callback = atkbd_setup_deactivate,
-+		.driver_data = (void*) 1,
-+	},
- 	{ }
- };
- 
--- 
-1.9.1.423.g4596e3a
+http://lists.gnu.org/archive/html/qemu-devel/2012-02/msg00962.html
+
+Now that the dust has settled on QOM (I believe that QOM instability
+was a dis-encouraging factor at that time). Perhaps we should revist
+that QOMification idea and punch all these magic numbers through as
+(over-ridable) props? -global and friends does the rest without ARM
+specific intrusion on machine and boot opts (vl.c etc).
+
+Regards,
+Peter
+
+> thanks
+> -- PMM
+>
