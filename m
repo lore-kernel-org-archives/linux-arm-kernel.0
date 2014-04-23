@@ -1,177 +1,49 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 23 Apr 2014 18:46:58 +0200
-Subject: [PATCH v3 3/3] ARM: exynos: Move to generic power domain bindings
-In-Reply-To: <1398271618-28932-1-git-send-email-t.figa@samsung.com>
-References: <1398271618-28932-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1398271618-28932-4-git-send-email-t.figa@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Apr 2014 17:49:19 +0100
+Subject: [PATCH] ARM: head: fix virt/phys patching for big-endian systems
+In-Reply-To: <1398265448-13541-1-git-send-email-will.deacon@arm.com>
+References: <1398265448-13541-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20140423164919.GH5649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves Exynos power domain code to use the new generic power
-domain look-up framework introduced by previous patch, allowing the new
-code to be compiled with CONFIG_ARCH_EXYNOS selected as well.
+On Wed, Apr 23, 2014 at 04:04:08PM +0100, Will Deacon wrote:
+> Commit e26a9e00afc4 ("ARM: Better virt_to_page() handling") reworked the
+> dynamic virt/phys patching to store the physical offset of the start of
+> memory as a PFN (32-bit quantity) instead of a physical address (potentially
+> a 64-bit quantity). Unfortunately, some of the old code was left behind,
+> causing big-endian systems to store the calculated PFN to the next word
+> *after* __pv_phys_pfn_offset and causing the kernel to treat PHYS_OFFSET
+> as 0x0.
+> 
+> This patch fixes the patching code, so that we store the 32-bit PFN offset
+> to the correct address, regardless of endianness.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- .../bindings/arm/exynos/power_domain.txt           | 12 ++--
- arch/arm/mach-exynos/pm_domains.c                  | 81 +---------------------
- kernel/power/Kconfig                               |  2 +-
- 3 files changed, 7 insertions(+), 88 deletions(-)
+Aha, this was already fixed in 8033/1 which Russell has pushed out on his
+fixes branch.
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index 5216b41..60f26a8 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -8,6 +8,8 @@ Required Properties:
-     * samsung,exynos4210-pd - for exynos4210 type power domain.
- - reg: physical base address of the controller and length of memory mapped
-     region.
-+- #power-domain-cells: number of cells in power domain specifier;
-+    must be 0.
- 
- Node of a device using power domains must have a samsung,power-domain property
- defined with a phandle to respective power domain.
-@@ -17,12 +19,8 @@ Example:
- 	lcd0: power-domain-lcd0 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C00 0x10>;
-+		#power-domain-cells = <0>;
- 	};
- 
--Example of the node using power domain:
--
--	node {
--		/* ... */
--		samsung,power-domain = <&lcd0>;
--		/* ... */
--	};
-+See Documentation/devicetree/bindings/power/power_domain.txt for description
-+of consumer-side bindings.
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index fe6570e..9cad3c6 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -73,89 +73,14 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
- 	return exynos_pd_power(domain, false);
- }
- 
--static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
--					 struct device *dev)
--{
--	int ret;
--
--	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
--
--	while (1) {
--		ret = pm_genpd_add_device(&pd->pd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--
--	pm_genpd_dev_need_restore(dev, true);
--}
--
--static void exynos_remove_device_from_domain(struct device *dev)
--{
--	struct generic_pm_domain *genpd = dev_to_genpd(dev);
--	int ret;
--
--	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
--
--	while (1) {
--		ret = pm_genpd_remove_device(genpd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--}
--
--static void exynos_read_domain_from_dt(struct device *dev)
--{
--	struct platform_device *pd_pdev;
--	struct exynos_pm_domain *pd;
--	struct device_node *node;
--
--	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
--	if (!node)
--		return;
--	pd_pdev = of_find_device_by_node(node);
--	if (!pd_pdev)
--		return;
--	pd = platform_get_drvdata(pd_pdev);
--	exynos_add_device_to_domain(pd, dev);
--}
--
--static int exynos_pm_notifier_call(struct notifier_block *nb,
--				    unsigned long event, void *data)
--{
--	struct device *dev = data;
--
--	switch (event) {
--	case BUS_NOTIFY_BIND_DRIVER:
--		if (dev->of_node)
--			exynos_read_domain_from_dt(dev);
--
--		break;
--
--	case BUS_NOTIFY_UNBOUND_DRIVER:
--		exynos_remove_device_from_domain(dev);
--
--		break;
--	}
--	return NOTIFY_DONE;
--}
--
--static struct notifier_block platform_nb = {
--	.notifier_call = exynos_pm_notifier_call,
--};
--
- static __init int exynos4_pm_init_power_domain(void)
- {
--	struct platform_device *pdev;
- 	struct device_node *np;
- 
- 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
- 		struct exynos_pm_domain *pd;
- 		int on;
- 
--		pdev = of_find_device_by_node(np);
--
- 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
- 		if (!pd) {
- 			pr_err("%s: failed to allocate memory for domain\n",
-@@ -168,17 +93,13 @@ static __init int exynos4_pm_init_power_domain(void)
- 		pd->base = of_iomap(np, 0);
- 		pd->pd.power_off = exynos_pd_power_off;
- 		pd->pd.power_on = exynos_pd_power_on;
--		pd->pd.of_node = np;
--
--		platform_set_drvdata(pdev, pd);
- 
- 		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
-+		of_genpd_add_provider(np, of_genpd_xlate_simple, &pd->pd);
- 	}
- 
--	bus_register_notifier(&platform_bus_type, &platform_nb);
--
- 	return 0;
- }
- arch_initcall(exynos4_pm_init_power_domain);
-diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-index 45aa98e..b17588c 100644
---- a/kernel/power/Kconfig
-+++ b/kernel/power/Kconfig
-@@ -308,7 +308,7 @@ config PM_GENERIC_DOMAINS_RUNTIME
- 
- config PM_GENERIC_DOMAINS_OF
- 	def_bool y
--	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
-+	depends on PM_GENERIC_DOMAINS && OF
- 
- config CPU_PM
- 	bool
--- 
-1.9.2
+Sorry for the noise,
+
+Will
+
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kernel/head.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index f8c08839edf3..591d6e4a6492 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -587,7 +587,7 @@ __fixup_pv_table:
+>  	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
+>  	add	r7, r7, r3	@ adjust __pv_offset address
+>  	mov	r0, r8, lsr #12	@ convert to PFN
+> -	str	r0, [r6, #LOW_OFFSET]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
+> +	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
+>  	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
+>  	mov	r6, r3, lsr #24	@ constant for add/sub instructions
+>  	teq	r3, r6, lsl #24 @ must be 16MiB aligned
+> -- 
+> 1.9.2
+> 
