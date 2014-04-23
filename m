@@ -1,57 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Apr 2014 18:20:44 +0200
-Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
-In-Reply-To: <20140423142315.GO865@e106497-lin.cambridge.arm.com>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <4565008.ZECF3eWqge@wuerfel>
- <20140423142315.GO865@e106497-lin.cambridge.arm.com>
-Message-ID: <14215032.8jhN17iHj5@wuerfel>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 23 Apr 2014 09:22:22 -0700
+Subject: [PATCH] ARM64: disable DCACHE_WORD_ACCESS in big endian case
+In-Reply-To: <20140423123845.GB5649@arm.com>
+References: <1398119770-27817-1-git-send-email-victor.kamensky@linaro.org>
+ <20140422094659.GB6979@arm.com>
+ <CAA3XUr20eFyLshVM+7VBSMz4a4-cCA0PLrYGN5oyk-wOM2NLtg@mail.gmail.com>
+ <20140423123845.GB5649@arm.com>
+Message-ID: <CAA3XUr1LLphqsumkbY8UJNVx2R9_okjGox9SqukZ8cZib-AZgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 April 2014 15:23:16 Liviu Dudau wrote:
-> > Unfortunately we are in a tricky situation on arm64 because we have
-> > to support both server-type SoCs and embedded-type SoCs. In an
-> > embedded system, you can't trust the boot loader to do a proper
-> > setup of all the hardware, so the kernel needs full control over
-> > all the initialization. In a server, the initialization is the
-> > responsibility of the firmware, and we don't want the kernel to
-> > even know about those registers.
-> > 
-> > My hope is that all server chips use an SBSA compliant PCIe
-> > implementation, but we already have X-Gene, which is doing server
-> > workloads with a nonstandard PCIe, and it's possible that there
-> > will also be server-like systems with a DesignWare PCIe block
-> > instead of an SBSA compliant one. We can still support those, but
-> > I don't want to see more than one implementation of dw-pcie
-> > on servers. Just like we have the generic PCIe support that Will
-> > is doing for virtual machines and SBSA compliant systems, we
-> > would do one dw-pcie variant for all systems that come with a
-> > host firmware and rely on it being set up already.
-> 
-> There is nothing in the SBSA that mandates firmware setup. All it requires
-> is that hardware is setup in a way that is not specific to a board
-> or a particular OEM. Surely if the setup being done for GH7 is always
-> the same it should fit the bill?
+On 23 April 2014 05:38, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Apr 23, 2014 at 07:37:11AM +0100, Victor Kamensky wrote:
+>> Hi Will,
+>
+> Hi Victor,
+>
+> Thanks for investigating this!
+>
+>> On 22 April 2014 02:46, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Apr 21, 2014 at 11:36:10PM +0100, Victor Kamensky wrote:
+>> The issue turned out to be in another commit: "word-at-a-time:
+>> provide generic big-endian zero_bytemask implementation". Because
+>> of the issue in zero_bytemask function full_name_hash and
+>> hash_name were giving different hash results for the same path
+>> name (without slash). The issue is that (~0ul << 64) gives
+>> ~0ul not 0. I could not come up with more elegant solution other
+>> than use inline function that check shift value against type maximum
+>> width. Please take a look below.
+>
+> Ah yes, we're in UNDEFINED territory here and AArch64 differs from AArch32
+> wrt LSL >= register width. Can you try the following instead of your patch
+> please? I think it should be more efficient.
 
-GH7 is already not SBSA compliant because it uses a nonstandard config
-space access method, and it uses its own MSI controller rather than GIC.
-This means it violates at least two out of the four clauses in SBSA
-describing PCIe.
+Yes, it works. Checked initramfs and nfs boot with FVP.
+I knew you could do it way more elegant :).
 
-Regardless of this, the level of detail describing config space and
-MSI handling in SBSA can only make sense if the purpose is to handle
-all compliant implementations without platform specific code. If you
-require platform specific setup code in the OS, this underlying assumption
-no longer holds true and there is no point in having a spec in the
-first place.
+How do we get it in? Do you want to commit/submit it yourself?
 
-I think we should treat DW-PCIe in the same way if anyone attempts
-to use that in a server, e.g. in SBSA level 0. As you can see here,
-even when reusing hardware between Exynos and GH7, you can't just
-use the same init code, so it has to be in firmware to be any good.
-On a real server platform, you can't require a kernel upgrade every
-time a new SoC comes out, any basic functionality like PCI just has to
-work with existing OS images.
+Thanks,
+Victor
 
-	Arnd
+> Cheers,
+>
+> Will
+>
+> --->8
+>
+> diff --git a/include/asm-generic/word-at-a-time.h b/include/asm-generic/word-at-a-time.h
+> index d3909effd725..243ce8c84ee9 100644
+> --- a/include/asm-generic/word-at-a-time.h
+> +++ b/include/asm-generic/word-at-a-time.h
+> @@ -50,11 +50,7 @@ static inline bool has_zero(unsigned long val, unsigned long *data, const struct
+>  }
+>
+>  #ifndef zero_bytemask
+> -#ifdef CONFIG_64BIT
+> -#define zero_bytemask(mask)    (~0ul << fls64(mask))
+> -#else
+> -#define zero_bytemask(mask)    (~0ul << fls(mask))
+> -#endif /* CONFIG_64BIT */
+> +#define zero_bytemask(mask)    (mask ? ~0ul << __fls(mask) << 1 : ~0ul)
+>  #endif /* zero_bytemask */
+>
+>  #endif /* _ASM_WORD_AT_A_TIME_H */
