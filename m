@@ -1,34 +1,56 @@
 From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 22 Apr 2014 20:27:01 -0500
-Subject: [PATCH 0/8] OMAP2+ system timer cleanup series
-Message-ID: <1398216429-4681-1-git-send-email-joelf@ti.com>
+Date: Tue, 22 Apr 2014 20:27:02 -0500
+Subject: [PATCH 1/8] ARM: OMAP2+: timer: Add a powerup function
+In-Reply-To: <1398216429-4681-1-git-send-email-joelf@ti.com>
+References: <1398216429-4681-1-git-send-email-joelf@ti.com>
+Message-ID: <1398216429-4681-2-git-send-email-joelf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is a clean up series that attempts to separate out some of the DT-only vs
-legacy system timer usage for OMAP2+. Emphasis is on separating legacy stuff,
-and abstracting annoyances such as hwmod to give us the flexibilty for the
-migration. The series will relieve some of the difficulties in moving out the
-timer code from mach layer. As such it is incremental and there is a bit of
-duplication for fallback cases, but emphasis is on keeping things working
-during the migration.
+In an effort to isolate the time power initialization for future purposes, add
+a function to do the same. This primarily involves a hwmod lookup, setup and
+enable.
 
-Earlier series posted for dmtimer cleanup, and changes for OMAP1 is at [1].
+Signed-off-by: Joel Fernandes <joelf@ti.com>
+---
+ arch/arm/mach-omap2/timer.c |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-[1] https://lkml.org/lkml/2014/4/16/737
-
-Joel Fernandes (8):
-  ARM: OMAP2+: timer: Add a powerup function
-  ARM: OMAP2+: timer: Simplify clock event/source name setting
-  ARM: OMAP2+: timer: Add comment on timer clk parenting
-  ARM: OMAP2+: timer: Remove hwmod look-up dependency for DT-boot
-  ARM: OMAP2+: timer: Use of_clk_get for DT platforms
-  ARM: OMAP2+: timer: Fix error message to not use hwmod structure
-  ARM: OMAP2+: timer: Add fallback for of_clk_get
-  ARM: OMAP2+: timer: Add legacy code for old way of getting fclk
-
- arch/arm/mach-omap2/timer.c |  111 +++++++++++++++++++++++++++++++++----------
- 1 file changed, 85 insertions(+), 26 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index dfb19df..ec427e6 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -210,6 +210,31 @@ static void __init omap_dmtimer_init(void)
+ 	}
+ }
+ 
++int __init omap_dmtimer_powerup(struct device_node *np)
++{
++	struct omap_hwmod *oh;
++	const char *oh_name = NULL;
++	int ret;
++
++	of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
++	if (!oh_name)
++		return -ENODEV;
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh)
++		return -ENODEV;
++
++	ret = omap_hwmod_setup_one(oh_name);
++	if (ret)
++		return ret;
++
++	ret = omap_hwmod_enable(oh);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
+ /**
+  * omap_dm_timer_get_errata - get errata flags for a timer
+  *
 -- 
 1.7.9.5
