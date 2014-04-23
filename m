@@ -1,64 +1,105 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Apr 2014 15:45:29 +0200
-Subject: [PATCH v2] gpio: omap: implement get_direction
-In-Reply-To: <1398173505-28193-1-git-send-email-yegorslists@googlemail.com>
-References: <1398173505-28193-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <CACRpkdbTq+UHVsZ-mYYPs7mZoVbv8wUctiCcgH9AKzQZ5O1aNw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 23 Apr 2014 15:44:48 +0200
+Subject: [PATCH 3/4] drm: Introduce drm_fb_helper_prepare()
+In-Reply-To: <20140423073548.GW10722@phenom.ffwll.local>
+References: <1398177741-28482-1-git-send-email-thierry.reding@gmail.com>
+ <1398177741-28482-3-git-send-email-thierry.reding@gmail.com>
+ <20140422155406.GU10722@phenom.ffwll.local>
+ <20140423071439.GA31226@ulmo>
+ <20140423073548.GW10722@phenom.ffwll.local>
+Message-ID: <20140423134447.GB28031@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 3:31 PM,  <yegorslists@googlemail.com> wrote:
+On Wed, Apr 23, 2014 at 09:35:48AM +0200, Daniel Vetter wrote:
+> On Wed, Apr 23, 2014 at 09:14:41AM +0200, Thierry Reding wrote:
+> > On Tue, Apr 22, 2014 at 05:54:06PM +0200, Daniel Vetter wrote:
+> > > On Tue, Apr 22, 2014 at 04:42:20PM +0200, Thierry Reding wrote:
+> > [...]
+> > > > diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+> > [...]
+> > > > @@ -502,6 +503,33 @@ static void drm_fb_helper_crtc_free(struct drm_fb_helper *helper)
+> > > >  }
+> > > >  
+> > > >  /**
+> > > > + * drm_fb_helper_prepare - setup a drm_fb_helper structure
+> > > > + * @dev: DRM device
+> > > > + * @helper: driver-allocated fbdev helper structure to set up
+> > > > + * @funcs: pointer to structure of functions associate with this helper
+> > > > + *
+> > > > + * Sets up the bare minimum to make the framebuffer helper usable. This is
+> > > > + * useful to implement race-free initialization of the polling helpers. In
+> > > > + * that case a typical sequence would be:
+> > > > + *
+> > > > + *   - call drm_fb_helper_prepare()
+> > > > + *   - set dev->mode_config.funcs
+> > > 
+> > > This step is done in drm_fb_helper_prepare already.
+> > 
+> > drm_fb_helper_prepare() sets fb_helper->funcs. dev->mode_config.funcs
+> > needs to be set because it gets called by drm_kms_helper_hotplug_event()
+> > which in turn is called by output_poll_execute(), which can be called at
+> > any point after drm_kms_helper_poll_init(). It could be scheduled
+> > immediately by drm_kms_helper_poll_enable().
+> > 
+> > I wonder if perhaps we should be wrapping that into a function as well.
+> > Currently this is only documented in code by the drivers that call this.
+> > But since it's only a single step it doesn't seem worth it. Perhaps if
+> > we rolled the min/max_width/height into that function as well it would
+> > be more worth it? That could be difficult to do since a couple of
+> > drivers need to set those depending on the chipset generation.
+> 
+> Oh I've misread this step for the fb_helper->funcs assignment. Makes sense
+> and I don't think we need to augment your kerneldoc more to explain this.
+> 
+> > > > + *   - perform driver-specific setup
+> 
+> Hm, maybe clarify this as "initialize modeset objects like crtcs, encoders
+> and connectors"? Since that's the important part we need to get done here.
+> 
+> > > > + *   - call drm_kms_helper_poll_init()
+> > > 
+> > > Maybe mention that after this you can start to handle hpd events using the
+> > > probe helpers?
+> > 
+> > Isn't that somewhat implied already? The poll helpers call directly the
+> > dev->mode_config.funcs->output_poll_changed() function, which has
+> > already been set up earlier.
+> 
+> I've more meant that after this it's save for drivers to enable hpd
+> interrupts and start to process them. I.e.
+> 
+> 	- enable interrupts and start processing hpd events
+> 
+> as an additional step to make it really cleear how it all fits together.
+> Otherwise driver authors are left wondering wtf this isn't just one
+> function call to do it all for them ;-)
+> 
+> > > > + *   - call drm_fb_helper_init()
+> > > > + *   - call drm_fb_helper_single_add_all_connectors()
+> > > > + *   - call drm_fb_helper_initial_config()
+> > > 
+> > > Does this list look sane in the generated DocBook? Afaik kerneldoc
+> > > unfortunately lacks any form of markup, at least afaik :(
+> > 
+> > I must admit I didn't check. I'll make sure I do that before sending out
+> > the next version.
+> 
+> If it looks ugly I'm ok as-is, just wondered. Kerneldoc is a bit
+> simplistic ime.
 
-> From: Yegor Yefremov <yegorslists@googlemail.com>
->
-> This patch implements gpio_chip's get_direction() routine, that
-> lets other drivers get particular GPIOs direction using
-> struct gpio_desc.
->
-> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-> Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
-> ---
-> Changes:
->         v2: rework return value calculation
-(...)
+In the second version I just sent out I ended up moving the description
+of this sequence into the fbdev helper section rather than keeping it in
+the description of the drm_fb_helper_prepare() function, since the new
+function is really just a part of the whole sequence, so it seemed to
+fit more nicely. And I've dropped the list formatting and turned it into
+prose instead.
 
-I don't see why this need to be a broken-out function? Can it not
-be factored into gpio_get_direction?
-
-> +static int _get_gpio_direction(struct gpio_bank *bank, int gpio)
-> +{
-> +       void __iomem *reg = bank->base;
-> +       u32 l;
-> +
-> +       reg += bank->regs->direction;
-> +       l = (readl_relaxed(reg) >> gpio);
-> +
-> +       return (l & 0x00000001);
-
-Rewrite the last two statements like this:
-
-#include <linux/bitops.h>
-
-return !!(readl_relaxed(reg) & BIT(gpio));
-
-> +static int gpio_get_direction(struct gpio_chip *chip, unsigned offset)
-> +{
-> +       struct gpio_bank *bank;
-> +       unsigned long flags;
-> +       int dir;
-> +
-> +       bank = container_of(chip, struct gpio_bank, chip);
-> +       spin_lock_irqsave(&bank->lock, flags);
-> +       dir = _get_gpio_direction(bank, offset);
-> +       spin_unlock_irqrestore(&bank->lock, flags);
-> +       return dir;
-> +}
-
-So since _get_gpio_direction is never called from unlocked context,
-can it not just be part of this function then?
-
-(I make a mental note to prefix all functions in this driver
-with omap_*....)
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/317fadc2/attachment.sig>
