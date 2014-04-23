@@ -1,68 +1,76 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Tue, 22 Apr 2014 20:27:03 -0500
-Subject: [PATCH 2/8] ARM: OMAP2+: timer: Simplify clock event/source name
- setting
-In-Reply-To: <1398216429-4681-1-git-send-email-joelf@ti.com>
-References: <1398216429-4681-1-git-send-email-joelf@ti.com>
-Message-ID: <1398216429-4681-3-git-send-email-joelf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 22 Apr 2014 20:36:50 -0500
+Subject: kdump for ARM Linux?
+In-Reply-To: <132601cf5e89$94556a70$bd003f50$@gmail.com>
+References: <132601cf5e89$94556a70$bd003f50$@gmail.com>
+Message-ID: <CAL_JsqKRqyQUMdDBavh5vfQAq9bNZ7OCSdooqOKiPGX8eOGPSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the OMAPs, we're setting up only one clockevent and clocksource. Further,
-for DT boot there's no easy way to get the timer name and currently this is
-done in an ugly way by reading a hwmod entry. So let's just set it to a simpler
-name like timer_clkev and timer_clksrc.
+On Tue, Apr 22, 2014 at 7:18 PM, Andy Nicholas
+<andy.nicholas.work@gmail.com> wrote:
+> Hello, hopefully this is the correct mailing list for this question:
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- arch/arm/mach-omap2/timer.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Yes.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index ec427e6..f192a41 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -251,7 +251,6 @@ static u32 __init omap_dm_timer_get_errata(void)
- static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 					 const char *fck_source,
- 					 const char *property,
--					 const char **timer_name,
- 					 int posted)
- {
- 	char name[10]; /* 10 = sizeof("gptXX_Xck0") */
-@@ -290,8 +289,6 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	if (!oh)
- 		return -ENODEV;
- 
--	*timer_name = oh->name;
--
- 	if (!of_have_populated_dt()) {
- 		r = omap_hwmod_get_resource_byname(oh, IORESOURCE_IRQ, NULL,
- 						   &irq);
-@@ -365,8 +362,10 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
- 	 */
- 	__omap_dm_timer_override_errata(&clkev, OMAP_TIMER_ERRATA_I103_I767);
- 
-+	clockevent_gpt.name = "timer_clkev";
-+
- 	res = omap_dm_timer_init_one(&clkev, fck_source, property,
--				     &clockevent_gpt.name, OMAP_TIMER_POSTED);
-+				     OMAP_TIMER_POSTED);
- 	BUG_ON(res);
- 
- 	omap2_gp_timer_irq.dev_id = &clkev;
-@@ -489,10 +488,11 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
- 	clksrc.errata = omap_dm_timer_get_errata();
- 
- 	res = omap_dm_timer_init_one(&clksrc, fck_source, property,
--				     &clocksource_gpt.name,
- 				     OMAP_TIMER_NONPOSTED);
- 	BUG_ON(res);
- 
-+	clocksource_gpt.name = "timer_clksrc";
-+
- 	__omap_dm_timer_load_start(&clksrc,
- 				   OMAP_TIMER_CTRL_AR, 0,
- 				   OMAP_TIMER_NONPOSTED);
--- 
-1.7.9.5
+> I'm working on a derivative of the mainline Linux 3.8 kernel and I'm trying
+> to enable ARM kdump functionality to collect crashdumps when we have kernel
+> problems. But, there's some kind of unresolved issue in
+> arch/arm/mm/ioremap.c which prevents /proc/vmcore from being able to
+> function properly. I checked and this appears to still be in kernel.org
+> Linux 3.13. The target platform is a regular, recent ARMv7 compatible chip.
+
+There are only irregular platforms.
+
+> Has this issue been addressed in any version of an ARM Linux kernel? Or, is
+> there a work-around? If not, how does a crashdump file get generated when/if
+> the kernel crashes or a driver faults?
+>
+>>> WARNING: at arch/arm/mm/ioremap.c:244
+> __arm_ioremap_pfn_caller+0x1d8/0x1f0()
+>>> Modules linked in:
+>>> [<c0016660>] (unwind_backtrace+0x0/0x138) from [<c0020480>]
+> (warn_slowpath_common+0x4c/0x64)
+>>> [<c0020480>] (warn_slowpath_common+0x4c/0x64) from [<c00204b4>]
+> (warn_slowpath_null+0x1c/0x24)
+>>> [<c00204b4>] (warn_slowpath_null+0x1c/0x24) from [<c0018e9c>]
+> (__arm_ioremap_pfn_caller+0x1d8/0x1f0)
+>>> [<c0018e9c>] (__arm_ioremap_pfn_caller+0x1d8/0x1f0) from [<c0018f20>]
+> (__arm_ioremap_caller+0x54/0x5c)
+>>> [<c0018f20>] (__arm_ioremap_caller+0x54/0x5c) from [<c0018c58>]
+> (__arm_ioremap+0x18/0x1c)
+>>> [<c0018c58>] (__arm_ioremap+0x18/0x1c) from [<c00168fc>]
+> (copy_oldmem_page+0x34/0xc0)
+>>> [<c00168fc>] (copy_oldmem_page+0x34/0xc0) from [<c010350c>]
+> (read_from_oldmem+0xb8/0xe4)
+>>> [<c010350c>] (read_from_oldmem+0xb8/0xe4) from [<c05c37e0>]
+> (parse_crash_elf32_headers+0x184/0x43c)
+>>> [<c05c37e0>] (parse_crash_elf32_headers+0x184/0x43c) from [<c05c3b64>]
+> (vmcore_init+0xcc/0x198)
+>>> [<c05c3b64>] (vmcore_init+0xcc/0x198) from [<c000863c>]
+> (do_one_initcall+0x34/0x184)
+>>> [<c000863c>] (do_one_initcall+0x34/0x184) from [<c05b28dc>]
+> (kernel_init_freeable+0xfc/0x1c8)
+>>> [<c05b28dc>] (kernel_init_freeable+0xfc/0x1c8) from [<c04326d4>]
+> (kernel_init+0x8/0xe4)
+>>> [<c04326d4>] (kernel_init+0x8/0xe4) from [<c000ec58>]
+> (ret_from_fork+0x14/0x3c)
+>>>
+>>> arch/arm/mm/ioremap.c:244
+>>>        /*
+>>>          * Don't allow RAM to be mapped - this causes problems with
+> ARMv6+
+>>>          */
+>>>         if (WARN_ON(pfn_valid(pfn)))
+>>>                 return NULL;
+>
+> Thanks in advance for any help.
+
+This is on purpose as the comment says because 2 mappings of different
+types (of memory attributes) is undefined behavior on ARMv6+. RAM is
+normal memory type and mmio devices are device memory. This check
+could possibly be relaxed in the case the memory type is compatible
+with normal RAM mappings. Then perhaps ioremap_cache could be used on
+RAM for kdump.
+
+Rob
