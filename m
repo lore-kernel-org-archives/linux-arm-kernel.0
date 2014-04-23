@@ -1,46 +1,61 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 23 Apr 2014 10:50:31 +0200
-Subject: BUG: spinlock trylock failure on UP, i.MX28 3.12.15-rt25
-In-Reply-To: <53577559.9090501@linutronix.de>
-References: <534C3606.7010206@meduna.org> <534C731F.1050406@meduna.org>
- <534DADF1.6060608@meduna.org>
- <20140422115439.GA20669@linutronix.de>
- <20140422094657.5b6ca1e2@gandalf.local.home>
- <20140422140918.GE11096@twins.programming.kicks-ass.net>
- <53577559.9090501@linutronix.de>
-Message-ID: <20140423085031.GI11096@twins.programming.kicks-ass.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 23 Apr 2014 10:53:24 +0200
+Subject: [PATCH] arm: dma-mapping: Fix mapping size value
+In-Reply-To: <20140422085307.GB5747@arm.com>
+References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
+ <1398062847-5770-2-git-send-email-ritesh.harjani@gmail.com>
+ <20140422085307.GB5747@arm.com>
+Message-ID: <53577F84.1080101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 10:10:01AM +0200, Sebastian Andrzej Siewior wrote:
-> On 04/22/2014 04:09 PM, Peter Zijlstra wrote:
-> > On Tue, Apr 22, 2014 at 09:46:57AM -0400, Steven Rostedt wrote:
-> >>>  According to lockdep a trylock should not fail on UP.
-> > 
-> > Oh!? Where does it say that? A trylock can fail at all times.
-> 
-> kernel/locking/spinlock_debug.c:
-> 
-> int do_raw_spin_trylock(raw_spinlock_t *lock)
->  {
->          int ret = arch_spin_trylock(&lock->raw_lock);
-> 
->          if (ret)
->                  debug_spin_lock_after(lock);
->  #ifndef CONFIG_SMP
->          /*
->           * Must not happen on UP:
->           */
->          SPIN_BUG_ON(!ret, lock, "trylock failure on UP");
->  #endif
->          return ret;
->  }
-> 
-> How can a trylock (spinlock, not mutex) fail on UP? That would mean the
-> lock is not interrupt safe.
-> Unless, you attempt to take the lock from interrupt context via trylock
-> while in general you take the spinlock in process context with
-> interrupts enabled.
+Hello,
 
-But that's not lockdep. That's the spinlock debugging code, entirely
-different beasts.
+On 2014-04-22 10:53, Will Deacon wrote:
+> On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
+> > 68efd7d2fb("arm: dma-mapping: remove order parameter from
+> > arm_iommu_create_mapping()") is causing kernel panic
+> > because it wrongly sets the value of mapping->size:
+> >
+> > Unable to handle kernel NULL pointer dereference at virtual
+> > address 000000a0
+> > pgd = e7a84000
+> > [000000a0] *pgd=00000000
+> > ...
+> > PC is at bitmap_clear+0x48/0xd0
+> > LR is at __iommu_remove_mapping+0x130/0x164
+> >
+> > Fix it by correcting mapping->size value.
+> >
+> > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > ---
+> >  arch/arm/mm/dma-mapping.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index f62aa06..6b00be1 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+> >  	mapping->nr_bitmaps = 1;
+> >  	mapping->extensions = extensions;
+> >  	mapping->base = base;
+> > -	mapping->size = bitmap_size << PAGE_SHIFT;
+> >  	mapping->bits = BITS_PER_BYTE * bitmap_size;
+> > +	mapping->size = mapping->bits << PAGE_SHIFT;
+>
+> Ok, but given that mapping->size is derived from mapping->bits, do we really
+> need both of these fields in struct dma_iommu_mapping?
+
+You are right. I didn't notice this while I was refactoring the code. 
+Ritesh,
+could you update your patch and simply replace all references of 
+mapping->size
+with (mapping->bits << PAGE_SHIFT), probably with some temporary variable to
+make the code easier to understand? I've didn't apply your patch yet.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
