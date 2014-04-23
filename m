@@ -1,135 +1,192 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Apr 2014 14:07:50 -0700
-Subject: [PATCH 07/11] ARM: dts: Enable N900 keybaord sleep leds by default
-In-Reply-To: <20140411233109.GG15736@drone.musicnaut.iki.fi>
-References: <1397173639-29587-1-git-send-email-tony@atomide.com>
- <1397173639-29587-8-git-send-email-tony@atomide.com>
- <20140411233109.GG15736@drone.musicnaut.iki.fi>
-Message-ID: <20140423210750.GC6053@atomide.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 23 Apr 2014 14:09:16 -0700
+Subject: [PATCH 2/2] arm: use fixmap for text patching when text is RO
+In-Reply-To: <1396646870-29695-2-git-send-email-rabin@rab.in>
+References: <1396646870-29695-1-git-send-email-rabin@rab.in>
+ <1396646870-29695-2-git-send-email-rabin@rab.in>
+Message-ID: <CAGXu5jJFRapP6EA_T6fCK1po_4sf=34mpC13t9L0SCo1COB5gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [140411 16:39]:
-> Hi,
-> 
-> On Thu, Apr 10, 2014 at 04:47:15PM -0700, Tony Lindgren wrote:
-> > +        leds {
-> > +                compatible = "gpio-leds";
-> > +                heartbeat {
-> > +                        label = "debug::sleep";
-> > +                        gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;  /* gpio162 */
-> > +                        linux,default-trigger = "default-on";
-> 
-> Just some very minor nits, spaces should be converted to TABs here
-> for indent, and patch title should say "keyboard" instead of "keybaord".
-> 
-> Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+On Fri, Apr 4, 2014 at 2:27 PM, Rabin Vincent <rabin@rab.in> wrote:
+> Use fixmaps for text patching when the kernel text is read-only,
+> inspired by x86.  This makes jump labels and kprobes work with the
+> currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
+> CONFIG_DEBUG_RODATA options.
+>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/include/asm/fixmap.h |  3 ++
+>  arch/arm/kernel/jump_label.c  |  2 +-
+>  arch/arm/kernel/patch.c       | 66 ++++++++++++++++++++++++++++++++++++++-----
+>  arch/arm/kernel/patch.h       | 12 +++++++-
+>  4 files changed, 74 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 55ed076..79c1719 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -18,6 +18,9 @@
+>  #define FIXADDR_TOP            (FIXADDR_END - PAGE_SIZE)
+>
+>  enum fixed_addresses {
+> +       FIX_TEXT_POKE0,
+> +       FIX_TEXT_POKE1,
+> +
+>         FIX_KMAP_BEGIN,
+>         FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
+>         __end_of_fixed_addresses
+> diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
+> index 4ce4f78..afeeb9e 100644
+> --- a/arch/arm/kernel/jump_label.c
+> +++ b/arch/arm/kernel/jump_label.c
+> @@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+>                 insn = arm_gen_nop();
+>
+>         if (is_static)
+> -               __patch_text(addr, insn);
+> +               __patch_text_early(addr, insn);
+>         else
+>                 patch_text(addr, insn);
+>  }
+> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+> index 07314af..761c5b6 100644
+> --- a/arch/arm/kernel/patch.c
+> +++ b/arch/arm/kernel/patch.c
+> @@ -1,8 +1,11 @@
+>  #include <linux/kernel.h>
+> +#include <linux/spinlock.h>
+>  #include <linux/kprobes.h>
+> +#include <linux/mm.h>
+>  #include <linux/stop_machine.h>
+>
+>  #include <asm/cacheflush.h>
+> +#include <asm/fixmap.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/opcodes.h>
+>
+> @@ -13,21 +16,67 @@ struct patch {
+>         unsigned int insn;
+>  };
+>
+> -void __kprobes __patch_text(void *addr, unsigned int insn)
+> +static DEFINE_SPINLOCK(patch_lock);
+> +
+> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+> +{
+> +       unsigned int uintaddr = (uintptr_t) addr;
+> +       bool module = !core_kernel_text(uintaddr);
+> +       struct page *page;
+> +
+> +       if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX)) {
+> +               page = vmalloc_to_page(addr);
+> +       } else if (!module && IS_ENABLED(CONFIG_ARM_KERNMEM_PERMS)) {
+> +               page = virt_to_page(addr);
+> +       } else {
+> +               return addr;
+> +       }
+> +
+> +       if (flags)
+> +               spin_lock_irqsave(&patch_lock, *flags);
+> +
+> +       set_fixmap(fixmap, page_to_phys(page));
+> +
+> +       return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+> +}
+> +
+> +static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
+> +{
+> +       clear_fixmap(fixmap);
+> +
+> +       if (flags)
+> +               spin_unlock_irqrestore(&patch_lock, *flags);
+> +}
+> +
+> +void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
+>  {
+>         bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
+> +       unsigned int uintaddr = (uintptr_t) addr;
+> +       unsigned long flags;
+> +       void *waddr = addr;
+>         int size;
+>
+> +       if (remap)
+> +               waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
+> +
+>         if (thumb2 && __opcode_is_thumb16(insn)) {
+> -               *(u16 *)addr = __opcode_to_mem_thumb16(insn);
+> +               *(u16 *)waddr = __opcode_to_mem_thumb16(insn);
+>                 size = sizeof(u16);
+> -       } else if (thumb2 && ((uintptr_t)addr & 2)) {
+> +       } else if (thumb2 && (uintaddr & 2)) {
+> +               bool twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
+>                 u16 first = __opcode_thumb32_first(insn);
+>                 u16 second = __opcode_thumb32_second(insn);
+> -               u16 *addrh = addr;
+> +               u16 *addrh0 = waddr;
+> +               u16 *addrh1 = waddr + 2;
+> +
+> +               if (remap && twopage)
+> +                       addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
+>
+> -               addrh[0] = __opcode_to_mem_thumb16(first);
+> -               addrh[1] = __opcode_to_mem_thumb16(second);
+> +               *addrh0 = __opcode_to_mem_thumb16(first);
+> +               *addrh1 = __opcode_to_mem_thumb16(second);
+> +
+> +               if (twopage && addrh1 != addr + 2)
+> +                       patch_unmap(FIX_TEXT_POKE1, NULL);
+>
+>                 size = sizeof(u32);
+>         } else {
+> @@ -36,10 +85,13 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
+>                 else
+>                         insn = __opcode_to_mem_arm(insn);
+>
+> -               *(u32 *)addr = insn;
+> +               *(u32 *)waddr = insn;
+>                 size = sizeof(u32);
+>         }
+>
+> +       if (waddr != addr)
+> +               patch_unmap(FIX_TEXT_POKE0, &flags);
+> +
+>         flush_icache_range((uintptr_t)(addr),
+>                            (uintptr_t)(addr) + size);
+>  }
+> diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
+> index b4731f2..77e054c 100644
+> --- a/arch/arm/kernel/patch.h
+> +++ b/arch/arm/kernel/patch.h
+> @@ -2,6 +2,16 @@
+>  #define _ARM_KERNEL_PATCH_H
+>
+>  void patch_text(void *addr, unsigned int insn);
+> -void __patch_text(void *addr, unsigned int insn);
+> +void __patch_text_real(void *addr, unsigned int insn, bool remap);
+> +
+> +static inline void __patch_text(void *addr, unsigned int insn)
+> +{
+> +       __patch_text_real(addr, insn, true);
+> +}
+> +
+> +static inline void __patch_text_early(void *addr, unsigned int insn)
+> +{
+> +       __patch_text_real(addr, insn, false);
+> +}
+>
+>  #endif
+> --
+> 1.9.1
+>
 
-Thanks and sorry for the delay, got sidetracked with some GPMC bugs.
-Here's the updated version of this patch.
+I think we can use this for the kgdb case too. Has anyone tried that
+yet? Perhaps implementing text_poke() in terms of patch_map/unmap
+calls would be best? Then the arm-specific kgdb hooks can use that,
+since it does the icache flushing separately.
 
-Tony
+-Kees
 
-8< ------------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 23 Apr 2014 13:59:24 -0700
-Subject: [PATCH] ARM: dts: Enable N900 keyboard sleep leds by default
-
-On N900 there are nice LEDs that show the state of the
-sys_clkreq and sys_off_mode pins.
-
-These LEDs go low when the system enters deeper idle
-states. The left LED shows the state of the sys_clkreq
-pin, and goes off during retention idle. The right LED
-shows the state of sys_off_mode pin and both go off
-during off idle.
-
-As N900 is a battery operated device, these LEDs should
-be off most of the time. So let's enable them by default
-so we can make sure the system is mostly idle.
-
-This allows the maintainers to also immediately test
-patches for PM regressions by looking at the LEDs,
-which certainly makes my life easier.
-
-The LED can naturally be disabled during runtime with:
-
-# echo none > /sys/class/leds/debug::sleep/trigger
-
-Note that we don't currently have support for omap3
-errata 1.158 that remuxes GPIO pins to INPUT_PULLUP |
-MUX_MODE7 for the duration of idle. This means that the
-GPIO pins set high will go down during off idle. In this
-case it does not matter as the sys_off_mode goes down
-too, but there's still a slim chance of false off idle
-LED signals. If in doubt, false LED signals can be
-verified by the sys_off_mode or vdd_core values.
-
-Also note that to allow the UARTs to autoidle, the
-following needs to be run on N900 to enable off idle:
-
-#!/bin/sh
-uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
-for uart in $uarts; do
-	echo 3000 > $uart/autosuspend_delay_ms
-done
-
-uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
-for uart in $uarts; do
-	echo enabled > $uart/wakeup
-	echo auto > $uart/control
-done
-
-echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
-
-For retention idle, change the above to set 0 to
-enable_off_mode.
-
-Also note that without the twl4030 PM scripts the actual
-voltage scaling won't happen for off idle so we only get
-voltage scaling over I2C4 for retention idle. I'll do
-some device tree patches for those also a bit later on.
-
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Pali Roh?r <pali.rohar@gmail.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: Sebastian Reichel <sre@kernel.org>
-Cc: Tero Kristo <t-kristo@ti.com>
-Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -21,6 +21,17 @@
- 		};
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+		heartbeat {
-+			label = "debug::sleep";
-+			gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;  /* gpio162 */
-+			linux,default-trigger = "default-on";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&debug_leds>;
-+		};
-+	};
-+
- 	memory {
- 		device_type = "memory";
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
-@@ -114,6 +125,12 @@
- 		>;
- 	};
- 
-+	debug_leds: pinmux_debug_led_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2198, PIN_OUTPUT | MUX_MODE4)	/* mcbsp1_clkx.gpio_162 */
-+		>;
-+	};
-+
- 	mmc1_pins: pinmux_mmc1_pins {
- 		pinctrl-single,pins = <
- 			0x114 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk */
+-- 
+Kees Cook
+Chrome OS Security
