@@ -1,73 +1,49 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Wed, 23 Apr 2014 17:15:54 +0800
-Subject: Perf top always show 0.00
-In-Reply-To: <CAHrpEqQZ_0G-rmwfaeEzHOFVckyRRSUpYrPdMUgPjRZ1JYyy6g@mail.gmail.com>
-References: <CAHrpEqQZ_0G-rmwfaeEzHOFVckyRRSUpYrPdMUgPjRZ1JYyy6g@mail.gmail.com>
-Message-ID: <CAB4PhKdP_gXiB56DPLC3DxdjW2Epr_RTghW_VL1X84Ux1U+bLw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 23 Apr 2014 18:19:30 +0900
+Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
+In-Reply-To: <201404221611.40087.arnd@arndb.de>
+References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
+ <000a01cf592e$67e592e0$37b0b8a0$%han@samsung.com>
+ <201404221611.40087.arnd@arndb.de>
+Message-ID: <031b01cf5ed5$21d536a0$657fa3e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frank,
+Arnd Bergmann wrote:
+> 
+> On Wednesday 16 April 2014, Jingoo Han wrote:
+> > Samsung GH7 has four PCIe controllers which can be used as root
+> > complex for PCIe interface.
+> >
+> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > ---
+> >  drivers/pci/host/Kconfig      |    2 +-
+> >  drivers/pci/host/pci-exynos.c |  135
+> ++++++++++++++++++++++++++++++++++++++---
+> >  2 files changed, 126 insertions(+), 11 deletions(-)
+> 
++ Byungho An, Ilho Lee
 
-2014-04-19 1:00 GMT+08:00 Frank Li <lznuaa@gmail.com>:
-> I use mx6dq platform. Found below problem.
->
-> Run Perf top. First column always 0, but order look like correct.
->
->    0.00%  perf          [.] 0x00049420
->      0.00%  [kernel]      [k] kallsyms_expand_symbol.constprop.5
->      0.00%  [kernel]      [k] vsnprintf
->      0.00%  [kernel]      [k] arch_cpu_idle
->      0.00%  [kernel]      [k] format_decode
->      0.00%  [kernel]      [k] number.isra.2
->      0.00%  libc-2.19.so  [.] strstr
->      0.00%  libc-2.19.so  [.] 0x00072498
->      0.00%  libc-2.19.so  [.] memchr
->      0.00%  [kernel]      [k] _raw_spin_unlock_irqrestore
->      0.00%  [kernel]      [k] string.isra.4
->      0.00%  [kernel]      [k] strnlen
->      0.00%  libc-2.19.so  [.] getdelim
->      0.00%  libc-2.19.so  [.] memcpy
->      0.00%  [kernel]      [k] lock_acquire
->      0.00%  libc-2.19.so  [.] strchr
->      0.00%  libc-2.19.so  [.] strcmp
->      0.00%  [kernel]      [k] _raw_spin_unlock_irq
->      0.00%  libc-2.19.so  [.] __libc_calloc
->      0.00%  libc-2.19.so  [.] _IO_feof
->      0.00%  [kernel]      [k] pointer.isra.15
+Hi Arnd,
 
-This issue has been resolved by the following commit:
+> Can you explain how much the GH7 and Exynos front-ends actually have in
+> common? Would it make sense to have a separate driver for gh7?
+> 
+Basically, ARMv8 based GH7 has same PCIe hardware IP with previous ARMv7
+based exynos5440, several features in PCIe are different though. In other
+words, basic functionalities for PCIe are same. So I think, would be nice if
+we could use one PCIe device driver for both SoCs.
 
-commit 9dfd005a3f4e1c648cb4aa1dc70604bb370c5e7b
-Author: Michael Hudson-Doyle <michael.hudson@linaro.org>
-Date:   Thu Oct 31 16:47:45 2013 -0700
+However, if we need to support the PCIe with each own device driver because
+of difference of 32bit and 64bit, please kindly let us know. Honestly, I'm
+not sure about that right now.
 
-    perf tools: Remove cast of non-variadic function to variadic
+> Also, if gh7 is expected to run a full firmware, I think you should
+> do all the setup in the firmware before booting Linux, and just
+> do the required run-time operations in the driver itself.
+> 
+Well, we're expecting that all the setup should be done by the device driver
+in kernel not firmware.
 
-    commit 53805eca3d89b095062c11a6798689bb0af09216 upstream.
-
-    The 4fb71074a570 (perf ui/hist: Consolidate hpp helpers) cset introduced
-    a cast of percent_color_snprintf to a function pointer type with
-    varargs.  Change percent_color_snprintf to be variadic and remove the
-    cast.
-
-    The symptom of this was all percentages being reported as 0.00% in perf
-    report --stdio output on the armhf arch.
-
-    Signed-off-by: Michael Hudson-Doyle <michael.hudson@linaro.org>
-    Acked-by: Namhyung Kim <namhyung@kernel.org>
-    Acked-by: Will Deacon <will.deacon@arm.com>
-    Cc: Jean Pihet <jean.pihet@linaro.org>
-    Cc: Jiri Olsa <jolsa@redhat.com>
-    Cc: Will Deacon <will.deacon@arm.com>
-    Link: http://lkml.kernel.org/r/87zjppvw7y.fsf at canonical.com
-    Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
-
-Jason Liu
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Kukjin
