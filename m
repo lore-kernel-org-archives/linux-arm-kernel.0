@@ -1,90 +1,77 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 23 Apr 2014 15:23:16 +0100
-Subject: [RFC PATCH 2/2] PCI: exynos: Add PCIe support for Samsung GH7 SoC
-In-Reply-To: <4565008.ZECF3eWqge@wuerfel>
-References: <000801cf592e$30b7bff0$92273fd0$%han@samsung.com>
- <201404221611.40087.arnd@arndb.de>
- <031b01cf5ed5$21d536a0$657fa3e0$@samsung.com>
- <4565008.ZECF3eWqge@wuerfel>
-Message-ID: <20140423142315.GO865@e106497-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 23 Apr 2014 09:24:56 -0500
+Subject: [PATCH v6 1/3] PSCI: Add initial support for PSCIv0.2 functions
+In-Reply-To: <CAJ5Y-eagfKcS65uHWEeUZjr=C+7Zpb-S3QHxRzahuM=2pstU8Q@mail.gmail.com>
+References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
+ <1397762146-8337-2-git-send-email-ashwin.chaugule@linaro.org>
+ <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
+ <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
+ <CAL_JsqKkmfWaDkc_DHh5ZWc=E13qii4U4g_bfiDzJ+N3e0Az8Q@mail.gmail.com>
+ <CAJ5Y-eagfKcS65uHWEeUZjr=C+7Zpb-S3QHxRzahuM=2pstU8Q@mail.gmail.com>
+Message-ID: <CAL_Jsq+b562TSUiHFdiRYXxF89Ps2Buu3QWc-Wg5wNWVLW8vMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 12:03:47PM +0100, Arnd Bergmann wrote:
-> On Wednesday 23 April 2014 18:19:30 Kukjin Kim wrote:
-> > 
-> 
-> > Basically, ARMv8 based GH7 has same PCIe hardware IP with previous ARMv7
-> > based exynos5440, several features in PCIe are different though. In other
-> > words, basic functionalities for PCIe are same. So I think, would be nice if
-> > we could use one PCIe device driver for both SoCs.
-> 
-> Ok, I see. I was just trying to get a feeling for how much is shared
-> or SoC specific between your variants. If they are different enough,
-> it may be easier to have two drivers.
-> 
-> > However, if we need to support the PCIe with each own device driver because
-> > of difference of 32bit and 64bit, please kindly let us know. Honestly, I'm
-> > not sure about that right now.
-> 
-> We are working already on ideas to minimize the differences between
-> arm32 and arm64 PCI support, it will just take more work.
-> 
-> > > Also, if gh7 is expected to run a full firmware, I think you should
-> > > do all the setup in the firmware before booting Linux, and just
-> > > do the required run-time operations in the driver itself.
-> > > 
-> > Well, we're expecting that all the setup should be done by the device driver
-> > in kernel not firmware.
-> 
-> Ok, just make sure this hardware never shows up in servers then.
+On Wed, Apr 23, 2014 at 9:19 AM, Ashwin Chaugule
+<ashwin.chaugule@linaro.org> wrote:
+> On 23 April 2014 09:16, Rob Herring <robherring2@gmail.com> wrote:
+>> On Tue, Apr 22, 2014 at 12:32 PM, Ashwin Chaugule
+>> <ashwin.chaugule@linaro.org> wrote:
+>>> On 21 April 2014 02:23, Anup Patel <anup.patel@linaro.org> wrote:
+>>>> Hi Ashwin,
+>>>>
+>>>> Please include system reboot & shutdown implementation
+>>>> in this patch using PSCI v0.2 SYSTEM_OFF and
+>>>> SYSTEM_RESET functions.
+>>>
+>>> hm, I had thought these relied on having the (optional) MIGRATE
+>>> function. But thats not the case.
+>>>
+>>> So, how about this..
+>>>
+>>> ---------------------8<---------------------
+>>>
+>>> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+>>> index ead8cdb..5a54f2f 100644
+>>> --- a/arch/arm/kernel/psci.c
+>>> +++ b/arch/arm/kernel/psci.c
+>>> @@ -17,6 +17,8 @@
+>>>
+>>>  #include <linux/init.h>
+>>>  #include <linux/of.h>
+>>> +#include <linux/reboot.h>
+>>> +#include <linux/pm.h>
+>>>  #include <uapi/linux/psci.h>
+>>>
+>>>  #include <asm/compiler.h>
+>>> @@ -24,6 +26,7 @@
+>>>  #include <asm/opcodes-sec.h>
+>>>  #include <asm/opcodes-virt.h>
+>>>  #include <asm/psci.h>
+>>> +#include <asm/system_misc.h>
+>>>
+>>>  struct psci_operations psci_ops;
+>>>
+>>> @@ -196,6 +199,16 @@ static int get_set_conduit_method(struct device_node *np)
+>>>   return 0;
+>>>  }
+>>>
+>>> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+>>> +{
+>>> + invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+>>> +}
+>>> +
+>>> +static void psci_sys_off(void)
+>>
+>> This is a bit terse. I would spell out system or use sys_poweroff
+>> here. Otherwise,
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>>
+>
+> Thanks Rob. Are you okay with adding this Acked-by for this complete
+> patch [1/3]?
 
-Not necessarily, as long as the setup will always happen in the kernel?
+Yes. In fact, you can add Reviewed-by.
 
-> 
-> Unfortunately we are in a tricky situation on arm64 because we have
-> to support both server-type SoCs and embedded-type SoCs. In an
-> embedded system, you can't trust the boot loader to do a proper
-> setup of all the hardware, so the kernel needs full control over
-> all the initialization. In a server, the initialization is the
-> responsibility of the firmware, and we don't want the kernel to
-> even know about those registers.
-> 
-> My hope is that all server chips use an SBSA compliant PCIe
-> implementation, but we already have X-Gene, which is doing server
-> workloads with a nonstandard PCIe, and it's possible that there
-> will also be server-like systems with a DesignWare PCIe block
-> instead of an SBSA compliant one. We can still support those, but
-> I don't want to see more than one implementation of dw-pcie
-> on servers. Just like we have the generic PCIe support that Will
-> is doing for virtual machines and SBSA compliant systems, we
-> would do one dw-pcie variant for all systems that come with a
-> host firmware and rely on it being set up already.
-
-There is nothing in the SBSA that mandates firmware setup. All it requires
-is that hardware is setup in a way that is not specific to a board
-or a particular OEM. Surely if the setup being done for GH7 is always
-the same it should fit the bill?
-
-Kind regards,
-Liviu
-
-
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Rob
