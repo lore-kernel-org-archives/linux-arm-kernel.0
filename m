@@ -1,55 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 23 Apr 2014 19:26:11 +0100
-Subject: [PATCH 2/2] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140423172720.GA18588@lc-sj1-5012.sj.broadcom.com>
-References: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
- <1398217214-12204-3-git-send-email-zlim@broadcom.com>
- <20140423103648.GM12304@sirena.org.uk>
- <20140423172720.GA18588@lc-sj1-5012.sj.broadcom.com>
-Message-ID: <20140423182611.GF12304@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Apr 2014 19:37:42 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <20140423171727.GK5649@arm.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+ <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
+ <20140423090251.GA5281@arm.com> <20140423160216.GC2208@arm.com>
+ <20140423171727.GK5649@arm.com>
+Message-ID: <20140423183742.GK24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 10:27:20AM -0700, Zi Shen Lim wrote:
+On Wed, Apr 23, 2014 at 06:17:27PM +0100, Will Deacon wrote:
+> On Wed, Apr 23, 2014 at 05:02:16PM +0100, Catalin Marinas wrote:
+> > In the I/O coherency case, I would say it is the responsibility of the
+> > device/hardware to ensure that the data is visible to all observers
+> > (CPUs) prior to issuing a interrupt for DMA-ready. Looking at the mvebu
+> > code, I think it covers such scenario from-device or bidirectional
+> > scenarios.
+> > 
+> > Maybe Santosh still has a point ;) but I don't know what the right
+> > barrier would be here. And I really *hate* per-SoC/snoop unit barriers
+> > (I still hope a dsb would do the trick on newer/ARMv8 systems).
+> 
+> If you have device interrupts which are asynchronous to memory coherency,
+> then you're in a world of pain. I can't think of a generic (architected)
+> solution to this problem, unfortunately -- it's going to be both device
+> and interconnect specific. Adding dsbs doesn't necessarily help at all.
 
-> Or is it likely that some folks may opt to skip aff2, and simply use aff3?
-> Mark, is there precedence for such usage of affinity levels?
+Think, network devices with NAPI handling.  There, we explicitly turn
+off the device's interrupt, and switch to software polling for received
+packets.
 
-Not that I'm aware of at the minute myself but of course this code may
-end up running on some enterprise distribution with an extended support
-time with hardware that isn't even on the drawing board now.
+The memory for the packets has already been mapped, and we're unmapping
+the buffer, and then reading from it (to locate the ether type, and/or
+vlan headers) before passing it up the network stack.
 
-> > I had been intending to just combine all the bits from affinitly levels
-> > above the CPU number into a single number until we know what to do with
-> > them individually.  We shouldn't just ignore them.
+So in this case, we need to ensure that the cache operations are ordered
+before the subsequent loads read from the DMA'd data.  It's purely an
+ordering thing, it's not a completion thing.
 
-> I agree we shouldn't ignore aff3 if someone is already using it.
+However, what must not happen is that the unmap must not be re-ordered
+before reading the descriptor and deciding whether there's a packet
+present to be unmapped.  That probabily imples that code _should_ be
+doing this:
 
-> I'm not sure how combining them into a single number helps with topology.
-> We already started out with a cpuid, no?
+	status = desc->status;
+	if (!(status & CPU_OWNS_THIS_DESCRIPTOR))
+		no_packet;
 
-It will at least ensure that all clusters get assigned a unique ID and
-we don't end up discarding some of the information and coming out with
-two identically numbered clusters which then have identically numbered
-CPUs inside of them which doesn't seem clever.
+	rmb();
 
-When I was looking at this it wasn't sufficiently clear to me that the
-cluster clustering would be well modelled by sockets as the scheduler
-currently assumes them, nor what to do with additional levels of that
-(the DT binding allows for infinite levels).  Punting and just putting
-all clusters at the same level avoids active bugs and seems fairly
-conservative.
+	addr = desc->buf;
+	len = desc->length;
 
-> Perhaps we should just add a new 'socket_id' and that will accommodate
-> all cases (up to aff3).
+	dma_unmap_single(dev, addr, len, DMA_FROM_DEVICE);
 
-Not in the non-MT case where we've got two levels above the cluster ID
-in affinity level 1 unless we just combine 2 and 3 (which would be
-reasonable enough of course).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/73faad4d/attachment.sig>
+	...receive skb...reading buffer...
+
+and there's a number of ethernet drivers which do exactly that.  For
+example, drivers/net/ethernet/intel/e1000e/netdev.c, e1000_clean_rx_irq()
+and various other Intel networking drivers.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
