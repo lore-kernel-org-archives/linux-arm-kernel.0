@@ -1,60 +1,40 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 23 Apr 2014 18:10:50 -0500
-Subject: [RESEND PATCH] regulator: core: Disable unused regulators after
- deferred probing is done
-Message-ID: <1398294650-24821-1-git-send-email-nm@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 24 Apr 2014 07:11:46 +0800
+Subject: [PATCH] ARM: prima2: remove L2 cache size override
+In-Reply-To: <20140423182127.GJ24070@n2100.arm.linux.org.uk>
+References: <1397555342-25644-1-git-send-email-21cnbao@gmail.com>
+ <20140416092433.GG24070@n2100.arm.linux.org.uk>
+ <20140423182127.GJ24070@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4xsTOTdpK0GM4mud4Brq7EnttpLbxtdnPGiS=qQuimVGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Saravana Kannan <skannan@codeaurora.org>
+2014-04-24 2:21 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Apr 16, 2014 at 10:24:33AM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Apr 15, 2014 at 05:49:02PM +0800, Barry Song wrote:
+>> > +static __init void sirfsoc_init_mach(void)
+>> > +{
+>> > +   l2x0_of_init(0, 0xFDFFFFFFUL);
+>>
+>> BTW, this should be just the plain: 0xfdffffff - no need for UL on the
+>> end.  Also lower case is preferred for hex.
+>
+> So... I provide feedback, and nothing happens.
+>
+> FYI, tonight, I'm pushing out my L2C branch into linux-next with the
+> original patch for prima2 incorporated, as my concerns against your
+> patch have not been addressed.
 
-regulator_init_complete does a scan of regulators which dont have
-always-on or consumers are automatically disabled as being unused.
-However, with deferred probing, late_initcall() is too soon to
-declare a regulator as unused as the regulator itself might not
-have registered due to defferal - Example: A regulator deffered due
-to i2bus not available which in turn is deffered due to pinctrl
-availability.
+Russell, i do agree with your feedback.
+but, in your original patch,  moving to early_initcall will make other
+non-csr platforms call l2x0_of_init() and finish initialization by (0,
+~0) directly since other platforms also put same general compatible
+prop in dts. in your patch, you have dropped "sirf,prima2-pl310-cache"
+and "sirf,marco-pl310-cache", so it happens by matching general
+"arm,pl310-cache".
+i am still on the way to send v2. if it is not too urgent to you, will
+you wait for me to send v2 by fixing issues in your feedback?
 
-Since deferred probing is done in late_initcall(), do the cleanup of
-unused regulators by regulator_init_complete in late_initcall_sync
-instead of late_initcall.
+>
 
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Markus Pargmann <mpa@pengutronix.de>
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-[nm at ti.com: minor rewording]
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-Applies on v3.15-rc2 and on next-20140423
-Original post: https://patchwork.kernel.org/patch/2545061/
-
-I rediscovered this patch many times now :(:
-Latest Example: https://patchwork.kernel.org/patch/4044811/
-http://slexy.org/raw/s21MCHgeJo shows none of the unused regulators are disabled
-and with this fix:
-http://slexy.org/raw/s2TH36cThR (which auto disables unused regulators).
-
-Ccying Markus as author of 66fda75f47dc (regulator: core: Replace
-direct ops->disable usage) he might be interested as well.
-
-Btw, this might open up a lot of broken boards - like we discovered
-for DRA7 - so it might be a good idea for next instead of current rc
-cyle giving it some time to cook and get platforms fixed.
-
- drivers/regulator/core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 9a09f3c..5a05de3 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -3867,4 +3867,4 @@ unlock:
- 
- 	return 0;
- }
--late_initcall(regulator_init_complete);
-+late_initcall_sync(regulator_init_complete);
--- 
-1.7.9.5
+-barry
