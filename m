@@ -1,99 +1,47 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 23 Apr 2014 20:42:59 +0200
-Subject: [PATCH 0/2] Fix few omap gpmc regressions when booted with device
- tree
-In-Reply-To: <20140423180844.GC4833@atomide.com>
-References: <1398128080-18903-1-git-send-email-tony@atomide.com>
- <CABxcv=nDAp=iDXxVrajELJzEG=hEV3ceMJkUaiFOpe79za+LKA@mail.gmail.com>
- <20140422152347.GB19317@atomide.com>
- <20140423000012.GD12204@atomide.com>
- <20140423180844.GC4833@atomide.com>
-Message-ID: <CABxcv=nUXPT_FZwPxyVD1OrxtqGmqD81vHKJSnNNYPOGzErWWg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 23 Apr 2014 22:54:33 +0400
+Subject: [PATCH 05/14] ARM: shmobile: koelsch-reference: Work around core
+ clock issues
+In-Reply-To: <20140423002254.GD5738@verge.net.au>
+References: <cover.1397774190.git.horms+renesas@verge.net.au>
+ <53cf0cf7ba2ef785b339826a0765bb6b1756adeb.1397774191.git.horms+renesas@verge.net.au>
+ <5356D0B8.5010406@cogentembedded.com> <20140423002254.GD5738@verge.net.au>
+Message-ID: <53580C69.20602@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+Hello.
 
-On Wed, Apr 23, 2014 at 8:08 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tony Lindgren <tony@atomide.com> [140422 17:01]:
->> * Tony Lindgren <tony@atomide.com> [140422 08:24]:
->> > * Javier Martinez Canillas <javier@dowhile0.org> [140421 23:55]:
->> > > On Tue, Apr 22, 2014 at 2:54 AM, Tony Lindgren <tony@atomide.com> wrote:
->> > > >
->> > > > 2. There seems to be some timing issues with smc911x where
->> > > >    rsync of larger files and apt-get dist-upgrade can produce
->> > > >    strange errors. This seems to work reliably when booted in
->> > > >    legacy mode.
->> > > >
->> > >
->> > > In what board are you having this issue? The smsc911x driver supports
->> > > both SMSC's LAN911x and LAN921x families and I see that we have two
->> > > .dtsi files with different timings
->> > > (arm/boot/dts/omap-gpmc-smsc{911x,9221}.dtsi).
->> > >
->> > > This is only a wild guess, but maybe your board has a smsc LAN921x
->> > > chip but is including omap-gpmc-smsc911x.dtsi on its DTS?
->> >
->> > Yes it seems to have two LAN9220s, so this could be the reason.
->> > I don't think we had the omap-gpmc-smsc9221.dtsi when I added the
->> > timings initially.
->> >
->> > This is on a sbc-t3730 that I'm using as a gateway that was behaving
->> > reliably before I upgraded it to DT based booting. It's currently
->> > at v3.13-rc3 something, but I don't think we've much GPMC changes
->> > since then.
->> >
->> > I'll try upgrading the kernel today and running some tests with
->> > rsync. Looks like we can also remove quite a bit of duplicate
->> > timing data by using omap-gpmc-smsc9221.dtsi, I'll try something
->> > like the patch below.
->> >
->> > In any case, I suggest others run some tests on their GPMC Ethernet
->> > too.
->> >
->> > +#include "omap-gpmc-smsc9221.dtsi"
->> > +
->>
->> The 9221 timings won't work at all on 9220, it requires a 9221.
->> I'll post a better clean-up patch to use the 911x timings.
->>
->> Upgraded the kernel and the occasional corruption is still
->> there. I guess I need to test also the same kernel in legacy
->> mode to try to narrow it down.
->
-> OK hopefully got it figured out now. For legacy booting we were
-> always using just the bootloader timings. With device tree, we
-> started using the timings with your commit d72b4415 (ARM: dts:
-> omap3-igep0020: Add SMSC911x LAN chip support) that was probably
-> actually tested on a LAN9221 instead of LAN9220?
->
+On 04/23/2014 04:22 AM, Simon Horman wrote:
 
-Right, since the same driver (drivers/net/ethernet/smsc/smsc911x.c) is
-used for both SMSC families I assumed that the same timings could be
-used by both chips.
+>>> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-So I took the timings from IGEP board support in u-boot but then you
-did the refactoring and later Florian added another .dtsi for SMSC
-9221 in commit aac9aa3 ("ARM: dts: omap: Add common file for
-SMSC9221").
+>>> Due to issues with runtime PM clock management, clocks not explicitly
+>>> managed by their drivers may not be enabled at all, or be inadvertently
+>>> disabled by the clk_disable_unused() late initcall.
 
-I didn't notice about this new .dtsi file until you reported your
-issue and the IGEPv2 does indeed have a SMSC LAN9221i ethernet chip so
-it is wrongly including omap-gpmc-smsc911x.dtsi and should include
-omap-gpmc-smsc9221.dtsi instead.
+>>> Until this is fixed, add a temporary workaround, calling
+>>> shmobile_clk_workaround() with enable == true.
 
-> In any case, I've patched omap-gpmc-smsc911x.dtsi so the values
-> match the u-boot values, and so far that seems to be working just
-> fine. Will post few patches shortly.
->
+>>> For now this enables the clocks for: ether, i2c2, msiof0, qspi_mod, and
+>>> thermal. More clocks can be added if needed.
 
-Great, I'll patch the IGEPv2 DTS file too to use
-omap-gpmc-smsc9221.dtsi, do some testing and post a patch.
+>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-> Regards,
->
-> Tony
->
+>>     It is strange but this workaround doesn't seem to help me booting Koelsch
+>> reference kernel with NFS root: it still crashes due to imprecise
+>> external abort once the userland starts. Only the actual drivers/sh/
 
-Thanks a lot and best regards,
-Javier
+    Unfortunately, I currently don't have time to find out what is wrong with 
+the workaround...
+
+>> fixing series by Ben/Geert helps with booting further. I therefore
+>> would like to have it merged by Simon the sooner the better...
+
+> For my reference, specifically which patches are you referring to?
+
+    Here the link to the cover letter of the 17 patch series:
+http://marc.info/?l=linux-sh&m=139756526122104
+
+WBR, Sergei
