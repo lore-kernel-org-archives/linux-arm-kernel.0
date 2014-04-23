@@ -1,102 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Apr 2014 11:48:40 +0200
-Subject: [PATCH v8 07/17] ARM: dts: sun5i: Add mmc controller nodes
-In-Reply-To: <1398164497-14212-8-git-send-email-hdegoede@redhat.com>
-References: <1398164497-14212-1-git-send-email-hdegoede@redhat.com>
- <1398164497-14212-8-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140423094840.GL24905@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Apr 2014 11:51:54 +0200
+Subject: [PATCH v2 3/4] ARM: OMAP2+: Add machine entry for dra72x devices
+In-Reply-To: <1398243775-4145-4-git-send-email-rnayak@ti.com>
+References: <1398243775-4145-1-git-send-email-rnayak@ti.com>
+ <1398243775-4145-4-git-send-email-rnayak@ti.com>
+Message-ID: <66310471.kybX1mlztt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 01:01:27PM +0200, Hans de Goede wrote:
-> From: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+On Wednesday 23 April 2014 14:32:54 Rajendra Nayak wrote:
 > 
-> Add nodes for the 3 mmc controllers found on A10s SoCs and for the 2 mmc
-> controllers found on A13 SoCs.
-> 
-> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun5i-a10s.dtsi | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/sun5i-a13.dtsi  | 18 ++++++++++++++++++
->  2 files changed, 45 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> index 79989ed..12113f9 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-> @@ -338,6 +338,33 @@
->  			#size-cells = <0>;
->  		};
+>  #ifdef CONFIG_SOC_DRA7XX
+> -static const char *dra7xx_boards_compat[] __initdata = {
+> +static const char *dra74x_boards_compat[] __initconst = {
+> +       "ti,dra74x",
+>         "ti,dra7xx",
+>         "ti,dra7",
+>         NULL,
+>  };
 >  
-> +		mmc0: mmc at 01c0f000 {
-> +			compatible = "allwinner,sun5i-a13-mmc";
-> +			reg = <0x01c0f000 0x1000>;
-> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
-> +			clock-names = "ahb", "mod";
-> +			interrupts = <32>;
-> +			status = "disabled";
-> +		};
+> -DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
+> +DT_MACHINE_START(DRA74X_DT, "Generic DRA74X (Flattened Device Tree)")
+>         .reserve        = omap_reserve,
+>         .smp            = smp_ops(omap4_smp_ops),
+>         .map_io         = omap5_map_io,
+> @@ -255,7 +256,26 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
+>         .init_irq       = omap_gic_of_init,
+>         .init_machine   = omap_generic_init,
+>         .init_time      = omap5_realtime_timer_init,
+> -       .dt_compat      = dra7xx_boards_compat,
+> +       .dt_compat      = dra74x_boards_compat,
+> +       .restart        = omap44xx_restart,
+> +MACHINE_END
 > +
-> +		mmc1: mmc at 01c10000 {
-> +			compatible = "allwinner,sun5i-a13-mmc";
-> +			reg = <0x01c10000 0x1000>;
-> +			clocks = <&ahb_gates 9>, <&mmc1_clk>;
-> +			clock-names = "ahb", "mod";
-> +			interrupts = <33>;
-> +			status = "disabled";
-> +		};
-> +
-> +		mmc2: mmc at 01c11000 {
-> +			compatible = "allwinner,sun5i-a13-mmc";
-> +			reg = <0x01c11000 0x1000>;
-> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
-> +			clock-names = "ahb", "mod";
-> +			interrupts = <34>;
-> +			status = "disabled";
-> +		};
-> +
->  		usbphy: phy at 01c13400 {
->  			#phy-cells = <1>;
->  			compatible = "allwinner,sun5i-a13-usb-phy";
-> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-> index f01c315..a0e55e8 100644
-> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-> @@ -320,6 +320,24 @@
->  			#size-cells = <0>;
->  		};
->  
-> +		mmc0: mmc at 01c0f000 {
-> +			compatible = "allwinner,sun5i-a13-mmc";
-> +			reg = <0x01c0f000 0x1000>;
-> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
-> +			clock-names = "ahb", "mod";
-> +			interrupts = <32>;
-> +			status = "disabled";
-> +		};
-> +
-> +		mmc2: mmc at 01c11000 {
-> +			compatible = "allwinner,sun5i-a13-mmc";
-> +			reg = <0x01c11000 0x1000>;
-> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
-> +			clock-names = "ahb", "mod";
-> +			interrupts = <34>;
-> +			status = "disabled";
-> +		};
-> +
+> +static const char *dra72x_boards_compat[] __initconst = {
+> +       "ti,dra72x",
+> +       "ti,dra7xx",
+> +       "ti,dra7",
+> +       NULL,
+> +};
 
-The A13 user manual reports that there is 3 of them in the A13, just
-like on the A10s. Have you forgotten one?
+Now you have two lists that both match "ti,dra7xx" and "ti,dra7", which will
+cause problems if you have a new machine that doesn't match the more specific
+strings.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/adabe2e0/attachment.sig>
+Note that we intentionally don't allow wildcards in compatible strings
+to avoid this situation.
+
+Please remove all strings with an "x" in them from the dts files and from
+the source, and make sure you have no duplication between the lists.
+
+	Arnd
