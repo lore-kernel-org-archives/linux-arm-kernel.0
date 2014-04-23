@@ -1,55 +1,51 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 23 Apr 2014 20:00:42 +0530
-Subject: [PATCH 0/9] Enable USB 3.0 support on Exynos5 systems
-Message-ID: <1398263451-18023-1-git-send-email-gautam.vivek@samsung.com>
+Date: Wed, 23 Apr 2014 20:00:43 +0530
+Subject: [PATCH v5 1/9] dt: exynos5420: Enable support for USB 3.0 PHY
+ controller
+In-Reply-To: <1398263451-18023-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398263451-18023-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1398263451-18023-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on 'for-next' branch of Kgene's linux-samsung tree.
-Tested with phy-driver[1] patches and peach-pit dts[2].
+Add device tree nodes for USB 3.0 PHY present alongwith
+USB 3.0 controller Exynos 5420 SoC. This phy driver is
+based on generic phy framework.
 
-This is the DT split part of the patch-series[3].
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+---
+ arch/arm/boot/dts/exynos5420.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Patches:  usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
-          ARM: exynos_defconfig: Remove SAMSUNG_USB3PHY config
-are removing the older phy-samsung-usb3 driver. Have included this driver patch
-in this series since we are moving the device tree of DWC3 controller to new
-phy driver, so we wouldn't be needing this older driver anymore.
-
-[1]: [PATCH v6 1/2] phy: Add new Exynos5 USB 3.0 PHY driver
-     http://www.spinics.net/lists/linux-usb/msg106185.html
-     [PATCH v6 2/2] phy: exynos5-usbdrd: Add facility for VBUS supply
-     http://www.spinics.net/lists/linux-usb/msg106184.html
-
-[2]: [PATCH] ARM: dts: Add peach-pit board support
-     http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg28846.html
-
-[3]: [PATCH V4 0/5] Add Exynos5 USB 3.0 phy driver based on generic PHY framework
-     https://lkml.org/lkml/2014/4/8/247
-
-Vivek Gautam (9):
-  dt: exynos5420: Enable support for USB 3.0 PHY controller
-  dt: exynos5420: Enable support for DWC3 controller
-  dt: exynos5250: Enable support for generic USB DRD phy
-  dts: exynos5250: Update DWC3 usb controller to use new phy driver
-  dts: exynos5250-snow: Add Vbus regulator for USB 3.0
-  dts: exynos5420-peach-pit: Add Vbus regulator for USB 3.0
-  dts: exynos5420-smdk5420: Add Vbus regulator for USB 3.0
-  usb-phy: samsung-usb3: Remove older phy-samsung-usb3 driver
-  ARM: exynos_defconfig: Remove SAMSUNG_USB3PHY config
-
- arch/arm/boot/dts/exynos5250-snow.dts      |   22 ++
- arch/arm/boot/dts/exynos5250.dtsi          |   21 +-
- arch/arm/boot/dts/exynos5420-peach-pit.dts |   44 ++++
- arch/arm/boot/dts/exynos5420-smdk5420.dts  |   46 ++++
- arch/arm/boot/dts/exynos5420.dtsi          |   54 +++++
- arch/arm/configs/exynos_defconfig          |    1 -
- drivers/usb/phy/Kconfig                    |    8 -
- drivers/usb/phy/Makefile                   |    1 -
- drivers/usb/phy/phy-samsung-usb.h          |   80 -------
- drivers/usb/phy/phy-samsung-usb3.c         |  350 ----------------------------
- 10 files changed, 175 insertions(+), 452 deletions(-)
- delete mode 100644 drivers/usb/phy/phy-samsung-usb3.c
-
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index c3a9a66..f69745f 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -732,4 +732,24 @@
+ 		clock-names = "secss";
+ 		samsung,power-domain = <&g2d_pd>;
+ 	};
++
++	usbdrd_phy0: phy at 12100000 {
++		compatible = "samsung,exynos5420-usbdrd-phy";
++		reg = <0x12100000 0x100>;
++		clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
++		clock-names = "phy", "ref";
++		samsung,pmu-syscon = <&pmu_system_controller>;
++		samsung,pmu-offset = <0x704>;
++		#phy-cells = <1>;
++	};
++
++	usbdrd_phy1: phy at 12500000 {
++		compatible = "samsung,exynos5420-usbdrd-phy";
++		reg = <0x12500000 0x100>;
++		clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
++		clock-names = "phy", "ref";
++		samsung,pmu-syscon = <&pmu_system_controller>;
++		samsung,pmu-offset = <0x708>;
++		#phy-cells = <1>;
++	};
+ };
 -- 
 1.7.10.4
