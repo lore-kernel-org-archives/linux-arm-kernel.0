@@ -1,228 +1,52 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 23 Apr 2014 19:10:04 +0200
-Subject: [PATCH 1/5] clk: berlin: add support for clocks
-In-Reply-To: <5357F24B.8070405@gmail.com>
-References: <1398261667-12621-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1398261667-12621-2-git-send-email-alexandre.belloni@free-electrons.com>
- <5357F24B.8070405@gmail.com>
-Message-ID: <5357F3EC.8070203@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Apr 2014 18:13:52 +0100
+Subject: [PATCH RFC 3/3] drm/exynos: use pending_components for
+ components tracking
+In-Reply-To: <20140423164328.GG24070@n2100.arm.linux.org.uk>
+References: <1397734130-21019-1-git-send-email-a.hajda@samsung.com>
+ <1397734130-21019-4-git-send-email-a.hajda@samsung.com>
+ <20140417220412.GZ24070@n2100.arm.linux.org.uk>
+ <5351145D.8070207@samsung.com>
+ <20140418124652.GE24070@n2100.arm.linux.org.uk>
+ <535652B2.7000607@samsung.com>
+ <20140422115145.GU24070@n2100.arm.linux.org.uk>
+ <5357D68E.8060605@samsung.com>
+ <20140423164328.GG24070@n2100.arm.linux.org.uk>
+Message-ID: <20140423171351.GH24070@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 07:03 PM, Sebastian Hesselbarth wrote:
-> On 04/23/2014 04:01 PM, Alexandre Belloni wrote:
->> Add support for clocks having their own register set.
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> ---
->>  drivers/clk/berlin/Makefile |   2 +-
->>  drivers/clk/berlin/clk.c    | 132 ++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 133 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/clk/berlin/clk.c
->>
->> diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
->> index 94859513de90..9bfa58eaf25a 100644
->> --- a/drivers/clk/berlin/Makefile
->> +++ b/drivers/clk/berlin/Makefile
->> @@ -1,4 +1,4 @@
->> -obj-y += pll.o
->> +obj-y += pll.o clk.o
->>  obj-$(CONFIG_MACH_BERLIN_BG2)   += pll-berlin2.o
->>  obj-$(CONFIG_MACH_BERLIN_BG2CD) += pll-berlin2.o
->>  obj-$(CONFIG_MACH_BERLIN_BG2Q)  += pll-berlin2q.o
->> diff --git a/drivers/clk/berlin/clk.c b/drivers/clk/berlin/clk.c
->> new file mode 100644
->> index 000000000000..a0e688e5bead
->> --- /dev/null
->> +++ b/drivers/clk/berlin/clk.c
->> @@ -0,0 +1,132 @@
->> +/*
->> + * Copyright (c) 2014 Marvell Technology Group Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#include <linux/bitops.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/slab.h>
->> +
->> +#include "common.h"
->> +
->> +#define CLKEN		(1 << 0)
-> 
-> Alexandre,
-> 
-> please use BIT(n) instead of (1 << n).
-> 
->> +#define CLKPLLSEL_MASK	7
->> +#define CLKPLLSEL_SHIFT	1
->> +#define CLKPLLSWITCH	(1 << 4)
->> +#define CLKSWITCH	(1 << 5)
->> +#define CLKD3SWITCH	(1 << 6)
->> +#define CLKSEL_MASK	7
->> +#define CLKSEL_SHIFT	7
-> 
-> In general, I would change the above defines to CLK_SEL_MASK, i.e.
-> add a _ after CLK. While at it (as it can be seen from the code
-> below), also rename CLK_D3SWITCH to CLK_DIV3_SWITCH.
-> 
->> +
->> +struct berlin_clk {
->> +	struct clk_hw hw;
->> +	void __iomem *base;
->> +};
->> +
->> +#define to_berlin_clk(hw)	container_of(hw, struct berlin_clk, hw)
->> +
->> +static u8 clk_div[] = {1, 2, 4, 6, 8, 12, 1, 1};
->> +
->> +static unsigned long berlin_clk_recalc_rate(struct clk_hw *hw,
->> +					unsigned long parent_rate)
->> +{
->> +	u32 val, divider;
->> +	struct berlin_clk *clk = to_berlin_clk(hw);
->> +
->> +	val = readl_relaxed(clk->base);
->> +	if (val & CLKD3SWITCH)
->> +		divider = 3;
->> +	else {
->> +		if (val & CLKSWITCH) {
->> +			val >>= CLKSEL_SHIFT;
->> +			val &= CLKSEL_MASK;
->> +			divider = clk_div[val];
->> +		} else
->> +			divider = 1;
->> +	}
->> +
-> 
-> There are stylistic issues:
-> 
-> if-else with one part being enclosed in {} requires both parts
-> to be enclosed in those curly brackets, i.e.
-> 
-> if (foo)
-> 	bar;
-> else {
-> 	foobar;
-> 	barfoo;
-> }
-> 
-> has to become
-> 
-> if (foo) {
-> 	bar;
-> } else {
-> 	foobar;
-> 	barfoo;
-> }
-> 
-> How about writing the above
+On Wed, Apr 23, 2014 at 05:43:28PM +0100, Russell King - ARM Linux wrote:
+> So, maybe you would like to finally address *my* point about TDA998x
+> and your solution in a way that provides a satisfactory answer.  *Show*
+> how it can be done, or *outline* how it can be done.
 
-Grr, I wasn't done with my review but who the f*ck puts
-"Send now" on ^D ?
+Let me be absolutely clear *why* I'm very interested in this - and that
+is because I'm presently converting TDA998x and Armada DRM to use the
+component helpers.  If your solution is better, then I'd want to convert
+to that instead, and let's retire the component helpers.
 
-So, how about writing the above
+At the moment, my belief is that your solution is *very* substandard and
+suboptimal precisely for the reasons I've outlined, especially when it
+comes to sharing a component between several drivers.
 
-val = readl_relaxed(clk->base);
+So, if you *really* care, you'll stop fobbing me off on this point and
+provide some real technical input how you'd see your solution being used
+in exactly the scenario that I've been outlining several times in this
+thread.
 
-divider = 1;
-if (val & CLKD3SWITCH) {
-	divider = 3;
-} else if (val & CLKSWITCH) {
-	val >>= CLKSEL_SHIFT;
-	val &= CLKSEL_MASK;
-	divider = clk_div[val];
-}
+For example, you could show what kind of modifications you expect would
+be required to the _existing_ TDA998x driver to allow it to participate
+as a device declared in DT as an entirely separate entity, probed via the
+standard I2C probing methods, and then hook itself into the appropriate
+DRM driver.  Remembering, of course, that the TDA998x device is used by
+more than _just_ Armada DRM.
 
->> +	return parent_rate / divider;
->> +}
->> +
->> +static u8 berlin_clk_get_parent(struct clk_hw *hw)
->> +{
->> +	u32 val;
->> +	struct berlin_clk *clk = to_berlin_clk(hw);
->> +
->> +	val = readl_relaxed(clk->base);
->> +	if (val & CLKPLLSWITCH) {
->> +		val >>= CLKPLLSEL_SHIFT;
->> +		val &= CLKPLLSEL_MASK;
->> +		return val;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct clk_ops berlin_clk_ops = {
->> +	.recalc_rate	= berlin_clk_recalc_rate,
->> +	.get_parent	= berlin_clk_get_parent,
->> +};
->> +
->> +static void __init berlin_clk_setup(struct device_node *np)
->> +{
->> +	struct clk_init_data init;
->> +	struct berlin_clk *bclk;
->> +	struct clk *clk;
->> +	const char **parent_names;
->> +	int nparents, i, ret;
->> +
->> +	bclk = kzalloc(sizeof(*bclk), GFP_KERNEL);
->> +	if (WARN_ON(!bclk))
->> +		return;
->> +
->> +	bclk->base = of_iomap(np, 0);
->> +	if (WARN_ON(!bclk->base))
->> +		goto exit;
->> +
->> +	nparents = of_clk_get_parent_count(np);
->> +	if (WARN_ON(!nparents))
->> +		goto exit;
->> +
->> +	parent_names = kzalloc((sizeof(char *) * nparents), GFP_KERNEL);
+I don't care if you show it via pseudo-code or by real patch.  I just
+want to know _how_ your solution could be used.  And I won't want some
+silly remark like "trivially" or "I've already answered that."  I want
+_you_ to _show_ _how_ it can be done.
 
-No need to put () around the calculation above. Also, if you put
-nparents in front it may be more readable.
-
-Sebastian
-
->> +	if (WARN_ON(!parent_names))
->> +		goto exit;
->> +
->> +	init.name = np->name;
->> +	init.ops = &berlin_clk_ops;
->> +	for (i = 0; i < nparents; i++) {
->> +		parent_names[i] = of_clk_get_parent_name(np, i);
->> +		if (!parent_names[i])
->> +			break;
->> +	}
->> +	init.parent_names = parent_names;
->> +	init.num_parents = i;
->> +
->> +	bclk->hw.init = &init;
->> +
->> +	clk = clk_register(NULL, &bclk->hw);
->> +	kfree(parent_names);
->> +	if (WARN_ON(IS_ERR(clk)))
->> +		goto exit;
->> +
->> +	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
->> +	WARN_ON(ret);
->> +
->> +	return;
->> +exit:
->> +	kfree(bclk);
->> +}
->> +
->> +CLK_OF_DECLARE(berlin_clk, "marvell,berlin-clk", berlin_clk_setup);
->>
-> 
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
