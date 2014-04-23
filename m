@@ -1,24 +1,50 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 23 Apr 2014 12:41:03 -0500
-Subject: [PATCH v6 2/6] ARM: allow user access to arch timer virtual
- counter
-In-Reply-To: <20140423173244.GL5649@arm.com>
-References: <cover.1398213562.git.nathan_lynch@mentor.com>
- <10ed3f4cfce13a80a9a3070934fc0e31619a1242.1398213562.git.nathan_lynch@mentor.com>
- <20140423173244.GL5649@arm.com>
-Message-ID: <5357FB2F.8060002@mentor.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 23 Apr 2014 19:43:22 +0200
+Subject: [PATCH v2 2/2] ARM: dts: berlin: enable SD card reader and eMMC
+ for the BG2Q DMP
+In-Reply-To: <20140423173631.GA10464@kwain>
+References: <1398155248-1659-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1398155248-1659-3-git-send-email-antoine.tenart@free-electrons.com>
+ <5357F7BF.8000703@gmail.com> <20140423173631.GA10464@kwain>
+Message-ID: <5357FBBA.6070107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 12:32 PM, Will Deacon wrote:
-> On Wed, Apr 23, 2014 at 01:48:53AM +0100, Nathan Lynch wrote:
->> As ARM64 does.  This is a necessary prerequisite for implementing
->> gettimeofday and clock_gettime in a vdso.
+On 04/23/2014 07:36 PM, Antoine T?nart wrote:
+> On Wed, Apr 23, 2014 at 07:26:23PM +0200, Sebastian Hesselbarth wrote:
+>> On 04/22/2014 10:27 AM, Antoine T?nart wrote:
+>>> Enable the SD Card reader and the internal eMMC on the Berlin BG2Q DMP
+>>> using two of the SDHCI nodes of the Berlin BG2Q.
+>>>
+>>> Signed-off-by: Antoine T?nart <antoine.tenart@free-electrons.com>
+>>> ---
+>>>  arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 11 +++++++++++
+>>>  1 file changed, 11 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+>>> index 2da9c41e29d8..6ca8c9e52b08 100644
+>>> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+>>> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+>>> @@ -26,3 +26,14 @@
+>>>  &uart0 {
+>>>  	status = "okay";
+>>>  };
+>>> +
+>>> +&sdhci1 {
+>>
+>> Antoine,
+>>
+>> nit: please sort referenced nodes alphabetically.
+>>
+>> With your comments about mmc aliases, I can take both patches
+>> in now (and fixup ordering) if you like.
 > 
-> Doesn't this change make arch_counter_set_user_access identical for arm and
-> arm64? In which case, we could move it into the driver itself.
+> You can take them.
+> 
+> I talked with Jisheng about this and the plan is to make a following up
+> series for the aliases since it will require to modify the subsystem.
 
-True; I had considered this but wasn't sure how it could be staged.
+Applied both patches to berlin/dt, with &uart0, &sdhci1, &sdhci2 sorted
+alphabetically now.
 
-Would a single patch updating arch/arm64, arch/arm, and
-drivers/clocksource/arm_arch_timer.c be okay?
+Sebastian
