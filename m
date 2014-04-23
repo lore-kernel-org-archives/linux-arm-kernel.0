@@ -1,42 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Apr 2014 08:59:30 +0200
-Subject: [PATCH] mmc: mmci: switch the driver to using gpio descriptors
-In-Reply-To: <CAPDyKFq8TGsHQixYJwtPGkr0HS8r1-B0LZWsO9DKYH+gTq_Dgg@mail.gmail.com>
-References: <1397550786-8146-1-git-send-email-linus.walleij@linaro.org>
- <CAPDyKFq8TGsHQixYJwtPGkr0HS8r1-B0LZWsO9DKYH+gTq_Dgg@mail.gmail.com>
-Message-ID: <CACRpkdZHbxYvHbxrTzZ_k=U9sUNjh86GkwUiEjM5cZXM3WyfEA@mail.gmail.com>
+Date: Wed, 23 Apr 2014 09:01:09 +0200
+Subject: [PATCHv2] pinctrl: exynos: Add driver data for Exynos3250
+In-Reply-To: <1397439947-31592-1-git-send-email-cw00.choi@samsung.com>
+References: <1397439947-31592-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CACRpkdaycY=Mba1pYQMv-Yq87JGfyJEnwmrT+qwDhrZ_4Rqs+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 16, 2014 at 9:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 15 April 2014 10:33, Linus Walleij <linus.walleij@linaro.org> wrote:
->> The next step in modernization of GPIO is to let drivers handle
->> descriptors rather than integer numbers representing GPIO pins,
->> akin to how clocks or regulators are already handled today.
->>
->> This patch makes the MMCI driver use GPIO descriptos in the
->> core code with fallback code using the platform data if that
->> is not possible. After all platforms with MMCI have been
->> migrated to use descriptors, the platform data entries for
->> GPIO pins can be removed.
->>
->> Cc: Alexandre Courbot <gnurou@gmail.com>
->> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> Hi Russell,Ulf: there is no hurry to do these changes (only used
->> for my very corner-case MMCI PL181 experiments) but it's the
->> desired direction to use descriptors for GPIOs going forward.
->> I can rebase this on top of Ulf's patch stack any time, no
->> problem.
->
-> If you rebase it on top of my patch stack - I can resend the pull
-> request I sent a few days ago and include this one!?
+On Mon, Apr 14, 2014 at 3:45 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
 
-There is no hurry. I'd let Russell think about your recent patches
-first and I will keep this patch on my watchlist until things
-settle down.
+> From: Tomasz Figa <t.figa@samsung.com>
+>
+> This patch adds driver data (bank list and EINT layout) for Exynos3250
+> to pinctrl-exynos driver. Exynos3250 includes 158 multi-functional input/output
+> ports. There are 23 general port groups.
+>
+> Changes from v1:
+> - Add signed-off of sender
+> - Post only separated patch for pinctrl from following patchset(v1)
+>   : https://lkml.org/lkml/2014/4/10/286
+>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+This v2 patch applied.
 
 Yours,
 Linus Walleij
