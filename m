@@ -1,55 +1,62 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 23 Apr 2014 08:29:14 +0200
-Subject: [RESEND PATCH v3 8/9] tty: cadence: Document DT binding
-In-Reply-To: <1396657425-31029-8-git-send-email-soren.brinkmann@xilinx.com>
+Date: Wed, 23 Apr 2014 08:29:24 +0200
+Subject: [RESEND PATCH v3 9/9] ARM: zynq: DT: Migrate UART to Cadence
+ binding
+In-Reply-To: <1396657425-31029-9-git-send-email-soren.brinkmann@xilinx.com>
 References: <1396657425-31029-1-git-send-email-soren.brinkmann@xilinx.com>
- <1396657425-31029-8-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <53575DBA.9070704@monstr.eu>
+ <1396657425-31029-9-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <53575DC4.6080008@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/05/2014 02:23 AM, Soren Brinkmann wrote:
-> Add binding documentation for the Cadence UART.
+> The Zynq UART is Cadence IP and the driver has been renamed accordingly.
+> Migrate the DT to use the new binding for the UART driver.
 > 
 > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > Acked-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
 > Acked-by: Rob Herring <robh@kernel.org>
 > Tested-by: Michal Simek <michal.simek@xilinx.com>
 > ---
+> This change depends on 'tty: xuartps: Rebrand driver as Cadence UART',
+> which introduces the new clock-names.
 > 
 > Changes in v3: None
 > Changes in v2: None
 > 
->  .../devicetree/bindings/serial/cdns,uart.txt         | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/cdns,uart.txt
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt b/Documentation/devicetree/bindings/serial/cdns,uart.txt
-> new file mode 100644
-> index 000000000000..a3eb154c32ca
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
-> @@ -0,0 +1,20 @@
-> +Binding for Cadence UART Controller
-> +
-> +Required properties:
-> +- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
-> +- reg: Should contain UART controller registers location and length.
-> +- interrupts: Should contain UART controller interrupts.
-> +- clocks: Must contain phandles to the UART clocks
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Tuple to identify input clocks, must contain "uart_clk" and "pclk"
-> +  See ../clocks/clock-bindings.txt for details.
-> +
-> +
-> +Example:
-> +	uart at e0000000 {
-> +		compatible = "cdns,uart-r1p8";
-> +		clocks = <&clkc 23>, <&clkc 40>;
-> +		clock-names = "uart_clk", "pclk";
-> +		reg = <0xE0000000 0x1000>;
-> +		interrupts = <0 27 4>;
-> +	};
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 789d0bacc110..d27eb5c21831 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -73,19 +73,19 @@
+>  		};
+>  
+>  		uart0: uart at e0000000 {
+> -			compatible = "xlnx,xuartps";
+> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>  			status = "disabled";
+>  			clocks = <&clkc 23>, <&clkc 40>;
+> -			clock-names = "ref_clk", "aper_clk";
+> +			clock-names = "uart_clk", "pclk";
+>  			reg = <0xE0000000 0x1000>;
+>  			interrupts = <0 27 4>;
+>  		};
+>  
+>  		uart1: uart at e0001000 {
+> -			compatible = "xlnx,xuartps";
+> +			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>  			status = "disabled";
+>  			clocks = <&clkc 24>, <&clkc 41>;
+> -			clock-names = "ref_clk", "aper_clk";
+> +			clock-names = "uart_clk", "pclk";
+>  			reg = <0xE0001000 0x1000>;
+>  			interrupts = <0 50 4>;
+>  		};
 > 
 
 Applied to zynq/dt2 branch.
@@ -71,4 +78,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/0896ffc5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/ff0f6fd8/attachment.sig>
