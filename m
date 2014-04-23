@@ -1,99 +1,73 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 23 Apr 2014 14:28:59 +0200
-Subject: [PATCH 2/2] pinctrl: rockchip: implement PIN_CONFIG_OUTPUT handling
-In-Reply-To: <7604038.VoEVFUfvet@phil>
-References: <7604038.VoEVFUfvet@phil>
-Message-ID: <1574132.ZxCpxPcbBr@phil>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Apr 2014 14:27:50 +0200
+Subject: [PATCH] reset: Add of_reset_control_get to reset.h
+In-Reply-To: <1397462286.3800.2.camel@paszta.hi.pengutronix.de>
+References: <1397390955-22644-1-git-send-email-hdegoede@redhat.com>
+ <1397462286.3800.2.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140423122750.GP24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases it is nice to be able to simply control a gpio output
-via the PIN_CONFIG_OUTPUT option without having a driver control it.
-Thus add support for it to the rockchip pinctrl driver.
+Hi Philipp,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/pinctrl/pinctrl-rockchip.c | 40 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+On Mon, Apr 14, 2014 at 09:58:06AM +0200, Philipp Zabel wrote:
+> Am Sonntag, den 13.04.2014, 14:09 +0200 schrieb Hans de Goede:
+> > of_reset_control_get is not declared static in drivers/reset/core.c, which
+> > is correct as we want to use it elsewhere too. But it does not have a
+> > protype declared anywhere under include/linux. Add a prototype / stub for it
+> > to linux/reset.h to fix this.
+> > 
+> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > ---
+> >  include/linux/reset.h | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/include/linux/reset.h b/include/linux/reset.h
+> > index c0eda50..f1ae7ce 100644
+> > --- a/include/linux/reset.h
+> > +++ b/include/linux/reset.h
+> > @@ -33,6 +33,9 @@ static inline struct reset_control *devm_reset_control_get_optional(
+> >  	return devm_reset_control_get(dev, id);
+> >  }
+> >  
+> > +struct reset_control *of_reset_control_get(struct device_node *node,
+> > +					   const char *id);
+> > +
+> >  #else
+> >  
+> >  static inline int reset_control_reset(struct reset_control *rstc)
+> > @@ -75,6 +78,12 @@ static inline struct reset_control *devm_reset_control_get_optional(
+> >  	return ERR_PTR(-ENOSYS);
+> >  }
+> >  
+> > +static inline struct reset_control *of_reset_control_get(
+> > +				struct device_node *node, const char *id)
+> > +{
+> > +	return ERR_PTR(-ENOSYS);
+> > +}
+> > +
+> >  #endif /* CONFIG_RESET_CONTROLLER */
+> >  
+> >  #endif
+> 
+> Applied, thanks.
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index ae3dfe7..2e198a4 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -329,6 +329,23 @@ static const struct pinctrl_ops rockchip_pctrl_ops = {
-  * Hardware access
-  */
- 
-+static int rockchip_get_mux(struct rockchip_pin_bank *bank, int pin)
-+{
-+	struct rockchip_pinctrl *info = bank->drvdata;
-+	void __iomem *reg = info->reg_base + info->ctrl->mux_offset;
-+	u8 bit;
-+
-+	if (bank->bank_type == RK3188_BANK0 && pin < 16)
-+		return RK_FUNC_GPIO;
-+
-+	/* get basic quadrupel of mux registers and the correct reg inside */
-+	reg += bank->bank_num * 0x10;
-+	reg += (pin / 8) * 4;
-+	bit = (pin % 8) * 2;
-+
-+	return ((readl(reg) >> bit) & 3);
-+}
-+
- /*
-  * Set a new mux function for a pin.
-  *
-@@ -687,6 +704,10 @@ static bool rockchip_pinconf_pull_valid(struct rockchip_pin_ctrl *ctrl,
- 	return false;
- }
- 
-+static int rockchip_gpio_direction_output(struct gpio_chip *gc,
-+					  unsigned offset, int value);
-+static int rockchip_gpio_get(struct gpio_chip *gc, unsigned offset);
-+
- /* set the pin config settings for a specified pin */
- static int rockchip_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
- 				unsigned long *configs, unsigned num_configs)
-@@ -724,6 +745,13 @@ static int rockchip_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
- 			if (rc)
- 				return rc;
- 			break;
-+		case PIN_CONFIG_OUTPUT:
-+			rc = rockchip_gpio_direction_output(&bank->gpio_chip,
-+							    pin - bank->pin_base,
-+							    arg);
-+			if (rc)
-+				return rc;
-+			break;
- 		default:
- 			return -ENOTSUPP;
- 			break;
-@@ -741,6 +769,7 @@ static int rockchip_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
- 	struct rockchip_pin_bank *bank = pin_to_bank(info, pin);
- 	enum pin_config_param param = pinconf_to_config_param(*config);
- 	u16 arg;
-+	int rc;
- 
- 	switch (param) {
- 	case PIN_CONFIG_BIAS_DISABLE:
-@@ -761,6 +790,17 @@ static int rockchip_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
- 
- 		arg = 1;
- 		break;
-+	case PIN_CONFIG_OUTPUT:
-+		rc = rockchip_get_mux(bank, pin - bank->pin_base);
-+		if (rc != RK_FUNC_GPIO)
-+			return -EINVAL;
-+
-+		rc = rockchip_gpio_get(&bank->gpio_chip, pin - bank->pin_base);
-+		if (rc < 0)
-+			return rc;
-+
-+		arg = rc ? 1 : 0;
-+		break;
- 	default:
- 		return -ENOTSUPP;
- 		break;
+I just noticed you queued this patch up for 3.16.
+
+Since that function got introduced in 3.15-rc1, maybe it would be
+better if you queued it for one of 3.15-rc* ?
+
+Thanks,
+Maxime
+
 -- 
-1.9.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/e3d3819a/attachment.sig>
