@@ -1,31 +1,25 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Wed, 23 Apr 2014 22:15:20 +0200
-Subject: [PATCH v2 3/3] omapdss: panel-tpo-td028ec1: Add module alias
-In-Reply-To: <1398284120-4986-1-git-send-email-marek@goldelico.com>
-References: <1398284120-4986-1-git-send-email-marek@goldelico.com>
-Message-ID: <1398284120-4986-4-git-send-email-marek@goldelico.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Apr 2014 22:17:16 +0200
+Subject: [PATCH 4/4] pinctrl: sirf: move to use irq_get_handler_data
+In-Reply-To: <1397544229-20545-5-git-send-email-21cnbao@gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+ <1397544229-20545-5-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdbDeF5gBVv=hQSdX1i9fw=7Or+=qN=g4OXHvHkZKr7vcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add module alias string to make it working when panel is compiled as module.
-Without this change panel module is not probed thus display is not working.
+On Tue, Apr 15, 2014 at 8:43 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
----
- drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c | 1 +
- 1 file changed, 1 insertion(+)
+> From: Barry Song <Baohua.Song@csr.com>
+>
+> we set bank as handler_data, now we can get bank in ISR directly
+> instead of looking-up.
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-diff --git a/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c b/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c
-index 5b3466e..728808b 100644
---- a/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c
-+++ b/drivers/video/fbdev/omap2/displays-new/panel-tpo-td028ttec1.c
-@@ -505,6 +505,7 @@ static struct spi_driver td028ttec1_spi_driver = {
- 
- module_spi_driver(td028ttec1_spi_driver);
- 
-+MODULE_ALIAS("spi:toppoly,td028ttec1");
- MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
- MODULE_DESCRIPTION("Toppoly TD028TTEC1 panel driver");
- MODULE_LICENSE("GPL");
--- 
-1.8.3.2
+If you want to use some other handler data than the gpiochip,
+you should just use irq_set_chained_handler() and
+irq_set_handler_data() directly.
+
+Yours,
+Linus Walleij
