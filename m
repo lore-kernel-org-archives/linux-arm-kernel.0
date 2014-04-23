@@ -1,137 +1,69 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 23 Apr 2014 11:35:12 +0530
-Subject: [PATCH v6 1/3] PSCI: Add initial support for PSCIv0.2 functions
-In-Reply-To: <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
-References: <1397762146-8337-1-git-send-email-ashwin.chaugule@linaro.org>
- <1397762146-8337-2-git-send-email-ashwin.chaugule@linaro.org>
- <CALrVBkuSsi=2J1YT7w2bGtcL7CL6_xheZceaRtqETyC9mUqhTw@mail.gmail.com>
- <CAJ5Y-eZ=ugeav++ysMCbAUFnPMr5=WaCdrEdYojwLi1HTYX6rw@mail.gmail.com>
-Message-ID: <CAAhSdy04J+Baw537BdRZFH0vV+fWn6SVVa=Y+QXUjk=Znb=oow@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 23 Apr 2014 08:11:15 +0200
+Subject: [GIT PULL] serial: Cadence
+Message-ID: <53575983.3030508@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 11:02 PM, Ashwin Chaugule
-<ashwin.chaugule@linaro.org> wrote:
-> On 21 April 2014 02:23, Anup Patel <anup.patel@linaro.org> wrote:
->> Hi Ashwin,
->>
->> Please include system reboot & shutdown implementation
->> in this patch using PSCI v0.2 SYSTEM_OFF and
->> SYSTEM_RESET functions.
->
-> hm, I had thought these relied on having the (optional) MIGRATE
-> function. But thats not the case.
->
-> So, how about this..
->
-> ---------------------8<---------------------
->
-> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-> index ead8cdb..5a54f2f 100644
-> --- a/arch/arm/kernel/psci.c
-> +++ b/arch/arm/kernel/psci.c
-> @@ -17,6 +17,8 @@
->
->  #include <linux/init.h>
->  #include <linux/of.h>
-> +#include <linux/reboot.h>
-> +#include <linux/pm.h>
->  #include <uapi/linux/psci.h>
->
->  #include <asm/compiler.h>
-> @@ -24,6 +26,7 @@
->  #include <asm/opcodes-sec.h>
->  #include <asm/opcodes-virt.h>
->  #include <asm/psci.h>
-> +#include <asm/system_misc.h>
->
->  struct psci_operations psci_ops;
->
-> @@ -196,6 +199,16 @@ static int get_set_conduit_method(struct device_node *np)
->   return 0;
->  }
->
-> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> + invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-> +}
-> +
-> +static void psci_sys_off(void)
-> +{
-> + invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-> +}
-> +
->  /*
->   * PSCI Function IDs for v0.2+ are well defined so use
->   * standard values.
-> @@ -249,6 +262,10 @@ static int psci_0_2_init(struct device_node *np)
->   PSCI_0_2_FN_MIGRATE_INFO_TYPE;
->   psci_ops.migrate_info_type = psci_migrate_info_type;
->
-> + arm_pm_restart = psci_sys_reset;
-> +
-> + pm_power_off = psci_sys_off;
-> +
+Hi Greg,
 
-Yes, I think this should work.
+this is around for a while and I would like to close it.
+I have applied patches 1-7 from v3.
+Patches 8 and 9 should go through arm-soc tree and I will add them
+to my zynq/dt branch.
+
+Please apply these patches to your tree.
+If this should go through different tree please let me know.
 
 Thanks,
-Anup
+Michal
 
->  out_put_node:
->   of_node_put(np);
->   return err;
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 63a7685..583b7c3 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -18,6 +18,8 @@
->  #include <linux/init.h>
->  #include <linux/of.h>
->  #include <linux/smp.h>
-> +#include <linux/reboot.h>
-> +#include <linux/pm.h>
->  #include <uapi/linux/psci.h>
->
->  #include <asm/compiler.h>
-> @@ -25,6 +27,7 @@
->  #include <asm/errno.h>
->  #include <asm/psci.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/system_misc.h>
->
->  #define PSCI_POWER_STATE_TYPE_STANDBY 0
->  #define PSCI_POWER_STATE_TYPE_POWER_DOWN 1
-> @@ -217,6 +220,16 @@ static int get_set_conduit_method(struct device_node *np)
->   return 0;
->  }
->
-> +static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-> +{
-> + invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-> +}
-> +
-> +static void psci_sys_off(void)
-> +{
-> + invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-> +}
-> +
->  /*
->   * PSCI Function IDs for v0.2+ are well defined so use
->   * standard values.
-> @@ -270,6 +283,10 @@ static int psci_0_2_init(struct device_node *np)
->   PSCI_0_2_FN_MIGRATE_INFO_TYPE;
->   psci_ops.migrate_info_type = psci_migrate_info_type;
->
-> + arm_pm_restart = psci_sys_reset;
-> +
-> + pm_power_off = psci_sys_off;
-> +
->  out_put_node:
->   of_node_put(np);
->   return err;
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+The following changes since commit c9eaa447e77efe77b7fa4c953bd62de8297fd6c5:
+
+  Linux 3.15-rc1 (2014-04-13 14:18:35 -0700)
+
+are available in the git repository at:
+
+  git://git.monstr.eu/linux-2.6-microblaze.git tags/cadence-uart-for-3.16
+
+for you to fetch changes up to 05a06a30d212f76e7822ef1093fa002baac021a7:
+
+  tty: xuartps: Rebrand driver as Cadence UART (2014-04-23 08:00:10 +0200)
+
+----------------------------------------------------------------
+tty: Cadence uart rebranding and cleanup
+
+----------------------------------------------------------------
+Michal Simek (2):
+      tty: xuartps: Fix kernel-doc errors in the driver
+      tty: xuartps: Initialize ports according to aliases
+
+Soren Brinkmann (5):
+      tty: xuartps: Clean up
+      tty: xuartps: Print warning in clock notifier
+      tty: xuartps: Refactor read-modify-writes
+      tty: xuartps: Don't write IRQ disable register to enable interrupts
+      tty: xuartps: Rebrand driver as Cadence UART
+
+ drivers/tty/serial/Kconfig         |    9 +-
+ drivers/tty/serial/xilinx_uartps.c | 1129 +++++++++++++++++++++++++++++++++++--------------------------------------
+ include/uapi/linux/serial_core.h   |    2 +-
+ 3 files changed, 546 insertions(+), 594 deletions(-)
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/93e2adbf/attachment.sig>
