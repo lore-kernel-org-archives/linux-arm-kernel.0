@@ -1,84 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Apr 2014 18:04:45 +0100
-Subject: [PATCH v3] arm64: enable EDAC on arm64
-In-Reply-To: <CAL_Jsq+pcK4XvSyahaK8zoxNMWrebqsU+funBqzR9MBfK2ABYA@mail.gmail.com>
-References: <1398096556-26799-1-git-send-email-robherring2@gmail.com>
- <20140422102455.GD7484@arm.com>
- <CAL_JsqKS_NZbxq_nFBnsQvj51TtraEeFm0aY=j=N3DwJ+bTL6g@mail.gmail.com>
- <20140422132624.GC9820@arm.com>
- <CAL_JsqJEwUu0ooEcL+hniD8vxjBW5571ea3u3JmPN3x1MfXW3w@mail.gmail.com>
- <20140422160100.GH9820@arm.com>
- <CAL_Jsq+pcK4XvSyahaK8zoxNMWrebqsU+funBqzR9MBfK2ABYA@mail.gmail.com>
-Message-ID: <20140423170445.GI5649@arm.com>
+Date: Wed, 23 Apr 2014 18:08:21 +0100
+Subject: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+In-Reply-To: <175CCF5F49938B4D99B2E3EF7F558EBE5507A3B59B@SC-VEXCH4.marvell.com>
+References: <1398133596-29170-1-git-send-email-zhangwm@marvell.com>
+ <20140422103642.GF7484@arm.com>
+ <175CCF5F49938B4D99B2E3EF7F558EBE5507A3B59B@SC-VEXCH4.marvell.com>
+Message-ID: <20140423170821.GJ5649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 05:29:52PM +0100, Rob Herring wrote:
-> On Tue, Apr 22, 2014 at 11:01 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Looking at the edac_mc_scrub_block code, atomic_scrub is always called with
-> > a normal, cacheable mapping (kmap_atomic) so that doesn't help us (although
-> > it means the exclusives will at least succeed).
-> >
-> > The problem of speculative reads by the CPU could be solved by unmapped the
-> > DMA buffer when we transfer the ownership over to the device (instead of
-> > invalidating it after the transfer). However, I'm now slightly confused as
-> > to how atomic_scrub fixes errors reported at any cache level higher than
-> > L1. Do we need cache-flushing to ensure that the exclusive-store propagates
-> > to the point of failure?
+On Wed, Apr 23, 2014 at 11:31:09AM +0100, Neil Zhang wrote:
 > 
-> The whole point of scrubbing is to stop repeated error reporting of
-> correctable errors. For example, you do a write to memory and the ECC
-> code is added to it. Suppose the data stored in the memory gets
-> corrupted either on the write or some time later you get a bit flip in
-> the memory cell. Then when the data is read from memory, the memory
-> controller will detect the error, correct it, and trigger and ECC
-> correctable error interrupt. It will do this every time you read that
-> memory location because the error occurred on the write. The only way
-> to clear the error is re-writing memory.
+> > -----Original Message-----
+> > From: Will Deacon [mailto:will.deacon at arm.com]
+> > Sent: 2014?4?22? 18:37
+> > To: Neil Zhang
+> > Cc: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org;
+> > linux-kernel at vger.kernel.org; Sudeep Holla; devicetree at vger.kernel.org
+> > Subject: Re: [PATCH v4] ARM: perf: save/restore pmu registers in pm notifier
+> > 
+> > Hi Neil,
+> > 
+> > On Tue, Apr 22, 2014 at 03:26:36AM +0100, Neil Zhang wrote:
+> > > This adds core support for saving and restoring CPU PMU registers for
+> > > suspend/resume support i.e. deeper C-states in cpuidle terms.
+> > > This patch adds support only to ARMv7 PMU registers save/restore.
+> > > It needs to be extended to xscale and ARMv6 if needed.
+> > >
+> > > I made this patch because DS-5 is not working on Marvell's CA7 based SoCs.
+> > > And it has consulted Sudeep KarkadaNagesha's patch set for multiple PMUs.
+> > >
+> > > Thanks Will and Sudeep's suggestion to only save / restore used events.
+> > 
+> > Whilst this is a step in the right direction, I'd still like to see the save/restore
+> > predicated on something in the device-tree or otherwise. Most SoCs *don't*
+> > require these registers to be preserved by software, so we need a way to
+> > describe that the PMU is in a power-domain where its state is lost when the
+> > CPU goes idle.
+> > 
+> > This doesn't sound like a PMU-specific problem, so there's a possibility that
+> > this has been discussed elsewhere, in the context of other IP blocks
+> > 
+> > [adding the devicetree list in case somebody there is aware of any work in
+> > this area]
+> > 
+> 
+> Thanks Will.
+> What should I do now?
+> Add a filed under PMU or waiting for somebody whether there are general
+> supporting for power domain maintain.
 
-Thanks for the explanation.
-
-> As long as that cache line is dirty, no reads from that memory location
-> will occur as other readers will get the line from other cores, the L2, or
-> the line will get pushed out to memory first.
-
-Agreed, if all of the readers are coherent.
-
-> I guess you could see an invalidate on DMA memory causing the scrub to get
-> lost, but that doesn't really matter.  It would be harmless to get the
-> error again other than making your error rate seem higher (which is
-> something OEMs are very sensitive to). You are doing the invalidate so
-> that DMA can write new data anyway.
-
-Also agreed that the error-rate could be higher, but I still think there's
-a corruption issue here as well.
-
-To be clear:
-
- (1) The CPU maps a non-coherent, streaming DMA buffer for a device to
-     populate (i.e. cache cleaning).
-
- (2) The device starts writing to the buffer
-
- (3) Whilst the device is writing, the CPU performs a speculative read
-     from the buffer and an ECC error occurs. The error is corrected and
-     the CPU gets a clean line, whilst an interrupt is pended at the GIC
-     to inform the CPU about the error.
-
- (4) The CPU takes the interrupt and starts scrubbing the line. It issues
-     the exclusive load but then...
-
- (5) The device writes the location in question. The error is cleared (not
-     that we really care) and the memory location now contains new data
-
- (6) The CPU continues with its scrub, executing a successful
-     exclusive-store of *stale* data back to the memory location, but
-     allocating into L1.
-
- (7) Before the DMA completes, the line gets evicted from L1 and back to
-     main memory, corrupting the DMA transfer.
-
-So that's more serious that inflated reports -- we're turning a corrected
-error into a data corruption.
+I think we need some input from the device-tree guys to see whether they
+would object to us solving this locally (in the PMU node) or not.
+Personally, I'd much prefer a general way to describe the need for
+pm-notifiers, but if that's not being looked at then we can cook something
+specifically for our needs.
 
 Will
