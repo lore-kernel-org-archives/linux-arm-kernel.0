@@ -1,34 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Apr 2014 15:54:35 +0200
-Subject: [PATCH v3 7/7] ARM: sunxi: update the default ARCH_NR_GPIO for
- sunxi arch
-In-Reply-To: <201404221620.19519.arnd@arndb.de>
-References: <1397137966-30818-1-git-send-email-boris.brezillon@free-electrons.com>
- <1397137966-30818-8-git-send-email-boris.brezillon@free-electrons.com>
- <CACRpkdYT9HvG6dOVOEnBSNhRt847tdCsAU6E_dZLdFQEHntpKg@mail.gmail.com>
- <201404221620.19519.arnd@arndb.de>
-Message-ID: <CACRpkdZAd5SqeCg7XsjXMbYxD+RoriV6x6YMR=59Aon=S7cDnA@mail.gmail.com>
+Date: Wed, 23 Apr 2014 15:55:52 +0200
+Subject: [PATCH 2/7] gpiolib: Support purely name based gpiod lookup in
+ device trees
+In-Reply-To: <20140422151840.GH24905@lukather>
+References: <1397544101-18135-1-git-send-email-wens@csie.org>
+ <1397544101-18135-3-git-send-email-wens@csie.org>
+ <CACRpkdZ+3dnhoj1TS4KSVUP8iFHsjjwop-FG2Nf07YtH6aSO_Q@mail.gmail.com>
+ <20140422151840.GH24905@lukather>
+Message-ID: <CACRpkdbdgkYEGWpQiX0WuvS3iivfAyz0r+oK=5D8WB_e=0js2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 22, 2014 at 4:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, Apr 22, 2014 at 5:18 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
->> Patch applied, and grrrr we need to get rid of these static #gpios defines
->> in the long run.
+> This patch has a dependency on the first patch of this serie, since it
+> uses a binding that was documented there.
 >
-> Yes, that would be nice. I guess the gpio-descriptor framework should
-> have solved this, but we can't move everything over to that soon, right?
+> Maybe you'll want to wait for the ACK from the DT maintainers to merge
+> this one.
 
-Not really, it has to happen platform by platform.
-
-I did consider putting all the GPIO descriptors into a radix and
-use that internally in gpiolib, but that wasn't easy to do
-when I tried it, maybe I just thought backwards.
-
-I would appreciate if drivers for new archs like arm64 would
-use only GPIO descriptors from day one. Also if new drivers
-only apply a an entirely new machine even. They should just
-use descriptors.
+Yeah I realized this a bit later, sorry for being a bit confused :-/
 
 Yours,
 Linus Walleij
