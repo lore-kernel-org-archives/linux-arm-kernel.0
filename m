@@ -1,159 +1,44 @@
-From: bcousson@baylibre.com (Benoit Cousson)
-Date: Wed, 23 Apr 2014 17:35:29 +0200
-Subject: [PATCH RFC] ARM: dts: am335x: update USB DT references
-In-Reply-To: <20140423144822.GA4833@atomide.com>
-References: <1397647595-10927-1-git-send-email-leigh@solinno.co.uk>
- <5356794C.7070707@baylibre.com> <20140423144822.GA4833@atomide.com>
-Message-ID: <5357DDC1.1070609@baylibre.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 23 Apr 2014 20:59:27 +0530
+Subject: [PATCH 1/3] dts: exynos5250: Add required VDD regulator supplies for
+ usb
+In-Reply-To: <1398266969-26000-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398266969-26000-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1398266969-26000-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Add required VDD 3.3V and VDD 1.0V regulator supplies to usb nodes.
 
-On 23/04/2014 16:48, Tony Lindgren wrote:
-> * Benoit Cousson <bcousson@baylibre.com> [140422 07:14]:
->> Hi Leigh,
->>
->> On 16/04/2014 13:26, Leigh Brown wrote:
->>> In "ARM: dts: am33xx: correcting dt node unit address for usb", the
->>> usb_ctrl_mod and cppi41dma nodes were updated with the correct register
->>> addresses.  However, the dts files that reference these nodes were not
->>> updated, and those devices are no longer being enabled.
->>>
->>> This patch corrects the references for the affected dts files.
->>
->> Thanks for the fix. BTW, why is it a RFC? Do you plan to send an updated
->> version?
->>
->> FYI, even with this fix, the BBB still does not have a working MUSB on
->> 3.15-rc2. Have you observed that as well?
->>
->>> Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
->>
->> If this is a final version, I'll apply it for -rc3.
->
-> Looks like I already have this in omap-for-v3.15/fixes-v2, sorry
-> looks like I never replied to this one.
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-:-)
-
-OK, I'll let you handle this one.
-
-Thanks,
-Benoit
-
->
-> Regards,
->
-> Tony
->
->>> ---
->>>   arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
->>>   arch/arm/boot/dts/am335x-evm.dts          | 4 ++--
->>>   arch/arm/boot/dts/am335x-evmsk.dts        | 4 ++--
->>>   arch/arm/boot/dts/am335x-igep0033.dtsi    | 4 ++--
->>>   4 files changed, 8 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
->>> index e3f27ec..2e7d932 100644
->>> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
->>> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
->>> @@ -183,7 +183,7 @@
->>>   &usb {
->>>   	status = "okay";
->>>
->>> -	control at 44e10000 {
->>> +	control at 44e10620 {
->>>   		status = "okay";
->>>   	};
->>>
->>> @@ -204,7 +204,7 @@
->>>   		dr_mode = "host";
->>>   	};
->>>
->>> -	dma-controller at 07402000  {
->>> +	dma-controller at 47402000  {
->>>   		status = "okay";
->>>   	};
->>>   };
->>> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
->>> index 28ae040..77df10d 100644
->>> --- a/arch/arm/boot/dts/am335x-evm.dts
->>> +++ b/arch/arm/boot/dts/am335x-evm.dts
->>> @@ -331,7 +331,7 @@
->>>   &usb {
->>>   	status = "okay";
->>>
->>> -	control at 44e10000 {
->>> +	control at 44e10620 {
->>>   		status = "okay";
->>>   	};
->>>
->>> @@ -352,7 +352,7 @@
->>>   		dr_mode = "host";
->>>   	};
->>>
->>> -	dma-controller at 07402000  {
->>> +	dma-controller at 47402000  {
->>>   		status = "okay";
->>>   	};
->>>   };
->>> diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
->>> index ec08f6f..ab23885 100644
->>> --- a/arch/arm/boot/dts/am335x-evmsk.dts
->>> +++ b/arch/arm/boot/dts/am335x-evmsk.dts
->>> @@ -364,7 +364,7 @@
->>>   &usb {
->>>   	status = "okay";
->>>
->>> -	control at 44e10000 {
->>> +	control at 44e10620 {
->>>   		status = "okay";
->>>   	};
->>>
->>> @@ -385,7 +385,7 @@
->>>   		dr_mode = "host";
->>>   	};
->>>
->>> -	dma-controller at 07402000  {
->>> +	dma-controller at 47402000  {
->>>   		status = "okay";
->>>   	};
->>>   };
->>> diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
->>> index 7063311..5942e7d 100644
->>> --- a/arch/arm/boot/dts/am335x-igep0033.dtsi
->>> +++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
->>> @@ -202,7 +202,7 @@
->>>   &usb {
->>>   	status = "okay";
->>>
->>> -	control at 44e10000 {
->>> +	control at 44e10620 {
->>>   		status = "okay";
->>>   	};
->>>
->>> @@ -223,7 +223,7 @@
->>>   		dr_mode = "host";
->>>   	};
->>>
->>> -	dma-controller at 07402000  {
->>> +	dma-controller at 47402000  {
->>>   		status = "okay";
->>>   	};
->>>   };
->>>
->>
->>
->> --
->> Beno?t Cousson
->> BayLibre
->> Embedded Linux Technology Lab
->> www.baylibre.com
-
-
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index a794a70..2f183b8 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -363,8 +363,20 @@
+ 		samsung,audio-codec = <&wm8994>;
+ 	};
+ 
++	usb at 12000000 {
++		vdd33-supply = <&ldo12_reg>;
++		vdd10-supply = <&ldo15_reg>;
++	};
++
+ 	usb at 12110000 {
+ 		samsung,vbus-gpio = <&gpx2 6 0>;
++		vdd33-supply = <&ldo12_reg>;
++		vdd10-supply = <&ldo15_reg>;
++	};
++
++	usb at 12120000 {
++		vdd33-supply = <&ldo12_reg>;
++		vdd10-supply = <&ldo15_reg>;
+ 	};
+ 
+ 	dp-controller at 145B0000 {
 -- 
-Beno?t Cousson
-BayLibre
-Embedded Linux Technology Lab
-www.baylibre.com
+1.7.10.4
