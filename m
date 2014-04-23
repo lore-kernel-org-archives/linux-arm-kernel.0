@@ -1,124 +1,85 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 23 Apr 2014 16:36:29 +0530
-Subject: [PATCH 3/3] usb: dwc3-exynos: Make provision for vdd regulators
-In-Reply-To: <00d201cf5ee2$d55c4e90$8014ebb0$%tikhomirov@samsung.com>
-References: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
- <1398082604-3013-3-git-send-email-gautam.vivek@samsung.com>
- <00bf01cf5ed6$28de18d0$7a9a4a70$%tikhomirov@samsung.com>
- <CAFp+6iE2eWJPMmxSF9gbfwMmeO7k0bo=geo5SKmdgBRjiFq7mA@mail.gmail.com>
- <00d201cf5ee2$d55c4e90$8014ebb0$%tikhomirov@samsung.com>
-Message-ID: <CAFp+6iGBz-0LjkUU8A4var5frEqaumF85scZfHPEVwk62mTe8g@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 23 Apr 2014 18:16:48 +0800
+Subject: [PATCH v1 0/7] mtd: spi-nor: Add the DDR quad read support
+In-Reply-To: <a>
+References: <a>
+Message-ID: <1398248215-26768-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ (0) This patch set depends on the patch:
+	http://lists.infradead.org/pipermail/linux-mtd/2014-April/053308.html
 
+  
+ (1) This patch set tries to add the DDR quad read support for the SPI
+     NOR framework, and it also adds the DDR quad read support for FREESCALE
+     quadspi controller driver.
 
-On Wed, Apr 23, 2014 at 4:27 PM, Anton Tikhomirov
-<av.tikhomirov@samsung.com> wrote:
-> Hi,
->
->> Hi Anton,
->>
->>
->> On Wed, Apr 23, 2014 at 2:56 PM, Anton Tikhomirov
->> <av.tikhomirov@samsung.com> wrote:
->> > Hello,
->> >
->> >> -----Original Message-----
->> >> From: Vivek Gautam [mailto:gautamvivek1987 at gmail.com] On Behalf Of
->> >> Vivek Gautam
->> >> Sent: Monday, April 21, 2014 9:17 PM
->> >> To: linux-usb at vger.kernel.org; linux-samsung-soc at vger.kernel.org
->> >> Cc: linux-kernel at vger.kernel.org; linux-omap at vger.kernel.org; linux-
->> >> arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
->> >> stern at rowland.harvard.edu; balbi at ti.com; kgene.kim at samsung.com;
->> Vivek
->> >> Gautam; Anton Tikhomirov
->> >> Subject: [PATCH 3/3] usb: dwc3-exynos: Make provision for vdd
->> >> regulators
->> >>
->> >> Facilitate getting required 3.3V and 1.0V VDD supply for
->> >> DWC3 controller on Exynos.
->> >>
->> >> With patches for regulators' nodes merged in 3.15:
->> >> c8c253f ARM: dts: Add regulator entries to smdk5420
->> >> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
->> >>
->> >> certain perripherals will now need to ensure that,
->> >> they request VDD regulators in their drivers, and enable
->> >> them so as to make them working.
->> >>
->> >> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> >> Cc: Anton Tikhomirov <av.tikhomirov@samsung.com>
->> >> ---
->> >>
->> >> Based on 'usb-next' branch of Greg's USB tree.
->> >> Also cleanly applies on 'next' branch of Balbi's USB tree.
->> >>
->> >>  drivers/usb/dwc3/dwc3-exynos.c |   51
->> >> ++++++++++++++++++++++++++++++++++++++--
->> >>  1 file changed, 49 insertions(+), 2 deletions(-)
->> >>
->> >> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-
->> >> exynos.c
->> >> index 28c8ad7..c9d9102 100644
->> >> --- a/drivers/usb/dwc3/dwc3-exynos.c
->> >> +++ b/drivers/usb/dwc3/dwc3-exynos.c
->> >> @@ -27,6 +27,7 @@
->> >>  #include <linux/usb/usb_phy_gen_xceiv.h>
->> >>  #include <linux/of.h>
->> >>  #include <linux/of_platform.h>
->> >> +#include <linux/regulator/consumer.h>
->> >>
->> >>  struct dwc3_exynos {
->> >>       struct platform_device  *usb2_phy;
->> >> @@ -34,6 +35,8 @@ struct dwc3_exynos {
->> >>       struct device           *dev;
->> >>
->> >>       struct clk              *clk;
->> >> +     struct regulator        *vdd33;
->> >> +     struct regulator        *vdd10;
->> >>  };
->> >>
->> >>  static int dwc3_exynos_register_phys(struct dwc3_exynos *exynos)
->> >> @@ -144,20 +147,46 @@ static int dwc3_exynos_probe(struct
->> >> platform_device *pdev)
->> >>
->> >>       clk_prepare_enable(exynos->clk);
->> >>
->> >> +     exynos->vdd33 = devm_regulator_get(dev, "vdd33");
->> >> +     if (IS_ERR(exynos->vdd33)) {
->> >> +             ret = PTR_ERR(exynos->vdd33);
->> >> +             goto err2;
->> >
->> > Is regulator property mandatory for dwc3-exynos? If it is not
->> > and device tree doesn't provide it, dwc3-exynos driver probe
->> shouldn't
->> > fail here.
->>
->> These are the VDD regulators (from PMIC ldo supplies), in absence of
->> which the controller will not be powered up.
->> So doesn't it make sense to stop the probe when these are not supplied
->> by device tree ?
->
-> Agree. Just curious, is there special reason for this change except making
-> things right?
+ (2) Test this patch set with Spansion s25fl128s, the performance with mtd_speedtest.ko:
+     =================================================
+     mtd_speedtest: MTD device: 0
+     mtd_speedtest: not NAND flash, assume page size is 512 bytes.
+     mtd_speedtest: MTD device size 16777216, eraseblock size 65536, page size 512,
+                    count of eraseblocks 256, pages per eraseblock 128, OOB size 0
+     mtd_speedtest: testing eraseblock write speed
+     mtd_speedtest: eraseblock write speed is 665 KiB/s
+     mtd_speedtest: testing eraseblock read speed
+     mtd_speedtest: eraseblock read speed is 49799 KiB/s
+     mtd_speedtest: testing page write speed
+     mtd_speedtest: page write speed is 662 KiB/s
+     mtd_speedtest: testing page read speed
+     mtd_speedtest: page read speed is 24236 KiB/s
+     mtd_speedtest: testing 2 page write speed
+     mtd_speedtest: 2 page write speed is 657 KiB/s
+     mtd_speedtest: testing 2 page read speed
+     mtd_speedtest: 2 page read speed is 32637 KiB/s
+     mtd_speedtest: Testing erase speed
+     mtd_speedtest: erase speed is 518 KiB/s
+     mtd_speedtest: Testing 2x multi-block erase speed
+     mtd_speedtest: 2x multi-block erase speed is 506 KiB/s
+     mtd_speedtest: Testing 4x multi-block erase speed
+     mtd_speedtest: 4x multi-block erase speed is 503 KiB/s
+     mtd_speedtest: Testing 8x multi-block erase speed
+     mtd_speedtest: 8x multi-block erase speed is 501 KiB/s
+     mtd_speedtest: Testing 16x multi-block erase speed
+     mtd_speedtest: 16x multi-block erase speed is 498 KiB/s
+     mtd_speedtest: Testing 32x multi-block erase speed
+     mtd_speedtest: 32x multi-block erase speed is 496 KiB/s
+     mtd_speedtest: Testing 64x multi-block erase speed
+     mtd_speedtest: 64x multi-block erase speed is 495 KiB/s
+     mtd_speedtest: finished
+     =================================================
 
-Yea, actually after the patch (which got merged in 3.15 rc1)
-275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+  (3) Conclusion:
+     The DDR quad read could be 49799 KiB/s.
+     
+Changlog:
+  About this patch set:
+     For patch 1, please see the old discusstion:
+     http://lists.infradead.org/pipermail/linux-mtd/2014-April/053370.html
 
-the USB stops working, and that's because the regulators related to
-usb are not turned on by default (ldo12 and ldo15 to be specific).
-So we need to enable those regulators, which ofcourse the driver
-should be doing, if i am not wrong.
-Similar is the reason for EHCI, and OHCI exynos patches in this series.
+     For patch 2, please see the old discusstion:
+     http://lists.infradead.org/pipermail/linux-mtd/2014-April/053374.html
 
-I shall be sending the dt patch for this soon.
+     
+Huang Shijie (7):
+  mtd: spi-nor: fix the wrong dummy value
+  mtd: spi-nor: add DDR quad read support
+  Documentation: mtd: add a new document for SPI NOR flash
+  Documentation: fsl-quadspi: update the document
+  mtd: fsl-quadspi: get the dummy cycles for DDR Quad read from the DT
+    property
+  mtd: fsl-quadspi: use the information stored in spi-nor{}
+  mtd: fsl-quadspi: add the DDR quad read support
 
+ .../devicetree/bindings/mtd/fsl-quadspi.txt        |   16 +++
+ .../devicetree/bindings/mtd/spi-nor-flash.txt      |    7 +
+ drivers/mtd/devices/m25p80.c                       |    5 +-
+ drivers/mtd/spi-nor/fsl-quadspi.c                  |  121 +++++++++++++-------
+ drivers/mtd/spi-nor/spi-nor.c                      |   52 ++++++++-
+ include/linux/mtd/spi-nor.h                        |    8 +-
+ 6 files changed, 162 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/spi-nor-flash.txt
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+1.7.2.rc3
