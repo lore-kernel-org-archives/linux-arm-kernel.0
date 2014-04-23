@@ -1,69 +1,32 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 23 Apr 2014 21:45:57 +0200
-Subject: [PATCH v1 2/7] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <1398248215-26768-3-git-send-email-b32955@freescale.com>
-References: <a> <1398248215-26768-3-git-send-email-b32955@freescale.com>
-Message-ID: <201404232145.57404.marex@denx.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 23 Apr 2014 21:52:01 +0200
+Subject: [PATCH 1/4] dma: ste_dma40: Maintain spinlock order while handling
+ pause
+Message-ID: <1398282724-2607-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 23, 2014 at 12:16:50 PM, Huang Shijie wrote:
-> This patch adds the DDR quad read support by the following:
-> 
->   [1] add SPI_NOR_DDR_QUAD read mode.
-> 
->   [2] add DDR Quad read opcodes:
->        SPINOR_OP_READ_1_4_4_D / SPINOR_OP_READ4_1_4_4_D
-> 
->   [3] add set_ddr_quad_mode() to initialize for the DDR quad read.
->       Currently it only works for Spansion NOR.
-> 
->   [3] set the dummy with 8 for DDR quad read.
->       The m25p80.c can not support the DDR quad read, the SPI NOR
-> controller can set the dummy value in its driver, such as fsl-quadspi.c.
-> 
-> Test this patch for Spansion s25fl128s NOR flash.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/mtd/spi-nor/spi-nor.c |   50
-> +++++++++++++++++++++++++++++++++++++++- include/linux/mtd/spi-nor.h   |  
->  8 +++++-
->  2 files changed, 54 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index 1a12f81..e2f69db 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -74,6 +74,15 @@ static int read_cr(struct spi_nor *nor)
->  static inline int spi_nor_read_dummy_cycles(struct spi_nor *nor)
->  {
->  	switch (nor->flash_read) {
-> +	case SPI_NOR_DDR_QUAD:
-> +		/*
-> +		 * The m25p80.c can not support the DDR quad read.
-> +		 * We set the dummy cycles to 8 by default. If the SPI NOR
-> +		 * controller driver has already set it before call the
-> +		 * spi_nor_scan(), we just keep it as it is.
-> +		 */
-> +		if (nor->read_dummy)
-> +			return nor->read_dummy;
+The runtime PM resume callback needs to be executed while holding the
+spinlock, make sure to maintain this for the pause operation as well.
 
-Can the controller set this variable to zero ?
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/dma/ste_dma40.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-[...]
-
-> +static int set_ddr_quad_mode(struct spi_nor *nor, u32 jedec_id)
-> +{
-> +	int status;
-> +
-> +	switch (JEDEC_MFR(jedec_id)) {
-> +	case CFI_MFR_AMD: /* Spansion, actually */
-> +		status = spansion_quad_enable(nor);
-> +		if (status) {
-> +			dev_err(nor->dev,
-> +				"Spansion DDR quad-read not enabled\n");
-> +			return -EINVAL;
-
-Can't you just return status here as well to propagate the failure?
-[...]
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index bf18c78..6e97cf6 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1495,8 +1495,8 @@ static int d40_pause(struct d40_chan *d40c)
+ 	if (!d40c->busy)
+ 		return 0;
+ 
+-	pm_runtime_get_sync(d40c->base->dev);
+ 	spin_lock_irqsave(&d40c->lock, flags);
++	pm_runtime_get_sync(d40c->base->dev);
+ 
+ 	res = d40_channel_execute_command(d40c, D40_DMA_SUSPEND_REQ);
+ 
+-- 
+1.7.9.5
