@@ -1,53 +1,71 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 23 Apr 2014 10:24:09 +0200
-Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
-In-Reply-To: <CAL_JsqJwC2xcZakXiJXJscK7tN7xt2OotBKyr9u+aK3bOP+7GQ@mail.gmail.com>
-References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
- <CAL_JsqKE_Z3kBhS1VaQADV5ob8x6AKHhbHaQEGoVSwkwdd50zA@mail.gmail.com>
- <CAL_JsqJwC2xcZakXiJXJscK7tN7xt2OotBKyr9u+aK3bOP+7GQ@mail.gmail.com>
-Message-ID: <20140423082409.GC24355@kwain>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Wed, 23 Apr 2014 09:31:29 +0100
+Subject: [Xen-devel] [PATCH RFC] arm64: 32-bit tolerant sync bitops
+In-Reply-To: <534FB009.5030904@citrix.com>
+References: <1397723881-31648-1-git-send-email-murzin.v@gmail.com>
+ <534FB009.5030904@citrix.com>
+Message-ID: <1398241889.4880.96.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
-
-On Tue, Apr 22, 2014 at 01:54:33PM -0500, Rob Herring wrote:
-> On Tue, Apr 22, 2014 at 1:47 PM, Rob Herring <robherring2@gmail.com> wrote:
-> > On Tue, Apr 22, 2014 at 10:38 AM, Antoine T?nart
-> > <antoine.tenart@free-electrons.com> wrote:
-> >> Add support for the Berlin SoCs AHCI SATA controller allowing to
-> >> interface with devices like external hard drives.
+On Thu, 2014-04-17 at 11:42 +0100, David Vrabel wrote:
+> On 17/04/14 09:38, Vladimir Murzin wrote:
+> > Xen assumes that bit operations are able to operate on 32-bit size and
+> > alignment [1]. For arm64 bitops are based on atomic exclusive load/store
+> > instructions to guarantee that changes are made atomically. However, these
+> > instructions require that address to be aligned to the data size. Because, by
+> > default, bitops operates on 64-bit size it implies that address should be
+> > aligned appropriately. All these lead to breakage of Xen assumption for bitops
+> > properties.
+> > 
+> > With this patch 32-bit sized/aligned bitops is implemented. 
+> > 
+> > [1] http://www.gossamer-threads.com/lists/xen/devel/325613
+> > 
+> > Signed-off-by: Vladimir Murzin <murzin.v@gmail.com>
+> > ---
+> >  Apart this patch other approaches were implemented:
+> >  1. turn bitops to be 32-bit size/align tolerant.
+> >     the changes are minimal, but I'm not sure how broad side effect might be
+> >  2. separate 32-bit size/aligned operations.
+> >     it exports new API, which might not be good
 > 
-> One more thing.
+> I've never been particularly happy with the way the events_fifo.c uses
+> casts for the sync_*_bit() calls and I think we should do option 2.
 > 
-> >> +       nports = readl(hpriv->mmio + HOST_PORTS_IMPL);
-> >> +
-> >> +       /* force_map is modified only if the property is found */
-> >> +       of_property_read_u32(np, "marvell,force-port-map", &force_map);
-> 
-> This property does not appear to be documented.
+> A generic implementation could be something like:
 
-I'll update it regarding Sebastian comments, or maybe drop it if it is
-possible to enable each port individually.
+It seems like there isn't currently much call for/interest in a generic
+32-bit set of bitops. Since this is a regression on arm64 right now how
+about we simply fix it up in the Xen layer now and if in the future a
+common need is found we can rework to use it.
 
-> 
-> >> +       if (force_map)
-> >> +               nports = force_map;
-> 
-> You don't need this as your comment says, you can just do:
-> 
-> of_property_read_u32(np, "marvell,force-port-map", &nports);
-> 
-> nports will only be changed if property is present.
+We already have evtchn_fifo_{clear,set,is}_pending (although
+evtchn_fifo_unmask and consume_one_event need fixing to use is_pending)
+and evtchn_fifo_{test_and_set_,}mask, plus we would need
+evtchn_fifo_set_mask for consume_one_event to use instead of open
+coding.
 
-Sure.
+With that then those helpers can become something like:
+        #define BM(w) (unsigned long *)(w & ~0x7)
+        #define EVTCHN_FIFO_BIT(b, w) (BUG_ON(w&0x3), w & 0x4 ? EVTCHN_FIFO_#b + 32 : EVTCHN_FIFO_#b)
+        static void evtchn_fifo_clear_pending(unsigned port)
+        {
+        	event_word_t *word = event_word_from_port(port);
+        	sync_clear_bit(EVTCHN_FIFO_BIT(PENDING, word), BM(word));
+        }
+similarly for the others.
 
-Thanks!
+If that is undesirable in the common code then wrap each existing helper
+in #ifndef evtchn_fifo_clean_pending and put something like the above in
+arch/arm64/include/asm/xen/events.h with a #define (and/or make the
+helpers themselves macros, or #define HAVE_XEN_FIFO_EVTCHN_ACCESSORS etc
+etc)
 
-Antoine
+We still need your patch from
+http://article.gmane.org/gmane.comp.emulators.xen.devel/196067 for the
+other unaligned bitmap case. Note that this also removes the use of BM
+for non-PENDING/MASKED bits, which is why it was safe for me to change
+it above (also it would be safe to & ~0x7 after that change anyway).
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ian.
