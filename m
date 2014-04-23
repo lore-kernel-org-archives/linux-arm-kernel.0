@@ -1,101 +1,37 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 23 Apr 2014 09:03:55 -0400
-Subject: [PATCH] ftrace/arm: add save_stack_trace_regs() implementation
-In-Reply-To: <1398257541-18201-1-git-send-email-linyongting@gmail.com>
-References: <1398257541-18201-1-git-send-email-linyongting@gmail.com>
-Message-ID: <20140423090355.5a0a98cd@gandalf.local.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Apr 2014 14:09:01 +0100
+Subject: [Question] ARM/ARM64: Ticket Spinlock With GENERIC_BREAKLOCK
+In-Reply-To: <53508F7B.2000400@marvell.com>
+References: <53508F7B.2000400@marvell.com>
+Message-ID: <20140423130901.GC5649@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Apr 2014 20:52:21 +0800
-Lin Yongting <linyongting@gmail.com> wrote:
+On Fri, Apr 18, 2014 at 03:35:39AM +0100, Leo Yan wrote:
+> hi,
 
-> When configure kprobe events of ftrace with "stacktrace" option enabled
-> in arm, there is no stacktrace was recorded after the kprobe event was
-> triggered. The root cause is no save_stack_trace_regs() function implemented.
-> 
-> Implement the save_stack_trace_regs() function in arm, then ftrace will
-> call this architecture-related function to record the stacktrace into
-> ring buffer.
-> 
-> After this fix, stacktrace can be recorded, for example:
-> 
-> # mount -t debugfs nodev /sys/kernel/debug
-> # echo "p:netrx net_rx_action" >> /sys/kernel/debug/tracing/kprobe_events
-> # echo 1 > /sys/kernel/debug/tracing/events/kprobes/netrx/enable
-> # echo 1 > /sys/kernel/debug/tracing/options/stacktrace
-> # echo 1 > /sys/kernel/debug/tracing/tracing_on
-> # ping 127.0.0.1 -c 1
-> # echo 0 > /sys/kernel/debug/tracing/tracing_on
-> 
-> # cat /sys/kernel/debug/tracing/trace
-> # tracer: nop
-> #
-> # entries-in-buffer/entries-written: 12/12   #P:1
-> #
-> #                              _-----=> irqs-off
-> #                             / _----=> need-resched
-> #                            | / _---=> hardirq/softirq
-> #                            || / _--=> preempt-depth
-> #                            ||| /     delay
-> #           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
-> #              | |       |   ||||       |         |
->             <------ missing some entries ---------------->
->             ping-1200  [000] dNs1   667.603250: netrx: (net_rx_action+0x0/0x1f8)
->             ping-1200  [000] dNs1   667.604738: <stack trace>
->  => net_rx_action
->  => do_softirq
->  => local_bh_enable
->  => ip_finish_output
->  => ip_output
->  => ip_local_out
->  => ip_send_skb
->  => ip_push_pending_frames
->  => raw_sendmsg
->  => inet_sendmsg
->  => sock_sendmsg
->  => SyS_sendto
->  => ret_fast_syscall
-> 
-> Signed-off-by: Lin Yongting <linyongting@gmail.com>
-> ---
+Hello,
 
-As this affects ftrace for ARM...
-
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-
--- Steve
-
->  arch/arm/kernel/stacktrace.c |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> I noticed now for ARM and ARM64 both have disabled GENERIC_BREAKLOCK, 
+> and i found the patch "ARM: 7484/1: Don't enable GENERIC_LOCKBREAK with 
+> ticket spinlocks" to remove related configuration.
 > 
-> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-> index af4e8c8..c558db6 100644
-> --- a/arch/arm/kernel/stacktrace.c
-> +++ b/arch/arm/kernel/stacktrace.c
-> @@ -123,6 +123,25 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
->  		trace->entries[trace->nr_entries++] = ULONG_MAX;
->  }
->  
-> +void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
-> +{
-> +	struct stack_trace_data data;
-> +	struct stackframe frame;
-> +
-> +	data.trace = trace;
-> +	data.skip = trace->skip;
-> +	data.no_sched_functions = 0;
-> +
-> +	frame.fp = regs->ARM_fp;
-> +	frame.sp = regs->ARM_sp;
-> +	frame.lr = regs->ARM_lr;
-> +	frame.pc = regs->ARM_pc;
-> +
-> +	walk_stackframe(&frame, save_trace, &data);
-> +	if (trace->nr_entries < trace->max_entries)
-> +		trace->entries[trace->nr_entries++] = ULONG_MAX;
-> +}
-> +
->  void save_stack_trace(struct stack_trace *trace)
->  {
->  	save_stack_trace_tsk(current, trace);
+> The ticket spinlock will be helpful for spinlock's performance, but 
+> after disabled LOCKBREAK, it will always disable the preempt when the 
+> cpu is spinning to wait for the lock.
+> 
+> So even after have refined the spinlock with ticket algorithm, we still 
+> need LOCKBREAK for the cpu has the chance to do scheduling so that other 
+> threads have chance can run.
+
+The problem with GENERIC_LOCKBREAK is that we no longer end up using the
+lock() function. Instead, we trylock() in a busy loop, so if the machine
+doesn't have pending interrupts or other tasks to run, we end up chewing
+power in a busy loop while the lock is contended. Worse still, we're polling
+the lock value, so the relevant cacheline will be thrasing between all
+waiters (and potentially the CPU trying to unlock()!).
+
+If latency is an issue for you, have you considered either using a mutex
+(where we explicitly block) or something like PREEMPT_RT instead?
+
+Will
