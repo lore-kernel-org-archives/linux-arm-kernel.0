@@ -1,83 +1,80 @@
-From: zlim@broadcom.com (Zi Shen Lim)
-Date: Wed, 23 Apr 2014 10:27:20 -0700
-Subject: [PATCH 2/2] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140423103648.GM12304@sirena.org.uk>
-References: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
- <1398217214-12204-3-git-send-email-zlim@broadcom.com>
- <20140423103648.GM12304@sirena.org.uk>
-Message-ID: <20140423172720.GA18588@lc-sj1-5012.sj.broadcom.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 23 Apr 2014 10:31:53 -0700
+Subject: [PATCH v1] dma: imx-sdma: add support for sdma memory copy
+In-Reply-To: <1398165864.11914.241.camel@smile.fi.intel.com>
+References: <1397728870-22086-1-git-send-email-b38343@freescale.com>	
+ <1397730289.11914.225.camel@smile.fi.intel.com>	
+ <20140418094057.GA11496@Robin-OptiPlex-780>	
+ <1398162484.11914.234.camel@smile.fi.intel.com>	
+ <20140422105142.GA9693@Robin-OptiPlex-780>
+ <1398165864.11914.241.camel@smile.fi.intel.com>
+Message-ID: <5357F909.7070205@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 11:36:48AM +0100, Mark Brown wrote:
-> On Tue, Apr 22, 2014 at 06:40:14PM -0700, Zi Shen Lim wrote:
+On 04/22/14 04:24, Andy Shevchenko wrote:
+> On Tue, 2014-04-22 at 18:51 +0800, Robin Gong wrote:
+>> On Tue, Apr 22, 2014 at 10:28:05AM +0000, Shevchenko, Andriy wrote:
+>>> On Fri, 2014-04-18 at 17:41 +0800, Robin Gong wrote:
+>>>> On Thu, Apr 17, 2014 at 10:24:50AM +0000, Shevchenko, Andriy wrote:
+>>>>> On Thu, 2014-04-17 at 18:01 +0800, Robin Gong wrote:
+>>>
+>>> []
+>>>
+>>>>>> +	dev_dbg(sdma->dev, "memcpy: %x->%x, len=%d, channel=%d.\n",
+>>>>>
+>>>>> %pad for dma_addr_t variables.
+>>>>>
+>>>> Yes, %x here is not proper, will be %#llx here to align with others similar
+>>>> code in this file.
+>>>
+>>> Why %#llx? You don't need the specific casting since kernel has special
+>>> specifiers for phys_addr_t and dma_addr_t and their derivatives (see
+>>> Documentation/printk-formats.txt)
+>>>
+>> I think both are ok, why I choose %llx is only for align the code style,
 > 
-> > +		/* Multiprocessor system */
-> > +		if (mpidr & MPIDR_MT_BITMASK) {
-> > +			/* Multi-threads per core */
-> > +			cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +			cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +			cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2);
-> > +		} else {
-> > +			/* Single-thread per core */
-> > +			cpuid_topo->thread_id  = -1;
-> > +			cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +			cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +		}
-> > +	}
+> Yes, but it was started being developed earlier than kernel gains the
+> feature.
 > 
-> This means that we ignore affinity level 3 and on non-MT cores we ignore
-> affinity level 2.  That means that if it runs on some system where we do
-> have multiple levels of clustering (for example some future multi socket
-> server) or if for some reason the hardware engineers have decided to use
-> one of the higher affinity levels then we will incorrectly report cores
-> from several clusters as being part of a single cluster.
+>>  you
+>> can find the same code in sdma_prep_dma_cyclic function. below description also
+>> copy from Documentation/printk-formats.txt:
+>>
+>>
+>> If <type> is dependent on a config option for its size (e.g., sector_t,
+>> blkcnt_t, phys_addr_t, resource_size_t) or is architecture-dependent
+>> for its size (e.g., tcflag_t), use a format specifier of its largest
+>> possible type and explicitly cast to it.  Example:
+>>
+>> 	printk("test: sector number/total blocks: %llu/%llu\n",
+>> 		(unsigned long long)sector, (unsigned long long)blockcount);
 > 
+> Yeah, I think it requires to be updated accordingly to last changes
+> regarding to new specifiers.
+> 
+> +Cc Randy. Randy, do you think is a matter of fact that we have to
+> update that paragraph somehow and recommend to prefer special specifiers
+> over explicit casting to longest possible type?
 
-Good points.
+Yes, I agree, if there is a printk format specifier that supports a certain type
+to be printed, we should prefer to use that instead of the generic casting method.
 
-"Cluster" in my case is actually "Socket".
+IMO, the cast to (long long) or (unsigned long long) or (u64) or (s64) should be a last
+resort safe method.
 
-I guess single-socket in b.L configuration could have multiple clusters,
-in which case, a new 'socket_id' would map to aff3 in MT case.
 
-	thread	= aff0
-	core	= aff1
-	cluster	= aff2
-	socket	= aff3
-
-For non-MT, it could very well be aff2?
-
-	thread	= -1
-	core	= aff0
-	cluster	= aff1
-	socket	= aff2
-
-Or is it likely that some folks may opt to skip aff2, and simply use aff3?
-Mark, is there precedence for such usage of affinity levels?
-
-Maybe ARM folks can point us to documentation or conventions w.r.t.
-usage of those affinity levels.  Otherwise, this has potential to become
-a creative playground :)
-
-> I had been intending to just combine all the bits from affinitly levels
-> above the CPU number into a single number until we know what to do with
-> them individually.  We shouldn't just ignore them.
+>>>>>> +		dev_dbg(sdma->dev, "entry %d: count: %d dma: 0x%08x %s%s\n",
+>>>>>> +				i, count, sg_src->dma_address,
+>>>>>
+>>>>> %pad for dma_addr_t.
+>>>>>
+>>>> Accept the idea, same as the above.
+>>>
+>>> Same as above.
+> 
 > 
 
-I agree we shouldn't ignore aff3 if someone is already using it.
 
-I'm not sure how combining them into a single number helps with topology.
-We already started out with a cpuid, no?
-
-Perhaps we should just add a new 'socket_id' and that will accommodate
-all cases (up to aff3).
-
-> > +	pr_info("CPU%u: cluster %d core %d thread %d mpidr %llx\n",
-> > +		cpuid, cpuid_topo->cluster_id, cpuid_topo->core_id,
-> > +		cpuid_topo->thread_id, mpidr);
-> > +
-> 
-> Catalin or Lorenzo asked for stuff like that to be taken out.
-
-Is it ok to change it pr_debug instead? Or drop it completely?
+-- 
+~Randy
