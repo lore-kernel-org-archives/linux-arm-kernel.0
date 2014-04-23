@@ -1,59 +1,103 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 24 Apr 2014 00:42:19 +0400
-Subject: [PATCH v2 1/9] ARM: S3C24XX: cpufreq-utils: don't write raw values
- to MPLLCON when using ccf
-In-Reply-To: <5855371.5GIoOu8EnE@phil>
-References: <2104342.rkElQpXtvM@phil> <5855371.5GIoOu8EnE@phil>
-Message-ID: <535825AB.8060802@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Apr 2014 13:49:26 -0700
+Subject: [PATCH 02/11] ARM: OMAP3: Fix idle mode signaling for sys_clkreq
+ and sys_off_mode
+In-Reply-To: <535770EE.8060603@ti.com>
+References: <1397173639-29587-1-git-send-email-tony@atomide.com>
+ <1397173639-29587-3-git-send-email-tony@atomide.com>
+ <5348FFFA.5040207@ti.com> <20140412150205.GB32292@atomide.com>
+ <535770EE.8060603@ti.com>
+Message-ID: <20140423204926.GB6053@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Tero Kristo <t-kristo@ti.com> [140423 00:51]:
+> On 04/12/2014 06:02 PM, Tony Lindgren wrote:
+> >* Tero Kristo <t-kristo@ti.com> [140412 02:01]:
+> >>On 04/11/2014 02:47 AM, Tony Lindgren wrote:>
+> >>>@@ -282,6 +283,7 @@ void omap_sram_idle(void)
+> >>>
+> >>>   	/* CORE */
+> >>>   	if (core_next_state < PWRDM_POWER_ON) {
+> >>>+		omap3_vc_set_pmic_signaling(core_next_state);
+> >>>   		if (core_next_state == PWRDM_POWER_OFF) {
+> >>>   			omap3_core_save_context();
+> >>>   			omap3_cm_save_context();
+> >>
+> >>I think this implementation is sub-optimal, as it only scales
+> >>voltages if core is entering idle state. MPU only idle is possible,
+> >>however you do not scale voltages in this case.
+> >
+> >Hmm that's same as PWRDM_POWER_RET? That's working too.
+> >Or do you have something else in mind that I'm not aware
+> >of?
+> 
+> No, I mean the case where core_next_state == PWRDM_POWER_ON, but
+> mpu_next_state <= PWRDM_POWER_RET. You could scale MPU voltage in this case
+> but you don't with this implementation.
 
-On 04/23/2014 11:34 PM, Heiko St?bner wrote:
+OK makes sense to pass both mpu_next_state and core_next_state  
+to the function then.
 
-> The s3c24xx cpufreq driver needs to change the mpll speed and was doing
-> this by writing raw values from a translation table into the MPLLCON
-> register.
+> >>>@@ -220,6 +220,78 @@ static inline u32 omap_usec_to_32k(u32 usec)
+> >>>   	return DIV_ROUND_UP_ULL(32768ULL * (u64)usec, 1000000ULL);
+> >>>   }
+> >>>
+> >>>+void omap3_vc_set_pmic_signaling(int core_next_state)
+> >>>+{
+> >>>+	u32 voltctrl;
+> >>>+
+> >>>+	voltctrl = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
+> >>>+					  OMAP3_PRM_VOLTCTRL_OFFSET);
+> >>
+> >>Just a note here, I am currently working on trying to get rid of all
+> >>the direct prm_read/write calls outside PRCM drivers, this and rest
+> >>should use voltdm->read/write.
+> >
+> >OK, sounds like you already have a patch for that in your
+> >3.14-rc4-cm-prm-driver-wip branch?
+> 
+> Yes, there is a patch for that.
 
-> Change this to use a regular clk_set_rate call when using the common
-> clock framework and only write the raw value in the samsung_clock case.
+OK I'll pick it from there. 
 
-> To not needing to create additional infrastructure for this, the mpll clock
-> is requested at the first call to s3c2410_set_fvco().
+> >Let's do the fixes first, then it's going to be a lot easier for
+> >us to test the rest of the PRMC changes.
+> >
+> >>>+	/*
+> >>>+	 * By default let's use I2C4 signaling for retention idle
+> >>>+	 * and sys_off_mode pin signaling for off idle. This way we
+> >>>+	 * have sys_clk_req pin go down for retention and both
+> >>>+	 * sys_clk_req and sys_off_mode pins will go down for off
+> >>>+	 * idle. And we can also scale voltages to zero for off-idle.
+> >>>+	 * Note that no actual voltage scaling will happen unless the
+> >>>+	 * board specific twl4030 PMIC scripts are loaded.
+> >>>+	 */
+> >>>+	val = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
+> >>>+				     OMAP3_PRM_VOLTCTRL_OFFSET);
+> >>
+> >>Why not use the I2C4 signalling for off-mode? This way the voltages
+> >>can be scaled to 0.6V even without any board specific scripts.
+> >
+> >Using I2C4 works too, we're just missing a place to set
+> >and clear OMAP3430_PRM_VOLTCTRL_SEL_OFF bit currently. Sounds
+> >like eventually we should allow changing it dynamically somewhere.
+> 
+> You can't check the presence of the scripts here?
 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   arch/arm/mach-s3c24xx/cpufreq-utils.c | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
+I guess we could eventually add something for that :)
+ 
+> >But for now, SEL_OFF should be enabled as it allows debugging PM
+> >by looking at the sys_clkreq and sys_off_mode pins no matter if
+> >there are board specific scripts or not. The sys_off_mode won't
+> >toggle if things are configured to use I2C4, which is confusing.
+> 
+> You can always measure the voltage rails directly also, but yea, it is more
+> convenient to just look at the led.
 
-> diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c b/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> index 2a0aa56..d5e797b 100644
-> --- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> +++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
-[...]
-> @@ -60,5 +61,18 @@ void s3c2410_cpufreq_setrefresh(struct s3c_cpufreq_config *cfg)
->    */
->   void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
->   {
-> +#ifdef CONFIG_SAMSUNG_CLOCK
->   	__raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
-> +#endif
-> +
-> +#ifdef CONFIG_COMMON_CLK
-> +	static struct clk *mpll;
-> +
-> +	if (!mpll)
+And works for making sure we don't get new PM kernel regressions
+even if twl4030 is not working properly :)
 
-    You are testing uninitialized variable. This check wouldn't make much 
-sense even if the variable was initialized.
+Regards,
 
-> +		mpll = clk_get(NULL, "mpll")
-> +	if (IS_ERR(mpll))
-> +		return;
-> +
-> +	clk_set_rate(mpll, cfg->pll.frequency);
-> +#endif
->   }
-
-WBR, Sergei
+Tony
