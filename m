@@ -1,88 +1,72 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 23 Apr 2014 15:17:43 +0200
-Subject: [PATCH] arm: dma-mapping: Fix mapping size value
-In-Reply-To: <CAD15agYETzLJZ26wh8c=+PCSoQ9dR9vLgg7VmZTnQquXxoW+2Q@mail.gmail.com>
-References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
- <20140422085307.GB5747@arm.com> <53577F84.1080101@samsung.com>
- <4662711.Ubz0jaKMvq@avalon>
- <CAD15agYETzLJZ26wh8c=+PCSoQ9dR9vLgg7VmZTnQquXxoW+2Q@mail.gmail.com>
-Message-ID: <5357BD77.3060908@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Apr 2014 15:17:20 +0200
+Subject: [PATCH v6 3/8] ARM: sunxi: Move the clock protection to machine
+ hooks
+In-Reply-To: <201404231439.02913.arnd@arndb.de>
+References: <1397724379-15398-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1397724379-15398-4-git-send-email-maxime.ripard@free-electrons.com>
+ <201404231439.02913.arnd@arndb.de>
+Message-ID: <20140423131720.GS24905@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Apr 23, 2014 at 02:39:02PM +0200, Arnd Bergmann wrote:
+> On Thursday 17 April 2014, Maxime Ripard wrote:
+> > Since we start to have a lot of clocks to protect, some of them in a few boards
+> > only, it becomes difficult to handle the clock protection without having to add
+> > per machine exceptions.
+> > 
+> > Move these where they belong, in the machine definition code.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> I don't like the fact that these are required to be hardcoded
+> anywhere in source code.
 
-On 2014-04-23 12:04, Ritesh Harjani wrote:
-> Hi Marek/Will
->
-> On Wed, Apr 23, 2014 at 3:00 PM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> > Hi Marek,
-> >
-> > On Wednesday 23 April 2014 10:53:24 Marek Szyprowski wrote:
-> >> On 2014-04-22 10:53, Will Deacon wrote:
-> >> > On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
-> >> > > 68efd7d2fb("arm: dma-mapping: remove order parameter from
-> >> > > arm_iommu_create_mapping()") is causing kernel panic
-> >> > > because it wrongly sets the value of mapping->size:
-> >> > >
-> >> > > Unable to handle kernel NULL pointer dereference at virtual
-> >> > > address 000000a0
-> >> > > pgd = e7a84000
-> >> > > [000000a0] *pgd=00000000
-> >> > > ...
-> >> > > PC is at bitmap_clear+0x48/0xd0
-> >> > > LR is at __iommu_remove_mapping+0x130/0x164
-> >> > >
-> >> > > Fix it by correcting mapping->size value.
-> >> > >
-> >> > > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
-> >> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >> > > ---
-> >> > >
-> >> > >  arch/arm/mm/dma-mapping.c | 2 +-
-> >> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> > >
-> >> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> >> > > index f62aa06..6b00be1 100644
-> >> > > --- a/arch/arm/mm/dma-mapping.c
-> >> > > +++ b/arch/arm/mm/dma-mapping.c
-> >> > > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
-> >> > > dma_addr_t base, size_t size)> >
-> >> > >   mapping->nr_bitmaps = 1;
-> >> > >   mapping->extensions = extensions;
-> >> > >   mapping->base = base;
-> >> > >
-> >> > > - mapping->size = bitmap_size << PAGE_SHIFT;
-> >> > >
-> >> > >   mapping->bits = BITS_PER_BYTE * bitmap_size;
-> >> > >
-> >> > > + mapping->size = mapping->bits << PAGE_SHIFT;
-> >> >
-> >> > Ok, but given that mapping->size is derived from mapping->bits, do we
-> >> > really need both of these fields in struct dma_iommu_mapping?
-> >>
-> >> You are right. I didn't notice this while I was refactoring the code.
-> >> Ritesh, could you update your patch and simply replace all references of
-> >> mapping->size with (mapping->bits << PAGE_SHIFT), probably with some
-> >> temporary variable to make the code easier to understand? I've didn't apply
-> >> your patch yet.
-> >
-> > As this patch fixes a v3.15 regression, shouldn't it be applied as-is and
-> > ASAP, with the cleanup that removes mapping->size coming in a later, less
-> > urgent patch ?
->
-> I agree with Laurent. Anyway this cleanup can be taken care when we will be
-> doing refactoring of common code to lib/iommu-helper.c.
->
-> Anyways, if you still insist I can prepare and submit the patch. Let me know
-> again on this.
+I agree, but that would also mean having a driver for everything that
+would need a clock: a CPU, the RAM. I'm not sure we want that either.
 
-Ok, I've merged the patch as is and I will send pull request soon.
-Please include the above discussed cleanup while refactoring common code 
-to lib.
+> > +#include <linux/clk.h>
+> >  #include <linux/init.h>
+> >  #include <linux/of_platform.h>
+> >  
+> > @@ -19,9 +20,17 @@
+> >  
+> >  static void __init sun4i_dt_init(void)
+> >  {
+> > +       struct clk *clk;
+> > +
+> >         sunxi_setup_restart();
+> >  
+> >         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > +
+> > +       /* Make sure the clocks we absolutely need are enabled */
+> > +       /* DDR clock */
+> > +       clk = clk_get(NULL, "pll5_ddr");
+> > +       if (!IS_ERR(clk))
+> > +               clk_prepare_enable(clk);
+> >  }
+> 
+> Isn't there already DT syntax to do the same? If not, should there be?
 
-Best regards
+I don't think there is, and I gave some thought about it too. But
+something a la regulator-always-on wouldn't work with clocks with
+multiple outputs (like pll5), because you might need to leave only one
+of the output enabled, but not the others, and I couldn't think of a
+nice way to do so.
+
+If you have one, I'd be happy to implement it.
+
+Maxime
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/683b2315/attachment-0001.sig>
