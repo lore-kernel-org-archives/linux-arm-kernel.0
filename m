@@ -1,163 +1,240 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 23 Apr 2014 14:32:54 +0530
-Subject: [PATCH v2 3/4] ARM: OMAP2+: Add machine entry for dra72x devices
+Date: Wed, 23 Apr 2014 14:32:53 +0530
+Subject: [PATCH v2 2/4] ARM: dts: Add support for DRA72x family of devices
 In-Reply-To: <1398243775-4145-1-git-send-email-rnayak@ti.com>
 References: <1398243775-4145-1-git-send-email-rnayak@ti.com>
-Message-ID: <1398243775-4145-4-git-send-email-rnayak@ti.com>
+Message-ID: <1398243775-4145-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only difference from the dra74x devices is the missing .smp entry.
+DRA72x is a single core cortex A15 device with most infrastructure IPs otherwise
+same as whats on the DRA74x devices.
 
-While at it, also fix the use of __initdata (across the file) and replace them
-with __initconst as reported by checkpatch
+So move the cpu nodes into dra74x.dtsi and dra72x.dtsi respectively.
 
-ERROR: Use of const init definition must use __initconst
-+static const char *dra72x_boards_compat[] __initdata = {
+Also add a minimal dra72-evm dts file.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Cc: linux-doc at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 ---
- arch/arm/mach-omap2/board-generic.c |   46 +++++++++++++++++++++++++----------
- 1 file changed, 33 insertions(+), 13 deletions(-)
+ .../devicetree/bindings/arm/omap/omap.txt          |   12 ++++--
+ arch/arm/boot/dts/Makefile                         |    3 +-
+ arch/arm/boot/dts/dra7-evm.dts                     |    6 +--
+ arch/arm/boot/dts/dra7.dtsi                        |   27 -------------
+ arch/arm/boot/dts/dra72-evm.dts                    |   24 ++++++++++++
+ arch/arm/boot/dts/dra72x.dtsi                      |   25 ++++++++++++
+ arch/arm/boot/dts/dra74x.dtsi                      |   41 ++++++++++++++++++++
+ 7 files changed, 104 insertions(+), 34 deletions(-)
+ create mode 100644 arch/arm/boot/dts/dra72-evm.dts
+ create mode 100644 arch/arm/boot/dts/dra72x.dtsi
+ create mode 100644 arch/arm/boot/dts/dra74x.dtsi
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index b8920b6..4d1222d 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -43,7 +43,7 @@ static void __init omap_generic_init(void)
- }
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index 36ede19..88de8e0 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -79,8 +79,11 @@ SoCs:
+ - OMAP5432
+   compatible = "ti,omap5432", "ti,omap5"
  
- #ifdef CONFIG_SOC_OMAP2420
--static const char *omap242x_boards_compat[] __initdata = {
-+static const char *omap242x_boards_compat[] __initconst = {
- 	"ti,omap2420",
- 	NULL,
- };
-@@ -62,7 +62,7 @@ MACHINE_END
- #endif
- 
- #ifdef CONFIG_SOC_OMAP2430
--static const char *omap243x_boards_compat[] __initdata = {
-+static const char *omap243x_boards_compat[] __initconst = {
- 	"ti,omap2430",
- 	NULL,
- };
-@@ -81,7 +81,7 @@ MACHINE_END
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP3
--static const char *omap3_boards_compat[] __initdata = {
-+static const char *omap3_boards_compat[] __initconst = {
- 	"ti,omap3430",
- 	"ti,omap3",
- 	NULL,
-@@ -100,7 +100,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.restart	= omap3xxx_restart,
- MACHINE_END
- 
--static const char *omap36xx_boards_compat[] __initdata = {
-+static const char *omap36xx_boards_compat[] __initconst = {
- 	"ti,omap36xx",
- 	NULL,
- };
-@@ -118,7 +118,7 @@ DT_MACHINE_START(OMAP36XX_DT, "Generic OMAP36xx (Flattened Device Tree)")
- 	.restart	= omap3xxx_restart,
- MACHINE_END
- 
--static const char *omap3_gp_boards_compat[] __initdata = {
-+static const char *omap3_gp_boards_compat[] __initconst = {
- 	"ti,omap3-beagle",
- 	"timll,omap3-devkit8000",
- 	NULL,
-@@ -137,7 +137,7 @@ DT_MACHINE_START(OMAP3_GP_DT, "Generic OMAP3-GP (Flattened Device Tree)")
- 	.restart	= omap3xxx_restart,
- MACHINE_END
- 
--static const char *am3517_boards_compat[] __initdata = {
-+static const char *am3517_boards_compat[] __initconst = {
- 	"ti,am3517",
- 	NULL,
- };
-@@ -157,7 +157,7 @@ MACHINE_END
- #endif
- 
- #ifdef CONFIG_SOC_AM33XX
--static const char *am33xx_boards_compat[] __initdata = {
-+static const char *am33xx_boards_compat[] __initconst = {
- 	"ti,am33xx",
- 	NULL,
- };
-@@ -177,7 +177,7 @@ MACHINE_END
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--static const char *omap4_boards_compat[] __initdata = {
-+static const char *omap4_boards_compat[] __initconst = {
- 	"ti,omap4460",
- 	"ti,omap4430",
- 	"ti,omap4",
-@@ -199,7 +199,7 @@ MACHINE_END
- #endif
- 
- #ifdef CONFIG_SOC_OMAP5
--static const char *omap5_boards_compat[] __initdata = {
-+static const char *omap5_boards_compat[] __initconst = {
- 	"ti,omap5432",
- 	"ti,omap5430",
- 	"ti,omap5",
-@@ -221,7 +221,7 @@ MACHINE_END
- #endif
- 
- #ifdef CONFIG_SOC_AM43XX
--static const char *am43_boards_compat[] __initdata = {
-+static const char *am43_boards_compat[] __initconst = {
- 	"ti,am4372",
- 	"ti,am43",
- 	NULL,
-@@ -240,13 +240,14 @@ MACHINE_END
- #endif
- 
- #ifdef CONFIG_SOC_DRA7XX
--static const char *dra7xx_boards_compat[] __initdata = {
-+static const char *dra74x_boards_compat[] __initconst = {
-+	"ti,dra74x",
- 	"ti,dra7xx",
- 	"ti,dra7",
- 	NULL,
- };
- 
--DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
-+DT_MACHINE_START(DRA74X_DT, "Generic DRA74X (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.smp		= smp_ops(omap4_smp_ops),
- 	.map_io		= omap5_map_io,
-@@ -255,7 +256,26 @@ DT_MACHINE_START(DRA7XX_DT, "Generic DRA7XX (Flattened Device Tree)")
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
- 	.init_time	= omap5_realtime_timer_init,
--	.dt_compat	= dra7xx_boards_compat,
-+	.dt_compat	= dra74x_boards_compat,
-+	.restart	= omap44xx_restart,
-+MACHINE_END
+-- DRA742
+-  compatible = "ti,dra7xx", "ti,dra7"
++- DRA74x
++  compatible = "ti,dra74x", "ti,dra7xx", "ti,dra7"
 +
-+static const char *dra72x_boards_compat[] __initconst = {
-+	"ti,dra72x",
-+	"ti,dra7xx",
-+	"ti,dra7",
-+	NULL,
++- DRA72x
++  compatible = "ti,dra72x", "ti,dra7xx", "ti,dra7"
+ 
+ - AM4372
+   compatible = "ti,am4372", "ti,am43"
+@@ -121,4 +124,7 @@ Boards:
+   compatible = "ti,am437x-gp-evm", "ti,am4372", "ti,am43"
+ 
+ - DRA7 EVM:  Software Developement Board for DRA7XX
+-  compatible = "ti,dra7-evm", "ti,dra7"
++  compatible = "ti,dra7-evm", "ti,dra74x", "ti,dra7"
++
++- DRA72 EVM: Software Development Board for DRA72x
++  compatible = "ti,dra72-evm", "ti,dra72x", "ti,dra7"
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 35c146f..ff98a97 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -288,7 +288,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	am3517_mt_ventoux.dtb \
+ 	am43x-epos-evm.dtb \
+ 	am437x-gp-evm.dtb \
+-	dra7-evm.dtb
++	dra7-evm.dtb \
++	dra72-evm.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += qcom-msm8660-surf.dtb \
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 7807429..a07fb30 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -7,11 +7,11 @@
+  */
+ /dts-v1/;
+ 
+-#include "dra7.dtsi"
++#include "dra74x.dtsi"
+ 
+ / {
+-	model = "TI DRA7";
+-	compatible = "ti,dra7-evm", "ti,dra7";
++	model = "TI DRA74x";
++	compatible = "ti,dra7-evm", "ti,dra74x", "ti,dra7";
+ 
+ 	memory {
+ 		device_type = "memory";
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 1c0f8e1..e27fec7 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -33,33 +33,6 @@
+ 		serial5 = &uart6;
+ 	};
+ 
+-	cpus {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		cpu0: cpu at 0 {
+-			device_type = "cpu";
+-			compatible = "arm,cortex-a15";
+-			reg = <0>;
+-
+-			operating-points = <
+-				/* kHz    uV */
+-				1000000	1060000
+-				1176000	1160000
+-				>;
+-
+-			clocks = <&dpll_mpu_ck>;
+-			clock-names = "cpu";
+-
+-			clock-latency = <300000>; /* From omap-cpufreq driver */
+-		};
+-		cpu at 1 {
+-			device_type = "cpu";
+-			compatible = "arm,cortex-a15";
+-			reg = <1>;
+-		};
+-	};
+-
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+new file mode 100644
+index 0000000..d105e66
+--- /dev/null
++++ b/arch/arm/boot/dts/dra72-evm.dts
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++#include "dra72x.dtsi"
++
++/ {
++	model = "TI DRA72x";
++	compatible = "ti,dra72-evm", "ti,dra72x", "ti,dra7";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x40000000>; /* 1024 MB */
++	};
 +};
 +
-+DT_MACHINE_START(DRA72_DT, "Generic DRA72X (Flattened Device Tree)")
-+	.reserve	= omap_reserve,
-+	.map_io		= omap5_map_io,
-+	.init_early	= dra7xx_init_early,
-+	.init_late	= dra7xx_init_late,
-+	.init_irq	= omap_gic_of_init,
-+	.init_machine	= omap_generic_init,
-+	.init_time	= omap5_realtime_timer_init,
-+	.dt_compat	= dra72x_boards_compat,
- 	.restart	= omap44xx_restart,
- MACHINE_END
- #endif
++&uart1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+new file mode 100644
+index 0000000..d03c138
+--- /dev/null
++++ b/arch/arm/boot/dts/dra72x.dtsi
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ * Based on "omap4.dtsi"
++ */
++
++#include "dra7.dtsi"
++
++/ {
++	compatible = "ti,dra72x", "ti,dra7xx" ,"ti,dra7";
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+new file mode 100644
+index 0000000..984e705
+--- /dev/null
++++ b/arch/arm/boot/dts/dra74x.dtsi
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ * Based on "omap4.dtsi"
++ */
++
++#include "dra7.dtsi"
++
++/ {
++	compatible = "ti,dra74x", "ti,dra7xx", "ti,dra7";
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0>;
++
++			operating-points = <
++				/* kHz    uV */
++				1000000	1060000
++				1176000	1160000
++				>;
++
++			clocks = <&dpll_mpu_ck>;
++			clock-names = "cpu";
++
++			clock-latency = <300000>; /* From omap-cpufreq driver */
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <1>;
++		};
++	};
++};
 -- 
 1.7.9.5
