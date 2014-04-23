@@ -1,91 +1,69 @@
-From: av.tikhomirov@samsung.com (Anton Tikhomirov)
-Date: Wed, 23 Apr 2014 18:26:51 +0900
-Subject: [PATCH 3/3] usb: dwc3-exynos: Make provision for vdd regulators
-In-Reply-To: <1398082604-3013-3-git-send-email-gautam.vivek@samsung.com>
-References: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
- <1398082604-3013-3-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <00bf01cf5ed6$28de18d0$7a9a4a70$%tikhomirov@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 23 Apr 2014 11:30:53 +0200
+Subject: [PATCH] arm: dma-mapping: Fix mapping size value
+In-Reply-To: <53577F84.1080101@samsung.com>
+References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
+ <20140422085307.GB5747@arm.com> <53577F84.1080101@samsung.com>
+Message-ID: <4662711.Ubz0jaKMvq@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Marek,
 
-> -----Original Message-----
-> From: Vivek Gautam [mailto:gautamvivek1987 at gmail.com] On Behalf Of
-> Vivek Gautam
-> Sent: Monday, April 21, 2014 9:17 PM
-> To: linux-usb at vger.kernel.org; linux-samsung-soc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-omap at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org; gregkh at linuxfoundation.org;
-> stern at rowland.harvard.edu; balbi at ti.com; kgene.kim at samsung.com; Vivek
-> Gautam; Anton Tikhomirov
-> Subject: [PATCH 3/3] usb: dwc3-exynos: Make provision for vdd
-> regulators
+On Wednesday 23 April 2014 10:53:24 Marek Szyprowski wrote:
+> On 2014-04-22 10:53, Will Deacon wrote:
+> > On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
+> > > 68efd7d2fb("arm: dma-mapping: remove order parameter from
+> > > arm_iommu_create_mapping()") is causing kernel panic
+> > > because it wrongly sets the value of mapping->size:
+> > > 
+> > > Unable to handle kernel NULL pointer dereference at virtual
+> > > address 000000a0
+> > > pgd = e7a84000
+> > > [000000a0] *pgd=00000000
+> > > ...
+> > > PC is at bitmap_clear+0x48/0xd0
+> > > LR is at __iommu_remove_mapping+0x130/0x164
+> > > 
+> > > Fix it by correcting mapping->size value.
+> > > 
+> > > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
+> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > ---
+> > > 
+> > >  arch/arm/mm/dma-mapping.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > > index f62aa06..6b00be1 100644
+> > > --- a/arch/arm/mm/dma-mapping.c
+> > > +++ b/arch/arm/mm/dma-mapping.c
+> > > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
+> > > dma_addr_t base, size_t size)> > 
+> > >  	mapping->nr_bitmaps = 1;
+> > >  	mapping->extensions = extensions;
+> > >  	mapping->base = base;
+> > > 
+> > > -	mapping->size = bitmap_size << PAGE_SHIFT;
+> > > 
+> > >  	mapping->bits = BITS_PER_BYTE * bitmap_size;
+> > > 
+> > > +	mapping->size = mapping->bits << PAGE_SHIFT;
+> > 
+> > Ok, but given that mapping->size is derived from mapping->bits, do we
+> > really need both of these fields in struct dma_iommu_mapping?
 > 
-> Facilitate getting required 3.3V and 1.0V VDD supply for
-> DWC3 controller on Exynos.
-> 
-> With patches for regulators' nodes merged in 3.15:
-> c8c253f ARM: dts: Add regulator entries to smdk5420
-> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
-> 
-> certain perripherals will now need to ensure that,
-> they request VDD regulators in their drivers, and enable
-> them so as to make them working.
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Cc: Anton Tikhomirov <av.tikhomirov@samsung.com>
-> ---
-> 
-> Based on 'usb-next' branch of Greg's USB tree.
-> Also cleanly applies on 'next' branch of Balbi's USB tree.
-> 
->  drivers/usb/dwc3/dwc3-exynos.c |   51
-> ++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 49 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-
-> exynos.c
-> index 28c8ad7..c9d9102 100644
-> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> @@ -27,6 +27,7 @@
->  #include <linux/usb/usb_phy_gen_xceiv.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/regulator/consumer.h>
-> 
->  struct dwc3_exynos {
->  	struct platform_device	*usb2_phy;
-> @@ -34,6 +35,8 @@ struct dwc3_exynos {
->  	struct device		*dev;
-> 
->  	struct clk		*clk;
-> +	struct regulator	*vdd33;
-> +	struct regulator	*vdd10;
->  };
-> 
->  static int dwc3_exynos_register_phys(struct dwc3_exynos *exynos)
-> @@ -144,20 +147,46 @@ static int dwc3_exynos_probe(struct
-> platform_device *pdev)
-> 
->  	clk_prepare_enable(exynos->clk);
-> 
-> +	exynos->vdd33 = devm_regulator_get(dev, "vdd33");
-> +	if (IS_ERR(exynos->vdd33)) {
-> +		ret = PTR_ERR(exynos->vdd33);
-> +		goto err2;
+> You are right. I didn't notice this while I was refactoring the code.
+> Ritesh, could you update your patch and simply replace all references of
+> mapping->size with (mapping->bits << PAGE_SHIFT), probably with some
+> temporary variable to make the code easier to understand? I've didn't apply
+> your patch yet.
 
-Is regulator property mandatory for dwc3-exynos? If it is not
-and device tree doesn't provide it, dwc3-exynos driver probe shouldn't
-fail here.
+As this patch fixes a v3.15 regression, shouldn't it be applied as-is and 
+ASAP, with the cleanup that removes mapping->size coming in a later, less 
+urgent patch ?
 
-> +	}
-> +	ret = regulator_enable(exynos->vdd33);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to enable VDD33 supply\n");
-> +		goto err2;
-> +	}
-> +
+-- 
+Regards,
 
-Thanks
+Laurent Pinchart
