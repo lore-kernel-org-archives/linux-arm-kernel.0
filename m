@@ -1,33 +1,53 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 23 Apr 2014 13:40:15 +0300
-Subject: [PATCH] ARM: Fix double definition of virt_to_pfn()
-In-Reply-To: <20140423093700.GF24070@n2100.arm.linux.org.uk>
-References: <20140422195514.GA13106@arch.cereza>
- <1398238547-23065-1-git-send-email-peter.ujfalusi@ti.com>
- <20140423093700.GF24070@n2100.arm.linux.org.uk>
-Message-ID: <5357988F.2050306@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 23 Apr 2014 13:44:47 +0300
+Subject: [PATCH 1/2] omapdss: panel-tpo-td028ec1: Add DT support.
+In-Reply-To: <1398201168-25275-2-git-send-email-marek@goldelico.com>
+References: <1398201168-25275-1-git-send-email-marek@goldelico.com>
+ <1398201168-25275-2-git-send-email-marek@goldelico.com>
+Message-ID: <5357999F.6010200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2014 12:37 PM, Russell King - ARM Linux wrote:
-> On Wed, Apr 23, 2014 at 10:35:47AM +0300, Peter Ujfalusi wrote:
->> One definition of virt_to_pfn() was outside of the #if #elif #else section
->> causing constant redefinition of the macro.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->> Hi,
->>
->> the redefinition actually coming from different source. It is caused by the
->> leftover definition of virt_to_pfn() which would redefine the virt_to_pfn()
->> all the time.
->>
->> The redefinition still exist in next-20140423.
-> 
-> Please see the thread "Re: [PATCH v7 2/2] ARM hibernation / suspend-to-disk"
-> this month.  The fixed up commit will be pushed out shortly.
+On 23/04/14 00:12, Marek Belisko wrote:
 
-Thanks, I found the thread.
+>  static int td028ttec1_panel_probe(struct spi_device *spi)
+>  {
+>  	struct panel_drv_data *ddata;
+> @@ -418,6 +436,10 @@ static int td028ttec1_panel_probe(struct spi_device *spi)
+>  		r = td028ttec1_panel_probe_pdata(spi);
+>  		if (r)
+>  			return r;
+> +	} else if (spi->dev.of_node) {
+> +		r = td028ttec1_probe_of(spi);
+> +		if (r)
+> +			return r;
+>  	} else {
+>  		return -ENODEV;
+>  	}
+> @@ -463,6 +485,13 @@ static int td028ttec1_panel_remove(struct spi_device *spi)
+>  	return 0;
+>  }
+>  
+> +static const struct of_device_id td028ttec1_of_match[] = {
+> +	{ .compatible = "toppoly,td028ttec1", },
 
--- 
-P?ter
+We need to hack a bit here for the time being. You need to have
+"omapdss," prefix for the compatible string in the driver, and add the
+panel's compatible string to arch/arm/mach-omap2/display.c:
+dss_compat_conv_list.
+
+The reason for this is that the drivers are omap specific, but the DT
+data is not.
+
+Otherwise looks good to me.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140423/b05ffe8d/attachment.sig>
