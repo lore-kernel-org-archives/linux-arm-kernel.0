@@ -1,61 +1,71 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 23 Apr 2014 11:41:04 +0530
-Subject: [PATCH 2/2] ARM: OMAP2+: hwmod: Don't leave the optional clocks in
- clk_prepare()ed state
-In-Reply-To: <1398233465-8845-1-git-send-email-rnayak@ti.com>
-References: <1398233465-8845-1-git-send-email-rnayak@ti.com>
-Message-ID: <1398233465-8845-3-git-send-email-rnayak@ti.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Wed, 23 Apr 2014 11:50:01 +0530
+Subject: [PATCH 1/4] cpuidle: config: Add SOC_EXYNOS5420 entry to select
+ cpuidle-big-little driver
+In-Reply-To: <5356477C.1070403@linaro.org>
+References: <1398080958-21677-1-git-send-email-chander.kashyap@linaro.org>
+ <1398080958-21677-2-git-send-email-chander.kashyap@linaro.org>
+ <5356477C.1070403@linaro.org>
+Message-ID: <CANuQgHHx+EyPXK0joYU-Af4dj+=ikW0SWE6g2-N0=K-dK3nMRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At hwmod init, theres no reason why optional clocks should be left in
-clk_prepare()ed state as these are actually directly controlled by the
-drivers themselves. Let the drivers prepare/unprepare as well as enable/
-disable them.
+Hi Daniel,
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Benoit Cousson <bcousson@baylibre.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+On 22 April 2014 16:12, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 04/21/2014 01:49 PM, Chander Kashyap wrote:
+>>
+>> Exynos5420 is a big-little SoC from Samsung. It has 4 A15 and 4 A7 cores.
+>> In order to use generic cpuidle-big-little driver, this patch adds
+>> Exynos5420
+>> specific check to initialize generic cpuidle driver.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+>> ---
+>>   drivers/cpuidle/Kconfig.arm |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+>> index 97ccc31..5244d87 100644
+>> --- a/drivers/cpuidle/Kconfig.arm
+>> +++ b/drivers/cpuidle/Kconfig.arm
+>> @@ -4,7 +4,7 @@
+>>
+>>   config ARM_BIG_LITTLE_CPUIDLE
+>>         bool "Support for ARM big.LITTLE processors"
+>> -       depends on ARCH_VEXPRESS_TC2_PM
+>> +       depends on ARCH_VEXPRESS_TC2_PM || SOC_EXYNOS5420
+>
+>
+> For the sake of consistency, I would prefer:
+>
+> depends on ARCH_VEXPRESS_TC2_PM || ARCH_EXYNOS
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 1f33f5d..9e3afc9 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -857,15 +857,6 @@ static int _init_opt_clks(struct omap_hwmod *oh)
- 			continue;
- 		}
- 		oc->_clk = c;
--		/*
--		 * HACK: This needs a re-visit once clk_prepare() is implemented
--		 * to do something meaningful. Today its just a no-op.
--		 * If clk_prepare() is used at some point to do things like
--		 * voltage scaling etc, then this would have to be moved to
--		 * some point where subsystems like i2c and pmic become
--		 * available.
--		 */
--		clk_prepare(oc->_clk);
- 	}
- 
- 	return ret;
-@@ -945,7 +936,7 @@ static void _enable_optional_clocks(struct omap_hwmod *oh)
- 		if (oc->_clk) {
- 			pr_debug("omap_hwmod: enable %s:%s\n", oc->role,
- 				 __clk_get_name(oc->_clk));
--			clk_enable(oc->_clk);
-+			clk_prepare_enable(oc->_clk);
- 		}
- }
- 
-@@ -960,7 +951,7 @@ static void _disable_optional_clocks(struct omap_hwmod *oh)
- 		if (oc->_clk) {
- 			pr_debug("omap_hwmod: disable %s:%s\n", oc->role,
- 				 __clk_get_name(oc->_clk));
--			clk_disable(oc->_clk);
-+			clk_disable_unprepare(oc->_clk);
- 		}
- }
- 
+Yes i will change it.
+
+Thanks
+>
+> and let the current code (and future platform driver) to handle the loading
+> of the driver.
+>
+>
+>>         select ARM_CPU_SUSPEND
+>>         select CPU_IDLE_MULTIPLE_DRIVERS
+>>         help
+>>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+
+
+
 -- 
-1.7.9.5
+with warm regards,
+Chander Kashyap
