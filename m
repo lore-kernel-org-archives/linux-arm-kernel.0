@@ -1,66 +1,71 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 23 Apr 2014 11:02:46 +0200
-Subject: [PATCH v2 1/2] ARM: dts: berlin: add the SDHCI nodes for the BG2Q
-In-Reply-To: <5356A85F.6030708@gmail.com>
-References: <1398155248-1659-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398155248-1659-2-git-send-email-antoine.tenart@free-electrons.com>
- <5356A85F.6030708@gmail.com>
-Message-ID: <20140423090246.GG24355@kwain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Apr 2014 10:02:51 +0100
+Subject: [PATCH] ARM: mm: dma: Update coherent streaming apis with
+ missing memory barrier
+In-Reply-To: <5356D163.1070304@ti.com>
+References: <1398103390-31968-1-git-send-email-santosh.shilimkar@ti.com>
+ <201404222153.41786.arnd@arndb.de> <5356C9D1.2060001@ti.com>
+ <5895821.PvurJ8TWz2@wuerfel> <5356D163.1070304@ti.com>
+Message-ID: <20140423090251.GA5281@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
-
-On Tue, Apr 22, 2014 at 07:35:27PM +0200, Sebastian Hesselbarth wrote:
-> On 04/22/2014 10:27 AM, Antoine T?nart wrote:
-
-[?]
-
-> > +		sdhci0: sdhci at ab0000 {
-> > +			compatible = "mrvl,pxav3-mmc";
-> > +			reg = <0xab0000 0x200>;
-> > +			clocks = <&sdio1clk>;
-> > +			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		sdhci1: sdhci at ab0800 {
-> > +			compatible = "mrvl,pxav3-mmc";
-> > +			reg = <0xab0800 0x200>;
-> > +			clocks = <&sdio1clk>;
-> > +			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		sdhci2: sdhci at ab1000 {
+On Tue, Apr 22, 2014 at 09:30:27PM +0100, Santosh Shilimkar wrote:
+> On Tuesday 22 April 2014 04:23 PM, Arnd Bergmann wrote:
+> > On Tuesday 22 April 2014 15:58:09 Santosh Shilimkar wrote:
+> >> On Tuesday 22 April 2014 03:53 PM, Arnd Bergmann wrote:
+> >>> On Tuesday 22 April 2014, Santosh Shilimkar wrote:
+> >>>> On Tuesday 22 April 2014 10:08 AM, Arnd Bergmann wrote:
+> >>>>> It's not the nicest API ever, but that's what it is and has been, mostly
+> >>>>> for compatibility with x86, where the 'mov' instruction performing the
+> >>>>> store to MMIO registers implies that all writes to DMA memory are
+> >>>>> visible to the device.
+> >>>>>
+> >>>> This is not about writel() and  writel_relaxed(). The driver don't
+> >>>> need that barrier. For example if the actual start of the DMA
+> >>>> happens bit later, that doesn't matter for the driver.
+> >>>>
+> >>>> DMA APIs already do barriers today for non-coherent case. We
+> >>>> are not talking anything new here. Sorry but I don't see the
+> >>>> connection here.
+> >>>
+> >>> I don't think they do, nor should they. Can you tell me where
+> >>> you see a barrier in dma_sync_single_for_cpu() or 
+> >>> arm_dma_sync_single_for_device()? For all I can tell, they
+> >>> only deal with L1 and L2 cache maintainance in arm_dma_ops.
+> >>>
+> >> The cache APIs used by dma_ops do have the necessary barriers
+> >> at end of the of the cache operations. Thats what I meant. So for
+> >> end user(Device driver), its transparent.
+> > 
+> > Ok, I see it now for the noncoherent operations, and I see
+> > the same thing on PowerPC and MIPS, which also have both coherent
+> > and noncoherent versions of their dma_map_ops.
+> > 
+> > However, I also see that neither of those does a wmb() for the
+> > coherent version. I don't see why ARM should be different from
+> > the others here, so if there is a reason to do a barrier there,
+> > we should change all architectures. I still don't see a reason
+> > why the barrier is needed though.
+> > 
+> Thats fair.
 > 
-> Didn't Jisheng ask for sdhci2 being registered at mmc0?
+> > Can you be more specific in your driver example why you think
+> > the barrier in the writel() is not sufficient?
+> > 
+> writel() or an explcit barrier in the driver will do the job. I was
+> just thinking that we are trying to work around the short comings
+> of streaming API by adding barriers in the driver. For example
+> on a non-coherent system, i don't need that barrier because
+> dma_ops does take care of that.
 
-Yes sure, but I don't know if he agreeded on this solution. I'll ask him.
-Otherwise aliases seems ok from my point of view.
+I wonder whether we can remove those barriers altogether then (from the DMA
+cache operations). For the coherent case, the driver must provide the
+barrier (probably via writel) so the non-coherent case shouldn't be any
+different.
 
-> Renaming the node labels will not help, but have you tried using an:
-> 
-> aliases {
-> 	mmc0 = &sdhci2;
-> 	mmc1 = &sdhci0;
-> 	mmc2 = &sdhci1;
-> };
-> 
-> node and set the platform_device's .id field with what you get
-> from of_alias_get_id(np, "mmc")?
-> 
-> @Chris, Ulf: Is there any generic alias, e.g. "sdhci", you prefer for
-> drivers/mmc so we can put it into sdhci_get_of_property()?
+I need some more coffee and a serious look at the code, but we may be able
+to use dmb instructions to order the cache maintenance and avoid a final
+dsb for completion.
 
-I'd also like the subsystem maintainers to give their opinion on this
-before updating.
-
-Thanks!
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
