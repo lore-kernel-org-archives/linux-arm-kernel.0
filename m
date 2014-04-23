@@ -1,55 +1,98 @@
-From: zlim@broadcom.com (Zi Shen Lim)
-Date: Wed, 23 Apr 2014 12:22:28 -0700
-Subject: [PATCH 2/2] arm64: topology: add MPIDR-based detection
-In-Reply-To: <20140423182611.GF12304@sirena.org.uk>
-References: <1398217214-12204-1-git-send-email-zlim@broadcom.com>
- <1398217214-12204-3-git-send-email-zlim@broadcom.com>
- <20140423103648.GM12304@sirena.org.uk>
- <20140423172720.GA18588@lc-sj1-5012.sj.broadcom.com>
- <20140423182611.GF12304@sirena.org.uk>
-Message-ID: <20140423192228.GA21142@lc-sj1-5012.sj.broadcom.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 23 Apr 2014 21:32:58 +0200
+Subject: [PATCH v2 0/9] ARM: S3C24XX: convert s3c2410,
+ s3c2440 s3c2442 to common clock framework
+Message-ID: <2104342.rkElQpXtvM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 23, 2014 at 07:26:11PM +0100, Mark Brown wrote:
-> On Wed, Apr 23, 2014 at 10:27:20AM -0700, Zi Shen Lim wrote:
-> 
-> It will at least ensure that all clusters get assigned a unique ID and
-> we don't end up discarding some of the information and coming out with
-> two identically numbered clusters which then have identically numbered
-> CPUs inside of them which doesn't seem clever.
+At least, here is v2 of the common clock conversion of s3c2410 - s3c2442.
+If suitable this will finish the conversion of s3c24xx arches.
 
-I agree with you. Simply ignoring aff3 is not acceptable, whether or not
-someone is using it.
+Tested on an Openmoko Neo Freerunner (GTA02).
 
-> 
-> When I was looking at this it wasn't sufficiently clear to me that the
-> cluster clustering would be well modelled by sockets as the scheduler
-> currently assumes them, nor what to do with additional levels of that
-> (the DT binding allows for infinite levels).  Punting and just putting
-> all clusters at the same level avoids active bugs and seems fairly
-> conservative.
-> 
+It is meant to go on top of the s3c2412 ccf conversion already in
+linux-samsung.
 
-Sounds like you prefer "cluster of clusters" over "socket", correct?
+changes since v1:
+- add already received Acks and Reviews
+- remove patches that were already part of the s3c2412 submission
+- implement suggestions from Tomasz Figa:
+- in cpufreq-utils only request mpll clock the first time
+- in dclk driver
+  - use variant list to describe SoC differences
+  - do not provide a dt binding at this time, as the dclk
+    parts should probably be part of the pinctrl driver
+    In any case this can be solved when the first dt platform needs
+    support for the external clock outputs
+- in clk-s3c2410
+  - fix sentinels
+  - rename dt-bindings header
+  - don't export XTI clock id
 
-In any case, with only 4 affinity levels defined in the arch, as long as
-we also have 4 variables to capture that information, we should be good,
-right?
 
-Anything more exotic not expressable by these 4 affinity levels in MPIDR
-will require additional information from other sources such as DT or ACPI.
+Heiko Stuebner (9):
+  ARM: S3C24XX: cpufreq-utils: don't write raw values to MPLLCON when
+    using ccf
+  clk: samsung: add clock driver for external clock outputs
+  ARM: S3C24XX: enable usage of common dclk if common clock framework is
+    enabled
+  dt-bindings: add documentation for s3c2410 clock controller
+  clk: samsung: add clock controller driver for s3c2410, s3c2440 and
+    s3c2442
+  ARM: S3C24XX: add platform code for conversion to the common clock
+    framework
+  ARM: S3C24XX: convert s3c2440 and s3c2442 to common clock framework
+  ARM: S3C24XX: convert s3c2410 to common clock framework
+  ARM: S3C24XX: remove legacy clock code
 
-> > Perhaps we should just add a new 'socket_id' and that will accommodate
-> > all cases (up to aff3).
-> 
-> Not in the non-MT case where we've got two levels above the cluster ID
-> in affinity level 1 unless we just combine 2 and 3 (which would be
-> reasonable enough of course).
+ .../bindings/clock/samsung,s3c2410-clock.txt       |  50 +++
+ arch/arm/mach-s3c24xx/Kconfig                      |  50 ++-
+ arch/arm/mach-s3c24xx/Makefile                     |   6 +-
+ arch/arm/mach-s3c24xx/clock-dclk.c                 | 195 ---------
+ arch/arm/mach-s3c24xx/clock-s3c2410.c              | 285 ------------
+ arch/arm/mach-s3c24xx/clock-s3c2440.c              | 217 ----------
+ arch/arm/mach-s3c24xx/clock-s3c244x.c              | 141 ------
+ arch/arm/mach-s3c24xx/common.c                     |  45 +-
+ arch/arm/mach-s3c24xx/common.h                     |  11 +-
+ arch/arm/mach-s3c24xx/cpufreq-utils.c              |  14 +
+ arch/arm/mach-s3c24xx/include/mach/regs-clock.h    |  18 -
+ arch/arm/mach-s3c24xx/include/mach/regs-gpio.h     |   3 -
+ arch/arm/mach-s3c24xx/mach-amlm5900.c              |   9 +-
+ arch/arm/mach-s3c24xx/mach-anubis.c                |  15 +-
+ arch/arm/mach-s3c24xx/mach-at2440evb.c             |  10 +-
+ arch/arm/mach-s3c24xx/mach-bast.c                  |  15 +-
+ arch/arm/mach-s3c24xx/mach-gta02.c                 |   8 +-
+ arch/arm/mach-s3c24xx/mach-h1940.c                 |  10 +-
+ arch/arm/mach-s3c24xx/mach-mini2440.c              |  10 +-
+ arch/arm/mach-s3c24xx/mach-n30.c                   |  12 +-
+ arch/arm/mach-s3c24xx/mach-nexcoder.c              |  10 +-
+ arch/arm/mach-s3c24xx/mach-osiris.c                |  15 +-
+ arch/arm/mach-s3c24xx/mach-otom.c                  |  10 +-
+ arch/arm/mach-s3c24xx/mach-qt2410.c                |   9 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |  15 +-
+ arch/arm/mach-s3c24xx/mach-rx3715.c                |  10 +-
+ arch/arm/mach-s3c24xx/mach-smdk2410.c              |   9 +-
+ arch/arm/mach-s3c24xx/mach-smdk2440.c              |  10 +-
+ arch/arm/mach-s3c24xx/mach-tct_hammer.c            |   9 +-
+ arch/arm/mach-s3c24xx/mach-vr1000.c                |  15 +-
+ arch/arm/mach-s3c24xx/pm.c                         |  12 -
+ arch/arm/mach-s3c24xx/s3c2410.c                    |  56 ---
+ arch/arm/mach-s3c24xx/s3c2442.c                    | 111 -----
+ arch/arm/mach-s3c24xx/s3c244x.c                    |  59 +--
+ drivers/clk/samsung/Makefile                       |   2 +
+ drivers/clk/samsung/clk-s3c2410-dclk.c             | 440 +++++++++++++++++++
+ drivers/clk/samsung/clk-s3c2410.c                  | 477 +++++++++++++++++++++
+ include/dt-bindings/clock/s3c2410.h                |  62 +++
+ 38 files changed, 1276 insertions(+), 1179 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2410-clock.txt
+ delete mode 100644 arch/arm/mach-s3c24xx/clock-dclk.c
+ delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2410.c
+ delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2440.c
+ delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c244x.c
+ create mode 100644 drivers/clk/samsung/clk-s3c2410-dclk.c
+ create mode 100644 drivers/clk/samsung/clk-s3c2410.c
+ create mode 100644 include/dt-bindings/clock/s3c2410.h
 
-Is the following an accurate description of your proposal for non-MT?
-
-	thread_id   = -1
-	core_id     = aff0
-	cluster_id  = aff1
-	clusters_id = combine(aff2,aff3)
+-- 
+1.9.0
