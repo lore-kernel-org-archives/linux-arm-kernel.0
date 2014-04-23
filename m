@@ -1,85 +1,57 @@
-From: ritesh.harjani@gmail.com (Ritesh Harjani)
-Date: Wed, 23 Apr 2014 15:34:20 +0530
-Subject: [PATCH] arm: dma-mapping: Fix mapping size value
-In-Reply-To: <4662711.Ubz0jaKMvq@avalon>
-References: <1398062847-5770-1-git-send-email-ritesh.harjani@gmail.com>
- <20140422085307.GB5747@arm.com> <53577F84.1080101@samsung.com>
- <4662711.Ubz0jaKMvq@avalon>
-Message-ID: <CAD15agYETzLJZ26wh8c=+PCSoQ9dR9vLgg7VmZTnQquXxoW+2Q@mail.gmail.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Wed, 23 Apr 2014 11:08:05 +0100
+Subject: [PATCH 1/3] asm-generic: Add renameat2 syscall
+In-Reply-To: <1398247687-13453-1-git-send-email-james.hogan@imgtec.com>
+References: <1398247687-13453-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1398247687-13453-2-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek/Will
+Add the renameat2 syscall to the generic syscall list, which is used by
+the following architectures: arc, arm64, c6x, hexagon, metag, openrisc,
+score, tile, unicore32.
 
-On Wed, Apr 23, 2014 at 3:00 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Marek,
->
-> On Wednesday 23 April 2014 10:53:24 Marek Szyprowski wrote:
->> On 2014-04-22 10:53, Will Deacon wrote:
->> > On Mon, Apr 21, 2014 at 07:47:27AM +0100, Ritesh Harjani wrote:
->> > > 68efd7d2fb("arm: dma-mapping: remove order parameter from
->> > > arm_iommu_create_mapping()") is causing kernel panic
->> > > because it wrongly sets the value of mapping->size:
->> > >
->> > > Unable to handle kernel NULL pointer dereference at virtual
->> > > address 000000a0
->> > > pgd = e7a84000
->> > > [000000a0] *pgd=00000000
->> > > ...
->> > > PC is at bitmap_clear+0x48/0xd0
->> > > LR is at __iommu_remove_mapping+0x130/0x164
->> > >
->> > > Fix it by correcting mapping->size value.
->> > >
->> > > Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
->> > > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> > > ---
->> > >
->> > >  arch/arm/mm/dma-mapping.c | 2 +-
->> > >  1 file changed, 1 insertion(+), 1 deletion(-)
->> > >
->> > > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> > > index f62aa06..6b00be1 100644
->> > > --- a/arch/arm/mm/dma-mapping.c
->> > > +++ b/arch/arm/mm/dma-mapping.c
->> > > @@ -1963,8 +1963,8 @@ arm_iommu_create_mapping(struct bus_type *bus,
->> > > dma_addr_t base, size_t size)> >
->> > >   mapping->nr_bitmaps = 1;
->> > >   mapping->extensions = extensions;
->> > >   mapping->base = base;
->> > >
->> > > - mapping->size = bitmap_size << PAGE_SHIFT;
->> > >
->> > >   mapping->bits = BITS_PER_BYTE * bitmap_size;
->> > >
->> > > + mapping->size = mapping->bits << PAGE_SHIFT;
->> >
->> > Ok, but given that mapping->size is derived from mapping->bits, do we
->> > really need both of these fields in struct dma_iommu_mapping?
->>
->> You are right. I didn't notice this while I was refactoring the code.
->> Ritesh, could you update your patch and simply replace all references of
->> mapping->size with (mapping->bits << PAGE_SHIFT), probably with some
->> temporary variable to make the code easier to understand? I've didn't apply
->> your patch yet.
->
-> As this patch fixes a v3.15 regression, shouldn't it be applied as-is and
-> ASAP, with the cleanup that removes mapping->size coming in a later, less
-> urgent patch ?
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arch at vger.kernel.org
+Cc: Vineet Gupta <vgupta@synopsys.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+Cc: linux-c6x-dev at linux-c6x.org
+Cc: Richard Kuo <rkuo@codeaurora.org>
+Cc: linux-hexagon at vger.kernel.org
+Cc: linux-metag at vger.kernel.org
+Cc: Jonas Bonn <jonas@southpole.se>
+Cc: linux at lists.openrisc.net
+Cc: Chen Liqin <liqin.linux@gmail.com>
+Cc: Lennox Wu <lennox.wu@gmail.com>
+Cc: Chris Metcalf <cmetcalf@tilera.com>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+---
+This patch is for v3.15.
+---
+ include/uapi/asm-generic/unistd.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-I agree with Laurent. Anyway this cleanup can be taken care when we will be
-doing refactoring of common code to lib/iommu-helper.c.
-
-Anyways, if you still insist I can prepare and submit the patch. Let me know
-again on this.
-
->
-> --
-> Regards,
->
-> Laurent Pinchart
->
-
-Thanks
-Ritesh
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 6db66783d268..333640608087 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -697,9 +697,11 @@ __SYSCALL(__NR_finit_module, sys_finit_module)
+ __SYSCALL(__NR_sched_setattr, sys_sched_setattr)
+ #define __NR_sched_getattr 275
+ __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
++#define __NR_renameat2 276
++__SYSCALL(__NR_renameat2, sys_renameat2)
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 276
++#define __NR_syscalls 277
+ 
+ /*
+  * All syscalls below here should go away really,
+-- 
+1.8.1.2
