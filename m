@@ -1,90 +1,69 @@
 From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
-Date: Wed, 23 Apr 2014 12:07:43 +1000
+Date: Wed, 23 Apr 2014 12:20:00 +1000
 Subject: [Qemu-devel] [PATCH] QEMU: ARM: boot: Load kernel at an Image
  friendly address
-In-Reply-To: <CAFEAcA8Ahe7A8Usy5x-DVvb6xxr3x6ELJS+NyzjDQKPv6FFLoQ@mail.gmail.com>
+In-Reply-To: <534FD87C.4090708@codeaurora.org>
 References: <1395718484-20424-1-git-send-email-joelf@ti.com>
  <CAFEAcA9Dc5bN_JdMNWODB9Puj9HLoEBm4mDo7ZcaJj97qBbAdw@mail.gmail.com>
  <CAEgOgz6Tou7aOOKsWO2cOaPjWJrkWBFyU-_bApf+ks=qzSKDdA@mail.gmail.com>
  <CAFEAcA-1hWT69JzSv2zJta_PCCuJ-9fH7muBGPD=u+WOLHmvXQ@mail.gmail.com>
  <CAFEAcA96XGvwPM=OpqW8EU5nFksiEruGgncwqUPEWeU2ryCoJg@mail.gmail.com>
- <CAL_JsqKxsR6-pKv9sP4z1nnp+sy7GncGDyL+kMkF60efn2=DsA@mail.gmail.com>
- <CAFEAcA8Ahe7A8Usy5x-DVvb6xxr3x6ELJS+NyzjDQKPv6FFLoQ@mail.gmail.com>
-Message-ID: <CAEgOgz5Hw3-m0_w8bZs2OfMXit+ipPYzeXcu3iwmPq4cShx91A@mail.gmail.com>
+ <534FD87C.4090708@codeaurora.org>
+Message-ID: <CAEgOgz6hQBCD694PL_euJMngDkc7QGPZJuNr+KqTEoG_cHfVSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 18, 2014 at 5:26 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 17 April 2014 17:58, Rob Herring <robherring2@gmail.com> wrote:
->> On Thu, Apr 17, 2014 at 5:02 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
->>> On 2 April 2014 13:47, Peter Maydell <peter.maydell@linaro.org> wrote:
->>>> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
->>>>> Like others, I have been carrying this change locally. Good to see it up!
->>>>
->>>> Why are you all booting raw Images anyway (just out of curiosity)?
+On Thu, Apr 17, 2014 at 11:34 PM, Christopher Covington
+<cov@codeaurora.org> wrote:
+> On 04/17/2014 06:02 AM, Peter Maydell wrote:
+>> On 2 April 2014 13:47, Peter Maydell <peter.maydell@linaro.org> wrote:
+>>> On 2 April 2014 13:11, Peter Crosthwaite <peter.crosthwaite@xilinx.com> wrote:
+>>>> Like others, I have been carrying this change locally. Good to see it up!
 >>>
->>> Given the recent feedback from the kernel mailing list (viz "don't boot
->>> Image unless you really know what you're doing, the correct load
->>> image may change randomly depending what other board support
->>> is in a multikernel image, etc") maybe we should just remove the
->>> Image booting support instead? Clearly nobody who hasn't locally
->>> patched QEMU is using it at the moment...
+>>> Why are you all booting raw Images anyway (just out of curiosity)?
 >>
->> Including AArch64, too? :) It happens to be correct ATM, but really we
->> should be looking the Image header to determine the offset. I heard
->> Mark Rutland has some patches to do TEXT_OFFSET randomization in fact.
+>> Given the recent feedback from the kernel mailing list (viz "don't boot
+>> Image unless you really know what you're doing, the correct load
+>> image may change randomly depending what other board support
+>> is in a multikernel image, etc") maybe we should just remove the
+>> Image booting support instead? Clearly nobody who hasn't locally
+>> patched QEMU is using it at the moment...
 >
-> AArch64 is different -- the Image format is sanely specified and
-> includes enough information to get it right. (The fact that we don't
-> currently do so is a clear QEMU bug.)
->
->> The choice of 0x10000 is not really a good one either as this forces
->> the decompressor to move itself out of the way first. I guess it is a
->> good choice if your goal is to test the worst possible code path for
->> the decompressor.
->
-> The major awkwardness with AArch32 zImage is that it doesn't
-> give you enough information to know how big the zImage will
-> be uncompressed, so it's not possible for the bootloader to
-> sanity check that all the various bits and pieces aren't going
-> to overlap (and the kernel doesn't check either IIRC, so if things go
-> wrong they go wrong in various obscure ways).
->
-> We could certainly rearrange where QEMU puts things; the current
-> setup results from a mixture of:
->  * legacy "this is how we've always done it" (and the fact that if we
->    get things wrong and the uncompressed kernel overlaps with the
->    DTB or initrd then the failure is unhelpfully cryptic has generally
->    been a pressure towards "don't tweak things too much")
->  * handling both Image and zImage (and now AArch64 Image)
->    in broadly similar codepaths
->  * wanting to handle both boards with what by modern standards are
->     tiny amounts of memory and also boards with gigabytes of RAM,
->     even though optimal choices for location are going to differ
->
-> I don't insist that we drop AArch32 Image support (or necessarily
-> even think we should gratuitously do so), but if it
-> makes it simpler to refactor the code to better handle the
-> other options then I don't particularly object to that happening.
-> I do think that it seems like an AArch32 Image loader that would
-> be useful to end-users ought to provide them with some way to
-> specify the load address or offset.
+> An opportunity for a fresh start at low-level loading facilities, should
+> anyone be inclined to pursue it, sounds good to me.
 >
 
-Regarding implementation of new bootloader specific user properties -
-the issue was discussed in my attempt to QOMify the ARM bootloader:
+FWIW, im already using my own bootloader out of tree that cuts in on
+this lower level. I'm getting close to be able to throw away -kernel
+and friends completely. To implement I have it as a QOMified device so
+you just add it on the command line:
 
-http://lists.gnu.org/archive/html/qemu-devel/2012-02/msg00962.html
+qemu-system-foo -device loader,image=/path/to/file[,addr=0xdeadbeef][,cpunr=X]
 
-Now that the dust has settled on QOM (I believe that QOM instability
-was a dis-encouraging factor at that time). Perhaps we should revist
-that QOMification idea and punch all these magic numbers through as
-(over-ridable) props? -global and friends does the rest without ARM
-specific intrusion on machine and boot opts (vl.c etc).
+To load a particular image to a particular CPU (and it is repeatable).
+
+You can:
+
+1: Load elfs and uImages (addr= is ignored)
+2: Load raw or zImages
+3: Load data files at arbitrary addresses (cpunr= is ignored)
+
+With this, you can BYO secondary bootloops or even run multiple guests
+of different CPUs. You can also boot on a non-zeroth CPU. You can
+place raw images wherever you want (the issue in this thread). You can
+also load in firmware to ROMs.
+
+I then have a tiny hack to make -kernel optional for all ARM.
+Bootloader works for at least ARM and Microblaze, haven't tested for
+others yet.
 
 Regards,
 Peter
 
-> thanks
-> -- PMM
+> Christopher
+>
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by the Linux Foundation.
 >
