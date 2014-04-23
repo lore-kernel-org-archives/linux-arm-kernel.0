@@ -1,175 +1,139 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Apr 2014 14:41:46 +0200
-Subject: [PATCH 3/4 v2] gpio: tc3589x: get rid of static IRQ and GPIO bases
-Message-ID: <1398256906-25118-1-git-send-email-linus.walleij@linaro.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 23 Apr 2014 21:43:33 +0900
+Subject: [PATCH 1/3] usb: ohci-exynos: Make provision for vdd regulators
+In-Reply-To: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
+References: <1398082604-3013-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <000a01cf5ef1$a3111a10$e9334e30$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The static IRQ and GPIO base is not used on any platforms with
-this chip (only Ux500, only device tree). Get rid of the static
-assignments forever, and rely on dynamic IRQ and GPIO descriptor
-allocation.
+On Monday, April 21, 2014 9:17 PM, Vivek Gautam wrote:
+> 
+> Facilitate getting required 3.3V and 1.0V VDD supply for
+> OHCI controller on Exynos.
+> 
+> With patches for regulators' nodes merged in 3.15:
+> c8c253f ARM: dts: Add regulator entries to smdk5420
+> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+> 
+> certain perripherals will now need to ensure that,
+> they request VDD regulators in their drivers, and enable
+> them so as to make them working.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Jingoo Han <jg1.han@samsung.com>
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Be more thorough, delete all static GPIO and IRQ assignments.
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-Lee/Sam: can you either ACK this small(ish) change so I can
-take it through the GPIO tree or provide an immutable TC3589x
-branch including any other TC3589x patches I've written or
-may have arrived?
----
- drivers/gpio/gpio-tc3589x.c | 12 ++----------
- drivers/mfd/tc3589x.c       |  9 +++------
- include/linux/mfd/tc3589x.h | 11 -----------
- 3 files changed, 5 insertions(+), 27 deletions(-)
+Best regards,
+Jingoo Han
 
-diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
-index 113e50cb1f59..fee8c73cf8c8 100644
---- a/drivers/gpio/gpio-tc3589x.c
-+++ b/drivers/gpio/gpio-tc3589x.c
-@@ -32,9 +32,6 @@ struct tc3589x_gpio {
- 	struct device *dev;
- 	struct mutex irq_lock;
- 	struct irq_domain *domain;
--
--	int irq_base;
--
- 	/* Caches of interrupt control registers for bus_lock */
- 	u8 regs[CACHE_NR_REGS][CACHE_NR_BANKS];
- 	u8 oldregs[CACHE_NR_REGS][CACHE_NR_BANKS];
-@@ -290,8 +287,6 @@ static struct irq_domain_ops tc3589x_irq_ops = {
- static int tc3589x_gpio_irq_init(struct tc3589x_gpio *tc3589x_gpio,
- 				struct device_node *np)
- {
--	int base = tc3589x_gpio->irq_base;
--
- 	/*
- 	 * If this results in a linear domain, irq_create_mapping() will
- 	 * take care of allocating IRQ descriptors at runtime. When a base
-@@ -299,7 +294,7 @@ static int tc3589x_gpio_irq_init(struct tc3589x_gpio *tc3589x_gpio,
- 	 * domain is instantiated.
- 	 */
- 	tc3589x_gpio->domain = irq_domain_add_simple(np,
--			tc3589x_gpio->chip.ngpio, base, &tc3589x_irq_ops,
-+			tc3589x_gpio->chip.ngpio, 0, &tc3589x_irq_ops,
- 			tc3589x_gpio);
- 	if (!tc3589x_gpio->domain) {
- 		dev_err(tc3589x_gpio->dev, "Failed to create irqdomain\n");
-@@ -342,15 +337,12 @@ static int tc3589x_gpio_probe(struct platform_device *pdev)
- 	tc3589x_gpio->chip = template_chip;
- 	tc3589x_gpio->chip.ngpio = tc3589x->num_gpio;
- 	tc3589x_gpio->chip.dev = &pdev->dev;
--	tc3589x_gpio->chip.base = (pdata) ? pdata->gpio_base : -1;
-+	tc3589x_gpio->chip.base = -1;
- 
- #ifdef CONFIG_OF_GPIO
- 	tc3589x_gpio->chip.of_node = np;
- #endif
- 
--	tc3589x_gpio->irq_base = tc3589x->irq_base ?
--		tc3589x->irq_base + TC3589x_INT_GPIO(0) : 0;
--
- 	/* Bring the GPIO module out of reset */
- 	ret = tc3589x_set_bits(tc3589x, TC3589x_RSTCTRL,
- 			       TC3589x_RSTCTRL_GPIRST, 0);
-diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
-index bd83accc0f6d..972b00d0220f 100644
---- a/drivers/mfd/tc3589x.c
-+++ b/drivers/mfd/tc3589x.c
-@@ -241,10 +241,8 @@ static struct irq_domain_ops tc3589x_irq_ops = {
- 
- static int tc3589x_irq_init(struct tc3589x *tc3589x, struct device_node *np)
- {
--	int base = tc3589x->irq_base;
--
- 	tc3589x->domain = irq_domain_add_simple(
--		np, TC3589x_NR_INTERNAL_IRQS, base,
-+		np, TC3589x_NR_INTERNAL_IRQS, 0,
- 		&tc3589x_irq_ops, tc3589x);
- 
- 	if (!tc3589x->domain) {
-@@ -298,7 +296,7 @@ static int tc3589x_device_init(struct tc3589x *tc3589x)
- 	if (blocks & TC3589x_BLOCK_GPIO) {
- 		ret = mfd_add_devices(tc3589x->dev, -1, tc3589x_dev_gpio,
- 				      ARRAY_SIZE(tc3589x_dev_gpio), NULL,
--				      tc3589x->irq_base, tc3589x->domain);
-+				      0, tc3589x->domain);
- 		if (ret) {
- 			dev_err(tc3589x->dev, "failed to add gpio child\n");
- 			return ret;
-@@ -309,7 +307,7 @@ static int tc3589x_device_init(struct tc3589x *tc3589x)
- 	if (blocks & TC3589x_BLOCK_KEYPAD) {
- 		ret = mfd_add_devices(tc3589x->dev, -1, tc3589x_dev_keypad,
- 				      ARRAY_SIZE(tc3589x_dev_keypad), NULL,
--				      tc3589x->irq_base, tc3589x->domain);
-+				      0, tc3589x->domain);
- 		if (ret) {
- 			dev_err(tc3589x->dev, "failed to keypad child\n");
- 			return ret;
-@@ -404,7 +402,6 @@ static int tc3589x_probe(struct i2c_client *i2c,
- 	tc3589x->dev = &i2c->dev;
- 	tc3589x->i2c = i2c;
- 	tc3589x->pdata = pdata;
--	tc3589x->irq_base = pdata->irq_base;
- 
- 	switch (version) {
- 	case TC3589X_TC35893:
-diff --git a/include/linux/mfd/tc3589x.h b/include/linux/mfd/tc3589x.h
-index 6b8e1ff4672b..c07aba9a1a2a 100644
---- a/include/linux/mfd/tc3589x.h
-+++ b/include/linux/mfd/tc3589x.h
-@@ -111,15 +111,12 @@ enum tx3589x_block {
- #define TC3589x_INT_PORIRQ	7
- 
- #define TC3589x_NR_INTERNAL_IRQS	8
--#define TC3589x_INT_GPIO(x)	(TC3589x_NR_INTERNAL_IRQS + (x))
- 
- struct tc3589x {
- 	struct mutex lock;
- 	struct device *dev;
- 	struct i2c_client *i2c;
- 	struct irq_domain *domain;
--
--	int irq_base;
- 	int num_gpio;
- 	struct tc3589x_platform_data *pdata;
- };
-@@ -165,13 +162,10 @@ struct tc3589x_keypad_platform_data {
- 
- /**
-  * struct tc3589x_gpio_platform_data - TC3589x GPIO platform data
-- * @gpio_base: first gpio number assigned to TC3589x.  A maximum of
-- *	       %TC3589x_NR_GPIOS GPIOs will be allocated.
-  * @setup: callback for board-specific initialization
-  * @remove: callback for board-specific teardown
-  */
- struct tc3589x_gpio_platform_data {
--	int gpio_base;
- 	void (*setup)(struct tc3589x *tc3589x, unsigned gpio_base);
- 	void (*remove)(struct tc3589x *tc3589x, unsigned gpio_base);
- };
-@@ -179,18 +173,13 @@ struct tc3589x_gpio_platform_data {
- /**
-  * struct tc3589x_platform_data - TC3589x platform data
-  * @block: bitmask of blocks to enable (use TC3589x_BLOCK_*)
-- * @irq_base: base IRQ number.  %TC3589x_NR_IRQS irqs will be used.
-  * @gpio: GPIO-specific platform data
-  * @keypad: keypad-specific platform data
-  */
- struct tc3589x_platform_data {
- 	unsigned int block;
--	int irq_base;
- 	struct tc3589x_gpio_platform_data *gpio;
- 	const struct tc3589x_keypad_platform_data *keypad;
- };
- 
--#define TC3589x_NR_GPIOS	24
--#define TC3589x_NR_IRQS		TC3589x_INT_GPIO(TC3589x_NR_GPIOS)
--
- #endif
--- 
-1.9.0
+> ---
+> 
+> Based on 'usb-next' branch of Greg's usb tree.
+> 
+>  drivers/usb/host/ohci-exynos.c |   47 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+> 
+> diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
+> index 68588d8..e2e72a8 100644
+> --- a/drivers/usb/host/ohci-exynos.c
+> +++ b/drivers/usb/host/ohci-exynos.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <linux/usb/phy.h>
+>  #include <linux/usb/samsung_usb_phy.h>
+>  #include <linux/usb.h>
+> @@ -37,6 +38,8 @@ struct exynos_ohci_hcd {
+>  	struct clk *clk;
+>  	struct usb_phy *phy;
+>  	struct usb_otg *otg;
+> +	struct regulator *vdd33;
+> +	struct regulator *vdd10;
+>  };
+> 
+>  static void exynos_ohci_phy_enable(struct platform_device *pdev)
+> @@ -98,6 +101,28 @@ static int exynos_ohci_probe(struct platform_device *pdev)
+>  		exynos_ohci->otg = phy->otg;
+>  	}
+> 
+> +	exynos_ohci->vdd33 = devm_regulator_get(&pdev->dev, "vdd33");
+> +	if (IS_ERR(exynos_ohci->vdd33)) {
+> +		err = PTR_ERR(exynos_ohci->vdd33);
+> +		goto fail_regulator1;
+> +	}
+> +	err = regulator_enable(exynos_ohci->vdd33);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "Failed to enable VDD33 supply\n");
+> +		goto fail_regulator1;
+> +	}
+> +
+> +	exynos_ohci->vdd10 = devm_regulator_get(&pdev->dev, "vdd10");
+> +	if (IS_ERR(exynos_ohci->vdd10)) {
+> +		err = PTR_ERR(exynos_ohci->vdd10);
+> +		goto fail_regulator2;
+> +	}
+> +	err = regulator_enable(exynos_ohci->vdd10);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "Failed to enable VDD10 supply\n");
+> +		goto fail_regulator2;
+> +	}
+> +
+>  skip_phy:
+>  	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
+> 
+> @@ -154,6 +179,10 @@ fail_add_hcd:
+>  fail_io:
+>  	clk_disable_unprepare(exynos_ohci->clk);
+>  fail_clk:
+> +	regulator_disable(exynos_ohci->vdd10);
+> +fail_regulator2:
+> +	regulator_disable(exynos_ohci->vdd33);
+> +fail_regulator1:
+>  	usb_put_hcd(hcd);
+>  	return err;
+>  }
+> @@ -172,6 +201,9 @@ static int exynos_ohci_remove(struct platform_device *pdev)
+> 
+>  	clk_disable_unprepare(exynos_ohci->clk);
+> 
+> +	regulator_disable(exynos_ohci->vdd10);
+> +	regulator_disable(exynos_ohci->vdd33);
+> +
+>  	usb_put_hcd(hcd);
+> 
+>  	return 0;
+> @@ -208,6 +240,9 @@ static int exynos_ohci_suspend(struct device *dev)
+> 
+>  	clk_disable_unprepare(exynos_ohci->clk);
+> 
+> +	regulator_disable(exynos_ohci->vdd10);
+> +	regulator_disable(exynos_ohci->vdd33);
+> +
+>  	spin_unlock_irqrestore(&ohci->lock, flags);
+> 
+>  	return 0;
+> @@ -218,6 +253,18 @@ static int exynos_ohci_resume(struct device *dev)
+>  	struct usb_hcd *hcd			= dev_get_drvdata(dev);
+>  	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
+>  	struct platform_device *pdev		= to_platform_device(dev);
+> +	int ret;
+> +
+> +	ret = regulator_enable(exynos_ohci->vdd33);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to enable VDD33 supply\n");
+> +		return ret;
+> +	}
+> +	ret = regulator_enable(exynos_ohci->vdd10);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to enable VDD10 supply\n");
+> +		return ret;
+> +	}
+> 
+>  	clk_prepare_enable(exynos_ohci->clk);
+> 
+> --
+> 1.7.10.4
