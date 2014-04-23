@@ -1,88 +1,47 @@
-From: antoine.tenart@free-electrons.com (Antoine =?iso-8859-1?Q?T=E9nart?=)
-Date: Wed, 23 Apr 2014 10:33:26 +0200
-Subject: [PATCH 1/6] ata: ahci: add AHCI support for Berlin SoCs
-In-Reply-To: <CAL_JsqKE_Z3kBhS1VaQADV5ob8x6AKHhbHaQEGoVSwkwdd50zA@mail.gmail.com>
-References: <1398181105-19714-1-git-send-email-antoine.tenart@free-electrons.com>
- <1398181105-19714-2-git-send-email-antoine.tenart@free-electrons.com>
- <CAL_JsqKE_Z3kBhS1VaQADV5ob8x6AKHhbHaQEGoVSwkwdd50zA@mail.gmail.com>
-Message-ID: <20140423083326.GD24355@kwain>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 23 Apr 2014 14:09:46 +0530
+Subject: [PATCH 1/3] Documentation: dts: OMAP: Fix typos in DRA752 device
+ name
+In-Reply-To: <1394788841-15112-2-git-send-email-rnayak@ti.com>
+References: <1394788841-15112-1-git-send-email-rnayak@ti.com>
+ <1394788841-15112-2-git-send-email-rnayak@ti.com>
+Message-ID: <53577C52.1020809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Friday 14 March 2014 02:50 PM, Rajendra Nayak wrote:
+> DRA752 device is wrongly documented as DRA742 device. Fix the typo.
 
-On Tue, Apr 22, 2014 at 01:47:43PM -0500, Rob Herring wrote:
-> On Tue, Apr 22, 2014 at 10:38 AM, Antoine T?nart
-> <antoine.tenart@free-electrons.com> wrote:
-
-[?]
-
-> > +static inline void ahci_berlin_reg_clear_set(void __iomem *reg, u32 clear_val,
-> > +                                            u32 set_val)
-> > +{
-> > +       u32 regval;
-> > +
-> > +       regval = readl(reg);
-> > +       regval &= ~(clear_val);
-> > +       regval |= set_val;
-> > +       writel(regval, reg);
-> > +}
-> > +
-> > +static void ahci_berlin_init(void __iomem *mmio)
-> 
-> I don't really see the point of a function to do 2 register writes of
-> magic values especially when the function name doesn't provide any
-> indication of what you are doing really.
-> 
-> > +{
-> > +       /* interface select */
-> > +       ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, BIT(2));
-> > +       ahci_berlin_reg_set(mmio + HOST_VSA_ADDR,
-> 
-> 2 writes to the same reg? Is this supposed to be the VSA_DATA register?
-
-You're right it's VSA_DATA.
+Thanks to Nishanth for pointing out that the device part number is infact
+DRA742. The compatible sting infact seems to have a typo. I'll fix
+that up a post a v2 of this series soon.
 
 > 
-> > +                           BIT(21) | BIT(18) | BIT(5) | BIT(4) | BIT(2));
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  .../devicetree/bindings/arm/omap/omap.txt          |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Use of BIT is only helpful to people that don't understand hex. Can
-> you define what these bits are. Otherwise, just use 0x00240034 and
-> note that it is magic value which you have no idea what the bits are.
-
-This is magic. I'll update and add a comment.
-
-> > +static void ahci_berlin_port_init(void __iomem *mmio, unsigned int ports)
-> > +{
-> > +       int p;
-> > +
-> > +       /* power down pll */
-> > +       ahci_berlin_reg_set(mmio + HOST_VSA_ADDR, 0x0);
-> > +       ahci_berlin_reg_setbits(mmio + HOST_VSA_DATA, BIT(6));
-> > +
-> > +       for (p = 0; p < ports; p++) {
-> > +               /* port control register */
-> > +               void __iomem *ctrl_reg = mmio + 0x100 + (p * 0x80);
-> > +
-> > +               /* set PHY mode to SATA, ref freq to 25 MHz */
-> > +               ahci_berlin_reg_set(ctrl_reg + PORT_VSR_ADDR, 0x201);
-> > +               ahci_berlin_reg_clear_set(ctrl_reg + PORT_VSR_DATA,
-> > +                                         0xff, BIT(0));
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index af9b4a0..0491868 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -48,7 +48,7 @@ SoC Families:
+>    compatible = "ti,omap4"
+>  - OMAP5 generic - defaults to OMAP5430
+>    compatible = "ti,omap5"
+> -- DRA7 generic - defaults to DRA742
+> +- DRA7 generic - defaults to DRA752
+>    compatible = "ti,dra7"
+>  - AM43x generic - defaults to AM4372
+>    compatible = "ti,am43"
+> @@ -79,7 +79,7 @@ SoCs:
+>  - OMAP5432
+>    compatible = "ti,omap5432", "ti,omap5"
+>  
+> -- DRA742
+> +- DRA752
+>    compatible = "ti,dra7xx", "ti,dra7"
+>  
+>  - AM4372
 > 
-> So you have registers hidden behind an address and data register.
-> Perhaps a read and write function to provide that access rather than
-> all these set/clear bit functions.
-
-I'd like to do so if I could name 0x201, 0x225 ...
-I can also merge the two functions if you think it's better for
-readability.
-
-Thanks!
-
-Antoine
-
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
