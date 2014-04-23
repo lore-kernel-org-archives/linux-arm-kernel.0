@@ -1,51 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 23 Apr 2014 09:06:09 -0300
-Subject: [PATCH] ARM: dts: imx53-qsb-common: Add TVE support
-Message-ID: <1398254769-10513-1-git-send-email-festevam@gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 23 Apr 2014 20:09:30 +0800
+Subject: [PATCH 0/4] pinctrl: sirf: switch to one gpiolib and
+ gpiolib_irqchip helpers
+In-Reply-To: <CACRpkdY6N3vh2-a5NwU0ZkXKsf8ArmxLBCL3dMrPTFwvN+x5JQ@mail.gmail.com>
+References: <1397544229-20545-1-git-send-email-21cnbao@gmail.com>
+ <CACRpkdY6N3vh2-a5NwU0ZkXKsf8ArmxLBCL3dMrPTFwvN+x5JQ@mail.gmail.com>
+Message-ID: <CAGsJ_4zowXarh0xy2y4oTsTZbnKFDgMfA6JPTK+sSx6ew_Qw4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+2014-04-23 5:47 GMT+08:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, Apr 15, 2014 at 8:43 AM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> This patchset depends on Linus Walleij's "pinctrl: sirf: rename inlined accessor".
+>> and "pinctrl: sirf: switch driver to use gpiolib irqchip helpers" is rebased
+>> from Linus Walleij's patch too.
+>>
+>> Barry Song (3):
+>>   pinctrl: sirf: wrap all gpio banks into one gpio_chip
+>>   gpio: make handler_data configurable while using gpiolib_irqchip
+>>   pinctrl: sirf: move to use irq_get_handler_data
+>> Linus Walleij (1):
+>>   pinctrl: sirf: switch driver to use gpiolib irqchip helpers
+>
+> As mentioned I can't get this series to apply so please rebase,
+> resend and take this opportunity to also add relevant ACKs.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx53-qsb-common.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+linus, this patchset depends on your "pinctrl: sirf: rename inlined
+accessor" you sent to me. it seems it is in neither your devel nor
+3.5-rc2.
 
-diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-index ede04fa..a491bde 100644
---- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-+++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-@@ -272,6 +272,14 @@
- 			>;
- 		};
- 
-+		pinctrl_vga_sync_1: vgasync-grp1 {
-+			fsl,pins = <
-+				/* VGA_HSYNC, VSYNC with max drive strength */
-+				MX53_PAD_EIM_OE__IPU_DI1_PIN7 0xe6
-+				MX53_PAD_EIM_RW__IPU_DI1_PIN8 0xe6
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
-@@ -281,6 +289,15 @@
- 	};
- };
- 
-+&tve {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_vga_sync_1>;
-+	fsl,tve-mode = "vga";
-+	fsl,hsync-pin = <4>;
-+	fsl,vsync-pin = <6>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
--- 
-1.8.3.2
+https://lkml.org/lkml/2014/4/8/156
+
+>
+> Yours,
+> Linus Walleij
+
+-barry
