@@ -1,45 +1,25 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 23 Apr 2014 14:32:55 +0530
-Subject: [PATCH v2 4/4] ARM: DRA7: Add support for soc_is_dra74x() and
- soc_is_dra72x() varients
-In-Reply-To: <1398243775-4145-1-git-send-email-rnayak@ti.com>
-References: <1398243775-4145-1-git-send-email-rnayak@ti.com>
-Message-ID: <1398243775-4145-5-git-send-email-rnayak@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Apr 2014 10:05:36 +0100
+Subject: [PATCH] arm64: Make default dma_ops to be noncoherent
+In-Reply-To: <1398230986-2823-2-git-send-email-ritesh.harjani@gmail.com>
+References: <20140422152152.GG9820@arm.com>
+ <1398230986-2823-1-git-send-email-ritesh.harjani@gmail.com>
+ <1398230986-2823-2-git-send-email-ritesh.harjani@gmail.com>
+Message-ID: <20140423090536.GB5281@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the corresponding compatibles to identify the devices.
+On Wed, Apr 23, 2014 at 06:29:46AM +0100, Ritesh Harjani wrote:
+> Currently arm64 dma_ops is by default made coherent
+> which makes it opposite in default policy
+> from arm.
+> 
+> Make default dma_ops to be noncoherent (same
+> as arm), as currently there aren't any
+> dma-capable drivers which assumes coherent ops
+> 
+> Signed-off-by: Ritesh Harjani <ritesh.harjani@gmail.com>
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/soc.h |    7 +++++++
- 1 file changed, 7 insertions(+)
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-index 30abcc8..b8a4834 100644
---- a/arch/arm/mach-omap2/soc.h
-+++ b/arch/arm/mach-omap2/soc.h
-@@ -245,6 +245,8 @@ IS_AM_SUBCLASS(437x, 0x437)
- #define soc_is_omap54xx()		0
- #define soc_is_omap543x()		0
- #define soc_is_dra7xx()			0
-+#define soc_is_dra74x()			0
-+#define soc_is_dra72x()			0
- 
- #if defined(MULTI_OMAP2)
- # if defined(CONFIG_ARCH_OMAP2)
-@@ -393,7 +395,12 @@ IS_OMAP_TYPE(3430, 0x3430)
- 
- #if defined(CONFIG_SOC_DRA7XX)
- #undef soc_is_dra7xx
-+#undef soc_is_dra74x
-+#undef soc_is_dra72x
- #define soc_is_dra7xx()	(of_machine_is_compatible("ti,dra7"))
-+#define soc_is_dra74x()	(of_machine_is_compatible("ti,dra74x"))
-+#define soc_is_dra72x()	(of_machine_is_compatible("ti,dra72x"))
-+
- #endif
- 
- /* Various silicon revisions for omap2 */
--- 
-1.7.9.5
+Will
